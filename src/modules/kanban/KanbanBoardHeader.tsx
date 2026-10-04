@@ -203,7 +203,6 @@ export function KanbanBoardHeader({
           items={items}
           icon={MoreHorizontal}
           iconOnly
-          portal
           variant="ghost"
           size="icon"
           triggerClassName="h-7 w-7"

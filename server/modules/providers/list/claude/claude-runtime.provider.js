@@ -26,9 +26,10 @@ import {
   normalizeImageDescriptors
 } from '@/shared/image-attachments.js';
 import {
-  CLAUDE_PREDEFINED_MODELS,
+  CLAUDE_DEFAULT_MODEL,
+  CLAUDE_FALLBACK_MODELS,
   CLAUDE_ULTRACODE_EFFORT
-} from '@/modules/providers/list/claude/claude-models.provider.js';
+} from '@/modules/providers/list/claude/claude-model-options.js';
 import { resolveClaudeCodeExecutablePath } from '@/shared/claude-cli-path.js';
 import {
   createNotificationEvent,
@@ -96,7 +97,7 @@ const HOOK_MODES = new Set(['bypassPermissions', 'auto', 'dontAsk']);
 // selection is translated back into the two options the SDK actually understands here.
 const ULTRACODE_SDK_EFFORT = 'xhigh';
 
-function resolveClaudeEffort(model, effort, modelsDefinition = CLAUDE_PREDEFINED_MODELS) {
+function resolveClaudeEffort(model, effort, modelsDefinition = CLAUDE_FALLBACK_MODELS) {
   const selectedModel = modelsDefinition?.OPTIONS?.find((option) => option.value === model) || null;
   const allowedEfforts = selectedModel?.effort?.values
     ?.map((value) => value.value) || [];
@@ -234,15 +235,18 @@ function findByPromptKey(promptKey) {
   return undefined;
 }
 
+/**
+ * Settles the approval a decision names, answering whether this runtime held it. A key it does not
+ * hold is not its to judge: the holders of asks are asked in turn and the first to claim a key settles
+ * it (`providerRuntimeService`), and the one warning for a key NOBODY claimed is the service's —
+ * answered already, timed out, or a prompt raised by a predecessor that is no longer pending anywhere
+ * (its successor never re-issued it).
+ */
 function resolveToolApproval(requestId, decision) {
   const resolver = pendingToolApprovals.get(requestId) ?? findByPromptKey(requestId);
-  if (resolver) {
-    resolver(decision);
-    return;
-  }
-  // A request this process never held: answered already, timed out, or a prompt raised by a
-  // predecessor that is no longer pending anywhere (its successor never re-issued it).
-  console.warn(`[permission] decision for unknown request ${requestId}: no pending approval in this process`);
+  if (!resolver) return false;
+  resolver(decision);
+  return true;
 }
 
 // Match stored permission entries against a tool + input combo.
@@ -335,12 +339,12 @@ function mapCliOptionsToSDK(options = {}) {
 
   sdkOptions.disallowedTools = settings.disallowedTools || [];
 
-  sdkOptions.model = options.model || CLAUDE_PREDEFINED_MODELS.DEFAULT;
+  sdkOptions.model = options.model || CLAUDE_DEFAULT_MODEL;
 
   applyClaudeEffort(sdkOptions, resolveClaudeEffort(
     sdkOptions.model,
     effort,
-    options.effortModels || CLAUDE_PREDEFINED_MODELS,
+    options.effortModels || CLAUDE_FALLBACK_MODELS,
   ));
 
   sdkOptions.systemPrompt = {
@@ -791,7 +795,7 @@ async function resolveSdkOptions(options, context) {
   const { sessionId } = options;
   const providerSessionId = context.resolveProviderSessionId(sessionId);
   const resolvedModel = await context.resolveResumeModel(sessionId, options.model);
-  let effortModels = CLAUDE_PREDEFINED_MODELS;
+  let effortModels = CLAUDE_FALLBACK_MODELS;
   try {
     effortModels = await context.getProviderModels();
   } catch (error) {
@@ -1197,11 +1201,13 @@ async function spawnProcess(command, options, initialWs, context) {
       // and the PreToolUse hook for the modes that never reach it.
       const promptForToolDecision = async (toolName, input, { signal, requiresInteraction, toolUseId = null }) => {
         const requestId = createRequestId();
-        // The ask's own name, shared with every successor that re-issues it. The push is keyed on
-        // THIS, the in-app frame on the request id: a re-issue must put the question back on the
-        // chat's wire while never buzzing the phone a second time for it.
+        // The ask's own name, shared with every successor that re-issues it: a re-issue puts the
+        // question back on the chat's wire on a FRESH attempt id, so a reader of that wire — a tab
+        // deciding whether to ring, the push deciding whether it has already spoken — must be able
+        // to read the QUESTION, not the attempt. The frame carries it beside the request id for
+        // exactly that, and `dedupeKey` below is built on it.
         const promptKey = promptKeyFor(toolUseId, sessionId || capturedSessionId, toolName, input);
-        ws.send(createNormalizedMessage({ kind: 'permission_request', requestId, toolName, input, sessionId: capturedSessionId || sessionId || null, provider: 'claude' }));
+        ws.send(createNormalizedMessage({ kind: 'permission_request', requestId, promptKey, toolName, input, sessionId: capturedSessionId || sessionId || null, provider: 'claude' }));
         emitNotification(createNotificationEvent({
           provider: 'claude',
           sessionId: sessionId || capturedSessionId || null,
@@ -1793,6 +1799,10 @@ function getPendingApprovalsForSession(sessionId) {
     if (resolver._sessionId === sessionId) {
       pending.push({
         requestId,
+        // The ask's own name beside the attempt's id, for the same reason the frame carries it: a
+        // client that rings per QUESTION — the in-app bell — must recognize a re-issued prompt
+        // (fresh request id, same ask) as the question it has already announced.
+        promptKey: resolver._promptKey,
         toolName: resolver._toolName || 'UnknownTool',
         input: resolver._input,
         context: resolver._context,

@@ -1,7 +1,7 @@
 /**
  * The session-host package's public surface.
  *
- * Everything else here — the host registry, the socket facade, the tmux plumbing — is
+ * Everything else here — the rest of the host registry, the socket facade, the tmux plumbing — is
  * package-internal on purpose: the mechanism's one home is this directory, and the provider
  * seam is deliberately only a handful of lines wide (D-6).
  */
@@ -34,3 +34,13 @@ export { readoptKeepaliveSessions, releaseKeepaliveOwnership } from './readopt.j
  * consumer: .verify probes only
  */
 export { retireStaleIdleHosts, watchInstalledCliVersionChanges } from './idle-version-sweep.js';
+
+/**
+ * The live hosts and the one test that says whether a host is mid-work — the registry where it can
+ * answer, the host's own meta where it cannot. The claude-activity module asks exactly this of every
+ * host, so an update never installs under a conversation the idle sweep itself would leave alone.
+ * consumer: the claude-activity module, through the providers barrel
+ */
+export { busyReason } from './idle-version-sweep.js';
+export { listLiveHosts } from './hosts.js';
+export type { LiveHost } from './hosts.js';

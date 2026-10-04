@@ -803,6 +803,10 @@ export function shouldHideToolResult(toolName: string, toolResult: any): boolean
 
   if (!config.result) return false;
 
+  // A picture the tool returned is the result itself — drawn by ToolRenderer whatever the
+  // tool's text result does, so a Read of an image is never hidden.
+  if (Array.isArray(toolResult?.images) && toolResult.images.length > 0) return false;
+
   // Hidden/success-only configs suppress noisy successful output, but errors
   // still need to be visible so failed tool calls are diagnosable.
   if (toolResult?.isError) return false;

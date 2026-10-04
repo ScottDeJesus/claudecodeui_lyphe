@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { Dispatch, KeyboardEvent, RefObject, SetStateAction } from 'react';
 
 import { api } from '@/shared/api';
+import { useHostWindow } from '@/shared/context/HostWindowContext';
 import { safeLocalStorage } from '@/modules/chat/utils/chatStorage';
 import type { LLMProvider, Project, SlashCommand } from '@/shared/types';
 
@@ -141,11 +142,18 @@ export function useSlashCommands({
   const [selectedCommandIndex, setSelectedCommandIndex] = useState(-1);
   const [slashPosition, setSlashPosition] = useState(-1);
 
-  const commandQueryTimerRef = useRef<number | null>(null);
+  // The window the chat is drawn in: the menu's debounce and the caret frame pace what the reader
+  // sees, and a hidden opener throttles the first and runs none of the second.
+  const hostWindow = useHostWindow();
+
+  // The debounce timer and the window that armed it: a timer id means something only to the window
+  // that issued it, so it is cleared there even if the chat has moved since.
+  const commandQueryTimerRef = useRef<{ id: number; armedOn: Window } | null>(null);
 
   const clearCommandQueryTimer = useCallback(() => {
-    if (commandQueryTimerRef.current !== null) {
-      window.clearTimeout(commandQueryTimerRef.current);
+    const pending = commandQueryTimerRef.current;
+    if (pending) {
+      pending.armedOn.clearTimeout(pending.id);
       commandQueryTimerRef.current = null;
     }
   }, []);
@@ -277,13 +285,13 @@ export function useSlashCommands({
       setInput(newInput);
       resetCommandMenuState();
 
-      window.requestAnimationFrame(() => {
+      hostWindow.requestAnimationFrame(() => {
         currentTextarea?.focus();
         const nextCursorPosition = `${textBeforeCommand}${separator}${command.name} `.length;
         currentTextarea?.setSelectionRange(nextCursorPosition, nextCursorPosition);
       });
     },
-    [input, resetCommandMenuState, setInput, slashPosition, textareaRef],
+    [hostWindow, input, resetCommandMenuState, setInput, slashPosition, textareaRef],
   );
 
   const executeNonSkillCommand = useCallback(
@@ -387,11 +395,14 @@ export function useSlashCommands({
       setSelectedCommandIndex(-1);
 
       clearCommandQueryTimer();
-      commandQueryTimerRef.current = window.setTimeout(() => {
-        setCommandQuery(query);
-      }, COMMAND_QUERY_DEBOUNCE_MS);
+      commandQueryTimerRef.current = {
+        id: hostWindow.setTimeout(() => {
+          setCommandQuery(query);
+        }, COMMAND_QUERY_DEBOUNCE_MS),
+        armedOn: hostWindow,
+      };
     },
-    [resetCommandMenuState, clearCommandQueryTimer],
+    [hostWindow, resetCommandMenuState, clearCommandQueryTimer],
   );
 
   const handleCommandMenuKeyDown = useCallback(

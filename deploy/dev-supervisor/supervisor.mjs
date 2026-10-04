@@ -13,6 +13,9 @@ const WATCH_DIR = path.join(REPO, 'server');
 
 const children = new Set();  // every child spawned and not yet exited, whatever its role
 let serving = null;  // the child that answered READY and holds the port
+// The serving child that asked for the cycle now running; it is owed an answer if that cycle's boot
+// fails. Set by its `reboot`, cleared either by that answer or by the handover it asked for.
+let rebootRequester = null;
 let pending = null;  // a child still booting; nothing is listening on its behalf yet
 let queued = false;  // an edit arrived while a boot or a retirement was in flight
 let busy = false;    // a cycle owns the children right now
@@ -23,15 +26,22 @@ const log = (message) => console.log(`[supervisor] ${message}`);
 /** Node's own record of how a child ended — no second copy of that fact is kept here. */
 const exitReason = (child) => child.signalCode ?? String(child.exitCode);
 
+/**
+ * One line for a boot that never became the serving server, and returns the detail it logged.
+ * The requester of a reboot that failed is owed the journal's own words, not a second summary of
+ * them that could read differently.
+ */
 function reportFailedBoot(attempt, failure) {
     const kept = serving !== null;
     if (failure.timedOut) {
-        log(`boot timed out after ${BOOT_TIMEOUT_MS / 1000} s — ${kept ? 'previous server kept' : 'no previous server'}`);
-        return;
+        const detail = `boot timed out after ${BOOT_TIMEOUT_MS / 1000} s`;
+        log(`${detail} — ${kept ? 'previous server kept' : 'no previous server'}`);
+        return detail;
     }
     const detail = attempt.firstErrorLine() ?? failure.message;
     if (kept) log(`boot failed — previous server kept: ${detail}`);
     else log(`boot failed — no previous server: ${detail}`);
+    return detail;
 }
 
 /** Reports a serving child that dies on its own. Deliberately does NOT boot a replacement. */
@@ -71,6 +81,8 @@ async function retire(previous, next, pid) {
     // Awaited to its exit, never merely signalled: see handOver above for what a live predecessor
     // costs the sessions of a successor that re-adopts too early.
     await previous.stop();
+    // The handover answered the request that asked for it, so nothing is owed this child any more.
+    if (rebootRequester === previous) rebootRequester = null;
     log(`retired pid ${oldPid} (${exitReason(previous.child)})`);
     handOver(next, pid);
 }
@@ -89,7 +101,7 @@ async function bootOnce() {
     let failure = null;
     try { pid = await attempt.ready; } catch (error) { failure = error; }
 
-    // Superseded while it booted: onChange already signalled it and cleared the slot, so all that
+    // Superseded while it booted: the cycle already signalled it and cleared the slot, so all that
     // is left is reaping it — which is what keeps exactly one child here between bursts.
     if (pending !== attempt) { await attempt.stop(); return; }
     pending = null;
@@ -98,7 +110,20 @@ async function bootOnce() {
         // Reported BEFORE the stop, never after: a child wedged enough to need the SIGKILL
         // escalation holds stop() for its full 10 s, and the line explaining a stalled restart
         // must not queue behind the stall it explains.
-        if (!stopping) reportFailedBoot(attempt, failure);
+        if (!stopping) {
+            const detail = reportFailedBoot(attempt, failure);
+            // The child that asked for this cycle is still on the port, and it is owed the answer:
+            // the same words the journal just got, so both sides name one failure. Its channel is
+            // checked, never `send` — the method outlives the channel (supervised-boot.ts:19-29).
+            if (rebootRequester !== null && rebootRequester === serving && rebootRequester.child.connected) {
+                const requesterPid = rebootRequester.child.pid;
+                rebootRequester.child.send({ type: 'reboot-failed', detail }, (error) => {
+                    if (error) console.error(`[supervisor] reboot-failed to pid ${requesterPid} failed: ${error.message}`);
+                });
+                log(`reboot failed — told pid ${requesterPid}`);
+                rebootRequester = null;
+            }
+        }
         // The old server is never touched on this path; a hung boot is, or it would linger forever.
         await attempt.stop();
         return;
@@ -106,6 +131,20 @@ async function bootOnce() {
 
     const previous = serving;
     serving = attempt;
+    // The serving child's channel. A `reboot` from it is the API asking for its own handover, and
+    // it is honoured only while the sender still holds the port: a predecessor winding down would
+    // otherwise start a cycle nobody asked for, whose answer would land on a dying process.
+    attempt.child.on('message', (message) => {
+        if (serving !== attempt || message?.type !== 'reboot') return;
+        // The reason is free text on its way into this process's own journal, which is the only
+        // receipt this protocol has: a reason that is not a string is not this shape and is ignored
+        // whole, and line breaks are flattened so that no reason can ever write a second, forged
+        // `[supervisor]` line beneath the request that carried it.
+        if (typeof message.reason !== 'string') return;
+        log(`reboot requested by pid ${pid}: ${message.reason.replace(/[\r\n]+/g, ' ')}`);
+        rebootRequester = attempt;
+        requestCycle();
+    });
     watchForCrash(attempt, pid);
     if (previous) {
         log(`handover: pid ${pid} ready — retiring pid ${previous.child.pid}`);
@@ -148,6 +187,16 @@ async function cycle() {
 function onChange(relativePath) {
     if (stopping) return;
     log(`change: ${relativePath}`);
+    requestCycle();
+}
+
+/**
+ * Starts a cycle: the edited server booted beside this one. An edit and a serving child's reboot
+ * request want the same thing of this process — the code on disk put on the port — so they share
+ * these rules rather than each keeping a copy of them.
+ */
+function requestCycle() {
+    if (stopping) return;
 
     if (pending) {
         // The booting child already loaded the previous version of this file, so there is nothing

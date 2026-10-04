@@ -52,10 +52,12 @@ export function resetInstant(resetsAt: string): number {
  * window's LENGTH — a fact that never changes and that the bar beside it already implies. What
  * a person wants at a glance is how long they have.
  *
- * Floors throughout, so a label never claims more time than there is: 23h50m reads "23h", not
- * "1d", and 59m50s reads "59m" rather than the "60m" a ceiling would print. The one exception
- * is the last minute, which reads "1m" rather than "0m" until it is actually spent. `null` when
- * the meter reports no reset time — the caller keeps its static label rather than drawing a blank.
+ * Days and hours read to one decimal, rounded UP to the next tenth: 3.81 days reads "3.9d" and
+ * 1.84 hours "1.9h". Tenths are counted straight from the milliseconds (`msLeft / 8_640_000` is
+ * tenths of a day), so an exact tenth never picks up a float's stray digit and ticks up early.
+ * Below an hour it reads whole minutes, floored, and the last minute reads "1m" rather than "0m"
+ * until it is actually spent. `null` when the meter reports no reset time — the caller keeps its
+ * static label rather than drawing a blank.
  */
 export function formatWindowCountdown(resetsAt: string | null, now: number = Date.now()): string | null {
   if (!resetsAt) return null;
@@ -66,11 +68,8 @@ export function formatWindowCountdown(resetsAt: string | null, now: number = Dat
   const msLeft = at - now;
   if (msLeft <= 0) return 'now';
 
-  const days = Math.floor(msLeft / 86_400_000);
-  if (days >= 1) return `${days}d`;
-
-  const hours = Math.floor(msLeft / 3_600_000);
-  if (hours >= 1) return `${hours}h`;
+  if (msLeft >= 86_400_000) return `${(Math.ceil(msLeft / 8_640_000) / 10).toFixed(1)}d`;
+  if (msLeft >= 3_600_000) return `${(Math.ceil(msLeft / 360_000) / 10).toFixed(1)}h`;
 
   return `${Math.max(1, Math.floor(msLeft / 60_000))}m`;
 }

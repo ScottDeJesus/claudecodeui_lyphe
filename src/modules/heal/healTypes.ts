@@ -5,9 +5,11 @@
  * a judgment: `rail-deny`, `script-nudge-blocked`, `tool-error`. A heal is scoped to a kind, the
  * triage counts a kind, the hold is taken on a kind.
  *
- * `klass` is THE CAUSE CLASS, null until judged — the heal doctrine's four. Only a klass feeds a
- * heal's `classes_claimed`, and only a klass can mark a regression: rails refuse BY DESIGN, so a
- * regression measured on the door's word would fire within the hour, forever.
+ * `klass` is THE CAUSE CLASS, null until judged — the heal doctrine's four. It is what a kind's chip
+ * and the tallies' class breakdown read, and it is NOT what a heal claims: a claim is the set of
+ * `signature` SHAPES of the rows a heal took (`HealCard.signatures_claimed`), because a bucket is too coarse to
+ * be a cause — a busy kind's rows carry all four, so a claim of the buckets marked every classified
+ * row a regression (measured 2026-09-23: 109 rows). Only a shape can mark one.
  *
  * A CYCLE is the unit the operator asks about — "what did last night do?" — one nightly (or pressed)
  * pass in which Chiron ranks the live friction and heals walk his list. The tab renders the
@@ -41,10 +43,11 @@ export type HealItem = {
   ignored: boolean;
 };
 
-/** A landed heal claimed this class, and a live row of it is later than that heal's ending. */
+/** A landed heal took this SHAPE, and a live row of that kind carries it again. */
 export type HealRegression = {
   heal_id: string;
-  klass: HealClass;
+  /** The normalized failure shape that came back — the worker's own claim, printed as it wrote it. */
+  signature: string;
   /** Epoch seconds of the row that marks it. */
   since: number;
 };
@@ -81,23 +84,87 @@ export type HealCard = {
   athena: AthenaCounts | null;
   /** Rows this heal claimed and closed. */
   closed: number;
-  classes_claimed: HealClass[];
+  /**
+   * The failure shapes of the rows this heal took — what `read.regressions()` compares a returning row against.
+   * A HEAD of the claim, never all of it: the worker sends `SIGNATURES_SHOWN` (12) and the count in
+   * `shapes_claimed`, because one heal of a long-running kind can take hundreds of shapes and this
+   * payload rides every sixty seconds. The whole list is on the heal row and in its brief.
+   */
+  signatures_claimed: string[];
+  /** How many shapes the heal claimed in total — `signatures_claimed.length` or more. */
+  shapes_claimed: number;
   /** Rows filed after this heal landed that carry its id — the after-landing spike mark. */
   spikes: number;
+  /**
+   * Dollars this heal booked — WHOSE dollars depends on when it ended: a heal that landed before the
+   * 2026-09-23 recipe change booked its chain's WHOLE bill, Claude stages included; one that landed
+   * after books its DeepSeek share alone, which is what `spend_today` and the daily cap count. Read
+   * `bookedBy` rather than the date, so no reader re-derives which of the two this is.
+   */
   cost_usd: number;
+  /**
+   * The chain's tokens beside the dollars, THE CLAUDE HALF ALONE, and the same reading the run
+   * cards use: `tokens_in` is what its CLAUDE souls READ (input + cache read + cache write),
+   * `tokens_out` what they wrote, and `tokens` the total as the chain recorded it
+   * (`chain_state.usage`, which zeroes a stage a vendor billed). Both parts read `0` against a real
+   * total on a chain whose stages kept no split — a record older than the split — and the card then
+   * states the total alone (`⛁ 2.6M tok`, `spendParts`), never a fabricated `2.6M in · 0 out`.
+   * A SPEND FIGURE IS DOLLARS
+   * **OR** TOKENS, BY WHO WAS USED (operator rule, 2026-09-24): the dollar figure above is a
+   * PAYING API's share alone, so a heal that only ever paid the vendor bills there and draws NO
+   * tokens here — they are the vendor's own business — while one that rode the subscription
+   * bills 0 and draws these and no `$`. `undefined` from a worker build older than the keys,
+   * which reads as "not recorded" and never as zero.
+   */
+  tokens?: number;
+  tokens_in?: number;
+  tokens_out?: number;
   chain_id: string | null;
 };
 
-/** The runner heal queue's own items — the second door, read here and never written. */
-export type HealQueueItem = {
-  id: string;
-  plan: string;
-  phase: string;
-  cause: string;
-  status: string;
-  next: string | null;
-  enqueued_at: number;
-};
+/**
+ * The instant the cost recipe changed. A heal's `cost_usd` has meant two different things: before this
+ * the ledger booked a chain's WHOLE bill, Claude stages included (the six rows of 2026-09-23 sum
+ * $7.259154, of which $3.109996 is Claude — the operator's subscription, counted as if it were
+ * DeepSeek); from it, a heal books its DeepSeek share alone. The payload carries no mark of which
+ * recipe booked a row — no column of the ledger records it and the worker sends none — so the boundary
+ * is carried here as the fact it is.
+ *
+ * ITS VALUE IS THE BUILD'S OWN CHAIN START (`chain-heal-deepseek-dollars-20260923-123256-c6ec`,
+ * 2026-09-23 12:32:56 local). No row can hide in the gap above it: the day's last heal landed 12:02:48
+ * and the $7.26 those six booked was already past the $5.00 cap, so the reflex launched nothing
+ * between — every booking from here on is the new recipe, which from the next local midnight is every
+ * card this tab can draw.
+ */
+const DEEPSEEK_SHARE_SINCE = 1790191976;
+
+/** Which recipe booked a heal's `cost_usd` — the two readings a reader must be told apart, and nothing yet booked. */
+export type HealBookedBy = 'deepseek-share' | 'chain-total' | 'unbooked';
+
+/**
+ * Whose figure a heal's `cost_usd` is. A heal books when it ENDS (`ended_at`), so the boundary is read
+ * there and never off this screen's own clock: a walking row has booked nothing, an ended row before
+ * the change carries its chain's whole bill, and later rows DeepSeek's share.
+ */
+export function bookedBy(heal: Pick<HealCard, 'ended_at'>): HealBookedBy {
+  if (heal.ended_at === null) return 'unbooked';
+  return heal.ended_at >= DEEPSEEK_SHARE_SINCE ? 'deepseek-share' : 'chain-total';
+}
+
+/**
+ * Whether the day's figure is mixed — a card booked by the OLD recipe and ended inside the day's own
+ * window (`sinceMidnight`, the cut `spend_today` is summed from) must be read for what it is. A card
+ * older than the window is not in the figure and has nothing to say about it: this is what keeps the
+ * answer from outliving the day, since the tab's card list is longer than its day.
+ */
+export function hasPreChangeRows(
+  heals: readonly Pick<HealCard, 'ended_at'>[],
+  sinceMidnight: number,
+): boolean {
+  return heals.some(
+    (heal) => heal.ended_at !== null && heal.ended_at >= sinceMidnight && bookedBy(heal) === 'chain-total',
+  );
+}
 
 export type IgnoreRow = {
   id: number;
@@ -111,21 +178,20 @@ export type IgnoreRow = {
 /** Where a cycle stands: Chiron judging, heals walking his list, the last ones finishing, or over. */
 export type HealCycleStage = 'judging' | 'healing' | 'closing' | 'done' | 'stopped';
 
-/** Why an item ranks where it does — a cause that came back, a run that cannot finish, a kind that keeps happening, or once. */
-export type HealCycleTier = 'regression' | 'blocked-run' | 'frequent' | 'one-off';
+/** Why an item ranks where it does — a cause that came back, a kind that keeps happening, or once. */
+export type HealCycleTier = 'regression' | 'frequent' | 'one-off';
 
 /** One line of a cycle's worklist, in the worker's rank, with Chiron's `why` and what became of it. */
 export type HealCycleItem = {
   rank: number;
-  /** `kind:<kind>` or `queue:<item id>`. */
+  /** `kind:<kind>`. */
   ref: string;
   tier: HealCycleTier;
-  /** The kind name, or `run ⛔ <plan basename> phase <phase>` — printed as the worker wrote it. */
+  /** The kind name, printed as the worker wrote it. */
   label: string;
   why: string;
   state: 'pending' | 'launched' | 'landed' | 'skipped' | 'dropped' | 'ignored';
   heal_id: string | null;
-  pid: number | null;
   note: string;
 };
 
@@ -146,7 +212,12 @@ export type HealCycle = {
   gathered: number;
   ignored: number;
   healed: number;
-  /** DeepSeek dollars only. A cycle on Claude spends a subscription, and reads zero. */
+  /**
+   * DeepSeek dollars only. A cycle on Claude spends a subscription, and reads zero. A heal booked
+   * before the 2026-09-23 recipe change counts its chain's whole bill here (see `bookedBy`), so a cycle
+   * that spans that date — the night of the change, and no other — reads high by the Claude stages its
+   * heals rode.
+   */
   spent: number;
   /** Chiron's launch id, `fallback: <why>`, `none — nothing to judge`, or null before he is launched. */
   judge: string | null;
@@ -198,12 +269,18 @@ export type HealSummary = {
   live_since_last_heal: number;
   ignored: number;
   last_heal: { id: string; kind: HealKind; status: HealStatus; ended_at: number | null } | null;
+  /** DeepSeek dollars LANDED today — a heal books its cost when it ends, so this is what has closed. */
   spend_today: number;
+  /**
+   * DeepSeek dollars the heals still WALKING have yet to book: the ones in flight, priced at the mean
+   * of the last five landed heals (0 when none has landed). The daily cap weighs `spend_today` plus
+   * this — a cap read off the landed half alone lets the launches already open close past it.
+   */
+  spend_reserved: number;
   /** kind → heal id, for every kind a running heal holds. */
   held: Record<HealKind, string>;
   kinds: HealKindRow[];
   heals: HealCard[];
-  queue: HealQueueItem[];
   ignore: IgnoreRow[];
   switches: HealSwitches;
   /** Up to ten, newest first. */

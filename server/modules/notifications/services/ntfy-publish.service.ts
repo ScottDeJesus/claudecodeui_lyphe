@@ -9,7 +9,11 @@
  */
 
 // Consumed by the ntfy channel and the ntfy action decisions: one tappable button (ntfy's `http` action).
-export type NtfyAction = { action: 'http'; label: string; url: string; method: 'POST'; clear: true };
+export type NtfyAction =
+  | { action: 'http'; label: string; url: string; method: 'POST'; clear: true }
+  // A button that only OPENS a page: the answer it stands for needs the operator's own words, which a
+  // tap cannot carry (a plan prompt's Rework takes his notes in the app).
+  | { action: 'view'; label: string; url: string; clear: true };
 
 // Consumed by the ntfy channel and the notifications test route: one push, before clamping.
 export type NtfyMessage = {

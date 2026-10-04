@@ -1,8 +1,6 @@
 import { useState } from 'react';
-import type { SyntheticEvent } from 'react';
 
 import { ImageLightbox } from '@/modules/chat/transcript/ChatMessageImages';
-import { TRANSCRIPT_GREW_EVENT } from '@/modules/chat/transcript/transcriptGrew';
 import type { PreviewKind } from '@/modules/chat/transcript/shapes/detect';
 
 type FilePreviewFrameProps = {
@@ -14,10 +12,6 @@ type FilePreviewFrameProps = {
   /** What the file is, when the author said so (`![alt](path)`); the path otherwise. */
   alt?: string;
 };
-
-/** A preview grew its row after it painted: say so, so a chat left at its bottom re-pins (`transcriptGrew.ts`). */
-const announceGrowth = (event: SyntheticEvent<HTMLElement>) =>
-  event.currentTarget.dispatchEvent(new CustomEvent(TRANSCRIPT_GREW_EVENT, { bubbles: true }));
 
 /**
  * The preview under a file chip: the picture itself, or the PDF in the browser's own viewer.
@@ -48,13 +42,12 @@ export function FilePreviewFrame({ path, kind, url, alt }: FilePreviewFrameProps
         >
           {/* `my-0`: the transcript's prose container gives every `img` a 2em margin, which would be
               drawn as a blank band above and below the picture inside this border. */}
-          <img src={url} alt={label} onLoad={announceGrowth} className="my-0 block max-h-80 max-w-full object-contain" />
+          <img src={url} alt={label} className="my-0 block max-h-80 max-w-full object-contain" />
         </button>
       ) : (
         <iframe
           src={url}
           title={label}
-          onLoad={announceGrowth}
           className="block h-[min(32rem,60vh)] w-full border border-border/70 bg-card"
         />
       )}

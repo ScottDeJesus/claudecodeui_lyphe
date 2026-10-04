@@ -1,9 +1,11 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 
 import { IS_PLATFORM } from '@/shared/utils';
 import { api, BOOT_REQUEST_FLOOR_MS, BOOT_REQUEST_TIMEOUTS_MS, BOOT_TOTAL_BUDGET_MS } from '@/shared/api';
-import { AUTH_SESSION_EXPIRED_EVENT, AUTH_TOKEN_REFRESHED_EVENT, getAuthTokenRefreshDelay, isValidRefreshedToken, storeAuthToken } from '@/shared/authToken';
+import { AUTH_SESSION_EXPIRED_EVENT, AUTH_TOKEN_KEY, AUTH_TOKEN_REFRESHED_EVENT, getAuthTokenRefreshDelay, isValidRefreshedToken, storeAuthToken, storeSignedInToken, traceAuthDecision, traceUnrecordedSignOut } from '@/shared/authToken';
+import { useSharedSessionFollower } from '@/modules/auth/hooks/useSharedSessionFollower';
+import { dropAuthEvents, peekAuthEvents } from '@/shared/authTrace';
 import { hydrateChatDrafts, resetChatDrafts } from '@/shared/chatDrafts';
 import { hydrateUserPreferences, resetUserPreferences } from '@/shared/userSettings';
 /** The signed-in account held by AuthContext - a required `username` plus an optional id and any additional fields the auth API returns - and should be read through `useAuth()` rather than re-derived from raw auth responses. */
@@ -12,8 +14,6 @@ type AuthUser = {
   username: string;
   [key: string]: unknown;
 };
-
-const AUTH_TOKEN_STORAGE_KEY = 'auth-token';
 
 const AUTH_ERROR_MESSAGES = {
   authStatusCheckFailed: 'Failed to check authentication status',
@@ -112,15 +112,31 @@ function resolveApiErrorMessage(payload: ApiErrorPayload | null, fallback: strin
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
-const readStoredToken = (): string | null => localStorage.getItem(AUTH_TOKEN_STORAGE_KEY);
-
-const persistToken = (token: string) => {
-  storeAuthToken(token);
-};
+const readStoredToken = (): string | null => localStorage.getItem(AUTH_TOKEN_KEY);
 
 const clearStoredToken = () => {
-  localStorage.removeItem(AUTH_TOKEN_STORAGE_KEY);
+  localStorage.removeItem(AUTH_TOKEN_KEY);
 };
+
+/**
+ * Hands the page's record of why a session ended (or a verdict was refused) to the server's journal.
+ * Runs once a session is up, because the report is an authenticated request; the records stay in
+ * storage until the server has taken them.
+ */
+async function reportAuthEvents() {
+  const events = peekAuthEvents();
+  if (events.length === 0) {
+    return;
+  }
+  try {
+    const response = await api.auth.clientEvents(events);
+    if (response.ok) {
+      dropAuthEvents(events.length);
+    }
+  } catch {
+    // Kept for the next load.
+  }
+}
 
 export function useAuth(): AuthContextValue {
   const context = useContext(AuthContext);
@@ -200,17 +216,24 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [needsSetup, setNeedsSetup] = useState(false);
   const [hasCompletedOnboarding, setHasCompletedOnboarding] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // Whether this tab holds a session, for the listeners below that subscribe once and would
+  // otherwise act on the `user`/`token` of the render that created them.
+  const sessionHeldRef = useRef(false);
+  useEffect(() => {
+    sessionHeldRef.current = Boolean(user || token);
+  }, [token, user]);
 
   const setSession = useCallback((nextUser: AuthUser, nextToken: string) => {
     setUser(nextUser);
     setToken(nextToken);
-    persistToken(nextToken);
+    storeSignedInToken(nextToken);
   }, []);
 
+  // Ends THIS tab's view of the session and never touches storage: storage is the one shared
+  // session, and whoever ended it (expireAuthSession, logout, another tab) has already dealt with it.
   const clearSession = useCallback(() => {
     setUser(null);
     setToken(null);
-    clearStoredToken();
     // Otherwise the next person to sign in on this device would start out
     // looking at the previous user's theme, language, permissions and drafts.
     resetUserPreferences();
@@ -227,6 +250,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
     void hydrateUserPreferences();
     void hydrateChatDrafts();
+    void reportAuthEvents();
   }, [userKey]);
 
   const checkOnboardingStatus = useCallback(async () => {
@@ -262,8 +286,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
       const payload = await parseJsonSafely<AuthSessionPayload>(response);
       if (isValidRefreshedToken(payload?.token)) {
-        setToken(payload.token);
-        persistToken(payload.token);
+        // The store decides whether this is newer than the session held; the token event it raises
+        // then brings this tab's memory along, so a refused token never reaches `token` either.
+        storeAuthToken(payload.token, { trigger: 'refresh-endpoint', url: '/api/auth/refresh', method: 'POST', status: response.status });
       }
     } catch (caughtError) {
       // A transient network failure must not sign the user out. Focus/visibility
@@ -279,9 +304,17 @@ export function AuthProvider({ children }: AuthProviderProps) {
         setToken(nextToken);
       }
     };
-    const handleSessionExpired = () => {
+    const handleSessionExpired = (event: Event) => {
+      // A visitor who never had a session (the login screen's own stray 401s) has nothing to be told expired.
+      const hadSession = sessionHeldRef.current;
+      // Not left to the effect above, which runs after the next render: a burst of stray verdicts
+      // arriving before it would each look like the end of a session and each be recorded.
+      sessionHeldRef.current = false;
       clearSession();
-      setError(AUTH_ERROR_MESSAGES.sessionExpired);
+      if (hadSession) {
+        traceUnrecordedSignOut(event);
+        setError(AUTH_ERROR_MESSAGES.sessionExpired);
+      }
     };
 
     window.addEventListener(AUTH_TOKEN_REFRESHED_EVENT, handleTokenRefreshed);
@@ -291,6 +324,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
       window.removeEventListener(AUTH_SESSION_EXPIRED_EVENT, handleSessionExpired);
     };
   }, [clearSession]);
+
+  useSharedSessionFollower({ sessionHeldRef, adoptToken: setToken, endSessionView: clearSession });
 
   const checkAuthStatus = useCallback(async () => {
     try {
@@ -320,46 +355,66 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
       setNeedsSetup(false);
 
-      if (!token) {
+      // Storage, not this render's `token`, is the session: another tab may have signed in or
+      // refreshed since this page mounted. Depending on `token` re-ran this whole gate — and blanked
+      // the app behind the loading screen — once for every refreshed token that arrived.
+      for (let attempt = 0; attempt < 2; attempt += 1) {
+        const heldToken = readStoredToken();
+        if (!heldToken) {
+          return;
+        }
+
+        const userResponse = await requestWithRetry(
+          (timeoutMs) => api.auth.user(timeoutMs),
+          budgetEndsAt,
+          () => setIsReconnecting(true),
+        );
+        // No answer at all after the retries: the server is down or unreachable, which says
+        // nothing about whether the session is still good. Keeping the token means the next
+        // reload signs the user straight back in instead of asking for a password the server
+        // could not have checked anyway.
+        if (!userResponse) {
+          setServerUnreachable(true);
+          setError(AUTH_ERROR_MESSAGES.authStatusCheckFailed);
+          return;
+        }
+
+        if (userResponse.status === 401 || userResponse.status === 403) {
+          if (userResponse.headers.get('X-Auth-Error')) {
+            // The server's verdict on `heldToken`. authenticatedFetch has already acted on it: the
+            // tab is signed out if that token was still the session, or — when another tab stored a
+            // newer one while this request was out — the session was kept, and it is asked again.
+            const newerToken = readStoredToken();
+            if (newerToken && newerToken !== heldToken) {
+              continue;
+            }
+            return;
+          }
+          // Only the server's own verdict on the SESSION ends it, and that verdict is the
+          // X-Auth-Error header. A bare 401/403 is a proxy or gateway speaking, not the session.
+          setServerUnreachable(true);
+          setError(AUTH_ERROR_MESSAGES.authStatusCheckFailed);
+          return;
+        }
+
+        if (!userResponse.ok) {
+          setServerUnreachable(true);
+          setError(AUTH_ERROR_MESSAGES.authStatusCheckFailed);
+          return;
+        }
+
+        const userPayload = await parseJsonSafely<AuthUserPayload>(userResponse);
+        if (!userPayload?.user) {
+          // A 200 that will not parse (a half-started process, a gateway page) is not a verdict either.
+          setServerUnreachable(true);
+          setError(AUTH_ERROR_MESSAGES.authStatusCheckFailed);
+          return;
+        }
+
+        setUser(userPayload.user);
+        await checkOnboardingStatus();
         return;
       }
-
-      const userResponse = await requestWithRetry(
-        (timeoutMs) => api.auth.user(timeoutMs),
-        budgetEndsAt,
-        () => setIsReconnecting(true),
-      );
-      // No answer at all after the retries: the server is down or unreachable, which says
-      // nothing about whether the session is still good. Keeping the token means the next
-      // reload signs the user straight back in instead of asking for a password the server
-      // could not have checked anyway.
-      if (!userResponse) {
-        setServerUnreachable(true);
-        setError(AUTH_ERROR_MESSAGES.authStatusCheckFailed);
-        return;
-      }
-
-      // Only the server's own verdict on the SESSION ends it. A 500 from a half-started
-      // process used to land here and sign the user out mid-restart.
-      if (userResponse.status === 401 || userResponse.status === 403) {
-        clearSession();
-        return;
-      }
-
-      if (!userResponse.ok) {
-        setServerUnreachable(true);
-        setError(AUTH_ERROR_MESSAGES.authStatusCheckFailed);
-        return;
-      }
-
-      const userPayload = await parseJsonSafely<AuthUserPayload>(userResponse);
-      if (!userPayload?.user) {
-        clearSession();
-        return;
-      }
-
-      setUser(userPayload.user);
-      await checkOnboardingStatus();
     } catch (caughtError) {
       console.error('[Auth] Auth status check failed:', caughtError);
       setServerUnreachable(true);
@@ -368,7 +423,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       setIsReconnecting(false);
       setIsLoading(false);
     }
-  }, [checkOnboardingStatus, clearSession, token]);
+  }, [checkOnboardingStatus]);
 
   useEffect(() => {
     if (IS_PLATFORM) {
@@ -472,6 +527,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const logout = useCallback(() => {
     // JWT logout is client-side: the server endpoint does not maintain a
     // revocation list, so clearing the session is the complete operation.
+    traceAuthDecision({ trigger: 'logout', token: readStoredToken() }, 'signed-out');
+    clearStoredToken();
     clearSession();
   }, [clearSession]);
 

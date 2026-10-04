@@ -11,6 +11,7 @@ import {
   type SubagentSummary,
 } from '@/modules/chat/utils/subagentSummary';
 import { dismissPin, dismissPins, useDismissedPins } from '@/modules/chat/utils/pinnedDismissals';
+import { mergeSoulLaunchIds, readStampedLaunchIds } from '@/modules/chat/utils/soulLaunchAnchors';
 
 /**
  * The rows a conversation pins: the agents and launcher souls working for it right now, and the
@@ -117,10 +118,18 @@ function expiryOf(entry: PinnedSubagentRow): number | null {
  * `soulLaunchIds` is passed in rather than scanned here: the scan has to be memoized against a
  * transcript that changes on every streamed token, and the caller's own memo key is the messages
  * it already holds.
+ *
+ * `cliSessionId` is the conversation's own CLI (provider) session id, or `null` while it is not yet
+ * known. It is what lets a launch be anchored LIVE: any launch the lane carries whose `launched_by`
+ * stamp equals it belongs to this chat, so a chain stage the detached walker mints — which prints no
+ * receipt into any transcript — pins the moment the lane pushes it. It is joined here, beside the
+ * lane read this hook already holds, and not in the session-state hook: a lane push re-renders the
+ * pinned rows (memoized behind the strip) and never the whole chat.
  */
 export function usePinnedSubagentRows(
   messages: ChatMessage[],
   soulLaunchIds: string[],
+  cliSessionId: string | null,
 ): { rows: PinnedSubagentRow[]; dismiss: (id: string) => void; dismissMany: (ids: string[]) => void } {
   const dismissed = useDismissedPins();
 
@@ -175,7 +184,11 @@ export function usePinnedSubagentRows(
   // lane push, the transcript, or the one timer above actually moves it, which is where the cost
   // of walking a handful of ids belongs.
   const soulEntries: PinnedSubagentRow[] = [];
-  for (const id of soulLaunchIds) {
+  // The anchored ids (receipt scan and the server's list) plus every launch the lane stamps as this
+  // chat's own; a launch both name appears once. The lane stays the only judge of what is still
+  // there: an id it no longer carries draws nothing, whichever list named it.
+  const anchoredIds = mergeSoulLaunchIds(soulLaunchIds, readStampedLaunchIds(launchesById.values(), cliSessionId));
+  for (const id of anchoredIds) {
     const launch = launchesById.get(id);
     // An id the lane knows nothing about draws nothing: the transcript's receipt says a soul was
     // launched, and the lane is the only thing that can say it is still there. This is also what

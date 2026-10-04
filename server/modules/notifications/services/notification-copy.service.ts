@@ -1,3 +1,5 @@
+import { humanizeTokens } from '@/shared/utils.js';
+
 /**
  * The wording of every notification CloudCLI sends.
  *
@@ -48,7 +50,15 @@ const WINDOW_LABELS: Record<string, string> = {
 };
 
 /** Codes about the account's usage windows: their title names the window, never a session. */
-const ACCOUNT_LIMIT_CODES = new Set(['limit.reached', 'limit.reset', 'limit.warning', 'limit.overage', 'limit.out_of_credits']);
+const ACCOUNT_LIMIT_CODES = new Set([
+  'limit.reached',
+  'limit.reset',
+  'limit.warning',
+  'limit.overage',
+  'limit.out_of_credits',
+  // The dispatcher's one push for every plan a usage limit paused: it speaks for the account, not for the first plan.
+  'dispatcher.limit_paused',
+]);
 
 /** Tools whose approval body is the path they touch. */
 const FILE_PATH_TOOLS = new Set(['Edit', 'Write', 'Read', 'MultiEdit', 'NotebookEdit']);
@@ -109,6 +119,41 @@ function resetsAtText(resetsAt: unknown, rateLimitType: unknown): string {
   const today = date.toDateString() === new Date().toDateString();
   const weekly = typeof rateLimitType === 'string' && WEEK_WINDOWS.has(rateLimitType);
   return weekly || !today ? `${date.toLocaleDateString('en-US', { weekday: 'short' })} ${time}` : time;
+}
+
+/**
+ * A usage-limit pause's lift time, for a sentence: the time alone when it is today, else the DATE
+ * beside it (`Oct 3, 8:12 PM`). Never a weekday alone — a lift a full week out would read as
+ * today's weekday.
+ */
+function limitLiftText(resetsAt: unknown): string {
+  const epoch = readNumber(resetsAt);
+  if (epoch === null || epoch <= 0) return 'soon';
+  const date = new Date(epoch < 1e12 ? epoch * 1000 : epoch);
+  const time = date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+  if (date.toDateString() === new Date().toDateString()) return time;
+  return `${date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}, ${time}`;
+}
+
+/**
+ * What a plan cost, in the one sentence every spending push uses.
+ *
+ * PAID DOLLARS ONLY, LABELLED BY THE VENDOR THAT BILLED THEM: `$6.29 DeepSeek on this plan`. Claude
+ * work is counted in tokens in and out and never in dollars (operator rule, 2026-09-24 — the
+ * subscription is not a bill), so a plan that rode it has no `$` figure at all and this says its
+ * TOKENS instead: `216M in · 4M out on this plan`. `$0.00` is the one thing it must never say.
+ *
+ * `null` when neither figure was recorded — a plan with nothing to report says nothing, which is
+ * why the callers put this in a list they filter.
+ */
+function spendText(meta: Record<string, unknown>, suffix = ''): string | null {
+  const cost = readNumber(meta.costUsd);
+  if (cost !== null && cost > 0) return `$${cost.toFixed(2)} DeepSeek${suffix}`;
+  const read = readNumber(meta.tokensIn) ?? 0;
+  const written = readNumber(meta.tokensOut) ?? 0;
+  if (read + written > 0) return `${humanizeTokens(read)} in · ${humanizeTokens(written)} out${suffix}`;
+  const total = readNumber(meta.tokens) ?? 0;
+  return total > 0 ? `${humanizeTokens(total)} tokens${suffix}` : null;
 }
 
 /** `45s`, `3m 12s`, `1h 5m` — the precision a person reads at a glance. */
@@ -173,6 +218,13 @@ function permissionCopy(meta: Record<string, unknown>): { headline: string; body
   const toolInput = isRecord(meta.toolInput) ? meta.toolInput : null;
 
   if (toolName === 'AskUserQuestion') {
+    // A plan's prompt, raised by the app itself on the plan's card (`dispatcher-asks.service.ts`):
+    // the headline names the plan, since no model is the one asking.
+    const plan = readText(meta.plan);
+    if (plan) {
+      const headline = meta.askKind === 'accept' ? `Accept ${plan}?` : `${plan} has questions`;
+      return { headline, body: questionBody(toolInput) };
+    }
     return { headline: 'Claude has a question', body: questionBody(toolInput) };
   }
   if (toolName === 'ExitPlanMode') {
@@ -189,22 +241,23 @@ function permissionCopy(meta: Record<string, unknown>): { headline: string; body
 }
 
 /**
- * A plan-runner ending that wants a hand, by the runner's own outcome word. `complete` here means
- * phases were left: a clean `complete` is `runner.finished`, never this code.
+ * `3/7 tasks` — the dispatcher's own progress, counted over ALL of a plan's phases rather than
+ * its shipped ones: its card's meter is `done` out of `phases`, so a push that counted anything else
+ * would disagree with the screen it sends the operator to.
  */
-const RUNNER_STOP_HEADLINES: Record<string, string> = {
-  complete: 'Plan incomplete',
-  'all-blocked': 'Plan blocked',
-  halted: 'Plan halted',
-  budget: 'Plan out of budget',
-  'flag-off': 'Plan stopped: flag off',
-};
+function dispatcherPhaseText(meta: Record<string, unknown>): string {
+  const phases = readNumber(meta.phases) ?? 0;
+  return `${readNumber(meta.done) ?? 0}/${phases} task${phases === 1 ? '' : 's'}`;
+}
 
-/** `3 of 4 phases shipped`, or `No phases` for a plan that had none. */
-function runnerShippedText(meta: Record<string, unknown>): string {
-  const total = readNumber(meta.total) ?? 0;
-  if (total === 0) return 'No phases';
-  return `${readNumber(meta.shipped) ?? 0} of ${total} phase${total === 1 ? '' : 's'} shipped`;
+/**
+ * What a push from a feature of an epic adds to its body: the epic's name, and that the next ones stay
+ * on the card until the epic has been quiet for an hour (`WAVE_S` in `dispatcher-endings.service.ts`,
+ * the window the lane keeps a wave open for). `null` for a feature in no epic, whose every push is its own.
+ */
+function epicWaveText(meta: Record<string, unknown>, noun: 'retries' | 'stops'): string | null {
+  const epic = readText(meta.epic);
+  return epic === null ? null : `Epic ${epic}: further ${noun} stay on its card until it has been quiet for an hour`;
 }
 
 const COPY_BY_CODE = new Map<string, CodeCopy>([
@@ -274,33 +327,73 @@ const COPY_BY_CODE = new Map<string, CodeCopy>([
     body: 'You are now using overage',
   })],
   ['limit.out_of_credits', () => ({ headline: 'Out of credits', body: 'Overage is disabled: out of credits' })],
-  ['runner.finished', ({ meta }) => {
-    const durationMs = readNumber(meta.durationMs);
-    const cost = readNumber(meta.costUsd);
+  /**
+   * THE DISPATCHER'S ENDINGS (`dispatcher-endings.service.ts`), read off the same `events` table
+   * the plan's own card draws: a feature wraps up, a feature stops wanting a hand, a task the walk
+   * had left standing is taken up again, and an epic is finished. What is done out of how many, what
+   * it cost, and the one next move.
+   *
+   * A feature in no epic says each of these as it happens. A feature of an epic says only the first
+   * of a wave of retries or of stops, and its copy names the epic and says the rest stay on the
+   * card (`epicWaveText`); its own finish is never said, because the epic's is.
+   *
+   * `dispatcher.paused` is the lane's stop-and-look: the dispatcher pauses a walk for its own
+   * reasons (a spent ladder, a budget, the pause verb) and the phone is where the operator finds
+   * out, since the Roadmap tab's In flight face is only read when he opens it. The remedy is named because it is the
+   * least obvious part: the plan is not retried by anything, it is resumed. A pause the dispatcher
+   * itself held carries its cause in `meta.detail` (an API error line, the storm guard's), and the
+   * body says it.
+   */
+  ['dispatcher.finished', ({ meta }) => {
     return {
-      headline: 'Plan finished',
+      headline: 'Feature finished',
       body: [
-        runnerShippedText(meta),
-        // "since start" is the WALK: a parked run is stamped by its Start press,
-        // while a stopped-then-resumed one keeps its first start.
-        durationMs && durationMs > 0 ? `${humanDuration(durationMs)} since start` : null,
-        cost === null ? null : `$${cost.toFixed(2)} on this plan`,
+        dispatcherPhaseText(meta),
+        spendText(meta),
       ].filter((part): part is string => part !== null).join(' · '),
     };
   }],
-  ['runner.blocked', ({ meta }) => {
-    const blocked = readNumber(meta.blocked) ?? 0;
-    const left = readNumber(meta.left) ?? 0;
-    const phase = readText(meta.blockedPhase);
-    const cause = readText(meta.blockCause);
-    const counts = [
-      runnerShippedText(meta),
-      blocked > 0 ? `${blocked} blocked` : null,
-      left > 0 ? `${left} left` : null,
-    ].filter((part): part is string => part !== null).join(' · ');
+  // The title reads `Epic finished · <epic name>`: the ending's `sessionName` is the epic. Its spend is
+  // the epic's own sum over all of its features, in the same words a feature's push uses.
+  ['dispatcher.epic_finished', ({ meta }) => {
+    const features = readNumber(meta.features) ?? 0;
+    const tasks = readNumber(meta.tasks);
     return {
-      headline: lookup(RUNNER_STOP_HEADLINES, meta.outcome) ?? 'Plan stopped',
-      body: phase && cause ? `${counts}\nPhase ${phase}: ${cause}` : counts,
+      headline: 'Epic finished',
+      body: [
+        `${features} feature${features === 1 ? '' : 's'}`,
+        tasks === null ? null : `${tasks} task${tasks === 1 ? '' : 's'}`,
+        spendText(meta),
+      ].filter((part): part is string => part !== null).join(' · '),
+    };
+  }],
+  ['dispatcher.paused', ({ meta }) => ({
+    headline: 'Feature paused',
+    body: [dispatcherPhaseText(meta), readText(meta.detail), 'Resume from the Roadmap tab', epicWaveText(meta, 'stops')]
+      .filter((part): part is string => part !== null)
+      .join(' · '),
+  })],
+  // ONE push for a usage limit however many plans it paused (`dispatcher-endings.service.ts`): the
+  // limit is the account's, the time is when the dispatcher's own armed Resume fires, and an early
+  // Resume after an account switch is the operator's.
+  ['dispatcher.limit_paused', ({ meta }) => ({
+    headline: 'Claude usage limit',
+    // A limit that named no reset time carries the dispatcher's own GUESS: it says so, and does not
+    // promise the hour as though the API had given it.
+    body: `${meta.limitGuess === true
+      ? `Features paused — no reset time named, retrying at ${limitLiftText(meta.resetsAt)}`
+      : `Features paused until ${limitLiftText(meta.resetsAt)}`} · Resume from the Roadmap tab`,
+  })],
+  ['dispatcher.relaunched', ({ meta }) => {
+    const phase = readText(meta.phase);
+    const detail = readText(meta.detail);
+    return {
+      headline: 'Task relaunched',
+      body: [
+        phase ? `Task ${phase} was taken up again` : 'A task was taken up again',
+        detail,
+        epicWaveText(meta, 'retries'),
+      ].filter((part): part is string => part !== null).join(' · '),
     };
   }],
   ['push.enabled', () => ({ headline: 'Push notifications enabled', body: 'Push notifications are now enabled!' })],

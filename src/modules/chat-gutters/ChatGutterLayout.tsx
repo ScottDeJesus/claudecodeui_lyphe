@@ -1,4 +1,4 @@
-import { ActivityIcon, BotIcon, BrainIcon, GlobeIcon, type LucideIcon } from 'lucide-react';
+import { ActivityIcon, BotIcon, BrainIcon, GlobeIcon, RouteIcon, StickyNoteIcon, type LucideIcon } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ComponentType, ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -14,9 +14,13 @@ import {
 import { GUTTER_SIDES, useGutterPlacements, widgetsOn } from '@/modules/chat-gutters/hooks/useGutterPlacements';
 import { GutterColumn } from '@/modules/chat-gutters/GutterColumn';
 import { GutterWidgetFrame } from '@/modules/chat-gutters/GutterWidgetFrame';
+import { useDispatcherPlans } from '@/modules/dispatcher';
 import { MemoryWidgetBody, useMemoryIntake } from '@/modules/memory-intake';
-import { RunnerWidgetBody, useArcs, useRunnerRuns } from '@/modules/plan-runner';
-import type { GutterSide, GutterWidgetId } from '@/shared/types';
+import { NotesWidgetBody, useNotes } from '@/modules/notes';
+import { RoadmapWidgetBody, useRoadmap } from '@/modules/roadmap';
+import { RunnerWidgetBody } from '@/modules/runner-tab';
+import { useHostWindow } from '@/shared/context/HostWindowContext';
+import type { GutterSide, GutterWidgetId, Tone } from '@/shared/types';
 import { otherOverlayHoldsEscape } from '@/shared/ui/overlayEscape';
 import { cn } from '@/shared/utils';
 
@@ -44,7 +48,7 @@ const GUTTER_MIN_PX = 300;
 const MIN_REGION_PX = CHAT_COLUMN_PX + 2 * (GUTTER_MIN_PX + GUTTER_GAP_PX);
 
 /**
- * The desktop chat's side gutters: the runner, memory, subagents and embed widgets beside the
+ * The desktop chat's side gutters: the runner, roadmap, memory, subagents, embed and notes widgets beside the
  * transcript, each of them draggable into either side's stack, at any place in it, and any one of
  * them able to take the whole viewport for as long as the reader wants it.
  *
@@ -78,15 +82,31 @@ export function ChatGutterLayout({
   children: ReactNode;
 }) {
   const { t } = useTranslation();
+  // The gutters always live in the opener, where this answers `window`; read through the seam anyway
+  // so the Escape below asks the same window it listens on.
+  const hostWindow = useHostWindow();
   const { placements, moveWidget, toggleWidget } = useGutterPlacements(sessionId);
-  const { count: runCount } = useRunnerRuns();
-  // The Runner widget draws the arc deck above its runs, so its badge counts both: every run the
-  // lane carries, plus the arcs still walking — the same unfinished-arc count that holds the tab open.
-  const { count: arcCount } = useArcs();
-  const runnerCount = runCount + arcCount;
+  // The Runs widget lists the arcs as decks and the plans no arc holds as cards, so its badge
+  // counts the plans alone: an arc's own plans are already counted, and the arc's deck is a
+  // heading over cards the count has counted — the In flight face's own rule (`useDispatcherPlans.count`).
+  // `waiting` is the badge's TONE, not its number: the count stays what it always was, and turns
+  // amber while any of those plans owes the operator a word — the same amber the tab's dot wears.
+  const { count: runnerCount, waiting: runnerWaiting } = useDispatcherPlans();
+  // The Roadmap widget's badge counts what is being worked on — features still being designed and features in
+  // flight, on the ONE roadmap on screen — and turns amber while any of them owes the operator a word: the
+  // same register as the Runs badge above. These reads sit OUTSIDE every widget's boundary, so a picture whose
+  // `standing` is missing or partial must cost the badge its number and nothing more, as the other widgets'
+  // hooks fall back to zero — a throw here would take the whole chat to the workspace's error panel.
+  const { selected: selectedRoadmap } = useRoadmap();
+  const roadmapStanding = selectedRoadmap?.standing;
+  const roadmapCount = (roadmapStanding?.designing ?? 0) + (roadmapStanding?.in_flight ?? 0);
+  const roadmapWaiting = roadmapStanding?.waiting_on_you ?? 0;
   const { pendingCount } = useMemoryIntake();
   const subagentCount = useSubagentWidgetCount(sessionId);
   const { count: embedCount, newest: newestEmbed, known: embedsKnown } = useEmbedWidgetState(sessionId);
+  // The notes belong to the account, not to the chat: there is no per-session reading to make, and
+  // the badge is simply how many cards the list holds — zero until the provider's first read lands.
+  const { notes } = useNotes();
 
   const rootRef = useRef<HTMLDivElement | null>(null);
 
@@ -126,13 +146,13 @@ export function ChatGutterLayout({
   useEffect(() => {
     if (fullscreen === null) return undefined;
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== 'Escape' || otherOverlayHoldsEscape()) return;
+      if (event.key !== 'Escape' || otherOverlayHoldsEscape(hostWindow.document)) return;
       event.stopPropagation();
       setFullscreen(null);
     };
-    window.addEventListener('keydown', onKeyDown, true);
-    return () => window.removeEventListener('keydown', onKeyDown, true);
-  }, [fullscreen]);
+    hostWindow.addEventListener('keydown', onKeyDown, true);
+    return () => hostWindow.removeEventListener('keydown', onKeyDown, true);
+  }, [fullscreen, hostWindow]);
 
   // A NEWLY NAMED address opens the Embed widget, once. The whole point of the embed fence is that
   // the model can put a page in front of the reader, and a widget that stayed collapsed would make it
@@ -175,8 +195,11 @@ export function ChatGutterLayout({
       // than unmounting it, so this region measures 0 while another tab is open — and a gutters-off
       // reading there would tear down the widgets and the state inside them (a scrolled run list,
       // an expanded phase) on a trip to the Files tab and back. The real width answers when the tab
-      // comes back, which is a resize the observer sees.
-      if (width === 0) return;
+      // comes back, which is a resize the observer sees. ONLY WHILE `enabled`: a region switched off by
+      // its owner (the chat floats) is off whatever it measures, and a hidden tab's 0 must not leave the
+      // gutters standing — with the columns, their claim on the pinned subagent strip stands too, and
+      // the floating chat would draw no strip at all.
+      if (width === 0 && enabled) return;
       const next = enabled && width >= MIN_REGION_PX;
       setWide((previous) => (previous === next ? previous : next));
       // The gutters going away ends any drag they were carrying — the handle is unmounted and the
@@ -251,6 +274,8 @@ export function ChatGutterLayout({
       count: number;
       icon: LucideIcon;
       Body: ComponentType<{ sessionId: string | null }>;
+      /** The tone of the frame's count badge; absent means the badge's own `info` register. */
+      countTone?: Tone;
       /** Set by a widget whose body is itself a frame: the card gives it its whole inside. */
       flush?: boolean;
       /** A widget's own control for the frame's header row, drawn beside the fullscreen switch. */
@@ -260,8 +285,21 @@ export function ChatGutterLayout({
     runner: {
       title: t('gutters.runner.title'),
       count: runnerCount,
+      // Amber while a prompt on the lane is waiting on the operator — the badge is the widget's
+      // only mark that says so, and the tab it mirrors wears the same tone at the same moment.
+      countTone: runnerWaiting > 0 ? 'warn' : undefined,
       icon: ActivityIcon,
       Body: RunnerWidgetBody,
+    },
+    roadmap: {
+      title: t('gutters.roadmap.title'),
+      count: roadmapCount,
+      countTone: roadmapWaiting > 0 ? 'warn' : undefined,
+      icon: RouteIcon,
+      Body: RoadmapWidgetBody,
+      // A body that scrolls its own content and carries its own celebrations box: the card gives it its
+      // whole inside, with no padding and no scroll area of its own (as the Embed widget's is).
+      flush: true,
     },
     memory: {
       title: t('gutters.memory.title'),
@@ -287,16 +325,23 @@ export function ChatGutterLayout({
       // where the fullscreen switch earns its keep — a dashboard in a 300px column is a thumbnail.
       flush: true,
     },
+    notes: {
+      title: t('gutters.notes.title'),
+      count: notes?.length ?? 0,
+      icon: StickyNoteIcon,
+      Body: NotesWidgetBody,
+    },
   };
 
   const renderWidget = (widget: GutterWidgetId): ReactNode => {
-    const { title, count, icon, Body, flush, HeaderAction } = widgets[widget];
+    const { title, count, countTone, icon, Body, flush, HeaderAction } = widgets[widget];
 
     return (
       <GutterWidgetFrame
         widget={widget}
         title={title}
         count={count}
+        countTone={countTone}
         icon={icon}
         open={placements[widget].open}
         onToggle={() => toggleWidget(widget)}

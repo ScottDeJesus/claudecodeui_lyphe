@@ -3,7 +3,10 @@ import {
   getStoredAuthToken,
   storeAuthToken,
 } from '@/shared/authToken';
-import type { DeepseekRange, FileLinePatch, JevRange, NtfySettingsInput, RunnerModelChoice, SubagentTranscriptResult } from '@/shared/types';
+import type { AuthTraceEvent, DeepseekRange, DispatcherAsk, DispatcherModelChoice, DispatcherSwarmChoice, FileLinePatch, JevRange, NoteInput, NtfySettingsInput, SimpleListItemRef, SimpleListPosition, SubagentTranscriptResult } from '@/shared/types';
+import type { AgentLaunchDefaultsChange, AgentLaunchRowChange } from '@/shared/agent-launch-types';
+import type { ClaudeUpdateApplyRequest } from '@/shared/claude-update-types';
+import type { RoadmapWriteBody } from '@/shared/roadmap-types';
 import { IS_PLATFORM } from '@/shared/utils';
 import { readVoiceConfig, voiceConfigHeaders } from '@/shared/voiceConfig';
 
@@ -108,10 +111,11 @@ export const authenticatedFetch = (
   }).then((response) => {
     const refreshedToken = response.headers.get('X-Refreshed-Token');
     if (refreshedToken) {
-      storeAuthToken(refreshedToken);
+      storeAuthToken(refreshedToken, { trigger: 'refresh-header', url, method: requestInit.method ?? 'GET', status: response.status });
     }
-    if (response.headers.get('X-Auth-Error')) {
-      expireAuthSession();
+    const authError = response.headers.get('X-Auth-Error');
+    if (authError) {
+      expireAuthSession({ trigger: 'request-verdict', token, url, method: requestInit.method ?? 'GET', status: response.status, authError });
     }
     return response;
   });
@@ -252,6 +256,9 @@ const readKanbanMetisTranscript = async (sessionId: string): Promise<SubagentTra
  */
 export const LESSON_LIST_LIMIT = 500;
 
+/** The deadline of an Edit Agent Chains write: the relay's own 90 s for the CLI, with the network's margin. */
+const AGENT_LAUNCH_WRITE_TIMEOUT_MS = 95_000;
+
 // ─── API endpoints ──────────────────────────────────────────────────────────
 // Every `/api/...` path the frontend talks to is declared here; components
 // import a named method instead of assembling URLs of their own.
@@ -274,6 +281,8 @@ export const api = {
       body: JSON.stringify({ username, password }),
     }),
     refresh: () => post('/api/auth/refresh'),
+    // The page's own record of why its session ended or was kept, for the server's journal.
+    clientEvents: (events: AuthTraceEvent[]) => post('/api/auth/client-events', { events }),
     user: (timeoutMs: number = BOOT_REQUEST_TIMEOUTS_MS[0]) => get('/api/auth/user', { timeoutMs }),
   },
 
@@ -346,12 +355,17 @@ export const api = {
   // the default glyph.
   setSessionIcon: (sessionId: string, icon: string | null) =>
     put(`/api/providers/sessions/${encodeURIComponent(sessionId)}/icon`, { icon }),
-  // Moves a chat in the simple list to sit directly below `afterSessionId`, or
-  // to the top of the list when that is null.
-  moveSimpleListSession: (sessionId: string, afterSessionId: string | null) =>
-    put(`/api/providers/sessions/${encodeURIComponent(sessionId)}/simple-list-position`, {
-      afterSessionId,
-    }),
+
+  // The simple list's folders and the place of its rows. The feed keeps its own
+  // helper (`recentConversations`) above.
+  simpleList: {
+    createFolder: (name: string) => post('/api/providers/simple-list/folders', { name }),
+    updateFolder: (folderId: string, change: { name?: string; collapsed?: boolean }) =>
+      patch(`/api/providers/simple-list/folders/${encodeURIComponent(folderId)}`, change),
+    deleteFolder: (folderId: string) => del(`/api/providers/simple-list/folders/${encodeURIComponent(folderId)}`),
+    move: (item: SimpleListItemRef, position: SimpleListPosition) =>
+      put('/api/providers/simple-list/position', { item, folderId: position.folderId, after: position.after }),
+  },
 
   // Scheduled messages: send a message to a session at a future time.
   scheduledMessages: {
@@ -599,6 +613,21 @@ export const api = {
     saveSwarmSwitch: (state: { enabled: boolean; lanes: number | null }) =>
       put('/api/settings/swarm', state),
 
+    // The dispatcher's planner-lane dial — how many planners (designs, cuts, judgments) may be out at
+    // once. A fifth flag file on this host, in the same host-wide shape and with the same read-back
+    // answer: `lanes` is the whole number the file holds, at least 1, with no "all" above it.
+    plannerLanes: () => get('/api/settings/planner-lanes'),
+    savePlannerLanes: (state: { lanes: number }) => put('/api/settings/planner-lanes', state),
+
+    // The dispatcher's park-at-peak switch — the fourth flag file on this host, and the same shape
+    // as the three above for the same reason: a file the dispatcher's own process re-reads, not a
+    // preference the browser owns. On, an Accept during DeepSeek's peak window queues the plan and
+    // arms the hour it lifts; off, Accept walks now. Both calls answer with the state read back off
+    // disk, never with what was sent.
+    parkAtPeakSwitch: () => get('/api/settings/park-at-peak'),
+    saveParkAtPeakSwitch: (state: { enabled: boolean }) =>
+      put('/api/settings/park-at-peak', state),
+
     // The heal reflex's MASTER switch — the reflex's whole launching, on one word. `off` stops it
     // launching from the next ending onwards while an ending still indexes, and the typed `/heal`
     // door is never gated by it; `on` is what the flag file being absent has always meant. Same
@@ -702,6 +731,28 @@ export const api = {
     update: () => post('/api/system/update', undefined, { timeoutMs: NO_REQUEST_TIMEOUT }),
   },
 
+  // The Claude update pipeline (MAN-7401–MAN-7404 are the check, the install/restart backend and this
+  // client's own row; MAN-7408–MAN-7414 are the reference form): what the two Claude
+  // packages are on, what npm has, the two presses that move them, and the switch that makes the app
+  // press the first itself when no Claude work is running. The report is also what every action
+  // answers with, so one read serves the tab, the cards and the sidebar row — `setAutoInstall`
+  // included: its position comes back in the report's own `autoInstall` block.
+  //
+  // `check` opts out of the request ceiling for the same reason `system.update` does: it waits out
+  // however long npm takes to answer, and a ceiling here would report a check that is still running
+  // as a failed one.
+  //
+  // `apply` and `restart` refuse with a `ClaudeUpdateRefusal` — a 400/409 whose `message` is the
+  // sentence the tab shows under the button that asked. The caller reads it off the raw response
+  // rather than through `readApiJson`, because the status IS the answer.
+  claudeUpdates: {
+    report: () => get('/api/claude-updates'),
+    check: () => post('/api/claude-updates/check', undefined, { timeoutMs: NO_REQUEST_TIMEOUT }),
+    apply: (request: ClaudeUpdateApplyRequest) => post('/api/claude-updates/apply', request),
+    restart: () => post('/api/claude-updates/restart'),
+    setAutoInstall: (enabled: boolean) => put('/api/claude-updates/auto-install', { enabled }),
+  },
+
   // The Claude account switcher and its usage meter, served by the server's own accounts module.
   // Both reads answer 200 whatever the state — the calm `{reachable:false, reason}` picture when
   // nothing can be computed — so a caller reads the BODY rather than the status. Both writes carry
@@ -716,7 +767,7 @@ export const api = {
     capture: () => post('/api/accounts/capture', {}),
   },
 
-  // The memory-intake lane (docs/memory-intake.md): what a session PROPOSES and a person reviews.
+  // The memory-intake lane (docs/MANUAL.md (memory-intake)): what a session PROPOSES and a person reviews.
   // The reads answer 200 with the `reachable` envelope the panel, the tab gates and the command
   // palette all branch on — it is a fact about the read now rather than about a remote server, and
   // no shape moved when the lane moved here. The two writes are read from the RAW response for the
@@ -730,35 +781,96 @@ export const api = {
     reject: (id: string) => post(`/api/memory/${encodeURIComponent(id)}/reject`, {}),
   },
 
-  // The plan-runner lane (docs/plan-runner.md). The server READS the runner's state directory —
-  // runs and arc decks alike — and relays a run's four verbs and an arc's reorder, model word, start
-  // and schedule to the runner's own binary; it never writes a state file and never starts a run
-  // from a plan. The reads are plain gets. The
-  // verbs are read from the RAW response, like `memory.approve` above and for the same reason: a
-  // 409 here carries the runner's own verdict — its refusal in its own `stderr`, with the run (or
-  // the arc) left exactly as it was — and putting it through `readApiJson` would turn that verdict
-  // into a thrown error the caller cannot show.
-  planRunner: {
-    runs: () => get('/api/plan-runner/runs'),
-    run: (id: string) => get(`/api/plan-runner/runs/${encodeURIComponent(id)}`),
-    stop: (id: string) => post(`/api/plan-runner/runs/${encodeURIComponent(id)}/stop`, {}),
-    resume: (id: string) => post(`/api/plan-runner/runs/${encodeURIComponent(id)}/resume`, {}),
-    // The run's own DeepSeek / Claude word (`auto` follows the chat's switch); restarts nothing.
-    model: (id: string, model: RunnerModelChoice) => post(`/api/plan-runner/runs/${encodeURIComponent(id)}/model`, { model }),
-    // A QUEUED run's Start at a time — `offpeak`, an ISO instant with a zone, or `none` to cancel — and the
-    // runner's next off-peak moment the `Start at …` button shows (`{ at }`, epoch seconds, or null).
-    schedule: (id: string, when: string) => post(`/api/plan-runner/runs/${encodeURIComponent(id)}/schedule`, { when }),
-    offpeak: () => get('/api/plan-runner/runs/offpeak'),
-    // The arc deck: every arc the runner is walking, and the verbs the deck owns — a drag that
-    // reorders the cards the runner has not started yet, and the arc's ONE model word, which every
-    // card it mints inherits. Both are read from the RAW response like the writes above: a 409
-    // carries the runner's own refusal sentence whole.
-    arcs: () => get('/api/plan-runner/arcs'),
-    arcReorder: (arc: string, from: number, to: number) => post(`/api/plan-runner/arcs/${encodeURIComponent(arc)}/reorder`, { from, to }),
-    arcModel: (arc: string, model: RunnerModelChoice) => post(`/api/plan-runner/arcs/${encodeURIComponent(arc)}/model`, { model }),
-    // The deck header's Start (`arc start`) and its `Start at …` / Cancel (`arc schedule`), raw like the rest.
-    arcStart: (arc: string) => post(`/api/plan-runner/arcs/${encodeURIComponent(arc)}/start`, {}),
-    arcSchedule: (arc: string, when: string) => post(`/api/plan-runner/arcs/${encodeURIComponent(arc)}/schedule`, { when }),
+  // The notes lane (docs/MANUAL.md MAN-7517): one account's cards, read whole. The read answers the
+  // list, newest first, which is exactly the shape the wall draws; the three writes answer the note
+  // they wrote, and NOBODY reads that body — the list on screen comes from the read that follows
+  // the write, so a card is never drawn from an answer the server has already moved past.
+  notes: {
+    list: () => get('/api/notes'),
+    create: (input: NoteInput) => post('/api/notes', input),
+    update: (id: string, input: NoteInput) => put(`/api/notes/${encodeURIComponent(id)}`, input),
+    remove: (id: string) => del(`/api/notes/${encodeURIComponent(id)}`),
+  },
+
+  // The dispatcher lane (docs/MANUAL.md (dispatcher)): the plans in the dispatcher's own store, and the
+  // seven verbs the plan cards and the arc header press. The picture is `dispatcher status --json`
+  // relayed whole, and the verbs are relayed to the dispatcher's own binary by argv, never by a shell.
+  //
+  // The verbs are read from the RAW response for one reason worth naming: the dispatcher prints its
+  // refusals on STDOUT (`REFUSED schedule
+  // <name>: is live — stop it first`, exit 2), not on stderr, so a 409 body carries the verdict
+  // in `stdout` and the reader looks there first. Its successes are on stdout too (`UNSCHEDULED
+  // <name>`), so the answer is the same field either way.
+  dispatcher: {
+    plans: () => get('/api/dispatcher/plans'),
+    plan: (name: string) => get(`/api/dispatcher/plans/${encodeURIComponent(name)}`),
+    stop: (name: string) => post(`/api/dispatcher/plans/${encodeURIComponent(name)}/stop`, {}),
+    resume: (name: string) => post(`/api/dispatcher/plans/${encodeURIComponent(name)}/resume`, {}),
+    park: (name: string) => post(`/api/dispatcher/plans/${encodeURIComponent(name)}/park`, {}),
+    unpark: (name: string) => post(`/api/dispatcher/plans/${encodeURIComponent(name)}/unpark`, {}),
+    // A plan out of the store for good (`dispatcher drop <plan>`): `DROPPED <name>`, or the
+    // dispatcher's REFUSED line while a phase walks or a planner outing is live, as a 409.
+    drop: (name: string) => post(`/api/dispatcher/plans/${encodeURIComponent(name)}/drop`, {}),
+    // A plan's STALLED planner outing put back to work (`dispatcher planner-resume <plan>`): the
+    // dispatcher reads which door from its own store — `cut`, `judge`, or a `tell` of `continue` — and
+    // answers with that door's own sentence (`QUEUED cut <plan> — …`), or `REFUSED planner-resume …` as a 409.
+    plannerResume: (name: string) => post(`/api/dispatcher/plans/${encodeURIComponent(name)}/planner-resume`, {}),
+    // The operator's answer to a plan's prompt, from its card: the ask exactly as the card drew
+    // it, the chosen label (or typed words) by question, and a Rework's notes by question. A
+    // refusal is a RESULT (409), as for every verb.
+    answer: (ask: DispatcherAsk, answers: Record<string, string>, notes?: Record<string, string>) =>
+      post('/api/dispatcher/answer', { ask, answers, ...(notes ? { notes } : {}) }),
+    // A plan's own DeepSeek / Claude word (`dispatcher model <plan> <word>`). The plan card's
+    // control relays it; nothing is optimistic, and the next `dispatcher_state` frame reads the
+    // word back. Restarts nothing — the word is read when a chain is LAUNCHED.
+    model: (name: string, model: DispatcherModelChoice) => post(`/api/dispatcher/plans/${encodeURIComponent(name)}/model`, { model }),
+    // A plan's own swarm word (`dispatcher swarm <plan> <word>`) — `off`, `on`, `on <N>`, or `auto` to
+    // follow the box's switch again. The plan card's swarm control relays it; nothing is optimistic,
+    // and the next `dispatcher_state` frame reads the word back. A plan's verb alone: no arc route.
+    swarm: (name: string, swarm: DispatcherSwarmChoice) => post(`/api/dispatcher/plans/${encodeURIComponent(name)}/swarm`, { swarm }),
+    // The DISPATCH ARC header's four presses (`dispatcher model|stop|resume|schedule <arc> …`), each
+    // relayed to the arc's own door. Separate routes from the plan's because an arc is addressed by
+    // its own door (`.arc`), never through a plan's.
+    //
+    // AN ARC HAS NO WALK OF ITS OWN: the dispatcher applies the PLAN verb to the arc's plans in one
+    // step — `stop` over the arc's walking plans, `resume` and `schedule` over its stopped ones — so
+    // the header's press and one typed at a terminal are the same verb on the same set of plans. A
+    // `/arcs/…` route for each is the whole reason the two surfaces cannot drift.
+    arcModel: (name: string, model: DispatcherModelChoice) => post(`/api/dispatcher/arcs/${encodeURIComponent(name)}/model`, { model }),
+    arcStop: (name: string) => post(`/api/dispatcher/arcs/${encodeURIComponent(name)}/stop`, {}),
+    arcResume: (name: string) => post(`/api/dispatcher/arcs/${encodeURIComponent(name)}/resume`, {}),
+    // The arc's Resume — or Start, for plans still at the gate — at a time: the same three shapes a
+    // plan's schedule takes, through the same server-side reader.
+    arcSchedule: (name: string, when: string) => post(`/api/dispatcher/arcs/${encodeURIComponent(name)}/schedule`, { when }),
+    // A plan's Start at a time — `offpeak`, an ISO instant with a zone, or `none` to cancel — the
+    // same three shapes the arc's own schedule takes, through the same reader.
+    schedule: (name: string, when: string) => post(`/api/dispatcher/plans/${encodeURIComponent(name)}/schedule`, { when }),
+    // The dispatcher's next DeepSeek off-peak moment (`{ at }`, epoch seconds, or null), relayed
+    // from the dispatcher's own binary.
+    offpeak: () => get('/api/dispatcher/plans/offpeak'),
+  },
+
+  // The roadmap lane (`server/modules/roadmap/`): the picture `dispatcher roadmap show --json` prints,
+  // read whole, and the nine writes the Roadmap tab presses — one helper per route. Read RAW like the
+  // dispatcher's verbs above, for the same reason: a write the dispatcher refuses answers 409 with its
+  // own sentence in the body's `stdout` (and a body the lane's fence refuses answers 400 with the
+  // sentence in `error`), so the reader looks at the body whatever the status. Nothing is optimistic:
+  // the picture redraws from the `roadmap_state` frame a landed write pokes.
+  roadmap: {
+    picture: () => get('/api/roadmap'),
+    // One feature's active regression cases, read when its dialog opens (`FeatureDialog`'s Cases
+    // section, through `useFeatureCases`): `{ cases }`, or 400/502 with the reason in `error`.
+    cases: (feature: string) => get(`/api/roadmap/cases?feature=${encodeURIComponent(feature)}`),
+    add: (body: RoadmapWriteBody) => post('/api/roadmap/add', body),
+    edit: (body: RoadmapWriteBody) => post('/api/roadmap/edit', body),
+    move: (body: RoadmapWriteBody) => post('/api/roadmap/move', body),
+    propose: (body: RoadmapWriteBody) => post('/api/roadmap/propose', body),
+    unpropose: (body: RoadmapWriteBody) => post('/api/roadmap/unpropose', body),
+    block: (body: RoadmapWriteBody) => post('/api/roadmap/block', body),
+    unblock: (body: RoadmapWriteBody) => post('/api/roadmap/unblock', body),
+    remove: (body: RoadmapWriteBody) => post('/api/roadmap/remove', body),
+    // The design door, not a roadmap verb: it sends the feature to Eupalinos (`dispatcher design`).
+    promote: (body: RoadmapWriteBody) => post('/api/roadmap/promote', body),
   },
 
   // The heal reflex, the runner's twin lane: the worker's own summary (the tab's whole poll),
@@ -776,6 +888,21 @@ export const api = {
     cycleStop: () => post('/api/heal/cycle/stop', {}),
   },
 
+  // The launch table (`~/.claude/charters/launch.toml`) behind Settings → Agents → Edit Agent Chains, relayed
+  // from the launch-table CLI: the census the window draws, one row's pins, and the table's defaults. Every
+  // write answers with the census read back after it, so the window never holds a picture the table did not confirm.
+  //
+  // A write waits as long as the relay lets the CLI run (90 s: the lock, then the shims' regeneration),
+  // plus a margin: at the browser's default 30 s a slow but healthy save would be called "not saved"
+  // while the CLI went on to write it.
+  agentLaunch: {
+    census: () => get('/api/agent-launch'),
+    saveRow: (name: string, change: AgentLaunchRowChange) =>
+      put('/api/agent-launch/rows/' + encodeURIComponent(name), change, { timeoutMs: AGENT_LAUNCH_WRITE_TIMEOUT_MS }),
+    saveDefaults: (change: AgentLaunchDefaultsChange) =>
+      put('/api/agent-launch/defaults', change, { timeoutMs: AGENT_LAUNCH_WRITE_TIMEOUT_MS }),
+  },
+
   // The API tab's Jev view: one reader answer per window, and the one thing the view can CHANGE —
   // the replay cache. Both go through the server's door, which runs `scripts/jev`; nothing in the
   // browser reads the ledger, the account file or the cache for itself. The window and the feed
@@ -786,7 +913,7 @@ export const api = {
     clearCache: () => post('/api/jev/cache/clear', {}),
   },
 
-  // The Kanban board (docs/kanban.md). Boards are GLOBAL: the selected board is a server-side
+  // The Kanban board (docs/MANUAL.md (kanban)). Boards are GLOBAL: the selected board is a server-side
   // setting, so switching projects never switches boards, and the only method here that names a
   // project is the first-mount lookup that adopts a board for the project the panel opened with.
   // Writes carry no actor — there is no per-user identity on this board yet, and the server
@@ -802,13 +929,11 @@ export const api = {
       patch(`/api/kanban/boards/${encodeURIComponent(id)}`, body),
     selectBoard: (id: string) => post(`/api/kanban/boards/${encodeURIComponent(id)}/select`, {}),
     lanes: (id: string) => get(`/api/kanban/boards/${encodeURIComponent(id)}/lanes`),
-    // The header's six registers in one request — four of this board, two of the whole estate —
-    // and one card's plan cost, which is `null` for a card whose plan column is empty.
+    // The header's six registers in one request — four of this board, two of the whole estate.
     vitals: (id: string) => get(`/api/kanban/boards/${encodeURIComponent(id)}/vitals`),
-    cardPlanCost: (id: string) => get(`/api/kanban/cards/${encodeURIComponent(id)}/plan-cost`),
 
-    // The lessons lane's REVIEW surface (docs/memory-intake.md; the store itself is
-    // docs/kanban.md's). Every call here is a person's: STAGING a lesson is the agent's, over MCP,
+    // The lessons lane's REVIEW surface (docs/MANUAL.md (memory-intake); the store itself is
+    // docs/MANUAL.md (kanban)'s). Every call here is a person's: STAGING a lesson is the agent's, over MCP,
     // and this app never writes one.
     //
     // `lessons` asks for `staged` and nothing else, at the route's own ceiling rather than its
@@ -878,7 +1003,7 @@ export const api = {
     events: (query: string) => get(`/api/kanban/events${query}`),
   },
 
-  // The board's Metis fleet (docs/kanban.md): who this board has out working for it, the four verbs
+  // The board's Metis fleet (docs/MANUAL.md (kanban)): who this board has out working for it, the four verbs
   // over a session, the nudge that wakes the driver, and the driver's own reading of the board.
   // `sessions` is the SEED — the fleet is pushed on change as a `kanban_metis_state` frame, which a
   // panel mounting between two changes would otherwise wait for with nothing on screen. `launch` is
@@ -914,15 +1039,20 @@ export const api = {
     transcript: readKanbanMetisTranscript,
   },
 
-  // The application registry (docs/applications.md): the rows the switcher's drawer lists, each a
-  // `{host}`-templated url this reader resolves against their own hostname. Three verbs and no
-  // more — `list` is read on mount and on every drawer open rather than polled, because the
+  // The application registry (docs/MANUAL.md (applications)): the rows the switcher's drawer lists, each a
+  // `{host}`-templated url this reader resolves against their own hostname. `list` is read on
+  // mount and on every drawer open rather than polled, because the
   // registry changes when the operator or a builder edits the file, and a row that appears a
   // minute after the edit is a row nobody is waiting for. The shapes are `@/shared/app-types`.
   apps: {
     list: () => get('/api/apps'),
-    add: (body: { id?: string; name: string; url: string; description?: string }) => post('/api/apps', body),
-    describe: (id: string, description: string) => patch(`/api/apps/${encodeURIComponent(id)}`, { description }),
+    add: (body: { id?: string; name: string; url: string; description?: string; project?: string }) =>
+      post('/api/apps', body),
+    // Sets or clears a row's description and/or project. Only the keys given are sent, and the server
+    // leaves an absent key's field alone: `{ project: '' }` unlinks, `{ description }` alone never
+    // touches the project. Named `fields` because `patch` is this module's own request helper.
+    update: (id: string, fields: { description?: string; project?: string }) =>
+      patch(`/api/apps/${encodeURIComponent(id)}`, fields),
     move: (id: string, direction: 'up' | 'down') => post(`/api/apps/${encodeURIComponent(id)}/move`, { direction }),
     addDivider: (title: string) => post('/api/apps/dividers', { title }),
     renameDivider: (id: string, title: string) => patch(`/api/apps/dividers/${encodeURIComponent(id)}`, { title }),
@@ -977,12 +1107,12 @@ export const api = {
     metis: readKanbanMetisTranscript,
   },
 
-  // The installed Claude CLI and the version each LIVE run is on (docs/cli-version.md). It
+  // The installed Claude CLI and the version each LIVE run is on (docs/MANUAL.md (cli-version)). It
   // answers 200 even when no version could be read — an unreadable binary is a fact in words,
   // so the caller reads the body's `installed`/`reason` rather than the status.
   cliVersion: () => get('/api/cli-version'),
 
-  // The money left on this host's DeepSeek account (docs/deepseek-balance.md). A different account
+  // The money left on this host's DeepSeek account (docs/MANUAL.md (deepseek-balance)). A different account
   // from the Claude slots the switcher holds, and a different origin: the server reads it from the
   // vendor with the key it holds, so the key never reaches this side. Answers 200 always, for the
   // same reason `accounts.usage` does — no reading is a reading in words, never an error wall.
@@ -990,7 +1120,7 @@ export const api = {
     balance: () => get('/api/deepseek/balance'),
 
     // What this host has spent on DeepSeek and who spent it, one window at a time
-    // (docs/deepseek-balance.md). The server answers by running the ledger reader as a command, so
+    // (docs/MANUAL.md (deepseek-balance)). The server answers by running the ledger reader as a command, so
     // the whole payload is one object and the tab reads it whole — every figure it draws is already
     // in the body, and no number is derived on this side. `feed` is the newest-first tail length.
     usage: (range: DeepseekRange, feed: number) => get(`/api/deepseek/usage?range=${range}&feed=${feed}`),

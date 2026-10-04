@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { HTMLAttributes } from 'react';
-import { Edit2, EyeOff, Loader2, MoreHorizontal, Smile, Trash2 } from 'lucide-react';
+import { Edit2, EyeOff, FolderInput, Loader2, MoreHorizontal, Smile, Trash2 } from 'lucide-react';
 import type { TFunction } from 'i18next';
 
 import { ActionMenu, Tooltip } from '@/shared/ui';
@@ -8,6 +8,7 @@ import { cn } from '@/shared/utils';
 import type { RecentConversationListItem } from '@/shared/types';
 import { useCompactSidebar } from '@/modules/sidebar/hooks/useCompactSidebar';
 import { SimpleChatIconGlyph } from '@/modules/sidebar/SidebarSessionIcon';
+import { chatMarks } from '@/modules/sidebar/utils/simpleChatMarks';
 
 // File-local: read only by SidebarSimpleList, which renders one of these per row.
 type SidebarSimpleListRowProps = {
@@ -26,11 +27,15 @@ type SidebarSimpleListRowProps = {
    */
   isSubagentRunning: boolean;
   isRemoveFailed: boolean;
+  // One step in, under the folder this chat sits in: indented, and marked `data-nested`.
+  isNested: boolean;
   onSelect: () => void;
   onArchive: () => void;
   onDelete: () => void;
   onRename: (title: string) => void;
   onChooseIcon: () => void;
+  // The "Move to folder…" entry, or null while the list holds no folder to move this chat into.
+  onMoveToFolder: (() => void) | null;
   // The pointer handlers that pick this row up; null when the list offers no reorder.
   dragProps: Pick<HTMLAttributes<HTMLElement>, 'onPointerDown' | 'onClickCapture' | 'onDragStart'> | null;
   // True while this very row is the one being carried: it fades so the drop line reads.
@@ -48,11 +53,13 @@ export default function SidebarSimpleListRow({
   isAwaitingInput,
   isSubagentRunning,
   isRemoveFailed,
+  isNested,
   onSelect,
   onArchive,
   onDelete,
   onRename,
   onChooseIcon,
+  onMoveToFolder,
   dragProps,
   isDragging,
   dropEdge,
@@ -63,6 +70,15 @@ export default function SidebarSimpleListRow({
   const [isEditing, setIsEditing] = useState(false);
   // The rename input's live value, seeded from the row's title when editing starts.
   const [draft, setDraft] = useState(row.sessionTitle);
+  // Which of the four marks this chat draws, from the row's own facts — the same rule the session
+  // picker's rows read, so the two rows cannot disagree. Editing hides all four below.
+  const marks = chatMarks({
+    unread: row.unread,
+    isSelected,
+    isRunning,
+    isAwaitingInput,
+    isSubagentRunning,
+  });
 
   const startRename = () => {
     setDraft(row.sessionTitle);
@@ -84,8 +100,16 @@ export default function SidebarSimpleListRow({
       data-session-id={row.sessionId}
       data-dragging={isDragging ? 'true' : 'false'}
       data-drop-edge={dropEdge ?? undefined}
+      // Present only on a row that sits inside a folder, so `[data-nested]` finds exactly those.
+      data-nested={isNested ? 'true' : undefined}
       className={cn(
         'group relative flex min-w-0 items-center gap-2 rounded-lg px-2 text-left transition-colors',
+        // ONE STEP IN, and the step is this row's own icon box plus its gap (`w-6` + `gap-2` = 32px),
+        // so a nested row's GLYPH starts in the folder header's chevron column and its title starts
+        // 13px past the folder's own name. Measured, not guessed: at 16px the title landed 3px LEFT
+        // of the folder's name — a near-miss that reads as a mistake — and the glyph sat between the
+        // header's glyph and its chevron, three columns crowded into one 54px band.
+        isNested && 'ml-8',
         // No `py-2` in compact mode: the anchor below reaches 44px by stretching to fill this
         // row's own content box, so vertical padding here would eat directly into that box and
         // force the row taller than its own 44px floor to compensate (measured live: 60px).
@@ -147,7 +171,7 @@ export default function SidebarSimpleListRow({
         </a>
       )}
 
-      {isAwaitingInput && !isEditing && (
+      {marks.awaitingInput && !isEditing && (
         <Tooltip content={t('simpleList.awaitingInput')} position="top">
           <span
             data-testid="simple-chat-awaiting-input"
@@ -161,7 +185,7 @@ export default function SidebarSimpleListRow({
         </Tooltip>
       )}
 
-      {isRunning && !isAwaitingInput && !isEditing && (
+      {marks.running && !isEditing && (
         <Tooltip content={t('simpleList.running')} position="top">
           <span
             data-testid="simple-chat-running"
@@ -172,7 +196,7 @@ export default function SidebarSimpleListRow({
         </Tooltip>
       )}
 
-      {isSubagentRunning && !isEditing && (
+      {marks.subagents && !isEditing && (
         <Tooltip content={t('simpleList.subagentsRunning')} position="top">
           <span
             data-testid="simple-chat-subagents-running"
@@ -186,7 +210,7 @@ export default function SidebarSimpleListRow({
         </Tooltip>
       )}
 
-      {row.unread && !isSelected && !isRunning && !isAwaitingInput && !isEditing && (
+      {marks.unread && !isEditing && (
         <span
           data-testid="simple-chat-unread"
           role="img"
@@ -203,7 +227,6 @@ export default function SidebarSimpleListRow({
             ariaLabel={`Chat options for ${row.sessionTitle}`}
             icon={MoreHorizontal}
             iconOnly
-            portal
             variant="ghost"
             size="icon"
             triggerClassName="h-7 w-7 flex-shrink-0 text-muted-foreground opacity-70 hover:bg-muted hover:opacity-100"
@@ -220,6 +243,16 @@ export default function SidebarSimpleListRow({
                 icon: Smile,
                 onSelect: onChooseIcon,
               },
+              // Only when the list holds a folder to move into: the entry sits between Change icon
+              // and Archive, and the divider below stays with Archive.
+              ...(onMoveToFolder === null
+                ? []
+                : [{
+                  key: 'simple-chat-move-to-folder',
+                  label: t('simpleList.moveToFolder'),
+                  icon: FolderInput,
+                  onSelect: onMoveToFolder,
+                }]),
               // Two entries where there was one "Remove", because they are two different
               // outcomes: archive keeps the transcript and can be undone from the archive
               // list, delete takes it off disk. Only the second is painted as danger.

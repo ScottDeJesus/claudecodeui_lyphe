@@ -6,11 +6,11 @@ import { AppDrawerHeader } from '@/modules/app-switcher/AppDrawerHeader';
 import { AppDrawerRow } from '@/modules/app-switcher/AppDrawerRow';
 import { useAppSwitcher } from '@/modules/app-switcher/context/AppSwitcherContext';
 import { useDrawerLayout } from '@/modules/app-switcher/hooks/useDrawerLayout';
-import type { PaneSide, PaneSlot } from '@/modules/app-switcher/context/AppSwitcherContext';
 import { NewApplicationForm } from '@/modules/app-switcher/NewApplicationForm';
 import { addRegistryApp, removeRegistryApp } from '@/modules/app-switcher/utils/registryRequests';
 import type { AppEntry } from '@/shared/app-types';
 import { useTheme } from '@/shared/context/ThemeContext';
+import type { PaneSide, PaneSlot } from '@/shared/types';
 import {
   Banner,
   Button,
@@ -39,7 +39,7 @@ type RemoveRefusal = {
 };
 
 /**
- * The applications drawer, opened from the FAB, on the kit.
+ * The applications drawer, opened from the FAB's radial by its Applications act, on the kit.
  *
  * A SHEET DOWN THE LEFT, min(88vw, 364px) on the canvas ground: the FAB it answers docks in the left
  * rail, so the sheet opens from the side the reader's hand is already on, and the strip of backdrop
@@ -226,10 +226,11 @@ export function AppDrawer() {
             {formOpen ? (
               <NewApplicationForm onSubmit={handleSubmitNewApplication} onCancel={handleCloseForm} />
             ) : !registryRead ? (
-              <div aria-busy="true" className="flex flex-col gap-2">
-                <div className="vv-skeleton h-[68px] rounded-xl" />
-                <div className="vv-skeleton h-[68px] rounded-xl" />
-                <div className="vv-skeleton h-[68px] rounded-xl" />
+              <div aria-busy="true" className="flex flex-col gap-1.5">
+                {/* The placeholder is the row it stands in for: 47px is that row's measured two-line height. */}
+                <div className="vv-skeleton h-[47px] rounded-xl" />
+                <div className="vv-skeleton h-[47px] rounded-xl" />
+                <div className="vv-skeleton h-[47px] rounded-xl" />
               </div>
             ) : showEmpty ? (
               <div className="rounded-xl bg-card">
@@ -241,7 +242,7 @@ export function AppDrawer() {
                 />
               </div>
             ) : (
-              <ul className="flex flex-col gap-2">
+              <ul className="flex flex-col gap-1.5">
                 {/* File order, dividers among the apps. A row whose app is missing from `apps` is skipped. */}
                 {rows.map((row, index) => {
                   const position = { first: index === 0, last: index === rows.length - 1 };

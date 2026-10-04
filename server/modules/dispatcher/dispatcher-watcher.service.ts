@@ -1,0 +1,63 @@
+import { createPolledLane, type PolledLane } from '@/shared/polled-lane.service.js';
+import type { DispatcherStateEvent } from '@/shared/types.js';
+
+import type { DispatcherPicture } from './dispatcher-state.service.js';
+
+/**
+ * The poll behind the `dispatcher_state` frame: every plan on this host, read off
+ * `dispatcher status --json` and put on the wire when the picture moves.
+ *
+ * The mechanism — why it polls rather than watches, when it speaks and when it stays quiet, and why
+ * a tick never takes the interval down with it — is `server/shared/polled-lane.service.ts`, where
+ * the lanes that share it can read it once. What is THIS lane's is named here: the frame it sends,
+ * and the snapshot it takes.
+ *
+ * This is the one lane on the server whose reading is a SUBPROCESS, so its snapshot answers a
+ * promise; the lane's own rules cover that (a tick with a reading still out is skipped, the picture
+ * it serves is the last one that landed, and until the first one lands there is no picture at all —
+ * `current()` answers `null` and a reader waits the gap out through `whenLanded`). It is also the
+ * one lane whose picture carries a clock of its own, so it is the one lane that states how its
+ * pictures are compared (`changeOf`) — without that, it would speak on every tick.
+ */
+
+export type DispatcherWatcherDependencies = {
+  /** The whole picture as of now, off the dispatcher's own command. Called on every tick; it never resolves on a body it cannot read. */
+  snapshot: () => Promise<DispatcherPicture>;
+  /** Puts one frame on every open chat socket. Called only when the picture changed. */
+  broadcast: (frame: DispatcherStateEvent) => void;
+  /** How often to look, in milliseconds. */
+  pollMs: number;
+  /** Injected by the composition root — this server has no logger (see `polled-lane.service.ts`). */
+  logError: (message: string) => void;
+};
+
+export type DispatcherWatcher = PolledLane<DispatcherPicture>;
+
+/**
+ * The picture as the lane compares it for change: everything but the read's own clock.
+ *
+ * `report.py::snapshot` stamps `generated_at` from the dispatcher's clock at SECOND resolution on
+ * every read, and this lane polls every two seconds, so two successive readings can never carry the
+ * same one. Compared whole, the picture would therefore differ from itself on every single tick — and
+ * the lane would put its ~28 KB frame on every open socket every two seconds on a host where nothing
+ * moved, which is the one thing a change-only lane exists not to do.
+ *
+ * `generated_at` is a READING CLOCK: it says when the dispatcher looked, not what it found. Every
+ * frame still carries it whole (`frame` below spreads the picture as the service built it), because
+ * a client is owed the reading's own time next to the frame's arrival time — so this is the
+ * comparison and nothing else.
+ */
+function changeOf(picture: DispatcherPicture): string {
+  const { generated_at: readAt, ...moving } = picture;
+  return JSON.stringify(moving);
+}
+
+export function createDispatcherWatcher(dependencies: DispatcherWatcherDependencies): DispatcherWatcher {
+  return createPolledLane<DispatcherPicture, DispatcherStateEvent>({
+    ...dependencies,
+    serialize: changeOf,
+    // The document's own keys, exactly as the service built them, plus the frame's two: its kind and
+    // its millisecond clock (`at`), which is what tells a client when the picture was read.
+    frame: (picture) => ({ kind: 'dispatcher_state', ...picture, at: Date.now() }),
+  });
+}

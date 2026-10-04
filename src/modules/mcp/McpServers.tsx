@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 
 import type { McpProject, McpProvider, McpScope, ProviderMcpServer } from '@/shared/types';
 import { IS_PLATFORM } from '@/shared/utils';
-import { ActionMenu, Badge, Button } from '@/shared/ui';
+import { ActionMenu, Badge, Button, SettingRow } from '@/shared/ui';
 import { MCP_GLOBAL_SUPPORTED_TRANSPORTS, MCP_PROVIDER_NAMES } from '@/shared/constants';
 import { useMcpServers } from '@/modules/mcp/hooks/useMcpServers';
 import { maskSecret } from '@/modules/mcp/utils/mcpFormatting';
@@ -60,6 +60,8 @@ const getServerKey = (server: ProviderMcpServer): string => (
 // shown read-only so users don't edit/delete them out of sync with the feature.
 const isManagedServer = (server: ProviderMcpServer): boolean => server.name.startsWith('cloudcli-');
 
+// The value breaks anywhere: a URL, a path or an env list is one unbroken word, and a word that
+// cannot break runs out of its column and under the row's action buttons.
 function ConfigLine({ label, children }: { label: string; children: string }) {
   if (!children) {
     return null;
@@ -68,7 +70,7 @@ function ConfigLine({ label, children }: { label: string; children: string }) {
   return (
     <div>
       {label}:{' '}
-      <code className="rounded bg-muted px-1 text-xs">{children}</code>
+      <code className="break-all rounded bg-muted px-1 text-xs">{children}</code>
     </div>
   );
 }
@@ -146,6 +148,14 @@ export default function McpServers({ selectedProvider, currentProjects }: McpSer
         <ActionMenu
           label="Add MCP Server"
           icon={Plus}
+          // In place, against the default. This panel renders inside Settings' own `fixed
+          // z-[9999]` layer, which sits in the ROOT stacking context — so a menu portalled to
+          // `<body>` at `z-[70]` is drawn UNDER the panel's content rather than over it, measured
+          // at 1280px in both themes (`.verify/export-menu-layer.mjs`, settings-mcp site, where
+          // every hit test at the menu's centre landed on `div.space-y-4`, the panel behind it).
+          // The trigger is the panel's first row and nothing here scrolls it near the panel's
+          // bottom edge, so the in-place menu has no ancestor to be clipped by.
+          portal={false}
           className="w-full sm:w-auto"
           triggerClassName={`w-full sm:w-auto ${MCP_PROVIDER_BUTTON_CLASSES[selectedProvider]}`}
           items={[
@@ -194,36 +204,37 @@ export default function McpServers({ selectedProvider, currentProjects }: McpSer
           const managed = isManagedServer(server);
 
           return (
-            <div key={getServerKey(server)} className="rounded-lg border border-border bg-card/50 p-4">
-              <div className="flex items-start justify-between">
-                <div className="min-w-0 flex-1">
-                  <div className="mb-2 flex flex-wrap items-center gap-2">
-                    {!managed && getTransportIcon(server.transport)}
-                    <span className="font-medium text-foreground">{server.name}</span>
+            <div key={getServerKey(server)} className="rounded-lg border border-border bg-card/50">
+              <SettingRow
+                icon={!managed ? getTransportIcon(server.transport) : undefined}
+                label={(
+                  <span className="flex flex-wrap items-center gap-2">
+                    <span className="text-foreground">{server.name}</span>
                     {!managed && (
                       <>
-                        <Badge variant="outline" className="text-xs">
+                        <Badge variant="outline" className="text-xs font-normal">
                           {server.transport || 'stdio'}
                         </Badge>
-                        <Badge variant="outline" className="text-xs">
+                        <Badge variant="outline" className="text-xs font-normal">
                           {getScopeLabel(server.scope)}
                         </Badge>
                         {server.projectDisplayName && (
-                          <Badge variant="outline" className="max-w-full truncate text-xs">
+                          <Badge variant="outline" className="max-w-full truncate text-xs font-normal">
                             {server.projectDisplayName}
                           </Badge>
                         )}
                       </>
                     )}
                     {managed && (
-                      <Badge variant="outline" className="gap-1 text-xs text-muted-foreground">
+                      <Badge variant="outline" className="gap-1 text-xs font-normal text-muted-foreground">
                         <Lock className="h-3 w-3" />
                         {t('mcpServers.managed.badge', { defaultValue: 'Managed' })}
                       </Badge>
                     )}
-                  </div>
-
-                  <div className="space-y-1 text-sm text-muted-foreground">
+                  </span>
+                )}
+                description={(
+                  <div className="space-y-1">
                     {!managed && (
                       <>
                         <ConfigLine label={t('mcpServers.config.command')}>{server.command || ''}</ConfigLine>
@@ -241,17 +252,17 @@ export default function McpServers({ selectedProvider, currentProjects }: McpSer
                       </>
                     )}
                     {managed && (
-                      <div className="text-xs text-muted-foreground">
+                      <div>
                         {t('mcpServers.managed.hint', {
                           defaultValue: 'Managed by CloudCLI.',
                         })}
                       </div>
                     )}
                   </div>
-                </div>
-
-                {!managed && (
-                  <div className="ml-4 flex items-center gap-2">
+                )}
+              >
+                {managed ? null : (
+                  <div className="flex items-center gap-2">
                     <Button
                       onClick={() => openForm(server)}
                       variant="ghost"
@@ -272,7 +283,7 @@ export default function McpServers({ selectedProvider, currentProjects }: McpSer
                     </Button>
                   </div>
                 )}
-              </div>
+              </SettingRow>
             </div>
           );
         })}

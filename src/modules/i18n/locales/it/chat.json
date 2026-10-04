@@ -113,7 +113,7 @@
     "deepseekFlash": "DeepSeek Flash",
     "deepseekFlashShort": "Flash",
     "deepseekFlashOffShort": "Claude",
-    "deepseekFlashTooltip": "Finché è attivo, le anime costruttrici del plan runner — il builder, il suo passaggio di correzioni e Athena — girano su DeepSeek Flash. Prometheus e gli scouts restano su Claude.",
+    "deepseekFlashTooltip": "Finché è attivo, le anime costruttrici del runner — il builder, il suo passaggio di correzioni e Athena — girano su DeepSeek Flash. Prometheus e gli scouts restano su Claude.",
     "deepseekFlashReading": "Lettura dell'interruttore…",
     "deepseekFlashUnreadable": "Non è stato possibile leggere l'interruttore — premi per riprovare.",
     "clearInput": "Cancella input",
@@ -310,5 +310,24 @@
       "warning": "Avviso",
       "caution": "Attenzione"
     }
+  },
+  "question": {
+    "needsInput": "Claude ha bisogno della tua risposta",
+    "selectAll": "Seleziona tutte quelle pertinenti",
+    "other": "Altro...",
+    "otherPlaceholder": "Scrivi la tua risposta...",
+    "skip": "Salta",
+    "skipAll": "Salta tutte",
+    "back": "Indietro",
+    "next": "Avanti",
+    "submit": "Invia",
+    "skipped": "Saltata",
+    "noAnswer": "Nessuna risposta",
+    "yourAnswer": "La tua risposta",
+    "yourWords": "Con parole tue",
+    "showFull": "Mostra la domanda intera",
+    "showLess": "Mostra meno",
+    "showDetails": "Mostra la domanda intera e tutte le opzioni",
+    "hideDetails": "Nascondi la domanda intera"
   }
 }

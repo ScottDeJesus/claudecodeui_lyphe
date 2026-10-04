@@ -1,4 +1,4 @@
-import type { NormalizedMessage } from '@/shared/types';
+import type { NormalizedMessage, SentUserTurn } from '@/shared/types';
 
 const LOCAL_USER_DEDUPE_WINDOW_MS = 5 * 60 * 1000;
 const LOCAL_USER_DEDUPE_CLOCK_SKEW_MS = 10_000;
@@ -56,40 +56,81 @@ function findServerEchoForLocalUser(
   // retire the message the user just sent.
   const firstEligibleIndex = localMessage.replacesAfterRowCount ?? 0;
 
-  const dedupeWindow = localFingerprint.text
+  return findClosestMatchingUserTurn(
+    serverMessages,
+    localFingerprint,
+    localTime,
+    firstEligibleIndex,
+    claimedServerIds,
+  )?.message ?? null;
+}
+
+/**
+ * The row among `messages` that is the user turn `fingerprint` sent at `localTime`: the closest in
+ * time of those with the same words and attachments inside the dedupe window. The one rule both the
+ * echo retirement above and `findSentUserTurn` match by, so a row one of them calls the same turn is
+ * the row the other does.
+ */
+function findClosestMatchingUserTurn(
+  messages: NormalizedMessage[],
+  fingerprint: UserTurnFingerprint,
+  localTime: number,
+  firstEligibleIndex: number,
+  claimedServerIds: Set<string>,
+): { message: NormalizedMessage; index: number } | null {
+  const dedupeWindow = fingerprint.text
     ? LOCAL_USER_DEDUPE_WINDOW_MS
     : LOCAL_ATTACHMENT_ONLY_DEDUPE_WINDOW_MS;
-  let closestMatch: NormalizedMessage | null = null;
+  let closestMatch: { message: NormalizedMessage; index: number } | null = null;
   let closestTimeDifference = Number.POSITIVE_INFINITY;
 
-  for (let index = firstEligibleIndex; index < serverMessages.length; index++) {
-    const serverMessage = serverMessages[index];
-    if (claimedServerIds.has(serverMessage.id)) {
+  for (let index = firstEligibleIndex; index < messages.length; index++) {
+    const candidate = messages[index];
+    if (claimedServerIds.has(candidate.id)) {
       continue;
     }
 
-    const serverFingerprint = userTurnFingerprint(serverMessage);
-    if (!serverFingerprint || !userTurnFingerprintsMatch(localFingerprint, serverFingerprint)) {
+    const candidateFingerprint = userTurnFingerprint(candidate);
+    if (!candidateFingerprint || !userTurnFingerprintsMatch(fingerprint, candidateFingerprint)) {
       continue;
     }
 
-    const serverTime = readMessageTime(serverMessage);
+    const candidateTime = readMessageTime(candidate);
     if (
-      serverTime === null
-      || serverTime < localTime - LOCAL_USER_DEDUPE_CLOCK_SKEW_MS
-      || serverTime - localTime > dedupeWindow
+      candidateTime === null
+      || candidateTime < localTime - LOCAL_USER_DEDUPE_CLOCK_SKEW_MS
+      || candidateTime - localTime > dedupeWindow
     ) {
       continue;
     }
 
-    const timeDifference = Math.abs(serverTime - localTime);
+    const timeDifference = Math.abs(candidateTime - localTime);
     if (timeDifference < closestTimeDifference) {
-      closestMatch = serverMessage;
+      closestMatch = { message: candidate, index };
       closestTimeDifference = timeDifference;
     }
   }
 
   return closestMatch;
+}
+
+/**
+ * Finds the transcript row that is the message the operator sent, whichever form it is in — the local
+ * echo or the persisted row that replaced it (they share no id and no timestamp). Answers the row and
+ * its index in `messages`, or null when it is not among them (an older page the transcript has not
+ * loaded). Used by the chat's reply anchor to find where the operator replied.
+ */
+export function findSentUserTurn(
+  messages: NormalizedMessage[],
+  sent: SentUserTurn,
+): { message: NormalizedMessage; index: number } | null {
+  return findClosestMatchingUserTurn(
+    messages,
+    { text: sent.text.trim(), imageCount: sent.imageCount, fileCount: sent.fileCount },
+    sent.sentAtMs,
+    0,
+    new Set(),
+  );
 }
 
 /**
@@ -106,7 +147,7 @@ export function removeOptimisticUserEchoes(
     // A row with no id is not an optimistic echo of anything — it passes through untouched, the
     // way a server row does. Reading `id.startsWith` off it would throw instead, and this merge
     // runs on the websocket listener's own thread of control: one unrecognised row would cost the
-    // whole conversation its liveness, which is exactly what it did when a box-wide `arc_state`
+    // whole conversation its liveness, which is exactly what it did when a box-wide `dispatcher_state`
     // frame was appended as a chat row and left the open transcript frozen until a reload.
     if (typeof message?.id !== 'string' || !message.id.startsWith('local_')) {
       return true;

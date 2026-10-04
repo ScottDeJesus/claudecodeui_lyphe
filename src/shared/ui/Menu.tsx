@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 
+import { useHostWindow } from '@/shared/context/HostWindowContext';
 import { OWNS_ESCAPE } from '@/shared/ui/overlayEscape';
 import { cn } from '@/shared/utils';
 
@@ -43,6 +44,7 @@ type MenuProps = {
  * trap and no arrow-key roving — every item is a tab stop, and no site asks for more.
  */
 export function Menu({ trigger, triggerLabel, items, onSelect, width, align = 'left' }: MenuProps) {
+  const hostWindow = useHostWindow();
   // Whether the panel is showing. Not derivable: `selected` is the choice already made, and
   // the panel is open precisely while the reader is reconsidering it.
   const [open, setOpen] = useState(false);
@@ -61,13 +63,16 @@ export function Menu({ trigger, triggerLabel, items, onSelect, width, align = 'l
       triggerRef.current?.focus();
     };
 
-    document.addEventListener('pointerdown', closeOnOutsidePointer);
-    document.addEventListener('keydown', closeOnEscape);
+    // The host window's document: a panel opened in the floating window hears that window's pointer
+    // and keys, not the opener's.
+    const hostDocument = hostWindow.document;
+    hostDocument.addEventListener('pointerdown', closeOnOutsidePointer);
+    hostDocument.addEventListener('keydown', closeOnEscape);
     return () => {
-      document.removeEventListener('pointerdown', closeOnOutsidePointer);
-      document.removeEventListener('keydown', closeOnEscape);
+      hostDocument.removeEventListener('pointerdown', closeOnOutsidePointer);
+      hostDocument.removeEventListener('keydown', closeOnEscape);
     };
-  }, [open]);
+  }, [open, hostWindow]);
 
   const choose = (id: string) => {
     onSelect(id);

@@ -5,10 +5,11 @@ import type { AppEntry } from '@/shared/app-types';
  * The registry's WRITE verbs, and the one reader of a refusal that every registry request in
  * this module answers with.
  *
- * Three callers, one sentence each: the drawer's add and remove handlers call the verbs, and the
- * list read (`useAppRegistry`) reads its own refusals in the same words — which is why the reader
- * lives here, beside the writes, rather than inside either of them. A server that says no says it in
- * ONE place, and the reader prints what it said.
+ * Three callers, one sentence each: the drawer's handlers and the row's own saves (its description
+ * and its Link project… picker, `describeRegistryApp` and `linkRegistryProject`) call the verbs, and
+ * the list read (`useAppRegistry`) reads its own refusals in the same words — which is why the
+ * reader lives here, beside the writes, rather than inside either of them. A server that says no
+ * says it in ONE place, and the reader prints what it said.
  *
  * WHY NOT `readApiJson`: this server answers a refusal with `{ success: false, error: { code,
  * message, details } }` — `error` is an OBJECT — and `readApiJson` throws `new Error(data.error)`,
@@ -26,8 +27,18 @@ export async function addRegistryApp(draft: Pick<AppEntry, 'name' | 'url' | 'des
 
 /** Sets one row's description, or clears it when blank. Rejects with the server's own sentence. */
 export async function describeRegistryApp(appId: string, description: string): Promise<void> {
-  const response = await api.apps.describe(appId, description);
+  const response = await api.apps.update(appId, { description });
   if (!response.ok) throw new Error(await refusalInWords(response, 'The description was not saved'));
+}
+
+/**
+ * Links one row to the project it is built from, by that project's `fullPath`; a blank path unlinks.
+ * The server validates the path and stores it normalised, so a refusal (a relative path, say) comes
+ * back as its own sentence. Rejects with it; the row prints it under the picker.
+ */
+export async function linkRegistryProject(appId: string, projectPath: string): Promise<void> {
+  const response = await api.apps.update(appId, { project: projectPath });
+  if (!response.ok) throw new Error(await refusalInWords(response, 'The project was not linked'));
 }
 
 /** Moves any row, app or divider, one place up or down. */

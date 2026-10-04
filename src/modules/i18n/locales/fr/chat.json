@@ -114,7 +114,7 @@
     "deepseekFlash": "DeepSeek Flash",
     "deepseekFlashShort": "Flash",
     "deepseekFlashOffShort": "Claude",
-    "deepseekFlashTooltip": "Tant que ceci est actif, les âmes de construction du plan runner — le builder, sa passe de correction et Athena — tournent sur DeepSeek Flash. Prometheus et les scouts restent sur Claude.",
+    "deepseekFlashTooltip": "Tant que ceci est actif, les âmes de construction du runner — le builder, sa passe de correction et Athena — tournent sur DeepSeek Flash. Prometheus et les scouts restent sur Claude.",
     "deepseekFlashReading": "Lecture de l'interrupteur…",
     "deepseekFlashUnreadable": "L'interrupteur n'a pas pu être lu — appuyez pour réessayer.",
     "clearInput": "Effacer la saisie",
@@ -312,5 +312,24 @@
       "warning": "Avertissement",
       "caution": "Attention"
     }
+  },
+  "question": {
+    "needsInput": "Claude a besoin de votre réponse",
+    "selectAll": "Sélectionnez toutes les réponses pertinentes",
+    "other": "Autre...",
+    "otherPlaceholder": "Saisissez votre réponse...",
+    "skip": "Passer",
+    "skipAll": "Tout passer",
+    "back": "Retour",
+    "next": "Suivant",
+    "submit": "Envoyer",
+    "skipped": "Passée",
+    "noAnswer": "Aucune réponse",
+    "yourAnswer": "Votre réponse",
+    "yourWords": "Dans vos mots",
+    "showFull": "Voir la question entière",
+    "showLess": "Voir moins",
+    "showDetails": "Voir la question entière et toutes les options",
+    "hideDetails": "Masquer la question entière"
   }
 }

@@ -20,8 +20,19 @@ import type { SoulLaunchSnapshot, SubagentTranscriptResult } from '@/shared/type
  */
 
 export type DispatchSoulsRouterDependencies = {
-  /** The lane's last reading. Never a fresh scan: the poll already owns the disk. */
-  current: () => SoulLaunchSnapshot[];
+  /**
+   * The lane's last reading — `null` while a first one has not landed, which is the one thing a lane
+   * that has not read can honestly say. Never a fresh scan: the poll already owns the disk.
+   *
+   * THIS LANE'S READING IS FROM MEMORY, so its construction seed is already a picture and the `null`
+   * below is never taken (`dispatch-souls.module.ts`). The type admits it because the polled lane's
+   * door is shared with a lane whose reading is a subprocess, and the answer written here is the one
+   * such a lane owes a reader: "not read yet", never an empty launch list dressed as a reading — and
+   * never an error status, because the refusal is not picture-shaped and the client drops it anyway
+   * (`SoulLaunchFeed.tsx`: `!Array.isArray(body.launches)`), while a non-2xx status is what a browser
+   * logs as a console error in every tab that seeds through it.
+   */
+  current: () => SoulLaunchSnapshot[] | null;
   /** One launch's transcript, from the launch id the request carries. */
   transcript: (launchId: string) => Promise<SubagentTranscriptResult>;
 };
@@ -33,7 +44,12 @@ export function createDispatchSoulsRouter(dependencies: DispatchSoulsRouterDepen
   const router = express.Router();
 
   router.get('/launches', (_request, response) => {
-    response.json({ launches: dependencies.current(), at: Date.now() });
+    const launches = dependencies.current();
+    if (launches === null) {
+      response.json({ error: 'the launcher has not been read yet' });
+      return;
+    }
+    response.json({ launches, at: Date.now() });
   });
 
   router.get('/launches/:launchId/transcript', async (request, response) => {

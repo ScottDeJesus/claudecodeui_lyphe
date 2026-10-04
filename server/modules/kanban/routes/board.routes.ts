@@ -1,6 +1,8 @@
 import express from 'express';
 import type { NextFunction, Request, RequestHandler, Response, Router } from 'express';
 
+import { kanbanWriteContext } from '@/shared/kanban-types.js';
+
 import type { KanbanBoardsService } from '../kanban-boards.service.js';
 import { vitalsCounts } from '../kanban-vitals.service.js';
 
@@ -78,9 +80,10 @@ function parseEventLimit(value: unknown): number {
  * claimable count, the six registers of its vitals strip, the lookup that resolves a project to
  * its board, and the board's audit log.
  *
- * Auth is the mount's (`authenticateToken` in `server/index.ts`): no file here imports the guard,
- * and no route reads an actor off the request — the write verbs take the optional trailing context
- * and the routes pass nothing, so an event's actor is `'operator'`.
+ * Auth is the mount's (`authenticateToken` in `server/index.ts`, `kanbanMetisSecretGuard` for
+ * `/api/kanban-pm`): no file here imports a guard. Every write verb takes the optional trailing
+ * context and the route hands it `kanbanWriteContext(response)` — the actor the mount's guard
+ * stamped, so an event's actor is `'metis'` through the Metis door and `'operator'` everywhere else.
  *
  * These handlers parse, call one service verb and shape the answer. No transaction, no database
  * handle, and no board policy lives here. The card routes are Phase 3's and are a sibling file.
@@ -111,7 +114,12 @@ export function createBoardRoutes(dependencies: BoardRouteDependencies): Router 
         return;
       }
 
-      response.json({ board: boards.createBoard({ name: body.name, projectId: body.projectId ?? null }) });
+      response.json({
+        board: boards.createBoard(
+          { name: body.name, projectId: body.projectId ?? null },
+          kanbanWriteContext(response)
+        ),
+      });
     })
   );
 
@@ -177,14 +185,16 @@ export function createBoardRoutes(dependencies: BoardRouteDependencies): Router 
         patch.archived = body.archived;
       }
 
-      response.json({ board: boards.updateBoard(request.params.boardId, patch) });
+      response.json({
+        board: boards.updateBoard(request.params.boardId, patch, kanbanWriteContext(response)),
+      });
     })
   );
 
   router.post(
     '/boards/:boardId/select',
     handle<{ boardId: string }>((request, response) => {
-      response.json(boards.selectBoard(request.params.boardId));
+      response.json(boards.selectBoard(request.params.boardId, kanbanWriteContext(response)));
     })
   );
 

@@ -8,7 +8,7 @@ import { clearCollapsed, hasEntered, isCollapsed, markEntered, setCollapsed } fr
  *
  * Used by `ShapeFrame`, `ShapeSection`, `LongOutput` and `useFilePreview` (a chip's preview fold). Three components each remembering to
  * call `useIsExportingTranscript()` themselves would be three chances to ship a shape that exports
- * EMPTY — the failure `docs/architecture/06-tool-view.md` §"Rendering into an exported document"
+ * EMPTY — the failure MAN-408
  * warns about — so this is the only place under `shapes/` that reads the export context. A fourth
  * collapsible shape gets both rules for free by calling this and nothing else, and a shape that has
  * controls but no fold state of its own (`DataTable`, `DiffBlock`, `TabbedCode`) calls

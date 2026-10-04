@@ -1,9 +1,10 @@
 import { useCallback, useLayoutEffect, useRef, useState } from 'react';
 import type { ComponentType, KeyboardEvent } from 'react';
 
+import { useHostWindow } from '@/shared/context/HostWindowContext';
 import { MoreFace, TabsMore } from '@/shared/ui/TabsMore';
 import { useTabsOverflow } from '@/shared/ui/useTabsOverflow';
-import { cn } from '@/shared/utils';
+import { cn, resizeObserverIn } from '@/shared/utils';
 
 /**
  * `count` is a capability of the strip, not a prop every caller needs: a measured site
@@ -13,13 +14,38 @@ import { cn } from '@/shared/utils';
  * A tab with an `icon` draws the glyph ALONE and keeps `label` as its accessible name and
  * hover title — the workspace strip's built-in tabs, where seven words never fit a 328px
  * sidebar without a scroller. A tab without one draws its label, unchanged.
+ *
+ * `attention` is the SECOND capability of the same kind, and it is a sentence rather than a
+ * number: what is waiting on the tab, in the operator's own words — the Roadmap tab's
+ * "`3 waiting for you`". While it is set the tab's mark is drawn in the warn register (the dot
+ * amber on an icon tab, the count pill amber on a word tab) and the title reads
+ * `<label> (<count>) · <attention>`, so a mark that is only a colour is never the whole signal
+ * (doctrine §6). A tab without one is drawn exactly as it was.
  */
 export type TabItem = {
   id: string;
   label: string;
   count?: number;
+  /** What waits on this tab, said in words — drawn on hover, and the reason its mark turns amber. */
+  attention?: string;
   icon?: ComponentType<{ className?: string; strokeWidth?: string | number }>;
 };
+
+/**
+ * A tab's hover title: its name, the count in words when the mark can only say THAT something
+ * waits — an icon tab's dot never says how many — and the attention beside both.
+ *
+ * A word tab that draws its own label needs no title for it; one carrying attention does, because
+ * the amber is a colour and the sentence is the point. An `equal`-share tab keeps the full label
+ * there whatever else it carries, since its slice of the row may have cut the word short.
+ * `undefined` is what leaves the attribute off entirely rather than drawing an empty tooltip.
+ */
+function tabTitle(tab: TabItem, hasCount: boolean, equal: boolean): string | undefined {
+  const withCount = hasCount ? `${tab.label} (${tab.count})` : tab.label;
+  if (tab.attention !== undefined) return `${withCount} · ${tab.attention}`;
+  if (tab.icon) return withCount;
+  return equal ? tab.label : undefined;
+}
 
 /**
  * Arrow / Home / End move the selection, which is the contract `role="tablist"` announces.
@@ -57,6 +83,11 @@ function moveSelectionByKey(event: KeyboardEvent<HTMLElement>, current: HTMLElem
 /** A tab's face — the glyph or the word, and its count — drawn by the live tab and by the ghost. */
 function TabFace({ tab }: { tab: TabItem }) {
   const hasCount = typeof tab.count === 'number' && tab.count > 0;
+  // The mark's amber register: set while the tab's own attention says something is waiting on the
+  // OPERATOR, not merely counted. It tones the marks that are drawn and never decides whether one is
+  // — a tab with nothing to count draws no mark either way — so the count stays the one rule for
+  // what a mark exists, and attention is only ever the colour it wears.
+  const tone = tab.attention !== undefined ? 'warn' : undefined;
 
   return (
     <>
@@ -65,14 +96,14 @@ function TabFace({ tab }: { tab: TabItem }) {
         // row, a dot anchored to the TAB's corner drifts as far from the icon as the slice is wide.
         <span className="vv-tabs__glyph">
           <tab.icon className="vv-tabs__icon" strokeWidth={2} />
-          {hasCount && <span className="vv-tabs__dot" aria-hidden="true" />}
+          {hasCount && <span className="vv-tabs__dot" data-tone={tone} aria-hidden="true" />}
         </span>
       ) : tab.label}
       {/* A glyph has no room beside it for a number, so an icon tab marks a waiting count with a
         * single accent dot; a word tab still counts out loud in the pill. Both are decoration —
         * the tab's name is its aria-label either way. */}
       {hasCount && !tab.icon && (
-        <span className="vv-tabs__count" data-tone="neutral" aria-hidden="true">
+        <span className="vv-tabs__count" data-tone={tone ?? 'neutral'} aria-hidden="true">
           {tab.count}
         </span>
       )}
@@ -147,6 +178,7 @@ type TabsProps = TabsBaseProps & (
  * tablist owns tabs and a menu button is not one.
  */
 export function Tabs({ tabs, active, onChange, ariaLabel, variant = 'segmented', equal = false, overflowLabel }: TabsProps) {
+  const hostWindow = useHostWindow();
   const isUnderline = variant === 'underline';
   const overflows = isUnderline && !equal && overflowLabel !== undefined;
   const { rowRef, ghostRef, shown, collapsed } = useTabsOverflow(tabs, active, overflows);
@@ -188,15 +220,17 @@ export function Tabs({ tabs, active, onChange, ariaLabel, variant = 'segmented',
     measure();
 
     const list = listRef.current;
-    if (!list || typeof ResizeObserver === 'undefined') return undefined;
+    if (!list) return undefined;
 
     // Every tab, not just the strip: a label that grows changes ITS box, and the strip's own
-    // width may not move at all when the row has room to absorb it.
-    const observer = new ResizeObserver(measure);
+    // width may not move at all when the row has room to absorb it. Built by the host window's own
+    // constructor: a strip in the transcript's tabbed code is drawn in the floating window too.
+    const observer = resizeObserverIn(hostWindow, measure);
+    if (!observer) return undefined;
     observer.observe(list);
     for (const tab of list.querySelectorAll('[role="tab"]')) observer.observe(tab);
     return () => observer.disconnect();
-  }, [isUnderline, measure, active, tabs, shownKey]);
+  }, [isUnderline, measure, active, tabs, shownKey, hostWindow]);
 
   const strip = (
     <div
@@ -231,9 +265,10 @@ export function Tabs({ tabs, active, onChange, ariaLabel, variant = 'segmented',
             // a div between `role="tablist"` and `role="tab"` breaks the relationship a screen
             // reader announces the strip by. An icon-only tab still has to be nameable on hover,
             // and it carries the count in words there, since the dot says only THAT something
-            // waits and never how much. An equal-share tab carries its label there too, since its
-            // share of the row may have cut the word short.
-            title={tab.icon ? (hasCount ? `${tab.label} (${tab.count})` : tab.label) : equal ? tab.label : undefined}
+            // waits and never how much — and the attention, word for word, because a mark that is
+            // only a colour says nothing at all to a reader who cannot see it. An equal-share tab
+            // carries its label there too, since its share of the row may have cut the word short.
+            title={tabTitle(tab, hasCount, equal)}
             // Roving: exactly one tab is a Tab stop, and the arrows walk the rest.
             tabIndex={index === stopIndex ? 0 : -1}
             onClick={() => onChange(tab.id)}
@@ -260,7 +295,17 @@ export function Tabs({ tabs, active, onChange, ariaLabel, variant = 'segmented',
       }}
     >
       {strip}
-      {collapsed.length > 0 && <TabsMore label={overflowLabel} tabs={collapsed} onSelect={onChange} />}
+      {/* The trigger carries what the collapsed tabs carry: a dot for a count behind it, and the
+          warn tone when one of them is waiting on the operator — so the Roadmap tab hidden behind More
+          keeps its amber instead of losing the one mark that says it wants him. */}
+      {collapsed.length > 0 && (
+        <TabsMore
+          label={overflowLabel}
+          tabs={collapsed}
+          onSelect={onChange}
+          warn={collapsed.some((tab) => tab.attention !== undefined)}
+        />
+      )}
       {/* Every tab once, at its natural width, plus the trigger — what the plan is measured
         * against. Invisible, out of the flow, and clipped to the row so it never widens a scroller
         * the strip happens to sit in. */}

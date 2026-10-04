@@ -122,7 +122,7 @@
     "deepseekFlash": "DeepSeek Flash",
     "deepseekFlashShort": "Flash",
     "deepseekFlashOffShort": "Claude",
-    "deepseekFlashTooltip": "开启期间，plan runner 的构建之魂（构建者、修复轮与 Athena）在 DeepSeek Flash 上运行。Prometheus 与侦察者仍留在 Claude。",
+    "deepseekFlashTooltip": "开启期间，runner 的构建之魂（构建者、修复轮与 Athena）在 DeepSeek Flash 上运行。Prometheus 与侦察者仍留在 Claude。",
     "deepseekFlashReading": "正在读取开关…",
     "deepseekFlashUnreadable": "无法读取开关——按下以重试。",
     "clearInput": "清空输入",
@@ -329,5 +329,24 @@
       "warning": "警告",
       "caution": "注意"
     }
+  },
+  "question": {
+    "needsInput": "Claude 需要你的回答",
+    "selectAll": "选择所有适用项",
+    "other": "其他...",
+    "otherPlaceholder": "输入你的回答...",
+    "skip": "跳过",
+    "skipAll": "全部跳过",
+    "back": "上一步",
+    "next": "下一步",
+    "submit": "提交",
+    "skipped": "已跳过",
+    "noAnswer": "未作答",
+    "yourAnswer": "你的回答",
+    "yourWords": "你的原话",
+    "showFull": "显示完整问题",
+    "showLess": "收起",
+    "showDetails": "显示完整问题和所有选项",
+    "hideDetails": "隐藏完整问题"
   }
 }

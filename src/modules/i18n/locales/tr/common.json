@@ -332,12 +332,27 @@
       "closeSidebar": "Kenar çubuğunu kapat"
     }
   },
+  "lightbox": {
+    "close": "Önizlemeyi kapat",
+    "zoomIn": "Yakınlaştır",
+    "zoomOut": "Uzaklaştır",
+    "fit": "Ekrana sığdır"
+  },
   "shapes": {
-    "diagramFailed": "Bu diyagram çizilemedi; kaynağı gösteriliyor."
+    "diagramFailed": "Bu diyagram çizilemedi; kaynağı gösteriliyor.",
+    "diagram": "Diyagram",
+    "diagramOpen": "Diyagramı tam ekran aç"
+  },
+  "runner": {
+    "collapse": "Daralt",
+    "expand": "Genişlet"
   },
   "gutters": {
     "runner": {
       "title": "Çalıştırmalar"
+    },
+    "roadmap": {
+      "title": "Yol haritası"
     },
     "memory": {
       "title": "Bellek",
@@ -369,6 +384,9 @@
       "open": "Sayfayı yeni sekmede aç",
       "rejected": "Bu bir http:// veya https:// adresi değil"
     },
+    "notes": {
+      "title": "Notlar"
+    },
     "open": "{{name}} aç",
     "collapse": "Daralt",
     "dragHint": "İki yandan birine sürükleyin",
@@ -380,7 +398,16 @@
     "exitFullscreen": "Tam ekrandan çık"
   },
   "applications": {
-    "fabLabel": "Uygulamalar",
+    "fabLabelMenu": "Menüyü aç",
+    "fabLabelCollapse": "Sohbeti küçült",
+    "radialLabel": "Hızlı eylemler",
+    "fabUnread": "Sıra sizde: sizi bir yanıt ya da çalıştırma bekliyor",
+    "actChat": "Sohbet",
+    "actCollapseChat": "Sohbeti küçült",
+    "actApplications": "Uygulamalar",
+    "actReload": "Uygulamayı yenile",
+    "actClose": "Uygulamayı kapat",
+    "actOpenInTab": "Sekmede aç",
     "heading": "<em>Uygulamaların</em>",
     "closeDrawer": "Kapat",
     "close": "Tümünü kapat",
@@ -399,6 +426,10 @@
     "closeDual": "Bölünmüş ekranı kapat",
     "editDescription": "Açıklamayı düzenle",
     "descriptionLabel": "{{name}} açıklaması",
+    "linkProject": "Projeyi bağla…",
+    "noProject": "Proje yok",
+    "projectLabel": "{{name}} projesi",
+    "projectUnknown": "Bu yolda proje yok",
     "moveUp": "Yukarı taşı",
     "moveDown": "Aşağı taşı",
     "addDivider": "Ayırıcı ekle",
@@ -435,5 +466,29 @@
     "appearanceLight": "Açık görünüm",
     "appearanceDark": "Koyu görünüm",
     "divider": "Uygulamaları yeniden boyutlandır"
+  },
+  "chatHost": {
+    "panelLabel": "Yüzen sohbet",
+    "collapse": "Sohbeti küçült",
+    "resize": "Sohbeti yeniden boyutlandır",
+    "panelTitle": "Sohbet yüzen panelde",
+    "panelMessage": "Çalışmanın üstünde açık.",
+    "windowTitle": "Sohbet kendi penceresinde",
+    "windowMessage": "Diğer pencerelerin üstünde kalır.",
+    "bringBack": "Geri getir",
+    "pickerTitle": "Konuşmayı değiştir",
+    "pickerList": "Konuşmalar",
+    "pickerEmpty": "Henüz konuşma yok. “Yeni sohbet” ile bir tane başlat.",
+    "pickerLoading": "Konuşmalar yükleniyor",
+    "pickerError": "Konuşmalar yüklenemedi"
+  },
+  "gitPanel": {
+    "lastPushed": "Son push {{when}}",
+    "neverPushed": "Buradan henüz push yapılmadı",
+    "age": {
+      "justNow": "az önce",
+      "minutesAgo": "{{count}} dk önce",
+      "hoursAgo": "{{count}} sa önce"
+    }
   }
 }

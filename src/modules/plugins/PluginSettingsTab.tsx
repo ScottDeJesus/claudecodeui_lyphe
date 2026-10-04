@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 
 import { usePlugins } from '@/modules/plugins/context/PluginsContext';
+import { SettingRow } from '@/shared/ui';
 import type { Plugin } from '@/shared/types';
 import PluginIcon from '@/modules/plugins/PluginIcon';
 
@@ -235,10 +236,12 @@ function PluginCard({
       {/* Left accent bar */}
       <div className={`w-[3px] flex-shrink-0 ${accentColor} transition-colors duration-300`} />
 
-      <div className="min-w-0 flex-1 p-4">
-        {/* Header row */}
-        <div className="flex items-start justify-between gap-3">
-          <div className="flex min-w-0 items-center gap-2.5">
+      {/* The card's own chrome ends at the accent bar; the row inside is the kit's, so the actions
+          sit beside the text only while a 10rem text column fits next to them and drop below it on
+          a phone, instead of squeezing the name, the byline and the repo slug into a sliver. */}
+      <div className="min-w-0 flex-1">
+        <SettingRow
+          icon={(
             <div className="h-5 w-5 flex-shrink-0 text-foreground/80">
               <PluginIcon
                 pluginName={plugin.name}
@@ -246,49 +249,44 @@ function PluginCard({
                 className="h-5 w-5 [&>svg]:h-full [&>svg]:w-full"
               />
             </div>
-            <div className="min-w-0">
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="text-sm font-semibold leading-none text-foreground">
-                  {plugin.displayName}
-                </span>
-                <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
-                  v{plugin.version}
-                </span>
-                <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
-                  {plugin.slot}
-                </span>
-                <ServerDot running={!!plugin.serverRunning} t={t} />
-              </div>
+          )}
+          label={(
+            <span className="flex flex-wrap items-center gap-2">
+              <span className="font-semibold text-foreground">{plugin.displayName}</span>
+              <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-normal text-muted-foreground">
+                v{plugin.version}
+              </span>
+              <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-normal text-muted-foreground">
+                {plugin.slot}
+              </span>
+              <ServerDot running={!!plugin.serverRunning} t={t} />
+            </span>
+          )}
+          description={(
+            <div className="space-y-1">
               {plugin.description && (
-                <p className="mt-1 text-sm leading-snug text-muted-foreground">
-                  {plugin.description}
-                </p>
+                <p className="text-sm leading-snug">{plugin.description}</p>
               )}
-              <div className="mt-1 flex items-center gap-3">
-                {plugin.author && (
-                  <span className="text-xs text-muted-foreground/60">
-                    {plugin.author}
-                  </span>
-                )}
-                {plugin.repoUrl && (
-                  <a
-                    href={plugin.repoUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1 text-xs text-muted-foreground/60 transition-colors hover:text-foreground"
-                  >
-                    <GitBranch className="h-3 w-3" />
-                    <span className="max-w-[200px] truncate">
-                      {plugin.repoUrl.replace(/^https?:\/\/(www\.)?github\.com\//, '')}
-                    </span>
-                  </a>
-                )}
-              </div>
+              {(plugin.author || plugin.repoUrl) && (
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-muted-foreground/60">
+                  {plugin.author && <span>{plugin.author}</span>}
+                  {plugin.repoUrl && (
+                    <a
+                      href={plugin.repoUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-start gap-1 transition-colors hover:text-foreground"
+                    >
+                      <GitBranch className="mt-0.5 h-3 w-3 flex-shrink-0" />
+                      <span className="min-w-0 break-all">{repoSlug(plugin.repoUrl)}</span>
+                    </a>
+                  )}
+                </div>
+              )}
             </div>
-          </div>
-
-          {/* Controls */}
-          <div className="flex flex-shrink-0 items-center gap-2">
+          )}
+        >
+          <div className="flex items-center gap-2">
             <button
               onClick={onUpdate}
               disabled={updating || !plugin.repoUrl}
@@ -317,36 +315,41 @@ function PluginCard({
 
             <ToggleSwitch checked={plugin.enabled} onChange={onToggle} ariaLabel={`${plugin.enabled ? t('pluginSettings.disable') : t('pluginSettings.enable')} ${plugin.displayName}`} />
           </div>
-        </div>
+        </SettingRow>
 
-        {/* Confirm uninstall banner */}
-        {confirmingUninstall && (
-          <div className="mt-3 flex items-center justify-between gap-3 rounded border border-red-200 bg-red-50 px-3 py-2 dark:border-red-800/50 dark:bg-red-950/30">
-            <span className="text-sm text-red-600 dark:text-red-400">
-              {t('pluginSettings.confirmUninstallMessage', { name: plugin.displayName })}
-            </span>
-            <div className="flex gap-1.5">
-              <button
-                onClick={onCancelUninstall}
-                className="rounded border border-border px-2.5 py-1 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-              >
-                {t('pluginSettings.cancel')}
-              </button>
-              <button
-                onClick={onUninstall}
-                className="rounded border border-red-300 px-2.5 py-1 text-sm font-medium text-red-600 transition-colors hover:bg-red-100 dark:border-red-700 dark:text-red-400 dark:hover:bg-red-900/30"
-              >
-                {t('pluginSettings.remove')}
-              </button>
-            </div>
-          </div>
-        )}
+        {(confirmingUninstall || updateError) && (
+          <div className="space-y-2 px-4 pb-4">
+            {confirmingUninstall && (
+              // Wraps: the buttons drop under the message when the two do not fit, and the message
+              // breaks anywhere — a plugin's name can be one unbroken word, and the card's
+              // `overflow-hidden` would cut the Remove button off behind it.
+              <div className="flex flex-wrap items-center justify-between gap-3 rounded border border-red-200 bg-red-50 px-3 py-2 dark:border-red-800/50 dark:bg-red-950/30">
+                <span className="min-w-0 text-sm text-red-600 [overflow-wrap:anywhere] dark:text-red-400">
+                  {t('pluginSettings.confirmUninstallMessage', { name: plugin.displayName })}
+                </span>
+                <div className="flex gap-1.5">
+                  <button
+                    onClick={onCancelUninstall}
+                    className="rounded border border-border px-2.5 py-1 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                  >
+                    {t('pluginSettings.cancel')}
+                  </button>
+                  <button
+                    onClick={onUninstall}
+                    className="rounded border border-red-300 px-2.5 py-1 text-sm font-medium text-red-600 transition-colors hover:bg-red-100 dark:border-red-700 dark:text-red-400 dark:hover:bg-red-900/30"
+                  >
+                    {t('pluginSettings.remove')}
+                  </button>
+                </div>
+              </div>
+            )}
 
-        {/* Update error */}
-        {updateError && (
-          <div className="mt-2 flex items-center gap-1.5 text-sm text-red-500">
-            <ServerCrash className="h-3.5 w-3.5 flex-shrink-0" />
-            <span>{updateError}</span>
+            {updateError && (
+              <div className="flex items-center gap-1.5 text-sm text-red-500">
+                <ServerCrash className="h-3.5 w-3.5 flex-shrink-0" />
+                <span>{updateError}</span>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -403,49 +406,53 @@ function PluginRecommendationCard({
   return (
     <div className={`relative flex overflow-hidden rounded-lg border border-dashed border-border bg-card transition-all duration-200 ${hoverClass}`}>
       <div className={`w-[3px] flex-shrink-0 ${accentClass}`} />
-      <div className="min-w-0 flex-1 p-4">
-        <div className="flex items-start justify-between gap-3">
-          <div className="flex min-w-0 items-center gap-2.5">
-            <div className={`h-5 w-5 flex-shrink-0 ${iconClass}`}>
-              <Icon className="h-5 w-5" />
-            </div>
-            <div className="min-w-0">
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="text-sm font-semibold leading-none text-foreground">
-                  {t(`pluginSettings.${recommendation.translationKey}.name`)}
-                </span>
-                <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
-                  {t('pluginSettings.tab')}
-                </span>
-              </div>
-              <p className="mt-1 text-sm leading-snug text-muted-foreground">
-                {t(`pluginSettings.${recommendation.translationKey}.description`)}
-              </p>
-              <a
-                href={recommendation.repoUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="mt-1 inline-flex items-center gap-1 text-xs text-muted-foreground/60 transition-colors hover:text-foreground"
-              >
-                <GitBranch className="h-3 w-3" />
-                {repoSlug(recommendation.repoUrl)}
-              </a>
-            </div>
+      <SettingRow
+        className="min-w-0 flex-1"
+        icon={(
+          <div className={`h-5 w-5 flex-shrink-0 ${iconClass}`}>
+            <Icon className="h-5 w-5" />
           </div>
-          <button
-            onClick={onInstall}
-            disabled={disabled}
-            className="flex flex-shrink-0 items-center gap-1.5 rounded-md bg-foreground px-4 py-2 text-sm font-medium text-background transition-opacity hover:opacity-90 disabled:opacity-50"
-          >
-            {installing ? (
-              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-            ) : (
-              <Download className="h-3.5 w-3.5" />
-            )}
-            {installing ? t('pluginSettings.installing') : t(`pluginSettings.${recommendation.translationKey}.install`)}
-          </button>
-        </div>
-      </div>
+        )}
+        label={(
+          <span className="flex flex-wrap items-center gap-2">
+            <span className="font-semibold text-foreground">
+              {t(`pluginSettings.${recommendation.translationKey}.name`)}
+            </span>
+            <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-normal text-muted-foreground">
+              {t('pluginSettings.tab')}
+            </span>
+          </span>
+        )}
+        description={(
+          <div className="space-y-1">
+            <p className="text-sm leading-snug">
+              {t(`pluginSettings.${recommendation.translationKey}.description`)}
+            </p>
+            <a
+              href={recommendation.repoUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-start gap-1 text-muted-foreground/60 transition-colors hover:text-foreground"
+            >
+              <GitBranch className="mt-0.5 h-3 w-3 flex-shrink-0" />
+              <span className="min-w-0 break-all">{repoSlug(recommendation.repoUrl)}</span>
+            </a>
+          </div>
+        )}
+      >
+        <button
+          onClick={onInstall}
+          disabled={disabled}
+          className="flex flex-shrink-0 items-center gap-1.5 rounded-md bg-foreground px-4 py-2 text-sm font-medium text-background transition-opacity hover:opacity-90 disabled:opacity-50"
+        >
+          {installing ? (
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+          ) : (
+            <Download className="h-3.5 w-3.5" />
+          )}
+          {installing ? t('pluginSettings.installing') : t(`pluginSettings.${recommendation.translationKey}.install`)}
+        </button>
+      </SettingRow>
     </div>
   );
 }
@@ -573,7 +580,8 @@ export default function PluginSettingsTab() {
         </p>
       </div>
 
-      {/* Install from Git — compact */}
+      {/* Install from Git — compact. The input is `min-w-0`: a text input's own minimum width (218–265px)
+          otherwise pushes the button past the form's `overflow-hidden` edge on a phone, and cuts it. */}
       <div className="flex items-center gap-0 overflow-hidden rounded-lg border border-border bg-card">
         <span className="flex-shrink-0 pl-3 pr-1 text-muted-foreground/40">
           <GitBranch className="h-3.5 w-3.5" />
@@ -587,7 +595,7 @@ export default function PluginSettingsTab() {
           }}
           placeholder={t('pluginSettings.installPlaceholder')}
           aria-label={t('pluginSettings.installAriaLabel')}
-          className="flex-1 bg-transparent px-2 py-2.5 text-sm text-foreground placeholder:text-muted-foreground/40 focus:outline-none"
+          className="min-w-0 flex-1 bg-transparent px-2 py-2.5 text-sm text-foreground placeholder:text-muted-foreground/40 focus:outline-none"
           onKeyDown={(e) => {
             if (e.key === 'Enter') void handleInstall();
           }}

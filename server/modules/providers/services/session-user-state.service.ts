@@ -19,11 +19,10 @@ function sessionNotFound(sessionId: string): AppError {
 }
 
 /**
- * The two user-chosen session attributes the sidebar owns: the icon, and the
- * session's place in the simple list's manual order.
+ * The one user-chosen session attribute the sidebar owns: the icon.
  *
- * Both are small writes whose whole point is that other clients see them, so
- * each one broadcasts the updated session rather than returning silently.
+ * It is a small write whose whole point is that other clients see it, so the
+ * write broadcasts the updated session rather than returning silently.
  * Consumed by `session-user-state.routes.ts`.
  */
 export const sessionUserStateService = {
@@ -35,21 +34,5 @@ export const sessionUserStateService = {
 
     broadcastSessionState(sessionId, 'session icon change');
     return { sessionId, icon };
-  },
-
-  /**
-   * Moves one session to the top of the simple list, or directly below the
-   * session named in `afterSessionId`.
-   */
-  moveInSimpleListById(
-    sessionId: string,
-    afterSessionId: string | null,
-  ): { sessionId: string; afterSessionId: string | null } {
-    if (!sessionUserStateDb.moveInSimpleList(sessionId, afterSessionId)) {
-      throw sessionNotFound(sessionId);
-    }
-
-    broadcastSessionState(sessionId, 'simple list move');
-    return { sessionId, afterSessionId };
   },
 };

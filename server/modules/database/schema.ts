@@ -148,6 +148,8 @@ CREATE TABLE IF NOT EXISTS sessions (
     -- The simple list's manual sort key: a higher value sits nearer the top.
     -- NULL for a row that is not tagged for the simple list.
     simple_list_rank REAL,
+    -- The simple-list folder this chat sits in; NULL for a chat in no folder.
+    simple_list_folder_id TEXT,
     -- The kebab-case icon name chosen for this chat; NULL renders the default.
     icon TEXT,
     -- When this session's last run finished, as ISO-8601 UTC with
@@ -164,6 +166,19 @@ CREATE TABLE IF NOT EXISTS sessions (
     FOREIGN KEY (project_path) REFERENCES projects(project_path)
     ON DELETE SET NULL
     ON UPDATE CASCADE
+);
+`;
+
+export const SIMPLE_LIST_FOLDERS_TABLE_SCHEMA_SQL = `
+CREATE TABLE IF NOT EXISTS simple_list_folders (
+    folder_id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    -- The folder's place in the simple list's one ladder, in the number space of
+    -- sessions.simple_list_rank: a higher value sits nearer the top.
+    rank REAL NOT NULL,
+    -- 1 while the folder is folded shut.
+    collapsed INTEGER NOT NULL DEFAULT 0,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 `;
 
@@ -185,10 +200,11 @@ CREATE TABLE IF NOT EXISTS app_config (
 /**
  * Persistent custom-model library used by the Providers module.
  *
- * Only user-created models are stored here. Predefined models remain source-
- * controlled in each provider's `-models.provider.ts` adapter so they can be
- * updated without migrating application data. `model_id` is unique only within
- * a provider because different CLIs can accept the same identifier.
+ * Only user-created models are stored here. A provider's own models are that provider's to
+ * source — a `*_PREDEFINED_MODELS` constant in its `-models.provider.ts` adapter, or, for Claude,
+ * the installed CLI's catalog (`claude-model-catalog.ts`) — so no provider list is application
+ * data to migrate. `model_id` is unique only within a provider because different CLIs can accept
+ * the same identifier.
  */
 export const PROVIDER_MODELS_TABLE_SCHEMA_SQL = `
 CREATE TABLE IF NOT EXISTS provider_models (
@@ -305,6 +321,8 @@ ${SESSIONS_TABLE_SCHEMA_SQL}
 CREATE INDEX IF NOT EXISTS idx_session_ids_lookup ON sessions(session_id);
 -- NOTE: This index is created in migrations after sessions is rebuilt to include project_path.
 -- Creating it here can fail on upgraded installs where the legacy sessions table has no project_path.
+
+${SIMPLE_LIST_FOLDERS_TABLE_SCHEMA_SQL}
 
 ${LAST_SCANNED_AT_SQL}
 

@@ -186,9 +186,10 @@ const MessageComponent = memo(({ message, prevMessage, previewAnchor = '', isRun
               <ChatMessageFiles files={message.files} />
             )}
             {userCopyContent.trim().length > 0 || (!message.images?.length && !message.files?.length) ? (
-              /* The row paints nothing past its own box (`.chat-message` is paint-contained),
+              /* The scroller clips horizontally (`overflow-x-hidden` on `.chat-messages-pane`),
                  so from `sm` up, where the row has no side padding, the bubble stands in from
-                 the edge by the tail's reach — flush, the tail would be clipped away. */
+                 the edge by the tail's reach — flush, the tail (`.vv-bubble::before`, at
+                 `right: -6px`) would be cut away. */
               <div data-side="end" className="vv-bubble group max-w-full bg-secondary px-4 py-3 text-foreground sm:mr-2.5" style={{ borderRadius: 'var(--radius-card)' }}>
                 <div className="mb-1.5 text-xs uppercase tracking-[0.14em] text-ink-faint">
                   {messageTime.isValid ? `${t('messageTypes.you', { defaultValue: 'You' })} · ${formattedTime}` : t('messageTypes.you', { defaultValue: 'You' })}

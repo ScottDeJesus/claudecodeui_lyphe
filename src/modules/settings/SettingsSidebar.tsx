@@ -1,4 +1,4 @@
-import { Bell, Bot, GitBranch, Info, Key, ListChecks, Mic, MonitorPlay, Palette, Puzzle } from 'lucide-react';
+import { Bell, Bot, Download, GitBranch, Info, Key, ListChecks, Mic, MonitorPlay, Palette, Puzzle } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 import { cn } from '@/shared/utils';
@@ -22,6 +22,9 @@ type NavItem = {
  *
  * Browser has no row in the prototype — the design predates the tab — so it sits with the
  * other optional integrations, after Plugins, and About stays last as it does there.
+ *
+ * Updates has no row in the prototype either, and sits immediately before About: it is about the
+ * application itself rather than about how it behaves, which is where About already is.
  */
 const NAV_ITEMS: NavItem[] = [
   { id: 'agents', labelKey: 'mainTabs.agents', icon: Bot },
@@ -33,6 +36,7 @@ const NAV_ITEMS: NavItem[] = [
   { id: 'voice', labelKey: 'mainTabs.voice', icon: Mic },
   { id: 'plugins', labelKey: 'mainTabs.plugins', icon: Puzzle },
   { id: 'browser', labelKey: 'mainTabs.browser', icon: MonitorPlay },
+  { id: 'updates', labelKey: 'mainTabs.updates', icon: Download },
   { id: 'about', labelKey: 'mainTabs.about', icon: Info },
 ];
 

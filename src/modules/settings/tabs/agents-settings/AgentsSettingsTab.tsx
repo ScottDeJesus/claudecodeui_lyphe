@@ -10,6 +10,8 @@ type ProviderAuthStatusByProvider = Record<AgentProvider, ProviderAuthStatus>;
 type AgentsSettingsTabProps = {
   providerAuthStatus: ProviderAuthStatusByProvider;
   onProviderLogin: (provider: AgentProvider) => void;
+  /** Runs Claude Design's own authorization in the login modal. Takes no provider: `design-login` is Claude's command, and Claude is the only context it is handed to. */
+  onProviderDesignLogin: () => void;
   claudePermissions: ClaudePermissionsState;
   onClaudePermissionsChange: (value: ClaudePermissionsState) => void;
   cursorPermissions: CursorPermissionsState;
@@ -23,6 +25,7 @@ type AgentsSettingsTabProps = {
 export default function AgentsSettingsTab({
   providerAuthStatus,
   onProviderLogin,
+  onProviderDesignLogin,
   claudePermissions,
   onClaudePermissionsChange,
   cursorPermissions,
@@ -47,6 +50,7 @@ export default function AgentsSettingsTab({
     claude: {
       authStatus: providerAuthStatus.claude,
       onLogin: () => onProviderLogin('claude'),
+      onDesignLogin: () => onProviderDesignLogin(),
     },
     cursor: {
       authStatus: providerAuthStatus.cursor,
@@ -61,6 +65,7 @@ export default function AgentsSettingsTab({
       onLogin: () => onProviderLogin('opencode'),
     },
   }), [
+    onProviderDesignLogin,
     onProviderLogin,
     providerAuthStatus.claude,
     providerAuthStatus.codex,

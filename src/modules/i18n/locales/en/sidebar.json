@@ -188,6 +188,15 @@
     "iconOption": "{{name}} icon",
     "unread": "Finished, not read yet",
     "dragHandle": "Drag to reorder",
-    "subagentsRunning": "Subagents running"
+    "subagentsRunning": "Subagents running",
+    "newFolder": "New folder",
+    "folderNamePlaceholder": "Folder name",
+    "folderOptions": "Options for folder {{name}}",
+    "folderDelete": "Delete folder",
+    "folderDeleteTitle": "Delete this folder?",
+    "folderDeleteBody": "Its chats stay in the list, in the folder's place.",
+    "moveToFolder": "Move to folder…",
+    "folderPickerTitle": "Move to folder",
+    "noFolder": "No folder"
   }
 }

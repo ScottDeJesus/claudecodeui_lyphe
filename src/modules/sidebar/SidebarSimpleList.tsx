@@ -2,14 +2,16 @@ import { useCallback, useEffect, useState } from 'react';
 import type { TFunction } from 'i18next';
 
 import { api } from '@/shared/api';
-import { Button, EmptyState } from '@/shared/ui';
+import { Button, ConfirmDialog, EmptyState } from '@/shared/ui';
 import { useAwaitingInputSessionIdSet, useBusySessionIdSet, useSubagentRunningSessionIdSet } from '@/shared/context/SessionProtectionContext';
 import type { Project, ProjectSession, RecentConversationListItem, SessionWithProvider } from '@/shared/types';
 import { useSimpleChatList } from '@/modules/sidebar/hooks/useSimpleChatList';
 import { useSimpleChatProject } from '@/modules/sidebar/hooks/useSimpleChatProject';
 import { useSimpleChatRemove } from '@/modules/sidebar/hooks/useSimpleChatRemove';
-import { useSimpleChatReorder } from '@/modules/sidebar/hooks/useSimpleChatReorder';
-import SidebarSimpleListRow from '@/modules/sidebar/SidebarSimpleListRow';
+import { useSimpleChatDrag } from '@/modules/sidebar/hooks/useSimpleChatDrag';
+import { useSimpleChatFolders } from '@/modules/sidebar/hooks/useSimpleChatFolders';
+import SidebarSimpleListItems from '@/modules/sidebar/SidebarSimpleListItems';
+import SidebarSimpleFolderPicker from '@/modules/sidebar/SidebarSimpleFolderPicker';
 import SidebarNewChatButton from '@/modules/sidebar/SidebarNewChatButton';
 import SidebarSimpleDeleteDialog from '@/modules/sidebar/SidebarSimpleDeleteDialog';
 import SidebarSimpleStopDialog from '@/modules/sidebar/SidebarSimpleStopDialog';
@@ -38,10 +40,12 @@ type SidebarSimpleListProps = {
 
 /**
  * Rendered by Sidebar (not SidebarContent) in place of the project tree when the "Simple chat
- * list" preference is on: a flat, server-tagged feed of chats started from this view, ending in a
- * New chat row (`SidebarNewChatButton`). The project a new chat starts in is picked on the new-chat
- * screen. Composes `useSimpleChatList` (the feed) and
- * `useSimpleChatRemove` (idle-archive / stop-then-archive) so this file stays presentational.
+ * list" preference is on: the server-tagged feed of chats started from this view, drawn as a tree
+ * — a loose chat, or a folder with its chats — and ending in the New chat pill and the New folder
+ * button; a new chat's project is picked on the new-chat screen. The composer:
+ * `useSimpleChatList` (the feed), `useSimpleChatDrag` (the carry), `useSimpleChatFolders` (the
+ * folder verbs) and `useSimpleChatRemove` (the disposals) hold every rule; this file wires them to
+ * `SidebarSimpleListItems` and the five dialogs below.
  */
 export default function SidebarSimpleList({
   projects,
@@ -58,7 +62,7 @@ export default function SidebarSimpleList({
   const awaitingInputSessionIds = useAwaitingInputSessionIdSet();
   const subagentRunningSessionIds = useSubagentRunningSessionIdSet();
 
-  const { rows, hasMore, isLoading, hasError, reload, loadMore, patchLocal, removeLocal, moveLocal } =
+  const { items, hasMore, isLoading, hasError, reload, loadMore, patchLocal, patchFolderLocal, removeLocal, moveLocal } =
     useSimpleChatList(selectedSession?.id ?? null);
 
   const handleArchived = useCallback((sessionId: string) => {
@@ -150,66 +154,83 @@ export default function SidebarSimpleList({
     }
   }, [iconTarget, patchLocal]);
 
-  // Puts the row where the pointer left it, then asks the server for the same order. A server
-  // that refuses the move rolls the list back by reloading it, so the two never disagree.
-  const handleMove = useCallback((sessionId: string, afterSessionId: string | null) => {
-    moveLocal(sessionId, afterSessionId);
-    void (async () => {
-      try {
-        const response = await api.moveSimpleListSession(sessionId, afterSessionId);
-        if (!response.ok) throw new Error(`moveSimpleListSession answered HTTP ${response.status}`);
-      } catch (error) {
-        console.error('[SidebarSimpleList] Failed to move the chat:', error);
-        await reload();
-      }
-    })();
-  }, [moveLocal, reload]);
+  // The folder verbs and the three facts behind them: the folder just made, the chat whose picker
+  // is open, and the folder whose delete waits on a yes.
+  const {
+    freshFolderId, onFreshShown, pickerChat, pickerFolderId, pendingDeleteFolder, createFolder,
+    renameFolder, toggleFolder, requestDelete, openFolderPicker, closeFolderPicker, moveToFolder,
+    move, confirmDelete: confirmFolderDelete, cancelDelete: cancelFolderDelete,
+  } = useSimpleChatFolders({ items, reload, patchFolderLocal, moveLocal, t });
 
-  const { draggingId, dropTarget, rowDragProps } = useSimpleChatReorder({ rows, onMove: handleMove });
+  // The carry, feeding the folder hook's own `move`: a drop and a "Move to folder…" are one write.
+  const { dragging, dropTarget, dragProps } = useSimpleChatDrag({ items, onMove: move });
+  // The tree's folders in drawn order: what the folder picker lists.
+  const folders = items.flatMap((item) => (item.kind === 'folder' ? [item.folder] : []));
+
+  // Drawn at the end of the list in the empty state and the listed one alike, and the one way a
+  // folder is born: named for the button that made it until its header opens the name for typing.
+  const newFolderButton = (
+    <Button
+      data-testid="simple-chat-new-folder"
+      variant="ghost"
+      size="sm"
+      className="mt-1"
+      onClick={() => void createFolder()}
+    >
+      {t('simpleList.newFolder')}
+    </Button>
+  );
 
   return (
     <div data-testid="simple-chat-list" className="flex flex-col gap-2 px-2 py-2">
-      {hasError && rows.length === 0 ? (
+      {hasError && items.length === 0 ? (
         <div className="px-2 py-6 text-center text-sm text-muted-foreground">
           {t('recent.loadFailed', 'Could not load recent conversations')}
           <Button variant="ghost" size="sm" className="mt-2 block" onClick={() => void reload()}>
             {t('buttons.retry', { ns: 'common', defaultValue: 'Try again' })}
           </Button>
         </div>
-      ) : !isLoading && rows.length === 0 ? (
+      ) : !isLoading && items.length === 0 ? (
         <div className="flex flex-col gap-1">
           <div data-testid="simple-chat-empty">
             <EmptyState title={t('simpleList.empty')} />
           </div>
           <SidebarNewChatButton project={effectiveProject} onNewSession={onNewSession} t={t} />
+          {newFolderButton}
         </div>
       ) : (
         <div
           data-testid="simple-chat-list-rows"
           // No text selection while a row is carried; the titles stay selectable at rest.
-          className={draggingId !== null ? 'flex select-none flex-col gap-1' : 'flex flex-col gap-1'}
+          className={dragging !== null ? 'flex select-none flex-col gap-1' : 'flex flex-col gap-1'}
         >
-          {rows.map((row) => (
-            <SidebarSimpleListRow
-              key={row.sessionId}
-              row={row}
-              isSelected={selectedSession?.id === row.sessionId}
-              isRunning={busySessionIds.has(row.sessionId)}
-              isAwaitingInput={awaitingInputSessionIds.has(row.sessionId)}
-              isSubagentRunning={subagentRunningSessionIds.has(row.sessionId)}
-              isRemoveFailed={failedSessionId === row.sessionId}
-              onSelect={() => handleRowSelect(row)}
-              onArchive={() => remove(row, 'archive')}
-              onDelete={() => remove(row, 'delete')}
-              onRename={(title) => void handleRename(row.sessionId, title)}
-              onChooseIcon={() => setIconTarget(row)}
-              dragProps={rowDragProps(row.sessionId)}
-              isDragging={draggingId === row.sessionId}
-              dropEdge={dropTarget?.sessionId === row.sessionId ? dropTarget.edge : null}
-              t={t}
-            />
-          ))}
+          <SidebarSimpleListItems
+            items={items}
+            selectedSessionId={selectedSessionId}
+            busySessionIds={busySessionIds}
+            awaitingInputSessionIds={awaitingInputSessionIds}
+            subagentRunningSessionIds={subagentRunningSessionIds}
+            failedSessionId={failedSessionId}
+            freshFolderId={freshFolderId}
+            onFreshShown={onFreshShown}
+            dragging={dragging}
+            dropTarget={dropTarget}
+            dragProps={dragProps}
+            onSelectChat={handleRowSelect}
+            onArchiveChat={(chat) => remove(chat, 'archive')}
+            onDeleteChat={(chat) => remove(chat, 'delete')}
+            onChooseIcon={(chat) => setIconTarget(chat)}
+            onRenameChat={(sessionId, title) => void handleRename(sessionId, title)}
+            // A list with no folder offers no way into one: the entry is drawn only once `folders`
+            // holds one, and null is what tells every row so.
+            onMoveToFolder={folders.length === 0 ? null : openFolderPicker}
+            onToggleFolder={toggleFolder}
+            onRenameFolder={renameFolder}
+            onDeleteFolder={requestDelete}
+            t={t}
+          />
           <SidebarNewChatButton project={effectiveProject} onNewSession={onNewSession} t={t} />
+          {newFolderButton}
           {hasMore && (
             <Button
               data-testid="simple-chat-load-more"
@@ -247,6 +268,30 @@ export default function SidebarSimpleList({
         onPick={handlePickIcon}
         onCancel={() => setIconTarget(null)}
         t={t}
+      />
+
+      <SidebarSimpleFolderPicker
+        open={pickerChat !== null}
+        // The tree's folders in drawn order, and the folder the chat is in now — the row the
+        // dialog presses and disables.
+        folders={folders}
+        currentFolderId={pickerFolderId}
+        onPick={moveToFolder}
+        onCancel={closeFolderPicker}
+        t={t}
+      />
+
+      {/* The one delete that stops to ask: a folder that holds chats gives them back to the list,
+          and the sentence below says so before the yes. */}
+      <ConfirmDialog
+        open={pendingDeleteFolder !== null}
+        title={t('simpleList.folderDeleteTitle')}
+        message={t('simpleList.folderDeleteBody')}
+        actions={[
+          { label: t('actions.cancel'), variant: 'outline', onSelect: cancelFolderDelete },
+          { label: t('simpleList.folderDelete'), variant: 'destructive', onSelect: confirmFolderDelete },
+        ]}
+        onDismiss={cancelFolderDelete}
       />
     </div>
   );

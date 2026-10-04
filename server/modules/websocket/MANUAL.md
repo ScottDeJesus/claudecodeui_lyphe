@@ -33,7 +33,7 @@ The `session_upserted` delta builders; the providers module's sessions watcher f
 5. `runDetachedChatTurn` (and the `ProviderRuntimeGateway` type)
 Runs one chat turn with no socket attached. Two consumers: the scheduled-messages module drives it from a timer, and keepalive re-adoption (`session-host/readopt.ts`) composes it on boot to give each CLI that outlived the API its run back (`beforeRun` exists for that caller — it settles a run whose turn already finished before the provider is asked for anything). Both compose it rather than re-implementing the dispatch, which is what keeps the session row lookup, the busy check and the run-completion safety net in one place.
 6. `startRunStallWatchdog()`
-Starts the sweep that turns a silent run into one `session.stuck` notification, and returns the function that stops it. Called once by `server/index.ts` inside the `listen` callback and stopped on shutdown, for the same reason the plan runner is: the notification is about runs this process is only now able to host. It lives in this module because the registry it reads owns runs — no provider knows it exists. What counts as silence, and which runs are deliberately never announced, is [docs/notifications.md](../../../docs/notifications.md) §"A silent run is noticed from outside".
+Starts the sweep that turns a silent run into one `session.stuck` notification, and returns the function that stops it. Called once by `server/index.ts` inside the `listen` callback and stopped on shutdown, for the same reason the plan runner is: the notification is about runs this process is only now able to host. It lives in this module because the registry it reads owns runs — no provider knows it exists. What counts as silence, and which runs are deliberately never announced, is [docs/MANUAL.md (notifications)](../../../docs/MANUAL.md) §"A silent run is noticed from outside".
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/websocket/index.ts
 
@@ -187,7 +187,8 @@ The shell handler manages persistent PTY sessions keyed by:
 
 `<projectPath>_<sessionIdOrDefault>[_cmd_<hash>]`
 
-This enables reconnect behavior and isolates command-specific plain-shell sessions.
+`<hash>` is the first 16 hex characters of SHA-256 over the whole `initialCommand`; the suffix is present only for a plain-shell command.
+Two different commands never share a key, so a reconnect only reattaches to a PTY running the same command.
 
 ## MAN-720 — Shell Lifecycle
 section: README/010 `/shell` Terminal Flow/011 Shell Lifecycle
@@ -274,18 +275,16 @@ That shared set is consumed by:
 Broadcasts `kind: loading_progress` while project snapshots are being built.
 2. `modules/providers/services/sessions-watcher.service.ts`
 Broadcasts per-session `kind: session_upserted` deltas when provider session artifacts change (no full project snapshots).
-3. `modules/plan-runner/runner-watcher.service.ts`
-Broadcasts `kind: runner_state` when the plan runner's state directory changes, reaching this set through `modules/websocket/index.js` rather than a deep import.
-4. `modules/plan-runner/arc-lane.ts`
-Broadcasts `kind: arc_state` when an arc directory under `~/.claude/state/arcs/` changes, over the same `broadcast` closure `plan-runner.module.ts` hands item 3 — one composition root, two lanes, the same socket set.
-5. `modules/dispatch-souls/dispatch-souls.module.ts`
+3. `modules/dispatcher/dispatcher.module.ts`
+Broadcasts `kind: dispatcher_state` when the plan store's document changes, reaching this set through `modules/websocket/index.js` rather than a deep import.
+4. `modules/dispatch-souls/dispatch-souls.module.ts`
 Broadcasts `kind: soul_launch_state` when a hand-launched soul's directory changes, the same `modules/websocket/index.js` way.
-6. `modules/universe/universe.module.ts`
-Broadcasts `kind: universe_map` when a tracked repo's HEAD moves, and `kind: universe_activity` — the coalesced journal-and-transcript feed, at most ten frames a second and none while the estate is quiet — from the two taps in the same module ([docs/architecture/01-websocket-transport.md](../../../docs/architecture/01-websocket-transport.md) §"Fan-out: who receives what").
-7. `modules/kanban-metis/kanban-metis.module.ts`
-Broadcasts `kind: kanban_metis_state` when a board's live Metis sessions change, on the same `createPolledLane` shape as items 3, 4 and 5.
+5. `modules/universe/universe.module.ts`
+Broadcasts `kind: universe_map` when a tracked repo's HEAD moves, and `kind: universe_activity` — the coalesced journal-and-transcript feed, at most ten frames a second and none while the estate is quiet — from the two taps in the same module ([docs/architecture/MANUAL.md (01-websocket-transport)](../../../docs/architecture/MANUAL.md) §"Fan-out: who receives what").
+6. `modules/kanban-metis/kanban-metis.module.ts`
+Broadcasts `kind: kanban_metis_state` when a board's live Metis sessions change, on the same `createPolledLane` shape as items 3 and 4.
 
-8. `modules/websocket/services/chat-run-registry.service.ts`
+7. `modules/websocket/services/chat-run-registry.service.ts`
 Broadcasts per-session `kind: session_upserted` when a run ends — once per run,
 from the terminal `complete` — so the sidebar re-reads the row whose
 `last_completed_at` (and `last_read_at`, when the chat was on screen) it just
@@ -296,6 +295,11 @@ session broadcasts nothing, so a tab's 30 s heartbeat writes and sends nothing.
 `markReadIfCompleted` in `chat-websocket.service.ts` reads `last_completed_at`
 and `last_read_at` through the one unread expression
 (`SESSION_UNREAD_SQL`), never by re-deriving the comparison here.
+
+8. `modules/notes/notes.service.ts`
+Broadcasts `kind: notes_changed` after a note is created, replaced or deleted, reaching this set through `modules/websocket/index.js`. The frame names no note and no account (MAN-7517).
+9. `modules/providers/services/simple-list.service.ts`
+Broadcasts `kind: simple_list_changed` after a simple-list folder is made, renamed, folded or deleted, or a chat or folder is moved, reaching this set through `modules/websocket/index.js`. The frame names no folder and no chat (MAN-7519).
 
 This design centralizes cross-module realtime fanout without requiring route-local references to WebSocket internals.
 

@@ -28,7 +28,8 @@ import type {
   ProviderCurrentActiveModel,
   ProviderModelsDefinition,
   ProviderSkillSource,
-  RunnerModelChoice,
+  DispatcherModelChoice,
+  DispatcherSwarmWord,
   SubagentActivity,
   WorkspacePathValidationResult,
 } from '@/shared/types.js';
@@ -1453,55 +1454,128 @@ export function expandHome(value: string): string {
   return value.startsWith('~/') ? path.join(os.homedir(), value.slice(2)) : value;
 }
 
-// ---------------------------
-//----------------- PLAN-RUNNER MODEL WORD UTILITIES ------------
-
 /**
- * The only words `plan-runner model` and `plan-runner arc model` accept (`hooks/plan_runner/run_model.py`), in
- * the order the controls draw them. The routes relay a member of THIS list, never the request's own string, so
- * the argv word a verb is spawned with is always ours.
+ * Where the launcher keeps its launch directories, unless the operator moved it.
+ *
+ * Consumers: the dispatch-souls module (its poll and its running-launchers read) and the providers
+ * module (`session-soul-launches.service.ts`'s stamp scan), which all had to ask the same question
+ * and answered it three times over before this.
+ *
+ * The launcher's own root is `hooks/plan_runner/solo/record.py:dispatch_dir()` — `dispatch-souls/`
+ * under the house's state root, `~/.claude/state` unless `$DISPATCHER_HOME` moves it — so this
+ * default is a COPY of a rule we do not own, and the env name is ours: a seam for pointing a probe
+ * at a hermetic tree rather than a knob for moving the launcher. Set it and every reader here looks
+ * somewhere else; a dispatch still writes to the launcher's own root, which is not something an env
+ * var of THIS name may reach.
+ *
+ * Read on every call, never cached, so a probe that sets the seam after import is not answered with
+ * the live root.
  */
-const RUNNER_MODEL_CHOICES: readonly RunnerModelChoice[] = ['deepseek', 'claude', 'auto'];
-
-/**
- * A model word as one of `RUNNER_MODEL_CHOICES`, or `null` for anything else — a missing field, another casing,
- * a word with padding. Used by the run route (`POST /runs/:id/model`) and the arc route (`POST /arcs/:arc/model`)
- * to refuse a body with a 400 before anything is spawned, and by `runner-state.service.ts` / `arc-state.service.ts`
- * to carry a record's stored word into the snapshot (`null` for a record born before the runner wrote its default).
- */
-export function readRunnerModelChoice(value: unknown): RunnerModelChoice | null {
-  return RUNNER_MODEL_CHOICES.find((choice) => choice === value) ?? null;
+export function dispatchSoulsStateDir(): string {
+  return expandHome(process.env.DISPATCH_SOULS_STATE_DIR || '~/.claude/state/dispatch-souls');
 }
 
-/** The 400 sentence both model routes answer with when `readRunnerModelChoice` finds no word. */
-export function runnerModelChoiceError(): string {
-  return `model must be one of ${RUNNER_MODEL_CHOICES.join(', ')}`;
+// ---------------------------
+//----------------- DISPATCHER MODEL WORD UTILITIES ------------
+
+/**
+ * The only words the dispatcher's own `model` verb accepts (`hooks/plan_runner/run_model.py:WORDS`,
+ * unpacked by `hooks/dispatcher/model.py`) in the order the controls draw them. The routes relay a
+ * member of THIS list, never the request's own string, so the argv word a verb is spawned with is
+ * always ours.
+ */
+const DISPATCHER_MODEL_CHOICES: readonly DispatcherModelChoice[] = ['deepseek', 'claude', 'auto'];
+
+/**
+ * A model word as one of `DISPATCHER_MODEL_CHOICES`, or `null` for anything else — a missing field, another
+ * casing, a word with padding. Used by the plan route (`POST /plans/:name/model`) and the arc route
+ * (`POST /arcs/:name/model`) to refuse a body with a 400 before anything is spawned, and by
+ * `dispatcher-state.transport.ts` (`modelSince`) to carry a document's stored word into the picture (`null` for
+ * a build older than the field, which the client reads as the store's default — `effectiveModelWord`).
+ */
+export function readDispatcherModelChoice(value: unknown): DispatcherModelChoice | null {
+  return DISPATCHER_MODEL_CHOICES.find((choice) => choice === value) ?? null;
+}
+
+/** The 400 sentence both model routes answer with when `readDispatcherModelChoice` finds no word. */
+export function dispatcherModelChoiceError(): string {
+  return `model must be one of ${DISPATCHER_MODEL_CHOICES.join(', ')}`;
 }
 
 
 // ---------------------------
-//----------------- PLAN-RUNNER SCHEDULE WORD UTILITIES ------------
+//----------------- DISPATCHER SWARM WORD UTILITIES ------------
+
+/** One canonical swarm word: `off`, `on`, or `on` and a count with no leading zero. */
+const DISPATCHER_SWARM_WORD = /^(?:off|on|on ([1-9][0-9]*))$/;
+
+/**
+ * A plan's own swarm word in its CANONICAL spelling — `off`, `on`, `on <N>` — or `null` for anything
+ * else: a missing field, another casing, padding, `on 0`, a count past the safe-integer range.
+ *
+ * The grammar is the runner's (`hooks/plan_runner/swarm.py:parse`) and the spelling is the store's
+ * (`hooks/dispatcher/swarm_word.py:spell`), so a word this accepts is one the dispatcher stores
+ * unchanged. The count is rebuilt from its number rather than echoed, so what reaches an argv array
+ * is a string this server wrote. `Number.isSafeInteger` is the floor for the reason
+ * `swarm-switch.ts` gives: past it this server's double and the runner's int disagree about the count.
+ *
+ * Used by the plan route (`POST /plans/:name/swarm`, which adds the door's `auto` itself) to refuse
+ * a body with a 400 before anything is spawned, and by `dispatcher-plan.reader.ts` to carry the
+ * document's stored word into the picture.
+ */
+export function readDispatcherSwarmWord(value: unknown): DispatcherSwarmWord | null {
+  if (typeof value !== 'string') return null;
+  const match = DISPATCHER_SWARM_WORD.exec(value);
+  if (!match) return null;
+  if (match[1] === undefined) return value as 'off' | 'on';
+  const lanes = Number(match[1]);
+  return Number.isSafeInteger(lanes) ? `on ${lanes}` : null;
+}
+
+
+// ---------------------------
+//----------------- DISPATCHER SCHEDULE WORD UTILITIES ------------
 
 /**
  * A strict ISO-8601 instant WITH its zone: `2026-09-23T10:00:00Z`, `2026-09-23T03:00-07:00`, seconds and a
- * fraction optional. The zone is required because the runner refuses a naive time (it names no clock), and the
- * shape is anchored end to end so nothing but a timestamp can ride through to argv.
+ * fraction optional. The zone is required because the dispatcher refuses a naive time (it names no clock), and
+ * the shape is anchored end to end so nothing but a timestamp can ride through to argv.
  */
 const ISO_INSTANT = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d{1,6})?)?(?:Z|[+-]\d{2}:\d{2})$/;
 
 /**
- * A request body's schedule word, or `null` for anything the runner's `schedule` verbs would not take:
- * `offpeak`, `none`, or an `ISO_INSTANT` that `Date.parse` also accepts. The runner stays the final judge — a
- * time already past is ITS refusal, carried back whole. Used by `POST /runs/:id/schedule` and `POST /arcs/:arc/schedule` to refuse a body with a 400 before
- * anything is spawned, so the argv word is always one of these shapes and never free text.
+ * A request body's schedule word, or `null` for anything the dispatcher's `schedule` verb would not take:
+ * `offpeak`, `none`, or an `ISO_INSTANT` that `Date.parse` also accepts. The dispatcher stays the final judge —
+ * a time already past is ITS refusal, carried back whole. Used by `POST /plans/:name/schedule` and
+ * `POST /arcs/:name/schedule` to refuse a body with a 400 before anything is spawned, so the argv word is
+ * always one of these shapes and never free text.
  */
-export function readRunnerScheduleWhen(value: unknown): string | null {
+export function readDispatcherScheduleWhen(value: unknown): string | null {
   if (value === 'offpeak' || value === 'none') return value;
   if (typeof value !== 'string' || !ISO_INSTANT.test(value)) return null;
   return Number.isFinite(Date.parse(value)) ? value : null;
 }
 
-/** The 400 sentence both schedule routes answer with when `readRunnerScheduleWhen` finds no word. */
-export function runnerScheduleWhenError(): string {
+/** The 400 sentence both schedule routes answer with when `readDispatcherScheduleWhen` finds no word. */
+export function dispatcherScheduleWhenError(): string {
   return 'when must be offpeak, none, or an ISO-8601 timestamp with a zone';
+}
+
+
+// ---------------------------
+//----------------- TOKEN FIGURES ------------
+
+/**
+ * A token count as a person reads it: `94.9M`, `1M`, `12.5k`, `412`.
+ *
+ * The server's twin of `src/shared/spend.ts:humanizeTokens`, and both are byte-for-byte
+ * `hooks/plan_runner/costs.py`'s `humanize` — the same cut at 999,950 and the same trailing-zero trim,
+ * so a card and the push it earns cannot round the same figure two ways. Duplicated rather than
+ * imported because the two builds each resolve `@/shared` to their OWN tree (`server/shared` here,
+ * `src/shared` in the client); the pair is checked by eye, as the type mirrors are.
+ */
+export function humanizeTokens(n: number): string {
+  if (n < 1000) return String(n);
+  if (n < 999_950) return `${(n / 1e3).toFixed(1).replace(/\.0$/, '')}k`;   // the same cut
+  return `${(n / 1e6).toFixed(1).replace(/\.0$/, '')}M`;
 }

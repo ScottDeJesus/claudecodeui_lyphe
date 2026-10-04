@@ -61,4 +61,4 @@ the card the moment you write it and dies with the card; a lesson outlives the c
 from (its card reference is provenance, and its id is the whole of its identity once that
 card is gone) and waits for the operator to decide whether a future session should learn
 from it. **And Metis never seals her own record** — there is no approve/reject verb for her
-to reach for, exactly as with the approval fence (ABSOLUTE RULE #5).
+to reach for (ABSOLUTE RULE #5).

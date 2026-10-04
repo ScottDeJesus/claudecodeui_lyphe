@@ -1,5 +1,9 @@
 import { getConnection } from '@/modules/database/index.js';
-import { KANBAN_LEASE_STALE_SECONDS, type KanbanVitals } from '@/shared/kanban-types.js';
+import {
+  KANBAN_LEASE_STALE_SECONDS,
+  KANBAN_OPERATOR_SCHEDULED_TAG,
+  type KanbanVitals,
+} from '@/shared/kanban-types.js';
 
 import { requireBoard } from './kanban-cards.guards.js';
 
@@ -17,8 +21,9 @@ import { requireBoard } from './kanban-cards.guards.js';
  *   claimable/staging lane
  *   (`todo`/`questions`/`not_ready`), and content-complete — a non-blank plan, body or description,
  *   because an intake card carries its intent in `description` with `body` empty.
- * - `claimable` — the same predicate `kanbanBoardsDb.countClaimable` grants a claim by, read
- *   against the same staleness window, so the driver's green light and this register never disagree.
+ * - `claimable` — the same predicate `kanbanBoardsDb.countClaimable` grants a claim by (a To-do card
+ *   tagged `operator-scheduled` is the operator's, not claimable), read against the same staleness
+ *   window, so the driver's green light and this register never disagree.
  * - `lessonsPendingEstate` — STAGED lessons awaiting a person's review. It is on the board's own
  *   lesson table and it is NOT board-scoped: a lesson belongs to the estate and its card is
  *   provenance, so there is no board filter here to get wrong.
@@ -101,11 +106,15 @@ export function vitalsCounts(boardId: string, estate: KanbanEstateReadings): Kan
           WHERE status = 'staged') AS lessons_pending_estate,
          (SELECT COUNT(*) FROM kanban_cards c
           WHERE c.board_id = ? AND c.archived = 0
-            AND (c.status = 'todo'
+            AND ((c.status = 'todo' AND NOT EXISTS (
+                   SELECT 1 FROM kanban_card_tags t
+                   WHERE t.card_id = c.id AND lower(trim(t.tag)) = ?))
               OR (c.status = 'active'
                 AND (c.build_lease_at IS NULL OR c.build_lease_at < ?)))) AS claimable`
     )
-    .get(boardId, boardId, boardId, boardId, staleBefore) as VitalsRow | undefined;
+    .get(boardId, boardId, boardId, boardId, KANBAN_OPERATOR_SCHEDULED_TAG, staleBefore) as
+    | VitalsRow
+    | undefined;
 
   return {
     building: readCount(row?.building),

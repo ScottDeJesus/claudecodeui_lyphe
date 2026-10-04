@@ -1,7 +1,7 @@
 import { useBrowserUseEnabled } from '@/modules/browser-use';
+import { useDispatcherPlans } from '@/modules/dispatcher';
 import { useHeal } from '@/modules/heal';
 import { useMemoryIntake } from '@/modules/memory-intake';
-import { useArcs, useRunnerRuns } from '@/modules/plan-runner';
 import { useTasksSettings } from '@/modules/task-master';
 import { useUiPreferences } from '@/shared/context/UiPreferencesContext';
 import type { AppTab } from '@/shared/types';
@@ -14,11 +14,21 @@ export type WorkspaceTabGates = {
   shouldShowMemoryTab: boolean;
   /** How many memories are waiting. Zero whenever the lane could not be read, so the pill and the gate agree. */
   memoryPendingCount: number;
-  /** True while the Runner tab belongs on the bar — the same sticky rule the Memory tab takes. */
+  /**
+   * Always true. The Roadmap tab (the `runner` id) is where the operator lives, so it is first in the house row
+   * whatever the lane holds and nothing can take it off the bar — the way the Universe tab is global. The gate
+   * exists only so the strip, the palette and the pane read the same shape.
+   */
   shouldShowRunnerTab: boolean;
-  /** How many runs the lane is carrying, for the tab's count pill. Paused runs are counted: they are still runs. */
+  /** How many plans the lane DRAWS, for the tab's count pill. Paused and queued plans are counted: they are still plans. A hidden one is not. */
   runnerCount: number;
-  /** True while the Heal tab belongs on the bar — the same sticky, data-gated rule the Memory and Runner tabs take. */
+  /**
+   * How many prompts the drawn plans are waiting on (`useDispatcherPlans.waiting`), for the tab's
+   * attention mark: the strip draws the Roadmap tab's dot amber and says the count in words while
+   * this is above zero. Zero leaves the tab exactly as it was.
+   */
+  runnerWaiting: number;
+  /** True while the Heal tab belongs on the bar — the same sticky, data-gated rule the Memory tab takes. */
   shouldShowHealTab: boolean;
   /** How much live friction the ledger holds, for the tab's count pill. */
   healCount: number;
@@ -52,13 +62,11 @@ export type WorkspaceTabGates = {
  * The Memory tab is STICKY, which is the whole reason `activeTab` is an argument: once it is the
  * tab a person is standing in it stays on the bar until they choose another one, so filing the
  * last pending memory empties the panel rather than taking the tab out from under them — and no
- * snap-back effect exists for it, because the gate itself never turns off mid-act. The Runner tab
- * is the SECOND DATA-gated, sticky tab and takes that rule whole: it appears while a run is in
- * motion OR an arc the runner is still walking is unfinished — the arc deck draws in that same
- * pane — it stays while it is the selected tab even once the last run ends and the last arc is
- * finished, and it has no snap-back effect either. The Heal tab is the THIRD and takes the same rule whole: it appears
- * while the ledger holds live friction and stays while it is the selected tab. The other three are
- * PREFERENCE-gated and keep their snap-backs in WorkspaceMain.
+ * snap-back effect exists for it, because the gate itself never turns off mid-act. The Heal tab is
+ * the SECOND such data-gated, sticky tab and takes that rule whole: it appears while the ledger holds
+ * live friction and stays while it is the selected tab. The Roadmap tab is not gated by data at all —
+ * it is the operator's home, ungated like Universe. Tasks, Shell and Browser are PREFERENCE-gated and
+ * keep their snap-backs in WorkspaceMain.
  *
  * Three call sites read this now — WorkspaceMain, ProjectSidebarRegion and ProjectCommandPalette
  * — each passing its own `activeTab`. The palette used to recompute the gates privately from the
@@ -69,10 +77,11 @@ export function useWorkspaceTabGates(activeTab: AppTab): WorkspaceTabGates {
   const { tasksEnabled, isTaskMasterInstalled } = useTasksSettings();
   const browserUseEnabled = useBrowserUseEnabled();
   const { pendingCount } = useMemoryIntake();
-  const { count: runnerCount } = useRunnerRuns();
-  // The deck's own count, off the same bus the runs come from: an arc the runner has not finished
-  // keeps the Runner tab on the bar by itself, because the gallery lives in that tab's pane.
-  const { count: arcCount } = useArcs();
+  // The dispatcher's plans ARE the Roadmap tab's In flight list — the arcs' decks and the cards they
+  // hold. The pill counts the cards drawn, and `waiting` rides alongside as the tab's ATTENTION: the
+  // asks those cards owe the operator, which the pill (a count of plans) cannot say. Neither gates
+  // the tab: it is on the bar with an empty lane too.
+  const { count: runnerCount, waiting: runnerWaiting } = useDispatcherPlans();
   // The live count off the Heal tab's own context — the one poll of the ledger, read here in the
   // sidebar, the main region and the palette as well as in the panel. Zero until a read has landed
   // AND while one is failing, so the pill and the gate can never disagree; an unreadable ledger is
@@ -86,8 +95,10 @@ export function useWorkspaceTabGates(activeTab: AppTab): WorkspaceTabGates {
     shouldShowShellTab: !hideShellTab,
     shouldShowMemoryTab: pendingCount > 0 || activeTab === 'memory',
     memoryPendingCount: pendingCount,
-    shouldShowRunnerTab: runnerCount > 0 || arcCount > 0 || activeTab === 'runner',
+    // The literal true, never a reading: the Roadmap tab is the operator's home, the way the Universe tab is global.
+    shouldShowRunnerTab: true,
     runnerCount,
+    runnerWaiting,
     shouldShowHealTab: healCount > 0 || activeTab === 'heal',
     healCount,
     // The literal true, never a reading: the Universe tab is global, the way the kanban board is.

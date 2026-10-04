@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next';
 
-import { DarkModeToggle, Select, Stepper } from '@/shared/ui';
+import { DarkModeToggle, Select, SettingRow, Stepper } from '@/shared/ui';
 import type { AgentSettingsProject, ProjectSortOrder } from '@/shared/types';
 import { LanguageSelector } from '@/modules/i18n';
 import { useTasksSettings } from '@/modules/task-master';
@@ -9,7 +9,6 @@ import { useTheme } from '@/shared/context/ThemeContext';
 import { useChatFontSize } from '@/shared/hooks/useChatFontSize';
 import { useSimpleChatListPreferences } from '@/shared/hooks/useSimpleChatListPreferences';
 import SettingsCard from '@/modules/settings/SettingsCard';
-import SettingsRow from '@/modules/settings/SettingsRow';
 import SettingsSection from '@/modules/settings/SettingsSection';
 import SettingsToggle from '@/modules/settings/SettingsToggle';
 
@@ -65,13 +64,13 @@ export default function AppearanceSettingsTab({
     <div className="space-y-8">
       <SettingsSection title={t('appearanceSettings.darkMode.label')}>
         <SettingsCard>
-          <SettingsRow
+          <SettingRow
             label={t('appearanceSettings.darkMode.label')}
             description={t('appearanceSettings.darkMode.description')}
           >
             <DarkModeToggle ariaLabel={t('appearanceSettings.darkMode.label')} />
-          </SettingsRow>
-          <SettingsRow
+          </SettingRow>
+          <SettingRow
             label={t('appearanceSettings.followSun.label')}
             description={t('appearanceSettings.followSun.description')}
           >
@@ -80,7 +79,7 @@ export default function AppearanceSettingsTab({
               onChange={setFollowsSun}
               ariaLabel={t('appearanceSettings.followSun.label')}
             />
-          </SettingsRow>
+          </SettingRow>
         </SettingsCard>
       </SettingsSection>
 
@@ -92,7 +91,7 @@ export default function AppearanceSettingsTab({
 
       <SettingsSection title={t('appearance.text.title')}>
         <SettingsCard>
-          <SettingsRow
+          <SettingRow
             label={t('appearance.text.chatFontSize.label')}
             description={t('appearance.text.chatFontSize.description')}
           >
@@ -106,7 +105,7 @@ export default function AppearanceSettingsTab({
               increaseLabel={t('appearance.text.chatFontSize.increase')}
               ariaLabel={t('appearance.text.chatFontSize.label')}
             />
-          </SettingsRow>
+          </SettingRow>
         </SettingsCard>
       </SettingsSection>
 
@@ -115,43 +114,43 @@ export default function AppearanceSettingsTab({
           them would have made them unreachable rather than tidier. */}
       <SettingsSection title={t('appearance.toolDisplay.title')}>
         <SettingsCard divided>
-          <SettingsRow label={t('appearance.toolDisplay.showWork')}>
+          <SettingRow label={t('appearance.toolDisplay.showWork')}>
             <SettingsToggle
               checked={showWork}
               onChange={(value) => setPreference('showWork', value)}
               ariaLabel={t('appearance.toolDisplay.showWork')}
             />
-          </SettingsRow>
+          </SettingRow>
 
-          <SettingsRow label={t('appearance.toolDisplay.showCompactSummary')}>
+          <SettingRow label={t('appearance.toolDisplay.showCompactSummary')}>
             <SettingsToggle
               checked={showCompactSummary}
               onChange={(value) => setPreference('showCompactSummary', value)}
               ariaLabel={t('appearance.toolDisplay.showCompactSummary')}
             />
-          </SettingsRow>
+          </SettingRow>
 
-          <SettingsRow label={t('appearance.toolDisplay.showThinking')}>
+          <SettingRow label={t('appearance.toolDisplay.showThinking')}>
             <SettingsToggle
               checked={showThinking}
               onChange={(value) => setPreference('showThinking', value)}
               ariaLabel={t('appearance.toolDisplay.showThinking')}
             />
-          </SettingsRow>
+          </SettingRow>
 
-          <SettingsRow label={t('appearance.toolDisplay.showRawParameters')}>
+          <SettingRow label={t('appearance.toolDisplay.showRawParameters')}>
             <SettingsToggle
               checked={showRawParameters}
               onChange={(value) => setPreference('showRawParameters', value)}
               ariaLabel={t('appearance.toolDisplay.showRawParameters')}
             />
-          </SettingsRow>
+          </SettingRow>
         </SettingsCard>
       </SettingsSection>
 
       <SettingsSection title={t('appearance.inputSettings.title')}>
         <SettingsCard>
-          <SettingsRow
+          <SettingRow
             label={t('appearance.inputSettings.sendByCtrlEnter')}
             description={t('appearance.inputSettings.sendByCtrlEnterDescription')}
           >
@@ -160,13 +159,13 @@ export default function AppearanceSettingsTab({
               onChange={(value) => setPreference('sendByCtrlEnter', value)}
               ariaLabel={t('appearance.inputSettings.sendByCtrlEnter')}
             />
-          </SettingsRow>
+          </SettingRow>
         </SettingsCard>
       </SettingsSection>
 
       <SettingsSection title={t('appearance.workspaceTabs.title')}>
         <SettingsCard divided>
-          <SettingsRow
+          <SettingRow
             label={t('appearance.workspaceTabs.hideShell.label')}
             description={t('appearance.workspaceTabs.hideShell.description')}
           >
@@ -175,9 +174,9 @@ export default function AppearanceSettingsTab({
               onChange={(value) => setPreference('hideShellTab', value)}
               ariaLabel={t('appearance.workspaceTabs.hideShell.label')}
             />
-          </SettingsRow>
+          </SettingRow>
 
-          <SettingsRow
+          <SettingRow
             label={t('appearance.workspaceTabs.hideTasks.label')}
             description={t(
               tasksTabUnavailable
@@ -191,13 +190,13 @@ export default function AppearanceSettingsTab({
               ariaLabel={t('appearance.workspaceTabs.hideTasks.label')}
               disabled={tasksTabUnavailable}
             />
-          </SettingsRow>
+          </SettingRow>
         </SettingsCard>
       </SettingsSection>
 
       <SettingsSection title={t('appearance.sidebar.title')}>
         <SettingsCard divided>
-          <SettingsRow
+          <SettingRow
             label={t('appearance.sidebar.simpleChatList.label')}
             description={t('appearance.sidebar.simpleChatList.description')}
           >
@@ -206,9 +205,9 @@ export default function AppearanceSettingsTab({
               onChange={setSimpleChatListEnabled}
               ariaLabel={t('appearance.sidebar.simpleChatList.label')}
             />
-          </SettingsRow>
+          </SettingRow>
 
-          <SettingsRow
+          <SettingRow
             label={t('appearance.sidebar.simpleChatProject.label')}
             description={t('appearance.sidebar.simpleChatProject.description')}
           >
@@ -219,25 +218,25 @@ export default function AppearanceSettingsTab({
               placeholder={t('appearance.sidebar.simpleChatProject.label')}
               onChange={(next) => setSimpleChatProjectId(next || null)}
             />
-          </SettingsRow>
+          </SettingRow>
         </SettingsCard>
       </SettingsSection>
 
       <SettingsSection title={t('appearanceSettings.projectSorting.label')}>
         <SettingsCard>
-          <SettingsRow
+          <SettingRow
             label={t('appearanceSettings.projectSorting.label')}
             description={t('appearanceSettings.projectSorting.description')}
           >
             <select
               value={projectSortOrder}
               onChange={(event) => onProjectSortOrderChange(event.target.value as ProjectSortOrder)}
-              className="w-full touch-manipulation rounded-lg border border-input bg-card p-2.5 text-sm text-foreground focus:border-primary focus:ring-1 focus:ring-primary sm:w-36"
+              className="w-36 touch-manipulation rounded-lg border border-input bg-card p-2.5 text-sm text-foreground focus:border-primary focus:ring-1 focus:ring-primary"
             >
               <option value="name">{t('appearanceSettings.projectSorting.alphabetical')}</option>
               <option value="date">{t('appearanceSettings.projectSorting.recentActivity')}</option>
             </select>
-          </SettingsRow>
+          </SettingRow>
         </SettingsCard>
       </SettingsSection>
     </div>

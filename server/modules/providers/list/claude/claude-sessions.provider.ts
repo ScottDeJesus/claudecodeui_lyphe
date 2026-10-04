@@ -14,6 +14,7 @@ import type {
   SubagentInfo,
 } from '@/shared/types.js';
 import { parseFilesInputTag } from '@/shared/image-attachments.js';
+import { liftToolResultImages, readImageBlockDataUrl, storeToolResultImages } from '@/modules/providers/list/claude/claude-image-blocks.js';
 import { localCommandDisplayText, type LocalCommandPayload } from '@/shared/local-commands.js';
 import { prepareTranscriptMessages } from '@/shared/message-unification.js';
 import {
@@ -38,6 +39,8 @@ const MAX_TRANSMITTED_SUBAGENT_ACTIVITIES = 200;
 
 type ClaudeToolResult = {
   content: unknown;
+  /** Pictures the tool returned, lifted out of `content` (see `liftToolResultImages`). */
+  images?: Array<{ data?: string; path?: string }>;
   isError: boolean;
   subagentTools?: SubagentActivity[];
   subagent?: SubagentInfo;
@@ -910,9 +913,9 @@ export class ClaudeSessionsProvider implements IProviderSessions {
         // render them on the user bubble.
         const imageAttachments: Array<{ data: string }> = [];
         for (const part of raw.message.content) {
-          if (part?.type === 'image' && part.source?.type === 'base64' && typeof part.source.data === 'string') {
-            const mediaType = typeof part.source.media_type === 'string' ? part.source.media_type : 'image/png';
-            imageAttachments.push({ data: `data:${mediaType};base64,${part.source.data}` });
+          const dataUrl = readImageBlockDataUrl(part);
+          if (dataUrl) {
+            imageAttachments.push({ data: dataUrl });
           }
         }
         let imagesAttached = false;
@@ -921,6 +924,9 @@ export class ClaudeSessionsProvider implements IProviderSessions {
         for (let partIndex = 0; partIndex < raw.message.content.length; partIndex++) {
           const part = raw.message.content[partIndex];
           if (part.type === 'tool_result') {
+            // A picture the tool returned (a Read of an image) rides beside the text as
+            // `images`, never inside `content` as a base64 JSON string nothing could draw.
+            const { content: resultContent, images: resultImages } = liftToolResultImages(part.content);
             messages.push(createNormalizedMessage({
               id: `${baseId}_tr_${part.tool_use_id}`,
               sessionId,
@@ -928,7 +934,8 @@ export class ClaudeSessionsProvider implements IProviderSessions {
               provider: PROVIDER,
               kind: 'tool_result',
               toolId: part.tool_use_id,
-              content: typeof part.content === 'string' ? part.content : JSON.stringify(part.content),
+              content: typeof resultContent === 'string' ? resultContent : JSON.stringify(resultContent),
+              images: resultImages,
               isError: Boolean(part.is_error),
               toolUseResult: raw.toolUseResult,
             }));
@@ -1289,8 +1296,10 @@ export class ClaudeSessionsProvider implements IProviderSessions {
       if (raw.message?.role === 'user' && Array.isArray(raw.message?.content)) {
         for (const part of raw.message.content) {
           if (part.type === 'tool_result' && part.tool_use_id) {
+            const { content: resultContent, images: resultImages } = liftToolResultImages(part.content);
             toolResultMap.set(part.tool_use_id, {
-              content: part.content,
+              content: resultContent,
+              images: resultImages,
               isError: Boolean(part.is_error),
               subagentTools: raw.subagentTools,
               subagent: raw.subagent,
@@ -1324,6 +1333,7 @@ export class ClaudeSessionsProvider implements IProviderSessions {
           content: typeof toolResult.content === 'string'
             ? toolResult.content
             : JSON.stringify(toolResult.content),
+          images: toolResult.images,
           isError: toolResult.isError,
           toolUseResult: toolResult.toolUseResult,
           timestamp: toolResult.timestamp,
@@ -1336,6 +1346,9 @@ export class ClaudeSessionsProvider implements IProviderSessions {
     // Everything the transcript draws, and nothing else — so a page of N rows
     // is N rows the user sees, and `total` counts the same thing.
     const transcript = prepareTranscriptMessages(normalized);
+    // Pictures leave the rows before anything holds or slices them: the full-history cache keeps
+    // this array, and a page of inline base64 is several times the size of the page it sits in.
+    await storeToolResultImages(transcript);
     const total = transcript.length;
     const normalizedOffset = Math.max(0, offset);
     const normalizedLimit = limit === null ? null : Math.max(0, limit);

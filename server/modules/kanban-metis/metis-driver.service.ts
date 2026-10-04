@@ -506,6 +506,14 @@ export function createMetisDriver(dependencies: MetisDriverDependencies): MetisD
           say(`board ${board.id} was at its dial by the time this tick's launch went in — not counted as a failed launch`);
           return;
         }
+        // A TABLE OUTAGE IS NOT THE BOARD'S FAILURE. The spawner answers `LAUNCH_TABLE_UNREADABLE` when the
+        // house's launch table cannot be read (its CLI crashed, an import broke): nothing about this board
+        // failed, and charging it walks the ledger to its ten-minute backoff and, by the third attempt,
+        // parks an autonomous board for the ~30 minutes the outage lasts. The next tick asks again.
+        if (error instanceof AppError && error.code === 'LAUNCH_TABLE_UNREADABLE') {
+          say(`board ${board.id} launch not made: ${describe(error)} — not counted as a failed launch`);
+          return;
+        }
         // Not recorded as a spawn: a launch that failed did not land, so the cooldown must not hold
         // the board back from the next tick's attempt.
         //

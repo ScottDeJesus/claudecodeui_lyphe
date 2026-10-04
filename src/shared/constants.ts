@@ -1,6 +1,7 @@
 import {
   Bell,
   Bot,
+  Download,
   GitBranch,
   Info,
   KeyRound,
@@ -12,6 +13,7 @@ import {
 } from 'lucide-react';
 import type { ComponentType } from 'react';
 
+import type { RoadmapFeatureWord, RoadmapMilestoneWord } from '@/shared/roadmap-types';
 import type { FileStatusCode, LLMProvider, McpProvider, McpScope, McpTransport, SettingsMainTab } from '@/shared/types';
 import type { UserPreferenceKey } from '@/shared/userSettings';
 
@@ -68,11 +70,17 @@ type SettingsMainTabMeta = {
 };
 
 /**
- * The ordered list of top-level settings tabs. The settings sidebar renders it directly and
- * the command palette turns each entry into an "open settings" command, so both stay in sync.
+ * The ordered list of top-level settings tabs, in the order they are shown. The command palette
+ * turns each entry into an "open settings" command.
+ *
+ * IT IS NOT THE SIDEBAR'S LIST. The settings sidebar keeps its own `NAV_ITEMS`
+ * (`SettingsSidebar.tsx`) and the two are kept in step by hand: a tab added here and not there is a
+ * palette command that opens a panel the sidebar cannot reach, and one added there and not here is
+ * a panel the palette cannot name. `mainTabs.*` in the settings namespace holds the sidebar's
+ * labels; these are the palette's.
  */
 export const SETTINGS_MAIN_TABS: SettingsMainTabMeta[] = [
-  { id: 'agents', label: 'Agents', keywords: 'agents subagents claude code', icon: Bot },
+  { id: 'agents', label: 'Agents', keywords: 'agents subagents claude code chains model effort launch', icon: Bot },
   { id: 'appearance', label: 'Appearance', keywords: 'appearance theme dark light language', icon: Palette },
   { id: 'git', label: 'Git', keywords: 'git github commits', icon: GitBranch },
   { id: 'tasks', label: 'Tasks', keywords: 'tasks taskmaster', icon: ListChecks },
@@ -81,6 +89,7 @@ export const SETTINGS_MAIN_TABS: SettingsMainTabMeta[] = [
   { id: 'voice', label: 'Voice', keywords: 'voice speech dictation transcription', icon: Mic },
   { id: 'plugins', label: 'Plugins', keywords: 'plugins extensions integrations', icon: Plug },
   { id: 'browser', label: 'Browser', keywords: 'browser playwright chromium automation', icon: MonitorPlay },
+  { id: 'updates', label: 'Updates', keywords: 'updates claude code sdk versions patch notes', icon: Download },
   { id: 'about', label: 'About', keywords: 'about version info', icon: Info },
 ];
 
@@ -262,3 +271,141 @@ export const LLM_PROVIDER_LABELS: Record<LLMProvider, string> = {
  * every tool markdown body. User message bubbles and tool errors deliberately do not carry it.
  */
 export const MARKDOWN_CARDS_CLASS = 'chat-md-cards';
+
+// ---------------------------
+
+//----------------- SWARM CEILING LADDER ------------
+
+/**
+ * The floor of a swarm ceiling, mirrored from the runner's own grammar: a switch that is on runs at
+ * least one phase, and `on 0` is not on at all. Nothing is narrowed above it — the count the operator
+ * sets is the count the file holds.
+ *
+ * Used by `useSwarmSwitch` (the writer clamps to it), `swarmLadderSteps` (the ladder stops there), the
+ * dispatcher module's `SwarmControl` (one lane is the word `off`) and the settings module's
+ * `RunnerModelContent` (one lane has its own singular).
+ */
+export const LANES_MIN = 1;
+
+/**
+ * The count the swarm ladder climbs to before `All`: `1, 2, … 6, All`. Six is the widest count the
+ * operator has ever chosen. It is only the FLOOR of the ladder's top rung — a wider count in play
+ * raises it (`swarmLadderTop`). On the plan card the box's count is always in play, so it stays a rung
+ * however the plan's own count moves; on the Settings row the row's own count is the only one.
+ *
+ * Used by `swarmLadderTop` in `utils.ts`, which both steppers of the swarm — the plan card's
+ * `SwarmControl` and the settings module's `RunnerModelContent` — climb through.
+ */
+export const SWARM_LADDER_TOP = 6;
+
+// ---------------------------
+
+//----------------- DISPATCHER LANE WALL ------------
+
+/**
+ * The space between two lane cards, whether they stand side by side on the wall of the Roadmap tab's
+ * In flight face or one under another in the Runs widget. Both homes read this one value,
+ * so the widget's list keeps the face's card spacing.
+ *
+ * Used by `LANE_WALL_GRID` below and by the runner-tab module's `RunnerWidgetBody` (its list of cards).
+ */
+export const LANE_CARD_GAP = 'gap-4';
+
+/**
+ * The wall of the Roadmap tab's In flight face: an auto-fill grid of lane cards, each column at least 22rem wide (or the
+ * whole column where the pane is narrower, so a phone gets one card a row and never a sideways
+ * scroll), row-major, and every card at its OWN height (`items-start`) rather than the tallest in
+ * its row, spaced `LANE_CARD_GAP` apart.
+ *
+ * Used by the runner-tab module's `RunnerPanel`, for the plans of no arc.
+ */
+export const LANE_WALL_GRID = `grid grid-cols-[repeat(auto-fill,minmax(min(100%,22rem),1fr))] items-start ${LANE_CARD_GAP}`;
+
+// ---------------------------
+//----------------- CHAT HOTKEY ------------
+
+/**
+ * The key that, held with Ctrl (⌘ on a Mac), floats the chat or brings it home again. It is printed
+ * beside the switcher's Chat act through `formatShortcut`, and it is the key `useChatHotkey` listens for.
+ *
+ * Used by the app-switcher module (the Chat act's printed shortcut) and the project-workspace module
+ * (the hotkey itself); one value, so what is printed is what is heard.
+ */
+export const CHAT_TOGGLE_KEY = '.';
+
+// ---------------------------
+
+//----------------- FLOATING ACTION BUTTON ------------
+
+/**
+ * The FAB's drawn width and height, the JS twin of `--vv-fab-size` in the kit's surfaces.css: the size the
+ * kit clamps a FAB it cannot measure yet to, the size the switcher's radial draws each disc and works out
+ * its label geometry from, and the size the floating chat's rest anchor stands as. The stylesheet's variable
+ * is what draws; keep the two equal (the radial's proof measures a disc against the FAB itself).
+ *
+ * Used by the DockableFab kit piece, the app-switcher module's radial layout and labels, and the chat-host
+ * module's floating panel.
+ */
+export const FAB_SIZE_PX = 28;
+
+/**
+ * How wide the FAB's catch is: a transparent round area centred on the button, so a press up to half of this
+ * from its centre is the FAB's while its drawn box stays `FAB_SIZE_PX`. Every radial disc keeps the same
+ * catch, so a finger lands on either. The JS twin of `--vv-fab-catch` in surfaces.css.
+ *
+ * Used by the app-switcher module's radial layout (the room an item is given) and label plan (what a label
+ * keeps clear of).
+ */
+export const FAB_CATCH_PX = 44;
+
+// ---------------------------
+
+//----------------- THE ROADMAP'S FEATURE WORDS ------------
+
+/**
+ * Each feature word's key in the locale, which spells `in flight` as `inFlight`: the one way a feature's
+ * word is put into words. Used by the roadmap module's `StateLine` (its five stations and its label) and
+ * `FeatureFacts` (the word of each feature a feature waits on).
+ */
+export const ROADMAP_FEATURE_WORD_KEYS: Record<RoadmapFeatureWord, string> = {
+  idea: 'roadmap.word.idea',
+  proposed: 'roadmap.word.proposed',
+  designing: 'roadmap.word.designing',
+  'in flight': 'roadmap.word.inFlight',
+  shipped: 'roadmap.word.shipped',
+};
+
+// ---------------------------
+
+//----------------- THE ROADMAP'S MILESTONE WORDS ------------
+
+/**
+ * Each milestone word's key in the locale, which spells `not started` and `in progress` as `notStarted` and
+ * `inProgress`: the one way a milestone's word is put into words. Used by the roadmap module's
+ * `MilestonePath` (each station's line and label) and `MilestoneFocus` (the stage's eyebrow).
+ */
+export const ROADMAP_MILESTONE_WORD_KEYS: Record<RoadmapMilestoneWord, string> = {
+  empty: 'roadmap.milestoneWord.empty',
+  'not started': 'roadmap.milestoneWord.notStarted',
+  'in progress': 'roadmap.milestoneWord.inProgress',
+  reached: 'roadmap.milestoneWord.reached',
+};
+
+// ---------------------------
+
+//----------------- THE RUNNER LANDING ------------
+
+/**
+ * The query parameter a landing names a plan in (`?runner=<plan>`): the key one side writes and the other
+ * reads. Used by the project-workspace module's `useRunnerLanding`, which reads it, and the roadmap
+ * module's `useRevealCard`, which writes it from a surface that has no Roadmap tab above it.
+ */
+export const RUNNER_LANDING_PARAM = 'runner';
+
+/**
+ * The query parameter a landing names a roadmap in (`?roadmap=<name>`): the Roadmap tab's Roadmap face
+ * on that roadmap. Taken, held and stripped under the very rule `RUNNER_LANDING_PARAM` follows. Used by
+ * the project-workspace module's `useRunnerLanding`, which reads it, and the roadmap module's chat-gutter
+ * widget (`RoadmapWidgetBody`), which writes it from a surface that has no Roadmap tab above it.
+ */
+export const ROADMAP_LANDING_PARAM = 'roadmap';

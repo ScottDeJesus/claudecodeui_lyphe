@@ -1,9 +1,7 @@
 import { getConnection } from '@/modules/database/connection.js';
 import { projectsDb } from '@/modules/database/repositories/projects.db.js';
-import {
-  NEXT_TOP_SIMPLE_LIST_RANK_SQL,
-  SESSION_UNREAD_SQL,
-} from '@/modules/database/repositories/session-user-state.db.js';
+import { SESSION_UNREAD_SQL } from '@/modules/database/repositories/session-user-state.db.js';
+import { NEXT_TOP_SIMPLE_LIST_RANK_SQL } from '@/modules/database/repositories/simple-list-ladder.db.js';
 import { normalizeProjectPath } from '@/shared/utils.js';
 import { visibleProjectPathSql } from '@/shared/hidden-project-paths.js';
 

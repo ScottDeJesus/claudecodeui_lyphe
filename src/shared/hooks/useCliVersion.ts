@@ -109,16 +109,16 @@ const getSnapshot = () => report;
  * The installed Claude CLI, and which live conversations are running a different one.
  *
  * Used by the chat module (the banner above the transcript, and the composer's restart toast)
- * and the sidebar module (the footer's fact line and the session row's inert badge). It is the
- * ONE place the comparison is made — three screens reading three comparisons is three chances
- * for them to disagree about the same fact.
+ * and the sidebar module (the session row's inert badge). It is the ONE place the comparison
+ * is made — two screens reading two comparisons is two chances for them to disagree about the
+ * same fact.
  *
  * `staleSessionIds` holds only sessions with a run alive right now: a finished conversation
  * that once ran an older CLI is not stale, it is simply over.
  *
- * `reason` is the route's OWN words for why `installed` is null, and it is what separates the two
- * states that would otherwise render the same sentence: before the first answer lands, `installed`
- * and `reason` are BOTH null — nothing has been read, so nothing may be explained.
+ * `reason` is the route's OWN words for why `installed` is null. Before the first answer lands
+ * `installed` and `reason` are BOTH null — no reading has arrived, which is a different fact from
+ * a reading that failed.
  *
  * `refresh()` resolves on a reading no older than the call — TRUE when one was obtained — so a
  * caller may act on the answer and can tell it apart from having failed to ask.

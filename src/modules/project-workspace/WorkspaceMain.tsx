@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 
 import { ChatInterface, type ChatExportSurface, type TokenUsageSurface } from '@/modules/chat';
 import { ChatGutterLayout } from '@/modules/chat-gutters';
+import { ChatHostSlot, useChatHost } from '@/modules/chat-host';
 import { FileManager } from '@/modules/file-manager';
 import { StandaloneShell } from '@/modules/standalone-shell';
 import { GitRepositoriesPanel } from '@/modules/git-panel';
@@ -11,16 +12,18 @@ import { BrowserUsePanel } from '@/modules/browser-use';
 import { usePaletteOpsRegister } from '@/modules/command-palette';
 import { KanbanPanel } from '@/modules/kanban';
 import { MemoryIntakePanel } from '@/modules/memory-intake';
-import { RunnerPanel } from '@/modules/plan-runner';
+import { RoadmapTab } from '@/modules/roadmap';
 import { HealPanel } from '@/modules/heal';
 import { ApiPanel } from '@/modules/api-tab';
 import { TaskMasterPanel, useTaskMasterProjectSync } from '@/modules/task-master';
 import { UniversePanel } from '@/modules/universe';
 import { SchedulesPanel } from '@/modules/schedules';
+import { NotesPanel } from '@/modules/notes';
 import type { AppTab, GitRepository, Project, ProjectChoice, ProjectSession, SessionEstablishedContext, SessionNavigationOptions, SettingsMainTab } from '@/shared/types';
 import { api } from '@/shared/api';
 import { useUiPreferences } from '@/shared/context/UiPreferencesContext';
 import { useFileOpenResolver } from '@/modules/project-workspace/hooks/useFileOpenResolver';
+import { useRunnerLanding } from '@/modules/project-workspace/hooks/useRunnerLanding';
 import { useWorkspaceTabGates } from '@/modules/project-workspace/hooks/useWorkspaceTabGates';
 import WorkspaceHeader from '@/modules/project-workspace/WorkspaceHeader';
 import WorkspaceStateView from '@/modules/project-workspace/WorkspaceStateView';
@@ -115,7 +118,15 @@ function WorkspaceMain({
     preferencesSettled,
   } = useWorkspaceTabGates(activeTab);
 
+  // The two landings onto the Roadmap tab: `?runner=<plan>` brings it forward on its In flight face with that plan's card in view,
+  // and `?roadmap=<name>` on its Roadmap face with that roadmap selected.
+  const { revealPlan, clearReveal, openRoadmap, clearOpenRoadmap } = useRunnerLanding({ selectedProject, activeTab, setActiveTab });
+
   useTaskMasterProjectSync(selectedProject);
+
+  // While the chat floats it is live outside this tab: it counts as the active chat whichever tab is open,
+  // and the gutters stand down — the floating chat draws its own pinned subagent strip.
+  const floating = useChatHost().placement !== 'home';
 
   // The one path-opening capability three caller families share — the chat's Edit/Write cards and
   // bare links, the git panel's changed-file rows, and the tree beside the file manager. It lives
@@ -243,9 +254,10 @@ function WorkspaceMain({
   // fourth effect for the Memory tab, and adding one would fight the design: that tab is
   // DATA-gated, so its gate is written to HOLD while it is the selected tab
   // (`useWorkspaceTabGates`) and filing the last pending memory empties the panel instead of
-  // taking the tab away mid-act. The Runner tab is the SECOND DATA-gated tab and takes the same
-  // policy — no fifth effect for it either, for exactly the same reason: a run ending under
-  // someone reading its phases must leave them where they are standing. Two kinds of tab, two policies, each living in the layer that
+  // taking the tab away mid-act. The Heal tab is the SECOND DATA-gated tab and takes the same
+  // policy — no fifth effect for it either, for exactly the same reason: a friction cleared under
+  // someone reading its entries must leave them where they are standing. (The Roadmap tab is not
+  // gated at all.) Two kinds of tab, two policies, each living in the layer that
   // owns the act — the gate rule in the hook that decides a tab exists, the navigation here,
   // where `setActiveTab` is.
   //
@@ -328,31 +340,33 @@ function WorkspaceMain({
                 their own column untouched. The boundary is handed down rather than imported
                 there: each widget body gets its own, and a crashing widget cannot blank the
                 chat tab. */}
-            <ChatGutterLayout enabled={!isMobile} sessionId={selectedSession?.id ?? null}
+            <ChatGutterLayout enabled={!isMobile && !floating} sessionId={selectedSession?.id ?? null}
               boundary={WorkspaceErrorBoundary}>
-              <ChatInterface
-                isActive={activeTab === 'chat'}
-                selectedProject={selectedProject}
-                selectedSession={selectedSession}
-                ws={ws}
-                sendMessage={sendMessage}
-                onFileOpen={handleFileOpen}
-                onNavigateToSession={onNavigateToSession}
-                onSessionEstablished={onSessionEstablished}
-                onShowSettings={onShowSettings}
-                showRawParameters={showRawParameters}
-                showThinking={showThinking}
-                showWork={showWork}
-                showCompactSummary={showCompactSummary}
-                projectChoices={projectChoices}
-                onSelectProject={onSelectProject}
-                sendByCtrlEnter={sendByCtrlEnter}
-                externalMessageUpdate={externalMessageUpdate}
-                newSessionTrigger={newSessionTrigger}
-                onTokenUsageSurface={setTokenUsageSurface}
-                onChatExportSurface={setChatExportSurface}
-                onShowAllTasks={shouldShowTasksTab ? showAllTasks : null}
-              />
+              <ChatHostSlot sessionId={selectedSession?.id ?? null} showing={activeTab === 'chat'}>
+                <ChatInterface
+                  isActive={activeTab === 'chat' || floating}
+                  selectedProject={selectedProject}
+                  selectedSession={selectedSession}
+                  ws={ws}
+                  sendMessage={sendMessage}
+                  onFileOpen={handleFileOpen}
+                  onNavigateToSession={onNavigateToSession}
+                  onSessionEstablished={onSessionEstablished}
+                  onShowSettings={onShowSettings}
+                  showRawParameters={showRawParameters}
+                  showThinking={showThinking}
+                  showWork={showWork}
+                  showCompactSummary={showCompactSummary}
+                  projectChoices={projectChoices}
+                  onSelectProject={onSelectProject}
+                  sendByCtrlEnter={sendByCtrlEnter}
+                  externalMessageUpdate={externalMessageUpdate}
+                  newSessionTrigger={newSessionTrigger}
+                  onTokenUsageSurface={setTokenUsageSurface}
+                  onChatExportSurface={setChatExportSurface}
+                  onShowAllTasks={shouldShowTasksTab ? showAllTasks : null}
+                />
+              </ChatHostSlot>
             </ChatGutterLayout>
           </WorkspaceErrorBoundary>
         </div>
@@ -419,7 +433,12 @@ function WorkspaceMain({
 
           {shouldShowRunnerTab && activeTab === 'runner' && (
             <div className="h-full overflow-hidden">
-              <RunnerPanel />
+              <RoadmapTab
+                revealPlan={revealPlan}
+                onRevealed={clearReveal}
+                openRoadmap={openRoadmap}
+                onRoadmapOpened={clearOpenRoadmap}
+              />
             </div>
           )}
 
@@ -458,6 +477,14 @@ function WorkspaceMain({
           {activeTab === 'schedules' && (
             <div className="h-full overflow-hidden">
               <SchedulesPanel />
+            </div>
+          )}
+
+          {/* No gate, for the same reason again: the notes belong to the account and not to the
+              project, so nothing here changes with the selection. */}
+          {activeTab === 'notes' && (
+            <div className="h-full overflow-hidden">
+              <NotesPanel />
             </div>
           )}
 

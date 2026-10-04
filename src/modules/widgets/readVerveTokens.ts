@@ -34,14 +34,22 @@ export const WIDGET_TOKEN_NAMES: readonly string[] = [
 ];
 
 /**
- * Resolves every widget token against the live document element.
+ * Resolves every widget token against the live document element of `hostDocument`.
+ *
+ * `hostDocument` is the document whose theme is wanted. `WidgetFrame` passes the document the widget
+ * is drawn in (`useHostWindow().document`) for a widget's first build; `useWidgetHost` passes the
+ * OPENER's, because a picture-in-picture window carries a mirrored copy of `<html>`'s class and style
+ * (chat-host's mirror) that trails the theme by a microtask on a flip, and a token read must not
+ * describe the theme that was just left.
  *
  * A name that resolves to nothing is omitted rather than copied as an empty string, so a widget
  * that falls back with `var(--foo, somedefault)` gets its default instead of an empty value that
  * would win and paint nothing.
  */
-export function readVerveTokens(): Record<string, string> {
-  const computed = getComputedStyle(document.documentElement);
+export function readVerveTokens(hostDocument: Document): Record<string, string> {
+  const view = hostDocument.defaultView;
+  if (!view) return {};
+  const computed = view.getComputedStyle(hostDocument.documentElement);
   const tokens: Record<string, string> = {};
 
   for (const name of WIDGET_TOKEN_NAMES) {

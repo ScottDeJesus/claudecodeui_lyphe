@@ -21,6 +21,7 @@
  * dev server's handovers boot, and each of them would otherwise buzz the phone.
  */
 
+import { landingPathOf } from '@/modules/notifications/services/notification-landing.service.js';
 import { buildNtfyActions } from '@/modules/notifications/services/ntfy-action-decisions.service.js';
 import { getAppUrl, getNtfyConfig } from '@/modules/notifications/services/ntfy-config.service.js';
 import type { NtfyConfig } from '@/modules/notifications/services/ntfy-config.service.js';
@@ -112,8 +113,12 @@ async function publishSummary(last: SuppressedPush, suppressedCount: number): Pr
 }
 
 function priorityFor(event: ChannelEvent): NtfyMessage['priority'] {
-  // A plan run ends a few times a day and closes hours of work: its finish is not a chat turn's quiet stop.
-  if (event.code === 'runner.finished') return 3;
+  // A plan or an epic ends a few times a day and closes hours of work: its finish is not a chat turn's quiet stop.
+  if (
+    event.code === 'dispatcher.finished' ||
+    event.code === 'dispatcher.epic_finished' ||
+    event.code === 'dispatcher.limit_paused'
+  ) return 3;
   switch (event.kind) {
     case 'action_required':
     case 'error':
@@ -130,8 +135,14 @@ function priorityFor(event: ChannelEvent): NtfyMessage['priority'] {
 
 /** ntfy renders a tag that names an emoji as that emoji in front of the title. */
 function tagsFor(event: ChannelEvent): string[] {
-  // A blocked plan asks for a hand; nothing crashed, so it is not the siren a failed run gets.
-  if (event.code === 'runner.blocked') return ['warning'];
+  // A plan that stopped wanting a hand asks for one; nothing crashed, so it is not the siren a failed run
+  // gets — and deliberately NOT in `COLLAPSIBLE_CODES` either: `dispatcher.relaunched` is a phase taken up
+  // again, a plan that changed its mind rather than a crash, and its once-only promise is kept by the
+  // ending's own event-id key (`dispatcher-endings.service.ts`), which a window that swallowed a second
+  // event inside the same minute would break.
+  if (event.code === 'dispatcher.relaunched') return ['warning'];
+  // A usage limit is a wait with a time on it, not a finish and not a crash.
+  if (event.code === 'dispatcher.limit_paused') return ['hourglass_flowing_sand'];
   switch (event.kind) {
     case 'action_required':
       return ['question'];
@@ -145,12 +156,6 @@ function tagsFor(event: ChannelEvent): string[] {
     default:
       return ['bell'];
   }
-}
-
-/** Where a tap opens: the session when both are known, the app root when only the URL is. */
-function clickFor(appUrl: string | null, sessionId: string | null | undefined): string | undefined {
-  if (!appUrl) return undefined;
-  return sessionId ? `${appUrl}/session/${sessionId}` : `${appUrl}/`;
 }
 
 /**
@@ -176,11 +181,13 @@ function promptKeyOf(event: ChannelEvent): string | null {
 }
 
 /**
- * The tap-to-answer buttons, only for a permission request that names its prompt, and only when
- * the phone has an app URL to send the tap to. Building them also REGISTERS the prompt, which is
- * how a successor re-registers the question a predecessor's push still points at — so this runs
- * before EVERY skip in `send`, and a push this channel does not send still leaves its buttons
- * answerable on the push that did go out.
+ * The tap-to-answer buttons, only for a permission request that names its prompt, and only when the
+ * phone has an app URL to send the tap to. That URL is the event's own landing (`landingPathOf`), so
+ * an option that takes words opens the same path the push's click carries.
+ *
+ * Building them also REGISTERS the prompt, which is how a successor re-registers the question a
+ * predecessor's push still points at — so this runs before EVERY skip in `send`, and a push this
+ * channel does not send still leaves its buttons answerable on the push that did go out.
  * A failure here (say, the signing secret cannot be stored) costs the buttons, never the push:
  * the most urgent push still says "look".
  */
@@ -199,6 +206,7 @@ function actionsFor(
       toolName: typeof event.meta?.toolName === 'string' ? event.meta.toolName : '',
       toolInput: event.meta?.toolInput,
       appUrl,
+      landingUrl: `${appUrl}${landingPathOf(event)}`,
     });
   } catch (error) {
     console.warn('[ntfy] answer buttons skipped', error instanceof Error ? error.message : error);
@@ -252,7 +260,8 @@ export const ntfyChannel = {
       if (event.sessionId && isSessionWatched(presenceUserId(userId), event.sessionId)) return null;
       if (event.code === 'run.stopped' && !ranLongEnough(event, config.longRunMinutes)) return null;
 
-      const click = clickFor(appUrl, event.sessionId);
+      // Where a tap opens, on the app URL this push is for; without one there is nowhere to send it.
+      const click = appUrl ? `${appUrl}${landingPathOf(event)}` : undefined;
       // The phone has this question already: a successor re-issues the prompt it inherited, and
       // one ask is one push. Its `permission_request` still reaches the chat — that door is the
       // runtime's — and the buttons built above still answer the push that did go out.

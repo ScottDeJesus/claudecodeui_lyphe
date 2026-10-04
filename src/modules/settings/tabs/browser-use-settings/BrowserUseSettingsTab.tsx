@@ -1,10 +1,9 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Download, Loader2 } from 'lucide-react';
 
-import { Button } from '@/shared/ui';
+import { Button, SettingRow } from '@/shared/ui';
 import { api, readApiJson } from '@/shared/api';
 import SettingsCard from '@/modules/settings/SettingsCard';
-import SettingsRow from '@/modules/settings/SettingsRow';
 import SettingsSection from '@/modules/settings/SettingsSection';
 import SettingsToggle from '@/modules/settings/SettingsToggle';
 
@@ -107,7 +106,7 @@ export default function BrowserUseSettingsTab() {
         description="Allow agents to create guarded Playwright browser sessions that you can monitor from the Browser tab."
       >
         <SettingsCard divided>
-          <SettingsRow
+          <SettingRow
             label="Enable Browser"
             description="Registers Browser for supported agents. Agents can create browser sessions; you can watch, stop, and delete them."
           >
@@ -121,7 +120,7 @@ export default function BrowserUseSettingsTab() {
                 disabled={isSaving}
               />
             )}
-          </SettingsRow>
+          </SettingRow>
 
           <div className="space-y-4 px-4 py-4">
             <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">

@@ -8,7 +8,7 @@ import path from 'node:path';
 import { projectsDb } from '@/modules/database/index.js';
 import { kanbanBoardsService } from '@/modules/kanban/index.js';
 import type { KanbanBoard } from '@/shared/kanban-types.js';
-import type { KanbanMetisSession } from '@/shared/types.js';
+import type { AgentLaunchResolved, AgentLaunchResult, KanbanMetisSession } from '@/shared/types.js';
 import { AppError, findApplicationRoot, getModuleDirectory } from '@/shared/utils.js';
 
 import {
@@ -73,7 +73,6 @@ const BRIEF_CHAPTERS = [
   'learning',
   'mcp-fallback',
   'parallelism',
-  'plan-template',
   'recovery',
 ] as const;
 
@@ -86,6 +85,15 @@ export type MetisSpawnDependencies = {
   appSecret: string;
   /** The DeepSeek key reader from `@/modules/deepseek/index.js`, called only for a Flash board. */
   readDeepseekKey: () => Promise<string | null>;
+  /**
+   * The launch table's answer for Metis on one side of the DeepSeek switch, from
+   * `@/modules/agent-launch/index.js`. Asked at every spawn, resume and reply; never throws — a failed
+   * ask is a result, and `prepare` turns it into a refusal.
+   */
+  resolveLaunchSide: (
+    name: string,
+    side: AgentLaunchResolved['side'],
+  ) => Promise<AgentLaunchResult<AgentLaunchResolved>>;
 };
 
 export type MetisSpawner = {
@@ -155,7 +163,7 @@ function briefRoot(): string {
  * own file comes first because it is the one that describes the board she is working.
  *
  * The hash is over the COMPOSED string — the bytes the child actually received — and not over one
- * of the seven files: what a later reader wants to know is whether the prompt that built a session
+ * of the six files: what a later reader wants to know is whether the prompt that built a session
  * is the prompt on disk today, and a hash of the entry file alone would say nothing about a chapter
  * that had been rewritten under it.
  */
@@ -222,7 +230,7 @@ function endForExit(
  * and is stopped by pid instead, which is why nothing below assumes the handle exists.
  */
 export function createMetisSpawner(dependencies: MetisSpawnDependencies): MetisSpawner {
-  const { registry, apiOrigin, appSecret, readDeepseekKey } = dependencies;
+  const { registry, apiOrigin, appSecret, readDeepseekKey, resolveLaunchSide } = dependencies;
   const children = new Map<string, ChildProcess>();
   /**
    * Sessions this process has been asked to end. The `exit` handler reads it and clears it in the
@@ -301,7 +309,7 @@ export function createMetisSpawner(dependencies: MetisSpawnDependencies): MetisS
         });
       }
       // The turn, then EOF: `claude -p` with unwritten stdin waits for input forever
-      // (`souls.py:310-312` writes the prompt and closes for exactly this reason).
+      // (`souls.py`'s `spawn` writes the prompt and closes for exactly this reason).
       child.stdin.write(specRecord.openingTurn);
       child.stdin.end();
 
@@ -365,7 +373,6 @@ export function createMetisSpawner(dependencies: MetisSpawnDependencies): MetisS
     // instant, so a dial moved from the panel is honoured by the next spawn instead of by the next
     // restart.
     ensureDialAllows(board);
-    const route = metisRouteFor(board.deepseekFlash);
     // A Flash board with no key is refused HERE, before this launch has created anything: the
     // alternative is a 201 `running` and a child that dies on its first model call, which reads to
     // the operator as a broken board rather than an unset key. Read only for a Flash board — a
@@ -378,6 +385,20 @@ export function createMetisSpawner(dependencies: MetisSpawnDependencies): MetisS
         { statusCode: 503, code: 'DEEPSEEK_KEY_MISSING' },
       );
     }
+
+    // THE LAUNCH TABLE IS ASKED AT EVERY SPAWN, RESUME AND REPLY — all three pass through here — so an
+    // edit made in Settings → Agents → Edit Agent Chains reaches her at her next launch with nothing restarted. The side is the
+    // board's own switch, read at this instant. It is asked HERE, before `startedAt`, the cwd or the
+    // board's flag file exist, so a table that cannot be read refuses the launch having created nothing:
+    // the alternative is a child launched at whatever words this file could guess, unannounced.
+    const resolved = await resolveLaunchSide('metis', board.deepseekFlash ? 'deepseek' : 'claude');
+    if (!resolved.ok) {
+      throw new AppError(`Metis's launch table could not be read: ${resolved.message}`, {
+        statusCode: 503,
+        code: 'LAUNCH_TABLE_UNREADABLE',
+      });
+    }
+    const route = metisRouteFor(board.deepseekFlash, resolved.value);
 
     const startedAt = Date.now();
     const brief = readMetisBrief();
@@ -392,6 +413,7 @@ export function createMetisSpawner(dependencies: MetisSpawnDependencies): MetisS
       boardId: board.id,
       sessionId: input.sessionId,
       model: route.model,
+      effort: route.effort,
       provider: route.provider,
       deepseekFlash: board.deepseekFlash,
       apiOrigin,
@@ -408,6 +430,7 @@ export function createMetisSpawner(dependencies: MetisSpawnDependencies): MetisS
       boardName: board.name,
       provider: route.provider,
       model: route.model,
+      effort: route.effort,
       owner: deriveLeaseOwner(input.sessionId),
       launchedBy: input.launchedBy,
       apiOrigin,
@@ -418,6 +441,14 @@ export function createMetisSpawner(dependencies: MetisSpawnDependencies): MetisS
       resumed: input.resumed,
       startedAt,
     };
+
+    // THE GATES, ASKED AGAIN AS THE LAST SYNCHRONOUS ACT BEFORE THE DOOR RECORDS. The first look above
+    // is the cheap refusal; this one is the fence. Between them lie the DeepSeek key read, the launch
+    // table's Python process (about 85 ms, ceiling 20 s) and the flag write, and the registry only
+    // learns of this child when the door calls `registry.record` — so a second request that arrived
+    // meanwhile passed the same gates, and both would have spawned. Nothing is awaited between this
+    // line and the door's `registry.record`, so no third request can slip in behind it.
+    ensureNoRivalSince(board, input);
 
     return { spec, record, cwd };
   };
@@ -447,6 +478,23 @@ export function createMetisSpawner(dependencies: MetisSpawnDependencies): MetisS
       statusCode: 409,
       code: 'CONFLICT',
     });
+  };
+
+  /**
+   * The gates `prepare` checked on the way in, checked once more after everything it awaited: the dial
+   * (a rival launch may have taken the last place) and, for a resume or a reply, that no other child
+   * has taken the SAME session in the meantime — two children in one conversation would both claim
+   * cards, and the registry records only one pid, so the other could never be signalled again.
+   * Both refusals are 409s in the words the front doors use.
+   */
+  const ensureNoRivalSince = (board: KanbanBoard, input: { sessionId: string; resumed: boolean }): void => {
+    ensureDialAllows(board);
+    if (input.resumed && registry.isRunning(input.sessionId)) {
+      throw new AppError(`Metis session "${input.sessionId}" is already running.`, {
+        statusCode: 409,
+        code: 'CONFLICT',
+      });
+    }
   };
 
   /**

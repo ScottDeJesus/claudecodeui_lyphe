@@ -10,15 +10,13 @@ const execFileAsync = promisify(execFile);
  * Relaying the heal reflex's own worker.
  *
  * This server keeps no view of the reflex and owns none of its state. It never touches the ledger's
- * file, never lists the reflex's queue directory and never writes a friction row: it runs the
- * worker's own command and carries back what the worker said. The reflex's Python package is the one
- * reader of each of those stores, and the worker's `--status` payload already CONTAINS the runner's
- * heal queue — read there, in Python, through its own module — so the queue's item shape exists once
- * in this house rather than once per language. That is the whole design: one reader per store, one
- * transport, and the transport is a process this service does not look inside of.
+ * file and never writes a friction row: it runs the worker's own command and carries back what the
+ * worker said. The reflex's Python package is the one reader of each of those stores, so every shape
+ * the tab draws exists once in this house rather than once per language. That is the whole design: one
+ * reader per store, one transport, and the transport is a process this service does not look inside of.
  *
  * Nothing here throws. A refusal is a RESULT — the operator needs the worker's own sentence, not a
- * 500 — and the shapes below are the plan-runner lane's (`runner-verb.service.ts`), so the two relay
+ * 500 — and the shapes below are the dispatcher lane's (`@/shared/dispatcher-command.ts`), so the two relay
  * lanes in this server answer the same way. The argv array is the security boundary: no shell parses
  * any of this, so a pattern or a reason carrying a space, a semicolon or a quote is one argument the
  * worker rejects rather than a second command.
@@ -31,7 +29,7 @@ const execFileAsync = promisify(execFile);
  */
 const OUTPUT_MAX_BYTES = 4 * 1024 * 1024;
 
-/** Wall-clock ceiling for the summary. The worker opens its ledger, asks the queue and prints. */
+/** Wall-clock ceiling for the summary. The worker opens its ledger and prints. */
 const STATUS_TIMEOUT_MS = 20_000;
 
 /** Wall-clock ceiling for an ignore add. It inserts one row and sweeps the rows it matches. */
@@ -42,9 +40,9 @@ const KIND_TIMEOUT_MS = 20_000;
 
 /**
  * Wall-clock ceiling for a cycle door. Both doors run the worker's own bounded wait for the ledger's
- * flock first (`LOCK_WAIT_S`, 45 s) and then answer, so the bound has to clear that wait with room to
- * index what the press arrives among; 90 s is `heal-reflex`'s own number for this door, kept here so
- * the server does not cut a worker that is behaving exactly as it promised.
+ * flock first (`LOCK_WAIT_S`, 45 s) and then answer, so the bound has to clear that wait with room for
+ * the pass the door runs once it holds the lock; 90 s is `heal-reflex`'s own number for this door, kept
+ * here so the server does not cut a worker that is behaving exactly as it promised.
  */
 const CYCLE_TIMEOUT_MS = 90_000;
 
@@ -73,8 +71,8 @@ export type HealResult<T> =
 /**
  * What a cycle door answers, carried WHOLE: the worker's own object (`{"cycle", "started", "stage",
  * "why"}`), which is the cycle's verdict on the press — including its REFUSAL, which is an answer and
- * not a fault. `started` false carries the worker's sentence in `why` ("busy — run … is walking …",
- * "heal switch off", "a cycle is already open (healing) — Stop ends it"); true carries the id and stage
+ * not a fault. `started` false carries the worker's sentence in `why` ("heal switch off",
+ * "a cycle is already open (healing) — Stop ends it"); true carries the id and stage
  * the press opened. Nothing here narrows the object: the panel renders `why`, and a second shape
  * written down in this lane would be a second place it is defined.
  */
@@ -86,7 +84,7 @@ export type HealServiceDependencies = {
 };
 
 export type HealService = {
-  /** The whole summary the tab reads: counts, kind rows, heal cards, the ignore table, the queue. */
+  /** The whole summary the tab reads: counts, kind rows, heal cards, cycles, the ignore table. */
   summary(): Promise<HealResult<HealSummary>>;
   /** The rows filed under one door's word, newest first, as the worker's own kind door answers them. */
   kind(kind: string): Promise<HealResult<unknown>>;
@@ -187,7 +185,7 @@ export function createHealService({ bin }: HealServiceDependencies): HealService
      * The cycle door, asked and ANSWERED. A cycle press is a question ("may one open now?"), and the
      * worker's own object IS the answer, refusal included: `execFile` holds the response until the
      * worker prints it, and the bound is that worker's own for this door. Spawning it detached would give the press nowhere to
-     * put its reason, and the panel would read "busy — run … is walking …" as a wall instead.
+     * put its reason, and the panel would read "heal switch off" as a wall instead.
      */
     cycle: () => ask(bin, ['--cycle', 'now'], CYCLE_TIMEOUT_MS),
 

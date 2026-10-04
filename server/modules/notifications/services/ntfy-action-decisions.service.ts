@@ -24,8 +24,9 @@ const LONG_LIVED_TOOLS = new Set(['AskUserQuestion', 'ExitPlanMode']);
 /** ntfy shows at most three buttons; a question with more options is answered in the app. */
 const MAX_OPTION_BUTTONS = 3;
 
-type SingleChoiceQuestion = { question: string; optionLabels: string[] };
-type ButtonChoice = { label: string; decision: NtfyActionDecision };
+type SingleChoiceQuestion = { question: string; optionLabels: string[]; needsNote: boolean[] };
+/** A button that answers (`decision`), or one that opens the app because its answer takes words (`opensApp`). */
+type ButtonChoice = { label: string; decision: NtfyActionDecision } | { label: string; opensApp: true };
 
 /**
  * The one question of an AskUserQuestion input, when a row of buttons can
@@ -43,7 +44,10 @@ function readSingleChoiceQuestion(input: unknown): SingleChoiceQuestion | null {
 
   const optionLabels = options.map((option: unknown) => (option as { label?: unknown } | null)?.label);
   if (!optionLabels.every((label): label is string => typeof label === 'string' && label.length > 0)) return null;
-  return { question, optionLabels };
+  // An option that takes the operator's note (`needsNote` — a plan prompt's Rework) cannot be answered
+  // by a tap: its button opens the app, where the panel takes the note.
+  const needsNote = options.map((option: unknown) => (option as { needsNote?: unknown } | null)?.needsNote === true);
+  return { question, optionLabels, needsNote };
 }
 
 function optionDecision(index: number): NtfyActionDecision {
@@ -59,7 +63,9 @@ function buttonChoicesFor(toolName: string, toolInput: unknown): ButtonChoice[] 
   if (toolName === 'AskUserQuestion') {
     const question = readSingleChoiceQuestion(toolInput);
     if (!question || question.optionLabels.length > MAX_OPTION_BUTTONS) return [];
-    return question.optionLabels.map((label, index) => ({ label, decision: optionDecision(index) }));
+    return question.optionLabels.map((label, index): ButtonChoice => (question.needsNote[index]
+      ? { label, opensApp: true }
+      : { label, decision: optionDecision(index) }));
   }
   if (toolName === 'ExitPlanMode') {
     return [{ label: 'Approve', decision: 'allow' }, { label: 'Revise', decision: 'revise' }];
@@ -68,10 +74,11 @@ function buttonChoicesFor(toolName: string, toolInput: unknown): ButtonChoice[] 
 }
 
 /**
- * The buttons for one `permission.required` push, each carrying its own signed
- * single-use token. Consumed by the ntfy channel. Registers the prompt with
- * the token service first — only when it gets at least one button — because a
- * token expires with its prompt.
+ * The buttons for one `permission.required` push, each answering one carrying its own signed
+ * single-use token — and an option that takes the operator's note opening the app at that push's
+ * own landing (`landingUrl`) instead, since a tap cannot carry words. Consumed by the ntfy channel.
+ * Registers the prompt with the token service first — only when it gets at least one button —
+ * because a token expires with its prompt.
  *
  * Keyed by the prompt and not by the ask that carried it: the channel builds
  * these again on every re-issue, including the ones whose push it skips, so a
@@ -84,6 +91,8 @@ export function buildNtfyActions(input: {
   toolName: string;
   toolInput: unknown;
   appUrl: string;
+  /** The event's own app path (`landingPathOf`), on the app URL: where a button that needs words opens. */
+  landingUrl: string;
 }): NtfyAction[] {
   const choices = buttonChoicesFor(input.toolName, input.toolInput);
   if (choices.length === 0) return [];
@@ -98,13 +107,20 @@ export function buildNtfyActions(input: {
     ttlMs: LONG_LIVED_TOOLS.has(input.toolName) ? LONG_LIVED_TTL_MS : SHORT_LIVED_TTL_MS,
   });
 
-  return choices.map((choice): NtfyAction => ({
-    action: 'http',
-    label: choice.label,
-    url: `${input.appUrl}/api/ntfy/act?t=${mintActionToken(input.promptKey, userId, choice.decision)}`,
-    method: 'POST',
-    clear: true,
-  }));
+  return choices.map((choice): NtfyAction => ('opensApp' in choice
+    ? {
+      action: 'view',
+      label: choice.label,
+      url: input.landingUrl,
+      clear: true,
+    }
+    : {
+      action: 'http',
+      label: choice.label,
+      url: `${input.appUrl}/api/ntfy/act?t=${mintActionToken(input.promptKey, userId, choice.decision)}`,
+      method: 'POST',
+      clear: true,
+    }));
 }
 
 /**
@@ -132,6 +148,6 @@ export function toPermissionDecision(
 
 // Consumed by the act route: the label of the tapped button, for its `Answered: <label>` reply.
 export function describeDecision(action: PendingAction, decision: NtfyActionDecision): string {
-  return buttonChoicesFor(action.toolName, action.input).find((choice) => choice.decision === decision)?.label
-    ?? decision;
+  return buttonChoicesFor(action.toolName, action.input)
+    .find((choice) => 'decision' in choice && choice.decision === decision)?.label ?? decision;
 }

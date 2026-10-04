@@ -68,8 +68,8 @@ export function ensureAppsFile(): void {
 }
 
 /**
- * An entry is a row of three non-empty strings, and an optional `description` that is a string when
- * present. Anything else is a broken row, not a row.
+ * An entry is a row of three non-empty strings, and an optional `description` and `project` that
+ * are strings when present. Anything else is a broken row, not a row.
  */
 function isAppEntry(value: unknown): value is AppEntry {
   if (typeof value !== 'object' || value === null) return false;
@@ -81,7 +81,8 @@ function isAppEntry(value: unknown): value is AppEntry {
     candidate.name.length > 0 &&
     typeof candidate.url === 'string' &&
     candidate.url.length > 0 &&
-    (candidate.description === undefined || typeof candidate.description === 'string')
+    (candidate.description === undefined || typeof candidate.description === 'string') &&
+    (candidate.project === undefined || typeof candidate.project === 'string')
   );
 }
 

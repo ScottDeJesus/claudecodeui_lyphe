@@ -8,7 +8,6 @@
   },
   "account": {
     "title": "Compte",
-    "language": "Langue",
     "languageLabel": "Langue d'affichage",
     "languageDescription": "Choisissez votre langue préférée pour l'interface",
     "username": "Nom d'utilisateur",
@@ -328,8 +327,23 @@
     "connectionStatus": "Statut de la connexion",
     "runnerModel": {
       "label": "Utiliser DeepSeek Flash pour les souls de build",
-      "description": "Le plan runner envoie son builder, sa passe de correction et Athena sur deepseek-flash de DeepSeek au lieu de Claude Opus. Prometheus, les scouts et le replanner restent sur Claude. Prend effet à la phase suivante.",
+      "description": "Le runner envoie son builder, sa passe de correction et Athena sur deepseek-flash de DeepSeek au lieu de Claude Sonnet. Prometheus, les scouts et le replanner restent sur Claude. Prend effet à la tâche suivante.",
       "unreadable": "L'interrupteur n'a pas pu être lu depuis le serveur : sa position est inconnue — ce n'est pas la même chose qu'éteint. Une nouvelle tentative a lieu chaque fois que cette page reprend le focus."
+    },
+    "runnerParkAtPeak": {
+      "label": "Mettre en attente les nouvelles fonctionnalités aux heures de pointe DeepSeek",
+      "description": "Un Accept pendant la fenêtre de pointe de DeepSeek (01:00–04:00 et 06:00–10:00 UTC, en semaine) met la fonctionnalité en file et la lance quand la fenêtre se lève. Éteint : Accept lance tout de suite.",
+      "unreadable": "L'interrupteur n'a pas pu être lu depuis le serveur : sa position est inconnue — ce n'est pas la même chose qu'éteint. Une nouvelle tentative a lieu chaque fois que cette page reprend le focus."
+    },
+    "plannerLanes": {
+      "label": "Voies des planificateurs",
+      "description": "Combien de planificateurs (conceptions, découpes, jugements) tournent en même temps — {{count}} à la fois. Baisser cette valeur n'arrête aucun planificateur déjà lancé ; la voie n'en prend un nouveau que lorsqu'elle a de la place. Effet immédiat.",
+      "lane": "1 voie",
+      "lanes": "{{count}} voies",
+      "lanesDown": "Une voie de moins",
+      "lanesUp": "Une voie de plus",
+      "lanesLabel": "Planificateurs lancés en même temps",
+      "unreadable": "Le réglage n'a pas pu être lu depuis le serveur, sa position est donc inconnue. Une nouvelle tentative a lieu chaque fois que cette page reprend le focus."
     },
     "jev": {
       "master": {

@@ -8,10 +8,12 @@ import { ToastStack } from '@/shared/ui';
 import { AuthProvider, ProtectedRoute } from '@/modules/auth';
 import { TaskMasterProvider,TasksSettingsProvider } from '@/modules/task-master';
 import { MemoryIntakeProvider } from '@/modules/memory-intake';
+import { NotesProvider } from '@/modules/notes';
 import { HealProvider } from '@/modules/heal';
 import { LiveBusProvider } from '@/modules/live-bus';
-import { ArcFeed, RunnerFeed } from '@/modules/plan-runner';
+import { DispatcherFeed } from '@/modules/dispatcher';
 import { SoulLaunchFeed } from '@/modules/dispatch-souls';
+import { RoadmapFeed } from '@/modules/roadmap';
 import { UniverseFeed } from '@/modules/universe';
 import { WebSocketProvider } from '@/shared/context/WebSocketContext';
 import { PluginsProvider } from '@/modules/plugins';
@@ -135,37 +137,43 @@ export default function App() {
                       auth gate so the REST seed never fires against the login screen — and below
                       WebSocketProvider above, because the feed subscribes to the one socket. */}
                   <LiveBusProvider>
-                    <RunnerFeed>
-                      {/* Nested rather than chained because a feed is a wrapper, not a sibling: each
-                          one subscribes to the one socket and renders what it wraps, so the innermost
-                          thing here is still the router. One feed per lane, in the lane's own module. */}
-                      <ArcFeed>
-                      {/* The arc deck's lane: the stack of plans the runner walks card after card.
-                          Its feed is nested here, directly inside RunnerFeed, because the deck reads
-                          the runner's own state directory — a second lane, never a second job for
-                          RunnerFeed. */}
-                      <SoulLaunchFeed>
-                      {/* The estate's lane: a digest of its activity, and the map fetch the fresh
-                          check needs. Its canvas reads the socket itself, inside the tab. */}
-                      <UniverseFeed>
-                      {/* Inside the auth gate, so the memory poll never fires against the login screen. */}
-                      <MemoryIntakeProvider>
-                        {/* Above the Router, so every route under it reads ONE 60-second poll of the
-                            reflex's summary — the workspace's own tab-gate hook included, which weighs
-                            the ledger's live count for the Heal tab's badge. */}
-                        <HealProvider>
-                        <Router basename={routerBasename}>
-                          <Routes>
-                            <Route path="/" element={<ProjectWorkspaceRoute />} />
-                            <Route path="/session/:sessionId" element={<ProjectWorkspaceRoute />} />
-                          </Routes>
-                        </Router>
-                        </HealProvider>
-                      </MemoryIntakeProvider>
-                      </UniverseFeed>
-                      </SoulLaunchFeed>
-                      </ArcFeed>
-                    </RunnerFeed>
+                    {/* The dispatcher's lane: the plan cards' whole picture, kept by a feed in its
+                        own module. */}
+                    <DispatcherFeed>
+                    {/* Nested rather than chained because a feed is a wrapper, not a sibling: each
+                        one subscribes to the one socket and renders what it wraps, so the innermost
+                        thing here is still the router. One feed per lane, in the lane's own module. */}
+                    <SoulLaunchFeed>
+                    {/* The estate's lane: a digest of its activity, and the map fetch the fresh
+                        check needs. Its canvas reads the socket itself, inside the tab. */}
+                    <UniverseFeed>
+                    {/* The roadmap's lane: the picture the Roadmap tab draws one roadmap of, kept by a
+                        feed in its own module. */}
+                    <RoadmapFeed>
+                    {/* Inside the auth gate, so the memory poll never fires against the login screen. */}
+                    <MemoryIntakeProvider>
+                      {/* The notes: the account's cards, read once for every home that draws them.
+                          Inside the auth gate like its neighbours, so the read never fires against
+                          the login screen, and below WebSocketProvider, whose one socket carries
+                          the `notes_changed` frame that re-reads it. */}
+                      <NotesProvider>
+                      {/* Above the Router, so every route under it reads ONE 60-second poll of the
+                          reflex's summary — the workspace's own tab-gate hook included, which weighs
+                          the ledger's live count for the Heal tab's badge. */}
+                      <HealProvider>
+                      <Router basename={routerBasename}>
+                        <Routes>
+                          <Route path="/" element={<ProjectWorkspaceRoute />} />
+                          <Route path="/session/:sessionId" element={<ProjectWorkspaceRoute />} />
+                        </Routes>
+                      </Router>
+                      </HealProvider>
+                      </NotesProvider>
+                    </MemoryIntakeProvider>
+                    </RoadmapFeed>
+                    </UniverseFeed>
+                    </SoulLaunchFeed>
+                    </DispatcherFeed>
                   </LiveBusProvider>
                 </ProtectedRoute>
                 </TaskMasterProvider>

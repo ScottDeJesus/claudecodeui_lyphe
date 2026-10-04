@@ -24,6 +24,20 @@ type AuthDependencies = {
   generateToken(user: AuthUser): string;
 };
 
+// The most events one report may carry, and the widest a logged value may be. A report is text a
+// browser wrote, so it is bounded and cut down to a safe alphabet before it reaches the journal.
+const MAX_REPORTED_EVENTS = 10;
+const MAX_REPORTED_VALUE_LENGTH = 120;
+
+/** One client-reported field as a journal-safe value: short, no whitespace, no quotes, no query string. */
+function journalSafeValue(value: unknown): string {
+  if (typeof value !== 'string' && typeof value !== 'number' && typeof value !== 'boolean') {
+    return '-';
+  }
+  const cleaned = String(value).split('?')[0].replace(/[^A-Za-z0-9._:/@+=,-]/g, '_');
+  return cleaned.slice(0, MAX_REPORTED_VALUE_LENGTH) || '-';
+}
+
 function numericUserId(userId: number | bigint): number {
   return Number(userId);
 }
@@ -146,6 +160,31 @@ export function createAuthService(dependencies: AuthDependencies) {
       }
 
       return { token: dependencies.generateToken(user as AuthUser) };
+    },
+
+    /**
+     * Writes the sign-out trace a browser kept since its last session into the journal.
+     *
+     * The browser records why it dropped (or, for a verdict it refused to obey, kept) a session in
+     * its own storage, because the server cannot see a sign-out that no request carried; the next
+     * authenticated page load hands the record here. Values are text the browser wrote — clipped and
+     * cut to a safe alphabet, never trusted as structure, and never a token (the client records only
+     * the shape of one).
+     */
+    recordClientAuthEvents(user: unknown, eventsInput: unknown) {
+      const username = typeof user === 'object' && user !== null && 'username' in user
+        ? journalSafeValue((user as { username: unknown }).username)
+        : '-';
+      const events = Array.isArray(eventsInput) ? eventsInput.slice(0, MAX_REPORTED_EVENTS) : [];
+      for (const event of events) {
+        const fields = typeof event === 'object' && event !== null ? event as Record<string, unknown> : {};
+        const rendered = Object.keys(fields)
+          .slice(0, 16)
+          .map((key) => `${journalSafeValue(key)}=${journalSafeValue(fields[key])}`)
+          .join(' ');
+        console.warn(`[auth] client-report user=${username} ${rendered}`);
+      }
+      return { success: true, recorded: events.length };
     },
 
     logout() {

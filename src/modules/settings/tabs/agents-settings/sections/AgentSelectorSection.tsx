@@ -23,8 +23,13 @@ export default function AgentSelectorSection({
   agentContextById,
 }: AgentSelectorSectionProps) {
   return (
-    <div className="flex-shrink-0 border-b border-border px-3 py-2 md:px-4 md:py-3">
-      <PillBar className="w-full md:w-auto">
+    // The strip scrolls sideways when the pane is too narrow for the four providers' names, the way
+    // the Settings tab bar does on a phone; the pills keep their words instead of shrinking to
+    // "C  C…  C•  O…" beside each other. From 768px the pane is the window less the 192px rail, so
+    // a window a little over 768px, or larger text, is narrower than the strip too; the tab's own
+    // `overflow-hidden` would have cut the last provider off.
+    <div className="scrollbar-hide flex-shrink-0 overflow-x-auto border-b border-border px-3 py-2 md:px-4 md:py-3">
+      <PillBar className="w-max min-w-full md:min-w-0">
         {agents.map((agent) => {
           const dotColor =
             agent === 'claude' ? 'bg-blue-500' :
@@ -36,10 +41,10 @@ export default function AgentSelectorSection({
               key={agent}
               isActive={selectedAgent === agent}
               onClick={() => onSelectAgent(agent)}
-              className="min-w-0 flex-1 justify-center md:flex-initial"
+              className="flex-1 justify-center md:flex-initial"
             >
               <LLMProviderLogo provider={agent} className="h-4 w-4 flex-shrink-0" />
-              <span className="truncate">{AGENT_NAMES[agent]}</span>
+              <span>{AGENT_NAMES[agent]}</span>
               {agentContextById[agent].authStatus.authenticated && (
                 <span className={`h-1.5 w-1.5 flex-shrink-0 rounded-full ${dotColor}`} />
               )}

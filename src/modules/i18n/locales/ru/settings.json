@@ -8,7 +8,6 @@
   },
   "account": {
     "title": "Аккаунт",
-    "language": "Язык",
     "languageLabel": "Язык интерфейса",
     "languageDescription": "Выберите предпочитаемый язык для интерфейса",
     "username": "Имя пользователя",
@@ -325,7 +324,7 @@
     "connectionStatus": "Статус подключения",
     "runnerModel": {
       "label": "Использовать DeepSeek Flash для строительных душ",
-      "description": "plan runner отправляет сборщика, его проход исправлений и Athena на deepseek-flash от DeepSeek вместо Claude Opus. Prometheus, разведчики и репланер остаются на Claude. Действует со следующей фазы.",
+      "description": "runner отправляет сборщика, его проход исправлений и Athena на deepseek-flash от DeepSeek вместо Claude Sonnet. Prometheus, разведчики и репланер остаются на Claude. Действует со следующей задачи.",
       "unreadable": "Не удалось прочитать переключатель с сервера, поэтому его положение неизвестно — это не то же самое, что выключено. Повтор при каждом возврате фокуса на эту страницу."
     },
     "jev": {

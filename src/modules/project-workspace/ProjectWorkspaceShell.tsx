@@ -1,11 +1,10 @@
 import { memo } from 'react';
 
-import { AppSwitcherFab, AppSwitcherLayer, AppSwitcherProvider } from '@/modules/app-switcher';
-import ProjectEffects from '@/modules/project-workspace/controllers/ProjectEffects';
+import { AppSwitcherProvider } from '@/modules/app-switcher';
+import { ChatHostProvider } from '@/modules/chat-host';
+import { useProjectChatState } from '@/modules/project-workspace/context/ProjectsStateContext';
 import type { ProjectWorkspaceShellProps } from '@/shared/types';
-import ProjectCommandPalette from '@/modules/project-workspace/ProjectCommandPalette';
-import ProjectMainRegion from '@/modules/project-workspace/ProjectMainRegion';
-import ProjectSidebarRegion from '@/modules/project-workspace/ProjectSidebarRegion';
+import WorkspaceFrame from '@/modules/project-workspace/WorkspaceFrame';
 
 /** Rendered by ProjectWorkspaceRoute to lay out the workspace sidebar, main region and global overlays. */
 function ProjectWorkspaceShell({
@@ -14,33 +13,16 @@ function ProjectWorkspaceShell({
   sendMessage,
   navigate,
 }: ProjectWorkspaceShellProps) {
+  // Read from the chat context, not the sidebar's: the choices keep one identity until a project is
+  // added, renamed or removed, so this shell is not woken by every session upsert.
+  const { projectChoices } = useProjectChatState();
+
   return (
-    <AppSwitcherProvider>
-      {/* `pwa-status-clear` is the frame's opt-in to the status-bar offset in a standalone PWA
-          (see src/index.css): this shell and the drawer it holds are the only layers whose
-          persistent chrome has to clear the iOS status bar. Overlays must NOT take it — they
-          cover the whole screen and pad their own content. */}
-      <div
-        className="pwa-status-clear fixed inset-0 flex bg-background"
-        style={{ bottom: 'var(--keyboard-height, 0px)' }}
-      >
-        <ProjectEffects navigate={navigate} />
-        <ProjectSidebarRegion isMobile={isMobile} />
-
-        <div className="relative flex min-w-0 flex-1 flex-col">
-          <ProjectMainRegion
-            isMobile={isMobile}
-            ws={ws}
-            sendMessage={sendMessage}
-            navigate={navigate}
-          />
-          <AppSwitcherLayer />
-        </div>
-
-        <ProjectCommandPalette />
-        <AppSwitcherFab />
-      </div>
-    </AppSwitcherProvider>
+    <ChatHostProvider>
+      <AppSwitcherProvider projects={projectChoices}>
+        <WorkspaceFrame isMobile={isMobile} ws={ws} sendMessage={sendMessage} navigate={navigate} />
+      </AppSwitcherProvider>
+    </ChatHostProvider>
   );
 }
 

@@ -1,5 +1,6 @@
 import {
   KANBAN_LEASE_STALE_SECONDS,
+  KANBAN_OPERATOR_SCHEDULED_TAG,
   type KanbanBoard,
   type KanbanCardDetail,
   type KanbanCardSummary,
@@ -25,9 +26,6 @@ import type { KanbanPmClient } from './kanban-pm-client.js';
  * Consumers: `kanban-pm-tools-board.ts`, which builds the orient queue and the resume read from
  * these projections.
  */
-
-/** The tag the operator uses to keep a card in their own court; such a card is never ours to claim. */
-export const OPERATOR_SCHEDULED_TAG = 'operator-scheduled';
 
 /** The lease facts a resume read classifies off: who holds it, how old the stamp is, whose it is. */
 export type LeaseFacts = {
@@ -136,7 +134,7 @@ export async function buildActionableQueue(
         queue.active.push(row);
       } else if (card.status === 'questions') {
         queue.awaiting_you.push(row);
-      } else if (card.tags.some((tag) => tag.trim().toLowerCase() === OPERATOR_SCHEDULED_TAG)) {
+      } else if (card.tags.some((tag) => tag.trim().toLowerCase() === KANBAN_OPERATOR_SCHEDULED_TAG)) {
         queue.awaiting_you.push(row);
       } else if (card.approved && card.openQuestions === 0) {
         queue.buildable.push(row);

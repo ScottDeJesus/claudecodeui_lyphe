@@ -169,10 +169,11 @@ function priorityLine(priority: CardPriority, toned: boolean): { text: string; c
  * Whether a pointer or key event landed on the card's own `…` control rather than on the card.
  *
  * The card is a single focusable, clickable surface with a menu inside it, so every event the
- * card cares about also fires there. `aria-haspopup="menu"` is the one attribute both the
- * trigger button and (in a non-portal menu) the menu itself carry, which makes it the honest
- * test: a check against a class name would break the moment the paint file renamed one, and a
- * check against the card's children would swallow the title.
+ * card cares about also fires there — one from the menu included, which is portalled out to
+ * `<body>` and still bubbles through the card in the React tree. The check matches the two
+ * attributes those nodes carry, the trigger's `aria-haspopup="menu"` and the menu's own
+ * `role="menu"`: a check against a class name would break the moment the paint file renamed one,
+ * and a check against the card's children would swallow the title.
  */
 function fromOverflowMenu(target: EventTarget | null): boolean {
   return target instanceof Element && target.closest('[aria-haspopup="menu"], [role="menu"]') !== null;
@@ -319,7 +320,6 @@ export function KanbanCard({
         items={menuItems}
         icon={MoreHorizontal}
         iconOnly
-        portal
         variant="ghost"
         size="icon"
         className="vv-lane-card__reveal absolute right-1 top-1"

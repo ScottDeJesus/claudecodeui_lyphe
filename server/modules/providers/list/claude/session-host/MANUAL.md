@@ -216,8 +216,13 @@ which is sent only after the previous API's `exit` event. Re-adopting sooner wou
 predecessor is still serving and end its runs with SIGHUP, which is the failure this order exists
 to prevent; the deferred process says so once, with
 `[keepalive] re-adoption deferred until the previous server exits (handover boot)`, and
-`[keepalive] taking over` when it is released. The listener is up throughout either way, because
-the retiring server is still answering `:3011` for the whole window. Why the message can only come
+`[keepalive] taking over` when it is released. The listener is up throughout either way: from the retiring server's SIGTERM on
+it takes every new connection, while the retiring server only finishes the HTTP requests it had
+already accepted — at most 4 s, [`server/http-drain.ts`](../../../../../http-drain.ts) — and keeps
+its websockets until it exits, so no chat re-subscribes before this pass. The one
+takeover-dependent read the tabs poll, `GET /api/providers/sessions/running`, is held until this
+pass has run (at most 11 s, [`server/index.ts`](../../../../../index.ts)), so a live keepalive
+session is never answered as idle. Why the message can only come
 then, and what happens when it never comes, is in
 [`deploy/dev-supervisor/README.md`](../../../../../../deploy/dev-supervisor/README.md).
 
@@ -246,7 +251,7 @@ lookup, the busy check and the run-completion safety net stay in one place. Anyt
 a host — a note, a kill, an `end_input` — goes through that run's own handle, never through the
 app session id, because a supersede overlap would address the wrong host.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/deploy/dev-supervisor/README.md
+governs: /home/lyphe/.claude/claudecodeui_lyphe/deploy/dev-supervisor/README.md, /home/lyphe/.claude/claudecodeui_lyphe/server/http-drain.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts
 
 ## MAN-691 — The idle host an install leaves behind
 section: README/009 The idle host an install leaves behind
@@ -331,9 +336,9 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/keepalive-cases-p4.mjs
 ## MAN-694 — See also
 section: README/012 See also
 
-- [`docs/hosting.md`](../../../../../../docs/hosting.md) §"What runs", §"Rules that bite" — the
+- [`docs/MANUAL.md (hosting)`](../../../../../../docs/MANUAL.md) §"What runs", §"Rules that bite" — the
   unit, the stop switch, what a restart now costs a turn
-- [`docs/verification.md`](../../../../../../docs/verification.md) §"The keepalive cases" — how
+- [`docs/MANUAL.md (verification)`](../../../../../../docs/MANUAL.md) §"The keepalive cases" — how
   each ending above is driven against the real units
-- [`docs/architecture/02-realtime-stream.md`](../../../../../../docs/architecture/02-realtime-stream.md)
+- [`docs/architecture/MANUAL.md (02-realtime-stream)`](../../../../../../docs/architecture/MANUAL.md)
   §"One run, end to end" — why a re-adopted run restarts `seq` at 1

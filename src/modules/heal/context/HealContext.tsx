@@ -13,7 +13,7 @@ import { api, readApiJson } from '@/shared/api';
 const HEAL_POLL_MS = 60_000;
 
 /** The arrays the panel and the pill bar walk without a guard. */
-const SUMMARY_ARRAYS = ['kinds', 'heals', 'queue', 'ignore', 'cycles'] as const;
+const SUMMARY_ARRAYS = ['kinds', 'heals', 'ignore', 'cycles'] as const;
 
 /**
  * The facts the worker reads off its flag family. `daily_cap: null` is NO CEILING and `model` is

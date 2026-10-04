@@ -12,8 +12,8 @@ section: 01-websocket-transport/000
 *One websocket server, four paths, and the small protocol that runs over the chat one.
 Covers routing, auth, the frame vocabulary in both directions, and how a client catches up
 after a drop. What the frames turn into on screen is
-[the realtime stream](./02-realtime-stream.md); which ids they carry is
-[conversation handoff](./03-conversation-handoff.md).*
+[the realtime stream](MANUAL.md); which ids they carry is
+[conversation handoff](MANUAL.md).*
 
 ## MAN-289 — In one paragraph
 section: 01-websocket-transport/001 In one paragraph
@@ -92,7 +92,7 @@ section: 01-websocket-transport/003 The pieces
 | `src/modules/chat/hooks/useChatRealtimeHandlers.ts` | The one `kind` switch on the client, and `lastSeqRef` bookkeeping |
 | `src/modules/chat/ChatInterface.tsx`, `src/modules/chat/hooks/useChatSessionState.ts` | The two places that send `chat.subscribe` |
 | `src/modules/chat/hooks/useChatComposerState.ts` | Builds `chat.send`, `chat.edit-send`, `chat.abort`, `chat.permission-response` |
-| `src/modules/chat/hooks/useSessionPresence.ts` | Builds `chat.presence` — the one place, called once from `ChatInterface.tsx` |
+| `src/modules/chat/hooks/useSessionPresence.ts` | Builds `chat.presence` — the one place, called once from `ChatInterface.tsx`. Also exports `useIsLookingAtSession(isActive)`, the same pair (chat on screen, document visible) as a boolean (MAN-7575) |
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/auth/auth.middleware.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notifications/websocket/desktop-notifications-websocket.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/projects/services/projects-with-sessions-fetch.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/taskmaster/taskmaster.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/websocket/services/chat-run-registry.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/websocket/services/chat-session-writer.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/websocket/services/chat-websocket.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/websocket/services/plugin-websocket-proxy.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/websocket/services/session-upsert-broadcast.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/websocket/services/shell-websocket.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/websocket/services/websocket-auth.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/websocket/services/websocket-server.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/websocket/services/websocket-state.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/ChatInterface.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useChatComposerState.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useChatRealtimeHandlers.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useChatSessionState.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useSessionPresence.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/context/WebSocketContext.tsx
 
@@ -167,8 +167,11 @@ call `subscribe(listener)`; they never construct a `WebSocket`.**
 
 `buildWebSocketUrl` (`WebSocketContext.tsx:36-45`) is the whole URL story: same host as the
 page, `wss:` when the page is `https:`, `/ws` with no token in platform mode, `/ws?token=`
-in OSS mode. An expired token is caught here — `expireAuthSession()` runs and the function
-returns `null`, so no socket is created at all.
+in OSS mode. An expired token is caught here — the function returns `null`, so no socket is
+created at all — and `expireAuthSession()` runs with that token as its evidence, which ends the
+session only if that token is still the one in `localStorage`. A tab whose remembered token has aged
+out while another tab holds the refreshed one leaves the newer session alone (the trace line
+reads `websocket-token-expired ignored`; MAN-7447).
 
 **The listener registry is a ref-held `Set`, dispatched synchronously** (`:56`, `:61-69`),
 not React state. The declaration says why:
@@ -190,9 +193,8 @@ immediately hand `subscribe` to the hook that does the real work:
 | `ChatInterface.tsx:72` | `useChatRealtimeHandlers` | every provider `kind`, `chat_subscribed`, `history_truncated`, `protocol_error`, `websocket_reconnected` | session store, processing state, pending permissions, token budget |
 | `ProjectWorkspaceRoute.tsx:32` | `useProjectsState` | `session_upserted`, `loading_progress`, `websocket_reconnected`, plus a sessionId-keyed "attention" marker for background sessions | project list, sidebar rows, session aliasing, selection |
 | `TaskMasterContext.tsx:102` | itself | `taskmaster-project-updated`, `taskmaster-tasks-updated` (`type`-keyed) | task board data |
-| `RunnerFeed.tsx` | itself | `runner_state`, `websocket_reconnected` | none of its own — it publishes the retained runner topics into the live bus |
-| `ArcFeed.tsx` | itself | `arc_state`, `websocket_reconnected` | none of its own — it publishes the retained `arc:*` topic into the live bus ([plan-runner.md](../plan-runner.md) §"The arc deck") |
-| `SoulLaunchFeed.tsx` | itself | `soul_launch_state`, `websocket_reconnected` | none of its own — it publishes the retained `souls:*` topic into the live bus ([dispatch-souls.md](../dispatch-souls.md)) |
+| `DispatcherFeed.tsx` | itself | `dispatcher_state`, `websocket_reconnected` | none of its own — it publishes the retained `dispatcher:all` topic into the live bus ([docs/MANUAL.md (dispatcher)](../MANUAL.md) §"The plan card") |
+| `SoulLaunchFeed.tsx` | itself | `soul_launch_state`, `websocket_reconnected` | none of its own — it publishes the retained `souls:*` topic into the live bus ([docs/MANUAL.md (dispatch-souls)](../MANUAL.md)) |
 | `UniverseFeed.tsx` | itself | `universe_activity`, `universe_map`, `websocket_reconnected` | none of its own — it publishes the retained `universe:*` digest into the live bus, and `useUniverseStream` reads the same frames for the tab's canvas (`src/modules/universe/`) |
 
 The call sites the table does not row — `SessionProtectionContext.tsx`, `useSessionPresence.ts`,
@@ -233,7 +235,7 @@ Shell or Git reports `null`): it announces at mount, on every session or connect
 on `websocket_reconnected`, on `visibilitychange` and every 30 s while the tab is visible, and
 announces `sessionId: null` on the way out — which is how an event about a session you are
 already watching goes unpushed
-([notifications.md](../notifications.md) §"What gets pushed, and how loud", *Not while you are
+([docs/MANUAL.md (notifications)](../MANUAL.md) §"What gets pushed, and how loud", *Not while you are
 watching*).
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useSessionPresence.ts
@@ -250,7 +252,7 @@ provider-native id from there:
 
 A send for a session with no row is refused with `SESSION_NOT_FOUND` and told to create it
 over REST first (`:184-189`) — that is the entry point in
-[conversation handoff](./03-conversation-handoff.md).
+[conversation handoff](MANUAL.md).
 
 Attachments get the same treatment. `filterAttachmentsToUploadStore` (`:34-56`) resolves
 every path against the global upload store (`~/.cloudcli/assets`, where
@@ -309,8 +311,7 @@ in `server/shared/types.ts`.**
 `history_truncated`, `task_notification`.
 
 **`GatewayEventKind` (`server/shared/types.ts`) — produced by the gateway, no provider involved:**
-`chat_subscribed`, `session_upserted`, `loading_progress`, `runner_state`, `soul_launch_state`,
-`arc_state`, `kanban_metis_state`, `kanban_event`, `universe_activity`, `universe_map`, `protocol_error`.
+`chat_subscribed`, `session_upserted`, `loading_progress`, `soul_launch_state`, `kanban_metis_state`, `kanban_event`, `universe_activity`, `universe_map`, `protocol_error`.
 `kanban_metis_state` is `server/modules/kanban-metis`'s own frame — a board's live Metis
 sessions, pushed on change the same way `soul_launch_state` is (`kanban-metis.module.ts`'s
 polled lane) — and it has no row in the consumption table below for the same reason
@@ -345,9 +346,8 @@ Two kinds in those unions never appear where you would look for them:
 | `protocol_error` | `chat-websocket.service.ts:127` | Error row, spinner cleared |
 | `session_upserted` | `session-upsert-broadcast.service.ts:81-105` | `useProjectsState` — sidebar rows and alias folding |
 | `loading_progress` | `projects-with-sessions-fetch.service.ts:164-175` | `useProjectsState` — project scan progress (`:720-736`) |
-| `runner_state` | `plan-runner/runner-watcher.service.ts` | The plan runner's live runs, pushed on change. Not consumed by the chat handler, which returns early on it |
 | `soul_launch_state` | `dispatch-souls/dispatch-souls.module.ts` | The launcher souls a session started by hand, pushed on change. `SoulLaunchFeed` publishes it into the live bus; the chat handler returns early on it too, in the same `case` group |
-| `universe_map` | `universe/universe.module.ts` | The estate map was rebuilt because a tracked repo's `.git` HEAD moved; carries the `mapId` `GET /api/universe/map` now serves. Consumed by `useUniverseStream.ts:122` and `UniverseFeed.tsx:77`, which announce it through `setKnownMapId` and refetch on the strength of it; the announcement never redefines the gate, so the rows admitted below are still keyed to the map the client holds. Excused from the chat handler beside `runner_state`/`soul_launch_state` (`useChatRealtimeHandlers.ts:191-195`) |
+| `universe_map` | `universe/universe.module.ts` | The estate map was rebuilt because a tracked repo's `.git` HEAD moved; carries the `mapId` `GET /api/universe/map` now serves. Consumed by `useUniverseStream.ts:122` and `UniverseFeed.tsx:77`, which announce it through `setKnownMapId` and refetch on the strength of it; the announcement never redefines the gate, so the rows admitted below are still keyed to the map the client holds. Excused from the chat handler beside `soul_launch_state` (`useChatRealtimeHandlers.ts:191-195`) |
 | `universe_activity` | `universe/universe-activity.service.ts` | What the estate is doing now: the journald and transcript taps' rows, coalesced per node and sent at most ten times a second. Sent only when there is a row, so a quiet estate keeps silence on the wire. Consumed by `useUniverseStream.ts:126`, which keeps the canvas's ring of rows and the chrome's 1 Hz summary, and by `UniverseFeed.tsx:60-67`, which accumulates the same rows into the `universe:*` bus digest. Excused from the chat handler with `universe_map`, which it must be — at ten frames a second the fall-through would fill an open transcript with stray rows |
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts
@@ -545,7 +545,7 @@ section: 01-websocket-transport/016 Drop, reconnect, replay/017 What survives a 
 That table is about the *socket* dropping. A Claude run also survives the API **process** being
 replaced, and recovers differently: it is rebuilt on boot as a fresh registry run, which makes
 the reconnecting client's remembered cursor a previous run's — see
-[02-realtime-stream.md](./02-realtime-stream.md) §"One run, end to end". `handleChatSubscribe`
+[docs/architecture/MANUAL.md (02-realtime-stream)](MANUAL.md) §"One run, end to end". `handleChatSubscribe`
 catches that one case on the way in: a requested `lastSeq` above the run's own `lastSeq` is
 treated as 0, so the new run replays from its start instead of replaying nothing.
 
@@ -627,12 +627,16 @@ flowchart TD
     SET --> E1["loading_progress"]
     SET --> E2["session_upserted"]
     SET --> E3["taskmaster frames"]
-    SET --> E4["runner_state"]
-    SET --> E10["arc_state"]
+    SET --> E10["kanban_event"]
+    
+    SET --> E11["dispatcher_state"]
     SET --> E6["soul_launch_state"]
     SET --> E7["universe_map"]
     SET --> E8["universe_activity"]
     SET --> E9["kanban_metis_state"]
+    SET --> E14["roadmap_state"]
+    SET --> E12["notes_changed"]
+    SET --> E13["simple_list_changed"]
   end
   subgraph PerRun["Per-run, this run's audience only"]
     W["ChatSessionWriter connections set"]
@@ -640,29 +644,23 @@ flowchart TD
   end
 ```
 
-There are eight broadcasters over that set: `loading_progress`, `session_upserted`, the Task Master
-frames, and FIVE STATE LANES — the plan-runner watcher (`server/modules/plan-runner/`) over the
-runner's state directory, the plan-runner's own arc deck lane
-(`server/modules/plan-runner/arc-lane.ts`) over `~/.claude/state/arcs/`, the launcher-souls lane
-(`server/modules/dispatch-souls/`) over `~/.claude/state/dispatch-souls/`, a board's own Metis
-sessions (`server/modules/kanban-metis/`) over `~/.claude/state/kanban-metis/`, and the universe lane
+There are eleven broadcasters over that set: `loading_progress`, `session_upserted`, the Task Master frames, the board's `kanban_event`, the notes lane's `notes_changed` (MAN-7517), the simple-list lane's `simple_list_changed` (MAN-7519), and FIVE STATE LANES — the launcher-souls lane (`server/modules/dispatch-souls/`) over `~/.claude/state/dispatch-souls/`, a board's own Metis sessions (`server/modules/kanban-metis/`) over `~/.claude/state/kanban-metis/`, the dispatcher's plans (`server/modules/dispatcher/`) over its `status --json` document, the roadmap (`server/modules/roadmap/`, the `roadmap_state` frame, MAN-7631) over its `roadmap show --json` document, and the universe lane
 (`server/modules/universe/`), which watches the registered repos' `.git` HEADs and reads two live
-feeds of the estate, the systemd journal and the Claude transcripts. The first four poll every two
-seconds and put a frame on the wire only when the picture actually changed — a live→stale flip
-included, since that is a change in the snapshot like any other. The dedup records a picture as
+feeds of the estate, the systemd journal and the Claude transcripts. The four polled lanes — the launcher-souls lane, a board's own Metis sessions, the dispatcher's plans and the roadmap — tick every two seconds and put a frame on the wire only when the picture actually changed, and the universe lane is the exception, below. `notes_changed` and `simple_list_changed` go out once per write that landed and name no row and no account: a client that hears one reads its own list again. The dedup records a picture as
 sent only AFTER the send returns, so a broadcast that throws part-way is re-sent on the next tick
 instead of being suppressed as unchanged — the frame carries the whole picture, so a client
 receiving it twice receives it once. All of them reach `connectedClients` through the websocket
 module's own barrel, never a deep import.
 
 That loop is written once, in `server/shared/polled-lane.service.ts` (`createPolledLane`); each lane
-supplies only its own `snapshot` and `frame`. The universe lane is the one broadcaster over
-`connectedClients` that runs through NEITHER that shape NOR a single kind — it sends `universe_map`
+supplies only its own `snapshot` and `frame`. The universe lane is the one STATE LANE that runs through NEITHER that shape NOR a single
+kind — it sends `universe_map`
 and `universe_activity`, and the reason differs for each.
 
 `universe_map` is the HEAD watcher. Reconciling a HEAD change means shelling a crawler child and
-awaiting it, and `createPolledLane`'s contract is a `snapshot()` that is cheap and never throws — a
-snapshot that can launch a subprocess would fire on a cadence nobody chose and let crawls stack. So
+awaiting it, and `createPolledLane`'s contract is a `snapshot()` that is cheap — the dispatcher lane's subprocess
+read is ~170 ms, and a tick that finds it still out is skipped — and a snapshot that launched a
+crawler would fire on a cadence nobody chose and let crawls stack. So
 `universe.module.ts` writes its own thirty-second interval, reads every registered repo's `.git/HEAD`
 directly off disk (never a `git rev-parse` subprocess), and broadcasts only when a rebuilt map
 actually lands.
@@ -679,17 +677,17 @@ than a picture of state that persists between ticks, so there is nothing cheap o
 against a previous snapshot — an empty window is silence, not an unchanged picture, and a lane that sent
 it anyway would be ten frames a second saying nothing.
 
-Reasoning that belongs to polling-rather-than-watching for the other four lanes lives at
+Reasoning that belongs to polling-rather-than-watching for the four polled lanes lives at
 `polled-lane.service.ts`, not in any lane. The launcher lane's own half — what it reads off a launch
 directory, how it classifies a soul and which provider its pin paints — is
-[dispatch-souls.md](../dispatch-souls.md). A board's own Metis lane has no write-up of its own yet.
+[docs/MANUAL.md (dispatch-souls)](../MANUAL.md). A board's own Metis lane has no write-up of its own yet.
 
 A socket joins `connectedClients` when `handleChatConnection` runs
-(`chat-websocket.service.ts:589`) and leaves on close (`:632`) — closing a tab removes a
+(`chat-websocket.service.ts`) and leaves on close — closing a tab removes a
 listener and nothing more; the run keeps going. Broadcast consumers filter by session id
 themselves, which is why the sidebar can react to sessions the user is not looking at.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/plan-runner/arc-lane.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/polled-lane.service.ts
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/shared/polled-lane.service.ts
 
 ## MAN-316 — Heartbeat
 section: 01-websocket-transport/020 Heartbeat
@@ -712,23 +710,27 @@ like that.
 ## MAN-317 — The `/shell` socket
 section: 01-websocket-transport/021 The `/shell` socket
 
-`handleShellConnection` (`shell-websocket.service.ts:296`) carries PTY sessions and has its
-own, entirely separate, `type`-keyed protocol: `init` (`:314`), `input` (`:561`) and
-`resize` (`:568`). No `kind`, no `seq`, no run registry.
+`handleShellConnection` (`shell-websocket.service.ts`) carries PTY sessions and has its
+own, entirely separate, `type`-keyed protocol: `init`, `input` and `resize`. No `kind`, no
+`seq`, no run registry.
 
 The parts worth knowing:
 
-- **PTYs outlive their socket too.** `ptySessionsMap` (`:34`) holds them, and a disconnect
-  starts a 30 minute `PTY_SESSION_TIMEOUT` (`:35`) before the process is killed
-  (`:587-617`). A reconnect within that window reattaches.
-- **Output is buffered per session, capped at 5000 chunks** (`:432-447`), and replayed to a
-  returning client (`:361-377`) so a reconnect shows recent terminal output instead of a
-  blank screen.
-- **A stale close cannot detach a live PTY** (`:599-601`) — mobile networks deliver an old
-  socket's `close` after its replacement has already attached. Covered by *a stale socket
-  close cannot detach the socket that replaced it*.
+- **PTYs outlive their socket too.** `ptySessionsMap` holds them, and a disconnect in the
+  socket's `close` handler starts a 30 minute `PTY_SESSION_TIMEOUT` before the process is
+  killed. A reconnect within that window reattaches.
+- **A plain-shell command owns its own slot.** The key is
+  `<projectPath>_<sessionId|default>` plus, for a plain-shell `initialCommand`,
+  `_cmd_<first 16 hex chars of SHA-256(initialCommand)>`. The digest covers the whole string, so
+  two commands never share a slot and a reattach lands only on a PTY running the same command.
+- **Output is buffered per session, capped at 5000 chunks** (`session.buffer` in `onData`), and
+  replayed to a returning client (the `existingSession` branch of `init`) so a reconnect shows
+  recent terminal output instead of a blank screen.
+- **A stale close cannot detach a live PTY** (the `session.ws !== ws` guard in `close`) — mobile
+  networks deliver an old socket's `close` after its replacement has already attached. Covered
+  by *a stale socket close cannot detach the socket that replaced it*.
 - **Provider auth URLs are detected in the output stream** and forwarded as
-  `type: 'auth_url'`, deduplicated per connection (`:459-475`).
+  `type: 'auth_url'`, deduplicated per connection (`announcedAuthUrls`).
 
 The client is `useShellConnection.ts:127` via `getShellWebSocketUrl`
 (`src/modules/shell/utils/socket.ts:39-53`), which builds the URL the same way the chat one
@@ -754,7 +756,7 @@ with 1008 (`:47-50`); the client then sends one `register` frame carrying `devic
 (`:61-63`). The socket-to-device registry itself lives in
 `server/modules/notifications/services/desktop-notification-clients.service.ts`. What the server
 sends down that socket — the notification payload, and the web push and ntfy channels beside it —
-is in [notifications.md](../notifications.md).
+is in [docs/MANUAL.md (notifications)](../MANUAL.md).
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notifications/services/desktop-notification-clients.service.ts
 
@@ -793,7 +795,7 @@ section: 01-websocket-transport/024 Where to look when something breaks
 | Duplicate messages after a reload | The completed-run replay guard (`chat-websocket.service.ts:494`) |
 | The spinner never clears | The terminal `complete` — `completeRun:279`, `completeRunIfCurrent:296` |
 | A run is terminated early, or two runs appear | `completeRunIfCurrent:296` and the queued-message race |
-| "Session not found" on send | The session was never created over REST — [conversation handoff](./03-conversation-handoff.md) |
+| "Session not found" on send | The session was never created over REST — [conversation handoff](MANUAL.md) |
 | A plugin frontend receiving chat frames | Something is broadcasting over `wss.clients` instead of `connectedClients` |
 
 ## MAN-321 — If you change this, check that
@@ -813,18 +815,18 @@ section: 01-websocket-transport/025 If you change this, check that
 | The reconnect timing or the `ws` memo | Both `chat.subscribe` senders — `useChatSessionState.ts:664` and `ChatInterface.tsx:263` — and whether either now fires with a stale `lastSeq` |
 | `attachWebSocketHeartbeat` | `tests/websocket-heartbeat.service.test.ts`, and that the interval is still shorter than the shortest proxy idle timeout in front of the app |
 
-Related: [the realtime stream](./02-realtime-stream.md) for what the frames become,
-[conversation handoff](./03-conversation-handoff.md) for the ids they carry,
-[the index](./README.md) for the rest of the set.
+Related: [the realtime stream](MANUAL.md) for what the frames become,
+[conversation handoff](MANUAL.md) for the ids they carry,
+[the index](MANUAL.md) for the rest of the set.
 
 ## MAN-322 — The realtime stream
 section: 02-realtime-stream/000
 
 *One frame's journey from a provider CLI to a rendered row, and the buffer that keeps a
 fast reply from re-rendering the transcript on every token. The socket itself is
-[the websocket layer](./01-websocket-transport.md); which session id a frame carries is
-[conversation handoff](./03-conversation-handoff.md); how a tool frame becomes a card is
-[tool views](./06-tool-view.md).*
+[the websocket layer](MANUAL.md); which session id a frame carries is
+[conversation handoff](MANUAL.md); how a tool frame becomes a card is
+[tool views](MANUAL.md).*
 
 ## MAN-323 — In one paragraph
 section: 02-realtime-stream/001 In one paragraph
@@ -853,19 +855,16 @@ it.
    touches a raw frame. It does not branch on provider, does not navigate, and does not
    translate session ids — the backend has already done all three. A frame with no `kind`
    is dropped on the first line, which is what makes Task Master's `type`-keyed
-   broadcasts invisible to chat. The box-wide lanes are the other case: `runner_state`,
-   `soul_launch_state`, `universe_map` and `universe_activity` HAVE a kind and carry no session
+   broadcasts invisible to chat. The box-wide lanes are the other case: `soul_launch_state`, `universe_map` and `universe_activity` HAVE a kind and carry no session
    id of their own, so they are returned early by name — one shared `case` group — the same way
    `session_upserted` and `loading_progress` are. Each is a picture of the whole box owned by a
    reader outside the transcript, republished into the live bus by its own feed. Each RETURNs
    rather than breaking, to say so and to stay off the provider path below — no stream buffering,
    no store append, no UI side effect
-   ([01-websocket-transport.md](./01-websocket-transport.md) §"Fan-out: who receives what").
+   ([docs/architecture/MANUAL.md (01-websocket-transport)](MANUAL.md) §"Fan-out: who receives what").
    **That `case` group names the lanes; it is not what stops them.** What stops them is the
    stamp: a row joins the transcript only if a numeric `seq` says the RUN wrote it, and no
-   sessionless lane frame carries one (`writtenByRun` at `:253`). A lane that is not in the
-   group — `arc_state`, `kanban_event`, `kanban_metis_state` — is stopped by the stamp all the
-   same, which is the point: the group lagged the lanes it was meant to fence, and the frame
+   sessionless lane frame carries one (`writtenByRun` at `:253`). A lane that is not in the group — `dispatcher_state`, `kanban_event`, `kanban_metis_state` — is stopped by the stamp all the same, which is the point: the group lagged the lanes it was meant to fence, and the frame
    that slipped past it landed in the viewed transcript with no `id`, where the store's
    `removeOptimisticUserEchoes` read `id.startsWith` off `undefined` and threw inside the
    websocket listener — losing that frame and every frame after it, and freezing the open chat
@@ -897,11 +896,11 @@ it.
    keeps `realtimeMessages` and `serverMessages` in separate arrays and computes `merged`
    from them. `complete` triggers a REST refresh of the persisted tail; the live copy of
    the reply survives until the persisted copy demonstrably supersedes it. Details in
-   [the message store](./04-message-store-and-lazy-loading.md).
+   [the message store](MANUAL.md).
 8. **The delta buffer belongs to the chat pane, not to a session.** There is one
    `accumulatedStreamRef` and one `streamTimerRef` for the whole `ChatInterface`. Two
    sessions streaming at once share them. This is a real limitation, not a subtlety —
-   see [Cross-session behaviour](#cross-session-behaviour).
+   see Cross-session behaviour (MAN-333).
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useChatRealtimeHandlers.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/useSessionProtection.ts
 
@@ -917,7 +916,7 @@ section: 02-realtime-stream/003 The pieces
 | `src/modules/chat/hooks/useChatMessages.ts` | `normalizedToChatMessages` — the projection from store records to UI objects. Pairs `tool_use` with `tool_result`, folds subagent rows into their container, and memoises through a `WeakMap`. |
 | `src/modules/chat/hooks/useChatSessionState.ts` | Sends `chat.subscribe` on session open and on reconnect, owns `requestLatestMessages` and `resetStreamingState`, and memoises `chatMessages`. |
 | `src/modules/chat/hooks/useChatComposerState.ts` | The outbound side: `chat.send`, `chat.edit-send`, `chat.abort`, `chat.permission-response`, plus the optimistic user echo. |
-| `src/modules/chat/hooks/useSessionPresence.ts` | Sends `chat.presence`: which session this tab is showing, restated on reconnect, on `visibilitychange` and every 30 s, and cleared on the way out — so the notification channels skip a session you are watching. |
+| `src/modules/chat/hooks/useSessionPresence.ts` | Sends `chat.presence`: which session this tab is showing, restated on reconnect, on `visibilitychange` and every 30 s, and cleared on the way out — so the notification channels skip a session you are watching. `useIsLookingAtSession(isActive)` exposes the same "watching" test as a boolean for the scroll follow and the reply anchor (MAN-7575). |
 | `src/shared/hooks/useSessionProtection.ts` | The per-session activity map that the indicator and the abort button derive from. |
 | `src/modules/chat/transcript/StreamingMarkdown.tsx` | Renders an assistant reply, streaming or finished, as a settled half plus a pending half. |
 | `src/modules/chat/utils/streamingMarkdown.ts` | `splitStreamingMarkdown` — where it is safe to cut a partially-written markdown document in two. |
@@ -928,12 +927,6 @@ section: 02-realtime-stream/003 The pieces
 | `server/shared/utils.ts` | `createNormalizedMessage` at `:348` and `createCompleteMessage` — the envelope every provider event is built with. **Not** `message-unification.ts`; that file exports only `prepareTranscriptMessages`, which runs on REST history reads and never on the live path. |
 | `server/shared/types.ts` | `MessageKind` at `:178` — the fifteen kinds a provider can emit. `GatewayEventKind` at `:204` — the four the gateway adds. |
 | `server/modules/providers/list/*/` | Per provider, a `*-runtime.provider.js` that drives the CLI or SDK and a `*-sessions.provider.ts` whose `normalizeMessage` converts one raw event into `NormalizedMessage[]`. |
-
-Tests worth knowing about: `streamingMarkdown.test.ts` and
-`streamingMarkdownRenderEquivalence.test.tsx` pin the split; `messageStreamEnd.test.tsx`
-pins the DOM-identity rule; `tokenBudgetSessionScope.test.tsx` pins the token-counter
-scoping; `liveSubagentGrouping.test.ts` pins the subagent fold;
-`sessionStoreTruncate.test.tsx` pins `truncateAt`. All in `src/modules/chat/tests/`.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/websocket/services/chat-run-registry.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/websocket/services/chat-session-writer.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/websocket/services/chat-websocket.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/utils.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/ChatInterface.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useChatComposerState.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useChatMessages.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useChatRealtimeHandlers.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useChatSessionState.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useSessionPresence.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useSessionStore.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/transcript/StreamingMarkdown.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/utils/streamingMarkdown.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/context/WebSocketContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/useSessionProtection.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts
 
@@ -995,7 +988,7 @@ Four things in that picture are easy to get backwards:
   installed CLI version itself (a process runs the build it was started with) retire the
   process — interrupt first, then end-of-input — and spawns a fresh one. The launch profile
   travels in the host meta, so a re-adopted process is diffed against what it was really
-  launched with; the version [comes from the host's own journal](../cli-version.md), because
+  launched with; the version [comes from the host's own journal](../MANUAL.md), because
   only that process can say what it is on. A turn already in flight is never retired for a
   version: it keeps the build it started on, and the banner above its transcript says so.
 - **A Claude run can outlive the API process too, and then `seq` restarts at 1.** The CLI
@@ -1006,7 +999,7 @@ Four things in that picture are easy to get backwards:
   than replaying nothing. The check is one-sided on purpose: a cursor *below* the run's seq
   is left to the REST history refetch, which is what a reconnecting client does anyway. The
   mechanism behind the survival is
-  [`server/modules/providers/README.md`](../../server/modules/providers/README.md)
+  [`server/modules/providers/MANUAL.md (README)`](../../server/modules/providers/MANUAL.md)
   §"The exception: `list/claude/session-host/`".
 
 ## MAN-327 — What each provider actually emits
@@ -1033,8 +1026,8 @@ reload can make the transcript look completely different from what streamed.
 
 Two entries deserve the emphasis:
 
-**Claude does not stream deltas today.** `claude-sessions.provider.ts:684` does contain a
-branch that turns `content_block_delta` into a `stream_delta`, which is why the opposite
+**Claude does not stream deltas today.** `claude-sessions.provider.ts` does contain a
+`content_block_delta` branch in `normalizeMessageRows` that turns it into a `stream_delta`, which is why the opposite
 is widely believed. That branch is unreachable: `mapCliOptionsToSDK` in
 `claude-runtime.provider.js` builds its options object from scratch and never sets
 `includePartialMessages`, which the SDK defaults to false — and even with it enabled the
@@ -1111,7 +1104,7 @@ section: 02-realtime-stream/007 Text streaming
 A provider that streams emits deltas far faster than a transcript can usefully re-render.
 The handler's answer is a leading-edge-armed, trailing-edge-fired timer:
 
-- The **first** delta appends to `accumulatedStreamRef` and arms a 100 ms `setTimeout`.
+- The **first** delta appends to `accumulatedStreamRef` and arms a 100 ms timer on the window the chat is drawn in (`armStreamFlush`, `utils/streamFlushTimer.ts`; a host move runs a pending flush at once — MAN-7452).
 - Every delta inside that window only appends to the ref. The timer is not re-armed and
   not extended.
 - When it fires, it clears itself and calls `updateStreaming(sid, wholeAccumulatedText)`.
@@ -1192,15 +1185,14 @@ Four surprises, all of them intended:
   reload is a navigation of a frame the reader can type into, so what a retraction discards
   there is an unsaved edit rather than a tick. In practice a reply is done writing a fence
   before a reader has reached it, and the streaming gate keeps the frame from mounting at
-  all until the fence is closed. See [live widgets](./07-live-widgets.md) §"The fence" and
+  all until the fence is closed. See [live widgets](MANUAL.md) §"The fence" and
   §"The DocSpace kind".
 - **The same component renders finished replies**, with `isStreaming: false` and no split.
   That is deliberate. `MessageComponent` used to swap `<StreamingMarkdown>` for
   `<Markdown>` at that position, and React treats a different element type in the same
   position as a different component — so every reply threw away its DOM the moment it
-  completed, destroying a selection the user had started. `messageStreamEnd.test.tsx`
-  asserts on node identity, not HTML, because identity is what the browser keys a
-  selection to.
+  completed, destroying a selection the user had started. Identity, not HTML, is what the
+  browser keys a selection to.
 - **The `streaming` flag decides more than the widget fence.** `StreamingMarkdown`
   renders the pending half as `<MarkdownBody streaming>`, and `MarkdownBodyRenderer`
   reads that one flag to pick which react-markdown component map to hand down: the plain
@@ -1214,7 +1206,7 @@ Four surprises, all of them intended:
   again on the next delta. Fences and inline marks cross the map rather than obey it —
   fences take the flag as a prop through `CodeBlock`, and file chips, colour swatches and
   keycaps draw on both halves. That, and the probes that hold each half, is
-  [rendered shapes](./08-rendered-shapes.md) §"Streaming".
+  [rendered shapes](MANUAL.md) §"Streaming".
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/utils/streamingMarkdown.ts
 
@@ -1291,16 +1283,17 @@ change, and do not assume the status text you see in the UI came from it.
 section: 02-realtime-stream/010 Permission requests
 
 Claude is the only provider with interactive tool approvals. Asking a human is one function,
-`promptForToolDecision` in `claude-runtime.provider.js`: it emits `permission_request` with a
-`requestId`, raises the `permission.required` notification that can carry the question to a
-phone ([../notifications.md](../notifications.md) §"Answering from the phone"), and blocks
+`promptForToolDecision` in `claude-runtime.provider.js`: it emits `permission_request` under two
+names — `requestId`, the ATTEMPT's, minted fresh every time a process raises the ask, and
+`promptKey`, the ASK's own (the tool use id the CLI stamped on the call, carried unchanged by a
+replayed request) — raises the `permission.required` notification that can carry the question to a
+phone ([docs/MANUAL.md (notifications)](../MANUAL.md) §"Answering from the phone"), and blocks
 until the client answers with `chat.permission-response`. When an answer arrives it emits
 `permission_resolved` with the same id; if the run ends or the request times out it emits
 `permission_cancelled` instead. The distinction matters because the answer itself travels only
 on the inbound socket: without the outbound `permission_resolved`, the `permission_request`
 sitting in the replay buffer had nothing to retract it, so a mid-run page refresh resurrected an
-already-answered prompt — and a second tab kept it forever. `permissionPromptReplay.test.tsx`
-pins the replayed request-then-resolution netting out to nothing.
+already-answered prompt — and a second tab kept it forever.
 
 **Two callers ask, and exactly one of them asks per mode.** `canUseTool` is the ordinary door.
 But the SDK resolves approval at the permission-mode step and never calls `canUseTool` in
@@ -1325,11 +1318,15 @@ that is deliberately waiting on a person. The wait itself has no timeout for an 
 through either caller; an ordinary tool's wait is `CLAUDE_TOOL_APPROVAL_TIMEOUT_MS` and the
 runtime denies the tool when it runs out.
 
+**The app itself asks no chat.** A plan that lands owing the operator's word has its Accept prompt or its designer's questions drawn on the plan's card and pushed to the phone by the dispatcher lane (`server/modules/dispatcher/dispatcher-asks.service.ts`, MAN-7400), never raised as a `permission_request`. The lane registers a permission gateway with the provider registry (`registerPermissionGateway`) that answers the phone's taps through the dispatcher's own verbs, never a run, and lists nothing: `listPending` and `listPendingSessions` are optional on the gateway, and every reader of `providerRegistry.listPermissionGateways()` — `chat.subscribe`'s `pendingPermissions`, the sidebar's waiting mark — calls them optionally. `resolveToolApproval` stops at the first gateway that claims the key and warns once when none does; the dispatcher's claims every key of its own, held or not, and settles it from the store.
+
 The client keeps the pending list in `ChatInterface` state, not in the store — permission
 kinds are among the five that are never persisted as rows. The rules:
 
-- A request plays a notification sound, **except** for `ExitPlanMode` / `exit_plan_mode`,
-  which are not actionable prompts.
+- A request plays a notification sound **once per ask**, never once per delivery — the bell is
+  keyed on the ask's own `promptKey` (`announcementKeyOf` / `announceOnce`), so the question a
+  handover re-issues under a fresh `requestId` is already rung and arrives silent. `ExitPlanMode` /
+  `exit_plan_mode` do not ring at all: they are not actionable prompts.
 - The list is only maintained for the **viewed** session. A request for a background
   session still marks that session processing and still plays the sound, but does not
   enter the list.
@@ -1337,9 +1334,12 @@ kinds are among the five that are never persisted as rows. The rules:
   pending set and can race with a live `permission_request`.
 - `permission_resolved` and `permission_cancelled` remove their `requestId` from the
   list, whichever tab or replay delivered the request.
-- `chat_subscribed` replaces the list wholesale, and plays the sound only on the
-  transition from "no actionable requests" to "some".
+- `chat_subscribed` replaces the list wholesale, and rings for any actionable ask in it whose key
+  this tab has not yet announced — a handover puts the still-parked question back in that catalogue
+  under a fresh `requestId`, and the key is what keeps that delivery silent.
 - `complete` empties the list for the viewed session.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-runtime.provider.js, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useChatRealtimeHandlers.ts
 
 ## MAN-333 — Cross-session behaviour
 section: 02-realtime-stream/011 Cross-session behaviour
@@ -1387,10 +1387,10 @@ section: 02-realtime-stream/012 Gotchas and why the code looks like this
 - **`finalizeStreaming` mutates the array slot in place.** It does not remove and append.
   The id changes underneath the same position, on purpose, so React reconciles the
   existing DOM and a text selection survives the end of the reply.
-- **A streaming reply does not re-trigger auto-scroll.** The follow effect depends on
-  `chatMessages.length`, and an in-place rewrite does not change it. Within one streamed
-  block the browser pins the pane; the next row that arrives re-follows. See
-  [scrolling](./05-scrolling.md).
+- **A streaming reply is followed by size, not by row count.** Each flush rewrites the
+  same row, so `chatMessages.length` does not change; the follow watches the size of the
+  pane's content box, and the growth glides a reader at the foot down (MAN-7574). See
+  [scrolling](MANUAL.md).
 - **The 100 ms flush publishes the whole reply, not the delta.** Anyone optimising this
   into an incremental append has to also handle the case where a flush is skipped, which
   is exactly what the current design makes impossible to get wrong.
@@ -1435,7 +1435,7 @@ section: 02-realtime-stream/013 If you change this, check that
 | --- | --- |
 | The 100 ms flush interval or the timer arming | `StreamingMarkdown`'s whole reason for existing is that interval. Slower means fewer re-parses but visibly chunkier text; faster means the split has to earn more. |
 | `updateStreaming` or the `__streaming_` id | `pruneRealtimeSupersededByServer` matches that id by name, and `dedupeAdjacentAssistantEchoes` special-cases a `stream_delta` row followed by an identical assistant `text` row. |
-| `finalizeStreaming` | It must keep the array position and must not append. `messageStreamEnd.test.tsx` covers the DOM-identity half; the duplicate-bubble half is covered by the store's dedupe. |
+| `finalizeStreaming` | It must keep the array position and must not append: the reply's DOM identity, and a selection inside it, survive only when the slot is rewritten in place. The duplicate-bubble half is covered by the store's dedupe. |
 | The `shouldPersist` filter | Adding a kind to it makes that kind renderable, which means `normalizedToChatMessages` needs a case for it or it silently disappears. |
 | Anything in `splitStreamingMarkdown` | `streamingMarkdown.test.ts` for the boundary rules and `streamingMarkdownRenderEquivalence.test.tsx` for split-equals-unsplit on every prefix. Both must pass on the fenced and list fixtures. |
 | A provider's `normalizeMessage` | The kind table above. Adding `stream_delta` to a provider that had none makes the shared buffer and the missing `stream_end` suddenly matter for it. |
@@ -1443,10 +1443,10 @@ section: 02-realtime-stream/013 If you change this, check that
 | The `status` branch | Both arms. The `token_budget` arm is scoped to the viewed session on purpose, and the other arm currently has no producer — a new producer will start writing status text into the activity map for the first time. |
 | Session-switch cleanup in `useChatSessionState` | `resetStreamingState` is the only thing that unwinds a shared buffer mid-stream. Removing that call re-introduces cross-session text bleed. |
 
-Related: [the websocket layer](./01-websocket-transport.md) for the transport and the replay
-contract, [the message store](./04-message-store-and-lazy-loading.md) for what happens to
-a row after `appendRealtime`, [tool views](./06-tool-view.md) for how a paired
-`tool_use` becomes a card, and [the index](./README.md) for the rest of the set.
+Related: [the websocket layer](MANUAL.md) for the transport and the replay
+contract, [the message store](MANUAL.md) for what happens to
+a row after `appendRealtime`, [tool views](MANUAL.md) for how a paired
+`tool_use` becomes a card, and [the index](MANUAL.md) for the rest of the set.
 
 ## MAN-336 — In one paragraph
 section: 03-conversation-handoff/000 In one paragraph
@@ -1460,8 +1460,8 @@ So "the handoff" is not about ids at all. It is about ownership, and a conversat
 hands in four places: a draft becomes a persisted row, a live run's frames become a
 transcript on disk, the filesystem watcher's provisional sidebar row is merged into the app
 row, and an edit moves the conversation onto a different provider transcript. The transport
-underneath is [the websocket layer](./01-websocket-transport.md); how frames become
-rendered messages is [the realtime stream](./02-realtime-stream.md).
+underneath is [the websocket layer](MANUAL.md); how frames become
+rendered messages is [the realtime stream](MANUAL.md).
 
 ## MAN-337 — Mental model
 section: 03-conversation-handoff/001 Mental model
@@ -1487,7 +1487,7 @@ section: 03-conversation-handoff/001 Mental model
    running*. `runDetachedChatTurn` starts a run with no socket at all.
    A run also carries `cliVersion`: the CLI version its own process announced in the SDK's
    init message, stamped at the top of the runtime's message loop on every turn, resumed
-   ones included, and served by `GET /api/cli-version` ([cli-version.md](../cli-version.md)).
+   ones included, and served by `GET /api/cli-version` ([docs/MANUAL.md (cli-version)](../MANUAL.md)).
 5. **The persisted transcript wins; live rows are an overlay.** Every `complete` for the
    viewed session schedules a bounded REST tail refresh, and the overlay is pruned against
    whatever comes back. Predict from this: any live row that is also on disk disappears
@@ -1509,7 +1509,7 @@ section: 03-conversation-handoff/002 The pieces
 
 | File | Role |
 | --- | --- |
-| `server/modules/providers/provider.routes.ts` | `POST /sessions` mints the app id; `GET /sessions/:id/messages`, `/sessions/:id/provider-id`, `/sessions/running`, `POST /sessions/:id/fork` |
+| `server/modules/providers/provider.routes.ts` | `POST /sessions` mints the app id; `GET /sessions/:id/messages`, `/sessions/:id/provider-id` (409 until the first turn reports an id), `GET /sessions/:id` (details, `providerSessionId` null inside a 200 until then — what `useCliSessionId` reads), `/sessions/running`, `POST /sessions/:id/fork` |
 | `server/modules/providers/services/sessions.service.ts` | `createAppSession`, `resolveProviderSessionId`, `resolveEditAnchor`, `providerRewindsForEdit`, `rewindSessionForEdit`, `forkSessionById`, `fetchHistory`, `listRunningSessions` |
 | `server/modules/database/repositories/sessions.db.ts` | The one row that holds both ids, and every mutation of the mapping |
 | `server/modules/websocket/services/chat-session-writer.service.ts` | `ChatSessionWriter`: swallows `session_created`, captures the native id, fans out to every attached socket |
@@ -1526,7 +1526,7 @@ section: 03-conversation-handoff/002 The pieces
 | `src/modules/chat/hooks/useChatSessionState.ts` | Subscribe-on-open, load-on-switch, the refresh coordinator, the New Session reset |
 | `src/modules/chat/hooks/useChatRealtimeHandlers.ts` | Routes frames into the store and the busy map |
 | `src/modules/chat/hooks/useSessionStore.ts` | Per-session slots, `appendRealtime`, `truncateAt`, `refreshLatestFromServer` |
-| `src/modules/chat/utils/sessionMessageReconciliation.ts` | `removeOptimisticUserEchoes` — retires local echoes against persisted rows |
+| `src/modules/chat/utils/sessionMessageReconciliation.ts` | `removeOptimisticUserEchoes` — retires local echoes against persisted rows; `findSentUserTurn` — finds the operator's sent message in either form, by the same matcher (MAN-7575) |
 | `src/modules/chat/utils/messageHistoryRefreshCoordinator.ts` | Coalesces refresh signals; keeps hidden sessions dirty |
 | `src/modules/chat/utils/messageKeys.ts` | `getIntrinsicMessageKey` — stable React keys across re-fetches |
 | `src/shared/context/SessionProtectionContext.tsx`, `src/shared/hooks/useSessionProtection.ts` | The busy map: which sessions are producing a response |
@@ -1586,9 +1586,8 @@ Going the other way — a provider or disk-discovered id in, the app id out — 
 `superseded_provider_sessions` (so an id an edit moved on from still resolves), then a plain app id,
 and returns the input unchanged rather than `null` when no row carries it at all. It exists for
 callers outside the sessions service that hold a provider-spelled id and must show it beside an app
-session without ever letting a provider id itself reach the browser: the plan-runner lane's
-`launched_by_session` ([plan-runner.md](../plan-runner.md) §files) and the memory lane's `sessionId`
-([memory-intake.md](../memory-intake.md) §"Where the shapes live").
+session without ever letting a provider id itself reach the browser: the dispatcher lane's plan `session` (MAN-1498) and the memory lane's `sessionId`
+([docs/MANUAL.md (memory-intake)](../MANUAL.md) §"Where the shapes live").
 
 ## MAN-340 — What `session_created` used to do
 section: 03-conversation-handoff/003 The two ids and where they meet/004 What `session_created` used to do
@@ -1671,15 +1670,15 @@ Three details worth pinning:
   `recordProviderSessionId`. The reducer matches it to the optimistic row by alias id,
   updates in place, and refuses to blank a title it already has.
 - **This describes the project tree.** The flat simple chat list is a second front door onto
-  the same `POST /api/providers/sessions` (see [simple-chat-list.md](../simple-chat-list.md))
+  the same `POST /api/providers/sessions` (see [docs/MANUAL.md (simple-chat-list)](../MANUAL.md))
   and has no optimistic row at all: `useSimpleChatList` only reloads once the server's own
-  `session_upserted` reaches it, debounced 500 ms.
+  `session_upserted` or `simple_list_changed` reaches it, debounced 500 ms.
 
 Navigation happens once. `ChatInterface.handleSessionEstablished` sets `currentSessionId`,
 calls `onSessionEstablished` (which registers the optimistic row) and then
 `onNavigateToSession`, which is `ProjectMainRegion.handleNavigateToSession` doing
 `navigate('/session/:id')`. The only other navigate in this area is the alias fix-up
-described under [transcripts on disk](#transcripts-on-disk), and it fires only when the URL
+described under transcripts on disk (MAN-348), and it fires only when the URL
 holds a provider-native id.
 
 ## MAN-343 — Switching sessions in the UI
@@ -1693,7 +1692,7 @@ section: 03-conversation-handoff/007 Switching sessions in the UI
 | Re-render | `notify(sessionId)` bumps the tick only when the written session is the active one, so A's background frames cost no renders |
 | Live subscription | The `chat.subscribe` effect in `useChatSessionState.ts` fires for B with B's `lastSeq`. A is never unsubscribed — there is no `chat.unsubscribe` frame, and the only server-side audience state is each run's connection set |
 | History | If B's slot has a `fetchedAt` and the session key matches, nothing is refetched; only `isStale` (`STALE_THRESHOLD_MS = 30_000`) may trigger a bounded tail refresh. Otherwise `fetchFromServer` loads the newest `SESSION_MESSAGES_PAGE_SIZE = 20` rows |
-| Scroll and pagination | Reset in the same load effect and by the scroll effects; see [scrolling](./05-scrolling.md) |
+| Scroll and pagination | Reset in the same load effect and by the scroll effects; see [scrolling](MANUAL.md) |
 | Streaming buffer | `resetStreamingState()` clears `streamTimerRef` and `accumulatedStreamRef`. These are per-`ChatInterface`, not per-slot |
 
 A background run therefore keeps accumulating. Frames for A arrive on the same socket,
@@ -1801,7 +1800,7 @@ session, at most one trailing request, and a session that cannot refresh right n
 hidden, or no longer the viewed session) stays marked dirty until `flushPending` runs on
 activation. The fetch itself is `refreshLatestSlotFromServer`, which pulls the newest 20 rows
 and stitches them onto the cached suffix, bridging with extra requests for turns bigger than
-one page. See [the message store](./04-message-store-and-lazy-loading.md).
+one page. See [the message store](MANUAL.md).
 
 ## MAN-346 — Editing an already-sent message
 section: 03-conversation-handoff/010 Editing an already-sent message
@@ -1906,8 +1905,10 @@ section: 03-conversation-handoff/012 Transcripts on disk
 **RULE: the watcher discovers conversations independently of the app, and its rows are keyed
 by the provider id until the app claims them.**
 
-`sessions-watcher.service.ts` watches four provider directories with chokidar in polling mode
-(`usePolling`, a 6 s interval, `depth: 6`, `ignoreInitial`), keeps only `*.jsonl` files —
+`sessions-watcher.service.ts` watches four provider directories with chokidar on native file
+events (inotify, one watch per file and directory; `depth: 6`, `ignoreInitial`) — never polling,
+whose one stat watcher per entry stalled a freshly booted API for seconds while it armed — keeps
+only `*.jsonl` files —
 `opencode.db` for OpenCode — and calls `sessionSynchronizerService.synchronizeProviderFile`.
 Indexed ids are queued and flushed with a 500 ms debounce and a 2 s maximum wait
 (`PROJECTS_UPDATE_DEBOUNCE_MS`, `PROJECTS_UPDATE_MAX_WAIT_MS`), then handed to
@@ -1929,7 +1930,7 @@ How rows are claimed:
   resolves under `~/.claude/kanban-metis/<boardId>/` is refused before any row is created — it
   belongs to a Metis session the Kanban board's own driver launched and reads by session id
   directly, never through this app's session list. See
-  [providers/README.md](../../server/modules/providers/README.md)'s Claude scan-roots row.
+  [server/modules/providers/MANUAL.md (README)](../../server/modules/providers/MANUAL.md)'s Claude scan-roots row.
 
 `session-synchronizer.service.ts` adds two guarantees beyond indexing. Concurrent callers
 share one scan (opening the UI fires `/api/projects` and `/api/projects/archived` at once),
@@ -1947,6 +1948,8 @@ The sidebar's `session_upserted` reducer in `useProjectsState.ts` then does five
 4. Bumps `externalMessageUpdate` when the delta names the viewed session and that session is
    not processing; otherwise marks the row for attention.
 5. Navigates to `/session/:appId` when the URL still holds the provider-native alias.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/services/sessions-watcher.service.ts
 
 ## MAN-349 — Forking and resuming
 section: 03-conversation-handoff/013 Forking and resuming
@@ -1987,7 +1990,7 @@ transcript — only a new process, which stamps its own `cliVersion` at the top 
 loop. It waits for the `complete` rather than for the busy map because the map is rewritten
 every 5 s from the server's own list, and because a send made while the flag is up is not a
 send at all: `handleSubmit` persists it as a queued draft for the server's 30 s dispatcher to
-pick up. The client half is at [cli-version.md](../cli-version.md).
+pick up. The client half is at [docs/MANUAL.md (cli-version)](../MANUAL.md).
 
 ## MAN-350 — Gotchas and why the code looks like this
 section: 03-conversation-handoff/014 Gotchas and why the code looks like this
@@ -2025,7 +2028,7 @@ section: 03-conversation-handoff/015 If you change this, check that
 | `handleChatEditSend` | Both provider shapes — `resolveEditAnchor` for Claude, `rewindSession` for Codex — and that a refused run never rewinds |
 | `session-upsert-broadcast.service.ts` | The sidebar reducer's alias dedupe and empty-summary guard in `useProjectsState.ts`. It is the only builder; keep it that way |
 | The busy map's shape | `useSessionIdSet`'s membership-key memo, which every sidebar mark reads its set through (sidebar re-render cost), and the 5 s running-sessions reconciliation |
-| `useSessionStore` slot fields | [the message store doc](./04-message-store-and-lazy-loading.md), `recomputeMergedIfNeeded`'s reference-equality cache, and the pagination helpers |
+| `useSessionStore` slot fields | [the message store doc](MANUAL.md), `recomputeMergedIfNeeded`'s reference-equality cache, and the pagination helpers |
 | Anything that would make a session id mutable | Nothing should need this. A mutable id breaks slots, `lastSeqRef`, the busy map, the run registry key and the URL at once |
 
 ## MAN-352 — In one paragraph
@@ -2065,11 +2068,11 @@ section: 04-message-store-and-lazy-loading/001 Mental model
 5. **Server history and live frames are different shapes of the same conversation.**
    `prepareTranscriptMessages` runs on REST reads only, so the transcript mid-run does not
    match the transcript after a refresh. Reconciliation, not equality, is the contract — see
-   [the realtime stream](./02-realtime-stream.md).
-6. **The render list is narrowed three times, and none of them is virtualization.**
-   `visibleMessages` is a tail slice of `chatMessages` (100 rows by default); each surviving
-   row mounts its content only near the viewport; and each *mounted* row still skips layout
-   and paint off-screen via `content-visibility: auto`. Every row keeps a DOM node throughout.
+   [the realtime stream](MANUAL.md).
+6. **The render list is narrowed twice, and neither is virtualization.**
+   `visibleMessages` is a tail slice of `chatMessages` (100 rows by default), and each
+   surviving row mounts its content only near the viewport — `LazyMessageRow`, with a 1200px
+   band. Every row keeps a DOM node throughout.
 7. **A row's wrapper element never unmounts.** It carries `data-message-timestamp` whenever
    the row has a timestamp, so a search jump can find and scroll to a row whose content is
    still a placeholder. Scroll *anchor restore* is different — it selects `.chat-message`,
@@ -2090,7 +2093,7 @@ section: 04-message-store-and-lazy-loading/002 The pieces
 | --- | --- |
 | `src/modules/chat/hooks/useSessionStore.ts` | The `Map<sessionId, SessionSlot>`, the merge, and every mutator. |
 | `src/modules/chat/utils/sessionMessagePagination.ts` | Pure page-stitching helpers: overlap detection, bridge planning, prepend merge. |
-| `src/modules/chat/utils/sessionMessageReconciliation.ts` | `removeOptimisticUserEchoes` — retires a locally-appended user row once its persisted copy arrives. |
+| `src/modules/chat/utils/sessionMessageReconciliation.ts` | `removeOptimisticUserEchoes` — retires a locally-appended user row once its persisted copy arrives. `findSentUserTurn` — finds the operator's sent message among the rows, echo or persisted, by the same matcher (MAN-7575). |
 | `src/modules/chat/hooks/useChatMessages.ts` | `normalizedToChatMessages` — `NormalizedMessage[]` to `ChatMessage[]`, with a `WeakMap` projection cache. |
 | `src/modules/chat/hooks/useChatSessionState.ts` | The view layer: decides when to fetch, owns the render window, scroll restore and "load all". |
 | `src/modules/chat/utils/messageHistoryRefreshCoordinator.ts` | Coalesces automatic tail refreshes; keeps hidden sessions dirty instead of fetching. |
@@ -2162,7 +2165,7 @@ renders.
 `idle` or `error` when it settles (also `idle` when `canRequest` refuses). Nothing else in the
 store touches it. `'streaming'` is declared in the `SessionStatus` union but no code path
 assigns it — streaming is visible through the `__streaming_<sessionId>` row instead, and busy
-state lives in the processing map described in [the realtime stream](./02-realtime-stream.md).
+state lives in the processing map described in [the realtime stream](MANUAL.md).
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useSessionStore.ts
 
@@ -2366,7 +2369,7 @@ sequenceDiagram
 `captureScrollRestoreState` records the first `.chat-message` whose bottom is at or below the
 container top, plus its offset from the top. After the commit, the layout effect either
 re-pins that anchor (`anchor.isConnected`) or falls back to a `scrollHeight` delta. See
-[scrolling](./05-scrolling.md) for the full arbitration.
+[scrolling](MANUAL.md) for the full arbitration.
 
 ## MAN-363 — When the tail moves under you
 section: 04-message-store-and-lazy-loading/009 Pagination: the tail-page model/011 When the tail moves under you
@@ -2440,7 +2443,7 @@ Standalone `tool_result` rows are already gone — Claude and Codex drop them in
 `prepareTranscriptMessages` (which also unifies ask-tool calls, collapses consecutive checklist
 snapshots and caps tool output), Cursor filters `kind === 'tool_result'` itself, and OpenCode's
 normalizer never emits one. This does not hold for live frames — see
-[the realtime stream](./02-realtime-stream.md).
+[the realtime stream](MANUAL.md).
 
 ---
 
@@ -2453,7 +2456,7 @@ section: 04-message-store-and-lazy-loading/013 Row-level laziness
 wraps every rendered row — a `MessageComponent` or a `ToolGroupContainer` — in a
 `LazyMessageRow`.
 
-Three constants shape it, all listed under [the numbers](#the-numbers). Two details about them
+Three constants shape it, all listed under the numbers (MAN-355). Two details about them
 are easy to get wrong. `INITIAL_MOUNTED_TAIL_ROWS` is counted over the *grouped* list, so a
 collapsed tool group of nine calls spends one of the thirty. And `LAZY_ROW_VIEWPORT_MARGIN_PX`
 is a `rootMargin` of `1200px 0px` on the scroll container, so the band is 1200 px above *and*
@@ -2491,22 +2494,23 @@ Three details make this safe rather than jumpy:
   entries entirely, so a row keeps both its mounted state and its recorded height; acting on
   them would re-measure the whole transcript on the next activation.
 
-`useLazyRowObserver` returns `null` when `IntersectionObserver` is undefined (jsdom), and
-`LazyMessageRow` treats `lazyRows === null` as "always mounted" — the pre-existing behaviour,
-so component tests are unaffected.
+`useLazyRowObserver` returns `null` when `IntersectionObserver` is undefined, and
+`LazyMessageRow` treats `lazyRows === null` as "always mounted" — the fallback for an
+environment with no observer, where every row is real and nothing is measured.
 
-`src/modules/chat/tests/lazyMessageRow.test.tsx` covers exactly these four behaviours:
-*"starts far rows as an addressable placeholder instead of mounting content"*, *"unmounts to a
-placeholder of the measured height and remounts when near again"*, *"ignores the zero-rect
-non-intersections a hidden tab reports"*, and *"keeps every row mounted where
-IntersectionObserver does not exist"*.
-
-This layers on top of CSS containment, not instead of it: `.chat-message` in `src/index.css`
-carries `contain: layout style paint` and `content-visibility: auto` with
-`contain-intrinsic-size: auto 180px` — 240px for assistant rows, 96px for user, tool and error
-rows — which lets a *mounted* off-screen row skip layout, paint and style. Note that
-`.chat-message` is on the row's content, not on `LazyMessageRow`'s wrapper: an unmounted row
-is a bare sized `div`, so it costs nothing to skip either way.
+**This unmounting IS the mechanism; no CSS takes part in it.** `.chat-message` in `src/index.css`
+carried `contain: layout style paint` (since the Electron commit, `97c9b67b`, until 2026-09-24)
+and `content-visibility: auto` with `contain-intrinsic-size` (until 2026-09-11, `75e7f3f0`);
+both are gone, and neither may come back. `content-visibility`
+because a render-skipped row reports a stand-in height until the browser draws it, and every
+geometry reader in the transcript reads a row on its first frame; `contain` because it makes the
+element the CONTAINING BLOCK for a fullscreen card's `position: fixed` box — the whole reason a
+card asking for the screen came back an 802×2259.5 box mid-transcript, taller than the 900px
+window it asked for (2026-09-24; the long form is under
+[lazy rows and height stability](MAN-388)). Its `paint` half also clipped the card there;
+`contain: layout` alone does not clip and breaks fullscreen all the same. `.chat-message`
+is on the row's content, not on `LazyMessageRow`'s wrapper, so an unmounted row is a bare sized
+`div` either way — there is nothing there worth skipping.
 
 ---
 
@@ -2557,16 +2561,16 @@ and superseded by this document. Its verdict was *no for the sidebar, not yet fo
 The reasoning worth keeping:
 
 1. **The list is already bounded twice** — a 100-row tail window plus
-   `content-visibility: auto`, which is the browser's native version of what windowing buys.
-   Now three times, with `LazyMessageRow`.
+   `LazyMessageRow`, which unmounts a row's content outside a 1200px band around the
+   viewport.
 2. **The scroll machinery reads the DOM.** Anchor restore does
    `querySelectorAll('.chat-message')` + `getBoundingClientRect`, then checks
    `anchor.isConnected` and falls back to a `scrollHeight` delta. A virtualizer unmounts that
    node by design and turns `scrollHeight` into a synthetic spacer. Search jumps do the same
    through `[data-message-timestamp]`.
-3. **Ctrl+F and cross-message selection would narrow to the viewport.** `content-visibility`
-   subtrees are reachable by find-in-page in Chromium, Firefox and Safari; unmounted DOM is
-   not. The assessment was careful about the size of this loss: the reachable range would go
+3. **Ctrl+F and cross-message selection would narrow to the viewport.** A virtualizer
+   unmounts rows by design, and unmounted DOM is reachable by find-in-page in no browser. The
+   assessment was careful about the size of this loss: the reachable range would go
    from the ~100-message window to roughly the viewport, not from "the whole transcript".
    `LazyMessageRow` pays a smaller version of the same price, and only for rows more than
    `LAZY_ROW_VIEWPORT_MARGIN_PX` away.
@@ -2641,7 +2645,7 @@ section: 04-message-store-and-lazy-loading/016 Gotchas and why the code looks li
   would be one more thing to forget to call.
 - **The store keys sessions directly, with no alias table.** The app session id is allocated by
   `POST /api/providers/sessions` before the first send — see
-  [conversation handoff](./03-conversation-handoff.md) — so nothing downstream re-keys a slot.
+  [conversation handoff](MANUAL.md) — so nothing downstream re-keys a slot.
 - **A fold the reader set by hand cannot live inside the row.** The row's whole subtree
   unmounts once it leaves the 1200 px band, so `useState` holding an open-or-closed flag is
   forgotten the moment the reader scrolls past it and comes back — and the row returns shorter
@@ -2650,7 +2654,7 @@ section: 04-message-store-and-lazy-loading/016 Gotchas and why the code looks li
   `openedTurns` Set, keyed by the turn's anchor id; `transcript/shapes/collapseState.ts`'s
   Map, keyed by a hash of the block's own text rather than by a message id — one reply carries
   three different ids before it settles, synthetic then finalised then persisted ([the realtime
-  stream](./02-realtime-stream.md) §"Text streaming"), while the text the reader folded does not
+  stream](MANUAL.md) §"Text streaming"), while the text the reader folded does not
   change at all; and `transcript/shapes/TabbedCode.tsx`'s `chosenTabs` Map, which remembers the
   tab a code group last showed under the same content-addressed key as its fold.
   All three are written only by a click, so they grow with human effort rather than with
@@ -2676,11 +2680,11 @@ section: 04-message-store-and-lazy-loading/017 If you change this, check that
 | `computeMerged` / `dedupeAdjacentAssistantEchoes` | `sessionStoreTruncate.test.tsx` and `sessionMessageReconciliation.test.ts`; the edit/replacement ordering is asserted there. |
 | Any mutator | It must assign a **new** `serverMessages`/`realtimeMessages` array rather than mutating one in place, or `recomputeMergedIfNeeded` sees unchanged references and skips the recompute. |
 | `normalizedToChatMessages` | The `WeakMap` projection cache invalidation keys, and `useChatMessages.test.ts` which pins object reuse across prepends and streaming. |
-| `LazyMessageRow` / `useLazyRowObserver` | Search jumps, which address rows by `data-message-timestamp` on the permanent wrapper; scroll anchor restore, which selects `.chat-message` inside the *mounted* content ([scrolling](./05-scrolling.md)); and the three module-level stores that exist only because a row's subtree unmounts — `CollapsibleUserText`, `transcript/shapes/collapseState.ts` and `TabbedCode`'s `chosenTabs`. |
+| `LazyMessageRow` / `useLazyRowObserver` | Search jumps, which address rows by `data-message-timestamp` on the permanent wrapper; scroll anchor restore, which selects `.chat-message` inside the *mounted* content ([scrolling](MANUAL.md)); and the three module-level stores that exist only because a row's subtree unmounts — `CollapsibleUserText`, `transcript/shapes/collapseState.ts` and `TabbedCode`'s `chosenTabs`. |
 | `INITIAL_MOUNTED_TAIL_ROWS` | The initial scroll-to-bottom, which relies on the newest rows having real measured heights. |
 | The history cache's key or validity check | `sessions.service.test.ts` and the Cursor/OpenCode bypass — their history does not live in `jsonl_path`. |
-| `prepareTranscriptMessages` | The live-vs-history divergence documented in [the realtime stream](./02-realtime-stream.md) and the tool grouping in [the tool view](./06-tool-view.md). |
-| `truncateAt` or `replacesAnchorId` | `history_truncated` emission order in the gateway ([websocket transport](./01-websocket-transport.md)) and `removeOptimisticUserEchoes`. |
+| `prepareTranscriptMessages` | The live-vs-history divergence documented in [the realtime stream](MANUAL.md) and the tool grouping in [the tool view](MANUAL.md). |
+| `truncateAt` or `replacesAnchorId` | `history_truncated` emission order in the gateway ([websocket transport](MANUAL.md)) and `removeOptimisticUserEchoes`. |
 | `visibleMessageCount` or who writes it | All four writers: `INITIAL_VISIBLE_MESSAGES` on session change, `+SESSION_MESSAGES_PAGE_SIZE` on prepend, `Infinity` on "Load all", `Math.max` with `resolveSearchWindowSize` on a search jump, plus `loadEarlierMessages` stepping 100. A shrink anywhere can scroll the transcript out from under the user. |
 | `messagesRepresentSamePersistedRow` | Every other helper in `sessionMessagePagination.ts` — all overlap detection funnels through it, so loosening it silently glues unrelated pages together and tightening it turns every refresh into a full bridge walk. |
 
@@ -2689,24 +2693,23 @@ section: 05-scrolling/000
 
 *Where the transcript sits, who is allowed to move it, and the rules that stop the app from
 fighting the user. Paging and row mounting are covered in
-[the message store and lazy loading](./04-message-store-and-lazy-loading.md).*
+[the message store and lazy loading](MANUAL.md).*
 
 ## MAN-371 — In one paragraph
 section: 05-scrolling/001 In one paragraph
 
-The transcript is one scrolling `div`, and five separate pieces of code write its
+The transcript is one scrolling `div`, and seven separate pieces of code write its
 `scrollTop`. There is no scroll controller and no state machine: the writers are
 coordinated by a handful of refs that each one checks before acting. The shared truth is
 `isUserScrolledUp` — `false` means "the user is parked at the bottom, keep them there",
 `true` means "the user is reading, do not move them" — and it is recomputed only from
-`scroll`, `wheel` and `touchmove`, never from a height change. Every deferred automatic
-scroll re-reads that intent through `isUserScrolledUpRef` at the moment it fires, because
-the value it was armed with may be seconds stale. Everything else — the settle after
-opening a session, the position restore after older history is prepended, the jump to a
-search hit — stakes a temporary claim in a ref that tells the other writers to stand down
-until it is finished. The test file says it plainly: *"The transcript's scroll position is
-written from five places coordinated by refs and timers rather than by one owner"*
-(`src/modules/chat/tests/transcriptScrollOwnership.test.tsx`).
+`scroll`, `wheel` and `touchmove`, never from a height change. The follow is a glide
+(`useFollowGlide`, MAN-7574) started by the size of the pane's content box; it asks
+`canFollow` at every frame, because the value it started with may be a second stale.
+Everything else — the settle after opening a session, the position restore after older
+history is prepended, the jump to a search hit, the landing on the message the operator
+sent (MAN-7575) — stakes a temporary claim in a ref that tells the other writers to stand
+down until it is finished.
 
 ## MAN-372 — Mental model
 section: 05-scrolling/002 Mental model
@@ -2717,10 +2720,12 @@ section: 05-scrolling/002 Mental model
    and their native `scroll` events do not bubble, so they never reach `handleScroll`.
 2. **The pane component holds no scroll state.** It takes `scrollContainerRef`, `onWheel`
    and `onTouchMove` as props. Every write to `scrollTop`, every threshold and every claim
-   ref lives in `src/modules/chat/hooks/useChatSessionState.ts`. If you are reading
+   ref lives in `src/modules/chat/hooks/useChatSessionState.ts`; the glide's per-frame
+   writes are in `useFollowGlide.ts` and the landing pin's in `landAtMessageTop.ts`, both
+   started from that hook, which supplies their conditions. If you are reading
    `ChatMessagesPane.tsx` looking for scroll logic, you are in the wrong file.
 3. **`isUserScrolledUp` is the only shared decision, and it has exactly three readers.**
-   The append-follow effect, the tab-reactivation branch of the `useLayoutEffect`, and the
+   The follow's `canFollow`, the tab-reactivation branch of the `useLayoutEffect`, and the
    jump-to-bottom button in `ChatInterface.tsx`. Predict from it: if the flag is `true`,
    no automatic scroll happens, and the round arrow button is on screen.
 4. **The flag is only recomputed from an input event.** `handleScroll` runs on `scroll`,
@@ -2728,18 +2733,17 @@ section: 05-scrolling/002 Mental model
    < 50`. Content that grows *below* the fold does not move `scrollTop`, emits no event, and
    therefore leaves the flag stale.
 5. **A deferred scroll must re-read intent at fire time.** `isUserScrolledUpRef` mirrors
-   the state so a timer armed 50 ms or 200 ms ago can ask whether the user has scrolled
-   away since. Adding a timed scroll without that check reintroduces the bug
-   `transcriptScrollOwnership.test.tsx` exists to catch.
-6. **The follow effect re-runs on three things, not one.** Its deps are
-   `chatMessages.length`, `isUserScrolledUp` and `isLoadingMoreMessages`. So a new *row*
-   re-follows; a streamed rewrite of an existing row does not; and the flag flipping back
-   to `false` also arms a scroll, which is what snaps you the last few pixels when you
-   scroll back down.
+   the state so a frame or a timer armed earlier can ask whether the user has scrolled
+   away since; the glide asks `canFollow` at every frame (MAN-379).
+6. **The follow is keyed on size, not on rows.** A `ResizeObserver` on the content box
+   starts a glide on any growth — a new row, a row rewritten in place, a late picture, the
+   activity padding — while `canFollow()` holds. A reader's wheel, touchmove, scrollbar
+   press, or a move of the view the glide did not make, stops it (MAN-7574).
 7. **A claim ref suppresses the other writers.** `pendingInitialScrollRef`,
-   `pendingScrollRestoreRef`, `searchScrollActiveRef`, plus one latch at the top of the
-   list, `wasNearTopRef`. A session change clears or re-arms all four in one effect, and
-   drops `liveScrollStateRef` with them.
+   `pendingScrollRestoreRef`, `searchScrollActiveRef`, `landingPendingRef` and
+   `landingHoldRef` (MAN-7575), plus one latch at the top of the list, `wasNearTopRef`. A
+   session change clears or re-arms all of them in one effect, and drops
+   `liveScrollStateRef` with them.
 8. **Row geometry does not change behind the user's back.** Lazy rows keep their measured
    height when their content unmounts, React keys are derived from intrinsic message fields
    rather than object identity, and rows are never render-skipped, so a mounted row reports
@@ -2752,23 +2756,25 @@ section: 05-scrolling/003 The pieces
 
 | File | Role |
 | --- | --- |
-| `src/modules/chat/hooks/useChatSessionState.ts` | Owns the scroll position. All five writers, `isNearBottom`, `handleScroll`, every claim ref, the search jump. |
-| `src/modules/chat/transcript/ChatMessagesPane.tsx` | Renders the one scrolling element, binds the ref and the wheel/touch handlers it is handed, mounts the newest `INITIAL_MOUNTED_TAIL_ROWS` rows eagerly. |
-| `src/modules/chat/ChatInterface.tsx` | Wires the hook to the pane, passes `handleScroll` as `onWheel`/`onTouchMove`, renders the jump-to-bottom button. |
-| `src/modules/chat/hooks/useChatComposerState.ts` | `handleSubmit` clears `isUserScrolledUp` and scrolls to the bottom at +100 ms. |
+| `src/modules/chat/hooks/useChatSessionState.ts` | Owns the scroll position. The writers it runs itself (`scrollToBottom`, the prepend restore, the tab-reactivation restore, the open-session settle, the search jump), `isNearBottom`, `handleScroll`, every claim ref, `canFollow`, and the reveal effect that lands on a message. It starts the glide and the landing pin from the hooks below. It calls `useHostMoveScroll`: the restore across a host move is that hook's, and chat-host never touches a scroll position (MAN-7489). |
+| `src/modules/chat/hooks/useHostMoveScroll.ts` | `useHostMoveScroll({ scrollContainerRef, isFollowing, fallback })`, called by `useChatSessionState`: keeps the reader's place when the chat's node moves between hosts (tab, panel, picture-in-picture window), because a detached node loses its `scrollTop` and the new host may be another width. On `'before'`, only when the scroller is connected with `clientHeight > 0`, it captures `captureScrollRestoreState` (offsets, the first `.chat-message` still on screen and that row's offset) and whether the reader follows the foot. On `'after'` it restores from that capture, else from `fallback()`, through `restoreScroll`. `restoreScroll` is the one restore rule — the foot when following, else the anchor row at its recorded offset, else the saved top — and the tab's became-active branch calls it too, so two writers never race to different answers. Both phases run in the move's own task; the node's first adoption at mount is a move (MAN-7452, MAN-7489). |
+| `src/modules/chat/hooks/useFollowGlide.ts` | The follow: a `ResizeObserver` on the content box starts a spring toward the live foot while `canFollow()` holds; `stopGlide` and `isOwnScroll` are what the other writers and `handleScroll` call (MAN-7574). |
+| `src/modules/chat/hooks/useReplyAnchor.ts` | Per-session anchors on the message the operator sent: `armReplyAnchor`, `takeLanding`, `takeDeferredLanding` (MAN-7575). |
+| `src/modules/chat/utils/landAtMessageTop.ts` | The instant landing on that message and its 45-frame pin (MAN-7575). |
+| `src/modules/chat/hooks/useSessionPresence.ts` | `useIsLookingAtSession(isActive)` — `isActive` and the host document visible; the one definition of "looking" the follow and the landing read (MAN-7575). |
+| `src/modules/chat/transcript/ChatMessagesPane.tsx` | Renders the one scrolling element, binds the ref and the wheel/touch handlers it is handed, mounts the newest `INITIAL_MOUNTED_TAIL_ROWS` rows eagerly. The bottom padding sits on the content box inside the scroller, which is the box the glide observes. |
+| `src/modules/chat/ChatInterface.tsx` | Wires the hook to the pane, passes `handleScroll` as `onWheel`/`onTouchMove`, renders the jump-to-bottom button. Computes `isLooking` once and passes it, with `isConnected`, to the hook, and `armReplyAnchor` to the composer. |
+| `src/modules/chat/hooks/useChatComposerState.ts` | `handleSubmit` clears `isUserScrolledUp`, arms the reply anchor and scrolls to the bottom at +100 ms. |
 | `src/modules/chat/transcript/LoadAllMessagesOverlay.tsx` | The "load all" pill that appears when the user reaches the top. |
 | `src/modules/chat/transcript/LazyMessageRow.tsx` | Swaps a row's content for a placeholder of the same measured height, keeping an addressable wrapper. |
-| `src/modules/chat/hooks/useLazyRowObserver.ts` | One `IntersectionObserver` per pane, rooted at the scroll container, `LAZY_ROW_VIEWPORT_MARGIN_PX = 1200`. |
+| `src/modules/chat/hooks/useLazyRowObserver.ts` | One `IntersectionObserver` per pane, rooted at the scroll container, `LAZY_ROW_VIEWPORT_MARGIN_PX = 1200`; built by the host window's constructor and rebuilt on a host move, re-observing every registered row (MAN-7452). |
 | `src/modules/chat/utils/searchTargetLocator.ts` | `findSearchTargetIndex` resolves a sidebar hit against loaded data; `resolveSearchWindowSize` sizes the render window. |
 | `src/modules/chat/utils/messageKeys.ts` | `getIntrinsicMessageKey` — stable render keys, so a prepend does not remount the rows below it. |
-| `src/index.css` | `.chat-messages-pane` / `.chat-message` containment, mobile `touch-action`, document-level overscroll containment, `.search-highlight-flash`. |
+| `src/index.css` | Mobile `touch-action`, document-level overscroll containment, `.search-highlight-flash`. **Neither the pane nor a row carries `contain`** — containment makes the element the containing block for a fullscreen card's `position: fixed` box, which is what a card asking for the screen sized itself to (MAN-388). |
 | `src/modules/project-workspace/hooks/useVisualViewportKeyboardOffset.ts` | Publishes `--keyboard-height` so the shell shrinks above the iOS keyboard. |
-| `src/shared/ui/ScrollArea.tsx` | **Not used by chat.** Every caller is a pane outside the transcript — `FileTree.tsx`, `SidebarContent.tsx`, `MemoryIntakePanel.tsx` and the Runner tab's `RunnerPanel.tsx`. Grep before trusting that list to be complete; the rule is the exclusion, not the roll call. |
-| `src/modules/chat/tests/transcriptScrollOwnership.test.tsx` | Pins the two ownership bugs — the deferred scroll and the cross-session search jump. |
-| `src/modules/chat/tests/lazyMessageRow.test.tsx` | Pins placeholder height and the hidden-tab zero-rect case. |
-| `src/modules/chat/tests/searchTargetLocator.test.ts` | Pins snippet-first resolution, the timestamp fallback and the window size. |
+| `src/shared/ui/ScrollArea.tsx` | **Not used by chat.** Every caller is a pane outside the transcript; the component's own head comment names them, and `grep -rl "<ScrollArea" src` is the live list. The rule is the exclusion, not the roll call. Its INNER scroller is `relative`, the containing block of everything it scrolls: while it was static, every `sr-only` span in a Runner plan card escaped it to the `overflow-hidden` outer box and gave that box a scroll range (2820px over 621px at 320px), so a centring `scrollIntoView` (`block: 'center'`) on a control near the list's end scrolled the outer box and left the pane's foot drawn empty with `Show all` out of reach (2026-09-26). A focus does not reach that range: it scrolls the inner box to its end and stops. |
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/index.css, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/ChatInterface.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useChatComposerState.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useChatSessionState.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useLazyRowObserver.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/transcript/ChatMessagesPane.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/transcript/LazyMessageRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/transcript/LoadAllMessagesOverlay.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/utils/messageKeys.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/utils/searchTargetLocator.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/hooks/useVisualViewportKeyboardOffset.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/ScrollArea.tsx
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/index.css, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/ChatInterface.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useChatComposerState.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useChatSessionState.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useHostMoveScroll.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useLazyRowObserver.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/transcript/ChatMessagesPane.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/transcript/LazyMessageRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/transcript/LoadAllMessagesOverlay.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/utils/messageKeys.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/utils/searchTargetLocator.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/hooks/useVisualViewportKeyboardOffset.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/ScrollArea.tsx
 
 ## MAN-374 — Who writes `scrollTop`
 section: 05-scrolling/003 The pieces/004 Who writes `scrollTop`
@@ -2781,19 +2787,24 @@ flowchart TD
   W3["Tab reactivation restore"] --> PANE
   W4["Initial settle rAF loop"] --> PANE
   W5["Search jump scrollIntoView"] --> PANE
+  W6["Follow glide, one write per frame"] --> PANE
+  W7["Landing pin, up to 45 frames"] --> PANE
   PANE -->|"scroll, wheel, touchmove"| HS["handleScroll"]
   HS --> FLAG["isUserScrolledUp and isUserScrolledUpRef"]
   FLAG --> W1
   FLAG --> W3
+  FLAG --> W6
 ```
 
-All five are in `useChatSessionState.ts`. A repo-wide grep for `scrollTop =`, `scrollTop +=`,
+Five are in `useChatSessionState.ts`. The glide is `useFollowGlide.ts` (MAN-7574) and the landing pin
+is `landAtMessageTop.ts` (MAN-7575); both are started from that hook. The tab-reactivation restore writes through
+`restoreScroll` in `useHostMoveScroll.ts` (MAN-7452). A repo-wide grep for `scrollTop =`, `scrollTop +=`,
 `scrollIntoView` and `scrollTo(` finds no other transcript writer — the remaining hits are the
 composer's textarea highlight overlay and its own dropdown, the command menu, the sidebar's mobile
 rename input, the mobile terminal's momentum scroller, and the file manager's preview pane, which
 reveals a targeted line by writing two NAMED scrollers of its own rather than reaching for
 `scrollIntoView` — the same discipline this page holds the transcript to, argued out for that pane
-in [the file manager](../file-manager.md) §"The rules that bite".
+in [the file manager](../MANUAL.md) §"The rules that bite".
 
 ## MAN-375 — The single scroll container
 section: 05-scrolling/005 The single scroll container
@@ -2813,12 +2824,8 @@ offset.
 
 **`flex-1` is the whole height rule: every `flex-none` sibling above the pane is height the
 conversation loses.** Exactly one thing stands there — the CLI-version banner
-([../cli-version.md](../cli-version.md)) — and by operator ruling 2026-09-09 nothing else may,
-not a card, not a strip, not a chip. The plan-runner lane provoked it and keeps the reasoning
-([../plan-runner.md](../plan-runner.md) §"The runner card"); what matters here is that the rule is
-MEASURED and not merely written down. `.verify/phase-25.mjs`
-reads the pane's height against its chat root, minus the composer below and the banner above, and
-fails a new region above the transcript whatever that region is named.
+([docs/MANUAL.md (cli-version)](../MANUAL.md)) — and by operator ruling 2026-09-09 nothing else may,
+not a card, not a strip, not a chip. The Runs widget provoked it and keeps the reasoning (MAN-642, "Nothing renders over the transcript"). No probe measures it: a region added above the pane shows only as a shorter transcript.
 
 Three row-level scrollers do exist — `BashCommandDisplay.tsx` (`max-h-80 overflow-auto`),
 `FileListContent.tsx` and `AskUserQuestionPanel.tsx` (`max-h-48 overflow-y-auto`). They are
@@ -2848,35 +2855,84 @@ section: 05-scrolling/006 Staying at the bottom
 `useChatSessionState.ts` → `isNearBottom` returns
 `scrollHeight - scrollTop - clientHeight < 50`, and `false` when there is no container.
 `handleScroll` calls it on every `scroll`, `wheel` and `touchmove` (after bailing out when
-the Chat tab is inactive), writes `setIsUserScrolledUp(!nearBottom)`, and records the
-current `{height, top}` into `scrollPositionRef` for the tab-reactivation restore. A
+the Chat tab is inactive), writes `setIsUserScrolledUp(!nearBottom)` — except for a scroll
+event that is the follow's own glide, which `isOwnScroll()` recognises and the flag ignores
+(MAN-7574) — and records the current `{height, top}` into `scrollPositionRef` for the
+tab-reactivation restore. A
 separate effect mirrors the state into `isUserScrolledUpRef` — an effect rather than an
 assignment beside each setter, because `setIsUserScrolledUp` is also returned from the hook
 and called by the composer.
 
-**RULE: an append only scrolls when the user has not scrolled away, and it re-checks
-before it moves.**
+**RULE: a change in the transcript's size glides a following reader down, and the glide
+re-checks before every frame.** The trigger is the size of the pane's content box, never a
+row count.
 
 ```mermaid
 flowchart TD
-  A["Follow effect runs on a change to chatMessages.length, isUserScrolledUp or isLoadingMoreMessages"] --> B{"Chat tab active and transcript non-empty"}
-  B -->|"no"| Z["Do nothing"]
-  B -->|"yes"| D{"Loading an older page or a restore is pending"}
-  D -->|"yes"| Z
-  D -->|"no"| E{"Search jump in flight"}
-  E -->|"yes"| Z
-  E -->|"no"| F{"isUserScrolledUp"}
-  F -->|"true"| Z
-  F -->|"false"| G["Arm a 50 ms timer"]
-  G --> H{"isUserScrolledUpRef still false when it fires"}
-  H -->|"no"| Z
-  H -->|"yes"| I["Set scrollTop to scrollHeight"]
+  A["The pane's content box changes size"] --> B["ResizeObserver in useFollowGlide"]
+  B --> C{"canFollow"}
+  C -->|"no"| Z["Do nothing"]
+  C -->|"yes"| D{"Gap to the foot is 0.75 px or more"}
+  D -->|"no"| Z
+  D -->|"yes"| E["Start a glide: a spring toward the live foot, one step per animation frame"]
+  E --> F{"canFollow, asked again at every frame"}
+  F -->|"no"| Z
+  F -->|"yes"| G["Write scrollTop until the foot is reached"]
 ```
 
-That is the whole auto-follow. Note what re-runs it. A new **row** re-follows; the 100 ms
-streaming flushes that rewrite an existing row in place do not (see the gotchas). And
-because `isUserScrolledUp` is a dependency, dropping back inside the 50 px band arms one
-more scroll that finishes the trip to the bottom.
+- `canFollow` is the whole condition: the reader is looking at the session, `isUserScrolledUp`
+  is false, and no other writer's claim is held (MAN-7574).
+- Everything that grows the transcript takes this one path: a new row, a streamed reply
+  rewritten in place (Cursor and OpenCode flush the whole reply every 100 ms into one row),
+  a picture that loads late, an expanded tool card, the typing indicator, the activity
+  padding.
+- A reader who drops back inside the 50 px band sets the flag false, and the next growth
+  follows again.
+
+## MAN-7574 — The follow glide
+section: 05-scrolling/006 Staying at the bottom/006a The follow glide
+
+**RULE: when the content under a reader parked at the foot grows, the view eases down to the live foot. It never jumps, and the reader always wins.**
+
+`src/modules/chat/hooks/useFollowGlide.ts` — `useFollowGlide({ scrollContainerRef, canFollow })` returns `{ stopGlide, isOwnScroll }`. `useChatSessionState` calls it and stays the scroll's one owner.
+
+| Part | Fact |
+| --- | --- |
+| Trigger | A `ResizeObserver` on the pane's content box (`container.firstElementChild`), built by the host window's constructor. A new row, a row that grew in place (a late picture, an expanded tool card), the typing indicator and the activity padding all resize that box. None of them fires a scroll event |
+| Padding | The room under the last row (`pb-12 sm:pb-14` while the activity tab floats over it, else `pb-3 sm:pb-4`) is padding of the content box in `ChatMessagesPane.tsx`, not of the scroller. why: padding on the scroller moves the foot while nothing observed resizes |
+| Motion | A critically damped spring, `GLIDE_RATE_PER_SECOND = 18`, solved exactly each frame so it does not depend on frame rate, with no overshoot. `MAX_FRAME_SECONDS = 0.05` caps a delayed frame. 2026-10-01: 0.46 s to 0.57 s over a 300 to 2600 px gap |
+| Target | The live foot, re-read every frame: growth that continues is chased. It lands exactly inside `SNAP_DISTANCE_PX = 0.75` at under `SNAP_SPEED_PX_PER_S = 40` |
+| Reduced motion | `prefers-reduced-motion: reduce` on the host window: one instant write to the foot |
+| Frames | `requestAnimationFrame` of the host window, cancelled on the window that armed it |
+
+## `canFollow()` — asked when growth is seen and again on every frame
+
+True only when ALL hold: `isLooking`; `!isUserScrolledUp`; and none of `pendingInitialScrollRef`, `isLoadingMoreRef`, `pendingScrollRestoreRef`, `searchScrollActiveRef`, `landingHoldRef` is set. A false ends the glide where it stands.
+
+## Whose scroll event is it
+
+The glide keeps `ownTopRef`, the position it last wrote. `classifyScroll` sorts each event:
+
+| Origin | When | Result |
+| --- | --- | --- |
+| `own` | `scrollTop` within `OWN_SCROLL_TOLERANCE_PX = 2` of the last write | `handleScroll` leaves `isUserScrolledUp` alone: a mid-glide gap is not the reader scrolling up |
+| `browser-adjustment` | not the app's, no reader input in the last `READER_INTENT_MS = 600`, moved at most `BROWSER_ADJUSTMENT_LIMIT_PX = 120` | scroll anchoring after a row above changed height; the glide adopts the new position |
+| `reader` | anything else | `stopGlide()`; `handleScroll` reads the event as the reader's |
+
+## What stops a glide
+
+| Input | Stops it |
+| --- | --- |
+| `wheel` with `deltaY !== 0` | yes. A sideways wheel moves nothing vertically and does not |
+| `touchmove` | yes. A `touchstart` or a tap does not |
+| `pointerdown` whose target is the scroller itself (its scrollbar) | yes. A press on a row does not |
+| `keydown` outside INPUT, TEXTAREA, SELECT and contenteditable | not itself: it makes the move that follows the reader's |
+
+- Every other writer of the scroll position calls `stopGlide()` first: `scrollToBottom`, the session-change effect, the landing (MAN-7575).
+- A new condition for "may the app move the view" goes into `canFollow`, never into a second observer.
+- Probe: MAN-7576.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useFollowGlide.ts
 
 ## MAN-377 — Follow and detached
 section: 05-scrolling/006 Staying at the bottom/007 Follow and detached
@@ -2885,6 +2941,10 @@ section: 05-scrolling/006 Staying at the bottom/007 Follow and detached
 flowchart LR
   S["Settling — pendingInitialScrollRef is set"] -->|"height stable for 3 frames or 60 frames elapsed"| F["Following — isUserScrolledUp is false"]
   S -->|"a search target was armed for this session"| J["Jumping — searchScrollActiveRef is set"]
+  S -->|"a landing was requested for this session"| L["Landing — searchScrollActiveRef, then landingHoldRef while the pin runs"]
+  F -->|"looked again and rows arrived below the message the operator sent"| L
+  L -->|"message placed at the top of the view"| D
+  L -->|"message cannot be placed"| F
   F -->|"input event and the gap from the bottom is 50 px or more"| D["Detached — isUserScrolledUp is true"]
   D -->|"input event and the gap is under 50 px"| F
   D -->|"jump-to-bottom button"| F
@@ -2895,7 +2955,8 @@ flowchart LR
   D -->|"session change"| S
 ```
 
-`Settling` and `Jumping` are claims held in refs, not values of the flag. Note the last
+`Settling`, `Jumping` and `Landing` are claims held in refs, not values of the flag
+(`Landing`: MAN-7575). `Following` is the glide (MAN-7574). Note the last
 `Jumping` edge: when a jump resolves to nothing, `searchScrollActiveRef` clears but the
 initial settle has already been consumed, so the transcript stays wherever it rendered with
 the flag still `false`.
@@ -2924,19 +2985,17 @@ sequenceDiagram
     participant H as handleScroll
     participant W as Realtime
     participant S as Store
-    participant E as FollowEffect
+    participant G as FollowGlide
 
     U->>P: drag upward
     P->>H: scroll event
     H->>H: gap is 50 px or more, set isUserScrolledUp true
-    W->>S: stream_delta flush every 100 ms
-    S->>E: same row rewritten, so the row count is unchanged
-    E->>E: effect does not re-run
-    W->>S: a tool_use row arrives
-    S->>E: row count changed, effect runs
-    E->>E: isUserScrolledUp is true, no timer armed
+    W->>S: stream_delta flush every 100 ms, or a tool_use row arrives
+    S->>P: the transcript grows, so the content box resizes
+    P->>G: ResizeObserver fires
+    G->>G: canFollow is false because isUserScrolledUp is true, no glide starts
     U->>P: press jump-to-bottom
-    P->>P: scrollToBottomAndReset sets scrollTop to scrollHeight
+    P->>P: scrollToBottomAndReset stops any glide, sets scrollTop to scrollHeight
     P->>H: scroll event
     H->>H: gap is under 50 px, set isUserScrolledUp false
 ```
@@ -2944,32 +3003,20 @@ sequenceDiagram
 ## MAN-379 — Deferred scrolls re-check intent
 section: 05-scrolling/009 Deferred scrolls re-check intent
 
-**RULE: a scroll armed on a timer must re-read `isUserScrolledUpRef` before it moves
+**RULE: a scroll armed on a timer or a frame must re-read the reader's intent before it moves
 anything.**
 
-| Where | Delay | Re-checks? |
+| Where | Fires | Re-checks? |
 | --- | --- | --- |
-| Append follow effect (`useChatSessionState.ts`) | 50 ms | yes — `if (!isUserScrolledUpRef.current)` |
-| External-update refresh (same file, the `externalMessageUpdate` effect) | 200 ms | yes — same guard, and only armed when `isNearBottom()` held before the refetch |
-| Composer send (`useChatComposerState.ts` → `handleSubmit`) | 100 ms | **no** — it sets the flag false itself, then calls `scrollToBottom()` unconditionally |
+| Follow glide (`useFollowGlide.ts`) | every animation frame while it runs | yes — `canFollow()` at each frame; a reader's wheel, touchmove or scrollbar press, or a move of the view the glide did not make, stops it (MAN-7574) |
+| Landing pin (`landAtMessageTop.ts`) | every frame for `PIN_FRAMES = 45` | yes — gives up on reader input or a position it did not leave (MAN-7575) |
+| Composer send (`useChatComposerState.ts` → `handleSubmit`) | 100 ms | **no** — it sets the flag false itself, then calls `scrollToBottom()` unconditionally; `scrollToBottom` stops any glide first |
 
-The first two used to fire unconditionally. Commit `a1a42774` describes the failure:
-scrolling up inside the delay was silently undone, and because a programmatic scroll itself
-emits a `scroll` event, the resulting `handleScroll` reset `isUserScrolledUp` to false and
-hid the jump-to-bottom button too. The user was returned to the bottom *and* lost the
-control that would have explained why.
-
-`transcriptScrollOwnership.test.tsx` pins both directions on fake timers, driving the real
-hook against a hand-built container (jsdom has no layout, so `scrollHeight`/`clientHeight`
-are stubbed and `scrollTop` writes are recorded):
-
-- *"does not yank the view back down when the user scrolls up inside the delay"* — appends
-  a row, flips the flag, advances 200 ms, asserts **zero** writes.
-- *"still sticks to the bottom when the user has not scrolled away"* — same setup without
-  the flip, asserts a write of `scrollHeight`.
-
-The test stubs `requestAnimationFrame` to a no-op on purpose: the initial-settle loop is a
-separate writer that would otherwise satisfy an assertion meant for the timer.
+Why the check matters: a programmatic scroll itself emits a `scroll` event. An unguarded
+write returns a reader who scrolled up to the bottom and, through `handleScroll`, resets
+`isUserScrolledUp` and hides the jump-to-bottom button — the reader loses the control that
+would explain why. The glide's own writes are the exception `handleScroll` recognises
+(`isOwnScroll`); every other writer's are read as the reader's.
 
 The composer send is deliberately unguarded — the user pressed Enter, so the intent is
 fresh. The cost is that scrolling up within 100 ms of sending is undone.
@@ -3008,6 +3055,9 @@ flowchart TD
   moves `scrollTop` down by what it added, and a page that brings nothing back ends it. A
   restore's own `scroll` event can chain the next page; that is intended, and it stops once a
   screen of history sits above the view.
+- **A landing's pin holds the pager.** The landing parks the sent message near the top of a
+  partial transcript, inside the pager's zone. While `landingHoldRef` is set the pager stands
+  down, so it cannot prepend and re-arm the open-session settle over the landing (MAN-7575).
 
 `loadAllMessages` (the overlay's button) takes a different path: it fetches the whole
 transcript with `limit: null`, sets `visibleMessageCount` to `Infinity`, captures a scroll
@@ -3050,7 +3100,7 @@ hydration. The key falls back through `id`, `messageId`, `toolId`, `toolCallId`,
 `rowid`, `sequence`, and only then to a timestamp-plus-content-prefix string.
 
 The same mechanism is reused by `loadAllMessages`. While `pendingScrollRestoreRef` is set,
-the append-follow effect declines outright — a prepend must never be mistaken for an
+the follow's `canFollow` is false — a prepend must never be mistaken for an
 append — and the restore branch of the `useLayoutEffect` returns early, so a pending restore
 also beats the tab-reactivation restore in the same commit.
 
@@ -3062,11 +3112,13 @@ section: 05-scrolling/012 Opening a session, switching, and coming back
 | Trigger | Mechanism | Claim ref |
 | --- | --- | --- |
 | Opening a session | rAF settle loop | `pendingInitialScrollRef` |
-| Returning to the Chat tab | `useLayoutEffect` reactivation branch | — |
+| Looking again: the Chat tab, the browser tab or the floating chat | `useLayoutEffect` `becameLooking` branch | — |
+| Looking again after a reply arrived below the sent message, or the session picked again | reveal effect → `landAtMessageTop` (MAN-7575) | `searchScrollActiveRef`, `landingPendingRef`, then `landingHoldRef` while the pin runs |
+| Content growing under a reader at the foot | `useFollowGlide` (MAN-7574) | — (`canFollow` reads every claim ref) |
 | Older page prepended | `useLayoutEffect` restore branch | `pendingScrollRestoreRef` |
 | Short screen filled while at the bottom | rAF settle loop, re-armed | `pendingInitialScrollRef` |
 | Sidebar search hit | `scrollIntoView` retry chain | `searchScrollActiveRef` |
-| Expanding a tool view | nothing — pure layout change | — |
+| Expanding a tool view | nothing, or the glide when the reader is at the foot | — |
 
 ## MAN-383 — Opening a session
 section: 05-scrolling/012 Opening a session, switching, and coming back/013 Opening a session
@@ -3098,28 +3150,33 @@ rows mount with real content on the first commit, so the loop measures real heig
 bottom rather than placeholder estimates.
 
 The loop declines entirely if `searchScrollActiveRef` is set — a session opened from a
-search hit is not supposed to land at the bottom.
+search hit is not supposed to land at the bottom. A landing request sets the same flag; it
+keeps `isOpeningSession` true until the message is placed (MAN-7575).
 
 **Filling a short screen.** A 20-row page with "Show work", thinking or the compaction summary off can leave one
 reply and nothing to scroll, so `fillViewportWithHistory` (asked by `ChatMessagesPane` after
-every commit; see [the message store](./04-message-store-and-lazy-loading.md)) loads older
+every commit; see [the message store](MANUAL.md)) loads older
 history until the transcript overflows by 200 px. While the reader has not scrolled up it
 passes `pinToBottom`, and `loadOlderMessages` **re-arms `pendingInitialScrollRef`** instead
 of setting `pendingScrollRestoreRef`: the older page lands above and the settle loop keeps
 the newest reply in view. An anchor restore there would pin a row near the top and let the
-tail drift off screen as the prepended rows change the heights below it. `visibleMessageCount` is
+tail drift off screen as the prepended rows change the heights below it. The fill stands down
+while a landing is pending or held (MAN-7575). `visibleMessageCount` is
 in the loop's dependencies so a fill that only widens the window re-runs it too.
 
 ## MAN-384 — Switching sessions
 section: 05-scrolling/012 Opening a session, switching, and coming back/014 Switching sessions
 
 The session-change effect (keyed on `selectedProject?.projectId` and `selectedSession?.id`)
-clears the pending search timer, clears `searchScrollActiveRef` and `searchTarget`, nulls
+clears the pending search timer, clears `searchScrollActiveRef`, `landingPendingRef`, the
+landing's pin and `searchTarget`, stops any glide, nulls
 `pendingScrollRestoreRef` and `liveScrollStateRef`, clears `wasNearTopRef`, re-arms
 `pendingInitialScrollRef`, resets `visibleMessageCount` to `INITIAL_VISIBLE_MESSAGES`, and
 sets `isUserScrolledUp` to false. Its comment records that ordering is load-bearing: the
 effect that reads `__searchTargetSnippet` off the newly selected session runs *after* this
-one, so a session opened *from* a search result re-arms immediately.
+one, so a session opened *from* a search result re-arms immediately. An effect declared after
+it asks `takeLanding` for the picked session and requests a landing when rows arrived below
+the message the operator sent (MAN-7575); it skips a session opened from a search hit.
 
 ## MAN-385 — Returning to the Chat tab
 section: 05-scrolling/012 Opening a session, switching, and coming back/015 Returning to the Chat tab
@@ -3127,10 +3184,60 @@ section: 05-scrolling/012 Opening a session, switching, and coming back/015 Retu
 The chat tree stays mounted behind Tailwind's `hidden` (`display: none`) when another
 workspace tab is active (`WorkspaceMain.tsx`, which also passes `isActive`). An effect with
 no dependency array records `{height, top}` into `scrollPositionRef` after every render
-while the tab is active, and the `useLayoutEffect` reactivation branch — recognised through
-`wasChatActiveRef` — restores `scrollPositionRef.current.top` when detached, or
-`container.scrollHeight` when following. Hidden tabs must not reset pagination or scroll:
-`handleScroll`, the restore branch and the settle loop all bail out on `!isActive`.
+while the tab is active, and the `useLayoutEffect` reactivation branch — `becameLooking`, read
+off `wasLookingRef` — runs when `isLooking` (`useIsLookingAtSession`, MAN-7575) turns true: the
+Chat tab shown, the browser tab visible, the floating chat reopened. It first asks `takeLanding`:
+rows that arrived below the message the operator sent while they were away make it a landing
+on that message (MAN-7575), and nothing else runs. Otherwise it restores through `restoreScroll` (`useHostMoveScroll.ts`, the rule a move between hosts shares, MAN-7452): `container.scrollHeight` when following, else `scrollPositionRef.current.top` (no anchor is passed). Hidden tabs must not reset pagination or scroll:
+`handleScroll`, the restore branch and the settle loop all bail out on `!isActive`, and the
+follow does not move a hidden browser tab (`canFollow` needs `isLooking`).
+
+## MAN-7575 — Landing on the message you sent
+section: 05-scrolling/012 Opening a session, switching, and coming back/015a Landing on the message you sent
+
+**RULE: a reader who left while a reply was still coming is put back at the message they sent, at the top of the view — never at the foot of a reply they have not read.**
+
+| File | Role |
+| --- | --- |
+| `src/modules/chat/hooks/useReplyAnchor.ts` | `useReplyAnchor({ sessionId, isLooking, isProcessing, getMessages })` returns `{ armReplyAnchor, takeLanding, takeDeferredLanding }`. One anchor per session, in a ref that survives session switches (one `ChatInterface` serves every session) |
+| `src/modules/chat/utils/landAtMessageTop.ts` | `landAtMessageTop(container, locateMessage, hostWindow, onDone)` — the instant landing and its pin |
+| `src/modules/chat/hooks/useSessionPresence.ts` | `useIsLookingAtSession(isActive)` — `isActive` and the host document visible. The one definition of "looking", the pair the server's presence record is built from. `ChatInterface` calls it once and passes `isLooking` to `useChatSessionState` |
+| `src/modules/chat/utils/sessionMessageReconciliation.ts` | `findSentUserTurn(messages, sent)` — finds the sent message in the store, local echo or persisted row, by text, image and file counts, and time (`SentUserTurn`, `src/shared/types.ts`). Shares its matcher with `removeOptimisticUserEchoes` |
+
+## Life of an anchor
+
+1. Armed: `handleSubmit` (`useChatComposerState.ts`) calls `armReplyAnchor` after `addMessage`, replacing the session's earlier anchor. A message queued mid-turn arms nothing: the queued path returns before the arm.
+2. Departure: `isLooking` turns false for the session (another session picked, Chat tab left, browser tab hidden). The rows after the sent message at that moment are recorded.
+3. Return: `isLooking` true again. `takeLanding(sessionId, messages, isTurnRunning, isSocketUp)` answers the sent message when more rows follow it than at departure, else null — then the ordinary return stands (the foot when following, else the saved top).
+4. Spent: a landing on a turn that already ended deletes the anchor; one on a running turn keeps it. A turn ending while the reader looks at the session deletes it too.
+
+## Where a return is caught
+
+| Return | Caught by |
+| --- | --- |
+| Chat tab shown again, browser tab visible again, floating chat reopened | the `becameLooking` branch of the layout effect in `useChatSessionState`, before the first paint |
+| Session picked again in the sidebar | the effect declared after the session-change reset, so it runs after the reset in the same commit |
+| Session opened from a message-search hit (`__searchTargetSnippet`) | never landed: the search jump owns the position (MAN-386) |
+
+## Socket down
+
+A "nothing new" answer while `isSocketUp` is false is not an answer: the store may be behind the server. The anchor is marked `isReturnDeferred` and `takeDeferredLanding` asks again as rows arrive below the message (the reconnect's catch-up). It runs in a layout effect, so the claim on the position is made before the follow's observer sees the growth.
+
+## The landing
+
+`requestLanding(sent)` sets `searchScrollActiveRef` and `landingPendingRef` at once and calls `setSearchTarget({ landing })`. The reveal effect — a layout effect shared with the search jump (MAN-386) — places it:
+
+- The sent row is found with `findSentUserTurn` and addressed by its own timestamp. The whole transcript is fetched only when the row is not loaded; the window widens to cover it.
+- It tries at once (a search hit waits 150 ms), then on the same retry chain. No row to place: `abandonLanding` leaves the reader at the foot.
+- It is instant, with no smooth scroll and no flash. The message stands at the scroller's `padding-top` inset. `isOpeningSession` stays true — the chat hidden behind the loading wheel — until it is placed.
+- `landAtMessageTop` pins it for `PIN_FRAMES = 45` frames (about 0.75 s) and locates the row again every frame, because the persisted row replaces the echo's wrapper and rows near it measure themselves a commit later. It ends on a wheel, a `touchstart`, a scrollbar press, a key, or a position it did not leave.
+- The view is then above the foot: `isUserScrolledUp` is true, the jump-to-bottom button shows, the follow is off (MAN-7574).
+
+**RULE: while a landing's pin runs, nothing but the pin writes the scroll position.** `landingHoldRef` is true from the pin's start to its `onDone`. The older-page pager in `handleScroll`, `fillViewportWithHistory` (also while a landing is pending) and the follow's `canFollow` stand down. why: the message sits near the top of a partial transcript, where the pager and the short-screen fill re-armed the open-session settle and re-pinned the foot over the landing. A new writer of the position checks `landingHoldRef`.
+
+Probe: MAN-7576.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useReplyAnchor.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/utils/landAtMessageTop.ts
 
 ## MAN-386 — Jumping to a search hit
 section: 05-scrolling/016 Jumping to a search hit
@@ -3141,7 +3248,7 @@ exact timestamp until the final try.**
 The sidebar (`Sidebar.tsx`, `onConversationResultClick`) puts `__searchTargetSnippet` and
 `__searchTargetTimestamp` on the selected session object. The jump then:
 
-1. Sets `searchScrollActiveRef` — the initial settle and the append-follow both stand down.
+1. Sets `searchScrollActiveRef` — the initial settle and the follow both stand down.
    The arming effect requires a non-empty snippet string; without one there is no jump.
 2. Fetches the **entire** transcript into the store (`limit: null`) so an old hit is
    reachable, without rendering all of it.
@@ -3152,9 +3259,7 @@ The sidebar (`Sidebar.tsx`, `onConversationResultClick`) puts `__searchTargetSni
    and string tool-result content. **Only if the snippet misses** does the timestamp take
    over, and it returns the *nearest* message by time, not an exact match. `-1` — and
    therefore no scroll at all — happens only when the snippet misses *and* there is no
-   finite timestamp. `searchTargetLocator.test.ts` pins both halves: *"a snippet that
-   matches nothing reports a miss instead of guessing"* and *"the timestamp is only a
-   fallback when the snippet misses"*.
+   finite timestamp.
 4. Widens the render window with
    `resolveSearchWindowSize(count, index, SEARCH_TARGET_CONTEXT_MESSAGES = 20)`, applied as
    `Math.max(previous, required)` so the window never shrinks. `visibleMessages` is a tail
@@ -3169,6 +3274,9 @@ spaced `SEARCH_SCROLL_RETRY_DELAY_MS = 150` apart — about 3.15 s in total**. T
 that long because widening the window can commit thousands of rows that each run the
 markdown pipeline.
 
+The same reveal effect and retry chain land the operator on the message they sent — instant,
+at the top, no flash (MAN-7575).
+
 **Why `allowNearest` exists.** `findRenderedMessageElement` is called with
 `allowNearest = (retriesLeft === 0)`, so every attempt but the last accepts an **exact**
 timestamp match only. The final attempt relaxes to nearest-by-time because a hit on the
@@ -3179,10 +3287,11 @@ second or later call inside a collapsed tool group has no row of its own:
 ## MAN-387 — Expanding a tool view
 section: 05-scrolling/016 Jumping to a search hit/017 Expanding a tool view
 
-Nothing scrolls. There is no `scrollIntoView` anywhere under
-`src/modules/chat/transcript/` or the tool renderers. Expansion is a layout change the
-browser's own scroll anchoring absorbs; if the row later unmounts, `LazyMessageRow` records
-the expanded height first.
+No code scrolls for it: there is no `scrollIntoView` anywhere under
+`src/modules/chat/transcript/` or the tool renderers. Expansion is a layout change. The
+browser's own scroll anchoring absorbs it for a reader above the foot; a reader at the foot
+is glided down with the growth (MAN-7574). If the row later unmounts, `LazyMessageRow`
+records the expanded height first.
 
 ## MAN-388 — Lazy rows and height stability
 section: 05-scrolling/018 Lazy rows and height stability
@@ -3210,18 +3319,31 @@ Three details exist purely to protect the scroll position:
    the rows around the viewport are exactly the mounted ones.
 3. **Zero-sized rects are ignored.** A hidden Chat tab (`display: none`) reports
    `isIntersecting: false` with a `0x0` rect. Treating that as "scrolled away" would wipe
-   every row's mounted state and its measured height. `lazyMessageRow.test.tsx` pins this
-   as *"ignores the zero-rect non-intersections a hidden tab reports"*.
+   every row's mounted state and its measured height, and re-measure the whole transcript on
+   the tab's next activation.
 
 Rows never yet measured fall back to `ESTIMATED_ROW_HEIGHT_PX = 100` and rely on the
 browser's own scroll anchoring while they settle.
 
-CSS contains each row but never skips rendering one (`src/index.css`):
-
-```css
-.chat-messages-pane { contain: layout style paint; }
-.chat-message { contain: layout style paint; }
-```
+**NEITHER `.chat-messages-pane` NOR `.chat-message` MAY CARRY `contain`.** Both did —
+`contain: layout style paint`, carried since the Electron commit (`97c9b67b`, 2026-06-29) —
+until 2026-09-24, when it turned out to have been breaking every fullscreen card in the chat. Any
+`contain: layout` — or `paint`, or `content`, which is both — makes the element the **containing
+block** for its `position: fixed` descendants, so a live card asked for the whole screen sized
+itself to the pane's box: measured in a 1440×900 window as an 802×2259.5 box mid-transcript, taller
+than the window itself, with `pos=fixed`, `z=45` and every fullscreen state attribute already
+correct —
+which is why it read as "fullscreen does not work" rather than as a layout fault. The gutter
+widgets, whose fullscreen lives outside this pane, filled the screen the whole time. Nothing
+here needs containment: the cost it was aimed at is off-screen rows, and those `LazyMessageRow`
+unmounts. Dropping both rules measured inert — on a 19-row transcript no row geometry moved and
+`scrollHeight` did not change. Re-adding either rule re-breaks fullscreen, silently — and so does
+`content-visibility: auto` on a row, or an ancestor `transform`, `filter`, `perspective`,
+`will-change: transform` or `backdrop-filter`: none of those shows up in a `contain`-shaped audit,
+and `content-visibility: auto` leaves `contain` computed as `none` while containing the card
+exactly as `content` does.
+`.verify/contain-fixed-mechanism.mjs` measures every one of them, plus the two effects apart
+(containing block without clipping).
 
 **RULE: no `content-visibility` on transcript rows.** A render-skipped row reports a stand-in
 height until the browser draws it, a frame or more later. Every geometry reader here reads a
@@ -3232,7 +3354,8 @@ and out of the band. Off-screen cost is `LazyMessageRow`'s job alone.
 
 The repo **never sets `overflow-anchor`**, so the browser default (`auto`) stays in effect
 for everything the JS does not explicitly restore — which is what absorbs a tool card
-expanding or a code block finishing highlighting.
+expanding or a code block finishing highlighting. A reader at the foot is followed by the
+glide, which counts a browser adjustment of up to 120 px as its own (MAN-7574).
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/index.css
 
@@ -3250,39 +3373,37 @@ section: 05-scrolling/019 Mobile, keyboard and CSS
 | `--keyboard-height` from `visualViewport.resize` | `useVisualViewportKeyboardOffset.ts` | `ProjectWorkspaceShell.tsx` applies it as `style={{ bottom: 'var(--keyboard-height, 0px)' }}`, so the fixed shell shrinks above the iOS keyboard instead of being covered by it. |
 | `@media (prefers-reduced-motion: reduce) { scroll-behavior: auto !important; }` | `src/index.css` | The only `scroll-behavior` declaration in the repo. Nothing sets `smooth` in CSS. |
 
-`scrollToBottom` is an instant `scrollTop = scrollHeight` assignment. The only smooth scroll
-in the transcript is the search jump's explicit `behavior: 'smooth'`.
+`scrollToBottom` (the jump button, the composer send) is an instant `scrollTop = scrollHeight`
+assignment that stops any glide first. The other motion in the transcript is the follow glide —
+a spring written one animation frame at a time, instant under `prefers-reduced-motion` (MAN-7574)
+— and the search jump's explicit `behavior: 'smooth'`.
 
-The pane's bottom padding switches between `pb-12 sm:pb-14` and `pb-3 sm:pb-4` depending on
-`hasActivityIndicator` — the composer's floating activity/stop tab overlaps the pane, so the
-padding reserves space for it. That toggle changes the pane's usable height without emitting
-a scroll event.
+The bottom padding of the pane's content box (the `div` inside the scroller, not the scroller)
+switches between `pb-12 sm:pb-14` and `pb-3 sm:pb-4` depending on `hasActivityIndicator` — the
+composer's floating activity/stop tab overlaps the pane, so the padding reserves space for it.
+That toggle resizes the content box, which the follow glide observes, so a reader at the foot is
+carried with it; it emits no scroll event.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/index.css
 
 ## MAN-390 — Gotchas and why the code looks like this
 section: 05-scrolling/020 Gotchas and why the code looks like this
 
-- **Streaming text does not re-follow, but the first flush does.** `updateStreaming` in
-  `useSessionStore.ts` writes a row with the well-known id `__streaming_<sessionId>`. The
-  first flush appends it, so `chatMessages.length` changes once and the follow effect runs.
-  Every flush after that replaces the same array slot, so the length is unchanged and the
-  effect stays quiet. Within one streamed block the pane is held by the browser, not by this
-  code.
-- **`stream_end` does not re-follow either.** `finalizeStreaming` rewrites the same slot in
-  place, changing only the id, `kind` and `role`; both `stream_delta` and an assistant
-  `text` map to exactly one row in `normalizedToChatMessages`. The length never moves, so
-  the effect does not re-run. What re-follows is the *next* row — a tool call, or the next
-  streamed block, which allocates a fresh `__streaming_` id.
+- **The follow is keyed on size, not on row count.** `updateStreaming` in `useSessionStore.ts`
+  writes a row with the well-known id `__streaming_<sessionId>`; the first flush appends it
+  and every flush after that replaces the same array slot. `finalizeStreaming` rewrites the
+  same slot in place, changing only the id, `kind` and `role`. `chatMessages.length` moves
+  only once, yet each rewrite grows the row and resizes the pane's content box, which is what
+  `useFollowGlide` observes (MAN-7574). Nothing re-follows by watching the length.
 - **`isUserScrolledUp` can be stale.** It is only recomputed from `scroll`, `wheel` and
-  `touchmove`. Content growing below the fold does not move `scrollTop`, so no event fires,
-  the flag stays `false`, and the jump-to-bottom button stays hidden even though the newest
-  content is off screen. Same for the keyboard opening and for the activity indicator's
-  padding toggle.
+  `touchmove`. Growth the follow does not take — a hidden browser tab — does not move
+  `scrollTop`, so no event fires, the flag stays `false`, and the jump-to-bottom button stays
+  hidden even though the newest content is off screen. Same for the keyboard opening.
 - **A programmatic scroll emits a `scroll` event.** Every `scrollTop` write feeds back
-  through `handleScroll` and rewrites the flag. That is why the deferred writers guard
-  themselves — an unguarded write both moves the user *and* erases the evidence that they
-  had scrolled away.
+  through `handleScroll`. The glide's own writes are recognised (`isOwnScroll`) and leave the
+  flag alone; any other writer's rewrite the flag, so an unguarded write both moves the user
+  *and* erases the evidence that they had scrolled away. That is why the deferred writers
+  guard themselves (MAN-379).
 - **The pager cannot drain a long session in one gesture.** The restore after a prepend
   lands the reader near the top by design, but the zone is `scrollTop < clientHeight` and each
   prepend moves the reader down by what it added, so the chain stops once a screen of history
@@ -3290,17 +3411,14 @@ section: 05-scrolling/020 Gotchas and why the code looks like this
   it exists for.
 - **`loadEarlierMessages` has no scroll restore.** It just does
   `setVisibleMessageCount(prev + 100)` on already-loaded messages, so `chatMessages.length`
-  never changes and neither the follow effect nor the restore `useLayoutEffect` runs. Only
+  never changes and the restore `useLayoutEffect` does not run. Only
   the browser's native scroll anchoring holds the position there. `loadOlderMessages` and
   `loadAllMessages` both capture an anchor; this one does not.
 - **A search jump left armed across a session change was visibly wrong twice.** The new
   session opened part-way up (the initial settle declines while a jump is pending), and then
   once the retries ran out and `allowNearest` engaged, it scrolled to an unrelated message
-  in the *new* session and flashed the highlight on it.
-  `transcriptScrollOwnership.test.tsx` → *"does not follow the user into the next session"*
-  drives exactly that: it plants a session-B row in the container, lets the jump start
-  retrying against session A, switches sessions, advances past the whole retry budget, and
-  asserts zero `scrollIntoView` calls and zero `.search-highlight-flash` elements.
+  in the *new* session and flashed the highlight on it. The session-change effect cancels the
+  retry timer; the same reset clears a landing's request and pin (MAN-7575).
 - **The nearest-row fallback is not laziness.** It was removed from the early attempts
   (commit `0a19ad8a`) because an uncommitted window made it scroll to an arbitrary message —
   the exact failure the rewrite was meant to remove. It survives on the final attempt only,
@@ -3314,11 +3432,15 @@ section: 05-scrolling/020 Gotchas and why the code looks like this
   few dozen mounted rows instead of ~1 GB with seven thousand. Every geometry guarantee in
   `LazyMessageRow` — measure-before-unmount, permanent wrapper, zero-rect filter — exists to
   make that trade invisible.
-- **`content-visibility: auto` is overridden for exports.**
-  `src/modules/chat/export/buildTranscriptHtml.tsx` emits
-  `.chat-message { content-visibility: visible !important; contain-intrinsic-size: auto !important; }`
+- **The export neutralises off-screen skipping nothing in `src/` sets.**
+  `src/modules/chat/export/buildTranscriptHtml.tsx` still emits
+  `.chat-message { content-visibility: visible !important; contain-intrinsic-size: auto !important; }`,
   with the comment "off-screen skipping is a scrolling optimisation; in a printed document it
-  leaves blank pages."
+  leaves blank pages." Nothing in the app sets either property today — `LazyMessageRow`'s
+  unmounting is the whole mechanism, and it is untouched by the override — so the rule is a
+  guard on a printed document rather than a mirror of a live declaration. That is also why it is
+  kept: the export is a file a person opens, and its correctness should not depend on the app
+  never growing a skipping declaration again.
 - **Where `IntersectionObserver` does not exist (jsdom), every row stays mounted.**
   `useLazyRowObserver` returns `null` and `LazyMessageRow` treats that as "always mounted".
   Tests that need the lazy path install a stub observer and drive it by hand.
@@ -3330,19 +3452,41 @@ section: 05-scrolling/021 If you change this, check that
 
 | If you touch | Also check |
 | --- | --- |
-| The 50 px threshold in `isNearBottom` | The follow effect, the tab-reactivation branch and the jump-to-bottom button all read the same flag. |
+| The 50 px threshold in `isNearBottom` | `canFollow`, the tab-reactivation branch and the jump-to-bottom button all read the same flag. |
 | The one-screen (`clientHeight`) pager zone | Each prepend must still move the reader down by what it added (the anchor restore), or paging runs away. |
-| `chatMessages` shape or identity | The follow effect and the restore/reactivation `useLayoutEffect` are both keyed on `chatMessages.length`; in-place row rewrites are invisible to both. |
-| Anything that adds a deferred scroll | It must re-read `isUserScrolledUpRef` at fire time, or `transcriptScrollOwnership.test.tsx` should fail. |
+| `chatMessages` shape or identity | The restore/reactivation `useLayoutEffect` and the deferred-landing effect are keyed on `chatMessages.length`; in-place row rewrites are invisible to both. The follow is keyed on the content box's size, not on this. |
+| Anything that adds a scroll write, deferred or not | It re-reads intent at fire time (`canFollow` for a follow, MAN-379), calls `stopGlide()` before it writes, and does not write at all while `landingHoldRef` is set (MAN-7575). |
+| `canFollow`, a claim ref, or the follow's reader-input list | Every writer that sets a claim ref must be in `canFollow`, or the glide moves the view under it (MAN-7574). |
+| The landing, the reply anchor or `findSentUserTurn` | The reveal effect shared with the search jump, `landingHoldRef` in the pager and `fillViewportWithHistory`, and the socket-down deferral (MAN-7575). |
 | `getIntrinsicMessageKey` or the key map in `ChatMessagesPane` | The prepend restore needs the anchor element to survive; unstable keys remount rows and drop it to the height-delta fallback. |
-| `LazyMessageRow` placeholder height, the `.chat-message` class placement, or the 1200 px observer margin | Prepend anchor scan, search-jump row lookup, and `lazyMessageRow.test.tsx`. |
-| `SEARCH_SCROLL_RETRIES`, the retry delay, or `findRenderedMessageElement` | The cross-session cancellation test and `searchTargetLocator.test.ts`; `allowNearest` must stay on the final attempt only. |
-| `.chat-message` containment or `content-visibility` | The export override in `buildTranscriptHtml.tsx` mirrors these declarations. |
-| Session load or pagination in `useChatSessionState.ts` | `pendingScrollRestoreRef`, `liveScrollStateRef`, `pendingInitialScrollRef`, `searchScrollActiveRef` and `wasNearTopRef` are all handled by the session-change effect — see [the message store](./04-message-store-and-lazy-loading.md). |
-| Composer send or the activity indicator | `handleSubmit` forces `isUserScrolledUp` false and scrolls unconditionally at +100 ms; the indicator changes the pane's padding without a scroll event. |
-| Tool card expand/collapse | Nothing scrolls today — see [tool views](./06-tool-view.md). Adding a `scrollIntoView` there adds a sixth writer with no claim ref. |
+| `LazyMessageRow` placeholder height, the `.chat-message` class placement, or the 1200 px observer margin | Prepend anchor scan and search-jump row lookup. |
+| `SEARCH_SCROLL_RETRIES`, the retry delay, or `findRenderedMessageElement` | The landing shares the chain (MAN-7575); `allowNearest` must stay on the final attempt only. |
+| `.chat-message` or `.chat-messages-pane` gaining `contain`, any `content-visibility` on a row, or an ancestor `transform`/`filter`/`perspective`/`will-change` | A fullscreen card's `fixed inset: 0` is sized (and, under `paint`/`content`, clipped) by that ancestor instead of the viewport — `contain: layout` alone is enough, and it shows in neither a `contain`-shaped nor a clip-shaped audit; a render-skipped row also reports a stand-in height to every geometry reader in the transcript. [Lazy rows and height stability](MAN-388). |
+| Session load or pagination in `useChatSessionState.ts` | `pendingScrollRestoreRef`, `liveScrollStateRef`, `pendingInitialScrollRef`, `searchScrollActiveRef` and `wasNearTopRef` are all handled by the session-change effect — see [the message store](MANUAL.md). |
+| Composer send or the activity indicator | `handleSubmit` forces `isUserScrolledUp` false, arms the reply anchor (MAN-7575) and scrolls unconditionally at +100 ms. The indicator's padding is the content box's, which the follow observes; moved onto the scroller it resizes nothing the follow can see. |
+| Tool card expand/collapse | No code scrolls for it; a reader at the foot is glided with the growth (MAN-7574) — see [tool views](MANUAL.md). A `scrollIntoView` there adds another writer with no claim ref. |
 
-Related: [the realtime stream](./02-realtime-stream.md) for how rows arrive.
+Related: [the realtime stream](MANUAL.md) for how rows arrive.
+
+## MAN-7576 — Probe — the glide and the landing
+section: 05-scrolling/021a Probe — the glide and the landing
+
+`node .verify/probe-follow-glide.mjs` — real Haiku turns in scratch chats under `/tmp` (`.verify/lib/probe-project.mjs`), driven through the composer on :5183. Every chat it makes is deleted at the end. Exits 1 with the failed checks listed.
+
+| Leg | Proves |
+| --- | --- |
+| 1 glide | 800×300 window at the foot, a tall reply lands whole: the view reaches the foot over several frames and never in one jump, in 250 to 1100 ms, ends within 2 px, and the jump-to-bottom button never shows (MAN-7574) |
+| 2 landing | Send, pick another session before the reply lands, wait for the turn to finish, come back with no page reload: the sent message stands within 24 px of the scroller's top and the button shows. Run at desktop and 390×844, dark and light (MAN-7575) |
+| 3 hidden tab | `document.visibilityState` answers `hidden` while a reply lands: the transcript grows with 0 px of follow movement; shown again, the sent message is at the top |
+| 4 reader wins | A wheel 150 ms into the glide stops it; the reader stays scrolled up with the button showing |
+| 5 reduced motion | `prefers-reduced-motion: reduce`: the foot is reached in one frame and kept |
+
+- "Pick the session again" is the router's own navigation to the chat's link. why: the scratch chat sits in a hidden root the sidebar does not list.
+- The reply prompt is a markdown bulleted list. why: "one number per line" renders as one 338 px paragraph, too short for the glide to cover real distance.
+- A reply is waited for on the server, after this turn's own prompt only. why: an earlier reply in the same chat can hold the same number.
+- Sibling: `node .verify/chat-window-bindings-home.mjs` covers the follow and the Files-tab return (MAN-7452).
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-follow-glide.mjs
 
 ## MAN-392 — In one paragraph
 section: 06-tool-view/000 In one paragraph
@@ -3356,8 +3500,8 @@ result that arrives seconds later, deciding what to show in between, collapsing 
 same tool into one row, and nesting a running subagent's calls inside the row that spawned
 it.
 
-Read [the realtime stream](./02-realtime-stream.md) first for how the frames arrive, and
-[the message store](./04-message-store-and-lazy-loading.md) for what `merged` means.
+Read [the realtime stream](MANUAL.md) first for how the frames arrive, and
+[the message store](MANUAL.md) for what `merged` means.
 
 ## MAN-393 — Mental model
 section: 06-tool-view/001 Mental model
@@ -3412,7 +3556,8 @@ section: 06-tool-view/002 The pieces
 | `src/modules/chat/tools/SubagentNote.tsx` | One prose or reasoning entry from an agent's own narration. Extracted out of `SubagentPanel.tsx` so it can be shared, verbatim, with the gutter's read-on-demand transcript view (§Subagents) |
 | `src/modules/chat/tools/PlanDisplay.tsx` | ExitPlanMode card with the inline Build and Revise buttons |
 | `src/modules/chat/tools/ContentRenderers/` | The bodies a collapsible can contain |
-| `src/modules/chat/tools/InteractiveRenderers/AskUserQuestionPanel.tsx` | Keyboard-driven answer picker for an `AskUserQuestion` prompt |
+| `src/modules/chat/tools/InteractiveRenderers/AskUserQuestionPanel.tsx` | Keyboard-driven answer picker for an `AskUserQuestion` prompt — a run's own ask, drawn inline in the transcript |
+| `src/modules/chat/tools/InteractiveRenderers/QuestionTextField.tsx` | The panel's typed half of an answer: the "Other" option's words |
 | `src/modules/chat/transcript/MessageComponent.tsx` | Draws one transcript row. Decides container versus tool versus error |
 | `src/modules/chat/transcript/ToolGroupContainer.tsx` | The collapsed `Read x4` row and its expanded children |
 | `src/modules/chat/transcript/ThinkingRow.tsx` | A thinking block as a tool row: brain, `Thinking /`, the first line truncated, copy on hover (always shown on touch); the row toggles the full text |
@@ -3621,7 +3766,7 @@ The four phrases are the deny messages the Claude runtime returns in
 `claude-runtime.provider.js`. Three of them — timed out, cancelled, and the default
 `User denied tool use` — come from `promptForToolDecision`, the one function that asks a human,
 so they read the same whether `canUseTool` or the `PreToolUse` hook did the asking
-([02-realtime-stream.md](02-realtime-stream.md) §"Permission requests"). `Tool disallowed by
+([docs/architecture/MANUAL.md (02-realtime-stream)](MANUAL.md) §"Permission requests"). `Tool disallowed by
 settings` comes from `canUseTool`'s own pre-check, above the prompt. They are capitalized at the
 source, so the check lowercases, and it is a substring test rather than equality so it survives
 the SDK wrapping the message in error text. A deny carrying a different message does not match —
@@ -3664,7 +3809,23 @@ not frozen: the status badge changes, Bash grows an expandable output section, a
 `jump-to-results` row grows its down-arrow link. All three appear only once `toolResult` is
 non-null.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useChatMessages.ts
+**A picture rides beside the text.** The Claude provider lifts every base64 `image` block out of a
+result's `content` array into `images` (`{ data: 'data:<media_type>;base64,…' }`, the `ChatImage`
+shape) and keeps only the joined text blocks as `content`, so the base64 never travels as a JSON
+string (`claude-image-blocks.ts`, used for a live `tool_result` row and for the result a history load
+attaches to its call). An array with no image block is left as it was — the tool views unwrap those
+themselves. A live frame carries the picture inline; a history load stores each one under
+`~/.cloudcli/assets` as `tr-<hash of its base64>.<ext>` (`storeToolResultImages`) and the row carries
+`{ path }`, which `ChatMessageImages` draws through the assets route like any path-based attachment —
+so a page of history stays small and the full-history cache never holds base64. A picture that cannot
+be stored stays inline. The projection copies `images` onto `toolResult`; `shouldHideToolResult` answers false for
+a result that has any; `ToolRenderer` draws them under the call through `ChatMessageImages`. That is
+how a `Read` of a picture, whose text result is hidden, still shows the picture, named for the file it
+read. A folded run of the same tool says how many pictures it holds in its summary line. With "Show
+work" off the whole call is hidden work and its picture goes with it. Proven by
+`node .verify/chat-image-results.mjs` (one Haiku turn, then screenshots of the session).
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-image-blocks.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useChatMessages.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/tools/ToolRenderer.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/chat-image-results.mjs
 
 ## MAN-402 — Grouping consecutive calls
 section: 06-tool-view/010 Grouping consecutive calls
@@ -3780,6 +3941,11 @@ the "show N more" button raises the limit by four times that. Separately,
 included", because the backend truncates long timelines for transport; that line appears
 only once nothing is left to expand locally.
 
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/services/session-agents.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/services/session-subagent-runs.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/usePinnedSubagentRows.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/subagents/subagentSource.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/subagents/SubagentWidgetBody.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/utils/soulLaunchAnchors.ts
+
+## MAN-6221 — Subagents — Live nesting. A running subagent's rows arrive stamped with `parentToolUseId` — Claude's
+section: 06-tool-view/012 Subagents/001 Live nesting. A running subagent's rows arrive stamped with `parentToolUseId` — Claude's
+
 **Live nesting.** A running subagent's rows arrive stamped with `parentToolUseId` — Claude's
 `parent_tool_use_id`, preserved by `transformMessage` in `claude-runtime.provider.js`, which
 maps the SDK's other snake-case field the same way: `tool_use_result` becomes `toolUseResult`,
@@ -3815,6 +3981,11 @@ alone carries no time.
 | any row carrying `usage` + `usageMessageId` | The container's live token reading: `contextTokens` from the newest row, one request per distinct id. Never the reply count — a live row's usage is the snapshot taken when the row was cut, a few tokens into the reply (measured: 69 live against 3,298 on the transcript for one run) |
 | anything else | Nothing |
 
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/services/session-agents.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/services/session-subagent-runs.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/usePinnedSubagentRows.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/subagents/subagentSource.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/subagents/SubagentWidgetBody.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/utils/soulLaunchAnchors.ts
+
+## MAN-6222 — Subagents — What an agent has spent.
+section: 06-tool-view/012 Subagents/002 What an agent has spent.
+
 **What an agent has spent.** Every assistant row the Claude provider normalizes carries `usage`
 (`{ contextTokens, outputTokens }`, reduced from the Anthropic payload by `readClaudeMessageUsage`
 in `claude-sessions.provider.ts`) and the API message id as `usageMessageId`. `contextTokens` is
@@ -3840,6 +4011,11 @@ failure; on the live path the fold applies only to the `Agent` container itself,
 resumed agent notifies under the `SendMessage` call that resumed it. `readSubagentSummary` carries it and `describeSubagentUsage`
 prints it (`36K tokens · 3.3K out`; a live reading has no `out`), on the pinned row's second
 line and the agent card's header.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/services/session-agents.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/services/session-subagent-runs.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/usePinnedSubagentRows.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/subagents/subagentSource.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/subagents/SubagentWidgetBody.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/utils/soulLaunchAnchors.ts
+
+## MAN-6223 — Subagents — A chat's pinned rows come from the whole history.
+section: 06-tool-view/012 Subagents/003 A chat's pinned rows come from the whole history.
 
 **A chat's pinned rows come from the whole history.** They are drawn in the strip above the chat box
 whenever the desktop chat gutters are NOT showing, and in the chat gutter's Subagents widget
@@ -3868,6 +4044,11 @@ containers plus any listed agent the loaded rows do not hold, projecting those t
 live rows that concern agents (their own streamed rows and finish rows) so they fold live exactly
 like a loaded container.
 
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/services/session-agents.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/services/session-subagent-runs.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/usePinnedSubagentRows.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/subagents/subagentSource.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/subagents/SubagentWidgetBody.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/utils/soulLaunchAnchors.ts
+
+## MAN-6224 — Subagents — A pin is not always an `Agent` tool call.
+section: 06-tool-view/012 Subagents/004 A pin is not always an `Agent` tool call.
+
 **A pin is not always an `Agent` tool call.** The pinned rows hold TWO KINDS OF ROW, sorted into one list
 — running first by oldest launch, then finished by newest finish — because the reader is asking it
 one question, *what is working for me right now*, and the answer would be a lie if half of it were
@@ -3886,17 +4067,25 @@ result that dumped another conversation carries that conversation's receipts (me
 anchoring seven ids it never launched). The same test is applied twice, by
 `src/modules/chat/utils/soulLaunchAnchors.ts` over the loaded rows and by `collectSessionSoulLaunches`
 over the WHOLE history, for the same tail-window reason `agents` exists; the ids ride a latest page as
-`soulLaunches` and merge. **Liveness comes from the dispatch-souls lane**, polled server-side and
+`soulLaunches` and merge. **A third witness is the launcher's own stamp**: a chain's later stages print no
+receipt into any transcript, so the row hook also anchors every lane launch whose `launched_by` exactly
+equals the chat's CLI session id (`readStampedLaunchIds`, `useCliSessionId`; docs/MANUAL.md MAN-7583), and
+a new stage pins the moment the lane pushes it. **Liveness comes from the dispatch-souls lane**, polled server-side and
 pushed as `soul_launch_state` — an id the lane does not answer for draws nothing at all.
 
 The soul row's own contract — what a launch directory holds, how a soul's state and provider are
 decided, the six-hour lane window, and why a soul needs none of the four-hour "still believed
-running" discount an agent does — is [dispatch-souls.md](../dispatch-souls.md). Dismissals are shared:
+running" discount an agent does — is [docs/MANUAL.md (dispatch-souls)](../MANUAL.md). Dismissals are shared:
 one `localStorage` list for both kinds (`pinnedDismissals.ts`), because a pin's id is unique on its own
 and the reader's act is the same either way. The list is read through a module-scope store
 (`useDismissedPins()` / `dismissPin()`, over `useSyncExternalStore`) rather than a private `useState`,
 so every copy of the rows — the strip and the gutter widget alike, whichever has the claim above —
 drops a dismissed row in the same frame; a `storage` listener folds in another tab's dismissal too.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/services/session-agents.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/services/session-subagent-runs.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/usePinnedSubagentRows.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/subagents/subagentSource.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/subagents/SubagentWidgetBody.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/utils/soulLaunchAnchors.ts
+
+## MAN-6225 — Subagents — Clear completed is the widget's alone (`subagents/SubagentWidgetClearCompleted.tsx`), and it is worn
+section: 06-tool-view/012 Subagents/005 Clear completed is the widget's alone (`subagents/SubagentWidgetClearCompleted.tsx`), and it is worn
 
 **Clear completed** is the widget's alone (`subagents/SubagentWidgetClearCompleted.tsx`), and it is worn
 in the widget's HEADER rather than above its list: it acts on the list rather than on a row, so it
@@ -3919,6 +4108,11 @@ ONE storage write and ONE publish for the whole list, where dismissing eight row
 repaint every copy of them eight times. The strip keeps only the per-row X — it holds a window of
 rows and has no room for chrome, and the widget is where a reader goes to tidy up.
 
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/services/session-agents.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/services/session-subagent-runs.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/usePinnedSubagentRows.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/subagents/subagentSource.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/subagents/SubagentWidgetBody.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/utils/soulLaunchAnchors.ts
+
+## MAN-6226 — Subagents — Click to read, live.
+section: 06-tool-view/012 Subagents/006 Click to read, live.
+
 **Click to read, live.** Both row components take `onOpen`/`openLabel`: the row's root is a
 keyboard-and-mouse button, its dismiss control calls `event.stopPropagation()` so a click on the X
 cannot also open the row, and the row's key handler ignores keys whose target is not the row itself,
@@ -3937,16 +4131,21 @@ and a launcher soul carries none of at all — through `useSubagentTranscript`
 the server reports the file still growing (`inFlight`), and stops re-reading once it is finished. An
 `Agent` row resolves through `GET
 /api/providers/sessions/:sessionId/subagents/:toolUseId/transcript`; a soul row through `GET
-/api/dispatch-souls/launches/:launchId/transcript` ([dispatch-souls.md](../dispatch-souls.md)
+/api/dispatch-souls/launches/:launchId/transcript` ([docs/MANUAL.md (dispatch-souls)](../MANUAL.md)
 §"The routes and the frame"); and the view's third target kind, a board's Metis, through `GET
 /api/kanban-metis/sessions/:sessionId/transcript` — opened from outside this module entirely, by
 the kanban module's `KanbanMetisConversation.tsx` (mounted beside the fleet list by
 `KanbanMetisPanel.tsx` once a row is opened) with `sessionId` null, since a board's Metis belongs to
-no chat ([kanban.md](../kanban.md) §"The pilot panel"). Only the newest 100 entries draw at first, with a "show earlier" step
+no chat ([docs/MANUAL.md (kanban)](../MANUAL.md) §"The pilot panel"). Only the newest 100 entries draw at first, with a "show earlier" step
 of 100 more, because a single entry can expand into a diff and mounting all 1000 the server may hold
 at once would be a thousand tool renderers the moment the row opens. The entries reuse the same
 drawing the panel uses: `tools/SubagentNote.tsx` for prose and reasoning, `ToolRenderer` in
 `mode="input"` for everything else.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/services/session-agents.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/services/session-subagent-runs.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/usePinnedSubagentRows.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/subagents/subagentSource.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/subagents/SubagentWidgetBody.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/utils/soulLaunchAnchors.ts
+
+## MAN-6227 — Subagents — How history reads an agent's end.
+section: 06-tool-view/012 Subagents/007 How history reads an agent's end.
 
 **How history reads an agent's end.** From the agent's own transcript, last record first: Claude
 Code's interruption marker (`[Request interrupted by user…]`, a user record) means `stopped`; a
@@ -3958,12 +4157,18 @@ there is one, overrides all of these. A BACKGROUNDED agent's finish time is that
 when no notification gives one; a foreground agent's is its own `tool_result` row's stamp in the
 parent, which is the better source and the one used.
 
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/services/session-agents.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/services/session-subagent-runs.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/usePinnedSubagentRows.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/subagents/subagentSource.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/subagents/SubagentWidgetBody.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/utils/soulLaunchAnchors.ts
+
+## MAN-6228 — Subagents — The same rule, one strip away.
+section: 06-tool-view/012 Subagents/008 The same rule, one strip away.
+
 **The same rule, one strip away.** The sidebar's chat rows carry a purple dot for a conversation
 with an agent still running — the mark the strip draws per agent, drawn per chat. It has to come
 from the server for the ordinary case, not the edge one: a backgrounded agent outlives the turn
 that launched it, so the chat it belongs to is usually not open and its transcript is loaded
-nowhere. `hasRunningSubagent` (same file as `collectSessionAgents`) is that answer, asked through
-the same container selection and the same four-hour window, and it rides the existing five-second
+nowhere. For an `Agent`-tool agent, `hasRunningSubagent` (same file as `collectSessionAgents`) is
+that answer, asked through the same container selection and the same four-hour window, and it rides
+the existing five-second
 running-sessions poll as a top-level `subagentSessionIds` rather than a second poller. One case
 separates the two readings, and it is the resume: the strip times a row from
 `subagent.resume.at ?? message.timestamp` (`usePinnedSubagentRows`'s `startedAtMs`), while
@@ -3972,6 +4177,28 @@ after that launch leaves the row pinned as running in its own chat while the dot
 the endpoint does to keep the answer cheap — the candidate window, the sidechain freshness gate,
 and the history cache it shares with the chat's own reads — is documented in
 `server/modules/providers/services/session-subagent-runs.service.ts`.
+
+**A dispatched soul or chain lights the same dot.** A builder or reviewer started through the
+dispatch door (`plan-runner chain`, `plan-runner soul`) is a separate process: it streams no
+sidechain into the chat that launched it, so the reading above never sees it. The launcher records
+it instead — `spec.json` carries `launched_by`, the Claude CLI session id whose turn launched it —
+and `listRunningLaunchers` (dispatch-souls module, `running-launchers.service.ts`) reads that
+record. A chat counts when a soul it launched reads `running` by `classifyLaunch`'s own reading
+(the lane the pinned strip draws), or when a chain with a stage it launched still reads
+`status: running` with its walker alive — which keeps the dot steady between a chain's stages
+(the walker's relaunch gap, the hand-off from builder to review to doc sweep), where no soul is
+running but the work is not over. A chain is owned by every session stamped on any of its stages,
+the rule `session_rails_chains.py` keeps for the rails. The stamp is the CLI's id and the dot is the
+app's, so `session-subagent-runs.service.ts` maps each one through the sessions table
+(`resolveAppSessionId`), skips an id the app does not know, and unions the result with the
+sidechain answer inside the same two-second cached pass. Records older than six hours are never
+opened — above the launcher's own caps (one hour a soul, four a planner) — and a missing, torn or
+half-written record is skipped, never thrown. A planner outing or a phase chain the dispatcher
+launches is stamped with the session of the PLAN that asked for it, never the daemon's own
+(`launch_env`, `planners._start`), so it lights that plan's chat like any other launch while it is
+out; one launched with no session to name carries no stamp and lights nothing.
+
+The records and the checks behind the dispatched half are `running-launchers.service.ts` (the two readings and the 6-hour window) and `chain-record.transport.ts` (`chain.json`, `walker.pid`); the launcher rules they restate are INV-6335.
 
 Those sidechain files are also why the full-history cache takes a second freshness value. It is
 keyed on the parent transcript's stat, and an agent writes its own file continuously while the
@@ -3986,8 +4213,6 @@ history load later attaches the server-indexed `subagentTools`, **the longer of 
 lists wins** — a mid-run refresh can attach a partial server timeline while newer live rows
 keep streaming. The projection cache's second key, `subagentActivitySource`, holds the
 newest row folded into that container, so a growing timeline invalidates the cached card.
-
-`src/modules/chat/tests/liveSubagentGrouping.test.ts` pins all four behaviours.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/services/session-agents.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/services/session-subagent-runs.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/usePinnedSubagentRows.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/subagents/subagentSource.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/subagents/SubagentWidgetBody.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/utils/soulLaunchAnchors.ts
 
@@ -4072,7 +4297,7 @@ permission entry with `buildClaudeToolPermissionEntry`, appends it to the stored
 no entry can be derived — and then answers *every* pending request that computes the same
 entry in one call. That batch is why `handlePermissionDecision` takes an array of ids.
 
-`AskUserQuestionPanel` is a keyboard-first stepper: number keys pick options, `0` toggles a
+`AskUserQuestionPanel` is a keyboard-first stepper, drawn from the same `QuestionText` and `QuestionOptionRow` as the answered card so a question reads the same before and after: number keys pick options, `0` toggles a
 free-text "Other", `Enter` advances or submits on the last question, `Escape` skips — from a
 window-level capture listener that acts only when the key was pressed inside the panel: it marks
 the event so `ChatInterface`'s document-level abort gate, gated on `defaultPrevented`, leaves the
@@ -4104,7 +4329,7 @@ the shaping lives in the config's `getContentProps`.
 | `file-list` | `ContentRenderers/FileListContent.tsx` | Grep and Glob results | Comma-separated basenames, click to open, capped at `max-h-48` |
 | `todo-list` | `ContentRenderers/TodoListContent.tsx` → `TodoList.tsx` → `Queue.tsx` | TodoWrite input, TodoRead result | `TodoListContent` keeps only values with string `content` and `status`; `TodoList` normalizes the status and renders a `Queue` |
 | `task` | `ContentRenderers/TaskListContent.tsx` | TaskList and TaskGet results | Regex-parses `#15. [in_progress] Subject` lines out of plain text into rows |
-| `question-answer` | `ContentRenderers/QuestionAnswerContent.tsx` | AskUserQuestion input | The only stateful renderer — it expands one question at a time. Guards every field, because transcript payloads are runtime data |
+| `question-answer` | `ContentRenderers/QuestionAnswerContent.tsx` → `AnsweredQuestion.tsx` | AskUserQuestion input | The only stateful renderer: the pending panel while the run waits, then one `AnsweredQuestion` per question, each expanding on its own. The question: `QuestionText` (the tool-body markdown, `breaks` on, a blank line put at each list boundary so a trailing `Run it?` never joins the last item), clamped when long. The chosen options: `QuestionOptionRow`s. The operator's own words: ONE `blockquote`. An answer becomes option rows only when it is WHOLLY known labels joined by `", "`, matched longest first; anything else is ONE note exactly as sent — the string cannot tell a label plus a note from a note that opens with a label, so the record never shows a tap the string does not prove. A single-select answer is one label or one note. Guards every field, because transcript payloads are runtime data |
 | `text` | `ContentRenderers/TextContent.tsx` | Default, exec, WebSearch, WebFetch | `format` is `'plain' \| 'json' \| 'code'`; no config sets `'json'` |
 | `success-message` | inline SVG in `ToolRenderer` | nothing | The branch exists; no config sets the type or `getMessage` |
 
@@ -4146,7 +4371,7 @@ which today is `DataTable`'s copy-as-CSV action and its sort headers, `DiffBlock
 `TabbedCode`'s tab strip. With no strip, an exported tab group draws every fence stacked, so the
 export keeps the languages the reader never clicked. `CodeFence` asks it too, about what it may
 MOUNT rather than draw: in an export a mermaid fence is its source, never `MermaidDiagram` (see
-[rendered shapes](./08-rendered-shapes.md) §"Collapse and export"). Keeping both in one module is
+[rendered shapes](MANUAL.md) §"Collapse and export"). Keeping both in one module is
 the point: a shape that remembers the rule for itself is a chance to ship one that exports empty,
 and the next shape gets the rule for free by calling whichever of the two fits. The `interactive`
 half is not cosmetic — an export inlines the app's stylesheets (`export/buildTranscriptHtml.tsx`),
@@ -4188,8 +4413,10 @@ section: 06-tool-view/017 Gotchas and why the code looks like this
   renderers behind a collapsed header. The timeline mounts only while open, in pages of 25
   (commit `7113270e`).
 - **A soul pin that does not appear has THREE possible causes, and only one of them is a bug.**
-  The row is a join, so it is drawn only when the id was anchored in this transcript AND the lane
-  carries that launch. Walk it in that order: is there a `SOUL LAUNCHED` line in a `Bash` *result*
+  The row is a join, so it is drawn only when the id was anchored AND the lane carries that launch.
+  Anchored means a receipt in this transcript, the server's list, or the lane's `launched_by` equal to
+  the chat's CLI session id (null until the chat's first turn). Walk it in that order: is there a
+  `SOUL LAUNCHED` line in a `Bash` *result*
   whose command segment opens with `plan-runner soul` (a quoted receipt, or one printed by a
   `grep`, deliberately anchors nothing); does
   `GET /api/dispatch-souls/launches` list the id; and has it been more than six hours since that
@@ -4265,7 +4492,7 @@ section: 06-tool-view/017 Gotchas and why the code looks like this
   `format: 'json'`, `OneLineDisplay`'s `resultId` prop — the anchor is built from `toolId`
   inside the component — `CollapsibleDisplay`'s `action` prop, and `PlanDisplay`'s `toolId`
   and `toolName` props. Do not copy them into a new config expecting behaviour.
-- **`src/modules/chat/tools/README.md` is a stale draft.** It describes a `components/`
+- **`src/modules/chat/tools/MANUAL.md (README)` is a stale draft.** It describes a `components/`
   directory that does not exist and a `success-message` result for TodoWrite that is now
   `hideOnSuccess`, and it predates `question-answer`, the `denied` status, subagents and
   permissions. Verify against the code, not against it.
@@ -4279,7 +4506,7 @@ section: 06-tool-view/018 If you change this, check that
 | --- | --- |
 | `TOOL_CONFIGS` entry shape | `ToolRenderer`'s three `type` branches and its `contentType` switch; the `input` and `result` unions differ, so a field valid on one may not be on the other; `ToolGroupContainer` reads `label`, `colorScheme` and `contentType` off the same config |
 | `getToolConfig` fallback | `toolGrouping.ts` → `getToolInputPreview` calls it for the collapsed line, so an unmapped tool must still name what it did |
-| The soul-launch ownership rule (the receipt regex, the marker, the chain-segment test) | It is written TWICE and the two trees cannot import each other: `src/modules/chat/utils/soulLaunchAnchors.ts` and `server/modules/providers/services/session-soul-launches.service.ts`. Loosen one alone and one half pins souls the other will not. The line itself is the launcher's — `~/.claude/hooks/GOTCHAS.md` #36 |
+| The soul-launch ownership rule (the receipt regex, the marker, the chain-segment test) | It is written TWICE and the two trees cannot import each other: `src/modules/chat/utils/soulLaunchAnchors.ts` and `server/modules/providers/services/session-soul-launches.service.ts`. Loosen one alone and one half pins souls the other will not. The stamp test is exact string equality in both (`readStampedLaunchIds`, `collectStampedSoulLaunches`). The line itself is the launcher's — INV-36 |
 | Anything the pinned rows render | Both row components, not one: `PinnedAgentRow.tsx` and `SoulLaunchPinRow.tsx` are deliberately the same shape, and `usePinnedSubagentRows.ts` feeds TWO surfaces — the strip above the composer when the desktop chat gutters are not showing, and the gutter's Subagents widget (`SubagentWidgetBody.tsx`) while they are — so a change to the centred mark, the two-line layout or the status column that lands in only one component, or in only one surface, makes the same rows read as two different lists |
 | The click-to-open affordance (`onOpen`/`openLabel`) | Both row components again: their keyboard handling and their dismiss button's `stopPropagation()` must stay identical, since both surfaces (`SubagentWidgetBody.tsx` and `PinnedSubagents.tsx`) supply the props and a divergence breaks one kind of row on both |
 | `deriveToolStatus` | `ToolStatusBadge`'s `STATUS_CONFIG` needs a key for every `ToolStatus`; `BashCommandDisplay` and `OneLineDisplay` both special-case `running`; every caller filters out `completed` |
@@ -4317,8 +4544,8 @@ are never this app's — and `classifyWidgetBody` is the one place the three are
 one of them is drawn inside the transcript's ordinary shape card, which carries a fullscreen
 switch that hands the frame the whole viewport without reloading it.
 
-Read [the realtime stream](./02-realtime-stream.md) for how a reply arrives, and
-[tool views](./06-tool-view.md) for the other way a block of model output becomes UI.
+Read [the realtime stream](MANUAL.md) for how a reply arrives, and
+[tool views](MANUAL.md) for the other way a block of model output becomes UI.
 
 ## MAN-412 — Mental model
 section: 07-live-widgets/001 Mental model
@@ -4353,7 +4580,7 @@ section: 07-live-widgets/001 Mental model
    a prefix test. **The live bus** below says why the difference is not stylistic.
 9. **The bus knows no producer.** It retains values, dispatches them and admits topics — that is
    all it does. What fills it is a FEED, a headless component owned by the module whose data it
-   carries, and the first is `RunnerFeed` in `src/modules/plan-runner/`.
+   carries, and `DispatcherFeed` in `src/modules/dispatcher/` is one.
 10. **Three body shapes, one fence.** The info string says *widget*; the BODY says which kind. Raw
     HTML is the default and everything above describes it — an opaque-origin frame carrying a
     document this app composed inline. A body that parses as JSON naming a DocSpace block instead
@@ -4373,29 +4600,29 @@ section: 07-live-widgets/002 The pieces
 | File | Role |
 | --- | --- |
 | `src/modules/widgets/index.ts` | The barrel. Exports `WidgetFrame` and nothing else |
-| `src/modules/widgets/WidgetFrame.tsx` | `WidgetFrame` — the `<pre>`/iframe decision, and the optional `frame` a caller hands it — and the private `WidgetFrameLive`, which only ever renders in a browser |
+| `src/modules/widgets/WidgetFrame.tsx` | `WidgetFrame` — the `<pre>`/iframe decision, and the optional `frame` a caller hands it — and the private `WidgetFrameLive`, which only ever renders in a browser. Both frames are keyed on the host window and the body (`windowKey`); the Escape listener binds to the host window (MAN-7443) |
 | `src/modules/widgets/buildWidgetDocument.ts` | `WIDGET_CSP` and `buildWidgetDocument` — the whole HTML document a widget lives in |
 | `src/modules/widgets/widgetBridgeScript.ts` | `WIDGET_BRIDGE_SCRIPT` — the in-frame script that becomes `window.live` |
-| `src/modules/widgets/readVerveTokens.ts` | `WIDGET_TOKEN_NAMES` (the contract) and `readVerveTokens` (the live read) |
-| `src/modules/widgets/hooks/useWidgetHost.ts` | `useWidgetHost` — the page's half: one message listener, the height, the theme post, and the `load` counter that revokes a frame which navigated itself away |
+| `src/modules/widgets/readVerveTokens.ts` | `WIDGET_TOKEN_NAMES` (the contract) and `readVerveTokens(hostDocument)` (the live read of the document handed in) |
+| `src/modules/widgets/hooks/useWidgetHost.ts` | `useWidgetHost` — the page's half: one message listener on the host window, the height, the theme post (tokens read from the opener's document), every post made as the host window (`postAsHostWindow`, MAN-416), and the `load` counter that revokes a frame which navigated itself away |
 | `src/modules/widgets/hooks/useWidgetBridge.ts` | `useWidgetBridge` — one frame's subscriptions: the two refusals, the per-frame cap, and the unmount sweep |
 | `src/modules/widgets/classifyWidgetBody.ts` | `DOCSPACE_ID_RE` and `classifyWidgetBody` — which KIND a settled fence body is. The raw path is the default |
 | `src/modules/widgets/EmbedUrlFrame.tsx` | `EMBED_SANDBOX`, `EMBED_MIN_HEIGHT` / `EMBED_MAX_HEIGHT` / `EMBED_DEFAULT_HEIGHT` and `EmbedUrlFrame` — the third frame: any address, the origin gate, a DECLARED height, and no protocol at all |
 | `src/modules/chat/embeds/collectEmbedTargets.ts` | `collectEmbedTargets` — every embed a chat has declared, read out of its own messages through the one classifier |
 | `src/modules/chat/embeds/embedSource.ts` | `publishEmbedSource`, `useChatEmbedTargets`, `useEmbedWidgetState` — the chat's list, published for the widget that draws it, and whether it has arrived at all |
 | `src/modules/chat/embeds/EmbedWidgetBody.tsx` | `EmbedWidgetBody` — the gutter widget: the follow latch, the one-row dropdown (house presets, the chat's addresses, `Type an address…`), the way out, and `EmbedUrlFrame` filling the card |
-| `src/modules/chat-gutters/GutterWidgetFrame.tsx` | The gutter card, and its `fullscreen` / `onToggleFullscreen` / `flush` / `headerAction` props |
+| `src/modules/chat-gutters/GutterWidgetFrame.tsx` | The gutter card, and its `fullscreen` / `onToggleFullscreen` / `flush` / `headerAction` / `countTone` props |
 | `src/modules/widgets/embedUrl.ts` | `isLoopbackHost` and `resolveEmbedUrl` — a loopback address moved onto the host that reached this page, because an `src` is resolved by the reader's browser |
 | `src/modules/widgets/docspaceOrigin.ts` | `DOCSPACE_EMBED_DEFAULT_PORT`, `resolveDocSpaceOrigin`, `docspaceEmbedUrl`, `docspaceStudioUrl`, and `isForeignOrigin` — the gate on `allow-same-origin` |
 | `src/modules/widgets/DocSpaceFrame.tsx` | `DOCSPACE_SANDBOX`, `DOCSPACE_READY_TIMEOUT_MS` and `DocSpaceFrame` — the second frame: a `src` on ArchPulse's origin, the latched theme, the ready timer, and the `framed` prop that drops its own border where a card already draws one |
 | `src/modules/widgets/WidgetErrorCard.tsx` | `WidgetErrorCard` — the two-sentence card shown where a widget was asked for and cannot be drawn |
-| `src/modules/live-bus/topics.ts` | `LIVE_TOPIC_ALLOWLIST`, `isAllowedTopic`, `RUNNER_ALL_TOPIC`, `SOULS_ALL_TOPIC`, `UNIVERSE_ALL_TOPIC`, `runnerTopic` — the whole vocabulary |
+| `src/modules/live-bus/topics.ts` | `LIVE_TOPIC_ALLOWLIST`, `isAllowedTopic`, `DISPATCHER_ALL_TOPIC`, `ROADMAP_ALL_TOPIC`, `SOULS_ALL_TOPIC`, `UNIVERSE_ALL_TOPIC` — the whole vocabulary |
 | `src/modules/live-bus/context/LiveBusContext.tsx` | `LiveBusProvider` and `useLiveBus` — the retained values, the listener registry, `publish`/`subscribe`/`get` |
 | `src/modules/live-bus/hooks/useLiveTopic.ts` | `useLiveTopic` — the module's ONE render trigger, for a React component reading a topic |
 | `src/modules/live-bus/index.ts` | The barrel. The provider, the bus hook, `useLiveTopic`, and the vocabulary |
 | `src/modules/chat/transcript/shapes/code/index.tsx` | `CodeBlock` — the `code` override's routing decision, and the widget branch inside it, which hands `EmbedFrame` down as `WidgetFrame`'s `frame` |
 | `src/modules/chat/transcript/shapes/code/EmbedFrame.tsx` | `EmbedFrame` — the card a LIVE embed wears: the one `ShapeFrame` header every shape draws (flush), the way out (`Open in ArchPulse` for a block, `Open page` for an embed), and the fullscreen switch. It imports nothing from this module |
-| `src/modules/chat/transcript/shapes/ShapeFrame.tsx` | The card itself, and its `fullscreen` prop — the fixed panel at `z-[45]`, the flex chain that lets a frame fill it, the forced-open fold and the `data-owns-escape` claim |
+| `src/modules/chat/transcript/shapes/ShapeFrame.tsx` | The card itself, and its `fullscreen` prop — the fixed panel at `z-[45]`, the flex chain that lets a frame fill it, the forced-open fold, the `data-owns-escape` claim, and the fold's chevron — the shared `FoldChevron` from `@/shared/ui` that the runner lane's cards wear too, not a glyph of its own |
 | `src/modules/chat/transcript/shapes/markdownStreaming.ts` | `MarkdownStreamingContext`, in its own module. `CodeBlock` is the last consumer left in the tree |
 | `src/modules/chat/transcript/Markdown.tsx` | Provides that context around its `ReactMarkdown`, and names `CodeBlock` as the `code` override in both component maps |
 | `src/modules/chat/transcript/StreamingMarkdown.tsx` | Marks the pending half streaming; the settled half is untouched |
@@ -4451,7 +4678,7 @@ in front of this file's two gates: the export runs no effects, and a streaming f
 fragment still growing on every delta. `frame` is therefore called from BEHIND both of them, and
 the `<pre>` and the error card are never passed to it at all — an exported or still-streaming fence
 stays raw source with no header over it, which is also what the invalid body draws. The element the
-framer is given is the same keyed one it would have been without a framer: `key={code}` stays on
+framer is given is the same keyed one it would have been without a framer: its key (`<windowKey>:<code>`) stays on
 the inner `<DocSpaceFrame>`/`<WidgetFrameLive>`, because that key is what makes the host's revoke
 rule sound (below), and a key belongs to the element whose load count it resets rather than to
 whatever wraps it.
@@ -4498,8 +4725,8 @@ leaves by, and no shipped control closes that — it closes the CONTINUING chann
 part that is closable.
 
 That count is only trustworthy because the element loads exactly one document in its life, and
-that is structural rather than conventional: `WidgetFrame` keys `WidgetFrameLive` on the fence
-body, so a CHANGED body arrives as a new element instead of as a fresh `srcDoc` on the old one.
+that is structural rather than conventional: `WidgetFrame` keys `WidgetFrameLive` on the host window
+and the fence body (`<windowKey>:<code>`), so a CHANGED body arrives as a new element instead of as a fresh `srcDoc` on the old one, and so does a move to another window.
 The distinction matters because an in-place `srcDoc` reassignment fires a second `load` that is
 indistinguishable from a navigation — measured: one load at mount, a second on reassignment. Were
 the two conflated, an ordinary body change would revoke a healthy widget permanently and in
@@ -4507,6 +4734,8 @@ silence: no error, no console line, just a widget that never sees another theme 
 datum, since revocation is never lifted. Gate 9c holds the key in place by rebuilding a widget's
 body and requiring the host to still answer it. Do not remove the key without removing the
 counter; each is the other's premise.
+
+The window half of the key rests on the same premise. A frame carried into another window's document is reloaded by the browser, and the counter reads that second `load` as self-navigation (measured 2026-09-29: 1 `theme` message before a move into the picture-in-picture window, 0 after). Keyed on the window, a move arrives as a NEW element: one `load`, a fresh `message` listener on the window it stands in, fresh bus subscriptions (the reloaded document asks for its topics again; the old element's are swept), and a `srcDoc` dressed by the new window's tokens. `windowKey` in `WidgetFrame.tsx` numbers each window; `DocSpaceFrame` carries the same key; `EmbedUrlFrame` stays keyed on `code` alone.
 
 **The CSP.** `WIDGET_CSP` is `default-src 'none'` with `script-src` and `style-src` opened to
 `'unsafe-inline'` (the widget's own markup is inline by definition), `img-src` and `font-src`
@@ -4533,8 +4762,8 @@ makes the topic allowlist the real control on exfiltration rather than a formali
 live bus**. And a nested frame is refused, so the exit cannot be taken quietly: the widget has
 to navigate itself away to use it, and a widget that vanishes is one the reader watches vanish.
 
-**The tokens.** `readVerveTokens()` resolves every name in `WIDGET_TOKEN_NAMES` against
-`document.documentElement` and omits any that resolve to nothing, so a widget's own
+**The tokens.** `readVerveTokens(hostDocument)` resolves every name in `WIDGET_TOKEN_NAMES` against
+`hostDocument.documentElement`, through that document's own `defaultView`, and omits any that resolve to nothing, so a widget's own
 `var(--x, fallback)` still gets its fallback. The values are interpolated into the `<style>`
 block only, declared on `:root`, alongside a reset that gives the body `var(--canvas)`,
 `var(--ink)`, `var(--font-body)` and `display:flow-root` — the last so a first or last child's
@@ -4543,12 +4772,13 @@ few pixels the frame cannot show. The fence body is never interpolated into a sc
 attribute or the CSP.
 
 **The theme.** The document's opening theme is read off the `dark` class on `<html>` at build
-time, the same instant and the same source the tokens come from. Every change after that is a
+time, the same instant and the same source the tokens come from. `WidgetFrame` passes
+`useHostWindow().document` for that first build: the document the card is drawn in. Every change after that is a
 `theme` message: `useWidgetHost` posts one when the frame says `ready` and again whenever
 `useTheme().isDarkMode` changes, and the bridge toggles the `dark` class and calls
 `style.setProperty` for each token on the frame's own document element.
 
-That repost reads the tokens off `<html>` inside an ordinary effect, so it depends on the page
+That repost reads the tokens off the OPENER's `<html>` (`readVerveTokens(document)` in `postTheme`) inside an ordinary effect, so it depends on the page
 having switched already. ThemeProvider (`src/shared/context/ThemeContext.tsx`) guarantees it by
 putting `dark` on `<html>` in a LAYOUT effect, which runs before every ordinary (passive) effect of
 the same update. A plain effect there would run after the widget host's, because React runs a
@@ -4559,6 +4789,8 @@ through the app's own switch, no reload, diff against a fresh dark load). Any ot
 computed tokens gets the same guarantee only from an ordinary effect; one in its own layout effect,
 or at render time, would still read the old theme.
 
+The repost reads the opener's `<html>`, never the picture-in-picture window's copy of it. chat-host's mirror keeps that copy live through a `MutationObserver`, which runs AFTER the widget host's effect on a click-driven flip; a read there posted the new `dark` flag with the previous theme's tokens, one flip behind on every flip (measured 2026-09-29). The window's sheets are clones of the opener's, so once the mirror catches up it computes the same values.
+
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/authToken.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/context/ThemeContext.tsx
 
 ## MAN-416 — The bridge protocol
@@ -4568,6 +4800,16 @@ Both directions use `postMessage` with a target origin of `'*'`, because an opaq
 name to address. Safety comes from identity instead: the frame acts only on messages whose
 `event.source` is `window.parent`, and the host only on messages whose `event.source` is that
 frame's `contentWindow`.
+
+**The host's half runs on the window the frame is drawn in.** A widget posts to its `parent`, and for a frame in the picture-in-picture window that parent is that window: `useWidgetHost` binds its `message` listener to `useHostWindow()`, and re-binds when the chat moves. Its posts are made AS that window (`postAsHostWindow` in `src/modules/widgets/hooks/useWidgetHost.ts`). A message's `event.source` is the window whose script made the call, and every line of the app runs in the opener's realm; a post made straight from here to a frame in the floating window arrives from the opener, and the bridge drops it in silence (measured 2026-09-29: the frame's own listener saw the message, `live.theme` stayed null). So the call is made by a function built once per window in that window's realm (`new hostWindow.Function('target', 'message', 'target.postMessage(message, "*")')`, kept in a `WeakMap`).
+
+| case | does |
+| --- | --- |
+| `hostWindow === window` (home) | the direct `target.postMessage(message, '*')` |
+| the window refuses to build the function | direct post from the opener, and a `console.warn` names it: the widget then hears nothing |
+| a delivery to a window that is closing | caught, `console.warn`; the frame went with the window |
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/widgets/hooks/useWidgetHost.ts
 
 ## MAN-417 — Frame → host (`WidgetFrameMessage`)
 section: 07-live-widgets/005 The bridge protocol/006 Frame → host (`WidgetFrameMessage`)
@@ -4658,9 +4900,14 @@ silence.
 SANDBOX token.** A canvas block's own Full Screen control calls the browser's Fullscreen API from
 inside this document; without the grant the call is refused and `useElementFullscreen` falls back
 to its CSS overlay instead, same as any other host that withholds it
-(`~/.claude/ArchPulse/README.md` §"Embedding one block"). Gate 1 of
+(MAN-238). Gate 1 of
 `.verify/probe-docspace-canvas.mjs` reads `allow` off the rendered element alongside the three
 sandbox tokens, so a change that drops either reddens the same gate.
+
+**A canvas block opens in READ in this frame** — pan locked, its Read/Edit switch the way into
+Edit. The mode is the block's own default on every surface, so nothing here asks whether it is
+framed; the hooks that mode rides on are MAN-238's, not this section's,
+and `.verify/probe-docspace-canvas.mjs` reads them from inside the frame.
 
 **A frame that never answers is a fault the reader cannot see**, so `DocSpaceFrame` arms a timer
 for `DOCSPACE_READY_TIMEOUT_MS` at mount and replaces the iframe with `WidgetErrorCard` naming the
@@ -4698,7 +4945,7 @@ each draw their own `my-3 rounded-xl border` wrapper when they stand alone, beca
 iframe itself would be taken out of the height the embed reported (border-box sizing) and leave a
 two-pixel scrollbar. Inside a card that border is the card's, so `WidgetFrame` passes
 `framed={Boolean(frame)}` and the wrapper keeps only the clipping and the fill. The sandbox, the
-`src`, the ready timer and `key={code}` are unchanged either way.
+`src`, the ready timer and the `<windowKey>:<code>` key are unchanged either way. The ready deadline runs on the host window and is cleared on the window that armed it (`{ id, armedOn }`).
 
 **The embed probes are not the unframed path.** `phase-22`, `phase-28` and `phase-29` mount through
 `MarkdownBody`, the app's own transcript renderer, so `CodeBlock` hands them `EmbedFrame` exactly as
@@ -4716,10 +4963,10 @@ transcript here, edits it from inside the frame, and watches that edit arrive in
 showing the same block in ArchPulse's own studio — the round trip, rather than either end of it.
 It is the one probe in this repo that needs `archpulse.service` up; the gates it reads, the
 title-prefixed fixture it creates and deletes, and what an ArchPulse restart mid-run looks like are
-in [verification.md](../verification.md) §"The browser harness" and §"What bites people". The other
+in [docs/MANUAL.md (verification)](../MANUAL.md) §"The browser harness" and §"What bites people". The other
 half of this contract — the embed route, the block types that behave differently there, the
 `resize` height being the body's border box rather than the document's `scrollHeight` — is
-`~/.claude/ArchPulse/README.md` §"Embedding one block", which points back here for this half.
+MAN-238, which points back here for this half.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/authToken.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-29.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-docspace-canvas.mjs
 
@@ -4768,7 +5015,10 @@ question that needs the live page to answer it. `allow-popups` and `allow-top-na
 withheld: an embed may not spray windows over the operator's browser, and may not steer the tab it
 sits in away from the chat. The one grant made through `allow` is `fullscreen`, so an embedded
 video's own control keeps working — a different mechanism from the card's switch, which never
-touches the frame.
+touches the frame. The same grant reaches a whole ArchPulse page framed here: its canvas blocks
+open in **Read**, pan locked, and the `fullscreen` grant is what lets one of their Full Screen
+controls call the real API rather than fall back to the CSS overlay (§"The DocSpace kind";
+MAN-238 for the block).
 
 **The height is DECLARED, not reported, and it has to be.** A page that never heard of this app
 will never post `resize`, so `useWidgetHost`'s protocol has nothing to say here and the frame would
@@ -4786,15 +5036,15 @@ What the card carries instead is the address itself as an `a[data-embed-open]` `
 which is why `openUrl` on this kind is not a convenience — it is the reader's only recourse when
 the frame shows nothing.
 
-`EmbedUrlFrame` is keyed on the fence body by `WidgetFrame`, exactly like its two neighbours, so a
+`EmbedUrlFrame` is keyed on the fence body alone by `WidgetFrame` (its two neighbours' keys also carry the host window), so a
 changed address arrives as a NEW element rather than as a reassigned `src`: the frame navigates
 once in its life and a re-render can never throw away what the reader did inside it.
 
 ## MAN-421 — The Embed widget
 section: 07-live-widgets/010 The Embed widget
 
-The same address, in the gutter beside the transcript rather than inline in it — the fourth chat
-gutter widget, next to Runs, Memory and Subagents.
+The same address, in the gutter beside the transcript rather than inline in it — a chat
+gutter widget, beside Runs, Roadmap, Memory, Subagents and Notes (MAN-7526).
 
 **Why a widget and not only a card.** An inline card is part of the reply: it scrolls away with the
 message that declared it, and it is as wide as the transcript column. A page the reader is *working
@@ -4854,7 +5104,7 @@ area — a live iframe scrolls itself), and the `flex-1` that goes with it, beca
 peeking through a slot. It KEEPS a floor while it grows — a taller one, 16rem or 45% of the column —
 because growth and a floor do not conflict and dropping the floor (`min-h-0`) let a taller neighbour
 crush the card to 2px, header and switches clipped out of reach, with nothing left to reopen it
-(Athena's review, memory 658 / embed 2 in a 700px column). The other three widgets stay
+(Athena's review, memory 658 / embed 2 in a 700px column). The other widgets stay
 content-sized.
 
 ## MAN-422 — Fullscreen
@@ -4891,10 +5141,12 @@ behind the card and keeps the keyboard, so every keystroke lands in a list the r
 full-screen card showing only its own header is a screen of nothing — and the chevron is not drawn
 at all rather than drawn dead; the fold MEMORY is untouched, so leaving fullscreen returns the card
 to exactly the state it was left in. The root carries `data-owns-escape` (`shared/ui/overlayEscape`)
-while it is up, and `WidgetFrame`'s own listener takes the key in the capture phase and stops it
-there, so the transcript's turn-abort Escape behind the card never fires. A modal DIALOG is the
+while it is up, and `WidgetFrame`'s own listener takes the key in the capture phase, on the window the card is
+drawn in (`useHostWindow()`, MAN-7443), and stops it there, so the transcript's turn-abort Escape
+behind the card never fires. A modal DIALOG is the
 exception, because it is not behind — and so is any panel that owns the key (`OWNS_ESCAPE`): the
-widget's own dropdown, the composer's menu. The listener asks `otherOverlayHoldsEscape()` and stands
+widget's own dropdown, the composer's menu. The listener asks `otherOverlayHoldsEscape(hostWindow.document)` — the document of that same window,
+because a panel open in a picture-in-picture window lives in that window's document — and stands
 down, so the press closes what is in front and leaves the card fullscreen. It cannot win that by `stopPropagation` — the
 dialog listens on the same window capture stage, and stopping propagation there does not stop a
 second listener on the same node, so without the stand-down one press closes the dialog AND leaves
@@ -4905,12 +5157,12 @@ The listener exists only while fullscreen is on.
 `fullscreen` and `onToggleFullscreen`; `ChatGutterLayout` holds WHICH widget has the screen (one
 value, so two fullscreen WIDGETS cannot happen — though a transcript card and a widget can both be
 fullscreen at once, two identical panels on one layer that one Escape leaves together) and owns the
-Escape listener, with the same dialog stand-down, and drops it when the region narrows past the
+Escape listener, on the same host window and with the same dialog stand-down, and drops it when the region narrows past the
 gutters' threshold. The switch is a second control, so it
 is a second button beside the header's toggle rather than inside it — a button within a button is
 invalid markup — and the header row therefore holds every control at once: the toggle, the frame's
 switch, and one node the widget itself supplies through `headerAction` (the Subagents widget's
-"Clear completed" is the only one; [06-tool-view.md](06-tool-view.md) §Subagents). Each is a sibling
+"Clear completed" is the only one; [docs/architecture/MANUAL.md (06-tool-view)](MANUAL.md) §Subagents). Each is a sibling
 of the toggle, so a press meant for one of them folds nothing and drags nothing.
 
 A retraction is the one thing that ends fullscreen without the reader: a fence that flashes back to
@@ -4922,33 +5174,14 @@ section: 07-live-widgets/012 The live bus
 
 `LiveBusProvider` (mounted once by `App`) holds one retained value per topic and dispatches
 publishes synchronously to whoever subscribed. `useWidgetBridge` is the widget module's door onto
-it; `useLiveTopic` is the door for an ordinary React component, and the Runner tab is its first
-caller in the app — the panel and the tab's own gate both read `runner:*` through `useRunnerRuns`
-([plan-runner.md](../plan-runner.md) §"The Runner tab"), never through a fetch of their own.
+it; `useLiveTopic` is the door for an ordinary React component, and the Roadmap tab is a caller — the In flight face and the strip's count both read `dispatcher:all` through `useDispatcherPlans` ([docs/MANUAL.md (dispatcher)](../MANUAL.md) §"The In flight face and the Runs widget"), and the Roadmap face reads `roadmap:all` through `useRoadmap` (MAN-7635), never through a fetch of their own.
 
 **The bus knows no producer.** It imports no transport, calls no endpoint and names no frame kind.
 What fills it is a FEED — a headless component owned by the module whose data it carries, which
-subscribes to whatever it likes and calls `publish`. The first is `RunnerFeed` in
-`src/modules/plan-runner/`, documented in [plan-runner.md](../plan-runner.md) under *Consumers*.
-Three more have followed and all three kept the shape: `ArcFeed`, beside `RunnerFeed` in that same
-module, publishes the arc deck's own `arc:*` ([plan-runner.md](../plan-runner.md) §"The arc deck");
-`SoulLaunchFeed` in `src/modules/dispatch-souls/` ([dispatch-souls.md](../dispatch-souls.md)); and
-`UniverseFeed` in `src/modules/universe/`, which publishes a once-a-second digest rather than the raw
-activity stream ([plan-runner.md](../plan-runner.md) §"The feed"). A further lane (git delegation,
-Task Master) lands the same way — a sibling `*Feed.tsx`, usually in ITS own module, though `ArcFeed`
-is the exception: the arc deck reads the runner's own state directory rather than owning one of its
-own, so its feed never became a second job for `RunnerFeed`. Every feed lands as a component, never
-as a line in `live-bus/`. That rule is what keeps this file from acquiring a switch over frame kinds
-it has no business knowing, and it is why the bus can be read without knowing anything about the
-runner.
+subscribes to whatever it likes and calls `publish`. There are four, and all four keep the shape: `DispatcherFeed` in `src/modules/dispatcher/`, publishing `dispatcher:all` ([docs/MANUAL.md (dispatcher)](../MANUAL.md) §"The plan card"); `SoulLaunchFeed` in `src/modules/dispatch-souls/` ([docs/MANUAL.md (dispatch-souls)](../MANUAL.md)); `UniverseFeed` in `src/modules/universe/`, which publishes a once-a-second digest rather than the raw activity stream; and `RoadmapFeed` in `src/modules/roadmap/`, publishing `roadmap:all` (MAN-7635). A further lane (git delegation, Task Master) lands the same way — a sibling `*Feed.tsx` in ITS own module. Every feed lands as a component, never as a line in `live-bus/`. That rule is what keeps this file from acquiring a switch over frame kinds
+it has no business knowing, and it is why the bus can be read without knowing anything about the dispatcher.
 
-**The vocabulary is an allowlist, and the shapes are anchored.** `LIVE_TOPIC_ALLOWLIST` holds four
-patterns today — `runner:*` (every run as one array), `runner:<run_id>` with the route's own
-character class and its 120-character ceiling, `souls:*` (every launcher soul), and `universe:*`
-(the estate's activity as one digest, never its rows) — and `isAllowedTopic` is the single question
-every other file asks. A `startsWith('runner:')` test would admit `runner:../../etc/passwd`, a topic
-carrying a URL, and a topic 40 kB long, each of which reads as a runner topic to a prefix and as
-nonsense to everything downstream. Adding a lane means adding a pattern here and nowhere else.
+**The vocabulary is an allowlist, and the shapes are anchored.** `LIVE_TOPIC_ALLOWLIST` holds four patterns today — `dispatcher:all` (every plan the dispatcher carries, as one picture), `souls:*` (every launcher soul), `roadmap:all` (every roadmap and what no roadmap reaches yet, as one picture) and `universe:*` (the estate's activity as one digest, never its rows) — and `isAllowedTopic` is the single question every other file asks. A `startsWith('dispatcher:')` test would admit `dispatcher:all/../../etc/passwd`, a topic carrying a URL, and a topic 40 kB long, each of which reads as a dispatcher topic to a prefix and as nonsense to everything downstream. Adding a lane means adding a pattern here and nowhere else.
 
 **Retained, and replayed synchronously.** `subscribe(topic, listener)` on an allowed topic replays
 the retained value before it returns, so a subscriber never has to reason about whether it arrived
@@ -4973,8 +5206,7 @@ value became true rather than the last instant something confirmed it, which is 
 
 **The registry is refs, not React state**, for the reason the socket's own listener set is
 (`WebSocketContext.tsx`, quoted in `LiveBusContext.tsx`): two publishes in one tick would otherwise
-collapse into a single render carrying only the later one — which for a runner frame plus a
-retirement means the retirement lands and the picture explaining it does not. The one render
+collapse into a single render carrying only the later one — which for a frame plus a retirement means the retirement lands and the picture explaining it does not. The one render
 trigger in the module is `useLiveTopic`, which subscribes through `useSyncExternalStore`, the same
 idiom `useCliVersion` and the git-panel run store already use.
 
@@ -5014,7 +5246,7 @@ section: 07-live-widgets/013 Gotchas
   `ThemeProvider`.** That is why `WidgetFrame` keeps every context read inside `WidgetFrameLive`,
   behind the mount gate, rather than following mermaid's shape exactly. The transcript export
   never mounts `MermaidDiagram`: `CodeFence` draws a mermaid fence's source there instead (see
-  [rendered shapes](./08-rendered-shapes.md) §"Collapse and export").
+  [rendered shapes](MANUAL.md) §"Collapse and export").
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/main.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-22.mjs
 
@@ -5027,7 +5259,7 @@ section: 07-live-widgets/014 If you change this, check that
 | `WIDGET_CSP` | `connect-src 'none'` survives, `img-src`/`font-src` stay at `data:`, and the meta is still emitted before the style, the script and the body. If you added a directive meaning to close frame self-navigation, re-measure the twelve vectors before believing it — the last three candidates all looked right and changed nothing |
 | `buildWidgetDocument` | The fence body still reaches only the `<body>` element, and token values still come from `getComputedStyle` |
 | `WIDGET_TOKEN_NAMES` | Every name is still declared in `src/shared/ui/verve/tokens.css`, and the `theme` message carries the same list |
-| The theme path | A flip still posts `theme` and does NOT rebuild `srcDoc`; the memo in `WidgetFrameLive` is keyed on `code` alone. Gate 10 of the probe leaves a sentinel on the frame's `window` and requires it to survive a flip, so adding anything theme-shaped to that memo key reddens it |
+| The theme path | A flip still posts `theme` and does NOT rebuild `srcDoc`; the memo in `WidgetFrameLive` is keyed on `code` and `hostDocument` alone (a theme flip changes neither). Gate 10 of the probe leaves a sentinel on the frame's `window` and requires it to survive a flip, so adding anything theme-shaped to that memo key reddens it |
 | The height clamp | A widget still SHRINKS, not just grows — gate 4 drives one widget each way, because a `min-height` (or a monotonic `setHeight`) passes every growth assertion alone |
 | `useWidgetHost`'s listener | The `event.source` identity check, the shape validation, and the `[24, 2000]` clamp on a finite number |
 | `WidgetFrame`'s mount gate | `buildTranscriptHtml` still exports a `<pre>` and no `<iframe>` — gate 9 of the probe |
@@ -5038,7 +5270,7 @@ section: 07-live-widgets/014 If you change this, check that
 | `MAX_TOPICS_PER_FRAME` | The refusal is still an ANSWER, not a silence — gate 6 reads the reason out of the seventeenth topic's `onError` inside the frame |
 | `useWidgetBridge`'s cleanup | Gate 8 drops the WIDGETS while the bus and the feed stay mounted and publishing, and requires every subscription they held to have been released — counted at the bus through a wrapper over `subscribe`, which a leaked listener never calls back. Not console silence: a listener left behind posts into a dead `contentWindow`, and `postToFrame`'s `?.` makes that raise nothing at all |
 | `publish`'s equal-value skip | It must remain a COMPLETE no-op. Replace the retained entry on an equal reading and `useLiveTopic` re-renders forever, because its snapshot is compared by reference |
-| The feed's retirement or its seed guard | Gate 9 drives the REST seed into a fresh bus and gate 10 ends a run and requires it to leave `runner:*`. Both live in `RunnerFeed.tsx`, never in `live-bus/` |
+| The feed's seed guard | The REST seed never overwrites a reading newer than itself (`held.at >= at`). It lives in `DispatcherFeed.tsx`, never in `live-bus/` |
 | `DOCSPACE_SANDBOX` | It still carries EXACTLY `allow-scripts allow-same-origin allow-forms` and the frame still has no inline document. Gate 1 of `.verify/phase-28.mjs` compares the attribute with `===`, never `includes`, so a quietly added `allow-popups` or `allow-top-navigation` reddens it |
 | `DocSpaceFrame`'s `allow` attribute | It still reads `fullscreen` — a canvas block's own Full Screen control needs it to reach the real Fullscreen API rather than its CSS-overlay fallback. Gate 1 of `.verify/probe-docspace-canvas.mjs` checks it alongside `DOCSPACE_SANDBOX` on the same rendered iframe |
 | `isForeignOrigin` | It still compares ORIGINS (not hostnames — the two services differ only by port here), still treats an unparseable URL as not-foreign, and is still consulted BEFORE the iframe renders. It is the only thing standing between a same-origin `VITE_DOCSPACE_EMBED_ORIGIN` and `localStorage['auth-token']`; gate 2 of the probe asserts the rendered frame's origin is not the page's |
@@ -5048,9 +5280,9 @@ section: 07-live-widgets/014 If you change this, check that
 | `ShapeFrame`'s `fullscreen` prop | The flex chain is unbroken (root → `Collapsible` → `CollapsibleContent` + its inner `[&>div]` → body → wrapper → iframe at `height: 100%`), the fold is still forced open with the MEMORY untouched, and the root still carries `data-owns-escape` while it is up. A break in the chain leaves the frame at its card height inside a screen-sized box |
 | The fullscreen layer or the flush floor | The card still sits at `z-[45]`, under `Dialog`'s z-50 — raise it and a dialog opened from fullscreen comes up behind it holding the keyboard. The flush gutter card still has a floor under its `flex-1` — drop it and a tall neighbour crushes the Embed widget to 2px with no control left to reopen it |
 | `WidgetFrame`'s fullscreen state | It is still a class change and never a move: the live element must keep its position in the React tree across the toggle, or the iframe reloads and a part-typed DocSpace edit is gone. Toggle it and assert the SAME DOM node before and after |
-| The `key` on `WidgetFrameLive` OR on `DocSpaceFrame` | BOTH forks carry `key={code}` and both rest on the same premise — the revoke rule, not a reconciliation nicety. Without it a changed fence body is applied to the SAME element: `srcDoc` reassigned in place for an HTML widget, a new `src` for a DocSpace block. Either fires a second `load`, which the host cannot tell from the frame navigating itself away, and it silently revokes a healthy frame forever. Gate 9c rebuilds a body and requires `live.theme` to be set inside the new document — the sentinel half of that gate passes either way, because an in-place swap is also a new document, so `live.theme` is the read that matters |
+| The `key` on `WidgetFrameLive` OR on `DocSpaceFrame` | BOTH forks carry the key `<windowKey>:<code>` (host window and body) and both rest on the same premise — the revoke rule, not a reconciliation nicety. Without the body half a changed fence body is applied to the SAME element: `srcDoc` reassigned in place for an HTML widget, a new `src` for a DocSpace block. Either fires a second `load`, which the host cannot tell from the frame navigating itself away, and it silently revokes a healthy frame forever. Gate 9c rebuilds a body and requires `live.theme` to be set inside the new document — the sentinel half of that gate passes either way, because an in-place swap is also a new document, so `live.theme` is the read that matters. Without the window half a widget carried into the floating window reloads under the same element and is revoked: 1 `theme` message before the move, 0 after (`.verify/chat-surfaces-window.mjs` moves one across and back and requires it still sized and still hearing the host) |
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/verve/tokens.css, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-22.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-24.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-28.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-docspace-canvas.mjs
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/widgets/WidgetFrame.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/verve/tokens.css, /home/lyphe/.claude/claudecodeui_lyphe/.verify/chat-surfaces-window.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-22.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-24.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-28.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-docspace-canvas.mjs
 
 ## MAN-426 — In one paragraph
 section: 08-rendered-shapes/000 In one paragraph
@@ -5071,8 +5303,8 @@ may never render less than the markdown it replaced** — and the rest of this d
 consequences.
 
 Every path below is under `src/modules/chat/transcript/` unless it says otherwise. Read
-[the realtime stream](./02-realtime-stream.md) §"Incremental markdown rendering" for the settled and
-pending halves every streaming rule here leans on, and [live widgets](./07-live-widgets.md) for the
+[the realtime stream](MANUAL.md) §"Incremental markdown rendering" for the settled and
+pending halves every streaming rule here leans on, and [live widgets](MANUAL.md) for the
 one fence this feature routes around.
 
 ## MAN-427 — Mental model
@@ -5166,6 +5398,14 @@ section: 08-rendered-shapes/002 The pieces
 | `shapes/useShapeCollapse.ts` | `useShapeCollapse` (fold state, key migration, export override, and `enter` — whether THIS mount may play its entrance) and `useShapeInteractive` (may a control be drawn at all) |
 | `shapes/markdownStreaming.ts` | `MarkdownStreamingContext`, in its own module to avoid an import cycle. Its one consumer is `CodeBlock` |
 | `shapes/remarkShapeGroups.ts` | The one remark plugin, three passes over the root's children: fence runs into `tabbed-code`, a title paragraph and the list or table under it into `lead-in`, headings and their bodies into `section` wrappers |
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/surface-signal.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/command-palette/context/PaletteOpsContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/markdown-preview/MermaidDiagram.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/constants.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/artifacts/shapes-elements-baseline.html, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/mountReact.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/shapes-fixture.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-32.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-33.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-34.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-markdown-cards.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-baseline.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-detect.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-fences.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-groups.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-inline.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-lineopen.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-lists.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-prose.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-tables.mjs
+
+## MAN-5898 — The pieces — `shapes/leadInContext.ts`
+section: 08-rendered-shapes/002 The pieces/001 `shapes/leadInContext.ts`
+
+| File | Role |
+| --- | --- |
 | `shapes/leadInContext.ts` | `LeadInTitle` (`{ title, hasLink }`) and `LeadInTitleContext` — the line above a block, travelling from `LeadIn`, which provides the paragraph's own rendered children AND whether they hold a link, to `ShapeFrame`, which shows them in place of its `title` prop, folds from its chevron alone when `hasLink` is true, and re-provides `null` around its own body so no nested frame can inherit the title |
 | `shapes/LeadIn.tsx` | `LeadIn` — the `lead-in` wrapper: asks `tableRung`/`listRung` whether the block below frames itself, hands the words down through `LeadInTitleContext` when it does, frames the list itself when it does not, and leaves a table that draws no frame exactly as it was |
 | `shapes/ShapeFrame.tsx` | `ShapeFrame` — the header bar, fold and markers every framed shape wears. `kind` is a closed `ShapeKind` union; its default icon and tone come from the file-local `SHAPE_KINDS` registry, overridable by the `tone`/`icon` props for the three kinds whose meaning only the caller knows. `title` is a `ReactNode` (a lead-in title is the author's own rendered paragraph), `prose` keeps `not-prose` off a frame that holds plain prose, `flush` drops the body's inset for a frame whose own content reaches its own edge, and the title span carries `data-shape-title` inside `ChipsSuppressedContext` while the body carries `data-shape-body`. Every header and body size is `em`, off the named scale `tailwind.config.js`'s `fontSize` declares (§"Header, type and motion"). A title holding a link folds from the chevron alone, the same answer `ShapeSection` gives a heading with a link in it |
@@ -5177,14 +5417,22 @@ section: 08-rendered-shapes/002 The pieces
 | `shapes/elements/plain.tsx` | `PlainRule`, `PlainHeading` (forwards hast properties, so GFM's `sr-only` footnote label stays hidden), `PlainDiv`, and `ShapeDiv`, which routes the three plugin wrappers |
 | `shapes/elements/inlineText.tsx` | `renderInline` — the one seam where a block's rendered inline content gets file chips |
 | `shapes/code/index.tsx` | `CodeBlock` (the `code` override's dispatcher: inline or block, then the widget branch) and `CodePre` |
-| `shapes/code/EmbedFrame.tsx` | `EmbedFrame` — the card a LIVE embed wears: the one `ShapeFrame` header every shape draws, `flush` so the iframe reaches the card's own edge, plus an `a[data-docspace-open]` action carrying a DocSpace block's studio deep link. `CodeBlock` hands it to `WidgetFrame` as its `frame`, and `WidgetFrame` calls it only behind its mount and streaming gates; it imports nothing from `@/modules/widgets` and classifies no body. See [live widgets](./07-live-widgets.md) §"The DocSpace kind" |
+| `shapes/code/EmbedFrame.tsx` | `EmbedFrame` — the card a LIVE embed wears: the one `ShapeFrame` header every shape draws, `flush` so the iframe reaches the card's own edge, plus an `a[data-docspace-open]` action carrying a DocSpace block's studio deep link. `CodeBlock` hands it to `WidgetFrame` as its `frame`, and `WidgetFrame` calls it only behind its mount and streaming gates; it imports nothing from `@/modules/widgets` and classifies no body. See [live widgets](MANUAL.md) §"The DocSpace kind" |
 | `shapes/code/CodeFence.tsx` | The fence precedence, and `FenceBlock`, today's highlighted block. Injects the `cc-syntax-theme` style at module scope |
 | `shapes/code/InlineCode.tsx` | Today's inline code span, or a colour swatch, keycaps or a file chip |
 | `shapes/MarkdownLink.tsx` | The `a` override. Asks `parseFileRef` under its loose link policy and forwards the `:line` |
 | `shapes/InlineMarks.tsx` | `FileChip`, `ColorSwatch`, `KeyCaps`, and `linkifyChildren`, the prose scan |
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/surface-signal.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/command-palette/context/PaletteOpsContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/markdown-preview/MermaidDiagram.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/constants.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/artifacts/shapes-elements-baseline.html, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/mountReact.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/shapes-fixture.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-32.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-33.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-34.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-markdown-cards.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-baseline.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-detect.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-fences.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-groups.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-inline.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-lineopen.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-lists.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-prose.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-tables.mjs
+
+## MAN-5899 — The pieces — `shapes/useFilePreview.ts`
+section: 08-rendered-shapes/002 The pieces/002 `shapes/useFilePreview.ts`
+
+| File | Role |
+| --- | --- |
 | `shapes/useFilePreview.ts` | `useFilePreview` — a file chip's preview: reads a picture's or a PDF's bytes through the workspace's `readFileReference` palette op, shared within the reply, and keeps its fold in the shapes' own fold memory. Nothing while loading, when unreadable or mistyped, in an export, where chips are suppressed, in a reply still streaming, or for a PDF unless `navigator.pdfViewerEnabled` is true and the pointer is fine (a phone gets none). An SVG is shown from a `data:` URL, never a `blob:` one a new tab would run in this origin |
 | `shapes/previewScope.ts` | `PreviewScopeContext` — the row a preview belongs to: `MessageComponent` provides a tool row's `toolId`, or a finished reply's trimmed text hashed with its turn anchor — the last tool call before it in its turn, else the prompt, read by `ChatMessagesPane` from the full message order (never an id, which changes as a reply finalises, and never the rows on screen, which "Show work" changes), `false` while a reply streams, and `null` — this mount alone — where neither exists |
-| `shapes/FilePreview.tsx` | `FilePreviewFrame` — the preview under a chip: the picture (a click opens `ImageLightbox`, square as well) or the PDF in an `iframe` at most 32rem or 60vh tall, in a square-cornered hairline frame with nothing drawn over it, so a screenshot's corners and edges all show. The chip beside it carries the open-in-Files button. A loaded preview fires `TRANSCRIPT_GREW_EVENT` (`transcript/transcriptGrew.ts`), which `useChatSessionState` answers by re-pinning a chat left at its bottom |
+| `shapes/FilePreview.tsx` | `FilePreviewFrame` — the preview under a chip: the picture (a click opens `ImageLightbox`, square as well) or the PDF in an `iframe` at most 32rem or 60vh tall, in a square-cornered hairline frame with nothing drawn over it, so a screenshot's corners and edges all show. The chip beside it carries the open-in-Files button. A preview that loads late grows its row like any other growth: `useFollowGlide`'s observer on the transcript's content box sees it and glides a chat left at its bottom down to the new foot (MAN-7574) |
 | `shapes/MarkdownImage.tsx` | `MarkdownImage`, the `img` override in both maps: a relative `src` with a picture's extension is drawn as that file's chip (labelled with the alt text), which previews it; any other `src` is react-markdown's own `<img>` with the props it was given |
 | `shapes/DataTable.tsx` | Every table that is not a matrix or a before/after pair: three-state sort, CSV copy, and a `Meter` bar down the one numeric column |
 | `shapes/DecisionMatrix.tsx` | `Option \| Pros \| Cons [\| Verdict]` as one `Card` per option, verdict as a `Badge` toned by its glyph |
@@ -5200,8 +5448,16 @@ section: 08-rendered-shapes/002 The pieces
 | `shapes/LongOutput.tsx` | Clamps a fence over 25 lines to 12 under a fade, with a "Show all N lines" control |
 | `shapes/TabbedCode.tsx` | A plugin `tabbed-code` group as the shared `Tabs` over the rendered fences |
 | `shapes/ShapeSection.tsx` | A plugin `section` wrapper: the heading's words become its fold button. `SECTION_FLOW` restates Typography's positional margins |
-| `src/modules/markdown-preview/MermaidDiagram.tsx` | Draws a `mermaid` fence, shared with the PRD editor. Its failure line reads `common.shapes.diagramFailed` |
-| `src/modules/command-palette/context/PaletteOpsContext.tsx` | `openFileReference(path, line?)` — the door a chip and a file link open through. The rest of the chain is [file-manager.md](../file-manager.md) |
+| `src/modules/markdown-preview/MermaidDiagram.tsx` | Draws a `mermaid` fence, shared with the PRD editor. Its failure line reads `common.shapes.diagramFailed`. A DRAWN diagram is a button that opens the kit's `Lightbox` — from the one component both the chat's fence and a markdown preview render; a diagram shown as its source never opens. The viewer, its id prefix and its strings are MAN-7426 |
+| `src/modules/command-palette/context/PaletteOpsContext.tsx` | `openFileReference(path, line?)` — the door a chip and a file link open through. The rest of the chain is [docs/MANUAL.md (file-manager)](../MANUAL.md) |
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/surface-signal.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/command-palette/context/PaletteOpsContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/markdown-preview/MermaidDiagram.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/constants.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/artifacts/shapes-elements-baseline.html, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/mountReact.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/shapes-fixture.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-32.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-33.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-34.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-markdown-cards.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-baseline.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-detect.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-fences.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-groups.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-inline.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-lineopen.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-lists.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-prose.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-tables.mjs
+
+## MAN-5900 — The pieces — `server/modules/providers/list/claude/surface-signal.ts`
+section: 08-rendered-shapes/002 The pieces/003 `server/modules/providers/list/claude/surface-signal.ts`
+
+| File | Role |
+| --- | --- |
 | `server/modules/providers/list/claude/surface-signal.ts` | `SURFACE_PROMPT_APPEND` — `WIDGET_SIGNAL` then `MARKDOWN_SIGNAL`, the four conventions a model is told about |
 | `src/modules/i18n/locales/<locale>/chat.json` | Every shape string, under `shapes`, in all eleven locales |
 | `.verify/lib/mountReact.mjs` | Mounts a second React root over the running page from the dev server's own modules |
@@ -5221,7 +5477,7 @@ section: 08-rendered-shapes/002 The pieces
 | `.verify/phase-34.mjs` | The falsifiable probe for the rendered-markdown verve: lead-in frames, header wash, the text scale, framed embeds, and the entrance — a first settled mount carries `data-vv-enter` and plays the rise, a later mount of the same content carries neither, and reduced motion draws no rule at all |
 
 What each probe asserts, and which of its gates redden on which defect, is
-[verification.md](../verification.md) §"The browser harness".
+[docs/MANUAL.md (verification)](../MANUAL.md) §"The browser harness".
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/surface-signal.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/command-palette/context/PaletteOpsContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/markdown-preview/MermaidDiagram.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/constants.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/artifacts/shapes-elements-baseline.html, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/mountReact.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/shapes-fixture.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-32.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-33.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-34.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-markdown-cards.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-baseline.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-detect.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-fences.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-groups.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-inline.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-lineopen.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-lists.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-prose.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-tables.mjs
 
@@ -5325,7 +5581,7 @@ What "matches" means, rung by rung:
   down and a pass after it would never see a pair written under a heading.
 
 **What the model is told.** `SURFACE_PROMPT_APPEND` reaches every Claude turn sent through
-CloudCLI's chat (see [chat-contracts.md](../chat-contracts.md) §"7. A widget fence is the opt-in,
+CloudCLI's chat (see [docs/MANUAL.md (chat-contracts)](../MANUAL.md) §"7. A widget fence is the opt-in,
 and only on this surface" for where it is set, and why only there). Its
 `MARKDOWN_SIGNAL` names only the four conventions a model would not write unprompted — the `stats`
 fence, the `VERDICT:` line with its counts, `path/to/file.ext:line`, and `mermaid` — and says in one
@@ -5384,7 +5640,7 @@ watched.
   stay.
 
 The saved file inlines the app's stylesheets, so a control drawn into it would paint its hover and
-do nothing. See [tool views](./06-tool-view.md) §"Rendering into an exported document" for the rule
+do nothing. See [tool views](MANUAL.md) §"Rendering into an exported document" for the rule
 this follows. `mermaid` is the one exception: an export draws the fence's SOURCE, as the ordinary
 highlighted block inside the same `diagram` frame. A static render runs no effect for mermaid to
 draw in, and no `ThemeProvider` sits above `MermaidDiagram`'s `useTheme()`, which throws outside
@@ -5421,7 +5677,7 @@ which `probe-shapes-inline.mjs` holds under 4 ms for 42,000 characters holding 4
 the same on both sides of the settle boundary. The reasoning lives in `elements/inlineText.tsx`.
 
 **A block that crosses the boundary remounts.** The split can retract, putting a settled block back
-in the pending half, which is a different parent (see [live widgets](./07-live-widgets.md)
+in the pending half, which is a different parent (see [live widgets](MANUAL.md)
 §"The fence" for the measured restart). A shape there drops to plain markup until it settles again,
 then mounts fresh and re-reads its fold from the map, so the fold returns when its payload is
 unchanged.
@@ -5446,7 +5702,7 @@ carded body size over `PlainTable`'s own smaller default. Seventeen rules, R1–
 (`text-accent-ink` — the bullet, every `::marker`, the number pill's numeral, the title, the footnote
 chip) and its washes are the accent FILL at low alpha (`bg-primary/…` — the pill, the quotation, the
 chip behind that reference). That is the same pair the shapes draw between a green word and a green
-shape ([verve/README.md](../../src/shared/ui/verve/README.md) rule 3), and the frame itself stays the
+shape ([src/shared/ui/verve/MANUAL.md (README)](../../src/shared/ui/verve/MANUAL.md) rule 3), and the frame itself stays the
 neutral hairline it was: Verve spends the accent sparingly, so a card is not a green box, it is a
 neutral box whose marks are green. Two rules spend no accent at all — R14 inks a struck word the
 muted foreground and R15 washes display maths in `bg-muted/50` — because those are the two marks a
@@ -5558,7 +5814,7 @@ compounding rule** follows from the unit — an `md-*` size goes on a text leaf,
 and body wrappers, and never on a container that holds another sized element, where it would
 multiply. `ShapeFrame` writes `data-text-scale="flow"` on every frame's root so a probe can confirm
 the scale is in force. `MarkdownContent.tsx` (every tool markdown body — see
-[tool views](./06-tool-view.md) §"Content renderers") carries `text-chat-tool` beside its existing
+[tool views](MANUAL.md) §"Content renderers") carries `text-chat-tool` beside its existing
 `prose-sm`, and `markdownCards.css`'s R5, R11, R12 and R17 (§"Element cards") spell `md-meta` and
 `md-body` where they spelled `text-xs`/`text-sm` before.
 
@@ -5574,7 +5830,7 @@ the frame; the same component built bare — Settings' own `Badge`, say — find
 any ancestor and keeps the px it always had. `phase-34.mjs`'s `T4` reads the framed case and `T6`
 pins eight bare library class strings' literal size as a ratchet, so a later change to one of those
 literals is a deliberate, measured one. The library's own side of the contract is
-[verve/README.md](../../src/shared/ui/verve/README.md) rule 7.
+[src/shared/ui/verve/MANUAL.md (README)](../../src/shared/ui/verve/MANUAL.md) rule 7.
 
 **`cn()` has to be told the five names are sizes, not colours.** `tailwind-merge` reads an unknown
 `text-<name>` utility as a text COLOUR by default, so an unextended merger answers `cn('text-md-body',
@@ -5584,6 +5840,8 @@ merger through `extendTailwindMerge` rather than importing `twMerge` directly, r
 `md-meta`, `md-code`, `md-stat` and `chat-tool` under the `font-size` class group so a later
 `text-md-body` really does replace an earlier one. See that file's own header comment for the failure
 this avoids.
+
+**The bare `outline` is the second name the merger misreads.** `tailwind-merge` 3 is written for Tailwind 4, where `outline` is a WIDTH; this app builds on Tailwind 3.4, where `outline` is the STYLE and `outline-2` only a width. Unextended, `cn('outline outline-2')` keeps the last width, the ring is drawn with no style, and nothing draws (measured 2026-09-26 on `StatusFlow`'s selected node). `src/shared/utils.ts` moves bare `outline` into the `outline-style` group and keeps `outline-<number>` in `outline-w`. Any other class the two versions name differently misreads the same way, silently.
 
 **Motion is frames only, and an entrance is remembered by content the way a fold is.** The
 transcript's entrances are one stylesheet, `shapes/shapeMotion.css`, side-effect imported by
@@ -5626,7 +5884,7 @@ section: 08-rendered-shapes/008 Gotchas
   `.verify/artifacts/shapes-elements-baseline.html` is pinned to the PRE-MOVE renderer. A DOM
   change means the change is wrong, not the artifact: re-capturing from the current tree compares
   the new DOM with itself and can never fail again. How it was captured, and the only legitimate way
-  to re-establish it, is in [verification.md](../verification.md).
+  to re-establish it, is in [docs/MANUAL.md (verification)](../MANUAL.md).
 - **`FILE_REF_SCAN` carries the `g` flag.** Use it only with `match`, `matchAll`, `replace` or
   `split`. `test` and `exec` keep `lastIndex` between calls, so a second identical `test` answers
   `false`, and a scan built on them drops every other hit without a sound.
@@ -5670,7 +5928,7 @@ section: 08-rendered-shapes/009 If you change this, check that
 | `useShapeCollapse` or `useShapeInteractive` | The tables, fences and groups probes' export mounts still draw every shape whole with zero controls, and a fold still survives its row remounting |
 | `data-vv-enter`, `shapeMotion.css`'s selectors, or `hasEntered`/`markEntered` | `phase-34.mjs`'s `M` gates: a first settled mount carries the marker and plays the rise, a later mount of the same content carries neither, and reduced motion draws no rule at all |
 | `LeadIn`, `LeadInTitleContext`, or the rung predicates it asks (`tableRung`/`listRung`) | `phase-34.mjs`'s `L` gates: three list frames titled from their own line, a table no rung claimed left with its paragraph above it, and a link inside a lead-in title still folding from the chevron alone. `LeadIn` asks the SAME predicates the ladders use, so a rung answered two ways loses a paragraph or gives a table a second frame |
-| `EmbedFrame`, or `WidgetFrame`'s `frame` prop | `phase-34.mjs`'s `E` gates: a settled widget and a DocSpace fence wear the card header, an export and a streaming fence draw their raw source and no frame, and the DocSpace action points at the studio ([live widgets](./07-live-widgets.md) §"The DocSpace kind") |
+| `EmbedFrame`, or `WidgetFrame`'s `frame` prop | `phase-34.mjs`'s `E` gates: a settled widget and a DocSpace fence wear the card header, an export and a streaming fence draw their raw source and no frame, and the DocSpace action points at the studio ([live widgets](MANUAL.md) §"The DocSpace kind") |
 | `ShapeFrame`'s markers | Every probe finds shapes by `data-shape`, `data-collapsed` and `data-shape-toggle`; a title and a body are read by `data-shape-title` and `data-shape-body`, a header by `data-shape-header`, its icon by `data-shape-icon`, its actions by `data-shape-actions`, and the scale itself by `data-text-scale`. Rename one and gates that never read this source go quiet |
 | A new `ShapeKind`, or a kind's icon/tone in `SHAPE_KINDS` | Adding a kind with no `SHAPE_KINDS` entry is a type error at the call site, but the icon's existence in the installed `lucide-react` is not type-checked — confirm the import resolves before shipping |
 | A new named size in `tailwind.config.js`'s `fontSize`, or the `chat-tool` ratio | `src/shared/utils.ts`'s `extendTailwindMerge` list names every `text-<name>` this app spends as a font size; a size added there and not to that list is read as a text COLOUR by `cn()`'s merger and silently stops following the reader's setting (§"Header, type and motion") |
@@ -5703,8 +5961,8 @@ resolve onto map stars and reach the canvas over one websocket frame kind, while
 frame kind and over REST. Nothing on the sky is invented — an edit flares its star, an execution sends a comet
 along edges the graph really has, and a quiet estate is a dark sky. **The map's schema has one home**, the
 module docstring of `scripts/universe/build.py` (lines 1-95, the code that writes it); this document points at
-it rather than restating it. See [07-live-widgets.md](./07-live-widgets.md) for the bus a digest rides, and
-[02-realtime-stream.md](./02-realtime-stream.md) for the transport.
+it rather than restating it. See [docs/architecture/MANUAL.md (07-live-widgets)](MANUAL.md) for the bus a digest rides, and
+[docs/architecture/MANUAL.md (02-realtime-stream)](MANUAL.md) for the transport.
 
 ## MAN-437 — Mental model
 section: 09-universe/001 Mental model
@@ -5727,7 +5985,7 @@ section: 09-universe/002 The pieces
 | `scripts/universe-crawl:2`, `scripts/universe/{registry,gitcrawl,blobs,nodes,build,merge,resolve}.py`, `edges/`, `routedump.py` | The crawler: the registry and its entry shape, git facts per repo, the line cache, the node list, the four resolvers, the three derived lanes and their caps, one live app's route table, and the build — **the map schema's one home** (`build.py:1-103`) |
 | `server/modules/universe/universe-journal.tap.ts`, `universe-transcript.{tap,tail}.ts` | Tap 1: `journalctl -f -o json` per unit, resolved to a star (`:116-257`); tap 2: the byte-offset tail (`tail:1-17`), and what a tool call means (`tap:9-29`) |
 | `server/modules/universe/universe.module.ts`, `{universe-activity,universe-map,universe-route-match,universe-state,universe-registry}.service.ts`, `universe.routes.ts` | The lane: held map, route, HEADS watcher, taps, broadcast (`:48-148`); The throttle, the held map, route matching, the layout, the registry read (`activity:39-99`); `GET /api/universe/map`, and deliberately no rebuild endpoint (`routes:5-13`) |
-| `src/modules/universe/{UniverseFeed,UniversePanel,UniverseCanvas}.tsx`, `hooks/`, `utils/`, `src/shared/types.ts:425-506`, `src/modules/live-bus/topics.ts:19-37,56` | The live-bus door (`Feed:9-38`); the tab and its chrome (`Panel:19-43`); the sky — five stacked canvases and the cadence that repaints them, per its own header (`Canvas:43-78`); the hooks and the engine; the four universe types and `universe:*` in the bus allowlist; the frame's own cost, published every frame at `window.__universePerf` for a probe to read (`utils/universePerf.ts:1-51`) |
+| `src/modules/universe/{UniverseFeed,UniversePanel,UniverseCanvas}.tsx`, `hooks/`, `utils/`, `src/shared/types.ts:425-506`, `src/modules/live-bus/topics.ts` | The live-bus door (`Feed:9-38`); the tab and its chrome (`Panel:19-43`); the sky — five stacked canvases and the cadence that repaints them, per its own header (`Canvas:43-78`); the hooks and the engine; the four universe types and `universe:*` in the bus allowlist; the frame's own cost, published every frame at `window.__universePerf` for a probe to read (`utils/universePerf.ts:1-51`) |
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/universe/universe-journal.tap.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/universe/universe.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/live-bus/topics.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts
 
@@ -5877,6 +6135,11 @@ answers with the map the client HOLDS, never with the id a `universe_map` frame 
 announcement says a crawl landed somewhere and not that this client has it (`:83-95`). The announcement opens a
 fetch and the fetch landing opens the gate, so one request is ever in the air (`:96-131`).
 
+governs: /home/lyphe/.claude/claudecodeui_lyphe/scripts/universe-fps-probe.mjs, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useChatRealtimeHandlers.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/live-bus/context/LiveBusContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/universe/hooks/useUniverseMap.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts
+
+## MAN-5654 — The client — The activity reaches the client in two shapes
+section: 09-universe/010 The client/001 The activity reaches the client in two shapes
+
 **The activity reaches the client in two shapes** (`UniverseFeed.tsx:9-38`). The digest — how many edits and
 executions the last window held — is published onto `universe:*` at most once a second, because the bus retains
 one value per topic and compares every publish by `JSON.stringify`, so a lane carrying raw rows would stringify
@@ -5886,6 +6149,11 @@ the server's coalescer keeps. The raw rows go, unreduced, straight to the canvas
 function call, React never consulted (`hooks/useUniverseStream.ts:14-27,130-135`); the ring behind it is capped
 at 200 rows (`:31`). Both readers ask that same freshness rule, so the canvas and the digest can never disagree
 about whether a frame from a retired map is real (`utils/universeFrames.ts:3-23`).
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/scripts/universe-fps-probe.mjs, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useChatRealtimeHandlers.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/live-bus/context/LiveBusContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/universe/hooks/useUniverseMap.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts
+
+## MAN-5655 — The client — What a frame draws.
+section: 09-universe/010 The client/002 What a frame draws.
 
 **What a frame draws.** A star's radius is `2.4 + min(sqrt(max(lines, 1)), 120) / 9`
 (`utils/universeBirth.ts:57`) and its brightness is git recency — full inside `recencyBrightDays`, easing to
@@ -5906,6 +6174,11 @@ the graph carries an endpoint edge, and otherwise to its parent body, so an exec
 round trip (`:20-27`, `utils/universeComets.ts:9-15`). The starfield behind it is decoration, not a reading
 (`utils/universeStarfield.ts:1-12`).
 
+governs: /home/lyphe/.claude/claudecodeui_lyphe/scripts/universe-fps-probe.mjs, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useChatRealtimeHandlers.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/live-bus/context/LiveBusContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/universe/hooks/useUniverseMap.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts
+
+## MAN-5656 — The client — The frame is drawn on five layers, and not every one every time.
+section: 09-universe/010 The client/003 The frame is drawn on five layers, and not every one every time.
+
 **The frame is drawn on five layers, and not every one every time.** `UniverseCanvas.tsx` renders `sky`,
 `stars`, `gl`, `live` and `input` — the layer the pointer reads, carrying
 the pre-stack className and aria-label unchanged (`Canvas:43-78,540-568`). `utils/universeLayers.ts` owns the
@@ -5918,6 +6191,11 @@ header: a row keeps the loop at sixty for the live layer's sake, never as licenc
 which is this cadence's to bound (`:15-19`). A star's glow, core, flare halo/ring and doppler swing are pure
 functions of the node alone in `utils/universeStarGeometry.ts`, with no `ctx` and no frame, so the 2D star
 layer and the GPU layer below read the same shape and cannot drift.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/scripts/universe-fps-probe.mjs, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useChatRealtimeHandlers.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/live-bus/context/LiveBusContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/universe/hooks/useUniverseMap.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts
+
+## MAN-5657 — The client — The `gl` layer draws the stars when the `renderer` tweak reads `webgl` and this page has WebGL to
+section: 09-universe/010 The client/004 The `gl` layer draws the stars when the `renderer` tweak reads `webgl` and this page has WebGL to
 
 **The `gl` layer draws the stars when the `renderer` tweak reads `webgl` and this page has WebGL to give
 it.** `utils/universeStarsGL.ts`'s `createStarsGL` links one program over the `gl` canvas and answers `null`
@@ -5935,16 +6213,26 @@ of the gate in one layer and the other side in the other. The panel's `renderer`
 group beside the tweaks that change what the sky looks like, though it is the one entry there that instead
 changes only what the sky costs to draw (`UniverseTweaksPanel.tsx`'s `WORDS.renderer`).
 
+governs: /home/lyphe/.claude/claudecodeui_lyphe/scripts/universe-fps-probe.mjs, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useChatRealtimeHandlers.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/live-bus/context/LiveBusContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/universe/hooks/useUniverseMap.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts
+
+## MAN-5658 — The client — The loop has four answers
+section: 09-universe/010 The client/005 The loop has four answers
+
 **The loop has four answers** (`utils/universeLoop.ts:3-8`): 60 fps while the estate is alive, a slow tick once
 nothing has happened for 20 s, nothing at all while the tab is hidden, and a single frame for a visitor who
 asked for less motion (`:108,132-139,158-168`). All four answer *when* a frame is owed and none of them what
 that frame repaints: the fast path is held for the live layer, whose comets, flares and labels move every
-frame, and the star layer keeps to a cadence of its own ([the frame's cost](#what-a-frame-costs) below). The
+frame, and the star layer keeps to a cadence of its own (the frame's cost, MAN-446, below). The
 window measures IDLENESS, not presence, so a page left open overnight ticks rather than burning a core on a sky
 nobody is watching. `mode()` answers which of the four
 the frame now drawing was scheduled on, not the one queued next (`:71-74,114-119,171-174`) — the field
 `utils/universePerf.ts` publishes alongside `stepMs` and `drawMs` on `window.__universePerf` every frame, and
 what `node scripts/universe-fps-probe.mjs <app-url> <token>` reads to print one line of cost per camera state.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/scripts/universe-fps-probe.mjs, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useChatRealtimeHandlers.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/live-bus/context/LiveBusContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/universe/hooks/useUniverseMap.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts
+
+## MAN-5659 — The client — The chrome reads the map and that 1 Hz snapshot.
+section: 09-universe/010 The client/006 The chrome reads the map and that 1 Hz snapshot.
 
 **The chrome reads the map and that 1 Hz snapshot.** The strip holds six readings — repos, stars, lines, edges,
 when it was built, and the events-per-second rate — and no control, because a chip there would be the second
@@ -5955,12 +6243,21 @@ big, how alive, what it touches — and only from what the map carries (`Univers
 panel's four fetch states are a spinner, an empty state, an amber banner leaving the sky as it was, and the map
 itself (`UniversePanel.tsx:39-43,97-128`).
 
+governs: /home/lyphe/.claude/claudecodeui_lyphe/scripts/universe-fps-probe.mjs, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useChatRealtimeHandlers.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/live-bus/context/LiveBusContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/universe/hooks/useUniverseMap.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts
+
+## MAN-5660 — The client — The chat reducer returns early on these frames
+section: 09-universe/010 The client/007 The chat reducer returns early on these frames
+
 **The chat reducer returns early on these frames**
-(`src/modules/chat/hooks/useChatRealtimeHandlers.ts:181-195`). Four kinds — `runner_state`, `soul_launch_state`,
-`universe_map` and `universe_activity` — carry no `sessionId`. The early return is a naming, not the fence: what
+(`src/modules/chat/hooks/useChatRealtimeHandlers.ts:181-195`). Three kinds — `soul_launch_state`, `universe_map` and `universe_activity` — carry no `sessionId`. The early return is a naming, not the fence: what
 actually keeps a frame out of the open transcript is that the append below admits a row only when it carries a
 run's numeric `seq` (`:253`), and no box-wide lane frame ever does. For this pair the second kind is still worth
 naming: it arrives up to ten times a second for as long as anything in the estate is busy.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/scripts/universe-fps-probe.mjs, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useChatRealtimeHandlers.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/live-bus/context/LiveBusContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/universe/hooks/useUniverseMap.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts
+
+## MAN-5661 — The client — The Tweaks dialog
+section: 09-universe/010 The client/008 The Tweaks dialog
 
 **The Tweaks dialog** (`UniverseTweaksPanel.tsx:9-27`) is the ONE control surface — a gear beside Recenter,
 opening a dialog with exactly one control per tunable, so no tunable has a second control anywhere to drift. A
@@ -5974,6 +6271,11 @@ key removed rather than filled (`hooks/useUniverseTweaks.ts:11-27,39-63`, `utils
 Those decorative passes were never deleted: each defaults to zero, and a zero or `false` skips its pass WHOLE,
 so the default frame pays for none of them (`utils/universeTweaks.ts:15-17,70-77`,
 `utils/universeLayout.ts:14-19`, `utils/universeRenderer.ts:53-57,130-131,166,171`).
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/scripts/universe-fps-probe.mjs, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useChatRealtimeHandlers.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/live-bus/context/LiveBusContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/universe/hooks/useUniverseMap.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts
+
+## MAN-5662 — The client — Each galaxy sits in a nebula of its own colour
+section: 09-universe/010 The client/009 Each galaxy sits in a nebula of its own colour
 
 **Each galaxy sits in a nebula of its own colour** (`utils/universeNebula.ts`), the first thing the star layer
 draws inside the world transform, so it is under every edge, glow and star. The haze is the repo's own SHAPE,
@@ -6017,12 +6319,22 @@ Its fields are `fps/stepMs/drawMs/otherMs` per camera state, `other` being the f
 passes the instrument times (`frameMs − stepMs − drawMs`): at fit the baseline was paying 26.8 ms of layout a
 frame it did not need, and at folder 419.2 ms the instrument attributes to neither pass.
 
+governs: /home/lyphe/.claude/claudecodeui_lyphe/scripts/universe-fps-probe.mjs, /home/lyphe/.claude/claudecodeui_lyphe/scripts/universe-token.mjs
+
+## MAN-5507 — What a frame costs — The simulation is bounded by its cadence.
+section: 09-universe/011 What a frame costs/001 The simulation is bounded by its cadence.
+
 **The simulation is bounded by its cadence.** At the floor `relax` runs one frame in `RELAX_EVERY`, and every
 frame while the sky is hot — settling, a drag, a gravity change; while the sky is coarse the call is skipped
 whole, never handed a zero that would read to `advanceTemperature` as a settled sky and end the relaxation for
 good. `applyGravity` returns the moment the tweak already matches `graph.gv`, so a page that never touches the
 gravity control walks the links once, at birth (`utils/universeForces.ts`,
 `utils/universeGraph.ts:234,288-297`).
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/scripts/universe-fps-probe.mjs, /home/lyphe/.claude/claudecodeui_lyphe/scripts/universe-token.mjs
+
+## MAN-5508 — What a frame costs — Every subtree is given the room it needs, and the sources stand outside the repos.
+section: 09-universe/011 What a frame costs/002 Every subtree is given the room it needs, and the sources stand outside the repos.
 
 **Every subtree is given the room it needs, and the sources stand outside the repos.** The export placed
 children on a ring that shrank by 0.55 per depth whatever hung beneath them, and on the merged map sibling
@@ -6051,6 +6363,11 @@ and 3-4 ms at folder zoom 1.8. The
 settled speed floor under the default orbit rises with the sky's size (2.6 at 1,670 units to 3.5-4.0 at 9,200) — the ellipse
 breathing against the spring rests, bounded by the relax cadence as before (`universeForces.ts` header).
 
+governs: /home/lyphe/.claude/claudecodeui_lyphe/scripts/universe-fps-probe.mjs, /home/lyphe/.claude/claudecodeui_lyphe/scripts/universe-token.mjs
+
+## MAN-5509 — What a frame costs — Distance is a tweak, applied as one rigid scale.
+section: 09-universe/011 What a frame costs/003 Distance is a tweak, applied as one rigid scale.
+
 **Distance is a tweak, applied as one rigid scale.** The `distance` slider (0.3-1.5, default 1) multiplies every
 resting and drawn position, spring rest, held ring, room measure and cloud extent about the sun in one call
 (`applyDistance`, `universeGraph.ts`), so the sky closes in on Claude at any zoom — including the fitted view,
@@ -6060,11 +6377,21 @@ so closer means a little more crowded, and at 0.3 the dense folders merge into k
 "star size is not distance". The number input commits on Enter or blur, so a change is one snap and the camera
 eases to the new fit. Operator's word, 2026-09-17.
 
+governs: /home/lyphe/.claude/claudecodeui_lyphe/scripts/universe-fps-probe.mjs, /home/lyphe/.claude/claudecodeui_lyphe/scripts/universe-token.mjs
+
+## MAN-5510 — What a frame costs — Only code is drawn by default.
+section: 09-universe/011 What a frame costs/004 Only code is drawn by default.
+
 **Only code is drawn by default.** The `files` tweak (`code`) keeps every star but the `source` kind — config,
 docs, data, assets, 27% of the map — out of the active list, the hit test, the clouds' bake, the edges and the
 flares (`hiddenKind`, `universeTweaks.ts`; `graph.codeOnly`, written by the regimes). The map is unchanged: the
 stats strip still counts them, and switching the tweak to `all` draws them on the next frame and rebakes the
 clouds. Operator's word, 2026-09-17.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/scripts/universe-fps-probe.mjs, /home/lyphe/.claude/claudecodeui_lyphe/scripts/universe-token.mjs
+
+## MAN-5511 — What a frame costs — The viewport has one home, and the camera is an argument.
+section: 09-universe/011 What a frame costs/005 The viewport has one home, and the camera is an argument.
 
 **The viewport has one home, and the camera is an argument.** `utils/universeView.ts` owns the `Viewport`
 type, `SCREEN_PAD` and `viewportBounds`; `stepLayout(graph, now, tweaks, view)` and
@@ -6075,6 +6402,11 @@ simulation and the drawing, and `act`, the list every display pass walks. A star
 frame's* display and not out of the model — the relaxation is whole-graph by physics, so an unwatched star
 keeps moving, and the frame its parent is marked again it is drawn where the physics put it.
 
+governs: /home/lyphe/.claude/claudecodeui_lyphe/scripts/universe-fps-probe.mjs, /home/lyphe/.claude/claudecodeui_lyphe/scripts/universe-token.mjs
+
+## MAN-5512 — What a frame costs — A pass that redraws at sixty makes everything under it redraw too.
+section: 09-universe/011 What a frame costs/006 A pass that redraws at sixty makes everything under it redraw too.
+
 **A pass that redraws at sixty makes everything under it redraw too.** That is why the sky is five canvases
 and not one — React renders the five elements in JSX, and no file under `utils/` creates one — and why each
 layer got a cadence: `utils/universeRepaint.ts` decides what a frame owes, the sky on a movement or every
@@ -6083,10 +6415,20 @@ and the live layer every frame, because the comets, the flares and the labels ar
 still, a settled sky repaints its star layer every second or third frame instead of sixty times a second, and
 the picture is the same one.
 
+governs: /home/lyphe/.claude/claudecodeui_lyphe/scripts/universe-fps-probe.mjs, /home/lyphe/.claude/claudecodeui_lyphe/scripts/universe-token.mjs
+
+## MAN-5513 — What a frame costs — What a star looks like has one home.
+section: 09-universe/011 What a frame costs/007 What a star looks like has one home.
+
 **What a star looks like has one home.** `utils/universeStarGeometry.ts` holds the glow, the core, the flare's
 halo and the doppler swing as pure functions — no `ctx`, no frame — so the 2D passes and the layer below read
 the same shape and cannot drift; the flare itself is drawn once, on the live layer, because a flare is a thing
 that moves (`utils/universeStarlight.ts`'s `drawFlares`).
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/scripts/universe-fps-probe.mjs, /home/lyphe/.claude/claudecodeui_lyphe/scripts/universe-token.mjs
+
+## MAN-5514 — What a frame costs — The stars themselves go to the GPU when the page has one.
+section: 09-universe/011 What a frame costs/008 The stars themselves go to the GPU when the page has one.
 
 **The stars themselves go to the GPU when the page has one.** `utils/universeStarsGL.ts` packs the small
 lights into one interleaved buffer, uploads it once and reads it with two draws, the glow additive and the
@@ -6098,6 +6440,11 @@ reads the tweak; the same decision is what `perfSample.renderer` reports, which 
 `renderer=webgl` is a fact about the page it ran on and not about the panel's setting. The control is one
 `Select` beside the other Look tweaks, defaulting to `webgl` (`utils/universeTweaks.ts:76,97`).
 
+governs: /home/lyphe/.claude/claudecodeui_lyphe/scripts/universe-fps-probe.mjs, /home/lyphe/.claude/claudecodeui_lyphe/scripts/universe-token.mjs
+
+## MAN-5515 — What a frame costs — Before and after
+section: 09-universe/011 What a frame costs/009 Before and after
+
 **Before and after**, one line per run, quoted from the proof file beside it:
 
 | Run | The line |
@@ -6106,6 +6453,11 @@ reads the tweak; the same decision is what `perfSample.renderer` reports, which 
 | Phase 3, regimes and the cadence — `perf-phase3.txt` | `fit=28.9/0.4/4.2/30.0 package=5.4/8.8/156.5/18.8 folder=1.7/6.0/12.4/574.9 folder+dof=1.7/6.7/14.1/564.1 renderer=canvas painted=2244` |
 | Phase 4, the layer stack — `perf-phase4.txt` | `fit=49.4/0.4/6.7/13.1 package=15.5/6.9/49.5/8.1 folder=3.3/5.7/7.6/292.6 folder+dof=3.4/6.5/9.6/276.0 renderer=canvas painted=2105` |
 | Phase 5, the GPU star layer — `perf-final.txt` | `fit=48.6/0.7/6.9/13.0 package=16.5/8.8/6.9/44.8 folder=3.2/6.9/6.0/301.7 folder+dof=3.2/6.9/8.3/300.6 renderer=webgl painted=1450` |
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/scripts/universe-fps-probe.mjs, /home/lyphe/.claude/claudecodeui_lyphe/scripts/universe-token.mjs
+
+## MAN-5516 — What a frame costs — Re-measure it in one line
+section: 09-universe/011 What a frame costs/010 Re-measure it in one line
 
 **Re-measure it in one line**, with the app up on its dev port and a token from the same origin:
 
@@ -6196,15 +6548,15 @@ section: README/002 Reading order
 
 | # | Document | Why it comes here |
 | --- | --- | --- |
-| 1 | [WebSocket transport](./01-websocket-transport.md) | The pipe everything rides on. Read first — the frame tables below are its vocabulary. |
-| 2 | [The realtime stream](./02-realtime-stream.md) | One run's full journey, from provider output to a rendered reply. The heart of the system. |
-| 3 | [Conversation handoff](./03-conversation-handoff.md) | Which ids exist, and the four points where a conversation changes hands. Answers "why does this conversation have two ids". |
-| 4 | [The message store and lazy loading](./04-message-store-and-lazy-loading.md) | Where messages live in the client, and how a huge transcript loads without freezing the tab. |
-| 5 | [Scrolling](./05-scrolling.md) | Where the view sits, and why five different pieces of code move it. |
-| 6 | [Tool views](./06-tool-view.md) | How a tool call becomes UI. Needs the message model from 2 and 4. |
-| 7 | [Live widgets](./07-live-widgets.md) | How a `widget` fence becomes a live frame — two of them, chosen by the body: a sandboxed HTML document, or one DocSpace block embedded from ArchPulse's own origin. Late, because it needs the streaming markdown pipeline from 2 — and the transport from 1 once a widget can subscribe to live data. |
-| 8 | [Rendered shapes](./08-rendered-shapes.md) | How ordinary markdown in a settled reply becomes a component — a sortable table, a callout, a verdict banner, a file chip — and why a block that misses its trigger renders exactly as it always did. After 7, because both share the `code` override's dispatcher, and it needs the streaming split from 2. |
-| 9 | [Project Universe](./09-universe.md) | How four repositories become one map and how the estate's real journal and transcript activity is drawn on it — the crawler and its registry, the two taps, the two websocket frames, and the tab. Last, because it adds two frame kinds to 1's tables and a second consumer to the stream in 2, and its map is the only thing here that is not about a conversation. |
+| 1 | [WebSocket transport](MANUAL.md) | The pipe everything rides on. Read first — the frame tables below are its vocabulary. |
+| 2 | [The realtime stream](MANUAL.md) | One run's full journey, from provider output to a rendered reply. The heart of the system. |
+| 3 | [Conversation handoff](MANUAL.md) | Which ids exist, and the four points where a conversation changes hands. Answers "why does this conversation have two ids". |
+| 4 | [The message store and lazy loading](MANUAL.md) | Where messages live in the client, and how a huge transcript loads without freezing the tab. |
+| 5 | [Scrolling](MANUAL.md) | Where the view sits, and why five different pieces of code move it. |
+| 6 | [Tool views](MANUAL.md) | How a tool call becomes UI. Needs the message model from 2 and 4. |
+| 7 | [Live widgets](MANUAL.md) | How a `widget` fence becomes a live frame — two of them, chosen by the body: a sandboxed HTML document, or one DocSpace block embedded from ArchPulse's own origin. Late, because it needs the streaming markdown pipeline from 2 — and the transport from 1 once a widget can subscribe to live data. |
+| 8 | [Rendered shapes](MANUAL.md) | How ordinary markdown in a settled reply becomes a component — a sortable table, a callout, a verdict banner, a file chip — and why a block that misses its trigger renders exactly as it always did. After 7, because both share the `code` override's dispatcher, and it needs the streaming split from 2. |
+| 9 | [Project Universe](MANUAL.md) | How four repositories become one map and how the estate's real journal and transcript activity is drawn on it — the crawler and its registry, the two taps, the two websocket frames, and the tab. Last, because it adds two frame kinds to 1's tables and a second consumer to the stream in 2, and its map is the only thing here that is not about a conversation. |
 
 **In a hurry?** Read 1 and 2.
 **Debugging something a user can see?** Start at 5 or 6.
@@ -6237,7 +6589,7 @@ section: README/003 The protocol, in two tables/004 Server → client: the `kind
 | `status` | provider | Progress text, and the token-budget payload. |
 | `permission_request` | provider | A tool is asking for approval. |
 | `permission_resolved` | provider | A client answered that request. Retracts it from replays and other tabs. |
-| `permission_cancelled` | provider | That request is no longer live (timeout, abort, withdrawal). |
+| `permission_cancelled` | provider | That request is no longer live (timeout, abort, withdrawal). A plan's prompt is never a request: the server sends no frame about it (MAN-7400). |
 | `error` | provider | An informational failure row. **Not terminal.** |
 | `complete` | provider | The one terminal event of a run. Exactly one per run, always. |
 | `session_created` | provider | The runtime announcing its native id. **Swallowed server-side; no client ever sees it.** |
@@ -6246,10 +6598,10 @@ section: README/003 The protocol, in two tables/004 Server → client: the `kind
 | `chat_subscribed` | gateway | Ack for `chat.subscribe`: authoritative processing state plus pending permissions. |
 | `session_upserted` | gateway | Sidebar delta. Owned by the projects state, not by chat. |
 | `loading_progress` | gateway | Project scan progress. |
-| `runner_state` | gateway | The plan runner's runs, pushed on change. |
-| `soul_launch_state` | gateway | The launcher souls a session started by hand, pushed on change. Feeds the soul pins in the strip above the composer when the desktop chat gutters are not showing, and in the gutter's Subagents widget while they are ([dispatch-souls.md](../dispatch-souls.md)). |
-| `universe_map` | gateway | The estate map was rebuilt because a tracked repo's HEAD moved; carries the `mapId` a client refetches `GET /api/universe/map` for. Excused from the chat reducer beside `runner_state`/`soul_launch_state`. |
-| `universe_activity` | gateway | Coalesced estate activity — journal lines and Claude transcript edits resolved onto map stars. At most ten frames a second, and none at all while the estate is quiet; carries the held `mapId`, a `rows` array and a `dropped` count. Excused from the chat reducer. See [01-websocket-transport.md](./01-websocket-transport.md) §"Fan-out: who receives what". |
+| `soul_launch_state` | gateway | The launcher souls a session started by hand, pushed on change. Feeds the soul pins in the strip above the composer when the desktop chat gutters are not showing, and in the gutter's Subagents widget while they are ([docs/MANUAL.md (dispatch-souls)](../MANUAL.md)). |
+| `simple_list_changed` | gateway | The simple chat list's shape changed: a folder was made, renamed, folded or deleted, or a chat changed place or folder. `{ kind, at }` only; names nothing, so a client that hears it re-reads the feed. Never a transcript row (MAN-7519). |
+| `universe_map` | gateway | The estate map was rebuilt because a tracked repo's HEAD moved; carries the `mapId` a client refetches `GET /api/universe/map` for. Excused from the chat reducer beside `soul_launch_state`. |
+| `universe_activity` | gateway | Coalesced estate activity — journal lines and Claude transcript edits resolved onto map stars. At most ten frames a second, and none at all while the estate is quiet; carries the held `mapId`, a `rows` array and a `dropped` count. Excused from the chat reducer. See [docs/architecture/MANUAL.md (01-websocket-transport)](MANUAL.md) §"Fan-out: who receives what". |
 | `protocol_error` | gateway | The request was rejected or never started. No `complete` follows. |
 
 One more kind never crosses the wire: **`websocket_reconnected`** is synthesized inside
@@ -6329,15 +6681,15 @@ section: README/008 Symptom lookup
 
 | Symptom | Start here |
 | --- | --- |
-| Message appears twice, or vanishes on refresh | [3](./03-conversation-handoff.md), then [4](./04-message-store-and-lazy-loading.md) |
-| Spinner never stops | [2](./02-realtime-stream.md) — look for the terminal `complete` |
-| A second tab froze mid-run | [1](./01-websocket-transport.md) — writer fan-out and replay |
-| Transcript opens part-way up, or jumps while reading | [5](./05-scrolling.md) |
-| Old messages never load, or loading is slow | [4](./04-message-store-and-lazy-loading.md) |
-| A tool renders wrong, or a group collapses oddly | [6](./06-tool-view.md) |
-| Markdown in a reply drew as a card, banner or chip it should not have — or lost words doing it | [8](./08-rendered-shapes.md) — the trigger table, then `detect.ts` |
-| Nothing arrives at all after a network blip | [1](./01-websocket-transport.md) — reconnect and `lastSeq` |
-| A live session reads as idle, or replays itself, right after the API restarted | [2](./02-realtime-stream.md) — a re-adopted run's fresh `seq`, and [hosting.md](../hosting.md) |
+| Message appears twice, or vanishes on refresh | [3](MANUAL.md), then [4](MANUAL.md) |
+| Spinner never stops | [2](MANUAL.md) — look for the terminal `complete` |
+| A second tab froze mid-run | [1](MANUAL.md) — writer fan-out and replay |
+| Transcript opens part-way up, or jumps while reading | [5](MANUAL.md) |
+| Old messages never load, or loading is slow | [4](MANUAL.md) |
+| A tool renders wrong, or a group collapses oddly | [6](MANUAL.md) |
+| Markdown in a reply drew as a card, banner or chip it should not have — or lost words doing it | [8](MANUAL.md) — the trigger table, then `detect.ts` |
+| Nothing arrives at all after a network blip | [1](MANUAL.md) — reconnect and `lastSeq` |
+| A live session reads as idle, or replays itself, right after the API restarted | [2](MANUAL.md) — a re-adopted run's fresh `seq`, and [docs/MANUAL.md (hosting)](../MANUAL.md) |
 
 ---
 
@@ -6347,6 +6699,40 @@ section: README/009 Related module docs
 These stay authoritative for their own module's API surface; the documents above explain
 how the pieces fit together.
 
-- `server/modules/websocket/README.md` — the gateway's service map.
-- `server/modules/providers/README.md` — the provider abstraction.
-- `src/modules/chat/tools/README.md` — the tool config registry, from the module's side.
+- `server/modules/websocket/MANUAL.md (README)` — the gateway's service map.
+- `server/modules/providers/MANUAL.md (README)` — the provider abstraction.
+- `src/modules/chat/tools/MANUAL.md (README)` — the tool config registry, from the module's side.
+
+## MAN-7526 — Chat gutters — widget ids, default places, adding a widget
+
+## Gutter widgets — ids and default places
+
+`GutterWidgetId` (`src/shared/types.ts`) = `'runner' | 'roadmap' | 'memory' | 'subagents' | 'embed' | 'notes'`. The ids are the DOM's `data-widget` and the keys of the stored record. Six widgets, three a side by default: left `runner`, `roadmap`, `subagents`; right `memory`, `embed`, `notes`. Any of them drags to either side at any rank.
+
+| id | default side | order | open | table entry in `ChatGutterLayout` |
+|---|---|---|---|---|
+| `runner` | left | 0 | no | badge `useDispatcherPlans().count`, `countTone: 'warn'` while `waiting > 0` (MAN-7540) |
+| `roadmap` | left | 1 | yes | badge `designing + in_flight` of `useRoadmap().selected.standing`, each read `?? 0`; `countTone: 'warn'` while `waiting_on_you > 0`; `Body: RoadmapWidgetBody` (MAN-7668); `flush: true`; title `gutters.roadmap.title` |
+| `subagents` | left | 2 | yes | `HeaderAction: SubagentWidgetClearCompleted` |
+| `memory` | right | 0 | no | |
+| `embed` | right | 1 | no | `flush: true` |
+| `notes` | right | 2 | no | badge `notes?.length ?? 0`, `Body: NotesWidgetBody`; not `flush`, no header action (MAN-7518) |
+
+Defaults live in `DEFAULT_PLACEMENTS` (`src/modules/chat-gutters/hooks/useGutterPlacements.ts`).
+- `roadmap` opens itself: the operator asked for it beside Runs, and a widget he asked for is seen without hunting.
+- `ChatGutterLayout` takes `RoadmapWidgetBody` and `useRoadmap` from the roadmap barrel (MAN-7635); the body's own row is MAN-7668.
+- The `roadmap` badge reads sit outside every widget's boundary, so the `?? 0` falls are load-bearing: a picture without `standing` costs the badge its number; a throw would take the whole chat to the workspace error panel.
+- A stored arrangement without `roadmap` gains it at its default through `parsePlacements`; ranks are then made dense per side and ties break on `GUTTER_WIDGET_ORDER`, so a stored `subagents` at order 1 draws after it.
+
+## Gutter widgets — adding one
+
+1. Add the id to `GutterWidgetId`.
+2. Give it a place in `DEFAULT_PLACEMENTS` (`Record<GutterWidgetId, …>`; a missing key fails typecheck). `GUTTER_WIDGET_ORDER` is read off that record's keys.
+3. Add its entry to the `widgets` table in `ChatGutterLayout` (`Record<GutterWidgetId, …>`; also compiler-checked): `title`, `count`, `icon`, `Body`, optional `countTone` (a `Tone`, default `info`), `flush`, `HeaderAction`.
+4. Add `gutters.<id>.title` to every locale's `common.json`.
+
+- No stored placement is migrated. `parsePlacements` is seeded from `DEFAULT_PLACEMENTS`, so a stored arrangement without the new id gains it at its default; stored values are never rewritten.
+- `GutterWidgetFrame`, `GutterColumn` and the server's preference merge are id-generic: no edit.
+- `count` is the badge and `countTone` its colour; a widget counting something other than a list length changes its own table line.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat-gutters/ChatGutterLayout.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat-gutters/hooks/useGutterPlacements.ts

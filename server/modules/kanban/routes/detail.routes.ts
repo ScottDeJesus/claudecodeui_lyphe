@@ -1,7 +1,7 @@
 import express from 'express';
 import type { NextFunction, Request, RequestHandler, Response, Router } from 'express';
 
-import type { KanbanLeaseResult } from '@/shared/kanban-types.js';
+import { kanbanWriteContext, type KanbanLeaseResult } from '@/shared/kanban-types.js';
 
 import type { KanbanChecklistService } from '../kanban-checklist.service.js';
 import type { KanbanLeasesService } from '../kanban-leases.service.js';
@@ -145,10 +145,12 @@ function leaseRoute(
  * (`attachment.routes.ts`), because they are the only routes in the package that handle a
  * multipart body and stream a file rather than parse JSON.
  *
- * Auth is the mount's (`authenticateToken` in `server/index.ts`): no file here imports the guard,
- * and no route reads an actor off the request — the write verbs take the optional trailing context
- * and the routes pass nothing, so an event's actor is `'operator'`. A lease is the exception, and
- * deliberately: its owner is its own concept and travels as its own field.
+ * Auth is the mount's (`authenticateToken` in `server/index.ts`, `kanbanMetisSecretGuard` for
+ * `/api/kanban-pm`): no file here imports a guard. Every write verb takes the optional trailing
+ * context and the route hands it `kanbanWriteContext(response)` — the actor the mount's guard
+ * stamped, so an event's actor is `'metis'` through the Metis door and `'operator'` everywhere else.
+ * A lease is the exception, and deliberately: its owner is its own concept and travels as its own
+ * field.
  *
  * These handlers parse, call one service verb and shape the answer. No transaction, no database
  * handle and no board policy lives here.
@@ -163,12 +165,16 @@ export function createDetailRoutes(dependencies: DetailRouteDependencies): Route
       const body = readBody(request);
 
       response.json({
-        question: questions.addQuestion(request.params.cardId, {
-          text: readString(body, 'text'),
-          options: readOptionalStringList(body, 'options'),
-          multi: readOptionalBoolean(body, 'multi'),
-          otherOn: readOptionalBoolean(body, 'otherOn'),
-        }),
+        question: questions.addQuestion(
+          request.params.cardId,
+          {
+            text: readString(body, 'text'),
+            options: readOptionalStringList(body, 'options'),
+            multi: readOptionalBoolean(body, 'multi'),
+            otherOn: readOptionalBoolean(body, 'otherOn'),
+          },
+          kanbanWriteContext(response)
+        ),
       });
     })
   );
@@ -179,10 +185,11 @@ export function createDetailRoutes(dependencies: DetailRouteDependencies): Route
       const body = readBody(request);
 
       response.json({
-        question: questions.answerQuestion(request.params.questionId, {
-          selected: readStringList(body, 'selected'),
-          other: readOptionalString(body, 'other'),
-        }),
+        question: questions.answerQuestion(
+          request.params.questionId,
+          { selected: readStringList(body, 'selected'), other: readOptionalString(body, 'other') },
+          kanbanWriteContext(response)
+        ),
       });
     })
   );
@@ -193,7 +200,11 @@ export function createDetailRoutes(dependencies: DetailRouteDependencies): Route
       const body = readBody(request);
 
       response.json({
-        issue: checklist.fileIssue(request.params.cardId, { text: readString(body, 'text') }),
+        issue: checklist.fileIssue(
+          request.params.cardId,
+          { text: readString(body, 'text') },
+          kanbanWriteContext(response)
+        ),
       });
     })
   );
@@ -204,9 +215,11 @@ export function createDetailRoutes(dependencies: DetailRouteDependencies): Route
       const body = readBody(request);
 
       response.json({
-        issue: checklist.resolveIssue(request.params.issueId, {
-          resolvedBy: readOptionalString(body, 'resolvedBy'),
-        }),
+        issue: checklist.resolveIssue(
+          request.params.issueId,
+          { resolvedBy: readOptionalString(body, 'resolvedBy') },
+          kanbanWriteContext(response)
+        ),
       });
     })
   );
@@ -217,10 +230,11 @@ export function createDetailRoutes(dependencies: DetailRouteDependencies): Route
       const body = readBody(request);
 
       response.json({
-        item: checklist.addChecklistItem(request.params.cardId, {
-          text: readString(body, 'text'),
-          note: readOptionalString(body, 'note'),
-        }),
+        item: checklist.addChecklistItem(
+          request.params.cardId,
+          { text: readString(body, 'text'), note: readOptionalString(body, 'note') },
+          kanbanWriteContext(response)
+        ),
       });
     })
   );
@@ -231,11 +245,15 @@ export function createDetailRoutes(dependencies: DetailRouteDependencies): Route
       const body = readBody(request);
 
       response.json({
-        item: checklist.updateChecklistItem(request.params.itemId, {
-          state: readOptionalState(body, 'state'),
-          text: readOptionalString(body, 'text'),
-          note: readOptionalString(body, 'note'),
-        }),
+        item: checklist.updateChecklistItem(
+          request.params.itemId,
+          {
+            state: readOptionalState(body, 'state'),
+            text: readOptionalString(body, 'text'),
+            note: readOptionalString(body, 'note'),
+          },
+          kanbanWriteContext(response)
+        ),
       });
     })
   );
@@ -243,7 +261,7 @@ export function createDetailRoutes(dependencies: DetailRouteDependencies): Route
   router.delete(
     '/checklist/:itemId',
     handle<{ itemId: string }>((request, response) => {
-      checklist.removeChecklistItem(request.params.itemId);
+      checklist.removeChecklistItem(request.params.itemId, kanbanWriteContext(response));
       response.json({ ok: true });
     })
   );
@@ -251,14 +269,14 @@ export function createDetailRoutes(dependencies: DetailRouteDependencies): Route
   router.post(
     '/cards/:cardId/approve',
     handle<{ cardId: string }>((request, response) => {
-      response.json({ card: questions.approveCard(request.params.cardId) });
+      response.json({ card: questions.approveCard(request.params.cardId, kanbanWriteContext(response)) });
     })
   );
 
   router.post(
     '/cards/:cardId/unapprove',
     handle<{ cardId: string }>((request, response) => {
-      response.json({ card: questions.unapproveCard(request.params.cardId) });
+      response.json({ card: questions.unapproveCard(request.params.cardId, kanbanWriteContext(response)) });
     })
   );
 

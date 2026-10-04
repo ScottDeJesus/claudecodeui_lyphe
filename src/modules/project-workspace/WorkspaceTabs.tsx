@@ -1,5 +1,4 @@
 import {
-  Activity,
   Brain,
   Clock,
   Coins,
@@ -11,6 +10,8 @@ import {
   ListTodo,
   MessageSquare,
   Orbit,
+  Route,
+  StickyNote,
   Terminal,
 } from 'lucide-react';
 import type { ComponentType, Dispatch, SetStateAction } from 'react';
@@ -29,9 +30,10 @@ type WorkspaceTabsProps = {
   shouldShowMemoryTab: boolean;
   /** How many memories are waiting, for the tab's count pill. Zero draws no pill at all. */
   memoryPendingCount: number;
-  shouldShowRunnerTab: boolean;
   /** How many runs are on the lane, for the tab's count pill. Zero draws no pill at all. */
   runnerCount: number;
+  /** How many prompts the lane is waiting on, for the tab's attention mark. Zero leaves the tab unmarked. */
+  runnerWaiting: number;
   shouldShowHealTab: boolean;
   /** How much live friction the ledger holds, for the tab's count pill. Zero draws no pill at all. */
   healCount: number;
@@ -49,11 +51,11 @@ type BuiltInTab = {
 // One glyph per view, each naming the thing the view actually shows rather than an action:
 // a speech bubble for the conversation, a terminal for the shell, a file tree for the files,
 // a branch for git, lanes for the board, a globe for the browser, a checklist for tasks, a
-// brain for memory, an orbit for the sky, a pulse for the runner — the one view whose
-// subject is something moving on its own — a clock for what the box runs on a schedule, and a
-// heartbeat for the heal reflex, the view whose subject is the house mending itself, and coins
-// for the API tab, the view whose subject is what the house spends on third-party services —
-// Jev and DeepSeek.
+// brain for memory, an orbit for the sky, a route for the roadmap, the path the work is on,
+// a clock for what the box runs on a schedule, a sticky note for the notes a person jots down
+// and comes back to, a heartbeat for the heal reflex, the view whose subject is the house
+// mending itself, and coins for the API tab, the view whose subject is what the house spends
+// on third-party services — Jev and DeepSeek.
 
 // Row one — views of THIS project: what each one shows changes with the project selected.
 const PROJECT_BASE_TABS: BuiltInTab[] = [
@@ -65,6 +67,10 @@ const PROJECT_BASE_TABS: BuiltInTab[] = [
 
 // Row two — the house: surfaces that read the same whichever project is open.
 const HOUSE_BASE_TABS: BuiltInTab[] = [
+  // First, and ungated like Universe: the operator lives here, so the tab is on the row whatever the
+  // lane holds, and an ungated tab never moves the row again. Its two faces are the roadmap and what
+  // is in flight; the count pill and the amber mark on this glyph are the in-flight face's own.
+  { id: 'runner', labelKey: 'tabs.runner', icon: Route },
   // Always visible, and so carrying no gate at all — the convention chat, files and git
   // already keep. The board is global, not per project or per session: it is here whatever
   // the workspace is pointed at.
@@ -74,6 +80,10 @@ const HOUSE_BASE_TABS: BuiltInTab[] = [
   { id: 'universe', labelKey: 'tabs.universe', icon: Orbit },
   // The registry is about the box itself, not the open project, so it too carries no gate.
   { id: 'schedules', labelKey: 'tabs.schedules', icon: Clock },
+  // One list per account, the same in every project, so no gate either — and a tab a person opens
+  // to WRITE in must be on the row before the thing they came to write, whatever their gates say.
+  // It carries no count: a note is not something waiting to be read.
+  { id: 'notes', labelKey: 'tabs.notes', icon: StickyNote },
 ];
 
 const BROWSER_TAB: BuiltInTab = { id: 'browser', labelKey: 'tabs.browser', icon: Globe };
@@ -81,8 +91,6 @@ const BROWSER_TAB: BuiltInTab = { id: 'browser', labelKey: 'tabs.browser', icon:
 const TASKS_TAB: BuiltInTab = { id: 'tasks', labelKey: 'tabs.tasks', icon: ListTodo };
 
 const MEMORY_TAB: BuiltInTab = { id: 'memory', labelKey: 'tabs.memory', icon: Brain };
-
-const RUNNER_TAB: BuiltInTab = { id: 'runner', labelKey: 'tabs.runner', icon: Activity };
 
 const HEAL_TAB: BuiltInTab = { id: 'heal', labelKey: 'tabs.heal', icon: HeartPulse };
 
@@ -96,12 +104,15 @@ const API_TAB: BuiltInTab = { id: 'api', labelKey: 'tabs.api', icon: Coins };
  * any enabled plugin tabs — in TWO rows, split by kind.
  *
  * Row one is this project: Chat, Shell, Files, Git, Browser, Tasks — views whose content changes
- * with the project selected. Row two is the house: Kanban, Universe, Schedules, Memory, Runner,
- * Heal, API, then plugin tabs — surfaces that read the same whichever project is open, which is why
- * every count dot the strip carries lives there. One row held both kinds until it outgrew the
- * sidebar: measured at 328px (a 304px strip, 36px a glyph), nine tabs made 340px of content and
- * the ninth sat past the edge with no affordance at all, three more tabs still to come. Split by
- * kind, each row answers one question, and neither is near its width at today's gates.
+ * with the project selected. Row two is the house: Roadmap, Kanban, Universe, Schedules, Notes,
+ * Memory, Heal, API, then plugin tabs — surfaces that read the same whichever project is open,
+ * which is why every count dot the strip carries lives there. One row held both kinds until it
+ * outgrew the sidebar: measured at 328px (a 304px strip, 36px a glyph), nine tabs made 340px of
+ * content and the ninth sat past the edge with no affordance at all, three more tabs still to
+ * come. Split by kind, each row answers one question, and the house row now holds eight glyphs
+ * with both gates on (Memory and Heal; the Roadmap tab is ungated and always one of them):
+ * 8 × 36 + 7 × 2 = 302px of the 304px strip, so a narrower strip holds fewer and hands the
+ * trailing tabs to the More trigger (`overflowLabel`).
  *
  * Both rows are `underline`, the sidebar's register, and share ONE `activeTab`: the row that
  * does not hold it draws no indicator. Neither row wraps — a row that reflowed would move every
@@ -121,8 +132,8 @@ export default function WorkspaceTabs({
   shouldShowShellTab,
   shouldShowMemoryTab,
   memoryPendingCount,
-  shouldShowRunnerTab,
   runnerCount,
+  runnerWaiting,
   shouldShowHealTab,
   healCount,
   onTabChange,
@@ -141,7 +152,6 @@ export default function WorkspaceTabs({
   const houseTabs: BuiltInTab[] = [
     ...HOUSE_BASE_TABS,
     ...(shouldShowMemoryTab ? [MEMORY_TAB] : []),
-    ...(shouldShowRunnerTab ? [RUNNER_TAB] : []),
     ...(shouldShowHealTab ? [HEAL_TAB] : []),
     API_TAB,
   ];
@@ -149,11 +159,21 @@ export default function WorkspaceTabs({
   // Three tabs carry a count, and each only while there is something to count: `undefined` is what
   // tells `Tabs` to draw no pill at all, so a queue that has just been emptied — or a lane whose
   // last run has just ended under the person standing in the tab — leaves a bare glyph rather
-  // than a zero nobody needs to read. All three tabs are sticky, so each outlives its own count.
+  // than a zero nobody needs to read. Each outlives its own count: Memory and Heal are sticky, and
+  // the Roadmap tab is never off the row at all.
   const countFor = (id: AppTab): number | undefined => {
     if (id === 'memory') return memoryPendingCount > 0 ? memoryPendingCount : undefined;
     if (id === 'runner') return runnerCount > 0 ? runnerCount : undefined;
     if (id === 'heal') return healCount > 0 ? healCount : undefined;
+    return undefined;
+  };
+
+  // One tab carries an ATTENTION, and only while there is something to attend to: the Roadmap tab
+  // says how many prompts the lane is waiting on, which is the one thing its own count pill cannot
+  // tell the operator — a pill of three plans says nothing about the word two of them want. The
+  // sentence is the tab's, off the module's own locale, and the strip draws its mark amber with it.
+  const attentionFor = (id: AppTab): string | undefined => {
+    if (id === 'runner' && runnerWaiting > 0) return t('runner.waiting', { count: runnerWaiting });
     return undefined;
   };
 
@@ -162,6 +182,7 @@ export default function WorkspaceTabs({
     label: t(tab.labelKey),
     icon: tab.icon,
     count: countFor(tab.id),
+    attention: attentionFor(tab.id),
   });
 
   // Plugin tabs keep their place at the end of the house row, after every built-in one, so a newly

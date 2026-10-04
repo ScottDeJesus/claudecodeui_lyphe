@@ -77,6 +77,13 @@ export type RunningSessionListItem = {
 type SessionDetails = {
   /** Canonical app-facing session id (may differ from the looked-up id when a provider-native id was given). */
   sessionId: string;
+  /**
+   * The provider's own (CLI) session id, or `null` before the provider has reported one — a chat with
+   * no turn yet. Carried here, as a 200, so a caller that only wants to know whether the id exists
+   * yet (the open chat anchoring the launches the launcher stamped with it) is not answered with
+   * the 409 the `provider-id` route gives, which the browser logs as a console error on every empty chat.
+   */
+  providerSessionId: string | null;
   provider: LLMProvider;
   summary: string;
   createdAt: string | null;
@@ -196,9 +203,10 @@ export const sessionsService = {
         projectDisplayName: resolveProjectDisplayName(projectPath, project?.custom_project_name),
         sessionTitle: session?.custom_name?.trim() || run.sessionId,
         lastActivity: session?.updated_at ?? session?.created_at ?? null,
-        // Read from the providers directly: `providerRuntimeService` imports this service.
-        awaitingInput: providerRegistry.listProviders().some(
-          (provider) => (provider.runtime.permissions?.listPending(run.sessionId) ?? []).length > 0,
+        // Read from the registry directly: `providerRuntimeService` imports this service. A gateway
+        // whose asks are pending in no chat lists nothing at all (the dispatcher's).
+        awaitingInput: providerRegistry.listPermissionGateways().some(
+          (gateway) => (gateway.listPending?.(run.sessionId) ?? []).length > 0,
         ),
       };
     });
@@ -213,13 +221,16 @@ export const sessionsService = {
    * it was parked on — in both states the question is pending on screen while the run registry has
    * already forgotten the session. A mark read off the runs alone cannot appear in either.
    *
-   * Reads the providers directly: `providerRuntimeService` imports this service.
+   * Reads the registry directly: `providerRuntimeService` imports this service.
    */
   listAwaitingInputSessionIds(): string[] {
     const sessionIds = new Set<string>();
 
-    for (const provider of providerRegistry.listProviders()) {
-      for (const sessionId of provider.runtime.permissions?.listPendingSessions() ?? []) {
+    // Every holder of an ask that is pending in a CHAT — a provider's run, or a runtime's own approval.
+    // The dispatcher's gateway is not one of them: a plan's prompt is answered on the plan's card and
+    // on the phone, and this mark is the chat's.
+    for (const gateway of providerRegistry.listPermissionGateways()) {
+      for (const sessionId of gateway.listPendingSessions?.() ?? []) {
         sessionIds.add(sessionId);
       }
     }
@@ -642,6 +653,7 @@ export const sessionsService = {
 
     return {
       sessionId: session.session_id,
+      providerSessionId: session.provider_session_id || null,
       provider: session.provider as LLMProvider,
       summary: session.custom_name?.trim() || '',
       createdAt: session.created_at ?? null,

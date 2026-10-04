@@ -28,10 +28,12 @@ import {
   LLMProviderLogo,
   Select,
 } from "@/shared/ui";
+import { useHostWindow } from '@/shared/context/HostWindowContext';
 import { useSimpleChatListPreferences } from "@/shared/hooks/useSimpleChatListPreferences";
 import ModelLibraryPanel from "@/modules/chat/modals/ModelLibraryPanel";
 import { useSignedOutProviders } from "@/modules/chat/hooks/useSignedOutProviders";
 import { writeSelectedProvider } from '@/shared/selectedProvider';
+import { formatShortcut } from '@/shared/utils';
 
 const PROVIDER_META: { id: LLMProvider; name: string }[] = [
   { id: "claude", name: "Anthropic" },
@@ -39,9 +41,6 @@ const PROVIDER_META: { id: LLMProvider; name: string }[] = [
   { id: "cursor", name: "Cursor" },
   { id: "opencode", name: "OpenCode" },
 ];
-
-const MOD_KEY =
-  typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.platform) ? "⌘" : "Ctrl";
 
 // cmdk's default filter is fuzzy (loose character-subsequence scoring), which
 // surfaces unrelated models — e.g. searching "chatgpt" also matched "Fable".
@@ -126,6 +125,9 @@ export default function ProviderSelectionEmptyState({
   onSelectProject,
 }: ProviderSelectionEmptyStateProps) {
   const { t } = useTranslation("chat");
+  // The focus that follows a pick is timed on the window the reader is in: a hidden opener throttles
+  // its timers, and the box would take focus late.
+  const hostWindow = useHostWindow();
   const [modelLibraryOpen, setModelLibraryOpen] = useState(false);
   const isNewChat = !selectedSession && !currentSessionId;
   // Providers the server reports signed out offer nothing to pick; the hook also owns the
@@ -175,9 +177,9 @@ export default function ProviderSelectionEmptyState({
       writeSelectedProvider(providerId);
       setProviderModel(providerId, modelValue);
       setDialogOpen(false);
-      setTimeout(() => textareaRef.current?.focus(), 100);
+      hostWindow.setTimeout(() => textareaRef.current?.focus(), 100);
     },
-    [setProvider, setProviderModel, setDialogOpen, textareaRef],
+    [setProvider, setProviderModel, setDialogOpen, textareaRef, hostWindow],
   );
 
   const openModelLibrary = () => {
@@ -368,20 +370,21 @@ export default function ProviderSelectionEmptyState({
             </DialogContent>
           </Dialog>
 
+          {/* Named the way the card above names it: the option's label, not the value it sends. */}
           <p className="mt-4 text-center text-sm text-muted-foreground/70">
             {
               {
                 claude: t("providerSelection.readyPrompt.claude", {
-                  model: providerModels.claude,
+                  model: currentModelLabel,
                 }),
                 cursor: t("providerSelection.readyPrompt.cursor", {
-                  model: providerModels.cursor,
+                  model: currentModelLabel,
                 }),
                 codex: t("providerSelection.readyPrompt.codex", {
-                  model: providerModels.codex,
+                  model: currentModelLabel,
                 }),
                 opencode: t("providerSelection.readyPrompt.opencode", {
-                  model: providerModels.opencode,
+                  model: currentModelLabel,
                   defaultValue: "Ready with OpenCode {{model}}",
                 }),
               }[provider]
@@ -392,7 +395,7 @@ export default function ProviderSelectionEmptyState({
             <Trans
               ns="chat"
               i18nKey="providerSelection.pressToSearch"
-              values={{ shortcut: MOD_KEY === "⌘" ? "⌘K" : "Ctrl+K" }}
+              values={{ shortcut: formatShortcut("K") }}
               components={{
                 kbd: (
                   <kbd className="inline-flex items-center gap-0.5 rounded border border-border/60 bg-muted/40 px-1.5 py-0.5 font-mono text-[10px]" />

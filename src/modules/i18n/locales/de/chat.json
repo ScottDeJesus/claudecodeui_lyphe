@@ -113,7 +113,7 @@
     "deepseekFlash": "DeepSeek Flash",
     "deepseekFlashShort": "Flash",
     "deepseekFlashOffShort": "Claude",
-    "deepseekFlashTooltip": "Solange das an ist, laufen die Bau-Souls des Plan-Runners — der Builder, sein Fix-Durchlauf und Athena — auf DeepSeek Flash. Prometheus und die Scouts bleiben auf Claude.",
+    "deepseekFlashTooltip": "Solange das an ist, laufen die Bau-Souls des Runners — der Builder, sein Fix-Durchlauf und Athena — auf DeepSeek Flash. Prometheus und die Scouts bleiben auf Claude.",
     "deepseekFlashReading": "Der Schalter wird gelesen…",
     "deepseekFlashUnreadable": "Der Schalter konnte nicht gelesen werden — zum erneuten Versuch tippen.",
     "clearInput": "Eingabe leeren",
@@ -310,5 +310,24 @@
       "warning": "Warnung",
       "caution": "Achtung"
     }
+  },
+  "question": {
+    "needsInput": "Claude braucht deine Eingabe",
+    "selectAll": "Alle zutreffenden auswählen",
+    "other": "Andere...",
+    "otherPlaceholder": "Antwort eingeben...",
+    "skip": "Überspringen",
+    "skipAll": "Alle überspringen",
+    "back": "Zurück",
+    "next": "Weiter",
+    "submit": "Senden",
+    "skipped": "Übersprungen",
+    "noAnswer": "Keine Antwort",
+    "yourAnswer": "Deine Antwort",
+    "yourWords": "In deinen Worten",
+    "showFull": "Ganze Frage anzeigen",
+    "showLess": "Weniger anzeigen",
+    "showDetails": "Ganze Frage und alle Optionen anzeigen",
+    "hideDetails": "Ganze Frage ausblenden"
   }
 }

@@ -51,6 +51,16 @@ export function createSettingsRouter(
   // it is OPTIONAL: absent or null is no ceiling at all, which is the switch's default.
   router.get('/swarm', respond(() => service.getSwarm()));
   router.put('/swarm', respond((req) => service.setSwarm(req.body?.enabled, req.body?.lanes)));
+  // The dispatcher's park-at-peak switch, host-wide like the two above and read the same way: it
+  // steers the dispatcher on this host, so no `userId` is read. One word on the PUT body, because
+  // the file holds one line — `off`, or `on`.
+  router.get('/park-at-peak', respond(() => service.getParkAtPeak()));
+  router.put('/park-at-peak', respond((req) => service.setParkAtPeak(req.body?.enabled)));
+  // The dispatcher's planner-lane dial, host-wide like the switches above and read the same way: it
+  // steers the dispatcher on this host, so no `userId` is read. One integer on the PUT body, because
+  // the file holds one line — a bare count of at least 1.
+  router.get('/planner-lanes', respond(() => service.getPlannerLanes()));
+  router.put('/planner-lanes', respond((req) => service.setPlannerLanes(req.body?.lanes)));
   // The heal reflex's four switches, host-wide and read the same way: they are flag files steering a
   // worker on this host, so no `userId` is read. THE MASTER is the first of the family — one line,
   // `off` or `on`, and the only one of the four the reflex's whole launching hangs on. The CYCLE

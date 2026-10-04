@@ -35,6 +35,42 @@ export function signalReady(): void {
 }
 
 /**
+ * Asks the supervisor to boot this server's code again and hand the port over — the API restarting
+ * itself, which is how the update pipeline loads a newly installed SDK. `reason` is for the
+ * journal, where the supervisor logs it beside this pid. `false` means nothing was sent: this
+ * process is not a supervised child, or the supervisor's channel is already gone, so no boot is
+ * coming and the caller must not wait on one.
+ *
+ * Guarded on `process.connected`, NEVER on `process.send`, for the reason in the paragraph above
+ * `signalReady`: the method outlives the channel, and the send then fails asynchronously as an
+ * unhandled 'error' on `process`. The callback closes what is left of that window.
+ */
+export function requestReboot(reason: string): boolean {
+    if (!supervised || !process.connected) return false;
+    process.send?.({ type: 'reboot', reason }, (error: Error | null) => {
+        if (error) console.warn('[keepalive] supervisor left before the reboot request was sent');
+    });
+    return true;
+}
+
+/**
+ * Registers the listener the supervisor's `reboot-failed` answer lands on: the boot this process
+ * asked for never came up, and `detail` is that boot's first error line (its timeout line when it
+ * hung). Asked once per process, before the first request is sent.
+ *
+ * Its own `process.on('message')` handler, never a branch inside the one `onTakeover` installs:
+ * that handler detaches itself once it has done its single job, and this answer arrives long after
+ * a request — and only ever for one whose boot failed.
+ */
+export function onRebootFailed(listener: (detail: string) => void): void {
+    process.on('message', (message: unknown) => {
+        const answer = message as { type?: unknown; detail?: unknown } | null;
+        if (answer?.type !== 'reboot-failed' || typeof answer.detail !== 'string') return;
+        listener(answer.detail);
+    });
+}
+
+/**
  * Defers the sole-server duties until the supervisor reports the predecessor gone.
  *
  * Only `takeover` may run them. Re-adopting while the previous server still holds its hosts is a

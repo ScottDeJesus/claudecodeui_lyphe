@@ -81,11 +81,15 @@ function buildGroupPreview(messages: ChatMessage[]): string {
   // whose first preview is empty render "/b.ts, +1 more" beside an x3 badge.
   const extraCount = messages.length - named.length;
 
-  if (!previewText) {
-    return extraCount > 0 ? `+${extraCount} more` : '';
-  }
+  const listed = !previewText
+    ? (extraCount > 0 ? `+${extraCount} more` : '')
+    : (extraCount > 0 ? `${previewText}, +${extraCount} more` : previewText);
 
-  return extraCount > 0 ? `${previewText}, +${extraCount} more` : previewText;
+  // The group is folded, and a picture inside it is not drawn until it opens — the row says one is there.
+  const pictureCount = messages.reduce((count, message) => count + (message.toolResult?.images?.length ?? 0), 0);
+  const pictureNote = pictureCount > 0 ? `${pictureCount} ${pictureCount === 1 ? 'picture' : 'pictures'}` : '';
+
+  return [listed, pictureNote].filter(Boolean).join(' · ');
 }
 
 export function groupConsecutiveTools(

@@ -33,7 +33,7 @@ type TimelineProps = {
  *
  * The rail is painted from `border-border` and the dot from `bg-accent-ink` — the mark the card's
  * own ink uses, and the fill that clears the 3:1 graphics floor the accent FILL does not
- * (`src/shared/ui/verve/README.md`). A timeline is one of the two shapes `src/shared/ui/` has not
+ * (`src/shared/ui/verve/MANUAL.md (README)`). A timeline is one of the two shapes `src/shared/ui/` has not
  * built yet, so it is drawn from tokens here and moves the day a second module wants one.
  */
 export function Timeline({ ordered, start, collapseKey, children }: TimelineProps) {

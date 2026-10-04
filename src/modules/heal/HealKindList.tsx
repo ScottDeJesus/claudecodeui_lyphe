@@ -12,13 +12,14 @@ import { cn } from '@/shared/utils';
 /**
  * Friction BY KIND — the door's own word, which is what a heal is scoped to.
  *
- * ONE ROW PER KIND, IN TRIAGE ORDER: a regression first (a cause a heal claimed has come back —
+ * ONE ROW PER KIND, IN TRIAGE ORDER: a regression first (a SHAPE a heal claimed has come back —
  * the one red thing on this list), then the most live rows, then the all-ignored kinds last and
  * greyed, because they are refusals by design and read as noise on purpose.
  *
  * THE CAUSE CLASS SITS BESIDE THE KIND ONLY WHERE ONE IS KNOWN. A kind whose rows carry no `klass`
- * shows the kind alone — never a guessed class — since only a judged class can feed a heal's
- * claims or mark a regression. A null trend prints a dash and SAYS "no trend"; an arrow would be
+ * shows the kind alone — never a guessed class — since a class is a judgment about the rows. It
+ * never marks a regression: a claim is a set of shapes, and the badge prints the shape itself. A
+ * null trend prints a dash and SAYS "no trend"; an arrow would be
  * a fabricated reading of a window that does not exist.
  *
  * Each kind opens to its items, and an item shows enough to open its transcript line: the source
@@ -132,7 +133,7 @@ function KindRow({ row, onOpenItem }: { row: HealKindRow; onOpenItem: (item: Hea
 
   return (
     <li className={cn('min-w-0 rounded-lg border border-border', quiet && 'opacity-60')} data-heal-kind={row.kind}>
-      {/* A regression opens on arrival: the reader must not have to press to see the cause that came back. */}
+      {/* A regression opens on arrival: the reader must not have to press to see the shape that came back. */}
       <Collapsible
         defaultOpen={row.regression !== null}
         onOpenChange={(open) => {
@@ -166,8 +167,8 @@ function KindRow({ row, onOpenItem }: { row: HealKindRow; onOpenItem: (item: Hea
           {row.regression !== null && (
             <Badge as="span" tone="danger" className="min-w-0 break-words">
               {t('heal.kinds.regression', {
-                defaultValue: '⚠ regression · {{klass}} came back {{ago}}',
-                klass: classWord(row.regression.klass),
+                defaultValue: '⚠ regression · {{signature}} came back {{ago}}',
+                signature: row.regression.signature,
                 ago: agoWord(row.regression.since),
               })}
             </Badge>

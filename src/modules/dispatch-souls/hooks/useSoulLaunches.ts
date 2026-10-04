@@ -15,7 +15,8 @@ import type { SoulLaunchSnapshot } from '@/shared/types';
  * ids ANCHORED IN THE TRANSCRIPT and asks, for each, whether the lane knows that launch. An array
  * would be walked once per anchor; this is one lookup each, and it is also where the "which
  * launches are real" question is answered — an id no entry answers for is a launch this lane does
- * not carry, and draws nothing.
+ * not carry, and draws nothing. The strip also walks the values once, for the launches whose
+ * `launched_by` stamp is the open chat's own CLI session id (`readStampedLaunchIds`).
  *
  * `undefined` (nothing retained yet) and `[]` (the lane is empty) collapse to an empty map on
  * purpose: to a screen they are the same instruction — draw nothing — and a caller forced to tell

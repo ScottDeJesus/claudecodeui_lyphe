@@ -168,7 +168,11 @@ function ChatMessagesPane({
   // does not carry, which is how the caption falls back to the provider's name
   // instead of printing an identifier.
   const resolveModelLabel = useCallback(
-    (modelId: string): string | null => labelForModelId(providerModelCatalog[provider]?.OPTIONS ?? [], modelId),
+    (modelId: string): string | null => labelForModelId(
+      providerModelCatalog[provider]?.OPTIONS ?? [],
+      modelId,
+      providerModelCatalog[provider]?.LABELS_BY_MODEL_ID,
+    ),
     [provider, providerModelCatalog],
   );
   const lazyRows = useLazyRowObserver(scrollContainerRef);
@@ -286,17 +290,20 @@ function ChatMessagesPane({
       ref={scrollContainerRef}
       onWheel={onWheel}
       onTouchMove={onTouchMove}
-      className={`chat-messages-pane relative min-h-0 flex-1 overflow-y-auto overflow-x-hidden pt-3 sm:pt-4 ${
-        hasActivityIndicator ? 'pb-12 sm:pb-14' : 'pb-3 sm:pb-4'
-      }`}
+      className="chat-messages-pane relative min-h-0 flex-1 overflow-y-auto overflow-x-hidden pt-3 sm:pt-4"
       // Published here, on the scroller, rather than on :root — the reader's size belongs to
       // the transcript, and every message body inside it reads the variable off this ancestor.
       style={{ '--chat-font-size': `${chatFontSize}px` } as CSSProperties}
     >
       {/* Laid out but invisible while the chat opens, so the settle loop measures real
-          heights and pins the bottom before anything is seen; it then appears whole. */}
+          heights and pins the bottom before anything is seen; it then appears whole.
+          The room under the last row (taller while the activity tab floats over it) is padding of
+          THIS box, not of the scroller: the follow watches this box's size, and a change in the
+          scroller's own padding would move the foot without resizing anything it could see. */}
       <div
         className={`mx-auto w-full max-w-[54.25rem] space-y-3 px-4 sm:space-y-4 ${
+          hasActivityIndicator ? 'pb-12 sm:pb-14' : 'pb-3 sm:pb-4'
+        } ${
           isOpeningSession ? 'pointer-events-none opacity-0' : 'opacity-100 transition-opacity duration-150'
         }`}
         aria-busy={isOpeningSession || undefined}

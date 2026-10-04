@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { Dispatch, KeyboardEvent, RefObject, SetStateAction } from 'react';
 
 import { api } from '@/shared/api';
+import { useHostWindow } from '@/shared/context/HostWindowContext';
 import { escapeRegExp } from '@/modules/chat/utils/chatFormatting';
 import type { Project } from '@/shared/types';
 
@@ -48,6 +49,8 @@ const flattenFileTree = (files: ProjectFileNode[], basePath = ''): MentionableFi
 };
 
 export function useFileMentions({ selectedProject, input, setInput, textareaRef }: UseFileMentionsOptions) {
+  // The caret is set on the window that paints the box: a hidden opener runs no frames.
+  const hostWindow = useHostWindow();
   const [fileList, setFileList] = useState<MentionableFile[]>([]);
   const [fileMentions, setFileMentions] = useState<string[]>([]);
   const [filteredFiles, setFilteredFiles] = useState<MentionableFile[]>([]);
@@ -205,7 +208,7 @@ export function useFileMentions({ selectedProject, input, setInput, textareaRef 
         return;
       }
 
-      requestAnimationFrame(() => {
+      hostWindow.requestAnimationFrame(() => {
         if (!textareaRef.current) {
           return;
         }
@@ -215,7 +218,7 @@ export function useFileMentions({ selectedProject, input, setInput, textareaRef 
         }
       });
     },
-    [input, atSymbolPosition, textareaRef, setInput],
+    [input, atSymbolPosition, textareaRef, setInput, hostWindow],
   );
 
   const handleFileMentionsKeyDown = useCallback(

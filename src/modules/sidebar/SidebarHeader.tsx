@@ -3,12 +3,9 @@ import type { ReactNode } from 'react';
 import type { TFunction } from 'i18next';
 
 import { Button, Chip, Input } from '@/shared/ui';
-import { IS_PLATFORM } from '@/shared/utils';
+import { IS_PLATFORM, modifierKeyLabel } from '@/shared/utils';
 import type { SidebarSearchMode } from '@/shared/types';
 import { useCompactSidebar } from '@/modules/sidebar/hooks/useCompactSidebar';
-
-const MOD_KEY =
-  typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform) ? '⌘' : 'Ctrl';
 
 type SidebarHeaderProps = {
   isPWA: boolean;
@@ -212,7 +209,7 @@ export default function SidebarHeader({
                   title={t('tooltips.openCommandPalette')}
                   className="pointer-events-none absolute right-2.5 top-1/2 hidden -translate-y-1/2 items-center gap-0.5 rounded border border-border/60 bg-muted/40 px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground md:inline-flex"
                 >
-                  {MOD_KEY}
+                  {modifierKeyLabel()}
                   <span>K</span>
                 </kbd>
               )}

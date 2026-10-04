@@ -1,19 +1,24 @@
 import { useEffect, useState } from 'react';
 
+import { useHostWindow } from '@/shared/context/HostWindowContext';
+
 type UseDeviceSettingsOptions = {
   mobileBreakpoint?: number;
   trackMobile?: boolean;
   trackPWA?: boolean;
 };
 
-const getIsMobile = (mobileBreakpoint: number): boolean => {
-  if (typeof window === 'undefined') {
-    return false;
-  }
+/**
+ * A viewport measurement, so it reads the window the reader is looking through. The chat's composer
+ * asks this at breakpoint 640, and inside a 420px picture-in-picture window it must answer narrow
+ * although the opener is 1440 wide.
+ */
+const getIsMobile = (hostWindow: Window, mobileBreakpoint: number): boolean => (
+  hostWindow.innerWidth < mobileBreakpoint
+);
 
-  return window.innerWidth < mobileBreakpoint;
-};
-
+// Stays on the global window on purpose: display mode (standalone, home-screen app) is a fact of the
+// opener's browser window, and a picture-in-picture window it opened has none of its own.
 const getIsPWA = (): boolean => {
   if (typeof window === 'undefined') {
     return false;
@@ -35,29 +40,32 @@ export function useDeviceSettings(options: UseDeviceSettingsOptions = {}) {
     trackPWA = true
   } = options;
 
+  const hostWindow = useHostWindow();
   const [isMobile, setIsMobile] = useState<boolean>(() => (
-    trackMobile ? getIsMobile(mobileBreakpoint) : false
+    trackMobile ? getIsMobile(hostWindow, mobileBreakpoint) : false
   ));
   const [isPWA, setIsPWA] = useState<boolean>(() => (
     trackPWA ? getIsPWA() : false
   ));
 
   useEffect(() => {
-    if (!trackMobile || typeof window === 'undefined') {
+    if (!trackMobile) {
       return;
     }
 
     const checkMobile = () => {
-      setIsMobile(getIsMobile(mobileBreakpoint));
+      setIsMobile(getIsMobile(hostWindow, mobileBreakpoint));
     };
 
+    // Read on the way in as well as on `resize`: a move to another window changes the width without
+    // a resize event on the window the listener is about to bind to.
     checkMobile();
-    window.addEventListener('resize', checkMobile);
+    hostWindow.addEventListener('resize', checkMobile);
 
     return () => {
-      window.removeEventListener('resize', checkMobile);
+      hostWindow.removeEventListener('resize', checkMobile);
     };
-  }, [mobileBreakpoint, trackMobile]);
+  }, [mobileBreakpoint, trackMobile, hostWindow]);
 
   useEffect(() => {
     if (!trackPWA || typeof window === 'undefined') {

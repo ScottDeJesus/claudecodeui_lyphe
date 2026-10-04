@@ -113,7 +113,7 @@
     "deepseekFlash": "DeepSeek Flash",
     "deepseekFlashShort": "Flash",
     "deepseekFlashOffShort": "Claude",
-    "deepseekFlashTooltip": "Пока это включено, строительные души plan runner — сборщик, его проход исправлений и Athena — работают на DeepSeek Flash. Prometheus и разведчики остаются на Claude.",
+    "deepseekFlashTooltip": "Пока это включено, строительные души runner — сборщик, его проход исправлений и Athena — работают на DeepSeek Flash. Prometheus и разведчики остаются на Claude.",
     "deepseekFlashReading": "Чтение переключателя…",
     "deepseekFlashUnreadable": "Не удалось прочитать переключатель — нажмите, чтобы повторить.",
     "clearInput": "Очистить ввод",
@@ -310,5 +310,24 @@
       "warning": "Предупреждение",
       "caution": "Осторожно"
     }
+  },
+  "question": {
+    "needsInput": "Claude ждёт вашего ответа",
+    "selectAll": "Выберите все подходящие",
+    "other": "Другое...",
+    "otherPlaceholder": "Введите ответ...",
+    "skip": "Пропустить",
+    "skipAll": "Пропустить все",
+    "back": "Назад",
+    "next": "Далее",
+    "submit": "Отправить",
+    "skipped": "Пропущено",
+    "noAnswer": "Ответа нет",
+    "yourAnswer": "Ваш ответ",
+    "yourWords": "Вашими словами",
+    "showFull": "Показать вопрос целиком",
+    "showLess": "Свернуть",
+    "showDetails": "Показать вопрос целиком и все варианты",
+    "hideDetails": "Скрыть вопрос целиком"
   }
 }

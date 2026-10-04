@@ -77,6 +77,12 @@ export type LiveHost = {
    * is newer (see `lastReportedCliVersion`).
    */
   cliVersion: string | null;
+  /**
+   * The pid of the CLI this host owns — `child.pid` in `host.js`, recorded in the meta — or null for a
+   * meta that holds none. The claude-activity module uses it to tell a host's own CLI from a `claude`
+   * process nothing here knows about.
+   */
+  cliPid: number | null;
 };
 
 export type TmuxResult = { ok: boolean; stdout: string; error: string | null };
@@ -178,7 +184,8 @@ export function listLiveHosts(): LiveHost[] {
       profile: meta.profile && typeof meta.profile === 'object' ? meta.profile : null,
       // Out of the journal, not the meta: what the CLI said about itself, at the one moment it said
       // it. A host spawned before this field existed answers just the same.
-      cliVersion: lastReportedCliVersion(hostId)
+      cliVersion: lastReportedCliVersion(hostId),
+      cliPid: Number.isInteger(meta.pid) && (meta.pid as number) > 0 ? (meta.pid as number) : null
     });
   }
   return live;

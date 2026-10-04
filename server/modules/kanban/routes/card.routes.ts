@@ -6,30 +6,16 @@ import {
   KANBAN_LANE_LIMIT_MAX,
   KANBAN_PRIORITIES,
   KANBAN_STATUSES,
+  kanbanWriteContext,
   type KanbanPriority,
   type KanbanStatus,
 } from '@/shared/kanban-types.js';
 
 import type { KanbanCardsService } from '../kanban-cards.service.js';
 
-/**
- * What one card's plan cost, as the plan-runner's own reading answers it.
- *
- * Declared here — structurally, with no import across modules — because the board module's whole
- * composition discipline is that everything below its constructor takes what it needs as an
- * argument: `plan-runner`'s `planCostFor` satisfies this shape field for field, and the ONE
- * cross-module import that joins them lives in the composition root (`server/index.ts`).
- */
-export type KanbanPlanCostReader = (planPath: string) => {
-  totalUsd: number;
-  byKind: { planning: number; review: number; scouts: number; build: number };
-  runs: number;
-} | null;
-
 /** The dependencies this route package needs. `kanban.routes.ts` hands them over. */
 export type CardRouteDependencies = {
   cards: KanbanCardsService;
-  planCost: KanbanPlanCostReader;
 };
 
 /**
@@ -117,12 +103,13 @@ function optionalString(
 }
 
 /**
- * The card routes: the lane page, create, detail, the plan-cost read, patch, move, archive,
- * restore and the two tag writes.
+ * The card routes: the lane page, create, detail, patch, move, archive, restore and the two tag
+ * writes.
  *
- * Auth is the mount's (`authenticateToken` in `server/index.ts`): no file here imports the guard,
- * and no route reads an actor off the request — the write verbs take the optional trailing context
- * and the routes pass nothing, so an event's actor is `'operator'`.
+ * Auth is the mount's (`authenticateToken` in `server/index.ts`, `kanbanMetisSecretGuard` for
+ * `/api/kanban-pm`): no file here imports a guard. Every write verb takes the optional trailing
+ * context and the route hands it `kanbanWriteContext(response)` — the actor the mount's guard
+ * stamped, so an event's actor is `'metis'` through the Metis door and `'operator'` everywhere else.
  *
  * These handlers parse, call one service verb and shape the answer. No transaction, no database
  * handle, and no lane policy lives here: which statuses compose a lane is the panel's, and the
@@ -130,7 +117,7 @@ function optionalString(
  */
 export function createCardRoutes(dependencies: CardRouteDependencies): Router {
   const router = express.Router();
-  const { cards, planCost } = dependencies;
+  const { cards } = dependencies;
 
   router.get(
     '/boards/:boardId/cards',
@@ -181,12 +168,16 @@ export function createCardRoutes(dependencies: CardRouteDependencies): Router {
       }
 
       response.json({
-        card: cards.createCard(request.params.boardId, {
-          title: body.title,
-          priority: isPriority(body.priority) ? body.priority : undefined,
-          status: isStatus(body.status) ? body.status : undefined,
-          description,
-        }),
+        card: cards.createCard(
+          request.params.boardId,
+          {
+            title: body.title,
+            priority: isPriority(body.priority) ? body.priority : undefined,
+            status: isStatus(body.status) ? body.status : undefined,
+            description,
+          },
+          kanbanWriteContext(response)
+        ),
       });
     })
   );
@@ -195,21 +186,6 @@ export function createCardRoutes(dependencies: CardRouteDependencies): Router {
     '/cards/:cardId',
     handle<{ cardId: string }>((request, response) => {
       response.json({ card: cards.getCard(request.params.cardId) });
-    })
-  );
-
-  router.get(
-    '/cards/:cardId/plan-cost',
-    handle<{ cardId: string }>((request, response) => {
-      // The card's plan COLUMN is read first, and it is read from the card rather than from the
-      // query: a card with no plan is `null` — not a zero, which would be the drawer claiming a
-      // build that never happened cost nothing. `getCard` is also what answers the 404 for an id
-      // that names no card, so this route invents no refusal of its own.
-      const plan = cards.getCard(request.params.cardId).plan;
-
-      response.json({
-        planCost: plan === null || plan.trim().length === 0 ? null : planCost(plan),
-      });
     })
   );
 
@@ -251,7 +227,9 @@ export function createCardRoutes(dependencies: CardRouteDependencies): Router {
         patch.priority = body.priority;
       }
 
-      response.json({ card: cards.updateCard(request.params.cardId, patch) });
+      response.json({
+        card: cards.updateCard(request.params.cardId, patch, kanbanWriteContext(response)),
+      });
     })
   );
 
@@ -272,11 +250,15 @@ export function createCardRoutes(dependencies: CardRouteDependencies): Router {
       }
 
       response.json({
-        card: cards.moveCard(request.params.cardId, {
-          status: body.status,
-          afterId: (body.afterId as string | null | undefined) ?? null,
-          beforeId: (body.beforeId as string | null | undefined) ?? null,
-        }),
+        card: cards.moveCard(
+          request.params.cardId,
+          {
+            status: body.status,
+            afterId: (body.afterId as string | null | undefined) ?? null,
+            beforeId: (body.beforeId as string | null | undefined) ?? null,
+          },
+          kanbanWriteContext(response)
+        ),
       });
     })
   );
@@ -284,14 +266,14 @@ export function createCardRoutes(dependencies: CardRouteDependencies): Router {
   router.post(
     '/cards/:cardId/archive',
     handle<{ cardId: string }>((request, response) => {
-      response.json({ card: cards.archiveCard(request.params.cardId) });
+      response.json({ card: cards.archiveCard(request.params.cardId, kanbanWriteContext(response)) });
     })
   );
 
   router.post(
     '/cards/:cardId/restore',
     handle<{ cardId: string }>((request, response) => {
-      response.json({ card: cards.restoreCard(request.params.cardId) });
+      response.json({ card: cards.restoreCard(request.params.cardId, kanbanWriteContext(response)) });
     })
   );
 
@@ -305,14 +287,16 @@ export function createCardRoutes(dependencies: CardRouteDependencies): Router {
         return;
       }
 
-      response.json({ card: cards.addTag(request.params.cardId, body.tag) });
+      response.json({ card: cards.addTag(request.params.cardId, body.tag, kanbanWriteContext(response)) });
     })
   );
 
   router.delete(
     '/cards/:cardId/tags/:tag',
     handle<{ cardId: string; tag: string }>((request, response) => {
-      response.json({ card: cards.removeTag(request.params.cardId, request.params.tag) });
+      response.json({
+        card: cards.removeTag(request.params.cardId, request.params.tag, kanbanWriteContext(response)),
+      });
     })
   );
 

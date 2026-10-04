@@ -20,6 +20,17 @@ type StepperProps = {
   increaseLabel: string;
   /** Names the value itself, e.g. "Chat text size". */
   ariaLabel: string;
+  /**
+   * A quiet word after the value, inside the control — muted and small, for a value that is not the
+   * reader's own choice ("3 · default"). Announced with the value, so a reader who cannot see it still
+   * hears which kind of 3 it is.
+   */
+  note?: string;
+  /**
+   * The 32px-tall form, for a control that shares a card's action row with `h-8` buttons: the
+   * default stepper is 32px of button inside a 1.5px border, and so stands 35px tall in that row.
+   */
+  compact?: boolean;
 };
 
 export function Stepper({
@@ -31,9 +42,11 @@ export function Stepper({
   decreaseLabel,
   increaseLabel,
   ariaLabel,
+  note,
+  compact = false,
 }: StepperProps) {
   return (
-    <div className="vv-stepper inline-flex items-center" role="group" aria-label={ariaLabel}>
+    <div className={`vv-stepper${compact ? ' vv-stepper--compact' : ''} inline-flex items-center`} role="group" aria-label={ariaLabel}>
       <button
         type="button"
         className="vv-stepper__button"
@@ -43,7 +56,17 @@ export function Stepper({
       >
         <Minus className="h-4 w-4" strokeWidth={2} />
       </button>
-      <span className="vv-stepper__value" aria-live="polite">{value}</span>
+      <span className="vv-stepper__value" aria-live="polite">
+        {value}
+        {/* A real space before the note: the dot is drawn and not spoken, so without it a screen
+            reader runs the two into one word ("Alldefault"). */}
+        {note !== undefined && (
+          <>
+            {' '}
+            <span className="vv-stepper__note">{note}</span>
+          </>
+        )}
+      </span>
       <button
         type="button"
         className="vv-stepper__button"

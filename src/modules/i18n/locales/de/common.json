@@ -302,12 +302,27 @@
       "closeSidebar": "Seitenleiste schließen"
     }
   },
+  "lightbox": {
+    "close": "Vorschau schließen",
+    "zoomIn": "Vergrößern",
+    "zoomOut": "Verkleinern",
+    "fit": "An Bildschirm anpassen"
+  },
   "shapes": {
-    "diagramFailed": "Dieses Diagramm konnte nicht gezeichnet werden – der Quelltext wird angezeigt."
+    "diagramFailed": "Dieses Diagramm konnte nicht gezeichnet werden – der Quelltext wird angezeigt.",
+    "diagram": "Diagramm",
+    "diagramOpen": "Diagramm im Vollbild öffnen"
+  },
+  "runner": {
+    "collapse": "Einklappen",
+    "expand": "Ausklappen"
   },
   "gutters": {
     "runner": {
       "title": "Läufe"
+    },
+    "roadmap": {
+      "title": "Roadmap"
     },
     "memory": {
       "title": "Erinnerungen",
@@ -339,6 +354,9 @@
       "open": "Seite in neuem Tab öffnen",
       "rejected": "Das ist keine http:// oder https:// Adresse"
     },
+    "notes": {
+      "title": "Notizen"
+    },
     "open": "{{name}} öffnen",
     "collapse": "Einklappen",
     "dragHint": "Auf eine Seite ziehen",
@@ -350,7 +368,16 @@
     "exitFullscreen": "Vollbild verlassen"
   },
   "applications": {
-    "fabLabel": "Anwendungen",
+    "fabLabelMenu": "Menü öffnen",
+    "fabLabelCollapse": "Chat einklappen",
+    "radialLabel": "Schnellaktionen",
+    "fabUnread": "Du bist dran: Eine Antwort oder ein Lauf wartet auf dich",
+    "actChat": "Chat",
+    "actCollapseChat": "Chat einklappen",
+    "actApplications": "Apps",
+    "actReload": "App neu laden",
+    "actClose": "App schließen",
+    "actOpenInTab": "In Tab öffnen",
     "heading": "Deine <em>Apps</em>",
     "closeDrawer": "Schließen",
     "close": "Alle schließen",
@@ -369,6 +396,10 @@
     "closeDual": "Geteilten Bildschirm schließen",
     "editDescription": "Beschreibung bearbeiten",
     "descriptionLabel": "Beschreibung von {{name}}",
+    "linkProject": "Projekt verknüpfen…",
+    "noProject": "Kein Projekt",
+    "projectLabel": "Projekt von {{name}}",
+    "projectUnknown": "Unter diesem Pfad gibt es kein Projekt",
     "moveUp": "Nach oben",
     "moveDown": "Nach unten",
     "addDivider": "Trennlinie hinzufügen",
@@ -405,5 +436,29 @@
     "appearanceLight": "Helles Erscheinungsbild",
     "appearanceDark": "Dunkles Erscheinungsbild",
     "divider": "Größe der Anwendungen ändern"
+  },
+  "chatHost": {
+    "panelLabel": "Schwebender Chat",
+    "collapse": "Chat einklappen",
+    "resize": "Chat-Größe ändern",
+    "panelTitle": "Der Chat ist im schwebenden Panel",
+    "panelMessage": "Er ist über deiner Arbeit geöffnet.",
+    "windowTitle": "Der Chat ist in einem eigenen Fenster",
+    "windowMessage": "Er bleibt über deinen anderen Fenstern.",
+    "bringBack": "Zurückholen",
+    "pickerTitle": "Unterhaltung wechseln",
+    "pickerList": "Unterhaltungen",
+    "pickerEmpty": "Noch keine Unterhaltungen. Starte eine mit „Neuer Chat“.",
+    "pickerLoading": "Unterhaltungen werden geladen",
+    "pickerError": "Unterhaltungen konnten nicht geladen werden"
+  },
+  "gitPanel": {
+    "lastPushed": "Zuletzt gepusht {{when}}",
+    "neverPushed": "Von hier aus noch nicht gepusht",
+    "age": {
+      "justNow": "gerade eben",
+      "minutesAgo": "vor {{count}} Min.",
+      "hoursAgo": "vor {{count}} Std."
+    }
   }
 }

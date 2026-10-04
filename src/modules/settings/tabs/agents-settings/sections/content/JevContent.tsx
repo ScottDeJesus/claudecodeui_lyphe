@@ -2,10 +2,9 @@ import { useTranslation } from 'react-i18next';
 
 import { JEV_SCOPES, useJevSwitches } from '@/shared/hooks/useJevSwitches';
 import type { JevScopeName } from '@/shared/hooks/useJevSwitches';
-import { Button } from '@/shared/ui';
+import { Button, SettingRow } from '@/shared/ui';
 import { JevLogo } from '@/shared/ui/JevLogo';
 import SettingsCard from '@/modules/settings/SettingsCard';
-import SettingsRow from '@/modules/settings/SettingsRow';
 import SettingsToggle from '@/modules/settings/SettingsToggle';
 
 /**
@@ -114,7 +113,7 @@ export default function JevContent() {
 
   return (
     <SettingsCard divided>
-      <SettingsRow label={masterLabel} icon={<JevLogo className="h-4 w-4" />} description={masterDescription}>
+      <SettingRow label={masterLabel} icon={<JevLogo className="h-4 w-4" />} description={masterDescription}>
         {unknown ? (
           // The press a control with no position can honour: ask again. Without it a persistent read
           // failure left every row dead until Settings was closed and reopened.
@@ -134,7 +133,7 @@ export default function JevContent() {
             disabled={state === null || (saving !== null && saving !== 'master')}
           />
         )}
-      </SettingsRow>
+      </SettingRow>
 
       {JEV_SCOPES.map((scope) => {
         const row = scopeRows[scope];
@@ -154,7 +153,7 @@ export default function JevContent() {
           // Subordinate to the row above by indentation and a muted ground, because each is not a
           // second setting but a narrowing of the first: it counts only while the master is on. It
           // keeps showing its stored value while the master is off — the file is untouched.
-          <SettingsRow key={scope} label={row.label} description={description} className="bg-muted/30 pl-8">
+          <SettingRow key={scope} label={row.label} description={description} className="bg-muted/30 pl-8">
             {unknown ? null : (
               // Gated in ONE direction only. A stored on can always be parked off with the master
               // off — the narrowing act must never require widening the blast radius first (master
@@ -167,7 +166,7 @@ export default function JevContent() {
                 disabled={state === null || (saving !== null && saving !== scope) || (gated && !stored)}
               />
             )}
-          </SettingsRow>
+          </SettingRow>
         );
       })}
 

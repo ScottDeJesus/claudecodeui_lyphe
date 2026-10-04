@@ -224,6 +224,20 @@ export function AccountPopover({
           </button>
         )}
 
+        {/* The sign-in Settings → Agents → Claude → Re-login runs, reached from where the account
+            in use is read. It rides the add-account path on purpose: that path saves the live
+            login first, so signing in as someone else here loses nothing. */}
+        {picture && (
+          <button
+            type="button"
+            disabled={busy}
+            onClick={onAddAccount}
+            className="rounded-lg px-2.5 py-2 text-left text-[13px] text-accent-ink transition-colors hover:bg-primary/10 disabled:opacity-60"
+          >
+            ↻ Re-login
+          </button>
+        )}
+
         {/* The live login and its saved copy have diverged. A fact with a remedy, not an
             error: both accounts are named, because "Save it" adopts the live one. */}
         {picture?.drift && (

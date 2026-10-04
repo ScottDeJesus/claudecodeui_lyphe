@@ -43,3 +43,7 @@ export { createKanbanMetisModule } from './kanban-metis.module.js';
 // comes in through, on the derived per-session credential. It reads the process's registry itself (`setLiveMetisRegistry`,
 // called by the composition root above), so it too needs nothing here.
 export { kanbanMetisSecretGuard } from './kanban-metis.routes.js';
+
+// countRunningMetisSessions: used by the claude-activity module, which counts a running Metis as
+// Claude work in flight when it decides whether a Claude update may install.
+export { countRunningMetisSessions } from './metis-registry.service.js';

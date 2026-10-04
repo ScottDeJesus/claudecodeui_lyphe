@@ -2,10 +2,13 @@ import { Settings, Sparkles, PanelLeftOpen, AlertTriangle } from 'lucide-react';
 import type { TFunction } from 'i18next';
 
 import { AccountFooterRow } from '@/modules/accounts';
+import { ClaudeUpdateRailButton } from '@/modules/claude-updates';
 
 type SidebarCollapsedProps = {
   onExpand: () => void;
   onShowSettings: () => void;
+  /** Opens Settings on its Updates tab. */
+  onShowUpdates: () => void;
   updateAvailable: boolean;
   restartRequired: boolean;
   onShowVersionModal: () => void;
@@ -16,6 +19,7 @@ type SidebarCollapsedProps = {
 export default function SidebarCollapsed({
   onExpand,
   onShowSettings,
+  onShowUpdates,
   updateAvailable,
   restartRequired,
   onShowVersionModal,
@@ -44,6 +48,9 @@ export default function SidebarCollapsed({
       >
         <Settings className="h-4 w-4 text-muted-foreground transition-colors group-hover:text-foreground" />
       </button>
+
+      {/* Claude updates, right after Settings. Absent until one is on offer. */}
+      <ClaudeUpdateRailButton onOpen={onShowUpdates} />
 
       {/* Restart-required indicator */}
       {restartRequired && (

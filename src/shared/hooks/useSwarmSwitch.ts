@@ -1,13 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 
 import { api } from '@/shared/api';
-
-/**
- * The floor a ceiling is held to, mirrored from the runner's own grammar: a switch that is on runs
- * at least one phase, and `on 0` is not on at all. Nothing is narrowed above it — the count the
- * operator sets is the count the file holds.
- */
-export const LANES_MIN = 1;
+import { LANES_MIN } from '@/shared/constants';
 
 /** What the server read off the flag file: the switch, and the ceiling it runs under. */
 type SwarmPosition = { enabled: boolean; lanes: number | null };
@@ -33,7 +27,7 @@ function positionOf(body: unknown): SwarmPosition | null {
 type SwarmSwitch = {
   /** The switch as the server last read it off disk, or `null` while no read has succeeded. */
   enabled: boolean | null;
-  /** The ceiling on how many phases run at once, or `null` for NO ceiling. While the switch is on
+  /** The ceiling on how many phases of each plan run at once, or `null` for NO ceiling. While the switch is on
    * this is the file's own reading; while it is off it is what the next ON press will write. */
   lanes: number | null;
   /** True once a read has failed: the position is unknown, which is not the same as off. */

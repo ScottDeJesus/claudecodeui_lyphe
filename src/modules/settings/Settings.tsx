@@ -14,6 +14,7 @@ import BrowserUseSettingsTab from '@/modules/settings/tabs/browser-use-settings/
 import NotificationsSettingsTab from '@/modules/settings/tabs/NotificationsSettingsTab';
 import TasksSettingsTab from '@/modules/settings/tabs/tasks-settings/TasksSettingsTab';
 import { PluginSettingsTab } from '@/modules/plugins';
+import { ClaudeUpdatesSettingsTab } from '@/modules/claude-updates';
 import AboutTab from '@/modules/settings/tabs/AboutTab';
 import { useSettingsController } from '@/modules/settings/hooks/useSettingsController';
 import { useWebPush } from '@/modules/settings/hooks/useWebPush';
@@ -59,9 +60,11 @@ function Settings({ isOpen, onClose, projects = [], initialTab = 'agents' }: Set
     setCodexPermissionMode,
     providerAuthStatus,
     openLoginForProvider,
+    openDesignLogin,
+    closeLoginModal,
     showLoginModal,
-    setShowLoginModal,
     loginProvider,
+    loginFlow,
     handleLoginComplete,
   } = useSettingsController({
     isOpen,
@@ -162,6 +165,7 @@ function Settings({ isOpen, onClose, projects = [], initialTab = 'agents' }: Set
               variant="ghost"
               size="sm"
               onClick={onClose}
+              aria-label={t('close')}
               className="h-10 w-10 touch-manipulation p-0 text-muted-foreground hover:text-foreground active:bg-accent/50"
             >
               <X className="h-5 w-5" />
@@ -189,6 +193,7 @@ function Settings({ isOpen, onClose, projects = [], initialTab = 'agents' }: Set
                 <AgentsSettingsTab
                   providerAuthStatus={providerAuthStatus}
                   onProviderLogin={openLoginForProvider}
+                  onProviderDesignLogin={openDesignLogin}
                   claudePermissions={claudePermissions}
                   onClaudePermissionsChange={setClaudePermissions}
                   cursorPermissions={cursorPermissions}
@@ -229,19 +234,29 @@ function Settings({ isOpen, onClose, projects = [], initialTab = 'agents' }: Set
                 </Suspense>
               )}
 
+              {activeTab === 'updates' && <ClaudeUpdatesSettingsTab />}
+
               {activeTab === 'about' && <AboutTab />}
             </div>
           </main>
         </div>
       </div>
 
+      {/* The flow is part of the key so a change of authorization remounts the terminal rather than
+          handing the new command to a pty already running the old one. The two commands are the
+          CLI's own interactive login, mirrored for design authorization: `design-login` is the
+          slash command the DesignSync tool tells the user to run in the interactive TUI — the
+          `claude design-login --json` subcommand beside it is the VS Code extension's machine
+          interface and would answer in JSON lines instead of asking anyone to sign in. */}
       <ProviderLoginModal
-        key={loginProvider || 'claude'}
+        key={`${loginProvider || 'claude'}:${loginFlow}`}
         isOpen={showLoginModal}
-        onClose={() => setShowLoginModal(false)}
+        onClose={closeLoginModal}
         provider={loginProvider || 'claude'}
         onComplete={handleLoginComplete}
         isAuthenticated={isAuthenticated}
+        customCommand={loginFlow === 'design' ? 'claude --dangerously-skip-permissions /design-login' : undefined}
+        title={loginFlow === 'design' ? 'Claude Design Login' : undefined}
       />
 
     </div>

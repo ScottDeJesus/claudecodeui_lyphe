@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { CheckIcon, CopyIcon } from 'lucide-react';
 
+import { useHostWindow } from '@/shared/context/HostWindowContext';
 import type { Tone } from '@/shared/types';
 import { copyTextToClipboard, cn } from '@/shared/utils';
 import { splitDiffLine } from '@/modules/chat/transcript/shapes/detect';
@@ -56,6 +57,9 @@ const CLASS_BY_KIND: Record<DiffLineKind, string> = {
  */
 export function DiffBlock({ raw, collapseKey }: DiffBlockProps) {
   const { t } = useTranslation('chat');
+  // The window the block is drawn in: the copy goes through its clipboard and the "copied" tick is
+  // timed on it.
+  const hostWindow = useHostWindow();
   // False inside a transcript export, where no click handler can ever run.
   const interactive = useShapeInteractive();
   // Whether the last copy landed, so the action can say so for a moment. The effect resets it.
@@ -63,9 +67,9 @@ export function DiffBlock({ raw, collapseKey }: DiffBlockProps) {
 
   useEffect(() => {
     if (!copied) return;
-    const timer = window.setTimeout(() => setCopied(false), 1600);
-    return () => window.clearTimeout(timer);
-  }, [copied]);
+    const timer = hostWindow.setTimeout(() => setCopied(false), 1600);
+    return () => hostWindow.clearTimeout(timer);
+  }, [copied, hostWindow]);
 
   const lines = useMemo(() => raw.split('\n').map((text) => ({ text, kind: splitDiffLine(text) })), [raw]);
   const added = lines.filter((line) => line.kind === 'add').length;
@@ -86,7 +90,7 @@ export function DiffBlock({ raw, collapseKey }: DiffBlockProps) {
         <button
           type="button"
           data-copy-code
-          onClick={() => void copyTextToClipboard(raw).then((didCopy) => didCopy && setCopied(true))}
+          onClick={() => void copyTextToClipboard(raw, hostWindow).then((didCopy) => didCopy && setCopied(true))}
           title={copied ? t('codeBlock.copied') : t('codeBlock.copyCode')}
           aria-label={copied ? t('codeBlock.copied') : t('codeBlock.copyCode')}
           className="inline-flex items-center rounded p-1 transition-colors hover:bg-muted hover:text-foreground"

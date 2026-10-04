@@ -42,6 +42,11 @@ export type MetisSpecRecord = {
   boardName: string;
   provider: 'deepseek' | 'claude';
   model: string;
+  /**
+   * The `--effort` word the child was given, or `null` when the launch table named none and the CLI's
+   * own effortLevel applied. A record written before the table carried this reads back as `null`.
+   */
+  effort: string | null;
   owner: string;
   launchedBy: 'operator' | 'driver';
   /** The origin the child's MCP client writes through — the SERVER THAT SPAWNED HER, not a default. */
@@ -254,6 +259,8 @@ export function createMetisRegistry(root: string = DEFAULT_METIS_STATE_ROOT): Me
         boardName: session.boardName,
         provider: session.provider,
         model: session.model,
+        // Every record written before the launch table carries no `effort`, so an absent or empty key is `null`.
+        effort: readString(spec, 'effort') || null,
         owner: session.owner,
         launchedBy: session.launchedBy,
         apiOrigin: readString(spec, 'api_origin'),
@@ -344,6 +351,7 @@ export function createMetisRegistry(root: string = DEFAULT_METIS_STATE_ROOT): Me
         board_name: spec.boardName,
         provider: spec.provider,
         model: spec.model,
+        effort: spec.effort,
         owner: spec.owner,
         launched_by: spec.launchedBy,
         api_origin: spec.apiOrigin,
@@ -410,4 +418,17 @@ export function setLiveMetisRegistry(registry: MetisRegistry): void {
 /** The process's registry, or `null` before the module is composed — which a caller must deny on. */
 export function getLiveMetisRegistry(): MetisRegistry | null {
   return live;
+}
+
+/**
+ * How many Metis sessions are running right now — each one a live `claude` CLI building a board — or
+ * `null` before the module is composed, which a caller that must not act on an unknown has to read as
+ * "cannot tell" rather than as zero.
+ *
+ * consumer: the claude-activity module, through this module's barrel, so a Claude update never
+ * installs under a board's Metis.
+ */
+export function countRunningMetisSessions(): number | null {
+  if (live === null) return null;
+  return live.list().filter((session) => session.state === 'running').length;
 }

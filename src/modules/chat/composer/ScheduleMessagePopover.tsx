@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 
+import { useHostWindow } from '@/shared/context/HostWindowContext';
 import { useComposerMenuAnchor } from '@/modules/chat/hooks/useComposerMenuAnchor';
 import {
   ComposerMenuHeading,
@@ -50,6 +51,7 @@ function toLocalInputValue(date: Date): string {
  */
 export function ScheduleMessagePopover({ isOpen, onClose, getTrigger, onSchedule }: ScheduleMessagePopoverProps) {
   const { t } = useTranslation('chat');
+  const hostWindow = useHostWindow();
   // Portalled and anchored like the model and permission menus: the composer
   // sits inside the scrolling transcript's stacking context, so a popover
   // positioned inside it is clipped by the message pane.
@@ -109,6 +111,6 @@ export function ScheduleMessagePopover({ isOpen, onClose, getTrigger, onSchedule
         </button>
       </div>
     </ComposerMenuSurface>,
-    document.body,
+    hostWindow.document.body,
   );
 }

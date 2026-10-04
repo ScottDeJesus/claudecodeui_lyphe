@@ -3,6 +3,7 @@ import webPush from 'web-push';
 import { notificationPreferencesDb, pushSubscriptionsDb, sessionsDb } from '@/modules/database/index.js';
 import { sendDesktopNotification as sendDesktopNotificationToClients } from '@/modules/notifications/services/desktop-notification-clients.service.js';
 import { buildNotificationText } from '@/modules/notifications/services/notification-copy.service.js';
+import { landingPathOf } from '@/modules/notifications/services/notification-landing.service.js';
 import { ntfyChannel } from '@/modules/notifications/services/ntfy-channel.service.js';
 
 const KIND_TO_PREF_KEY = {
@@ -161,7 +162,8 @@ function buildNotificationPayload(event) {
       code: normalizedEvent.code,
       provider: normalizedEvent.provider || null,
       sessionName,
-      tag: `${normalizedEvent.provider || 'assistant'}:${normalizedEvent.sessionId || 'none'}:${normalizedEvent.code}`
+      tag: `${normalizedEvent.provider || 'assistant'}:${normalizedEvent.sessionId || 'none'}:${normalizedEvent.code}`,
+      path: landingPathOf(normalizedEvent)
     }
   };
 }

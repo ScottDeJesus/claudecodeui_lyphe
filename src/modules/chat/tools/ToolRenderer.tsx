@@ -20,6 +20,7 @@ import { deriveToolOutcome, type ToolPermissionState } from '@/modules/chat/tool
 import { TOOL_ROW_FRAME } from '@/modules/chat/tools/toolRow';
 import { ToolRowIcon } from '@/modules/chat/tools/ToolRowIcon';
 import { parseToolPayload, summarizeDiff } from '@/modules/chat/utils/messageTransforms';
+import ChatMessageImages from '@/modules/chat/transcript/ChatMessageImages';
 
 type ToolRendererProps = {
   toolName: string;
@@ -74,14 +75,8 @@ function deriveToolStatus(toolResult: any, reportedStatus?: string): ToolStatus 
   return 'completed';
 }
 
-/**
- * Main tool renderer router
- * Routes to OneLineDisplay or CollapsibleDisplay based on tool config
- *
- * Rendered by chat's MessageComponent for every tool call and tool result in
- * the transcript; it is the single entry point for tool presentation.
- */
-export const ToolRenderer: React.FC<ToolRendererProps> = memo(({
+/** One tool call or result drawn from its config: the router to OneLineDisplay, CollapsibleDisplay and the rest. */
+const ToolRow: React.FC<ToolRendererProps> = memo(({
   toolName,
   toolInput,
   toolResult,
@@ -374,6 +369,51 @@ export const ToolRenderer: React.FC<ToolRendererProps> = memo(({
   }
 
   return null;
+});
+
+ToolRow.displayName = 'ToolRow';
+
+/**
+ * What a picture a tool returned is called: the file it read, else the tool. Never the "Attached
+ * image" a chat image is named by default — nothing was attached — and it is the label of the
+ * picture's button and of its enlarged view.
+ */
+function nameToolPicture(toolName: string, toolInput: unknown, index: number, count: number): string {
+  const payload = parseToolPayload(toolInput);
+  const filePath = typeof payload === 'object' && payload !== null && 'file_path' in payload ? String(payload.file_path) : '';
+  const base = filePath.split('/').pop() || `${formatToolDisplayName(toolName)} result`;
+  return count > 1 ? `${base} (${index + 1})` : base;
+}
+
+/**
+ * Main tool renderer.
+ * Draws the tool's own row from its config, and — on a result — the pictures the tool returned
+ * beneath it. The pictures ride apart from the text because a tool config only knows how to draw
+ * text: a Read of an image has a hidden text result, and a screenshot tool has an empty one.
+ *
+ * Rendered by chat's MessageComponent for every tool call and tool result in
+ * the transcript; it is the single entry point for tool presentation.
+ */
+export const ToolRenderer: React.FC<ToolRendererProps> = memo((props) => {
+  const resultImages = props.mode === 'result' ? props.toolResult?.images : undefined;
+  if (!Array.isArray(resultImages) || resultImages.length === 0) {
+    return <ToolRow {...props} />;
+  }
+
+  // An image-only result has no text to put in a row, and an empty "Output" section is noise.
+  const hasResultText = String(props.toolResult?.content ?? '').trim() !== '';
+  const namedImages = resultImages.map((image, index) => ({
+    ...image,
+    name: image.name ?? nameToolPicture(props.toolName, props.toolInput, index, resultImages.length),
+  }));
+  return (
+    <>
+      {hasResultText && <ToolRow {...props} />}
+      <div className="mt-1.5">
+        <ChatMessageImages images={namedImages} align="start" />
+      </div>
+    </>
+  );
 });
 
 ToolRenderer.displayName = 'ToolRenderer';

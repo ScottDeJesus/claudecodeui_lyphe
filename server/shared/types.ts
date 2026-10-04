@@ -94,18 +94,23 @@ export type ProviderModelOption = {
 
 /**
  * Provider model catalog returned by `GET /api/providers/:provider/models`.
+ *
+ * `LABELS_BY_MODEL_ID` is present only where the provider reports its own catalog (Claude): the
+ * name it gives each concrete model id it can run, offered in `OPTIONS` or not, so a stored turn
+ * that recorded `claude-sonnet-5` is captioned "Sonnet 5" by the CLI's own words.
  */
 export type ProviderModelsDefinition = {
   OPTIONS: ProviderModelOption[];
   DEFAULT: string;
+  LABELS_BY_MODEL_ID?: Record<string, string>;
 };
 
 /**
  * One persisted custom-model row in the provider model library.
  *
  * Provider modules use this shape at the database boundary. Predefined models
- * never use this type because they remain source-controlled in provider
- * adapters. `modelId` is sent to the provider runtime, while `model` is the
+ * never use this type because each provider adapter supplies them itself.
+ * `modelId` is sent to the provider runtime, while `model` is the
  * user-supplied display name shown in pickers.
  */
 export type CustomProviderModelRecord = {
@@ -209,11 +214,11 @@ export type GatewayEventKind =
   | 'chat_subscribed'
   | 'session_upserted'
   | 'loading_progress'
-  | 'runner_state'
   | 'soul_launch_state'
-  | 'arc_state'
   | 'kanban_metis_state'
   | 'kanban_event'
+  | 'notes_changed'
+  | 'simple_list_changed'
   | 'universe_activity'
   | 'universe_map'
   | 'pong'
@@ -292,81 +297,85 @@ export type KanbanBoardEvent = {
   at: number;
 };
 
-// ---------------------------
-//----------------- PLAN RUNNER CONTRACTS ------------
-// The plan runner writes `~/.claude/state/runner/<run_id>/` and this server only READS it: `progress.json` (the
-// whole picture, replaced whole by `os.replace`), `run.json` (`stopped_at` is the pause), `receipt.json` (present ⇒ the
-// run is over) and `runner.log` (one line per stage change). Nothing here is ever written back — the runner is a
-// separate process that may be executing right now, and a second writer would race its own atomic rewrite.
-// Every timestamp below is epoch SECONDS, because that is what the runner's Python writes (`time.time()`);
-// read one as milliseconds and a live run renders in 1970. Mirrored field-for-field in `src/shared/types.ts`.
-
-/** How this lane reads one run's liveness. `queued` is a run the runner CREATED parked — `start --queue`, or DeepSeek's peak hours with the switch on — so nothing has ever walked it: it carries `stopped_at` like a paused run, and its `run.json` says `status: "queued"` and when the peak window ends. `paused` is the ONE deliberate difference from `scripts/runner_statusline.py`, whose `read_run` returns `None` for a parked run because its bar is for what is moving; this lane CARRIES paused runs so the tab can list them and offer Resume. `ended` is a run whose receipt has landed and is still within the keep window — carried so the operator sees the ending and dismisses it themselves; after the window it is omitted. */
-export type RunnerRunState = 'live' | 'paused' | 'queued' | 'stale' | 'ended';
-/** One phase's outcome as the runner spells it, from `progress.json.phases[].state`. */
-export type RunnerPhaseState = 'shipped' | 'running' | 'blocked' | 'deferred' | 'pending';
-/** One row of `progress.json.phases[]`. `note` is the runner's own short word for the state (a ship date, `builder-blocked`, `depends`) and is free text — it reaches the DOM as a text node, never as markup. `wave` is the phase's 1-based wave in the plan's whole map (`independence.waves(plan)`, what `plan-runner swarm <plan>` prints), `null` for a phase no wave can place and on a file from before the field; always written by `readPhaseRow`, optional for frames crossing a version boundary, as `lanes` is. */
-export type RunnerPhaseRow = { rank: number; id: string; title: string; state: RunnerPhaseState; note: string; wave?: number | null };
-/** One `runner.log` stage change. `at` is the runner's LOCAL ISO timestamp to the second, kept as the string it wrote — never re-parsed into an epoch, since it carries no zone to parse it against. `detail` is `''` when the stage word stood alone. */
-export type RunnerTimelineEntry = { at: string; phase_id: string; stage: string; detail: string };
-/** Where the run stands, from `progress.json.position`. `pipeline` is the phase's own chain as the runner composed it (`heph → athena → prometheus`), so a phase with no code change carries a shorter one. `stage_since` is epoch SECONDS. */
-export type RunnerPosition = { rank: number; total: number; phase_id: string; title: string; remain: number; pipeline: string; stage: string; stage_detail: string; stage_since: number };
-/** One live lane of a run, from `progress.json.lanes[]` (`hooks/plan_runner/progress.py::_lanes`). `lane` is the lane's id — which IS the phase id it carries, a phase running on exactly one lane — `rank` the phase's place in the census, `stage`/`stage_detail` the runner's own stage words, `stage_since` epoch SECONDS like every timestamp here. */
-export type RunnerLaneRow = { lane: string; phase_id: string; rank: number; title: string; stage: string; stage_detail: string; stage_since: number };
 /**
- * One run as this lane reads it off disk. Every field but `state` and `timeline` is `progress.json`'s own;
- * `state` is this lane's classification and `timeline` is `runner.log` parsed.
- *
- * `launched_by_session` is the APP session id of the chat whose turn launched the run. `run.json`'s raw
- * `launched_by_session` (a Claude transcript uuid) is resolved through `sessionsDb.resolveAppSessionId` by
- * `plan-runner.module.ts` before any snapshot leaves the server. `null` when absent or not a non-empty string.
- *
- * `stopped_at` is `run.json`'s, `null` when the run was never parked. `outcome` and `ended_at` are the receipt's `status` and
- * `ended_at`, `null` until the run ends; `outcome` is the runner's own word (`complete`, `halted`, `all-blocked`, `budget`, `flag-off`) and is shown, never branched on beyond its tone. `pid` is the runner process the run
- * last announced — a fact to show, never something to signal: this server does not own that process.
- * `position` is `null` while the runner has not composed one yet, which a live run does show in its first seconds.
- * `line` is the composed status-bar line the terminal bar renders, carried through unaltered.
- * `lanes` is `progress.json.lanes[]` — one row per LIVE lane, lowest rank first, `[]` on a serial run — and the
- * `?` is about the PRODUCER, not this reader: `classifyRun` always writes the key (`readLanes` answers `[]` for an
- * absent, null or malformed one, so a `progress.json` from before lanes shipped still classifies), but a snapshot
- * crossing a version boundary — a server binary older than this shape, or the client's own mirror — carries none.
- * `blocked_causes` is the receipt's `blocked` map, phase id → the cause the runner wrote (`crash`, `budget`, `athena: …`), `{}` until
- * the run ends. It is the only record of a phase the runner halted on a crash or a budget: that phase's row never turns `blocked`.
+ * The simple chat list's shape changed: a folder was made, renamed, folded, moved or deleted, or a
+ * chat changed place or folder. It names nothing: a reader that hears it re-reads the feed.
+ * Built only by `modules/providers/services/simple-list.service.ts`.
  */
-/** The fix-it session on a blocked phase, from `progress.json.repair`: the one IN FLIGHT (`repairing`, `step` the sub-stage it is on; `paused` while the run waits out a rate limit), else the last one finished (`fixed` — the phase walks again — or `failed`). `by` says whose session it is: `unblock` is the run's own outing, walked by the run's process; `heal` is the heal drain's, which works while the run itself is halted. `live` is whether the process doing a `heal` repair is alive right now (always `false` for an `unblock`, whose liveness is the run's). `resumed` is whether a finished repair put the phase back on the walk: a cleared unblock always did, a heal only when it re-armed the phase's spec — a heal can cure the cause and leave the phase standing; `null` when the heal never measured it. `since` and `ended_at` are epoch SECONDS; `k` is the number of the outing this repair belongs to, and `limit` its per-phase ceiling (0 = none carried, as for a heal). */
-export type RunnerRepair = { phase_id: string; state: 'repairing' | 'paused' | 'fixed' | 'failed'; by: 'replan' | 'unblock' | 'heal'; live: boolean; resumed: boolean | null; step: string; k: number; limit: number; since: number | null; ended_at: number | null; reason: string };
-export type RunnerRunSnapshot = { run_id: string; plan_path: string; plan_title: string; /** A test's run, never the operator's: its plan sits in a scratch root (the runner's own fixtures under the temp dir) or its id is a probe's `fixture-` run. Hidden from every runs list unless a probe opts in, and never pushed as a notification. */ test_run: boolean; state: RunnerRunState; status: string; started_at: number; heartbeat_at: number; stopped_at: number | null; /** `run.json`'s `queued_until`, `null` on every run that was not created parked and on a queued one given no window to wait for (a bare `--queue` outside DeepSeek's peak hours). Epoch SECONDS, like every timestamp here. */ queued_until: number | null; /** `run.json`'s `start_at`: the operator's SCHEDULED Start on a queued run (`plan-runner schedule`), pressed by the watchdog's tick when it comes; `null` when none was asked for (the key absent too). Epoch SECONDS. */ start_at: number | null; /** The run's own model word off `run.json:model`; `null` only on a record born before the runner wrote its default, which reads `deepseek` (`effectiveModelWord`). */ model: RunnerModelChoice | null; launched_by_session: string | null; outcome: string | null; ended_at: number | null; blocked_causes: Record<string, string>; pid: number | null; position: RunnerPosition | null; /** The run's LIVE lanes, lowest rank first, `[]` on a serial run. Always written by `classifyRun`, and OPTIONAL for the frames that cross a version boundary: a snapshot from a binary older than this shape has no such field, and a required one would have the card map `undefined`. */ lanes?: RunnerLaneRow[]; repair: RunnerRepair | null; phases: RunnerPhaseRow[]; spawns: number; max_spawns: number; cost_usd: number; plan_runs: number; plan_spawns: number; plan_cost_usd: number; plan_planning_usd: number; plan_review_usd: number; plan_scouts_usd: number; plan_total_usd: number; tokens: number; plan_tokens: number; line: string; timeline: RunnerTimelineEntry[] };
-/** The whole picture, pushed on change over `/ws`. `runs` is ordered by `started_at` ascending, oldest first, the order the terminal bar uses. `at` is epoch MILLISECONDS (`Date.now()`), unlike every field inside a snapshot. */
-export type RunnerStateEvent = { kind: 'runner_state'; runs: RunnerRunSnapshot[]; at: number };
-/** A run's or an arc's OWN model word, as `run.json:model` and `arc.json:model` record it (`hooks/plan_runner/run_model.py`) and as the model control sends it through `POST /runs/:id/model` and `POST /arcs/:arc/model`: `deepseek` (the runner's default, written at birth), `claude`, or `auto` — follow the chat's DeepSeek switch. The server checks a request against exactly these three before anything is spawned, so the argv word is always ours. */
-export type RunnerModelChoice = 'deepseek' | 'claude' | 'auto';
-/** The verbs this server may relay: `stop`, `resume`, `model` (the run's own DeepSeek / Claude word; restarts nothing) and `schedule` (a QUEUED run's Start at a time — `offpeak`, an ISO timestamp, or `none` to clear). Starting a run from a plan is `/execute`'s act, never a button's; a queued run's Start, now or scheduled, is the operator's. */
-export type RunnerVerb = 'stop' | 'resume' | 'model' | 'schedule';
-/** `GET /runs/offpeak`: the runner's next DeepSeek off-peak moment in epoch SECONDS (`plan-runner offpeak`, derived from `deepseek.PEAK_UTC`), or `null` when the runner could not answer. The card's `Start at …` button shows it in the reader's clock and never computes it. */
-export type RunnerOffpeak = { at: number | null };
-/** What one relayed verb did. `ok` is the runner's own exit being 0 — a refusal is a RESULT, not an error, and `stderr` carries the runner's own line whole so the reader sees the verdict rather than our paraphrase. `reason` is present only when the runner never got to answer: it timed out, or its binary could not be spawned. */
-export type RunnerVerbResult = { ok: boolean; verb: RunnerVerb; run_id: string; exit: number | null; stdout: string; stderr: string; reason?: 'timeout' | 'spawn-failed' };
+export type SimpleListChangedEvent = { kind: 'simple_list_changed'; at: number };
 
-//----------------- ARC DECK: a stack of plans walked one card after another ------------
-// An arc is a stack: one orchestrating plan listing ordered cards, each card a plan of its own, walked one
-// after another. The runner keeps one record per arc under `~/.claude/state/arcs/<name>/` — `arc.json` (the
-// whole picture, written whole through `os.replace`), `receipt.json` (present ⇒ the arc is over) and
-// `resume_brief.md` — and this server only READS them. The deck never computes the order: `current` and
-// `last_started` are the runner's own decisions, copied out of `arc.json`. Every timestamp is epoch SECONDS,
-// because that is what the runner's Python writes (`time.time()`). Mirrored field-for-field in `src/shared/types.ts`.
+/** Sent to every open socket after a note is created, replaced or deleted. It names no note and no account: a client that hears it reads its own list again. It carries no `seq` and no `sessionId`, so it can never become a transcript row. */
+export type NotesChangedEvent = { kind: 'notes_changed'; at: number };
 
-/** One card's walk, as the runner spells it in `arc.json:cards[].state` (`hooks/plan_runner/arcs.py:CARD_STATES`). `unminted` is a card whose run the runner has not created yet — each card is created at its own turn — and `stalled` is one whose latest run carries a receipt that is not `complete`. */
-export type ArcCardState = 'unminted' | 'queued' | 'walking' | 'paused' | 'complete' | 'stalled';
-/** One phase of an arc card's plan, as `arc.json:cards[].phases[]` writes it (`hooks/plan_runner/arc_phases.py`): the phase's `id` and heading `title` in plan order, and `shipped` — the runner's own census verdict, true only for a phase whose ship-log line has landed. A plan not yet on disk has no phases, and its card carries `[]`. */
-export type ArcCardPhase = { id: string; title: string; shipped: boolean };
-/** One card of an arc, as `arc.json:cards[]` writes it. `plan_path` is the card's own `plan` field: an ABSOLUTE path, since the runner resolves the bare basename against the arc file's directory. `charter` is free text and reaches the DOM as a text node, never as markup. `cost_usd` and `spawns` are the card's run's books, `0` before it has any. `phases` is the card's plan's phase list, re-read by the runner on every sync (the watchdog's two-minute tick), so a plan that lands or a phase that ships reaches the deck within one tick. */
-export type ArcCardSnapshot = { position: number; plan_path: string; title: string; charter: string; run_id: string | null; state: ArcCardState; run_status: string | null; ended_at: number | null; cost_usd: number; spawns: number; phases: ArcCardPhase[] };
-/** One arc, as `<arcs dir>/<name>/arc.json` records it. `current` is the position of the first non-complete card — the card the walk acts on next, `null` once every card is complete — and `last_started` is the highest position that has started; BOTH are the runner's own decisions, copied here and never recomputed, because they are what tells the deck which card is live and which may still be dragged. `test_arc` is whether the arc lives in a hidden root (`isHiddenProjectPath(arc_path)`), the same rule a run's `test_run` follows, so a `/tmp` fixture never reaches the operator's deck. `has_receipt` is the arc's own `receipt.json` on disk — the arc has finished. `now` is the runner's recorded word that this arc walks through DeepSeek's peak hours. */
-export type ArcSnapshot = { arc: string; arc_path: string; title: string; test_arc: boolean; status: 'not-started' | 'walking' | 'stalled' | 'complete'; started_at: number | null; ended_at: number | null; synced_at: number; has_receipt: boolean; now: boolean; /** `arc.json`'s `start_at`: the operator's SCHEDULED `arc start` (`plan-runner arc schedule`), pressed by the watchdog's tick; `null` when none was asked for, and always once the arc has started. Epoch SECONDS. */ start_at: number | null; /** The arc's ONE model word off `arc.json:model` (`plan-runner arc model`), handed to every card it mints; `null` only on a record synced before the runner wrote its default, which reads `deepseek` (`effectiveModelWord`). */ model: RunnerModelChoice | null; current: number | null; last_started: number; cards: ArcCardSnapshot[] };
-/** The whole deck, pushed on change over `/ws`. `at` is epoch MILLISECONDS (`Date.now()`), unlike every field inside a snapshot. */
-export type ArcStateEvent = { kind: 'arc_state'; arcs: ArcSnapshot[]; at: number };
-/** What one relayed arc verb did — the shape `RunnerVerbResult` gives a run's verbs, with the arc's name where the run id was, since `plan-runner arc reorder|model|start|schedule <name> …` names an arc rather than a run. `reason` is present only when the runner never got to answer: it timed out, or its binary could not be spawned. */
-export type ArcVerbResult = { ok: boolean; arc: string; exit: number | null; stdout: string; stderr: string; reason?: 'timeout' | 'spawn-failed' };
+// ---------------------------
+//----------------- DISPATCHER: the store's one status document, mirrored key for key ------------
+// The dispatcher keeps its plans in a SQLite store rather than in files, so the ONE picture of them
+// is a document: `hooks/dispatcher/report.py::snapshot`, what `dispatcher status --json` prints. The
+// types below mirror it key for key and name for name. The server converts NOTHING — every key, word
+// and string below is the document's own — and the client's `epochOf` is the single ISO-to-epoch
+// edge, because every time below is the store's own `YYYY-MM-DDTHH:MM:SSZ` UTC string, never a
+// number. ONE TEXT IN TWO FILES (`src/shared/types.ts` and `server/shared/types.ts`, the two
+// builds' shared trees): a change to either shape belongs in both at once.
+
+/** One stage of a phase's chain: a row of the store's `stages` table, `phase_chain`'s projection of the chain record (`chain.json`). `settle` REPLACES a phase's rows rather than appending, so a stage a walk re-enters is one row again (INV-181). `soul` is the soul the stage launched and `launch_id` that launch's own id; `resumed_sid` is the session a resume ran it under. `verdict` is the soul's own outcome word and is free text, reaching the DOM as a text node. `cost_usd` is PAID dollars — `0` on a stage on the operator's Claude subscription — and the `tokens`/`tokens_in`/`tokens_out` beside it are THE SUBSCRIPTION'S ALONE: a spend figure is dollars OR tokens, by who was used (operator rule, 2026-09-24), so a stage a vendor billed reads `0` in all three beside its `$`. All three come off the launch's own `result.json` at the dispatcher's report time, never from a store column (INV-172). `tokens_cache_read` is the part of `tokens_in` SERVED from the prompt cache (`costs.claude_cache_read`) — the card's `(94% cache)` numerator — and `null` where nothing states it: a record written before the field (no backfill), or on a phase, plan or arc, a sum over any such record, since a partial numerator under a whole `in` would understate the share. */
+export type DispatcherStage = { name: string; soul: string | null; launch_id: string | null; session_id: string | null; resumed_sid: string | null; launched_at: string | null; returned_at: string | null; output_path: string | null; verdict: string | null; cost_usd: number; tokens: number; tokens_in: number; tokens_out: number; tokens_cache_read: number | null };
+/** One phase of a plan, addressed by its stable `key` (INV-183 — never by position, which `put_phases` renumbers on every reload). `busy` is `phase_chain.busy`: the walker alive OR the soul it has in flight still out, which is the question the rule and the daemon ask — a phase whose walker was killed while its soul still bills reads busy, so the status column alone is never the liveness answer (INV-186). `waits_on` carries the waited phases' KEYS in position order, `start_here` the phase row's own JSON list of entry points. `rounds` is `store.rounds` — the DISTINCT `athena-*` stage names, never the launch count — and `cost_usd` sums this phase's stage rows; both are derived at read time, never stored (INV-172). `tokens*` are the same sum over the stages' own records, PAID dollars' token counterpart. */
+export type DispatcherPhase = { key: string; position: number; title: string; assignee: string; status: 'not started' | 'running' | 'done'; chain_id: string | null; done_at: string | null; waits_on: string[]; busy: boolean; rounds: number; cost_usd: number; tokens: number; tokens_in: number; tokens_out: number; tokens_cache_read: number | null; start_here: string[]; stages: DispatcherStage[] };
+/** One line of a plan's log, oldest first in `DispatcherPlan.events`. `phase` is the phase's KEY or null — the table stores a phase id, and an id is not an address (INV-183). `detail` is free text and reaches the DOM as a text node. */
+export type DispatcherEvent = { id: number; at: string; phase: string | null; kind: string; detail: string | null };
+/** ONE planner outing: the soul the dispatcher's daemon has out on one piece of work, on one model, for one stretch of time — `store_planners`' row as `report_planners._entry` reads it. A planner is NOT a phase and not a stage: nothing in a session dispatches it, it rides the operator's Claude subscription (so `tokens` is the figure and `cost_usd` is `0`), and its liveness is the store's own `state` rather than a column a card has to derive. `target` is the bare name the outing is FOR — a plan's, or an ARC's for the arc's own design, its cut and its judgment — and `plan` is the name it lands in, equal to `target` except for a judgment, which targets its arc and lands in `<arc>--judgment`. `verb` is the work it is doing and `state` is the row's own: `queued` and `out` are LIVE (the rule owes each something), `ended` is the record that the child is gone. `stalled` is the document's ONE derived word and is true on exactly the endings whose work is still unfinished — every `ended` entry the document carries is one, so a reader never re-asks the question to tell them apart. `outcome` is what an ending left behind: `done` when it did what it was for, else the crash the launch's own `result.json` carried. `launch_id` names the launch, and `tokens`/`cost_usd` are read off that launch's result at report time and never stored (INV-172). */
+export type DispatcherPlanner = { id: number; target: string; plan: string; soul: string; verb: 'design' | 'judge' | 'tell' | 'cut'; model: string; state: 'queued' | 'out' | 'ended'; stalled: boolean; launch_id: string | null; created_at: string; launched_at: string | null; ended_at: string | null; outcome: string | null; tokens: number; cost_usd: number };
+/** The plan's word, in ONE precedence: `complete`, `scheduled`, `paused`, `queued`, `live`, `parked`, else `idle`. `scheduled` outranks the pause flag on purpose — a paused plan with an hour set is going to start by itself, and calling it merely `paused` would hide the one fact the operator needs. `paused` and `queued` are told apart by whether a walk ever launched: a paused plan that has run is stopped mid-plan, one that never launched is still waiting at the gate. */
+export type DispatcherPlanStatus = 'idle' | 'parked' | 'queued' | 'scheduled' | 'paused' | 'live' | 'complete';
+/** The prompt CloudCLI has put up for a plan — on its card in the Roadmap tab's In flight face and in the Runs widget — and is still waiting on (`hooks/dispatcher/ask.py:asking`) — `null` on every plan it is not asking. `accept` is the intent lock: `question` is `dispatcher question`'s prompt word for word, markdown (the census line, what the plan delivers, its facts and open questions, then the phase lines with the done ones marked), `token` the lock it carries, `options` the three answers in their contract order — Accept, Queue, Rework — and `rework` the designer targets a Rework's notes are told to; `plans` is every plan the one lock names (an arc's lock names each plan of it still owing an Accept). `questions` is the designer's round: each question's text and options as `dispatcher show` prints them, and `target`, the name `dispatcher tell` sends the answers to. `asked` is the store's own record of the ask — the `asked` event's id and stamp — which is what makes a prompt the same ask across a restart. The card, the phone's buttons and every verb an answer runs are drawn from this and nothing else. */
+export type DispatcherAsk = { plan: string; plans: string[]; asked: { id: number; at: string } } & ({ kind: 'accept'; header: string; question: string; token: string; options: Array<{ label: string; description: string }>; rework: string[] } | { kind: 'questions'; questions: Array<{ text: string; options: string[] }>; target: string });
+/** One plan whole: its row, its waits, its armed hour, its books, its phases in position order and its log oldest first. `state` is the STORE's own state word — `designing`, `designed`, `questions`, `loaded`, `parked` — a string rather than a union, because the store's vocabulary belongs to the store. `goal` is null on a plan that has been opened and not yet designed. `session` is the session that opened it, `author` the soul that wrote its design. `schedule` is the armed hour read back out of systemd at this instant (`schedule.armed`), `{ start_at, unit }` with `start_at` the timer's own ISO stamp — so a timer stopped or fired by hand reads null here at once. `cost_usd`, `rounds` and `tokens*` sum this plan's phases — and `cost_usd` is PAID dollars, so a plan that rode the operator's Claude subscription reads `0` there while its tokens count everything it spent. `launched` is whether a walk has ever gone out for it — see the field. */
+export type DispatcherPlan = { name: string; state: string; status: DispatcherPlanStatus; repo: string; goal: string | null; delivers: string | null; session: string | null; /** The ONE field the server ADDS, which is why this type is not a pure mirror: the plan's `session` resolved through `sessionsDb.resolveAppSessionId` (the rule `dispatcher-state.service.ts` follows), `null` when the plan names no session or the id resolves to none. The document's own `session` travels untouched beside it. */ session_app_id: string | null; author: string | null; /** The name of the ARC this plan belongs to (`plans.arc_id` read through the arc row), or `null` for a plan of no arc — the join a card makes against the same document's `arcs` list. The bare name, with no `.arc` adornment. */ arc: string | null; /** The ONE planner outing this plan reports (`report_planners.of_plan`): its own newest live row, else its arc's when it has none of its own, then the newest ending of either whose work is still SHORT of a plan. So a plan of an arc being designed whole reports the arc's design, and a plan whose own cut died reports that cut. `null` on a plan no planner is on. Read tolerantly (`plannerSince`), so a dispatcher build older than the field draws no badge rather than blanking every card. */ planner: DispatcherPlanner | null; /** The plan's EFFECTIVE model word (`dispatcher/model.py:model.of`): its own, else its arc's, else the store's default — so the control that draws it and presses it back is showing what this plan's next chain will really be launched with, never a bare column. `null` only against a dispatcher build older than the field, which reads the store's default (`effectiveModelWord`). */ model: DispatcherModelChoice | null; /** The plan's OWN swarm word (`dispatcher/swarm_word.py:own`, `plans.swarm`), canonical — `off`, `on`, `on <N>` — or `null` when it carries none, which means it follows the box's switch as its default (`DispatcherRoute.swarm`). Either way the plan is bounded over its OWN phases in flight — by its own word when it carries one, else by the box's dial — on either route (`width.reason`). `null` against a dispatcher build older than the field too — the same meaning, since every plan followed the box before it existed. */ swarm: DispatcherSwarmWord | null; /** THIS plan's width in one phrase (`width.word` of its effective model word and its own swarm word) — the route it walks and the switch that bounds it, `plan swarm …` when its own word does. The card's caption reads it in place of the box's `DispatcherRoute.word`, so a plan is never captioned with a switch that is not the one in force for it. `null` against a build older than the field, where the box's phrase is the only one there is. */ posture: string | null; created_at: string; updated_at: string; completed_at: string | null; prompted_at: string | null; paused: boolean; /** Whether a walk has EVER gone out for this plan (`report.launched`, read off the plan's own event rows and never stored — INV-172). It is the ONE fact the status word cannot state on its own: `paused` and `scheduled` both describe a plan that is not moving, and neither says whether it was stopped mid-walk or is still waiting at the gate. So it is also the word on the card's primary button — Resume for the first, Start for the second. An arc's header draws nothing off it: the arc's Start reaches either state, and its Pause and its Schedule start reach the whole set of them (`report_arcs.stopped`). `false` against a dispatcher build older than the field. */ launched: boolean; approved: { at: string; by: string } | null; /** The prompt CloudCLI has put up for this plan and is waiting on (`DispatcherAsk`), or `null`. Read tolerantly (`askingSince`): a dispatcher build older than the key asks nothing. */ asking: DispatcherAsk | null; waits_on: string[]; schedule: { start_at: string; unit: string } | null; cost_usd: number; tokens: number; tokens_in: number; tokens_out: number; tokens_cache_read: number | null; rounds: number; phases: DispatcherPhase[]; events: DispatcherEvent[] };
+/** An arc's derived word, in ONE precedence (`store_arcs.arc_word`): `empty`, `complete`, `judging`, `live`, then its plans' OWN waiting word — `scheduled`, `paused`, `queued` — else `designing`. `empty` comes FIRST because an arc whose every plan was dropped has no plan row for anything below it to read; `complete` next, when every plan of it carries its completion stamp, its judgment's included; `judging` while the arc's own judgment plan exists and has not finished (no stamp, and not every phase of it done), because that plan IS a plan of its arc and would otherwise read as work still being designed, queued or live; then `live` while any phase of any of its plans is walking (`phase_chain.busy`, never the status column — INV-186) or while a plan of it is approved, unpaused and unfinished and so the rule's to take up (the same set `DispatcherArc.walking` draws Pause for); then the STRONGEST waiting word its plans carry (`report.status_word`), for an arc none of whose plans is still being designed: `scheduled` with an hour armed, `paused` stopped mid-walk, else `queued` at the gate. Never a column: INV-172. */
+export type DispatcherArcStatus = 'empty' | 'complete' | 'judging' | 'live' | 'scheduled' | 'paused' | 'queued' | 'designing';
+/** One arc of the store (`report_arcs.arc_dict`): its words, its own model word, its derived status and the NAMES of its plans, in `store.arc_plans` order — the arc file's order, except for a member that pre-dated its arc — which is what a reader joins against `plans[].arc` in the same document. `model` is the ARC's own word, never one plan's effective one: it is what the arc's control draws and what `dispatcher model <arc> <word>` hands to every plan of the arc. `cost_usd` and the four token keys are the sums of the plan cards under it in the same document (`report.plan_dict`'s own figures, a phase mid-walk counted as its card counts it), so an arc and its plans never disagree about what the arc has cost (INV-4299). `walking`, `stopped` and `schedule` are its own verbs' readings, taken off the same document's plan rows — so the header and `dispatcher stop|resume|schedule <arc>` can never disagree about what a press reaches. */
+export type DispatcherArc = { name: string; goal: string | null; architecture: string | null; delivers: string | null; model: DispatcherModelChoice | null; status: DispatcherArcStatus; /** Whether any of the arc's plans is LIVE (`report_arcs.walking` — the `live` ones): a walk is out on it, or it is approved and unpaused and so the rule's to take up when its waits are complete. This is what `dispatcher stop <arc>` acts on and the set the header draws Pause for — so Pause reaches the plans waiting their turn as well as the one in flight, and the next one cannot start the moment the walker of the one before it ends. */ walking: boolean; /** Whether any of the arc's plans is STOPPED — approved, paused and unfinished (`report_arcs.stopped`): `queued` at the gate, `paused` mid-walk, `scheduled` with an hour armed. This is what `dispatcher resume <arc>` and `dispatcher schedule <arc>` both act on, and the set the header draws Start and Schedule start for. NOT OFF `launched`: a plan of an arc is born paused — an arc whose plans the operator accepted with Queue is a row of plans waiting at the gate, and reading only the ones stopped MID-WALK left such an arc with no Start at all. The set is the plan's own card's: `PlanControls` draws its Start or its Resume for exactly these three words. */ stopped: boolean; /** The ONE hour the arc's STOPPED plans are armed for, as the timer's own ISO stamp, or null (`report_arcs.hour`). Over the same set the arc's Cancel reaches — which is the set its Start reaches — whoever armed it. One stamp because one press wrote them all; null when none of them is armed, and when they were armed apart — the header then offers the press again rather than naming a time half its plans are not waiting for. */ schedule: string | null; plans: string[]; /** The one planner outing of the ARC — its design, its cut, its judgment (`report_planners.of_arc`: the newest live row whose `target` IS the arc, else its newest ending still short of a plan). A row naming one of the arc's plans is that PLAN's, and rides `plan.planner` instead, so the deck's header and a card inside it can never state one outing twice. `null` on an arc no planner is on, and against a dispatcher build older than the field. */ planner: DispatcherPlanner | null; created_at: string; completed_at: string | null; cost_usd: number; tokens: number; tokens_in: number; tokens_out: number; tokens_cache_read: number | null };
+/** This box's posture, as `report.snapshot` reads it on every call: the provider the walks take (`width.route` — the DeepSeek switch, read live, never cached), the operator's swarm toggle (`swarm.read()`: `enabled`, and `lanes` — `null` for a bare `on`, a number for `on <N>`, both inert when the flag is off), and `ceiling`, the BOX's number (`width.ceiling`): the most phases of ONE plan that may walk at once when it carries no swarm word of its own — the default every such plan walks under, the swarm toggle's own number on either route, `null` for no ceiling — weighed over that plan's own phases in flight, never over the board's. A plan carrying a word (`DispatcherPlan.swarm`) is bounded by that word over its OWN phases in flight instead. `word` is the BOX's whole posture in one phrase (`width.word()`) — never a `held` line's ending, which names the clause that refused (`width.reason`); one plan's own phrase is `DispatcherPlan.posture`. `park_at_peak` is the operator's third switch file; `peak_until` is when the CURRENT DeepSeek peak window ends, as an ISO stamp, or null outside one — on the Claude route the peak has no price, so it is null whatever the toggle says. `planners` is the planner lane's dial and its census (`planner_lanes.census`): `lanes` the width the operator set in `planners.flag` (default 2, floor 1), `out` how many planner outings are out against it — `out` may stand above `lanes` after the dial is lowered, since an outing already out is never stopped. Absent against a dispatcher build older than the field, where the readout is not drawn. */
+export type DispatcherRoute = { provider: 'claude' | 'deepseek'; swarm: { enabled: boolean; lanes: number | null }; ceiling: number | null; word: string; park_at_peak: boolean; peak_until: string | null; planners?: { lanes: number; out: number } };
+/** This home's daemon. `alive` is the LOCK, not the file: the daemon takes a blocking exclusive flock on `<home>/daemon.lock` before anything else, so an exclusive flock taken by a reader answers without blocking — refused means somebody holds it, and that somebody is the daemon. `pid` and `unit` are therefore only reported on the alive branch: a lock file nobody holds is a dead daemon's, whatever pid it still names, and the unit comes from `/proc/<pid>/cgroup` — the kernel's answer, the one thing the daemon's four-name environment cannot have been handed. */
+export type DispatcherDaemon = { alive: boolean; pid: number | null; unit: string | null };
+/** The whole picture, pushed on change over `/ws` by the dispatcher lane. It is the document's own keys — `plans`, `arcs`, `planners`, `route`, `daemon`, `offpeak_at`, `home`, `generated_at` — with the frame's clock added as `at`, epoch MILLISECONDS (`Date.now()`), unlike every time inside. `offpeak_at` is always a stamp — the next DeepSeek off-peak moment, and the literal `none` when the clock cannot answer — so it is a string and never null. */
+export type DispatcherStateEvent = { kind: 'dispatcher_state'; arcs: DispatcherArc[]; plans: DispatcherPlan[]; planners: DispatcherPlanner[]; route: DispatcherRoute; daemon: DispatcherDaemon; offpeak_at: string; home: string; generated_at: string; at: number };
+/** The verbs this server may relay: `stop`, `resume`, `schedule` (a queued plan's Start at a time — `offpeak`, an ISO timestamp, or `none` to clear), `park` (a designed plan set aside), `unpark` (handed back to be cut), `model` (a plan's or an arc's own DeepSeek / Claude word; restarts nothing and wakes nobody — the word is read when a chain is launched), `swarm` (a plan's own swarm word, or `auto` to follow the box's switch again; a plan's verb alone — the dispatcher kicks its own daemon when the word changed, since a wider word can free a held phase), `drop` (a plan taken out of the store with everything it holds of it — refused while a phase of it walks or a planner outing for it or its arc is live; the one verb no press undoes) and `planner-resume` (a plan's stalled planner outing put back to work through the verb the house already has for it — `cut`, `judge`, or a `tell` of `continue` — read fresh off the store at the press; refused when nothing of the plan ended short). */
+export type DispatcherVerb = 'stop' | 'resume' | 'schedule' | 'park' | 'unpark' | 'model' | 'swarm' | 'drop' | 'planner-resume';
+/** What one relayed verb did. A refusal is a RESULT, not an error: the dispatcher prints its refusals on STDOUT (`REFUSED <verb> <name>: <reason>`, exit 2; a not-found line, exit 1 — `no plan <bare>`, or `no plan or arc <bare>` from one of the four verbs an arc's own name also reaches), so `stdout` carries the dispatcher's own first line whole and the reader never gets our paraphrase. `reason` is present only when the dispatcher never got to answer: it timed out, or its binary could not be spawned. */
+export type DispatcherVerbResult = { ok: boolean; verb: DispatcherVerb; plan: string; exit: number | null; stdout: string; stderr: string; reason?: 'timeout' | 'spawn-failed' };
+/** A plan's or an arc's OWN model word, as the store records it and as the model control sends it through `POST /plans/:name/model` and `POST /arcs/:name/model`: `deepseek`, `claude` (the store's default, what a row carrying no word of its own reads), or `auto` — follow the chat's DeepSeek switch. The three words have ONE home, `hooks/plan_runner/run_model.py:WORDS`, unpacked by `hooks/dispatcher/model.py` rather than re-spelled; the server checks a request against exactly these three (`readDispatcherModelChoice`) before anything is spawned, so the argv word is always ours. */
+export type DispatcherModelChoice = 'deepseek' | 'claude' | 'auto';
+/** A plan's OWN swarm word as the store records it and the document carries it (`DispatcherPlan.swarm`): the box flag's grammar (`hooks/plan_runner/swarm.py:parse`), canonical — `off` (one of this plan's phases at a time), `on` (no ceiling of its own), `on <N>` (at most N of its phases at once, N a positive safe integer). */
+export type DispatcherSwarmWord = 'off' | 'on' | `on ${number}`;
+/** What the swarm control sends through `POST /plans/:name/swarm`: a `DispatcherSwarmWord`, or `auto` — no word of its own, follow the box's switch (the store clears the column). The server checks a request against exactly this grammar (`readDispatcherSwarmWord`) and relays a word it spelled itself, so the argv word is always ours. */
+export type DispatcherSwarmChoice = DispatcherSwarmWord | 'auto';
+/** `GET /plans/offpeak`: the dispatcher's next DeepSeek off-peak moment in epoch SECONDS (`dispatcher offpeak`, derived from `deepseek.PEAK_UTC`), or `null` when the dispatcher could not answer. The card's `Start at …` button shows it in the reader's clock and never computes it. */
+export type DispatcherOffpeak = { at: number | null };
+
+// ---------------------------
+//----------------- DISPATCHER ANSWERS: how the dispatcher took an operator's answer ------------
+
+/**
+ * What the dispatcher did with ONE operator answer carried to it (`carryReply`): `took` — every verb
+ * the answer ran exited 0; `already-answered` — the Accept reached a plan the store had approved
+ * already (`dispatcher accept` exit 3), so the answer changed nothing and the plan's own approval
+ * stands; `refused` — a verb refused, failed or never answered (a stale lock, a plan no longer
+ * loaded, a timeout). Consumed by the answer service (which derives it from the verbs' exit codes)
+ * and the asks service (which keeps a `took` or `already-answered` prompt down and puts a `refused`
+ * one back). It is `DispatcherCardAnswer`'s first three outcomes: the card's door answers this word
+ * itself when the dispatcher heard the answer, and its own when it never reached it.
+ */
+export type DispatcherAnswerOutcome = 'took' | 'already-answered' | 'refused';
+
+/** The card's answer door's reply (`POST /api/dispatcher/answer`). `took`, `already-answered`, `refused`: what the dispatcher did (`carryReply`). `not-open`: no open ask carries the name the card's ask derives — answered, re-cut, changed since it was drawn, or already being carried. `no-answer`: the decision names no offered option, or a Rework carries no notes. `unread`: the store could not be read to find the ask. */
+export type DispatcherCardAnswer = {
+  outcome: 'took' | 'already-answered' | 'refused' | 'not-open' | 'no-answer' | 'unread';
+  /** The one line the card toasts: the dispatcher's own first line when it heard the answer, else the lane's sentence for why it never reached it — the field every relayed verb's sentence travels in. */
+  stdout: string;
+};
+
 // ---------------------------
 /**
  * How a launcher soul is going while it is out, and how it ended once its receipt landed.
@@ -384,11 +393,23 @@ export type SoulLaunchState = 'running' | 'completed' | 'failed' | 'stopped';
  * `blocked` marks a launch DeepSeek refused or never answered: it did no work, and the launcher
  * never re-routes a soul to Claude.
  *
+ * `launched_by` is the CLI session id the launcher stamped into `spec.json` from its own
+ * `CLAUDE_CODE_SESSION_ID` at the moment it minted the launch — ownership recorded by the process
+ * that made the launch, never read off a transcript. A chain's stages are minted later by the
+ * detached walker and carry the stamp of the chat that launched the chain. `null` when the spec
+ * names no launcher (a launch from a bare terminal, or one older than the stamp). A client anchors a
+ * launch to a chat only on an EXACT match between this and that chat's CLI session id.
+ *
  * Every timestamp is epoch SECONDS, which is what the launcher's Python wrote with `time.time()`.
- * `cost_usd`, `tokens` and `duration_s` are `null` until the receipt lands: a live soul's spend is
- * not knowable from here, and a zero would read as "free" rather than as "not yet".
+ * `cost_usd`, `tokens`, `tokens_in`/`tokens_out` and `duration_s` are `null` until the receipt lands: a
+ * live soul's spend is not knowable from here, and a zero would read as "free" rather than as "not yet".
+ *
+ * AND ONE HALF OR THE OTHER, NEVER BOTH (operator rule, 2026-09-24): `cost_usd` is PAID dollars — a soul
+ * on the operator's Claude subscription reads `0` there — and `tokens*` are THE SUBSCRIPTION'S, `null`
+ * throughout on a soul a vendor billed, whose tokens are that vendor's own business. So the pin draws
+ * `$0.28 DeepSeek` with no tokens or `1.2M in · 48k out` with no `$`.
  */
-export type SoulLaunchSnapshot = { launch_id: string; role: string; agent: string; brief: string; provider: 'deepseek' | 'claude'; blocked: boolean; state: SoulLaunchState; status: string; cause: string; started_at: number; ended_at: number | null; duration_s: number | null; cost_usd: number | null; tokens: number | null };
+export type SoulLaunchSnapshot = { launch_id: string; launched_by: string | null; role: string; agent: string; brief: string; provider: 'deepseek' | 'claude'; blocked: boolean; state: SoulLaunchState; status: string; cause: string; started_at: number; ended_at: number | null; duration_s: number | null; cost_usd: number | null; tokens: number | null; tokens_in: number | null; tokens_out: number | null };
 /** The whole picture, pushed on change over `/ws`. `launches` is ordered by `started_at` ascending, oldest first. `at` is epoch MILLISECONDS (`Date.now()`), unlike every field inside a snapshot. */
 export type SoulLaunchStateEvent = { kind: 'soul_launch_state'; launches: SoulLaunchSnapshot[]; at: number };
 // ---------------------------
@@ -407,9 +428,10 @@ export type SoulLaunchStateEvent = { kind: 'soul_launch_state'; launches: SoulLa
  * truncated to sixteen lowercase hex, DERIVED rather than minted, so a resumed or re-adopted
  * session comes back as the same owner and can still refresh the leases it holds.
  *
- * `model` is the `--model` flag the child was actually given (`deepseek-flash` or `opus`) and
- * `provider` says which endpoint it bills; the pair is settled at spawn from the board's own
- * `deepseekFlash`, never re-derived here, because the switch applies at the NEXT spawn.
+ * `model` is the `--model` flag the child was actually given (`deepseek-flash`, or the Claude word
+ * the launch table gives Metis) and `provider` says which endpoint it bills; the pair is settled at
+ * spawn from the board's own `deepseekFlash`, never re-derived here, because the switch applies at
+ * the NEXT spawn.
  *
  * `lastActivityAt` is `child.log`'s mtime, not a heartbeat the child writes: the child is
  * detached and owns its own log file descriptor, so its log's stamp is the only liveness signal
@@ -658,6 +680,8 @@ export type NormalizedMessage = {
   toolId?: string;
   toolResult?: {
     content?: string;
+    /** Pictures the tool returned (a Read of an image), drawn by the transcript under the call: an inline data URL on a live frame, the `path` of a stored chat asset in a loaded history. */
+    images?: Array<{ data?: string; path?: string }>;
     isError?: boolean;
     toolUseResult?: unknown;
     /** When the result landed — for an agent, when it finished. Absent when the transcript does not say. */
@@ -818,18 +842,50 @@ export type ProviderPermissionDecision = {
   rememberEntry?: unknown;
 };
 
+/**
+ * A pending approval as the STORE that holds it says it is now — what the phone's tap registry needs
+ * to answer a button whose push a process now gone sent (`ProviderRuntimePermissionGateway.recall`):
+ * the session the prompt belongs to — `null` when this app knows of none, as for a plan raised with
+ * no chat — the tool it stands for and the input its options are read from.
+ * Consumed by the dispatcher lane (which produces it), the provider runtime service (which asks every
+ * gateway for it) and the ntfy act route (which registers it before spending the tap's token).
+ */
+export type ProviderRuntimeRecalledPrompt = { sessionId: string | null; toolName: string; input: unknown };
+
 export type ProviderRuntimePermissionGateway = {
   /**
-   * Settles the approval a decision belongs to.
+   * Settles the approval a decision belongs to, answering whether this gateway HELD it.
    *
-   * `approvalKey` is the in-app panel's request id, OR the ask's own `promptKey` when the answer
-   * came from a phone: a push outlives the process that sent it, so a tap names a prompt the
-   * successor re-issued under a request id of its own. A runtime resolves both.
+   * `approvalKey` is the name the door that heard the answer gave the approval: an ask's own
+   * `promptKey` when the answer came from a phone — a push outlives the process that sent it, so a
+   * tap names the ask itself and not a handle some process minted — or whatever a runtime registers
+   * its own approvals under for the chat that shows them. The gateways are asked in turn and the
+   * FIRST to claim the key settles it (`providerRuntimeService.resolveToolApproval` stops there), so
+   * a key a gateway does not hold is answered `false` in silence, and the service speaks once for a
+   * key nobody claimed.
+   *
+   * A gateway whose asks live in a STORE claims every key of its own and settles it from the store
+   * (the dispatcher's plan prompts): the process that hears an answer is not always the one that
+   * raised the ask, so "this process has not registered it" is not "unknown".
    */
-  resolve(approvalKey: string, decision: ProviderPermissionDecision): void;
-  listPending(sessionId: string): unknown[];
+  resolve(approvalKey: string, decision: ProviderPermissionDecision): boolean;
   /**
-   * Every session with an approval waiting right now, whether or not it still has a run.
+   * OPTIONAL — only a gateway whose asks live in a store has one. Answers what the prompt named by
+   * `approvalKey` is, read from that store now, or `null` when no open ask carries the name. Asked by
+   * the phone's act route when a tap names a prompt this process never registered buttons for (it did
+   * not send the push, and has not yet raised the prompt); it never throws.
+   */
+  recall?(approvalKey: string): Promise<ProviderRuntimeRecalledPrompt | null>;
+  /**
+   * OPTIONAL — ABSENT on a gateway whose asks are pending in NO CHAT: the dispatcher's, whose asks are
+   * answered on the plan's card in the Roadmap tab's In flight face and in the Runs widget and on the phone, and are
+   * listed for no chat at all. What that gateway's approvals in this session are right now, for the
+   * chat that shows them.
+   */
+  listPending?(sessionId: string): unknown[];
+  /**
+   * OPTIONAL — the same absence as `listPending`. Every session with an approval waiting right now,
+   * whether or not it still has a run.
    *
    * Beside `listPending` rather than derived from it, because the gateway that holds the approvals
    * is the only party that can enumerate them: a prompt outlives the run that raised it (a
@@ -837,7 +893,7 @@ export type ProviderRuntimePermissionGateway = {
    * cannot ask this question session by session. Read by `sessionsService
    * .listAwaitingInputSessionIds` for the sidebar's yellow dot.
    */
-  listPendingSessions(): string[];
+  listPendingSessions?(): string[];
 };
 
 /**
@@ -2002,6 +2058,16 @@ export type MemoryCandidateRead =
   | { reachable: false; reason: string };
 
 // ---------------------------
+//----------------- NOTES ------------
+// The notes lane's own wire shapes, produced by `server/modules/notes/` and mirrored field-for-field in
+// `src/shared/types.ts` § NOTES. The frame that says a list has moved is `NotesChangedEvent` above,
+// beside the board's own frame, because it is built by the same kind of broadcaster.
+/** One note as the wire carries it: a card a person wrote. `createdAt` orders the list and never moves; `updatedAt` is the last save. Both are ISO-8601 UTC with milliseconds. The account it belongs to never leaves the server. */
+export type Note = { id: string; title: string; description: string; createdAt: string; updatedAt: string };
+/** What the two writes take: the whole of both fields, never a patch. */
+export type NoteInput = { title: string; description: string };
+
+// ---------------------------
 //----------------- CLI VERSION CONTRACTS ------------
 // Two facts of the same shape, deliberately kept apart: `installed` is what the binary a run WOULD spawn answers
 // to `--version` right now; a run's `cliVersion` is what THAT run's own process announced at init.
@@ -2030,6 +2096,63 @@ export type CliVersionReport = { installed: string | null; reason: string | null
 export type DeepseekBalance =
   | { reachable: true; available: boolean; currency: string; total: string; checkedAt: number }
   | { reachable: false; reason: string };
+
+// ---------------------------
+//----------------- AGENT LAUNCH RELAY: the launch table, through its CLI ------------
+// The launch table (`~/.claude/charters/launch.toml`) says which model and effort every soul, and Metis,
+// launches at. Its one reader and writer is the hooks' `launch_table` package, and this server only runs
+// that package's CLI (`~/.claude/scripts/launch-table`): it never opens the file. So the census
+// Settings → Agents → Edit Agent Chains draws is carried WHOLE as the CLI printed it, and its shape is written down once, in Python
+// (`hooks/launch_table/census.py`) and mirrored for the client in `src/shared/types.ts`. The
+// vocabulary (which models, which efforts) is Python's too: this side checks no word.
+/**
+ * What one call to the launch table's CLI came to: the object it printed, or why there is none.
+ *
+ *  - `refused`      the CLI answered no, in one sentence (exit 2 with `{"error"}`). `message` IS that sentence,
+ *                   carried untouched, and it is the operator's own mistake, never a server fault.
+ *  - `unreachable`  the CLI never answered: it could not be started, timed out, crashed or exited any other way.
+ *  - `unreadable`   the CLI exited 0 and what it printed was not the one JSON object its contract promises.
+ *
+ * Nothing that produces one of these throws: a caller branches on `ok`. Read by the relay's service and
+ * routes (the status each reason earns) and by kanban-metis's spawn (a failed resolve blocks a launch).
+ */
+export type AgentLaunchResult<T> =
+  | { ok: true; value: T }
+  | { ok: false; reason: 'refused' | 'unreachable' | 'unreadable'; message: string };
+
+/**
+ * What `launch-table resolve <name> --side <side>` answers: the `--model` word and the `--effort` word a
+ * launch of `name` takes on that side. `effort` is `null` when no `--effort` flag is due, so the CLI's own
+ * effortLevel applies. On the `deepseek` side `model` is the house's DeepSeek model word and `effort` is
+ * the one house-wide DeepSeek effort. Read by the relay's service, which checks the shape, and by
+ * kanban-metis's env service, which turns it into a child's argv.
+ */
+export type AgentLaunchResolved = {
+  name: string;
+  side: 'claude' | 'deepseek';
+  model: string;
+  effort: string | null;
+};
+
+/**
+ * One row's edit, as `PUT /api/agent-launch/rows/:name` carries it and `launch-table set` takes it. A field
+ * left out is left alone; a `null` clears that pin (the CLI's `default`), so the row falls back to the table's
+ * defaults. The words themselves are not checked on this side. Read by the relay's routes (the body's shape)
+ * and its service (the argv).
+ */
+export type AgentLaunchRowChange = { model?: string | null; effort?: string | null };
+
+/**
+ * An edit of the table's defaults, as `PUT /api/agent-launch/defaults` carries it and `launch-table defaults`
+ * takes it. `model` is the default model; `effort` maps a model to its default effort word, or to `null` for
+ * "no `--effort` flag on that model"; `deepseek_effort` is the one house-wide DeepSeek effort. A field left out is
+ * left alone. Read by the relay's routes (the body's shape) and its service (the argv).
+ */
+export type AgentLaunchDefaultsChange = {
+  model?: string;
+  effort?: Record<string, string | null>;
+  deepseek_effort?: string;
+};
 
 // ---------------------------
 //----------------- SUBAGENT TRANSCRIPTS ------------

@@ -8,7 +8,6 @@
   },
   "account": {
     "title": "帳戶",
-    "language": "語言",
     "languageLabel": "顯示語言",
     "languageDescription": "選擇您偏好的介面語言",
     "username": "使用者名稱",
@@ -326,7 +325,7 @@
     "connectionStatus": "連線狀態",
     "runnerModel": {
       "label": "建置之魂使用 DeepSeek Flash",
-      "description": "plan runner 將建構者、修復輪與 Athena 派送到 DeepSeek 的 deepseek-flash，而非 Claude Opus。Prometheus、偵察者與重新規劃者仍留在 Claude。下一階段生效。",
+      "description": "runner 將建構者、修復輪與 Athena 派送到 DeepSeek 的 deepseek-flash，而非 Claude Sonnet。Prometheus、偵察者與重新規劃者仍留在 Claude。下一個任務生效。",
       "unreadable": "無法從伺服器讀取此開關，因此其位置未知——這與關閉不同。每當此頁面重新取得焦點時都會重試。"
     },
     "jev": {

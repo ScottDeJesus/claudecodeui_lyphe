@@ -1,3 +1,5 @@
+import type { TFunction } from 'i18next';
+
 import type {
   FileStatusCode,
   GitCommitSummary,
@@ -99,7 +101,13 @@ export function describeUpstreamPosition(
     return { kind: 'unread', reason: remoteStatus?.error ?? null };
   }
   if (remoteStatus.hasUpstream === true && typeof remoteStatus.ahead === 'number') {
-    return { kind: 'tracked', ahead: remoteStatus.ahead, remoteBranch: remoteStatus.remoteBranch ?? null };
+    return {
+      kind: 'tracked',
+      ahead: remoteStatus.ahead,
+      remoteBranch: remoteStatus.remoteBranch ?? null,
+      // Absent and null both mean the server recorded no push from this copy; they render the same.
+      lastPushedAt: remoteStatus.lastPushedAt ?? null,
+    };
   }
   // `hasCommits` rides on /status, and it is the server's own reason for the first shape.
   if (status?.hasCommits === false) {
@@ -110,6 +118,74 @@ export function describeUpstreamPosition(
   }
   // A body carrying neither flag is not a shape the server sends. Nothing is known from it.
   return { kind: 'unread', reason: null };
+}
+
+/**
+ * How old a push has to be before the line drops the age and keeps the date: past a day the two
+ * would be the same moment written twice, and the stamp is the one the reader can act on.
+ */
+const LAST_PUSH_AGE_LIMIT_SECONDS = 24 * 60 * 60;
+
+/**
+ * The header's last-pushed badge, or null when this branch has no push to describe.
+ *
+ * Only `tracked` has an upstream to have pushed to, so the other three kinds say their own thing
+ * elsewhere and show no line at all: "not pushed from here" is a useless thing to read about a
+ * branch that tracks nothing. On a tracked branch, a null `lastPushedAt` is the server's own
+ * answer that this copy's reflog holds no push, and it is said in words rather than drawn as a
+ * zero or a dash — the one state where the app knows there is no time to show.
+ *
+ * Otherwise: the age in words beside the local date and time (`Last pushed 2 hours ago · Sep 24,
+ * 7:46 AM`), and past a day the date and time alone. `title` carries the same moment in full for
+ * the tooltip. Used by GitStatusHeader; `language` is the app's chosen language, so the stamp
+ * follows the words around it rather than the browser's own locale.
+ */
+export function describeLastPush(
+  upstream: UpstreamPosition,
+  t: TFunction,
+  language: string,
+): { label: string; title?: string } | null {
+  if (upstream.kind !== 'tracked') return null;
+  if (!upstream.lastPushedAt) return { label: t('gitPanel.neverPushed') };
+
+  const pushedAt = new Date(upstream.lastPushedAt);
+  const title = t('gitPanel.lastPushed', {
+    when: pushedAt.toLocaleString(language, { dateStyle: 'full', timeStyle: 'short' }),
+  });
+
+  const stamp = formatPushStamp(pushedAt, language);
+  const ageSeconds = Math.floor((Date.now() - pushedAt.getTime()) / 1000);
+  if (ageSeconds >= LAST_PUSH_AGE_LIMIT_SECONDS) {
+    return { label: t('gitPanel.lastPushed', { when: stamp }), title };
+  }
+  return { label: t('gitPanel.lastPushed', { when: `${describePushAge(ageSeconds, t)} · ${stamp}` }), title };
+}
+
+/**
+ * `Sep 24, 7:46 AM` in the reader's own time zone, with the year added once the push was not this
+ * year — an undated `Sep 24` would otherwise read as the most recent one.
+ */
+function formatPushStamp(pushedAt: Date, language: string): string {
+  const options: Intl.DateTimeFormatOptions = {
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  };
+  if (pushedAt.getFullYear() !== new Date().getFullYear()) options.year = 'numeric';
+  return pushedAt.toLocaleString(language, options);
+}
+
+/**
+ * The age in words, for a push younger than a day. A clock skewed the other way (a reflog entry
+ * stamped in the future) floors at "just now" rather than counting backwards.
+ */
+function describePushAge(ageSeconds: number, t: TFunction): string {
+  if (ageSeconds < 60) return t('gitPanel.age.justNow');
+
+  const minutes = Math.floor(ageSeconds / 60);
+  if (minutes < 60) return t('gitPanel.age.minutesAgo', { count: minutes });
+  return t('gitPanel.age.hoursAgo', { count: Math.floor(minutes / 60) });
 }
 
 /**

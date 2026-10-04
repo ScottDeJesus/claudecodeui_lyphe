@@ -2,7 +2,7 @@ import { ChevronDownIcon, Maximize2Icon, Minimize2Icon, type LucideIcon } from '
 import { useEffect, useRef, useState, type DragEvent, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import type { GutterWidgetId } from '@/shared/types';
+import type { GutterWidgetId, Tone } from '@/shared/types';
 import { GUTTER_DRAG_TYPE } from '@/modules/chat-gutters/gutterDrag';
 import { Badge, Card, ScrollArea } from '@/shared/ui';
 import { OWNS_ESCAPE } from '@/shared/ui/overlayEscape';
@@ -31,7 +31,8 @@ import { cn } from '@/shared/utils';
  * iframe scrolls itself and a padded one would sit in a box two insets smaller than the card.
  *
  * The count is drawn only when it is above zero — a badge reading zero is noise on a header that
- * already says what it is.
+ * already says what it is — and its TONE is the widget's to say (`countTone`): a count that is merely
+ * a list length wears the badge's cool register, and one the reader owes an answer to wears amber.
  *
  * THE HEADER IS THE TOGGLE, and it is also the drag handle. A press and release anywhere on it opens
  * or closes the body — the chevron is the sign of what a press will do, not the only place to press
@@ -76,6 +77,7 @@ export function GutterWidgetFrame({
   widget,
   title,
   count,
+  countTone = 'info',
   icon: Icon,
   open: placed,
   onToggle,
@@ -90,6 +92,13 @@ export function GutterWidgetFrame({
   widget: GutterWidgetId;
   title: string;
   count: number;
+  /**
+   * The tone of the header's count badge — `info`, the badge's own cool register, unless the widget
+   * has something to raise. The Runs widget passes `warn` while a plan owes the operator a word,
+   * so the badge says "these want you" rather than merely "these are here". Ignored at zero, where
+   * no badge is drawn at all.
+   */
+  countTone?: Tone;
   icon: LucideIcon;
   open: boolean;
   onToggle: () => void;
@@ -244,7 +253,7 @@ export function GutterWidgetFrame({
         >
           <Icon className="h-4 w-4 shrink-0 text-accent-ink forced-colors:text-[CanvasText]" aria-hidden="true" />
           <span className="min-w-0 flex-1 truncate text-sm font-medium text-foreground">{title}</span>
-          {count > 0 ? <Badge as="span" tone="info" data-testid="gutter-widget-count">{count}</Badge> : null}
+          {count > 0 ? <Badge as="span" tone={countTone} data-testid="gutter-widget-count">{count}</Badge> : null}
           {/* One glyph for both states, turned rather than swapped: it says which way the next press
               will go. It is a sign, not a second control — the press belongs to the header. */}
           <ChevronDownIcon

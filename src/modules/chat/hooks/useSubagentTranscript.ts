@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 
 import { api } from '@/shared/api';
+import { useHostWindow } from '@/shared/context/HostWindowContext';
 import type { SubagentTranscriptResult, SubagentTranscriptTarget } from '@/shared/types';
 
 /**
@@ -54,6 +55,10 @@ export function useSubagentTranscript(
   target: SubagentTranscriptTarget | null,
   running: boolean,
 ): { result: SubagentTranscriptResult | null; failed: boolean } {
+  // The poll refreshes a transcript the reader is watching, so it is paced on the window they are
+  // watching it in: a hidden opener throttles its timers (to one a minute after a while). Outside
+  // the chat (the kanban board's Metis panel) this is the global window.
+  const hostWindow = useHostWindow();
   const [latest, setLatest] = useState<TranscriptRead | null>(null);
   /** The newest read's number. A ref, because bumping it must not repaint anything by itself. */
   const tokenRef = useRef(0);
@@ -93,7 +98,7 @@ export function useSubagentTranscript(
           result: previous !== null && previous.key === key ? previous.result : null,
           failed: true,
         }));
-        if (running) timer = window.setTimeout(() => void run(), TRANSCRIPT_POLL_MS);
+        if (running) timer = hostWindow.setTimeout(() => void run(), TRANSCRIPT_POLL_MS);
         return;
       }
       if (cancelled || tokenRef.current !== token) return;
@@ -101,7 +106,7 @@ export function useSubagentTranscript(
       // The next read is armed only while something is still on its way: the row is running, or
       // the server says the file is still being written.
       if (running || next.inFlight) {
-        timer = window.setTimeout(() => void run(), TRANSCRIPT_POLL_MS);
+        timer = hostWindow.setTimeout(() => void run(), TRANSCRIPT_POLL_MS);
       }
     };
 
@@ -109,9 +114,10 @@ export function useSubagentTranscript(
 
     return () => {
       cancelled = true;
-      if (timer !== undefined) window.clearTimeout(timer);
+      if (timer !== undefined) hostWindow.clearTimeout(timer);
     };
-  }, [key, kind, id, sessionId, running]);
+  // `hostWindow`: a move re-arms the poll on the window the transcript now stands in.
+  }, [key, kind, id, sessionId, running, hostWindow]);
 
   // A read under another key is another view's answer, so this one asks again from the top.
   const current = latest !== null && latest.key === key ? latest : null;

@@ -10,6 +10,7 @@ import type { ServerEvent,
   ProjectSession,IsSessionProcessing } from '@/shared/types';
 import { mergeProjectSelectionMetadata } from '@/modules/project-workspace/utils/projectSelectionMetadata';
 import { readSelectedProvider } from '@/shared/selectedProvider';
+import { getSessionProvider } from '@/shared/sessionRecency';
 
 type UseProjectsStateArgs = {
   sessionId?: string;
@@ -78,16 +79,7 @@ type SessionDetailsApiPayload = {
 
 type ProjectSessionPage = Pick<Project, 'sessions' | 'sessionMeta'>;
 
-const DEFAULT_PROVIDER: LLMProvider = 'claude';
-
 const serialize = (value: unknown) => JSON.stringify(value ?? null);
-
-const getSessionProvider = (session: ProjectSession): LLMProvider => {
-  const provider = session.__provider ?? session.provider;
-  return typeof provider === 'string' && provider.trim()
-    ? provider as LLMProvider
-    : DEFAULT_PROVIDER;
-};
 
 const normalizeSessionProvider = (session: ProjectSession): ProjectSession => ({
   ...session,
@@ -346,7 +338,7 @@ const removeSessionFromProject = (project: Project, sessionIdToDelete: string): 
   return updatedProject;
 };
 
-const VALID_TABS: Set<string> = new Set(['chat', 'files', 'shell', 'git', 'tasks', 'browser', 'memory', 'runner', 'heal', 'api', 'kanban', 'universe', 'schedules']);
+const VALID_TABS: Set<string> = new Set(['chat', 'files', 'shell', 'git', 'tasks', 'browser', 'memory', 'runner', 'heal', 'api', 'kanban', 'universe', 'schedules', 'notes']);
 
 const isValidTab = (tab: string): tab is AppTab => {
   return VALID_TABS.has(tab) || tab.startsWith('plugin:');
@@ -1199,6 +1191,7 @@ export function useProjectsState({
       loadingProgress,
       onRefresh: handleSidebarRefresh,
       onShowSettings: () => setShowSettings(true),
+      onShowUpdates: () => openSettings('updates'),
       showSettings,
       settingsInitialTab,
       onCloseSettings: () => setShowSettings(false),
@@ -1216,6 +1209,7 @@ export function useProjectsState({
       isLoadingProjects,
       isMobile,
       loadingProgress,
+      openSettings,
       projects,
       settingsInitialTab,
       selectedProject,

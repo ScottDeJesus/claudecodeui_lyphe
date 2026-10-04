@@ -4,6 +4,7 @@ import { ArrowDownIcon } from 'lucide-react';
 
 import { useTasksSettings } from '@/modules/task-master';
 import { useWebSocket } from '@/shared/context/WebSocketContext';
+import { useHostWindow } from '@/shared/context/HostWindowContext';
 import PermissionContext from '@/modules/chat/context/PermissionContext';
 import type { TokenUsageSurface } from '@/modules/chat/composer/TokenUsageSummary';
 import type { ChatExportSurface } from '@/modules/chat/transcript/ChatExportMenu';
@@ -15,6 +16,7 @@ import type {
   ProjectSession,
   SessionEstablishedContext,
   SessionNavigationOptions,
+  StreamFlushTimer,
 } from '@/shared/types';
 import { useChatProviderState } from '@/modules/chat/hooks/useChatProviderState';
 import { useToolPermissionState } from '@/modules/chat/hooks/useToolPermissionState';
@@ -22,8 +24,10 @@ import { useScheduledMessages } from '@/modules/chat/composer/useScheduledMessag
 import { useChatSessionState } from '@/modules/chat/hooks/useChatSessionState';
 import { useChatRealtimeHandlers } from '@/modules/chat/hooks/useChatRealtimeHandlers';
 import { useChatComposerState } from '@/modules/chat/hooks/useChatComposerState';
-import { useSessionPresence } from '@/modules/chat/hooks/useSessionPresence';
+import { useIsLookingAtSession, useSessionPresence } from '@/modules/chat/hooks/useSessionPresence';
 import { useSessionStore } from '@/modules/chat/hooks/useSessionStore';
+import { useCliSessionId } from '@/modules/chat/hooks/useCliSessionId';
+import { clearStreamFlush } from '@/modules/chat/utils/streamFlushTimer';
 import {
   useProcessingSessions,
   useSessionProtectionActions,
@@ -103,6 +107,7 @@ function ChatInterface({
 }: ChatInterfaceProps) {
   const { tasksEnabled, isTaskMasterInstalled } = useTasksSettings();
   const { subscribe, isConnected } = useWebSocket();
+  const hostWindow = useHostWindow();
   // The transcript assembles what an export needs; two surfaces draw the button from it. On a phone
   // that is the workspace header (published upward, as before); on a desktop it is the composer,
   // beside the model and the edit mode, which is why it is also kept here.
@@ -112,6 +117,7 @@ function ChatInterface({
     onChatExportSurface?.(surface);
   }, [onChatExportSurface]);
   useSessionPresence({ sessionId: isActive ? selectedSession?.id ?? null : null, sendMessage, isConnected });
+  const isLooking = useIsLookingAtSession(isActive);
   const { t } = useTranslation('chat');
   const processingSessions = useProcessingSessions();
   const {
@@ -120,7 +126,7 @@ function ChatInterface({
   } = useSessionProtectionActions();
 
   const sessionStore = useSessionStore();
-  const streamTimerRef = useRef<number | null>(null);
+  const streamTimerRef = useRef<StreamFlushTimer | null>(null);
   const accumulatedStreamRef = useRef('');
   // When each session's `chat.subscribe` was last sent; idle acks older than
   // a later local request are discarded as stale.
@@ -131,10 +137,7 @@ function ChatInterface({
   const lastSeqRef = useRef(new Map<string, number>());
 
   const resetStreamingState = useCallback(() => {
-    if (streamTimerRef.current) {
-      clearTimeout(streamTimerRef.current);
-      streamTimerRef.current = null;
-    }
+    clearStreamFlush(streamTimerRef);
     accumulatedStreamRef.current = '';
   }, []);
 
@@ -147,6 +150,7 @@ function ChatInterface({
     currentProviderEffortOptions,
     currentProviderModel,
     currentProviderModelOptions,
+    currentProviderModelLabelsById,
     permissionMode,
     pendingPermissionRequests,
     setPendingPermissionRequests,
@@ -171,6 +175,7 @@ function ChatInterface({
     agentMessages,
     soulLaunchIds,
     addMessage,
+    armReplyAnchor,
     sessionActivity,
     isProcessing,
     canAbortSession,
@@ -203,6 +208,8 @@ function ChatInterface({
     requestLatestMessages,
   } = useChatSessionState({
     isActive,
+    isLooking,
+    isConnected,
     selectedProject,
     selectedSession,
     ws,
@@ -217,14 +224,19 @@ function ChatInterface({
     sessionStore,
   });
 
+  // The id the launcher stamps on every launch this chat makes — a chain's later stages included,
+  // which print no receipt into any transcript. The strip and the widget anchor the lane's launches
+  // by it (`readStampedLaunchIds`), so a new stage shows the moment the lane carries it.
+  const cliSessionId = useCliSessionId(selectedSession?.id ?? null);
+
   // The gutters cannot see this chat's own store — `useSessionStore` is a ref private to this
   // component — so the rows they draw are published here, tagged with the id they are handed.
   useEffect(() => {
     const sessionId = selectedSession?.id;
     if (typeof sessionId !== 'string') { publishSubagentSource(null); return; }
-    publishSubagentSource({ sessionId, agentMessages, soulLaunchIds });
+    publishSubagentSource({ sessionId, cliSessionId, agentMessages, soulLaunchIds });
     return () => publishSubagentSource(null);
-  }, [selectedSession?.id, agentMessages, soulLaunchIds]);
+  }, [selectedSession?.id, cliSessionId, agentMessages, soulLaunchIds]);
 
   // The addresses this chat has declared in embed fences, for the Embed widget in the gutter. Read
   // off the MESSAGES rather than off the rendered transcript, because the transcript unmounts rows
@@ -329,6 +341,7 @@ function ChatInterface({
     onShowSettings,
     scrollToBottom,
     addMessage,
+    armReplyAnchor,
     setIsUserScrolledUp,
     setPendingPermissionRequests,
     resolvePermissionModeForProvider,
@@ -370,6 +383,7 @@ function ChatInterface({
     setPendingPermissionRequests,
     streamTimerRef,
     accumulatedStreamRef,
+    scrollContainerRef,
     lastSeqRef,
     statusCheckSentAtRef,
     onSessionProcessing,
@@ -393,11 +407,15 @@ function ChatInterface({
       handleAbortSession();
     };
 
-    document.addEventListener('keydown', handleGlobalEscape, { capture: true });
+    // The host document, not the opener's: a key pressed in the floating window never reaches the
+    // opener's document. Still a document CAPTURE listener, so a panel that owns Escape (marked from
+    // a window capture listener, which runs first) keeps the key through `defaultPrevented`.
+    const hostDocument = hostWindow.document;
+    hostDocument.addEventListener('keydown', handleGlobalEscape, { capture: true });
     return () => {
-      document.removeEventListener('keydown', handleGlobalEscape, { capture: true });
+      hostDocument.removeEventListener('keydown', handleGlobalEscape, { capture: true });
     };
-  }, [canAbortSession, handleAbortSession]);
+  }, [canAbortSession, handleAbortSession, hostWindow]);
 
   useEffect(() => {
     return () => {
@@ -644,7 +662,7 @@ function ChatInterface({
 
           <ChatComposer
             exportSurface={exportSurface}
-          pinnedAgents={stripClaimed ? null : <PinnedSubagents messages={agentMessages} soulLaunchIds={soulLaunchIds} sessionId={selectedSession?.id ?? null} />}
+          pinnedAgents={stripClaimed ? null : <PinnedSubagents messages={agentMessages} soulLaunchIds={soulLaunchIds} sessionId={selectedSession?.id ?? null} cliSessionId={cliSessionId} />}
           pendingPermissionRequests={pendingPermissionRequests}
           handlePermissionDecision={handlePermissionDecision}
           handleGrantToolPermission={handleGrantToolPermission}
@@ -659,6 +677,7 @@ function ChatInterface({
           onSelectEffort={handleSelectComposerEffort}
           model={currentProviderModel}
           availableModelOptions={currentProviderModelOptions}
+          availableModelLabelsById={currentProviderModelLabelsById}
           onSelectModel={handleSelectComposerModel}
           modelsLoading={providerModelsLoading}
           tokenBudget={tokenBudget}

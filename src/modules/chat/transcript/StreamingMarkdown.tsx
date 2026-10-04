@@ -29,7 +29,6 @@ type StreamingMarkdownProps = {
  * element type in the same position as a different component: every completed
  * reply threw away its DOM and rebuilt it, losing any selection the user had
  * started making inside it. One component there means the nodes are reconciled.
- * messageStreamEnd.test.tsx pins that.
  *
  * A block changes parent when it crosses from pending to settled, so its DOM is
  * recreated at that moment, dropping transient in-block state (a code block's

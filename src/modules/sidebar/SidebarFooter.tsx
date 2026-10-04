@@ -2,6 +2,7 @@ import { ArrowUpCircle, Settings } from 'lucide-react';
 import type { TFunction } from 'i18next';
 
 import { AccountFooterRow } from '@/modules/accounts';
+import { ClaudeUpdateFooterRow } from '@/modules/claude-updates';
 import { Banner } from '@/shared/ui';
 import type { ReleaseInfo } from '@/shared/types';
 
@@ -12,6 +13,7 @@ type SidebarFooterProps = {
   latestVersion: string | null;
   onShowVersionModal: () => void;
   onShowSettings: () => void;
+  onShowUpdates: () => void;
   t: TFunction;
 };
 
@@ -23,6 +25,7 @@ export default function SidebarFooter({
   latestVersion,
   onShowVersionModal,
   onShowSettings,
+  onShowUpdates,
   t,
 }: SidebarFooterProps) {
   const updateTitle = releaseInfo?.title || `v${latestVersion}`;
@@ -41,6 +44,10 @@ export default function SidebarFooter({
           </div>
         </>
       )}
+
+      {/* Claude's own row, directly above the app's: two things can have an update, and the one
+          that is about Claude says Claude. Renders nothing when there is no offer to make. */}
+      <ClaudeUpdateFooterRow onOpen={onShowUpdates} />
 
       {/* Update banner */}
       {updateAvailable && (

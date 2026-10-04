@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -333,9 +334,15 @@ export function handleShellConnection(
             initialCommand.includes('cursor-agent login') ||
             initialCommand.includes('auth login'));
 
+        // The WHOLE command is hashed, and not a prefix of it. A 16-character base64 prefix encodes
+        // exactly the first 12 bytes, so any two plain-shell commands sharing a 12-byte head landed in
+        // one slot: `claude --dangerously-skip-permissions /login` and its `/design-login` sibling —
+        // the two the settings dialog's rows run — reattached to each other's pty, and each row then
+        // showed the other's authorization under its own title. A digest over the full string cannot
+        // collide that way, and 16 hex characters keep the key as short as it was.
         const commandSuffix =
           isPlainShell && initialCommand
-            ? `_cmd_${Buffer.from(initialCommand).toString('base64').slice(0, 16)}`
+            ? `_cmd_${createHash('sha256').update(initialCommand).digest('hex').slice(0, 16)}`
             : '';
         ptySessionKey = `${projectPath}_${sessionId ?? 'default'}${commandSuffix}`;
 

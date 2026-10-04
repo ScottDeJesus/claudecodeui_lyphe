@@ -55,6 +55,7 @@ const mergeProviderModels = (
       ...custom.map(toCustomProviderModelOption),
     ],
     DEFAULT: predefined.DEFAULT,
+    ...(predefined.LABELS_BY_MODEL_ID ? { LABELS_BY_MODEL_ID: predefined.LABELS_BY_MODEL_ID } : {}),
   };
 };
 
@@ -75,10 +76,12 @@ const isUniqueConstraintError = (error: unknown): boolean => (
  * Creates the provider model application service used by Providers routes,
  * Commands, and provider runtimes.
  *
- * Curated adapter definitions stay source-controlled and are merged at read
- * time with custom SQLite rows. This deliberately has no predefined-model
- * persistence, memory cache, disk cache, TTL, or provider-native discovery.
- * Tests inject a small custom-model store through the same boundary.
+ * Each adapter's predefined definition is merged at read time with custom
+ * SQLite rows. Where the predefined models come from is the adapter's own
+ * business — Claude reads its CLI's catalog, cached per CLI version in
+ * `claude-model-catalog.ts`; the others are lists in their adapters — so this
+ * service caches nothing. A probe injects a small custom-model store through
+ * the same boundary.
  */
 export const createProviderModelsService = (dependencies: ProviderModelsServiceDependencies = {}) => {
   const resolveProvider = dependencies.resolveProvider ?? providerRegistry.resolveProvider;
@@ -298,7 +301,7 @@ export const createProviderModelsService = (dependencies: ProviderModelsServiceD
    *   1. the model recorded on the session row;
    *   2. the provider's own session state for externally-created sessions;
    *   3. `requestedModel`, the client's current default;
-   *   4. the source-controlled provider catalog default.
+   *   4. the provider catalog's default.
    */
   const resolveSessionModel = async (
     provider: LLMProvider,

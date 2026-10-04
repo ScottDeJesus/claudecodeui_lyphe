@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
 import type { ReactNode } from 'react';
 
 import { api } from '@/shared/api';
+import { useAuth } from '@/modules/auth';
 import type { Plugin } from '@/shared/types';
 
 
@@ -58,9 +59,15 @@ export function PluginsProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  // The list is asked for once a session exists, not at mount: this provider sits above the login
+  // gate, so a mount-time request went out with no token, was refused, and — never repeated after
+  // sign-in — left the list empty until a reload.
+  const { user } = useAuth();
+  const signedIn = Boolean(user);
   useEffect(() => {
+    if (!signedIn) return;
     void refreshPlugins();
-  }, [refreshPlugins]);
+  }, [refreshPlugins, signedIn]);
 
   const installPlugin = useCallback(async (url: string) => {
     try {

@@ -58,8 +58,15 @@ export async function readFlagFile(filePath: string): Promise<boolean> {
   }
 }
 
+/** Writes one on/off flag file: the line is `on` or `off`, the write is `writeFlagText`'s. */
+export async function writeFlagFile(filePath: string, enabled: boolean): Promise<void> {
+  return writeFlagText(filePath, enabled ? 'on\n' : 'off\n');
+}
+
 /**
- * Writes one flag file, through a scratch file and a rename.
+ * Writes one flag file's text, through a scratch file and a rename — the ONE writer of every
+ * host-wide flag this server owns: the on/off pair (`writeFlagFile`) and the planner lane's integer
+ * (`planner-lanes.ts`) alike, so a fix to the dance below reaches them all.
  *
  * Another process reads these files while this one writes them, and a plain `writeFile` is a
  * truncate followed by a write — a reader landing between the two sees an empty file. That reads
@@ -83,14 +90,14 @@ export async function readFlagFile(filePath: string): Promise<boolean> {
  * (`~/.claude/state/kanban-deepseek/`) does not exist until the first board turns its switch on,
  * and a writer that failed on a missing directory would make that first flip the one that breaks.
  */
-export async function writeFlagFile(filePath: string, enabled: boolean): Promise<void> {
+export async function writeFlagText(filePath: string, text: string): Promise<void> {
   await mkdir(path.dirname(filePath), { recursive: true });
   // `realpath` throws when the flag does not exist yet, which is not an error: there is no link to
   // follow, and the literal path is the right destination.
   const destination = await realpath(filePath).catch(() => filePath);
   const scratch = `${destination}.${process.pid}.${randomUUID()}.tmp`;
   try {
-    await writeFile(scratch, enabled ? 'on\n' : 'off\n', 'utf8');
+    await writeFile(scratch, text, 'utf8');
     await rename(scratch, destination);
   } finally {
     // Only still in place when the rename failed; a successful rename moved it, and that ENOENT

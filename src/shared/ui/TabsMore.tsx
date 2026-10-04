@@ -8,13 +8,16 @@ import type { TabItem } from '@/shared/ui/Tabs';
  * menu holds is waiting — the same mark in the same place, so a count that collapsed is not a
  * count that vanished. Used by Tabs.tsx twice: inside the trigger, and in the ghost row that
  * measures it (useTabsOverflow.ts).
+ *
+ * `warn` is the tone of that dot, and it is the collapsed tabs' own attention passed down: a tab
+ * that was amber in the row must not turn plain by being pushed behind the trigger.
  */
-export function MoreFace({ waiting }: { waiting: boolean }) {
+export function MoreFace({ waiting, warn = false }: { waiting: boolean; warn?: boolean }) {
   return (
     <span className="vv-tabs__tab vv-tabs__tab--icon vv-tabs__more">
       <span className="vv-tabs__glyph">
         <MoreHorizontal className="vv-tabs__icon" strokeWidth={2} />
-        {waiting && <span className="vv-tabs__dot" aria-hidden="true" />}
+        {waiting && <span className="vv-tabs__dot" data-tone={warn ? 'warn' : undefined} aria-hidden="true" />}
       </span>
     </span>
   );
@@ -26,6 +29,8 @@ type TabsMoreProps = {
   /** The collapsed tabs, in strip order. */
   tabs: TabItem[];
   onSelect: (id: string) => void;
+  /** True while one of them carries attention: the trigger's own dot turns amber with it. */
+  warn?: boolean;
 };
 
 /**
@@ -33,10 +38,10 @@ type TabsMoreProps = {
  * tabs by their words — never their glyphs, which is what the row had no room for — with each
  * one's count out loud.
  */
-export function TabsMore({ label, tabs, onSelect }: TabsMoreProps) {
+export function TabsMore({ label, tabs, onSelect, warn = false }: TabsMoreProps) {
   return (
     <Menu
-      trigger={<MoreFace waiting={tabs.some((tab) => (tab.count ?? 0) > 0)} />}
+      trigger={<MoreFace waiting={tabs.some((tab) => (tab.count ?? 0) > 0)} warn={warn} />}
       triggerLabel={label}
       items={tabs.map((tab) => ({ id: tab.id, label: tab.label, count: tab.count }))}
       onSelect={onSelect}

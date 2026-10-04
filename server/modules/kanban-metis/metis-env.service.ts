@@ -5,6 +5,7 @@ import path from 'node:path';
 import { writeFlagFile } from '@/modules/settings/index.js';
 import { userFacingEnv } from '@/shared/child-env.js';
 import { resolveMcpCommand } from '@/shared/mcp-command.js';
+import type { AgentLaunchResolved } from '@/shared/types.js';
 
 /**
  * Everything a spawned Metis child is handed: its environment, its argv, its one credential and
@@ -26,16 +27,13 @@ const BOARD_FLAG_DIR = path.join(os.homedir(), '.claude', 'state', 'kanban-deeps
 /**
  * The DeepSeek endpoint and the model name a Flash child runs on.
  *
- * `~/.claude/hooks/plan_runner/deepseek.py:56-57` is the canonical home of both, and these are
+ * `~/.claude/hooks/plan_runner/deepseek.py` is the canonical home of both, and these are
  * its values transcribed rather than a second opinion: that file's `BASE_URL` and `MODEL` are
  * what every plan-runner on this box already routes on. A drift here would point a board's Metis
  * at an endpoint that no other child on the host uses, and nothing would say so.
  */
 export const DEEPSEEK_BASE_URL = 'https://api.deepseek.com/anthropic';
 export const DEEPSEEK_MODEL = 'deepseek-flash';
-
-/** The model a board that is NOT on Flash launches on. There is no second Claude pin for Metis. */
-export const METIS_CLAUDE_MODEL = 'opus';
 
 /** Where one board's switch file lives. Exported so the spawner and a probe name the same path. */
 export function boardFlagPath(boardId: string): string {
@@ -81,26 +79,41 @@ export function metisBearer(appSecret: string, sessionId: string): string {
  * `claude -p` with nothing written to stdin waits for input forever — the brief is the system
  * prompt, not a turn — so this string is what makes the child start working at all. It is
  * recorded VERBATIM in the session's `spec.json`, both so a reader months later knows what she
- * was actually asked and so a resume sends the same words (`souls.py:310-312` writes the prompt
+ * was actually asked and so a resume sends the same words (`souls.py`'s `spawn` writes the prompt
  * to stdin and then closes it for exactly this reason).
  */
 export function metisOpeningTurn(boardId: string): string {
   return `Work board \`${boardId}\`. Call \`list_actionable\`, take the top claimable card, and end the turn when nothing is claimable.`;
 }
 
-/** Which endpoint and which `--model` a board's switch buys. Settled at spawn, never re-derived. */
-export function metisRouteFor(deepseekFlash: boolean): { provider: 'deepseek' | 'claude'; model: string } {
-  return deepseekFlash
-    ? { provider: 'deepseek', model: DEEPSEEK_MODEL }
-    : { provider: 'claude', model: METIS_CLAUDE_MODEL };
+/**
+ * Which endpoint, which `--model` and which `--effort` a board's switch buys. Settled at spawn, never
+ * re-derived.
+ *
+ * `resolved` is the launch table's answer for the side the board's switch picked (`resolveLaunchSide`),
+ * and it supplies the Claude model word and the effort word for either side. A Flash board's `--model`
+ * stays this module's own `deepseek-flash` rather than the table's: the word is the whole safety of the
+ * DeepSeek route (INV-34 #1), so it is never read from a file that could be edited or mistyped.
+ */
+export function metisRouteFor(
+  deepseekFlash: boolean,
+  resolved: AgentLaunchResolved,
+): { provider: 'deepseek' | 'claude'; model: string; effort: string | null } {
+  return {
+    provider: deepseekFlash ? 'deepseek' : 'claude',
+    model: deepseekFlash ? DEEPSEEK_MODEL : resolved.model,
+    effort: resolved.effort,
+  };
 }
 
 /** Everything one spawn needs, as the spawner hands it over: identity, route, origin and secrets. */
 export type MetisChildSpec = {
   boardId: string;
   sessionId: string;
-  /** `deepseek-flash` or `opus` — the `--model` value, already settled by `metisRouteFor`. */
+  /** The `--model` value, already settled by `metisRouteFor`: `deepseek-flash`, or the Claude word the launch table gives Metis. */
   model: string;
+  /** The `--effort` value the launch table gives this route, or `null` for none, so the CLI's own effortLevel applies. */
+  effort: string | null;
   /** The board's own switch, read from the board row at this spawn. */
   deepseekFlash: boolean;
   provider: 'deepseek' | 'claude';
@@ -137,7 +150,7 @@ export type MetisChildSpec = {
  */
 export function buildMetisEnv(spec: MetisChildSpec): NodeJS.ProcessEnv {
   const extra: NodeJS.ProcessEnv = {
-    // The shelves loader's own bypass (`souls.py:186-202`): a Metis is a NEW session, so the
+    // The shelves loader's own bypass (`souls.py`'s `_child_env`): a Metis is a NEW session, so the
     // operator's shell shelves are not hers to load.
     MAIN_SHELVES_LOADER_DISABLE: '1',
     KANBAN_METIS_BOARD_ID: spec.boardId,
@@ -207,7 +220,7 @@ function buildMcpConfig(spec: MetisChildSpec): string {
 }
 
 /**
- * The child's argv, in the shape `~/.claude/hooks/plan_runner/souls.py:172-184` builds for a
+ * The child's argv, in the shape `~/.claude/hooks/plan_runner/souls.py`'s `argv` builds for a
  * launcher soul.
  *
  * `--permission-mode bypassPermissions` is what lets a detached session work unattended; the
@@ -237,6 +250,10 @@ export function buildMetisArgv(spec: MetisChildSpec): string[] {
   }
 
   argv.push('--model', spec.model);
+  // No `--effort` at all when the table names none for this model: the CLI's own effortLevel then applies.
+  if (spec.effort !== null) {
+    argv.push('--effort', spec.effort);
+  }
   argv.push('--append-system-prompt', spec.appendSystemPrompt);
   argv.push('--mcp-config', buildMcpConfig(spec));
   argv.push('--strict-mcp-config');

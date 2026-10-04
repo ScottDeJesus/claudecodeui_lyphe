@@ -1,6 +1,7 @@
 import * as React from 'react';
 import { createPortal } from 'react-dom';
 
+import { useHostWindow } from '@/shared/context/HostWindowContext';
 import { OWNS_ESCAPE_SELECTOR } from '@/shared/ui/overlayEscape';
 import { cn } from '@/shared/utils';
 
@@ -112,21 +113,24 @@ const FOCUSABLE_SELECTOR = 'a[href], button:not([disabled]), input:not([disabled
  * Anything earlier is BEHIND — a composer menu left open under a dialog opened after it — and then
  * the key is the dialog's again.
  *
+ * `doc` is the dialog's host document: a panel open in the picture-in-picture window lives in that
+ * window's document, and the opener's holds none of them.
+ *
  * The candidates are the panels that STATE they own the key (`shared/ui/overlayEscape`), not every
  * element carrying some role. Scanning `[role="menu"], [role="listbox"]` here was wrong, and
  * shipped for one pass: cmdk's list carries `role="listbox"` as STATIC content of the dialog it is
  * placed in, so the command palette stood this dialog down on every Escape and nothing else took the
  * key — the palette's only pointerless dismissal, dead.
  *
- * Why a dialog has to ask at all: it listens on `window` in the CAPTURE phase, which fires before
- * every `document` listener an overlay uses, and it stops the event when it acts on it. An overlay
+ * Why a dialog has to ask at all: it listens on its host `window` in the CAPTURE phase, which fires
+ * before every `document` listener an overlay uses, and it stops the event when it acts on it. An overlay
  * above it would never see the key. Asking first is what lets Escape mean "the menu" and then, on
  * the next press, "the sheet".
  */
-function overlayInFrontHoldsEscape(content: HTMLElement | null): boolean {
+function overlayInFrontHoldsEscape(content: HTMLElement | null, doc: Document): boolean {
   // No panel: this dialog is mid-mount, and nothing can be in front of one that is not on screen.
   if (content === null) return false;
-  return Array.from(document.querySelectorAll(OWNS_ESCAPE_SELECTOR)).some((overlay) => (
+  return Array.from(doc.querySelectorAll(OWNS_ESCAPE_SELECTOR)).some((overlay) => (
     content.contains(overlay)
     || (content.compareDocumentPosition(overlay) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0
   ));
@@ -136,24 +140,36 @@ function overlayInFrontHoldsEscape(content: HTMLElement | null): boolean {
 export const DialogContent = React.forwardRef<HTMLDivElement, DialogContentProps>(
   ({ className, children, onEscapeKeyDown, onPointerDownOutside, wrapperClassName, animationClassName, ...props }, ref) => {
     const { open, onOpenChange, triggerRef } = useDialog();
+    const hostWindow = useHostWindow();
     const contentRef = React.useRef<HTMLDivElement | null>(null);
     const previousFocusRef = React.useRef<HTMLElement | null>(null);
 
-    // Save the element that had focus before opening, restore on close
+    // Save the element that had focus before opening, restore on close. Saved only once per opening
+    // (`??=`): this effect re-runs when the chat moves to another window while the dialog is open,
+    // and by then the focus is the dialog's own, which must not replace the element to return to.
     React.useEffect(() => {
       if (open) {
-        previousFocusRef.current = document.activeElement as HTMLElement;
+        previousFocusRef.current ??= hostWindow.document.activeElement as HTMLElement | null;
       } else if (previousFocusRef.current) {
-        // Prefer the trigger, fall back to whatever was focused before
-        const restoreTarget = triggerRef.current || previousFocusRef.current;
-        restoreTarget?.focus();
+        // Focus that already sits on a live element is a choice made in this same commit — the
+        // command palette's Chat row closes it and floats the chat, whose composer takes focus in a
+        // layout effect that runs BEFORE this passive one — and restoring over it undoes that. The
+        // dialog's own removal drops focus to `body`, which is the one case that still restores.
+        const active = hostWindow.document.activeElement;
+        const focusMovedOn = active !== null && active !== hostWindow.document.body;
+        if (!focusMovedOn) {
+          // Prefer the trigger, fall back to whatever was focused before
+          const restoreTarget = triggerRef.current || previousFocusRef.current;
+          restoreTarget?.focus();
+        }
         previousFocusRef.current = null;
       }
-    }, [open, triggerRef]);
+    }, [open, triggerRef, hostWindow]);
 
     React.useEffect(() => {
       if (!open) return;
 
+      const hostDocument = hostWindow.document;
       const handleKeyDown = (e: KeyboardEvent) => {
         if (e.key === 'Escape') {
           // Marked, from a WINDOW capture listener: ChatInterface stops the running turn on an
@@ -168,7 +184,7 @@ export const DialogContent = React.forwardRef<HTMLDivElement, DialogContentProps
           // switcher's sheet is a Dialog, its rows' kebab menus are portalled in front of it, and one
           // Escape took the sheet (and the row) instead of the menu. See
           // `overlayInFrontHoldsEscape` for what "in front" is measured as.
-          if (overlayInFrontHoldsEscape(contentRef.current)) return;
+          if (overlayInFrontHoldsEscape(contentRef.current, hostDocument)) return;
           e.stopPropagation();
           onEscapeKeyDown?.();
           onOpenChange(false);
@@ -185,38 +201,46 @@ export const DialogContent = React.forwardRef<HTMLDivElement, DialogContentProps
           const first = focusable[0];
           const last = focusable[focusable.length - 1];
 
-          if (e.shiftKey && document.activeElement === first) {
+          if (e.shiftKey && hostDocument.activeElement === first) {
             e.preventDefault();
             last.focus();
-          } else if (!e.shiftKey && document.activeElement === last) {
+          } else if (!e.shiftKey && hostDocument.activeElement === last) {
             e.preventDefault();
             first.focus();
           }
         }
       };
 
-      window.addEventListener('keydown', handleKeyDown, true);
+      // The host window's capture phase, which runs before the chat's own document capture listener
+      // (ChatInterface's Escape-stops-the-turn) in that same window — the order the comment above
+      // depends on holds in a picture-in-picture window exactly as it does at home.
+      hostWindow.addEventListener('keydown', handleKeyDown, true);
 
-      // Prevent body scroll
-      const prev = document.body.style.overflow;
-      document.body.style.overflow = 'hidden';
+      // Prevent body scroll — of the body the dialog is drawn over.
+      const body = hostDocument.body;
+      const prev = body.style.overflow;
+      body.style.setProperty('overflow', 'hidden');
 
       return () => {
-        window.removeEventListener('keydown', handleKeyDown, true);
-        document.body.style.overflow = prev;
+        hostWindow.removeEventListener('keydown', handleKeyDown, true);
+        body.style.setProperty('overflow', prev);
       };
-    }, [open, onOpenChange, onEscapeKeyDown]);
+    }, [open, onOpenChange, onEscapeKeyDown, hostWindow]);
 
     // Auto-focus first focusable element on open
     React.useEffect(() => {
       if (open && contentRef.current) {
-        // Small delay to let the portal render
-        requestAnimationFrame(() => {
+        // Small delay to let the portal render. A frame of the window the reader is looking at: a
+        // hidden opener runs none, so a dialog raised from the floating window would wait for a
+        // frame that never comes. Cancelled on the window that armed it.
+        const frame = hostWindow.requestAnimationFrame(() => {
           const first = contentRef.current?.querySelector<HTMLElement>(FOCUSABLE_SELECTOR);
           first?.focus();
         });
+        return () => hostWindow.cancelAnimationFrame(frame);
       }
-    }, [open]);
+      return undefined;
+    }, [open, hostWindow]);
 
     if (!open) return null;
 
@@ -256,7 +280,7 @@ export const DialogContent = React.forwardRef<HTMLDivElement, DialogContentProps
           {children}
         </div>
       </div>,
-      document.body
+      hostWindow.document.body
     );
   }
 );

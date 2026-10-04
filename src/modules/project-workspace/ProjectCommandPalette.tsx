@@ -1,14 +1,20 @@
 import { memo, useMemo } from 'react';
 
+import { useSwitcherActions } from '@/modules/app-switcher';
 import { CommandPalette } from '@/modules/command-palette';
 import { selectGitRepository } from '@/modules/git-panel';
 import { useProjectCommandState } from '@/modules/project-workspace/context/ProjectsStateContext';
 import { useWorkspaceTabGates } from '@/modules/project-workspace/hooks/useWorkspaceTabGates';
 import { GIT_REPO_PATHS } from '@/shared/constants';
-import type { AppTab } from '@/shared/types';
+import type { AppTab, ChatDoor } from '@/shared/types';
 
-/** Rendered by ProjectWorkspaceShell to bind this module's project state to the command-palette module. */
-function ProjectCommandPalette() {
+/**
+ * Rendered by WorkspaceFrame to bind this module's project state, and the chat's door, to the
+ * command-palette module. The door is handed in rather than built here because WorkspaceFrame builds
+ * it once for the hotkey, the FAB and this palette: a second `useChatDoor` would be a second
+ * "which press goes which way" to keep in step.
+ */
+function ProjectCommandPalette({ chatDoor }: { chatDoor: ChatDoor }) {
   const {
     selectedProject,
     handleNewSession,
@@ -16,6 +22,10 @@ function ProjectCommandPalette() {
     activeTab,
     setActiveTab,
   } = useProjectCommandState();
+
+  // The switcher's five acts, the list the radial draws too. They are the switcher's to define (which
+  // pane is in front, what a Reload is), so this only forwards them to the palette's Applications group.
+  const switcherActions = useSwitcherActions(chatDoor);
 
   const {
     shouldShowShellTab,
@@ -50,7 +60,7 @@ function ProjectCommandPalette() {
   // Plugin tabs remain the one exclusion — they are discovered at runtime and the palette has no
   // rows for them at all. Memoised because a fresh array on every render would defeat the memo().
   const visibleTabs = useMemo<AppTab[]>(() => {
-    const tabs: AppTab[] = ['chat', 'files', 'git', 'kanban', 'universe', 'schedules', 'api'];
+    const tabs: AppTab[] = ['chat', 'files', 'git', 'kanban', 'universe', 'schedules', 'notes', 'api'];
     if (shouldShowShellTab) tabs.push('shell');
     if (shouldShowTasksTab) tabs.push('tasks');
     if (shouldShowBrowserTab) tabs.push('browser');
@@ -68,6 +78,7 @@ function ProjectCommandPalette() {
       onShowTab={setActiveTab}
       onShowRepoInGitTab={showSelectedRepoInGitTab}
       visibleTabs={visibleTabs}
+      switcherActions={switcherActions}
     />
   );
 }

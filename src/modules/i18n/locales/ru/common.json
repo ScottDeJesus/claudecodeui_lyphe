@@ -304,12 +304,27 @@
       "closeSidebar": "Закрыть боковую панель"
     }
   },
+  "lightbox": {
+    "close": "Закрыть просмотр",
+    "zoomIn": "Увеличить",
+    "zoomOut": "Уменьшить",
+    "fit": "По размеру экрана"
+  },
   "shapes": {
-    "diagramFailed": "Не удалось построить диаграмму — показан её исходный код."
+    "diagramFailed": "Не удалось построить диаграмму — показан её исходный код.",
+    "diagram": "Диаграмма",
+    "diagramOpen": "Открыть диаграмму на весь экран"
+  },
+  "runner": {
+    "collapse": "Свернуть",
+    "expand": "Развернуть"
   },
   "gutters": {
     "runner": {
       "title": "Запуски"
+    },
+    "roadmap": {
+      "title": "Дорожная карта"
     },
     "memory": {
       "title": "Память",
@@ -341,6 +356,9 @@
       "open": "Открыть страницу в новой вкладке",
       "rejected": "Это не адрес http:// или https://"
     },
+    "notes": {
+      "title": "Заметки"
+    },
     "open": "Открыть {{name}}",
     "collapse": "Свернуть",
     "dragHint": "Перетащите на любую сторону",
@@ -352,7 +370,16 @@
     "exitFullscreen": "Выйти из полноэкранного режима"
   },
   "applications": {
-    "fabLabel": "Приложения",
+    "fabLabelMenu": "Открыть меню",
+    "fabLabelCollapse": "Свернуть чат",
+    "radialLabel": "Быстрые действия",
+    "fabUnread": "Ваша очередь: вас ждёт ответ или запуск",
+    "actChat": "Чат",
+    "actCollapseChat": "Свернуть чат",
+    "actApplications": "Приложения",
+    "actReload": "Обновить приложение",
+    "actClose": "Закрыть приложение",
+    "actOpenInTab": "Открыть во вкладке",
     "heading": "Ваши <em>приложения</em>",
     "closeDrawer": "Закрыть",
     "close": "Закрыть все",
@@ -375,6 +402,10 @@
     "closeDual": "Закрыть разделённый экран",
     "editDescription": "Изменить описание",
     "descriptionLabel": "Описание {{name}}",
+    "linkProject": "Привязать проект…",
+    "noProject": "Без проекта",
+    "projectLabel": "Проект {{name}}",
+    "projectUnknown": "По этому пути проекта нет",
     "moveUp": "Выше",
     "moveDown": "Ниже",
     "addDivider": "Добавить разделитель",
@@ -411,5 +442,29 @@
     "appearanceLight": "Светлое оформление",
     "appearanceDark": "Тёмное оформление",
     "divider": "Изменить размер приложений"
+  },
+  "chatHost": {
+    "panelLabel": "Плавающий чат",
+    "collapse": "Свернуть чат",
+    "resize": "Изменить размер чата",
+    "panelTitle": "Чат в плавающей панели",
+    "panelMessage": "Она открыта поверх вашей работы.",
+    "windowTitle": "Чат в отдельном окне",
+    "windowMessage": "Оно остаётся поверх ваших других окон.",
+    "bringBack": "Вернуть чат",
+    "pickerTitle": "Сменить разговор",
+    "pickerList": "Разговоры",
+    "pickerEmpty": "Разговоров пока нет. Начните новый через «Новый чат».",
+    "pickerLoading": "Загрузка разговоров",
+    "pickerError": "Не удалось загрузить разговоры"
+  },
+  "gitPanel": {
+    "lastPushed": "Последний push {{when}}",
+    "neverPushed": "С этой машины ещё не отправляли",
+    "age": {
+      "justNow": "только что",
+      "minutesAgo": "{{count}} мин. назад",
+      "hoursAgo": "{{count}} ч. назад"
+    }
   }
 }

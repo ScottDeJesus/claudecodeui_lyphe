@@ -24,9 +24,36 @@
 // Dev server only: a build already emits compressed-by-the-network sizes and is served by whatever
 // hosts dist/.
 
+import { createHash } from 'node:crypto'
 import { gzipSync, brotliCompressSync, constants } from 'node:zlib'
 
 const MIN_BYTES = 1024
+
+// A body is compressed ONCE per content, not once per request. The dev server is one thread, and
+// brotli at quality 4 over the 15.8 MB of one cold load costs it ~270 ms of the ~650 ms it spends on
+// that load (measured 2026-10-04) — and every probe's fresh browser context is a cold load, so eight
+// concurrent probes queue for 8 x that. The key is the coding and a SHA-1 of the body about to be framed:
+// the same bytes frame to the same bytes, an edited module hashes to a new key, and hashing the load
+// costs ~30 ms. Insertion order is age; the oldest go first once the framed copies pass the cap
+// (the whole client frames to ~5 MB, so the cap holds many edits' worth of old versions).
+const MEMO_MAX_BYTES = 96 * 1024 * 1024
+const framedByContent = new Map()
+let framedBytes = 0
+
+function framedOnce(coding, body, frame) {
+  const key = `${coding}:${createHash('sha1').update(body).digest('base64')}`
+  const known = framedByContent.get(key)
+  if (known) return known
+  const framed = frame()
+  framedByContent.set(key, framed)
+  framedBytes += framed.length
+  for (const [oldest, copy] of framedByContent) {
+    if (framedBytes <= MEMO_MAX_BYTES || oldest === key) break
+    framedByContent.delete(oldest)
+    framedBytes -= copy.length
+  }
+  return framed
+}
 
 // Compressible types, by shape rather than an allow-list: the dev server serves JavaScript, CSS,
 // JSON, HTML and SVG, and a module's type is set from its extension.
@@ -94,10 +121,10 @@ export default function compressResponses() {
           let framed = null
           let name = ''
           if (accepts.has('br')) {
-            framed = brotliCompressSync(body, brotli)
+            framed = framedOnce('br', body, () => brotliCompressSync(body, brotli))
             name = 'br'
           } else if (accepts.has('gzip')) {
-            framed = gzipSync(body, { level: 6 })
+            framed = framedOnce('gzip', body, () => gzipSync(body, { level: 6 }))
             name = 'gzip'
           }
           if (!framed) return end.call(res, body, callback)

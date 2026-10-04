@@ -40,6 +40,10 @@ export { kanbanQuestionsDb } from '@/modules/database/repositories/kanban-questi
 // The memory-intake lane's own table: proposals to write a memory into one of five destinations,
 // each waiting on a person's approval. It is not a board table and no board reads it.
 export { memoryCandidatesDb } from '@/modules/database/repositories/memory-candidates.db.js';
+// The notes lane's own table: one account's cards, written one row at a time. It is not a board
+// table and no board reads it.
+export { notesDb } from '@/modules/database/repositories/notes.db.js';
+export type { NoteRow } from '@/modules/database/repositories/notes.db.js';
 export { notificationChannelEndpointsDb } from '@/modules/database/repositories/notification-channel-endpoints.js';
 export { notificationPreferencesDb } from '@/modules/database/repositories/notification-preferences.js';
 // providerModelsDb: used by Providers to persist user-managed custom model rows.
@@ -55,8 +59,14 @@ export type {
   SessionDraftRecord,
 } from '@/modules/database/repositories/session-drafts.db.js';
 export { sessionsDb } from '@/modules/database/repositories/sessions.db.js';
-// sessionUserStateDb: used by the chat run registry and the chat websocket to stamp completion and read, and by Providers to set an icon or reorder the simple list.
+// sessionUserStateDb: used by the chat run registry and the chat websocket to stamp completion and read, and by Providers to set an icon.
 export { sessionUserStateDb } from '@/modules/database/repositories/session-user-state.db.js';
+// simpleListDb: used by the providers module's simple-list service, for the list's folders and
+// every move — through the ladder's own item and entry types, which stay where the ladder
+// declares them.
+export { simpleListDb } from '@/modules/database/repositories/simple-list.db.js';
+export type { SimpleListFolderRow, SimpleListMoveVerdict } from '@/modules/database/repositories/simple-list.db.js';
+export type { SimpleListLadderEntry, SimpleListLadderItem } from '@/modules/database/repositories/simple-list-ladder.db.js';
 export { userDb } from '@/modules/database/repositories/users.js';
 // userPreferencesDb: used by the User module to persist the settings that used to live in browser localStorage.
 export { userPreferencesDb } from '@/modules/database/repositories/user-preferences.db.js';

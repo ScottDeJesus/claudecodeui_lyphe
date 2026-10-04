@@ -1,3 +1,5 @@
+import path from 'node:path';
+
 import type { AppEntry, AppRegistryResponse, RegistryRow } from '@/shared/app-types.js';
 import { AppError } from '@/shared/utils.js';
 
@@ -10,8 +12,9 @@ import { isDividerEntry, readEntries, writeEntries } from './apps.store.js';
  *
  * The routes are thin and the store knows only the file, so a rule lives here or nowhere: an id
  * that has to look like an id, a name that has to be a name, a url that has to be an address, a
- * duplicate that must not quietly overwrite the row it collides with. A POST that arrives through
- * some future caller skips the route it did not come through — it cannot skip this.
+ * duplicate that must not quietly overwrite the row it collides with, a project that has to be the
+ * absolute path of a repository. A POST that arrives through some future caller skips the route it
+ * did not come through — it cannot skip this.
  *
  * Order is file order, always: no sorting, no favourites, no reorder verb. The file is the order,
  * and the operator sets it with a text editor.
@@ -19,6 +22,7 @@ import { isDividerEntry, readEntries, writeEntries } from './apps.store.js';
 const APP_ID_PATTERN = /^[a-z0-9][a-z0-9-]{0,63}$/;
 const NAME_MAX_LENGTH = 64;
 const DESCRIPTION_MAX_LENGTH = 160;
+const PROJECT_MAX_LENGTH = 1024;
 
 /** A description as stored: trimmed, and absent when blank — a blank one is no description. */
 function optionalDescription(raw: unknown): string | undefined {
@@ -34,6 +38,36 @@ function optionalDescription(raw: unknown): string | undefined {
     });
   }
   return description.length > 0 ? description : undefined;
+}
+
+/**
+ * A project as stored: the absolute path of the repository the application is built from,
+ * `path.resolve`d so a trailing slash never makes one project two strings — the client matches a
+ * row to a project by string equality with that project's `fullPath`. Absent when blank.
+ *
+ * Only the SHAPE is judged here, never the disk: a row may name a repository that is not cloned on
+ * this machine yet, and the drawer shows such a path as it is.
+ */
+function optionalProject(raw: unknown): string | undefined {
+  if (raw === undefined || raw === null) return undefined;
+  if (typeof raw !== 'string') {
+    throw new AppError('A project must be text.', { code: 'APPS_PROJECT_INVALID', statusCode: 400 });
+  }
+  const project = raw.trim();
+  if (project.length === 0) return undefined;
+  if (project.length > PROJECT_MAX_LENGTH) {
+    throw new AppError(`A project may be at most ${PROJECT_MAX_LENGTH} characters.`, {
+      code: 'APPS_PROJECT_TOO_LONG',
+      statusCode: 400,
+    });
+  }
+  if (!path.isAbsolute(project)) {
+    throw new AppError('A project is the absolute path of its repository, like /home/lyphe/eis-app.', {
+      code: 'APPS_PROJECT_INVALID',
+      statusCode: 400,
+    });
+  }
+  return path.resolve(project);
 }
 
 /** An id is minted from the name when the caller sends none; a name that mints nothing is a 400. */
@@ -144,10 +178,11 @@ export const appsService = {
    * checked against and what a minted one steps around; a collision with the operator's own row
    * is a 409, never an overwrite.
    */
-  addApp(input: { id?: string; name: string; url: string; description?: string }): AppEntry {
+  addApp(input: { id?: string; name: string; url: string; description?: string; project?: string }): AppEntry {
     const name = requireName(input?.name);
     const url = requireUrl(input?.url);
     const description = optionalDescription(input?.description);
+    const project = optionalProject(input?.project);
 
     // Dividers share the id space: a move or a removal names a row by id, whichever kind it is.
     const entries = readEntries();
@@ -172,24 +207,49 @@ export const appsService = {
       }
     }
 
-    const app: AppEntry = description ? { id, name, url, description } : { id, name, url };
+    const app: AppEntry = {
+      id,
+      name,
+      url,
+      ...(description ? { description } : {}),
+      ...(project ? { project } : {}),
+    };
     writeEntries([...entries, app]);
     return app;
   },
 
   /**
-   * Sets or clears one row's description, leaving its place in the file and every other field as
-   * they were. A blank description removes the field, and the row shows its address again.
+   * Sets or clears one row's description and/or project, leaving its place in the file and every
+   * other field as they were. `patch` holds only the keys the caller sent: a key that is absent
+   * leaves its field exactly as it is, and a key that is present is judged like a new row's and
+   * replaces the field — a blank value removes it, and the row shows its address (or no project)
+   * again.
    */
-  updateDescription(id: string, raw: unknown): AppEntry {
-    const description = optionalDescription(raw);
+  updateApp(id: string, patch: { description?: unknown; project?: unknown }): AppEntry {
+    const hasDescription = 'description' in patch;
+    const hasProject = 'project' in patch;
+    // Judged before the file is read, so a bad value is a 400 whichever id it was sent to.
+    const description = hasDescription ? optionalDescription(patch.description) : undefined;
+    const project = hasProject ? optionalProject(patch.project) : undefined;
+
     const entries = readEntries();
     const index = entries.findIndex((entry) => entry.id === id && !isDividerEntry(entry));
     if (index === -1) {
       throw new AppError(`No application with id "${id}".`, { code: 'APPS_APP_NOT_FOUND', statusCode: 404 });
     }
-    const { description: _previous, ...rest } = entries[index] as AppEntry;
-    const next: AppEntry = description ? { ...rest, description } : rest;
+    const current = entries[index] as AppEntry;
+    if (!hasDescription && !hasProject) return current;
+
+    // Rebuilt in the row's own order — description, then project last — so a hand-edited row does
+    // not drift each time the drawer saves a field.
+    const { description: keptDescription, project: keptProject, ...rest } = current;
+    const nextDescription = hasDescription ? description : keptDescription;
+    const nextProject = hasProject ? project : keptProject;
+    const next: AppEntry = {
+      ...rest,
+      ...(nextDescription ? { description: nextDescription } : {}),
+      ...(nextProject ? { project: nextProject } : {}),
+    };
     writeEntries(entries.map((entry, at) => (at === index ? next : entry)));
     return next;
   },

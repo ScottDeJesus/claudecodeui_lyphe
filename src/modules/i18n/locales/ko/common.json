@@ -331,12 +331,27 @@
       "closeSidebar": "사이드바 닫기"
     }
   },
+  "lightbox": {
+    "close": "미리보기 닫기",
+    "zoomIn": "확대",
+    "zoomOut": "축소",
+    "fit": "화면에 맞추기"
+  },
   "shapes": {
-    "diagramFailed": "이 다이어그램을 그릴 수 없어 소스를 표시합니다."
+    "diagramFailed": "이 다이어그램을 그릴 수 없어 소스를 표시합니다.",
+    "diagram": "다이어그램",
+    "diagramOpen": "다이어그램을 전체 화면으로 열기"
+  },
+  "runner": {
+    "collapse": "접기",
+    "expand": "펼치기"
   },
   "gutters": {
     "runner": {
       "title": "실행"
+    },
+    "roadmap": {
+      "title": "로드맵"
     },
     "memory": {
       "title": "메모리",
@@ -368,6 +383,9 @@
       "open": "새 탭에서 페이지 열기",
       "rejected": "http:// 또는 https:// 주소가 아닙니다"
     },
+    "notes": {
+      "title": "메모"
+    },
     "open": "{{name}} 열기",
     "collapse": "접기",
     "dragHint": "양쪽 중 한쪽으로 드래그",
@@ -379,7 +397,16 @@
     "exitFullscreen": "전체 화면 종료"
   },
   "applications": {
-    "fabLabel": "애플리케이션",
+    "fabLabelMenu": "메뉴 열기",
+    "fabLabelCollapse": "채팅 접기",
+    "radialLabel": "빠른 작업",
+    "fabUnread": "당신 차례입니다: 답변 또는 실행이 기다리고 있습니다",
+    "actChat": "채팅",
+    "actCollapseChat": "채팅 접기",
+    "actApplications": "앱",
+    "actReload": "앱 새로 고침",
+    "actClose": "앱 닫기",
+    "actOpenInTab": "탭에서 열기",
     "heading": "내 <em>앱</em>",
     "closeDrawer": "닫기",
     "close": "모두 닫기",
@@ -396,6 +423,10 @@
     "closeDual": "화면 분할 닫기",
     "editDescription": "설명 편집",
     "descriptionLabel": "{{name}} 설명",
+    "linkProject": "프로젝트 연결…",
+    "noProject": "프로젝트 없음",
+    "projectLabel": "{{name}}의 프로젝트",
+    "projectUnknown": "이 경로에 해당하는 프로젝트가 없습니다",
     "moveUp": "위로 이동",
     "moveDown": "아래로 이동",
     "addDivider": "구분선 추가",
@@ -432,5 +463,29 @@
     "appearanceLight": "라이트 모드",
     "appearanceDark": "다크 모드",
     "divider": "애플리케이션 크기 조절"
+  },
+  "chatHost": {
+    "panelLabel": "플로팅 채팅",
+    "collapse": "채팅 접기",
+    "resize": "채팅 크기 조절",
+    "panelTitle": "채팅이 플로팅 패널에 있습니다",
+    "panelMessage": "작업 화면 위에 열려 있습니다.",
+    "windowTitle": "채팅이 별도 창에 있습니다",
+    "windowMessage": "다른 창 위에 계속 표시됩니다.",
+    "bringBack": "되돌리기",
+    "pickerTitle": "대화 전환",
+    "pickerList": "대화",
+    "pickerEmpty": "아직 대화가 없습니다. ‘새 채팅’으로 시작하세요.",
+    "pickerLoading": "대화를 불러오는 중",
+    "pickerError": "대화를 불러오지 못했습니다"
+  },
+  "gitPanel": {
+    "lastPushed": "마지막 push {{when}}",
+    "neverPushed": "여기에서는 아직 push하지 않았습니다",
+    "age": {
+      "justNow": "방금 전",
+      "minutesAgo": "{{count}}분 전",
+      "hoursAgo": "{{count}}시간 전"
+    }
   }
 }

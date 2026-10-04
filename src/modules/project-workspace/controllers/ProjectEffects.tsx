@@ -40,6 +40,15 @@ export default function ProjectEffects({
       setSidebarOpen(false);
       void refreshProjectsSilently();
 
+      // The push's own landing, when it carries one: a plan's prompt lands on
+      // `/session/<id>?runner=<plan>` (or `/?runner=<plan>` with no session), and the workspace's
+      // `useRunnerLanding` picks the `runner` param up from there. Anything not rooted — a message
+      // from a service worker older than the field — falls through to the two landings below.
+      if (typeof message.urlPath === 'string' && message.urlPath.startsWith('/')) {
+        navigate(message.urlPath);
+        return;
+      }
+
       if (typeof message.sessionId === 'string' && message.sessionId) {
         navigate(`/session/${message.sessionId}`);
         return;

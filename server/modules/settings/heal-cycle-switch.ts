@@ -1,6 +1,7 @@
 import os from 'node:os';
 import path from 'node:path';
 
+import { syncHealNightly } from './heal-nightly.js';
 import { PY_SPACE, readFlagText, writeFlag } from './heal-switch.js';
 
 /**
@@ -26,6 +27,10 @@ import { PY_SPACE, readFlagText, writeFlag } from './heal-switch.js';
  * same order. THE FAIL-OPEN IS THE SHIPPED DEFAULT'S, and it sits on the other side from the cap's:
  * a malformed cap is NO CEILING, a malformed cycle flag is ON at 10 — the state the file shipping
  * absent already means — so nothing but the operator's own typed word `off` ever stops the clock.
+ *
+ * THE CLOCK ITSELF IS A SYSTEMD CALENDAR UNIT, `heal-cycle-nightly.timer`, armed from this file and
+ * read back out of systemd (`scripts/heal_cycle_nightly.py`); `writeHealCycle` re-arms it on every
+ * write, so `on <N>` fires at N:00 UTC and `off` disarms it.
  */
 export const HEAL_CYCLE_PATH = path.join(os.homedir(), '.claude', 'state', 'heal_cycle.flag');
 
@@ -103,7 +108,12 @@ export function formatHealCycle(state: HealCycle): string {
   return state.enabled ? `${ON_WORD} ${state.hour}` : OFF_WORD;
 }
 
-/** The schedule, written: one line, atomically, through the family's own writer. */
+/**
+ * The schedule, written: one line, atomically, through the family's own writer — and then the nightly
+ * calendar unit re-armed from it (`heal-nightly.ts`), because the flag names the hour and the unit is
+ * what fires at it. Here, at the one writer, so no future caller can move the hour without the unit.
+ */
 export async function writeHealCycle(state: HealCycle): Promise<void> {
   await writeFlag(HEAL_CYCLE_PATH, `${formatHealCycle(state)}\n`);
+  await syncHealNightly();
 }

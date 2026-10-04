@@ -10,6 +10,7 @@ import {
   PROVIDER_MODELS_TABLE_SCHEMA_SQL,
   PUSH_SUBSCRIPTIONS_TABLE_SCHEMA_SQL,
   SESSION_DRAFTS_TABLE_SCHEMA_SQL,
+  SIMPLE_LIST_FOLDERS_TABLE_SCHEMA_SQL,
   SUPERSEDED_PROVIDER_SESSIONS_TABLE_SCHEMA_SQL,
   SCHEDULED_MESSAGES_TABLE_SCHEMA_SQL,
   SESSIONS_TABLE_SCHEMA_SQL,
@@ -19,6 +20,7 @@ import {
 } from '@/modules/database/schema.js';
 import { KANBAN_SCHEMA_SQL } from '@/modules/database/kanban-schema.js';
 import { MEMORY_SCHEMA_SQL } from '@/modules/database/memory-schema.js';
+import { NOTES_SCHEMA_SQL } from '@/modules/database/notes-schema.js';
 import { migrateProvenanceColumnToLegacyId } from '@/modules/database/migrations-legacy-id.js';
 
 const SQLITE_UUID_SQL = `
@@ -473,6 +475,19 @@ const addSessionUserStateColumns = (db: Database): void => {
 };
 
 /**
+ * Adds the simple list's folders table, and the column naming the folder a
+ * chat sits in.
+ *
+ * Nothing is backfilled: no chat was ever in a folder.
+ */
+const addSimpleListFolders = (db: Database): void => {
+  db.exec(SIMPLE_LIST_FOLDERS_TABLE_SCHEMA_SQL);
+
+  const columnNames = getTableInfo(db, 'sessions').map((column) => column.name);
+  addColumnToTableIfNotExists(db, 'sessions', columnNames, 'simple_list_folder_id', 'TEXT');
+};
+
+/**
  * Adds the `model` column that records which model each session runs with.
  *
  * Left NULL for pre-existing rows on purpose: the model resolver falls back to
@@ -619,6 +634,7 @@ export const runMigrations = (db: Database) => {
     addForkedFromSessionIdColumn(db);
     addSimpleListAtColumn(db);
     addSessionUserStateColumns(db);
+    addSimpleListFolders(db);
     ensureProjectsForSessionPaths(db);
     db.exec(SCHEDULED_MESSAGES_TABLE_SCHEMA_SQL);
     // The cron registry: what the box schedules, and one row per sync that read it. Neither
@@ -634,6 +650,9 @@ export const runMigrations = (db: Database) => {
     // board's script does: nothing in this lane references `projects`.
     db.exec(MEMORY_SCHEMA_SQL);
     migrateProvenanceColumnToLegacyId(db);
+    // The notes table, in its own script: one account's cards, not a board's and not a preference
+    // document. It sits after the projects rebuild while referencing `users` alone.
+    db.exec(NOTES_SCHEMA_SQL);
 
     db.exec('CREATE INDEX IF NOT EXISTS idx_session_ids_lookup ON sessions(session_id)');
     db.exec('CREATE INDEX IF NOT EXISTS idx_sessions_provider_session_id ON sessions(provider_session_id)');
@@ -645,6 +664,7 @@ export const runMigrations = (db: Database) => {
     db.exec('CREATE INDEX IF NOT EXISTS idx_sessions_is_archived ON sessions(isArchived)');
     db.exec('CREATE INDEX IF NOT EXISTS idx_sessions_simple_list_at ON sessions(simple_list_at)');
     db.exec('CREATE INDEX IF NOT EXISTS idx_sessions_simple_list_rank ON sessions(simple_list_rank)');
+    db.exec('CREATE INDEX IF NOT EXISTS idx_sessions_simple_list_folder ON sessions(simple_list_folder_id)');
     db.exec('CREATE INDEX IF NOT EXISTS idx_projects_is_starred ON projects(isStarred)');
     db.exec('CREATE INDEX IF NOT EXISTS idx_projects_is_archived ON projects(isArchived)');
 

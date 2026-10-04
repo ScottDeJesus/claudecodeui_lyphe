@@ -33,7 +33,8 @@ export type HealModule = { router: Router };
  * Builds the heal lane for the server entrypoint: the six routes and the one worker behind them.
  *
  * This is the whole composition — no watcher, no timer, no socket. The reflex runs on its own, fired
- * by the harness's endings, and this lane is a window onto what it wrote plus a door to its verbs;
+ * by events outside this server — the harness's endings, a heal walker's exit, and the nightly slot's
+ * systemd calendar unit — and this lane is a window onto what it wrote plus a door to its verbs;
  * nothing here polls, because the client polls and the worker is spawned per request.
  *
  * The environment is read here and nowhere below it, which is what lets the lane be proven against a

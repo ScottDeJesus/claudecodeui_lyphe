@@ -12,6 +12,7 @@ import type {
   UploadedFileRecord,
 } from '@/shared/types.js';
 import { AppError, FORBIDDEN_WORKSPACE_PATHS, normalizeProjectPath, resolvePathInsideProject } from '@/shared/utils.js';
+import { resolveReadablePath } from '@/modules/file-tree/file-tree-read-path.js';
 
 const HARD_EXCLUDED_DIRECTORY_NAMES = new Set([
   'node_modules', '.git', '.svn', '.hg',
@@ -395,7 +396,7 @@ export function createFileTreeService(dependencies: FileTreeServiceDependencies)
 
     async readTextFile(projectId, filePath) {
       const projectRoot = await resolveProjectRoot(projectId);
-      const resolvedPath = resolvePathInsideProject(projectRoot, filePath);
+      const resolvedPath = await resolveReadablePath(projectRoot, filePath);
       try {
         const content = await fileSystem.readTextFile(resolvedPath);
         return { content, path: resolvedPath };
@@ -409,15 +410,24 @@ export function createFileTreeService(dependencies: FileTreeServiceDependencies)
 
     async openFile(projectId, filePath) {
       const projectRoot = await resolveProjectRoot(projectId);
-      const resolvedPath = resolvePathInsideProject(projectRoot, filePath);
+      const resolvedPath = await resolveReadablePath(projectRoot, filePath);
       let size: number;
+      let isRegularFile: boolean | undefined;
       try {
         await fileSystem.access(resolvedPath);
         // The size travels as `Content-Length`, so a reader can refuse a file it will not hold (the
         // chat's file previews cap at 25 MB) before a byte of the body arrives.
-        size = (await fileSystem.stat(resolvedPath)).size;
+        const stats = await fileSystem.stat(resolvedPath);
+        size = stats.size;
+        isRegularFile = stats.isFile?.();
       } catch {
         throw createFileTreeError('File not found', 404, 'FILE_NOT_FOUND');
+      }
+      // A FIFO, socket or device node: opening a FIFO blocks until a writer appears and holds a
+      // libuv thread the whole time, and a read may now name any path under the workspace. Only a
+      // definite `false` refuses — see `FileTreeStats.isFile` (`previewFile` rules the same way).
+      if (isRegularFile === false) {
+        throw createFileTreeError('Only regular files can be opened', 400, 'NOT_A_REGULAR_FILE');
       }
 
       return {

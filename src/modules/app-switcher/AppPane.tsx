@@ -1,8 +1,12 @@
+import type { PaneSide } from '@/shared/types';
+
 type AppPaneProps = {
   /** The resolved url. The layer resolves it; this file resolves nothing and fetches nothing. */
   src: string;
   /** The application's name — the frame's accessible name. */
   title: string;
+  /** Which half of the layer this frame is, drawn as `data-pane-side` so `useFrontPane` can tell which frame holds focus. */
+  side: PaneSide;
 };
 
 /**
@@ -13,7 +17,7 @@ type AppPaneProps = {
  * Rendered by AppSwitcherLayer, which keys it on the app and its slot's reload nonce, so a Reload
  * remounts the frame.
  */
-export function AppPane({ src, title }: AppPaneProps) {
+export function AppPane({ src, title, side }: AppPaneProps) {
   return (
     // Deliberately NO `sandbox`, though the house's other two cross-origin frames carry one
     // (WidgetFrame.tsx, DocSpaceFrame.tsx). A sandbox without `allow-same-origin` cuts the framed
@@ -24,6 +28,7 @@ export function AppPane({ src, title }: AppPaneProps) {
     <iframe
       src={src}
       title={title}
+      data-pane-side={side}
       referrerPolicy="no-referrer"
       allow="geolocation"
       className="h-full w-full border-0"

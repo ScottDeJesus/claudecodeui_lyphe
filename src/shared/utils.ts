@@ -1,7 +1,9 @@
 import { clsx, type ClassValue } from 'clsx';
-import { extendTailwindMerge } from 'tailwind-merge';
+import { extendTailwindMerge, validators } from 'tailwind-merge';
 
-import type { Project, ProjectSession, RunnerModelChoice } from '@/shared/types';
+import { LANES_MIN, SWARM_LADDER_TOP } from '@/shared/constants';
+import type { RoadmapFeatureWord, RoadmapPicture } from '@/shared/roadmap-types';
+import type { DispatcherModelChoice, Project, ProjectSession } from '@/shared/types';
 
 //----------------- DEPLOYMENT MODE ------------
 
@@ -24,11 +26,24 @@ export const IS_PLATFORM = import.meta.env?.VITE_IS_PLATFORM === 'true';
  * builds, the element just quietly stops following the reader's chat text size, and no type
  * error ever says so. The five names are `tailwind.config.js`'s `fontSize` — `md-body`,
  * `md-meta`, `md-code`, `md-stat` and `chat-tool`.
+ *
+ * The bare `outline` is the second place the two versions part. tailwind-merge 3 is written for
+ * Tailwind 4, where `outline` is a WIDTH (1px); this app builds on Tailwind 3.4, where `outline` is
+ * the STYLE (`outline-style: solid`) and `outline-2` only a width. Unextended, the merger reads
+ * `cn('outline outline-2')` as two widths and keeps the last, so the ring is drawn with no style —
+ * that is, not at all (measured on the dispatcher's StatusFlow: its selected node lost `outline`).
+ * So bare `outline` is moved into the style group, beside `outline-none` and `outline-dashed`.
  */
 const twMerge = extendTailwindMerge({
+  override: {
+    classGroups: {
+      'outline-w': [{ outline: [validators.isNumber, validators.isArbitraryVariableLength, validators.isArbitraryLength] }],
+    },
+  },
   extend: {
     classGroups: {
       'font-size': [{ text: ['md-body', 'md-meta', 'md-code', 'md-stat', 'chat-tool'] }],
+      'outline-style': ['outline'],
     },
   },
 });
@@ -48,30 +63,36 @@ export function cn(...inputs: ClassValue[]) {
 /**
  * Copies text with `document.execCommand`, the only path that works in browsers or
  * contexts where the async Clipboard API is unavailable. Private to `copyTextToClipboard`.
+ *
+ * The scratch textarea is made, focused and selected in `win`'s own document: `execCommand('copy')`
+ * acts on the document that holds the selection, and a textarea appended to a document the reader
+ * is not looking at copies nothing.
  */
-function fallbackCopyToClipboard(text: string): boolean {
-  if (!text || typeof document === 'undefined') {
+function fallbackCopyToClipboard(text: string, win: Window): boolean {
+  const doc = win.document;
+  // A closed window keeps its `document` object but has no body to append to.
+  if (!text || !doc?.body) {
     return false;
   }
 
-  const textarea = document.createElement('textarea');
+  const textarea = doc.createElement('textarea');
   textarea.value = text;
   textarea.setAttribute('readonly', '');
   textarea.style.position = 'fixed';
   textarea.style.opacity = '0';
   textarea.style.pointerEvents = 'none';
 
-  document.body.appendChild(textarea);
+  doc.body.appendChild(textarea);
   textarea.focus();
   textarea.select();
 
   let copied = false;
   try {
-    copied = document.execCommand('copy');
+    copied = doc.execCommand('copy');
   } catch {
     copied = false;
   } finally {
-    document.body.removeChild(textarea);
+    doc.body.removeChild(textarea);
   }
 
   return copied;
@@ -80,8 +101,12 @@ function fallbackCopyToClipboard(text: string): boolean {
 /**
  * Copies text to the clipboard, falling back to a hidden textarea when the Clipboard API
  * is blocked. Resolves to whether the copy succeeded so callers can show copied feedback.
+ *
+ * `win` is the window the press happened in. The clipboard answers to the FOCUSED document, which
+ * for a control drawn in the chat's picture-in-picture window is that window's, not the opener's:
+ * the chat's callers pass `useHostWindow()`, and every other caller keeps the default.
  */
-export async function copyTextToClipboard(text: string): Promise<boolean> {
+export async function copyTextToClipboard(text: string, win: Window = window): Promise<boolean> {
   if (!text) {
     return false;
   }
@@ -89,16 +114,22 @@ export async function copyTextToClipboard(text: string): Promise<boolean> {
   let copied = false;
 
   try {
-    if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
-      await navigator.clipboard.writeText(text);
-      copied = true;
+    const clipboard = win.navigator?.clipboard;
+    if (clipboard?.writeText) {
+      // A CLOSED window answers `undefined` instead of a promise: the call returns, nothing is copied,
+      // and awaiting it would report a copy that never happened (measured 2026-09-29).
+      const written: Promise<void> | undefined = clipboard.writeText(text);
+      if (written) {
+        await written;
+        copied = true;
+      }
     }
   } catch {
     copied = false;
   }
 
   if (!copied) {
-    copied = fallbackCopyToClipboard(text);
+    copied = fallbackCopyToClipboard(text, win);
   }
 
   return copied;
@@ -321,6 +352,21 @@ export function formatRelativeTime(iso: string | null | undefined): string {
   return then.toLocaleDateString();
 }
 
+/**
+ * A UTC stamp as the reader's own short date — `Oct 3`, with the year once it is not this year's —
+ * or `null` for no stamp, or one that is not a time. The roadmap's one spelling of a day, so a step
+ * phrase (`useStepPhrase`), a path station (`MilestonePath`), the milestone banner (`CelebrationLayer`)
+ * and a feature's dates (`FeatureFacts`) all name it alike, in the browser's own locale.
+ */
+export function formatShortDate(stamp: string | null | undefined): string | null {
+  if (!stamp) return null;
+  const milliseconds = Date.parse(stamp);
+  if (Number.isNaN(milliseconds)) return null;
+  const day = new Date(milliseconds);
+  const thisYear = day.getFullYear() === new Date().getFullYear();
+  return day.toLocaleDateString(undefined, thisYear ? { month: 'short', day: 'numeric' } : { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
 /** The size ladder, largest unit last. Private to `formatBytes`. */
 const BYTE_UNITS = ['B', 'KB', 'MB', 'GB', 'TB'];
 
@@ -355,14 +401,197 @@ export function formatBytes(bytes: number | null | undefined): string {
 
 // ---------------------------
 
-//----------------- PLAN-RUNNER MODEL WORD ------------
+//----------------- THE ROADMAP PICTURE ------------
 
 /**
- * The model word a run's or an arc's control shows as pressed: the stored word, or `deepseek` for a record with
- * none (`null` / absent — born before the runner wrote its default), because that is how the runner itself reads
- * it (`run_model.clean`). Used by `RunCard` and `ArcDeck` to hand `RunModelControl` its value, so `Chat switch` is
- * pressed only when the record says `auto`.
+ * Each picture's feature index, built on its first ask and shared by every reader after. A WeakMap, so
+ * a picture the live bus has replaced takes its index with it. Private to `roadmapFeatureIndex`.
  */
-export function effectiveModelWord(stored: RunnerModelChoice | null | undefined): RunnerModelChoice {
-  return stored ?? 'deepseek';
+const ROADMAP_FEATURE_INDEXES = new WeakMap<RoadmapPicture, Map<string, { title: string; word: RoadmapFeatureWord }>>();
+
+/**
+ * Every feature of a roadmap picture by name — on a roadmap or unplaced — with what a reader of another
+ * feature's name needs: its title and its word. Used by `useStepPhrase` (the feature a `waiting` step
+ * names) and `FeatureFacts` (each wait of `FeatureDialog`'s feature). A name the index lacks — a feature
+ * under an epic no milestone holds is in neither `roadmaps` nor `unplaced` — is said as "another
+ * feature", never as its slug.
+ */
+export function roadmapFeatureIndex(picture: RoadmapPicture): Map<string, { title: string; word: RoadmapFeatureWord }> {
+  const known = ROADMAP_FEATURE_INDEXES.get(picture);
+  if (known) return known;
+  const index = new Map<string, { title: string; word: RoadmapFeatureWord }>();
+  for (const roadmap of picture.roadmaps) {
+    for (const milestone of roadmap.milestones) {
+      for (const epic of milestone.epics) {
+        for (const item of epic.features) index.set(item.name, { title: item.title, word: item.word });
+      }
+    }
+  }
+  for (const item of picture.unplaced.features) index.set(item.name, { title: item.title, word: item.word });
+  ROADMAP_FEATURE_INDEXES.set(picture, index);
+  return index;
+}
+
+// ---------------------------
+
+//----------------- THE ROADMAP LANE'S TEXT FENCES ------------
+
+/**
+ * Every character Python's `str.splitlines()` breaks a line on, which is how the store counts "one line"
+ * (`LINE_BREAK` in `roadmap-write.service.ts`). An `<input>` strips only LF and CR from what is pasted
+ * into it, so the others reach a draft and the lane would refuse them. Private to `roadmapTextBreak`.
+ */
+const ROADMAP_LINE_BREAK = /[\n\r\v\f\u001c-\u001e\u0085\u2028\u2029]/;
+
+/**
+ * Which of the lane's fences a roadmap write's free text breaks, or null when it breaks none: `text` for
+ * more than `max` code points (as the store counts them, not UTF-16 units) or a NUL, `line` for a
+ * line break in a field that is one line. The answer is the field's own invalid state, so a text the
+ * lane would refuse is never sent. Pass the TRIMMED text. Used by the roadmap dialogs: `ItemDialog`
+ * (title, goal, project name) and `BlockDialog` (the reason).
+ */
+export function roadmapTextBreak(text: string, max: number, oneLine: boolean): 'line' | 'text' | null {
+  const broken = [...text].length > max || text.includes('\0') || (oneLine && ROADMAP_LINE_BREAK.test(text));
+  if (!broken) return null;
+  return oneLine ? 'line' : 'text';
+}
+
+// ---------------------------
+
+//----------------- THE DISPATCHER'S MODEL WORD ------------
+
+/**
+ * The model word a plan's or an arc's control shows as pressed: the stored word, or `claude` for a record with
+ * none (`null` / absent — a store row carrying no word of its own), because that is how the store itself reads it
+ * (`run_model.DEFAULT`). Used by `PlanControls` and `DispatchArcControls` to hand `RunModelControl` its value, so
+ * `Chat switch` is pressed only when the record says `auto`.
+ */
+export function effectiveModelWord(stored: DispatcherModelChoice | null | undefined): DispatcherModelChoice {
+  return stored ?? 'claude';
+}
+
+// ---------------------------
+
+//----------------- THE DISPATCHER'S SENTENCE ------------
+
+/**
+ * The first non-blank line of a dispatcher answer's `stdout`, `stderr` or `error`, trimmed — or `''`
+ * for anything that is not text. Blank lines are stepped over rather than returned: a refusal that
+ * began with a newline would otherwise raise an empty toast. Used by `useDispatcherVerbs` and
+ * `useRoadmapWrites`, the two hooks that show the dispatcher's own sentence in a toast.
+ */
+export function firstLine(text: unknown): string {
+  if (typeof text !== 'string') return '';
+  for (const line of text.split('\n')) {
+    const trimmed = line.trim();
+    if (trimmed) return trimmed;
+  }
+  return '';
+}
+
+// ---------------------------
+
+//----------------- THE SWARM CEILING LADDER ------------
+
+/**
+ * The top counted rung of the swarm ladder (`1, 2, … top, All`): `SWARM_LADDER_TOP`, or the widest count
+ * already in play — the box's, the plan's own — whichever is larger. On the plan card the box's count is
+ * always in play, so a box count above six stays a rung however the plan's own count moves; on the
+ * Settings row the row's own count is the only one in play, so a count above six steps down by one and,
+ * once stepped below it, is not climbed back to. `null` is `All` (no ceiling) and widens nothing. Because every count the ladder
+ * ever steps to is at most this, `+` can never produce a count wider than one the server already
+ * handed us (and so never one the swarm reader refuses). Used by the dispatcher module's `SwarmControl`
+ * and the settings module's `RunnerModelContent`, which hand its answer to `swarmLadderSteps`.
+ */
+export function swarmLadderTop(...inPlay: Array<number | null>): number {
+  return Math.max(SWARM_LADDER_TOP, ...inPlay.filter((lanes): lanes is number => lanes !== null));
+}
+
+/**
+ * Where `−` and `+` land from `current` on the one swarm ladder, `1, 2, … top, All`; `null` is `All`
+ * (the box's bare `on`, Settings' `Unlimited`). A press that is refused is `null`; a press that lands is
+ * `{ lanes }`, where `lanes: null` is `All`.
+ *
+ * `+` adds one below `top`, and from `top` goes to `All`; it is refused on `All`. `−` takes `All` to
+ * `top`, and subtracts one from a count; it is refused on one lane. Used by the dispatcher module's
+ * `SwarmControl` (one plan's own word) and the settings module's `RunnerModelContent` (the box's
+ * switch), so the two climb the same ladder from one copy of the rules.
+ */
+export function swarmLadderSteps(
+  current: number | null,
+  top: number,
+): { down: { lanes: number | null } | null; up: { lanes: number | null } | null } {
+  if (current === null) return { down: { lanes: top }, up: null };
+  return {
+    down: current > LANES_MIN ? { lanes: current - 1 } : null,
+    up: { lanes: current < top ? current + 1 : null },
+  };
+}
+
+// ---------------------------
+
+//----------------- KEYBOARD SHORTCUTS ------------
+
+/**
+ * Whether the page runs on an Apple platform, where the command key (⌘) is the shortcut modifier
+ * and Ctrl is not. The one platform check the house makes for shortcuts; read it through
+ * `modifierKeyLabel` and `formatShortcut` rather than testing `navigator.platform` again. False
+ * where there is no `navigator` at all.
+ */
+export function isApplePlatform(): boolean {
+  return typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform);
+}
+
+/** The modifier a shortcut is printed with on this platform: `⌘` on Apple hardware, `Ctrl` elsewhere. */
+export function modifierKeyLabel(): '⌘' | 'Ctrl' {
+  return isApplePlatform() ? '⌘' : 'Ctrl';
+}
+
+/**
+ * A shortcut as a person reads it here: `⌘K` on a Mac, `Ctrl+K` elsewhere. Pass the key as it
+ * should print (`'K'`, `'.'`); the modifier is this platform's.
+ */
+export function formatShortcut(key: string): string {
+  return isApplePlatform() ? `⌘${key}` : `Ctrl+${key}`;
+}
+
+// ---------------------------
+
+//----------------- DOM TESTS AND OBSERVERS THAT SURVIVE A WINDOW MOVE ------------
+
+/**
+ * Whether an event target is a DOM node, by asking the node instead of its constructor.
+ *
+ * Why not `target instanceof Node`: an element created while the chat lives in a picture-in-picture
+ * window belongs to THAT window's realm, whose `Node` is not this page's — the test answers false for
+ * a real node, and the handler behind it quietly does nothing. `nodeType` is a plain number every
+ * node carries whichever window made it. Used by the kit's Tooltip.
+ */
+export function isNodeLike(target: EventTarget | null | undefined): target is Node {
+  return target != null && typeof (target as Node).nodeType === 'number';
+}
+
+/**
+ * Whether an event target is a DOM element, by its `nodeType` (1) rather than `instanceof Element`
+ * — see `isNodeLike` for why a constructor test lies about an element drawn in another window.
+ * Used by the kit's Lightbox to find the control a press began on.
+ */
+export function isElementLike(target: EventTarget | null | undefined): target is Element {
+  return target != null && (target as Node).nodeType === 1;
+}
+
+/**
+ * A ResizeObserver built by `hostWindow`'s own constructor, or null where that window has none.
+ *
+ * Why not `new ResizeObserver(...)`: an observer delivers on the frame lifecycle of the window whose
+ * constructor built it, not of the window its target is drawn in. Measured in Chromium (2026-09-29):
+ * six resizes of an element in a picture-in-picture window reached an observer built by the PiP's
+ * constructor six times, and one built by the opener's constructor NOT ONCE until the opener happened
+ * to draw frames of its own — and a hidden opener draws none, which is exactly when the reader is
+ * looking at the floating window. Build it from `useHostWindow()` and put that window in the effect's
+ * dependencies, so a move builds a new one. Used by the kit's Tabs and `useZoomPan`.
+ */
+export function resizeObserverIn(hostWindow: Window, callback: ResizeObserverCallback): ResizeObserver | null {
+  const HostResizeObserver = (hostWindow as Window & typeof globalThis).ResizeObserver;
+  return typeof HostResizeObserver === 'function' ? new HostResizeObserver(callback) : null;
 }

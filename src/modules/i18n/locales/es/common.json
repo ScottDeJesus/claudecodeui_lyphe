@@ -333,12 +333,27 @@
       "closeSidebar": "Cerrar barra lateral"
     }
   },
+  "lightbox": {
+    "close": "Cerrar vista previa",
+    "zoomIn": "Acercar",
+    "zoomOut": "Alejar",
+    "fit": "Ajustar a la pantalla"
+  },
   "shapes": {
-    "diagramFailed": "No se pudo dibujar este diagrama; se muestra su código fuente."
+    "diagramFailed": "No se pudo dibujar este diagrama; se muestra su código fuente.",
+    "diagram": "Diagrama",
+    "diagramOpen": "Abrir el diagrama a pantalla completa"
+  },
+  "runner": {
+    "collapse": "Contraer",
+    "expand": "Expandir"
   },
   "gutters": {
     "runner": {
       "title": "Ejecuciones"
+    },
+    "roadmap": {
+      "title": "Hoja de ruta"
     },
     "memory": {
       "title": "Memoria",
@@ -370,6 +385,9 @@
       "open": "Abrir la página en una pestaña nueva",
       "rejected": "Esa no es una dirección http:// o https://"
     },
+    "notes": {
+      "title": "Notas"
+    },
     "open": "Abrir {{name}}",
     "collapse": "Contraer",
     "dragHint": "Arrastra a cualquier lado",
@@ -381,7 +399,16 @@
     "exitFullscreen": "Salir de pantalla completa"
   },
   "applications": {
-    "fabLabel": "Aplicaciones",
+    "fabLabelMenu": "Abrir el menú",
+    "fabLabelCollapse": "Contraer el chat",
+    "radialLabel": "Acciones rápidas",
+    "fabUnread": "Te toca: te espera una respuesta o una ejecución",
+    "actChat": "Chat",
+    "actCollapseChat": "Contraer chat",
+    "actApplications": "Apps",
+    "actReload": "Recargar app",
+    "actClose": "Cerrar app",
+    "actOpenInTab": "Abrir en pestaña",
     "heading": "Tus <em>apps</em>",
     "closeDrawer": "Cerrar",
     "close": "Cerrar todas",
@@ -400,6 +427,10 @@
     "closeDual": "Cerrar pantalla dividida",
     "editDescription": "Editar descripción",
     "descriptionLabel": "Descripción de {{name}}",
+    "linkProject": "Vincular proyecto…",
+    "noProject": "Sin proyecto",
+    "projectLabel": "Proyecto de {{name}}",
+    "projectUnknown": "Ningún proyecto en esta ruta",
     "moveUp": "Subir",
     "moveDown": "Bajar",
     "addDivider": "Añadir divisor",
@@ -436,5 +467,29 @@
     "appearanceLight": "Apariencia clara",
     "appearanceDark": "Apariencia oscura",
     "divider": "Cambiar el tamaño de las aplicaciones"
+  },
+  "chatHost": {
+    "panelLabel": "Chat flotante",
+    "collapse": "Contraer el chat",
+    "resize": "Cambiar el tamaño del chat",
+    "panelTitle": "El chat está en el panel flotante",
+    "panelMessage": "Está abierto sobre tu trabajo.",
+    "windowTitle": "El chat está en su propia ventana",
+    "windowMessage": "Se queda encima de tus otras ventanas.",
+    "bringBack": "Traerlo de vuelta",
+    "pickerTitle": "Cambiar de conversación",
+    "pickerList": "Conversaciones",
+    "pickerEmpty": "Aún no hay conversaciones. Empieza una con «Nuevo chat».",
+    "pickerLoading": "Cargando conversaciones",
+    "pickerError": "No se pudieron cargar las conversaciones"
+  },
+  "gitPanel": {
+    "lastPushed": "Último push {{when}}",
+    "neverPushed": "Aún no se ha hecho push desde aquí",
+    "age": {
+      "justNow": "justo ahora",
+      "minutesAgo": "hace {{count}} min",
+      "hoursAgo": "hace {{count}} h"
+    }
   }
 }

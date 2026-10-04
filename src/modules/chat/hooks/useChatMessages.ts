@@ -395,6 +395,8 @@ export function normalizedToChatMessages(messages: NormalizedMessage[]): ChatMes
         const toolResult = tr
           ? {
               content: formatToolResultContent(tr.content),
+              // Pictures the tool returned ride beside the text, so a Read of an image can draw it.
+              images: Array.isArray(tr.images) && tr.images.length > 0 ? tr.images : undefined,
               isError: Boolean(tr.isError),
               toolUseResult: (tr as any).toolUseResult,
             }

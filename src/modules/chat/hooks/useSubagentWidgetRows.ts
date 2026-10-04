@@ -36,6 +36,7 @@ export function useSubagentWidgetRows(
   return usePinnedSubagentRows(
     source?.agentMessages ?? NO_AGENT_MESSAGES,
     source?.soulLaunchIds ?? NO_SOUL_LAUNCH_IDS,
+    source?.cliSessionId ?? null,
   );
 }
 

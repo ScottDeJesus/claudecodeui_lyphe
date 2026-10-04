@@ -12,6 +12,7 @@ import type {
 } from 'react';
 import { PaperclipIcon, PencilRulerIcon, XIcon, Loader2, ArrowUpIcon, PencilIcon } from 'lucide-react';
 
+import { useHostWindow } from '@/shared/context/HostWindowContext';
 import { useDeviceSettings } from '@/shared/hooks/useDeviceSettings';
 import {
   Chip,
@@ -64,6 +65,7 @@ type ChatComposerProps = {
   onSelectEffort: (effort: string) => void;
   model: string;
   availableModelOptions: ProviderModelOption[];
+  availableModelLabelsById?: Record<string, string>;
   onSelectModel: (model: string) => void;
   modelsLoading: boolean;
   tokenBudget: Record<string, unknown> | null;
@@ -160,6 +162,7 @@ export default function ChatComposer({
   onSelectEffort,
   model,
   availableModelOptions,
+  availableModelLabelsById,
   onSelectModel,
   modelsLoading,
   tokenBudget,
@@ -222,7 +225,12 @@ export default function ChatComposer({
   // Send-later hangs off a press-and-hold on the SEND button; it has no button of its own.
   const sendButtonRef = useRef<HTMLButtonElement | null>(null);
   const [isScheduleOpen, setIsScheduleOpen] = useState(false);
-  const longPressTimerRef = useRef<number | null>(null);
+  // The window the composer is drawn in: the command menu is placed against ITS viewport, and the
+  // send button's hold is timed on it (a hidden opener throttles its timers).
+  const hostWindow = useHostWindow();
+  // The hold timer and the window that armed it: a timer id means something only to the window that
+  // issued it, so a cancel after a move still clears it there.
+  const longPressTimerRef = useRef<{ id: number; armedOn: Window } | null>(null);
   // Set the moment the hold fires, and read by the click that a hold always produces afterwards
   // — without it, holding to schedule would ALSO send the message on release.
   const longPressFiredRef = useRef(false);
@@ -238,9 +246,9 @@ export default function ChatComposer({
     return {
       top: textareaRect ? Math.max(16, textareaRect.top - 316) : 0,
       left: textareaRect ? textareaRect.left : 16,
-      bottom: textareaRect ? window.innerHeight - textareaRect.top + 8 : 90,
+      bottom: textareaRect ? hostWindow.innerHeight - textareaRect.top + 8 : 90,
     };
-  }, [isCommandMenuOpen, textareaRef]);
+  }, [isCommandMenuOpen, textareaRef, hostWindow]);
 
   useEffect(() => {
     const dropdown = fileDropdownRef.current;
@@ -265,15 +273,16 @@ export default function ChatComposer({
   // recording and send the transcript in one tap, the way the mic button drops it in the box.
   const voiceAvailable = useVoiceAvailable();
   const [voiceError, setVoiceError] = useState<string | null>(null);
-  const voiceErrorTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const handleVoiceError = useCallback((msg: string) => {
-    setVoiceError(msg);
-    if (voiceErrorTimer.current) clearTimeout(voiceErrorTimer.current);
-    voiceErrorTimer.current = setTimeout(() => setVoiceError(null), 4000);
-  }, []);
-  useEffect(() => () => {
-    if (voiceErrorTimer.current) clearTimeout(voiceErrorTimer.current);
-  }, []);
+  const handleVoiceError = useCallback((msg: string) => setVoiceError(msg), []);
+  // The notice clears itself. An effect keyed on the window, not a timer armed once in the handler: a
+  // timer armed on a floating window dies with that window, and chat-host closes the window to bring
+  // the chat home — the notice would then stay until the next error. A move changes `hostWindow`, so
+  // the effect re-arms on the window the composer now stands in.
+  useEffect(() => {
+    if (voiceError === null) return;
+    const timer = hostWindow.setTimeout(() => setVoiceError(null), 4000);
+    return () => hostWindow.clearTimeout(timer);
+  }, [voiceError, hostWindow]);
   const noopTranscript = useCallback(() => {}, []);
   const { state: voiceState, toggle: voiceToggle, stop: voiceStop } = useVoiceInput(
     onVoiceTranscript ?? noopTranscript,
@@ -293,8 +302,9 @@ export default function ChatComposer({
   const canScheduleFromSend = !isLoading && !isRecording && !isTranscribing && input.trim().length > 0;
 
   const cancelLongPress = useCallback(() => {
-    if (longPressTimerRef.current !== null) {
-      window.clearTimeout(longPressTimerRef.current);
+    const pending = longPressTimerRef.current;
+    if (pending) {
+      pending.armedOn.clearTimeout(pending.id);
       longPressTimerRef.current = null;
     }
   }, []);
@@ -307,12 +317,15 @@ export default function ChatComposer({
     longPressFiredRef.current = false;
     cancelLongPress();
     if (!canScheduleFromSend) return;
-    longPressTimerRef.current = window.setTimeout(() => {
-      longPressTimerRef.current = null;
-      longPressFiredRef.current = true;
-      setIsScheduleOpen(true);
-    }, LONG_PRESS_MS);
-  }, [canScheduleFromSend, cancelLongPress]);
+    longPressTimerRef.current = {
+      id: hostWindow.setTimeout(() => {
+        longPressTimerRef.current = null;
+        longPressFiredRef.current = true;
+        setIsScheduleOpen(true);
+      }, LONG_PRESS_MS),
+      armedOn: hostWindow,
+    };
+  }, [canScheduleFromSend, cancelLongPress, hostWindow]);
 
   // A timer left running past unmount would call setState on a dead component.
   useEffect(() => cancelLongPress, [cancelLongPress]);
@@ -597,6 +610,7 @@ export default function ChatComposer({
               onSelectEffort={onSelectEffort}
               model={model}
               modelOptions={availableModelOptions}
+              modelLabelsById={availableModelLabelsById}
               onSelectModel={onSelectModel}
               modelsLoading={modelsLoading}
               permissionMode={isNarrowComposer ? permissionMode : undefined}

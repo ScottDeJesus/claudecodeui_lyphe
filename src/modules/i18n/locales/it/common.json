@@ -333,12 +333,27 @@
       "closeSidebar": "Chiudi barra laterale"
     }
   },
+  "lightbox": {
+    "close": "Chiudi anteprima",
+    "zoomIn": "Ingrandisci",
+    "zoomOut": "Riduci",
+    "fit": "Adatta allo schermo"
+  },
   "shapes": {
-    "diagramFailed": "Impossibile disegnare questo diagramma: ne viene mostrata la sorgente."
+    "diagramFailed": "Impossibile disegnare questo diagramma: ne viene mostrata la sorgente.",
+    "diagram": "Diagramma",
+    "diagramOpen": "Apri il diagramma a schermo intero"
+  },
+  "runner": {
+    "collapse": "Comprimi",
+    "expand": "Espandi"
   },
   "gutters": {
     "runner": {
       "title": "Esecuzioni"
+    },
+    "roadmap": {
+      "title": "Roadmap"
     },
     "memory": {
       "title": "Memoria",
@@ -370,6 +385,9 @@
       "open": "Apri la pagina in una nuova scheda",
       "rejected": "Non è un indirizzo http:// o https://"
     },
+    "notes": {
+      "title": "Note"
+    },
     "open": "Apri {{name}}",
     "collapse": "Comprimi",
     "dragHint": "Trascina su un lato",
@@ -381,7 +399,16 @@
     "exitFullscreen": "Esci da schermo intero"
   },
   "applications": {
-    "fabLabel": "Applicazioni",
+    "fabLabelMenu": "Apri il menu",
+    "fabLabelCollapse": "Comprimi la chat",
+    "radialLabel": "Azioni rapide",
+    "fabUnread": "Tocca a te: ti aspetta una risposta o un'esecuzione",
+    "actChat": "Chat",
+    "actCollapseChat": "Comprimi chat",
+    "actApplications": "App",
+    "actReload": "Ricarica app",
+    "actClose": "Chiudi app",
+    "actOpenInTab": "Apri in scheda",
     "heading": "Le tue <em>app</em>",
     "closeDrawer": "Chiudi",
     "close": "Chiudi tutte",
@@ -400,6 +427,10 @@
     "closeDual": "Chiudi schermo diviso",
     "editDescription": "Modifica descrizione",
     "descriptionLabel": "Descrizione di {{name}}",
+    "linkProject": "Collega progetto…",
+    "noProject": "Nessun progetto",
+    "projectLabel": "Progetto di {{name}}",
+    "projectUnknown": "Nessun progetto in questo percorso",
     "moveUp": "Sposta su",
     "moveDown": "Sposta giù",
     "addDivider": "Aggiungi divisore",
@@ -436,5 +467,29 @@
     "appearanceLight": "Aspetto chiaro",
     "appearanceDark": "Aspetto scuro",
     "divider": "Ridimensiona le applicazioni"
+  },
+  "chatHost": {
+    "panelLabel": "Chat flottante",
+    "collapse": "Comprimi la chat",
+    "resize": "Ridimensiona la chat",
+    "panelTitle": "La chat è nel pannello flottante",
+    "panelMessage": "È aperta sopra il tuo lavoro.",
+    "windowTitle": "La chat è nella sua finestra",
+    "windowMessage": "Resta sopra le tue altre finestre.",
+    "bringBack": "Riportala qui",
+    "pickerTitle": "Cambia conversazione",
+    "pickerList": "Conversazioni",
+    "pickerEmpty": "Ancora nessuna conversazione. Iniziane una con «Nuova chat».",
+    "pickerLoading": "Caricamento delle conversazioni",
+    "pickerError": "Impossibile caricare le conversazioni"
+  },
+  "gitPanel": {
+    "lastPushed": "Ultimo push {{when}}",
+    "neverPushed": "Non ancora pushato da qui",
+    "age": {
+      "justNow": "adesso",
+      "minutesAgo": "{{count}} min fa",
+      "hoursAgo": "{{count}} h fa"
+    }
   }
 }

@@ -331,12 +331,27 @@
       "closeSidebar": "關閉側邊欄"
     }
   },
+  "lightbox": {
+    "close": "關閉預覽",
+    "zoomIn": "放大",
+    "zoomOut": "縮小",
+    "fit": "符合螢幕"
+  },
   "shapes": {
-    "diagramFailed": "無法繪製此圖表，已顯示其原始碼。"
+    "diagramFailed": "無法繪製此圖表，已顯示其原始碼。",
+    "diagram": "圖表",
+    "diagramOpen": "以全螢幕開啟圖表"
+  },
+  "runner": {
+    "collapse": "收合",
+    "expand": "展開"
   },
   "gutters": {
     "runner": {
       "title": "執行"
+    },
+    "roadmap": {
+      "title": "路線圖"
     },
     "memory": {
       "title": "記憶",
@@ -368,6 +383,9 @@
       "open": "在新分頁中開啟頁面",
       "rejected": "這不是 http:// 或 https:// 網址"
     },
+    "notes": {
+      "title": "筆記"
+    },
     "open": "開啟 {{name}}",
     "collapse": "收合",
     "dragHint": "拖曳到任一側",
@@ -379,7 +397,16 @@
     "exitFullscreen": "離開全螢幕"
   },
   "applications": {
-    "fabLabel": "應用程式",
+    "fabLabelMenu": "開啟選單",
+    "fabLabelCollapse": "收合聊天",
+    "radialLabel": "快速動作",
+    "fabUnread": "換你了：有回覆或執行正在等你",
+    "actChat": "聊天",
+    "actCollapseChat": "收合聊天",
+    "actApplications": "應用程式",
+    "actReload": "重新載入應用程式",
+    "actClose": "關閉應用程式",
+    "actOpenInTab": "在分頁開啟",
     "heading": "我的<em>應用程式</em>",
     "closeDrawer": "關閉",
     "close": "全部關閉",
@@ -396,6 +423,10 @@
     "closeDual": "關閉雙螢幕",
     "editDescription": "編輯描述",
     "descriptionLabel": "{{name}} 的描述",
+    "linkProject": "連結專案…",
+    "noProject": "無專案",
+    "projectLabel": "{{name}} 的專案",
+    "projectUnknown": "此路徑下沒有專案",
     "moveUp": "上移",
     "moveDown": "下移",
     "addDivider": "新增分隔線",
@@ -432,5 +463,29 @@
     "appearanceLight": "淺色外觀",
     "appearanceDark": "深色外觀",
     "divider": "調整應用程式大小"
+  },
+  "chatHost": {
+    "panelLabel": "浮動聊天",
+    "collapse": "收合聊天",
+    "resize": "調整聊天大小",
+    "panelTitle": "聊天在浮動面板中",
+    "panelMessage": "它顯示在你的工作內容之上。",
+    "windowTitle": "聊天在獨立視窗中",
+    "windowMessage": "該視窗會保持在其他視窗之上。",
+    "bringBack": "移回",
+    "pickerTitle": "切換對話",
+    "pickerList": "對話",
+    "pickerEmpty": "還沒有對話。點選「新增對話」開始。",
+    "pickerLoading": "正在載入對話",
+    "pickerError": "無法載入對話"
+  },
+  "gitPanel": {
+    "lastPushed": "上次推送 {{when}}",
+    "neverPushed": "尚未從此處推送",
+    "age": {
+      "justNow": "剛剛",
+      "minutesAgo": "{{count}} 分鐘前",
+      "hoursAgo": "{{count}} 小時前"
+    }
   }
 }

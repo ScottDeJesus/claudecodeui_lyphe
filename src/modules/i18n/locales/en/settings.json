@@ -1,6 +1,7 @@
 {
   "title": "Settings",
   "savedAsYouChange": "Saved as you change them",
+  "close": "Close",
   "tabs": {
     "account": "Account",
     "permissions": "Permissions",
@@ -10,7 +11,6 @@
   },
   "account": {
     "title": "Account",
-    "language": "Language",
     "languageLabel": "Display Language",
     "languageDescription": "Choose your preferred language for the interface",
     "username": "Username",
@@ -131,7 +131,15 @@
     "browser": "Browser",
     "notifications": "Notifications",
     "plugins": "Plugins",
+    "updates": "Updates",
     "about": "About"
+  },
+  "updates": {
+    "autoInstall": {
+      "label": "Install updates automatically",
+      "description": "Only when no Claude session is working. Checked every 5 minutes.",
+      "waiting": "Not installed yet — {{reason}}"
+    }
   },
   "notifications": {
     "title": "Notifications",
@@ -384,10 +392,22 @@
       "button": "Login",
       "reLoginButton": "Re-login"
     },
+    "designLogin": {
+      "title": "Authenticate for designs",
+      "description": "Authorize Claude Design so sessions on this machine can read and write your design-system projects",
+      "button": "Authenticate"
+    },
     "error": "Error: {{error}}",
+    "agentChains": {
+      "label": "Agent chains",
+      "description": "The model and effort every soul, and Metis, launches at in each lane.",
+      "button": "Edit Agent Chains",
+      "loadFailed": "Agent Chains could not be loaded.",
+      "reload": "Reload the page"
+    },
     "runnerModel": {
       "label": "Use DeepSeek Flash for build souls",
-      "description": "Dispatch the plan runner’s builder, its fix-pass and Athena on DeepSeek’s deepseek-flash instead of Claude Opus. Prometheus, the scouts and the replanner stay on Claude. Takes effect on the next phase.",
+      "description": "Dispatch the runner’s builder, its fix-pass and Athena on DeepSeek’s deepseek-flash instead of Claude Sonnet. Prometheus, the scouts and the replanner stay on Claude. Takes effect on the next task.",
       "unreadable": "The switch could not be read from the server, so its position is unknown — this is not the same as off. It is retried whenever this page regains focus."
     },
     "runnerHealModel": {
@@ -395,6 +415,21 @@
       "descriptionClaude": "Pinned to Claude — your subscription, so these heals are capped by nothing and count against no daily cap. It steers the heal reflex’s souls only: the chat composer’s Flash switch is a different file and never moves with it. Press the chip to send them back to DeepSeek Flash.",
       "descriptionDeepseek": "Pinned to DeepSeek Flash. These heals count against the daily cap on the Heal tab, and park until midnight once it is reached. It steers the heal reflex’s souls only: the chat composer’s Flash switch is a different file and never moves with it. Press the chip to send them to Claude instead.",
       "descriptionUnknown": "Which model this heal’s souls run on could not be read — the reflex’s summary is not in hand. Press Try again to ask for it."
+    },
+    "runnerParkAtPeak": {
+      "label": "Park new features at DeepSeek peak hours",
+      "description": "An Accept during DeepSeek’s peak window (01:00–04:00 and 06:00–10:00 UTC, weekdays) queues the feature and starts it when the window lifts. Off: Accept walks now.",
+      "unreadable": "The switch could not be read from the server, so its position is unknown — this is not the same as off. It is retried whenever this page regains focus."
+    },
+    "plannerLanes": {
+      "label": "Planner lanes",
+      "description": "How many planners (designs, cuts, judgments) run at once — {{count}} at a time. Lowering it stops no planner already out; the lane takes no new one until it has room. Takes effect at once.",
+      "lane": "1 lane",
+      "lanes": "{{count}} lanes",
+      "lanesDown": "One lane fewer",
+      "lanesUp": "One lane more",
+      "lanesLabel": "Planners run at once",
+      "unreadable": "The dial could not be read from the server, so its position is unknown. It is retried whenever this page regains focus."
     },
     "jev": {
       "master": {

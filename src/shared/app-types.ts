@@ -17,9 +17,11 @@
 
 /**
  * One row of the application registry. The shape a builder appends by hand. `description` is the
- * operator's own line under the name; a row without one shows where it answers instead.
+ * operator's own line under the name; a row without one shows where it answers instead. `project`
+ * is the absolute path of the repository the application is built from, spelled as that project's
+ * `fullPath` reads, so the client can match the row to a project by string equality.
  */
-export type AppEntry = { id: string; name: string; url: string; description?: string };
+export type AppEntry = { id: string; name: string; url: string; description?: string; project?: string };
 
 /**
  * A divider in the registry file: a line across the drawer's list, with a title that may be blank.

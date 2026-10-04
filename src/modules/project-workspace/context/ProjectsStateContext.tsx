@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef } fr
 import type { ReactNode } from 'react';
 import type { NavigateFunction } from 'react-router-dom';
 
+import { useOpenProjectChat } from '@/modules/project-workspace/hooks/useOpenProjectChat';
 import { useProjectsState } from '@/modules/project-workspace/hooks/useProjectsState';
 import { GIT_REPO_PATHS } from '@/shared/constants';
 import type { GitRepository, IsSessionProcessing, ProjectChoice, ServerEvent } from '@/shared/types';
@@ -30,7 +31,7 @@ type ProjectMainState = Pick<
 > & {
   /** The git tab's repositories in strip order, memoised on the fields the tab reads. */
   gitRepositories: GitRepository[];
-  /** Every project a new chat can start in, by name, memoised on those two fields. */
+  /** Every project a new chat can start in, by name, memoised on its id, name and path. */
   projectChoices: ProjectChoice[];
   /** Points the workspace at a project by id; an id no longer in the list does nothing. */
   selectProjectById: (projectId: string) => void;
@@ -50,6 +51,13 @@ type ProjectActiveSessionState = {
   activeSessionId: string | null;
 };
 
+type ProjectChatState = {
+  /** Every project a chat can be pointed at, by name, memoised on its id, name and path. */
+  projectChoices: ProjectChoice[];
+  /** The one door into a project's conversation, with one identity for the provider's life. */
+  openProjectChat: ReturnType<typeof useOpenProjectChat>;
+};
+
 type ProjectsStateProviderProps = {
   children: ReactNode;
   sessionId?: string;
@@ -64,6 +72,10 @@ const ProjectMainContext = createContext<ProjectMainState | null>(null);
 const ProjectCommandContext = createContext<ProjectCommandState | null>(null);
 const ProjectEffectsContext = createContext<ProjectEffectsState | null>(null);
 const ProjectActiveSessionContext = createContext<ProjectActiveSessionState | null>(null);
+// Its own context, apart from `ProjectMainContext`: the choices and the door into a project move
+// far less often than the selection does, so a reader of only those two is not woken by every pick
+// (see `useProjectChatState`).
+const ProjectChatContext = createContext<ProjectChatState | null>(null);
 
 /** Rendered by ProjectWorkspaceRoute to own the workspace's project and session state and expose it through this module's context hooks. */
 export function ProjectsStateProvider({
@@ -119,16 +131,16 @@ export function ProjectsStateProvider({
     [gitRepositoriesKey],
   );
 
-  // The same discipline for the new-chat project picker: a list keyed on the id and name alone,
-  // so a session upsert that rebuilds `state.projects` does not wake the chat pane.
+  // The same discipline for the new-chat project picker: a list keyed on the id, name and path
+  // alone, so a session upsert that rebuilds `state.projects` does not wake the chat pane.
   const projectChoicesKey = JSON.stringify(
     [...state.projects]
       .sort((a, b) => a.displayName.localeCompare(b.displayName))
-      .map((project) => [project.projectId, project.displayName]),
+      .map((project) => [project.projectId, project.displayName, project.fullPath]),
   );
   const projectChoices = useMemo<ProjectChoice[]>(
-    () => (JSON.parse(projectChoicesKey) as [string, string][])
-      .map(([projectId, displayName]) => ({ projectId, displayName })),
+    () => (JSON.parse(projectChoicesKey) as [string, string, string][])
+      .map(([projectId, displayName, fullPath]) => ({ projectId, displayName, fullPath })),
     [projectChoicesKey],
   );
   // The full project is looked up at pick time, from the newest list, through a ref, so the
@@ -218,13 +230,23 @@ export function ProjectsStateProvider({
     [sessionId, state.selectedSession?.id],
   );
 
+  // Handed the whole `state`: the hook keeps only refs to what it reads, so the churn of
+  // `state.projects` never reaches the value below.
+  const openProjectChat = useOpenProjectChat(state);
+  const projectChatState = useMemo<ProjectChatState>(
+    () => ({ projectChoices, openProjectChat }),
+    [projectChoices, openProjectChat],
+  );
+
   return (
     <ProjectEffectsContext.Provider value={effectsState}>
       <ProjectCommandContext.Provider value={commandState}>
         <ProjectMainContext.Provider value={mainState}>
           <ProjectSidebarContext.Provider value={sidebarState}>
             <ProjectActiveSessionContext.Provider value={activeSessionState}>
-              {children}
+              <ProjectChatContext.Provider value={projectChatState}>
+                {children}
+              </ProjectChatContext.Provider>
             </ProjectActiveSessionContext.Provider>
           </ProjectSidebarContext.Provider>
         </ProjectMainContext.Provider>
@@ -261,4 +283,15 @@ export function useProjectActiveSessionState(): ProjectActiveSessionState {
     useContext(ProjectActiveSessionContext),
     'useProjectActiveSessionState',
   );
+}
+
+/**
+ * The project choices and the door into a project's conversation, and nothing else. It exists for
+ * WorkspaceFrame, the shell and the floating chat's header, which need both: `ProjectMainState`
+ * would wake them on every selection, and `state.projects` would wake them on every session upsert
+ * (what the comment above `gitRepositoriesKey` warns against). Its value moves only when the
+ * choices do — the door keeps one identity for the provider's life.
+ */
+export function useProjectChatState(): ProjectChatState {
+  return useRequiredProjectContext(useContext(ProjectChatContext), 'useProjectChatState');
 }

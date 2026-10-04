@@ -1,15 +1,18 @@
 import { useState } from 'react';
 import type { KeyboardEvent } from 'react';
-import { Columns2, ExternalLink, MoreHorizontal, PanelRightClose, Pencil, RotateCw, Trash2 } from 'lucide-react';
+import { Columns2, ExternalLink, FolderGit2, MoreHorizontal, PanelRightClose, Pencil, RotateCw, Trash2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
+import { AppRowProjectLine, AppRowProjectPicker } from '@/modules/app-switcher/AppRowProjectLink';
 import { useAppSwitcher } from '@/modules/app-switcher/context/AppSwitcherContext';
 import { moveItems } from '@/modules/app-switcher/utils/moveItems';
-import { describeRegistryApp } from '@/modules/app-switcher/utils/registryRequests';
+import { describeRegistryApp, linkRegistryProject } from '@/modules/app-switcher/utils/registryRequests';
 import { isSelfOrigin, resolveAppUrl } from '@/modules/app-switcher/utils/resolveAppUrl';
 import type { AppEntry } from '@/shared/app-types';
+import type { ProjectChoice } from '@/shared/types';
 import { ActionMenu, Card, Input } from '@/shared/ui';
 import type { ActionMenuItem } from '@/shared/ui';
+import { OWNS_ESCAPE } from '@/shared/ui/overlayEscape';
 import { cn } from '@/shared/utils';
 
 /**
@@ -53,6 +56,8 @@ type AppDrawerRowProps = {
  * THE SECOND LINE is the operator's description, or where the app answers when it has none. "Edit
  * description" in the kebab turns that line into a field in place: Enter or leaving the field saves,
  * Escape puts it back, and a blank one clears it.
+ * THE LINKED PROJECT rides on that line (`AppRowProjectLine`), and "Link project…" in the kebab swaps
+ * the line for a picker in place (`AppRowProjectPicker`) — both live in `AppRowProjectLink.tsx`.
  *
  * THE BODY IS ONE BUTTON — tile, name and host — and a toggle: an app already on screen reads
  * "· on screen" and comes down when it is pressed again, so `aria-pressed` carries the same fact the
@@ -70,6 +75,17 @@ export function AppDrawerRow({ app, position, onMove, onRemove, onOpenInDualScre
   // The description field's text while it is open; null while the line is just a line.
   const [draft, setDraft] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
+  // Whether the project picker stands in the row's second line. It cannot be derived: the row's
+  // project is the choice already made, and the picker is open precisely while the reader is
+  // reconsidering it. Held by the row, like `draft`. Unlike the description field it does not leave on
+  // blur (`AppRowProjectPicker` says why), so the pickers of two rows can be open at once; one Escape
+  // leaves them both.
+  const [linking, setLinking] = useState(false);
+  // The server's sentence for a refused link, printed under the picker until the next choice.
+  const [linkError, setLinkError] = useState<string | null>(null);
+  // Every project the sidebar knows, in the sidebar's order — the picker's list, and what a linked
+  // path is matched against to be named.
+  const choices: ProjectChoice[] = useAppSwitcher().projects;
   const icon = icons[app.id];
 
   // THE MODULE'S ONE PLACE THAT READS THE PAGE'S OWN ADDRESS, and both readings happen here because
@@ -171,6 +187,17 @@ export function AppDrawerRow({ app, position, onMove, onRemove, onOpenInDualScre
     icon: Pencil,
     onSelect: handleEditDescription,
   };
+  // Right after Edit description: both are the row's own facts, edited in place beside its second line.
+  const linkItem: ActionMenuItem = {
+    key: 'link-project',
+    label: t('applications.linkProject'),
+    icon: FolderGit2,
+    onSelect: () => {
+      // A refusal from the last visit is not this visit's news, as `handleEditDescription` clears its own.
+      setLinkError(null);
+      setLinking(true);
+    },
+  };
   const dualItem: ActionMenuItem = holdsSecondHalf
     ? { key: 'close-dual', label: t('applications.closeDual'), icon: PanelRightClose, onSelect: handleCloseDualScreen }
     : { key: 'open-in-dual', label: t('applications.openInDual'), icon: Columns2, onSelect: handleOpenInDualScreen };
@@ -183,6 +210,7 @@ export function AppDrawerRow({ app, position, onMove, onRemove, onOpenInDualScre
         newTabItem,
         dualItem,
         describeItem,
+        linkItem,
         ...moveItems(t, position, onMove),
         removeItem,
       ];
@@ -194,23 +222,66 @@ export function AppDrawerRow({ app, position, onMove, onRemove, onOpenInDualScre
       aria-hidden="true"
       data-initial={icon ? undefined : initialOf(app.name)}
       className={cn(
-        'grid h-9 w-9 flex-none place-items-center overflow-hidden rounded-[9px] border font-serif text-[19px] leading-none',
+        'grid h-7 w-7 flex-none place-items-center overflow-hidden rounded-[7px] border font-serif text-[15px] leading-none',
         !icon && 'before:content-[attr(data-initial)]',
         onScreen ? 'border-primary/30 bg-primary/10 text-accent-ink' : 'border-border bg-secondary text-muted-foreground',
       )}
     >
-      {icon && <img src={icon} alt="" className="h-6 w-6 object-contain" />}
+      {icon && <img src={icon} alt="" className="h-5 w-5 object-contain" />}
     </span>
   );
+
+  if (linking) {
+    return (
+      <li>
+        <Card className="flex min-h-[44px] items-center gap-3 py-1.5 pl-3 pr-2">
+          {tile}
+          <AppRowProjectPicker
+            appName={app.name}
+            value={app.project ?? ''}
+            choices={choices}
+            error={linkError}
+            onChoose={(fullPath) => {
+              // The project the row already holds is no change: the picker leaves without a request, as the
+              // description field's unchanged save does. Compared raw, so a hand-edited whitespace-only
+              // project is still cleared by "No project".
+              if (fullPath === (app.project ?? '')) {
+                setLinking(false);
+                return;
+              }
+              // Saved, then the registry is re-read so the row's second line is what the file now holds,
+              // then the picker goes. A refusal keeps the picker open with the server's sentence under it,
+              // as the description field's does — and brings it back if the reader's other choice has
+              // already sent it away, since a refusal answered after that would be dropped unseen. A failed
+              // re-read is not caught here: `useAppRegistry` puts it in the drawer's banner and the picker leaves.
+              linkRegistryProject(app.id, fullPath)
+                .then(() => refresh())
+                .then(() => setLinking(false))
+                .catch((failure: unknown) => {
+                  setLinkError(failure instanceof Error ? failure.message : String(failure));
+                  setLinking(true);
+                });
+            }}
+            onCancel={() => setLinking(false)}
+          />
+        </Card>
+      </li>
+    );
+  }
 
   if (draft !== null) {
     return (
       <li>
-        <Card className="flex min-h-[58px] items-center gap-3 py-2.5 pl-3 pr-2">
+        <Card className="flex min-h-[44px] items-center gap-3 py-1.5 pl-3 pr-2">
           {tile}
           <span className="flex min-w-0 flex-1 flex-col gap-1">
-            <span className="truncate text-[14.5px] font-medium leading-[1.65] text-foreground">{app.name}</span>
+            <span className="truncate text-[14.5px] font-medium leading-tight text-foreground">{app.name}</span>
             <Input
+              // The field states that it owns Escape while it is open (`shared/ui/overlayEscape`).
+              // Without the marker the drawer's Dialog stands the field down and closes the sheet
+              // before this input's own handler below is reached — `Dialog.tsx` listens on `window`
+              // in the capture phase, which no `stopPropagation` on the event's way down can stop.
+              {...OWNS_ESCAPE}
               value={draft}
               onChange={(event) => setDraft(event.target.value)}
               onKeyDown={handleDescriptionKey}
@@ -230,37 +301,36 @@ export function AppDrawerRow({ app, position, onMove, onRemove, onOpenInDualScre
 
   return (
     <li>
-      <Card className="flex min-h-[58px] items-center gap-1 pr-2 transition-colors duration-200 hover:border-input">
+      <Card className="flex min-h-[44px] items-center gap-1 pr-2 transition-colors duration-200 hover:border-input">
         <button
           type="button"
           aria-pressed={isSelf ? undefined : onScreen}
           onClick={handleSelect}
-          className="flex min-w-0 flex-1 items-center gap-3 self-stretch rounded-[11px] py-2.5 pl-3 text-left"
+          className="flex min-w-0 flex-1 items-center gap-3 self-stretch rounded-[11px] py-1.5 pl-3 text-left"
         >
           {tile}
-          <span className="flex min-w-0 flex-col gap-0.5">
+          <span className="flex min-w-0 flex-col gap-0">
             <span className="flex min-w-0 items-center gap-1.5">
-              <span className="truncate text-[14.5px] font-medium leading-[1.65] text-foreground">{app.name}</span>
+              <span className="truncate text-[14.5px] font-medium leading-tight text-foreground">{app.name}</span>
               {isSelf && <ExternalLink className="h-3 w-3 flex-none text-ink-faint" aria-hidden="true" />}
             </span>
-            <span className="truncate text-xs leading-[1.65] text-ink-faint">
-              {onScreen ? t('applications.hostOnScreen', { host: secondLine }) : secondLine}
-            </span>
+            <AppRowProjectLine
+              app={app}
+              choices={choices}
+              fallback={onScreen ? t('applications.hostOnScreen', { host: secondLine }) : secondLine}
+            />
           </span>
         </button>
 
-        {/* Portalled: the list scrolls inside an overflow-hidden ScrollArea, which would clip an
-            in-place menu at the sheet's edge. Named by the app alone, and the trigger announces
-            itself as a menu. */}
+        {/* Named by the app alone, and the trigger announces itself as a menu. */}
         <ActionMenu
           label={app.name}
           items={items}
           icon={MoreHorizontal}
           iconOnly
-          portal
           variant="ghost"
           size="icon"
-          triggerClassName="h-10 w-10 rounded-[9px] text-ink-faint hover:text-foreground"
+          triggerClassName="h-8 w-8 rounded-[9px] text-ink-faint hover:text-foreground"
         />
       </Card>
     </li>

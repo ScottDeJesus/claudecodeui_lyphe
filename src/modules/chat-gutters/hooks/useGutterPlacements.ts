@@ -21,8 +21,10 @@ import { readUserPreference, subscribeToUserPreferences, writeUserPreference } f
  * that is missing, names no usable side, or carries an `open` that is not a boolean falls back to
  * that widget's default, and ranks are renumbered so two widgets can never claim one place. The
  * defaults put `runner` first on the left and `memory` first on the right, both collapsed — the
- * state that costs the chat nothing — `subagents` under the runner, open, and `embed` under memory,
- * collapsed until a chat names a page for it.
+ * state that costs the chat nothing — `roadmap` under the runner, OPEN, because the operator asked for
+ * it beside the Runs widget and a widget he asked for is seen without hunting, `subagents` under the
+ * roadmap, open, `embed` under memory, collapsed until a chat names a page for it, and `notes` under
+ * embed, collapsed: the account's cards are the same in every chat, and folded costs a chat nothing.
  *
  * THE STORED SHAPE is `{ fallback, sessions: { <sessionId>: placements } }`, and an older build's
  * flat record reads as the fallback with no sessions — so an arrangement made before this is the one
@@ -47,12 +49,19 @@ import { readUserPreference, subscribeToUserPreferences, writeUserPreference } f
 
 const DEFAULT_PLACEMENTS: ChatGutterPlacements = {
   runner: { side: 'left', order: 0, open: false },
+  // Open, and on the left under the runner, for the reason the header gives: it opens itself in every chat.
+  // A stored arrangement that predates it gains it through the parser's own repair.
+  roadmap: { side: 'left', order: 1, open: true },
   memory: { side: 'right', order: 0, open: false },
-  subagents: { side: 'left', order: 1, open: true },
+  subagents: { side: 'left', order: 2, open: true },
   // Collapsed, and on the right under memory: an embed is a page the chat has yet to name, so a
   // widget that opened itself would give a column's height to an empty frame in every chat that
   // never uses one. It opens itself the moment a chat declares an address — see `ChatGutterLayout`.
   embed: { side: 'right', order: 1, open: false },
+  // Collapsed, and on the right under embed: the notes are the account's own cards, kept and shown
+  // whatever chat is open, and a folded widget costs a chat nothing — the reader who wants them
+  // opens them. A stored arrangement that predates it gains it through the parser's own repair.
+  notes: { side: 'right', order: 2, open: false },
 };
 
 /** Every widget there is, in the order a repair falls back to. */
@@ -132,8 +141,8 @@ function parsePlacements(raw: unknown): ChatGutterPlacements {
  * The read is memoised by the IDENTITY of the stored value, because `useSyncExternalStore`
  * compares snapshots by identity: a getter that parsed afresh on every call would report a change
  * on every render and loop. The store replaces that value only on a write or a hydrate, so the
- * parse is rebuilt exactly when the placements change — the shape `modules/plan-runner/
- * dismissedRuns.ts` uses for its own preference.
+ * parse is rebuilt exactly when the placements change — the shape `modules/dispatcher/
+ * hiddenPlans.ts` uses for its own preference.
  */
 /** How many chats keep an arrangement of their own before the least recently written is dropped. */
 const MAX_REMEMBERED_SESSIONS = 60;

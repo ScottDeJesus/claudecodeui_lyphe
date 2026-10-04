@@ -90,6 +90,10 @@
 .vv-badge--default { background: var(--accent); color: var(--on-accent); }
 /* `outline` is a SHAPE, so it composes with any tone: no fill, a visible edge, tone ink. */
 .vv-badge--outline { background: none; border-color: var(--border); }
+/* `kind` is IDENTITY, not state: a badge that names what a card IS (an epic, a feature) reads the
+ * `--kind-*` pair `[data-kind]` swaps in (tokens.css) and carries no `data-tone`. Two classes deep, so
+ * it outranks the tone read above and `--default`'s fill wherever the cascade lands them. */
+.vv-badge[data-kind] { background: var(--kind-soft); color: var(--kind-ink); }
 /* `compact` is a SIZE, for a badge that rides inside a dense row (the tool-call outcome pill):
  * the base badge is sized to stand alone and outweighs the row it labels. */
 .vv-badge.vv-badge--compact { padding: 0 6px; font-size: var(--vv-text-meta, 10px); line-height: 16px; }
@@ -277,6 +281,24 @@
   text-align: center;
   line-height: 32px;
 }
+/* The note after the value ("3 · default"): smaller and lighter than the number it qualifies, and joined
+ * to it by a dot that is drawn but not spoken — the second declaration gives the generated dot an empty
+ * text alternative where a browser supports it, and the first is what the others fall back to. It is the
+ * only visible cue that the number is the default, so it reads `--ink-mid` (4.5:1 and over on the
+ * surface in both themes) rather than `--ink-faint`, which is under that at this size. */
+.vv-stepper__note {
+  color: var(--ink-mid);
+  font-size: 10px;
+  font-weight: 500;
+}
+.vv-stepper__note::before {
+  content: '·\00a0';
+  content: '·\00a0' / '';
+}
+/* The action-row form: 29px of button inside the 1.5px border is the row's 32px (`h-8`), so a
+ * stepper beside a card's buttons lines up with them instead of standing 3px proud. */
+.vv-stepper--compact .vv-stepper__button { width: 28px; height: 29px; }
+.vv-stepper--compact .vv-stepper__value { min-width: 34px; font-size: 12px; line-height: 29px; }
 
 /* ---------------------------------------------------------------- Switch */
 .vv-switch {

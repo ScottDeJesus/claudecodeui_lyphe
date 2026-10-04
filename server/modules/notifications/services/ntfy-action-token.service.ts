@@ -13,7 +13,11 @@
  * tool use id of the ask), which a successor process re-issues the same
  * question under. The dev server hands over to a fresh process on every save,
  * and a parked question is re-asked by each of them — so a token minted before
- * a handover must still find its prompt on the other side of it.
+ * a handover must still find its prompt on the other side of it. A prompt that
+ * lives in a STORE (a plan's, raised by the dispatcher lane) does not wait for
+ * its re-issue: a tap that beats the successor's first raise is answered by
+ * asking the store what the prompt is (`unregisteredPromptOf`, then the act
+ * route's `recallApproval`) and registering it here before the token is spent.
  *
  * This file is the crypto and the bookkeeping only. It knows decision SHAPES
  * (`allow`, `deny`, `revise`, `opt:<n>`) and nothing about tools or what an
@@ -179,17 +183,12 @@ export function mintActionToken(promptKey: string, userId: string | number, deci
 }
 
 /**
- * Verifies a tapped token and, when it holds, spends it. Consumed by the act route.
- *
- * Checked in this order, so nothing an unsigned payload says is ever read:
- * shape (400) → signature over the raw payload segment (401) → payload fields
- * (400) → expiry and decision shape (401) → spent nonce, unknown prompt or a
- * different user (410). On success the nonce is recorded and the prompt
- * deleted BEFORE the caller acts on it, so a throw downstream can never leave
- * a reusable token behind. Each refusal also reports whether it was `forged` —
- * refused at or before the signature — which is the only kind the route counts.
+ * Everything a token proves by ITSELF, with no memory of this process consulted, in the order that
+ * keeps an unsigned payload unread: shape (400) → signature over the raw payload segment (401) →
+ * payload fields (400) → expiry and decision shape (401). Each refusal reports whether it was
+ * `forged` — refused at or before the signature — which is the only kind the route counts.
  */
-export function consumeActionToken(token: string): ConsumeResult {
+function verifyToken(token: string): { ok: true; payload: TokenPayload; now: number } | ConsumeRefusal {
   if (typeof token !== 'string' || token.length > MAX_TOKEN_CHARS) return refuse(400, 'malformed token', true);
   const segments = token.split('.');
   if (segments.length !== 2 || !segments[0] || !segments[1]) return refuse(400, 'malformed token', true);
@@ -204,6 +203,37 @@ export function consumeActionToken(token: string): ConsumeResult {
   const now = Date.now();
   if (payload.e <= now) return refuse(401, 'expired', false);
   if (!DECISION_PATTERN.test(payload.d)) return refuse(401, 'unknown decision', false);
+  return { ok: true, payload, now };
+}
+
+/**
+ * The prompt a genuine, live token names when THIS process has no such prompt registered — the shape
+ * of a tap that outlived the process that pushed it (a handover or a restart leaves the successor's
+ * registry empty until it raises the prompt itself) — or `null` for every other tap: forged, expired,
+ * already spent, or its prompt registered here. Spends nothing. Consumed by the act route, which asks
+ * the prompt's own store what it is and registers the answer before the token is spent.
+ */
+export function unregisteredPromptOf(token: string): { promptKey: string; userId: string; expiresAt: number } | null {
+  const checked = verifyToken(token);
+  if (!checked.ok) return null;
+  const { payload, now } = checked;
+  pruneExpired(now);
+  if (consumedNonces.has(payload.n) || pendingActions.get(payload.r)?.userId === payload.u) return null;
+  return { promptKey: payload.r, userId: payload.u, expiresAt: payload.e };
+}
+
+/**
+ * Verifies a tapped token and, when it holds, spends it. Consumed by the act route.
+ *
+ * Checked in this order, so nothing an unsigned payload says is ever read: what the token proves by
+ * itself (`verifyToken`) → spent nonce, unknown prompt or a different user (410). On success the nonce
+ * is recorded and the prompt deleted BEFORE the caller acts on it, so a throw downstream can never
+ * leave a reusable token behind.
+ */
+export function consumeActionToken(token: string): ConsumeResult {
+  const checked = verifyToken(token);
+  if (!checked.ok) return checked;
+  const { payload, now } = checked;
 
   pruneExpired(now);
   if (consumedNonces.has(payload.n)) return refuse(410, 'already answered', false);

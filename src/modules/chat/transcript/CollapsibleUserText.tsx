@@ -1,8 +1,10 @@
 import { useLayoutEffect, useRef, useState } from 'react';
-import type { ReactNode } from 'react';
+import type { ReactNode, RefObject } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ChevronDownIcon } from 'lucide-react';
 
+import { useHostWindow } from '@/shared/context/HostWindowContext';
+import { resizeObserverIn } from '@/shared/utils';
 import { useIsExportingTranscript } from '@/modules/chat/context/TranscriptRenderContext';
 
 /** Height a long turn folds to. */
@@ -16,6 +18,39 @@ const FOLD_OVER_PX = 320;
  * and the row would come back shorter than the placeholder that stood in for it.
  */
 const openedTurns = new Set<string>();
+
+/**
+ * Watches one turn's box and reports whether it is long enough to fold. Rendered only while the
+ * live transcript is on screen: the export document goes through `renderToStaticMarkup`, and
+ * React's server renderer warns about `useLayoutEffect` being CALLED there, whatever the effect
+ * then does — so a guard inside the effect body cannot silence it, and the hook has to be kept
+ * out of the exported tree altogether. (Measured 2026-09-25: with the body guarded, the warning
+ * still came back naming this component, once per long turn, in the console of whoever exports.)
+ * Mounting it as a sibling is safe: the measured box is the ref'd div, which is above it and
+ * already committed by the time effects run.
+ */
+function FoldMeasurement({
+  contentRef,
+  onMeasure,
+}: {
+  contentRef: RefObject<HTMLDivElement | null>;
+  onMeasure: (isLong: boolean) => void;
+}) {
+  // The observer is built by the constructor of the window the turn is drawn in: it delivers on
+  // that window's frames, and a hidden opener draws none. A move builds a new one.
+  const hostWindow = useHostWindow();
+  useLayoutEffect(() => {
+    const element = contentRef.current;
+    if (!element) return undefined;
+    const measure = () => onMeasure(element.scrollHeight > FOLD_OVER_PX);
+    measure();
+    const observer = resizeObserverIn(hostWindow, measure);
+    observer?.observe(element);
+    return () => observer?.disconnect();
+  }, [contentRef, onMeasure, hostWindow]);
+
+  return null;
+}
 
 type CollapsibleUserTextProps = {
   turnKey: string;
@@ -33,16 +68,6 @@ export default function CollapsibleUserText({ turnKey, children }: CollapsibleUs
   const contentRef = useRef<HTMLDivElement | null>(null);
   const [isLong, setIsLong] = useState(false);
   const [isOpen, setIsOpen] = useState(() => openedTurns.has(turnKey));
-
-  useLayoutEffect(() => {
-    const element = contentRef.current;
-    if (!element) return undefined;
-    const measure = () => setIsLong(element.scrollHeight > FOLD_OVER_PX);
-    measure();
-    const observer = new ResizeObserver(measure);
-    observer.observe(element);
-    return () => observer.disconnect();
-  }, []);
 
   const isFolded = isLong && !isOpen && !isExporting;
 
@@ -65,6 +90,7 @@ export default function CollapsibleUserText({ turnKey, children }: CollapsibleUs
       >
         <div ref={contentRef}>{children}</div>
       </div>
+      {!isExporting && <FoldMeasurement contentRef={contentRef} onMeasure={setIsLong} />}
       {isLong && !isExporting && (
         <button
           type="button"

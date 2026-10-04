@@ -98,8 +98,8 @@ function requireApprovable(row: KanbanCardRow): void {
  *
  * EVERY write here goes through `writeKanban` — no verb in this file opens a transaction, appends
  * an audit row or sends a frame — and every one threads `context?.actor` into the seam, so an
- * audit row's actor is `'operator'` today and an adapter's own tomorrow without a signature
- * moving. A verb that needs two writes to be atomic does both inside ONE `mutate` callback.
+ * audit row's actor is the caller's own (`'metis'` through the Metis door, `'operator'` when the
+ * route stamped none) without a signature moving. A verb that needs two writes to be atomic does both inside ONE `mutate` callback.
  *
  * Consumers: `routes/detail.routes.ts`, `kanban-cards.service.ts`'s `getCard`, and the barrel,
  * which is how a future in-process MCP adapter calls the same verbs.

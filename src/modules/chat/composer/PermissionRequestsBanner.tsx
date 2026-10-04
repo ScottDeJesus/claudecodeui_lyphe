@@ -31,7 +31,7 @@ export default function PermissionRequestsBanner({
 }: PermissionRequestsBannerProps) {
   const { t } = useTranslation('chat');
 
-  // Plan and question prompts are answered inline in the transcript — PlanDisplay and
+  // Plan and question prompts a run raised are answered inline in the transcript — PlanDisplay and
   // QuestionAnswerContent — so they are not offered a second time here.
   const filteredRequests = pendingPermissionRequests.filter(
     (r) => r.toolName !== 'ExitPlanMode' && r.toolName !== 'exit_plan_mode' && r.toolName !== 'AskUserQuestion'

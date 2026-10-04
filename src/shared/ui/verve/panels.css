@@ -1,0 +1,84 @@
+/* Verve panel paint — the rules for the form pieces that do not fit the first two sheets.
+ *
+ * The fifth paint file, opened rather than squeezed in: controls.css is past its stated ceiling,
+ * feedback.css is at it, surfaces.css belongs to the three kit pieces that are mechanism, and
+ * board.css to the board. README rule 6: the next file opens the same way again.
+ *
+ * Same contract as its siblings. A library class string carries `vv-<name>` plus layout utilities
+ * and nothing else; colour comes from tokens.css and nowhere else; no rule declares a `--tone-*`
+ * property.
+ *
+ * ONE departure from "a piece carries its own paint": `.vv-textarea` invents none. A textarea's
+ * border, ground, focus ring and amber invalid border are `.vv-input`'s (controls.css) — TextArea.tsx
+ * carries both classes — because a second spelling of a field's paint is how two fields in one dialog
+ * come to disagree by a shade. This file holds the geometry an input does not have, and says
+ * `.vv-input`'s own colours and ground back where src/index.css's rules for a bare `textarea`
+ * override them.
+ *
+ * Imported once, for side effect, from src/shared/ui/index.ts — after surfaces.css and before
+ * board.css, which keeps the last word. Nothing here depends on its place against controls.css or
+ * against src/index.css, which lands after this sheet: whatever has to beat `.vv-input`, a utility
+ * in the class string or one of index.css's pins does so on specificity.
+ */
+
+/* ---------------------------------------------------------------- TextArea */
+/* Line height and the floor are Verve's own (`_ds_bundle.js`, TextArea: 1.55 and 88px). The handle
+ * is vertical only: a sideways drag would push a dialog's field out past its Field's column.
+ * Two classes, because TextArea's `text-sm` carries a 1.25rem line height of its own at ONE class,
+ * and Tailwind's sheet lands after this one — at one class the utility won on order and the field
+ * measured 20px lines, not 1.55 x 14px. */
+.vv-input.vv-textarea {
+  line-height: 1.55;
+  min-height: 88px;
+  resize: vertical;
+}
+
+/* The house ring (`button:focus-visible, input:focus-visible, a:focus-visible, …`, tokens.css) names
+ * `input` and not `textarea`, so a focused TextArea drew the browser's own dark outline where Input
+ * draws the accent one. The same two lines, for this piece only: widening the house rule would reach
+ * the chat composer's textarea, which has its own. */
+.vv-textarea:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* The other place this piece paints, and it paints back. src/index.css pins EVERY bare `textarea` to
+ * gray-100 text, a gray-100 text fill and caret, and gray-400 / gray-600 placeholders, all
+ * `!important` (the chat composer's fixes, written before the tokens). Left alone they beat
+ * `.vv-input` and a TextArea stops sharing Input's paint. Measured 2026-10-03: in dark the
+ * placeholder is 2.3:1 where Input's is 7.5:1, and because the placeholder inherits the pinned text
+ * FILL it paints as bright as typed text, so an empty field reads as a filled one. `!important`
+ * only loses to `!important` by specificity, so each rule here has three class-level parts: the
+ * highest pin on the field itself is (0,2,1) — `.dark .bg-gray-800 textarea`, `.dark
+ * textarea.bg-transparent`, and `.dark textarea:focus` — and the highest on its placeholder (0,2,2),
+ * which (0,3,1) clears because the class column is compared first. The repeated `.vv-textarea` is the
+ * idiom for that bump, not a typo, and it makes these rules cover a field inside a `bg-gray-800`
+ * wrapper or given `bg-transparent`, which two classes did not. */
+.vv-input.vv-textarea.vv-textarea {
+  color: var(--ink) !important;
+  -webkit-text-fill-color: var(--ink) !important;
+  caret-color: var(--ink) !important;
+}
+.vv-input.vv-textarea.vv-textarea::placeholder {
+  color: var(--ink-muted) !important;
+  -webkit-text-fill-color: var(--ink-muted) !important;
+  opacity: 1 !important;
+}
+.vv-input.vv-textarea.vv-textarea:disabled {
+  color: var(--ink-faint) !important;
+  -webkit-text-fill-color: var(--ink-faint) !important;
+}
+
+/* The ground, answered only where it is pinned: iOS and Safari, under the same `@supports` index.css
+ * uses, which sets `.dark textarea` and `.dark textarea:focus` to a transparent ground with
+ * `!important` — so there a dark TextArea lost `Input`'s `--surface` (and a disabled one its
+ * `--surface2`). `:not(.bg-transparent)` leaves a caller's own transparent ground its say, which is
+ * the library's rule for a className (MAN-740 rule 2). */
+@supports (-webkit-touch-callout: none) {
+  .vv-input.vv-textarea.vv-textarea:not(.bg-transparent) {
+    background-color: var(--surface) !important;
+  }
+  .vv-input.vv-textarea.vv-textarea:not(.bg-transparent):disabled {
+    background-color: var(--surface2) !important;
+  }
+}

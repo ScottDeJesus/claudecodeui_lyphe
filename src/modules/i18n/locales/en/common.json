@@ -25,12 +25,13 @@
     "tasks": "Tasks",
     "browser": "Browser",
     "memory": "Memory",
-    "runner": "Runner",
+    "runner": "Roadmap",
     "heal": "Heal",
     "api": "API",
     "kanban": "Kanban",
     "universe": "Universe",
     "schedules": "Schedules",
+    "notes": "Notes",
     "project": "This project",
     "house": "The house",
     "more": "More views"
@@ -51,17 +52,20 @@
       "athenaClean": "Athena · clean",
       "athenaPending": "Athena · not yet",
       "by": "Fired by {{reason}} · built by {{builder}}",
-      "classes": "Cause classes claimed:",
       "closed": "{{count}} rows closed",
-      "costTitle": "What the chain cost",
+      "costTitle": "DeepSeek’s share of this heal — what the daily cap counts, never the chain’s whole bill. The tokens beside it are the chain’s Claude souls’ own work — a vendor’s tokens are its own business, so a heal only DeepSeek walked draws none",
+      "costTitleOld": "Booked before 2026-09-23, when a heal booked its chain’s WHOLE bill: the Claude stages in this number were your subscription, not DeepSeek — though the daily cap counts them as DeepSeek all the same",
+      "costTitleUnbooked": "Nothing booked yet — a heal books its cost when it ends",
       "empty": {
         "message": "A cycle fires them — nightly on the schedule, or Run a cycle now.",
         "title": "No heal has run yet"
       },
       "ended": "ended {{ago}}",
-      "noClasses": "none yet",
+      "moreShapes": "+{{count}} more",
+      "noShapes": "none yet",
       "openBrief": "Open brief",
       "quiet": "quiet after landing",
+      "shapes": "Shapes claimed:",
       "spike": "↑ {{count}} filed after landing",
       "title": "Heals"
     },
@@ -86,7 +90,7 @@
       "ignoredOne": "ignored",
       "live": "{{count}} live",
       "noTranscript": "no transcript",
-      "regression": "⚠ regression · {{klass}} came back {{ago}}",
+      "regression": "⚠ regression · {{signature}} came back {{ago}}",
       "soul": "soul",
       "title": "Friction by kind",
       "toggle": "Show the rows of {{kind}}",
@@ -116,17 +120,13 @@
       "noCapOnClaude": "no cap on Claude",
       "noHeal": "none yet",
       "noHealTitle": "No heal has run",
-      "spend": "Today",
-      "spendTitle": "Heal spend today against the daily cap",
-      "spendTitleClaude": "DeepSeek heal spend today. These heals run on Claude — your subscription — so the daily cap counts none of it and closes nothing."
-    },
-    "queue": {
-      "empty": "The runner’s queue is empty.",
-      "next": "next: {{next}}",
-      "noNext": "no next step named",
-      "phase": "phase {{phase}}",
-      "readOnly": "read-only",
-      "title": "Runner heal queue — the second door"
+      "spend": "DeepSeek today",
+      "spendMixed": "Heal spend today",
+      "spendNoteMixed": "Not DeepSeek’s dollars alone: the rows booked before 2026-09-23 booked their chain’s whole bill, Claude stages included, and the daily cap counts them all the same.",
+      "spendTitle": "DeepSeek heal spend today against the daily cap",
+      "spendTitleClaude": "DeepSeek heal spend today. These heals run on Claude — your subscription — so the daily cap counts none of it and closes nothing.",
+      "spendTitleReserved": "DeepSeek heal spend today: {{spent}} landed, {{reserved}} reserved for the heals still walking. The daily cap weighs both.",
+      "spendTitleUnknown": "DeepSeek heal spend today against the daily cap. The worker named no reserved figure, so the heals still walking are not in this number."
     },
     "reading": "Reading the friction ledger…",
     "settings": {
@@ -162,10 +162,10 @@
       "nightly": "Nightly",
       "openCaption": "A cycle is open — End cycle lets running heals finish and starts nothing new",
       "pill": "Cycle",
-      "pillOffTitle": "No cycle opens on its own; Run a cycle now opens one",
+      "pillOffTitle": "The nightly schedule is off; Run a cycle now opens one",
       "pressed": "Pressed",
       "refusedEntry": "ignore refused",
-      "spentTitle": "DeepSeek dollars this cycle spent",
+      "spentTitle": "DeepSeek dollars this cycle spent — a heal that landed before 2026-09-23 booked its chain’s whole bill, Claude stages included, so a cycle spanning that date counts more than DeepSeek billed",
       "startCaption": "Chiron ranks the live friction, then heals walk his list",
       "title": "Cycles",
       "toggle": "Show the worklist of the {{door}} cycle started {{ago}}",
@@ -173,11 +173,11 @@
     },
     "schedule": {
       "hourDown": "One hour earlier",
-      "hourLabel": "Hour the nightly cycle opens, UTC",
+      "hourLabel": "Hour of the day’s slot, UTC",
       "hourUp": "One hour later",
       "label": "Nightly maintenance cycle",
-      "off": "Off: only Run a cycle now opens one. On, a cycle opens every day at the hour beside it, once the box is quiet.",
-      "on": "Every day at {{slot}} a cycle opens on its own: Chiron ranks what hurt over the last two weeks, and heals walk his list one after another. It waits for a quiet box — nothing opens beside a walking run. Takes effect at the next slot."
+      "off": "Off: only Run a cycle now opens one. On, a cycle opens every day at the hour beside it, unless one is still open.",
+      "on": "Every day at {{slot}} a cycle opens on its own: Chiron ranks what hurt over the last two weeks, and heals walk his list one after another. It runs beside whatever else is walking. Takes effect at the next slot."
     }
   },
   "jev": {
@@ -332,6 +332,7 @@
       },
       "unmapped": "unmapped",
       "unmappedLine": "no description yet — add it to the Jev consumer map",
+      "retired": "retired",
       "never": "never",
       "ago": "{{ago}} ago",
       "empty": "No caller is known yet"
@@ -343,6 +344,75 @@
       "deepseek": "DeepSeek"
     },
     "subtabsLabel": "API services"
+  },
+  "agentLaunch": {
+    "title": "Agent Chains",
+    "reload": "Read the launch table again",
+    "reading": "Reading the launch table…",
+    "unreadable": {
+      "title": "The launch table could not be read",
+      "retry": "Try again"
+    },
+    "reach": "Chains, the dispatcher and Metis take a change at their next launch. Agent calls read their definitions once per session, so a change reaches them in new sessions only.",
+    "defaults": {
+      "title": "Defaults",
+      "hint": "what a launch runs at when its row pins nothing",
+      "model": "Default model",
+      "effort": "Default effort",
+      "effortFor": "{{model}} effort",
+      "none": "None · the CLI’s own ({{effort}})",
+      "noneBare": "None · the CLI’s own",
+      "deepseek": "DeepSeek effort",
+      "deepseekHint": "DeepSeek maps xhigh to high; only max raises it",
+      "saving": "Saving…",
+      "notSaved": "not saved"
+    },
+    "souls": {
+      "title": "Souls",
+      "pinned_one": "{{count}} pinned",
+      "pinned_other": "{{count}} pinned"
+    },
+    "metis": {
+      "title": "Metis"
+    },
+    "row": {
+      "model": "Model",
+      "effort": "Effort",
+      "pinned": "pinned",
+      "defaultOf": "Default · {{value}}",
+      "noFlag": "no flag",
+      "saving": "Saving…",
+      "shimBehind": "shim behind",
+      "modelLabel": "{{name}} model",
+      "effortLabel": "{{name}} effort",
+      "more": "Show more",
+      "less": "Show less",
+      "notSaved": "not saved"
+    },
+    "lanes": {
+      "agent": "Agent call",
+      "dispatcher": "Dispatcher",
+      "chain": "Chain",
+      "metis": "Metis",
+      "newSession": "new session",
+      "claude": "Claude",
+      "deepseek": "DeepSeek"
+    },
+    "warnings": {
+      "absent": "There is no launch table yet, so every launch runs at the shipped values. The next save creates the file.",
+      "malformed": "The launch table could not be read, so every launch runs at the shipped values. A save is refused until the file is fixed.",
+      "problems": "The table read with problems:",
+      "regen": "The table is saved, but the shims did not regenerate: {{said}}",
+      "shims_one": "{{count}} shim is behind the table:",
+      "shims_other": "{{count}} shims are behind the table:",
+      "shimLine": "{{name}}: the shim says {{shim}}, the table says {{table}}"
+    },
+    "refused": {
+      "notSaved": "Not saved — the launch table refused it:",
+      "notSavedRow": "Not saved — the launch table refused the change to {{name}}:",
+      "notSavedDefaults": "Not saved — the launch table refused the change to the defaults:",
+      "notRead": "The launch table could not be read again:"
+    }
   },
   "deepseekUsage": {
     "title": "DeepSeek",
@@ -513,7 +583,7 @@
       "noBoard": "No board",
       "autonomy": "Autonomy",
       "deepseekFlash": "DeepSeek Flash",
-      "deepseekFlashTooltip": "Puts this board's Metis, and every plan runner she starts, on DeepSeek Flash.",
+      "deepseekFlashTooltip": "Puts this board's Metis, and every runner she starts, on DeepSeek Flash.",
       "newBoard": "New board",
       "rename": "Rename",
       "archive": "Archive",
@@ -743,133 +813,524 @@
     }
   },
   "runner": {
-    "title": "Runner",
-    "empty": "Nothing is running",
-    "phases": "Phases",
-    "pipeline": "Pipeline",
-    "phaseCount_one": "{{count}} phase",
-    "phaseCount": "{{count}} phases",
-    "lanesAtOnce": "{{count}} phases at once",
-    "wave": "wave {{n}}",
-    "waveAlongside": "runs alongside {{phases}}",
-    "wavePhase": "Phase {{phase}}",
-    "spawns": "spawns {{used}}/{{max}}",
-    "planSpend_one": "{{spawns}} spawns · ${{cost}} across {{count}} run",
-    "planSpend": "{{spawns}} spawns · ${{cost}} across {{count}} runs",
-    "thisRun": "this run {{used}}/{{max}}",
-    "more": "+{{count}} more in Runner",
+    "title": "In flight",
+    "empty": "Nothing in flight",
+    "waiting_one": "{{count}} waiting for you",
+    "waiting_other": "{{count}} waiting for you",
     "stop": "Stop",
     "resume": "Resume",
     "start": "Start",
-    "queuedUntil": "DeepSeek peak until {{time}}",
-    "queuedWindowClosed": "peak window closed at {{time}} — ready to start",
-    "queuedManual": "queued — not started",
-    "state": {
-      "live": "LIVE",
-      "paused": "PAUSED",
-      "queued": "QUEUED",
-      "stale": "STALE"
-    },
-    "phase": {
-      "shipped": "shipped",
-      "running": "running",
-      "blocked": "blocked",
-      "deferred": "deferred",
-      "pending": "pending"
-    },
-    "timeline": {
-      "empty": "Nothing logged for this phase yet."
-    },
+    "collapse": "Collapse",
+    "expand": "Expand",
     "toast": {
-      "stopping": "stopping — the runner was asked to park this run",
-      "resumed": "resumed — the run is moving again",
-      "model": "model set — the next phase goes where this says",
-      "scheduled": "scheduled — the watchdog presses Start at that time",
-      "unscheduled": "scheduled start cancelled",
-      "arcStarted": "arc started — card 1 is on its way"
+      "model": "model set — the next task goes where this says"
     },
-    "dismiss": "Dismiss",
     "ended": "ended {{elapsed}} ago",
-    "outcome": {
-      "complete": "COMPLETE",
-      "halted": "HALTED",
-      "all-blocked": "ALL BLOCKED",
-      "budget": "BUDGET",
-      "flag-off": "FLAG OFF",
-      "dry-run": "DRY RUN",
-      "unknown": "ENDED",
-      "incomplete": "INCOMPLETE"
-    },
-    "planTotal": "plan ${{total}}",
-    "planSplit_one": "planning ${{planning}} · review ${{review}} · scouts ${{scouts}} · build ${{build}} in {{count}} run",
-    "planSplit": "planning ${{planning}} · review ${{review}} · scouts ${{scouts}} · build ${{build}} in {{count}} runs",
+    "paid": "${{usd}} {{vendor}}",
+    "usage": "{{in}} in · {{out}} out",
     "tokens": "⛁ {{n}} tok",
-    "repair": {
-      "repairing": "Repairing Phase {{phase}}",
-      "fixed": "Repair finished — Phase {{phase}} unblocked, running again",
-      "healed": "Heal finished — the cause behind Phase {{phase}}'s block is cured",
-      "cured": "Heal finished — the cause is cured; Phase {{phase}} stays blocked until its spec changes",
-      "failed": "Repair finished — Phase {{phase}} is still blocked",
-      "attempt": "attempt {{k}} of {{limit}}",
-      "step": {
-        "unblock": "a fix-it session is working on it",
-        "unblock-review": "Athena is reviewing the fix",
-        "unblock-fix": "applying the review's fixes",
-        "guard": "checking nothing it may not touch moved",
-        "stamp": "recording the result",
-        "heal": "a heal session is curing the cause",
-        "heal-review": "Athena is reviewing the heal",
-        "heal-fix": "applying the review's fixes",
-        "close": "merging the plan repair",
-        "measuring": "re-running the phase's checks for fresh evidence",
-        "replanning": "Odysseus is rewriting the phase"
-      },
-      "paused": "Repair of Phase {{phase}} paused — it resumes with the run",
-      "pausedHeal": "Heal of Phase {{phase}} is waiting for the heal drain",
-      "ended": "finished {{elapsed}} ago",
-      "replanning": "Replanning Phase {{phase}}",
-      "pausedReplan": "Replan of Phase {{phase}} paused — it resumes with the run"
-    },
-    "arcs": "Arcs",
-    "arcCards": "{{done}} of {{total}} done",
-    "arcCard": "Card {{n}}",
-    "arcWalking": "walking",
-    "arcStalled": "stalled",
-    "arcComplete": "complete",
-    "arcNotStarted": "not started",
-    "arcQueued": "queued",
-    "arcPaused": "paused",
-    "arcDragHint": "drag a card the runner has not started to change its place",
-    "arcViewing": "Card {{n}} of {{total}}",
-    "arcPrevious": "Previous card",
-    "arcNextCard": "Next card",
+    "soulBlocked": "DeepSeek refused or never answered — nothing ran on Claude",
     "arcStrip": "Cards of {{title}}",
-    "arcNoPhases": "Plan not written yet",
-    "arcMorePhases": "+{{n}} more",
-    "arcFewerPhases": "Show fewer",
     "model": {
-      "label": "Model for this run’s builders",
-      "arcLabel": "Model for every card in this arc",
       "deepseek": "DeepSeek",
       "claude": "Claude",
       "auto": "Chat switch",
-      "deepseekTitle": "Send this run’s builders to DeepSeek Flash from its next phase, whatever the chat’s switch says. A phase already building keeps the model it started on.",
-      "claudeTitle": "Send this run’s builders to Claude from its next phase, whatever the chat’s switch says. A phase already building keeps the model it started on.",
-      "autoTitle": "Follow the chat’s DeepSeek switch from its next phase, instead of the runner’s DeepSeek default.",
-      "arcDeepseekTitle": "Every card of this arc sends its builders to DeepSeek Flash — the card walking now from its next phase.",
-      "arcClaudeTitle": "Every card of this arc sends its builders to Claude — the card walking now from its next phase.",
-      "arcAutoTitle": "Every card of this arc follows the chat’s DeepSeek switch.",
       "refused": "Model not set"
     },
     "schedule": {
       "label": "Scheduled start",
       "startAt": "Start at {{time}}",
+      "resumeAt": "Resume at {{time}}",
       "cancel": "Cancel",
       "starts": "starts {{time}}",
-      "runTitle": "Start this run when DeepSeek’s daily peak lifts — the watchdog presses Start at that time, within two minutes",
-      "arcTitle": "Start this arc when DeepSeek’s daily peak lifts — the watchdog presses Start at that time, within two minutes",
       "cancelTitle": "Cancel the scheduled start; nothing starts until Start is pressed",
       "refused": "Schedule"
+    }
+  },
+  "roadmap": {
+    "faces": {
+      "label": "Roadmap view",
+      "path": "Roadmap",
+      "inFlight": "In flight"
+    },
+    "loading": "Reading the roadmap…",
+    "kind": {
+      "epic": "Epic",
+      "feature": "Feature"
+    },
+    "word": {
+      "idea": "Idea",
+      "proposed": "Proposed",
+      "designing": "Designing",
+      "inFlight": "In flight",
+      "shipped": "Shipped"
+    },
+    "step": {
+      "idea": "not proposed yet",
+      "proposed": "lined up for design",
+      "designing": "being designed",
+      "questions": "waiting on you: answer its questions",
+      "cutting": "being cut into tasks",
+      "accept": "waiting on you: Accept",
+      "parked": "set aside",
+      "building": "building",
+      "waiting": "waiting on {{title}}",
+      "waitingOnAnother": "waiting on another feature",
+      "queued": "queued for its Start",
+      "paused": "paused",
+      "starting": "starting",
+      "shipped": "shipped {{date}}",
+      "shippedUndated": "shipped"
+    },
+    "stateLine": "{{word}} — {{phrase}}",
+    "blocked": "Blocked: {{why}}",
+    "epicWord": {
+      "empty": "No features yet",
+      "notStarted": "Not started",
+      "inProgress": "In progress",
+      "complete": "Complete"
+    },
+    "milestoneWord": {
+      "empty": "No epics yet",
+      "notStarted": "Not started",
+      "inProgress": "In progress",
+      "reached": "Reached"
+    },
+    "roadmapWord": {
+      "noPath": "No path yet",
+      "onTheWay": "On the way",
+      "allReached": "Every milestone reached"
+    },
+    "standing": {
+      "reached_one": "{{reached}} of {{count}} milestone reached",
+      "reached_other": "{{reached}} of {{count}} milestones reached",
+      "shipped_one": "{{count}} feature shipped",
+      "shipped_other": "{{count}} features shipped",
+      "inFlight_one": "{{count}} in flight",
+      "inFlight_other": "{{count}} in flight",
+      "next_one": "{{count}} up next",
+      "next_other": "{{count}} up next",
+      "blocked_one": "{{count}} blocked",
+      "blocked_other": "{{count}} blocked",
+      "waiting_one": "{{count}} waiting on you",
+      "waiting_other": "{{count}} waiting on you"
+    },
+    "rail": {
+      "label": "Waiting on you, in flight, next up and blocked",
+      "waiting": "Waiting on you",
+      "inFlight": "In flight",
+      "next": "Next up",
+      "blocked": "Blocked",
+      "more_one": "+{{count}} more",
+      "more_other": "+{{count}} more"
+    },
+    "goal": {
+      "missing": "Write where this roadmap leads",
+      "showAll": "Show all"
+    },
+    "empty": {
+      "none": "Start a roadmap",
+      "noneMessage": "A roadmap is the path to a goal: the milestones on the way, the epics that make each one, and their features.",
+      "noPath": "Draw the path: add the first milestone",
+      "nextMilestone": "Every milestone reached. Add the next one",
+      "noEpics": "No epics yet"
+    },
+    "picker": {
+      "new": "New roadmap…",
+      "label": "Roadmap",
+      "none": "No roadmap yet"
+    },
+    "menu": {
+      "editRoadmap": "Edit the goal and title",
+      "addMilestone": "Add a milestone",
+      "addEpic": "Add an epic",
+      "addFeature": "Add a feature",
+      "edit": "Edit",
+      "moveEarlier": "Move earlier",
+      "moveLater": "Move later",
+      "moveToMilestone": "Move to milestone…",
+      "markBlocked": "Mark blocked…",
+      "unblock": "Unblock",
+      "delete": "Delete…",
+      "actions": "Actions for {{title}}"
+    },
+    "path": {
+      "label": "Milestones on the way to the goal",
+      "goalFlag": "Goal",
+      "station": "Milestone {{n}}: {{title}} — {{word}}",
+      "wordBlocked": "{{word}}, blocked",
+      "blocked": "Blocked",
+      "reachedOn": "reached {{date}}",
+      "features_one": "{{shipped}} of {{count}} feature",
+      "features_other": "{{shipped}} of {{count}} features"
+    },
+    "milestone": {
+      "eyebrow": "Milestone {{n}} · {{word}}"
+    },
+    "epic": {
+      "count": "{{shipped}} of {{count}} shipped"
+    },
+    "feature": {
+      "waitingAccept": "Waiting on you: Accept",
+      "waitingQuestions": "Waiting on you: answer its questions",
+      "answer": "Answer",
+      "done": "Done",
+      "tasks_one": "{{done}} of {{count}} task",
+      "tasks_other": "{{done}} of {{count}} tasks"
+    },
+    "cases": {
+      "holding_one": "{{count}} case holding",
+      "holding_other": "{{count}} cases holding",
+      "broken_one": "{{count}} broken",
+      "broken_other": "{{count}} broken",
+      "regressed_one": "{{count}} regressed",
+      "regressed_other": "{{count}} regressed",
+      "cantRun_one": "{{count}} can't run",
+      "cantRun_other": "{{count}} can't run",
+      "notRunYet_one": "{{count}} case · {{notRun}} not run yet",
+      "notRunYet_other": "{{count}} cases · {{notRun}} not run yet",
+      "joined": "{{broken}}, {{regressed}}",
+      "epicHolding_one": "{{holding}} of {{count}} case holding",
+      "epicHolding_other": "{{holding}} of {{count}} cases holding",
+      "epicBroken_one": "{{count}} broken",
+      "epicBroken_other": "{{count}} broken",
+      "total_one": "{{count}} case",
+      "total_other": "{{count}} cases",
+      "allHolding": "all holding",
+      "headerBroken_one": "{{count}} broken",
+      "headerBroken_other": "{{count}} broken",
+      "heading": "Cases",
+      "lastRan": "Last ran {{when}}",
+      "saw": "It saw: {{saw}}",
+      "loading": "Reading its cases…",
+      "failed": "Its cases could not be read: {{reason}}",
+      "unanswered": "the dispatcher did not answer",
+      "word": {
+        "holding": "Holding",
+        "broken": "Broken",
+        "regressed": "Regressed",
+        "notRun": "Not run",
+        "cantRun": "Can't run"
+      }
+    },
+    "unplaced": {
+      "banner_one": "{{count}} not on a roadmap yet",
+      "banner_other": "{{count}} not on a roadmap yet",
+      "place": "Place…"
+    },
+    "dialog": {
+      "cancel": "Cancel",
+      "close": "Close",
+      "fence": {
+        "line": "One line of at most {{max}} characters",
+        "text": "At most {{max}} characters",
+        "dash": "A goal cannot be a single “-”"
+      },
+      "item": {
+        "addTitle": {
+          "roadmap": "New roadmap",
+          "milestone": "New milestone",
+          "arc": "New epic",
+          "plan": "New feature"
+        },
+        "editTitle": {
+          "roadmap": "Edit roadmap",
+          "milestone": "Edit milestone",
+          "arc": "Edit epic",
+          "plan": "Edit feature"
+        },
+        "addIn": "In {{title}}",
+        "title": "Title",
+        "goal": "Goal",
+        "goalHint": {
+          "roadmap": "Where this roadmap leads",
+          "milestone": "What reaching it means",
+          "arc": "What this epic is for",
+          "plan": "A bare title is enough for an idea",
+          "proposed": "A proposed feature keeps its goal. Put it back to idea to clear it"
+        },
+        "project": "Project",
+        "anotherFolder": "Another folder…",
+        "folderPath": "Folder",
+        "folderHint": "The full path, starting with /",
+        "folderAbsolute": "Start with /: the full path to the folder",
+        "folderLabel": "Project name",
+        "designOwns": "Its design owns these now",
+        "add": "Add",
+        "save": "Save",
+        "saveAndPropose": "Save and propose",
+        "saveAndPromote": "Save, then promote…"
+      },
+      "feature": {
+        "path": "{{epic}} · {{milestone}}",
+        "nameForClaude": "Name for Claude: <name>{{name}}</name>",
+        "waitsOn": "Waits on {{title}} — {{word}}",
+        "waitsOnAnother": "Waits on another feature",
+        "epicBlocked": "Its epic is blocked: {{why}}",
+        "milestoneBlocked": "Its milestone is blocked: {{why}}",
+        "noGoal": "Write its goal to propose or promote it",
+        "goal": "Goal",
+        "tasks": "Tasks",
+        "task": {
+          "done": "done",
+          "running": "running",
+          "notStarted": "not started"
+        },
+        "propose": "Propose",
+        "promote": "Promote",
+        "backToIdea": "Back to idea",
+        "edit": "Edit",
+        "editTitleProject": "Edit title and project",
+        "move": "Move…",
+        "markBlocked": "Mark blocked…",
+        "unblock": "Unblock",
+        "deleteIdea": "Delete idea…",
+        "delete": "Delete…",
+        "openCard": "Open its card",
+        "answerCard": "Answer on its card"
+      },
+      "promote": {
+        "title": "Send {{title}} to design?",
+        "message": "Eupalinos designs it, and you see its Accept before anything is built.",
+        "confirm": "Send to design"
+      },
+      "delete": {
+        "title": "Delete {{title}}?",
+        "message": {
+          "roadmap": "It holds no milestone, so nothing else goes with it.",
+          "milestone": "It holds no epic, so nothing else goes with it.",
+          "arc": "It holds no feature, so nothing else goes with it.",
+          "plan": "It leaves the roadmap for good. Nothing has been designed for it yet."
+        },
+        "confirm": "Delete"
+      },
+      "move": {
+        "title": "Move {{title}}",
+        "to": "Move to",
+        "choose": {
+          "plan": "Choose an epic",
+          "arc": "Choose a milestone",
+          "milestone": "Choose a roadmap"
+        },
+        "none": {
+          "plan": "There is no epic to move it to yet",
+          "arc": "There is no milestone to move it to yet",
+          "milestone": "There is no roadmap to move it to yet"
+        },
+        "epicIn": "{{milestone}} · {{epic}}",
+        "elsewhere": "{{roadmap}} · {{place}}",
+        "now": "Now in {{place}}",
+        "nowhere": "Not on a roadmap yet",
+        "placeTitle": "Place {{title}}",
+        "placeSubmit": "Place",
+        "where": "Where in it",
+        "top": "At the top",
+        "bottom": "At the bottom",
+        "submit": "Move"
+      },
+      "block": {
+        "title": "Why is it blocked?",
+        "reason": "Reason",
+        "hint": "One line, shown on the roadmap until you unblock it",
+        "save": "Mark blocked"
+      }
+    },
+    "dates": {
+      "created": "Added {{date}}",
+      "promoted": "Promoted {{date}}",
+      "approved": "Accepted {{date}}",
+      "shipped": "Shipped {{date}}"
+    },
+    "celebrate": {
+      "shipped": "Shipped",
+      "epicComplete": "Epic complete",
+      "milestoneReached": "Milestone reached",
+      "epics_one": "{{count}} epic",
+      "epics_other": "{{count}} epics",
+      "features_one": "{{count}} feature",
+      "features_other": "{{count}} features",
+      "catchUp_one": "{{count}} feature shipped while you were away",
+      "catchUp_other": "{{count}} features shipped while you were away",
+      "alsoReached_one": "{{titles}} was reached too",
+      "alsoReached_other": "{{titles}} were reached too",
+      "skip": "Skip",
+      "announce": {
+        "task": "{{title}}: a task done",
+        "feature": "{{title}} shipped",
+        "epic": "Epic complete: {{title}}",
+        "milestone": "Milestone reached: {{title}}"
+      }
+    },
+    "toast": {
+      "add": "{{title}} added",
+      "edit": "{{title}} saved",
+      "move": "{{title}} moved",
+      "propose": "{{title}} proposed",
+      "unpropose": "{{title}} is an idea again",
+      "block": "{{title}} marked blocked",
+      "unblock": "{{title}} unblocked",
+      "remove": "{{title}} deleted",
+      "promote": "{{title}} sent to design"
+    },
+    "widget": {
+      "open": "Open the roadmap",
+      "more_one": "+{{count}} more",
+      "more_other": "+{{count}} more",
+      "focus_one": "Milestone {{n}} · {{title}} · {{complete}} of {{count}} epic complete",
+      "focus_other": "Milestone {{n}} · {{title}} · {{complete}} of {{count}} epics complete",
+      "focusWord": "Milestone {{n}} · {{title}} · {{word}}",
+      "quiet": "Nothing waiting on you, in flight or next up"
+    }
+  },
+  "dispatcher": {
+    "ask": {
+      "waiting": "Waiting for your word",
+      "open": "Open",
+      "answered": "Answered — waiting for the dispatcher",
+      "notes": "Your notes — sent word for word",
+      "sendNotes": "Send notes",
+      "cancel": "Cancel",
+      "other": "Other…",
+      "otherPlaceholder": "Type your answer…",
+      "sendAnswers": "Send answers",
+      "word": "Answer",
+      "questionsStrip": "Questions of {{plan}}, one at a time"
+    },
+    "status": {
+      "live": "LIVE",
+      "paused": "PAUSED",
+      "queued": "QUEUED",
+      "scheduled": "SCHEDULED",
+      "parked": "PARKED",
+      "idle": "IDLE",
+      "complete": "COMPLETE"
+    },
+    "phase": {
+      "running": "running",
+      "done": "done",
+      "notStarted": "not started"
+    },
+    "settling": "settling",
+    "events_one": "{{count}} event",
+    "events": "{{count}} events",
+    "allPhases_one": "{{count}} task",
+    "allPhases": "All {{count}} tasks",
+    "flow": {
+      "name": "Tasks of {{plan}}",
+      "node": "Task {{position}} · {{title}} · {{word}}",
+      "caption": "{{done}} of {{total}} done",
+      "arc": "Features of {{arc}}",
+      "plan": "{{name}} · {{word}}",
+      "questions": "Questions of {{plan}}",
+      "question": "Question {{position}} · {{word}}",
+      "answered": "answered",
+      "unanswered": "not answered yet"
+    },
+    "pager": {
+      "plan": "Card {{n}} of {{total}}",
+      "previousPlan": "Previous card",
+      "nextPlan": "Next card",
+      "question": "Question {{n}} of {{total}}",
+      "previousQuestion": "Previous question",
+      "nextQuestion": "Next question"
+    },
+    "now": {
+      "next": "Next",
+      "more": "+{{count}} more"
+    },
+    "rounds_one": "{{count}} round",
+    "rounds": "{{count}} rounds",
+    "pill": {
+      "paid": "${{usd}}",
+      "paidTitle": "${{usd}} billed by {{vendor}}",
+      "in": "{{n}} in",
+      "cache": "({{pct}}% cache)",
+      "cacheTitle": "{{hit}} of the {{n}} tokens in were read from the prompt cache",
+      "out": "{{n}} out",
+      "tokens": "{{n}} tokens"
+    },
+    "noStages": "No stage has launched for this task yet.",
+    "arcPause": "Pause",
+    "arcScheduleStart": "Schedule start",
+    "scheduleTitle": "Start this feature when DeepSeek’s daily peak lifts — a one-shot timer sends Resume at that hour",
+    "resumeTitle": "Resume this feature when DeepSeek’s daily peak lifts — a one-shot timer sends Resume at that hour",
+    "arcScheduleTitle": "Start every feature of this epic that is not moving when DeepSeek’s daily peak lifts — one timer per feature, at the gate or stopped mid-walk alike, each pressing Start at that hour",
+    "park": "Park",
+    "unpark": "Unpark",
+    "plannerResume": "Resume planner",
+    "delete": {
+      "word": "Delete",
+      "menu": "Delete feature…",
+      "title": "Delete {{name}}?",
+      "message": "Deleting removes {{phases}} and {{events}} from the store for good.",
+      "message_design": "Deleting removes its design, {{phases}} and {{events}} from the store for good.",
+      "message_spent": "Deleting removes {{phases}}, {{events}} and its spend ({{spend}}) from the store for good.",
+      "message_designSpent": "Deleting removes its design, {{phases}}, {{events}} and its spend ({{spend}}) from the store for good.",
+      "phases_one": "{{count}} task",
+      "phases": "{{count}} tasks",
+      "events_one": "{{count}} event",
+      "events": "{{count}} events",
+      "arc": "It leaves the epic {{arc}} — the epic itself stands.",
+      "waiters_one": "{{names}} waits on it — that wait goes too, and it may start sooner.",
+      "waiters": "{{names}} wait on it — that wait goes too, and they may start sooner.",
+      "cancel": "Cancel",
+      "confirm": "Delete"
+    },
+    "waitsOn": "waits on {{names}}",
+    "dismissDone": "Dismiss done · {{count}}",
+    "plannersOut": "planners {{out}} of {{lanes}} out",
+    "dismiss": "Dismiss feature",
+    "dismissArc": "Dismiss epic",
+    "dismissDonePlans": "Dismiss done features · {{count}}",
+    "hide": "Hide feature",
+    "hideArc": "Hide epic",
+    "menu": "More actions",
+    "hidden": {
+      "title": "Hidden · {{count}}",
+      "show": "Show",
+      "showAll": "Show all",
+      "allHidden": "Every unfinished feature is hidden"
+    },
+    "kind": {
+      "epic": "Epic",
+      "feature": "Feature"
+    },
+    "arcStatus": {
+      "designing": "DESIGNING",
+      "judging": "JUDGING",
+      "live": "LIVE",
+      "complete": "COMPLETE",
+      "empty": "EMPTY",
+      "queued": "QUEUED",
+      "paused": "PAUSED",
+      "scheduled": "SCHEDULED"
+    },
+    "planner": {
+      "soul": {
+        "eupalinos": "Eupalinos",
+        "odysseus": "Odysseus"
+      },
+      "queued": "queued",
+      "designing": "designing",
+      "judging": "judging",
+      "cutting": "cutting",
+      "endedShort": "ended short",
+      "endedShortCause": "ended short: {{outcome}}"
+    },
+    "model": {
+      "planLabel": "Model for this feature’s builders",
+      "arcLabel": "Model for every feature of this epic"
+    },
+    "swarm": {
+      "hint": "How many of this feature's tasks walk at once. Step back to Settings → Agents' number to follow Settings again.",
+      "hintDefault": "How many of this feature's tasks walk at once. This number comes from Settings → Agents; step to another to give this feature its own, and back to follow Settings again.",
+      "default": "default",
+      "all": "All",
+      "lanesLabel": "Most of this feature's tasks at once",
+      "lanesDown": "One task fewer at once",
+      "lanesUp": "One task more at once",
+      "refused": "Swarm not set",
+      "done": "Swarm set — the next take-up reads it"
     }
   },
   "navigation": {
@@ -1094,12 +1555,23 @@
       "closeSidebar": "Close sidebar"
     }
   },
+  "lightbox": {
+    "close": "Close preview",
+    "zoomIn": "Zoom in",
+    "zoomOut": "Zoom out",
+    "fit": "Fit to screen"
+  },
   "shapes": {
-    "diagramFailed": "This diagram could not be drawn — showing its source."
+    "diagramFailed": "This diagram could not be drawn — showing its source.",
+    "diagram": "Diagram",
+    "diagramOpen": "Open diagram full screen"
   },
   "gutters": {
     "runner": {
       "title": "Runs"
+    },
+    "roadmap": {
+      "title": "Roadmap"
     },
     "memory": {
       "title": "Memory",
@@ -1131,6 +1603,9 @@
       "open": "Open the page in a new tab",
       "rejected": "That is not an http:// or https:// address"
     },
+    "notes": {
+      "title": "Notes"
+    },
     "open": "Open {{name}}",
     "collapse": "Collapse",
     "dragHint": "Drag to either side",
@@ -1141,8 +1616,28 @@
     "fullscreen": "Fullscreen",
     "exitFullscreen": "Leave fullscreen"
   },
+  "notes": {
+    "title": "Notes",
+    "reading": "reading…",
+    "unreachable": "Your notes could not be read right now.",
+    "retry": "Try again",
+    "empty": { "title": "No notes yet", "message": "Write the first one in the card above." },
+    "form": { "title": "Title", "description": "Description", "descriptionPlaceholder": "Write a note…", "add": "Add note", "save": "Save", "cancel": "Cancel" },
+    "card": { "edit": "Edit {{title}}", "delete": "Delete {{title}}" },
+    "delete": { "title": "Delete this note?", "message": "\"{{title}}\" will be gone for good.", "confirm": "Delete", "cancel": "Keep it" },
+    "toast": { "saveFailed": "That note could not be saved", "deleteFailed": "That note could not be deleted" }
+  },
   "applications": {
-    "fabLabel": "Applications",
+    "fabLabelMenu": "Open the menu",
+    "fabLabelCollapse": "Collapse chat",
+    "radialLabel": "Quick actions",
+    "fabUnread": "Your turn: a reply or run is waiting for you",
+    "actChat": "Chat",
+    "actCollapseChat": "Collapse chat",
+    "actApplications": "Apps",
+    "actReload": "Reload app",
+    "actClose": "Close app",
+    "actOpenInTab": "Open in tab",
     "heading": "Your <em>apps</em>",
     "closeDrawer": "Close",
     "close": "Close all",
@@ -1161,6 +1656,10 @@
     "closeDual": "Close dual screen",
     "editDescription": "Edit description",
     "descriptionLabel": "Description of {{name}}",
+    "linkProject": "Link project…",
+    "noProject": "No project",
+    "projectLabel": "Project of {{name}}",
+    "projectUnknown": "No project at this path",
     "moveUp": "Move up",
     "moveDown": "Move down",
     "addDivider": "Add divider",
@@ -1197,5 +1696,29 @@
     "appearanceLight": "Light appearance",
     "appearanceDark": "Dark appearance",
     "divider": "Resize applications"
+  },
+  "chatHost": {
+    "panelLabel": "Floating chat",
+    "collapse": "Collapse chat",
+    "resize": "Resize chat",
+    "panelTitle": "Chat is in the floating panel",
+    "panelMessage": "It's open over your work.",
+    "windowTitle": "Chat is in its own window",
+    "windowMessage": "It stays on top of your other windows.",
+    "bringBack": "Bring it back",
+    "pickerTitle": "Switch conversation",
+    "pickerList": "Conversations",
+    "pickerEmpty": "No conversations yet. Start one with New chat.",
+    "pickerLoading": "Loading conversations",
+    "pickerError": "Could not load conversations"
+  },
+  "gitPanel": {
+    "lastPushed": "Last pushed {{when}}",
+    "neverPushed": "Not pushed from here yet",
+    "age": {
+      "justNow": "just now",
+      "minutesAgo": "{{count}}m ago",
+      "hoursAgo": "{{count}}h ago"
+    }
   }
 }

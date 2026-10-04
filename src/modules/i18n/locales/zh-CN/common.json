@@ -331,12 +331,27 @@
       "closeSidebar": "关闭侧边栏"
     }
   },
+  "lightbox": {
+    "close": "关闭预览",
+    "zoomIn": "放大",
+    "zoomOut": "缩小",
+    "fit": "适应屏幕"
+  },
   "shapes": {
-    "diagramFailed": "无法绘制此图表，已显示其源代码。"
+    "diagramFailed": "无法绘制此图表，已显示其源代码。",
+    "diagram": "图表",
+    "diagramOpen": "全屏打开图表"
+  },
+  "runner": {
+    "collapse": "收起",
+    "expand": "展开"
   },
   "gutters": {
     "runner": {
       "title": "运行"
+    },
+    "roadmap": {
+      "title": "路线图"
     },
     "memory": {
       "title": "记忆",
@@ -368,6 +383,9 @@
       "open": "在新标签页中打开页面",
       "rejected": "这不是 http:// 或 https:// 地址"
     },
+    "notes": {
+      "title": "笔记"
+    },
     "open": "打开 {{name}}",
     "collapse": "折叠",
     "dragHint": "拖到任意一侧",
@@ -379,7 +397,16 @@
     "exitFullscreen": "退出全屏"
   },
   "applications": {
-    "fabLabel": "应用",
+    "fabLabelMenu": "打开菜单",
+    "fabLabelCollapse": "收起聊天",
+    "radialLabel": "快捷操作",
+    "fabUnread": "轮到你了：有回复或运行在等你",
+    "actChat": "聊天",
+    "actCollapseChat": "收起聊天",
+    "actApplications": "应用",
+    "actReload": "重新加载应用",
+    "actClose": "关闭应用",
+    "actOpenInTab": "在标签页打开",
     "heading": "我的<em>应用</em>",
     "closeDrawer": "关闭",
     "close": "全部关闭",
@@ -396,6 +423,10 @@
     "closeDual": "关闭双屏",
     "editDescription": "编辑描述",
     "descriptionLabel": "{{name}} 的描述",
+    "linkProject": "关联项目…",
+    "noProject": "无项目",
+    "projectLabel": "{{name}} 的项目",
+    "projectUnknown": "此路径下没有项目",
     "moveUp": "上移",
     "moveDown": "下移",
     "addDivider": "添加分隔线",
@@ -432,5 +463,29 @@
     "appearanceLight": "浅色外观",
     "appearanceDark": "深色外观",
     "divider": "调整应用大小"
+  },
+  "chatHost": {
+    "panelLabel": "悬浮聊天",
+    "collapse": "收起聊天",
+    "resize": "调整聊天大小",
+    "panelTitle": "聊天在悬浮面板中",
+    "panelMessage": "它显示在你的工作内容之上。",
+    "windowTitle": "聊天在独立窗口中",
+    "windowMessage": "该窗口会保持在其他窗口之上。",
+    "bringBack": "移回",
+    "pickerTitle": "切换对话",
+    "pickerList": "对话",
+    "pickerEmpty": "还没有对话。点击“新建对话”开始。",
+    "pickerLoading": "正在加载对话",
+    "pickerError": "无法加载对话"
+  },
+  "gitPanel": {
+    "lastPushed": "上次推送 {{when}}",
+    "neverPushed": "尚未从此处推送",
+    "age": {
+      "justNow": "刚刚",
+      "minutesAgo": "{{count}} 分钟前",
+      "hoursAgo": "{{count}} 小时前"
+    }
   }
 }

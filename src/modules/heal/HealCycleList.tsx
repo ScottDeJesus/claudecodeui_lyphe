@@ -15,16 +15,16 @@ import { cn } from '@/shared/utils';
  * ONE CARD PER CYCLE, THE OPEN ONE STANDING OPEN. A closed cycle is one line — door, stage, when, its
  * four tallies — so ten of them read as a ledger and not a wall, and it opens to its worklist. The
  * open cycle is already open, because the thing in motion is the thing being watched, and its waiting
- * reason (a busy box, a park, the master off) is a banner and not a footnote: it is the one answer to
- * "why is nothing happening".
+ * reason (a park — the cap or DeepSeek's peak — or the master off) is a banner and not a footnote: it
+ * is the one answer to "why is nothing happening". A walk elsewhere never parks a cycle.
  *
  * THE WORKLIST IS CHIRON'S ORDER AND THE WORKER'S RANK. Nothing here re-sorts: the payload's order is
  * the order drawn, and `item.label` is printed as the worker wrote it. Colour is the tier — red for a
- * regression (a cause came back), amber for a blocked run, blue for a frequent kind, grey for a
- * one-off — and the state chip says what became of it. `spent` is DeepSeek dollars and shows only
+ * regression (a shape came back), blue for a frequent kind, grey for a one-off — and the state chip
+ * says what became of it. `spent` is DeepSeek dollars and shows only
  * above zero: Claude is a subscription, and a dollar figure on a Claude cycle would be an invented cost.
  *
- * With no cycle yet the empty line carries the worker's own sentence on what comes next
+ * With no cycle yet the empty line carries the worker's own sentence on how one opens
  * (`cycle_state.text` — "Next cycle 10:00 UTC", "Schedule off").
  */
 export function HealCycleList({ cycles, cycleState }: { cycles: HealCycle[]; cycleState: HealCycleState }) {
@@ -62,9 +62,9 @@ function stageTone(stage: HealCycle['stage']): Tone {
   return 'info';
 }
 
-const TIER_TONE: Record<HealCycleTier, Tone> = { regression: 'danger', 'blocked-run': 'warn', frequent: 'info', 'one-off': 'neutral' };
+const TIER_TONE: Record<HealCycleTier, Tone> = { regression: 'danger', frequent: 'info', 'one-off': 'neutral' };
 
-/** Landed is green only when the heal it names landed `done`; a blocked heal or a run given back is amber. */
+/** Landed is green only when the heal it names landed `done`; a heal the ledger reads as `gone`, stopped or failed is amber. */
 function itemTone(item: HealCycleItem): Tone {
   if (item.state === 'launched') return 'info';
   if (item.state === 'landed') return item.note === 'done' ? 'positive' : 'warn';
@@ -114,7 +114,7 @@ function CycleCard({ cycle }: { cycle: HealCycle }) {
             <Badge as="span" tone="neutral">{t('heal.cycles.ignored', { defaultValue: '{{count}} ignored', count: cycle.ignored })}</Badge>
             <Badge as="span" tone={cycle.healed > 0 ? 'positive' : 'neutral'}>{t('heal.cycles.healed', { defaultValue: '{{count}} healed', count: cycle.healed })}</Badge>
             {cycle.spent > 0 && (
-              <span className="font-mono text-muted-foreground" title={t('heal.cycles.spentTitle', { defaultValue: 'DeepSeek dollars this cycle spent' })}>{usd(cycle.spent)}</span>
+              <span className="font-mono text-muted-foreground" title={t('heal.cycles.spentTitle', { defaultValue: 'DeepSeek dollars this cycle spent — a heal that landed before 2026-09-23 booked its chain’s whole bill, Claude stages included, so a cycle spanning that date counts more than DeepSeek billed' })}>{usd(cycle.spent)}</span>
             )}
           </span>
         </CollapsibleTrigger>

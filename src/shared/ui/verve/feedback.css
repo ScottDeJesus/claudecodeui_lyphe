@@ -176,6 +176,11 @@
   background: var(--accent);
   box-shadow: 0 0 0 2px var(--canvas);
 }
+/* The dot's amber register: a tab whose count is waiting on the OPERATOR, not merely standing. It
+ * takes the palette's own warn dot — the tone the widget's badge and the card's pulse wear — so one
+ * colour means one thing wherever the lane is drawn. The ring above is untouched: what changes is
+ * the dot, not the disc it reads against. */
+.vv-tabs__dot[data-tone="warn"] { background: var(--warn-dot); }
 
 /* Underline register — for chrome that is already a surface (the sidebar), where a second
  * filled tray reads as a card on a card. There is no rail under the row: the indicator below

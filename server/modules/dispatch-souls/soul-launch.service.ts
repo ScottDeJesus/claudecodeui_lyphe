@@ -86,6 +86,53 @@ function providerOf(spec: unknown, result: unknown, ended: boolean): 'deepseek' 
 }
 
 /**
+ * The receipt's PAID dollars: its own `cost_usd`, and 0 where the receipt NAMES the operator's
+ * Claude subscription.
+ *
+ * A receipt's `cost_usd` is the CLI's self-report of what the outing cost, and on a subscription
+ * that self-report is not money — the launcher prices such a child at 0 now
+ * (`plan_runner/costs.py:result_cost` returns the PAID share alone) and records its TOKENS instead.
+ * Receipts written before that rule carry the figure anyway — one on disk today says
+ * `provider: claude`, `cost_usd: 5.467351`, `tokens_in: 12386281` — so the word the receipt itself
+ * carries is what settles an old one: named Claude, the dollars are suppressed outright rather than
+ * shown as `$0.00`, and the tokens beside it are the whole of the spend.
+ *
+ * A receipt that names NOTHING is the stub the launcher or the reaper writes for a wrapper that was
+ * killed outright; it says nothing about the endpoint, so it overrules nothing it stored.
+ */
+function receiptCostUsd(result: unknown, ended: boolean): number | null {
+  if (!ended) return null;
+  if (readString(field(result, 'provider')) === 'claude') return 0;
+  return readNumberOrNull(field(result, 'cost_usd'));
+}
+
+/**
+ * The receipt's tokens: its own three counts, and ALL OF THEM `null` where a vendor billed it.
+ *
+ * A SPEND FIGURE IS DOLLARS **OR** TOKENS, BY WHO WAS USED (operator rule, 2026-09-24): a soul on
+ * the operator's Claude subscription reads `1.2M in · 48k out` and no `$`, and one DeepSeek billed
+ * reads `$0.28 DeepSeek` and NO tokens — DeepSeek's tokens are DeepSeek's own business, which is
+ * the other half of the same rule `receiptCostUsd` keeps for the money. `null` rather than `0` for
+ * the same reason it returns `null` while the soul is out: the pin draws nothing for a figure that
+ * was never a figure of this kind, and `0` would read as a measured amount.
+ *
+ * `provider` is the launch's resolved word ({@link providerOf}), so a receipt that names nothing
+ * falls back to the pin the launcher wrote — never to showing a vendor's tokens as Claude's.
+ */
+function receiptTokens(
+  result: unknown,
+  ended: boolean,
+  provider: 'deepseek' | 'claude',
+): { tokens: number | null; tokens_in: number | null; tokens_out: number | null } {
+  if (!ended || provider !== 'claude') return { tokens: null, tokens_in: null, tokens_out: null };
+  return {
+    tokens: readNumberOrNull(field(result, 'tokens')),
+    tokens_in: readNumberOrNull(field(result, 'tokens_in')),
+    tokens_out: readNumberOrNull(field(result, 'tokens_out')),
+  };
+}
+
+/**
  * One launch directory's snapshot, or `null` when this lane does not carry that launch.
  *
  * A launch is carried while it is OUT, and for {@link DEFAULT_ENDED_KEEP_S} after its receipt.
@@ -123,14 +170,20 @@ export function classifyLaunch(
   // this lane is a pin list, not an archive.
   if (now - (endedAt ?? startedAt) >= keepS) return null;
 
+  const provider = providerOf(spec, result, ended);
   return {
     launch_id: files.launchId,
+    // The launcher's own stamp of which conversation made this launch (`solo/launch.py`, from
+    // `CLAUDE_CODE_SESSION_ID`). Carried so a chat can anchor a launch the instant the lane shows
+    // it — a chain's later stages leave no receipt in any transcript. `null`, never `''`: an empty
+    // stamp names nobody, and a client comparing ids must not be able to match it.
+    launched_by: readString(field(spec, 'launched_by')) || null,
     role: readString(field(spec, 'role')),
     agent: readString(field(spec, 'agent')),
     // The task the soul was handed, as its brief's first line. `''` when it could not be read —
     // absent is honest, and the row simply carries no description.
     brief: files.briefLine,
-    provider: providerOf(spec, result, ended),
+    provider,
     // DeepSeek refused this soul or never answered it: the receipt says why, and nothing ran on
     // Claude instead (the launcher never re-routes a soul).
     blocked: readString(field(result, 'provider_blocked')) !== '',
@@ -141,9 +194,19 @@ export function classifyLaunch(
     ended_at: endedAt,
     // The receipt's own figures, and NOTHING while it is out: a live soul's spend is not knowable
     // from this side, and a zero would read as "free" rather than as "not yet".
+    //
+    // AND ONE HALF OR THE OTHER, NEVER BOTH (operator rule, 2026-09-24): `cost_usd` is PAID dollars
+    // — a soul on the operator's Claude subscription recorded 0 there (`plan_runner/costs.py:
+    // result_cost`), and a pre-rule receipt that stored dollars reads 0 too where the receipt NAMES
+    // Claude (`receiptCostUsd`) — and the tokens are THE SUBSCRIPTION'S, `null` throughout where a
+    // vendor billed the soul (`receiptTokens`). So a pin draws `$0.28 DeepSeek` with no tokens or
+    // `1.2M in · 48k out` with no `$`, never both, and never `$0.00`.
+    // `tokens_in`/`tokens_out` are `null` on a receipt written before the split shipped, which is
+    // what tells the pin to say the total alone (`spendParts`, `src/shared/spend.ts`)
+    // rather than `0 in · 0 out`.
     duration_s: ended ? readNumberOrNull(field(result, 'duration_s')) : null,
-    cost_usd: ended ? readNumberOrNull(field(result, 'cost_usd')) : null,
-    tokens: ended ? readNumberOrNull(field(result, 'tokens')) : null,
+    cost_usd: receiptCostUsd(result, ended),
+    ...receiptTokens(result, ended, provider),
   };
 }
 

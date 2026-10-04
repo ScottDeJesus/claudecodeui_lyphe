@@ -75,7 +75,7 @@ export function createCardTools(client: KanbanPmClient): ToolTable {
     {
       name: 'create_feature',
       description:
-        "Create a feature card in the Not Ready staging lane (the operator's pre-To-do stage). " +
+        'Create a feature card in the Backlog (not_ready) lane, unapproved. ' +
         "Put the operator's PRIMARY INTENT in 'description' — it is the durable why/what and " +
         "attach_plan never overwrites it. Returns the minted card (id like 'c-N').",
       inputSchema: toolSchema(
@@ -99,13 +99,16 @@ export function createCardTools(client: KanbanPmClient): ToolTable {
     {
       name: 'attach_plan',
       description:
-        "Attach a plan to a feature: set its plan file path and cache the plan's markdown body " +
+        "Attach a brief to a feature: set its brief file path and cache the brief's markdown body " +
         'on the card. Overwrites any body already there.',
       inputSchema: toolSchema(
         {
           id: CARD_ID_ARGUMENT,
-          path: { type: 'string', description: "The plan file path (e.g. 'plans/<name>.md')." },
-          body: { type: 'string', description: "The plan's markdown body, cached on the card." },
+          path: {
+            type: 'string',
+            description: "The brief file path (e.g. '~/.claude/plans/briefs/<slug>.brief.md').",
+          },
+          body: { type: 'string', description: "The brief's markdown body, cached on the card." },
         },
         ['id', 'path', 'body']
       ),
@@ -129,7 +132,8 @@ export function createCardTools(client: KanbanPmClient): ToolTable {
       name: 'archive_feature',
       description:
         "Archive a feature (hide it from the board's active lanes). Extinguishes the building " +
-        'pill if it was building.',
+        'pill if it was building. A Metis session calls it only on a card whose problem no ' +
+        'longer exists, after set_closing_remarks names the evidence.',
       inputSchema: toolSchema({ id: CARD_ID_ARGUMENT }, ['id']),
     },
     {
@@ -137,7 +141,8 @@ export function createCardTools(client: KanbanPmClient): ToolTable {
       description:
         'Record CLOSING REMARKS on a feature card after a build completes — a short, HONEST ' +
         'summary of what shipped and any follow-ups. Call it as the FINAL build step, only on a ' +
-        'real ship. Open with one plain-prose TL;DR line, then any needs-the-operator lines.',
+        'real ship (or to name the evidence before archiving a card whose problem is gone). ' +
+        'Open with one plain-prose TL;DR line, then any needs-the-operator lines.',
       inputSchema: toolSchema(
         {
           id: CARD_ID_ARGUMENT,

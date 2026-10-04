@@ -22,6 +22,11 @@
  * a dock hit-test, a clamped divider — which no arrangement of the parts here can
  * produce, so every screen that wants either composes it rather than rebuilding it.
  *
+ * ResizeGrip has one consumer, chat-host's floating panel, and came in on the same test: a resize is a
+ * pointer drag that must survive a cross-origin frame under it, which is `usePointerDrag`'s body class
+ * and its `'resize'` kind. A grip a panel wrote for itself would be a drag that dies over the
+ * application it is standing on.
+ *
  * ClaudeCodeMark came in with one consumer, the composer's DeepSeek chip, by the operator's ruling
  * that a mark is a kit glyph and never an inline one-off: a brand mark drawn inside one module is
  * the copy the next module to need it re-draws slightly differently. The chat module's transcript
@@ -36,8 +41,13 @@
 import '@/shared/ui/verve/controls.css';
 import '@/shared/ui/verve/feedback.css';
 // The FAB and split-pane paint shares no selector with the files either side of it, so its only
-// constraint is the next line's: board.css stays last.
+// constraint is that board.css stays last, below.
 import '@/shared/ui/verve/surfaces.css';
+// `.vv-textarea` composes `.vv-input` (controls.css) and wins each tie it has — against `.vv-input`'s
+// colours, against src/index.css's pins on every `textarea` and against `text-sm`'s line height — by
+// specificity, never by order. It shares no selector with surfaces.css or board.css, so its only
+// constraint is that board.css stays last, below.
+import '@/shared/ui/verve/panels.css';
 // The board layer goes LAST on purpose, and the order is load-bearing: a lane card composes
 // `.vv-card`'s ground and then overrides its background, shadow and transition. Imported first,
 // `.vv-card` won every one of those at equal specificity and a selected card lost its wash.
@@ -46,10 +56,15 @@ import '@/shared/ui/verve/board.css';
 export { ActionMenu } from '@/shared/ui/ActionMenu';
 export type { ActionMenuItem } from '@/shared/ui/ActionMenu';
 export { Avatar } from '@/shared/ui/Avatar';
-export { Badge } from '@/shared/ui/Badge';
+export { Badge, badgeVariants } from '@/shared/ui/Badge';
 export { Banner } from '@/shared/ui/Banner';
 export { Button, buttonVariants } from '@/shared/ui/Button';
 export { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/shared/ui/Card';
+// The one fold a card's header can wear: the chevron glyph every foldable surface draws, the button
+// the four lane cards press, and the body slot that puts `inert` + `aria-hidden` on a folded card's
+// hidden content. The glyph is shared with the chat's shape cards on purpose — `ShapeFrame` draws it
+// too, so there is one sign and not two look-alikes.
+export { CardFoldBody, CardFoldToggle, FoldChevron } from '@/shared/ui/CardFold';
 export { Chip } from '@/shared/ui/Chip';
 export { ClaudeCodeMark } from '@/shared/ui/ClaudeCodeMark';
 export { Collapsible, CollapsibleTrigger, CollapsibleContent } from '@/shared/ui/Collapsible';
@@ -60,12 +75,14 @@ export { default as DeepSeekLogo } from '@/shared/ui/DeepSeekLogo';
 export { Dialog, DialogTrigger, DialogContent, DialogTitle } from '@/shared/ui/Dialog';
 export { DockableFab } from '@/shared/ui/DockableFab';
 export type { DockableFabPosition } from '@/shared/ui/DockableFab';
+export { ResizeGrip } from '@/shared/ui/ResizeGrip';
 export { EmptyState } from '@/shared/ui/EmptyState';
 export { Field } from '@/shared/ui/Field';
 export { Input } from '@/shared/ui/Input';
 export { KanbanCard } from '@/shared/ui/KanbanCard';
 export type { CardPriority, KanbanCardModel, KanbanCardSignals } from '@/shared/ui/KanbanCard';
 export { KanbanLane } from '@/shared/ui/KanbanLane';
+export { Lightbox } from '@/shared/ui/Lightbox';
 export { LLMProviderLogo } from '@/shared/ui/LLMProviderLogo';
 export { Menu } from '@/shared/ui/Menu';
 export { Meter } from '@/shared/ui/Meter';
@@ -86,14 +103,19 @@ export type {
   PromptInputButtonProps,
   PromptInputSubmitProps,
 } from '@/shared/ui/PromptInput';
+export { QuestionOptionRow } from '@/shared/ui/QuestionOptionRow';
 export { ScrollArea } from '@/shared/ui/ScrollArea';
 export { Select } from '@/shared/ui/Select';
+export { SettingRow } from '@/shared/ui/SettingRow';
 export { Shimmer } from '@/shared/ui/Shimmer';
 export { Spinner } from '@/shared/ui/Spinner';
 export { SplitPane, SPLIT_MIN_RATIO, SPLIT_MAX_RATIO } from '@/shared/ui/SplitPane';
 export { Stepper } from '@/shared/ui/Stepper';
 export { Switch } from '@/shared/ui/Switch';
 export { Tabs } from '@/shared/ui/Tabs';
+// The multi-line field `Input` has no sibling for: Verve's own TextArea on Input's field paint.
+// The roadmap's dialogs take it for a goal: ItemDialog adds and edits every kind of item with one.
+export { TextArea } from '@/shared/ui/TextArea';
 export { Toast } from '@/shared/ui/Toast';
 export { ToastStack } from '@/shared/ui/ToastStack';
 export { Tooltip } from '@/shared/ui/Tooltip';

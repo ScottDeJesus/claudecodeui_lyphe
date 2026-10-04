@@ -3,8 +3,9 @@ import { Activity, Archive, Folder, MessageSquare, RotateCcw, Search, Trash2 } f
 import type { TFunction } from 'i18next';
 
 import { Badge, LLMProviderLogo, ScrollArea } from '@/shared/ui';
+import { getAllSessions } from '@/shared/sessionRecency';
 import type { ArchivedProjectListItem, ArchivedSessionListItem, ConversationSearchResults, Project, RecentConversationListItem, ReleaseInfo, SearchProgress, SidebarProjectListProps, SidebarSearchMode } from '@/shared/types';
-import { formatCompactAge, getAllSessions } from '@/modules/sidebar/utils/sidebarProjectFormatting';
+import { formatCompactAge } from '@/modules/sidebar/utils/sidebarProjectFormatting';
 import SidebarFooter from '@/modules/sidebar/SidebarFooter';
 import SidebarHeader from '@/modules/sidebar/SidebarHeader';
 import SidebarProjectList from '@/modules/sidebar/SidebarProjectList';
@@ -132,6 +133,8 @@ type SidebarContentProps = {
   latestVersion: string | null;
   onShowVersionModal: () => void;
   onShowSettings: () => void;
+  /** Opens Settings on its Updates tab — passed through to the footer's Claude row. */
+  onShowUpdates: () => void;
   projectListProps: SidebarProjectListProps;
   t: TFunction;
 };
@@ -181,6 +184,7 @@ export default function SidebarContent({
   latestVersion,
   onShowVersionModal,
   onShowSettings,
+  onShowUpdates,
   projectListProps,
   t,
 }: SidebarContentProps) {
@@ -704,6 +708,7 @@ export default function SidebarContent({
           latestVersion={latestVersion}
           onShowVersionModal={onShowVersionModal}
           onShowSettings={onShowSettings}
+          onShowUpdates={onShowUpdates}
           t={t}
         />
       )}

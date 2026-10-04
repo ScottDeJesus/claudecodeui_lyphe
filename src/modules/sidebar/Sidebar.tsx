@@ -34,6 +34,8 @@ type SidebarProps = {
   loadingProgress: LoadingProgress | null;
   onRefresh: () => Promise<void> | void;
   onShowSettings: () => void;
+  /** Opens Settings on its Updates tab — what the Claude row and its rail icon are for. */
+  onShowUpdates: () => void;
   showSettings: boolean;
   settingsInitialTab: string;
   onCloseSettings: () => void;
@@ -66,6 +68,7 @@ function Sidebar({
   loadingProgress,
   onRefresh,
   onShowSettings,
+  onShowUpdates,
   showSettings,
   settingsInitialTab,
   onCloseSettings,
@@ -268,6 +271,7 @@ function Sidebar({
         <SidebarCollapsed
           onExpand={handleExpandSidebar}
           onShowSettings={onShowSettings}
+          onShowUpdates={onShowUpdates}
           updateAvailable={updateAvailable}
           restartRequired={restartRequired}
           onShowVersionModal={() => setShowVersionModal(true)}
@@ -369,6 +373,7 @@ function Sidebar({
             latestVersion={latestVersion}
             onShowVersionModal={() => setShowVersionModal(true)}
             onShowSettings={onShowSettings}
+            onShowUpdates={onShowUpdates}
             projectListProps={projectListProps}
             t={t}
           />

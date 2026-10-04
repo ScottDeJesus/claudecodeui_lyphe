@@ -1,7 +1,8 @@
 import { type ReactNode, useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 
-import { cn } from '@/shared/utils';
+import { useHostWindow } from '@/shared/context/HostWindowContext';
+import { cn, isNodeLike } from '@/shared/utils';
 
 type TooltipPosition = 'top' | 'bottom' | 'left' | 'right';
 
@@ -42,9 +43,12 @@ export function Tooltip({
   className = '',
   delay = 350,
 }: TooltipProps) {
+  const hostWindow = useHostWindow();
   const [isVisible, setIsVisible] = useState(false);
-  // Store the timer id without forcing re-renders while hovering.
-  const timeoutRef = useRef<number | null>(null);
+  // Store the pending show-delay timer without forcing re-renders while hovering. It keeps the window
+  // that armed it beside its id: timer ids are per window, so clearing one on a window the chat has
+  // since moved to would cancel a stranger's timer, or nothing.
+  const timeoutRef = useRef<{ id: number; armedOn: Window } | null>(null);
   const longPressTriggeredRef = useRef(false);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const tooltipRef = useRef<HTMLDivElement | null>(null);
@@ -91,16 +95,22 @@ export function Tooltip({
 
   const clearTooltipTimer = () => {
     if (timeoutRef.current !== null) {
-      window.clearTimeout(timeoutRef.current);
+      timeoutRef.current.armedOn.clearTimeout(timeoutRef.current.id);
       timeoutRef.current = null;
     }
   };
 
+  // The delay paces when the reader sees the tooltip, so it runs on the window the reader is in:
+  // a hidden opener throttles its timers to about one a minute.
+  const armShowTimer = (onFire: () => void) => {
+    timeoutRef.current = { id: hostWindow.setTimeout(onFire, delay), armedOn: hostWindow };
+  };
+
   const handleMouseEnter = () => {
     clearTooltipTimer();
-    timeoutRef.current = window.setTimeout(() => {
+    armShowTimer(() => {
       setIsVisible(true);
-    }, delay);
+    });
   };
 
   const handleMouseLeave = () => {
@@ -111,10 +121,10 @@ export function Tooltip({
   const handleTouchStart = () => {
     clearTooltipTimer();
     longPressTriggeredRef.current = false;
-    timeoutRef.current = window.setTimeout(() => {
+    armShowTimer(() => {
       longPressTriggeredRef.current = true;
       setIsVisible(true);
-    }, delay);
+    });
   };
 
   const handleTouchEnd = () => {
@@ -133,22 +143,24 @@ export function Tooltip({
   }, []);
 
   useEffect(() => {
-    if (!isVisible || typeof document === 'undefined') {
+    if (!isVisible) {
       return;
     }
 
     const handlePointerDown = (event: PointerEvent) => {
       const target = event.target;
-      if (target instanceof Node && containerRef.current?.contains(target)) {
+      // `nodeType`, not `instanceof Node`: a target in the floating window is that window's node.
+      if (isNodeLike(target) && containerRef.current?.contains(target)) {
         return;
       }
       setIsVisible(false);
       longPressTriggeredRef.current = false;
     };
 
-    document.addEventListener('pointerdown', handlePointerDown, true);
-    return () => document.removeEventListener('pointerdown', handlePointerDown, true);
-  }, [isVisible]);
+    const hostDocument = hostWindow.document;
+    hostDocument.addEventListener('pointerdown', handlePointerDown, true);
+    return () => hostDocument.removeEventListener('pointerdown', handlePointerDown, true);
+  }, [isVisible, hostWindow]);
 
   useEffect(() => {
     if (!isVisible) {
@@ -156,18 +168,18 @@ export function Tooltip({
       return;
     }
 
-    const rafId = window.requestAnimationFrame(updateTooltipPosition);
+    const rafId = hostWindow.requestAnimationFrame(updateTooltipPosition);
     const handleViewportChange = () => updateTooltipPosition();
 
-    window.addEventListener('resize', handleViewportChange);
-    window.addEventListener('scroll', handleViewportChange, true);
+    hostWindow.addEventListener('resize', handleViewportChange);
+    hostWindow.addEventListener('scroll', handleViewportChange, true);
 
     return () => {
-      window.cancelAnimationFrame(rafId);
-      window.removeEventListener('resize', handleViewportChange);
-      window.removeEventListener('scroll', handleViewportChange, true);
+      hostWindow.cancelAnimationFrame(rafId);
+      hostWindow.removeEventListener('resize', handleViewportChange);
+      hostWindow.removeEventListener('scroll', handleViewportChange, true);
     };
-  }, [isVisible, updateTooltipPosition]);
+  }, [isVisible, updateTooltipPosition, hostWindow]);
 
   if (!content) {
     return <>{children}</>;
@@ -184,7 +196,7 @@ export function Tooltip({
       onTouchCancel={handleTouchEnd}
     >
       {children}
-      {isVisible && typeof document !== 'undefined' && createPortal(
+      {isVisible && createPortal(
         // Two elements, because one cannot do both jobs: `tooltipStyle` places the bubble with
         // a `transform`, and `vv-pop` animates `transform` — on a single element the keyframe
         // wins for its quarter second and the tooltip flies in from the viewport's top-left.
@@ -200,7 +212,7 @@ export function Tooltip({
             <div className={cn('vv-tooltip__arrow absolute h-0 w-0', getArrowClasses(position))} />
           </div>
         </div>,
-        document.body
+        hostWindow.document.body
       )}
     </div>
   );

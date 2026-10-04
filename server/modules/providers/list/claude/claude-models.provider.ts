@@ -2,111 +2,11 @@ import { readFile } from 'node:fs/promises';
 
 import { sessionsDb } from '@/modules/database/index.js';
 import type { IProviderModels } from '@/shared/interfaces.js';
-import type {
-  ProviderCurrentActiveModel,
-  ProviderModelOption,
-  ProviderModelsDefinition,
-} from '@/shared/types.js';
+import type { ProviderCurrentActiveModel, ProviderModelsDefinition } from '@/shared/types.js';
 import { buildDefaultProviderCurrentActiveModel } from '@/shared/utils.js';
 
-/**
- * Ultracode is not one of the SDK's reasoning-effort levels. Selecting it runs the turn at
- * `xhigh` effort with standing dynamic-workflow orchestration, which the Claude runtime
- * translates into the session-scoped `ultracode` setting. It is therefore only offered on
- * models this catalog already marks as xhigh-capable.
- */
-export const CLAUDE_ULTRACODE_EFFORT = 'ultracode';
+import { readClaudeModelsDefinition } from './claude-model-catalog.js';
 
-const ULTRACODE_EFFORT_OPTION = {
-  value: CLAUDE_ULTRACODE_EFFORT,
-  description: 'Highest effort plus standing workflow orchestration.',
-};
-
-/**
- * One entry per model anyone here actually picks.
- *
- * `default` and `best` are POLICY selectors — "whatever your deployment recommends", "the
- * latest and greatest" — and the bare `sonnet`/`opus` aliases sat beside their `[1m]` twins.
- * All four were duplicates of an entry already in this list: the CLI's own baked catalog
- * resolves `opus` to claude-opus-5-5 (the id a `--model opus` child reports on its own init
- * line and `modelUsage` key, measured 2026-09-22 on Claude Code 2.1.280) and `sonnet` to
- * claude-sonnet-5, and BOTH are natively 1M (`context.window: 1e6, native_1m: true`), so the
- * `[1m]` suffix changes nothing for this generation. The alias is what the composer keeps
- * sending; only what it resolves to moves, which is the whole point of naming it.
- *
- * `opusplan` — the CLI's Opus-plans-then-Sonnet-executes mode — is gone for the same reason:
- * planning here runs through its own flow, and the alias had never been selected once.
- */
-export const CLAUDE_PREDEFINED_MODELS: ProviderModelsDefinition = {
-  OPTIONS: [
-    {
-      value: 'fable',
-      label: 'Fable 5.1',
-      description: 'Latest Fable model, the most capable Claude, for the hardest, longest-running tasks.',
-      effort: {
-        default: 'high',
-        values: [
-          { value: 'low' },
-          { value: 'medium' },
-          { value: 'high' },
-          { value: 'xhigh' },
-          { value: 'max' },
-          ULTRACODE_EFFORT_OPTION,
-        ],
-      },
-    },
-    {
-      value: 'sonnet[1m]',
-      label: 'Sonnet 5 (1M context)',
-      description: 'Latest Sonnet model with a 1M context window.',
-      effort: {
-        default: 'high',
-        values: [
-          { value: 'low' },
-          { value: 'medium' },
-          { value: 'high' },
-          { value: 'xhigh' },
-          { value: 'max' },
-          ULTRACODE_EFFORT_OPTION,
-        ],
-      },
-    },
-    {
-      value: 'opus[1m]',
-      label: 'Opus 5.5 (1M context)',
-      description: 'Latest Opus model with a 1M context window.',
-      effort: {
-        default: 'high',
-        values: [
-          { value: 'low' },
-          { value: 'medium' },
-          { value: 'high' },
-          { value: 'xhigh' },
-          { value: 'max' },
-          ULTRACODE_EFFORT_OPTION,
-        ],
-      },
-    },
-    {
-      value: 'haiku',
-      label: 'Haiku 4.5',
-      description: 'Fast and efficient Claude model for simple tasks.',
-    },
-  ],
-  // The default has to name a model that is actually in OPTIONS: it is both the fallback the
-  // runtime hands the SDK when a turn carries no model, and what the service compares a
-  // session's resolved model against.
-  DEFAULT: 'opus[1m]',
-};
-
-export const findClaudeModelOption = (model: string | undefined | null): ProviderModelOption | null => {
-  const normalizedModel = typeof model === 'string' ? model.trim() : '';
-  if (!normalizedModel) {
-    return null;
-  }
-
-  return CLAUDE_PREDEFINED_MODELS.OPTIONS.find((option) => option.value === normalizedModel) ?? null;
-};
 type ClaudeInitEvent = {
   sessionId?: string;
   session_id?: string;
@@ -133,8 +33,7 @@ const ANSI_PATTERN = new RegExp(
  */
 const isPlaceholderModel = (model: string): boolean => model.startsWith('<') && model.endsWith('>');
 
-/** Exported for tests. */
-export const extractClaudeEventModel = (event: ClaudeInitEvent, sessionId: string): string | null => {
+const extractClaudeEventModel = (event: ClaudeInitEvent, sessionId: string): string | null => {
   const eventSessionId = event.sessionId ?? event.session_id;
   if (eventSessionId && eventSessionId !== sessionId) {
     return null;
@@ -229,19 +128,9 @@ const readClaudeSessionModelFromJsonl = async (
 };
 
 export class ClaudeProviderModels implements IProviderModels {
+  /** The installed CLI's own catalog, read once per CLI version (claude-model-catalog.ts). */
   async getSupportedModels(): Promise<ProviderModelsDefinition> {
-    // claude creates a new jsonl file as a separate session for this request.
-    // As a result, it lists the workspace where this is invoked when it shouldn't.
-    //
-    // Disabled for now:
-    // const queryInstance = query({
-    //   prompt: 'Get supported models',
-    //   options: buildClaudeQueryOptions(),
-    // });
-    // const supportedModels = await queryInstance.supportedModels();
-    // queryInstance.close();
-    // return buildClaudeModelsDefinition(supportedModels);
-    return CLAUDE_PREDEFINED_MODELS;
+    return readClaudeModelsDefinition();
   }
 
   async getCurrentActiveModel(sessionId?: string): Promise<ProviderCurrentActiveModel> {
