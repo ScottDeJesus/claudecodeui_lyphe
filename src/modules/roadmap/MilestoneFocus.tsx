@@ -1,21 +1,16 @@
 import { ArrowLeft, ArrowRight, Ban, CircleCheck, Layers, MoreHorizontal, Pencil, Plus, Trash2 } from 'lucide-react';
-import { useId, useMemo } from 'react';
+import { useContext, useId, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { EpicCard } from '@/modules/roadmap/EpicCard';
-import { fakeSortable } from '@/modules/roadmap/fake'; // FILL: fake — import { useRoadmapWrites } from '@/modules/roadmap/hooks/useRoadmapWrites'; import { useSortable } from '@/shared/ui/sortable/useSortable'; and the dialog host's opener
-import type { Roadmap, RoadmapMilestone, RoadmapMilestoneWord } from '@/shared/roadmap-types';
+import { RoadmapFaceContext } from '@/modules/roadmap/faceContext';
+import { useRoadmapWrites } from '@/modules/roadmap/hooks/useRoadmapWrites';
+import { ROADMAP_MILESTONE_WORD_KEYS as WORD_KEYS } from '@/shared/constants';
+import type { Roadmap, RoadmapMilestone } from '@/shared/roadmap-types';
 import { ActionMenu, Badge, EmptyState } from '@/shared/ui';
 import type { ActionMenuItem } from '@/shared/ui';
+import { useSortable } from '@/shared/ui/sortable/useSortable';
 import { cn } from '@/shared/utils';
-
-/** Each milestone word's key in the locale. */
-const WORD_KEYS: Record<RoadmapMilestoneWord, string> = {
-  empty: 'roadmap.milestoneWord.empty',
-  'not started': 'roadmap.milestoneWord.notStarted',
-  'in progress': 'roadmap.milestoneWord.inProgress',
-  reached: 'roadmap.milestoneWord.reached',
-};
 
 /**
  * The epics' grid: as many 320px-or-wider columns as fit, never one wider than the face. `min()` keeps a
@@ -36,27 +31,45 @@ const GRID = 'grid grid-cols-[repeat(auto-fill,minmax(min(320px,100%),1fr))] gap
  */
 export function MilestoneFocus({ roadmap, milestone }: { roadmap: Roadmap; milestone: RoadmapMilestone }) {
   const { t } = useTranslation();
-  // FILL: writes — const writes = useRoadmapWrites(); Move earlier, Move later, Unblock and the cards' drops write through it
-  // FILL: dialogs — the dialog host's opener (RoadmapPath provides it): Edit, Add an epic and Mark blocked open a dialog; Delete opens its confirm
+  // Move earlier, Move later, Unblock and the cards' drops write through the lane; the screen redraws from the frame that follows.
+  const writes = useRoadmapWrites();
+  const { openDialog, focus } = useContext(RoadmapFaceContext);
   const titleId = useId();
   const index = roadmap.milestones.findIndex((item) => item.name === milestone.name);
   const reached = milestone.word === 'reached';
 
   const keys = useMemo(() => milestone.epics.map((item) => item.name), [milestone.epics]);
   const byName = useMemo(() => new Map(milestone.epics.map((item) => [item.name, item])), [milestone.epics]);
-  const { order, attachList, itemProps } = fakeSortable(keys); // FILL: sortable — useSortable({ keys, onReorder: (carried, order) => writes.move({ kind: 'arc', name: carried, before: order[i + 1] } or { after: order[i - 1] }, itemTitle) }). NESTED PRESS: every EpicCard's rows are a sortable list inside one of this list's items, and usePointerDrag never stops a press it accepted, so a press on a feature row arms BOTH lists (measured in review 1: the row and its whole card carried). Cure it at the source, not with a selector here: useSortable's itemProps marks its item, and isFreePress (src/shared/ui/sortable/freePress.ts) refuses a press whose nearest marked item is not its own — so any nested list works with no screen code
+  // A drop hands back the whole order; the store is told only which neighbour the card now stands before, else after.
+  // The cards of an epic hold sortable lists of their own (its features): `useSortable` marks its items, so a press on a row never arms this list.
+  const { order, attachList, itemProps } = useSortable({
+    keys,
+    // The promise lets `useSortable` keep the card where it was dropped until the frame that carries the move lands.
+    onReorder: (carried, next) => {
+      const at = next.indexOf(carried);
+      const place = at < next.length - 1 ? { before: next[at + 1] } : { after: next[at - 1] };
+      return writes.move({ kind: 'arc', name: carried, ...place, itemTitle: byName.get(carried)?.title });
+    },
+  });
   const cards = order.flatMap((name) => byName.get(name) ?? []);
 
+  // Moving this milestone along the path keeps it on the stage: without a press of its own the stage follows
+  // the current milestone, which a move can hand to its neighbour.
+  const moveAlong = (place: { before: string } | { after: string }) => {
+    focus(milestone.name);
+    void writes.move({ kind: 'milestone', name: milestone.name, ...place, itemTitle: milestone.title });
+  };
+
   const items: ActionMenuItem[] = [
-    { key: 'edit', label: t('roadmap.menu.edit'), icon: Pencil, onSelect: () => {} }, // FILL: onEdit — ItemDialog editing this milestone (kind milestone)
-    { key: 'add-epic', label: t('roadmap.menu.addEpic'), icon: Plus, onSelect: () => {} }, // FILL: onAddEpic — ItemDialog adding an epic (kind arc, parent milestone.name)
-    { key: 'earlier', label: t('roadmap.menu.moveEarlier'), icon: ArrowLeft, disabled: index <= 0, onSelect: () => {} }, // FILL: onMoveEarlier — writes.move({ kind: 'milestone', name: milestone.name, before: roadmap.milestones[index - 1].name, itemTitle: milestone.title })
-    { key: 'later', label: t('roadmap.menu.moveLater'), icon: ArrowRight, disabled: index === roadmap.milestones.length - 1, onSelect: () => {} }, // FILL: onMoveLater — writes.move({ kind: 'milestone', name: milestone.name, after: roadmap.milestones[index + 1].name, itemTitle: milestone.title })
+    { key: 'edit', label: t('roadmap.menu.edit'), icon: Pencil, onSelect: () => openDialog({ dialog: 'edit', kind: 'milestone', item: milestone }) },
+    { key: 'add-epic', label: t('roadmap.menu.addEpic'), icon: Plus, onSelect: () => openDialog({ dialog: 'add', kind: 'arc', parent: milestone }) },
+    { key: 'earlier', label: t('roadmap.menu.moveEarlier'), icon: ArrowLeft, disabled: index <= 0, onSelect: () => moveAlong({ before: roadmap.milestones[index - 1].name }) },
+    { key: 'later', label: t('roadmap.menu.moveLater'), icon: ArrowRight, disabled: index === roadmap.milestones.length - 1, onSelect: () => moveAlong({ after: roadmap.milestones[index + 1].name }) },
     milestone.blocked === null
-      ? { key: 'block', label: t('roadmap.menu.markBlocked'), icon: Ban, onSelect: () => {} } // FILL: onBlock — BlockDialog for this milestone (kind milestone)
-      : { key: 'unblock', label: t('roadmap.menu.unblock'), icon: CircleCheck, onSelect: () => {} }, // FILL: onUnblock — writes.unblock({ kind: 'milestone', name: milestone.name, itemTitle: milestone.title })
+      ? { key: 'block', label: t('roadmap.menu.markBlocked'), icon: Ban, onSelect: () => openDialog({ dialog: 'block', kind: 'milestone', item: milestone }) }
+      : { key: 'unblock', label: t('roadmap.menu.unblock'), icon: CircleCheck, onSelect: () => void writes.unblock({ kind: 'milestone', name: milestone.name, itemTitle: milestone.title }) },
     ...(milestone.epics.length === 0
-      ? [{ key: 'delete', label: t('roadmap.menu.delete'), icon: Trash2, isDanger: true, showDividerBefore: true, onSelect: () => {} }] // FILL: onDelete — the delete confirm, then writes.remove({ kind: 'milestone', name: milestone.name, itemTitle: milestone.title })
+      ? [{ key: 'delete', label: t('roadmap.menu.delete'), icon: Trash2, isDanger: true, showDividerBefore: true, onSelect: () => openDialog({ dialog: 'delete', kind: 'milestone', item: milestone }) }]
       : []),
   ];
 
@@ -94,7 +107,7 @@ export function MilestoneFocus({ roadmap, milestone }: { roadmap: Roadmap; miles
           icon={Layers}
           title={t('roadmap.empty.noEpics')}
           actionLabel={t('roadmap.menu.addEpic')}
-          onAction={() => {}} // FILL: onAddEpic — ItemDialog adding an epic (kind arc, parent milestone.name)
+          onAction={() => openDialog({ dialog: 'add', kind: 'arc', parent: milestone })}
         />
       ) : (
         <ul ref={attachList} className={GRID}>
@@ -107,7 +120,7 @@ export function MilestoneFocus({ roadmap, milestone }: { roadmap: Roadmap; miles
           <li className="min-w-0">
             <button
               type="button"
-              onClick={() => {}} // FILL: onAddEpic — ItemDialog adding an epic (kind arc, parent milestone.name)
+              onClick={() => openDialog({ dialog: 'add', kind: 'arc', parent: milestone })}
               className="vv-empty flex h-full min-h-36 w-full items-center justify-center text-sm font-medium text-muted-foreground hover:text-foreground"
             >
               <Plus aria-hidden="true" className="size-4" />

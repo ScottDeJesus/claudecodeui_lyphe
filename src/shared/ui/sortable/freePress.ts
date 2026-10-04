@@ -17,6 +17,12 @@
  * A press whose element is not INSIDE the item is refused too. React bubbles an event along the
  * component tree, portals included, so a press inside a dialog or a menu that a card opened arrives at
  * the card's own handler with a target that is somewhere else in the document.
+ *
+ * A NESTED LIST'S PRESS IS ITS OWN LIST'S. An item may hold a sortable list of its own (a card of rows),
+ * and `usePointerDrag` never stops a press it accepted, so one press on a row reaches the row's handler
+ * and then the card's. Each item carries `SORTABLE_ITEM_ATTRIBUTE`, and a press whose nearest marked
+ * ancestor is not this item belongs to the list inside it: the outer list refuses it. The test is on the
+ * DOM, like the rest, so any nesting works with no code in the screens that nest.
  */
 
 /** Everything a press on which is the control's own, never a carry's. */
@@ -33,9 +39,13 @@ function scrollsSideways(node: Element): boolean {
   return (overflowX === 'auto' || overflowX === 'scroll') && node.scrollWidth > node.clientWidth + 1;
 }
 
+/** The attribute `useSortable` puts on every item it carries, which `isFreePress` reads to tell a nested list's item from this one. Used by `useSortable`. */
+export const SORTABLE_ITEM_ATTRIBUTE = 'data-sortable-item';
+
 /** Used by `useSortable` as the press filter of every item it carries. */
 export function isFreePress(target: EventTarget | null, item: Element): boolean {
   if (!(target instanceof Element) || !item.contains(target)) return false;
+  if (target.closest(`[${SORTABLE_ITEM_ATTRIBUTE}]`) !== item) return false;
   const control = target.closest(INTERACTIVE);
   if (control !== null && item.contains(control)) return false;
   for (let node: Element | null = target; node !== null && node !== item; node = node.parentElement) {

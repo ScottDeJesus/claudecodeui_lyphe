@@ -1,13 +1,10 @@
-// FILL: imports — the markers' own: react's useState, and useRoadmapWrites
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { useRoadmapWrites } from '@/modules/roadmap/hooks/useRoadmapWrites';
 import { useReturnFocus } from '@/shared/hooks/useReturnFocus';
 import type { RoadmapKind } from '@/shared/roadmap-types';
 import { ConfirmDialog } from '@/shared/ui';
-
-// Each fill marker below governs the ONE statement under it, which holds a fake standing in for what the
-// fill holds or does; `imports` marks where the fill adds the imports its markers need. Every other line
-// is composition and stays as it is.
 
 type DeleteDialogProps = {
   /** The dispatcher's own word for what is deleted: `arc` is an epic, `plan` a feature. */
@@ -34,12 +31,18 @@ type DeleteDialogProps = {
  */
 export function DeleteDialog({ kind, item, onClose }: DeleteDialogProps) {
   const { t } = useTranslation();
+  const writes = useRoadmapWrites();
   useReturnFocus();
 
-  // FILL: busy — component state, with its comment: the delete is out, so Delete shows busy and the ways out wait for its answer
-  const busy = false;
-  // FILL: onDelete — writes.remove({ kind, name: item.name, itemTitle: item.title }) with busy held; true → onClose(true); false → the question stays
-  const confirm = () => {};
+  // The delete is out, so Delete shows busy and the ways out wait for its answer: the write is already at the dispatcher.
+  const [busy, setBusy] = useState(false);
+  const confirm = async () => {
+    setBusy(true);
+    const landed = await writes.remove({ kind, name: item.name, itemTitle: item.title });
+    // A landed delete closes the question; a refusal leaves it up, beside the hook's toast.
+    if (landed) onClose(true);
+    else setBusy(false);
+  };
 
   const dismiss = () => {
     if (!busy) onClose(false);

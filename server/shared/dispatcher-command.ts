@@ -43,11 +43,20 @@ const FAILURE_LINE_CHARS = 200;
 /**
  * What the dispatcher is run with: the lane's one composition, built once by its module and handed in.
  * Consumed by the dispatcher module (its verb relay and its status read) and by the roadmap module (its
- * writes and its read), both of which build it from the same environment rules.
+ * writes, its picture read and its cases read), all of which build it from the same environment rules.
  */
 export type DispatcherCommandDependencies = {
-  /** The dispatcher's entry point, absolute — `~/.claude/scripts/dispatcher` unless `DISPATCHER_BIN` moved it. */
+  /**
+   * The door's entry point, absolute — the dispatcher's `~/.claude/scripts/dispatcher` unless
+   * `DISPATCHER_BIN` moved it, or the roadmap's cases door `~/.claude/scripts/cases` unless `CASES_BIN` did.
+   */
   bin: string;
+  /**
+   * The name a failure of `readDispatcherJson` leads with ("dispatcher status --json exited 1: …"),
+   * which is the door's own: absent reads `dispatcher`, so every dispatcher caller's sentence is
+   * unchanged, and the cases door names itself (`cases`) instead of a verb the dispatcher lacks.
+   */
+  door?: string;
   /** Wall-clock ceiling for one command. A verb may kick the daemon and print its answer once that has been asked for. */
   timeoutMs: number;
   /** The child's environment, composed once by the lane's module — the dispatcher's own wake path looks `systemctl --user` up on `PATH`, and this server's unit may have been handed none. */
@@ -181,22 +190,23 @@ export async function runDispatcherCommand(
  * missing binary — "was stopped" and "did not answer" are different facts, and neither claims the
  * read changed anything.
  */
-function describeFailure(command: string, error: unknown): string {
+function describeFailure(door: string, command: string, error: unknown): string {
   const failure = error as { code?: unknown; stdout?: unknown; stderr?: unknown; signal?: unknown };
   const said = firstLine(failure.stderr) || firstLine(failure.stdout);
   if (typeof failure.code === 'number' && Number.isFinite(failure.code)) {
-    return `dispatcher ${command} exited ${failure.code}${said ? `: ${said}` : ''}`;
+    return `${door} ${command} exited ${failure.code}${said ? `: ${said}` : ''}`;
   }
   if (typeof failure.signal === 'string') {
-    return `dispatcher ${command} was stopped before it answered (${failure.signal})`;
+    return `${door} ${command} was stopped before it answered (${failure.signal})`;
   }
   const because = error instanceof Error ? firstLine(error.message) : '';
-  return `dispatcher ${command} did not answer${said ? `: ${said}` : because ? `: ${because}` : ''}`;
+  return `${door} ${command} did not answer${said ? `: ${said}` : because ? `: ${because}` : ''}`;
 }
 
 /**
- * One dispatcher command that prints a JSON document (`status --json`, `roadmap show --json`), as the
- * parsed body. A failure is a THROW whose sentence names `dispatcher <argv joined by spaces>`, so
+ * One command that prints a JSON document (`status --json`, `roadmap show --json`, the cases door's
+ * `list … --json`), as the parsed body. A failure is a THROW whose sentence names `<door> <argv joined
+ * by spaces>` — the door is `dependencies.door`, `dispatcher` unless a lane names another — so
  * `status --json` still reads "dispatcher status --json exited 1: …".
  *
  * `cwd` is the home directory rather than this repository, for `runDispatcherCommand`'s reason, and
@@ -211,7 +221,7 @@ function describeFailure(command: string, error: unknown): string {
  * to be patient with. `env` comes from the caller — each lane's module is the one place that reads the
  * environment.
  *
- * Consumed by the dispatcher module's state read and the roadmap module's picture read.
+ * Consumed by the dispatcher module's state read and the roadmap module's picture read and cases read.
  */
 export async function readDispatcherJson(
   argv: readonly string[],
@@ -219,6 +229,7 @@ export async function readDispatcherJson(
   maxBuffer: number,
 ): Promise<unknown> {
   const command = argv.join(' ');
+  const door = dependencies.door ?? 'dispatcher';
   let stdout: string;
   try {
     const answer = await execFileAsync(dependencies.bin, [...argv], {
@@ -229,11 +240,11 @@ export async function readDispatcherJson(
     });
     stdout = readOutput(answer.stdout);
   } catch (error) {
-    throw new Error(describeFailure(command, error));
+    throw new Error(describeFailure(door, command, error));
   }
   try {
     return JSON.parse(stdout);
   } catch {
-    throw new Error(`dispatcher ${command} did not answer JSON`);
+    throw new Error(`${door} ${command} did not answer JSON`);
   }
 }

@@ -858,6 +858,9 @@ export const api = {
   // the picture redraws from the `roadmap_state` frame a landed write pokes.
   roadmap: {
     picture: () => get('/api/roadmap'),
+    // One feature's active regression cases, read when its dialog opens (`FeatureDialog`'s Cases
+    // section, through `useFeatureCases`): `{ cases }`, or 400/502 with the reason in `error`.
+    cases: (feature: string) => get(`/api/roadmap/cases?feature=${encodeURIComponent(feature)}`),
     add: (body: RoadmapWriteBody) => post('/api/roadmap/add', body),
     edit: (body: RoadmapWriteBody) => post('/api/roadmap/edit', body),
     move: (body: RoadmapWriteBody) => post('/api/roadmap/move', body),

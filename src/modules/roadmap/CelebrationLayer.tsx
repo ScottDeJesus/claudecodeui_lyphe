@@ -1,18 +1,15 @@
 import { Check } from 'lucide-react';
-// FILL: imports — the markers' own: react's useState, useEffect and useLayoutEffect beside these two, and useRoadmap
-import { Fragment, useRef } from 'react';
+import { Fragment, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { CSSProperties, HTMLAttributes } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { Moment } from '@/modules/roadmap/celebrationContext';
-import { Button, Card } from '@/shared/ui';
+import { useRoadmap } from '@/modules/roadmap/hooks/useRoadmap';
+import { Badge, Button, Card } from '@/shared/ui';
+import { otherOverlayHoldsEscape } from '@/shared/ui/overlayEscape';
 import { cn, formatShortDate } from '@/shared/utils';
 
 // The milestone's moment, drawn over its scope, and the one line that says every moment in words.
-//
-// Each fill marker below governs the ONE statement under it, which holds a fake standing in for what
-// the fill reads or does; `imports` governs the react import under it and the one line the fill adds
-// beside it, `useRoadmap`'s. Every other line is composition and stays as it is.
 
 /** Where the burst is born: the reached station's centre, as fractions of the layer's own box, each clamped to [0, 1]. */
 type BurstOrigin = { x: number; y: number };
@@ -64,7 +61,7 @@ const SCOPE_FRAME: Record<CelebrationLayerProps['scope'], ScopeFrame> = {
 /**
  * The milestone's timeline from the moment's arrival, in ms. The layer waits out `entrance` first, the
  * rail's own draw to the station (`animate-roadmap-draw`, 900 ms), invisible and inert; then it enters,
- * and holds until `entrance + hold`, when it leaves over 300 ms. The `hold` fill keeps these times.
+ * and holds until `entrance + hold`, when it leaves over 300 ms. The layer's own timers step through them.
  */
 const MILESTONE_TIMELINE = { entrance: 900, hold: 2200 } as const;
 
@@ -123,6 +120,44 @@ const PARTICLES = Array.from({ length: 48 }, (_, index) => {
   };
 });
 
+/** Where the burst starts before a station has been measured: the middle, high, where a path usually lies. */
+const DEFAULT_ORIGIN: BurstOrigin = { x: 0.5, y: 0.2 };
+
+/** The reached milestone's station, found inside the layer's parent (the scope's own box), by the name the path puts on it. */
+function stationIn(layer: HTMLElement, name: string): HTMLElement | null {
+  return layer.parentElement?.querySelector<HTMLElement>(`[data-roadmap-milestone="${CSS.escape(name)}"]`) ?? null;
+}
+
+/**
+ * Where the burst is born: the centre of the reached station's DISC (the first child of its button is
+ * the row the disc is centred in; the title and the line sit under it, so the button's own centre would
+ * throw the burst from between the two), as fractions of the layer's box, each clamped to [0, 1]. A
+ * station scrolled out of the box therefore bursts from the box's edge nearest it. `null` when the
+ * station or the box cannot be measured, which leaves the origin where it was.
+ */
+function measureOrigin(layer: HTMLElement, name: string): BurstOrigin | null {
+  const station = stationIn(layer, name);
+  const box = layer.getBoundingClientRect();
+  if (!station || box.width === 0 || box.height === 0) return null;
+  const disc = (station.firstElementChild ?? station).getBoundingClientRect();
+  const fraction = (position: number, start: number, size: number) => Math.min(1, Math.max(0, (position - start) / size));
+  return {
+    x: fraction(disc.left + disc.width / 2, box.left, box.width),
+    y: fraction(disc.top + disc.height / 2, box.top, box.height),
+  };
+}
+
+/**
+ * When the moment goes (the hold's leave or a Skip) with focus inside the layer, hands focus on to the
+ * reached station on the next frame, the one control the moment is about, so a keyboard reader never
+ * drops to `<body>`. Asked BEFORE the layer is removed, since the removal itself moves focus.
+ */
+function handFocusOn(layer: HTMLElement, name: string): void {
+  if (!layer.contains(layer.ownerDocument.activeElement)) return;
+  const station = stationIn(layer, name);
+  requestAnimationFrame(() => station?.focus());
+}
+
 /**
  * Used by `RoadmapPath` (the Roadmap tab's face, at `face` scope) and `RoadmapWidgetBody` (the chat
  * gutter's roadmap widget, at `frame` scope). Each hands it `useCelebrations`' `moment` and `skip` and
@@ -132,7 +167,10 @@ const PARTICLES = Array.from({ length: 48 }, (_, index) => {
  *
  * EVERY MOMENT IS SAID. The polite live line is always mounted, empty while nothing plays, so a screen
  * reader hears each moment of every level the instant its words land. A task, a feature or an epic
- * draws that line and nothing more here: those three play on their own row and card.
+ * plays on its own row and card and draws nothing more here, with one exception: a feature moment that
+ * stands for a run of features carries a `summary` ("6 features shipped while you were away"), and one
+ * row sweeping says nothing of the other five, so that line is also drawn, as a pill at the top of the
+ * scope, for as long as the moment holds.
  *
  * THE MILESTONE TAKES THE WHOLE SCOPE, the one moment bigger than its element, and it comes LAST. For
  * the timeline's first `entrance` (900 ms) the layer is invisible and inert, out of reach of pointer,
@@ -156,23 +194,64 @@ export function CelebrationLayer({ moment, onSkip, scope }: CelebrationLayerProp
   // The layer's own box: the reached station is found inside its parent and measured against it.
   const layerRef = useRef<HTMLDivElement>(null);
 
-  // A station scrolled out of the layer's box bursts from the box's edge nearest it, so a reader watching
-  // the epics still sees the burst leave.
-  // FILL: origin — the centre of `[data-roadmap-milestone=<moment.name>]` in the scope, as fractions of layerRef's box, clamped to [0, 1] on each axis
-  const origin: BurstOrigin = { x: 0.5, y: 0.2 };
+  const { selected } = useRoadmap();
+
+  // Where the burst starts, measured off the reached station: as each milestone moment arrives, before
+  // paint, and again as its entrance ends, since the face may still have been scrolling the station
+  // into view when the moment arrived. A state because it is read off the DOM, which a render cannot do.
+  const [origin, setOrigin] = useState<BurstOrigin>(DEFAULT_ORIGIN);
   // Where the layer stands in its timeline, which decides whether it can be reached and when it fades.
-  // When the moment goes (the hold's leave or a Skip) with focus inside the layer, focus is handed on the
-  // next frame to the reached station, `[data-roadmap-milestone=<moment.name>]`, the one control the
-  // moment is about, so a keyboard reader never drops to `<body>` (`putAwayFocus.ts`'s rule).
-  // FILL: hold — 'arriving' as each milestone moment arrives, 'holding' at MILESTONE_TIMELINE.entrance, 'leaving' at entrance + hold, handing focus on as it leaves
-  const phase: LayerPhase = 'holding';
+  // A state because the timeline's steps are timers, not renders; it names the moment it is for, so a
+  // new moment reads 'arriving' from its first render with nothing to reset.
+  const [timeline, setTimeline] = useState<{ moment: Moment | null; phase: LayerPhase }>({ moment: null, phase: 'arriving' });
+  const phase: LayerPhase = timeline.moment === moment ? timeline.phase : 'arriving';
+
+  useLayoutEffect(() => {
+    if (moment?.level === 'milestone' && layerRef.current) setOrigin(measureOrigin(layerRef.current, moment.name) ?? DEFAULT_ORIGIN);
+  }, [moment]);
+
+  // The timeline: it holds from the end of the entrance, and leaves when the hold is up.
+  useEffect(() => {
+    if (moment?.level !== 'milestone') return undefined;
+    const holdTimer = setTimeout(() => {
+      setTimeline({ moment, phase: 'holding' });
+      const layer = layerRef.current;
+      if (layer) setOrigin((was) => measureOrigin(layer, moment.name) ?? was);
+    }, MILESTONE_TIMELINE.entrance);
+    const leaveTimer = setTimeout(() => {
+      const layer = layerRef.current;
+      if (layer) handFocusOn(layer, moment.name);
+      setTimeline({ moment, phase: 'leaving' });
+    }, MILESTONE_TIMELINE.entrance + MILESTONE_TIMELINE.hold);
+    return () => {
+      clearTimeout(holdTimer);
+      clearTimeout(leaveTimer);
+    };
+  }, [moment]);
+
+  // Ends the moment early, on a click on the layer and on Escape, handing focus on as the layer goes.
+  const skip = useCallback(() => {
+    if (layerRef.current && moment) handFocusOn(layerRef.current, moment.name);
+    onSkip();
+  }, [moment, onSkip]);
+
   // Escape skips while the layer holds, heard by a bubble-phase `keydown` on `window` that never stops
   // or prevents the key: a dialog over the face takes Escape at capture before it (`overlayEscape.ts`,
-  // MAN-741), and the chat beside the widget keeps its own.
-  // FILL: onSkip — calls onSkip, on a click on the layer and on that Escape, handing focus on as the layer goes
-  const skip: typeof onSkip = () => {};
-  // FILL: tally — the reached milestone's standing.epics and .features, off useRoadmap().selected by moment.name
-  const tally: MilestoneTally | null = { epics: 4, features: 8 };
+  // MAN-741), a menu or select open on the face asks to keep it (`otherOverlayHoldsEscape`), and the
+  // chat beside the widget keeps its own.
+  const holding = moment?.level === 'milestone' && phase === 'holding';
+  useEffect(() => {
+    if (!holding) return undefined;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && !otherOverlayHoldsEscape(document)) skip();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [holding, skip]);
+
+  // The reached milestone's size, the banner's figures, off the roadmap on screen.
+  const standing = moment ? selected?.milestones.find((milestone) => milestone.name === moment.name)?.standing : undefined;
+  const tally: MilestoneTally | null = standing ? { epics: standing.epics, features: standing.features } : null;
 
   const figures = moment
     ? [
@@ -193,6 +272,16 @@ export function CelebrationLayer({ moment, onSkip, scope }: CelebrationLayerProp
           </>
         )}
       </p>
+
+      {moment?.summary && moment.level !== 'milestone' && (
+        // Decorative to a screen reader, which has the same words in the live line above.
+        <div aria-hidden="true" data-roadmap-summary className="pointer-events-none absolute inset-x-0 top-3 z-30 flex justify-center px-4 md:top-5">
+          <Badge tone="positive" className="max-w-full whitespace-normal rounded-lg text-center leading-snug motion-safe:animate-roadmap-pop">
+            <Check className="mr-1 size-3 shrink-0" strokeWidth={3} />
+            {moment.summary}
+          </Badge>
+        </div>
+      )}
 
       {moment?.level === 'milestone' && (
         <div

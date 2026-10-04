@@ -1,12 +1,15 @@
 import { Layers, Milestone, Puzzle, Route } from 'lucide-react';
-import { useContext, useEffect, useId, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { CelebrationContext } from '@/modules/roadmap/celebrationContext';
-import type { CelebrationActive } from '@/modules/roadmap/celebrationContext';
 import { CelebrationLayer } from '@/modules/roadmap/CelebrationLayer';
-import { FAKE_ROADMAP_VIEW } from '@/modules/roadmap/fake'; // FILL: fake — import { useRoadmap } from '@/modules/roadmap/hooks/useRoadmap'; import { useCelebrations } from '@/modules/roadmap/hooks/useCelebrations'; and the dialogs the slot mounts
+import { RoadmapFaceContext } from '@/modules/roadmap/faceContext';
+import type { FaceDialog, RoadmapFace } from '@/modules/roadmap/faceContext';
+import { useCelebrations } from '@/modules/roadmap/hooks/useCelebrations';
+import { useRoadmap } from '@/modules/roadmap/hooks/useRoadmap';
 import { MilestoneFocus } from '@/modules/roadmap/MilestoneFocus';
+import { OpenDialog } from '@/modules/roadmap/modals/OpenDialog';
 import { RoadmapHeader } from '@/modules/roadmap/RoadmapHeader';
 import { RoadmapRail } from '@/modules/roadmap/RoadmapRail';
 import type { RoadmapPicture } from '@/shared/roadmap-types';
@@ -31,40 +34,78 @@ type RoadmapPathProps = {
  * only while this face is on screen), and its `relative` box is what `CelebrationLayer` covers, as its
  * last child, outside the scroller — so the milestone's banner centres in what the reader sees, not in a
  * content box scrolled half away. The face provides `CelebrationContext`, which the rows, cards and
- * stations read to play their own part of a moment.
+ * stations read to play their own part of a moment; while a feature, epic or milestone moment plays, its
+ * milestone holds the stage, so the card or row it plays on is drawn. A task moment moves nothing: its
+ * row plays where it already is.
  *
  * ONE DIALOG AT A TIME, mounted in one slot: every press on the face that opens a dialog — a menu item, a
  * tile, the ghost station, a row, Place… — opens it here, through the opener the face provides.
  *
  * Used by `RoadmapTab`, as its Roadmap face.
  */
-export function RoadmapPath({ onOpenCard: _onOpenCard }: RoadmapPathProps) { // FILL: onOpenCard — destructured as itself once the provider below hands it to FeatureRow's reveal and the slot hands it to FeatureDialog
+export function RoadmapPath({ onOpenCard }: RoadmapPathProps) {
   const { t } = useTranslation();
-  const { picture, selected } = useContext(FAKE_ROADMAP_VIEW); // FILL: roadmap — useRoadmap(): the whole picture and the roadmap on screen
+  const { picture, selected } = useRoadmap();
   // The face's own box: the celebrations play only while it is on screen, and the milestone's layer covers it.
   const rootRef = useRef<HTMLDivElement>(null);
   // The face's scroller: a milestone moment brings the path back into it before it plays.
   const scrollRef = useRef<HTMLDivElement>(null);
-  // FILL: celebrations — useCelebrations(selected, rootRef) (hooks/useCelebrations.ts): what plays on this face; its `active` is the CelebrationContext value below, its `moment` and `skip` the layer's
-  const active: CelebrationActive = { tasks: new Set(), features: new Set(), epics: new Set(), milestone: null };
-  // FILL: moment — when a milestone moment arrives and its station lies outside scrollRef's view, scroll the face so the path is in it, within the layer's 900 ms entrance (instantly under reduced motion), so the draw, the bloom and the burst play where the reader is looking
-  useEffect(() => {}, []);
-  // FILL: dialog — component state, with its comment: which dialog is open, for which item, adding or editing (one at a time); its opener is the face context's, provided below
-  // FILL: focus — component state per roadmap, with its comment: the milestone the operator put on the stage by pressing its station, remembered per roadmap so a switch and back returns to it; `focus(name)` is a station's press
-  const [focusedName, focus] = useState<string | null>(null);
-
-  // The stage's milestone: the one pressed, else the current one, else the last — so a roadmap whose
-  // every milestone is reached opens on the one it reached last, and a pressed station that has since
-  // gone falls back the same way.
   const milestones = selected?.milestones ?? [];
-  const focused = milestones.find((item) => item.name === focusedName)
+  // What plays on this face: `active` is the CelebrationContext value below, `moment` and `skip` the layer's.
+  const { moment, skip, active } = useCelebrations(selected, rootRef);
+  // The milestone holding what plays: named by `active.milestone`, or holding an epic of `active.epics`
+  // or a feature of `active.features`. The hook keeps `active` through the beat between two moments and
+  // empties it with the queue, so this holds through the gaps and is null once it is empty. A TASK moment
+  // is left out on purpose: its meter plays wherever its row is drawn (the stage or the rail's In flight
+  // section), and a task lands every few minutes while a feature walks, so taking the stage for it would
+  // pull the reader off the milestone he pressed and remount what he has open there.
+  const playing = milestones.find((item) => item.name === active.milestone)
+    ?? milestones.find((item) => item.epics.some((epic) => active.epics.has(epic.name) || epic.features.some((feature) => active.features.has(feature.name))))
+    ?? null;
+  // A milestone moment plays on its station, so a station scrolled out of the face's view (down the
+  // page, or along the sideways rail on a phone) is brought into it first: the smooth scroll lands inside
+  // the layer's 900 ms entrance, so the rail's draw, the bloom and the burst play where the reader looks.
+  // Instantly under reduced motion, which asks for no travel. A station already in view is left alone.
+  useEffect(() => {
+    if (moment?.level !== 'milestone') return;
+    const scroller = scrollRef.current;
+    const station = scroller?.querySelector<HTMLElement>(`[data-roadmap-milestone="${CSS.escape(moment.name)}"]`);
+    if (!scroller || !station) return;
+    const view = scroller.getBoundingClientRect();
+    const box = station.getBoundingClientRect();
+    const clipped = box.top < view.top || box.bottom > view.bottom || box.left < view.left || box.right > view.right;
+    if (!clipped) return;
+    const still = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    station.scrollIntoView({ behavior: still ? 'auto' : 'smooth', block: 'center', inline: 'center' });
+  }, [moment]);
+  // Which dialog is open, for which item, adding or editing — one at a time, as a dialog is modal. `null`
+  // for none. Its opener is the face context's `openDialog`, so any press under the face can put one up.
+  const [dialog, setDialog] = useState<FaceDialog | null>(null);
+  // The milestone the operator put on the stage by pressing its station, kept per roadmap (by name) so a
+  // switch to the other roadmap and back returns to the one he left on. Not derivable: only his press says it.
+  const [focusedBy, setFocusedBy] = useState<Record<string, string>>({});
+  const selectedName = selected?.name ?? null;
+  const focusedName = selectedName === null ? null : focusedBy[selectedName] ?? null;
+  const focus = useCallback((name: string) => {
+    if (selectedName !== null) setFocusedBy((held) => ({ ...held, [selectedName]: name }));
+  }, [selectedName]);
+  // What every press under the face reaches: the dialog opener, the card opener the tab supplied, and the stage.
+  const face = useMemo<RoadmapFace>(() => ({ openDialog: setDialog, openCard: onOpenCard, focus }), [onOpenCard, focus]);
+
+  // The stage's milestone: the one a moment is playing on, else the one pressed, else the current one,
+  // else the last. A moment's milestone borrows the stage because an epic's card and a feature's row play
+  // their own part only where they are drawn — when a milestone's last feature ships, `current` moves on
+  // and would take the stage with it. A roadmap whose every milestone is reached opens on the one it
+  // reached last, and a pressed station that has since gone falls back the same way.
+  const focused = playing
+    ?? milestones.find((item) => item.name === focusedName)
     ?? milestones.find((item) => item.name === selected?.current)
     ?? milestones.at(-1)
     ?? null;
   const loading = picture === null || (picture.roadmaps.length > 0 && selected === null);
 
   return (
-    // FILL: provider — the face's own context nests inside this provider, here and at its close: the dialog host's opener (read by RoadmapHeader, RoadmapPicker, MilestonePath's ghost station, MilestoneFocus, EpicCard and RoadmapRail) and onOpenCard (read by FeatureRow's reveal; FeatureDialog is handed it in the slot)
+    <RoadmapFaceContext.Provider value={face}>
     <CelebrationContext.Provider value={active}>
       <div ref={rootRef} className="relative flex h-full min-h-0 flex-col" data-roadmap-face>
         {loading ? (
@@ -79,7 +120,7 @@ export function RoadmapPath({ onOpenCard: _onOpenCard }: RoadmapPathProps) { // 
                 title={t('roadmap.empty.none')}
                 message={t('roadmap.empty.noneMessage')}
                 actionLabel={t('roadmap.picker.new')}
-                onAction={() => {}} // FILL: onNew — ItemDialog adding a roadmap (kind roadmap)
+                onAction={() => setDialog({ dialog: 'add', kind: 'roadmap', parent: null })}
               />
             </div>
           </div>
@@ -89,7 +130,7 @@ export function RoadmapPath({ onOpenCard: _onOpenCard }: RoadmapPathProps) { // 
               {picture !== null && picture.unplaced.epics.length + picture.unplaced.features.length > 0 && (
                 <UnplacedBanner
                   unplaced={picture.unplaced}
-                  onPlace={(_item: Unplaced) => {}} // FILL: onPlace — MoveDialog for this unplaced epic or feature: the milestones for an epic, the epics for a feature
+                  onPlace={(item: Unplaced) => setDialog({ dialog: 'move', kind: item.kind, name: item.name })}
                 />
               )}
 
@@ -100,7 +141,7 @@ export function RoadmapPath({ onOpenCard: _onOpenCard }: RoadmapPathProps) { // 
                   icon={Milestone}
                   title={t('roadmap.empty.noPath')}
                   actionLabel={t('roadmap.menu.addMilestone')}
-                  onAction={() => {}} // FILL: onAddMilestone — ItemDialog adding a milestone (kind milestone, parent selected.name)
+                  onAction={() => setDialog({ dialog: 'add', kind: 'milestone', parent: selected })}
                 />
               ) : (
                 // The stage, then the rail: beside it from 1280px up, under it below. A rail with nothing to say draws nothing, and the stage takes the row.
@@ -115,12 +156,11 @@ export function RoadmapPath({ onOpenCard: _onOpenCard }: RoadmapPathProps) { // 
           </ScrollArea>
         )}
 
-        {/* FILL: dialogs — the open dialog mounts here */}
-        {/* FILL: moment — the hook's moment and skip: moment={moment} onSkip={skip} */}
-        <CelebrationLayer moment={null} onSkip={() => {}} scope="face" />
+        {dialog !== null && <OpenDialog dialog={dialog} onClose={() => setDialog(null)} onOpenCard={onOpenCard} />}
+        <CelebrationLayer moment={moment} onSkip={skip} scope="face" />
       </div>
-    {/* FILL: provider — its close, the face's own context's beside this one's */}
     </CelebrationContext.Provider>
+    </RoadmapFaceContext.Provider>
   );
 }
 

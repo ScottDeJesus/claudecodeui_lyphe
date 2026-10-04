@@ -2,7 +2,9 @@ import { Check } from 'lucide-react';
 import { useContext, useId } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { FAKE_CELEBRATION_CONTEXT } from '@/modules/roadmap/fake'; // FILL: fake — import { CelebrationContext } from '@/modules/roadmap/celebrationContext';
+import { caseMark } from '@/modules/roadmap/caseMark';
+import { CelebrationContext } from '@/modules/roadmap/celebrationContext';
+import { useRevealCard } from '@/modules/roadmap/hooks/useRevealCard';
 import { useStepPhrase } from '@/modules/roadmap/hooks/useStepPhrase';
 import { StateLine } from '@/modules/roadmap/StateLine';
 import type { RoadmapFeature } from '@/shared/roadmap-types';
@@ -37,9 +39,9 @@ type FeatureRowProps = {
 };
 
 /**
- * One feature as one line of state: its step line, its title, its step in words with its project
- * beside them; a meter of its tasks while it is in flight; and, in warn, what it waits on the operator
- * for (in place of the step and the project) and why it is blocked. Used by `EpicCard` for its
+ * One feature as one line of state: its step line, its title, its step in words with its case mark and
+ * its project beside them; a meter of its tasks while it is in flight; and, in warn, what it waits on the
+ * operator for (in place of the step and the project) and why it is blocked. Used by `EpicCard` for its
  * features, by `RoadmapRail` at `compact` for its four sections, and by the chat gutter's roadmap
  * widget, which imports it through the module's barrel.
  *
@@ -54,11 +56,22 @@ type FeatureRowProps = {
  * row: a task moment regrows the meter (`data-vv-enter`) and pops its figure; a feature moment pops the
  * shipped station, rings it, sweeps the row and stamps "Shipped". Under reduced motion both are still:
  * the row holds a wash, with its words, for as long as the moment is named.
+ *
+ * A CASE MARK IS QUIET UNTIL SOMETHING BREAKS. A feature that keeps regression cases says ONE phrase
+ * about them, after its step words. Quiet ("5 cases holding", "4 cases · 2 not run yet") it is words in
+ * the step phrase's own muted ink, a line under it beside the project chip, which grows the row 5px (the
+ * step line stands 32px against the chip's 27). Amber ("1 broken", "2 broken, 1 regressed", "1 can't run")
+ * it is the library's warn badge on a line of its own, below the meter and right above the blocked reason,
+ * so the row's progress stays together and its warn lines sit together; never red, and always its words,
+ * so colour is never the only signal. A compact row — the rail, the chat gutter's widget, where the operator glances while working —
+ * shows only the amber one, and so does a row that waits on him, whose line belongs to what he owes and
+ * its press. A feature with no case shows none.
  */
 export function FeatureRow({ feature, onOpen, density }: FeatureRowProps) {
   const { t } = useTranslation();
-  const active = useContext(FAKE_CELEBRATION_CONTEXT); // FILL: active — useContext(CelebrationContext)
-  const reveal = (_plan: string) => {}; // FILL: reveal — the opener of a plan's live card, a hook read here: on the Roadmap tab, RoadmapTab's onOpenCard, read from the face context RoadmapPath provides (RoadmapTab hands it down: its face set to In flight, the plan's name handed down to RunnerPanel); in the chat gutter's widget, which has no RoadmapTab above it, the workspace's `?runner=<plan>` landing (design B)
+  const active = useContext(CelebrationContext);
+  // The Answer press shows this feature's live card: the Roadmap tab's In flight face, or the workspace's `?runner=` landing where no tab is above.
+  const reveal = useRevealCard();
   const phrase = useStepPhrase(feature);
   const titleId = useId();
 
@@ -85,6 +98,37 @@ export function FeatureRow({ feature, onOpen, density }: FeatureRowProps) {
     >
       {t('roadmap.feature.answer')}
     </Button>
+  );
+
+  // The row's one case phrase, or null when the feature keeps no case. `key` is the FULL locale key of its
+  // words, handed to `t()` as it is (`roadmap.cases.holding`, `.notRunYet`, `.broken`, `.regressed`, `.joined`
+  // or `.cantRun`); `count` the number they are said with — the total for holding and not run yet, else
+  // the amber words' own, a break and a regression summed when both stand; `tone` warn for what broke,
+  // neutral (the muted ink) for the rest.
+  const mark = caseMark(feature.cases);
+  // The phrase in words; its `notRun` and the joined phrase's two halves are said from the counts themselves.
+  const casePhrase = mark === null ? null : t(mark.key, {
+    count: mark.count,
+    notRun: feature.cases.not_run,
+    broken: t('roadmap.cases.broken', { count: feature.cases.broken }),
+    regressed: t('roadmap.cases.regressed', { count: feature.cases.regressed }),
+  });
+  // Quiet, it is words in the step phrase's own ink, on their own line under it: beside the project there is no
+  // width for a third thing (a pill there crushed "shipped Oct 2" to "shipp…" in a 336px card), and the two
+  // lines stand beside the chip at 32px where the chip alone gives 27. A full row's alone, and only under a step
+  // phrase — a row that waits on the operator has none, its line holds what he owes and its press.
+  const quietMark = mark !== null && mark.tone !== 'warn' && !compact && (
+    <p data-roadmap-cases={mark.key} className="text-xs text-muted-foreground">{casePhrase}</p>
+  );
+  // Amber, it is a warn badge on a line of its own, as what he owes and why it is blocked are: what broke is
+  // never squeezed beside anything, at any density. It stands below the meter and right above the blocked
+  // reason, so a building row's step words keep their meter and its warn lines sit together. A count, so a
+  // pill, not a sentence's block; proportional figures, because tabular ones give the joined phrase's comma
+  // a figure's width ("broken ,").
+  const amberMark = mark !== null && mark.tone === 'warn' && (
+    <div className="mt-1.5 flex min-w-0">
+      <Badge tone="warn" data-roadmap-cases={mark.key}>{casePhrase}</Badge>
+    </div>
   );
 
   // The project, at the end of the step phrase's line — never on the title's line, where it took a third
@@ -131,9 +175,12 @@ export function FeatureRow({ feature, onOpen, density }: FeatureRowProps) {
         {/* What it waits on the operator for IS its step, spelled in warn on this same line — so the muted phrase steps aside rather than say it twice. */}
         {owed === null ? (
           <div className="mt-0.5 flex min-w-0 items-center gap-2">
-            <p className="line-clamp-2 min-w-0 flex-1 break-words text-xs text-muted-foreground">
-              {feature.step === 'building' ? <Shimmer>{phrase}</Shimmer> : phrase}
-            </p>
+            <div className="min-w-0 flex-1">
+              <p className="line-clamp-2 break-words text-xs text-muted-foreground">
+                {feature.step === 'building' ? <Shimmer>{phrase}</Shimmer> : phrase}
+              </p>
+              {quietMark}
+            </div>
             {project}
           </div>
         ) : (
@@ -158,6 +205,8 @@ export function FeatureRow({ feature, onOpen, density }: FeatureRowProps) {
             />
           </div>
         )}
+
+        {amberMark}
 
         {/* A row's reason stays one line, cut: the row is the summary, and pressing it opens the dialog that holds the whole reason. */}
         {feature.blocked !== null && (

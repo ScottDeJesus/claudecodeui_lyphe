@@ -56,9 +56,49 @@ export type RoadmapMilestoneWord = 'empty' | 'not started' | 'in progress' | 're
 /** A whole roadmap's word. Consumers: the roadmap lane's reader and the screen. */
 export type RoadmapWord = 'no path yet' | 'on the way' | 'every milestone reached';
 
+/**
+ * One regression case's word, as the dispatcher's `store_case_words.case_word` derives it from the
+ * case's newest run and its standing. Spelled here only to be READ: this server derives none and the
+ * screen draws what it is told. `not run` is a case no run has judged yet; `can't run` is one whose
+ * newest run could not run its check; `regressed` is a `broken` whose current break a regression triage
+ * has named. Consumers: `roadmap-cases.service.ts` (a case's `word`) and the screen.
+ */
+export type RoadmapCaseWord = 'holding' | 'broken' | 'regressed' | 'not run' | "can't run";
+
 // ---------------------------
 
 //----------------- THE PICTURE ------------
+
+/**
+ * A feature's, an epic's or a roadmap's ACTIVE cases counted by word: `total` is every active case, and
+ * the five others are `RoadmapCaseWord`'s words (`not_run` for `not run`, `cant_run` for `can't run`,
+ * since a key cannot carry the space or the quote). The five sum to `total`. All six are zero when the
+ * dispatcher answers no `cases` key (a CloudCLI ahead of its dispatcher). Consumers: the roadmap lane's
+ * reader (`roadmap-state.service.ts`) and the screen's feature row, epic card, header and dialog.
+ */
+export type RoadmapCases = {
+  total: number;
+  holding: number;
+  broken: number;
+  regressed: number;
+  not_run: number;
+  cant_run: number;
+};
+
+/**
+ * One case as the feature dialog reads it: its `sentence` (the claim, in plain words) and its `word`.
+ * `last_run_at` is when its newest run finished and `last_saw` what that run saw, or null for each when
+ * no run has happened or the run recorded nothing. `name` is the dispatcher's key for the case and is
+ * never shown (INV-6394's rule for slugs). Consumers: `roadmap-cases.service.ts` (which builds it) and
+ * the screen's feature dialog.
+ */
+export type RoadmapCase = {
+  name: string;
+  sentence: string;
+  word: RoadmapCaseWord;
+  last_run_at: string | null;
+  last_saw: string | null;
+};
 
 /**
  * One task of a feature's plan — a cut phase, with the dispatcher's own key for it.
@@ -76,8 +116,8 @@ export type RoadmapTask = {
  * One feature: a plan on the roadmap, from an idea to shipped. `waiting_on_you` names what the
  * operator owes it (`questions` to answer, an `accept` to press) or is null; `blocked` is the
  * operator's own reason, a mark the picture shows and nothing reads, or null; `waits_on` names the
- * plans it waits on. `repo` is always a string, and `project` a label or null. Consumers: the roadmap
- * lane's reader and the screen.
+ * plans it waits on. `repo` is always a string, and `project` a label or null. `cases` counts the
+ * feature's own active cases by word. Consumers: the roadmap lane's reader and the screen.
  */
 export type RoadmapFeature = {
   name: string;
@@ -96,12 +136,13 @@ export type RoadmapFeature = {
   promoted_at: string | null;
   approved_at: string | null;
   shipped_at: string | null;
+  cases: RoadmapCases;
 };
 
 /**
  * One epic (an arc on the wire's other face): a body of features under a milestone.
- * `designed_whole` is true when the epic's features were cut together as one design. Consumers: the
- * roadmap lane's reader and the screen.
+ * `designed_whole` is true when the epic's features were cut together as one design. `standing.cases`
+ * is the dispatcher's sum of its features' `cases`. Consumers: the roadmap lane's reader and the screen.
  */
 export type RoadmapEpic = {
   name: string;
@@ -120,11 +161,15 @@ export type RoadmapEpic = {
     designing: number;
     proposed: number;
     ideas: number;
+    cases: RoadmapCases;
   };
   features: RoadmapFeature[];
 };
 
-/** One milestone: a place on the way, made of epics. Consumers: the roadmap lane's reader and the screen. */
+/**
+ * One milestone: a place on the way, made of epics. Its `standing` carries no `cases`: the epic and the
+ * roadmap are where cases are counted. Consumers: the roadmap lane's reader and the screen.
+ */
 export type RoadmapMilestone = {
   name: string;
   title: string;
@@ -141,7 +186,8 @@ export type RoadmapMilestone = {
 /**
  * One roadmap, the whole path to something. `current` is the name of its first milestone, in order,
  * that is not reached, or null when there is none (no path yet, or every milestone reached).
- * Consumers: the roadmap lane's reader and the screen, which draws one roadmap at a time.
+ * `standing.cases` is the dispatcher's sum of its epics' `standing.cases`. Consumers: the roadmap lane's
+ * reader and the screen, which draws one roadmap at a time.
  */
 export type Roadmap = {
   name: string;
@@ -164,6 +210,7 @@ export type Roadmap = {
     ideas: number;
     blocked: number;
     waiting_on_you: number;
+    cases: RoadmapCases;
   };
   milestones: RoadmapMilestone[];
 };

@@ -1,8 +1,8 @@
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { FAKE_PICTURE } from '@/modules/roadmap/fake'; // FILL: fake — import { useRoadmap } from '@/modules/roadmap/hooks/useRoadmap';
-import type { RoadmapFeature, RoadmapFeatureStep, RoadmapPicture } from '@/shared/roadmap-types';
+import { useRoadmap } from '@/modules/roadmap/hooks/useRoadmap';
+import type { RoadmapFeature, RoadmapFeatureStep } from '@/shared/roadmap-types';
 import { formatShortDate, roadmapFeatureIndex } from '@/shared/utils';
 
 /** The steps the locale has a phrase for, as `roadmap.step.<step>` keys. `waiting` and `shipped` are spelled apart: each needs a value. */
@@ -25,7 +25,8 @@ const PLAIN_STEPS: ReadonlySet<RoadmapFeatureStep> = new Set<RoadmapFeatureStep>
  */
 export function useStepPhrase(feature: RoadmapFeature): string {
   const { t } = useTranslation();
-  const picture: RoadmapPicture | null = FAKE_PICTURE; // FILL: picture — useRoadmap().picture: the whole picture, so a wait on a feature of another roadmap still has its title
+  // The whole picture, not the roadmap on screen: a wait on a feature of another roadmap still has its title.
+  const { picture } = useRoadmap();
 
   const waitingOn = useMemo(() => {
     if (feature.step !== 'waiting' || picture === null) return null;

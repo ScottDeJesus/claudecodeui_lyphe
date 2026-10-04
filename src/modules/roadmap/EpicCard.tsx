@@ -3,12 +3,15 @@ import { useContext, useMemo } from 'react';
 import type { CSSProperties } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { FAKE_CELEBRATION_CONTEXT, fakeSortable } from '@/modules/roadmap/fake'; // FILL: fake — import { CelebrationContext } from '@/modules/roadmap/celebrationContext'; import { useRoadmapWrites } from '@/modules/roadmap/hooks/useRoadmapWrites'; import { useSortable } from '@/shared/ui/sortable/useSortable'; and the dialog host's opener
+import { CelebrationContext } from '@/modules/roadmap/celebrationContext';
+import { RoadmapFaceContext } from '@/modules/roadmap/faceContext';
 import { FeatureRow } from '@/modules/roadmap/FeatureRow';
+import { useRoadmapWrites } from '@/modules/roadmap/hooks/useRoadmapWrites';
 import type { RoadmapEpic, RoadmapEpicWord, RoadmapFeature } from '@/shared/roadmap-types';
 import type { Tone } from '@/shared/types';
 import { ActionMenu, Badge, Button, Card, CardContent, CardHeader, CardTitle } from '@/shared/ui';
 import type { ActionMenuItem } from '@/shared/ui';
+import { useSortable } from '@/shared/ui/sortable/useSortable';
 import { cn } from '@/shared/utils';
 
 /** Each epic word's key in the locale. */
@@ -105,8 +108,9 @@ function oneLine(goal: string): string {
 
 /**
  * One epic as a card: its completion ring, its title, how many of its features have shipped, its word
- * and its menu; under that head why it is blocked, whole; its goal in a line; and its features as rows
- * the operator drags into order, then "Add a feature". Used by `MilestoneFocus`, one card a cell of its grid.
+ * and its menu, and — once it keeps regression cases — how many of them hold, with what broke in amber;
+ * under that head why it is blocked, whole; its goal in a line; and its features as rows the operator
+ * drags into order, then "Add a feature". Used by `MilestoneFocus`, one card a cell of its grid.
  *
  * THE EPIC MOMENT is the card's own: the ring's last share draws itself, the card lifts 4px onto
  * `shadow-lg` (`.vv-card`'s own transition, cut to 300ms), sixteen particles burst from the ring, and an
@@ -115,29 +119,44 @@ function oneLine(goal: string): string {
  */
 export function EpicCard({ epic }: { epic: RoadmapEpic }) {
   const { t } = useTranslation();
-  const active = useContext(FAKE_CELEBRATION_CONTEXT); // FILL: active — useContext(CelebrationContext)
-  // FILL: writes — const writes = useRoadmapWrites(); Unblock and the rows' drops write through it
-  // FILL: dialogs — the dialog host's opener (RoadmapPath provides it): Add a feature, Edit, Move and Mark blocked open a dialog; Delete opens its confirm
+  const active = useContext(CelebrationContext);
+  // Unblock and the rows' drops write through the lane; the screen redraws from the frame that follows.
+  const writes = useRoadmapWrites();
+  const { openDialog } = useContext(RoadmapFaceContext);
   const moment = active.epics.has(epic.name);
   const { features, shipped } = epic.standing;
+  // The epic's cases by word, summed over its features: the head's second standing line, drawn once it keeps one.
+  const { cases } = epic.standing;
+  // What broke, a break and a regression alike: that line's one amber word.
+  const broken = cases.broken + cases.regressed;
 
   const keys = useMemo(() => epic.features.map((item) => item.name), [epic.features]);
   const byName = useMemo(() => new Map(epic.features.map((item) => [item.name, item])), [epic.features]);
-  const { order, attachList, itemProps } = fakeSortable(keys); // FILL: sortable — useSortable({ keys, onReorder: (carried, order) => writes.move({ kind: 'plan', name: carried, before: order[i + 1] } or { after: order[i - 1] }, itemTitle) }); this list sits inside one of MilestoneFocus's items — the nested press, and its cure at the source, are in that file's sortable marker
+  // A drop hands back the whole order; the store is told only which neighbour the row now stands before, else after.
+  // This list sits inside one of `MilestoneFocus`'s items: `useSortable` marks its items, so a press on a row carries the row alone.
+  const { order, attachList, itemProps } = useSortable({
+    keys,
+    // The promise lets `useSortable` keep the row where it was dropped until the frame that carries the move lands.
+    onReorder: (carried, next) => {
+      const at = next.indexOf(carried);
+      const place = at < next.length - 1 ? { before: next[at + 1] } : { after: next[at - 1] };
+      return writes.move({ kind: 'plan', name: carried, ...place, itemTitle: byName.get(carried)?.title });
+    },
+  });
   const rows = order.flatMap((name) => byName.get(name) ?? []);
 
-  const openFeature = (_feature: RoadmapFeature) => {}; // FILL: onOpenFeature — FeatureDialog on this feature
+  const openFeature = (feature: RoadmapFeature) => openDialog({ dialog: 'feature', name: feature.name });
 
   const items: ActionMenuItem[] = [
-    { key: 'add-feature', label: t('roadmap.menu.addFeature'), icon: Plus, onSelect: () => {} }, // FILL: onAddFeature — ItemDialog adding a feature (kind plan, parent epic.name)
-    { key: 'edit', label: t('roadmap.menu.edit'), icon: Pencil, onSelect: () => {} }, // FILL: onEdit — ItemDialog editing this epic (kind arc)
-    { key: 'move', label: t('roadmap.menu.moveToMilestone'), icon: FolderInput, onSelect: () => {} }, // FILL: onMove — MoveDialog for this epic, its milestones to choose from
+    { key: 'add-feature', label: t('roadmap.menu.addFeature'), icon: Plus, onSelect: () => openDialog({ dialog: 'add', kind: 'plan', parent: epic }) },
+    { key: 'edit', label: t('roadmap.menu.edit'), icon: Pencil, onSelect: () => openDialog({ dialog: 'edit', kind: 'arc', item: epic }) },
+    { key: 'move', label: t('roadmap.menu.moveToMilestone'), icon: FolderInput, onSelect: () => openDialog({ dialog: 'move', kind: 'arc', name: epic.name }) },
     epic.blocked === null
-      ? { key: 'block', label: t('roadmap.menu.markBlocked'), icon: Ban, onSelect: () => {} } // FILL: onBlock — BlockDialog for this epic (kind arc)
-      : { key: 'unblock', label: t('roadmap.menu.unblock'), icon: CircleCheck, onSelect: () => {} }, // FILL: onUnblock — writes.unblock({ kind: 'arc', name: epic.name, itemTitle: epic.title })
+      ? { key: 'block', label: t('roadmap.menu.markBlocked'), icon: Ban, onSelect: () => openDialog({ dialog: 'block', kind: 'arc', item: epic }) }
+      : { key: 'unblock', label: t('roadmap.menu.unblock'), icon: CircleCheck, onSelect: () => void writes.unblock({ kind: 'arc', name: epic.name, itemTitle: epic.title }) },
     // An epic is deleted only once it holds no feature: the store refuses the rest, so the menu never offers it.
     ...(epic.features.length === 0
-      ? [{ key: 'delete', label: t('roadmap.menu.delete'), icon: Trash2, isDanger: true, showDividerBefore: true, onSelect: () => {} }] // FILL: onDelete — the delete confirm, then writes.remove({ kind: 'arc', name: epic.name, itemTitle: epic.title })
+      ? [{ key: 'delete', label: t('roadmap.menu.delete'), icon: Trash2, isDanger: true, showDividerBefore: true, onSelect: () => openDialog({ dialog: 'delete', kind: 'arc', item: epic }) }]
       : []),
   ];
 
@@ -163,6 +182,14 @@ export function EpicCard({ epic }: { epic: RoadmapEpic }) {
             {features > 0 && <span className="text-xs tabular-nums text-muted-foreground">{t('roadmap.epic.count', { shipped, count: features })}</span>}
             <Badge tone={WORD_TONES[epic.word]}>{t(WORD_KEYS[epic.word])}</Badge>
           </div>
+          {/* The cases on a line of their own under the features' standing: the head's middle column is narrow, and
+              sharing one wrapping line split a count from its badge at random. Quiet until something breaks. */}
+          {cases.total > 0 && (
+            <div data-roadmap-epic-cases className="mt-1.5 flex min-w-0 flex-wrap items-center gap-1.5">
+              <span className="text-xs tabular-nums text-muted-foreground">{t('roadmap.cases.epicHolding', { holding: cases.holding, count: cases.total })}</span>
+              {broken > 0 && <Badge tone="warn" className="tabular-nums">{t('roadmap.cases.epicBroken', { count: broken })}</Badge>}
+            </div>
+          )}
         </div>
         <ActionMenu
           label={t('roadmap.menu.actions', { title: epic.title })}
@@ -199,7 +226,7 @@ export function EpicCard({ epic }: { epic: RoadmapEpic }) {
             ))}
           </ul>
         )}
-        <Button variant="ghost" size="sm" className="-ml-3 mt-auto self-start" onClick={() => { /* FILL: onAddFeature — ItemDialog adding a feature (kind plan, parent epic.name) */ }}>
+        <Button variant="ghost" size="sm" className="-ml-3 mt-auto self-start" onClick={() => openDialog({ dialog: 'add', kind: 'plan', parent: epic })}>
           <Plus aria-hidden="true" />
           {t('roadmap.menu.addFeature')}
         </Button>

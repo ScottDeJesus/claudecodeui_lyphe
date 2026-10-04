@@ -2,10 +2,11 @@ import { createContext } from 'react';
 
 /**
  * One completion worth celebrating, at one of the four sizes (a task, a feature, an epic or a
- * milestone). `name` is the item's own (a task's key, a feature's, an epic's or a milestone's) and
- * `title` what the screen calls it; `at` is the dispatcher's UTC string for the completion
- * (`done_at`, `shipped_at`, `completed_at` or `reached_at`), which is both the order moments play in
- * and the stamp the seen-list advances to. `summary` is the one line a catch-up adds: "<n> features
+ * milestone). `name` is the item's own (a feature's, an epic's or a milestone's; a task moment is its
+ * FEATURE's, since the meter that grows is the feature's row) and `title` what the screen calls it;
+ * `at` is the dispatcher's UTC string for the completion (`done_at`, `shipped_at`, `completed_at` or
+ * `reached_at`), which is both the order moments play in and, for every size but a task, the stamp
+ * the seen-list advances to. `summary` is the one line a catch-up adds: "<n> features
  * shipped while you were away", or the other milestones a long absence reached. Used by
  * `useCelebrations` (which builds them) and `CelebrationLayer` (which draws the milestone's).
  */

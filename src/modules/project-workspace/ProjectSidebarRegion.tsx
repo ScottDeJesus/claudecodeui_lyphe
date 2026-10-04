@@ -24,7 +24,6 @@ function ProjectSidebarRegion({
     shouldShowShellTab,
     shouldShowMemoryTab,
     memoryPendingCount,
-    shouldShowRunnerTab,
     runnerCount,
     runnerWaiting,
     shouldShowHealTab,
@@ -50,7 +49,6 @@ function ProjectSidebarRegion({
       shouldShowShellTab={shouldShowShellTab}
       shouldShowMemoryTab={shouldShowMemoryTab}
       memoryPendingCount={memoryPendingCount}
-      shouldShowRunnerTab={shouldShowRunnerTab}
       runnerCount={runnerCount}
       runnerWaiting={runnerWaiting}
       shouldShowHealTab={shouldShowHealTab}

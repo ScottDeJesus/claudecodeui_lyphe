@@ -25,7 +25,24 @@ import { cn } from '@/shared/utils';
 import type { DispatcherLanePicture } from '@/shared/types';
 
 /**
- * The Runner tab's pane: every plan the dispatcher is carrying, each as a whole card.
+ * Pages an arc deck's strip so the named plan's card stands centred in it — the reveal's second move,
+ * after the pane has scrolled to the deck. The strip is one card per view and opens on the arc's current
+ * card, so a plan anywhere else on it would otherwise sit a whole strip-width off screen. Only the strip's
+ * own scroll moves, by the card's measured distance from the strip's centre (`DeckStrip` reads its
+ * position off that scroll, so its arrows, its `Card N of M` line and its map follow). A deck with no
+ * such card, or a strip with no width (a folded deck), is left exactly as it stands.
+ */
+function pageStripToCard(deck: Element, plan: string): void {
+  const strip = deck.querySelector<HTMLElement>('[data-arc-strip]');
+  const card = strip?.querySelector<HTMLElement>(`[data-dispatcher-card][data-plan-name="${CSS.escape(plan)}"]`);
+  if (!strip || !card) return;
+  const stripBox = strip.getBoundingClientRect();
+  const cardBox = card.getBoundingClientRect();
+  strip.scrollLeft += cardBox.left + cardBox.width / 2 - (stripBox.left + stripBox.width / 2);
+}
+
+/**
+ * The Roadmap tab's In flight face: every plan the dispatcher is carrying, each as a whole card.
  *
  * IT READS THE BUS AND NOTHING ELSE. `useDispatcherPlans` hands it the retained `dispatcher:all`
  * value, so this pane paints on its FIRST render with whatever the bus was already holding rather
@@ -74,16 +91,16 @@ import type { DispatcherLanePicture } from '@/shared/types';
  * foot is the way back from a Hide. A dismissed card has no way back and needs none: the dispatcher
  * still holds the plan, and the card returns by itself when the plan has news.
  *
- * The EmptyState is reachable and is not dead code: the tab is STICKY, so a person standing here when
- * the last plan ends keeps the tab and meets this instead of the tab vanishing under them. It shows
- * only when nothing is DRAWN — no plan, no arc and no loose planner outing: an arc whose plans have all
+ * The EmptyState is reachable and is not dead code: the tab is never off the bar, so a lane with no
+ * plan on it — or one whose last plan ends under a person standing here — draws this, never a missing
+ * tab. It shows only when nothing is DRAWN — no plan, no arc and no loose planner outing: an arc whose plans have all
  * been put away draws no deck at all (`useDispatcherPlans` drops it). `HiddenPlans` rides under it,
  * because a lane whose every unfinished plan is hidden must still offer the way back.
  *
  * IT IS ALSO THE LANDING'S DESTINATION (`revealPlan` / `onRevealed`). A tap on a plan's prompt opens
  * the page on `?runner=<plan>` (`useRunnerLanding`), and that plan's card has to be somewhere a
- * person can see it, however far down the wall or the deck stack it sits. The pane does that and
- * NOTHING ELSE: it scrolls, it unfolds nothing, it un-hides nothing, and it retires the request the
+ * person can see it, however far down the wall or the deck stack it sits and however far along its
+ * deck's strip. The pane does that and NOTHING ELSE: it scrolls, it unfolds nothing, it un-hides nothing, and it retires the request the
  * moment the bus has SPOKEN — a board that has been dealt and holds nothing is an answer, and a
  * request left pending over it would move the pane long after the tap, with no `?runner=` in the URL
  * left to explain why.
@@ -137,11 +154,12 @@ export function RunnerPanel({ revealPlan = null, onRevealed }: RunnerPanelProps)
   // that same value), so a lookup run on the first frames would read a board the feed has not filled
   // yet and retire a request that had nothing to find. An empty lane is not that case: the
   // bus spoke, the board was dealt, and it holds no card, so the request is retired there rather than
-  // left pending to move the pane whenever a plan next appears. A plan of an arc reveals its ARC'S
-  // DECK rather than the card: an arc pages its plans one per view in its strip (`DeckStrip`), so the
-  // deck is the thing that moves. `onRevealed` is called either way, so a plan the operator has put
-  // away since the push — or a name the lane does not carry at all — retires the request instead of
-  // re-scrolling on every frame.
+  // left pending to move the pane whenever a plan next appears. A plan of an arc is reached in TWO
+  // moves, because an arc pages its plans one per view in its strip (`DeckStrip`): the pane scrolls to
+  // the ARC'S DECK, then the deck's strip is paged to the plan's own card (`pageStripToCard`), so a
+  // plan that is not the card the strip opens on is in view and not a card away. `onRevealed` is
+  // called either way, so a plan the operator has put away since the push — or a name the lane does
+  // not carry at all — retires the request instead of re-scrolling on every frame.
   useEffect(() => {
     if (revealPlan === null) return;
     if (retained === undefined) return;
@@ -155,7 +173,9 @@ export function RunnerPanel({ revealPlan = null, onRevealed }: RunnerPanelProps)
       const target = arc !== null
         ? `[data-dispatch-arc][data-arc-name="${CSS.escape(arc)}"]`
         : `[data-runner-loose-plans] [data-dispatcher-card][data-plan-name="${CSS.escape(revealPlan)}"]`;
-      root.querySelector(target)?.scrollIntoView({ block: 'start' });
+      const found = root.querySelector(target);
+      found?.scrollIntoView({ block: 'start' });
+      if (arc !== null && found !== null) pageStripToCard(found, revealPlan);
     }
     onRevealed();
   }, [revealPlan, retained, plans, onRevealed]);

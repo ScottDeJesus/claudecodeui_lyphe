@@ -55,13 +55,6 @@ export function useDispatcherPlans(): {
    * alone, like `count`, because a plan the operator has put away draws no card his word could reach.
    */
   waiting: number;
-  /**
-   * Whether the Runner tab belongs on the bar: a plan is drawn, or one is hidden. A hidden plan is an
-   * unfinished one, so a lane whose every card is put away but one of them still walks keeps its tab,
-   * or the way back to that plan (the `Hidden` list) would be unreachable while it runs. A lane whose
-   * every card is dismissed does not.
-   */
-  laneOpen: boolean;
   route: DispatcherRoute | null;
   daemon: DispatcherDaemon | null;
   /**
@@ -133,7 +126,6 @@ export function useDispatcherPlans(): {
       hidden,
       count: plans.length,
       waiting,
-      laneOpen: plans.length > 0 || hidden.length > 0,
       route: picture?.route ?? null,
       daemon: picture?.daemon ?? null,
       offpeakAt: epochOf(picture?.offpeak_at ?? null),

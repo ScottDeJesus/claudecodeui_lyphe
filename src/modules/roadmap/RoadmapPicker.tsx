@@ -1,7 +1,8 @@
-import { useContext } from 'react';
+import { useContext, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { FAKE_ROADMAP_VIEW } from '@/modules/roadmap/fake'; // FILL: fake — import { useRoadmap } from '@/modules/roadmap/hooks/useRoadmap';
+import { RoadmapFaceContext } from '@/modules/roadmap/faceContext';
+import { useRoadmap } from '@/modules/roadmap/hooks/useRoadmap';
 import { Select } from '@/shared/ui';
 
 /**
@@ -15,21 +16,33 @@ import { Select } from '@/shared/ui';
  */
 export function RoadmapPicker({ size }: { size: 'md' | 'sm' }) {
   const { t } = useTranslation();
-  const { roadmaps, selected, select } = useContext(FAKE_ROADMAP_VIEW); // FILL: roadmap — useRoadmap(): the picture's roadmaps, the one on screen, and select(name), which writes roadmapSelected whole
-  // FILL: dialogs — the dialog host's opener (RoadmapPath provides it): New roadmap… opens ItemDialog adding a roadmap
+  const { roadmaps, selected, select } = useRoadmap();
+  const { openDialog } = useContext(RoadmapFaceContext);
+  // The Select's own box, to find its trigger in.
+  const rootRef = useRef<HTMLDivElement>(null);
+
+  // The Select takes its action button away in the very commit that mounts the dialog, so the dialog would
+  // record the page body as the place to give focus back to. The trigger takes focus first, and Escape on
+  // the dialog lands the keyboard back on the picker.
+  const openNewRoadmap = () => {
+    rootRef.current?.querySelector<HTMLElement>('[aria-haspopup="listbox"]')?.focus();
+    openDialog({ dialog: 'add', kind: 'roadmap', parent: null });
+  };
 
   return (
-    <Select
-      options={roadmaps.map((roadmap) => ({ value: roadmap.name, label: roadmap.title }))}
-      value={selected?.name ?? ''}
-      onChange={select}
-      placeholder={t('roadmap.picker.none')}
-      ariaLabel={t('roadmap.picker.label')}
-      size={size}
-      action={{
-        label: t('roadmap.picker.new'),
-        onSelect: () => {}, // FILL: onNew — ItemDialog adding a roadmap (kind roadmap), through the dialog host's opener
-      }}
-    />
+    <div ref={rootRef}>
+      <Select
+        options={roadmaps.map((roadmap) => ({ value: roadmap.name, label: roadmap.title }))}
+        value={selected?.name ?? ''}
+        onChange={select}
+        placeholder={t('roadmap.picker.none')}
+        ariaLabel={t('roadmap.picker.label')}
+        size={size}
+        action={{
+          label: t('roadmap.picker.new'),
+          onSelect: openNewRoadmap,
+        }}
+      />
+    </div>
   );
 }

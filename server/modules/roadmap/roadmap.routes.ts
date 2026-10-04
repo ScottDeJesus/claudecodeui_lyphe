@@ -1,8 +1,8 @@
 import express from 'express';
 
-import type { RoadmapAct, RoadmapPicture, RoadmapWriteResult } from '@/shared/roadmap-types.js';
+import type { RoadmapAct, RoadmapCase, RoadmapPicture, RoadmapWriteResult } from '@/shared/roadmap-types.js';
 
-import { writeArgv } from './roadmap-write.service.js';
+import { NAME_PATTERN, writeArgv } from './roadmap-write.service.js';
 
 export type RoadmapRouterDependencies = {
   /**
@@ -16,6 +16,11 @@ export type RoadmapRouterDependencies = {
   relay: (act: RoadmapAct, argv: readonly string[], body: unknown) => Promise<RoadmapWriteResult>;
   /** Reads the roadmap again now, so a write that landed redraws the screen within moments (`PolledLane.poke`). */
   poke: () => void;
+  /**
+   * One feature's active cases, read through the cases door (`roadmap-cases.service.ts`) when the
+   * feature dialog opens. Rejects with one sentence naming what the door said or did not.
+   */
+  cases: (feature: string) => Promise<RoadmapCase[]>;
 };
 
 /**
@@ -41,8 +46,13 @@ function statusForWrite(result: RoadmapWriteResult): number {
 }
 
 /**
- * The roadmap lane's ten routes: one read of the picture and the nine writes. Auth is the mount's
- * `authenticateToken`, in `server/index.ts`.
+ * The roadmap lane's eleven routes: one read of the picture, one read of a feature's cases and the nine
+ * writes. Auth is the mount's `authenticateToken`, in `server/index.ts`.
+ *
+ * `GET /cases?feature=<name>` fences its one query to a plan name (a 400 with a sentence, nothing run)
+ * and answers `{ cases }`. A read that threw answers 502 with the thrown sentence as `error`: the
+ * cases door is an upstream command that failed, and `readDispatcherJson` hands back a sentence, not a
+ * result with a `reason` for `statusForWrite` to sort into its 504 and 503.
  *
  * These handlers fence and translate and do nothing else. `writeArgv` turns a body into the
  * dispatcher's argv or a sentence naming the field that fails its fence (a 400, nothing spawned); the
@@ -60,6 +70,20 @@ export function createRoadmapRouter(dependencies: RoadmapRouterDependencies): ex
       response.json(picture === null ? NOT_READ_YET : { ...picture, at: Date.now() });
     } catch (error) {
       next(error);
+    }
+  });
+
+  router.get('/cases', async (request, response) => {
+    const feature = request.query.feature;
+    if (typeof feature !== 'string' || !NAME_PATTERN.test(feature)) {
+      response.status(400).json({ error: 'feature must be a plan name' });
+      return;
+    }
+    try {
+      response.json({ cases: await dependencies.cases(feature) });
+    } catch (error) {
+      // The sentence is the answer's reason, so the dialog says what the door said.
+      response.status(502).json({ error: error instanceof Error ? error.message : 'the cases door did not answer' });
     }
   });
 

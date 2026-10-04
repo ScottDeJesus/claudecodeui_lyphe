@@ -1,12 +1,14 @@
 import { Ban, FolderInput, MoreHorizontal, Pencil, Trash2, X } from 'lucide-react';
-// FILL: imports — the markers' own: react's useState beside these, and useRoadmap and useRoadmapWrites
-import { useEffect, useId, useMemo } from 'react';
+import { useEffect, useId, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { FAKE_PICTURE } from '@/modules/roadmap/fake'; // FILL: fake — retired with the picture's fake below
+import { useFeatureCases } from '@/modules/roadmap/hooks/useFeatureCases';
+import { useRoadmap } from '@/modules/roadmap/hooks/useRoadmap';
+import { useRoadmapWrites } from '@/modules/roadmap/hooks/useRoadmapWrites';
 import { BlockDialog } from '@/modules/roadmap/modals/BlockDialog';
 import { DeleteDialog } from '@/modules/roadmap/modals/DeleteDialog';
+import { FeatureCases } from '@/modules/roadmap/modals/FeatureCases';
 import { FeatureFacts } from '@/modules/roadmap/modals/FeatureFacts';
 import { ItemDialog } from '@/modules/roadmap/modals/ItemDialog';
 import { MoveDialog } from '@/modules/roadmap/modals/MoveDialog';
@@ -17,15 +19,10 @@ import { ActionMenu, Banner, Button, Chip, Dialog, DialogContent, DialogTitle } 
 import type { ActionMenuItem } from '@/shared/ui';
 import { folderName } from '@/shared/utils';
 
-// Each fill marker below governs the ONE statement under it, which holds a fake standing in for what the
-// fill reads, holds or does; a marker standing alone marks the line the fill adds there. `imports` governs
-// the react import under it and the lines the fill adds beside it, and `fake` the import it sits on, which
-// the fill deletes. Every other line is composition and stays as it is.
-
-/** What stands in for the feature's own dialog: one follow-on, opened from its presses. `goal` is the edit opened on the goal first, and `then` is what follows its Save. */
+/** What is open over the feature's own dialog: one follow-on, opened from its presses. `goal` is the edit opened on the goal first, and `then` is what follows its Save. */
 type FollowOn = { dialog: 'edit' | 'move' | 'block' | 'delete' | 'promote' } | { dialog: 'goal'; then: 'propose' | 'promote' | null };
 
-/** The dialog as it opens: the feature itself, no follow-on in its place. */
+/** The dialog as it opens: the feature itself, nothing open over it. */
 const NO_FOLLOW_ON: FollowOn | null = null;
 
 /** No write out from this dialog's own presses: what it opens with. */
@@ -58,7 +55,9 @@ function placeOf(picture: RoadmapPicture, name: string): Place | null {
 /**
  * THE FEATURE, WHOLE: where it lives ("<epic> · <milestone>"), its title in the display serif and its
  * project; then, first under the head, whatever is in its way in warn — waiting on the operator, blocked
- * (with Unblock beside the reason), or under a blocked epic or milestone; then `FeatureFacts`.
+ * (with Unblock beside the reason), or under a blocked epic or milestone; then `FeatureFacts`, which
+ * draws the feature's cases (`FeatureCases`) once the picture counts one: their sentences are read here as
+ * the dialog opens, never carried on the polled picture.
  *
  * ITS PRESSES FOLLOW ITS WORD. The way forward is the footer, one or two buttons: an idea is Propose
  * (lined up, cheap to undo) and Promote; a proposed feature is Promote and Back to idea; a designing or
@@ -71,10 +70,16 @@ function placeOf(picture: RoadmapPicture, name: string): Place | null {
  * open `ItemDialog` on the goal first, and its Save says what follows. Promote always asks first
  * (`PromoteDialog`), because it starts a real Eupalinos.
  *
- * ONE DIALOG AT A TIME. A follow-on — `ItemDialog`, `MoveDialog`, `BlockDialog`, `DeleteDialog`,
- * `PromoteDialog` — is drawn IN PLACE of this one and hands back to it when it closes: two dialogs open
- * at once would both take the same Escape. The feature is read off each frame, so what it hands back to
- * already shows the write; a frame without the feature closes it.
+ * A FOLLOW-ON OPENS OVER IT, AND THE FEATURE STAYS. `ItemDialog`, `MoveDialog`, `BlockDialog`,
+ * `DeleteDialog` and `PromoteDialog` draw over this dialog, their scrim fading in over a scrim that never
+ * leaves, so the screen never goes bare between two steps of one task, and the feature is there when the
+ * follow-on closes. Both dialogs hear an Escape (each listens on the window; a backdrop press lands on
+ * the follow-on's own scrim), so this one ignores a close while a follow-on is up: the first Escape closes
+ * the follow-on, the next this one.
+ * (Each library `Dialog` also saves and restores `body.style.overflow`; stacked, two restores can cross,
+ * which `html, body { overflow: hidden }` in `src/index.css` makes harmless.) The feature is read off each
+ * frame, so what a follow-on hands back to already shows its write; a frame without the feature closes
+ * this dialog, follow-on and all.
  *
  * Used by the roadmap module: the Roadmap face's dialog host opens it from a feature row (an epic's card,
  * the rail) and the chat gutter's roadmap widget from its rows.
@@ -84,37 +89,21 @@ export function FeatureDialog({ name, onOpenCard, onClose }: FeatureDialogProps)
   const titleId = useId();
   useReturnFocus();
 
-  // FILL: picture — useRoadmap().picture: the live picture the feature, its place and its waits are read from
-  const picture: RoadmapPicture | null = FAKE_PICTURE;
-  // FILL: writes — const writes = useRoadmapWrites(): Propose, Back to idea and Unblock write through it here; each follow-on writes its own
-  // FILL: followOn — component state, with its comment: which follow-on stands in for this dialog, opening on NO_FOLLOW_ON
-  const followOn: FollowOn | null = NO_FOLLOW_ON;
-  // FILL: busy — component state, with its comment: the act this dialog's own presses have out (propose, unpropose, unblock), so its press shows busy and none is sent twice
-  const busy: RoadmapAct | null = NOTHING_OUT;
-  // FILL: onPropose — writes.propose({ name, itemTitle: feature.title }) with busy 'propose'; with no goal, setFollowOn({ dialog: 'goal', then: 'propose' }) instead
-  const propose = () => {};
-  // FILL: onPromote — setFollowOn({ dialog: 'promote' }); with no goal, setFollowOn({ dialog: 'goal', then: 'promote' }) instead
-  const promote = () => {};
-  // FILL: onBackToIdea — writes.unpropose({ name, itemTitle: feature.title }) with busy 'unpropose'
-  const backToIdea = () => {};
-  // FILL: onUnblock — writes.unblock({ kind: 'plan', name, itemTitle: feature.title }) with busy 'unblock'
-  const unblock = () => {};
-  // FILL: onWriteGoal — setFollowOn({ dialog: 'goal', then: null }), from the goal's empty place
-  const writeGoal = () => {};
-  // FILL: onEdit — setFollowOn({ dialog: 'edit' }), from Edit and Edit title and project
-  const edit = () => {};
-  // FILL: onMove — setFollowOn({ dialog: 'move' })
-  const move = () => {};
-  // FILL: onMarkBlocked — setFollowOn({ dialog: 'block' })
-  const markBlocked = () => {};
-  // FILL: onDelete — setFollowOn({ dialog: 'delete' }), from Delete idea… and Delete…
-  const remove = () => {};
-  // FILL: onOpenCard — the prop itself (const openCard = onOpenCard): the face turns to In flight on the card named, and this dialog goes with the face
-  const openCard: typeof onOpenCard = () => {};
-  // FILL: onFollowOnClosed — (written) => a goal written for `then` 'propose' runs writes.propose with busy 'propose', for 'promote' opens setFollowOn({ dialog: 'promote' }); a landed delete closes this dialog (onClose()); anything else is setFollowOn(null), back to the feature
-  const closeFollowOn = (_written: boolean) => {};
+  // The live picture the feature, its place and its waits are read from: each new frame redraws them.
+  const { picture } = useRoadmap();
+  const writes = useRoadmapWrites();
+  // Which follow-on is open over this dialog, one at a time (a dialog is modal), or none: the feature alone.
+  const [followOn, setFollowOn] = useState<FollowOn | null>(NO_FOLLOW_ON);
+  // The act this dialog's own presses have out (propose, unpropose, unblock): its press shows busy and none is sent twice.
+  const [busy, setBusy] = useState<RoadmapAct | null>(NOTHING_OUT);
 
   const place = useMemo(() => (picture === null ? null : placeOf(picture, name)), [picture, name]);
+  // The feature's cases as the Cases section lists them: the list, whether a read is out, and why the latest one
+  // failed. Read as the dialog opens, then again ONLY when one of the six counts differs BY VALUE from those the
+  // last read answered for — every frame hands a new `cases` object, changed or not, so the object is never the
+  // key — and a re-read keeps the last list while it is out. So a case that breaks while the dialog is open is
+  // never still listed as holding beside a row that says "1 broken", and the list never blinks on a poll.
+  const caseRead = useFeatureCases(name, place?.feature.cases ?? null);
 
   // A FRAME CAN END THE DIALOG: once a picture no longer holds the feature (deleted, here or on another
   // device), there is nothing left to show. No picture yet is a reading still on its way.
@@ -128,6 +117,46 @@ export function FeatureDialog({ name, onOpenCard, onClose }: FeatureDialogProps)
   const unpromoted = word === 'idea' || word === 'proposed';
   const building = word === 'designing' || word === 'in flight';
   const out = busy !== null;
+  // The Cases section shows only for a feature the picture counts a case for.
+  const keepsCases = feature.cases.total > 0;
+
+  // One of this dialog's own writes, its press shown busy while it is out. The dialog stays on the feature
+  // either way: a landed write shows in the next frame, and a refusal in the hook's toast.
+  const write = async (act: RoadmapAct, send: () => Promise<boolean>) => {
+    setBusy(act);
+    await send();
+    setBusy(NOTHING_OUT);
+  };
+  const proposeNow = () => write('propose', () => writes.propose({ name, itemTitle: feature.title }));
+  // The store refuses a feature with no goal to propose or promote, so with none the press opens the goal first, and its Save says what follows.
+  const propose = () => {
+    if (feature.goal) void proposeNow();
+    else setFollowOn({ dialog: 'goal', then: 'propose' });
+  };
+  const promote = () => setFollowOn(feature.goal ? { dialog: 'promote' } : { dialog: 'goal', then: 'promote' });
+  const backToIdea = () => void write('unpropose', () => writes.unpropose({ name, itemTitle: feature.title }));
+  const unblock = () => void write('unblock', () => writes.unblock({ kind: 'plan', name, itemTitle: feature.title }));
+  const writeGoal = () => setFollowOn({ dialog: 'goal', then: null });
+  const edit = () => setFollowOn({ dialog: 'edit' });
+  const move = () => setFollowOn({ dialog: 'move' });
+  const markBlocked = () => setFollowOn({ dialog: 'block' });
+  const remove = () => setFollowOn({ dialog: 'delete' });
+  // A follow-on closes through here. A goal just written carries on to what it was written for — the propose,
+  // or the question before a promote; a delete that landed ends this dialog too (the feature is gone). Anything
+  // else, written or not, is back to the feature, which already shows what was written.
+  const closeFollowOn = (written: boolean) => {
+    const closed = followOn;
+    if (written && closed?.dialog === 'delete') {
+      onClose();
+      return;
+    }
+    if (written && closed?.dialog === 'goal' && closed.then === 'promote') {
+      setFollowOn({ dialog: 'promote' });
+      return;
+    }
+    setFollowOn(NO_FOLLOW_ON);
+    if (written && closed?.dialog === 'goal' && closed.then === 'propose') void proposeNow();
+  };
 
   const upkeep: ActionMenuItem[] = [
     { key: 'edit', label: t(unpromoted ? 'roadmap.dialog.feature.edit' : 'roadmap.dialog.feature.editTitleProject'), icon: Pencil, onSelect: edit },
@@ -151,15 +180,16 @@ export function FeatureDialog({ name, onOpenCard, onClose }: FeatureDialogProps)
       ? [press('back', t('roadmap.dialog.feature.backToIdea'), backToIdea, 'ghost', 'unpropose'), press('promote', t('roadmap.dialog.feature.promote'), promote, 'default')]
       : !building ? []
         : feature.waiting_on_you !== null
-          ? [press('answer', t('roadmap.dialog.feature.answerCard'), () => openCard(feature.name), 'default')]
-          : [press('open', t('roadmap.dialog.feature.openCard'), () => openCard(feature.name), 'outline')];
+          ? [press('answer', t('roadmap.dialog.feature.answerCard'), () => onOpenCard(feature.name), 'default')]
+          : [press('open', t('roadmap.dialog.feature.openCard'), () => onOpenCard(feature.name), 'outline')];
 
   const owed = feature.waiting_on_you;
   const warnings = owed !== null || feature.blocked !== null || epic.blocked !== null || milestone.blocked !== null;
 
   return (
     <>
-      <Dialog open={followOn === null} onOpenChange={(open) => { if (!open) onClose(); }}>
+      {/* Always open: a follow-on draws over it. An Escape while one is up is the follow-on's (both hear it), never this dialog's. */}
+      <Dialog open onOpenChange={(open) => { if (!open && followOn === null) onClose(); }}>
         <DialogContent
           aria-labelledby={titleId}
           data-roadmap-dialog="feature"
@@ -179,8 +209,9 @@ export function FeatureDialog({ name, onOpenCard, onClose }: FeatureDialogProps)
               </div>
             </div>
             <div className="-mr-2 -mt-1 flex shrink-0 items-center">
-              <ActionMenu label={t('roadmap.menu.actions', { title: feature.title })} items={upkeep} icon={MoreHorizontal} iconOnly variant="ghost" size="icon" triggerClassName="h-9 w-9" />
-              <Button variant="ghost" size="icon" className="h-9 w-9 text-muted-foreground" aria-label={t('roadmap.dialog.close')} onClick={onClose}>
+              {/* 44px on a phone, Verve's touch minimum: on a shipped feature the × is the one visible way out. */}
+              <ActionMenu label={t('roadmap.menu.actions', { title: feature.title })} items={upkeep} icon={MoreHorizontal} iconOnly variant="ghost" size="icon" triggerClassName="h-9 w-9 max-md:h-11 max-md:w-11" />
+              <Button variant="ghost" size="icon" className="h-9 w-9 text-muted-foreground max-md:h-11 max-md:w-11" aria-label={t('roadmap.dialog.close')} onClick={onClose}>
                 <X aria-hidden="true" />
               </Button>
             </div>
@@ -198,7 +229,7 @@ export function FeatureDialog({ name, onOpenCard, onClose }: FeatureDialogProps)
                     <Banner
                       tone="warn"
                       action={(
-                        <Button variant="ghost" size="sm" className="-my-1.5 h-8 shrink-0 px-2.5 max-md:h-11" disabled={out} aria-busy={busy === 'unblock' || undefined} onClick={unblock}>
+                        <Button variant="outline" size="sm" className="-my-1.5 h-8 shrink-0 px-2.5 max-md:h-11" disabled={out} aria-busy={busy === 'unblock' || undefined} onClick={unblock}>
                           {t('roadmap.dialog.feature.unblock')}
                         </Button>
                       )}
@@ -210,7 +241,12 @@ export function FeatureDialog({ name, onOpenCard, onClose }: FeatureDialogProps)
                   {milestone.blocked !== null && <Banner tone="warn"><span className="break-words">{t('roadmap.dialog.feature.milestoneBlocked', { why: milestone.blocked })}</span></Banner>}
                 </div>
               )}
-              <FeatureFacts feature={feature} picture={picture} onWriteGoal={writeGoal} />
+              <FeatureFacts
+                feature={feature}
+                picture={picture}
+                onWriteGoal={writeGoal}
+                cases={keepsCases ? <FeatureCases cases={caseRead.cases} loading={caseRead.loading} failure={caseRead.failure} /> : null}
+              />
             </div>
           </div>
 

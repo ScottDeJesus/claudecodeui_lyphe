@@ -587,20 +587,6 @@ probe-key: d8df40e2919b689a77d33f8ffd61032e5bfa0430
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/claude-updates/ClaudeUpdatesSettingsTab.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/claude-updates/hooks/useClaudeUpdates.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts
 
-## INV-5689 — probe — The catalog read loads all settings sources from world-writable `/tmp`: another user's `.claude/settings.json` there runs as the server user, and the operator's own session hooks fire on every read
-
-The catalog read loads all settings sources from world-writable `/tmp`: another user's `.claude/settings.json` there runs as the server user, and the operator's own session hooks fire on every read
-
-```probe
-D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1; mkdir -p "$D/cwd/.claude" || exit 1; printf '{"hooks":{"SessionStart":[{"hooks":[{"type":"command","command":"touch %s/PLANTED"}]}]}}' "$D" > "$D/cwd/.claude/settings.json"; printf "import { readClaudeModelsDefinition } from '/home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-model-catalog.ts';\nawait readClaudeModelsDefinition();\n" > "$D/r.mts"; cd /home/lyphe/.claude/claudecodeui_lyphe && TMPDIR="$D/cwd" CLOUDCLI_CLAUDE_MODEL_CATALOG_PATH="$D/cat.json" strace -f -qq -s 300 -e trace=execve -e signal=none -o "$D/trace" npx tsx --tsconfig server/tsconfig.json "$D/r.mts"; sleep 3; ls "$D/PLANTED"; echo "hooks run: $(grep -cE 'execve\("/bin/sh", \["/bin/sh", "-c", "[^"]*hooks/' "$D/trace")"; case "$D" in /tmp/athena-probe.*) rm -rf "$D";; esac
-expect: `ls` reports no such file for PLANTED and `hooks run: 0` (today: PLANTED exists and `hooks run: 4` — dispatcher_stop, docstore_start, heal_trigger, load_main_shelves)
-```
-
-measured 2026-09-28 by chain chain-claude-model-catalog-20260928-173328-cec2, finding H1, HIGH
-probe-key: 24eeb7a439b56f74f8f82a74f0baac3a50dc8fce
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/.claude/settings.json
-
 ## INV-5690 — probe — A null version reading overwrites the version-keyed record: one transient `--version` failure costs two catalog spawns
 
 A null version reading overwrites the version-keyed record: one transient `--version` failure costs two catalog spawns
@@ -983,20 +969,6 @@ measured 2026-09-29 by chain chain-chat-image-results-20260929-064842-edca, find
 probe-key: efe96c67a1a69d1908c92d137ef88f9fc6c07fa7
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/file-tree/file-tree-read-path.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-image-blocks.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/chat-image-results.mjs
-
-## INV-5759 — probe — LOW — `files/content` has no regular-file guard, and the diff made every FIFO under the home dir reachable
-
-LOW — `files/content` has no regular-file guard, and the diff made every FIFO under the home dir reachable
-
-```probe
-bash /home/lyphe/.claude/state/pipeline-reviews/chat-image-results/athena-probes/fifo_content.sh
-expect: `refused instead of hung: true` (today: answered `000`, the request hung)
-```
-
-measured 2026-09-29 by chain chain-chat-image-results-20260929-064842-edca, finding L1, LOW
-probe-key: 5034d4f2e62faed52d721a2efe95405f3bf14dfa
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/files/content
 
 ## INV-5760 — probe — LOW — the preview offers Edit on an outside text file, and Edit dead-ends
 
@@ -1421,7 +1393,7 @@ expect: `new in ArchPulse: answered true; project .claude → .claude; url /; tr
 measured 2026-09-29 by chain chain-app-drawer-chat--projects-door-20260929-171607-249f, finding M1, MEDIUM
 probe-key: e58ba3ce7986fa70dd0c73b2c22e54aaf33ebec4
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/.oxlintrc.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/context/ProjectsStateContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/hooks/useOpenProjectChat.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/hooks/useProjectsState.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/hooks/useSidebarController.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/SidebarContent.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/utils/sidebarProjectFormatting.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/sessionRecency.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/open-project-chat.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/recency-tree.mjs
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.oxlintrc.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/context/ProjectsStateContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/hooks/useOpenProjectChat.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/hooks/useProjectsState.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/hooks/useSidebarController.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/SidebarContent.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/utils/sidebarProjectFormatting.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/sessionRecency.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts
 
 ## INV-5892 — probe — `ProjectChatContext` has no why-comment above its declaration
 
@@ -1435,7 +1407,7 @@ expect: the line above is `const ProjectActiveSessionContext = createContext…`
 measured 2026-09-29 by chain chain-app-drawer-chat--projects-door-20260929-171607-249f, finding L1, LOW
 probe-key: c5e4f8710c1c0b5195fc0fd14f4bd392283f37e3
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/.oxlintrc.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/context/ProjectsStateContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/hooks/useOpenProjectChat.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/hooks/useProjectsState.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/hooks/useSidebarController.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/SidebarContent.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/utils/sidebarProjectFormatting.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/sessionRecency.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/open-project-chat.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/recency-tree.mjs
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.oxlintrc.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/context/ProjectsStateContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/hooks/useOpenProjectChat.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/hooks/useProjectsState.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/hooks/useSidebarController.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/SidebarContent.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/utils/sidebarProjectFormatting.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/sessionRecency.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts
 
 ## INV-5902 — probe — When the registry loses the row of the left slot, the layer draws the right application under `data-pane-side="left"`, and every act over it is greyed
 
@@ -2426,20 +2398,6 @@ probe-key: 5ab6902890cacb730a984a344dc7b77ec75aa07b
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/session-user-state.db.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/simple-list-ladder.db.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/services/session-user-state.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/session-user-state.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-sidebar-state-api.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-simple-reorder.mjs
 
-## INV-6110 — probe — `.verify/probe-plan-ask-scaffold.mjs` is stale by construction, and no longer inert
-
-`.verify/probe-plan-ask-scaffold.mjs` is stale by construction, and no longer inert
-
-```probe
-cd /home/lyphe/.claude/claudecodeui_lyphe && for f in PlanAsk LockAnswer RoundAnswer; do printf '%s %s\n' "$f" "$(grep -c '^[ \t]*// FILL: ' src/modules/dispatcher/$f.tsx)"; done
-expect: PlanAsk 0 / LockAnswer 0 / RoundAnswer 0 — while `.verify/probe-plan-ask-scaffold.mjs:658` demands 1 / 4 / 2
-```
-
-measured 2026-09-30 by chain chain-prompts-in-cards--fill-20260930-145432-20c1, finding M1, MEDIUM
-probe-key: bfa2d7be2ebac6322ccd9574bcda7afb113b1ae4
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-plan-ask-scaffold.mjs
-
 ## INV-6141 — probe — INV-6095: "the card's door … never consults it" no longer reproduces
 
 INV-6095: "the card's door … never consults it" no longer reproduces
@@ -2617,20 +2575,6 @@ measured 2026-10-01 by chain chain-plan-model-default-claude-20261001-165404-dcb
 probe-key: 64905667859c70b3b1fe440f60d1fe69f8225173
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/utils.ts, /home/lyphe/.claude/hooks/dispatcher/model.py, /home/lyphe/.claude/hooks/dispatcher/store_arcs.py, /home/lyphe/.claude/hooks/dispatcher/width.py
-
-## INV-6330 — probe — `.verify/probe-runner-model-pin.mjs` asserts the old default against a surface that is gone
-
-`.verify/probe-runner-model-pin.mjs` asserts the old default against a surface that is gone
-
-```probe
-cd /home/lyphe/.claude/claudecodeui_lyphe && rg -c "data-runner-model|plan-runner/runs" src server -g '!node_modules'; rg -n "the runner's default" .verify/probe-runner-model-pin.mjs
-expect: no output from either — the script is deleted, or no longer says DeepSeek is the default (today: the first prints nothing because the surface is gone, the second prints line 59)
-```
-
-measured 2026-10-01 by chain chain-plan-model-default-claude-20261001-165404-dcb1, finding L2, LOW
-probe-key: 3b5f37d101f8b284f660097a532f267045cd2e4f
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-runner-model-pin.mjs
 
 ## INV-6331 — probe — a keyboard reader cannot reach a page's options: focus never follows the strip, and Tab always enters page 1
 
@@ -2817,8 +2761,9 @@ CloudCLI's text names arcs, plans and phases as epics, features and tasks. Ident
 
 **CloudCLI's own words — where they are written**
 - The en locale: `src/modules/i18n/locales/en/{common,chat,settings}.json`.
+- The roadmap screen: the `roadmap` block of `en/common.json` (MAN-7634) and the Roadmap tab's `tabs.runner`, `runner.title`, `runner.empty` (MAN-7654). It says milestone, epic, feature and task everywhere, and shows a slug only as the `Name for Claude: <name>` line of a feature's dialog (MAN-7645).
 - The `defaultValue` beside a key: the drawn text when its key is absent, the fallback when present — both carry the new words (`ComposerDeepSeekSwitch.tsx`, `RunnerModelContent.tsx` with its five `agents.runnerSwarm.*` keys no locale holds, `RunnerParkAtPeakRow.tsx`).
-- The command palette's Runner keywords carry both vocabularies (`CommandPalette.tsx`).
+- The command palette's `Go to Roadmap` keywords carry both vocabularies (`CommandPalette.tsx`).
 - The ten other locales hold none of the dispatcher keys and fall back to English. Their values whose English changed say what the new English says: `chat.json` `input.deepseekFlashTooltip`, `settings.json` `agents.runnerModel.description`, fr `agents.runnerParkAtPeak.*`. "plan runner" is "runner" in them, left in English.
 - The push copy: `notification-copy.service.ts` — `Feature finished`, `Epic finished`, `Feature paused`, `Features paused …`, `Task relaunched`, `Task <key> was taken up again`, `<done>/<n> tasks`.
 - The server's two sentences: `NO_ANSWER.timeout` (`server/shared/dispatcher-command.ts`), `OTHER_PROCESS_EXAMPLES` (`claude-activity.service.ts`).
@@ -2827,6 +2772,7 @@ CloudCLI's text names arcs, plans and phases as epics, features and tasks. Ident
 - `useDispatcherVerbs` — the verb toast.
 - `PlanFace` — the caption's posture.
 - `PlannerBadge` — the cause a planner outing ended on.
+- `useRoadmapWrites` — the refusal toast of a roadmap write (its success toasts are written in the locale, `roadmap.toast.*`).
 - The dispatcher's own bytes never change.
 
 **The house's text to the operator** carries his words at its own home:
@@ -2838,7 +2784,7 @@ CloudCLI's text names arcs, plans and phases as epics, features and tasks. Ident
 
 **The slash doors**: `/feature` is `/plan`, `/epic` is `/arc` (`skills/feature/SKILL.md`, `skills/epic/SKILL.md`). Each loads its skill and runs that sequence; nothing of the sequence lives in the door.
 
-**Authored text is drawn as written**: a plan's name, goal, `delivers`, phase titles, the events feed, the stage lines.
+**Authored text is drawn as written**: a plan's name, goal, `delivers`, phase titles, the events feed, the stage lines, a roadmap's, milestone's, epic's and feature's title and goal.
 
 **Keeps arc, plan, phase**
 - Identifiers and store words: `plans`, `phases`, `arcs`, `plan.arc`, `DispatcherPlan`.
@@ -3009,20 +2955,6 @@ expect: parent is required: the milestone a arc belongs to | a arc takes no proj
 
 measured 2026-10-03 by chain chain-roadmap--lane--contract-20261003-164520-4b5e, finding L1, LOW
 probe-key: fd2c4fcc2acd6bc8e84e627948163ceab03bf0e4
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/.oxlintrc.json, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/roadmap/roadmap-write.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/roadmap-types.ts
-
-## INV-6550 — probe — the header points at a mirror file that does not exist
-
-the header points at a mirror file that does not exist
-
-```probe
-cd /home/lyphe/.claude/claudecodeui_lyphe && ls src/shared/roadmap-types.ts 2>&1 | head -1; sed -n 9p server/shared/roadmap-types.ts
-expect: ls: cannot access 'src/shared/roadmap-types.ts': No such file or directory, then the "The client mirror is …" line
-```
-
-measured 2026-10-03 by chain chain-roadmap--lane--contract-20261003-164520-4b5e, finding L2, LOW
-probe-key: 28f86f30dbef56bf7a9a52784cb3d0e92a3c9996
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/.oxlintrc.json, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/roadmap/roadmap-write.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/roadmap-types.ts
 
@@ -3304,3 +3236,500 @@ measured 2026-10-03 by chain chain-roadmap--screen--feature-scaffold-20261003-20
 probe-key: bf3752d689a6fa501d5febcccda656a5387f1ff6
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/FeatureRow.tsx
+
+## INV-6590 — probe — During a milestone moment the solid rail drops back to the station before the reached one, then snaps forward unanimated when the moment clears (MEDIUM)
+
+During a milestone moment the solid rail drops back to the station before the reached one, then snaps forward unanimated when the moment clears (MEDIUM)
+
+```probe
+cd /home/lyphe/.claude/claudecodeui_lyphe && node ~/.claude/state/pipeline-reviews/roadmap--screen--path-scaffold/review-1-probe/rail-moment.mjs light
+expect: every "moment t=" line prints "beyondLeg":1 (the defect stands while they print "beyondLeg":0 between a "before" and a "cleared" that print 1)
+```
+
+measured 2026-10-03 by chain chain-roadmap--screen--path-scaffold-20261003-215256-0fda, finding M1, MEDIUM
+probe-key: c787db8484a4d4338e2aff7d7fe18e86d0c24117
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/common.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/CelebrationLayer.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/hooks/useStepPhrase.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/MilestonePath.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/RoadmapHeader.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/RoadmapPath.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/RoadmapPicker.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/RoadmapRail.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/RoadmapTab.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/utils.ts
+
+## INV-6591 — probe — When a milestone is reached, the stage follows `current` past it, so that milestone's epic and feature moments play on cards and rows the face does not draw (MEDIUM)
+
+When a milestone is reached, the stage follows `current` past it, so that milestone's epic and feature moments play on cards and rows the face does not draw (MEDIUM)
+
+```probe
+cd /home/lyphe/.claude/claudecodeui_lyphe && node ~/.claude/state/pipeline-reviews/roadmap--screen--path-scaffold/review-1-probe/offstage.mjs
+expect: "epic moment (runner-cards)" prints "stage":"lyphecli-workspace","epicCard":true with "epic:runner-cards" in "celebrating" (the defect stands while it prints "stage":"lyphecli-command-center","epicCard":false,"celebrating":[])
+```
+
+measured 2026-10-03 by chain chain-roadmap--screen--path-scaffold-20261003-215256-0fda, finding M2, MEDIUM
+probe-key: d9884c0c15d351d451a36253762a8d9af9703a1b
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/common.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/CelebrationLayer.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/hooks/useStepPhrase.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/MilestonePath.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/RoadmapHeader.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/RoadmapPath.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/RoadmapPicker.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/RoadmapRail.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/RoadmapTab.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/utils.ts
+
+## INV-6592 — probe — The bloom's three rings go out together: their stagger is overridden (LOW)
+
+The bloom's three rings go out together: their stagger is overridden (LOW)
+
+```probe
+cd /home/lyphe/.claude/claudecodeui_lyphe && node ~/.claude/state/pipeline-reviews/roadmap--screen--path-scaffold/review-1-probe/rail-moment.mjs light
+expect: every "moment t=" line prints "delays":["0s","0.15s","0.3s"] (the defect stands while they print "delays":["0s","0s","0s"])
+```
+
+measured 2026-10-03 by chain chain-roadmap--screen--path-scaffold-20261003-215256-0fda, finding L1, LOW
+probe-key: 351bf6fa001f4c35294771438ae605154b3ac592
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/common.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/CelebrationLayer.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/hooks/useStepPhrase.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/MilestonePath.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/RoadmapHeader.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/RoadmapPath.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/RoadmapPicker.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/RoadmapRail.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/RoadmapTab.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/utils.ts
+
+## INV-6593 — probe — The milestone-word constant is now written twice (LOW)
+
+The milestone-word constant is now written twice (LOW)
+
+```probe
+cd /home/lyphe/.claude/claudecodeui_lyphe && grep -rln "'roadmap.milestoneWord.notStarted'" src/
+expect: one line, src/shared/constants.ts (the defect stands while it prints MilestonePath.tsx and MilestoneFocus.tsx)
+```
+
+measured 2026-10-03 by chain chain-roadmap--screen--path-scaffold-20261003-215256-0fda, finding L2, LOW
+probe-key: 1f81b2bb28ef8979db4f1b1aa5e29b0381f9270a
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/common.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/CelebrationLayer.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/hooks/useStepPhrase.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/MilestonePath.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/RoadmapHeader.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/RoadmapPath.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/RoadmapPicker.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/RoadmapRail.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/RoadmapTab.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/utils.ts
+
+## INV-6620 — probe — The stamp moves past the epic and the milestone before they play, so any interruption swallows them for good (S24)
+
+The stamp moves past the epic and the milestone before they play, so any interruption swallows them for good (S24)
+
+```probe
+node /home/lyphe/.claude/state/pipeline-reviews/roadmap--screen--celebration-fill/athena-probes/p1-interrupt.mjs
+expect: "reload: epic/milestone rows played = 0" stands (the epic runner-cards and the milestone lyphecli-workspace are swallowed); a number above 0 means cured
+```
+
+measured 2026-10-04 by chain chain-roadmap--screen--celebration-fill-20261003-231515-d4e1, finding M1, MEDIUM
+probe-key: 3674b756081bcf826460813a295429dcdeea1fd4
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/common.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/hooks/useCelebrations.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/utils/celebrationMoments.ts
+
+## INV-6621 — probe — A page signed in earlier replays what another device already played (S31)
+
+A page signed in earlier replays what another device already played (S31)
+
+```probe
+node /home/lyphe/.claude/state/pipeline-reviews/roadmap--screen--celebration-fill/athena-probes/p2-stale-mirror.mjs
+expect: "device B replayed 4 moment rows A already played" stands; 0 means cured
+```
+
+measured 2026-10-04 by chain chain-roadmap--screen--celebration-fill-20261003-231515-d4e1, finding M2, MEDIUM
+probe-key: ec2cc752e8b73cc6bff1972abb9daa7e47bab931
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/common.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/hooks/useCelebrations.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/utils/celebrationMoments.ts
+
+## INV-6622 — probe — A live task moment yanks the stage off the milestone the reader pressed, remounting the focus panel (this build × the scaffold's `playing`)
+
+A live task moment yanks the stage off the milestone the reader pressed, remounting the focus panel (this build × the scaffold's `playing`)
+
+```probe
+node /home/lyphe/.claude/state/pipeline-reviews/roadmap--screen--celebration-fill/athena-probes/p3-task-stage.mjs
+expect: "stands: the stage left the pressed milestone for the task moment" stands; "cured: the stage stayed on the pressed milestone" means cured
+```
+
+measured 2026-10-04 by chain chain-roadmap--screen--celebration-fill-20261003-231515-d4e1, finding M3, MEDIUM
+probe-key: 38a11db617f3b765c02ea52abe7af4ea728bae49
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/common.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/hooks/useCelebrations.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/utils/celebrationMoments.ts
+
+## INV-6623 — probe — The "four or more features become one" rule exists only in the catch-up; a live burst plays every feature
+
+The "four or more features become one" rule exists only in the catch-up; a live burst plays every feature
+
+```probe
+node /home/lyphe/.claude/state/pipeline-reviews/roadmap--screen--celebration-fill/athena-probes/p4-live-burst.mjs
+expect: "played 5 separate feature moments" stands; 1 means a summary, as the catch-up makes
+```
+
+measured 2026-10-04 by chain chain-roadmap--screen--celebration-fill-20261003-231515-d4e1, finding L1, LOW
+probe-key: 41314de06f23560debfc66ff5882678ba7469238
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/common.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/hooks/useCelebrations.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/utils/celebrationMoments.ts
+
+## INV-6624 — probe — The builder's fixture prints "played nothing: true" over zero sampled rows
+
+The builder's fixture prints "played nothing: true" over zero sampled rows
+
+```probe
+bash /home/lyphe/.claude/state/pipeline-reviews/roadmap--screen--celebration-fill/athena-probes/p5-fixture-vacuous.sh
+expect: "timeline rows: 0" beside "reload played nothing: true" stands; rows above 0 means cured
+```
+
+measured 2026-10-04 by chain chain-roadmap--screen--celebration-fill-20261003-231515-d4e1, finding L2, LOW
+probe-key: 92224e31781f704f26c98c8f45e6a78adccdc393
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/common.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/hooks/useCelebrations.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/utils/celebrationMoments.ts
+
+## INV-6625 — probe — `inPlay` has no comment above it
+
+`inPlay` has no comment above it
+
+```probe
+bash /home/lyphe/.claude/state/pipeline-reviews/roadmap--screen--celebration-fill/athena-probes/p6-ref-comment.sh
+expect: "line above inPlay:" printing a `const timer = …` line stands; a `//` comment line means cured
+```
+
+measured 2026-10-04 by chain chain-roadmap--screen--celebration-fill-20261003-231515-d4e1, finding L3, LOW
+probe-key: 366a2faec9c3c317b0b0d26455ddd47212962099
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/common.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/hooks/useCelebrations.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/utils/celebrationMoments.ts
+
+## INV-6626 — probe — The catch-up's headline sentence reaches only a screen reader (the design's gap, S11)
+
+The catch-up's headline sentence reaches only a screen reader (the design's gap, S11)
+
+```probe
+node /home/lyphe/.claude/state/pipeline-reviews/roadmap--screen--celebration-fill/athena-probes/p7-summary-sr-only.mjs
+expect: every node reading sr-only=true stands; a node reading sr-only=false means cured
+```
+
+measured 2026-10-04 by chain chain-roadmap--screen--celebration-fill-20261003-231515-d4e1, finding L4, LOW
+probe-key: 68f8f17497364919242d1c98bc85414116809b5c
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/common.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/hooks/useCelebrations.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/utils/celebrationMoments.ts
+
+## INV-6642 — probe — LOW: a carry begun while a drop's write is in flight snaps the list back to its pre-drop order, and its drop is written against an order the operator never saw
+
+LOW: a carry begun while a drop's write is in flight snaps the list back to its pre-drop order, and its drop is written against an order the operator never saw
+
+```probe
+cd ~/.claude/state/pipeline-reviews/roadmap--screen--path-fill/athena-probes && timeout 200 node hold2.mjs 2>&1 | grep -E "after drop 1|2nd carry begun|mid-carry 2|^bodies"
+expect: the "2nd carry begun" line reads ["C","A","B","D"] (the held order) when cured; it reads ["A","B","C","D"] while the defect stands
+```
+
+measured 2026-10-04 by chain chain-roadmap--screen--path-fill-20261004-001959-121c, finding L1, LOW
+probe-key: 5a1eff40f87d6cf05fb2dba1c0331753490dadd6
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/faceContext.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/hooks/useRevealCard.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/modals/OpenDialog.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/railSections.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/sortable/useSortable.ts
+
+## INV-6643 — probe — LOW: another writer's change to the same list ends the hold early, so the snap-back the hold exists to prevent comes back
+
+LOW: another writer's change to the same list ends the hold early, so the snap-back the hold exists to prevent comes back
+
+```probe
+cd ~/.claude/state/pipeline-reviews/roadmap--screen--path-fill/athena-probes && timeout 200 node hold3.mjs 2>&1 | grep -E "other writer added|order over time"
+expect: "order over time" holds no entry whose order starts A,B,C,D,E when cured; the defect prints one between the two C-first orders
+```
+
+measured 2026-10-04 by chain chain-roadmap--screen--path-fill-20261004-001959-121c, finding L2, LOW
+probe-key: 4b635fcba8c2a60ace5516833815113c95da34cd
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/faceContext.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/hooks/useRevealCard.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/modals/OpenDialog.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/railSections.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/sortable/useSortable.ts
+
+## INV-6644 — probe — LOW: `useRevealCard`'s URL fallback pushes a history entry that the landing then replaces, leaving two identical entries and a dead Back
+
+LOW: `useRevealCard`'s URL fallback pushes a history entry that the landing then replaces, leaving two identical entries and a dead Back
+
+```probe
+cd ~/.claude/state/pipeline-reviews/roadmap--screen--path-fill/athena-probes && timeout 200 node bare.mjs 2>&1 | grep -E "^before|after Answer|after ONE Back"
+expect: "after Answer" shows len equal to "before"'s len when cured (a replace); it shows len one higher while the defect stands, and the Back line reads "Back moved to a different URL: false"
+```
+
+measured 2026-10-04 by chain chain-roadmap--screen--path-fill-20261004-001959-121c, finding L3, LOW
+probe-key: bdd8472b09d55113d853866dfbba55b5afd842f0
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/faceContext.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/hooks/useRevealCard.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/modals/OpenDialog.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/railSections.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/sortable/useSortable.ts
+
+## INV-6645 — probe — LOW: Escape on the dialog "New roadmap…" opens from the picker leaves the keyboard on `<body>`
+
+LOW: Escape on the dialog "New roadmap…" opens from the picker leaves the keyboard on `<body>`
+
+```probe
+cd ~/.claude/state/pipeline-reviews/roadmap--screen--path-fill/athena-probes && timeout 120 node picker-focus.mjs 2>&1 | tail -2
+expect: "activeElement = BUTTON[Roadmap]" when cured; "activeElement = BODY" while the defect stands
+```
+
+measured 2026-10-04 by chain chain-roadmap--screen--path-fill-20261004-001959-121c, finding L4, LOW
+probe-key: f2531bdf15ef48a50978eb76159dfc76fd26f7c9
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/faceContext.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/hooks/useRevealCard.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/modals/OpenDialog.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/railSections.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/sortable/useSortable.ts
+
+## INV-6658 — probe — fixture: single-tenant by title; a run after a killed run walks the stale roadmap and exits 1 (`/tmp/heph-roadmap-dialogs-fixture.mjs`)
+
+fixture: single-tenant by title; a run after a killed run walks the stale roadmap and exits 1 (`/tmp/heph-roadmap-dialogs-fixture.mjs`)
+
+```probe
+node /home/lyphe/.claude/state/pipeline-reviews/roadmap--screen--dialogs-fill/athena-probes/probe-fixture-stale.mjs
+expect: fixture-stale: exit=1 left=none   (cured: exit=0 — the fixture clears a standing probe of its title before it starts; ~90 s)
+```
+
+measured 2026-10-04 by chain chain-roadmap--screen--dialogs-fill-20261004-005742-be07, finding L1, LOW
+probe-key: dad6d2e0ac141b490e1b4a6640e42130e82b26b6
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/common.json
+
+## INV-6659 — probe — fixture/report: the walk's footprint in the house is not stated (`result.md`, the fixture header)
+
+fixture/report: the walk's footprint in the house is not stated (`result.md`, the fixture header)
+
+```probe
+grep -c '^orphan page-roadmap-heph-probe-dialogs-walk$' /home/lyphe/.claude/state/dispatcher/roadmap-mirror.log || true
+expect: a number of 1 or more (the page the mirror composed while the builder's probe lived; it is never deleted)
+```
+
+measured 2026-10-04 by chain chain-roadmap--screen--dialogs-fill-20261004-005742-be07, finding L2, LOW
+probe-key: 3eeb92cc3912320d47c023a7d956ddd6ab7a1980
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/common.json
+
+## INV-6660 — probe — fixture transcript does not carry some of what the report states (`/tmp/heph-roadmap-dialogs-fixture.mjs`, `/tmp/heph-roadmap-dialogs-run.log`)
+
+fixture transcript does not carry some of what the report states (`/tmp/heph-roadmap-dialogs-fixture.mjs`, `/tmp/heph-roadmap-dialogs-run.log`)
+
+```probe
+grep -c 'data-tone\|dataset.tone' /tmp/heph-roadmap-dialogs-fixture.mjs || true
+expect: 0 (the fixture never reads a toast's tone; cured: 1 or more)
+```
+
+measured 2026-10-04 by chain chain-roadmap--screen--dialogs-fill-20261004-005742-be07, finding L3, LOW
+probe-key: b1deeda86adaaed48d92e4e42ddf0c156fa67378
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/common.json
+
+## INV-6666 — probe — `row`'s doc comment is stranded above the new `isWholeCount`
+
+`row`'s doc comment is stranded above the new `isWholeCount`
+
+```probe
+grep -n -B3 '^function row(' /home/lyphe/.claude/claudecodeui_lyphe/server/modules/roadmap/roadmap-state.service.ts || echo none
+expect: the three lines above `function row(` end in ` */` (row's own doc) once cured; while the defect stands they show `const isWholeCount = …` there instead
+```
+
+measured 2026-10-04 by chain chain-regression-cases--screen--shapes-20261004-023246-2502, finding L1, LOW
+probe-key: 05314ea0a61a868cc5735fdd43880da1f206e75d
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/roadmap/roadmap-state.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/roadmap-types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/roadmap-types.ts
+
+## INV-6667 — probe — the three containers that gain `cases` do not say what it is, and the epic/roadmap roll-up is told nowhere
+
+the three containers that gain `cases` do not say what it is, and the epic/roadmap roll-up is told nowhere
+
+```probe
+cd /home/lyphe/.claude/claudecodeui_lyphe && python3 -c "
+import re
+t = open('server/shared/roadmap-types.ts').read()
+for n in ('RoadmapFeature','RoadmapEpic','Roadmap'):
+    d = re.search(r'(/\*\*(?:(?!\*/).)*?\*/)\s*export type ' + n + r'\b', t, re.S)
+    print(n, 'container doc names cases:', bool(d and 'cases' in d.group(1)))"
+expect: three lines; `container doc names cases: False` for each while the defect stands, `True` once the containers say it
+```
+
+measured 2026-10-04 by chain chain-regression-cases--screen--shapes-20261004-023246-2502, finding L2, LOW
+probe-key: 70a4193179035e6ba9a58b28c4c87a4edae14ac9
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/roadmap/roadmap-state.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/roadmap-types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/roadmap-types.ts
+
+## INV-6670 — probe — LOW — a cases-door failure leads with `dispatcher list …`, a verb that does not exist, while the same route's field refusals lead with `cases list …`
+
+LOW — a cases-door failure leads with `dispatcher list …`, a verb that does not exist, while the same route's field refusals lead with `cases list …`
+
+```probe
+T=$(curl -s -X POST http://127.0.0.1:3011/api/auth/login -H 'Content-Type: application/json' -d '{"username":"verve","password":"verve-dev-2026"}' | jq -r .token); curl -s -H "Authorization: Bearer $T" 'http://127.0.0.1:3011/api/roadmap/cases?feature=no-such-plan' | jq -r '.error // "none"'
+expect: prints `dispatcher list --plan no-such-plan --state active --json exited 2: REFUSED list: no plan no-such-plan in the store` while the defect stands (cured: it leads with `cases list`)
+```
+
+measured 2026-10-04 by chain chain-regression-cases--screen--route-20261004-024905-8a65, finding L1, LOW
+probe-key: 4f48f6094ea1d423feecc4713bfb0c4450308bf6
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/roadmap/roadmap-cases.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/roadmap/roadmap.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/roadmap/roadmap.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts
+
+## INV-6671 — probe — LOW — a failed cases read leaves no server-side trace
+
+LOW — a failed cases read leaves no server-side trace
+
+```probe
+cd /home/lyphe/.claude/claudecodeui_lyphe && D=$(mktemp -d /tmp/athena-cases-XXXXXX) && case "$D" in /tmp/athena-cases-*) ;; *) exit 1;; esac && printf '#!/bin/sh\necho "Traceback (most recent call last):" >&2\nexit 1\n' > $D/stub && chmod +x $D/stub && cat > $D/j.mts <<'EOF'
+import express from 'express';
+import { createRoadmapRouter } from '/home/lyphe/.claude/claudecodeui_lyphe/server/modules/roadmap/roadmap.routes.ts';
+import { readFeatureCases } from '/home/lyphe/.claude/claudecodeui_lyphe/server/modules/roadmap/roadmap-cases.service.ts';
+const lines: string[] = [];
+for (const k of ['log', 'warn', 'error', 'info'] as const) (console as any)[k] = (...a: unknown[]) => { lines.push(`${k}: ${a.join(' ')}`); };
+const deps = { bin: process.env.STUB as string, timeoutMs: 3000, env: { PATH: process.env.PATH ?? '', HOME: process.env.HOME ?? '' } };
+const app = express();
+app.use('/api/roadmap', createRoadmapRouter({ current: async () => null, relay: async () => { throw new Error('no'); }, poke() {}, cases: (f: string) => readFeatureCases(deps, f) }));
+const server = app.listen(0, '127.0.0.1', async () => {
+  const port = (server.address() as { port: number }).port;
+  const r = await fetch(`http://127.0.0.1:${port}/api/roadmap/cases?feature=x`);
+  process.stdout.write(`status ${r.status} | console lines from route: ${lines.length}\n`);
+  server.close(); process.exit(0);
+});
+EOF
+STUB=$D/stub TSX_TSCONFIG_PATH=server/tsconfig.json node --import tsx $D/j.mts 2>&1 | tail -1; cd /tmp && case "$D" in /tmp/athena-cases-*) rm -r "$D";; esac
+expect: prints `status 502 | console lines from route: 0` while the defect stands (cured: a non-zero count, one `[Roadmap]`-style line naming the sentence)
+```
+
+measured 2026-10-04 by chain chain-regression-cases--screen--route-20261004-024905-8a65, finding L2, LOW
+probe-key: e386c334fe7399513c0af47b0284513cf0d462f7
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/roadmap/roadmap-cases.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/roadmap/roadmap.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/roadmap/roadmap.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts
+
+## INV-6672 — probe — LOW — "Healed means deleted": the words that describe the lane still describe the smaller lane
+
+LOW — "Healed means deleted": the words that describe the lane still describe the smaller lane
+
+```probe
+cd /home/lyphe/.claude/claudecodeui_lyphe && echo "module head: $(grep -c 'reads one document' server/modules/roadmap/roadmap.module.ts)"; echo "MAN-7631 names the route or the binary: $(~/.claude/scripts/docstore get MAN-7631 --text | grep -c 'CASES_BIN\|GET /cases\|roadmap-cases')"
+expect: prints `module head: 1` and `MAN-7631 names the route or the binary: 0` while the defect stands (cured: `0` and a non-zero count)
+```
+
+measured 2026-10-04 by chain chain-regression-cases--screen--route-20261004-024905-8a65, finding L3, LOW
+probe-key: dc84606e183ceb3031121c5bccad0df3eda4c15b
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/roadmap/roadmap-cases.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/roadmap/roadmap.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/roadmap/roadmap.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts
+
+## INV-6676 — probe — LOW — MAN-7635 names `api.roadmap` but does not govern `src/shared/api.ts`; its composes cells leave some pieces out
+
+LOW — MAN-7635 names `api.roadmap` but does not govern `src/shared/api.ts`; its composes cells leave some pieces out
+
+```probe
+cd /home/lyphe/.claude/claudecodeui_lyphe && docstore get MAN-7635 | python3 -c "import sys,json; r=json.load(sys.stdin)['row']; print(any(g.endswith('src/shared/api.ts') for g in r['governs']))"
+expect: `False` while the row describes `api.roadmap` without governing the file; `True` once added
+```
+
+measured 2026-10-04 by chain chain-roadmap--screen--docs-20261004-024747-4fa8, finding L4, LOW
+probe-key: 46813f06eaff8bee39bedc632ea23d0153b6fa51
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts
+
+## INV-6678 — probe — MEDIUM — the dialog's re-read: the marker departs from the fill phase, and the section as composed wipes its list on every re-read
+
+MEDIUM — the dialog's re-read: the marker departs from the fill phase, and the section as composed wipes its list on every re-read
+
+```probe
+cd ~/.claude/state/pipeline-reviews/regression-cases--screen--scaffold/review-1-probe && node probe.mjs refetch light 2>&1 | grep '^refetch 1440'
+expect: prints `refetch 1440 light: read=loading cases drawn=0` while the defect stands (cured: `read=listed cases drawn=6`)
+```
+
+measured 2026-10-04 by chain chain-regression-cases--screen--scaffold-20261004-024906-f45e, finding M1, MEDIUM
+probe-key: 0c99d89492ce14513012e0add3387d1caf154cdb
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/common.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/EpicCard.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/fakeCases.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/FeatureRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/modals/FeatureCases.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/modals/FeatureDialog.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/modals/FeatureFacts.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/RoadmapHeader.tsx
+
+## INV-6679 — probe — MEDIUM — the header's case facts come between the feature facts and "1 blocked · 1 waiting on you", which then read as if they counted cases
+
+MEDIUM — the header's case facts come between the feature facts and "1 blocked · 1 waiting on you", which then read as if they counted cases
+
+```probe
+cd ~/.claude/state/pipeline-reviews/regression-cases--screen--scaffold/review-1-probe && node probe.mjs header light 2>&1 | grep '^header 390'
+expect: prints the order `… cases="5 cases" · casesHolding="all holding" · blocked="1 blocked" · waiting="1 waiting on you"` while the defect stands (cured: `blocked` and `waiting` before `cases` and `casesHolding`)
+```
+
+measured 2026-10-04 by chain chain-regression-cases--screen--scaffold-20261004-024906-f45e, finding M2, MEDIUM
+probe-key: 1de71ea5e0c5a65b1c27d0e118b83048b8dd78aa
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/common.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/EpicCard.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/fakeCases.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/FeatureRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/modals/FeatureCases.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/modals/FeatureDialog.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/modals/FeatureFacts.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/RoadmapHeader.tsx
+
+## INV-6680 — probe — MEDIUM — the dialog lists what broke wherever the door's name order puts it, so a broken case can sit below the first view
+
+MEDIUM — the dialog lists what broke wherever the door's name order puts it, so a broken case can sit below the first view
+
+```probe
+cd ~/.claude/state/pipeline-reviews/regression-cases--screen--scaffold/review-1-probe && node probe.mjs order light 2>&1 | grep '^order 390'
+expect: prints `case words in order: holding, holding, holding, holding, holding, broken; an amber case in the dialog's first view: no` while the defect stands (cured: `broken, holding, …` and `yes`)
+```
+
+measured 2026-10-04 by chain chain-regression-cases--screen--scaffold-20261004-024906-f45e, finding M3, MEDIUM
+probe-key: 4e75d1b30e8ee2e8a40125cd51a64efaa786a150
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/common.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/EpicCard.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/fakeCases.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/FeatureRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/modals/FeatureCases.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/modals/FeatureDialog.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/modals/FeatureFacts.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/RoadmapHeader.tsx
+
+## INV-6681 — probe — LOW — a broken case whose run saw nothing draws a bare "It saw:"; a case's name alone may not be a unique key
+
+LOW — a broken case whose run saw nothing draws a bare "It saw:"; a case's name alone may not be a unique key
+
+```probe
+cd ~/.claude/state/pipeline-reviews/regression-cases--screen--scaffold/review-1-probe && node probe.mjs saw light 2>&1 | grep '^saw 390'
+expect: prints `saw 390 light: broken case with an empty saw draws: "It saw:"` while the defect stands (cured: `no saw line`)
+```
+
+measured 2026-10-04 by chain chain-regression-cases--screen--scaffold-20261004-024906-f45e, finding L1, LOW
+probe-key: 80f96dcdf8bfe68bd2a0269af2049f1b86ceb86b
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/common.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/EpicCard.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/fakeCases.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/FeatureRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/modals/FeatureCases.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/modals/FeatureDialog.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/modals/FeatureFacts.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/RoadmapHeader.tsx
+
+## INV-6682 — probe — LOW — on a building row the amber case badge splits the step words from their meter, and the row's two warn lines from each other
+
+LOW — on a building row the amber case badge splits the step words from their meter, and the row's two warn lines from each other
+
+```probe
+cd ~/.claude/state/pipeline-reviews/regression-cases--screen--scaffold/review-1-probe && node probe.mjs rowOrder light 2>&1 | grep '^rowOrder 1440'
+expect: prints `row pieces top to bottom: step → caseMark → meter → blocked` while the defect stands (cured: `step → meter → caseMark → blocked`)
+```
+
+measured 2026-10-04 by chain chain-regression-cases--screen--scaffold-20261004-024906-f45e, finding L2, LOW
+probe-key: 6e9b76609d8f8863767442c62f0d1f40ccc7f281
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/common.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/EpicCard.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/fakeCases.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/FeatureRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/modals/FeatureCases.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/modals/FeatureDialog.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/modals/FeatureFacts.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/RoadmapHeader.tsx
+
+## INV-6683 — probe — LOW — the photographed failure is not the line the operator will see, and the report's flag about it is stale
+
+LOW — the photographed failure is not the line the operator will see, and the report's flag about it is stale
+
+```probe
+cd /home/lyphe/.claude/claudecodeui_lyphe && grep -c "dispatcher list --plan" src/modules/roadmap/fakeCases.ts
+expect: prints `1` while the defect stands (cured: `0`)
+```
+
+measured 2026-10-04 by chain chain-regression-cases--screen--scaffold-20261004-024906-f45e, finding L3, LOW
+probe-key: 467916bdffc7713b8e54e051c6ce66c2a5951978
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/common.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/EpicCard.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/fakeCases.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/FeatureRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/modals/FeatureCases.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/modals/FeatureDialog.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/modals/FeatureFacts.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/RoadmapHeader.tsx
+
+## INV-6684 — probe — LOW — three comments say something the code does not
+
+LOW — three comments say something the code does not
+
+```probe
+cd /home/lyphe/.claude/claudecodeui_lyphe && grep -c 'inside the height the project chip already gives the line' src/modules/roadmap/FeatureRow.tsx; grep -c 'is its words under' src/modules/roadmap/FeatureRow.tsx
+expect: prints `1` and `1` while the defect stands (cured: `0` and `0`)
+```
+
+measured 2026-10-04 by chain chain-regression-cases--screen--scaffold-20261004-024906-f45e, finding L4, LOW
+probe-key: ff3aedf69de360de41fc07955203411f8f64196f
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/common.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/EpicCard.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/fakeCases.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/FeatureRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/modals/FeatureCases.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/modals/FeatureDialog.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/modals/FeatureFacts.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/RoadmapHeader.tsx
+
+## INV-6685 — probe — LOW — the scaffold's two new surfaces have no doc home, and the report says a phase will give them one that is not scheduled to
+
+LOW — the scaffold's two new surfaces have no doc home, and the report says a phase will give them one that is not scheduled to
+
+```probe
+~/.claude/scripts/docstore get MAN-7643 --text | grep -c 'FeatureCases'; ~/.claude/scripts/docstore get MAN-7643 --text | grep -c '{ feature, picture, onWriteGoal() }'
+expect: prints `0` and `1` while the defect stands (cured: a non-zero count and `0`)
+```
+
+measured 2026-10-04 by chain chain-regression-cases--screen--scaffold-20261004-024906-f45e, finding L5, LOW
+probe-key: be27479a0204efd06edd15f4d30f85825dfa127c
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/common.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/EpicCard.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/fakeCases.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/FeatureRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/modals/FeatureCases.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/modals/FeatureDialog.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/modals/FeatureFacts.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/RoadmapHeader.tsx
+
+## INV-6687 — probe — LOW — A failed cases read is final for the life of the dialog
+
+LOW — A failed cases read is final for the life of the dialog
+
+```probe
+cd /home/lyphe/.claude/claudecodeui_lyphe && node /home/lyphe/.claude/state/pipeline-reviews/regression-cases--screen--fill/athena-probes/sticky.mjs 2>&1 | tail -1
+expect: requests after the failure = 0 | section now: cases list exited 2: transient   (cured when it prints a request count above 0 and section now: RECOVERED)
+```
+
+measured 2026-10-04 by chain chain-regression-cases--screen--fill-20261004-035620-ec86, finding L1, LOW
+probe-key: 6969eaac99ebefef884d04d796dfeddab0365bc2
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/caseMark.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/hooks/useFeatureCases.ts
+
+## INV-6688 — probe — LOW — The failure line speaks the dispatcher's command, with the feature's slug
+
+LOW — The failure line speaks the dispatcher's command, with the feature's slug
+
+```probe
+cd /home/lyphe/.claude/claudecodeui_lyphe && node /home/lyphe/.claude/state/pipeline-reviews/regression-cases--screen--fill/athena-probes/fx.mjs 502 2>&1 | grep -E '^dialog Cases' | cut -c1-260
+expect: the text contains `cases list --plan restorly--shell` (the stubbed route sentence reaches the screen as it came); cured when it carries neither `--plan` nor `restorly--shell`
+```
+
+measured 2026-10-04 by chain chain-regression-cases--screen--fill-20261004-035620-ec86, finding L2, LOW
+probe-key: fca73ec3421d5b2d8d9aab48e39ef24596903c6b
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/caseMark.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/hooks/useFeatureCases.ts

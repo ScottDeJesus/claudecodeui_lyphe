@@ -1,15 +1,12 @@
-// FILL: imports — the markers' own: react's useState beside useId, and useRoadmapWrites
-import { useId } from 'react';
+import { useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { useRoadmapWrites } from '@/modules/roadmap/hooks/useRoadmapWrites';
 import { useReturnFocus } from '@/shared/hooks/useReturnFocus';
 import { Button, Dialog, DialogContent, DialogTitle, Field, Input } from '@/shared/ui';
+import { roadmapTextBreak } from '@/shared/utils';
 
-// Each fill marker below governs the ONE statement under it, which holds a fake standing in for what the
-// fill holds or does; `imports` governs the react import under it and the line the fill adds beside it.
-// Every other line is composition and stays as it is.
-
-/** A reason's fence (`roadmap-write.service.ts`): one line of at most this many characters. `maxLength` counts UTF-16 units, never fewer than the lane's code points. */
+/** A reason's fence (`roadmap-write.service.ts`): one line of at most this many characters. `maxLength` counts UTF-16 units, so it can stop an emoji-heavy reason short of the lane's limit but never lets one past it; a line break it cannot see is `whyBreak`'s. */
 const WHY_MAX = 1000;
 
 type BlockDialogProps = {
@@ -37,18 +34,25 @@ export function BlockDialog({ kind, item, onClose }: BlockDialogProps) {
   const { t } = useTranslation();
   const titleId = useId();
   const fieldId = useId();
+  const writes = useRoadmapWrites();
   useReturnFocus();
 
-  // FILL: why — component state, with its comment: the reason as typed, empty as the dialog opens
-  const why = '';
-  // FILL: change — setWhy(next)
-  const change = (_next: string) => {};
-  // FILL: busy — component state, with its comment: the mark is out, so Mark blocked shows busy and the ways out wait for its answer
-  const busy = false;
-  // FILL: submit — writes.block({ kind, name: item.name, why: why.trim(), itemTitle: item.title }) with busy held; true → onClose(true); false → it stays open
-  const submit = () => {};
+  // The reason as typed. Local to the form: nothing outside needs it until Mark blocked sends it, and a refusal must leave it as typed.
+  const [why, setWhy] = useState('');
+  // The mark is out, so Mark blocked shows busy and the ways out wait for its answer: the write is already at the dispatcher.
+  const [busy, setBusy] = useState(false);
+  const submit = async () => {
+    setBusy(true);
+    const landed = await writes.block({ kind, name: item.name, why: why.trim(), itemTitle: item.title });
+    // A landed mark closes the dialog, so the busy flag has no later reader; a refusal keeps the form open, with the reason as typed, for another try.
+    if (landed) onClose(true);
+    else setBusy(false);
+  };
 
-  const ready = why.trim() !== '';
+  // The lane's other fence, met before anything is sent: a reason holding a line break an `<input>` lets through (U+2028…)
+  // is marked invalid with its sentence, and Mark blocked waits, instead of the lane's 400 being the first word on it.
+  const whyBreak = roadmapTextBreak(why.trim(), WHY_MAX, true);
+  const ready = why.trim() !== '' && whyBreak === null;
   const dismiss = () => {
     if (!busy) onClose(false);
   };
@@ -70,10 +74,13 @@ export function BlockDialog({ kind, item, onClose }: BlockDialogProps) {
             <p className="mt-1 line-clamp-2 break-words text-sm text-muted-foreground">{item.title}</p>
           </header>
 
-          <Field label={t('roadmap.dialog.block.reason')} htmlFor={fieldId} helper={t('roadmap.dialog.block.hint')}>
+          <Field
+            label={t('roadmap.dialog.block.reason')} htmlFor={fieldId} helper={t('roadmap.dialog.block.hint')}
+            error={whyBreak === null ? undefined : t(`roadmap.dialog.fence.${whyBreak}`, { max: WHY_MAX })}
+          >
             <Input
-              id={fieldId} value={why} maxLength={WHY_MAX} aria-required="true" aria-describedby={`${fieldId}-helper`} autoComplete="off"
-              onChange={(event) => change(event.target.value)}
+              id={fieldId} value={why} maxLength={WHY_MAX} invalid={whyBreak !== null} aria-required="true" aria-describedby={`${fieldId}-helper`} autoComplete="off"
+              onChange={(event) => setWhy(event.target.value)}
             />
           </Field>
 

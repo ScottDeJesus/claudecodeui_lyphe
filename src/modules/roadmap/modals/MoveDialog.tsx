@@ -1,16 +1,12 @@
 import type { TFunction } from 'i18next';
-// FILL: imports — the markers' own: react's useState beside these, and useRoadmap and useRoadmapWrites
-import { useEffect, useId, useMemo } from 'react';
+import { useEffect, useId, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { FAKE_PICTURE } from '@/modules/roadmap/fake'; // FILL: fake — retired with the parents' fake below
+import { useRoadmap } from '@/modules/roadmap/hooks/useRoadmap';
+import { useRoadmapWrites } from '@/modules/roadmap/hooks/useRoadmapWrites';
 import { useReturnFocus } from '@/shared/hooks/useReturnFocus';
 import type { Roadmap, RoadmapPicture, RoadmapWriteBody } from '@/shared/roadmap-types';
 import { Button, Chip, Dialog, DialogContent, DialogTitle, Field, Select } from '@/shared/ui';
-
-// Each fill marker below governs the ONE statement under it, which holds a fake standing in for what the
-// fill reads, holds or does; `imports` governs the react import under it and the lines the fill adds
-// beside it, and `fake` the import it sits on, which the fill deletes. Every other line is composition.
 
 /** What moves: the dispatcher's own word — `plan` a feature into an epic, `arc` an epic into a milestone, `milestone` into a roadmap. */
 type MovedKind = 'milestone' | 'arc' | 'plan';
@@ -92,7 +88,9 @@ function placementOf(destination: Destination, where: Landing): Pick<RoadmapWrit
  * choice: the item will be all it holds.
  *
  * The choice of place is the library `Select`, opened in place, so the dialog is sized to its content and
- * never scrolls on its own. A picture with nowhere to go says so in a sentence instead of a field.
+ * the list opens past its edge. A screen too short for the dialog itself (600px and under: a phone held
+ * sideways) scrolls the dialog instead, and an open list grows what it scrolls. A picture with nowhere to
+ * go says so in a sentence instead of a field.
  *
  * Mounted for as long as it is open (`useReturnFocus`); a frame that no longer holds the item closes it.
  * A landed move closes it; a refusal keeps it open, beside the hook's toast.
@@ -103,31 +101,35 @@ function placementOf(destination: Destination, where: Landing): Pick<RoadmapWrit
 export function MoveDialog({ kind, name, onClose }: MoveDialogProps) {
   const { t } = useTranslation();
   const titleId = useId();
+  const writes = useRoadmapWrites();
   useReturnFocus();
 
-  // FILL: parents — useRoadmap(): the places are read off the live picture, and an item no roadmap holds yet is placed from the roadmap on screen (its `selected` stands in for `home`)
-  const view: { picture: RoadmapPicture | null; selected: Roadmap | null } = { picture: FAKE_PICTURE, selected: FAKE_PICTURE.roadmaps[0] ?? null };
-  // FILL: to — component state, with its comment: the place chosen, by name, null until one is
-  const to: string | null = null;
-  // FILL: choose — setTo(next)
-  const choose = (_next: string) => {};
-  // FILL: where — component state, with its comment: At the top or At the bottom, opening on LANDS_AT
-  const where: Landing = LANDS_AT;
-  // FILL: place — setWhere(next)
-  const place = (_next: Landing) => {};
-  // FILL: busy — component state, with its comment: the move is out, so Move shows busy and the ways out wait for its answer
-  const busy = false;
-  // FILL: submit — writes.move({ kind, name, ...placement, itemTitle: standing.title }) with busy held; true → onClose(true); false → it stays open
-  const submit = () => {};
+  // The places are read off the live picture, and an item no roadmap holds yet (the banner's Place…) is
+  // placed from the roadmap on screen: `selected` stands in for its `home`.
+  const { picture, selected } = useRoadmap();
+  // The place chosen, by name: null until one is. Local to the form — nothing outside needs it until Move sends it.
+  const [to, setTo] = useState<string | null>(null);
+  // Where in the place the item lands, At the top or At the bottom; opens on LANDS_AT, the choice most moves mean.
+  const [where, setWhere] = useState<Landing>(LANDS_AT);
+  // The move is out, so Move shows busy and the ways out wait for its answer: the write is already at the dispatcher.
+  const [busy, setBusy] = useState(false);
 
-  const { picture } = view;
   const standing = useMemo(() => (picture === null ? null : standingOf(picture, kind, name, t)), [picture, kind, name, t]);
-  const home = standing?.home ?? view.selected?.name ?? null;
+  const home = standing?.home ?? selected?.name ?? null;
   const destinations = useMemo(() => (picture === null ? [] : destinationsOf(picture, kind, name, home, t)), [picture, kind, name, home, t]);
   const destination = destinations.find((item) => item.name === to) ?? null;
   // What Move sends, once a place is chosen: none yet, and Move waits.
   const placement = destination === null ? null : placementOf(destination, where);
   const ready = placement !== null;
+
+  const submit = async () => {
+    if (placement === null || standing === null) return;
+    setBusy(true);
+    const landed = await writes.move({ kind, name, ...placement, itemTitle: standing.title });
+    // A landed move closes the dialog; a refusal keeps it open, with the place as chosen, beside the hook's toast.
+    if (landed) onClose(true);
+    else setBusy(false);
+  };
 
   // A FRAME CAN END THE QUESTION: once a picture no longer holds the item (deleted here or on another
   // device), there is nothing left to move. No picture yet is not that: it is a reading still on its way.
@@ -145,7 +147,12 @@ export function MoveDialog({ kind, name, onClose }: MoveDialogProps) {
 
   return (
     <Dialog open onOpenChange={(open) => { if (!open) dismiss(); }}>
-      <DialogContent aria-labelledby={titleId} data-roadmap-dialog="move" data-roadmap-kind={kind} className="w-[calc(100vw-2rem)] max-w-md p-0">
+      <DialogContent
+        aria-labelledby={titleId}
+        data-roadmap-dialog="move"
+        data-roadmap-kind={kind}
+        className="w-[calc(100vw-2rem)] max-w-md p-0 [@media(max-height:600px)]:max-h-[calc(100dvh-1rem)] [@media(max-height:600px)]:overflow-y-auto"
+      >
         <form
           className="flex flex-col gap-5 p-6"
           onSubmit={(event) => {
@@ -172,17 +179,17 @@ export function MoveDialog({ kind, name, onClose }: MoveDialogProps) {
                   value={to ?? ''}
                   placeholder={t(`roadmap.dialog.move.choose.${kind}`)}
                   ariaLabel={t('roadmap.dialog.move.to')}
-                  onChange={choose}
+                  onChange={setTo}
                 />
               </Field>
               {/* Top or bottom only means something beside what the place already holds. */}
               {(destination === null || destination.children.length > 0) && (
                 <Field label={t('roadmap.dialog.move.where')}>
                   <div role="group" aria-label={t('roadmap.dialog.move.where')} className="flex flex-wrap gap-2">
-                    <Chip selected={where === 'top'} onClick={() => place('top')} className="max-md:min-h-11">
+                    <Chip selected={where === 'top'} onClick={() => setWhere('top')} className="max-md:min-h-11">
                       {t('roadmap.dialog.move.top')}
                     </Chip>
-                    <Chip selected={where === 'bottom'} onClick={() => place('bottom')} className="max-md:min-h-11">
+                    <Chip selected={where === 'bottom'} onClick={() => setWhere('bottom')} className="max-md:min-h-11">
                       {t('roadmap.dialog.move.bottom')}
                     </Chip>
                   </div>

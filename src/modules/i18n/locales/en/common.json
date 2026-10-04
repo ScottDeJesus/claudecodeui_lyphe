@@ -25,7 +25,7 @@
     "tasks": "Tasks",
     "browser": "Browser",
     "memory": "Memory",
-    "runner": "Runner",
+    "runner": "Roadmap",
     "heal": "Heal",
     "api": "API",
     "kanban": "Kanban",
@@ -813,8 +813,8 @@
     }
   },
   "runner": {
-    "title": "Runner",
-    "empty": "Nothing is running",
+    "title": "In flight",
+    "empty": "Nothing in flight",
     "waiting_one": "{{count}} waiting for you",
     "waiting_other": "{{count}} waiting for you",
     "stop": "Stop",
@@ -978,6 +978,41 @@
       "tasks_one": "{{done}} of {{count}} task",
       "tasks_other": "{{done}} of {{count}} tasks"
     },
+    "cases": {
+      "holding_one": "{{count}} case holding",
+      "holding_other": "{{count}} cases holding",
+      "broken_one": "{{count}} broken",
+      "broken_other": "{{count}} broken",
+      "regressed_one": "{{count}} regressed",
+      "regressed_other": "{{count}} regressed",
+      "cantRun_one": "{{count}} can't run",
+      "cantRun_other": "{{count}} can't run",
+      "notRunYet_one": "{{count}} case · {{notRun}} not run yet",
+      "notRunYet_other": "{{count}} cases · {{notRun}} not run yet",
+      "joined": "{{broken}}, {{regressed}}",
+      "epicHolding_one": "{{holding}} of {{count}} case holding",
+      "epicHolding_other": "{{holding}} of {{count}} cases holding",
+      "epicBroken_one": "{{count}} broken",
+      "epicBroken_other": "{{count}} broken",
+      "total_one": "{{count}} case",
+      "total_other": "{{count}} cases",
+      "allHolding": "all holding",
+      "headerBroken_one": "{{count}} broken",
+      "headerBroken_other": "{{count}} broken",
+      "heading": "Cases",
+      "lastRan": "Last ran {{when}}",
+      "saw": "It saw: {{saw}}",
+      "loading": "Reading its cases…",
+      "failed": "Its cases could not be read: {{reason}}",
+      "unanswered": "the dispatcher did not answer",
+      "word": {
+        "holding": "Holding",
+        "broken": "Broken",
+        "regressed": "Regressed",
+        "notRun": "Not run",
+        "cantRun": "Can't run"
+      }
+    },
     "unplaced": {
       "banner_one": "{{count}} not on a roadmap yet",
       "banner_other": "{{count}} not on a roadmap yet",
@@ -986,6 +1021,11 @@
     "dialog": {
       "cancel": "Cancel",
       "close": "Close",
+      "fence": {
+        "line": "One line of at most {{max}} characters",
+        "text": "At most {{max}} characters",
+        "dash": "A goal cannot be a single “-”"
+      },
       "item": {
         "addTitle": {
           "roadmap": "New roadmap",
@@ -1111,6 +1151,8 @@
       "features_other": "{{count}} features",
       "catchUp_one": "{{count}} feature shipped while you were away",
       "catchUp_other": "{{count}} features shipped while you were away",
+      "alsoReached_one": "{{titles}} was reached too",
+      "alsoReached_other": "{{titles}} were reached too",
       "skip": "Skip",
       "announce": {
         "task": "{{title}}: a task done",

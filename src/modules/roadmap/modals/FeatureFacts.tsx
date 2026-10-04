@@ -33,6 +33,8 @@ type FeatureFactsProps = {
   picture: RoadmapPicture | null;
   /** The goal's empty place, pressed: `FeatureDialog` opens the goal for writing. */
   onWriteGoal: () => void;
+  /** The Cases section's body (`FeatureCases`), drawn under its heading; null for a feature that keeps no case. */
+  cases: ReactNode;
 };
 
 /** One section of the facts: a small heading over what it holds. */
@@ -45,29 +47,34 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
   );
 }
 
-/** A task's mark: a check once done, an accent dot that breathes while it runs, a hollow ring before it starts. */
+/**
+ * A task's mark: a check once done, an accent dot that breathes while it runs, a hollow ring before it
+ * starts, in the faint ink that still reads as a mark (over 3:1 in both themes).
+ */
 function TaskMark({ status }: { status: RoadmapTask['status'] }) {
   if (status === 'done') return <Check aria-hidden="true" className="size-3.5 text-primary" strokeWidth={3} />;
   if (status === 'running') return <span aria-hidden="true" className="size-2.5 rounded-full bg-primary motion-safe:animate-live-ring" />;
-  return <span aria-hidden="true" className="size-2.5 rounded-full border-[1.5px] border-input" />;
+  return <span aria-hidden="true" className="size-2.5 rounded-full border-[1.5px] border-ink-faint" />;
 }
 
 /**
  * Everything a feature says about itself, top to bottom: where it stands on its own path (the step line
  * at `large`, its step in words, and what it waits on, each wait with its word); its goal, pre-wrapped
- * and scrolling past 40vh; its tasks under a meter of how many are done; the days it was added,
+ * and scrolling past 40vh; its cases, each the goal's claim checked, so they sit right under it and above
+ * the tasks, which are history once it ships; its tasks under a meter of how many are done; the days it was added,
  * promoted, accepted and shipped; and, small and muted, its name for Claude — the one place on the
  * screen a slug is shown, selected whole on a press so it can be handed to a chat as it is.
  *
  * A feature with no goal shows "Write its goal to propose or promote it" in the goal's place while it is
  * an idea, as a press that opens the goal; a designed feature's goal is its design's, so it has none to
- * invite. A feature that waits on the operator lets its step phrase step aside: the warn banner above,
- * `FeatureDialog`'s own, already says what it owes. Each wait carries its word, so a met one reads as
- * met; a wait the picture cannot name reads "another feature", never its slug.
+ * invite. The step phrase steps aside where something else already says it: for a feature that waits on
+ * the operator, the warn banner above (`FeatureDialog`'s own); for one waiting on other features, the
+ * waits under it. Each wait carries its word, so a met one reads as met; a wait the picture cannot name
+ * reads "another feature", never its slug.
  *
  * Used by the roadmap module's `FeatureDialog`, as its scrolling body.
  */
-export function FeatureFacts({ feature, picture, onWriteGoal }: FeatureFactsProps) {
+export function FeatureFacts({ feature, picture, onWriteGoal, cases }: FeatureFactsProps) {
   const { t } = useTranslation();
   const phrase = useStepPhrase(feature);
   const index = picture === null ? null : roadmapFeatureIndex(picture);
@@ -75,6 +82,7 @@ export function FeatureFacts({ feature, picture, onWriteGoal }: FeatureFactsProp
   const total = feature.tasks.length;
   const done = feature.tasks.filter((task) => task.status === 'done').length;
   const unpromoted = feature.word === 'idea' || feature.word === 'proposed';
+  const phrased = feature.waiting_on_you === null && !(feature.step === 'waiting' && feature.waits_on.length > 0);
   const dates = DATE_KEYS.flatMap(([field, key]) => {
     const day = formatShortDate(feature[field]);
     return day === null ? [] : [t(key, { date: day })];
@@ -85,7 +93,7 @@ export function FeatureFacts({ feature, picture, onWriteGoal }: FeatureFactsProp
       {/* Where it stands, and what that stands on: each wait says "Waits on" itself, so the list needs no heading. */}
       <div className="flex min-w-0 flex-col gap-2.5">
         <StateLine word={feature.word} step={feature.step} phrase={phrase} size="large" />
-        {feature.waiting_on_you === null && (
+        {phrased && (
           <p className="text-sm text-muted-foreground">{feature.step === 'building' ? <Shimmer>{phrase}</Shimmer> : phrase}</p>
         )}
         {feature.waits_on.length > 0 && (
@@ -136,6 +144,7 @@ export function FeatureFacts({ feature, picture, onWriteGoal }: FeatureFactsProp
         </button>
       )}
 
+      {cases ? <Section title={t('roadmap.cases.heading')}>{cases}</Section> : null}
 
       {total > 0 && (
         <Section title={t('roadmap.dialog.feature.tasks')}>
@@ -166,7 +175,7 @@ export function FeatureFacts({ feature, picture, onWriteGoal }: FeatureFactsProp
           <Trans
             i18nKey="roadmap.dialog.feature.nameForClaude"
             values={{ name: feature.name }}
-            components={{ name: <code className="select-all font-mono text-foreground" /> }}
+            components={{ name: <code className="select-all font-mono" /> }}
           />
         </p>
       </div>

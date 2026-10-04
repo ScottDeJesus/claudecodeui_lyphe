@@ -1,15 +1,13 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 
+import { RUNNER_LANDING_PARAM as RUNNER_PARAM } from '@/shared/constants';
 import type { AppTab, Project } from '@/shared/types';
-
-/** The query parameter a landing names a plan in (`?runner=<plan>`): the key one side writes and this side reads. */
-const RUNNER_PARAM = 'runner';
 
 /**
  * The workspace's half of a tap on a plan's prompt (`landingPathOf`, `notification-landing.service.ts`):
- * the page opens on `…?runner=<plan>`, and this brings the Runner tab forward and asks its pane to put
- * that plan's card in view.
+ * the page opens on `…?runner=<plan>`, and this brings the Roadmap tab (the `runner` id) forward — its
+ * `RoadmapTab` turns to the In flight face — and asks the cards' pane to put that plan's card in view.
  *
  * THE NAME IS TAKEN THE MOMENT IT IS SEEN, BECAUSE THE PICK TAKES THE PARAM AWAY. At `/` with nothing
  * selected the workspace draws no tab strip and no panes (`ProjectSidebarRegion` gates the strip on the
@@ -20,9 +18,9 @@ const RUNNER_PARAM = 'runner';
  * landing makes, where the project is chosen from the session a frame later.
  *
  * `revealPlan` IS STATE, NOT THE PARAM. The effect below strips `runner` from the URL in the same
- * commit that it reads it, and the Runner pane mounts a render later (on `activeTab === 'runner'`),
+ * commit that it reads it, and the Roadmap tab mounts a render later (on `activeTab === 'runner'`),
  * so a live read of the URL down there would always find nothing. The name is held here instead and
- * cleared by `clearReveal` — handed to the pane as `onRevealed` — so one landing is one reveal.
+ * cleared by `clearReveal` — handed to the tab as `onRevealed` — so one landing is one reveal.
  *
  * The strip is `replace`: a landing is a redirection, not a place, and Back must not return to a URL
  * that would carry the operator to the same card again.

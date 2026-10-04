@@ -1,18 +1,13 @@
 import { Check, Flag, Plus } from 'lucide-react';
-import { useContext, useLayoutEffect, useRef } from 'react';
+import { useContext, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { FAKE_CELEBRATION_CONTEXT } from '@/modules/roadmap/fake'; // FILL: fake — import { CelebrationContext } from '@/modules/roadmap/celebrationContext';
-import type { Roadmap, RoadmapMilestone, RoadmapMilestoneWord } from '@/shared/roadmap-types';
+import { CelebrationContext } from '@/modules/roadmap/celebrationContext';
+import { RoadmapFaceContext } from '@/modules/roadmap/faceContext';
+import { useCurrentStationInView } from '@/modules/roadmap/hooks/useCurrentStationInView';
+import { ROADMAP_MILESTONE_WORD_KEYS as WORD_KEYS } from '@/shared/constants';
+import type { Roadmap, RoadmapMilestone } from '@/shared/roadmap-types';
 import { cn, formatShortDate } from '@/shared/utils';
-
-/** Each milestone word's key in the locale. */
-const WORD_KEYS: Record<RoadmapMilestoneWord, string> = {
-  empty: 'roadmap.milestoneWord.empty',
-  'not started': 'roadmap.milestoneWord.notStarted',
-  'in progress': 'roadmap.milestoneWord.inProgress',
-  reached: 'roadmap.milestoneWord.reached',
-};
 
 /** Where a station stands: reached, the current one (the first not reached), on its way though not current, or not started. */
 type Standing = 'reached' | 'current' | 'moving' | 'ahead';
@@ -31,10 +26,12 @@ const GEOMETRY: Record<Size, { column: number; row: string; rail: string; disc: 
 };
 
 /**
- * The bloom's three rings, each one `vv-ring` going out once from a wider circle a beat after the last.
- * The delays sit inside the path's own 900 ms, so the bloom has played before the layer dims the face.
+ * The bloom's three rings, each one `vv-ring` going out once from a wider circle a beat after the last,
+ * each run shortened by its delay so all three end with the bloom at 900 ms, before the layer dims the face.
+ * The timing rides inline, as `CelebrationLayer`'s `ENTRANCE_DELAY` does: the `animate-roadmap-ring`
+ * shorthand resets any delay or duration a class spells beside it, and the three rings went out as one.
  */
-const BLOOM_RINGS = ['', 'scale-125 [animation-delay:150ms]', 'scale-150 [animation-delay:300ms]'] as const;
+const BLOOM_RINGS = [{ scale: '', delay: '0ms', run: '900ms' }, { scale: 'scale-125', delay: '150ms', run: '750ms' }, { scale: 'scale-150', delay: '300ms', run: '600ms' }] as const;
 
 type MilestonePathProps = {
   roadmap: Roadmap;
@@ -82,12 +79,11 @@ function standingOf(milestone: RoadmapMilestone, current: string | null): Standi
  */
 export function MilestonePath({ roadmap, focused, onFocus, size }: MilestonePathProps) {
   const { t } = useTranslation();
-  const active = useContext(FAKE_CELEBRATION_CONTEXT); // FILL: active — useContext(CelebrationContext)
-  // FILL: dialogs — the dialog host's opener (RoadmapPath provides it): the ghost station's press opens ItemDialog adding a milestone
-  // The track that scrolls sideways: the station the operator is travelling to is brought into it.
+  const active = useContext(CelebrationContext);
+  const { openDialog } = useContext(RoadmapFaceContext);
+  // The track that scrolls sideways; below 768px it opens on the station the operator is travelling to, on mount and on a roadmap switch.
   const trackRef = useRef<HTMLDivElement>(null);
-  // FILL: scroll the current station into view — below 768px, on mount and on a roadmap switch: trackRef's scrollLeft set so the current station's [data-roadmap-milestone] (the last one when every milestone is reached) sits mid-track, instantly, never smooth; a track that does not overflow is left alone
-  useLayoutEffect(() => {}, [roadmap.name]);
+  useCurrentStationInView(trackRef, roadmap.name);
 
   const geometry = GEOMETRY[size];
   const { milestones, current } = roadmap;
@@ -98,12 +94,14 @@ export function MilestonePath({ roadmap, focused, onFocus, size }: MilestonePath
   const ghostLabel = t(milestones.length === 0 ? 'roadmap.empty.noPath' : 'roadmap.empty.nextMilestone');
 
   // The solid rail runs from the track's left edge — the path comes from somewhere — to the current
-  // station, else the last reached one. While a milestone moment plays it stops a station short and
-  // the SVG line draws the last leg into the reached station.
+  // station, else the last reached one. While a milestone moment plays, the SVG line draws the leg INTO
+  // the reached station again and nothing else moves: the solid rail keeps the way before that leg and
+  // the way after it, so the path never shows less of the journey than it did a moment earlier.
   const momentIndex = milestones.findIndex((milestone) => milestone.name === active.milestone);
   const currentIndex = milestones.findIndex((milestone) => milestone.name === current);
   const travelled = currentIndex !== -1 ? centre(currentIndex) : milestones.length > 0 ? centre(milestones.length - 1) : 0;
   const drawFrom = momentIndex > 0 ? centre(momentIndex - 1) : 0;
+  const drawTo = momentIndex === -1 ? 0 : centre(momentIndex);
   const focusedMilestone = milestones.find((milestone) => milestone.name === focused) ?? null;
 
   return (
@@ -122,9 +120,12 @@ export function MilestonePath({ roadmap, focused, onFocus, size }: MilestonePath
           {/* The way still to go, dashed, from the track's left edge to the flag; the way travelled laid
               over it. Beside the list, never in it: a list holds stations and nothing else. */}
           <span aria-hidden="true" className={cn('pointer-events-none absolute left-0 border-t-2 border-dashed border-border', geometry.rail)} style={{ width: `${centre(columns - 1)}%` }} />
-          <span aria-hidden="true" className={cn('pointer-events-none absolute left-0 h-0.5 bg-primary', geometry.rail)} style={{ width: `${momentIndex === -1 ? travelled : drawFrom}%` }} />
+          <span aria-hidden="true" className={cn('pointer-events-none absolute left-0 h-0.5 bg-primary', geometry.rail)} style={{ width: `${momentIndex === -1 ? travelled : Math.min(drawFrom, travelled)}%` }} />
+          {momentIndex !== -1 && travelled > drawTo && (
+            <span aria-hidden="true" className={cn('pointer-events-none absolute h-0.5 bg-primary', geometry.rail)} style={{ left: `${drawTo}%`, width: `${travelled - drawTo}%` }} />
+          )}
           {momentIndex !== -1 && (
-            <svg aria-hidden="true" className={cn('pointer-events-none absolute h-0.5 overflow-visible text-primary', geometry.rail)} style={{ left: `${drawFrom}%`, width: `${centre(momentIndex) - drawFrom}%` }}>
+            <svg aria-hidden="true" className={cn('pointer-events-none absolute h-0.5 overflow-visible text-primary', geometry.rail)} style={{ left: `${drawFrom}%`, width: `${drawTo - drawFrom}%` }}>
               <line x1="0" y1="1" x2="100%" y2="1" stroke="currentColor" strokeWidth={2} pathLength={1} strokeDasharray={1} className="motion-safe:animate-roadmap-draw" />
             </svg>
           )}
@@ -167,7 +168,7 @@ export function MilestonePath({ roadmap, focused, onFocus, size }: MilestonePath
               <GhostStation
                 size={size}
                 label={ghostLabel}
-                onAdd={() => {}} // FILL: onAddMilestone — ItemDialog adding a milestone (kind milestone, parent roadmap.name), through the dialog host's opener
+                onAdd={() => openDialog({ dialog: 'add', kind: 'milestone', parent: roadmap })}
               />
             )}
             <GoalFlag size={size} />
@@ -203,7 +204,11 @@ function Disc({ standing, size, blooming }: { standing: Standing; size: Size; bl
   return (
     <span aria-hidden="true" className="relative grid place-items-center">
       {blooming && BLOOM_RINGS.map((ring) => (
-        <span key={ring} className={cn('pointer-events-none absolute inset-0 rounded-full motion-safe:animate-roadmap-ring', ring)} />
+        <span
+          key={ring.delay}
+          className={cn('pointer-events-none absolute inset-0 rounded-full motion-safe:animate-roadmap-ring', ring.scale)}
+          style={{ animationDelay: ring.delay, animationDuration: ring.run }}
+        />
       ))}
       <span
         className={cn(

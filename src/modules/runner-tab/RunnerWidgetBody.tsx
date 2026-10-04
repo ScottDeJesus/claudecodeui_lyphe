@@ -48,7 +48,7 @@ function openedBy(plan: DispatcherPlan, sessionId: string | null): boolean {
  * The dispatcher's lane as the desktop chat gutter draws it: ONE vertical list of every top-level item
  * the lane carries — each arc as its deck, each plan of no arc as its card — in the operator's order.
  *
- * THE SECOND HOME, BESIDE THE TRANSCRIPT AND NEVER OVER IT. The Runner tab is the card's other home and
+ * THE SECOND HOME, BESIDE THE TRANSCRIPT AND NEVER OVER IT. The Roadmap tab's In flight face is the card's other home and
  * lays the loose cards out as a wall; here the column is the gutter's own width, one card wide, so the
  * same items stand one under another at the tab's own spacing — two cards `LANE_CARD_GAP` apart, a deck
  * 24px from its neighbours — and the widget frame's body scrolls them (`src/modules/chat-gutters`).

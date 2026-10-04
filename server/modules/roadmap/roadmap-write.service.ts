@@ -64,8 +64,12 @@ const ADD_TAKES: Record<RoadmapKind, readonly string[]> = {
  */
 const ACTOR: readonly string[] = ['--by', 'app:card'];
 
-/** The dispatcher's own name rule (`store.NAME_RE`), written out for the reason the plan lane's is. */
-const NAME_PATTERN = /^[a-z0-9][a-z0-9-]{0,99}$/;
+/**
+ * The dispatcher's own name rule (`store.NAME_RE`), written out for the reason the plan lane's is.
+ * Consumed by this file's fence and by the router's `GET /cases`, which fences its `feature` query
+ * to the same rule before the cases door is asked about it.
+ */
+export const NAME_PATTERN = /^[a-z0-9][a-z0-9-]{0,99}$/;
 
 /**
  * Every character Python's `str.splitlines()` breaks a line on, which is how the store counts "one

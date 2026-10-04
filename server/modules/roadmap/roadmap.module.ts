@@ -6,6 +6,7 @@ import { createPolledLane } from '@/shared/polled-lane.service.js';
 import type { RoadmapAct, RoadmapPicture, RoadmapStateEvent } from '@/shared/roadmap-types.js';
 import { expandHome } from '@/shared/utils.js';
 
+import { readFeatureCases } from './roadmap-cases.service.js';
 import { relayRoadmapWrite } from './roadmap-relay.service.js';
 import { readRoadmapState } from './roadmap-state.service.js';
 import { createRoadmapRouter } from './roadmap.routes.js';
@@ -17,10 +18,15 @@ import { createRoadmapRouter } from './roadmap.routes.js';
  *
  * The dispatcher is the roadmap's OWN owner, exactly as it is the plans': the store, the words each
  * row reads as, the names and the refusals are all its. NOTHING HERE WRITES ANY OF IT, and nothing here
- * decides a word. The lane reads one document (`dispatcher roadmap show --json`), validates it field
+ * decides a word. The poll reads one document (`dispatcher roadmap show --json`), validates it field
  * by field, serves it, and relays a closed set of dispatcher verbs by argv with words this server
  * spelled itself; the dispatcher's sentence travels back untouched. A write pressed on the screen
  * pokes the lane, so its frame goes out within moments instead of at the next tick.
+ *
+ * It reads a second document, on request and never in the poll: one feature's active regression cases,
+ * `cases list --plan <feature> --state active --json`, asked of the cases door (`CASES_BIN`, a binary
+ * of its own) when the feature dialog opens and served by `GET /cases`. The cases door has its own
+ * owner and its own words as well; this reads its answer the same way and keeps its sentence.
  *
  * The composition root is the only place here that reads the environment, names a binary or touches
  * a socket; the services under it spawn the process, and take what they need as an argument.
@@ -28,6 +34,9 @@ import { createRoadmapRouter } from './roadmap.routes.js';
 
 /** The dispatcher's entry point, unless the operator moved it (the dispatcher lane's own default). */
 const DEFAULT_BIN = '~/.claude/scripts/dispatcher';
+
+/** The regression cases' one door, unless the operator moved it (`CASES_BIN`). */
+const DEFAULT_CASES_BIN = '~/.claude/scripts/cases';
 
 /**
  * The `PATH` a command runs with when this process has none of its own. The dispatcher's verbs wake a
@@ -84,6 +93,15 @@ export function createRoadmapModule(): RoadmapModule {
     env: laneEnv(),
   };
 
+  // The cases door is its own binary with the lane's own timeout and child environment: the feature
+  // dialog's read of one plan's cases runs through it, never through the dispatcher.
+  const casesDependencies = {
+    ...dependencies,
+    bin: expandHome(process.env.CASES_BIN || DEFAULT_CASES_BIN),
+    // A failure's sentence leads with this door's own name, not the dispatcher's.
+    door: 'cases',
+  };
+
   /** Every frame this module's sockets carry: the roadmap's own picture, and nothing else. */
   const broadcast = (frame: RoadmapStateEvent): void => {
     const message = JSON.stringify(frame);
@@ -128,6 +146,13 @@ export function createRoadmapModule(): RoadmapModule {
     current: () => watcher.whenLanded(FIRST_READ_WAIT_MS),
     relay: (act: RoadmapAct, argv: readonly string[], body: unknown) => relayRoadmapWrite(act, argv, body, dependencies),
     poke: () => watcher.poke(),
+    // A read that fails answers 502 with its sentence and is journalled here once, as the picture's
+    // failures are: the dialog's amber line is otherwise the only trace a broken cases door leaves.
+    cases: (feature: string) =>
+      readFeatureCases(casesDependencies, feature).catch((error: unknown) => {
+        logErrorOnce(`cases read failed: ${error instanceof Error ? error.message : String(error)}`);
+        throw error;
+      }),
   });
 
   return {

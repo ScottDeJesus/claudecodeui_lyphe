@@ -1,8 +1,9 @@
-import { useId } from 'react';
+import { useContext, useId } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { fakeRailSections } from '@/modules/roadmap/fake'; // FILL: fake — import { railSections } from '@/modules/roadmap/railSections';
+import { RoadmapFaceContext } from '@/modules/roadmap/faceContext';
 import { FeatureRow } from '@/modules/roadmap/FeatureRow';
+import { railSections } from '@/modules/roadmap/railSections';
 import type { Roadmap, RoadmapFeature } from '@/shared/roadmap-types';
 import { cn } from '@/shared/utils';
 
@@ -26,9 +27,10 @@ type RailSection = { key: string; heading: string; features: RoadmapFeature[]; m
  */
 export function RoadmapRail({ roadmap }: { roadmap: Roadmap }) {
   const { t } = useTranslation();
-  const sections = fakeRailSections(roadmap); // FILL: sections — railSections(roadmap) (railSections.ts, which the gutter widget reads too): waiting on you, blocked with the reason it carries, in flight, and proposed, each in path order
-  // FILL: dialogs — the dialog host's opener (RoadmapPath provides it): a row's press opens FeatureDialog
-  const openFeature = (_feature: RoadmapFeature) => {}; // FILL: onOpen — FeatureDialog on this feature, through the dialog host's opener
+  // The four sections are one pure function of the roadmap, which the chat gutter's widget reads as well.
+  const sections = railSections(roadmap);
+  const { openDialog } = useContext(RoadmapFaceContext);
+  const openFeature = (feature: RoadmapFeature) => openDialog({ dialog: 'feature', name: feature.name });
   const labelId = useId();
 
   const drawn: RailSection[] = [

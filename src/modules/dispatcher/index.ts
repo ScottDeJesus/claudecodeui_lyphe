@@ -2,8 +2,9 @@
 // beside every other lane's feed.
 export { DispatcherFeed } from '@/modules/dispatcher/DispatcherFeed';
 // The lane's read side — every plan the store holds, this box's posture beside them, and which of
-// them the operator has hidden or dismissed. The Runner tab reads it for the card list, the `Hidden`
-// list and the count and `laneOpen` that badge and gate the tab.
+// them the operator has hidden or dismissed. The In flight face reads it for the card list and the
+// `Hidden` list; the tab strip and the Roadmap tab's In flight switch read the `count` and `waiting`
+// that mark them.
 export { useDispatcherPlans } from '@/modules/dispatcher/hooks/useDispatcherPlans';
 // Both hands, one hook: the plan card's seven verbs and the arc header's four — stop, resume, schedule
 // and the arc's model word — relayed to the dispatcher's own binary and answered with its own

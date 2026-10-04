@@ -2,6 +2,7 @@ import { readDispatcherJson, type DispatcherCommandDependencies } from '@/shared
 import { each, field, isCount, isFlag, isRecord, isText, isTextOrNull, need, oneOf } from '@/shared/document-fields.js';
 import type {
   Roadmap,
+  RoadmapCases,
   RoadmapEpic,
   RoadmapEpicWord,
   RoadmapFeature,
@@ -32,6 +33,13 @@ import type {
  * dispatcher reads a store state it has no step for as `designing` with the state as its step
  * (`report_roadmap.py::feature_word`), which is outside the contract's thirteen, and that one feature
  * would refuse the whole picture until the contract learns the step.
+ *
+ * ONE absence is tolerated, and it is `cases`: a feature, an epic's standing or a roadmap's standing
+ * with no `cases` key reads as six zeros (`readCases`). CloudCLI and the dispatcher deploy apart, so a
+ * CloudCLI that ships ahead of its dispatcher meets a picture from a build that has no cases at all,
+ * and refusing it would blank the whole Roadmap tab for a field whose true value in that build IS
+ * zero. The tolerance is the KEY's absence alone: a `cases` that is present and unreadable (a null, a
+ * string, a count that is not a whole number) is refused by its path like any other field.
  */
 
 /** The document's name in every refusal and every failure of the command that prints it. */
@@ -59,6 +67,9 @@ const EPIC_WORDS: readonly RoadmapEpicWord[] = ['empty', 'not started', 'in prog
 const MILESTONE_WORDS: readonly RoadmapMilestoneWord[] = ['empty', 'not started', 'in progress', 'reached'];
 const ROADMAP_WORDS: readonly RoadmapWord[] = ['no path yet', 'on the way', 'every milestone reached'];
 
+/** A non-negative integer: how many of something there are. */
+const isWholeCount = (value: unknown): value is number => isCount(value) && Number.isInteger(value) && value >= 0;
+
 /**
  * One object of the document, read by key. Every method names the field it refused by the object's
  * own path plus the key, so no reader below spells a path by hand and none can mis-spell one. The
@@ -67,9 +78,14 @@ const ROADMAP_WORDS: readonly RoadmapWord[] = ['no path yet', 'on the way', 'eve
 function row(raw: unknown, at: string) {
   const where = (key: string): string => (at === '' ? key : `${at}.${key}`);
   return {
+    /** The object this row reads and its path, for a reader that takes a whole object (`readCases`). */
+    raw,
+    at,
     text: (key: string): string => need(field(raw, key), isText, where(key), DOCUMENT),
     textOrNull: (key: string): string | null => need(field(raw, key), isTextOrNull, where(key), DOCUMENT),
     count: (key: string): number => need(field(raw, key), isCount, where(key), DOCUMENT),
+    /** A tally: `count` is any finite number, and a tally of cases is never negative or fractional. */
+    whole: (key: string): number => need(field(raw, key), isWholeCount, where(key), DOCUMENT),
     flag: (key: string): boolean => need(field(raw, key), isFlag, where(key), DOCUMENT),
     word: <T extends string>(key: string, words: readonly T[]): T => oneOf(field(raw, key), words, where(key), DOCUMENT),
     wordOrNull: <T extends string>(key: string, words: readonly T[]): T | null =>
@@ -94,6 +110,25 @@ function readTask(raw: unknown, at: string): RoadmapTask {
   };
 }
 
+/**
+ * The `cases` standing of the object that holds the key — a feature, or an epic's or a roadmap's
+ * `standing`. An ABSENT key is six zeros (see the head of this file); a present key is read whole.
+ */
+function readCases(raw: unknown, at: string): RoadmapCases {
+  if (field(raw, 'cases') === undefined) {
+    return { total: 0, holding: 0, broken: 0, regressed: 0, not_run: 0, cant_run: 0 };
+  }
+  const cases = row(raw, at).object('cases');
+  return {
+    total: cases.whole('total'),
+    holding: cases.whole('holding'),
+    broken: cases.whole('broken'),
+    regressed: cases.whole('regressed'),
+    not_run: cases.whole('not_run'),
+    cant_run: cases.whole('cant_run'),
+  };
+}
+
 function readFeature(raw: unknown, at: string): RoadmapFeature {
   const feature = row(raw, at);
   return {
@@ -113,6 +148,7 @@ function readFeature(raw: unknown, at: string): RoadmapFeature {
     promoted_at: feature.textOrNull('promoted_at'),
     approved_at: feature.textOrNull('approved_at'),
     shipped_at: feature.textOrNull('shipped_at'),
+    cases: readCases(raw, at),
   };
 }
 
@@ -136,6 +172,7 @@ function readEpic(raw: unknown, at: string): RoadmapEpic {
       designing: standing.count('designing'),
       proposed: standing.count('proposed'),
       ideas: standing.count('ideas'),
+      cases: readCases(standing.raw, standing.at),
     },
     features: epic.list('features', readFeature),
   };
@@ -187,6 +224,7 @@ function readRoadmap(raw: unknown, at: string): Roadmap {
       ideas: standing.count('ideas'),
       blocked: standing.count('blocked'),
       waiting_on_you: standing.count('waiting_on_you'),
+      cases: readCases(standing.raw, standing.at),
     },
     milestones: roadmap.list('milestones', readMilestone),
   };

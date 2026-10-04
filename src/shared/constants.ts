@@ -13,7 +13,7 @@ import {
 } from 'lucide-react';
 import type { ComponentType } from 'react';
 
-import type { RoadmapFeatureWord } from '@/shared/roadmap-types';
+import type { RoadmapFeatureWord, RoadmapMilestoneWord } from '@/shared/roadmap-types';
 import type { FileStatusCode, LLMProvider, McpProvider, McpScope, McpTransport, SettingsMainTab } from '@/shared/types';
 import type { UserPreferenceKey } from '@/shared/userSettings';
 
@@ -374,3 +374,30 @@ export const ROADMAP_FEATURE_WORD_KEYS: Record<RoadmapFeatureWord, string> = {
   'in flight': 'roadmap.word.inFlight',
   shipped: 'roadmap.word.shipped',
 };
+
+// ---------------------------
+
+//----------------- THE ROADMAP'S MILESTONE WORDS ------------
+
+/**
+ * Each milestone word's key in the locale, which spells `not started` and `in progress` as `notStarted` and
+ * `inProgress`: the one way a milestone's word is put into words. Used by the roadmap module's
+ * `MilestonePath` (each station's line and label) and `MilestoneFocus` (the stage's eyebrow).
+ */
+export const ROADMAP_MILESTONE_WORD_KEYS: Record<RoadmapMilestoneWord, string> = {
+  empty: 'roadmap.milestoneWord.empty',
+  'not started': 'roadmap.milestoneWord.notStarted',
+  'in progress': 'roadmap.milestoneWord.inProgress',
+  reached: 'roadmap.milestoneWord.reached',
+};
+
+// ---------------------------
+
+//----------------- THE RUNNER LANDING ------------
+
+/**
+ * The query parameter a landing names a plan in (`?runner=<plan>`): the key one side writes and the other
+ * reads. Used by the project-workspace module's `useRunnerLanding`, which reads it, and the roadmap
+ * module's `useRevealCard`, which writes it from a surface that has no Roadmap tab above it.
+ */
+export const RUNNER_LANDING_PARAM = 'runner';

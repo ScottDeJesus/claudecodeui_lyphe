@@ -369,7 +369,7 @@ const COPY_BY_CODE = new Map<string, CodeCopy>([
   }],
   ['dispatcher.paused', ({ meta }) => ({
     headline: 'Feature paused',
-    body: [dispatcherPhaseText(meta), readText(meta.detail), 'Resume from the Runner tab', epicWaveText(meta, 'stops')]
+    body: [dispatcherPhaseText(meta), readText(meta.detail), 'Resume from the Roadmap tab', epicWaveText(meta, 'stops')]
       .filter((part): part is string => part !== null)
       .join(' · '),
   })],
@@ -382,7 +382,7 @@ const COPY_BY_CODE = new Map<string, CodeCopy>([
     // promise the hour as though the API had given it.
     body: `${meta.limitGuess === true
       ? `Features paused — no reset time named, retrying at ${limitLiftText(meta.resetsAt)}`
-      : `Features paused until ${limitLiftText(meta.resetsAt)}`} · Resume from the Runner tab`,
+      : `Features paused until ${limitLiftText(meta.resetsAt)}`} · Resume from the Roadmap tab`,
   })],
   ['dispatcher.relaunched', ({ meta }) => {
     const phase = readText(meta.phase);

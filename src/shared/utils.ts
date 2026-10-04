@@ -443,6 +443,30 @@ export function roadmapFeatureIndex(picture: RoadmapPicture): Map<string, { titl
 
 // ---------------------------
 
+//----------------- THE ROADMAP LANE'S TEXT FENCES ------------
+
+/**
+ * Every character Python's `str.splitlines()` breaks a line on, which is how the store counts "one line"
+ * (`LINE_BREAK` in `roadmap-write.service.ts`). An `<input>` strips only LF and CR from what is pasted
+ * into it, so the others reach a draft and the lane would refuse them. Private to `roadmapTextBreak`.
+ */
+const ROADMAP_LINE_BREAK = /[\n\r\v\f\u001c-\u001e\u0085\u2028\u2029]/;
+
+/**
+ * Which of the lane's fences a roadmap write's free text breaks, or null when it breaks none: `text` for
+ * more than `max` code points (as the store counts them, not UTF-16 units) or a NUL, `line` for a
+ * line break in a field that is one line. The answer is the field's own invalid state, so a text the
+ * lane would refuse is never sent. Pass the TRIMMED text. Used by the roadmap dialogs: `ItemDialog`
+ * (title, goal, project name) and `BlockDialog` (the reason).
+ */
+export function roadmapTextBreak(text: string, max: number, oneLine: boolean): 'line' | 'text' | null {
+  const broken = [...text].length > max || text.includes('\0') || (oneLine && ROADMAP_LINE_BREAK.test(text));
+  if (!broken) return null;
+  return oneLine ? 'line' : 'text';
+}
+
+// ---------------------------
+
 //----------------- THE DISPATCHER'S MODEL WORD ------------
 
 /**

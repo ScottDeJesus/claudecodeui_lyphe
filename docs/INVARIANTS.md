@@ -112,12 +112,12 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-deck-height.mjs
 - THE FLOOR HAS ONE BOUND, MEASURED: `fit-content` is `min(max-content, max(min-content, available))` — capped by the room the row can give — and `break-words` (`overflow-wrap: break-word`) does NOT lower a word's intrinsic min-content. A title that is ONE token with no space and no hyphen in it, wider than the row, therefore neither wraps nor shrinks: the name leaves the card (measured 2026-09-25 at 390px with a 74-character token — one 622px line in a 332px row, the title 278px past the deck's right edge, the page itself not scrolling because its ancestors clip it). No live name reaches it: the corpus's longest unbroken segment is 19 characters. The row's own `scrollWidth` against its `clientWidth` is the reading that catches it; `lines === 1` passes there.
 - `flex-wrap` IS THE OTHER HALF, and neither half works alone: a floor with no wrap pushes the word, the clock and the count past the card's edge instead of under the title; a wrap with no floor (`min-w-0`) lets the title shrink to nothing.
 - THE CORNER STANDS OUTSIDE THE WRAPPING GROUP, `shrink-0`, so its presses keep the row's top-right whatever the group does; the group's `min-h-10 sm:min-h-7` is the corner's height, so a one-line title centres on it.
-- THE FLOOR IS CONTENT-DRIVEN, NEVER A BREAKPOINT: the same heads are drawn in the Runner tab and in the chat gutter (~380px even at 1440), so `sm:` would put one home's card on the other home's branch.
+- THE FLOOR IS CONTENT-DRIVEN, NEVER A BREAKPOINT: the same heads are drawn in the In flight face and in the chat gutter (~380px even at 1440), so `sm:` would put one home's card on the other home's branch.
 
 measured 2026-09-25. Operator, with a phone screenshot of the Runner widget: "This card is rendering funny on my phone" (`/tmp/chains/arc-header-phone.jpg`: `restorly.arc` one letter per line in a monospace column, `$0.32 DeepSeek · 2.6M in · 26k out` whole beside it, the status word and the fold chevron cut off past the card's edge).
 
 - CONTROL ON THE RUNNING BUILD (`--head-css` sets the group `nowrap` and the title `min-width: 0` in the page): on the 2026-09-25 header, 12 lines in a 0px-wide box at 390px and 23px of spill; on `LaneCardHead` with the Epic tag in the title (2026-09-28), 1 line in a 91px box at 390 and 4 lines in a 21px box at 320 — the corner now stands outside the group, so 390px leaves the title room even without its floor.
-- AFTER (2026-09-26, `LaneCardHead`): all 20 heads of the Runner tab — the `restorly` deck, its 13 plan cards and 6 loose plans — read `scrollWidth === clientWidth` on `data-lane-head-row` at 1920, 390 and 320; the arc's title is 1 line in a 113px box at 390 and 134px at 320, the pills below it, 0px of header overflow, light and dark.
+- AFTER (2026-09-26, `LaneCardHead`): all 20 heads of the In flight face — the `restorly` deck, its 13 plan cards and 6 loose plans — read `scrollWidth === clientWidth` on `data-lane-head-row` at 1920, 390 and 320; the arc's title is 1 line in a 113px box at 390 and 134px at 320, the pills below it, 0px of header overflow, light and dark.
 
 ```probe
 node .verify/probe-arc-header-fit.mjs --tag after             # exit 0: every reading held, 0 failed
@@ -150,34 +150,6 @@ expect: `before (static):` prints "outerScrollTop":0 with "innerScrollTop" equal
 
 measured 2026-09-26 by chain chain-runner-card-makeover--whole-20260926-210824-bf49, finding L2, LOW
 probe-key: 5ba30369542f5607a441e4f2004ee7f839d99d20
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/phaseWord.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/PlanCard.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/PlanPhaseRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/ScrollArea.tsx
-
-## INV-4651 — probe — MAN-373's ScrollArea roll call names 4 callers, beside a code comment naming all 12
-
-MAN-373's ScrollArea roll call names 4 callers, beside a code comment naming all 12
-
-```probe
-grep -o "Every caller is a pane outside the transcript — [^.]*" /home/lyphe/.claude/claudecodeui_lyphe/docs/architecture/MANUAL.md; grep -rl "<ScrollArea" /home/lyphe/.claude/claudecodeui_lyphe/src | wc -l
-expect: the row names four files while 12 files render <ScrollArea
-```
-
-measured 2026-09-26 by chain chain-runner-card-makeover--whole-20260926-210824-bf49, finding L3, LOW
-probe-key: 5fb1f128c394cc47b391f7f01bc0f2c1f149ac33
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/phaseWord.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/PlanCard.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/PlanPhaseRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/ScrollArea.tsx
-
-## INV-4652 — probe — PlanCard's comment says it is "the one lane read a card makes"; PlanFace makes a second, and MAN-1557's `waitsOn` rationale is stale with it
-
-PlanCard's comment says it is "the one lane read a card makes"; PlanFace makes a second, and MAN-1557's `waitsOn` rationale is stale with it
-
-```probe
-cd /home/lyphe/.claude/claudecodeui_lyphe && grep -n "one lane read" src/modules/dispatcher/PlanCard.tsx; grep -n "useDispatcherPlans()" src/modules/dispatcher/PlanCard.tsx src/modules/dispatcher/PlanFace.tsx; grep -c "would be one bus subscription per card" docs/MANUAL.md
-expect: PlanCard claims the one lane read while both PlanCard.tsx and PlanFace.tsx call useDispatcherPlans(), and MAN still prints the one-subscription rationale (count 1)
-```
-
-measured 2026-09-26 by chain chain-runner-card-makeover--whole-20260926-210824-bf49, finding L4, LOW
-probe-key: fc4abb9778d094436351a99d60c0a4b49ab42bcb
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/phaseWord.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/PlanCard.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/PlanPhaseRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/ScrollArea.tsx
 
@@ -297,7 +269,8 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/docs/
 - A key joins BOTH lists together: `ENTRY_PATCHED_KEYS` (`src/shared/userSettings.ts`) and `ENTRY_LISTED_KEYS` (`server/modules/database/repositories/user-preferences.db.ts`). One without the other sends patches the server stores whole, or stores whole what the client patches.
 - Write it through `writeUserPreferenceEntries`, never `writeUserPreference('roadmapSeen', …)`. why: a whole write from the device that read last erases the other roadmap's stamp and replays its completions.
 - THE MERGE IS NOT MONOTONIC. `mergeEntryLists` (server) and `applyEntryPatch` (client) replace the named entry and compare no `at`, so a patch carrying an older `at` moves the stamp backward and the other device replays what it already played.
-- A stamp writer never sends an `at` older than the one it read. This cannot cover a stale device that never re-read the server's stamp: only a merge that keeps the newer `at` per roadmap can, on both sides, and `dispatcher`'s lists share that merge.
+- A stamp writer never sends an `at` older than the one it read. The one writer, `rememberSeen` (`src/modules/roadmap/utils/seenStamp.ts`, MAN-7648), reads the newer of the device mirror and the server's copy (`api.user.preferences()`) at its turn, writes one at a time, and sends only a later `at`. why: the mirror is hydrated once at sign-in and can be hours stale.
+- What stays open is the window between that read and the server write: only a merge that keeps the newer `at` per roadmap closes it, on both sides, and `dispatcher`'s lists share that merge.
 - A reader treats `{ "seen": [] }` and an absent key alike: the entry merge keeps the key after every entry is removed.
 - `PreferenceListEntry` (`src/shared/types.ts`) is `string | { name: string; [field: string]: unknown }`, so `{ name, at }` is legal as a literal.
 

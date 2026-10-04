@@ -1,7 +1,8 @@
 import { MoreHorizontal, Pencil, Plus, Trash2 } from 'lucide-react';
-import { Fragment, useRef, useState } from 'react';
+import { Fragment, useContext, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { RoadmapFaceContext } from '@/modules/roadmap/faceContext';
 import { MilestonePath } from '@/modules/roadmap/MilestonePath';
 import { RoadmapPicker } from '@/modules/roadmap/RoadmapPicker';
 import type { Roadmap } from '@/shared/roadmap-types';
@@ -26,6 +27,13 @@ type StandingFact = { key: string; text: string; ink?: 'accent' | 'warn' };
  * because it is the one thing the operator wants in front of him above everything else; then where the
  * roadmap stands, in plain words and tabular figures; then the path itself, from here to the goal.
  *
+ * The standing says the features' facts first — progress, then what needs the operator ("1 blocked", "2
+ * waiting on you"), which count features because they follow them — and closes on the regression cases the
+ * roadmap keeps, the count first and its state right after it ("5 cases · all holding", "5 cases · 2
+ * broken"), so the pair is bound by adjacency and no feature fact reads as counting cases. "All holding" is
+ * said only when every case holds; a roadmap whose cases have not all run yet, with none broken, says just
+ * how many it keeps.
+ *
  * A goal runs to three lines and offers Show all past them, so the longest one never pushes the path
  * below a phone's fold. A roadmap with no goal says so in the goal's own place, in the same serif, as
  * the press that writes it. A roadmap with no milestone draws no path: the stage below says how to start
@@ -38,24 +46,43 @@ type StandingFact = { key: string; text: string; ink?: 'accent' | 'warn' };
  */
 export function RoadmapHeader({ roadmap, focused, onFocus }: RoadmapHeaderProps) {
   const { t } = useTranslation();
-  // FILL: dialogs — the dialog host's opener (RoadmapPath provides it): Edit the goal and title and the missing goal's press open ItemDialog editing this roadmap, Add a milestone opens ItemDialog adding one, Delete opens its confirm
+  const { openDialog } = useContext(RoadmapFaceContext);
   // The goal's heading: the fold measures whether its three clamped lines hold all of it.
   const goalRef = useRef<HTMLHeadingElement>(null);
-  // FILL: goalWhole — component state, with its comment: the goal drawn whole once Show all is pressed; false again on another roadmap (the header is keyed by its name)
+  // Whether the goal is drawn whole, once Show all is pressed. Local and never remembered: the header is
+  // keyed by its roadmap's name, so another roadmap starts its goal folded again.
   const [goalWhole, showWholeGoal] = useState(false);
-  // FILL: goalLong — whether the clamped goal runs past its three lines: goalRef's scrollHeight over its clientHeight, re-read as the face resizes and the goal changes, so Show all is offered only when there is more to show
-  const goalLong = (roadmap.goal?.length ?? 0) > (window.matchMedia('(min-width: 768px)').matches ? 180 : 96);
+  // Whether the clamped goal runs past its three lines, so Show all is offered only when there is more to
+  // show. A measurement of the laid-out heading (its content taller than its box), which no prop says: it
+  // is read when the goal changes and again whenever the heading is resized, as the face is.
+  const [goalLong, setGoalLong] = useState(false);
+  useEffect(() => {
+    const heading = goalRef.current;
+    if (heading === null) return;
+    // `observe` delivers a first reading of its own, so the fold is measured as soon as the heading is laid out.
+    // More than half a line of content below the box is hidden lines; less is just the serif's glyphs
+    // reaching past its tight leading (a one-line goal measures 3px over at 36px type).
+    const observer = new ResizeObserver(() => {
+      const line = Number.parseFloat(getComputedStyle(heading).lineHeight);
+      setGoalLong(heading.scrollHeight - heading.clientHeight > line / 2);
+    });
+    observer.observe(heading);
+    return () => observer.disconnect();
+  }, [roadmap.goal]);
 
   const items: ActionMenuItem[] = [
-    { key: 'edit', label: t('roadmap.menu.editRoadmap'), icon: Pencil, onSelect: () => {} }, // FILL: onEdit — ItemDialog editing this roadmap (kind roadmap): its title and its goal
-    { key: 'add-milestone', label: t('roadmap.menu.addMilestone'), icon: Plus, onSelect: () => {} }, // FILL: onAddMilestone — ItemDialog adding a milestone (kind milestone, parent roadmap.name)
+    { key: 'edit', label: t('roadmap.menu.editRoadmap'), icon: Pencil, onSelect: () => openDialog({ dialog: 'edit', kind: 'roadmap', item: roadmap }) },
+    { key: 'add-milestone', label: t('roadmap.menu.addMilestone'), icon: Plus, onSelect: () => openDialog({ dialog: 'add', kind: 'milestone', parent: roadmap }) },
     ...(roadmap.milestones.length === 0
-      ? [{ key: 'delete', label: t('roadmap.menu.delete'), icon: Trash2, isDanger: true, showDividerBefore: true, onSelect: () => {} }] // FILL: onDelete — the delete confirm, then writes.remove({ kind: 'roadmap', name: roadmap.name, itemTitle: roadmap.title })
+      ? [{ key: 'delete', label: t('roadmap.menu.delete'), icon: Trash2, isDanger: true, showDividerBefore: true, onSelect: () => openDialog({ dialog: 'delete', kind: 'roadmap', item: roadmap }) }]
       : []),
   ];
 
   const { standing } = roadmap;
   const allReached = roadmap.word === 'every milestone reached';
+  // The roadmap's cases by word, summed over its epics; a break and a regression are both what broke.
+  const { cases } = standing;
+  const casesBroken = cases.broken + cases.regressed;
   const facts: StandingFact[] = [
     roadmap.milestones.length === 0
       ? { key: 'word', text: t('roadmap.roadmapWord.noPath') }
@@ -65,6 +92,9 @@ export function RoadmapHeader({ roadmap, focused, onFocus }: RoadmapHeaderProps)
     ...(standing.proposed > 0 ? [{ key: 'next', text: t('roadmap.standing.next', { count: standing.proposed }) }] : []),
     ...(standing.blocked > 0 ? [{ key: 'blocked', text: t('roadmap.standing.blocked', { count: standing.blocked }), ink: 'warn' as const }] : []),
     ...(standing.waiting_on_you > 0 ? [{ key: 'waiting', text: t('roadmap.standing.waiting', { count: standing.waiting_on_you }), ink: 'warn' as const }] : []),
+    ...(cases.total > 0 ? [{ key: 'cases', text: t('roadmap.cases.total', { count: cases.total }) }] : []),
+    ...(casesBroken > 0 ? [{ key: 'casesBroken', text: t('roadmap.cases.headerBroken', { count: casesBroken }), ink: 'warn' as const }] : []),
+    ...(cases.total > 0 && cases.holding === cases.total ? [{ key: 'casesHolding', text: t('roadmap.cases.allHolding') }] : []),
   ];
 
   return (
@@ -107,7 +137,7 @@ export function RoadmapHeader({ roadmap, focused, onFocus }: RoadmapHeaderProps)
           <h2 className="font-normal">
             <button
               type="button"
-              onClick={() => {}} // FILL: onEditGoal — ItemDialog editing this roadmap (kind roadmap), its goal field first
+              onClick={() => openDialog({ dialog: 'edit', kind: 'roadmap', item: roadmap, goalFirst: true })}
               className="text-left font-serif text-[2rem]/[1.15] italic text-muted-foreground underline decoration-border decoration-dashed decoration-1 underline-offset-8 hover:text-foreground md:text-[2.25rem]/[1.15]"
             >
               {t('roadmap.goal.missing')}
@@ -120,7 +150,7 @@ export function RoadmapHeader({ roadmap, focused, onFocus }: RoadmapHeaderProps)
         {facts.map((fact, index) => (
           <Fragment key={fact.key}>
             {index > 0 && <span aria-hidden="true">·</span>}
-            <span className={cn(fact.ink === 'accent' && 'font-medium text-accent-ink', fact.ink === 'warn' && 'font-medium text-warn-ink')}>{fact.text}</span>
+            <span data-roadmap-fact={fact.key} className={cn(fact.ink === 'accent' && 'font-medium text-accent-ink', fact.ink === 'warn' && 'font-medium text-warn-ink')}>{fact.text}</span>
           </Fragment>
         ))}
       </p>

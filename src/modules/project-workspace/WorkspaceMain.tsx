@@ -12,7 +12,7 @@ import { BrowserUsePanel } from '@/modules/browser-use';
 import { usePaletteOpsRegister } from '@/modules/command-palette';
 import { KanbanPanel } from '@/modules/kanban';
 import { MemoryIntakePanel } from '@/modules/memory-intake';
-import { RunnerPanel } from '@/modules/runner-tab';
+import { RoadmapTab } from '@/modules/roadmap';
 import { HealPanel } from '@/modules/heal';
 import { ApiPanel } from '@/modules/api-tab';
 import { TaskMasterPanel, useTaskMasterProjectSync } from '@/modules/task-master';
@@ -118,7 +118,7 @@ function WorkspaceMain({
     preferencesSettled,
   } = useWorkspaceTabGates(activeTab);
 
-  // A `?runner=<plan>` landing: the Runner tab comes forward and its pane brings that plan into view.
+  // A `?runner=<plan>` landing: the Roadmap tab comes forward on its In flight face and brings that plan's card into view.
   const { revealPlan, clearReveal } = useRunnerLanding({ selectedProject, setActiveTab });
 
   useTaskMasterProjectSync(selectedProject);
@@ -253,9 +253,10 @@ function WorkspaceMain({
   // fourth effect for the Memory tab, and adding one would fight the design: that tab is
   // DATA-gated, so its gate is written to HOLD while it is the selected tab
   // (`useWorkspaceTabGates`) and filing the last pending memory empties the panel instead of
-  // taking the tab away mid-act. The Runner tab is the SECOND DATA-gated tab and takes the same
-  // policy — no fifth effect for it either, for exactly the same reason: a run ending under
-  // someone reading its phases must leave them where they are standing. Two kinds of tab, two policies, each living in the layer that
+  // taking the tab away mid-act. The Heal tab is the SECOND DATA-gated tab and takes the same
+  // policy — no fifth effect for it either, for exactly the same reason: a friction cleared under
+  // someone reading its entries must leave them where they are standing. (The Roadmap tab is not
+  // gated at all.) Two kinds of tab, two policies, each living in the layer that
   // owns the act — the gate rule in the hook that decides a tab exists, the navigation here,
   // where `setActiveTab` is.
   //
@@ -431,7 +432,7 @@ function WorkspaceMain({
 
           {shouldShowRunnerTab && activeTab === 'runner' && (
             <div className="h-full overflow-hidden">
-              <RunnerPanel revealPlan={revealPlan} onRevealed={clearReveal} />
+              <RoadmapTab revealPlan={revealPlan} onRevealed={clearReveal} />
             </div>
           )}
 

@@ -1,25 +1,19 @@
 import { Lock } from 'lucide-react';
-// FILL: imports — the markers' own: react's useState beside useId, and useRoadmap and useRoadmapWrites under them
-import { useId } from 'react';
+import { useId, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { useRoadmap } from '@/modules/roadmap/hooks/useRoadmap';
+import { useRoadmapWrites } from '@/modules/roadmap/hooks/useRoadmapWrites';
 import { useReturnFocus } from '@/shared/hooks/useReturnFocus';
-import type { Roadmap, RoadmapEpic, RoadmapFeature, RoadmapKind, RoadmapMilestone, RoadmapWriteBody } from '@/shared/roadmap-types';
+import type { Roadmap, RoadmapEpic, RoadmapFeature, RoadmapKind, RoadmapMilestone, RoadmapPicture, RoadmapWriteBody } from '@/shared/roadmap-types';
 import { Button, Dialog, DialogContent, DialogTitle, Field, Input, Select, TextArea } from '@/shared/ui';
-import { folderName } from '@/shared/utils';
+import { folderName, roadmapTextBreak } from '@/shared/utils';
 
-// Add or edit one roadmap item of any kind, in one form.
-//
-// Each fill marker below governs the ONE statement under it, which holds a fake standing in for what the
-// fill reads, holds or does; `imports` governs the react import under it and the lines the fill adds
-// beside it. Every other line is composition and stays as it is.
-
-/**
- * The lane's fences (`roadmap-write.service.ts`), met as each field is typed: a title and a project label
- * are one line, a folder an absolute path. `maxLength` counts UTF-16 units, never fewer than the code
- * points the lane counts, so a typed value never runs past its fence.
- */
+/** The lane's fences (`roadmap-write.service.ts`), met as each field is typed: `maxLength` counts UTF-16 units, so it can stop an emoji-heavy text short of the lane's limit but never lets one past it. */
 const FENCES = { title: 120, goal: 8000, label: 40, folder: 400 } as const;
+
+/** Which of the lane's fences a field's text breaks — too long or holding a NUL (`text`), a line break in a one-line field (`line`), a goal of one `-` (`dash`) — each said by its own sentence under the field (`roadmapTextBreak` finds the first two). */
+type FenceBreak = 'line' | 'text' | 'dash';
 
 /** The one project choice that is not a known pair: a folder and its label, typed by hand. */
 const ANOTHER_FOLDER = 'another-folder';
@@ -27,10 +21,7 @@ const ANOTHER_FOLDER = 'another-folder';
 /** The words a feature has before design: its goal and its folder are still the operator's to change. */
 const UNPROMOTED: ReadonlySet<string> = new Set(['idea', 'proposed']);
 
-/**
- * What a promoted feature's goal and folder are drawn in: words in a dashed, muted box, so nothing about
- * them reads as a field to type in. They stay selectable, in the muted ink that reads at AA.
- */
+/** A promoted feature's goal and folder: words in a dashed, muted box, never a field to type in; selectable, in the muted ink that reads at AA. */
 const DESIGN_OWNED = 'rounded-lg border border-dashed border-border bg-muted/40 px-3 py-2 text-sm text-muted-foreground';
 
 /** One project a feature can be built in: the label the roadmap shows (null: none, so its folder's name) and the folder the work happens in. */
@@ -68,6 +59,52 @@ function pairKey(pair: ProjectPair): string {
   return JSON.stringify([pair.repo, pair.project]);
 }
 
+/** The value `values` holds most often, the first of them on a tie; null for none. */
+function mostOf(values: string[]): string | null {
+  const counts = new Map<string, number>();
+  for (const value of values) counts.set(value, (counts.get(value) ?? 0) + 1);
+  let most: string | null = null;
+  for (const [value, count] of counts) if (most === null || count > (counts.get(most) ?? 0)) most = value;
+  return most;
+}
+
+/**
+ * The projects a feature can be built in, as the roadmaps' features carry them, in path order: each
+ * distinct (project, folder) pair — but never a pair with no label whose folder a labelled pair names,
+ * because that folder IS the labelled project and its bare name would list it twice. `keep`, an edited
+ * feature's own pair, is offered whatever it is, so an edit opens on it unchanged.
+ */
+function projectPairs(picture: RoadmapPicture | null, keep: string | null): ProjectPair[] {
+  const pairs = new Map<string, ProjectPair>();
+  for (const roadmap of picture?.roadmaps ?? []) {
+    for (const feature of roadmap.milestones.flatMap((milestone) => milestone.epics.flatMap((epic) => epic.features))) {
+      if (!pairs.has(pairKey(feature))) pairs.set(pairKey(feature), { project: feature.project, repo: feature.repo });
+    }
+  }
+  const named = new Set([...pairs.values()].flatMap((pair) => (pair.project === null ? [] : [pair.repo])));
+  return [...pairs].flatMap(([key, pair]) => (pair.project !== null || !named.has(pair.repo) || key === keep ? [pair] : []));
+}
+
+/**
+ * The project an add opens on: the folder its epic's own features use most, called by the label the
+ * picture gives that folder (the epic's own most-used one, else the first offered). An epic with no
+ * feature yet opens on the folder its roadmap's features use most, under the label they give it. The
+ * first project stands in only for a roadmap with no feature at all; a picture with none opens on
+ * Another folder….
+ */
+function openingPair(picture: RoadmapPicture | null, epic: string | undefined, pairs: ProjectPair[]): string {
+  const first = pairs[0] ? pairKey(pairs[0]) : ANOTHER_FOLDER;
+  const home = picture?.roadmaps.find((roadmap) => roadmap.milestones.some((milestone) => milestone.epics.some((item) => item.name === epic)));
+  const mine = home?.milestones.flatMap((milestone) => milestone.epics).find((item) => item.name === epic)?.features ?? [];
+  const own = mine.length > 0 ? mine : home?.milestones.flatMap((milestone) => milestone.epics.flatMap((item) => item.features)) ?? [];
+  const repo = mostOf(own.map((feature) => feature.repo));
+  if (repo === null) return first;
+  const label = mostOf(own.flatMap((feature) => (feature.repo === repo && feature.project !== null ? [feature.project] : [])))
+    ?? pairs.find((pair) => pair.repo === repo && pair.project !== null)?.project ?? null;
+  const key = pairKey({ project: label, repo });
+  return pairs.some((pair) => pairKey(pair) === key) ? key : first;
+}
+
 /** The pairs as choices: each called by its label, else its folder's name, with its whole path beside it where another pair is called the same. */
 function pairChoices(pairs: ProjectPair[]): { value: string; label: string }[] {
   const called = (pair: ProjectPair) => pair.project ?? folderName(pair.repo);
@@ -78,14 +115,13 @@ function pairChoices(pairs: ProjectPair[]): { value: string; label: string }[] {
 }
 
 /**
- * The draft a dialog opens on: the item's own words and project, or a blank add on the first known
- * project. A folder no known pair holds — an empty picture's first feature, or a feature whose pair the
- * picture no longer carries — opens on Another folder… with its path and label already typed.
+ * The draft a dialog opens on: the item's own words and project, or a blank add on `opening`. A feature
+ * whose pair the picture no longer carries opens on Another folder…, its path and label already typed.
  */
-function draftOf(item: EditedItem | undefined, pairs: ProjectPair[]): ItemDraft {
+function draftOf(item: EditedItem | undefined, pairs: ProjectPair[], opening: string): ItemDraft {
   const feature = item && 'repo' in item ? item : null;
   const opened = { title: item?.title ?? '', goal: item?.goal ?? '', folder: '', label: feature?.project ?? '' };
-  if (feature === null) return { ...opened, pair: pairs[0] ? pairKey(pairs[0]) : ANOTHER_FOLDER };
+  if (feature === null) return { ...opened, pair: opening };
   const pair = pairKey({ project: feature.project, repo: feature.repo });
   if (pairs.some((known) => pairKey(known) === pair)) return { ...opened, pair };
   return { ...opened, pair: ANOTHER_FOLDER, folder: feature.repo };
@@ -98,9 +134,8 @@ function pairOf(draft: ItemDraft, pairs: ProjectPair[]): ProjectPair | null {
 }
 
 /**
- * What an edit sends: each field whose trimmed value differs from the item's, and nothing else, so an
- * empty answer means nothing changed and Save waits. A promoted feature's goal and repo are its design's
- * (the store refuses them), so only its title and its project's label can change.
+ * What an edit sends: each field whose trimmed value differs from the item's, so an empty answer means Save
+ * waits. A promoted feature's goal and repo are its design's (the store refuses them): only its title and label.
  */
 function changesOf(draft: ItemDraft, item: EditedItem, pairs: ProjectPair[]): RoadmapWriteBody {
   const feature = 'repo' in item ? item : null;
@@ -118,7 +153,10 @@ function changesOf(draft: ItemDraft, item: EditedItem, pairs: ProjectPair[]): Ro
 /**
  * ADD OR EDIT, ANY KIND, ONE FORM: a roadmap, a milestone, an epic or a feature. A title is all an add
  * needs, and the store mints its name from it, so an add sends none. A feature also says where it is
- * built: a (project, folder) pair the roadmap's features already carry, or Another folder…, typed by hand.
+ * built, right under its title: a project the roadmaps' features already carry, or Another folder…, typed
+ * by hand. An add opens on the folder its epic's features use most (its roadmap's, while the epic has
+ * none), under that folder's own label, and a folder a label names is never offered again under its bare
+ * folder name (`projectPairs`, `openingPair`).
  *
  * AN EDIT SENDS ONLY WHAT CHANGED, and Save waits until something has. A promoted feature's goal and
  * folder belong to its design: they show locked under "Its design owns these now", and its title and its
@@ -142,32 +180,65 @@ export function ItemDialog(props: ItemDialogProps) {
   const { t } = useTranslation();
   const titleId = useId();
   const fieldId = useId();
+  const writes = useRoadmapWrites();
   useReturnFocus();
 
-  // FILL: projects — every distinct (project, repo) pair the picture's features carry (useRoadmap().picture), in the picture's own order
-  const pairs: ProjectPair[] = [
-    { project: 'Restorly', repo: '/home/lyphe/restorly' }, { project: 'house', repo: '/home/lyphe/restorly' },
-    { project: 'lyphecli', repo: '/home/lyphe/.claude/claudecodeui_lyphe' },
-  ];
-  // FILL: draft — component state, with its comment: the form as typed, opened ONCE on draftOf(item, pairs), so a frame that lands mid-edit never overwrites what is being typed
-  const draft: ItemDraft = draftOf(item, pairs);
-  // FILL: change — lays a field's new value over the draft: setDraft((typed) => ({ ...typed, ...patch }))
-  const change = (_patch: Partial<ItemDraft>) => {};
-  // FILL: busy — component state, with its comment: the write is out, so its button shows busy, and Cancel, Escape and the backdrop wait for the answer
-  const busy = false;
-  // FILL: submit — the write, through useRoadmapWrites with busy held. An add: writes.add({ kind, parent: parent?.name, title, goal (when one is typed) }, plus the pair's project and repo for a feature) — never a name. An edit: writes.edit({ kind, name: item.name, ...changesOf(draft, item, pairs), itemTitle: item.title }). true → onClose(true); false → it stays open
-  const submit = () => {};
-
+  // The projects its features carry, and the parent epic's own, are read off the live picture.
+  const { picture } = useRoadmap();
   const feature = item && 'repo' in item ? item : null;
+  const keep = feature === null ? null : pairKey(feature);
+  const pairs = useMemo(() => projectPairs(picture, keep), [picture, keep]);
+  const opening = useMemo(() => openingPair(picture, props.parent?.name, pairs), [picture, props.parent?.name, pairs]);
+  // The form as typed. Opened ONCE, on the item (or a blank add on `opening`), because the picture redraws
+  // on every frame the lane sends and a frame that lands mid-edit must never overwrite what is being typed.
+  const [draft, setDraft] = useState<ItemDraft>(() => draftOf(item, pairs, opening));
+  const change = (patch: Partial<ItemDraft>) => setDraft((typed) => ({ ...typed, ...patch }));
+  // The write is out, so its button shows busy and Cancel, Escape and the backdrop wait for the answer: it is already at the dispatcher.
+  const [busy, setBusy] = useState(false);
+
   const promoted = feature !== null && !UNPROMOTED.has(feature.word);
   const projected = kind === 'plan' && !promoted;
   const chosen = pairOf(draft, pairs);
   const another = projected && draft.pair === ANOTHER_FOLDER;
   const folder = draft.folder.trim();
   const folderWrong = another && folder !== '' && !folder.startsWith('/');
+  // The lane's other fences, met before anything is sent: each field's own invalid state, with its sentence under it.
+  const titleBreak = roadmapTextBreak(draft.title.trim(), FENCES.title, true);
+  const goalBreak: FenceBreak | null = roadmapTextBreak(draft.goal.trim(), FENCES.goal, false) ?? (draft.goal.trim() === '-' ? 'dash' : null);
+  const labelBreak = roadmapTextBreak(draft.label.trim(), FENCES.label, true);
   const goalAsked = props.goalFirst !== undefined || feature?.word === 'proposed';
   const changed = item === undefined || Object.keys(changesOf(draft, item, pairs)).length > 0;
-  const ready = draft.title.trim() !== '' && (!goalAsked || draft.goal.trim() !== '') && (!another || folder.startsWith('/')) && changed;
+  const ready = draft.title.trim() !== '' && (!goalAsked || draft.goal.trim() !== '') && (!another || folder.startsWith('/')) && changed
+    && titleBreak === null && goalBreak === null && labelBreak === null
+    // A frame can take the chosen pair away mid-dialog (the last feature carrying it moved or was re-labelled elsewhere):
+    // the Select then shows its placeholder, and a write sent now would carry no repo and no project, which the store
+    // answers by quietly giving the feature an inherited project. It waits until a project is chosen.
+    && (!projected || chosen !== null);
+
+  // An add names no item: the store mints its name from the title and its ADDED line says it. An edit sends only the
+  // fields that changed, and the toast calls the item by the title it now has.
+  const submit = async () => {
+    setBusy(true);
+    let landed: boolean;
+    if (item === undefined) {
+      const body: RoadmapWriteBody = { kind, parent: props.parent?.name, title: draft.title.trim() };
+      const goal = draft.goal.trim();
+      if (goal !== '') body.goal = goal;
+      // A feature's project is the pair chosen, or the folder and label typed; a label left blank is none, and the folder's name stands.
+      const pair = projected ? pairOf(draft, pairs) : null;
+      if (pair !== null) {
+        body.repo = pair.repo;
+        if (pair.project !== null) body.project = pair.project;
+      }
+      landed = await writes.add(body);
+    } else {
+      const changes = changesOf(draft, item, pairs);
+      landed = await writes.edit({ kind, name: item.name, ...changes, itemTitle: changes.title ?? item.title });
+    }
+    // A landed write closes the dialog; a refusal keeps it open, with what was typed, beside the hook's toast.
+    if (landed) onClose(true);
+    else setBusy(false);
+  };
 
   const then = props.goalFirst?.then ?? null;
   const submitLabel = item === undefined ? t('roadmap.dialog.item.add')
@@ -184,33 +255,75 @@ export function ItemDialog(props: ItemDialogProps) {
   };
 
   const titleField = (
-    <Field label={t('roadmap.dialog.item.title')} htmlFor={`${fieldId}-title`}>
-      <Input id={`${fieldId}-title`} value={draft.title} maxLength={FENCES.title} aria-required="true" autoComplete="off" onChange={(event) => change({ title: event.target.value })} />
+    <Field label={t('roadmap.dialog.item.title')} htmlFor={`${fieldId}-title`} error={titleBreak === null ? undefined : t(`roadmap.dialog.fence.${titleBreak}`, { max: FENCES.title })}>
+      <Input
+        id={`${fieldId}-title`} value={draft.title} maxLength={FENCES.title} invalid={titleBreak !== null} aria-required="true" autoComplete="off"
+        onChange={(event) => change({ title: event.target.value })}
+      />
     </Field>
   );
   const goalField = !promoted && (
-    <Field label={t('roadmap.dialog.item.goal')} htmlFor={`${fieldId}-goal`} helper={goalHint}>
+    <Field
+      label={t('roadmap.dialog.item.goal')} htmlFor={`${fieldId}-goal`} helper={goalHint}
+      error={goalBreak === null ? undefined : t(`roadmap.dialog.fence.${goalBreak}`, { max: FENCES.goal })}
+    >
       <TextArea
-        id={`${fieldId}-goal`} value={draft.goal} rows={props.goalFirst ? 6 : 4} maxLength={FENCES.goal}
+        id={`${fieldId}-goal`} value={draft.goal} rows={props.goalFirst ? 6 : 4} maxLength={FENCES.goal} invalid={goalBreak !== null}
         aria-required={goalAsked || undefined} aria-describedby={`${fieldId}-goal-helper`} onChange={(event) => change({ goal: event.target.value })}
       />
     </Field>
   );
   // A project's name, typed: Another folder…'s label, or a promoted feature's project renamed in place. Blank is none: the folder's name stands in, as the placeholder shows.
   const labelField = (placeholder: string) => (
-    <Field label={t('roadmap.dialog.item.folderLabel')} htmlFor={`${fieldId}-label`}>
-      <Input id={`${fieldId}-label`} value={draft.label} maxLength={FENCES.label} placeholder={placeholder || undefined} autoComplete="off" onChange={(event) => change({ label: event.target.value })} />
+    <Field label={t('roadmap.dialog.item.folderLabel')} htmlFor={`${fieldId}-label`} error={labelBreak === null ? undefined : t(`roadmap.dialog.fence.${labelBreak}`, { max: FENCES.label })}>
+      <Input
+        id={`${fieldId}-label`} value={draft.label} maxLength={FENCES.label} invalid={labelBreak !== null} placeholder={placeholder || undefined} autoComplete="off"
+        onChange={(event) => change({ label: event.target.value })}
+      />
     </Field>
+  );
+
+  // A feature's project, right under its title, so the list opens with the goal's room below it; and Another folder…'s path and name.
+  const projectFields = projected && (
+    <>
+      <Field label={t('roadmap.dialog.item.project')} helper={another ? undefined : chosen?.repo}>
+        <Select
+          options={[...pairChoices(pairs), { value: ANOTHER_FOLDER, label: t('roadmap.dialog.item.anotherFolder') }]}
+          value={draft.pair}
+          ariaLabel={t('roadmap.dialog.item.project')}
+          onChange={(next) => change({ pair: next })}
+        />
+      </Field>
+      {another && (
+        <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_11rem]">
+          <Field
+            label={t('roadmap.dialog.item.folderPath')}
+            htmlFor={`${fieldId}-folder`}
+            helper={t('roadmap.dialog.item.folderHint')}
+            error={folderWrong ? t('roadmap.dialog.item.folderAbsolute') : undefined}
+          >
+            <Input
+              id={`${fieldId}-folder`} value={draft.folder} maxLength={FENCES.folder} invalid={folderWrong} className="font-mono text-[13px]"
+              aria-required="true" aria-describedby={`${fieldId}-folder-helper`} spellCheck={false} autoCapitalize="off" autoComplete="off"
+              onChange={(event) => change({ folder: event.target.value })}
+            />
+          </Field>
+          {labelField(folderName(folder))}
+        </div>
+      )}
+    </>
   );
 
   return (
     <Dialog open onOpenChange={(open) => { if (!open) dismiss(); }}>
-      {/* Sized to its content, never a scroller of its own: the project list opens in place under its trigger, and a scrolling
-          body would cut it off. Only a screen too short to hold the form scrolls it. */}
+      {/* Sized to its content, and a scroller only on a screen too short for its tallest state (goal first, Another folder…
+          and its amber error: 811px with its margin at 320 wide). A scrolling panel clips the project list, which opens in
+          place under its trigger, and on a phone no touch reaches the clipped choices: the list keeps a pan, and a press
+          outside it closes it. */}
       <DialogContent
         aria-labelledby={titleId}
         data-roadmap-dialog="item"
-        className="w-[calc(100vw-2rem)] max-w-lg p-0 [@media(max-height:600px)]:max-h-[calc(100dvh-1rem)] [@media(max-height:600px)]:overflow-y-auto"
+        className="w-[calc(100vw-2rem)] max-w-lg p-0 [@media(max-height:820px)]:max-h-[calc(100dvh-2rem)] [@media(max-height:820px)]:overflow-y-auto [@media(max-height:820px)]:overscroll-contain"
       >
         <form
           className="flex flex-col gap-5 p-6"
@@ -227,36 +340,7 @@ export function ItemDialog(props: ItemDialogProps) {
           </header>
 
           {/* The goal first is the goal FIRST in the form too: the dialog's own first focus lands on it. */}
-          {props.goalFirst ? <>{goalField}{titleField}</> : <>{titleField}{goalField}</>}
-
-          {projected && (
-            <Field label={t('roadmap.dialog.item.project')} helper={another ? undefined : chosen?.repo}>
-              <Select
-                options={[...pairChoices(pairs), { value: ANOTHER_FOLDER, label: t('roadmap.dialog.item.anotherFolder') }]}
-                value={draft.pair}
-                ariaLabel={t('roadmap.dialog.item.project')}
-                onChange={(next) => change({ pair: next })}
-              />
-            </Field>
-          )}
-
-          {another && (
-            <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_11rem]">
-              <Field
-                label={t('roadmap.dialog.item.folderPath')}
-                htmlFor={`${fieldId}-folder`}
-                helper={t('roadmap.dialog.item.folderHint')}
-                error={folderWrong ? t('roadmap.dialog.item.folderAbsolute') : undefined}
-              >
-                <Input
-                  id={`${fieldId}-folder`} value={draft.folder} maxLength={FENCES.folder} invalid={folderWrong} className="font-mono text-[13px]"
-                  aria-required="true" aria-describedby={`${fieldId}-folder-helper`} spellCheck={false} autoCapitalize="off" autoComplete="off"
-                  onChange={(event) => change({ folder: event.target.value })}
-                />
-              </Field>
-              {labelField(folderName(folder))}
-            </div>
-          )}
+          {props.goalFirst ? <>{goalField}{titleField}{projectFields}</> : <>{titleField}{projectFields}{goalField}</>}
 
           {promoted && feature && (
             <>
