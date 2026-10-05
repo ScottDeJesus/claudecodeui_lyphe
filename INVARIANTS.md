@@ -2723,7 +2723,7 @@ CloudCLI's text names arcs, plans and phases as epics, features and tasks. Ident
 - `lock._count` — `<N> tasks`, `, <K> done`.
 - `lock_glance.facts_line` — `Epic <arc>`, `<N> tasks in <W> waves`.
 - `intent_lock.DESCRIPTIONS` — the Accept and Rework descriptions.
-- `roadmap_mirror` — the DocSpace copy of each roadmap: the page says milestone, epic, feature and task, and carries each row's `where` phrase from `report_roadmap_words` (`_STEP_PHRASES`, `step_phrase`, `milestone_where`; MAN-7621), the phrases' one home on the dispatcher's side.
+- `roadmap_mirror_blocks` — the DocSpace copy of each roadmap: the blocks' own words (titles, tile labels, the closing note) say milestone, epic, feature and task, and the Features database carries each row's `where` phrase from `report_roadmap_words` (`_STEP_PHRASES`, `step_phrase`, `milestone_where`; MAN-7621), the phrases' one home on the dispatcher's side.
 - Untouched in the prompt: `LOCK_HEADER`, `OPTIONS` and their labels, `TOKEN_RE`, `names_of`, and every input of `lock.token`. why: the vet reads the first line and the last token; an outstanding token must stand.
 
 **The slash doors**: `/feature` is `/plan`, `/epic` is `/arc` (`skills/feature/SKILL.md`, `skills/epic/SKILL.md`). Each loads its skill and runs that sequence; nothing of the sequence lives in the door.
@@ -2747,7 +2747,7 @@ CloudCLI's text names arcs, plans and phases as epics, features and tasks. Ident
 | a new CloudCLI string names an arc, plan or phase | write epic, feature, task, in the locale and in its `defaultValue` |
 | a house sentence reaches the DOM verbatim | draw it through `operatorWords` where it is drawn; add the reader to MAN-7596 |
 | the house prompts the operator | write his words at the sentence's own home; leave every input of the token alone |
-| the house writes the operator a page (the DocSpace roadmap) | write his words where the page is composed (`roadmap_mirror`) and in `report_roadmap_words`, the one home of the phrases; no token is involved |
+| the house writes the operator a page (the DocSpace roadmap) | write his words where the page's blocks are spelled (`roadmap_mirror_blocks`) and in `report_roadmap_words`, the one home of the phrases; no token is involved |
 | a row quotes an operator string | quote the new word; prose about the code keeps the code word |
 
 Proof — prints exactly the eight other-sense keys above:
@@ -2755,7 +2755,7 @@ Proof — prints exactly the eight other-sense keys above:
 
 Translator contract: MAN-7596. Push wording: MAN-622. The prompt's census and facts line: MAN-6047, MAN-1475.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notifications/services/notification-copy.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/operatorWords.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/, /home/lyphe/.claude/hooks/dispatcher/lock_glance.py, /home/lyphe/.claude/hooks/dispatcher/lock.py, /home/lyphe/.claude/hooks/dispatcher/report_roadmap_words.py, /home/lyphe/.claude/hooks/dispatcher/roadmap_mirror.py, /home/lyphe/.claude/hooks/intent_lock.py, /home/lyphe/.claude/skills/epic/, /home/lyphe/.claude/skills/feature/
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notifications/services/notification-copy.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/operatorWords.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/, /home/lyphe/.claude/hooks/dispatcher/lock_glance.py, /home/lyphe/.claude/hooks/dispatcher/lock.py, /home/lyphe/.claude/hooks/dispatcher/report_roadmap_words.py, /home/lyphe/.claude/hooks/dispatcher/roadmap_mirror_blocks.py, /home/lyphe/.claude/hooks/intent_lock.py, /home/lyphe/.claude/skills/epic/, /home/lyphe/.claude/skills/feature/
 
 ## INV-6398 — probe — `.verify/probe-dismiss-done.mjs` cannot run, and its edited labels were never run (LOW)
 
@@ -3293,7 +3293,7 @@ fixture/report: the walk's footprint in the house is not stated (`result.md`, th
 
 ```probe
 grep -c '^orphan page-roadmap-heph-probe-dialogs-walk$' /home/lyphe/.claude/state/dispatcher/roadmap-mirror.log || true
-expect: a number of 1 or more (the page the mirror composed while the builder's probe lived; it is never deleted)
+expect: a number of 1 or more (the log line the mirror wrote for the page it composed while the builder's probe lived)
 ```
 
 measured 2026-10-04 by chain chain-roadmap--screen--dialogs-fill-20261004-005742-be07, finding L2, LOW
