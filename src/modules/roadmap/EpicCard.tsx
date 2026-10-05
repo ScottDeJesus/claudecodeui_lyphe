@@ -8,6 +8,7 @@ import { RoadmapFaceContext } from '@/modules/roadmap/faceContext';
 import { FeatureRow } from '@/modules/roadmap/FeatureRow';
 import { useRoadmapWrites } from '@/modules/roadmap/hooks/useRoadmapWrites';
 import type { RoadmapEpic, RoadmapEpicWord, RoadmapFeature } from '@/shared/roadmap-types';
+import { humanizeDuration } from '@/shared/spend';
 import type { Tone } from '@/shared/types';
 import { ActionMenu, Badge, Button, Card, CardContent, CardHeader, CardTitle } from '@/shared/ui';
 import type { ActionMenuItem } from '@/shared/ui';
@@ -107,7 +108,8 @@ function oneLine(goal: string): string {
 }
 
 /**
- * One epic as a card: its completion ring, its title, how many of its features have shipped, its word
+ * One epic as a card: its completion ring, its title, how many of its features have shipped and, after
+ * that, how long agents have worked on it (`3 of 7 shipped · 30h`), its word
  * and its menu, and — once it keeps regression cases — how many of them hold, with what broke in amber;
  * under that head why it is blocked, whole; its goal in a line; and its features as rows the operator
  * drags into order, then "Add a feature". Used by `MilestoneFocus`, one card a cell of its grid.
@@ -179,7 +181,13 @@ export function EpicCard({ epic }: { epic: RoadmapEpic }) {
         <div className="min-w-0 flex-1 pt-0.5">
           <CardTitle className="text-base leading-snug">{epic.title}</CardTitle>
           <div className="mt-1.5 flex min-w-0 flex-wrap items-center gap-1.5">
-            {features > 0 && <span className="text-xs tabular-nums text-muted-foreground">{t('roadmap.epic.count', { shipped, count: features })}</span>}
+            {features > 0 && (
+              <span data-roadmap-epic-facts className="text-xs tabular-nums text-muted-foreground">
+                {epic.runtime_s > 0
+                  ? t('roadmap.facts.withTime', { facts: t('roadmap.epic.count', { shipped, count: features }), time: humanizeDuration(epic.runtime_s) })
+                  : t('roadmap.epic.count', { shipped, count: features })}
+              </span>
+            )}
             <Badge tone={WORD_TONES[epic.word]}>{t(WORD_KEYS[epic.word])}</Badge>
           </div>
           {/* The cases on a line of their own under the features' standing: the head's middle column is narrow, and

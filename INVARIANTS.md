@@ -3952,3 +3952,48 @@ measured 2026-10-04 by chain chain-wip-3-retire-swarm-20261004-160207-cd7a, find
 probe-key: 47b265e5b853f29d350f749556473399757b3d96
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/cardOrder.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/dispatcherState.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/order-lane.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-card-order.mjs, /home/lyphe/.claude/hooks/dispatcher/report.py
+
+## INV-6961 — probe — MEDIUM — a try's end is the chain's closing moment, not the soul's: a limit wait is counted as agents working
+
+MEDIUM — a try's end is the chain's closing moment, not the soul's: a limit wait is counted as agents working
+
+```probe
+bash /home/lyphe/.claude/state/pipeline-reviews/elapsed-runtime/athena-probes/capped_gap.sh
+echo "[probe exit $?]"
+expect: `overstated by 0 s` (the figure closes each try at its launch's own end); the defect reads `dispatcher runtime_s: 96814 | union with each try closed at its launch's own end: 92675 | overstated by 4139 s`
+```
+
+measured 2026-10-05 by chain chain-elapsed-runtime-20261005-141903-e942, finding M1, MEDIUM
+probe-key: 356d17e0d6f6649da51d76929d8b3005bebdab32
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/hooks/useWorkedSeconds.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/workingTime.ts, /home/lyphe/.claude/hooks/dispatcher/report_runtime.py, /home/lyphe/.claude/hooks/dispatcher/store_planners.py, /home/lyphe/.claude/hooks/dispatcher/store.py
+
+## INV-6962 — probe — LOW — the tick subtracts the server's stamp from the browser's clock; a browser ahead of the server paints a larger figure at once
+
+LOW — the tick subtracts the server's stamp from the browser's clock; a browser ahead of the server paints a larger figure at once
+
+```probe
+bash /home/lyphe/.claude/state/pipeline-reviews/elapsed-runtime/athena-probes/skew.sh
+echo "[probe exit $?]"
+expect: all three lines read `paints 10m` (the figure is the server's, whatever the browser's clock says); the defect reads `+5 min … paints 15m`
+```
+
+measured 2026-10-05 by chain chain-elapsed-runtime-20261005-141903-e942, finding L1, LOW
+probe-key: 60ac130b3bd02a8b4b7040d07f6b7a23ebe6fdce
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/hooks/useWorkedSeconds.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/workingTime.ts, /home/lyphe/.claude/hooks/dispatcher/report_runtime.py, /home/lyphe/.claude/hooks/dispatcher/store_planners.py, /home/lyphe/.claude/hooks/dispatcher/store.py
+
+## INV-6963 — probe — LOW — a feature's first agent can read `runtime_s` 0, and `runtime_s > 0 &&` then never mounts the pill that would tick it up
+
+LOW — a feature's first agent can read `runtime_s` 0, and `runtime_s > 0 &&` then never mounts the pill that would tick it up
+
+```probe
+bash /home/lyphe/.claude/state/pipeline-reviews/elapsed-runtime/athena-probes/first_launch_zero.sh
+echo "[probe exit $?]"
+expect: `runtime_s = 1` or more with the outing `out`, or a `card gate:` line that names `running`/`planAgentOut` ahead of the figure; the defect reads `runtime_s = 0 | planner outing out: out` and `card gate: … plan.runtime_s > 0 && <WorkingPill …`
+```
+
+measured 2026-10-05 by chain chain-elapsed-runtime-20261005-141903-e942, finding L2, LOW
+probe-key: f6a18bc5eec889e87415a54e9f421ff48d94596e
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/hooks/useWorkedSeconds.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/workingTime.ts, /home/lyphe/.claude/hooks/dispatcher/report_runtime.py, /home/lyphe/.claude/hooks/dispatcher/store_planners.py, /home/lyphe/.claude/hooks/dispatcher/store.py

@@ -46,10 +46,22 @@ export type DispatcherWatcher = PolledLane<DispatcherPicture>;
  * frame still carries it whole (`frame` below spreads the picture as the service built it), because
  * a client is owed the reading's own time next to the frame's arrival time — so this is the
  * comparison and nothing else.
+ *
+ * SO IS EACH PLAN'S AND ARC'S `runtime_s`, for the same reason: an interval still open ends at the
+ * reading's own `now` (`report_runtime`), so the figure of any plan with an agent out differs on
+ * every read — and the lane would speak every two seconds for as long as anything is working, which
+ * is nearly always. It is not lost: a card ticks it between frames from the frame's `at` while an
+ * agent is out (`useWorkedSeconds`), and every way a figure STOPS moving — a stage ending, a planner
+ * landing, a walk settling — changes something else in the picture, which sends a frame carrying the
+ * figure as it then stood.
  */
 function changeOf(picture: DispatcherPicture): string {
   const { generated_at: readAt, ...moving } = picture;
-  return JSON.stringify(moving);
+  return JSON.stringify({
+    ...moving,
+    plans: moving.plans.map(({ runtime_s: plansClock, ...still }) => still),
+    arcs: moving.arcs.map(({ runtime_s: arcsClock, ...still }) => still),
+  });
 }
 
 export function createDispatcherWatcher(dependencies: DispatcherWatcherDependencies): DispatcherWatcher {

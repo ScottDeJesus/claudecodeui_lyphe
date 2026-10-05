@@ -110,13 +110,17 @@ function cacheWords(t: TFunction, cacheRead: number | null, tokensIn: number): {
  * its fold's trigger button. The row states its own face (`font-sans`), so a pill reads the same in
  * a stage line's mono as in a header.
  *
+ * `children` are further pills of the SAME row, after the spend's own — the head's working time
+ * (`WorkingPill`) — so the books wrap as one line of pills and not two. A row with a child and no spend
+ * is still drawn; one with neither draws nothing.
+ *
  * Used by `PlanPhaseRow` (each phase and each stage line), `PlanCard` (the card's total) and
  * `DispatchArcDeck` (the arc's books).
  */
-export function SpendPills({ parts, countKey }: { parts: SpendParts; countKey?: string }) {
+export function SpendPills({ parts, countKey, children }: { parts: SpendParts; countKey?: string; children?: ReactNode }) {
   const { t } = useTranslation();
   const { paid, tokens } = parts;
-  if (paid === null && tokens === null) return null;
+  if (paid === null && tokens === null && !children) return null;
 
   const icon = 'h-3.5 w-3.5 flex-none';
   // A count's frame in its target's own shape (`humanizeTokens`' `scale`), so no frame outgrows the
@@ -166,6 +170,7 @@ export function SpendPills({ parts, countKey }: { parts: SpendParts; countKey?: 
           countKey={countKey}
         />
       )}
+      {children}
     </span>
   );
 }

@@ -34,12 +34,13 @@ import type {
  * (`report_roadmap.py::feature_word`), which is outside the contract's thirteen, and that one feature
  * would refuse the whole picture until the contract learns the step.
  *
- * ONE absence is tolerated, and it is `cases`: a feature, an epic's standing or a roadmap's standing
- * with no `cases` key reads as six zeros (`readCases`). CloudCLI and the dispatcher deploy apart, so a
- * CloudCLI that ships ahead of its dispatcher meets a picture from a build that has no cases at all,
- * and refusing it would blank the whole Roadmap tab for a field whose true value in that build IS
- * zero. The tolerance is the KEY's absence alone: a `cases` that is present and unreadable (a null, a
- * string, a count that is not a whole number) is refused by its path like any other field.
+ * TWO ABSENCES ARE TOLERATED, `cases` and `runtime_s`: a feature, an epic's standing or a roadmap's
+ * standing with no `cases` key reads as six zeros (`readCases`), and a feature or an epic with no
+ * `runtime_s` reads `0` (`wholeSince`). CloudCLI and the dispatcher deploy apart, so a CloudCLI that
+ * ships ahead of its dispatcher meets a picture from a build that has neither at all, and refusing it
+ * would blank the whole Roadmap tab for fields whose true value in that build IS zero. The tolerance is
+ * the KEY's absence alone: one that is present and unreadable (a null, a string, a count that is not a
+ * whole number) is refused by its path like any other field.
  */
 
 /** The document's name in every refusal and every failure of the command that prints it. */
@@ -86,6 +87,9 @@ function row(raw: unknown, at: string) {
     count: (key: string): number => need(field(raw, key), isCount, where(key), DOCUMENT),
     /** A tally: `count` is any finite number, and a tally of cases is never negative or fractional. */
     whole: (key: string): number => need(field(raw, key), isWholeCount, where(key), DOCUMENT),
+    /** A tally a build older than its key does not send: absent reads `0`, present is read whole (the head of this file). */
+    wholeSince: (key: string): number =>
+      field(raw, key) === undefined ? 0 : need(field(raw, key), isWholeCount, where(key), DOCUMENT),
     flag: (key: string): boolean => need(field(raw, key), isFlag, where(key), DOCUMENT),
     word: <T extends string>(key: string, words: readonly T[]): T => oneOf(field(raw, key), words, where(key), DOCUMENT),
     wordOrNull: <T extends string>(key: string, words: readonly T[]): T | null =>
@@ -148,6 +152,7 @@ function readFeature(raw: unknown, at: string): RoadmapFeature {
     promoted_at: feature.textOrNull('promoted_at'),
     approved_at: feature.textOrNull('approved_at'),
     shipped_at: feature.textOrNull('shipped_at'),
+    runtime_s: feature.wholeSince('runtime_s'),
     cases: readCases(raw, at),
   };
 }
@@ -165,6 +170,7 @@ function readEpic(raw: unknown, at: string): RoadmapEpic {
     designed_whole: epic.flag('designed_whole'),
     word: epic.word('word', EPIC_WORDS),
     completed_at: epic.textOrNull('completed_at'),
+    runtime_s: epic.wholeSince('runtime_s'),
     standing: {
       features: standing.count('features'),
       shipped: standing.count('shipped'),

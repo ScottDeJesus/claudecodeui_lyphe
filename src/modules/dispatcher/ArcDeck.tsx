@@ -13,6 +13,7 @@ import {
   waitsOnSiblings,
 } from '@/modules/dispatcher/dispatcherState';
 import { DeckFrame } from '@/modules/dispatcher/DeckFrame';
+import { useDispatcherPlans } from '@/modules/dispatcher/hooks/useDispatcherPlans';
 import { arcPutAway, doneDismiss, planPutAway, putAwayVerb } from '@/modules/dispatcher/hiddenPlans';
 import { CardDescription, LaneCardHead } from '@/modules/dispatcher/LaneCardHead';
 import { phaseWord } from '@/modules/dispatcher/phaseWord';
@@ -22,6 +23,8 @@ import { PlannerBadge } from '@/modules/dispatcher/PlannerBadge';
 import { SessionPin } from '@/modules/dispatcher/SessionPin';
 import { SnapStripItem } from '@/modules/dispatcher/SnapStrip';
 import { SpendPills } from '@/modules/dispatcher/SpendPills';
+import { WorkingPill } from '@/modules/dispatcher/WorkingPill';
+import { arcAgentOut } from '@/modules/dispatcher/workingTime';
 import { dispatchArcFoldKey, useCardFold } from '@/shared/hooks/useCardFold';
 import { spendParts } from '@/shared/spend';
 import { Badge } from '@/shared/ui';
@@ -88,7 +91,8 @@ const FLOW_MARK: Partial<Record<DispatcherPlanStatus, string>> = { complete: '�
  * are complete; then the arc's description (`cardDescription`: its design's `delivers` line, else its
  * goal's where that yields nothing), folded to one line until pressed (`CardDescription`), and who is
  * out on it; then its
- * books as pills, counting at first sight (`darc:<name>`). The corner is `⋯` — carrying `Dismiss done
+ * books as pills, counting at first sight (`darc:<name>`), the last of them how long agents have
+ * worked on the epic (`WorkingPill`). The corner is `⋯` — carrying `Dismiss done
  * features · N` while some plans of the deck are done and some are not — then the deck's own press, which
  * puts EVERY plan of the deck away in one write (`arcPutAway`), then the fold. That press is Dismiss
  * once every plan of the deck is complete (the deck leaves the board, and nothing lists it), and Hide
@@ -152,6 +156,10 @@ export function DispatchArcDeck({
   // itself (INV-4299), and `spendParts` is the one decision every card draws a figure from — dollars
   // or tokens by who was used, and NO pill at all where the arc has neither half.
   const spend = spendParts(arc.cost_usd, arc.tokens_in, arc.tokens_out, arc.tokens, arc.tokens_cache_read);
+  // Whether an agent is out on the epic — on any plan of it, the hidden ones too, or on its own design,
+  // cut or judge — which is what ticks its working time between frames (`arcAgentOut`).
+  const lane = useDispatcherPlans();
+  const agentsOut = arcAgentOut(arc, [...lane.plans, ...lane.hidden], lane.planners);
   // The hour a Schedule start armed, over the arc's stopped plans (`report_arcs.hour`) — the head's
   // clock, so a folded deck still says when it will start. The Cancel that clears it is in the bar.
   const armed = epochOf(arc.schedule);
@@ -204,8 +212,14 @@ export function DispatchArcDeck({
               {arc.planner && <PlannerBadge planner={arc.planner} />}
             </>
           )}
-          spend={spend.paid !== null || spend.tokens !== null
-            ? <div data-arc-spend className="min-w-0"><SpendPills parts={spend} countKey={`darc:${arc.name}`} /></div>
+          spend={spend.paid !== null || spend.tokens !== null || arc.runtime_s > 0 || agentsOut
+            ? (
+              <div data-arc-spend className="min-w-0">
+                <SpendPills parts={spend} countKey={`darc:${arc.name}`}>
+                  {(arc.runtime_s > 0 || agentsOut) && <WorkingPill seconds={arc.runtime_s} running={agentsOut} subject="epic" />}
+                </SpendPills>
+              </div>
+            )
             : undefined}
           corner={{
             menuLabel: t('dispatcher.menu'),

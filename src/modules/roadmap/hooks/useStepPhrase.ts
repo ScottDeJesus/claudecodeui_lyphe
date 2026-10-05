@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 
 import { useRoadmap } from '@/modules/roadmap/hooks/useRoadmap';
 import type { RoadmapFeature, RoadmapFeatureStep } from '@/shared/roadmap-types';
+import { humanizeDuration } from '@/shared/spend';
 import { formatShortDate, roadmapFeatureIndex } from '@/shared/utils';
 
 /** The steps the locale has a phrase for, as `roadmap.step.<step>` keys. `waiting` and `shipped` are spelled apart: each needs a value. */
@@ -12,7 +13,7 @@ const PLAIN_STEPS: ReadonlySet<RoadmapFeatureStep> = new Set<RoadmapFeatureStep>
 
 /**
  * A feature's step in plain words: `being designed`, `waiting on you: Accept`, `waiting on The day
- * sheet`, `shipped Oct 3`. Used by `FeatureRow`, which shows it beside the feature's step line and hands
+ * sheet`, `shipped Oct 3 · 3h 42m` (the time agents worked on it, once any did). Used by `FeatureRow`, which shows it beside the feature's step line and hands
  * it to `StateLine` for its label, and by `FeatureFacts` (`FeatureDialog`'s body), under the large step
  * line.
  *
@@ -39,7 +40,9 @@ export function useStepPhrase(feature: RoadmapFeature): string {
   }
   if (feature.step === 'shipped') {
     const date = formatShortDate(feature.shipped_at);
-    return date === null ? t('roadmap.step.shippedUndated') : t('roadmap.step.shipped', { date });
+    const shipped = date === null ? t('roadmap.step.shippedUndated') : t('roadmap.step.shipped', { date });
+    // How long agents worked on it follows the date (`shipped Oct 3 · 3h 42m`), once any did.
+    return feature.runtime_s > 0 ? t('roadmap.facts.withTime', { facts: shipped, time: humanizeDuration(feature.runtime_s) }) : shipped;
   }
   return PLAIN_STEPS.has(feature.step) ? t(`roadmap.step.${feature.step}`) : feature.step;
 }

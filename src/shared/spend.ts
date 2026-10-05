@@ -76,6 +76,28 @@ export function humanizeTokens(n: number, scale: number = n): string {
   return `${(n / divisor).toFixed(landed.includes('.') ? 1 : 0)}${unit}`;
 }
 
+/**
+ * A span of working time in its two largest whole units — `47s`, `12m`, `3h 42m`, `2d 5h` — and only
+ * the largest when the next is zero (`3h`, `2d`); each unit is floored, so 3,599 seconds is `59m`.
+ *
+ * Byte-for-byte `hooks/plan_runner/costs.py`'s `humanize_duration`, so `dispatcher status` and every
+ * card say the same figure. It lives with the token formatter because the cards that state what a
+ * plan's work cost state what it took beside it, and the two figures are formatted in one place.
+ */
+export function humanizeDuration(seconds: number): string {
+  const whole = Number.isFinite(seconds) ? Math.max(0, Math.floor(seconds)) : 0;
+  if (whole < 60) return `${whole}s`;
+  if (whole < 3600) return `${Math.floor(whole / 60)}m`;
+  if (whole < 86400) {
+    const hours = Math.floor(whole / 3600);
+    const minutes = Math.floor((whole % 3600) / 60);
+    return minutes > 0 ? `${hours}h ${minutes}m` : `${hours}h`;
+  }
+  const days = Math.floor(whole / 86400);
+  const hours = Math.floor((whole % 86400) / 3600);
+  return hours > 0 ? `${days}d ${hours}h` : `${days}d`;
+}
+
 /** A count off a JSON record, or `null` — an absent field and a `NaN` are both "not recorded". */
 function count(value: number | null | undefined): number | null {
   return typeof value === 'number' && Number.isFinite(value) ? value : null;

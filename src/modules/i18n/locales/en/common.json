@@ -879,6 +879,9 @@
       "shipped": "shipped {{date}}",
       "shippedUndated": "shipped"
     },
+    "facts": {
+      "withTime": "{{facts}} · {{time}}"
+    },
     "stateLine": "{{word}} — {{phrase}}",
     "blocked": "Blocked: {{why}}",
     "epicWord": {
@@ -1244,7 +1247,12 @@
       "cache": "({{pct}}% cache)",
       "cacheTitle": "{{hit}} of the {{n}} tokens in were read from the prompt cache",
       "out": "{{n}} out",
-      "tokens": "{{n}} tokens"
+      "tokens": "{{n}} tokens",
+      "working": "{{time}} working",
+      "workingTitle": {
+        "feature": "How long agents have worked on this feature — planning, building, review and fixes, overlaps counted once, pauses not at all",
+        "epic": "How long agents have worked on this epic — its design, its cut, every feature and its judgment; features walking at the same time count once, pauses not at all"
+      }
     },
     "noStages": "No stage has launched for this task yet.",
     "arcPause": "Pause",

@@ -3108,14 +3108,21 @@ and the frame the first landing broadcasts fills the tab a moment later. A read 
 read that throws leaves the LAST good picture on the tab with one line in the journal per distinct
 message.
 
-The one key of that picture this lane treats as a clock rather than as content is `generated_at`: the
-dispatcher derives it at second resolution on every read, so the watcher supplies the mechanism's
-`serialize` (its own `changeOf`) and that key alone is left out of the comparison. Compared whole,
-the picture would differ from itself on every tick and the lane would put ~28 KB on every open socket
-every two seconds on a host where nothing moved. Every frame still carries the key whole: a client is
-owed the reading's own time next to the frame's arrival time. On the live host, 120 s of listening
-over 59 reads — 59 distinct readings of that clock and no other movement — puts one frame on the
-wire, and that one is the first tick after a restart.
+The keys of that picture this lane treats as a clock rather than as content are `generated_at` and,
+on every plan and every arc, `runtime_s`: the dispatcher derives the first at second resolution on
+every read, and the second ends every interval still open at that same reading (`report_runtime`,
+MAN-7770), so a plan with an agent out reads differently on every read. The watcher supplies the
+mechanism's `serialize` (its own `changeOf`) and those keys alone are left out of the comparison.
+Compared whole, the picture would differ from itself on every tick and the lane would put ~28 KB on
+every open socket every two seconds on a host where nothing moved — or, with an agent out, on every
+host. Every frame still carries both keys whole: a client is owed the reading's own time next to the
+frame's arrival time, and a card ticks `runtime_s` between frames from the browser's own clock at the frame's arrival (`received_at`) while an agent
+is out on the plan (`useWorkedSeconds`, MAN-6789). The figure is not lost to the comparison: every way
+it STOPS moving — a stage ending, a planner landing, a walk settling — changes something else in the
+picture, which sends a frame carrying the figure as it then stood. On the live host, 120 s of
+listening over 59 reads — 59 distinct readings of that clock and no other movement — puts one frame
+on the wire, and that one is the first tick after a restart; 40 s of listening with the arc's
+judgment walking (its `runtime_s` moving on every read) puts none.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/
 
@@ -3362,6 +3369,8 @@ shape — `moneyText(v, target)` and `humanizeTokens(v, target)`'s `scale` (`src
 way or the fixed width overflows. One case not pinned: a total that SHRINKS (a phase re-settled lower, INV-181) can draw a frame
 one digit wider. A probe reads a pill's `.sr-only`, never its `textContent` (three nodes, run together).
 
+**The working pill.** The books' row carries one more pill after the spend's own: how long agents have worked on the feature or the epic — a clock glyph and `3h 42m` (`WorkingPill`, `src/modules/dispatcher/WorkingPill.tsx`, handle `data-working-pill="feature|epic"`; `SpendPills` takes it as `children`, so the books wrap as ONE row of pills, and draws a row for a child alone). The figure is `plan.runtime_s` / `arc.runtime_s` (the UNION of the intervals agents were out — two tasks walking at once count once, a pause counts not at all; `report_runtime`, MAN-7770) worded by `humanizeDuration` (`src/shared/spend.ts`: `47s`, `12m`, `3h 42m`, `2d 5h`, byte for byte `costs.humanize_duration`); it is drawn once anything has been worked OR an agent is out now (a feature's first agent reads 0 at the dispatcher's read when it launched under a second before it, and the lane sends no frame for the figure alone, so a pill gated on the figure would stay unmounted for the whole first outing), and nothing is drawn before either. It TICKS each second, from the moment this browser received the reading (`DispatcherLanePicture.received_at`, the browser's own clock — never the server's frame `at`, which would carry any skew between the two clocks into the figure), only while an agent is out on the thing — `planAgentOut` (a phase `busy`, or an own planner outing `out`) and `arcAgentOut` (any plan of the epic, the hidden ones included, or an outing whose subject is the epic), `src/modules/dispatcher/workingTime.ts` — and stands still otherwise: a `live` plan waiting on its epic's WIP slot or on another feature has no agent out, and a clock running there would say it works. `useWorkedSeconds` holds one interval at most, on the host window, and sets state only when the words would change (a minute from the first minute on). The lane sends no frame for the figure moving alone (it is out of the watcher's change test, MAN-5633), so that tick is the only thing moving it between frames; every frame that follows a change replaces the base it counts from. The pill is `tone="neutral"` and its words ride an `sr-only` node (`dispatcher.pill.working`), its title says whose time it is (`dispatcher.pill.workingTitle.feature|epic`).
+
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-arc-nest.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-arc-strip-return.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-dispatch-arc-start.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-dispatch-card-phases.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-dispatch-card-version-word.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-dispatch-model-word.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-dispatch-resume-3am.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-planner-card.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-planner-card-write.py
 
 ## MAN-6790 — The plan card — The face (`PlanFace`), top to bottom:
@@ -3491,7 +3500,7 @@ The deck's HEADER is the arc's own top: the Epic tag and the arc's bare name (`K
 wearing the PLAN's own tone through `planStatusTone`, the very function the status badge on the card under them is toned by, so a header cannot argue with its own cards; the eight words are
 `store.arc_word`'s and `dispatcher-arc.reader.ts` refuses any other BY
 NAME, so no default is invented here; standing proof MAN-5419), the arc's own spend where it has one (`data-arc-spend` holding `SpendPills` counting under
-`darc:<arc name>`; the plan card's own rule — dollars OR tokens by who was used, nothing at all for a lane that has not spent), the
+`darc:<arc name>`; the plan card's own rule — dollars OR tokens by who was used, nothing at all for a lane that has not spent — and, as the LAST pill of that row, the epic's working time, `WorkingPill subject="epic"`: the union of every agent interval on its plans and its own design, cut and judge (`arc.runtime_s`, MAN-7770), ticking while an agent is out on it (`arcAgentOut`, MAN-6789), and drawn for an epic that has only been planned and has no spend yet), the
 ARC's own planner badge where the store gives it one (`arc.planner`, `report_planners.of_arc`; drawn by
 the same `PlannerBadge` on the head's lead row, under the description — the full-width line under the title row, because of
 WIDTH and not because that row cannot wrap: the row WRAPS and its title is floored at its own longest
@@ -3648,8 +3657,8 @@ newer than itself (`held.at >= at`). A frame or body missing `plans`, `route`, `
 because a frame from a server older than either key is still a whole picture of the plans — an absent
 list draws no arc cards, or no planner badges, instead of blanking every card the frame did carry, while a key that IS
 there and is not a list is refused like every other field. The bus topic is `dispatcher:all`
-(`DISPATCHER_ALL_TOPIC`), one payload `{ plans, arcs, planners, route, daemon, offpeak_at }`
-(`DispatcherLanePicture`) with the frame's `at` as its clock; no per-plan topic exists. `home` and `generated_at` are left out on purpose: `generated_at` is
+(`DISPATCHER_ALL_TOPIC`), one payload `{ plans, arcs, planners, route, daemon, offpeak_at, received_at }`
+(`DispatcherLanePicture`) with the frame's `at` as its clock — and `received_at`, this BROWSER's own `Date.now()` at the moment `DispatcherFeed` published the reading (never sent by the server), which a running working-time pill counts its seconds from, so no subtraction crosses two clocks (an identical reading re-published, as a reconnect's seed can be, is therefore no longer a bus no-op: one re-render of its readers); no per-plan topic exists. `home` and `generated_at` are left out on purpose: `generated_at` is
 restamped every poll, so republishing the frame whole wakes every reader twice a second (2026-09-24: the four
 keys byte-identical across two reads 4 s apart, zero publishes). `useDispatcherPlans` reads that topic —
 `{ plans, hidden, arcs, planners, loosePlanners, count, waiting, route, daemon, offpeakAt, carriedNames }` — and every piece of the card reads the
@@ -10239,12 +10248,18 @@ key for key. The emitted document is the source of the shape.
   the runner's default `claude` (`report_arcs.arc_dict`) — so `null` arises only against a dispatcher build
   older than the field, and the card reads it as the runner's default (`effectiveModelWord`). Both readers (`dispatcher-plan.reader.ts`, `dispatcher-arc.reader.ts`)
   refuse any other word BY NAME (`modelSince`).
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts
+
+## MAN-7774 — The dispatcher types — the store's document, mirrored in two files — `DispatcherArc` is the store's `arcs` row as `report_arcs.arc_dict` prints it: `name`, `goal`,
+section: The dispatcher types — the store's document, mirrored in two files/001 `DispatcherArc` is the store's `arcs` row as `report_arcs.arc_dict` prints it: `name`, `goal`,
+
 - `DispatcherArc` is the store's `arcs` row as `report_arcs.arc_dict` prints it: `name`, `goal`,
   `architecture`, `delivers`, `model`, the derived `status` (`DispatcherArcStatus` — the eight words of
   `store_arcs.arc_word`: `empty`, `complete`, `judging`, `live`, then its plans' own waiting word —
   `scheduled`, `paused`, `queued` — else `designing`), `plans` (NAMES, in the
   arc file's order) and the arc's own `created_at`, `completed_at`, `cost_usd`, `tokens`, `tokens_in`,
-  `tokens_out`, `tokens_cache_read`, PLUS the three readings an arc's own controls are drawn by (`report_arcs.walking` /
+  `tokens_out`, `tokens_cache_read`, `runtime_s` (below), PLUS the three readings an arc's own controls are drawn by (`report_arcs.walking` /
   `.stopped` / `.hour`, MAN-5220): `walking: boolean` (does the arc have a `live` plan — walking, or
   approved and unpaused and waiting its turn — what its Pause is drawn for), `stopped: boolean` (a plan
   reading `paused`, `queued` or `scheduled`: approved, paused and unfinished — what its Start and its
@@ -10254,6 +10269,7 @@ key for key. The emitted document is the source of the shape.
   verb reach the same plans. An arc still has no phases and no events; a plan carries no `plans`.
   `walking` and `stopped` are read through `flagSince` and `schedule` through `textSince`, so an older
   frame reads false / null and the header simply offers no arc verbs rather than failing to load.
+- `runtime_s: number` rides `DispatcherPlan` and `DispatcherArc`: how long at least one agent was out on the plan, or on the epic (the union over its plans' intervals and its own outings, never their figures added), in whole seconds, derived at the dispatcher's reading time (`report_runtime`, MAN-7770). Both readers read it through `countSince` (an older build's frame reads `0`). It moves on every read of a thing with an agent out, so `dispatcher-watcher.service.ts`'s `changeOf` leaves it out of its comparison (MAN-5633) and the card ticks it between frames while an agent is out on it (`WorkingPill`, MAN-6789).
 - `tokens_cache_read: number | null` rides `DispatcherStage`, `DispatcherPhase`, `DispatcherPlan` and
   `DispatcherArc` beside `tokens_in`: the part of it SERVED from the prompt cache (`costs.claude_cache_read`,
   summed by `report.usage_sum`), the numerator of the `in` pill's `(97% cache)` (MAN-1557, INV-4299). NULL
@@ -10272,6 +10288,12 @@ key for key. The emitted document is the source of the shape.
   `tokens` and `cost_usd` are READ, NEVER STORED (INV-172): a planner rides the operator's Claude
   subscription, so its dollars are 0.00 and its tokens are the figure — both off one read of the outing's
   own `result.json`, exactly as a stage's are.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts
+
+## MAN-7775 — The dispatcher types — the store's document, mirrored in two files — `DispatcherPlan.planner` and `DispatcherArc.planner` are `DispatcherPlanner | null` — the ONE outing
+section: The dispatcher types — the store's document, mirrored in two files/002 `DispatcherPlan.planner` and `DispatcherArc.planner` are `DispatcherPlanner | null` — the ONE outing
+
 - `DispatcherPlan.planner` and `DispatcherArc.planner` are `DispatcherPlanner | null` — the ONE outing that
   plan or that arc reports, the store's own pick (`report_planners.of_plan` / `of_arc`): a plan's own
   newest live row, else its arc's when it has none of its own, then the newest ending of either whose work
@@ -10287,7 +10309,8 @@ key for key. The emitted document is the source of the shape.
   `DispatcherArc.plans`, read from the other side.
 - `DispatcherLanePicture` is declared in `src/shared/types.ts` ONLY, in its own block right after the
   DISPATCHER block (`DISPATCHER, CLIENT ONLY`) and never inside it: the frame's `plans`, `arcs`, `planners`,
-  `route`, `daemon`, `offpeak_at` without `home`, `generated_at` or `at` — what the client's feed retains on
+  `route`, `daemon`, `offpeak_at` without `home`, `generated_at` or `at`, plus the one key the feed adds itself, `received_at` (the
+  browser's clock when the reading arrived, `useWorkedSeconds`' base) — what the client's feed retains on
   `dispatcher:all`.
 - `SpendParts` (`spendParts`' output in `src/shared/spend.ts`; `spendText` and `SpendPills` draw it, INV-4299; a split carries
   `cacheRead`, the document's `tokens_cache_read` handed through, which `cachePercent` words) is client-only: it
@@ -12043,7 +12066,8 @@ Types — `server/shared/roadmap-types.ts` (18 exports; a sibling of `server/sha
 - `RoadmapPicture.generated_at` moves on every read: compare pictures without it.
 - `Roadmap.current`: name of the first unreached milestone, else `null`.
 - `RoadmapCaseWord` = `'holding' | 'broken' | 'regressed' | 'not run' | "can't run"`: `not run` no run has judged; `can't run` the newest run could not run its check; `regressed` a `broken` whose current break a regression triage named. Derived by `store_case_words.case_word`; this server only reads it against the five.
-- `cases` = `RoadmapCases` = `{ total, holding, broken, regressed, not_run, cant_run }`, six whole numbers; the five word counts sum to `total` (`not_run` is `not run`, `cant_run` is `can't run`: a key carries no space or quote). Carried by `RoadmapFeature.cases` (its own active cases), `RoadmapEpic.standing.cases` and `Roadmap.standing.cases` (the dispatcher's sums); a milestone's `standing` and `unplaced.features` carry none. A missing `cases` key reads as six zeros: MAN-7631.
+- `cases` = `RoadmapCases` = `{ total, holding, broken, regressed, not_run, cant_run }`, six whole numbers; the five word counts sum to `total` (`not_run` is `not run`, `cant_run` is `can't run`: a key carries no space or quote). Carried by `RoadmapFeature.cases` (its own active cases), `RoadmapEpic.standing.cases` and `Roadmap.standing.cases` (the dispatcher's sums); a milestone's `standing` and `unplaced.features` carry none. A missing `cases` key reads as six zeros: MAN-7631 (and a missing `runtime_s` reads `0`).
+- `RoadmapFeature.runtime_s` and `RoadmapEpic.runtime_s`: how long agents were out on the feature, or on the epic (the union over its features' intervals and its own outings, never their figures added), in whole seconds, counting what has ENDED (`report_roadmap`, MAN-7621: the picture is compared whole on every poll, so a figure moving each second would put its frame on every socket). A shipped feature's row and an epic's card say it after their facts (`shipped Oct 3 · 3h 42m`, MAN-7637). A missing `runtime_s` key reads `0` (`row.wholeSince`); a present one that is not a whole number is refused by its path.
 - `RoadmapFeature.waiting_on_you`: `'questions' | 'accept' | null`; `blocked` is the operator's reason or `null`: the picture shows it, nothing reads it.
 - `RoadmapFeature.project`: `string`, never null. It is always a label: the feature's own or the one the dispatcher derives (MAN-7621); the lane reads it as required text (`feature.text('project')`). The write body's `project` stays optional: an add that leaves it off stores none, and an edit sending `''` hands the feature back to the dispatcher's rule (MAN-7622).
 - Client mirror: `src/shared/roadmap-types.ts`, field for field, edited together with this file. Its closing `RoadmapWriteBody` has no twin here: the request body is `unknown` to this server, which fences each field in `writeArgv`. Client reading: MAN-7635.
@@ -12230,7 +12254,7 @@ Differs
 |---|---|---|
 | frame | `roadmap_state` | `dispatcher_state` |
 | read | `roadmap show --json`, ceiling 1 MiB (`ROADMAP_MAX_BUFFER`) | `status --json`, ceiling 4 MiB (`STATUS_MAX_BUFFER`) |
-| reading | refuses a field it cannot read, by path; one tolerance: an absent `cases` key reads as six zeros (MAN-7631); no plan resolved or filtered out (keys the contract does not name are dropped, MAN-7631) | tolerant `…Since` readers for keys an older build lacks; resolves `session_app_id`; drops plans ended over 24 h and their empty arcs (MAN-5634) |
+| reading | refuses a field it cannot read, by path; two tolerances: an absent `cases` key reads as six zeros (MAN-7631) and an absent `runtime_s` reads `0`; no plan resolved or filtered out (keys the contract does not name are dropped, MAN-7631) | tolerant `…Since` readers for keys an older build lacks; resolves `session_app_id`; drops plans ended over 24 h and their empty arcs (MAN-5634) |
 | second read | `GET /cases?feature=<name>`, on request and never polled: `cases list --plan <name> --state active --json` through the cases door, `door: 'cases'` (MAN-7658) | none |
 | writes | nine acts, a JSON body per route, argv composed by `writeArgv`, relayed by `relayRoadmapWrite` (MAN-7630) | verbs named by the URL (`/plans/:name/<verb>`, `/arcs/:name/<verb>`), relayed by `runDispatcherVerb` (MAN-5636) |
 | poke | `watcher.poke()` after an `ok` write | never: a write shows at the next tick |
@@ -12542,7 +12566,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/CelebrationL
 
 The roadmap screen's pieces, filled and drawn by the Roadmap tab's face (MAN-7640). Words: MAN-7634. The dialogs: MAN-7643. Feed, hooks, `Moment` and `CelebrationActive`: MAN-7635. The moment layer: MAN-7636. Wire shapes: MAN-7630. The face that composes them: MAN-7640 (tab, face, picker), MAN-7639 (header, rail), MAN-7638 (path). The face context, `useRevealCard` and `railSections` they read: MAN-7650.
 
-`FeatureRow` says its cases through `caseMark` and `EpicCard` reads `epic.standing.cases` in place (MAN-7660). The pieces read `useRoadmap`, `useRoadmapWrites`, `RoadmapFaceContext` and `CelebrationContext`; every write goes through `useRoadmapWrites` and what is drawn is the next frame's picture. `StateLine` reads and handles nothing.
+`FeatureRow` says its cases through `caseMark` and `EpicCard` reads `epic.standing.cases` in place (MAN-7660). `EpicCard`'s count line is `3 of 7 shipped`, then ` · 3h 42m` once agents have worked on the epic (`epic.runtime_s`, `data-roadmap-epic-facts`): the union of its features' intervals and its own outings, never their figures added. The pieces read `useRoadmap`, `useRoadmapWrites`, `RoadmapFaceContext` and `CelebrationContext`; every write goes through `useRoadmapWrites` and what is drawn is the next frame's picture. `StateLine` reads and handles nothing.
 
 Pieces
 | file | export | props | used by |
@@ -12561,13 +12585,18 @@ Pieces
 - `celebrating`: the shipped station pops (`roadmap-pop`) and sends one ring out (`roadmap-ring`); two elements, one animation each.
 - `phrase` is required: tasks, waits and dates are not in `word` and `step`.
 
-## useStepPhrase
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/EpicCard.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/FeatureRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/hooks/useStepPhrase.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/MilestoneFocus.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/StateLine.tsx
+
+## MAN-7771 — The roadmap screen's pieces — StateLine, FeatureRow, EpicCard, MilestoneFocus — useStepPhrase
+section: The roadmap screen's pieces — StateLine, FeatureRow, EpicCard, MilestoneFocus and useStepPhrase (src/modules/roadmap)/001 useStepPhrase
+
 | feature `step` | phrase |
 |---|---|
 | `waiting` | `roadmap.step.waiting` with the title of the first `waits_on` feature whose word is not `shipped`, found by name in every roadmap of the picture and in `unplaced.features` |
 | `waiting`, no such feature in the picture | `roadmap.step.waitingOnAnother`, never the slug |
 | `shipped` | `roadmap.step.shipped` with `formatShortDate(shipped_at)` (`src/shared/utils.ts`: `Oct 3`, the year once it is not this year's) |
 | `shipped`, `shipped_at` null or not a time | `roadmap.step.shippedUndated` |
+| `shipped`, `runtime_s` above 0 | either phrase above, then ` · ` and `humanizeDuration(runtime_s)` (`roadmap.facts.withTime`): `shipped Oct 3 · 3h 42m` — how long agents worked on it (`report_runtime`, MAN-7770), counting what has ended |
 | `idea proposed designing questions cutting accept parked building queued paused starting` | `roadmap.step.<step>` |
 | any other | the dispatcher's own word, as sent |
 - `building` names no count: the row's meter, right under it, carries `3 of 13 tasks`.
@@ -12576,7 +12605,11 @@ Pieces
 - The date is `formatShortDate` in `src/shared/utils.ts`, the module's one spelling of a day, shared with `MilestonePath`'s "reached <date>", `CelebrationLayer`'s banner and `FeatureFacts`' dates.
 - It reads `useRoadmap().picture`, the whole picture, not the selected roadmap: a wait on another roadmap's feature keeps its title.
 
-## FeatureRow
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/EpicCard.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/FeatureRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/hooks/useStepPhrase.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/MilestoneFocus.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/StateLine.tsx
+
+## MAN-7772 — The roadmap screen's pieces — StateLine, FeatureRow, EpicCard, MilestoneFocus — FeatureRow
+section: The roadmap screen's pieces — StateLine, FeatureRow, EpicCard, MilestoneFocus and useStepPhrase (src/modules/roadmap)/002 FeatureRow
+
 | line | holds |
 |---|---|
 | lead | `StateLine` at `row` |
@@ -12595,7 +12628,11 @@ Pieces
 - `data-celebrating` = `feature` or `task` while named.
 - The shimmer is on the word `building`, not the meter: the library meter has no live state.
 
-## EpicCard
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/EpicCard.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/FeatureRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/hooks/useStepPhrase.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/MilestoneFocus.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/StateLine.tsx
+
+## MAN-7773 — The roadmap screen's pieces — StateLine, FeatureRow, EpicCard, MilestoneFocus — EpicCard
+section: The roadmap screen's pieces — StateLine, FeatureRow, EpicCard, MilestoneFocus and useStepPhrase (src/modules/roadmap)/003 EpicCard
+
 - `Card` with `data-roadmap-epic=<name>`: `CompletionRing` (shipped over `epic.standing.features`, a check at share 1), title, `roadmap.epic.count` when the epic has features, a word badge (`empty` and `not started` neutral, `in progress` info, `complete` positive), the `ActionMenu` (label `roadmap.menu.actions`).
 - Cases line under the count and word, once the epic keeps one: MAN-7660.
 - Under the head: the blocked badge (`roadmap.blocked`, three lines, the whole reason), the goal in one line (`oneLine` takes the `>` markers off), the features as a sortable `ul` of `FeatureRow` at `full`, then `Add a feature`.

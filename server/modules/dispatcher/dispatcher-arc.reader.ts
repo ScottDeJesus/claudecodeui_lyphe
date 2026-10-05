@@ -101,6 +101,9 @@ export function arcOf(raw: unknown): DispatcherArc {
     tokens_in: countSince(field(arc, 'tokens_in'), 'arc.tokens_in'),
     tokens_out: countSince(field(arc, 'tokens_out'), 'arc.tokens_out'),
     tokens_cache_read: countOrNullSince(field(arc, 'tokens_cache_read'), 'arc.tokens_cache_read'),
+    // How long at least one agent was out on the epic: the UNION over its plans' intervals and its own
+    // outings (`report_arcs.arc_dict`), never its plans' figures added. Tolerant, like the plan's.
+    runtime_s: countSince(field(arc, 'runtime_s'), 'arc.runtime_s'),
   };
 }
 

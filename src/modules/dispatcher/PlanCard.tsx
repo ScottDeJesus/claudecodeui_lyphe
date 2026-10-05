@@ -14,6 +14,8 @@ import { PlanControls } from '@/modules/dispatcher/PlanControls';
 import { PlanClock, PlanFace, PlanStatusBadge } from '@/modules/dispatcher/PlanFace';
 import { PlannerBadge } from '@/modules/dispatcher/PlannerBadge';
 import { SpendPills } from '@/modules/dispatcher/SpendPills';
+import { WorkingPill } from '@/modules/dispatcher/WorkingPill';
+import { planAgentOut } from '@/modules/dispatcher/workingTime';
 import { planFoldKey, useCardFold } from '@/shared/hooks/useCardFold';
 import { spendParts } from '@/shared/spend';
 import { Card, CardContent, CardFoldBody, CardHeader, Collapsible } from '@/shared/ui';
@@ -36,7 +38,8 @@ function wipClause(hold: string): string {
  *   `delivers` line, else its goal's where that yields nothing) folded to one line until pressed, when
  *   it opens whole (`CardDescription`) — then who is out on the plan (`PlannerBadge`), what of its
  *   arc it waits on and, while its epic's feature limit holds it, the WIP slot it waits for, on row two; the plan's total as pills
- *   (`SpendPills`, counting at first sight) on row three; Dismiss or Hide, and the fold, in the corner.
+ *   (`SpendPills`, counting at first sight), the last of them how long agents have worked on it
+ *   (`WorkingPill`), on row three; Dismiss or Hide, and the fold, in the corner.
  * - THE BAR (`PlanControls` → `ActionBar`): the verbs the plan's status allows and its model switch.
  * - THE FACE (`PlanFace`): the phases' track, what is moving now, and the closed lists. Its own rules —
  *   which disclosures start closed and why no home can open them — are stated there, not here.
@@ -130,6 +133,8 @@ export function PlanCard({
     ? [{ key: 'delete', label: t('dispatcher.delete.menu'), icon: Trash2, isDanger: true, onSelect: () => setDeleting(true) }]
     : [];
   const verb = putAwayVerb([plan]);
+  // Whether an agent is out on the plan now: what lets its working time tick, and draws the pill for a first agent.
+  const agentOut = planAgentOut(plan, planners);
 
   return (
     <Card
@@ -176,7 +181,12 @@ export function PlanCard({
               <SpendPills
                 parts={spendParts(plan.cost_usd, plan.tokens_in, plan.tokens_out, plan.tokens, plan.tokens_cache_read)}
                 countKey={`plan:${plan.name}`}
-              />
+              >
+                {/* HOW LONG AGENTS HAVE WORKED ON IT, one more pill of the books' row — ticking only while
+                    one is out on the plan (`planAgentOut`), still otherwise; nothing before any has worked
+                    or is out (a first agent's figure reads 0, so the gate is the figure OR an agent out). */}
+                {(plan.runtime_s > 0 || agentOut) && <WorkingPill seconds={plan.runtime_s} running={agentOut} subject="feature" />}
+              </SpendPills>
             )}
             corner={{ menuLabel: t('dispatcher.menu'), menuItems, putAway: { verb, label: t(`dispatcher.${verb}`), onPress: onPutAway } }}
             headingLevel={headingLevel}

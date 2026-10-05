@@ -181,6 +181,9 @@ export function planOf(raw: unknown): DocumentPlan {
     tokens_in: countSince(field(plan, 'tokens_in'), 'plan.tokens_in'),
     tokens_out: countSince(field(plan, 'tokens_out'), 'plan.tokens_out'),
     tokens_cache_read: countOrNullSince(field(plan, 'tokens_cache_read'), 'plan.tokens_cache_read'),
+    // How long at least one agent was out on this plan (`report_runtime`), in whole seconds: derived at
+    // the dispatcher's own reading time and never stored. Read tolerantly, for a build older than the key.
+    runtime_s: countSince(field(plan, 'runtime_s'), 'plan.runtime_s'),
     rounds: need(field(plan, 'rounds'), isCount, 'plan.rounds'),
     phases: each(field(plan, 'phases'), 'plan.phases', phaseOf),
     events: each(field(plan, 'events'), 'plan.events', eventOf),

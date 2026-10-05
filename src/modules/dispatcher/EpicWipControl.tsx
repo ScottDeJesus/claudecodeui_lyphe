@@ -87,7 +87,7 @@ function LimitStepper({ limit, setting, defaultWord, busy, onChoose }: LimitStep
       data-epic-wip-default={following ? '' : undefined}
       {...{ [words.handle]: setting.own ?? 'default' }}
     >
-      <span className="min-w-[3.5rem] text-xs text-muted-foreground">{t(words.word)}</span>
+      <span className="min-w-14 text-xs text-muted-foreground">{t(words.word)}</span>
       <Stepper
         compact
         value={shown === null ? t('dispatcher.wip.all') : String(shown)}
