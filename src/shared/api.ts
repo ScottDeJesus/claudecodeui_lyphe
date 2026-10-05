@@ -385,8 +385,15 @@ export const api = {
   // mobile) would otherwise be aborted mid-body and read as a broken file.
   readFileBlob: (projectId: string, filePath: string, options: ApiRequestOptions = {}) =>
     get(fileContentPath(projectId, filePath), { timeoutMs: NO_REQUEST_TIMEOUT, ...options }),
-  getFiles: (projectId: string, options: ApiRequestOptions = {}) =>
-    get(`/api/file-tree/projects/${projectId}/files${query({ respectGitignore: true })}`, options),
+  // `respectGitignore` is the server's flag under its own name. `true` — the default, and what every
+  // caller but the tree sends — walks the project through its `.gitignore`, so an ignored `.env`,
+  // `dist/` or `state/` never arrives; `false` is the Files tab's "show ignored files" switch
+  // (`useFileTreeShowIgnored`). Spelled out as a string so `query()` cannot drop a `false`.
+  getFiles: (
+    projectId: string,
+    { respectGitignore = true, ...options }: ApiRequestOptions & { respectGitignore?: boolean } = {},
+  ) =>
+    get(`/api/file-tree/projects/${projectId}/files${query({ respectGitignore: String(respectGitignore) })}`, options),
 
   // The file manager's two reads. `path` is relative to the project root; empty means the root
   // itself, which is why it goes through `query()` (it drops the empty value) rather than being

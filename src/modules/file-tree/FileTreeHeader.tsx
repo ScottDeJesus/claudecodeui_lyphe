@@ -1,6 +1,6 @@
 import { useRef } from 'react';
 import type { ChangeEvent } from 'react';
-import { ChevronDown, Eye, FileText, FolderPlus, List, Loader2, RefreshCw, Search, TableProperties, Upload, X } from 'lucide-react';
+import { ChevronDown, Eye, FileText, Filter, FilterX, FolderPlus, List, Loader2, RefreshCw, Search, TableProperties, Upload, X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 import { Button, Input } from '@/shared/ui';
@@ -19,6 +19,9 @@ type FileTreeHeaderProps = {
   onUploadFiles?: (files: FileList) => void;
   onRefresh?: () => void;
   onCollapseAll?: () => void;
+  // Whether the files the project's `.gitignore` ignores are in the tree, and the press that flips it.
+  showIgnored?: boolean;
+  onToggleShowIgnored?: () => void;
   // Loading state
   loading?: boolean;
   operationLoading?: boolean;
@@ -37,6 +40,8 @@ export default function FileTreeHeader({
   onUploadFiles,
   onRefresh,
   onCollapseAll,
+  showIgnored,
+  onToggleShowIgnored,
   loading,
   operationLoading,
   isUploading,
@@ -153,6 +158,28 @@ export default function FileTreeHeader({
               aria-label={t('fileTree.collapseAll', 'Collapse All')}
             >
               <ChevronDown className="h-3.5 w-3.5" />
+            </Button>
+          )}
+          {/* The .gitignore filter. Drawn as a filter ON while ignored files are hidden (the default)
+              and as a filter struck OUT while they show — the icon reads the state, the title names
+              the press. Eye/EyeOff would say the same thing, but Eye is the compact-view button one
+              slot to the right. */}
+          {onToggleShowIgnored && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 w-7 p-0"
+              onClick={onToggleShowIgnored}
+              aria-pressed={Boolean(showIgnored)}
+              title={showIgnored
+                ? t('fileTree.hideIgnored', 'Hide files ignored by .gitignore')
+                : t('fileTree.showIgnored', 'Show files ignored by .gitignore')}
+              aria-label={showIgnored
+                ? t('fileTree.hideIgnored', 'Hide files ignored by .gitignore')
+                : t('fileTree.showIgnored', 'Show files ignored by .gitignore')}
+              disabled={operationLoading}
+            >
+              {showIgnored ? <FilterX className="h-3.5 w-3.5" /> : <Filter className="h-3.5 w-3.5" />}
             </Button>
           )}
           {/* Divider */}

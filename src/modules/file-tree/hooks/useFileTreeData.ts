@@ -27,7 +27,11 @@ function readResponseErrorMessage(responseBody: string): string | null {
   }
 }
 
-export function useFileTreeData(selectedProject: Project | null): UseFileTreeDataResult {
+/**
+ * The tree's files. `showIgnored` asks the server for the files the project's `.gitignore` ignores
+ * too (`useFileTreeShowIgnored`); flipping it is a fresh read, like a project change.
+ */
+export function useFileTreeData(selectedProject: Project | null, showIgnored = false): UseFileTreeDataResult {
   const [files, setFiles] = useState<FileTreeNode[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -65,7 +69,10 @@ export function useFileTreeData(selectedProject: Project | null): UseFileTreeDat
         setError(null);
       }
       try {
-        const response = await api.getFiles(projectId, { signal: abortControllerRef.current!.signal });
+        const response = await api.getFiles(projectId, {
+          respectGitignore: !showIgnored,
+          signal: abortControllerRef.current!.signal,
+        });
 
         if (!response.ok) {
           const errorText = await response.text();
@@ -104,7 +111,7 @@ export function useFileTreeData(selectedProject: Project | null): UseFileTreeDat
       isActive = false;
       abortControllerRef.current?.abort();
     };
-  }, [selectedProject?.projectId, refreshKey]);
+  }, [selectedProject?.projectId, refreshKey, showIgnored]);
 
   return {
     files,

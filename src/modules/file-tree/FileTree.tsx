@@ -9,6 +9,7 @@ import { useExpandedDirectories } from '@/modules/file-tree/hooks/useExpandedDir
 import { useFileTreeData } from '@/modules/file-tree/hooks/useFileTreeData';
 import { useFileTreeOperations } from '@/modules/file-tree/hooks/useFileTreeOperations';
 import { useFileTreeSearch } from '@/modules/file-tree/hooks/useFileTreeSearch';
+import { useFileTreeShowIgnored } from '@/modules/file-tree/hooks/useFileTreeShowIgnored';
 import { useFileTreeViewMode } from '@/modules/file-tree/hooks/useFileTreeViewMode';
 import { useFileTreeUpload } from '@/modules/file-tree/hooks/useFileTreeUpload';
 import type { FileTreeNode,Project } from '@/shared/types';
@@ -40,7 +41,8 @@ export default function FileTree({ selectedProject, onFileOpen }: FileTreeProps)
     push({ tone: type === 'success' ? 'positive' : 'warn', title: message });
   }, [push]);
 
-  const { files, loading, error, refreshFiles } = useFileTreeData(selectedProject);
+  const { showIgnored, toggleShowIgnored } = useFileTreeShowIgnored();
+  const { files, loading, error, refreshFiles } = useFileTreeData(selectedProject, showIgnored);
   const { viewMode, changeViewMode } = useFileTreeViewMode();
   const { expandedDirs, toggleDirectory, expandDirectories, collapseAll } = useExpandedDirectories();
   const { searchQuery, setSearchQuery, filteredFiles } = useFileTreeSearch({
@@ -176,6 +178,8 @@ export default function FileTree({ selectedProject, onFileOpen }: FileTreeProps)
         onNewFolder={() => operations.handleStartCreate('', 'directory')}
         onRefresh={refreshFiles}
         onCollapseAll={collapseAll}
+        showIgnored={showIgnored}
+        onToggleShowIgnored={toggleShowIgnored}
         loading={loading}
         operationLoading={operationLoading}
         isUploading={upload.uploadProgress?.status === 'uploading'}
