@@ -30,15 +30,17 @@ import type { DispatcherLanePicture } from '@/shared/types';
  * card, so a plan anywhere else on it would otherwise sit a whole strip-width off screen. Only the strip's
  * own scroll moves, by the card's measured distance from the strip's centre (`DeckStrip` reads its
  * position off that scroll, so its arrows, its `Card N of M` line and its map follow). A deck with no
- * such card, or a strip with no width (a folded deck), is left exactly as it stands.
+ * such card, or a strip with no width (a folded deck), is left exactly as it stands. It answers the card
+ * it paged to (or `null`), for the reveal's third move: scrolling that card whole into view.
  */
-function pageStripToCard(deck: Element, plan: string): void {
+function pageStripToCard(deck: Element, plan: string): HTMLElement | null {
   const strip = deck.querySelector<HTMLElement>('[data-arc-strip]');
   const card = strip?.querySelector<HTMLElement>(`[data-dispatcher-card][data-plan-name="${CSS.escape(plan)}"]`);
-  if (!strip || !card) return;
+  if (!strip || !card) return null;
   const stripBox = strip.getBoundingClientRect();
   const cardBox = card.getBoundingClientRect();
   strip.scrollLeft += cardBox.left + cardBox.width / 2 - (stripBox.left + stripBox.width / 2);
+  return card;
 }
 
 /**
@@ -175,7 +177,10 @@ export function RunnerPanel({ revealPlan = null, onRevealed }: RunnerPanelProps)
         : `[data-runner-loose-plans] [data-dispatcher-card][data-plan-name="${CSS.escape(revealPlan)}"]`;
       const found = root.querySelector(target);
       found?.scrollIntoView({ block: 'start' });
-      if (arc !== null && found !== null) pageStripToCard(found, revealPlan);
+      // The deck's top is at the top of the pane, and on a phone the epic's own header above the plan's card
+      // pushes the card's foot past the window: the card, not the deck, is what the landing is for, so the
+      // pane scrolls on only as far as the card's whole body shows ('nearest' moves nothing for a card already whole in view).
+      if (arc !== null && found !== null) pageStripToCard(found, revealPlan)?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
     }
     onRevealed();
   }, [revealPlan, retained, plans, onRevealed]);

@@ -3124,7 +3124,7 @@ section: dispatcher/000/002 The read. `readDispatcherState({ bin, timeoutMs, env
 
 **The read.** `readDispatcherState({ bin, timeoutMs, env })` runs `dispatcher status --json` by argv,
 `cwd` the home directory, `maxBuffer` 4 MiB (`STATUS_MAX_BUFFER` in `dispatcher-state.transport.ts` — the document carries
-every plan's `goal` whole, so a verb's 1 MiB is not headroom enough). The subprocess is `readDispatcherJson` in `server/shared/dispatcher-command.ts`, the one run every lane reading a dispatcher document goes through (the roadmap module's `roadmap show --json` read too); `maxBuffer` is its caller's argument, and a failure is a throw naming `dispatcher <argv joined by spaces>`. A document past the ceiling reaches the journal as `did not answer:` plus the document's own opening (200 characters), never a word about the buffer: a journal line that quotes the document is the ceiling too low (`2026-10-03`: 4 MiB against a 2.97 MB document, about 71%). The body is validated
+every plan's `goal` whole, so a verb's 1 MiB is not headroom enough). The subprocess is `readDispatcherJson` in `server/shared/dispatcher-command.ts`, the one run every lane reading a dispatcher document goes through (the roadmap module's `roadmap show --json` read too); `maxBuffer` is its caller's argument, and a failure is a throw naming `dispatcher <argv joined by spaces>`. A document past the ceiling reaches the journal as `printed more than <maxBuffer> bytes — past the buffer this read allows`, the ceiling named (`2026-10-03`: 4 MiB against a 2.97 MB document, about 71%). The body is validated
 FIELD BY FIELD into the F1 types — `dispatcher-plan.reader.ts` reads one plan with its phases, stages
 and events, and `launched`, the one fact its own card words its button off (Resume at 3:00 AM for a
 plan that has walked, Start at 3:00 AM for one that has not); `dispatcher-arc.reader.ts` reads one arc
@@ -3934,7 +3934,7 @@ section: dispatcher/020 The In flight face and the Runs widget
 
 **Nothing renders over the transcript.** Operator ruling 2026-09-09: not a card, not a strip, not a chip, not a banner. The Runs widget sits BESIDE the transcript in the desktop gutter (`src/modules/chat-gutters`), the Roadmap tab is its own pane, and the chat view keeps the whole height the composer and the CLI banner leave it. why: a card once pinned above the transcript took half a 390px screen and left one visible line with the keyboard open.
 
-**The panel is the landing's destination** (MAN-7531, MAN-7654): `RunnerPanel` takes `revealPlan` / `onRevealed` and scrolls that plan's card into view (an arc's plan: its deck, then the deck's strip is paged to the plan's own card, `pageStripToCard`); nothing unfolded, nothing un-hidden. A lane with nothing on it draws `EmptyState` here, never a missing tab.
+**The panel is the landing's destination** (MAN-7531, MAN-7654): `RunnerPanel` takes `revealPlan` / `onRevealed` and scrolls that plan's card into view (an arc's plan: its deck, then the deck's strip is paged to the plan's own card, `pageStripToCard`, then that card is scrolled whole into view with `block: 'nearest'`, so on a phone the epic's header above it does not push its foot past the window); nothing unfolded, nothing un-hidden. A lane with nothing on it draws `EmptyState` here, never a missing tab.
 
 **The panel is a wall for the plans of no arc, and an ARC is not a row of it** (`data-runner-panel` on the root — a probe scopes every reading to THIS pane). The pane's FULL width, no centred column: the glance face makes a loose card short and alike, and short alike cards read best side by side (MAN-643 → "AN ARC'S PLANS ARE SWIPED, NOT WALLED"). A plan OF an arc is not one of those: it is paged one card per view inside its arc's own strip — operator, 2026-09-26: "please bring back the swipable plan cards if it's under an arc" — so this pane draws two shapes, the decks' strips and the loose plans' wall, and only the second is a wall. A header carrying `runner.title`, the count (no badge at zero) and `PlannerLanesReadout` (`planners <out> of <lanes> out`, from `route.planners`; absent, not drawn), inset `px-4 lg:px-6`. Then, in one scroll whose body is `flex flex-col gap-6 px-4 py-5 lg:px-6` — ONE inset for everything in it, the decks carrying none of their own:
 
@@ -11591,14 +11591,14 @@ The workspace's half of a tap on a plan's prompt. The server's half (`landingPat
 | Part | File | Does |
 | --- | --- | --- |
 | `ProjectEffects` | `src/modules/project-workspace/controllers/ProjectEffects.tsx` | on the service worker's `notification:navigate`: `setActiveTab('chat')`, then `navigate(message.urlPath)` when `urlPath` is a string starting with `/`, verbatim |
-| `useRunnerLanding` | `src/modules/project-workspace/hooks/useRunnerLanding.ts` | reads `?runner=` and `?roadmap=` (MAN-7665), holds each name (`revealPlan`, `openRoadmap`), brings the Roadmap tab (the `runner` id) forward for either, strips both params in one call, retires both names when the tab leaves the screen |
+| `useRunnerLanding` | `src/modules/project-workspace/hooks/useRunnerLanding.ts` | reads `?runner=` and `?roadmap=` (MAN-7748), holds each name (`revealPlan`, `openRoadmap`), brings the Roadmap tab (the `runner` id) forward for either, strips both params in one call, retires both names when the tab leaves the screen |
 | `WorkspaceMain` | `src/modules/project-workspace/WorkspaceMain.tsx` | calls `useRunnerLanding({ selectedProject, activeTab, setActiveTab })`; renders `<RoadmapTab revealPlan={revealPlan} onRevealed={clearReveal} openRoadmap={openRoadmap} onRoadmapOpened={clearOpenRoadmap} />` |
 | `RoadmapTab` | `src/modules/roadmap/RoadmapTab.tsx` | a non-null `revealPlan` turns it to the In flight face during render, before `RoadmapPath` can mount; hands the plan to `RunnerPanel` (MAN-7640) |
 | `RunnerPanel` | `src/modules/runner-tab/RunnerPanel.tsx` | scrolls the named card into view (an arc's plan: its deck, then the deck's strip paged to the card), then calls `onRevealed` |
 
 - A `urlPath` not starting with `/` (a message from a worker older than the field) falls through to `/session/<sessionId>`, else `/`. No `?runner=` then; no landing.
 - `ProjectEffects` sets `chat` first; the landing's `setActiveTab('runner')` follows from the URL it navigated to.
-- `?roadmap=<name>` takes and strips under rules 1–9 below exactly as `?runner=` does. Its name is `ROADMAP_LANDING_PARAM` (`src/shared/constants.ts`), written by the widget's `roadmap.widget.open` (MAN-7668). A name the picture lacks selects nothing and is retired; the tab opens on its Roadmap face, on the roadmap already on screen (MAN-7665).
+- `?roadmap=<name>` takes and strips under rules 1–9 below exactly as `?runner=` does. Its name is `ROADMAP_LANDING_PARAM` (`src/shared/constants.ts`), written by the widget's `roadmap.widget.open` (MAN-7668). A name the picture lacks selects nothing and is retired; the tab opens on its Roadmap face, on the roadmap already on screen (MAN-7748).
 - The param's name is `RUNNER_LANDING_PARAM` (`src/shared/constants.ts`), read here. Written by the server's `landingPathOf` and by `useRevealCard` (MAN-7650), which navigates (`replace`) to `?runner=<plan>` from a roadmap press with no Roadmap tab above it.
 
 ## `useRunnerLanding` — rules
@@ -11624,7 +11624,7 @@ The workspace's half of a tap on a plan's prompt. The server's half (`landingPat
 - Only the pane retires a reveal; the workspace never does.
 
 ## The standing proof
-`node .verify/probe-runner-landing.mjs` on the dev client `:5183`, 390×844, five pages, exit 0 and `PASS` when clean; artifact `.verify/shots/runner-landing.png`; no non-GET request goes out (preferences pinned with `pinPreferences(…, { writes: 'drop' })`, the rest answered in-page and listed; `api.github.com` answered with an empty release, INV-6114).
+`node .verify/probe-runner-landing.mjs` on the dev client `:5183`, 390×844, six pages (the sixth: an empty `?runner=&roadmap=` keeps the page on Chat, no pane), exit 0 and `PASS` when clean; artifact `.verify/shots/runner-landing.png`; no non-GET request goes out (preferences pinned with `pinPreferences(…, { writes: 'drop' })`, the rest answered in-page and listed; `api.github.com` answered with an empty release, INV-6114).
 
 | Page | Holds |
 | --- | --- |
@@ -12206,7 +12206,7 @@ The read, `readRoadmapState`
 Traps
 | trap | fact |
 |---|---|
-| a document past `ROADMAP_MAX_BUFFER` | the journal line is `did not answer: <the document's opening>`; the opening starts with `generated_at`, so each tick's line differs and `logErrorOnce` bounds nothing: one line every 2 s. Cure is the sentence's, in `dispatcher-command.ts`; INV-6552 |
+| a document past `ROADMAP_MAX_BUFFER` | the journal line is `dispatcher roadmap show --json printed more than <maxBuffer> bytes — past the buffer this read allows` (`describeFailure`, `dispatcher-command.ts`): one sentence while it stays too big, so `logErrorOnce` says it once |
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/roadmap/, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/roadmap/roadmap-cases.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/roadmap-types.ts
 
@@ -12265,14 +12265,14 @@ Callers
 | `readFeatureCases` | `server/modules/roadmap/roadmap-cases.service.ts`, MAN-7658 | the cases door's binary (`CASES_BIN`) and `door: 'cases'` in the dependencies, argv `list --plan <feature> --state active --json`, its own 1 MiB ceiling, `document` `'cases list --plan <feature> --state active --json'` |
 
 - `dispatcher-state.transport.ts` re-exports `each field isCount isCountOrNull isFlag isRecord isText isTextOrNull need oneOf`: the dispatcher lane's readers import them from the transport, not from `@/shared/document-fields.js`.
-- `readDispatcherJson` failure sentences: `<door> <argv joined by spaces> exited <n>: <first line>` (`<door>` is `dependencies.door`, default `dispatcher`), `… was stopped before it answered (<signal>)`, `… did not answer: <first line or error message>`, `… did not answer JSON`. `status --json` reads `dispatcher status --json exited 1: …`; the cases door's reads `cases list --plan x --state active --json exited 2: REFUSED list: no plan x in the store`.
+- `readDispatcherJson` failure sentences: `<door> <argv joined by spaces> exited <n>: <first line>` (`<door>` is `dependencies.door`, default `dispatcher`), `… was stopped before it answered (<signal>)`, `… printed more than <maxBuffer> bytes — past the buffer this read allows`, `… did not answer: <first line or error message>`, `… did not answer JSON`. `status --json` reads `dispatcher status --json exited 1: …`; the cases door's reads `cases list --plan x --state active --json exited 2: REFUSED list: no plan x in the store`.
 - Spreading the result (`{ ...result, verb, plan }`) puts `verb` and `plan` last and moves a 409's bytes; write the keys out.
 
 Traps
 | trap | fact |
 |---|---|
 | refusal sentences name the document | `need` and `oneOf` throw `<document> answered no <where>` / `answered the <where> <word>`; a call that passes no `document` reads `dispatcher status --json answered no <where>`, byte for byte as before, so the dispatcher's journal line does not move. The roadmap's reads pass `dispatcher roadmap show --json` (2026-10-03: `… answered the roadmaps[1].milestones[0].epics[0].features[0].word bogus`) |
-| buffer overflow is unnamed | `describeFailure` prefers the first line of the partial `stdout` to the error's message: an overflow reads `did not answer: <the document's opening>`, never a word about the buffer; a line quoting the document means `maxBuffer` is too low |
+| buffer overflow | `ERR_CHILD_PROCESS_STDIO_MAXBUFFER` arrives with the partial `stdout`; `describeFailure(door, command, error, maxBuffer)` tests the code first and answers `<door> <command> printed more than <maxBuffer> bytes — past the buffer this read allows`, never the document's opening |
 | a new file in `server/shared/` | joins `.oxlintrc.json`'s `backend-shared-utils` list, INV-6548 |
 
 - A second, unrelated `runDispatcherCommand(dependencies, args, stdin?)` and `DispatcherCommandResult` (`{ exit, stdout, stderr }`, no `ok`, no `reason`) are exported by `dispatcher-ask.transport.ts`: the door for `dispatcher ask`, `accept` and `tell`, which takes stdin (callers `dispatcher-prompts.module.ts`, `dispatcher-answer.service.ts`). It is not this file's; a grep for `runDispatcherCommand` finds both. The roadmap lane uses only the shared one.
@@ -12728,9 +12728,9 @@ Pieces
   - `openCard(plan)` (stable `useCallback`, the face context's `openCard`): sets `requestedPlan` and `inFlight`. `requestedPlan` is the same request made from inside the tab.
 - `handleRevealed` (stable: `RunnerPanel`'s reveal effect lists it) clears `requestedPlan` and calls `onRevealed`.
 - `showFace` (the switch's `onChange`): `inFlight` just turns. `path` first clears `requestedPlan` and calls `onRevealed()` when `revealPlan !== null`, then turns. why: a held landing would re-apply the render-time turn, and a pending card press would fire its reveal later on a plain visit.
-- `?roadmap=<name>` landing (MAN-7665): the face turns to `path` once, at the render the request arrives in, unless `revealPlan` is non-null; an effect then selects the roadmap through `useRoadmap().select` and calls `onRoadmapOpened`.
+- `?roadmap=<name>` landing (MAN-7748): the face turns to `path` once, at the render the request arrives in, unless `revealPlan` is non-null; an effect then selects the roadmap through `useRoadmap().select` and calls `onRoadmapOpened`.
 - The tab retires nothing on unmount; `useRunnerLanding` drops both held names (`revealPlan`, `openRoadmap`) when `activeTab` leaves `runner` (MAN-7531). why: dev StrictMode's mount/unmount/mount would retire every landing from inside the tab.
-- An arc's plan is revealed in two moves, its deck then the deck's strip paged to the card (`pageStripToCard`, MAN-642); both entries use it.
+- An arc's plan is revealed in three moves, its deck, the deck's strip paged to the card (`pageStripToCard`, MAN-642), then the card scrolled whole into view; both entries use it.
 
 ## RoadmapPath
 - Box: `div[data-roadmap-face]`, `relative flex h-full min-h-0 flex-col`. It is the celebrations' box: `rootRef` is what `useCelebrations` watches, `CelebrationLayer` (`scope="face"`) is its LAST child, outside the `ScrollArea`, and `CelebrationContext.Provider value={active}` wraps it.
@@ -12769,7 +12769,7 @@ Proof: `node .verify/probe-roadmap-tab.mjs` (dev client; signs in through `lib/c
 | palette, "milestone" | lists exactly `Go to Roadmap`; choosing it opens the tab |
 - Writes: none to roadmaps or lane; `roadmapSelected` and `theme` read first, restored last, a throw in a walk recorded as `[FAIL]`.
 - Every write of the screen, the dialogs of every word, the catch-up and the built client: `node .verify/probe-roadmap-screen.mjs` (MAN-7663).
-- Phone landing, tap and root case: `probe-runner-landing.mjs`. The `?roadmap=` landing: `probe-roadmap-landing.mjs` (MAN-7665).
+- Phone landing, tap and root case: `probe-runner-landing.mjs`. The `?roadmap=` landing: `probe-roadmap-landing.mjs` (MAN-7748).
 - A probe that opens the tab by `aria-label="Runner"` finds nothing, and one that reads `[data-runner-panel]` at once meets the Roadmap face first: MAN-679.
 
 Traps
@@ -13126,7 +13126,7 @@ The Roadmap tab is the workspace tab whose id is `runner`: label `Roadmap`, glyp
 
 ## Landing
 - `?runner=<plan>`: `useRunnerLanding` brings the tab forward and holds `revealPlan`; `RoadmapTab` sets `inFlight` while rendering, before `RunnerPanel` is handed the plan; the card is scrolled into view and the param is stripped.
-- `?roadmap=<name>`: `useRunnerLanding` brings the tab forward and holds `openRoadmap`; `RoadmapTab` turns to the Roadmap face on arrival, selects that roadmap once the picture is read (an absent name selects nothing) and the param is stripped (MAN-7665). With `?runner=` too, In flight wins the face.
+- `?roadmap=<name>`: `useRunnerLanding` brings the tab forward and holds `openRoadmap`; `RoadmapTab` turns to the Roadmap face on arrival, selects that roadmap once the picture is read (an absent name selects nothing) and the param is stripped (MAN-7748). With `?runner=` too, In flight wins the face.
 - A feature's Open its card or Answer on the Roadmap face lands the same way, inside the tab (`openCard`) or by `?runner=` where no tab is above (`useRevealCard`, MAN-7650).
 
 ## Palette
@@ -13135,7 +13135,7 @@ The Roadmap tab is the workspace tab whose id is `runner`: label `Roadmap`, glyp
 
 ## Proof
 `node .verify/probe-roadmap-tab.mjs` (readings in MAN-7640): the strip at 1440, light and dark; both faces at 1440×900 and 390×844; the `?runner=` landing; the palette row.
-The `?roadmap=` landing: `node .verify/probe-roadmap-landing.mjs` (MAN-7665).
+The `?roadmap=` landing: `node .verify/probe-roadmap-landing.mjs` (MAN-7748).
 The whole screen, writes and catch-up included: `node .verify/probe-roadmap-screen.mjs` (MAN-7663); its `look` and `landing` parts read the strip and the landing again against the store.
 
 ## Traps
@@ -13154,7 +13154,7 @@ Two per-user preferences, kept in the per-user store every setting lives in (mir
 
 ## roadmapSelected
 - The name of the roadmap on screen in the Roadmap tab.
-- Written whole by `useRoadmap().select`, which `RoadmapPicker` and the `?roadmap=` landing (`RoadmapTab`, MAN-7665) call. The last device to choose wins. why: the value is one choice, "the roadmap on screen"; there is nothing to merge.
+- Written whole by `useRoadmap().select`, which `RoadmapPicker` and the `?roadmap=` landing (`RoadmapTab`, MAN-7748) call. The last device to choose wins. why: the value is one choice, "the roadmap on screen"; there is nothing to merge.
 - A stored name the picture lacks reads as the first roadmap. A reading, not a write: the preference stays, and a roadmap re-added under that name returns to screen.
 - `useRoadmap().selected` stays `null` until `hasHydratedUserPreferences()`. why: a cold mirror reads the default while the server's copy is in flight.
 
@@ -13166,7 +13166,7 @@ Two per-user preferences, kept in the per-user store every setting lives in (mir
 | half | list | holds | file |
 |---|---|---|---|
 | client | `ENTRY_PATCHED_KEYS` = `dispatcher`, `roadmapSeen` | folds two patches queued in one debounce per entry, retries only the failed entries, keeps the persisted outbox until the server has them | `src/shared/userSettings.ts` |
-| server | `ENTRY_LISTED_KEYS` = `dispatcher`, `roadmapSeen` | `mergeEntryLists` replaces the named entry and keeps the others; at most `ENTRY_LIST_CAP` (200) entries, newest last | `server/modules/database/repositories/user-preferences.db.ts` |
+| server | `ENTRY_LISTED_KEYS` = `dispatcher`, `roadmapSeen` | `mergeEntryLists` replaces the named entry and keeps the others; at most `ENTRY_LIST_CAP` (200) entries, newest last. Under `FORWARD_ONLY_KEYS` (`roadmapSeen`) an entry whose `at` is older than the stored one is a stale device's retry and is NOT applied; a `null` entry still drops, so a rewind is drop, then write. The client's `applyEntryPatch` and `unreflectedEntries` take the key's `FORWARD_ONLY_ENTRY_KEYS` flag and say the same | `server/modules/database/repositories/user-preferences.db.ts` |
 
 - One list without the other sends patches the server stores whole, or stores whole what the client patches. The two change together.
 - The merge compares no `at`: a writer never sends an `at` older than the one it read. Rule and residual window: INV-6580.
@@ -13385,7 +13385,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/report.mjs, /home/ly
 | a row | opens `FeatureDialog` in place (`openFeature`) |
 | a row's Answer | `useRevealCard()`: `?runner=<plan>` (MAN-7531) |
 | a dialog's Open its card | closes the dialog, then the same landing |
-| `roadmap.widget.open` | `?roadmap=<selected.name>` (MAN-7665) |
+| `roadmap.widget.open` | `?roadmap=<selected.name>` (MAN-7748) |
 | a station | focuses it here only |
 | the picker's New roadmap… | opens `OpenDialog` here |
 
@@ -13407,7 +13407,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/report.mjs, /home/ly
 | one `RoadmapFaceContext.Provider` `{ openDialog, openCard: null, focus }` and one `CelebrationContext.Provider value={active}` | no tab is above the gutter |
 | `const reveal = useRevealCard()` is read in the body, above its own provider | `openCard` is null there, so the call writes the `?runner=<plan>` landing (`replace`) |
 | the dialog slot mounts `OpenDialog` with `onOpenCard={(plan) => { setDialog(null); reveal(plan); }}`: close, then land | the tab's face unmounts under the turn to In flight; this gutter stays mounted behind `hidden`, and a dialog is a portal no hidden pane hides |
-| `openRoadmap` is `setSearchParams({ [ROADMAP_LANDING_PARAM]: selected.name }, { replace: true })` | `ROADMAP_LANDING_PARAM` (`src/shared/constants.ts`) is the one spelling `useRunnerLanding` reads (MAN-7665) |
+| `openRoadmap` is `setSearchParams({ [ROADMAP_LANDING_PARAM]: selected.name }, { replace: true })` | `ROADMAP_LANDING_PARAM` (`src/shared/constants.ts`) is the one spelling `useRunnerLanding` reads (MAN-7748) |
 | `useMilestoneMomentInView(moment, scrollRef)` with `scrollRef` on the body's `ScrollArea` | a milestone moment brings its station into the widget's scroller before it plays |
 
 ## useMilestoneMomentInView
@@ -13454,7 +13454,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/hooks/useMil
 | `prod` | the built client on :5184 (MAN-552), once its build is newer than every file `scripts/prod-client-build.sh` reads (the walk waits up to 5 minutes for the timer, builds nothing itself): signed in at 1680×1000 with lyphecli on screen, Runs first on the left and Roadmap under it, open; `readWidget` against the store (picker, goal in the display serif at 20px clamped to two lines, one station per milestone, the foot "Open the roadmap"); the stamp of lyphecli settled at its newest completion BEFORE the page opens and the widget read at rest (no layer, summary badge, celebrating row or spoken announce) before it is shot, so the capture is never of a catch-up playing over the picker; captures `prod-5184-gutters-1680-light.png` and `prod-5184-widget-lyphecli-1680-light.png`; console errors | `roadmap-widget-prod.mjs` `walkBuilt` |
 - Expected moments are derived from the store's dates (`expectedMoments`, `REWIND_TO` from `roadmap-catchup-walk.mjs`), never typed in; what is seen is the 20 ms DOM poller `installWidgetLog` (`roadmap-widget-kit.mjs`). Every walk ends with the stamp at the newest completion.
 - Helpers in `roadmap-widget-kit.mjs`: `hideSidebar`, `backToChat`, `openRoadmapViaWidget`, `reenter`, `placeOf`, `columnIds`, `dragWidget`, `toggleWidget`, `recordFrames`, `contactSheet`, `rewindInPage`.
-- `rewindInPage` rewinds a stamp under an already-open page by importing the app's own `seenStamp.ts` module instance in the page and calling its `writeUserPreferenceEntries`. why: the page keeps a mirror of the stamp; a rewind on the server alone replays nothing.
+- `rewindInPage` rewinds a stamp under an already-open page by importing the app's own `seenStamp.ts` module instance in the page and calling its `writeUserPreferenceEntries`. why: the page keeps a mirror of the stamp; a rewind on the server alone replays nothing. A stamp only moves forward on both sides, so it drops the entry on the server first (`dropStamp`) and writes `null` then the older stamp in the page (the two fold into the stamp alone); `writeStamp` drops before it writes for the same reason.
 
 ## What it touches and puts back
 - Written to the account: the gutter arrangement (folds, a drag), `roadmapSelected`, `theme`, the seen stamps of `restorly` and `lyphecli`.
@@ -13471,3 +13471,48 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/hooks/useMil
 - The plan's `selection` is the raw `roadmapSelected` found; MAN-7663's `foundSelection()` takes the last non-probe choice, which a run that finds a probe roadmap selected would need.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/roadmap-widget-kit.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/roadmap-widget-moments.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/roadmap-widget-prod.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/roadmap-widget-walks.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-roadmap-widget.mjs
+
+## MAN-7748 — The `?roadmap=<name>` landing — the Roadmap tab opens on its Roadmap face with that roadmap selected
+
+The workspace's second landing, beside `?runner=<plan>` (MAN-7531). The hook's shared rules (held name, one strip, leave-drop): MAN-7531 §"`useRunnerLanding` — rules". The tab: MAN-7654; its face state: MAN-7640; `useRoadmap().select`: MAN-7635; `roadmapSelected`: MAN-7655.
+
+| Part | File | Does |
+| --- | --- | --- |
+| `ROADMAP_LANDING_PARAM` | `src/shared/constants.ts` | `'roadmap'`; the hook imports it as `ROADMAP_PARAM` |
+| `useRunnerLanding` | `src/modules/project-workspace/hooks/useRunnerLanding.ts` | holds the name as `openRoadmap`, brings the `runner` tab forward, strips the param; `clearOpenRoadmap` is stable |
+| `WorkspaceMain` | `src/modules/project-workspace/WorkspaceMain.tsx` | passes `openRoadmap` and `onRoadmapOpened={clearOpenRoadmap}` to `RoadmapTab` |
+| `RoadmapTab` | `src/modules/roadmap/RoadmapTab.tsx` | turns the face to Roadmap on arrival; selects the roadmap once the picture is read; calls `onRoadmapOpened` |
+
+- Writer: the chat widget's foot link `roadmap.widget.open` (`RoadmapWidgetBody.openRoadmap`, MAN-7668) writes `?roadmap=<selected.name>` through `ROADMAP_LANDING_PARAM` (`replace`), as `useRevealCard` writes `RUNNER_LANDING_PARAM`; a hand-typed `?roadmap=<name>` takes the same road in.
+- `RoadmapTab` props: `openRoadmap: string | null`, `onRoadmapOpened: () => void`.
+
+## RoadmapTab — the landing's two steps
+| step | when | does |
+| --- | --- | --- |
+| turn the face | during render, once, at the render `openRoadmap` arrives in | `setFace('path')` unless `revealPlan` is non-null; `faceTurnedFor` records the request the face was turned for |
+| select and retire | effect, once `picture !== null` | name in `roadmaps`: wait for `selected !== null`, then `select(name)`; name absent: select nothing. Either way `onRoadmapOpened()` |
+
+- `faceTurnedFor` resets to `null` when the request is retired, so the same name landing later turns the face again. A tab already on In flight when a landing arrives still turns.
+- Once, never again: a press on In flight made while the picture loads is not undone when the picture lands.
+- `revealPlan` is read at the arrival render: a `?runner=` reveal that arrived with it wins the face (the card is the more specific ask); the roadmap is selected all the same.
+- Wait for `selected !== null` before `select`. why: `selected` is `null` until preferences hydrate (MAN-7655), and a write on a cold mirror is overwritten by the hydrate.
+- A name the picture lacks needs no wait: the tab opens on the Roadmap face on the roadmap already on screen, and the request is retired at once.
+- `?runner=<plan>&roadmap=<name>` together: both params leave the URL in one pass, In flight shows with the card in view, the roadmap is selected.
+- `/?roadmap=<name>` with no project picked: the param stays in the URL and the name is held; after a project is picked it lands and the param is stripped.
+
+## The standing proof
+`node .verify/probe-roadmap-landing.mjs` on the live app, 1440×900, light; exit 0 and `PASS` when clean. Artifacts: `.verify/artifacts/roadmap-widget/landing-{lyphecli,no-such-roadmap,runner-in-flight}-light.png`. `roadmapSelected` is read through the harness's `api()` (the server's copy) before and after each landing, and written back last.
+
+| Page | Holds |
+| --- | --- |
+| `/session/<id>?roadmap=lyphecli`, account on the other roadmap, stored tab `chat` | Roadmap tab on the Roadmap face showing lyphecli; `roadmapSelected` = `lyphecli`; URL without `roadmap` |
+| the same, then a picker pick of the other roadmap, a trip to Chat and back | the pick stands: the landing was retired, no replay |
+| `?roadmap=no-such-roadmap` | tab on the Roadmap face; `roadmapSelected` and the roadmap on screen unchanged, also after a trip away and back; URL stripped |
+| `?runner=<live card's plan>` | In flight face, that card in view, `runner` gone |
+| `?runner=<plan>&roadmap=lyphecli` | both gone from the URL, In flight with the card in view, lyphecli selected |
+| `/?roadmap=lyphecli`, no project | param stays; after a project click: lands on lyphecli, param stripped |
+
+- 2026-10-04: `node .verify/probe-roadmap-landing.mjs` ends `PASS`, the `[root]` leave-drop leg and the face turn on arrival among its checks; part `landings` of `probe-roadmap-widget.mjs` (MAN-7671) ends `PASS` with 13 ok, the Answer press among them (it is a `[SKIP]` only while nothing waits on the operator).
+- Counts console errors only from each page's own life: a chat fetch aborted by `goto` leaving the previous page is not a finding.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/hooks/useRunnerLanding.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/RoadmapTab.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/constants.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-roadmap-landing.mjs

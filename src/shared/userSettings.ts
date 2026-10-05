@@ -1,6 +1,7 @@
 import { api } from '@/shared/api';
 import {
   applyEntryPatch,
+  FORWARD_ONLY_ENTRY_KEYS,
   clearEntryOutbox,
   foldEntryPatches,
   readEntryOutbox,
@@ -400,7 +401,7 @@ export function writeUserPreference(key: UserPreferenceKey, value: unknown, wire
  * entry another device wrote since this one signed in is neither asserted nor erased.
  */
 export function writeUserPreferenceEntries(key: UserPreferenceKey, patch: PreferenceEntryPatch): void {
-  const next = applyEntryPatch(preferences[key], patch);
+  const next = applyEntryPatch(preferences[key], patch, FORWARD_ONLY_ENTRY_KEYS.has(key));
   if (JSON.stringify(preferences[key]) === JSON.stringify(next)) {
     return;
   }
@@ -569,10 +570,11 @@ export async function hydrateUserPreferences(): Promise<void> {
   // already holds is confirmed, and leaves the outbox.
   const outbox = readEntryOutbox();
   for (const key of ENTRY_PATCHED_KEYS) {
-    const missing = unreflectedEntries(serverPreferences[key], outbox[key]);
+    const forward = FORWARD_ONLY_ENTRY_KEYS.has(key);
+    const missing = unreflectedEntries(serverPreferences[key], outbox[key], forward);
     replaceEntryOutbox(key, missing);
     if (missing === null) continue;
-    preferences[key] = applyEntryPatch(preferences[key], missing);
+    preferences[key] = applyEntryPatch(preferences[key], missing, forward);
     queueServerWrite({ [key]: missing });
   }
   hasHydrated = true;

@@ -18,6 +18,11 @@ import type { PreferenceEntryPatch } from '@/shared/types';
  * rule: drop every entry the patch names, then append the patch's non-null entries in the patch's
  * order (a re-hidden plan becomes the newest), then keep the newest `ENTRY_LIST_CAP`.
  *
+ * A STAMP LIST MOVES FORWARD ONLY (`FORWARD_ONLY_ENTRY_KEYS`). `roadmapSeen` holds, per roadmap, the
+ * completion this user last celebrated (`{ name, at }`): a patch carrying an OLDER `at` than the entry
+ * it names is a stale device's retry, and it is not applied, so one device can never rewind what the
+ * other played. The server's merge (`patchEntryList`) says the same.
+ *
  * The store's other needs live here too, beside the rule they follow: folding two patches queued
  * inside one debounce window (`foldEntryPatches`), rebuilding a failed patch from what the store
  * holds NOW before it is retried (`refreshEntryPatch`), and the OUTBOX that keeps a patch until the
@@ -30,6 +35,9 @@ const ENTRY_LIST_CAP = 200;
 
 type EntryDocument = Record<string, unknown>;
 
+/** The preference keys whose entries carry an `at` that only moves forward: a patch older than the stored entry is dropped. The server's `FORWARD_ONLY_KEYS` mirrors it. */
+export const FORWARD_ONLY_ENTRY_KEYS: ReadonlySet<string> = new Set(['roadmapSeen']);
+
 const isRecord = (value: unknown): value is Record<string, unknown> => (
   value !== null && typeof value === 'object' && !Array.isArray(value)
 );
@@ -40,25 +48,45 @@ function entryKeyOf(entry: unknown): string | null {
   return isRecord(entry) && typeof entry.name === 'string' ? entry.name : null;
 }
 
-/** One list with one list-patch applied: the rule in this file's head. */
-function patchList(stored: unknown, listPatch: Record<string, unknown>): unknown[] {
-  const named = new Set(Object.keys(listPatch));
+/** Whether the stored entry carries a later `at` than the one a patch sends under its key: the stamp that must not be rewound. */
+function storedIsLater(stored: unknown, sent: unknown): boolean {
+  if (!isRecord(stored) || !isRecord(sent)) return false;
+  const held = Date.parse(String(stored.at));
+  const offered = Date.parse(String(sent.at));
+  return !Number.isNaN(held) && !Number.isNaN(offered) && held > offered;
+}
+
+/** The entries of a list by key, for the forward-only test. */
+function entriesByKey(list: unknown): Map<string, unknown> {
+  const held = new Map<string, unknown>();
+  for (const entry of Array.isArray(list) ? list : []) {
+    const key = entryKeyOf(entry);
+    if (key !== null) held.set(key, entry);
+  }
+  return held;
+}
+
+/** One list with one list-patch applied: the rule in this file's head. `forward`: an entry older than the stored one is not applied. */
+function patchList(stored: unknown, listPatch: Record<string, unknown>, forward: boolean): unknown[] {
+  const held = forward ? entriesByKey(stored) : new Map<string, unknown>();
+  const sent = Object.entries(listPatch).filter(([key, entry]) => !(forward && storedIsLater(held.get(key), entry)));
+  const named = new Set(sent.map(([key]) => key));
   const kept = (Array.isArray(stored) ? stored : []).filter((entry) => {
     const key = entryKeyOf(entry);
     return key !== null && !named.has(key);
   });
   // An entry whose own key is not the key it was sent under is malformed and is not stored.
-  const added = Object.entries(listPatch)
+  const added = sent
     .filter(([key, entry]) => entry !== null && entryKeyOf(entry) === key)
     .map(([, entry]) => entry);
   return [...kept, ...added].slice(-ENTRY_LIST_CAP);
 }
 
-/** The document with `patch` applied. Lists the patch does not name, and every other key, are carried as they stand. */
-export function applyEntryPatch(document: unknown, patch: PreferenceEntryPatch): EntryDocument {
+/** The document with `patch` applied. Lists the patch does not name, and every other key, are carried as they stand. `forward` is the key's own (`FORWARD_ONLY_ENTRY_KEYS`). */
+export function applyEntryPatch(document: unknown, patch: PreferenceEntryPatch, forward = false): EntryDocument {
   const next: EntryDocument = isRecord(document) ? { ...document } : {};
   for (const [list, listPatch] of Object.entries(patch)) {
-    next[list] = patchList(next[list], listPatch);
+    next[list] = patchList(next[list], listPatch, forward);
   }
   return next;
 }
@@ -173,20 +201,18 @@ export function settleEntryPatch(key: string, settled: unknown): void {
  * sets that the document lacks or holds differently, and an entry it removes that the document still
  * holds. `null` when the document holds all of it, which is the server's confirmation of that patch.
  */
-export function unreflectedEntries(document: unknown, patch: unknown): PreferenceEntryPatch | null {
+export function unreflectedEntries(document: unknown, patch: unknown, forward = false): PreferenceEntryPatch | null {
   if (!isRecord(patch)) return null;
   const held = isRecord(document) ? document : {};
   const missing: PreferenceEntryPatch = {};
   for (const [list, listPatch] of Object.entries(patch)) {
     if (!isRecord(listPatch)) continue;
-    const stored = new Map<string, string>();
-    for (const entry of Array.isArray(held[list]) ? held[list] : []) {
-      const key = entryKeyOf(entry);
-      if (key !== null) stored.set(key, JSON.stringify(entry));
-    }
+    const entries = entriesByKey(held[list]);
+    const stored = new Map<string, string>([...entries].map(([key, entry]) => [key, JSON.stringify(entry)]));
+    // A stamp the store already holds LATER is as good as stored: the server drops the older one, so it is never re-sent.
     const left = Object.entries(listPatch).filter(([key, entry]) => (entry === null
       ? stored.has(key)
-      : stored.get(key) !== JSON.stringify(entry)));
+      : !(forward && storedIsLater(entries.get(key), entry)) && stored.get(key) !== JSON.stringify(entry)));
     if (left.length > 0) missing[list] = Object.fromEntries(left) as PreferenceEntryPatch[string];
   }
   return Object.keys(missing).length === 0 ? null : missing;

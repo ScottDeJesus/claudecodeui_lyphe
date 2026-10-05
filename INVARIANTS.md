@@ -419,20 +419,6 @@ probe-key: 8734efe63225eeacfb3de1416303af86f7100857
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/ArcDeck.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/DeletePlanDialog.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/hiddenPlans.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/hooks/useDispatcherPlans.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/putAwayFocus.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/common.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/hooks/useWorkspaceTabGates.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/useCardFold.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-arc-nest.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-arc-strip-return.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-dismiss-done.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-runner-widget-list.mjs, /home/lyphe/.claude/state/dispatch-souls/dispatch-hephaestus-20260928-161608-f892/result.md
 
-## INV-5671 — probe — The one-command proof exits 1 on a correct build
-
-The one-command proof exits 1 on a correct build
-
-```probe
-node .verify/probe-dismiss-done.mjs
-expect: last line `ALL PASS`, exit 0 (today: `2 FAILURE(S)` — `[FAIL] done-only lane: a reload does not bring the Runner tab back` and a `tab-390-dark` console error)
-```
-
-measured 2026-09-28 by chain chain-done-cards-leave-20260928-160626-ad80, finding M2, MEDIUM
-probe-key: b87b80549775caac71892b521eaae808104335ca
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/ArcDeck.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/DeletePlanDialog.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/hiddenPlans.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/hooks/useDispatcherPlans.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/putAwayFocus.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/common.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/hooks/useWorkspaceTabGates.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/useCardFold.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-arc-nest.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-arc-strip-return.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-dismiss-done.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-runner-widget-list.mjs, /home/lyphe/.claude/state/dispatch-souls/dispatch-hephaestus-20260928-161608-f892/result.md
-
 ## INV-5672 — probe — The builder's report is a placeholder
 
 The builder's report is a placeholder
@@ -2283,20 +2269,6 @@ probe-key: 7176ac370388533667b3d08cf94c59333e01a442
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/controllers/ProjectEffects.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/hooks/useRunnerLanding.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/WorkspaceMain.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/runner-tab/RunnerPanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-runner-landing.mjs
 
-## INV-6085 — probe — an empty `?runner=` is read as a plan name (scenario S7)
-
-an empty `?runner=` is read as a plan name (scenario S7)
-
-```probe
-node /home/lyphe/.claude/state/pipeline-reviews/prompts-in-cards--reveal/athena-probes/landing-attacks-2.mjs
-expect: [FAIL] S7 an EMPTY `?runner=` lands on the Runner tab and strips the param — emptyParam.series[1] `/session/e609dd36-… | tab Runner | stored runner | pane no cards 0`, and the param is gone from the URL
-```
-
-measured 2026-09-30 by chain chain-prompts-in-cards--reveal-20260930-133613-4585, finding L1, LOW
-probe-key: 9b3a969a5eb2d2c04c66bf5e0ab83ac50dba5aa1
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/controllers/ProjectEffects.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/hooks/useRunnerLanding.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/WorkspaceMain.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/runner-tab/RunnerPanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-runner-landing.mjs
-
 ## INV-6086 — probe — the reveal is not retired over an empty lane; it stays pending and fires late (scenario S21)
 
 the reveal is not retired over an empty lane; it stays pending and fires late (scenario S21)
@@ -2857,20 +2829,6 @@ probe-key: 2c908dd059142b1c7344624ad97139f4e7bb5103
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/.oxlintrc.json, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/roadmap/roadmap-write.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/roadmap-types.ts
 
-## INV-6552 — probe — an oversized document is reported as a prefix of itself, and the moved comment claims otherwise (carried from HEAD, now in the shared file)
-
-an oversized document is reported as a prefix of itself, and the moved comment claims otherwise (carried from HEAD, now in the shared file)
-
-```probe
-cd /home/lyphe/.claude/claudecodeui_lyphe && D=$(mktemp -d /tmp/athena-probe-XXXXXX) && case "$D" in /tmp/athena-probe-*) ;; *) exit 1;; esac; printf '#!/bin/sh\nprintf "{\\"plans\\":[],\\"pad\\":\\""\nhead -c 4300000 /dev/zero | tr "\\0" " "\nprintf "\\"}"\n' > $D/big && chmod +x $D/big && printf "import { readDispatcherJson } from '/home/lyphe/.claude/claudecodeui_lyphe/server/shared/dispatcher-command.ts';\ntry { await readDispatcherJson(['status','--json'], { bin: '$D/big', timeoutMs: 8000, env: { PATH: process.env.PATH ?? '' } }, 4*1024*1024); console.log('read ok'); } catch (e) { console.log((e as Error).message); }\n" > $D/p.mts && TSX_TSCONFIG_PATH=server/tsconfig.json node --import tsx $D/p.mts; cd /tmp && case "$D" in /tmp/athena-probe-*) rm -r "$D";; esac
-expect: it prints `dispatcher status --json did not answer: {"plans":[],"pad":"` — the body's prefix with no word about the buffer; cured when the sentence names the exceeded buffer
-```
-
-measured 2026-10-03 by chain chain-roadmap--lane--shared-20261003-164519-da13, finding L1, LOW
-probe-key: f1778cd254d156aee051e86598cd6ed9f5dedbbb
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/.oxlintrc.json, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher-verb.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/dispatcher-command.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/document-fields.ts
-
 ## INV-6559 — probe — the row's Traps section quotes a hub refusal the hub does not give
 
 the row's Traps section quotes a hub refusal the hub does not give
@@ -3043,20 +3001,6 @@ expect: a TS2322 line ("'at' does not exist in type '{ name: string; }'") and "t
 
 measured 2026-10-03 by chain chain-roadmap--screen--data-20261003-192009-0fdf, finding L3, LOW
 probe-key: 02b657ca63eddcbb14315366ce1870e4fce1fe39
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/celebrationContext.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/hooks/useRoadmap.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/hooks/useRoadmapWrites.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/RoadmapFeed.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/roadmap-types.ts
-
-## INV-6585 — probe — A stale device's retry rewinds a roadmap's stamp
-
-A stale device's retry rewinds a roadmap's stamp
-
-```probe
-bash /home/lyphe/.claude/state/pipeline-reviews/roadmap--screen--data/athena-probes/stamp-rewind.sh
-expect: "stored restorly stamp after a stale retry" prints at 2026-10-01T00:00:00Z while the defect stands (rewound); 2026-10-04T00:00:00Z once a stamp can no longer go backward
-```
-
-measured 2026-10-03 by chain chain-roadmap--screen--data-20261003-192009-0fdf, finding L4, LOW
-probe-key: 5245ac0c86cd5b8771d1af9ce64e6d0c0b9f290e
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/celebrationContext.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/hooks/useRoadmap.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/hooks/useRoadmapWrites.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/RoadmapFeed.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/roadmap-types.ts
 
@@ -3654,24 +3598,6 @@ probe-key: fbe31717568fcd6bc19b26985edb711cd7f4a50c
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/report.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/roadmap-catchup-walk.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/roadmap-dialogs.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/roadmap-live-walks.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/roadmap-look-walk.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/roadmap-motion.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/roadmap-page.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/roadmap-store.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/roadmap-ui.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/roadmap-writes-build.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/roadmap-writes-kit.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/roadmap-writes-tidy.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/roadmap-writes-walk.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/roadmap-writes-words.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-roadmap-screen.mjs
 
-## INV-6691 — probe — LOW — "in view" now means "a top edge inside the window and half the card on screen": the transcript's own 32 px cut still passes
-
-LOW — "in view" now means "a top edge inside the window and half the card on screen": the transcript's own 32 px cut still passes
-
-```probe
-cd /home/lyphe/.claude/claudecodeui_lyphe && node --input-type=module -e "
-import { cardInView } from './.verify/lib/roadmap-page.mjs';
-const w = { found: true, left: 29, right: 361, width: 390, height: 844 };
-console.log('y 454-876 of 844:', cardInView({ ...w, top: 454, bottom: 876 }), '| 1 px at the bottom edge:', cardInView({ ...w, top: 843, bottom: 1265 }), '| 20 px foot:', cardInView({ ...w, top: -400, bottom: 20 }));
-"
-expect: "true false false" (the measured 32 px cut passes, the two extremes are cured); cured, if the card's whole body is required: "false false false"
-```
-
-measured 2026-10-04 by chain chain-roadmap--screen--whole-20261004-032012-391b, finding L2, LOW
-probe-key: 27d70e329e0abebbc121a1020e6165466fd0c3cd
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/report.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/roadmap-catchup-walk.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/roadmap-dialogs.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/roadmap-live-walks.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/roadmap-look-walk.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/roadmap-motion.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/roadmap-page.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/roadmap-store.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/roadmap-ui.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/roadmap-writes-build.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/roadmap-writes-kit.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/roadmap-writes-tidy.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/roadmap-writes-walk.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/roadmap-writes-words.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-roadmap-screen.mjs
-
 ## INV-6692 — probe — LOW — the mirror orphan count the writes walk prints is always 0, and the mirror's lines fill the transcript
 
 LOW — the mirror orphan count the writes walk prints is always 0, and the mirror's lines fill the transcript
@@ -3758,20 +3684,6 @@ probe-key: 0cd4841adf75e320ace09f2bc77e0ab8f76f9367
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/roadmap-cases-walk.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-roadmap-cases.mjs
 
-## INV-6720 — probe — Rows this phase owns carry history and process voice, and one says "not measured" about a thing that was measured
-
-Rows this phase owns carry history and process voice, and one says "not measured" about a thing that was measured
-
-```probe
-cd ~/.claude && echo "$(docstore get MAN-7668 --text | grep -c -i -E "reviewer'?s reading|builder'?s count") $(docstore get MAN-7665 --text | grep -c "predates the fix-pass") $(docstore get MAN-7640 --text | grep -c "not re-run")"
-expect: 0 0 0 (today it prints "2 1 1")
-```
-
-measured 2026-10-04 by chain chain-roadmap--widget--docs-20261004-081056-7d30, finding M1, MEDIUM
-probe-key: 488f91f90247b35baab3dc452a6747a690c5f9c2
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/modals/OpenDialog.tsx
-
 ## INV-6721 — probe — `src/modules/chat/index.ts:5` still says Subagents is "the third widget"
 
 `src/modules/chat/index.ts:5` still says Subagents is "the third widget"
@@ -3797,20 +3709,6 @@ expect: 0 (today 1)
 
 measured 2026-10-04 by chain chain-roadmap--widget--docs-20261004-081056-7d30, finding L2, LOW
 probe-key: 1ceda3f239971f8c1814612bee57e63ca846569e
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/modals/OpenDialog.tsx
-
-## INV-6723 — probe — MAN-7665 is the only row of the roadmap lane in the `cloudcli:.` package
-
-MAN-7665 is the only row of the roadmap lane in the `cloudcli:.` package
-
-```probe
-cd ~/.claude && docstore get MAN-7665 | python3 -c "import sys,json;p=json.load(sys.stdin)['row']['package'];print(p['repo']+':'+p['path'])"
-expect: cloudcli:docs (today cloudcli:.)
-```
-
-measured 2026-10-04 by chain chain-roadmap--widget--docs-20261004-081056-7d30, finding L3, LOW
-probe-key: 7e480a2c247126c9591ce31c868cf0f62ddf1859
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/modals/OpenDialog.tsx
 
