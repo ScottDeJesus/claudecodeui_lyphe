@@ -35,6 +35,10 @@ export { moveCard, useCardRanks } from '@/modules/dispatcher/cardOrderEntries';
 // is the stack of decks, given the split that says which plans go under which arc. Drawn by both homes
 // in `src/modules/runner-tab`: the Roadmap tab's In flight face and the chat gutter's widget.
 export { PlanCard } from '@/modules/dispatcher/PlanCard';
+// A card's description as one clamped line that a press opens whole and a second press folds back.
+// Drawn by the plan card's and the arc deck's heads inside this module, and by the roadmap module's
+// epic card for the epic's goal.
+export { CardDescription } from '@/modules/dispatcher/LaneCardHead';
 export { DispatchArcDecks } from '@/modules/dispatcher/ArcDeck';
 // How full the planner lane is — `planners <out> of <lanes> out` — drawn from the frame's own route by
 // the header of the Roadmap tab's In flight face and the chat gutter's widget, and by neither when the

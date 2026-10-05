@@ -3,6 +3,7 @@ import { useContext, useMemo } from 'react';
 import type { CSSProperties } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { CardDescription } from '@/modules/dispatcher';
 import { CelebrationContext } from '@/modules/roadmap/celebrationContext';
 import { RoadmapFaceContext } from '@/modules/roadmap/faceContext';
 import { FeatureRow } from '@/modules/roadmap/FeatureRow';
@@ -111,7 +112,8 @@ function oneLine(goal: string): string {
  * One epic as a card: its completion ring, its title, how many of its features have shipped and, after
  * that, how long agents have worked on it (`3 of 7 shipped · 30h`), its word
  * and its menu, and — once it keeps regression cases — how many of them hold, with what broke in amber;
- * under that head why it is blocked, whole; its goal in a line; and its features as rows the operator
+ * under that head why it is blocked, whole; its goal in a line that a press opens whole and a second
+ * press folds back (`CardDescription`, the In flight cards' own); and its features as rows the operator
  * drags into order, then "Add a feature". Used by `MilestoneFocus`, one card a cell of its grid.
  *
  * THE EPIC MOMENT is the card's own: the ring's last share draws itself, the card lifts 4px onto
@@ -221,7 +223,7 @@ export function EpicCard({ epic }: { epic: RoadmapEpic }) {
         </div>
       )}
 
-      {epic.goal && <p className="truncate px-4 pb-2 text-sm text-muted-foreground">{oneLine(epic.goal)}</p>}
+      {epic.goal && <CardDescription text={oneLine(epic.goal)} className="block w-full px-4 pb-2 text-sm" />}
 
       <CardContent className="flex flex-1 flex-col gap-1 pt-1">
         {/* An empty epic lists nothing: its word badge already says "No features yet", and its one press is below. */}
