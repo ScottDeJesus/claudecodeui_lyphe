@@ -2723,7 +2723,7 @@ CloudCLI's text names arcs, plans and phases as epics, features and tasks. Ident
 - `lock._count` — `<N> tasks`, `, <K> done`.
 - `lock_glance.facts_line` — `Epic <arc>`, `<N> tasks in <W> waves`.
 - `intent_lock.DESCRIPTIONS` — the Accept and Rework descriptions.
-- `roadmap_mirror` — the DocSpace copy of each roadmap: the page says milestone, epic, feature and task, and carries each row's `where` phrase from `report_roadmap_words` (`_STEP_PHRASES`, `step_phrase`, `milestone_where`; MAN-7621), the phrases' one home.
+- `roadmap_mirror` — the DocSpace copy of each roadmap: the page says milestone, epic, feature and task, and carries each row's `where` phrase from `report_roadmap_words` (`_STEP_PHRASES`, `step_phrase`, `milestone_where`; MAN-7621), the phrases' one home on the dispatcher's side.
 - Untouched in the prompt: `LOCK_HEADER`, `OPTIONS` and their labels, `TOKEN_RE`, `names_of`, and every input of `lock.token`. why: the vet reads the first line and the last token; an outstanding token must stand.
 
 **The slash doors**: `/feature` is `/plan`, `/epic` is `/arc` (`skills/feature/SKILL.md`, `skills/epic/SKILL.md`). Each loads its skill and runs that sequence; nothing of the sequence lives in the door.
