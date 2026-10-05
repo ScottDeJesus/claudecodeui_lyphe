@@ -15,11 +15,12 @@ import type { DispatcherArc, DispatcherArcSplit, DispatcherPhase, DispatcherPlan
  */
 
 /**
- * A scheduled moment in the reader's own clock: `3:00 AM` today, `Sep 23, 3:00 AM` any other day. The
+ * A moment in the reader's own clock: `3:00 AM` today, `Sep 23, 3:00 AM` any other day. The
  * date rides whenever the moment is not today, because DeepSeek's off-peak lifts at 3 AM Pacific — past
  * the operator's midnight — and a bare `3:00 AM` read in the evening names a time that has already
- * passed. One clock, three call sites: a plan card's own clock (`PlanFace.PlanClock`), an arc's armed
- * hour (`DispatchArcControls`) and `ScheduleControl`'s `Start at …` all name one moment one way.
+ * passed. One clock for every moment the card names: a plan card's own clock (`PlanFace.PlanClock`), an
+ * arc's armed hour (`DispatchArcControls`), `ScheduleControl`'s `Start at …`, and the stage lines and
+ * event feed through {@link clockOf} all name one moment one way.
  */
 export function scheduleClock(epochSeconds: number, now: number = Date.now()): string {
   const moment = new Date(epochSeconds * 1000);
@@ -236,15 +237,15 @@ export function planWaiters(plan: DispatcherPlan, lanePlans: readonly Dispatcher
 }
 
 /**
- * The time part of the document's ISO stamp (`2026-09-24T10:02:11Z` → `10:02:11Z`). Sliced, not
- * parsed: the stamp is the store's own UTC shape, and the `Z` stays so a reader knows whose clock
- * it is. A stamp with no `T` is shown whole; a missing one is empty. Used by `PlanPhaseRow`'s stage
- * lines and `PlanFace`'s event feed, so one stamp reads one way on the card.
+ * One of the document's ISO stamps in the reader's own clock, drawn by {@link scheduleClock}: `8:48 AM`
+ * today, `Oct 4, 8:48 AM` any other day. The store stamps in UTC (`2026-10-05T15:48:15Z`) and the
+ * operator reads Pacific (operator, 2026-10-05: "These aren't in PST"), so the stamp is converted,
+ * never sliced. A string that is not a time is shown whole; a missing one is empty. Used by
+ * `PlanPhaseRow`'s stage lines and `PlanFace`'s event feed, so a stamp reads as every moment on the card does.
  */
 export function clockOf(at: string | null): string {
-  if (!at) return '';
-  const marker = at.indexOf('T');
-  return marker === -1 ? at : at.slice(marker + 1);
+  const epoch = epochOf(at);
+  return epoch === null ? at ?? '' : scheduleClock(epoch);
 }
 
 /** The first line of a text with anything on it, trimmed; empty for a null or blank text. */
