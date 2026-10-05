@@ -155,17 +155,18 @@ export function EpicWipControl({ wip, defaults, busy, onChoose }: EpicWipControl
     <div
       role="group"
       aria-label={t('dispatcher.wip.groupLabel')}
-      className="inline-flex min-w-0 items-start gap-2"
+      className="inline-flex min-w-0 flex-col items-start gap-1"
       data-epic-wip=""
     >
-      {/* `leading-8` is a limit's own height (`h-8`), so the label sits on the first limit's line. */}
-      <span className="text-xs font-semibold leading-8 text-muted-foreground" title={t('dispatcher.wip.groupHint')}>
+      {/* EVERYTHING ON ITS OWN LINE (operator, 2026-10-04: "have the feature WIP limit on its own line …
+          on mobile it looks bad", then "WIP is on the same line"): the label is a line of its own above
+          the two limits, and each limit is a line of its own under it. A wrapping row broke between the
+          two at a narrow card's width, and a label beside them still shared Features' line. Stacked at
+          every width — the gutter's card is narrow on a wide screen too — with the limits' names one
+          width so the steppers align. */}
+      <span className="text-xs font-semibold text-muted-foreground" title={t('dispatcher.wip.groupHint')}>
         {t('dispatcher.wip.label')}
       </span>
-      {/* ONE LIMIT A LINE (operator, 2026-10-04: "have the feature WIP limit on its own line … on mobile
-          it looks bad"): a wrapping row broke between the two at a narrow card's width and left Tasks
-          under the group's label, out of line with Features. Stacked at every width — the gutter's card
-          is narrow on a wide screen too — with the limits' names one width so the steppers align. */}
       <div className="flex min-w-0 flex-col gap-1">
         {ORDER.map((limit) => (
           <LimitStepper key={limit} limit={limit} setting={wip[limit]} defaultWord={wip[limit].default ?? defaults[limit]} busy={busy} onChoose={onChoose} />
