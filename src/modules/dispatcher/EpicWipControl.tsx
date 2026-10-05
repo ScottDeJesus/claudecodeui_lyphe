@@ -87,7 +87,7 @@ function LimitStepper({ limit, setting, defaultWord, busy, onChoose }: LimitStep
       data-epic-wip-default={following ? '' : undefined}
       {...{ [words.handle]: setting.own ?? 'default' }}
     >
-      <span className="text-xs text-muted-foreground">{t(words.word)}</span>
+      <span className="min-w-[3.5rem] text-xs text-muted-foreground">{t(words.word)}</span>
       <Stepper
         compact
         value={shown === null ? t('dispatcher.wip.all') : String(shown)}
@@ -117,8 +117,8 @@ type EpicWipControlProps = {
 
 /**
  * An epic's WIP — how much of it may run at once — as ONE group labelled "WIP", two compact `Stepper`s
- * in it: **Features** (how many of the epic's features are in progress at once) and **Tasks** (how many
- * tasks each of them runs at once). These are the only concurrency switches there are for the work
+ * in it, one a line: **Features** (how many of the epic's features are in progress at once) and **Tasks**
+ * (how many tasks each of them runs at once). These are the only concurrency switches there are for the work
  * under an epic (`dispatcher wip`), which is why a feature's card carries none of its own.
  *
  * SETTINGS HOLDS THE DEFAULTS FOR CLAUDE WORK; DEEPSEEK WORK DEFAULTS TO ALL (operator, 2026-10-04:
@@ -155,15 +155,22 @@ export function EpicWipControl({ wip, defaults, busy, onChoose }: EpicWipControl
     <div
       role="group"
       aria-label={t('dispatcher.wip.groupLabel')}
-      className="inline-flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1"
+      className="inline-flex min-w-0 items-start gap-2"
       data-epic-wip=""
     >
-      <span className="text-xs font-semibold text-muted-foreground" title={t('dispatcher.wip.groupHint')}>
+      {/* `leading-8` is a limit's own height (`h-8`), so the label sits on the first limit's line. */}
+      <span className="text-xs font-semibold leading-8 text-muted-foreground" title={t('dispatcher.wip.groupHint')}>
         {t('dispatcher.wip.label')}
       </span>
-      {ORDER.map((limit) => (
-        <LimitStepper key={limit} limit={limit} setting={wip[limit]} defaultWord={wip[limit].default ?? defaults[limit]} busy={busy} onChoose={onChoose} />
-      ))}
+      {/* ONE LIMIT A LINE (operator, 2026-10-04: "have the feature WIP limit on its own line … on mobile
+          it looks bad"): a wrapping row broke between the two at a narrow card's width and left Tasks
+          under the group's label, out of line with Features. Stacked at every width — the gutter's card
+          is narrow on a wide screen too — with the limits' names one width so the steppers align. */}
+      <div className="flex min-w-0 flex-col gap-1">
+        {ORDER.map((limit) => (
+          <LimitStepper key={limit} limit={limit} setting={wip[limit]} defaultWord={wip[limit].default ?? defaults[limit]} busy={busy} onChoose={onChoose} />
+        ))}
+      </div>
     </div>
   );
 }
