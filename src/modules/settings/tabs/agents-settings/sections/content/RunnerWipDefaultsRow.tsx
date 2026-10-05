@@ -80,7 +80,7 @@ export default function RunnerWipDefaultsRow() {
             })
           : t('status.loading', { ns: 'common', defaultValue: 'Loading...' })
         : t('agents.wipDefaults.description', {
-            defaultValue: 'Every epic starts from these: how many of its features are in progress at once, and how many tasks each of them runs at once. An epic’s own numbers are changed on its card.',
+            defaultValue: 'Every epic walked on Claude starts from these: how many of its features are in progress at once, and how many tasks each of them runs at once. An epic walked on DeepSeek runs everything at once. An epic’s own numbers are changed on its card, on either.',
           })}
     >
       {words === null ? (

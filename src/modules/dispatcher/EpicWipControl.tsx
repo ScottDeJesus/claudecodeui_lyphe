@@ -121,11 +121,14 @@ type EpicWipControlProps = {
  * tasks each of them runs at once). These are the only concurrency switches there are for the work
  * under an epic (`dispatcher wip`), which is why a feature's card carries none of its own.
  *
- * SETTINGS HOLDS THE DEFAULTS. An epic with no word of its own draws Settings' number for the limit
- * (`DispatcherRoute.wip`) and wears a quiet `default` inside the stepper; one with its own word draws
- * that number and wears nothing. Stepping to a number other than Settings' gives the epic its own word;
- * stepping back to Settings' number sends `default`, so it follows Settings again and the marker comes
- * back. The number IS the word: a count is itself, `all` is All.
+ * SETTINGS HOLDS THE DEFAULTS FOR CLAUDE WORK; DEEPSEEK WORK DEFAULTS TO ALL (operator, 2026-10-04:
+ * "DeepSeek should default all always"). The epic's own block names the default it falls back to
+ * (`wip[limit].default`, decided by the dispatcher off the epic's route), Settings' number
+ * (`DispatcherRoute.wip`) standing in for a build older than that field. An epic with no word of its own
+ * draws that default and wears a quiet `default` inside the stepper; one with its own word draws that
+ * number and wears nothing. Stepping to a number other than the default gives the epic its own word;
+ * stepping back to it sends `default`, so it follows its default again and the marker comes back. The
+ * number IS the word: a count is itself, `all` is All.
  *
  * ONE LADDER FOR BOTH, AND THE SETTINGS ROW'S TOO (`wipLadderSteps`, one copy of the rules): `+` adds
  * one up to the top rung — six, or a wider count Settings or the epic already holds — then goes to All;
@@ -159,7 +162,7 @@ export function EpicWipControl({ wip, defaults, busy, onChoose }: EpicWipControl
         {t('dispatcher.wip.label')}
       </span>
       {ORDER.map((limit) => (
-        <LimitStepper key={limit} limit={limit} setting={wip[limit]} defaultWord={defaults[limit]} busy={busy} onChoose={onChoose} />
+        <LimitStepper key={limit} limit={limit} setting={wip[limit]} defaultWord={wip[limit].default ?? defaults[limit]} busy={busy} onChoose={onChoose} />
       ))}
     </div>
   );

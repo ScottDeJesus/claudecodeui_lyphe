@@ -22,13 +22,20 @@ import { plannerSince } from './dispatcher-planner.reader.js';
 /** The eight words an arc's derived status may be (`store_arcs.arc_word`'s one precedence). Anything else is a build this lane cannot draw. */
 export const ARC_STATUSES: readonly DispatcherArcStatus[] = ['empty', 'complete', 'judging', 'live', 'scheduled', 'paused', 'queued', 'designing'];
 
-/** One limit of an arc's `wip` block: the epic's own word (`null` while it follows Settings) and the word in force. */
+/**
+ * One limit of an arc's `wip` block: the epic's own word (`null` while it follows its default), the
+ * word in force, and the default it falls back to (`default`: Settings' word for Claude work, `all`
+ * for DeepSeek's — `wip.report`). `default` is absent from a build older than it, where Settings'
+ * word is the default.
+ */
 function wipSettingOf(raw: unknown, where: string): DispatcherWipSetting {
   const setting = need(raw, isRecord, where);
   const own = field(setting, 'own');
+  const fallback = setting.default;
   return {
     own: own === null ? null : wipWord(own, `${where}.own`),
     effective: wipWord(field(setting, 'effective'), `${where}.effective`),
+    ...(fallback === undefined ? {} : { default: wipWord(fallback, `${where}.default`) }),
   };
 }
 
