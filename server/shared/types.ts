@@ -218,6 +218,7 @@ export type GatewayEventKind =
   | 'kanban_metis_state'
   | 'kanban_event'
   | 'notes_changed'
+  | 'cerberus_changed'
   | 'simple_list_changed'
   | 'universe_activity'
   | 'universe_map'
