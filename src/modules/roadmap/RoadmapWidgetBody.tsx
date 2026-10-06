@@ -63,6 +63,9 @@ type DrawnSection = (typeof SECTIONS)[number] & { features: RoadmapFeature[]; mo
  * `data-roadmap-widget` is the root's handle; `data-roadmap-widget-goal`, `-focus`, `-section`, `-next`, `-quiet` and
  * `-open` its parts'.
  *
+ * AT FULL SCREEN THIS BODY IS NOT DRAWN: the gutter layout swaps in `RoadmapWidgetFullscreenBody`, the tab itself, so
+ * the digest stays what it is for a column and the whole roadmap is one press of the card's switch away.
+ *
  * Used by `src/modules/chat-gutters` (`ChatGutterLayout`), through the roadmap barrel, as the Roadmap widget's body.
  */
 export function RoadmapWidgetBody() {

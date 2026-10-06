@@ -60,7 +60,7 @@ const ROADMAP_MAX_BUFFER = 1024 * 1024;
 const FEATURE_WORDS: readonly RoadmapFeatureWord[] = ['idea', 'proposed', 'designing', 'in flight', 'shipped'];
 const FEATURE_STEPS: readonly RoadmapFeatureStep[] = [
   'idea', 'proposed', 'designing', 'questions', 'cutting', 'accept', 'parked', 'building', 'waiting', 'queued',
-  'paused', 'starting', 'shipped',
+  'paused', 'stalled', 'starting', 'shipped',
 ];
 const WAITING_ON_YOU: readonly NonNullable<RoadmapFeature['waiting_on_you']>[] = ['questions', 'accept'];
 const TASK_STATUSES: readonly RoadmapTask['status'][] = ['not started', 'running', 'done'];

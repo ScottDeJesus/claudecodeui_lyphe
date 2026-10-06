@@ -13,8 +13,8 @@ import { effectiveModelWord } from '@/shared/utils';
 
 /**
  * Everything a dispatch arc PRESSES, as the deck's ONE `ActionBar` — the plan card's own row, so the
- * two read alike: the verbs that move the plans under the arc (Pause, or Start and Schedule start),
- * then, at the row's end, the epic's WIP (`EpicWipControl`: how many features are in progress at once,
+ * two read alike: the verbs that move the plans under the arc (Pause, Start and Schedule start, or
+ * Resume), then, at the row's end, the epic's WIP (`EpicWipControl`: how many features are in progress at once,
  * how many tasks each runs at once) and the DeepSeek · Claude · Chat switch for the arc's ONE model word.
  *
  * IT IS THE DECK'S `bodyTop`, AND THE FOLD TAKES IT WITH THE STRIP: the switch and Start/Pause are
@@ -32,12 +32,18 @@ import { effectiveModelWord } from '@/shared/utils';
  *
  * THE VERBS ARE THE PLAN CARD'S OWN, APPLIED TO THE WHOLE ARC, and each is drawn exactly where the
  * dispatcher's own arc door would take it — `arc.walking` for Pause, `arc.stopped` for Start and for
- * Schedule start, and never a control drawn greyed out where the verb would refuse. Pause is a PAUSE,
- * so nothing guards it; Start is its undo — and it is the plans' own Start, over an arc whose plans
+ * Schedule start, `arc.stalled` for Resume, and never a control drawn greyed out where the verb would
+ * refuse. Pause is a PAUSE, so nothing guards it; Start is its undo — and it is the plans' own Start, over an arc whose plans
  * were queued at the gate as much as one stopped mid-walk, which is why it is drawn for a whole arc
  * that never walked. The order it then starts them in is not this row's business: the daemon's waits
- * keep it (`rule.eligible`), so one press begins the arc and each plan takes its turn. The sets are the
- * dispatcher's own (`report_arcs.walking` / `.stopped`), read off the same plan rows the strip's cards
+ * keep it (`rule.eligible`), so one press begins the arc and each plan takes its turn.
+ *
+ * A STALLED ARC DRAWS RESUME (`arc.stalled`), the same `dispatcher resume <arc>` the Start is: a plan of
+ * it is released and its running work has ended with nothing to record it (`report_stall`), so the press
+ * that starts things again wakes the dispatcher, or starts one. Where plans of the arc are ALSO stopped
+ * the one button is Start and its press reaches both sets — one button, one verb, so the header never
+ * draws two presses for the same act. Pause stays beside it, since a stalled plan is still released.
+ * The sets are the dispatcher's own (`report_arcs.walking` / `.stopped` / `.stalled`), read off the same plan rows the strip's cards
  * are drawn from, so a press here and the same verb at a terminal can never reach different plans.
  *
  * Nothing is counted here and nothing is invented: the switch draws `arc.model` — the ARC's own word,
@@ -64,7 +70,8 @@ export function DispatchArcControls({ arc }: { arc: DispatcherArc }) {
   // the same reason `PlanControls` passes the word its button carries: a refused press must answer in
   // the word the operator actually read. The hook defaults this to "Resume", which is the plan card's
   // word for a stopped plan and never this row's.
-  const { stop, resume, schedule, setModel, setWip, busy } = useDispatcherVerbs(arc.name, 'arc', t('runner.start'));
+  const { stop, resume, schedule, setModel, setWip, busy } = useDispatcherVerbs(arc.name, 'arc',
+    arc.stopped ? t('runner.start') : t('runner.resume'));
   const { route } = useDispatcherPlans();
   const armed = epochOf(arc.schedule);
   const held = busy !== null;
@@ -73,7 +80,7 @@ export function DispatchArcControls({ arc }: { arc: DispatcherArc }) {
     <ActionBar
       // Only where a verb would be taken: an arc with nothing live and nothing stopped draws no verb,
       // so a deck never offers a press the dispatcher would refuse.
-      verbs={arc.walking || arc.stopped ? (
+      verbs={arc.walking || arc.stopped || arc.stalled ? (
         <>
           {arc.walking && (
             <Button variant="secondary" size="sm" className="h-8" disabled={held} onClick={() => void stop()}
@@ -83,13 +90,13 @@ export function DispatchArcControls({ arc }: { arc: DispatcherArc }) {
               operator accepted with Queue is paused at the gate, which is `arc.stopped` — so this is
               drawn for an arc that has never walked, and one press lets the whole of it go: the
               plans' own Start repeated over the arc, with the daemon's waits keeping their order. */}
+          {(arc.stopped || arc.stalled) && (
+            <Button size="sm" className="h-8" disabled={held} onClick={() => void resume()}
+              data-dispatch-arc-resume>{arc.stopped ? t('runner.start') : t('runner.resume')}</Button>
+          )}
           {arc.stopped && (
-            <>
-              <Button size="sm" className="h-8" disabled={held} onClick={() => void resume()}
-                data-dispatch-arc-resume>{t('runner.start')}</Button>
-              <ScheduleControl scope="dispatch-arc" startAt={armed} busy={held}
-                onSchedule={(when) => void schedule(when)} />
-            </>
+            <ScheduleControl scope="dispatch-arc" startAt={armed} busy={held}
+              onSchedule={(when) => void schedule(when)} />
           )}
         </>
       ) : null}

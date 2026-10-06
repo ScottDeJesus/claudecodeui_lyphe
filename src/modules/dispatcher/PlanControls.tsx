@@ -16,6 +16,12 @@ import { effectiveModelWord } from '@/shared/utils';
  * refuse.
  *
  * - `live` → Stop. A pause; Resume is its undo, so no dialog guards it.
+ * - `stalled` → Resume, and Stop beside it. The plan is released and its running work has ended with
+ *   nothing to record it (`report_stall`): Resume is the press that starts things again — it wakes the
+ *   dispatcher, or starts one, and its first pass settles what ended and takes the walk up — so it is
+ *   the primary; Stop stays because the plan is still released, and an operator who would rather hold
+ *   it than wake it must be able to. Never Stop alone: a card that offers only Pause over work that
+ *   is not there is the card that said the epic was moving.
  * - `paused` → Resume and `Resume at …`: a plan STOPPED mid-walk is the one an hour makes sense in
  *   front of, because the timer's press is the very Resume the button beside it sends.
  * - `queued` → Start (it IS `resume`: the plan is approved and paused and has never walked) and
@@ -80,6 +86,17 @@ export function PlanControls({ plan }: { plan: DispatcherPlan }) {
       <Button variant="secondary" size="sm" className="h-8" disabled={held} onClick={() => void stop()} data-dispatcher-stop>
         {t('runner.stop')}
       </Button>
+    );
+  } else if (plan.status === 'stalled') {
+    verbs = (
+      <>
+        <Button size="sm" className="h-8" disabled={held} onClick={() => void resume()} data-dispatcher-resume>
+          {t('runner.resume')}
+        </Button>
+        <Button variant="secondary" size="sm" className="h-8" disabled={held} onClick={() => void stop()} data-dispatcher-stop>
+          {t('runner.stop')}
+        </Button>
+      </>
     );
   } else if (stops || starts) {
     // ONE PAIR, TWO STATES: the plan is at the gate (`starts` — Start, and `Start at …`) or the plan

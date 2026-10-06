@@ -8,8 +8,9 @@ type CardProps = React.HTMLAttributes<HTMLDivElement> & {
 };
 
 /**
- * Used by the chat module to frame the provider picker and plan tool output, and by
- * memory-intake to frame each proposed memory in the review queue.
+ * The app's framed surface. Used by the accounts, agent-launch, app-switcher, auth, chat, chat-gutters,
+ * chat-host, claude-updates, dispatcher, git-panel, heal, memory-intake, notes, roadmap, sidebar and
+ * widgets modules — in the roadmap, the epic card and the details panel under the tree.
  *
  * Paint is `.vv-card` in verve/controls.css. Padding is deliberately NOT part of it: this
  * card's inset belongs to CardHeader/CardContent/CardFooter, and a padded shell around padded

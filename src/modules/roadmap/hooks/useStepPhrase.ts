@@ -8,14 +8,14 @@ import { formatShortDate, roadmapFeatureIndex } from '@/shared/utils';
 
 /** The steps the locale has a phrase for, as `roadmap.step.<step>` keys. `waiting` and `shipped` are spelled apart: each needs a value. */
 const PLAIN_STEPS: ReadonlySet<RoadmapFeatureStep> = new Set<RoadmapFeatureStep>([
-  'idea', 'proposed', 'designing', 'questions', 'cutting', 'accept', 'parked', 'building', 'queued', 'paused', 'starting',
+  'idea', 'proposed', 'designing', 'questions', 'cutting', 'accept', 'parked', 'building', 'queued', 'paused', 'stalled', 'starting',
 ]);
 
 /**
  * A feature's step in plain words: `being designed`, `waiting on you: Accept`, `waiting on The day
  * sheet`, `shipped Oct 3 · 3h 42m` (the time agents worked on it, once any did). Used by `FeatureRow`, which shows it beside the feature's step line and hands
- * it to `StateLine` for its label, and by `FeatureFacts` (`FeatureDialog`'s body), under the large step
- * line.
+ * it to `StateLine` for its label, by `FeatureFacts` (`FeatureDialog`'s body), under the large step
+ * line, and by the tree's feature panel (`panel/FeaturePanel`), after the word in its State fact.
  *
  * `building` names no count: the row's meter, right under it, carries "3 of 13 tasks", and the dialog's
  * task list does. A `waiting` feature names the first feature it waits on that has not shipped, found

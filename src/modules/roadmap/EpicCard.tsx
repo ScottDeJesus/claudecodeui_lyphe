@@ -8,6 +8,7 @@ import { CelebrationContext } from '@/modules/roadmap/celebrationContext';
 import { RoadmapFaceContext } from '@/modules/roadmap/faceContext';
 import { FeatureRow } from '@/modules/roadmap/FeatureRow';
 import { useRoadmapWrites } from '@/modules/roadmap/hooks/useRoadmapWrites';
+import { ROADMAP_EPIC_WORD_KEYS } from '@/shared/constants';
 import type { RoadmapEpic, RoadmapEpicWord, RoadmapFeature } from '@/shared/roadmap-types';
 import { humanizeDuration } from '@/shared/spend';
 import type { Tone } from '@/shared/types';
@@ -15,14 +16,6 @@ import { ActionMenu, Badge, Button, Card, CardContent, CardHeader, CardTitle } f
 import type { ActionMenuItem } from '@/shared/ui';
 import { useSortable } from '@/shared/ui/sortable/useSortable';
 import { cn } from '@/shared/utils';
-
-/** Each epic word's key in the locale. */
-const WORD_KEYS: Record<RoadmapEpicWord, string> = {
-  empty: 'roadmap.epicWord.empty',
-  'not started': 'roadmap.epicWord.notStarted',
-  'in progress': 'roadmap.epicWord.inProgress',
-  complete: 'roadmap.epicWord.complete',
-};
 
 /** The badge each word wears: positive for done, info while moving, neutral before anything moved. */
 const WORD_TONES: Record<RoadmapEpicWord, Tone> = {
@@ -190,7 +183,7 @@ export function EpicCard({ epic }: { epic: RoadmapEpic }) {
                   : t('roadmap.epic.count', { shipped, count: features })}
               </span>
             )}
-            <Badge tone={WORD_TONES[epic.word]}>{t(WORD_KEYS[epic.word])}</Badge>
+            <Badge tone={WORD_TONES[epic.word]}>{t(ROADMAP_EPIC_WORD_KEYS[epic.word])}</Badge>
           </div>
           {/* The cases on a line of their own under the features' standing: the head's middle column is narrow, and
               sharing one wrapping line split a count from its badge at random. Quiet until something breaks. */}

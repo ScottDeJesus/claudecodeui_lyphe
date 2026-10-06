@@ -359,9 +359,13 @@
   }
 
   /* `color-scheme` is what makes a native control render itself for the dark canvas; without
-     it the UA draws a light control on dark. It is a scheme hint, not a colour. */
+     it the UA draws a light control on dark. It is a scheme hint, not a colour. The date and time
+     fields need it for their picker glyph, which is otherwise a dark clock or calendar on a dark
+     field (the Cerberus tab's lookup and History). */
   .dark input[type="checkbox"],
-  .dark input[type="radio"] {
+  .dark input[type="radio"],
+  .dark input[type="date"],
+  .dark input[type="time"] {
     color-scheme: dark;
   }
   

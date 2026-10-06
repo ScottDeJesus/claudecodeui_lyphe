@@ -43,10 +43,12 @@ import '@/shared/ui/verve/feedback.css';
 // The FAB and split-pane paint shares no selector with the files either side of it, so its only
 // constraint is that board.css stays last, below.
 import '@/shared/ui/verve/surfaces.css';
-// `.vv-textarea` composes `.vv-input` (controls.css) and wins each tie it has — against `.vv-input`'s
-// colours, against src/index.css's pins on every `textarea` and against `text-sm`'s line height — by
-// specificity, never by order. It shares no selector with surfaces.css or board.css, so its only
-// constraint is that board.css stays last, below.
+// panels.css holds the paint of TextArea, Sheet, Timeline and Steps. `.vv-textarea` composes `.vv-input`
+// (controls.css) and wins each tie it has — against `.vv-input`'s colours, against src/index.css's pins
+// on every `textarea` and against `text-sm`'s line height — by specificity, never by order. The Sheet,
+// Timeline and Steps rules share no selector with any sibling. So nothing here depends on its place
+// against controls.css, feedback.css or surfaces.css, and the one constraint is that board.css stays
+// last, below.
 import '@/shared/ui/verve/panels.css';
 // The board layer goes LAST on purpose, and the order is load-bearing: a lane card composes
 // `.vv-card`'s ground and then overrides its background, shadow and transition. Imported first,
@@ -107,15 +109,29 @@ export { QuestionOptionRow } from '@/shared/ui/QuestionOptionRow';
 export { ScrollArea } from '@/shared/ui/ScrollArea';
 export { Select } from '@/shared/ui/Select';
 export { SettingRow } from '@/shared/ui/SettingRow';
+// The panel pinned to the right edge over a scrim, on Dialog's host-window portal and Escape rule. The
+// cerberus tab's CheckSheet is the first; it is a kit piece rather than a module's own because a
+// detail that sits beside a screen is every screen's, and the Escape order it keeps with a dialog or
+// a menu in front is the kit's to hold.
+export { Sheet } from '@/shared/ui/Sheet';
 export { Shimmer } from '@/shared/ui/Shimmer';
 export { Spinner } from '@/shared/ui/Spinner';
 export { SplitPane, SPLIT_MIN_RATIO, SPLIT_MAX_RATIO } from '@/shared/ui/SplitPane';
 export { Stepper } from '@/shared/ui/Stepper';
+// Verve's navigation stepper: numbered rounds, a ✓ once done, an accent rail between. `Steps` and not
+// `Stepper`, which is the numeric minus/plus control above. The cerberus tab's Enroll dialog draws
+// Name it · Install · Say hello with it.
+export { Steps } from '@/shared/ui/Steps';
 export { Switch } from '@/shared/ui/Switch';
 export { Tabs } from '@/shared/ui/Tabs';
 // The multi-line field `Input` has no sibling for: Verve's own TextArea on Input's field paint.
-// The roadmap's dialogs take it for a goal: ItemDialog adds and edits every kind of item with one.
+// The roadmap's dialogs take it for a goal: ItemDialog adds and edits every kind of item with one. The
+// cerberus tab's Mute dialog takes it for the reason a mute is raised.
 export { TextArea } from '@/shared/ui/TextArea';
+// Verve's chronological feed: a tone dot, the source pill, a title, a summary when full, the time, and a
+// row that opens to its meta. The cerberus tab draws it twice — dense in Fleet's "What happened" card,
+// full in History's "Everything since" — and the transcript's `shapes/Timeline` stays its own rail.
+export { Timeline } from '@/shared/ui/Timeline';
 export { Toast } from '@/shared/ui/Toast';
 export { ToastStack } from '@/shared/ui/ToastStack';
 export { Tooltip } from '@/shared/ui/Tooltip';

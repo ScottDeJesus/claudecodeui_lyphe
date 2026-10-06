@@ -1035,7 +1035,7 @@ handlers run, and the same release runs on unmount so a component torn down mid-
 the whole application unclickable.
 
 **The overlays are drawn in the chat's host window.** The chat can stand in a picture-in-picture window (MAN-7488), so
-`Dialog`, `Tooltip`, `ActionMenu`, `Menu`, `Select`, `Lightbox` and `useZoomPan` read `useHostWindow()`
+`Dialog`, `Sheet`, `Tooltip`, `ActionMenu`, `Menu`, `Select`, `Lightbox` and `useZoomPan` read `useHostWindow()`
 (`src/shared/context/HostWindowContext.tsx`) and never the global `window` or `document`. `DockableFab`,
 `usePointerDrag` and `SplitPane` stay on the global: the FAB and the split live in the opener.
 
@@ -1049,7 +1049,10 @@ the whole application unclickable.
 | DOM test | `isNodeLike`, `isElementLike`; never `instanceof` |
 
 - `otherOverlayHoldsEscape(doc: Document)` (`overlayEscape.ts`) queries the document it is handed; each caller passes its host document.
-- `Dialog` binds Escape on the host window's capture phase and marks the event, so closing a dialog never also stops a running turn.
+- `Dialog` and `Sheet` bind Escape on the host window's capture phase and mark the event, so closing either never also stops a running turn.
+- `overlayInFrontHoldsEscape(content: HTMLElement | null, doc: Document)` (`overlayEscape.ts`): whether an `OWNS_ESCAPE` panel is drawn in front of `content`, inside it or after it in document order. `Dialog` and `Sheet` ask it before taking the key, each with its own panel as `content`; `null` (mid-mount) answers false.
+- `modalInFrontHoldsEscape(content, doc)` (`overlayEscape.ts`): the same question with `[role="dialog"][aria-modal="true"]` among the candidates; a candidate that is `content` itself never counts. Only `Sheet` asks it. why: a `Dialog` carries no `OWNS_ESCAPE`, so a Mute dialog opened from a sheet's body would otherwise close with the sheet on one press; both listen on `window` capture, where `stopPropagation` does not stop the second.
+- `Sheet` is rendered only while open and carries `OWNS_ESCAPE` on its root, so a `Dialog` opened before it stands down for it. Escape order: a Select or Mute dialog in front closes first, the sheet on the next press.
 - Rules, the audit grep and the opener's own facts: MAN-7488. Per-unit tables: MAN-7451.
 
 `src/shared/ui/verve/surfaces.css` is the fourth Verve paint file, holding `.vv-fab`, `.vv-split`,
@@ -1133,7 +1136,7 @@ that changed server code must not be verified against a process another phase le
 `stop_probe_server` kills that server. The probe writes its marker to a scratch path
 (`CLOUDCLI_LOCAL_SERVER_MARKER`) and keeps its chat hosts in a scratch sessions directory
 (`CLOUDCLI_SESSIONS_DIR`), so neither the operator's marker nor the operator's running chats are
-ever touched. It still runs against the live database; neither redirect isolates that.
+ever touched. It still runs against the live auth database; neither redirect isolates that. Cerberus's three roots are scratch values too (`CERBERUS_DB_PATH` and `CERBERUS_KEY_PATH` under `/tmp/apps-cerberus.*`, `CERBERUS_LISTEN` on any free loopback port): `.env` carries the live `CERBERUS_LISTEN`, and without them this server would open the live Cerberus store and try the live tailnet address.
 
 **`scripts/apps-ui-probe.mjs`** walks the switcher in a real browser over the DevTools protocol —
 no playwright runner, no test framework — because everything it checks (a FAB paints, a drawer opens
@@ -3136,8 +3139,8 @@ FIELD BY FIELD into the F1 types — `dispatcher-plan.reader.ts` reads one plan 
 and events, and `launched`, the one fact its own card words its button off (Resume at 3:00 AM for a
 plan that has walked, Start at 3:00 AM for one that has not); `dispatcher-arc.reader.ts` reads one arc
 (its own words and status, its model word, the NAMES of its plans — never resolved into plan rows, the
-store's report already made that join and a second one would be a second answer — and the three
-readings the arc's header is drawn by: `walking`, `stopped`, `schedule`); `dispatcher-planner.reader.ts`
+store's report already made that join and a second one would be a second answer — and the four
+readings the arc's header is drawn by: `walking`, `stopped`, `stalled`, `schedule`); `dispatcher-planner.reader.ts`
 reads one planner OUTING — the row the card's and the deck header's badge is drawn from, `plannerOf`, and
 the two TOLERANT reads `plannerSince` / `plannersOf` for `planner` and `planners`, because those are keys
 a dispatcher build older than them never wrote (`route.planners`, the planner lane's dial and census, is tolerant the same way in `dispatcher-state.service.ts`: absent is no readout, a malformed one is refused by name); the transport file holds the
@@ -3203,7 +3206,7 @@ name is the whole argument, the dispatcher resolves it plan-first-then-arc (`arc
 terminal and the card therefore say the same thing because they say it with the same verb. An unknown
 arc is refused by the VERB's own line, which names both doors (`no plan or arc <name>`), never
 re-worded by these routes. `model` hands its word to EVERY plan of the arc (`store.set_arc_model`); `stop`, `resume` and `schedule` reach the sets the header's
-own controls are drawn for (`report_arcs.walking` / `.stopped`), and the next frame redraws the header
+own controls are drawn for (`report_arcs.walking` / `.stopped` / `.stalled`), and the next frame redraws the header
 and its plans together: nothing optimistic, and nothing copied by this server.
 
 Reads: `GET /plans` and `GET /plans/:name` both start by awaiting `current()` (`dependencies.current`,
@@ -3280,7 +3283,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/, /home/l
 ## MAN-6784 — The plan card — Delete asks first
 section: dispatcher/010 The plan card/004 Delete asks first
 
-**Delete asks first** (`PlanCard.tsx`, `DeletePlanDialog.tsx`). The plan card's `⋯` carries `Delete feature…` (`isDanger`) exactly when `planDroppable(plan, planners)` holds. Status must not be `live`, no phase may be `busy`, and no planner row may be live for the plan or its arc: `queued` or `out` in the lane's `planners`, with `target` or `plan` naming either. That mirrors `store.live_for`, which `cmd/drop.py` asks. `plan.planner` cannot stand in: `report_planners.of_plan` gives a plan's own row first, an ending included, so a plan whose own cut ended short would hide its arc's queued cut. That lane read is the one a card makes. `live` covers the launch window the document cannot see (the walker is forked before the phase carries a `chain_id`). Where the gate is false the card draws no `⋯` at all, never a disabled Delete. The press mounts `DeletePlanDialog`, the module's one modal, which is mounted only while it is open: a `ConfirmDialog` titled `Delete <name>?`. Its message names what leaves the store for good: the design where there is one, the tasks, the events and the spend (`spendText`). For a plan of an arc it adds `It leaves the epic <arc> — the epic itself stands.`, the arc's bare name (`plan.arc`). It then names the plans this one still holds back (`planWaiters`): those whose `waits_on` names it while the wait is unmet, meaning neither side is complete (`rule.eligible` re-asks every wait on every pass). Only those plans may start sooner. A met wait's edge goes too, but it releases nothing and is not named. Drawn and hidden plans both count, because the drop deletes their edges too. `Cancel` is outline and `Delete` destructive. While `drop()` is out, Delete is `busy` and Cancel, Escape and the backdrop wait for the answer. A frame that makes the plan undroppable before the press closes the question. The dialog closes on the answer, and focus returns to `⋯`; when the card leaves on the frame that no longer carries the plan, focus falls to `<body>`, because `selectKeepingFocus` reads one frame after the press. The verdict is the verbs hook's toast, the dispatcher's own sentence in the operator's words (`operatorWords`, MAN-7596: `DROPPED <name>`, or its REFUSED line), spoken even when the card has already left. Nothing is optimistic: the card leaves when a frame no longer carries the plan. measured 2026-09-26 on 5183: `rcm-delete` answered `DROPPED` in 236 ms, its card left on the next frame 2.1 s after the press, `dispatcher show rcm-delete` printed `no plan rcm-delete`, and none of the 7 `live` cards drew a `⋯`.
+**Delete asks first** (`PlanCard.tsx`, `DeletePlanDialog.tsx`). The plan card's `⋯` carries `Delete feature…` (`isDanger`) exactly when `planDroppable(plan, planners)` holds. Status must not be `live` or `stalled`, no phase may be `busy`, and no planner row may be live for the plan or its arc: `queued` or `out` in the lane's `planners`, with `target` or `plan` naming either. That mirrors `store.live_for`, which `cmd/drop.py` asks. `plan.planner` cannot stand in: `report_planners.of_plan` gives a plan's own row first, an ending included, so a plan whose own cut ended short would hide its arc's queued cut. That lane read is the one a card makes. `live` covers the launch window the document cannot see (the walker is forked before the phase carries a `chain_id`), and `stalled` is the same released plan with its ended run waiting on a daemon that may be taking it up this second (`report_stall`). Where the gate is false the card draws no `⋯` at all, never a disabled Delete. The press mounts `DeletePlanDialog`, the module's one modal, which is mounted only while it is open: a `ConfirmDialog` titled `Delete <name>?`. Its message names what leaves the store for good: the design where there is one, the tasks, the events and the spend (`spendText`). For a plan of an arc it adds `It leaves the epic <arc> — the epic itself stands.`, the arc's bare name (`plan.arc`). It then names the plans this one still holds back (`planWaiters`): those whose `waits_on` names it while the wait is unmet, meaning neither side is complete (`rule.eligible` re-asks every wait on every pass). Only those plans may start sooner. A met wait's edge goes too, but it releases nothing and is not named. Drawn and hidden plans both count, because the drop deletes their edges too. `Cancel` is outline and `Delete` destructive. While `drop()` is out, Delete is `busy` and Cancel, Escape and the backdrop wait for the answer. A frame that makes the plan undroppable before the press closes the question. The dialog closes on the answer, and focus returns to `⋯`; when the card leaves on the frame that no longer carries the plan, focus falls to `<body>`, because `selectKeepingFocus` reads one frame after the press. The verdict is the verbs hook's toast, the dispatcher's own sentence in the operator's words (`operatorWords`, MAN-7596: `DROPPED <name>`, or its REFUSED line), spoken even when the card has already left. Nothing is optimistic: the card leaves when a frame no longer carries the plan. measured 2026-09-26 on 5183: `rcm-delete` answered `DROPPED` in 236 ms, its card left on the next frame 2.1 s after the press, `dispatcher show rcm-delete` printed `no plan rcm-delete`, and none of the 7 `live` cards drew a `⋯`.
 
 NO CARD WEARS A VERSION WORD: the title is the bare name the store holds (`plan.name`), and no version word rides any card in either home — not in a pill, not in a name, not in a document key.
 
@@ -3296,12 +3299,14 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/, /home/l
 ## MAN-6786 — The plan card — The status words.
 section: dispatcher/010 The plan card/006 The status words.
 
-**The status words.** `dispatcher.status.*` — `LIVE`, `PAUSED`, `QUEUED`, `SCHEDULED`, `PARKED`, `IDLE`,
-`COMPLETE` — toned by `planStatusTone` (`live`, `complete` positive; the rest neutral: every other status
+**The status words.** `dispatcher.status.*` — `LIVE`, `STALLED`, `PAUSED`, `QUEUED`, `SCHEDULED`, `PARKED`, `IDLE`,
+`COMPLETE` — toned by `planStatusTone` (`live`, `complete` positive; `stalled` warn — released work whose run has ended with nothing to record it, the one status nobody asked for; the rest neutral: every other status
 is one the operator chose or is waiting on). `PlanClock`: live → elapsed since the newest `launched` /
 `relaunched` event; complete → `ended <elapsed> ago` off `completed_at`, re-read once a minute; scheduled
-→ `starts <time>` (`runner.schedule.starts`, `scheduleClock` of the armed hour); queued, paused, parked
+→ `starts <time>` (`runner.schedule.starts`, `scheduleClock` of the armed hour); queued, paused, stalled, parked
 and idle → nothing.
+
+A STALLED plan says why: its head's second row carries one line (`data-plan-stalled`, `dispatcher.stalled.<cause>` — `plan.stalled`, the dispatcher's own cause word `dispatcher_down` | `ended_unrecorded`; the card words it and decides none of it), and its task wears the warning mark `!` (`phaseWord` key `stalled`, off `phase.stalled`), never the walking `▶︎` — `report_stall`, MAN-7783.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-arc-nest.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-arc-strip-return.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-dispatch-arc-start.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-dispatch-card-phases.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-dispatch-card-version-word.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-dispatch-model-word.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-dispatch-resume-3am.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-planner-card.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-planner-card-write.py
 
@@ -3435,7 +3440,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/, /home/l
 ## MAN-6794 — The plan card — The controls by status.
 section: dispatcher/010 The plan card/014 The controls by status.
 
-**The controls by status.** `live` → Stop; `paused` → Resume AND `Resume at …`; `queued` → Start (it
+**The controls by status.** `live` → Stop; `stalled` → Resume AND Stop (the plan is released and its running work has ended with nothing to record it: Resume — the same `resume` verb, which wakes the dispatcher or starts one — is the press that starts things again, and Stop stays for an operator who would rather hold the plan; a stalled card never offers Stop alone); `paused` → Resume AND `Resume at …`; `queued` → Start (it
 IS `resume`) AND `Start at …`; `scheduled` → the same pair, reading the armed hour (`startAt =
 epochOf(schedule.start_at)`); the hour itself is the card's own clock (`PlanClock`, `data-dispatcher-clock`)
 and is not said a second time beside the buttons; `parked` → Unpark; `idle` in state `designed` or
@@ -3496,8 +3501,8 @@ section: dispatcher/010 The plan card/017 The arc's deck.
 
 The deck's HEADER is the arc's own top: the Epic tag and the arc's bare name (`KindTag`, `data-kind-tag="epic"`, then `data-arc-title`; MAN-643 → "What the frame owns"), the arc's derived status as a
 `Badge` (`dispatcher.arcStatus.*`: `designing`, `live` and `judging` info — `judging` is the arc whose judgment is still being designed, cut or walked, work in flight — `complete` positive,
-`empty` warn, and the three waiting words — `queued`, `paused`, `scheduled` —
-wearing the PLAN's own tone through `planStatusTone`, the very function the status badge on the card under them is toned by, so a header cannot argue with its own cards; the eight words are
+`empty` warn, `stalled` warn through `planStatusTone` as well (an epic whose only running work has stopped), and the three waiting words — `queued`, `paused`, `scheduled` —
+wearing the PLAN's own tone through `planStatusTone`, the very function the status badge on the card under them is toned by, so a header cannot argue with its own cards; the nine words are
 `store.arc_word`'s and `dispatcher-arc.reader.ts` refuses any other BY
 NAME, so no default is invented here; standing proof MAN-5419), the arc's own spend where it has one (`data-arc-spend` holding `SpendPills` counting under
 `darc:<arc name>`; the plan card's own rule — dollars OR tokens by who was used, nothing at all for a lane that has not spent — and, as the LAST pill of that row, the epic's working time, `WorkingPill subject="epic"`: the union of every agent interval on its plans and its own design, cut and judge (`arc.runtime_s`, MAN-7770), ticking while an agent is out on it (`arcAgentOut`, MAN-6789), and drawn for an epic that has only been planned and has no spend yet), the
@@ -3560,8 +3565,8 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/, /home/l
 section: dispatcher/010 The plan card/021 Its four controls are the plan card's own, applied to the whole arc.
 
 **Its four controls are the plan card's own, applied to the whole arc.** Pause, Start and
-`Schedule start` — the last two drawn where `arc.stopped`, Pause where `arc.walking`, and none of the three
-where neither holds, so the deck never offers a press the dispatcher would refuse — plus
+`Schedule start` — the last two drawn where `arc.stopped`, Pause where `arc.walking` (the arc's released plans: `live`, and the `stalled` ones), and none of the three
+where neither holds, so the deck never offers a press the dispatcher would refuse; and RESUME where `arc.stalled` with nothing stopped (the same `dispatcher resume <arc>` the Start is, which takes the stalled plans — their running work ended with nothing to record it, `report_stall` — along with the stopped ones; with plans stopped as well the one button is Start and reaches both) — plus
 `RunModelControl` scope `dispatch-arc` drawing the ARC'S OWN word (`arc.model`, never a plan's
 effective one), handles `data-dispatch-arc-model` / `data-dispatch-arc-model-choice`. The words are the
 plan card's own wherever the act is the same (`dispatcher.arcPause` for the pause, `runner.start` for
@@ -3574,8 +3579,8 @@ the plans? So start should start all plans, unless it has dependencies. Pause, a
 buttons please."): an arc whose plans were approved with Queue and never walked reads `stopped` — its
 plans are APPROVED, PAUSED AND UNFINISHED — and draws Start and `Schedule start`. The three verbs
 are `dispatcher stop|resume|schedule <arc>`, which the CLI resolves to the arc's own plans in ONE step
-(`arc_verbs.targets`: the arc's `live` plans for Pause, its STOPPED ones — `queued` at the gate as
-readily as `paused` mid-walk — for Start and for the hour; the very sets `arc.walking` / `arc.stopped`
+(`arc_verbs.targets`: the arc's released plans for Pause, its STOPPED ones — `queued` at the gate as
+readily as `paused` mid-walk — plus its STALLED ones for Start, the stopped alone for the hour; the very sets `arc.walking` / `arc.stopped` / `arc.stalled`
 report), so the header and a terminal cannot disagree
 about what an arc's press reaches. STARTING THE ARC WHOLE IS SAFE BECAUSE THE WAITS KEEP THE ORDER:
 `rule.eligible` takes up only a plan whose arc-mates it waits on are complete, so the arc's Start
@@ -3877,7 +3882,7 @@ section: dispatcher/015 The arc deck's frame/006 The flow (`StatusFlow`, `flow: 
 
 | field | value |
 |---|---|
-| `mark` | `▶︎` while one of the plan's tasks is walking (`phaseWord`), else `✓` complete, `⏸︎` paused, `◷` scheduled, or the plan's position in the arc — a live plan whose turn has not come among them (`FLOW_MARK`) |
+| `mark` | `▶︎` while one of the plan's tasks is walking (`phaseWord`), else `✓` complete, `⏸︎` paused, `◷` scheduled, `!` stalled, or the plan's position in the arc — a live plan whose turn has not come among them (`FLOW_MARK`) |
 | `tone` | `planStatusTone(plan.status)`, the badge's own |
 | `label` | `dispatcher.flow.plan`: `<plan> · <status word>` |
 | `live` | one of the plan's tasks walking now — never the status alone, since `live` is also approved and waiting; the node breathes |
@@ -4654,7 +4659,7 @@ section: hosting/001 What runs
 
 | Unit | What it is | Bind |
 |---|---|---|
-| `cloudcli-server-dev.service` | `/usr/bin/node deploy/dev-supervisor/supervisor.mjs` — the handover supervisor: it boots each edited server beside the running one and retires the old one only when the new one reports READY; the API and WebSocket gateway are its child | `127.0.0.1:3011` (loopback only) |
+| `cloudcli-server-dev.service` | `/usr/bin/node deploy/dev-supervisor/supervisor.mjs` — the handover supervisor: it boots each edited server beside the running one and retires the old one only when the new one reports READY; the API process — the HTTP API, the browser's WebSocket gateway and the warden gateway — is its child | `127.0.0.1:3011` (the API, loopback only) and `100.103.222.79:3012` (`CERBERUS_LISTEN`, tailnet-bound: the warden gateway — see below) |
 | `cloudcli-client-dev.service` | `node_modules/.bin/vite --host 0.0.0.0 --port 5183 --strictPort` — the client with HMR, its responses compressed by `vite-plugins/compressResponses.js` (see Rules) | `0.0.0.0:5183`, minus the Docker bridges (see below) |
 | `cloudcli-client-prod.service` | `vite preview --host 0.0.0.0 --port 5184 --strictPort --outDir .prod-client/current` — the BUILT client: ~50 requests on a fresh load instead of ~700 unbundled modules, Brotli-precompressed at build time (the page document included), every `/assets/*` file cached for a year and everything else revalidated by ETag, by `vite-plugins/precompressedAssets.js`. Same `.env`, so it proxies `/api`, `/ws`, `/shell` and `/plugin-ws` to :3011 exactly as :5183 does. No HMR: an edit reaches it through the rebuild below | `0.0.0.0:5184`, minus the Docker bridges |
 | `cloudcli-client-prod-build.timer` → `.service` | every 2 min, `scripts/prod-client-build.sh`: builds only when a build input (`src`, `public`, `shared`, `index.html`, `vite.config.js`, `vite-plugins`, `tailwind.config.js`, `postcss.config.js`, `tsconfig.json`, `.env`, `package.json`, `package-lock.json`) changed since the last build's START (~30 s, `Nice=10`; one build at a time under `flock`, a failed build leaves nothing behind), into `.prod-client/builds/<id>`, then re-points the `.prod-client/current` symlink in one rename. The previous build's hashed assets are carried forward for two days, so a tab opened before a swap can still load its lazy chunks. `--force` builds regardless | — |
@@ -4682,7 +4687,7 @@ the commands in the service's header. The dev client (:5183) is for watching an 
 client (:5184) is the fast one for everyday use, at most one rebuild (≈2.5 min) behind the source.
 
 The clients are the only ports the LAN needs: `vite.config.js` proxies `/api`, `/ws`, `/shell` and
-`/plugin-ws` to the API on loopback, so the API never faces the LAN. The app is reachable at
+`/plugin-ws` to the API on loopback, so the API never faces the LAN. The API process owns one more port, the warden gateway on `CERBERUS_LISTEN` (`100.103.222.79:3012` in `.env`, the `tailscale0` address — never `0.0.0.0`): it carries only the warden websocket `/cerberus/ws` and the public install files (`/cerberus/enroll.sh` and `/cerberus/warden/…`, served by `warden-files.ts`; every other GET answers 404), no API route and no login, and under the supervisor it binds with `reusePort` so a handover's successor listens beside the retiring process. Its design: MAN-7803. The app is reachable at
 `http://<this host>:5183` on the LAN and over Tailscale, and as the **CloudCLI** row of the
 application drawer this app serves — `apps.local.json`, git-ignored; the drawer's one
 documentation home is [`docs/MANUAL.md (applications)`](MANUAL.md).
@@ -7939,45 +7944,74 @@ section: verification/003 The sunset probe harness
 
 ```bash
 set -e
+export SUNSET_SLOT=3        # optional: a slot of your own, set once, before the trap
 source scripts/sunset-probe.sh
 trap stop_probe_server EXIT
 probe_db
 boot_probe_server
 TOK=$(mint_token)
-# curl against http://127.0.0.1:7893 with "$TOK"
+# curl against "$SUNSET_API" (http://127.0.0.1:7893 with the slot unset) with "$TOK"
 ```
 
 `scripts/sunset-probe.sh` is the harness the sunset work is proven with, and it is four SOURCEABLE
-functions with no top-level side effects of their own — it sets no shell option and boots nothing on
-source, so a probe sources it, calls what it needs and traps its own teardown.
+functions and one helper they share, with no top-level side effects of their own — it sets no shell
+option and boots nothing on source, so a probe sources it, calls what it needs and traps its own
+teardown.
 
-- **`probe_db`** copies the live `~/.cloudcli/auth.db` to `/tmp/sunset-probe.db` and then DISARMS it
+**The slot.** Plans run side by side and several of their phases boot a scratch center at the same
+moment, so every function reads `SUNSET_SLOT`. Unset, it is the default slot: API on **7893**, warden
+gateway on **7894**, scratch paths beginning `/tmp/sunset-`. `SUNSET_SLOT=N`, one digit 1 to 9, moves
+the API to `7893 + 2N`, the gateway to `7894 + 2N` and every scratch path to `/tmp/sunset<N>-`
+(`/tmp/sunset3-probe.db`, `/tmp/sunset3-state`, …). Any other value — an empty one too — makes the
+function print one sentence and return 2. **Export the slot once, before the trap, and never prefix a
+single call** (`SUNSET_SLOT=1 boot_probe_server`): the prefix is gone when the call returns, and the
+bare `stop_probe_server` the trap then runs acts on the DEFAULT slot — another plan's probe. The
+helper `sunset_paths`, called first by each function, exports `SUNSET_API`
+(`http://127.0.0.1:<api port>`), `SUNSET_GATEWAY` (`127.0.0.1:<gateway port>`) and `SUNSET_PREFIX`
+(`/tmp/sunset-` or `/tmp/sunset<N>-`), which a probe reads after any function has run.
+
+- **`probe_db`** copies the live `~/.cloudcli/auth.db` to `<prefix>probe.db` and then DISARMS it
   (`update kanban_boards set autonomy=0`), so no board on the scratch copy can spawn a Metis while a
-  probe drives it. It COPIES the live file; nothing here opens it.
+  probe drives it. It COPIES the live file; nothing here opens it. A `-journal`, `-wal` or `-shm`
+  a killed run left beside the old copy is removed first, so it is never replayed onto the new one.
 - **`mint_token`** reads the JWT secret out of the SCRATCH database and prints a bearer for its first
-  user, so the token is valid only against the probe server it was minted alongside.
-- **`boot_probe_server`** boots a SECOND server on port **7893** against the scratch database and
-  scratch roots — `KANBAN_METIS_STATE_ROOT`, `KANBAN_ATTACHMENTS_ROOT`, `CLOUDCLI_ACCOUNTS_ROOT`,
-  `CLOUDCLI_SPILL_ROOT`, `CLOUDCLI_RATE_LIMIT_PATH`, `CLOUDCLI_SESSIONS_DIR` and
-  `CLOUDCLI_LOCAL_SERVER_MARKER`, all under `/tmp` — and waits for
-  `/api/auth/status` before returning. Every runtime root the server reads is redirected by an
-  environment variable; the operator's own server on 3011 never sees the scratch copy, and the probe
-  server is started with `tsx` directly rather than through `npm run dev`.
-- **`stop_probe_server`** kills the probe server and deletes every scratch root. It runs on EVERY
-  exit path, the aborted one included. Two of the redirects protect the operator's server rather than
-  its data: `CLOUDCLI_SESSIONS_DIR`, because a server booted without a supervisor claims the keepalive
-  whenever the operator's server is not holding it (`readopt.ts`'s `.owner` claim fails closed only
-  while it is held, not across the restart every `server/` save causes) and then re-adopts every host
-  in the directory — retiring each one whose session row its scratch database lacks, taking the
-  socket of each one it finds; and
-  `CLOUDCLI_LOCAL_SERVER_MARKER`, because a probe that writes the real `~/.cloudcli/local-server.json`
-  deletes it again at shutdown (measured 2026-09-18).
+  user, so the token is valid only against the probe server it was minted alongside. With no scratch
+  database at the slot's path it says so and returns 1 — it creates nothing.
+- **`boot_probe_server`** boots a SECOND server on the slot's API port against the scratch database
+  and scratch roots — `KANBAN_METIS_STATE_ROOT`, `KANBAN_ATTACHMENTS_ROOT`, `CLOUDCLI_ACCOUNTS_ROOT`,
+  `CLOUDCLI_SPILL_ROOT`, `CLOUDCLI_RATE_LIMIT_PATH`, `CLOUDCLI_SESSIONS_DIR`,
+  `CLOUDCLI_LOCAL_SERVER_MARKER` and the three Cerberus roots — `CERBERUS_DB_PATH`
+  (`<prefix>cerberus.db`), `CERBERUS_KEY_PATH` (`<prefix>cerberus.key`) and `CERBERUS_LISTEN`
+  (`127.0.0.1:<gateway port>`), all under `/tmp` — and waits for `/api/auth/status` before returning.
+  Every runtime root the server reads is redirected by an environment variable; the operator's own
+  server on 3011 never sees the scratch copy, no probe ever opens `~/.cloudcli/cerberus.db` or binds
+  3012, and the probe server is started with `tsx` directly rather than through `npm run dev`. The
+  roots are cleared before the boot, so a crashed run's leftovers never reach the next one (`boot_probe_server --keep-store` spares the Cerberus store and key, for a probe that stops its server and boots it again to see what a restart does to the nodes already enrolled) — but a
+  slot whose port already answers is REFUSED first (a sentence on stderr, return 1, nothing cleared):
+  another server holds it, and booting over it would delete its roots (`scripts/apps-probe-env.sh`
+  defaults `PROBE_PORT` to 7893, so its server there refuses a default-slot boot). Its pid and log are
+  `<prefix>server.pid` and `<prefix>server.log`. Two of the redirects protect the operator's server
+  rather than its data: `CLOUDCLI_SESSIONS_DIR`, because a server booted without a supervisor claims
+  the keepalive whenever the operator's server is not holding it (`readopt.ts`'s `.owner` claim fails
+  closed only while it is held, not across the restart every `server/` save causes) and then
+  re-adopts every host in the directory — retiring each one whose session row its scratch database
+  lacks, taking the socket of each one it finds; and `CLOUDCLI_LOCAL_SERVER_MARKER`, because a probe
+  that writes the real `~/.cloudcli/local-server.json` deletes it again at shutdown (measured
+  2026-09-18).
+- **`stop_probe_server`** kills the slot's own probe server, waits for it to exit (SIGKILL after
+  10 s), and deletes every scratch root — the Cerberus store with its `-wal` and `-shm`, the key, the
+  probe database's sidecars, the pid and the log among them (read `<prefix>server.log` before the
+  stop when a boot fails). Each removal passes
+  `case "$path" in /tmp/sunset-*|/tmp/sunset[1-9]-*) rm -rf -- "$path" ;; esac`. It signals a pid only
+  when the pid file holds plain digits (never `0`, `1` or a `-1`, which would reach every process the
+  user owns — measured 2026-10-05) AND `/proc/<pid>/cmdline` names `server/index.ts`, so a recycled
+  pid is never killed. It runs on EVERY exit path, the aborted one included.
 
 **The rule is that no probe ever touches the live ones.** The live database, the live state root and
 the live attachments root are never opened by a probe, and a probe's scratch database is disarmed
 before anything runs against it; a probe's own boards are named `probe-sunset<N>` so nothing it
 creates can be mistaken for the operator's. Nothing is left behind on a bad day: the teardown deletes
-the scratch database, every scratch root and the scratch rate-limit file.
+the scratch database, every scratch root, the Cerberus store and key, and the scratch rate-limit file.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/scripts/sunset-probe.sh
 
@@ -10063,6 +10097,7 @@ section: verification/009 What bites people
 | **Dev account** | `verve` / `verve-dev-2026`, created through the real setup form on the first run. To start over, delete `~/.cloudcli/auth.db` (an operator act) and run the harness again. |
 | **One dev user, so two runs collide** | Every phase signs in as that one account, and `phase-4.mjs` changes its *server-side* preferences mid-run — hiding and revealing the Shell tab, toggling `tasksEnabled` — then restores them inline and asserts it did. Two `all.mjs` runs at once therefore read and overwrite each other's half-done state, which surfaces as a regression rather than as the collision it is: run the harness solo. The restore being inline rather than in a `finally` also means a run that dies part-way leaves the dev user non-default — re-run the phase, or put the switches back by hand. |
 | **Every probe that calls `openConsole` writes the dev account's preferences** | Two writes, both against the dev account `verve`, before any probe's first gate. `parkOnProjectTree` (`.verify/lib/console.mjs`) PATCHes `/api/user/preferences` with `simpleChatList: false` through the page's own token, because that view hides the `PROJECT_ROW` every probe waits on. `ensureTheme` drives Settings → **Appearance** → **Dark Mode** whenever the stored theme disagrees with the run's, which rewrites the stored theme — so each run leaves the dev user on whichever mode ran last. No other account is touched: no probe signs in as anything but `verve`. A preference read back after a probe signs in is therefore a value the harness itself set, and a probe that asserts a default it never set is reading the harness's write as the app's. Two other stored preferences the harness leans on are **pinned, not written**: `openConsole` lays `userLanguage: 'en'` and `uiPreferences.sidebarVisible: true` over the account's own preference read for its own pages (`.verify/lib/prefs-pin.mjs`, `openConsole({ preferences })`; `null` opts out), so a probe that died mid-collapse or a session that flipped the language cannot leave the next run without a Settings button or a project row. |
+| **Headless Chromium paints no scrollbars** | `chromium.launch()` passes `--hide-scrollbars`, so a probe that measures a scrollbar gutter reads zero and one that photographs a scroll pane shows none. `openConsole({ launchOptions: { ignoreDefaultArgs: ['--hide-scrollbars'] } })` launches without it (`probe-widget-scrollbars.mjs`). The harness's own init script is guarded for the same family of surprise: it runs in every frame, and a sandboxed widget frame's `localStorage` read throws. |
 | **Onboarding writes real git config** | Its first step arrives pre-filled from the host's global git identity and the harness submits it unchanged. It never types one: an empty field stops the run rather than writing a fabricated identity into `git config --global`. |
 | **The Roadmap tab opens on Roadmap, not on the cards** | The `runner`-id tab is on the bar always (ungated, first in the house row, label `Roadmap`) and opens on its Path face every visit. A probe that reads `[data-runner-panel]` presses the In flight switch first, or arrives by `?runner=<plan>`; one that opens it by `aria-label="Runner"` finds nothing. Its count is read from the tab's `title` (`Roadmap (N)`), never from a `.vv-tabs__count` pill, which icon-only tabs do not render. |
 | **One stored theme per user** | The theme is saved server-side against the account, so every run leaves the dev user on whichever mode ran last. `ensureTheme` therefore forces it in both directions by driving Settings → **Appearance** → **Dark Mode**. Those are English labels — a phase that restyles or re-labels Settings must re-point them — and the language they need is the account's stored `userLanguage`, which the pin holds at `en`: the account was found on `fr` (2026-09-29), where every dark run after a light one died at `button:has-text("Settings"):visible` after 30 s, the failing page reading "Paramètres". |
@@ -10680,8 +10715,9 @@ Types in `src/shared/types.ts`: `HostWindowValue` = `{ hostWindow: Window; subsc
 - No provider ⇒ the global `window`. At home nothing changed.
 - `useHostMove` writes its latest-listener ref in a LAYOUT effect declared before the subscribing one. why: a move is emitted from a layout effect; a passive write leaves the ref one render stale at `'before'`.
 - The value is set in one place: chat-host's `moveTo`.
-- Escape order, in either window: `Dialog` binds Escape on the host window's capture phase and marks the event; `ChatInterface` stops the running turn from the host document's capture listener unless the event is marked; window capture runs first. Panels carry `OWNS_ESCAPE`.
+- Escape order, in either window: `Dialog` and `Sheet` bind Escape on the host window's capture phase and mark the event; `ChatInterface` stops the running turn from the host document's capture listener unless the event is marked; window capture runs first. Panels carry `OWNS_ESCAPE`.
 - `otherOverlayHoldsEscape(doc: Document)` (`overlayEscape.ts`): whether a modal dialog or an `OWNS_ESCAPE` panel that is not a fullscreen surface is in front, in the document handed in. Each caller passes its host document (`WidgetFrame`, `ChatGutterLayout`: `hostWindow.document`). why: a panel open in the picture-in-picture window is in that window's document.
+- `overlayInFrontHoldsEscape(content, doc)` and `modalInFrontHoldsEscape(content, doc)` (`overlayEscape.ts`): whether an `OWNS_ESCAPE` panel (the second also a modal dialog) is drawn in front of `content`; asked by `Dialog` and `Sheet` (the second by `Sheet` only) with `hostWindow.document`. Rules: MAN-490.
 
 ## Audit
 `grep -rnE "document\.(body|addEventListener|activeElement)|window\.(addEventListener|innerWidth|innerHeight|requestAnimationFrame)|instanceof (HTML[A-Za-z]*Element|Element|Node)\b" src/shared/ui src/modules/chat src/modules/widgets` prints only:
@@ -11512,7 +11548,7 @@ Two contexts. `why:` the list changes when a read lands, a draft on every keystr
 | `saveEdit` | note id | `writing[id]` | `notes.toast.saveFailed` | `edits[id]` dropped, only while it still holds the sent draft; `writing[id]` off |
 | `remove` | note id | `writing[id]` | `notes.toast.deleteFailed` | `edits[id]` dropped; `writing[id]` off |
 
-- A write that did not land answers `false`, turns its mark off, touches no draft, and raises one `warn` toast: `title` = `t(key)`; `message` = the server's own sentence, `errorMessage(error) ?? errorMessage(details)` from the refusal body, omitted when the body carries none or is not JSON.
+- A write that did not land answers `false`, turns its mark off, touches no draft, and raises one `warn` toast: `title` = `t(key)`; `message` = the server's own sentence, `refusalSentence(response)` from `src/shared/api.ts` (`errorMessage(error) ?? errorMessage(details)` of the refusal body; the one copy `CerberusProvider` shares, MAN-7822), omitted when the body carries none or is not JSON.
 - A write that landed is silent and answers `true`.
 - Drafts clear only after the re-read has returned, whichever way the re-read went — and only the draft the write SENT, only while it is still that text: typing that began while the write was in flight is newer than the write and is left standing. `why:` a card never shows the text it just replaced, and no keystroke is ever eaten.
 
@@ -12309,11 +12345,11 @@ Every word the roadmap screen draws, in the `roadmap` block of `src/modules/i18n
 
 ## Shape
 
-- 253 leaves under `roadmap.*`, `en` only. The other ten locales hold no `roadmap` block: `fallbackLng: 'en'` (`src/modules/i18n/config.ts`) reads the English.
+- 265 leaves under `roadmap.*`, `en` only. The other ten locales hold no `roadmap` block: `fallbackLng: 'en'` (`src/modules/i18n/config.ts`) reads the English.
 - `gutters.roadmap.title` (`Roadmap`) lies outside the block, translated in all eleven locales: the chat gutter widget's title (MAN-7668).
 - `tabs.runner`, `runner.title`, `runner.empty` read `Roadmap`, `In flight`, `Nothing in flight`.
 - `interpolation.escapeValue` is `false`: a title holding `&` is drawn as typed.
-- The file is about 1,700 lines.
+
 
 | group | keys | holds |
 |---|---|---|
@@ -12321,7 +12357,7 @@ Every word the roadmap screen draws, in the `roadmap` block of `src/modules/i18n
 | `loading` | 1 | the face's spinner label |
 | `kind` | 2 | `epic`, `feature`: the unplaced banner's kind badges |
 | `word` | 5 | feature word |
-| `step` | 15 | feature step phrase |
+| `step` | 16 | feature step phrase |
 | `stateLine` | 1 | the step line's label: `{{word}} — {{phrase}}` |
 | `blocked` | 1 | `Blocked: {{why}}`, shared by feature, epic and milestone |
 | `epicWord` | 4 | epic word |
@@ -12344,6 +12380,7 @@ Every word the roadmap screen draws, in the `roadmap` block of `src/modules/i18n
 | `celebrate` | 16 | `shipped`, `epicComplete`, `milestoneReached`, `epics_*`, `features_*`, `catchUp_*`, `alsoReached_*`, `skip`, `announce.*` |
 | `toast` | 9 | one key per act |
 | `widget` | 7 | the chat gutter's widget (MAN-7668): `open`, `more_one`, `more_other`, `focus_one`, `focus_other`, `focusWord`, `quiet` |
+| `tree` | 10 | the roadmap tree's words (MAN-7827): `label` (the svg's `aria-label`), `goal`, `milestone`, `milestoneLine_*`, `epicLine_*`, `epics_*`, `blocked` |
 
 ## Wire word → key
 
@@ -12358,11 +12395,11 @@ The wire words carry spaces; the keys are camelCase. A consumer maps; it never b
 | roadmap `no path yet`, `on the way`, `every milestone reached` | `roadmapWord.noPath`, `.onTheWay`, `.allReached` |
 | case `not run`, `can't run` | `cases.word.notRun`, `cases.word.cantRun` (the other three keep their word; map: `WORD_KEYS` in `FeatureCases.tsx`) |
 
-- `word.*` = 5 feature words, `epicWord.*` = 4, `milestoneWord.*` = 4, `roadmapWord.*` = 3, `step.*` = 15 leaves: the 13 wire steps, plus `waitingOnAnother` and `shippedUndated`. Every wire step has a phrase, `idea` and `proposed` included, so `` t(`roadmap.step.${step}`) `` never draws a key path.
+- `word.*` = 5 feature words, `epicWord.*` = 4, `milestoneWord.*` = 4, `roadmapWord.*` = 3, `step.*` = 16 leaves: the 14 wire steps, plus `waitingOnAnother` and `shippedUndated`. Every wire step has a phrase, `idea` and `proposed` included, so `` t(`roadmap.step.${step}`) `` never draws a key path.
 - `step.building` is the bare word `building`: it takes no count. The row's meter carries `feature.tasks`.
 - `epicWord.empty` (`No features yet`) is an empty epic's only such line: no `empty.*` key repeats it. `milestoneWord.empty` and `empty.noEpics` both read `No epics yet`: the badge word and the empty milestone's title.
 - A dialog key by kind takes the dispatcher's one-word kind straight, never mapped: `dialog.item.addTitle.<kind>`, `editTitle.<kind>`, `goalHint.<kind>`, `dialog.move.choose.<kind>`, `none.<kind>`, `dialog.delete.message.<kind>`, with `<kind>` one of `roadmap milestone arc plan` (`move.*` takes the last three). `dialog.item.goalHint.proposed` is the one non-kind leaf under `goalHint`.
-- A task's `not started` is `dialog.feature.task.notStarted`; `running` and `done` are their own keys. The feature word's map is `ROADMAP_FEATURE_WORD_KEYS` and the milestone word's `ROADMAP_MILESTONE_WORD_KEYS`, both in `src/shared/constants.ts`.
+- A task's `not started` is `dialog.feature.task.notStarted`; `running` and `done` are their own keys. The feature word's map is `ROADMAP_FEATURE_WORD_KEYS`, the milestone word's `ROADMAP_MILESTONE_WORD_KEYS` and the epic word's `ROADMAP_EPIC_WORD_KEYS`, all in `src/shared/constants.ts`.
 - `toast.<act>` has all nine acts (`add edit move propose unpropose block unblock remove promote`); `useRoadmapWrites` calls `` t(`roadmap.toast.${act}`, { title }) ``.
 
 ## Variables a call must pass
@@ -12380,6 +12417,10 @@ A key with `_one` / `_other` resolves only when the call passes `count`; without
 | `widget.focusWord` | `n`, `title`, `word` |
 | `celebrate.alsoReached_*` | `count: <titles.length>`, `titles` (the other milestones' titles, comma-joined): `{{titles}} was reached too` / `were reached too`, the summary of a catch-up that reached two or more milestones (MAN-7648) |
 | `epic.count` | `shipped`, `count` (a plain key, no plural forms; reads `2 of 5`) |
+| `tree.milestone` | `n` |
+| `tree.milestoneLine_*` | `shipped`, `count: <feature total>`, `word` |
+| `tree.epicLine_*` | `word`, `shipped`, `count: <feature total>` (both plural forms read alike) |
+| `tree.epics_*` | `count: <epic total>`, `word` |
 | `cases.holding_*` `broken_*` `regressed_*` `cantRun_*` `epicBroken_*` `total_*` `headerBroken_*` | `count` |
 | `cases.notRunYet_*` | `count`, `notRun` |
 | `cases.epicHolding_*` | `count`, `holding` |
@@ -12419,11 +12460,16 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/comm
 
 `src/modules/roadmap/` is the client side of the roadmap lane: server MAN-7631, contract MAN-7630, twin of the dispatcher's client MAN-6804. The dispatcher decides every word; the client derives and spells none it was not told. The tab that mounts it: MAN-7654. Preferences: MAN-7655. Celebration rules: MAN-7656. Words: MAN-7634.
 
-## Files
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/live-bus/topics.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/caseMark.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/celebrationContext.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/hooks/useFeatureCases.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/hooks/useRoadmap.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/hooks/useRoadmapWrites.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/railSections.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/RoadmapFeed.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/roadmap-types.ts
+
+## MAN-7793 — The roadmap module — RoadmapFeed and the roadmap:all topic, useRoadmap — Files
+section: The roadmap module — RoadmapFeed and the roadmap:all topic, useRoadmap, useRoadmapWrites, railSections, every component and what it composes, the dialogs (src/modules/roadmap, src/shared/roadmap-types.ts)/001 Files
+
 Data layer
 | file | owns |
 |---|---|
-| `index.ts` | barrel: `RoadmapFeed`, lazy `RoadmapTab` (the `runner` tab's pane), `RoadmapWidgetBody`, `useRoadmap` |
+| `index.ts` | barrel: `RoadmapFeed`, lazy `RoadmapTab` (the `runner` tab's pane), `RoadmapWidgetBody`, `RoadmapWidgetFullscreenBody`, `useRoadmap` |
+| `lazyRoadmapTab.ts` | `RoadmapTab = lazy(() => import('RoadmapTab'))`: the one lazy door to the tab's pane, re-exported by the barrel for `WorkspaceMain` and drawn by `RoadmapWidgetFullscreenBody` |
 | `RoadmapFeed.tsx` | headless feed: the only client code naming the `roadmap_state` frame |
 | `hooks/useRoadmap.ts` | read side: `RoadmapView` = `{ picture, roadmaps, selected, select }` |
 | `hooks/useRoadmapWrites.ts` | write side: `RoadmapWrites` = `Record<RoadmapAct, (body: RoadmapWriteBody) => Promise<boolean>>` |
@@ -12433,6 +12479,8 @@ Data layer
 | `faceContext.ts`, `hooks/useRevealCard.ts`, `hooks/useCurrentStationInView.ts`, `modals/OpenDialog.tsx` | what a press under the face reaches (MAN-7650) |
 | `celebrationContext.ts` | `Moment`, `CelebrationActive`, `CelebrationContext` (module root, not `context/`) |
 | `hooks/useCelebrations.ts`, `utils/celebrationMoments.ts`, `utils/seenStamp.ts` | which moments play and when, and the seen stamp: MAN-7648, rules MAN-7656 |
+| `utils/treeLayout.ts` | pure `layoutTree(roadmap, goalText)` -> `TreeLayout`: the tree's geometry and the `dots` map of every feature's `RoadmapDotState`: MAN-7819 |
+| `tree/` | the tree's drawing: `RoadmapTree`, `TreeGoal`, `TreeMilestoneNode`, `TreeEpicNode`, `TreeTip`, `treeWords` (MAN-7827); `TreeRing`, `TreeHalo` (MAN-7828) |
 | `src/shared/roadmap-types.ts` | wire shapes, mirror of `server/shared/roadmap-types.ts` (MAN-7630) plus client-only `RoadmapWriteBody`; imports nothing from `server/` |
 | `api.roadmap` in `src/shared/api.ts` | `picture()` = GET `/api/roadmap`; `cases(feature)` = GET `/api/roadmap/cases?feature=<encoded name>` (MAN-7658); nine write helpers, one POST each to `/api/roadmap/<act>`; read RAW, the status is never gated |
 | `ROADMAP_ALL_TOPIC` and `/^roadmap:all$/` in `src/modules/live-bus/topics.ts` | the topic and its allowlist pattern; the barrel of `live-bus` exports the constant |
@@ -12441,7 +12489,9 @@ Components (module root).
 | component | composes | row |
 |---|---|---|
 | `RoadmapTab` | `Tabs`, `Spinner`; `RoadmapPath` or `RunnerPanel` (`@/modules/runner-tab`); reads `useDispatcherPlans` | MAN-7640 |
-| `RoadmapPath` | `ScrollArea`, `Banner`, `Badge`, `Button`, `EmptyState`, `Spinner`, `RoadmapHeader`, `MilestoneFocus`, `RoadmapRail`, `OpenDialog`, `CelebrationLayer`; provides `RoadmapFaceContext`, `CelebrationContext`; reads `useRoadmap`, `useCelebrations` | MAN-7640 |
+| `RoadmapWidgetFullscreenBody` | `Suspense`, `Spinner`; the lazy `RoadmapTab` handed no landing (`revealPlan` and `openRoadmap` `null`, both callbacks a no-op): the Roadmap widget's body while its card is full screen | MAN-7668 |
+| `RoadmapPath` | `ScrollArea`, `Banner`, `Badge`, `Button`, `EmptyState`, `Spinner`, `RoadmapHeader`, `RoadmapTree`, `MilestoneFocus`, `RoadmapRail`, `OpenDialog`, `CelebrationLayer`; provides `RoadmapFaceContext`, `CelebrationContext`; reads `useRoadmap`, `useCelebrations`, `layoutTree` | MAN-7640 |
+| `RoadmapTree` | `TreeGoal`, `TreeMilestoneNode`, `TreeEpicNode`, `TreeTip`; reads `useTreeWords`; its nodes read `CelebrationContext` | MAN-7827 |
 | `RoadmapHeader` | `RoadmapPicker`, `ActionMenu`, `Button`, `MilestonePath` at `full`, the goal and standing line; reads `RoadmapFaceContext` | MAN-7639 |
 | `RoadmapPicker` | `Select`; reads `useRoadmap`, `RoadmapFaceContext` | MAN-7640 |
 | `MilestonePath` | stations as buttons on one rail, a ghost station, the Goal flag; reads `CelebrationContext`, `RoadmapFaceContext`, `useCurrentStationInView` | MAN-7638 |
@@ -12451,6 +12501,12 @@ Components (module root).
 | `StateLine` | five dots on a hairline; no library piece, no context | MAN-7637 |
 | `RoadmapRail` | `railSections`, `FeatureRow` at `compact`; reads `RoadmapFaceContext` | MAN-7639 |
 | `CelebrationLayer` | `Card`, `Badge`, `Button`; reads `useRoadmap` | MAN-7636 |
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/live-bus/topics.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/caseMark.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/celebrationContext.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/hooks/useFeatureCases.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/hooks/useRoadmap.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/hooks/useRoadmapWrites.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/railSections.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/RoadmapFeed.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/roadmap-types.ts
+
+## MAN-7794 — The roadmap module — RoadmapFeed and the roadmap:all topic, useRoadmap — The tab draws `RoadmapPicker` `sm`, `MilestonePath` `full`, `CelebrationLayer` `face`, `FeatureRow`
+section: The roadmap module — RoadmapFeed and the roadmap:all topic, useRoadmap, useRoadmapWrites, railSections, every component and what it composes, the dialogs (src/modules/roadmap, src/shared/roadmap-types.ts)/002 The tab draws `RoadmapPicker` `sm`, `MilestonePath` `full`, `CelebrationLayer` `face`, `FeatureRow`
+
 - The tab draws `RoadmapPicker` `sm`, `MilestonePath` `full`, `CelebrationLayer` `face`, `FeatureRow` `compact` (the rail). The widget (MAN-7668): `sm`, `compact`, `frame`, `compact`; `md` has no consumer.
 
 Dialogs (`modals/`; contract and shared rules MAN-7643)
@@ -12484,7 +12540,11 @@ Dialogs (`modals/`; contract and shared rules MAN-7643)
 - `selected` waits for the hydrate. why: a cold mirror (every fresh sign-in) reads the default while the server copy is in flight; the first roadmap would flash and hand a destructive reader (a celebration stamping what it played) the wrong one.
 - A stored name the picture lacks reads as the first roadmap; the preference stays, so a roadmap re-added under that name returns.
 
-## `useRoadmapWrites()`
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/live-bus/topics.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/caseMark.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/celebrationContext.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/hooks/useFeatureCases.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/hooks/useRoadmap.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/hooks/useRoadmapWrites.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/railSections.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/RoadmapFeed.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/roadmap-types.ts
+
+## MAN-7795 — The roadmap module — RoadmapFeed and the roadmap:all topic, useRoadmap — `useRoadmapWrites()`
+section: The roadmap module — RoadmapFeed and the roadmap:all topic, useRoadmap, useRoadmapWrites, railSections, every component and what it composes, the dialogs (src/modules/roadmap, src/shared/roadmap-types.ts)/003 `useRoadmapWrites()`
+
 - Acts: `add edit move propose unpropose block unblock remove promote`, bound to `api.roadmap.<act>`. Each resolves `true` on a 2xx, `false` on a refusal or a request that never completed; a dialog closes on `true` and stays open, with what was typed, on `false`.
 - Nothing is optimistic and the hook holds no copy of the picture: a landed write pokes the lane and the screen redraws from the `roadmap_state` frame (MAN-7631).
 - The answer is read BEFORE the status is judged: a 409 carries the dispatcher's sentence in `stdout`.
@@ -12550,7 +12610,7 @@ Placement
 Reads and ends
 | what | rule |
 |---|---|
-| burst origin | the centre of the reached station's DISC (first child of `[data-roadmap-milestone=<name>]`; its title sits under the disc) as fractions of the layer's box, clamped to [0, 1] per axis; measured on arrival before paint and again at `entrance`; a station scrolled out bursts from the nearest edge; an unmeasurable station keeps the last origin, first `{ x: 0.5, y: 0.2 }` |
+| burst origin | the centre of the reached station's DISC (first child of `[data-roadmap-milestone=<name>]`; its title sits under the disc) as fractions of the layer's box, clamped to [0, 1] per axis; measured on arrival before paint and again at `entrance`; the tree's milestone node (MAN-7827) draws its ring's track circle first for the same reading; a station scrolled out bursts from the nearest edge; an unmeasurable station keeps the last origin, first `{ x: 0.5, y: 0.2 }` |
 | phase | `arriving` on arrival, `holding` at `entrance`, `leaving` at `entrance + hold`, by two timers; on leave with focus inside the layer, hands focus on the next frame to the reached station |
 | skip | `onSkip` on a click on the layer and on Escape while `holding` (bubble-phase `keydown` on `window`, never stopped or prevented; refused while `otherOverlayHoldsEscape(document)`, `src/shared/ui/overlayEscape.ts`); focus is handed on as the layer goes |
 | figures | the reached milestone's `standing.epics` / `.features` off `useRoadmap().selected` by `moment.name`; no such milestone drops both |
@@ -12633,7 +12693,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/EpicCard.tsx
 ## MAN-7773 — The roadmap screen's pieces — StateLine, FeatureRow, EpicCard, MilestoneFocus — EpicCard
 section: The roadmap screen's pieces — StateLine, FeatureRow, EpicCard, MilestoneFocus and useStepPhrase (src/modules/roadmap)/003 EpicCard
 
-- `Card` with `data-roadmap-epic=<name>`: `CompletionRing` (shipped over `epic.standing.features`, a check at share 1), title, `roadmap.epic.count` when the epic has features, a word badge (`empty` and `not started` neutral, `in progress` info, `complete` positive), the `ActionMenu` (label `roadmap.menu.actions`).
+- `Card` with `data-roadmap-epic=<name>`: `CompletionRing` (shipped over `epic.standing.features`, a check at share 1), title, `roadmap.epic.count` when the epic has features, a word badge spelled through `ROADMAP_EPIC_WORD_KEYS` (`src/shared/constants.ts`, shared with the tree: MAN-7827) (`empty` and `not started` neutral, `in progress` info, `complete` positive), the `ActionMenu` (label `roadmap.menu.actions`).
 - Cases line under the count and word, once the epic keeps one: MAN-7660.
 - Under the head: the blocked badge (`roadmap.blocked`, three lines, the whole reason), the goal in one line (`oneLine` takes the `>` markers off), the features as a sortable `ul` of `FeatureRow` at `full`, then `Add a feature`.
 - A drop on the feature list: `writes.move({ kind: 'plan', name, before: <the key after it in the new order> })`, else `after: <the key before it>` when it is last (`useSortable`'s `onReorder` returns the promise, so the row stays where it was dropped until the frame lands: MAN-7577). This list sits inside one of `MilestoneFocus`'s items; a press on a row carries the row alone.
@@ -12745,14 +12805,14 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/RoadmapHeade
 
 ## MAN-7640 — The roadmap face — RoadmapTab, RoadmapPath and RoadmapPicker (src/modules/roadmap)
 
-The Roadmap tab's pane; the tab on the strip (id, slot, gate, pill, amber mark, palette, landing): MAN-7654. Two faces: `RoadmapPath` (with `RoadmapPicker`; reads `useRoadmap`, writes through `useRoadmapWrites`) and `RunnerPanel` (MAN-642). `index.ts` exports `RoadmapTab` lazily beside `RoadmapFeed`; `WorkspaceMain` mounts it as the `runner` pane with `revealPlan`, `onRevealed`, `openRoadmap` and `onRoadmapOpened` from `useRunnerLanding` (MAN-7531). Header and rail: MAN-7639. Path and its moment: MAN-7638. Rows, cards and stage: MAN-7637. Context, dialog host, card opener, rail sections: MAN-7650. Moment layer: MAN-7636. Words: MAN-7634. Client: MAN-7635.
+The Roadmap tab's pane; the tab on the strip (id, slot, gate, pill, amber mark, palette, landing): MAN-7654. Two faces: `RoadmapPath` (with `RoadmapPicker`; reads `useRoadmap`, writes through `useRoadmapWrites`) and `RunnerPanel` (MAN-642). `index.ts` re-exports `RoadmapTab` lazily (the one lazy door is `lazyRoadmapTab.ts`) beside `RoadmapFeed`; the chat gutter's Roadmap widget draws it too, at full screen and handed no landing (`RoadmapWidgetFullscreenBody`, MAN-7668); `WorkspaceMain` mounts it as the `runner` pane with `revealPlan`, `onRevealed`, `openRoadmap` and `onRoadmapOpened` from `useRunnerLanding` (MAN-7531). Header and rail: MAN-7639. Path and its moment: MAN-7638. Tree: MAN-7827, MAN-7828. Rows, cards and stage: MAN-7637. Context, dialog host, card opener, rail sections: MAN-7650. Moment layer: MAN-7636. Words: MAN-7634. Client: MAN-7635.
 
 
 Pieces
 | file | export | props | draws |
 |---|---|---|---|
 | `RoadmapTab.tsx` | `RoadmapTab` | `{ revealPlan: string \| null, onRevealed: () => void, openRoadmap: string \| null, onRoadmapOpened: () => void }` | `Tabs` over `RoadmapPath` or `RunnerPanel` |
-| `RoadmapPath.tsx` | `RoadmapPath` | `{ onOpenCard: (plan) => void }` | the face: banner, header, stage, rail, layer |
+| `RoadmapPath.tsx` | `RoadmapPath` | `{ onOpenCard: (plan) => void }` | the face: banner, header, tree, stage, rail, layer |
 | `RoadmapPicker.tsx` | `RoadmapPicker` | `{ size: 'md' \| 'sm' }` | library `Select` of roadmap titles |
 - `RoadmapPicker` is drawn at `sm` by `RoadmapHeader` and `RoadmapWidgetBody` (MAN-7668); `md` has no consumer. The barrel does not export it.
 
@@ -12769,12 +12829,18 @@ Pieces
 - The tab retires nothing on unmount; `useRunnerLanding` drops both held names (`revealPlan`, `openRoadmap`) when `activeTab` leaves `runner` (MAN-7531). why: dev StrictMode's mount/unmount/mount would retire every landing from inside the tab.
 - An arc's plan is revealed in three moves, its deck, the deck's strip paged to the card (`pageStripToCard`, MAN-642), then the card scrolled whole into view; both entries use it.
 
-## RoadmapPath
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/RoadmapPath.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/RoadmapPicker.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/RoadmapTab.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-roadmap-tab.mjs
+
+## MAN-7829 — The roadmap face — RoadmapTab, RoadmapPath and RoadmapPicker — RoadmapPath
+section: The roadmap face — RoadmapTab, RoadmapPath and RoadmapPicker (src/modules/roadmap)/001 RoadmapPath
+
 - Box: `div[data-roadmap-face]`, `relative flex h-full min-h-0 flex-col`. It is the celebrations' box: `rootRef` is what `useCelebrations` watches, `CelebrationLayer` (`scope="face"`) is its LAST child, outside the `ScrollArea`, and `CelebrationContext.Provider value={active}` wraps it.
 - States in order:
   - loading: `picture === null`, or roadmaps exist and `selected === null`: `Spinner` `roadmap.loading`.
   - no roadmap: `EmptyState` `roadmap.empty.none`, `roadmap.empty.noneMessage`, action `roadmap.picker.new`.
-  - the face, in a `ScrollArea` (`scrollRef`), `max-w-screen-2xl`: unplaced banner, `RoadmapHeader`, then the stage.
+  - the face, in a `ScrollArea` (`scrollRef`), `max-w-screen-2xl`: unplaced banner, `RoadmapHeader`, the tree, then the stage.
+- The tree: `RoadmapTree` (MAN-7827) between the header and the stage, drawn while the roadmap holds a milestone, `maxHeight={null}`, `paneRef` = `treePaneRef`. `layout` = `layoutTree(selected, goalText)` (MAN-7819), memoised on `selected` and `goalText`. `selected` and `onSelect` are stubs (`selected={null}`, a no-op) until the tree's fills land.
+- The old stage and the tree both draw `[data-roadmap-milestone]` and `[data-roadmap-epic]` until the face phase removes the old pieces: MAN-7828 Traps.
 - The stage: `MilestoneFocus` (keyed by milestone name) beside `RoadmapRail`: side by side from 1280px (`xl:flex-row`), stacked below. A roadmap with no milestone draws `EmptyState` `roadmap.empty.noPath`, action `roadmap.menu.addMilestone`.
 - Unplaced banner: `Banner tone="info"`, `data-roadmap-unplaced`, drawn only while `unplaced` holds an epic or a feature; `roadmap.unplaced.banner` with `count`; one grid row per item: `Badge` `roadmap.kind.epic` or `roadmap.kind.feature`, the title, a secondary `Place…` button (`roadmap.unplaced.place`) with `aria-describedby` its title.
 - Stage order: the milestone a moment is playing on, else the one pressed (`focusedName`), else `selected.current`, else the last. why: an epic card and a feature row play their part only where drawn, and a milestone's last feature shipping moves `current` on.
@@ -12787,6 +12853,12 @@ Pieces
 - `RoadmapFaceContext.Provider` wraps the `CelebrationContext.Provider`: value `{ openDialog: setDialog, openCard: onOpenCard, focus }` (MAN-7650). One context, read by every press under the face; `onOpenCard` also goes to `FeatureDialog` through `OpenDialog`.
 
 Presses owned by the face
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/RoadmapPath.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/RoadmapPicker.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/RoadmapTab.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-roadmap-tab.mjs
+
+## MAN-7830 — The roadmap face — RoadmapTab, RoadmapPath and RoadmapPicker — press
+section: The roadmap face — RoadmapTab, RoadmapPath and RoadmapPicker (src/modules/roadmap)/002 press
+
 | press | does |
 |---|---|
 | picker choice | `useRoadmap().select(name)`: `roadmapSelected` (MAN-7635) |
@@ -13008,7 +13080,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/modals/Block
 
 ## MAN-7648 — The roadmap celebrations — useCelebrations, celebrationMoments and seenStamp (src/modules/roadmap/hooks, src/modules/roadmap/utils)
 
-`useCelebrations` decides which moments play on a surface and when. Moments are read off the picture's own dates, never stored. `Moment` and `CelebrationActive`: MAN-7635. Drawn by `CelebrationLayer` (MAN-7636), `FeatureRow` and `EpicCard` (MAN-7637), `MilestonePath` (MAN-7638). Mounted by `RoadmapPath` (MAN-7640). Words: MAN-7634 (`roadmap.celebrate.*`). Stamp preference: INV-6580.
+`useCelebrations` decides which moments play on a surface and when. Moments are read off the picture's own dates, never stored. `Moment` and `CelebrationActive`: MAN-7635. Drawn by `CelebrationLayer` (MAN-7636), `FeatureRow` and `EpicCard` (MAN-7637), `MilestonePath` (MAN-7638), the tree's nodes (MAN-7827, MAN-7828). Mounted by `RoadmapPath` (MAN-7640). Words: MAN-7634 (`roadmap.celebrate.*`). Stamp preference: INV-6580.
 
 ## Files
 | file | owns |
@@ -13156,6 +13228,7 @@ The Roadmap tab is the workspace tab whose id is `runner`: label `Roadmap`, glyp
 - The In flight switch inside the tab reads the same two numbers: its pill (`count`, none at 0) and its amber (`attention`).
 
 ## Two faces
+- The chat gutter's Roadmap widget draws this same tab at full screen, handed no landing (`RoadmapWidgetFullscreenBody`, MAN-7668): both faces behind the same switch; a card press there turns to In flight through the tab's own `openCard`.
 - `RoadmapTab({ revealPlan, onRevealed, openRoadmap, onRoadmapOpened })` mounts as the `runner` pane: `{shouldShowRunnerTab && activeTab === 'runner' && <RoadmapTab … />}` in `WorkspaceMain`, imported from the roadmap barrel (lazy).
 - `face` is local state, `path` or `inFlight`, default `path`, never remembered: every visit opens on Roadmap. `data-roadmap-tab=<face>`.
 - A restored `runner` tab lands on the pane (`VALID_TABS`); choosing a conversation returns to chat from it, as from every tab (`handleSessionSelect`).
@@ -13226,6 +13299,7 @@ A moment is read off the picture's own dates (`done_at`, `shipped_at`, `complete
 | milestone | a milestone became `reached` | `reached_at` later than the stamp | `MilestonePath`: the rail draws to the station (`animate-roadmap-draw`, 900 ms), the station blooms (`animate-roadmap-bloom`, 900 ms) with three rings. From 900 ms `CelebrationLayer`: scrim, 48 particles, banner | 3500 ms |
 - Live: only an item the previous picture held can become anything; one arriving already finished is not news.
 - A task moment is its FEATURE's (`name`, `title`).
+- The tree's nodes (MAN-7827) play their own part of the same moments, read from `CelebrationContext`: a milestone's ring and its goal connector, an epic's ring and burst, a feature's dot (a task moment blooms its feature's dot). What each draws, and the reduced-motion halo: MAN-7828.
 
 ## Rules
 1. Order: size (task, feature, epic, milestone), then date, then name. One moment at a time, `GAP_MS` = 300 ms between; the stage holds on the moment's milestone through the beat.
@@ -13374,7 +13448,30 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/report.mjs, /home/ly
 
 ## MAN-7668 — The roadmap widget body — RoadmapWidgetBody and useMilestoneMomentInView (src/modules/roadmap)
 
-`RoadmapWidgetBody` is the chat gutter's Roadmap widget: the roadmap the tab shows, at a column's width, built from the tab's own pieces. Mounted: `GutterWidgetId` member `roadmap`, `DEFAULT_PLACEMENTS` and the `ChatGutterLayout` table entry (MAN-7526); the barrel exports it eagerly (MAN-7635). Tab: MAN-7640. Pieces it draws: MAN-7637, MAN-7638, MAN-7639. Layer: MAN-7636. Words: MAN-7634. Probe: MAN-7671.
+`RoadmapWidgetBody` is the chat gutter's Roadmap widget: the roadmap the tab shows, at a column's width, built from the tab's own pieces. At full screen the widget is the tab itself (`RoadmapWidgetFullscreenBody`, "At full screen" below). Mounted: `GutterWidgetId` member `roadmap`, `DEFAULT_PLACEMENTS` and the `ChatGutterLayout` table entry (MAN-7526); the barrel exports it eagerly (MAN-7635). Tab: MAN-7640. Pieces it draws: MAN-7637, MAN-7638, MAN-7639. Layer: MAN-7636. Words: MAN-7634. Probe: MAN-7671.
+
+## At full screen
+The card at full screen (`GutterWidgetFrame` `fullscreen`, MAN-7526) draws everything the Roadmap tab draws, by rendering the tab's own composition and not a second copy of it (a change to the tab is a change here). At a column's width the widget stays the digest below.
+- `RoadmapWidgetFullscreenBody` (`RoadmapWidgetFullscreenBody.tsx`, exported by the barrel; props none) renders `RoadmapTab` (MAN-7640): the `Tabs` switch (`roadmap.faces.label`) over the Roadmap face (`RoadmapPath`: unplaced banner, header with the picker at `sm`, stage, rail, celebration layer at `face`) and the In flight face (`RunnerPanel`, the live cards, with the strip's own pill and amber). The face is the tab's own local state and opens on Roadmap every time.
+- The swap is the layout's: the `widgets` table entry for `roadmap` has `FullscreenBody: RoadmapWidgetFullscreenBody` beside `Body: RoadmapWidgetBody` (MAN-7526); `ChatGutterLayout` draws `FullscreenBody` in place of `Body` while `fullscreen === widget`, and `Body` again after. `<Boundary>` is keyed `fullscreen` / `column` for a widget that has a `FullscreenBody`, so a crash in one body never leaves the boundary tripped over the other; a widget without one keeps its one body and its identity (the Embed widget's iframe is never remounted).
+- The tab's landing props, settled for a widget:
+| prop | here | why |
+|---|---|---|
+| `revealPlan` | `null` | `?runner=<plan>` is the workspace's request (`useRunnerLanding`, MAN-7531), held for the tab it brings forward; a widget holds none |
+| `openRoadmap` | `null` | the same for `?roadmap=<name>` (MAN-7748) |
+| `onRevealed` | `NOTHING_TO_RETIRE` (a no-op) | a card press's request lives in the tab (`requestedPlan`); this is called when its reveal has run, with nothing of the workspace's to retire |
+| `onRoadmapOpened` | `NOTHING_TO_RETIRE` | never called: it answers an `openRoadmap` that is never non-null |
+- A card press inside it still turns to In flight and reveals the card: a feature's Open its card or Answer (the row's, or its dialog's) goes through the tab's own `openCard` (the face context `RoadmapPath` provides), which turns the face and hands the plan to `RunnerPanel`. It is not the `?runner=` landing the digest uses, because a tab is above it.
+- `RoadmapTab` is reached through `lazyRoadmapTab.ts`, the one lazy door the barrel also re-exports for `WorkspaceMain`: the chat's first paint carries the digest only, and the first press of the fullscreen switch shows `Spinner` `roadmap.loading` while the chunk loads.
+- Leaving full screen (the switch, or Escape, which belongs to the layout) mounts the digest fresh and unmounts the tab with its face, focused station and dialogs. The tab held the focus, so `GutterWidgetFrame` hands a focus that fell to `<body>` back to the card's fullscreen switch (MAN-422); leaving by the switch has it there already. Nothing is written for the fullscreen itself: the placement stays untouched (`open = fullscreen || placed`, MAN-7526). The picker inside writes `roadmapSelected` as it does everywhere (one selection, MAN-7655).
+- No widget at a phone's width: the gutters draw only where `enabled={!isMobile && !floating}` and the chat region is 1500px or more (the viewport less 49px: 1560px draws, 1540px does not, measured 2026-10-06), so the phone's Roadmap is the tab.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/hooks/useMilestoneMomentInView.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/lazyRoadmapTab.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/RoadmapWidgetBody.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/RoadmapWidgetFullscreenBody.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/roadmap-fullscreen-reads.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/roadmap-fullscreen-walks.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-roadmap-widget-fullscreen.mjs
+
+## MAN-7790 — The roadmap widget body — RoadmapWidgetBody and useMilestoneMomentInView — Proof: `node .verify/probe-roadmap-widget-fullscreen.mjs` (`--before` takes the same shots against
+section: The roadmap widget body — RoadmapWidgetBody and useMilestoneMomentInView (src/modules/roadmap)/001 Proof: `node .verify/probe-roadmap-widget-fullscreen.mjs` (`--before` takes the same shots against
+
+- Proof: `node .verify/probe-roadmap-widget-fullscreen.mjs` (`--before` takes the same shots against the unchanged widget; shots in `.verify/shots/roadmap-widget-fullscreen/`). Measured 2026-10-06, dev client, dev account, light and dark at 1680×1000: per roadmap the picker offers (Restorly: 0 rail rows; lyphecli: 7, section `inFlight`), the DOM reading of the tab's faces equals the widget's (switch labels, picker, goal, stations, stage, epic cards, rail sections and rows, In flight arcs and plans); a feature dialog's Open its card inside the widget turned to In flight and put card `cerberus--center` whole on screen; leaving by the switch and by Escape brought `[data-roadmap-widget]` back and removed `[data-roadmap-tab]`; no gutter write, no dispatcher or roadmap write; console errors 0. At 1560px the full face drew 3 stations. At 390px `[data-testid=gutter-widget]` is 0; the tab alone drew both faces (3 stations, 9 cards). Before the change the same comparison failed 13 checks: the card held the digest and no `[data-roadmap-tab]`.
 
 ## Reads and state
 | name | source |
@@ -13406,7 +13503,11 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/report.mjs, /home/ly
 - `railSections` supplies each section in path order (MAN-7650). Blocked lists first a feature no section above drew, so its one row brings a reason the In flight row did not say; its heading still counts every blocked feature.
 - Focus: the milestone a moment plays on (`playingMilestone`, MAN-7648), else the one pressed here, else `selected.current`, else the last. A press focuses this widget only; the tab keeps its own stage.
 
-## Count and amber
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/hooks/useMilestoneMomentInView.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/RoadmapWidgetBody.tsx
+
+## MAN-7791 — The roadmap widget body — RoadmapWidgetBody and useMilestoneMomentInView — Count and amber
+section: The roadmap widget body — RoadmapWidgetBody and useMilestoneMomentInView (src/modules/roadmap)/002 Count and amber
+
 - Drawn by the gutter frame's badge, not by this body: `ChatGutterLayout` reads `useRoadmap().selected.standing` (MAN-7526).
 - Count = `standing.designing + standing.in_flight`: the features being designed or built, each read `?? 0`. No roadmap, or a picture with no `standing`: 0.
 - Amber (`countTone: 'warn'`) = `standing.waiting_on_you > 0`: a feature waits on the operator's Accept or answers.
@@ -13447,7 +13548,11 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/report.mjs, /home/ly
 | `openRoadmap` is `setSearchParams({ [ROADMAP_LANDING_PARAM]: selected.name }, { replace: true })` | `ROADMAP_LANDING_PARAM` (`src/shared/constants.ts`) is the one spelling `useRunnerLanding` reads (MAN-7748) |
 | `useMilestoneMomentInView(moment, scrollRef)` with `scrollRef` on the body's `ScrollArea` | a milestone moment brings its station into the widget's scroller before it plays |
 
-## useMilestoneMomentInView
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/hooks/useMilestoneMomentInView.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/RoadmapWidgetBody.tsx
+
+## MAN-7792 — The roadmap widget body — RoadmapWidgetBody and useMilestoneMomentInView — useMilestoneMomentInView
+section: The roadmap widget body — RoadmapWidgetBody and useMilestoneMomentInView (src/modules/roadmap)/003 useMilestoneMomentInView
+
 `useMilestoneMomentInView(moment: Moment | null, scrollRef: RefObject<HTMLElement | null>): void` — `hooks/useMilestoneMomentInView.ts`. Callers: `RoadmapPath` (the face's scroller), `RoadmapWidgetBody` (the widget's).
 - Acts only for `moment.level === 'milestone'`; finds `[data-roadmap-milestone="<name>"]` under `scrollRef.current`.
 - Acts only when the station's rect lies outside the scroller's rect on any edge; a station in view is left alone.
@@ -13461,14 +13566,16 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/report.mjs, /home/ly
 - Badge and sections disagree: the badge is `designing + in_flight` (MAN-7526); no section lists `designing`. 2026-10-04, Restorly: badge 1 over `roadmap.widget.quiet`.
 - Measured 2026-10-04 at 1680×1000, column 365.5px, body content 339.5px, light and dark: every text passes AA except the meter's `Shipped` label, 3.34:1 light, 4.32:1 dark. It is the library `Meter`'s own label colour, shared with every row's `Done`.
 - Left column with Runs, Memory and Subagents all open (the account's arrangement 2026-10-04): the card sits at the frame's 16rem floor and scrolls inside. With the column to itself the card is over 600px tall.
-- The gutters never draw on mobile: no phone width was checked.
+- A card left full screen while the chat pane is hidden (another workspace tab brought forward, e.g. by a notification tap) stays `data-fullscreen` behind the hidden pane, because the layout reads a 0-width region as no answer, so the whole `RoadmapTab` stays mounted there beside the workspace's own (two `[data-roadmap-tab]` roots, the in-card one not visible) until Escape or a return to Chat — not for a moment. The layout's capture-phase Escape listener lives as long as `fullscreen !== null`, so the first Escape pressed on the visible tab is taken by it (it ends the hidden fullscreen) and never reaches that tab's own Escape handling.
+- The gutters never draw on mobile or below a 1500px region: there is no widget at a phone's width (read 2026-10-06, 390px: 0 `gutter-widget`).
+- At full screen the card holds the tab's own `[data-roadmap-tab]`, `[data-roadmap-face]` and `[data-runner-panel]`, so a probe reading the workspace's pane scopes out anything inside `[data-widget]` (`lib/roadmap-fullscreen-reads.mjs` does).
 - `useCurrentStationInView` acts only below 768px, not whenever the track overflows (MAN-7650).
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/hooks/useMilestoneMomentInView.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/RoadmapWidgetBody.tsx
 
 ## MAN-7671 — The Roadmap widget probe — probe-roadmap-widget.mjs, its parts, its libs and what it puts back
 
-`.verify/probe-roadmap-widget.mjs` walks the chat gutter's Roadmap widget (MAN-7668) on the running app, signed in as `verve` (`DEV_USER`, `lib/console.mjs`), at 1680×1000, on the operator's own roadmaps. No roadmap is written. The whole-screen probe is MAN-7663; its restore and store libs (`roadmap-restore.mjs`, `roadmap-store.mjs`, `roadmap-exit.mjs`) are shared.
+`.verify/probe-roadmap-widget.mjs` walks the chat gutter's Roadmap widget (MAN-7668) on the running app, signed in as `verve` (`DEV_USER`, `lib/console.mjs`), at 1680×1000, on the operator's own roadmaps. No roadmap is written. The widget at full screen has its own probe, `.verify/probe-roadmap-widget-fullscreen.mjs` (MAN-7668 "At full screen"): the tab against the widget by DOM reading, per roadmap, light and dark, every dispatcher and roadmap write stubbed, and every preference write after sign-in dropped (`openConsole`'s own setup still rewrites the dev account's `theme` and `simpleChatList`, as for every probe on `lib/console.mjs`). The whole-screen probe is MAN-7663; its restore and store libs (`roadmap-restore.mjs`, `roadmap-store.mjs`, `roadmap-exit.mjs`) are shared.
 
 ## Run
 | command | does |

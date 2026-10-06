@@ -99,7 +99,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/main.tsx, /home/lyphe/.claud
 ## MAN-740 — The library those tokens paint
 section: README/002 The library those tokens paint
 
-Twenty-six components carry Verve paint today — Phase 2's twelve, then Phase 3's six new and
+Twenty-nine components carry Verve paint today — Phase 2's twelve, then Phase 3's six new and
 three restyled, then DockableFab and SplitPane for the application switcher's kit scaffold,
 admitted on the barrel's *mechanism* test rather than its two-module rule (`index.ts`'s own
 header), then `ResizeGrip` for chat-host's floating panel, admitted on that same mechanism test
@@ -107,7 +107,8 @@ header), then `ResizeGrip` for chat-host's floating panel, admitted on that same
 admitted on the ordinary two-module rule (the file-editor and file-manager modules both render it)
 and painting nothing of its own: it is `Dialog` and `Button` underneath, both already painted;
 then `TextArea` for the roadmap's goal field, which wears `Input`'s own `.vv-input` paint and adds
-its geometry in `panels.css`.
+its geometry in `panels.css`; then `Sheet`, `Timeline` and `Steps` for the Cerberus tab's detail,
+painted in that same `panels.css` (`Steps` and not `Stepper`, which is the numeric minus/plus control).
 What they share is the contract every later one joins:
 
 1. **A component is a flat file in `src/shared/ui/`.** `verve/` holds stylesheets and nothing
@@ -116,7 +117,9 @@ What they share is the contract every later one joins:
    live in `controls.css` as `.vv-<name>` / `.vv-<name>--<variant>`; the `className` spells only
    size and flow (`inline-flex`, `h-10 px-4`). A colour utility inside a library file is a second
    paint mechanism, and the harness greps every file it has restyled for one. The ban is on the
-   library file, not the call site: a caller's own `className` still wins over `.vv-*`, by design — except `TextArea`'s colours (rule 6).
+   library file, not the call site: a caller's own `className` still wins over `.vv-*`, by design — except `TextArea`'s colours (rule 6). One library file does spell a colour name: `Timeline`'s
+dot is `data-tone` + `bg-tone-dot`, the tone swap's own dot, which is what keeps it and a status mark
+drawn the same way elsewhere from drifting (`panels.css`'s header).
 3. **Marker classes are surface, not decoration.** `vv-button--<variant>`, `vv-badge--<variant>`
    and `data-tone` are what a verify script queries to prove a variant painted; rename one and a
    gate that never reads your source goes quiet. A variant emitting no marker is unprovable.
@@ -137,7 +140,9 @@ What they share is the contract every later one joins:
    rules that say `.vv-input`'s colours and ground back over `src/index.css`'s `!important` pins on every bare
    `textarea` (the piece's own header says why): every rule there that must beat `index.css` sits at three
    class-level parts (`.vv-input.vv-textarea.vv-textarea`), so a new one needs the same height, and a
-   caller's `text-*` class loses to a TextArea's colours — only its ground defers to `bg-transparent`. Each is imported
+   caller's `text-*` class loses to a TextArea's colours — only its ground defers to `bg-transparent`.
+   `Sheet`, `Timeline` and `Steps` joined it there, sharing no selector with any other sheet; the header of
+   `panels.css` names the two departures from rule 2 the file holds. Each is imported
    from the barrel exactly as the ones before it, and the order is load-bearing at both ends:
    `surfaces.css` and `panels.css` share no selector with their neighbours (`panels.css` wins its ties
    by specificity, never by order), so they only have to land before

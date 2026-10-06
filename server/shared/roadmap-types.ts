@@ -29,7 +29,7 @@ export type RoadmapFeatureWord = 'idea' | 'proposed' | 'designing' | 'in flight'
 
 /**
  * The finer step under a feature's word. `designing` carries the steps `designing`, `questions`,
- * `cutting`, `parked` and `accept`; `in flight` carries `building`, `paused`, `queued`, `waiting`
+ * `cutting`, `parked` and `accept`; `in flight` carries `building`, `paused`, `queued`, `stalled`, `waiting`
  * and `starting`; every other word is its own step. Consumers: the roadmap lane's reader and the screen.
  */
 export type RoadmapFeatureStep =
@@ -44,6 +44,7 @@ export type RoadmapFeatureStep =
   | 'waiting'
   | 'queued'
   | 'paused'
+  | 'stalled'
   | 'starting'
   | 'shipped';
 

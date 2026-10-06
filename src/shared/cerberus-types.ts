@@ -23,10 +23,11 @@
 //----------------- VOCABULARY ------------
 
 /**
- * The four statuses a result row can carry in the store: the only ones ever written. `ok`, `warn`
- * and `failing` come from a probe's own verdict or a health document's green, yellow and red;
- * `denied` is the only red — a command the warden refused or a credential that was said no to.
- * A result with no status at all (`null`) means "not enabled" and is stored as null, never spelled.
+ * The four statuses a result row's `status` can carry in the store: the only ones ever written
+ * there. `ok`, `warn` and `failing` come from a probe's own verdict or a health document's green,
+ * yellow and red; `denied` is the only red — a command the warden refused or a credential that was
+ * said no to. A result with no status at all (`null`) means "not enabled" and `status` stores it as
+ * null; only a row's `prev_status` spells it, as `not_enabled`, when the row before it had none.
  */
 export type CerberusStoredStatus = 'ok' | 'warn' | 'failing' | 'denied';
 
@@ -142,10 +143,14 @@ export type CerberusServiceView = {
 
 /**
  * One node as the fleet shows it. `role` is `hub` for center's own node and `node` for every warden.
- * `link` is `reporting` (heard within 90 s), `silent` (a warden that has reported before and is
- * not heard now, which is every node from boot until its warden is heard again) or `never` (enrolled,
- * and its warden has not yet sent a first heartbeat). `silentSince` is when the silence began and
- * `lastHeardAt` the last frame of any kind; `enrolledAt` is null for the hub.
+ * The hub has no warden and no link state: its `link` is `reporting`, its `lastHeardAt` is the
+ * moment of its newest self-check, its `wardenVersion`, `silentSince` and `enrolledAt` are null, and
+ * no silence is laid over its checks.
+ * For a warden, `link` is decided in this order: `never` when the node has no first heartbeat on
+ * record (the tab says "Waiting for the first heartbeat"; it wins over `silent`, so a boot does not
+ * turn it into one), else `reporting` when heard within 90 s, else `silent`. `lastHeardAt` is the
+ * last frame of any kind, and when nothing has been heard since this boot it is the node row's
+ * stored last heartbeat; `silentSince` is that plus 90 000 while silent, null otherwise.
  */
 export type CerberusNodeView = {
   id: string;
@@ -226,12 +231,16 @@ export type CerberusResultRow = {
 };
 
 /**
- * What a check was at one asked moment `at`. `verdict` is `result` (a stored row was fresh then),
- * `stale` (the latest row at or before it was older than `staleAfter` then, so the answer is "no
- * result" and never the old status), `too_early` (no result is recorded at or before it) or
- * `future` (the moment has not happened). `resultAt` is the `at` of the row the answer rests on and
- * `mute` the mute that covered the moment, if any. Answered by `GET /api/cerberus/lookup` and
- * carried inside `CerberusCheckDetail`.
+ * What a check was at one asked moment `at`. `verdict` is `result` (the check was fresh then — no
+ * row need have been stored at that very moment, since a quiet check stores only a change or a
+ * keep-alive), `stale` (no result had reached center within `staleAfter` of the moment, so the
+ * answer is "no result" and never the old status), `too_early` (no result is recorded at or before
+ * it) or `future` (the moment has not happened). Freshness rests on continuity, never on the stored
+ * row's own age: between two stored rows a moment is fresh while it is no later than the next row's
+ * `prevAt` + `staleAfter`, and past the latest row while it is no later than center's in-memory
+ * last-received time for the check + `staleAfter`. `resultAt` is the `at` of the stored row the
+ * answer rests on and `mute` the mute that covered the moment, if any. Answered by
+ * `GET /api/cerberus/lookup` and carried inside `CerberusCheckDetail`.
  */
 export type CerberusLookup = {
   node: string;
@@ -245,9 +254,10 @@ export type CerberusLookup = {
 };
 
 /**
- * What `GET /api/cerberus/checks/:node/:service/:check` answers: the check, its sibling checks of
- * the same service, a strip of 60 cells, the most recent stored results and the lookup at the
- * moment the caller asked about (or now).
+ * What `GET /api/cerberus/checks/:node/:service/:check` answers: the check and its sibling checks of
+ * the same service (both as they read now), a strip of 60 cells, the stored change rows of the 3 h
+ * before the strip's end and the lookup at the moment the caller asked about. The strip and the rows
+ * stand at the caller's `end` — now unless one earlier is asked — and the lookup defaults to it.
  */
 export type CerberusCheckDetail = {
   check: CerberusCheckView;

@@ -21,7 +21,8 @@ type CaseMark = { key: string; count: number; tone: 'warn' | 'neutral' };
  * not-run number of "· 2 not run yet" is `cases.not_run`, which the caller already holds.
  *
  * Used by `FeatureRow` — and so by the epic card's rows and by the rail and the chat gutter's roadmap
- * widget, which draw that row — so the row, the card and the widget read one rule.
+ * widget, which draw that row — and by the tree's feature panel (`panel/FeaturePanel`, its Cases fact), so
+ * the row, the card, the widget and the panel read one rule.
  */
 export function caseMark(cases: RoadmapCases): CaseMark | null {
   if (cases.total === 0) return null;

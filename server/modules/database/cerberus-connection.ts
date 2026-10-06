@@ -121,7 +121,11 @@ export function getCerberusConnection(): Database.Database {
  * Closes the Cerberus connection and clears the singleton, so the next
  * `getCerberusConnection()` opens the file afresh.
  *
- * Consumer: the cerberus module's `stop()`, at graceful shutdown.
+ * Consumers: the `store`, `read-model` and `gateway` probes in `.verify/probe-cerberus-*.mjs`, which
+ * close it as their last act (`probe-cerberus-store.mjs` also reopens it once, to prove the steps
+ * idempotent).
+ * The server never calls it: `cerberus.module.ts`'s `stop()` stops the self-checks, the prune and
+ * the gateway's accepting, and the handle closes with the process.
  */
 export function closeCerberusConnection(): void {
   if (instance) {

@@ -64,6 +64,7 @@ import { createKanbanModule } from './modules/kanban/index.js';
 import { createKanbanMetisModule, kanbanMetisSecretGuard } from './modules/kanban-metis/index.js';
 import { createMemoryIntakeModule, listMemoryCandidates } from './modules/memory-intake/index.js';
 import { createNotesModule } from './modules/notes/index.js';
+import { createCerberusModule } from './modules/cerberus/index.js';
 import { createDispatchSoulsModule } from './modules/dispatch-souls/index.js';
 import { createHealModule } from './modules/heal/index.js';
 import { createAgentLaunchModule } from './modules/agent-launch/index.js';
@@ -268,6 +269,14 @@ app.use('/api/memory', authenticateToken, createMemoryIntakeModule());
 // four verbs are the whole of it. Every write here sends one `notes_changed` to the open sockets, and
 // the frame names neither a note nor an account — a client that hears it reads its own list again.
 app.use('/api/notes', authenticateToken, createNotesModule());
+
+// The fleet's health (protected), mounted at this ONE address. Its gateway — where each node's
+// warden dials in — is a listener of its own on the tailnet, never a path on this server, so
+// nothing a signed-in user holds opens it and `HOST` stays loopback. Built once here because its
+// store and gateway start after `listen`, its self-checks are a sole-server duty, and shutdown has
+// to stop all three.
+const cerberus = createCerberusModule({ supervised });
+app.use('/api/cerberus', authenticateToken, cerberus.router);
 
 // The SAME board router behind a second door, for the `kanban-pm` MCP child and nothing else —
 // no verb is duplicated here, and there is deliberately NO `authenticateToken`: a Metis is not a
@@ -585,6 +594,8 @@ async function soleServerDuties() {
     // because on a handover this is the line the takeover runs, which is the moment the job's answer
     // becomes knowable.
     claudeUpdates.startReconciler();
+    // Center's own three checks and the store's daily prune: rows only the serving process may write.
+    cerberus.soleDuties();
 }
 
 // Stops the stall watchdog on shutdown. Assigned inside the `listen` callback that
@@ -642,6 +653,11 @@ async function startServer() {
             dispatcher.start();
             roadmap.start();
 
+            // The fleet's health: the store, the center key and the warden gateway, opened here
+            // because the gateway is a second listener and this boot has only now begun serving.
+            // Never rejects — a failure is logged and the API keeps serving.
+            void cerberus.start();
+
             // The Claude update check: armed here rather than at module build, because its first
             // tick writes a file and asks the registry, and a boot that never got this far has no
             // business doing either.
@@ -661,6 +677,9 @@ async function startServer() {
 
         // Clean up plugin processes on shutdown
         const shutdownRuntimeServices = async () => {
+            // The self-checks, the prune and the gateway's accepting stop before anything else: a
+            // tick or a new warden link on a process that is leaving would only meet its successor's.
+            cerberus.stop();
             // Stop accepting first and close idle sockets; websockets stay open until the exit (http-drain.ts).
             const drained = drainHttpServer();
             // Both start new work — a watcher-driven DB sync, a queued send — and the successor

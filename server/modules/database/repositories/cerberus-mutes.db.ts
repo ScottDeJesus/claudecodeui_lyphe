@@ -105,7 +105,9 @@ export const cerberusMutesDb = {
    * The mutes that began before `before`, newest activity first, at most `limit` — what the activity
    * feed turns into "muted", "lifted" and "expired" events. A mute is ranked by the newest of its
    * own moments that falls before `before`: its lift or expiry when that is already behind `before`,
-   * else its start. The service keeps the events that have actually happened.
+   * else its start. The service keeps the events that have actually happened. `limit` is clamped to
+   * a whole number of at least 0 — SQLite reads `LIMIT -1` as "no limit", and a negative must not
+   * dump the table.
    */
   recent(before: number, limit: number): CerberusMuteRow[] {
     return getCerberusConnection()
@@ -116,6 +118,6 @@ export const cerberusMutesDb = {
                         THEN COALESCE(lifted_at, until_at) ELSE from_at END DESC, id
           LIMIT @limit`
       )
-      .all({ before, limit }) as CerberusMuteRow[];
+      .all({ before, limit: Math.max(0, Math.trunc(limit)) }) as CerberusMuteRow[];
   },
 };

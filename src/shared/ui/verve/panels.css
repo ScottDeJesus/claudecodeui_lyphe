@@ -1,4 +1,5 @@
-/* Verve panel paint — the rules for the form pieces that do not fit the first two sheets.
+/* Verve panel paint — the rules for the pieces that do not fit the first two sheets: TextArea, and
+ * the three the Cerberus tab draws its detail with — Sheet, Timeline and Steps.
  *
  * The fifth paint file, opened rather than squeezed in: controls.css is past its stated ceiling,
  * feedback.css is at it, surfaces.css belongs to the three kit pieces that are mechanism, and
@@ -8,17 +9,22 @@
  * and nothing else; colour comes from tokens.css and nowhere else; no rule declares a `--tone-*`
  * property.
  *
- * ONE departure from "a piece carries its own paint": `.vv-textarea` invents none. A textarea's
- * border, ground, focus ring and amber invalid border are `.vv-input`'s (controls.css) — TextArea.tsx
- * carries both classes — because a second spelling of a field's paint is how two fields in one dialog
- * come to disagree by a shade. This file holds the geometry an input does not have, and says
- * `.vv-input`'s own colours and ground back where src/index.css's rules for a bare `textarea`
- * override them.
+ * TWO departures from "a piece carries its own paint", each for a reason:
+ *  - `.vv-textarea` invents none. A textarea's border, ground, focus ring and amber invalid border
+ *    are `.vv-input`'s (controls.css) — TextArea.tsx carries both classes — because a second
+ *    spelling of a field's paint is how two fields in one dialog come to disagree by a shade. This
+ *    file holds the geometry an input does not have, and says `.vv-input`'s own colours and ground
+ *    back where src/index.css's rules for a bare `textarea` override them.
+ *  - `.vv-timeline__dot` carries no colour. Its element spells `data-tone` + `bg-tone-dot` — the
+ *    tone swap's own dot, named in tailwind.config.js — so a timeline's dot and a status mark the
+ *    Cerberus tab draws the same way cannot drift, and the name has a consumer that makes Tailwind
+ *    emit it. The rule here is its geometry.
  *
  * Imported once, for side effect, from src/shared/ui/index.ts — after surfaces.css and before
  * board.css, which keeps the last word. Nothing here depends on its place against controls.css or
  * against src/index.css, which lands after this sheet: whatever has to beat `.vv-input`, a utility
- * in the class string or one of index.css's pins does so on specificity.
+ * in the class string or one of index.css's pins does so on specificity. The Sheet, Timeline and
+ * Steps rules share no selector with any sibling, so for them the order decides nothing.
  */
 
 /* ---------------------------------------------------------------- TextArea */
@@ -82,3 +88,133 @@
     background-color: var(--surface2) !important;
   }
 }
+
+/* ---------------------------------------------------------------- Sheet */
+/* A panel on the right edge over a scrim (`_ds_bundle.js`, Sheet). Verve's sheet is always mounted and
+ * transitions; this one is mounted while open, so the motion is an entrance — a `from` frame only,
+ * because the end state is the element's own, as `vv-meter-grow` is. Panel: translateX(110%) → 0 over
+ * .5s on --ease-enter. Scrim: a fade over .4s. Both sit behind the reduced-motion query, so a reader
+ * who asked for less gets the sheet in place. The scrim and shadow are Verve's own literals, as
+ * `.vv-dialog__backdrop`'s are: no token names either, and a light-ink wash would turn dark mode's
+ * scrim into a glow. */
+@keyframes vv-sheet-in { from { transform: translateX(110%); } }
+@keyframes vv-sheet-scrim { from { opacity: 0; } }
+
+.vv-sheet__scrim { background: rgba(16, 17, 22, 0.28); }
+.vv-sheet__panel {
+  background: var(--surface);
+  color: var(--ink);
+  border-left: 1px solid var(--border);
+  box-shadow: -16px 0 44px rgba(32, 26, 20, 0.12);
+}
+@media screen and (prefers-reduced-motion: no-preference) {
+  .vv-sheet__scrim { animation: vv-sheet-scrim 0.4s ease backwards; }
+  .vv-sheet__panel { animation: vv-sheet-in 0.5s var(--ease-enter) backwards; }
+}
+
+.vv-sheet__head { padding: 16px 20px; border-bottom: 1px solid var(--border); }
+/* Instrument Serif is never bold; the accent word is the italic and the green ink (accent TEXT is
+ * --accent-ink, the readable half — --accent is the fill). */
+.vv-sheet__title {
+  font-family: var(--font-display);
+  font-size: 20px;
+  font-weight: 400;
+  line-height: 1.2;
+  color: var(--ink);
+  /* A service id is one unbroken token (`snake_case_service_name`); it wraps rather than widening the
+   * head past the panel and taking the ✕ with it. */
+  overflow-wrap: anywhere;
+}
+.vv-sheet__accent { font-style: italic; color: var(--accent-ink); }
+.vv-sheet__close {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: var(--surface2);
+  color: var(--ink-muted);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  transition: background-color 0.15s;
+}
+.vv-sheet__close:hover { background: var(--border); }
+.vv-sheet__body { padding: 18px 20px; }
+.vv-sheet__foot { padding: 14px 20px; border-top: 1px solid var(--border); }
+
+/* ---------------------------------------------------------------- Timeline */
+/* A feed of rows (`_ds_bundle.js`, Timeline). Dense is one line a row: the summary is not drawn (the
+ * component leaves it out) and the title is cut with an ellipsis. Two inks moved one step up from
+ * Verve's, by measurement: the time is --ink-muted (5.1:1 light; Verve's --ink-faint is 3.3) and the
+ * source pill's text is --ink-mid on --surface2 (--ink-muted there is 4.46:1, a hair under AA at
+ * 11px). The row is a button, so its own chrome is reset here rather than left to a base layer. */
+.vv-timeline__item + .vv-timeline__item { border-top: 1px solid var(--surface2); }
+.vv-timeline__row {
+  padding: 11px 2px;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+.vv-timeline[data-density="dense"] .vv-timeline__row { padding: 8px 2px; }
+.vv-timeline__dot { width: 8px; height: 8px; margin-top: 7px; border-radius: 50%; flex: none; }
+.vv-timeline__source {
+  flex: none;
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  background: var(--surface2);
+  color: var(--ink-mid);
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.65;
+}
+/* `overflow-wrap: anywhere` on the title and summary because a check key or a service id is one
+ * unbroken token: left alone, a full row spilled past its column and the page scrolled sideways. A
+ * dense title is `nowrap` and keeps its ellipsis, which this does not touch. */
+.vv-timeline__title { font-size: 13.5px; font-weight: 500; color: var(--ink); overflow-wrap: anywhere; }
+.vv-timeline[data-density="dense"] .vv-timeline__title {
+  font-size: 13px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.vv-timeline__summary { margin-top: 1px; font-size: 12.5px; color: var(--ink-muted); overflow-wrap: anywhere; }
+.vv-timeline__when { flex: none; font-size: 11px; line-height: 1.65; color: var(--ink-muted); font-variant-numeric: tabular-nums; }
+.vv-timeline__chevron {
+  flex: none;
+  margin-top: 4px;
+  font-size: 10px;
+  line-height: 1.65;
+  color: var(--ink-faint);
+  transition: transform 0.3s var(--ease-enter);
+}
+.vv-timeline__row[aria-expanded="true"] .vv-timeline__chevron { transform: rotate(180deg); }
+.vv-timeline__detail { padding: 0 2px 12px 28px; font-size: 12.5px; color: var(--ink-muted); animation: vv-fade 0.25s ease both; }
+
+/* ---------------------------------------------------------------- Steps */
+/* The navigation stepper (`_ds_bundle.js`, Stepper): numbered rounds, a ✓ once done, the rail
+ * filling with the accent behind the step in hand. Number ink on the current round is --accent-ink,
+ * not --accent: it is a word, and --accent is the fill. A step not reached yet reads --ink-muted
+ * (Verve's --ink-faint is 3.3:1 on a white ground), and the current one steps up to --ink, so the
+ * state still never rests on colour alone: the ✓ and `aria-current` are in the markup. */
+.vv-steps__round {
+  width: 30px;
+  height: 30px;
+  box-sizing: border-box;
+  border: 1.5px solid var(--border-strong);
+  border-radius: 50%;
+  background: var(--surface);
+  color: var(--ink-muted);
+  font-size: 13px;
+  font-weight: 700;
+  transition: background-color 0.3s, border-color 0.3s, color 0.3s;
+}
+.vv-steps__step[data-state="current"] .vv-steps__round { border-color: var(--accent); color: var(--accent-ink); }
+.vv-steps__step[data-state="done"] .vv-steps__round { border-color: var(--accent); background: var(--accent); color: var(--on-accent); }
+.vv-steps__label { font-size: 11.5px; font-weight: 500; color: var(--ink-muted); }
+.vv-steps__step[data-state="current"] .vv-steps__label { color: var(--ink); }
+/* The bottom margin lifts the rail to the rounds' centre line: the label hangs below them. */
+.vv-steps__rail { width: 52px; height: 2px; margin: 0 8px 20px; border-radius: 2px; background: var(--border); transition: background-color 0.3s; }
+.vv-steps__rail[data-filled] { background: var(--accent); }

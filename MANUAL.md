@@ -654,6 +654,7 @@ The kit's overlays and two shared hooks bind to `useHostWindow()` (MAN-7443), ne
 | unit | file | bound to `hostWindow` |
 | --- | --- | --- |
 | `Dialog` | `src/shared/ui/Dialog.tsx` | portal target `hostWindow.document.body`; Escape/Tab `keydown` on `hostWindow` capture; body scroll lock; focus trap and `activeElement`; autofocus frame |
+| `Sheet` | `src/shared/ui/Sheet.tsx` | portal target `hostWindow.document.body`; Escape/Tab `keydown` on `hostWindow` capture; focus trap and `activeElement`; autofocus and focus-return frames (`hostWindow.requestAnimationFrame`); no body scroll lock |
 | `Tooltip` | `src/shared/ui/Tooltip.tsx` | portal; show-delay timer; position frame; `resize`/`scroll`; outside-press on the host document |
 | `ActionMenu` | `src/shared/ui/ActionMenu.tsx` | portal; viewport clamp reads `hostWindow.innerWidth`/`innerHeight`; `resize`/`scroll`; Escape and outside press on the host document |
 | `Menu`, `Select` | `src/shared/ui/Menu.tsx`, `Select.tsx` | Escape and outside press on the host document |
@@ -679,7 +680,7 @@ Every unit above has `hostWindow` in the dependency list of each effect that bin
 - A `ResizeObserver` is built with `resizeObserverIn(hostWindow, …)` and `hostWindow` goes in the effect's dependencies. why: an observer delivers on the frame lifecycle of the window whose constructor built it. 2026-09-29, Chromium PiP: 6 resizes of a PiP element reached a PiP-built observer 6 times; an opener-built one got 0 until the opener drew a frame, and a hidden opener draws none.
 - The chat's `IntersectionObserver` (`useLazyRowObserver`) is built with the host window's constructor and rebuilt on a move (MAN-7452). An opener-built observer's delivery in a PiP window is unmeasured.
 - A timer keeps the window that armed it with its id (`Tooltip`'s `timeoutRef` = `{ id, armedOn }`) and is cleared on `armedOn`. why: a move between arm and clear otherwise clears the wrong window's timer.
-- `Dialog` binds Escape on the `hostWindow` capture phase, which runs before the chat's host-document capture listener (ChatInterface's Escape-stops-the-turn). why: closing a dialog never also stops the run; it marks the event first.
+- `Dialog` and `Sheet` bind Escape on the `hostWindow` capture phase, which runs before the chat's host-document capture listener (ChatInterface's Escape-stops-the-turn). why: closing either never also stops the run; it marks the event first.
 - `Dialog` restores focus on close (the trigger, else the element focused at open) only when `hostWindow.document.activeElement` is `null` or the body. why: the palette's Chat row closes it and floats the chat, whose composer takes focus in a layout effect before the dialog's passive restore; restoring over that undoes it. 2026-09-30: after the palette's Chat row, `document.activeElement` is the composer `TEXTAREA`, was the palette trigger `BUTTON`. An ordinary close drops focus to the body and still restores.
 - A hook that binds pointer state to a window clears that state in the cleanup that unbinds the listeners (`useZoomPan` calls `heldPointers.clear()`). why: a move re-runs the effect; a half-held gesture must not outlive its window.
 - A frame or timer spy in a probe keys on the kit callback's source (`FOCUSABLE_SELECTOR` for the `Dialog` frame, `setTooltipStyle` for the `Tooltip` frame). why: the opener draws frames constantly; a raw count is meaningless.
@@ -711,7 +712,7 @@ Every unit above has `hostWindow` in the dependency list of each effect that bin
 - Both exit 1 with the failed checks listed; neither sends a model turn or writes app data.
 - Sibling probes touched by the same change: `.verify/lightbox-zoom.mjs`, `.verify/export-menu-layer.mjs` (MAN-7426, INV-4356).
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/useDeviceSettings.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/useElapsed.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/ActionMenu.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Dialog.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Lightbox.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Menu.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Select.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Tabs.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Tooltip.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/useZoomPan.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/utils.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/host-window-home.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/host-window-kit.mjs
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/useDeviceSettings.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/useElapsed.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/ActionMenu.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Dialog.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Lightbox.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Menu.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Select.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Sheet.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Tabs.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Tooltip.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/useZoomPan.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/utils.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/host-window-home.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/host-window-kit.mjs
 
 ## MAN-7452 — Chat state layer follows the host window
 
@@ -1902,3 +1903,603 @@ The folders' whole journey on the operator's own surface. Parts: MAN-7536 (folde
 - Size: 940 lines, over the 800 ceiling; the split shape is by stage (setup, steps, cleanup plus wire helpers).
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-whole-folders.mjs
+
+## MAN-7817 — The Cerberus screen's words — the cerberus block of en/common.json
+
+Every word the Cerberus screen draws, in the top-level `cerberus` block of `src/modules/i18n/locales/en/common.json`, between `notes` and `applications`, plus `tabs.cerberus` (`Cerberus`, after `tabs.notes`). Wire shapes: MAN-7807; the REST surface the screen reads: MAN-7802; the module: MAN-7815. Sibling words row: MAN-7634.
+
+## Shape
+
+- 224 leaves under `cerberus.*`, `en` only. The other ten locales hold no `cerberus` block and no `tabs.cerberus`: `fallbackLng: 'en'` (`src/modules/i18n/config.ts`) reads the English.
+- Read by the files under `src/modules/cerberus` (MAN-7822).
+- Nested multi-line objects, the file's own 2-space indentation.
+
+| group | keys | holds |
+|---|---|---|
+| `loading` | 1 | the spinner label |
+| `header` | 16 | `eyebrow`, `headline.*` (10), `summary.*` (6: `of_*`, `muted`, `nodes_*`, `lastResult`), `live`, `reconnecting`, `enroll` |
+| `status` | 8 | one word per status value |
+| `fleet` | 44 | `tabs`, `layouts`, `filters`, `searchPlaceholder`, `expandAll`, `collapseAll`, `bar`, `nodes_*`, `showing`, `showMore`, `noMatch`, `noneInGroup`, `legend`, `rings` |
+| `needs` | 13 | the Needs-you panel and its muted list |
+| `node` | 15 | a node card: warden line, empty and waiting states, squares |
+| `service` | 7 | a service row's pill and cell tip |
+| `activity` | 17 | the What-happened feed |
+| `sheet` | 17 | the check sheet |
+| `lookup` | 13 | the moment lookup's answers |
+| `history` | 9 | the History tab's form |
+| `mute` | 17 | the mute dialog and its toast |
+| `enroll` | 31 | the three-step enroll flow |
+| `time` | 13 | spans and relative times |
+| `errors` | 3 | `unreachable`, `retry`, `writeFailed` (the warn toast's title for a refused mute, lift or label write) |
+
+## Rules
+
+- `status.*` is keyed by the status value itself (`ok warn failing denied not_enabled unknown muted paused`): `` t(`cerberus.status.${status}`) `` needs no map. Every legend or cell that names a status reads it; only a different word has its own key.
+- `{{word}}` is the lowercased status word, passed by the caller: `lookup.was`, `lookup.wasNoValue`, `service.oneBad`, `node.bad`, `activity.check.other`.
+- A reason, a check label and a node description are data, never keys. The server stores "No reason given" itself (`NO_REASON_GIVEN`, `server/modules/cerberus/mutes.service.ts`), so the mute dialog has no key for it.
+- Glyphs `✓ ▲ ✕ — ·` stay in code. The two keys with a glyph inside: `enroll.copied` (`✓ Copied`) and `needs.word` (`· {{word}}`). `needs.quiet` carries no `✓`: the badge draws it.
+- A two-part headline is two keys, the second drawn in the accent by code: `header.headline.quiet` + `quietAccent`, `needs_*` + `needsAccent_*`, `enroll.title` + `titleAccent`, `enroll.helloLead` + `helloAccent`.
+- Apostrophes in keys are straight (`'`); `fleet.noMatch` quotes with `“ ”`.
+- `activity.expired` is the summary line under the `activity.lifted` title; never drawn alone.
+- `activity.muted` (`until {{time}}`) and `activity.mutedTomorrow` (`until {{time}} tomorrow`): `mutedTomorrow` when the lift falls on a later local day than the mute (MAN-7823).
+- `activity.source.check` and `activity.source.mute` have no reader: the pill is the service's label. Only `activity.source.node` is read.
+
+## Alternatives the caller picks
+
+| when | key | else |
+|---|---|---|
+| node role is `hub` | `sheet.rawHub`, `sheet.checkedHub`, `lookup.metaHub`, `lookup.metaHubMuted` | `sheet.raw`, `sheet.checked`, `lookup.meta`, `lookup.metaMuted` (name the warden and its node) |
+| result `value` is null | `lookup.wasNoValue`, `mute.rawNoValue` | `lookup.was`, `mute.raw` |
+
+- `fleet.bar.needs_one` (`{{count}} needs you`) and `node.allPassing_one` (`Its service is passing`) are the singular forms; the other counts use `_other`.
+- `node.silent` (`silent since {{time}}`) is the whole second warden-line form, with no `Warden {{version}} · ` prefix; `node.heard` is the first.
+
+## Composition
+
+- Summary line: the passing number is drawn on its own (it counts up), then `header.summary.of_*`; the parts are joined with ` · ` in code.
+- Mute helper: `time.liftsAt` or `time.liftsTomorrow`, then `. `, then `mute.keepsRunning`.
+- `lookup.stale` takes `{{staleAfter}}` as a formatted span: `staleAfter` is per check.
+- `time.secondsAgo minutesAgo hoursAgo daysAgo seconds minutes hours minutesLeft` are plain keys with `{{count}}` (the abbreviation follows the number): no `_one`/`_other`.
+
+## Variables a call must pass
+
+A `_one`/`_other` key resolves only when the call passes `count`.
+
+| key | pass |
+|---|---|
+| `header.headline.needs_*`, `needsAccent_*`, `summary.of_*`, `summary.nodes_*`, `summary.muted` | `count` |
+| `header.summary.lastResult` | `ago` |
+| `fleet.filters.label` | `name`, `count` |
+| `fleet.bar.*`, `fleet.nodes_*`, `fleet.showMore`, `fleet.rings.note_*` | `count` |
+| `fleet.showing` | `shown`, `total` |
+| `fleet.noMatch` | `query` |
+| `fleet.rings.hubTitle` | `name` |
+| `fleet.rings.dotTip` | `name`, `text` |
+| `fleet.rings.partial` | `shown`, `total` |
+| `needs.count_*`, `needs.mutedTitle` | `count` |
+| `needs.quietPassing_*` | `passing`, `count` |
+| `needs.word` | `word` |
+| `needs.where` | `service`, `node`, `time` |
+| `needs.mutedItem` | `label`, `service` |
+| `needs.mutedMeta` | `time`, `left`, `reason` |
+| `node.heard` | `version`, `ago` |
+| `node.silent` | `time` |
+| `node.bad` | `label`, `word` |
+| `node.allPassing_*`, `node.moreSquares` | `count` |
+| `node.squareTip` | `label`, `text` |
+| `node.emptyMessage` | `node` |
+| `service.oneBad` | `label`, `word` |
+| `service.needYou_*`, `service.allPassing_*` | `count` |
+| `service.someMuted` | `passing`, `total`, `muted` |
+| `service.cellTip`, `sheet.cellTip` | `time`, `word` |
+| `sheet.cellTipWorst` | `time`, `word`, `check` |
+| `sheet.moreResults` | `count` |
+| `activity.nothingSince` | `time` |
+| `activity.check.ok warn failing unknown`, `activity.lifted` | `label` |
+| `activity.check.other` | `label`, `word` |
+| `activity.muted`, `activity.mutedTomorrow` | `label`, `time` |
+| `activity.enrolled` | `node` |
+| `activity.enrolledSummary` | `version` |
+| `activity.meta`, `sheet.rawHub` | `service`, `node` |
+| `sheet.raw` | `service`, `node`, `version` |
+| `sheet.muteNote` | `time`, `reason` |
+| `sheet.checked` | `time`, `every`, `node` |
+| `sheet.checkedHub` | `time`, `every` |
+| `lookup.was` | `time`, `word`, `value` |
+| `lookup.wasNoValue` | `time`, `word` |
+| `lookup.futureMeta`, `lookup.metaHub` | `time` |
+| `lookup.stale` | `staleAfter` |
+| `lookup.meta` | `time`, `node` |
+| `lookup.metaMuted` | `time`, `node`, `reason` |
+| `lookup.metaHubMuted` | `time`, `reason` |
+| `history.option` | `service`, `check` |
+| `history.raw` | `key`, `node`, `every` |
+| `history.since` | `time` |
+| `mute.raw` | `service`, `key`, `value` |
+| `mute.rawNoValue` | `service`, `key` |
+| `mute.durations.untilTime`, `mute.confirm`, `mute.toast.title` | `time` |
+| `mute.toast.message` | `label` |
+| `enroll.nameTaken`, `enroll.listening` | `name` |
+| `enroll.expires`, `enroll.expired` | `time` |
+| `enroll.done` | `name`, `version`, `time` |
+| `time.*Ago`, `time.seconds minutes hours minutesLeft` | `count` |
+| `time.hoursMinutesLeft` | `hours`, `minutes` |
+| `time.liftsAt`, `time.liftsTomorrow` | `time` |
+
+## Words with no prototype sentence
+
+Written by the builder, not quoted: `enroll.expired`, `enroll.getNewCommand`, `node.allPassing_one`, `activity.check.other`, `activity.check.unknown`, `activity.mutedTomorrow`, `errors.retry` (copy of `notes.retry`), `fleet.bar.needs_one`, the hub forms and `wasNoValue`/`rawNoValue`.
+
+## Open words
+
+| gap | state |
+|---|---|
+| failure toast for enroll | no key |
+| fixes and warden-update words: `Fix running or updating`, `Updating · step`, `Updating to X`, `Paused while its warden restarts`, `Warden restarting`, `Show them in the fleet` | no key; the fixes and warden-update plans own them |
+| Catalog tab, scenario-player words, preview-node notes | no key |
+| `node.heard`, `enroll.done`, `activity.enrolledSummary` with a null `wardenVersion` | draw a double space; no code path writes such a row |
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/common.json
+
+## MAN-7819 — The roadmap tree's layout — layoutTree, TreeLayout and the dot state (src/modules/roadmap/utils/treeLayout.ts)
+
+What it is
+`layoutTree(roadmap, goalText)` works out the roadmap tree's whole geometry once, in px at scale 1. Pure and `import type` only (`@/shared/roadmap-types`, `@/shared/types`): no React, no DOM, no i18n. Runs headless on the store's own document: `npx --no-install tsx --tsconfig tsconfig.json`.
+Readers: `RoadmapPath` calls it once per picture (memoised on the roadmap and the goal text) and hands the result to `RoadmapTree` and `useTreeWords` (MAN-7827); every tree node reads its spot. The panel's feature rows are to read `dots`; none does yet.
+
+Public API
+| export | shape |
+|---|---|
+| `layoutTree(roadmap: Roadmap, goalText: string)` | -> `TreeLayout`; `goalText` is the label the goal draws (the goal or its "missing" words) |
+| `TreeLayout` | `{ width, height, goal: { y, r, lines, baselines, bottom }, milestones: TreeMilestoneSpot[], dots: Map<string, RoadmapDotState> }` |
+| `TreeMilestoneSpot` | `{ milestone, n, x, y, r, eyebrowY, titleLines, titleBaselines, lineY, spine: { x, top, bottom }, epics: TreeEpicSpot[] }` |
+| `TreeEpicSpot` | `{ epic, x, y, r, tickTo, labelX, titleLines, titleBaselines, dots: TreeDotSpot[], lineY }` |
+| `TreeDotSpot` | `{ feature, x, y, state: RoadmapDotState }` |
+| `RoadmapDotState` (in `src/shared/types.ts`) | `'shipped' \| 'inFlight' \| 'designing' \| 'proposed' \| 'idea' \| 'blocked'`; `inFlight` is the word `in flight` as a key |
+
+Rules
+- `dots` is keyed by feature name; the tree and the panel's feature rows both read the dot state from it, so they cannot disagree.
+- Dot state, in order: word `shipped` -> `shipped` whatever stands above it; else `feature.blocked ?? epic.blocked ?? milestone.blocked` not null -> `blocked`; else the word (`in flight` -> `inFlight`).
+- A milestone's `x` is its ring's centre and its column's centre; the column's left edge is `x - 124`. Epic `x`, `y`, `r` are the epic ring's.
+- `spine.bottom` is the last epic's `y`; `spine.top` when the milestone has no epic.
+- Row bottoms and column ends are not exposed; derive them as `max(lineY + 3, y + 19)`.
+- Columns: `width = max(400, 248 * milestones)`, centred in the width; one milestone sits at ring x 200, under the goal. Zero milestones: 400 wide, `height` = `goal.bottom + 8`.
+- `height` = deepest column end + 8.
+- `goal.bottom` = last goal baseline + 7; the connectors start there. An empty goal still reserves line 1, so `bottom` stays 52.
+- Wrap limits count UTF-16 units: goal 48, milestone title 30, epic title 26. An emoji counts 2.
+- Wrap: at most two lines; words pack greedily; a third line folds into the second. A line past the limit is cut to exactly the limit with `…` last (an overlong first word too).
+- Cut that would land after a high surrogate steps back one unit: that line is one under the limit.
+- A cut line is not trimmed: a cut after a space keeps it (`"… a …"`).
+- Geometry numbers are named constants at the top of the file; change them there, nowhere else.
+
+Measured
+2026-10-06, `dispatcher roadmap show --json`:
+| roadmap | size | dots = store features | scale at tab 1440x900 / widget 1680x1000 / tab 1680x1000 / tab 390x844 |
+|---|---|---|---|
+| Restorly | 744x614 | 38 = 38 | 0.821 / 0.876 / 0.948 / 0.678 |
+| lyphecli | 744x443 | 39 = 39 | 1.000 / 1.000 / 1.000 / 0.940 |
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/utils/treeLayout.ts
+
+## MAN-7822 — Cerberus — the client: `CerberusProvider`, `useCerberusNeeds`, `useCheckDetail`, `api.cerberus`, `cerberusTime`
+
+The browser's one reader of Cerberus: a provider holds the overview for every reader, a hook reads one check. Wire shapes: MAN-7807. Routes read: MAN-7802. Words: MAN-7817. The provider this follows: MAN-7521.
+
+## Files
+| file | holds |
+|---|---|
+| `src/modules/cerberus/index.ts` | barrel: `CerberusProvider`, `useCerberusNeeds` |
+| `src/modules/cerberus/context/CerberusContext.ts` | `CerberusContext` (default `null`), type `CerberusValue`, hooks `useCerberus`, `useCerberusNeeds`; no component |
+| `src/modules/cerberus/context/CerberusProvider.tsx` | `CerberusProvider` only |
+| `src/modules/cerberus/hooks/useCheckDetail.ts` | `useCheckDetail` |
+| `src/modules/cerberus/utils/cerberusTime.ts` | `hm`, `hms`, `dayAndTime`, `agoParts` |
+| `src/modules/cerberus/fleet/fleetModel.ts`, `utils/activityEvents.ts` | the Fleet's pure model and the activity→Timeline mapping: MAN-7823 |
+| `src/shared/api.ts` | `api.cerberus` (ten verbs), `refusalSentence` |
+| `src/shared/types.ts` | `CerberusMuteInput`, `CerberusLabelInput`, `CerberusEnrollInput` (client-only: the routes read a loose JSON body) |
+
+## Mount and barrel
+- `src/App.tsx`: `<CerberusProvider>` directly inside `<HealProvider>`, wrapping `<Router>`; inside the auth gate, below `WebSocketProvider`. why: `api.cerberus` is authenticated; `cerberus_changed` arrives on the one socket; above the Router a count pill is honest on every tab.
+- The barrel exports nothing else. Module files import siblings by path, never through the barrel.
+- `useCerberus()` throws outside the provider (`useCerberus must be used within a CerberusProvider`).
+- `useCerberusNeeds()` = `overview?.counts.needsYou ?? 0`. No reader outside the module yet: the workspace phase wires the tab strip's count pill.
+
+## `CerberusValue`
+| member | meaning |
+|---|---|
+| `overview: CerberusOverview \| null` | last good read; `null` = no read has answered |
+| `unreachable: boolean` | true only while `overview` is `null` and the last read failed; the next good apply clears it |
+| `refresh(): Promise<void>` | one read; the Try again press; never rejects |
+| `mute(input)`, `liftMute(id)`, `setLabel(input)` | `Promise<boolean>`: `true` = landed and the overview already re-read; `false` = refused or no answer, the warn toast already raised |
+
+- The four verbs keep one identity for the app's life; the translator is read through `tRef` (`useLayoutEffect`), never in a verb's deps.
+- A failed read over a held overview keeps it and raises nothing: `unreachable` never rises over one. Only `overview.now` aged against the browser's clock shows an outage; the header draws it.
+
+## Reads
+| trigger | rule |
+|---|---|
+| mount | one read, after the subscription |
+| `cerberus_changed` | at most one read per 1 s (`FRAME_READ_GAP_MS`); frames inside the gap queue ONE trailing read |
+| `websocket_reconnected` | read at once, unthrottled |
+| clock | every 30 s (`CLOCK_READ_MS`): cells slide, "ago" ages, a check goes stale with no row written |
+| own landed write | the re-read, before the verb answers |
+
+- A read is good when `response.ok` and the body has a `nodes` array and a `counts` object. Anything else, or a throw, keeps the overview.
+- Each read takes a ticket (`newestReadRef`); a good answer older than the newest applied (`newestAnswerRef`) is dropped. A failed read judges before the mark and never moves it, so an older good read still in flight can land.
+
+## Writes
+- One in flight per target: `mute:<node>/<key>`, `lift:<id>`, `label:<node>/<key or service>`. A second press returns the first's promise.
+- Verdict is `response.ok` alone; the body is not read. The screen comes from the re-read.
+- Refused or no answer: one `warn` toast, title `cerberus.errors.writeFailed`, message = `refusalSentence(response)` (the server's own sentence), omitted when none. Not raised after unmount.
+- Only the mute speaks on success: `positive` toast, `cerberus.mute.toast.title` (`time` = `hm(until)`), `cerberus.mute.toast.message` (`label` = the check's plain name, else its key). A lift and a label are silent.
+
+## `useCheckDetail({ node, service, id, lookupAt?, end? })`
+Answers `{ detail, loading, error, refresh }` from `GET /api/cerberus/checks/:node/:service/:id?lookup&end` (MAN-7802).
+
+| field | meaning |
+|---|---|
+| `detail` | `null` until a read for THIS check answered; an answer for another check is never shown |
+| `loading` | `detail === null` and no `error` |
+| `error` | `'gone'` (404: retired while open) or `'unreachable'` (network, 5xx, a body that is not a check detail); `null` otherwise |
+| `refresh()` | one read |
+
+- Re-reads: a `cerberus_changed` whose `checks` includes `<node>/<service>/<id>` (compared whole, never split), `websocket_reconnected`, every 30 s.
+- A change of `lookupAt`, `end` or the check is a new read; the previous answer of the same check stays on screen until it lands.
+- Only the newest read's outcome is published. A failure keeps the last good `detail` of the same check beside `error`.
+- `lookupAt` and `end` are epoch ms, both default to now; the server takes `lookup` as `end` when absent.
+- A caller holds `lookupAt` / `end` in state. `Date.now()` passed from render re-reads on every render.
+
+## `api.cerberus` — `src/shared/api.ts`
+| verb | request |
+|---|---|
+| `overview()` | `GET /api/cerberus/overview` |
+| `checks()` | `GET /api/cerberus/checks` |
+| `check(node, service, id, { lookup?, end? })` | `GET /api/cerberus/checks/:node/:service/:id` |
+| `lookup(node, key, at)` | `GET /api/cerberus/lookup` |
+| `activity({ before?, limit? })` | `GET /api/cerberus/activity`; `before` exclusive |
+| `mute(input)` | `POST /api/cerberus/mutes` |
+| `liftMute(id)` | `POST /api/cerberus/mutes/:id/lift` |
+| `setLabel(input)` | `PUT /api/cerberus/labels` |
+| `enroll(input)` | `POST /api/cerberus/enrollments` |
+| `enrollment(name)` | `GET /api/cerberus/enrollments/:name` |
+
+- Reads answer their wire shape bare; a refusal is the app's `{ success: false, error }` envelope. Nobody draws from a write's answer.
+- `refusalSentence(response)`: the server's own sentence from a refusal body (`errorMessage(error) ?? errorMessage(details)`), `null` when none or not JSON. One copy, shared by `NotesProvider` and `CerberusProvider`.
+
+## `cerberusTime.ts`
+Pure: no `t`, no `Date.now()`. Local time, 24-hour, written by hand so every browser locale reads alike.
+| function | answers |
+|---|---|
+| `hm(ms)` | `08:05` |
+| `hms(ms)` | `08:05:09` |
+| `dayAndTime(ms)` | `2026-10-05 08:05` |
+| `agoParts(ms, now)` | `'now'` (under 2 s, or a moment after `now`) or `{ n, unit: 's' \| 'min' \| 'h' \| 'd' }`, rounded down; the screen says it with `cerberus.time.*Ago` |
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/App.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/context/CerberusContext.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/context/CerberusProvider.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/hooks/useCheckDetail.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/utils/cerberusTime.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts
+
+## MAN-7823 — Cerberus — the fleet's pure model: `fleetModel`, `toTimelineEvent`, the `Fleet*` and `Rings*` types
+
+The Cerberus tab's pure half: the overview as sorted fleet items, filter counts, search, default expansion, rings geometry, and one mapping from a "What happened" line to a Timeline row. No React, no clock, no DOM. Client reader: MAN-7822. Wire shapes: MAN-7807. Words: MAN-7817.
+
+## Files
+| file | holds |
+|---|---|
+| `src/modules/cerberus/fleet/fleetModel.ts` | `fleetItems`, `groupOf`, `filterGroups`, `applyFilter`, `defaultExpanded`, `ringsLayout` |
+| `src/modules/cerberus/utils/activityEvents.ts` | `toTimelineEvent(activity, t, now)` |
+| `src/shared/types.ts` § CERBERUS FLEET MODEL | `FleetStatus`, `FleetGroup`, `FleetFilter`, `FleetFilterGroup`, `FleetService`, `FleetItem`, `RingSpokeKind`, `RingsNode`, `RingsLayout` (client-only; four views read them) |
+| `src/modules/cerberus/utils/cerberusStatus.ts` | `STATUS_TABLE`: the one owner of a status's tone, glyph, word key and cell shape; `activityEvents.ts` and the marks read it: MAN-7831 |
+
+## Functions — `fleetModel.ts`
+| function | answers |
+|---|---|
+| `fleetItems(overview)` | one `FleetItem` per node, worst first: `STATUS_RANK`, then the hub ahead of its peers, then id with numeric collation (`node-2` before `node-10`) |
+| `groupOf(status)` | the `FleetGroup` bucket |
+| `filterGroups(items)` | all six `FleetFilterGroup`s in order `all needs unknown muted updating empty`, zero counts included; counted over the WHOLE fleet; hiding an empty group is the toolbar's call |
+| `applyFilter(items, group, query)` | items in one filter, narrowed by `query` (trimmed, case aside, substring of `item.search`); blank query narrows nothing; keeps the caller's order, so pass `fleetItems` output |
+| `defaultExpanded(items)` | `Set<string>` of ids in group `needs`; empty when the fleet has more than 12 nodes; pass the WHOLE fleet, never a filtered list |
+| `ringsLayout(items, width, height)` | `RingsLayout` in pixels from the box's top-left |
+
+## Node status rules
+- `STATUS_RANK` (smaller = worse): `failing`/`denied` 0, `fixing` 1, `warn` 2, `unknown` 3, `paused`/`enrolling` 4, `muted` 5, `ok` 6, `empty` 7.
+- A node's status = the worst of its services'; no service = `empty`.
+- A `not_enabled` service counts as `ok` at the node level; its own row still says what it is.
+- `denied` outranks `failing` when a node has both.
+- `fixing` and `enrolling` are in the type and the rank; nothing produces them yet.
+- `groupOf`: `failing denied fixing warn` → `needs`; `paused enrolling` → `updating`; every other status is its own group. `ok` is counted by the status bar; no filter button selects it.
+- `FleetItem` carries `id desc role link status services search` only. Minute cells, warden version and last-heard time stay on `CerberusNodeView`, found by `id`.
+- `item.search` = lower-cased `id`, `desc`, each service's id and label, joined by single spaces; null and empty words are dropped, so `center cerberus` matches.
+
+## `ringsLayout`
+- Returns `{ center, hub, guides, nodes, total }`. Each `RingsNode` carries `item ring x y angleDeg length dot spoke live labelled`. Selection is the view's state, not in it.
+- `hub` is the item with `role === 'hub'`, at `center`, only when it is in the list: a caller that filters keeps it in. Every other item is sorted worst first and placed.
+- Rings are circles of the box's shorter side; a wide box leaves margin. 1 to 7 rings open as the fleet needs; the worst sit on ring 0.
+- `nodes.length < total`: the rest do not fit; they are in Grid.
+- A box of 0×0 or non-finite size places nothing and does not throw.
+- `spoke`: `dashed` for `unknown` and `enrolling`; `amber` for rank ≤ `warn`; `plain` otherwise. `live` = `link === 'reporting'`.
+- A loud node (rank ≤ `unknown`) is never drawn under 9 px. `labelled` = ring 0 with 12 nodes or fewer on it, or a loud node at dot ≥ 9.
+- Dot diameter by `total`: ≤24 → 18, ≤80 → 13, ≤260 → 9, else 6; scaled by `side / 470`, floor 0.7, minimum 5.
+
+## `toTimelineEvent(activity, t, now)`
+Maps one `CerberusActivity` to a kit `TimelineEvent`. Callers: the Fleet's What-happened card (overview's newest seven), History's feed (`GET /api/cerberus/activity` pages).
+
+| kind | tone | source (pill) | title key | summary |
+|---|---|---|---|---|
+| `check` | `STATUS_TABLE[to].tone` | `serviceLabel`, else the service of the check key | `activity.check.ok warn failing unknown`; any other `to` = `activity.check.other` with `word` lowercased | `value` when the check reported one |
+| `mute`, `event: 'muted'` | `neutral` | as `check` | `activity.muted`; `activity.mutedTomorrow` when the lift is on a later local day than the mute | `reason` |
+| `mute`, lifted or expired | `neutral` | as `check` | `activity.lifted` | `activity.expired` for `expired`, none for an early lift |
+| `node` | `positive` | `activity.source.node` | `activity.enrolled` | `activity.enrolledSummary` when `wardenVersion` is set |
+| any kind this bundle does not know | `neutral` | the kind | the kind | none; never thrown on |
+
+- `when` = `hms(at)` when `at` is on `now`'s own local day, else `dayAndTime(at)`. why: a bare `17:52:10` under History's "Everything since…" reads as today. `now` is the caller's, so a row never changes between two renders of one overview.
+- `mutedTomorrow` rests on the 24 h mute cap: a different local day is always the next. If the server allows longer mutes, `mutedTitle` must name the date.
+- `meta` = `activity.meta` (`service` = check key, `node`); for a `check` it is followed by ` · <from word> → <to word>`. Status words come from `STATUS_TABLE[status].wordKey`.
+- A label, reason, node name and value go in as variables, never as keys.
+- New `CerberusActivity` kinds (`fix catalog diagnosis warden`) add a case to the switch, a builder, and words under `cerberus.activity`.
+
+## Callers must
+- Guard `overview.lastResultAt` for null before `agoParts` (it takes a number).
+- Map `agoParts`' unit to a `cerberus.time.*Ago` key; there is no shared "12 s ago" helper yet.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/fleet/fleetModel.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/utils/activityEvents.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts
+
+## MAN-7827 — The roadmap tree — RoadmapTree, TreeGoal, TreeMilestoneNode, TreeEpicNode, TreeTip and treeWords (src/modules/roadmap/tree)
+
+`RoadmapTree` draws one roadmap as an SVG tree from `layoutTree`'s layout (MAN-7819): the goal at the apex, a connector to each milestone's ring, under each a spine of epic rings with titles, feature dots and lines. Mounted by `RoadmapPath` (MAN-7640). Marks, halos, moments and the probe: MAN-7828. Words: MAN-7634 (`roadmap.tree.*`).
+
+Files
+| file | exports | owns |
+|---|---|---|
+| `tree/RoadmapTree.tsx` | `RoadmapTree` | the pane, the svg, the fit, paint order, the memoised nodes |
+| `tree/TreeGoal.tsx` | `TreeGoal`, `TreeGoalConnectors` | the goal's flag ring and label; one connector per milestone |
+| `tree/TreeMilestoneNode.tsx` | `TreeMilestoneNode`, `TreeMilestoneEdges` | a milestone's eyebrow, ring, title and line; its spine and ticks |
+| `tree/TreeEpicNode.tsx` | `TreeEpicNode` | an epic's ring, title, dots, line and burst |
+| `tree/TreeTip.tsx` | `TreeTip` | the tip chip |
+| `tree/treeWords.ts` | `useTreeWords` | every item's words, for the tip and every `aria-label` |
+| `tree/treeKeys.ts` | `selectionUnder`, `treeKeyOf` | the item a `data-tree-key` names, and the key an item's node carries |
+| `tree/useTreePane.ts` | `useTreePane` | the pane's sideways scroll: the goal's x, the opening, the selection scroll, the scale hold |
+| `tree/TreeRing.tsx`, `tree/TreeHalo.tsx` | `TreeRing`; `TreeHalo`, `TreeDotCut` | the marks: MAN-7828 |
+
+Props
+`RoadmapTree({ roadmap: Roadmap, layout: TreeLayout, maxHeight: number | null, selected: RoadmapTreeSelection | null, onSelect(selection), paneRef: RefObject<HTMLDivElement> })`
+- `RoadmapTreeSelection` (`src/shared/types.ts`): `{ kind: 'roadmap' } | { kind: 'milestone' | 'epic' | 'feature'; name: string }`. A name the picture no longer holds reads as nothing selected.
+- `maxHeight` `null` draws at natural size (the face scrolls, so it is handed none).
+- `paneRef`: the tree's sideways scroller, which the face also hands a milestone moment's in-view scroll.
+
+Mount
+- `RoadmapPath` draws it between `RoadmapHeader` and the stage while the roadmap holds a milestone, `maxHeight={null}`. It holds the selection (`pressedBy`: `useState<Record<string, RoadmapTreeSelection>>` keyed by roadmap name), resolves it against the picture each render with `holdsItem` (a name the picture no longer holds reads as nothing selected), and hands the tree `selected` and an `onSelect` that writes the entry of the roadmap on screen. A switch to the other roadmap and back returns to the item pressed there.
+- `layout` = `layoutTree(selected, selected.goal ?? t('roadmap.goal.missing'))`, memoised on `selected` and `goalText`.
+
+Fit and pane
+- `scale = clamp((maxHeight − 8) / layout.height, 0.6, 1)`; `maxHeight` `null` is 1. svg `width`/`height` = layout × scale, `viewBox` the layout's, `mx-auto`.
+- Pane `[data-roadmap-tree]`: `overflow-x-auto overscroll-x-contain scrollbar-thin -mt-1 pt-1`. `overflow-y-auto` + `maxHeight` only while the 0.6 floor holds the scale; else `overflow-y-hidden`.
+- why `-mt-1 pt-1` and svg `overflow-visible`: the goal's halo stands above the drawing and would be clipped flat.
+- svg: `role="group"`, `aria-label` `roadmap.tree.label`, `select-none`. why: a double press must not highlight a title.
+- Fill phases must keep `overscroll-x-contain` (a sideways swipe past the end must not chain to the page's back gesture) and `select-none`.
+
+Paint order and memo
+1. Edges in an `aria-hidden` group: `TreeGoalConnectors`, then each milestone's `TreeMilestoneEdges`.
+2. `TreeGoal`.
+3. Per milestone: `TreeMilestoneNode`, then each of its `TreeEpicNode`s. This is also the Tab order; epics are siblings of their milestone, never inside its button.
+- The goal and its connectors take `goalX` as a prop; everything else is memoised on `layout`, `roadmap.current`, `selected` and the words function, so a scroll redraws only them.
+- Nodes read `CelebrationContext` themselves, so the memo does not depend on it.
+
+Markers
+| attribute | on | holds |
+|---|---|---|
+| `data-tree-key` | goal `roadmap`; milestone `milestone:<name>`; epic `epic:<name>`; each dot's group `feature:<name>` | the one key a press reads off the nearest node |
+| `data-roadmap-goal` | goal group | |
+| `data-roadmap-milestone=<name>` | milestone group | `CelebrationLayer` (MAN-7636) measures its FIRST child, the ring's track circle, for the burst origin, and focuses the group when the moment ends: the ring is drawn first |
+| `data-roadmap-epic=<name>` | epic group | |
+| `data-roadmap-feature=<name>`, `data-roadmap-dot=<state>` | the visible dot circle | how the motion probes name a dot |
+| `data-celebrating` | milestone group `milestone`, epic group `epic`, dot `feature` or `task` | a moment names it |
+| `data-selected` | node group, dot circle | the selected item |
+| `data-tree-halo=ring\|dot` | halo circle | |
+| `data-roadmap-tip` | tip chip | |
+
+Nodes
+- Goal, milestone and epic: `role="button"`, `tabIndex=0`, `aria-pressed`, `aria-label` = `<head> — <line>` from `useTreeWords`. A milestone is `aria-current="step"` while it is `roadmap.current`.
+- A dot is not a tab stop; the keyboard reaches a feature through its epic's panel.
+- A dot is a group: an invisible hit circle (r 4, `[pointer-events:all]`) then the visible circle (r 2.8), which is the topmost element at its centre. A press on a dot names the feature, never its epic.
+- A missing goal draws `roadmap.goal.missing` in italic muted.
+- No node wears an outline: `outline-none focus-visible:outline-none`. why: `outline-none` alone loses to tokens.css's `[tabindex]:focus-visible` rule; the halo is the focus ring.
+
+Words (`useTreeWords(roadmap, layout) → (item: RoadmapTreeSelection) => { head, line }`)
+| item | head | line |
+|---|---|---|
+| goal | `roadmap.tree.goal` | the goal, else `roadmap.goal.missing` |
+| milestone | `roadmap.tree.milestone` (`n`) + ` · ` + title | `roadmap.tree.epics` (`count`, `word`) |
+| epic | title | `roadmap.tree.epicLine`, or the word alone while it holds no feature; + ` · ` + `roadmap.tree.blocked` while `epic.blocked` is not null |
+| feature | title | feature word, `roadmap.feature.tasks` once it has a task, project; + ` · ` + `roadmap.tree.blocked` while its dot state is `blocked` |
+| a name the picture lacks | `''` | `''` |
+- Word maps: `ROADMAP_FEATURE_WORD_KEYS`, `ROADMAP_MILESTONE_WORD_KEYS`, `ROADMAP_EPIC_WORD_KEYS` (`src/shared/constants.ts`).
+- A blocked milestone says no "Blocked" on the tree: only its dots turn red.
+
+Tip (`TreeTip({ head, line, left, top })`)
+- `.vv-tooltip`, `max-w-60`, `pointer-events-none absolute z-10`, `aria-hidden`. The last child of `RoadmapTree`'s `relative` wrapper, outside the pane's clip. A screen reader skips it: the node labels say the same words.
+- `onPointerMove` on the svg names the item of the nearest `[data-tree-key]` and stands the chip 14px right of and below the pointer, in the wrapper's coordinates. Within 250px of the wrapper's right edge it stands left of the pointer (`left = x − 14 − 240`, held at the wrapper's left edge so a narrow pane never pushes it out of view). `onPointerLeave`, a pointer over empty drawing and a touch pointer clear it. why touch: a finger has no hover, and its press is the selection.
+
+Presses and keys
+- One delegated `click` on the svg: `selectionUnder(event.target)` reads the nearest `[data-tree-key]` and `onSelect` receives what it names. A dot's own key is nearer than its epic's, so a press on a dot selects the feature.
+- `keydown` on the svg: Enter or Space on a focused `[role="button"][data-tree-key]` (the goal, a milestone, an epic) selects it. Space is `preventDefault`ed, so the page does not scroll.
+
+The pane's scroll (`useTreePane`)
+- The goal's x: the drawing's centre while `layout.width × scale ≤ pane.clientWidth`; else `(scrollLeft + clientWidth / 2) / scale`, held within [200, width − 200]. A passive `scroll` listener and a `ResizeObserver` on the pane read it at most once per animation frame, and only `TreeGoal` and `TreeGoalConnectors` redraw: the nodes are memoised.
+- The opening: on mount and when `roadmap.name` changes (never on a new frame of the same roadmap), an overflowing pane is set `behavior: 'instant'` so the current milestone's column (`roadmap.current`, else the last) sits at its centre. The pane's own ends hold the first and the last column off-centre (`scrollLeft` clamps at 0 and at `scrollWidth − clientWidth`).
+- The selection: when the selected milestone, epic or dot is not wholly inside the pane's width, `scrollTo({ left })` brings its mark (its node's first child) to the centre, smooth, or instant under `prefers-reduced-motion: reduce`. It never scrolls vertically, and the goal is never scrolled to: it follows the pane. A roadmap switch is an opening, not a selection scroll. The effect is keyed on the selected key, so a press on the item already selected scrolls nothing.
+- The scale: a new `scale` (the face's measured height arrives after the tree mounts) holds the drawing x at the pane's centre across it, while the pane overflowed.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/tree/RoadmapTree.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/tree/TreeEpicNode.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/tree/TreeGoal.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/tree/treeKeys.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/tree/TreeMilestoneNode.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/tree/TreeTip.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/tree/treeWords.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/tree/useTreePane.ts
+
+## MAN-7828 — The roadmap tree's marks and motion — TreeRing, TreeHalo, TreeDotCut, the dot paint and the moments, with the probe (src/modules/roadmap/tree)
+
+The marks a tree node wears and the motion a moment gives it. Structure, props, markers and words: MAN-7827. Moment rules: MAN-7656. Layout and the dot state: MAN-7819.
+
+Dot paint
+`ROADMAP_DOT_PAINT[state]` (`src/shared/constants.ts`), put on through `style`; the state is `layout.dots`'.
+| state | fill | stroke |
+|---|---|---|
+| `shipped` | `--accent` | `--accent` |
+| `inFlight` | `--warn-dot` | `--warn-dot` |
+| `designing` | `--garnish` | `--garnish` |
+| `proposed` | `--info-dot` | `--info-dot` |
+| `idea` | `--surface` | `--ink-faint` |
+| `blocked` | `--danger-dot` | `--danger-dot` |
+- 2026-10-06: in dark mode `designing` (gold) sits close to `inFlight` (amber).
+
+Halo (`TreeHalo`)
+| state | paint |
+|---|---|
+| selected | dashed `2 3`, `--ink` |
+| keyboard focus on a ring node | solid accent, width 2 (`group-focus-visible:`); never on a dot, which sits inside its epic's `group` |
+| named by a moment, reduced motion | solid accent for as long as the moment names it; with motion the node's own motion plays and the halo stays hidden |
+| otherwise | `hidden` |
+- Stands at `r + 6` round a ring (stroke 1.5), `r + 3.5` round a dot (stroke 2). `pointer-events-none`: a press lands on the mark beneath.
+- A dot's halo is drawn after every dot of its epic, so neighbours never paint over it.
+
+Dot cut-out (`TreeDotCut`)
+- An alpha mask (`mask-type: alpha`, set inline so no generated class can fail it), one even-odd path of the dots' box with annuli as holes: the halo's width and 0.75 either side.
+- `TreeEpicNode` renders it while any of its dots wears a halo (selected, or a moment names it) and gives it as `mask` to the dots that wear none. A haloed dot never takes it.
+- A celebrating dot's annulus is cut under reduced motion only, where its halo shows.
+- why a mask, not a canvas-coloured knock-out ring: the tree sits on `--canvas` (the tab) and on `--surface` (the widget and full-screen Card); a mask paints nothing, so it fits both.
+- A mask leaves hit-testing alone: a cut-back neighbour takes its own press (measured in Chromium, 2026-10-06).
+- Dots must stay inside their epic's group; the visible dots carry their own `mask` attribute.
+- Residual: where a selected dot's cut-out overlaps a reduced-motion celebrating dot's, a dot caught in the overlap shows uncut.
+
+Moments
+| moment | the tree draws |
+|---|---|
+| milestone | its ring: the last share draws (`roadmap-draw`) and the ring blooms (`roadmap-bloom`, 900 ms); the goal's connector to it draws itself (`roadmap-draw`) |
+| epic | its ring draws and blooms; 12 particles burst from the ring's centre (`roadmap-burst`; accent, gold, deep green in turn; `--dx`/`--dy` inline) |
+| feature, task | that feature's dot blooms (`roadmap-bloom`); a task moment names its feature |
+| any, `prefers-reduced-motion: reduce` | nothing moves, no particle; the solid accent halo holds while the moment names the item |
+- A ring holds `scale-110` while its moment is named and eases back after (`motion-safe:transition-transform duration-move`).
+
+Ring (`TreeRing`)
+- Track first, then arcs: the track circle is the node's first child.
+- Shipped arc: the whole circle with one dash (`pathLength` 1, dash `share` on, `strokeDashoffset` .25), not a rotated path. why: the bloom's transform is free to scale it.
+- While `moment`: the last feature's share is an arc of its own drawn on `roadmap-draw` (`pathLength` 1, dash 1; a one-feature item's is the whole ring); track and arcs bloom about the ring's centre (`[transform-box:fill-box] origin-center`).
+- An item with no feature: dashed `3 3` track in `--ink-faint`.
+
+Proof: `node .verify/probe-roadmap-tree-scaffold.mjs` (dev client :5183, light and dark; helper `lib/roadmap-tree-kit.mjs`; shots `.verify/shots/roadmap-tree-scaffold/`; both files gitignored)
+| reading | holds |
+|---|---|
+| live, Restorly and lyphecli, 1440 and 390 | svg 744×614 and 744×443, as the layout says; each milestone's first child is its ring's track; `aria-current="step"` on the current milestone; 38 and 39 dots resolve to their tokens; no halo or tip while nothing is selected or hovered; at 390 the pane scrolls sideways |
+| mounted over the page from Restorly's real layout | a selection on the goal, a milestone, an epic and a feature each shows exactly one dashed halo; focus ring solid accent with a transparent outline; mid-moment rings bloom, connector draws, 12 particles burst, dots bloom; reduced motion shows four solid accent halos and no motion; tip for each kind |
+| a copy of Restorly with no goal and every dot state | each paint correct |
+- 2026-10-06: 54 ok, 0 failed, 0 console errors in both themes. Writes: none.
+
+Traps
+- 2026-10-06: the tree and the old stage both draw `[data-roadmap-milestone]` and `[data-roadmap-epic]`, so each appears twice on the face until the face phase removes the old pieces. `CelebrationLayer` and `useMilestoneMomentInView` find the old station first, by page order. A probe that counts these page-wide double-counts.
+  - Readers that will read or press the tree's nodes: `.verify/lib/roadmap-cases-walk.mjs`, `roadmap-dialogs.mjs`, `roadmap-look-walk.mjs`, `roadmap-live-walks.mjs`, `roadmap-ui.mjs`, `roadmap-fullscreen-reads.mjs`, and `roadmap-writes-build.mjs` (reads the goal and still finds the header's `<h2>` first).
+  - `.verify/probe-roadmap-tab.mjs` scopes its station count to `[data-milestone-path]` and its feature press to `[data-roadmap-focus]`; the face phase re-points both to the tree's nodes.
+- The `:5183` dev server may not generate a class new to the tree: fetch `/src/index.css` and read it before trusting a look (MAN-7640 Traps). `[transform-box:fill-box]`, `[stroke-dasharray:2_3]`, `text-[11.5px]`, `tracking-[.14em]`, `stroke-ink-faint` and `fill-card` were served on 2026-10-06.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/tree/TreeHalo.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/tree/TreeRing.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-roadmap-tree-scaffold.mjs
+
+## MAN-7831 — Cerberus — the tab's status marks and the check sheet's pieces: `STATUS_TABLE`, `StatusGlyph` `StatusCell` `StatusSquare` `StatusPill`, `MinuteCells`, `LookupMoment`, `RecordedResults`, `fake.ts`
+
+The Cerberus tab's drawing vocabulary and the check sheet's three pieces. Pure of data: each takes its read model from the caller. Spec: `design/cerberus/Cerberus Spec.dc.html`, Table 1. Client reader: MAN-7822. Pure fleet model: MAN-7823. Words: MAN-7817. Wire shapes: MAN-7807. Colour rules: MAN-739 (rules 3–5), MAN-578.
+
+## Files
+| file | holds |
+|---|---|
+| `src/modules/cerberus/utils/cerberusStatus.ts` | `STATUS_TABLE` |
+| `src/modules/cerberus/StatusMarks.tsx` | `StatusGlyph`, `StatusCell`, `StatusSquare`, `StatusPill` |
+| `src/modules/cerberus/sheet/MinuteCells.tsx` | `MinuteCells` |
+| `src/modules/cerberus/sheet/LookupMoment.tsx` | `LookupMoment`, `LookupSentence` |
+| `src/modules/cerberus/sheet/RecordedResults.tsx` | `RecordedResults` |
+| `src/modules/cerberus/fake.ts` | `fakeNow`, `fakeOverview`, `fakeCheckDetail`, `fakeLookups`, `fakeActivity` |
+| `src/shared/types.ts` § CERBERUS STATUS VOCABULARY | `CerberusCellShape` |
+
+No file outside the module imports the marks or the sheet pieces yet; the fleet, sheet and History fills compose them.
+
+## `STATUS_TABLE` — the one owner
+`Record<CerberusStatus, { tone, glyph, wordKey, cell }>`. Nothing else in the tab decides a status's tone, glyph or shape; a view reads it here. `activityEvents.ts` reads it too (MAN-7823).
+
+| status | tone | glyph | cell |
+|---|---|---|---|
+| `ok` | positive | ✓ | `soft` |
+| `warn` | warn | ▲ | `outline` |
+| `failing` | warn | ▲ | `solid` |
+| `denied` | danger | ✕ | `solid` |
+| `not_enabled` | neutral | · | `flat` |
+| `unknown` | neutral | — | `dashed` |
+| `muted` | neutral | — | `surface` |
+| `paused` | neutral | — | `dashed` |
+
+- `wordKey` = `cerberus.status.<status>` (MAN-7817).
+- `denied` is the only red; a sixth tone for it is refused (MAN-739 rule 4).
+- `unknown` and `paused` draw the same cell: no reading either way; only the word says why.
+- `not_enabled` never needs you.
+
+## `CerberusCellShape` — paint in `StatusMarks.tsx` `CELL_PAINT`
+| shape | paint | reads as |
+|---|---|---|
+| `soft` | `bg-tone-soft`, no edge | passing; recedes: 60 washed minutes are one calm band |
+| `outline` | wash inside the tone's edge | close to the limit |
+| `solid` | tone dot fill | failing, refused |
+| `flat` | `bg-tone-dot/35`, no edge | not enabled |
+| `dashed` | dashed edge, no fill | no reading |
+| `surface` | `bg-muted` inside `border-input` | muted |
+
+- `soft` keeps no tone-coloured edge. why: measured; an edge made a passing square read as an outlined "close to the limit" square in green, and the strip as 60 boxes.
+- `flat` steps from `soft` by lightness, not hue. why: at the neutral dot's 20% the two measured 1.07:1 light, 1.10:1 dark; at 35%, rendered, 1.26:1 and 1.42:1.
+- Tone reaches paint only as `data-tone` plus a `tone-*` Tailwind name. No hex, `rgba(` or `var(--` in the marks.
+- Colour never animates between statuses (MAN-739 rule 5). The only motion: the failing glyph's `animate-cerberus-ring-warn`, under `motion-safe`.
+
+## Marks — `StatusMarks.tsx`
+| mark | props | draws |
+|---|---|---|
+| `StatusGlyph` | `status`, `size` `sm`\|`md`\|`lg` (20, 24, 32 px; default `md`), `decorative`, `still` | round glyph in the tone's ink on its wash |
+| `StatusCell` | `status`, `label`, any span attribute | one minute; the caller gives size, flow and role |
+| `StatusSquare` | `status`, `label` | 10 px square in the cell's shape, with `title` |
+| `StatusPill` | `status`, `text` | `Badge` (`tone`) holding glyph then word or `text`; `text` is cut with an ellipsis |
+
+- `StatusGlyph` names its word as `role="img"` + `aria-label` + `title`; `decorative` replaces that with `aria-hidden` (the word is written beside it).
+- `StatusGlyph` rings only for `failing` and not `still`. A lookup's glyph is `still`: the ring means needs you NOW, and a looked-up moment may be long past.
+- `·` is drawn at 1.8em inside the glyph; the glyph still comes from the table.
+- `StatusCell` and `StatusSquare` default `label` to the bare word; a caller passes the sentence (`Shadow connector · All 4 checks passing`).
+- `StatusPill` is the library's `Badge`: every tone pill in the app shares one paint.
+
+## `MinuteCells({ cells, selectedFrom?, onPick })`
+`cells: CerberusCell[]`, oldest left; draws any count; renders `null` for none. Axis under it: `hm` of the first, middle (`floor(count / 2)`) and last cell's `from`. Holds no data and no marker: `onPick(cell)` is the caller's.
+- One tab stop: `role="listbox"`, each minute a `role="option"` (`aria-selected` = `selectedFrom` match), `aria-label` = `cerberus.sheet.cells`.
+- Keys: `ArrowLeft`/`ArrowRight` ±1, `PageUp`/`PageDown` ±10, `Home`/`End`, `Enter` or Space picks. A key starts from the minute it is on, else the `selectedFrom` one, else the newest.
+- Pointer: the minute is found from the pointer's x, so a press in the 2 px gap lands on the nearer cell, and a phone's 4 px cells stay tappable. A click with `detail` 0 (assistive tech) picks the keyboard's minute.
+- Tooltip (`vv-tooltip`): `cerberus.sheet.cellTip` (`time` `word`); a folded minute (`cell.worst` not null) adds the check key on its own mono line, and its accessible name uses `cerberus.sheet.cellTipWorst`.
+- Tooltip placement is written to the nodes in `useLayoutEffect`, not state: centred on the minute and held inside the strip, with its pointer on the minute's centre; above the strip, or `data-side="below"` when the nearest clipping ancestor leaves no room.
+- `selectedFrom` marks its minute with an accent outline; the minute under the pointer scales on y.
+
+## `LookupMoment({ time, onTimeChange, lookup, check })`, `LookupSentence({ lookup, check })`
+- `check` = `Pick<CerberusCheckView, 'at' | 'origin' | 'staleAfter'>`: the lookup alone cannot give "older than 90 s", "by Cerberus on this server" or "The latest is 17:52:00". Callers pass `detail.check`.
+- `LookupMoment`: `Input type="time" step={1}` (`time` is its `HH:MM:SS`), then the sentence; a value not matching `^\d{2}:\d{2}(:\d{2})?$` shows `cerberus.lookup.typeATime`. Turning `time` into a moment and reading the lookup is the caller's.
+- The sentence column is the stable `aria-live="polite"` region; `LookupSentence` alone is no live region, so History wraps it in one.
+- `verdict` → sentence: `result` → `lookup.was` / `wasNoValue` (the value's trailing full stops dropped); `future` → `lookup.future` + `futureMeta` (`check.at`); `too_early` → `lookup.tooEarly`; `stale` → `lookup.stale` (`staleAfter` as `time.seconds`/`minutes`/`hours`, the largest exact unit).
+- Glyph status: only `result` has its own; the other three show `unknown`, under `lookup.unknownMeta` ("not the same as passing").
+- Meta (`result` only, when `resultAt` is set): `lookup.meta`/`metaMuted` from a warden, `metaHub`/`metaHubMuted` when `check.origin === 'self'`; `Muted` forms when `lookup.mute` covered the moment.
+
+## `RecordedResults({ rows })`
+- `rows: CerberusResultRow[]`, the read's `recent`; sorted newest first inside, whatever order it arrives in.
+- Row: `hms` time column, `StatusPill` (a null `status` draws `not_enabled`), then `value` when not null.
+- 12 rows (`FIRST_ROWS`), then a ghost button `cerberus.sheet.moreResults` (`count` = hidden); one press shows all.
+- No rows: `cerberus.sheet.noChanges`.
+- Section headings belong to the sheet and History, not these pieces.
+
+## `fake.ts`
+Fixture data for photographing the pieces before their fills land; nothing in the app imports it. The spec's story: 2026-10-03, local time, now = 17:52:10 (`fakeNow`), the minute the session check expired on `eis1`.
+- `fakeOverview`: 6 nodes, 22 checks, 12 passing, 5 needing you, 2 muted; `activity` = the first seven of `fakeActivity`.
+- `fakeActivity`: the whole feed, derived as `server/modules/cerberus/read-model/activity.ts` derives it; History's fixtures read it.
+- `fakeCheckDetail`: the session check, 60 cells holding all eight statuses. `fakeLookups`: `result`, `resultMuted`, `stale`, `tooEarly`, `future`.
+- Every status appears as a check's and as a service's folded status. `cerberus/disk.free` and docstore's checks have no label.
+- Checks sit in key order in every service, as the store hands them out; code picking one finds it by key, never by position.
+
+## Rules
+- A new status or cell shape: one edit in `STATUS_TABLE` and `CELL_PAINT`; never a second table in a view.
+- Dark mode sets `color-scheme: dark` on `input[type="date"]` and `[type="time"]` in `src/index.css` (the rule beside checkbox and radio). Without it the picker glyph is dark on a dark field; History's date field shares it.
+
+## Traps
+| trap | do |
+|---|---|
+| the time field shows `05:52:10 PM` on an en-US browser, beside the tab's 24-hour sentences; neither `lang` nor the page locale changes it | known; an always-24-hour field needs a custom text field |
+| a `.tsx` file created under `src/` after the dev client starts has no Tailwind classes | `touch src/index.css` once: INV-6586 |
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/index.css, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/fake.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/sheet/LookupMoment.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/sheet/MinuteCells.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/sheet/RecordedResults.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/StatusMarks.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/utils/cerberusStatus.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts

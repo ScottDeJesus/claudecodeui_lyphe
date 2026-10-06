@@ -1,6 +1,6 @@
 import { readDispatcherJson } from '@/shared/dispatcher-command.js';
 import { each, isCount, isCountOrNull, isFlag, isText, isTextOrNull, need, oneOf } from '@/shared/document-fields.js';
-import type { DispatcherModelChoice } from '@/shared/types.js';
+import type { DispatcherModelChoice, DispatcherStall } from '@/shared/types.js';
 import { readDispatcherWipWord } from '@/shared/utils.js';
 
 // The dispatcher lane's readers import the field vocabulary from here, so its import surface is
@@ -90,6 +90,21 @@ export function textSince(value: unknown, where: string): string | null {
  */
 export function flagSince(value: unknown, where: string): boolean {
   return value === undefined ? false : need(value, isFlag, where);
+}
+
+/** The two causes a `stalled` word may carry (`report_stall`), the ONE list — a cause outside it is a build this lane cannot draw. */
+export const STALL_CAUSES: readonly DispatcherStall[] = ['dispatcher_down', 'ended_unrecorded'];
+
+/**
+ * A stall cause a build OLDER than the field did not write, read as `null` (nothing stalled), and
+ * refused by name when the key IS there and is neither `null` nor one of the two causes.
+ *
+ * `null` is the honest reading of an absent key for the same reason `flagSince`'s `false` is: the
+ * word says something HAS happened (a run ended with nothing to record it), and a build that never
+ * wrote the key is one whose plans never said so — the card then draws what that build's plans are.
+ */
+export function stallSince(value: unknown, where: string): DispatcherStall | null {
+  return value === undefined || value === null ? null : oneOf(value, STALL_CAUSES, where);
 }
 
 /** The three words a model word may be (`hooks/plan_runner/run_model.py:WORDS`), the ONE list — `readDispatcherModelChoice` checks a request against the same three. */

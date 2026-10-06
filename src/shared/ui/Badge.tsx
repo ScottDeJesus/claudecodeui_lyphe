@@ -59,8 +59,12 @@ type BadgeProps = React.HTMLAttributes<HTMLDivElement> & {
 );
 
 /**
- * Used by the browser-use, chat, mcp, settings, sidebar, skills and dispatcher modules for short status
- * labels; the dispatcher's lane-card heads also give it a `kind` for their Epic and Feature tags.
+ * Used for short status labels by the accounts, agent-launch, browser-use, cerberus, chat,
+ * chat-gutters, deepseek-spend, dispatcher, git-panel, heal, jev, kanban, mcp, memory-intake, notes,
+ * roadmap, runner-tab, schedules, settings, shell, sidebar, skills, standalone-shell, task-master and
+ * universe modules, and by the kit's own `KanbanCard`. The cerberus tab's `StatusPill` draws a
+ * status's glyph and word in it. The dispatcher's lane-card heads and the roadmap's path also give it
+ * a `kind`, for their Epic and Feature tags.
  */
 export function Badge({ className, variant = 'default', tone, kind, as: Element = 'div', ...props }: BadgeProps) {
   // `default` is the only variant whose paint is a FILL, so it is the only one that can fight

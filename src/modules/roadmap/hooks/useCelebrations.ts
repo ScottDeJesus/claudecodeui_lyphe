@@ -87,7 +87,8 @@ function activeOf(moment: Moment | null): CelebrationActive {
  * the roadmap on its screen and the ref of the box the reader sees (an element that stays mounted with
  * the surface: the hook observes it once, on mount). It returns what to draw: `moment`
  * and `skip` for `CelebrationLayer`, `active` for `CelebrationContext` (read by `FeatureRow`,
- * `EpicCard` and `MilestonePath`, which play their own part of a moment).
+ * `EpicCard`, `MilestonePath` and the tree's nodes — `tree/TreeGoal`'s connectors,
+ * `tree/TreeMilestoneNode` and `tree/TreeEpicNode` — which play their own part of a moment).
  *
  * MOMENTS ARE READ OFF THE PICTURE'S OWN DATES, never stored: every completion already carries its date.
  * Live, each new picture of the SAME roadmap is diffed against the one before it (a task, a feature, an

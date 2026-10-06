@@ -17,7 +17,7 @@ import { GutterWidgetFrame } from '@/modules/chat-gutters/GutterWidgetFrame';
 import { useDispatcherPlans } from '@/modules/dispatcher';
 import { MemoryWidgetBody, useMemoryIntake } from '@/modules/memory-intake';
 import { NotesWidgetBody, useNotes } from '@/modules/notes';
-import { RoadmapWidgetBody, useRoadmap } from '@/modules/roadmap';
+import { RoadmapWidgetBody, RoadmapWidgetFullscreenBody, useRoadmap } from '@/modules/roadmap';
 import { RunnerWidgetBody } from '@/modules/runner-tab';
 import { useHostWindow } from '@/shared/context/HostWindowContext';
 import type { GutterSide, GutterWidgetId, Tone } from '@/shared/types';
@@ -274,6 +274,11 @@ export function ChatGutterLayout({
       count: number;
       icon: LucideIcon;
       Body: ComponentType<{ sessionId: string | null }>;
+      /**
+       * A widget's body for while its card has the whole viewport, drawn in place of `Body` and only then.
+       * Absent, `Body` is drawn at both sizes (the Embed widget's live iframe must not be remounted by it).
+       */
+      FullscreenBody?: ComponentType<{ sessionId: string | null }>;
       /** The tone of the frame's count badge; absent means the badge's own `info` register. */
       countTone?: Tone;
       /** Set by a widget whose body is itself a frame: the card gives it its whole inside. */
@@ -297,6 +302,8 @@ export function ChatGutterLayout({
       countTone: roadmapWaiting > 0 ? 'warn' : undefined,
       icon: RouteIcon,
       Body: RoadmapWidgetBody,
+      // At full screen the widget is the Roadmap tab itself — both faces — where a column holds the digest.
+      FullscreenBody: RoadmapWidgetFullscreenBody,
       // A body that scrolls its own content and carries its own celebrations box: the card gives it its
       // whole inside, with no padding and no scroll area of its own (as the Embed widget's is).
       flush: true,
@@ -334,7 +341,11 @@ export function ChatGutterLayout({
   };
 
   const renderWidget = (widget: GutterWidgetId): ReactNode => {
-    const { title, count, countTone, icon, Body, flush, HeaderAction } = widgets[widget];
+    const { title, count, countTone, icon, Body, FullscreenBody, flush, HeaderAction } = widgets[widget];
+    // Which body the card draws now. Fullscreen is the layout's own state, so the layout is what tells a body
+    // apart; a widget with no `FullscreenBody` keeps its one body (and its identity) through the switch.
+    const swapsBody = fullscreen === widget && FullscreenBody !== undefined;
+    const Drawn = swapsBody ? FullscreenBody : Body;
 
     return (
       <GutterWidgetFrame
@@ -357,8 +368,10 @@ export function ChatGutterLayout({
       >
         {/* Its own boundary, inside its own frame: a body that throws costs this gutter and leaves
             the chat and the other widgets standing. */}
-        <Boundary>
-          <Body sessionId={sessionId} />
+        {/* Keyed to the body it holds, only for a widget that swaps: a crash in the full-screen body must not
+            leave the boundary tripped over the column's body after the card has left full screen. */}
+        <Boundary key={swapsBody ? 'fullscreen' : 'column'}>
+          <Drawn sessionId={sessionId} />
         </Boundary>
       </GutterWidgetFrame>
     );

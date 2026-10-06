@@ -34,7 +34,7 @@ import type { DispatcherArcGroup, DispatcherArcStatus, DispatcherPlanStatus, Lan
 import { cn } from '@/shared/utils';
 
 /**
- * The arc's own word and tone, over the STORE's eight words. A dispatch arc is a row in the store
+ * The arc's own word and tone, over the STORE's nine words. A dispatch arc is a row in the store
  * with plans hanging off it, so it states its vocabulary here rather than mapping it onto anything
  * else's shape. It lives beside the deck that wears it.
  *
@@ -43,8 +43,8 @@ import { cn } from '@/shared/utils';
  * judgment has finished too — stamped, or every phase of it done. `empty` is warn because an arc whose every plan was dropped is the one
  * state an operator did not ask for, and it is the state nothing else on the screen would show.
  *
- * THE THREE WAITING WORDS WEAR THE PLAN'S OWN TONE, through `planStatusTone` and not a colour of
- * their own: `queued`, `paused` and `scheduled` are the plans' words too (`DispatcherPlanStatus`),
+ * THE FOUR PLAN WORDS WEAR THE PLAN'S OWN TONE, through `planStatusTone` and not a colour of
+ * their own: `queued`, `paused`, `scheduled` and `stalled` are the plans' words too (`DispatcherPlanStatus`),
  * read off the arc's plans and printed on the cards in the strip below — a `queued` arc over `queued`
  * cards that were toned differently would be the header arguing with its own deck (`dispatcherState`
  * states that rule once). Every other word here is the arc's alone.
@@ -52,6 +52,7 @@ import { cn } from '@/shared/utils';
 const ARC_STATUS: Record<DispatcherArcStatus, { key: string; tone: Tone }> = {
   designing: { key: 'dispatcher.arcStatus.designing', tone: 'info' },
   judging: { key: 'dispatcher.arcStatus.judging', tone: 'info' },
+  stalled: { key: 'dispatcher.arcStatus.stalled', tone: planStatusTone('stalled') },
   live: { key: 'dispatcher.arcStatus.live', tone: 'info' },
   complete: { key: 'dispatcher.arcStatus.complete', tone: 'positive' },
   empty: { key: 'dispatcher.arcStatus.empty', tone: 'warn' },
@@ -61,14 +62,14 @@ const ARC_STATUS: Record<DispatcherArcStatus, { key: string; tone: Tone }> = {
 };
 
 /**
- * A plan's mark on the arc's flow, by its status: done, held and armed each have a glyph of their
- * own, and every other plan (queued, parked, idle) is its place in the arc — so the node reads
+ * A plan's mark on the arc's flow, by its status: done, held, armed and stalled each have a glyph of
+ * their own, and every other plan (queued, parked, idle) is its place in the arc — so the node reads
  * without its colour, and the plans still ahead count off in the order they will walk. WALKING is not
  * a status: `live` is also a plan approved and waiting on its turn (operator, 2026-10-03: "when a
  * feature isnt in progress, it should not have an animated play icon on it"), so `▶︎` is drawn from
  * the plan's tasks instead — one of them walking now (`phaseWord`, the task track's own rule).
  */
-const FLOW_MARK: Partial<Record<DispatcherPlanStatus, string>> = { complete: '✓', paused: '⏸︎', scheduled: '◷' };
+const FLOW_MARK: Partial<Record<DispatcherPlanStatus, string>> = { complete: '✓', paused: '⏸︎', scheduled: '◷', stalled: '!' };
 
 /**
  * ONE dispatch arc, drawn as the deck every arc on this screen is drawn as, in the lane card's ONE

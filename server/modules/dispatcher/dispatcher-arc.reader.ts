@@ -19,8 +19,8 @@ import { plannerSince } from './dispatcher-planner.reader.js';
  * one would be a second answer.
  */
 
-/** The eight words an arc's derived status may be (`store_arcs.arc_word`'s one precedence). Anything else is a build this lane cannot draw. */
-export const ARC_STATUSES: readonly DispatcherArcStatus[] = ['empty', 'complete', 'judging', 'live', 'scheduled', 'paused', 'queued', 'designing'];
+/** The nine words an arc's derived status may be (`store_arcs.arc_word`'s one precedence). Anything else is a build this lane cannot draw. */
+export const ARC_STATUSES: readonly DispatcherArcStatus[] = ['empty', 'complete', 'judging', 'stalled', 'live', 'scheduled', 'paused', 'queued', 'designing'];
 
 /**
  * One limit of an arc's `wip` block: the epic's own word (`null` while it follows its default), the
@@ -82,6 +82,10 @@ export function arcOf(raw: unknown): DispatcherArc {
     // once, and a `designing` header draws no press while `stopped` is what Start is drawn for).
     walking: flagSince(field(arc, 'walking'), `arc.walking of ${name}`),
     stopped: flagSince(field(arc, 'stopped'), `arc.stopped of ${name}`),
+    // Whether a plan of the arc has STALLED (`report_arcs.stalled`): released, its only running work
+    // ended and nothing to record it. The header draws Resume on it where nothing is stopped, beside
+    // the Pause `walking` still draws. Tolerant: a build older than the field has no stalled plan to say.
+    stalled: flagSince(field(arc, 'stalled'), `arc.stalled of ${name}`),
     // The ONE hour an arc's plans are armed for, or null (`report_arcs.hour`: the single distinct
     // armed stamp, null when there is none or when its plans were armed apart). It is the stamp the
     // header's Cancel is drawn over and the note beside it states — never computed here.

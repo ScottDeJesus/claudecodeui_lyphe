@@ -41,10 +41,23 @@ export const WIDGET_CSP = "default-src 'none'; script-src 'unsafe-inline'; style
  * last `<p>` keeps its margin INSIDE the body instead of collapsing through it. The bridge sizes
  * the frame from the body's box (`widgetBridgeScript.ts`), and a margin that escaped that box
  * would be a few pixels of document the frame cannot show — a scrollbar for nothing.
+ *
+ * The last five rules paint every element's scrollbar — the document's and each `overflow:auto`
+ * box a widget author writes — as the host's `.scrollbar-thin` does (`src/index.css`, whose
+ * declarations these repeat because no stylesheet of ours crosses the sandbox), so a widget's
+ * scroll panes match the app's rather than the browser's fat grey default. Chromium ignores a
+ * `::-webkit-scrollbar` rule on any element whose `scrollbar-width` or `scrollbar-color` is set, so
+ * an author's own applies only where the element also sets both to `auto` — and an element that
+ * does so with no rule of its own lands on the 6px bar of these rules, not the browser's default.
  */
 const DOCUMENT_RESET =
   'html,body{margin:0;background:var(--canvas);color:var(--ink);font-family:var(--font-body);font-size:var(--text-body)}' +
-  'body{display:flow-root}';
+  'body{display:flow-root}' +
+  '*{scrollbar-width:thin;scrollbar-color:var(--ink-muted) transparent}' +
+  '*::-webkit-scrollbar{width:6px;height:6px}' +
+  '*::-webkit-scrollbar-track{background:transparent}' +
+  '*::-webkit-scrollbar-thumb{background-color:var(--ink-muted);border-radius:3px}' +
+  '*::-webkit-scrollbar-thumb:hover{background-color:color-mix(in srgb,var(--ink-muted) 80%,transparent)}';
 
 /**
  * Token values come from `getComputedStyle` on our own document element, so they are CSS values

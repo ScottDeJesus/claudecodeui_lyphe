@@ -1,8 +1,9 @@
 import * as React from 'react';
 import { createPortal } from 'react-dom';
 
+import { FOCUSABLE_SELECTOR } from '@/shared/constants';
 import { useHostWindow } from '@/shared/context/HostWindowContext';
-import { OWNS_ESCAPE_SELECTOR } from '@/shared/ui/overlayEscape';
+import { overlayInFrontHoldsEscape } from '@/shared/ui/overlayEscape';
 import { cn } from '@/shared/utils';
 
 type DialogContextValue = {
@@ -99,42 +100,6 @@ type DialogContentProps = {
   wrapperClassName?: string;
   animationClassName?: string;
 } & React.HTMLAttributes<HTMLDivElement>;
-
-const FOCUSABLE_SELECTOR = 'a[href], button:not([disabled]), input:not([disabled]), textarea:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
-
-/**
- * Whether a panel that OWNS ESCAPE is drawn IN FRONT OF this dialog — the one case where the key is
- * not the dialog's to take.
- *
- * TWO WAYS TO BE IN FRONT, and they are the two ways these panels are drawn. *In place*: a Menu or a
- * Select inside the dialog, whose panel is a descendant of it. *Portalled*: a panel appended to
- * `<body>` as it opened, so it comes after the dialog's own portal node in document order — which is
- * also what puts it above, a portalled menu carrying a higher z than the panel it belongs to.
- * Anything earlier is BEHIND — a composer menu left open under a dialog opened after it — and then
- * the key is the dialog's again.
- *
- * `doc` is the dialog's host document: a panel open in the picture-in-picture window lives in that
- * window's document, and the opener's holds none of them.
- *
- * The candidates are the panels that STATE they own the key (`shared/ui/overlayEscape`), not every
- * element carrying some role. Scanning `[role="menu"], [role="listbox"]` here was wrong, and
- * shipped for one pass: cmdk's list carries `role="listbox"` as STATIC content of the dialog it is
- * placed in, so the command palette stood this dialog down on every Escape and nothing else took the
- * key — the palette's only pointerless dismissal, dead.
- *
- * Why a dialog has to ask at all: it listens on its host `window` in the CAPTURE phase, which fires
- * before every `document` listener an overlay uses, and it stops the event when it acts on it. An overlay
- * above it would never see the key. Asking first is what lets Escape mean "the menu" and then, on
- * the next press, "the sheet".
- */
-function overlayInFrontHoldsEscape(content: HTMLElement | null, doc: Document): boolean {
-  // No panel: this dialog is mid-mount, and nothing can be in front of one that is not on screen.
-  if (content === null) return false;
-  return Array.from(doc.querySelectorAll(OWNS_ESCAPE_SELECTOR)).some((overlay) => (
-    content.contains(overlay)
-    || (content.compareDocumentPosition(overlay) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0
-  ));
-}
 
 /** Focus-trapped panel of Dialog, used by the chat, command-palette, sidebar and skills modules. */
 export const DialogContent = React.forwardRef<HTMLDivElement, DialogContentProps>(

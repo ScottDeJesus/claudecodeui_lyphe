@@ -5,6 +5,7 @@
 # A phase's probe sources this file and calls what it needs:
 #
 #   set -e
+#   export SUNSET_SLOT=3        # optional: a slot of your own, set ONCE, before the trap
 #   source scripts/sunset-probe.sh
 #   trap stop_probe_server EXIT
 #   probe_db
@@ -18,6 +19,9 @@
 # `/tmp/sunset<N>-` (`/tmp/sunset3-probe.db`, `/tmp/sunset3-state`, ...). Any other value — an
 # empty one included, because an empty slot silently collapsing onto the default is exactly the
 # collision a slot exists to prevent — makes the function print one sentence and return 2.
+# Export the slot once, before the trap, and never prefix a single call
+# (`SUNSET_SLOT=1 boot_probe_server`): the prefix is gone when the call returns, and the bare
+# `stop_probe_server` the trap then runs acts on the DEFAULT slot — another plan's probe.
 # `sunset_paths` computes the slot's values and EXPORTS what a probe reads afterwards:
 #
 #   SUNSET_API       http://127.0.0.1:<api port>          — curl this
@@ -53,7 +57,9 @@ sunset_paths() {
   local slot_offset=0
   if [ -n "${SUNSET_SLOT+set}" ]; then
     case "$SUNSET_SLOT" in
-      [1-9]) slot_offset=$((2 * SUNSET_SLOT)); SUNSET_PREFIX="/tmp/sunset${SUNSET_SLOT}-" ;;
+      # Spelled out, not `[1-9]`: in a UTF-8 locale a range also matches `٣` or `③`, and the
+      # arithmetic below would then abort the caller's shell instead of answering with rc 2.
+      1|2|3|4|5|6|7|8|9) slot_offset=$((2 * SUNSET_SLOT)); SUNSET_PREFIX="/tmp/sunset${SUNSET_SLOT}-" ;;
       *) echo "SUNSET_SLOT must be unset or a single digit from 1 to 9." >&2; return 2 ;;
     esac
   else
@@ -67,6 +73,11 @@ sunset_paths() {
 # (a) A scratch copy of the database, DISARMED so no board can spawn a Metis from a probe.
 probe_db() {
   sunset_paths || return $?
+  local path
+  # A hot journal or WAL a killed run left beside the old copy would be replayed onto the new one.
+  for path in "${SUNSET_PREFIX}probe.db-journal" "${SUNSET_PREFIX}probe.db-wal" "${SUNSET_PREFIX}probe.db-shm"; do
+    case "$path" in /tmp/sunset-*|/tmp/sunset[1-9]-*) rm -rf -- "$path" ;; esac
+  done
   cp ~/.cloudcli/auth.db "${SUNSET_PREFIX}probe.db"
   python3 -c "import sqlite3,sys; c=sqlite3.connect(sys.argv[1]); c.execute('update kanban_boards set autonomy=0'); c.commit(); c.close()" "${SUNSET_PREFIX}probe.db"
 }
@@ -74,6 +85,8 @@ probe_db() {
 # (b) A JWT for the first user, minted from the SCRATCH database's own secret.
 mint_token() {
   sunset_paths || return $?
+  # sqlite3.connect creates a missing file, which would plant an empty database in the slot's namespace.
+  [ -f "${SUNSET_PREFIX}probe.db" ] || { echo "No scratch database at ${SUNSET_PREFIX}probe.db — run probe_db first." >&2; return 1; }
   python3 - "${SUNSET_PREFIX}probe.db" <<'PY'
 import sqlite3, json, hmac, hashlib, base64, time, sys
 conn = sqlite3.connect(sys.argv[1])
@@ -98,13 +111,28 @@ PY
 #     store, its signing key and the warden gateway's listener, so a probe never opens
 #     `~/.cloudcli/cerberus.db` or binds 3012. The roots are cleared before the boot: a crashed
 #     run's enrolled nodes and leftover state must not reach the next one.
+#     `boot_probe_server --keep-store` clears everything EXCEPT the Cerberus store and key: the call
+#     for a probe that stops its server and boots it again to see what a restart does to the nodes
+#     already enrolled (a warden's reconnect needs both its node row and center's signing key).
 boot_probe_server() {
   sunset_paths || return $?
-  local prefix="$SUNSET_PREFIX" path i
-  for path in "${prefix}state" "${prefix}att" "${prefix}sessions" "${prefix}spill" "${prefix}accounts" \
-              "${prefix}cerberus.db" "${prefix}cerberus.db-wal" "${prefix}cerberus.db-shm" "${prefix}cerberus.key"; do
+  local prefix="$SUNSET_PREFIX" path i keep_store=0
+  [ "${1:-}" = "--keep-store" ] && keep_store=1
+  # A slot whose port already answers is held by another server (a probe of another plan, or this
+  # slot's own left running): booting over it would delete its roots and report a success the
+  # squatter's answers satisfy. Refuse before anything is cleared.
+  if curl -sf --max-time 2 "$SUNSET_API/api/auth/status" > /dev/null; then
+    echo "Something already answers at $SUNSET_API — stop that server or pick another SUNSET_SLOT." >&2
+    return 1
+  fi
+  for path in "${prefix}state" "${prefix}att" "${prefix}sessions" "${prefix}spill" "${prefix}accounts"; do
     case "$path" in /tmp/sunset-*|/tmp/sunset[1-9]-*) rm -rf -- "$path" ;; esac
   done
+  if [ "$keep_store" = 0 ]; then
+    for path in "${prefix}cerberus.db" "${prefix}cerberus.db-wal" "${prefix}cerberus.db-shm" "${prefix}cerberus.key"; do
+      case "$path" in /tmp/sunset-*|/tmp/sunset[1-9]-*) rm -rf -- "$path" ;; esac
+    done
+  fi
   mkdir -p "${prefix}state" "${prefix}att" "${prefix}sessions" "${prefix}spill"
   CLOUDCLI_LOCAL_SERVER_MARKER="${prefix}marker.json" CLOUDCLI_SESSIONS_DIR="${prefix}sessions" \
   SERVER_PORT="${SUNSET_API##*:}" DATABASE_PATH="${prefix}probe.db" KANBAN_METIS_STATE_ROOT="${prefix}state" \
@@ -122,15 +150,22 @@ boot_probe_server() {
 #     is still shutting down is recreated by its last write, and the next probe inherits it.
 stop_probe_server() {
   sunset_paths || return $?
-  local prefix="$SUNSET_PREFIX" pid path i
+  local prefix="$SUNSET_PREFIX" pid path i command_line=""
   pid="$(cat "${prefix}server.pid" 2>/dev/null)" || pid=""
+  # Only a real process number is ever signalled: `kill -- -1` reaches every process this user owns
+  # and `kill 0` this shell's own group (2026-10-05: a pid file holding -1 took down every service on
+  # the box). The digits are spelled out, not a range, so no locale widens what counts as one.
+  case "$pid" in ''|*[!0123456789]*|0*|1) pid="" ;; esac
+  # And only a probe server: a pid file a killed run left behind can name a recycled pid.
+  if [ -n "$pid" ]; then command_line="$(tr '\0' ' ' < "/proc/$pid/cmdline" 2>/dev/null)" || command_line=""; fi
+  case "$command_line" in *server/index.ts*) ;; *) pid="" ;; esac
   if [ -n "$pid" ]; then
     kill "$pid" 2>/dev/null || true
     for i in $(seq 1 50); do kill -0 "$pid" 2>/dev/null || break; sleep 0.2; done
     if kill -0 "$pid" 2>/dev/null; then kill -KILL "$pid" 2>/dev/null || true; fi
   fi
   for path in "${prefix}state" "${prefix}att" "${prefix}accounts" "${prefix}spill" "${prefix}sessions" \
-              "${prefix}probe.db" "${prefix}probe.db-wal" "${prefix}probe.db-shm" \
+              "${prefix}probe.db" "${prefix}probe.db-journal" "${prefix}probe.db-wal" "${prefix}probe.db-shm" \
               "${prefix}cerberus.db" "${prefix}cerberus.db-wal" "${prefix}cerberus.db-shm" \
               "${prefix}cerberus.key" "${prefix}ratelimit.json" "${prefix}marker.json" "${prefix}server.pid" "${prefix}server.log"; do
     case "$path" in /tmp/sunset-*|/tmp/sunset[1-9]-*) rm -rf -- "$path" ;; esac

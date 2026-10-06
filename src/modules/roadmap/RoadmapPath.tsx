@@ -11,10 +11,14 @@ import { useMilestoneMomentInView } from '@/modules/roadmap/hooks/useMilestoneMo
 import { useRoadmap } from '@/modules/roadmap/hooks/useRoadmap';
 import { MilestoneFocus } from '@/modules/roadmap/MilestoneFocus';
 import { OpenDialog } from '@/modules/roadmap/modals/OpenDialog';
+import { TreePanel } from '@/modules/roadmap/panel/TreePanel';
 import { RoadmapHeader } from '@/modules/roadmap/RoadmapHeader';
 import { RoadmapRail } from '@/modules/roadmap/RoadmapRail';
+import { RoadmapTree } from '@/modules/roadmap/tree/RoadmapTree';
 import { playingMilestone } from '@/modules/roadmap/utils/celebrationMoments';
-import type { RoadmapPicture } from '@/shared/roadmap-types';
+import { layoutTree } from '@/modules/roadmap/utils/treeLayout';
+import type { Roadmap, RoadmapPicture } from '@/shared/roadmap-types';
+import type { RoadmapTreeSelection } from '@/shared/types';
 import { Badge, Banner, Button, EmptyState, ScrollArea, Spinner } from '@/shared/ui';
 
 /** Something the store holds that no roadmap reaches yet, as the banner names it: an epic (`arc`) or a feature (`plan`). */
@@ -28,9 +32,12 @@ type RoadmapPathProps = {
 /**
  * The Roadmap face: one roadmap as a path to its goal. At the top, what the store holds that no roadmap
  * reaches yet, when it holds anything; then the header — the picker, the goal, the standing and the path;
- * then the stage, the focused milestone with its epics, beside the rail of what wants the operator from
- * 1280px up and above it below that. Every other state says its own thing: the picture still on its
- * way, no roadmap at all, and a roadmap with no milestone yet.
+ * then the tree (`RoadmapTree`), the whole roadmap drawn from its goal down to every feature's dot, while
+ * it holds a milestone (the item pressed on it is held here, per roadmap), and right under it the details
+ * panel (`TreePanel`), a band at its own width that the selected item fills; then the stage, the focused
+ * milestone with its epics, beside the rail of what wants the operator from 1280px up and above it below
+ * that. Every other state says its own thing: the picture still on its way, no roadmap at all, and a
+ * roadmap with no milestone yet.
  *
  * THE FACE'S BOX IS THE CELEBRATIONS' BOX. `rootRef` is what `useCelebrations` watches (a moment plays
  * only while this face is on screen), and its `relative` box is what `CelebrationLayer` covers, as its
@@ -61,6 +68,11 @@ export function RoadmapPath({ onOpenCard }: RoadmapPathProps) {
   const playing = playingMilestone(milestones, active);
   // A milestone moment plays on its station, so a station scrolled out of the face's view is brought into it first.
   useMilestoneMomentInView(moment, scrollRef);
+  // The tree's own sideways scroller, which the tree opens on the current milestone and scrolls to a selection.
+  const treePaneRef = useRef<HTMLDivElement>(null);
+  // The roadmap laid out as a tree, once per picture of it: the goal's label is its goal, or its "missing" words.
+  const goalText = selected?.goal ?? t('roadmap.goal.missing');
+  const layout = useMemo(() => (selected === null ? null : layoutTree(selected, goalText)), [selected, goalText]);
   // Which dialog is open, for which item, adding or editing — one at a time, as a dialog is modal. `null`
   // for none. Its opener is the face context's `openDialog`, so any press under the face can put one up.
   const [dialog, setDialog] = useState<FaceDialog | null>(null);
@@ -71,6 +83,15 @@ export function RoadmapPath({ onOpenCard }: RoadmapPathProps) {
   const focusedName = selectedName === null ? null : focusedBy[selectedName] ?? null;
   const focus = useCallback((name: string) => {
     if (selectedName !== null) setFocusedBy((held) => ({ ...held, [selectedName]: name }));
+  }, [selectedName]);
+  // The item the operator pressed on the tree, kept per roadmap (by name) so a switch to the other roadmap and
+  // back returns to the item he pressed there. Not derivable: only his press says it.
+  const [pressedBy, setPressedBy] = useState<Record<string, RoadmapTreeSelection>>({});
+  // Each render holds the entry against the roadmap on screen: a name the picture no longer holds reads as nothing selected.
+  const pressed = selectedName === null ? null : pressedBy[selectedName] ?? null;
+  const treeSelection = selected !== null && pressed !== null && holdsItem(selected, pressed) ? pressed : null;
+  const selectOnTree = useCallback((item: RoadmapTreeSelection) => {
+    if (selectedName !== null) setPressedBy((held) => ({ ...held, [selectedName]: item }));
   }, [selectedName]);
   // What every press under the face reaches: the dialog opener, the card opener the tab supplied, and the stage.
   const face = useMemo<RoadmapFace>(() => ({ openDialog: setDialog, openCard: onOpenCard, focus }), [onOpenCard, focus]);
@@ -119,6 +140,33 @@ export function RoadmapPath({ onOpenCard }: RoadmapPathProps) {
 
               <RoadmapHeader key={selected.name} roadmap={selected} focused={focused?.name ?? null} onFocus={focus} />
 
+              {/* The tree at its natural size: this face scrolls, so it is handed no height to fit. */}
+              {layout !== null && selected.milestones.length > 0 && (
+                <RoadmapTree
+                  roadmap={selected}
+                  layout={layout}
+                  maxHeight={null}
+                  selected={treeSelection}
+                  onSelect={selectOnTree}
+                  paneRef={treePaneRef}
+                />
+              )}
+
+              {/* The details panel, right under the tree (the face's 32px gap pulled to 12): a band at its own width, the hint until a press fills it. */}
+              {layout !== null && selected.milestones.length > 0 && (
+                <div className="-mt-5">
+                  <TreePanel
+                    roadmap={selected}
+                    layout={layout}
+                    // FILL: selection — the item this face holds selected on this roadmap, the tree's own.
+                    selected={null}
+                    // FILL: onSelect — a press on a panel's row moves this roadmap's selection, as a press on the tree does.
+                    onSelect={() => {}}
+                    fit="viewport"
+                  />
+                </div>
+              )}
+
               {focused === null ? (
                 <EmptyState
                   icon={Milestone}
@@ -145,6 +193,15 @@ export function RoadmapPath({ onOpenCard }: RoadmapPathProps) {
     </CelebrationContext.Provider>
     </RoadmapFaceContext.Provider>
   );
+}
+
+/** Whether the roadmap still holds the item a press named: the goal always, a milestone, epic or feature while the picture has it. */
+function holdsItem(roadmap: Roadmap, item: RoadmapTreeSelection): boolean {
+  if (item.kind === 'roadmap') return true;
+  if (item.kind === 'milestone') return roadmap.milestones.some((milestone) => milestone.name === item.name);
+  const epics = roadmap.milestones.flatMap((milestone) => milestone.epics);
+  if (item.kind === 'epic') return epics.some((epic) => epic.name === item.name);
+  return epics.some((epic) => epic.features.some((feature) => feature.name === item.name));
 }
 
 /**

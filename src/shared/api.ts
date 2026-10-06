@@ -3,7 +3,7 @@ import {
   getStoredAuthToken,
   storeAuthToken,
 } from '@/shared/authToken';
-import type { AuthTraceEvent, DeepseekRange, DispatcherAsk, DispatcherModelChoice, DispatcherWipChoice, DispatcherWipLimit, FileLinePatch, JevRange, NoteInput, NtfySettingsInput, SimpleListItemRef, SimpleListPosition, SubagentTranscriptResult } from '@/shared/types';
+import type { AuthTraceEvent, CerberusEnrollInput, CerberusLabelInput, CerberusMuteInput, DeepseekRange, DispatcherAsk, DispatcherModelChoice, DispatcherWipChoice, DispatcherWipLimit, FileLinePatch, JevRange, NoteInput, NtfySettingsInput, SimpleListItemRef, SimpleListPosition, SubagentTranscriptResult } from '@/shared/types';
 import type { AgentLaunchDefaultsChange, AgentLaunchRowChange } from '@/shared/agent-launch-types';
 import type { ClaudeUpdateApplyRequest } from '@/shared/claude-update-types';
 import type { RoadmapWriteBody } from '@/shared/roadmap-types';
@@ -180,6 +180,24 @@ export async function readApiJson<T>(response: Response): Promise<T> {
     );
   }
   return data as T;
+}
+
+/**
+ * The server's own sentence out of a refusal body, or `null` when the body carried none — or was
+ * not JSON at all. Both envelope shapes `errorMessage` reads arrive here: a route's plain `error`
+ * string, and the error middleware's `{ error: { code, message } }`. For the writers that answer
+ * the person with a toast and keep the server's words under it (the notes and the Cerberus
+ * providers), where `readApiJson` would throw the sentence away with the status.
+ */
+export async function refusalSentence(response: Response): Promise<string | null> {
+  try {
+    const body: unknown = await response.json();
+    if (body === null || typeof body !== 'object') return null;
+    const envelope = body as { error?: unknown; details?: unknown };
+    return errorMessage(envelope.error) ?? errorMessage(envelope.details);
+  } catch {
+    return null;
+  }
 }
 
 const get = (url: string, options: ApiRequestOptions = {}) => authenticatedFetch(url, options);
@@ -790,6 +808,29 @@ export const api = {
     create: (input: NoteInput) => post('/api/notes', input),
     update: (id: string, input: NoteInput) => put(`/api/notes/${encodeURIComponent(id)}`, input),
     remove: (id: string) => del(`/api/notes/${encodeURIComponent(id)}`),
+  },
+
+  // The Cerberus lane (server/modules/cerberus/MANUAL.md): center's read model of the fleet, read
+  // whole. Every read answers its wire shape BARE — not wrapped in `{ success, data }` — and a
+  // refusal is the app's `{ success: false, error }` envelope. The `cerberus_changed` frame is only
+  // a HINT that something moved: the screen reads again and draws the answer, never the frame. The
+  // check read takes two moments — `lookup`, the instant the sentence is about, and `end`, where the
+  // 60 cells and the recorded results stand; both are epoch milliseconds and both default to now.
+  // The mute and the lift answer the `CerberusMute` they wrote and the label answers 204; nobody
+  // draws from those answers, because the screen is drawn from the read that follows the write.
+  cerberus: {
+    overview: () => get('/api/cerberus/overview'),
+    checks: () => get('/api/cerberus/checks'),
+    check: (node: string, service: string, id: string, { lookup, end }: { lookup?: number; end?: number } = {}) =>
+      get(`/api/cerberus/checks/${encodeURIComponent(node)}/${encodeURIComponent(service)}/${encodeURIComponent(id)}${query({ lookup, end })}`),
+    lookup: (node: string, key: string, at: number) => get(`/api/cerberus/lookup${query({ node, key, at })}`),
+    // `before` is exclusive, newest first: "Show earlier" passes the `at` of the oldest line it holds.
+    activity: ({ before, limit }: { before?: number; limit?: number } = {}) => get(`/api/cerberus/activity${query({ before, limit })}`),
+    mute: (input: CerberusMuteInput) => post('/api/cerberus/mutes', input),
+    liftMute: (id: string) => post(`/api/cerberus/mutes/${encodeURIComponent(id)}/lift`, {}),
+    setLabel: (input: CerberusLabelInput) => put('/api/cerberus/labels', input),
+    enroll: (input: CerberusEnrollInput) => post('/api/cerberus/enrollments', input),
+    enrollment: (name: string) => get(`/api/cerberus/enrollments/${encodeURIComponent(name)}`),
   },
 
   // The dispatcher lane (docs/MANUAL.md (dispatcher)): the plans in the dispatcher's own store, and the

@@ -19,11 +19,12 @@ export type Moment = {
 };
 
 /**
- * What is playing right now, by name, for the rows, cards and stations that carry their own motion:
- * the tasks and features whose row is moving, the epics whose card is, and the milestone whose
- * station is (or `null`). A task's name is its feature's, since the meter that grows is the
- * feature's row. Provided by `RoadmapPath` and `RoadmapWidgetBody`, each from `useCelebrations`; read
- * by `FeatureRow`, `EpicCard` and `MilestonePath`.
+ * What is playing right now, by name, for the rows, cards, stations and tree nodes that carry their own
+ * motion: the tasks and features whose row (and dot) is moving, the epics whose card (and ring) is, and
+ * the milestone whose station (and ring) is (or `null`). A task's name is its feature's, since the meter
+ * that grows is the feature's row. Provided by `RoadmapPath` and `RoadmapWidgetBody`, each from
+ * `useCelebrations`; read by `FeatureRow`, `EpicCard`, `MilestonePath` and the tree's nodes
+ * (`tree/TreeGoal`'s connectors, `tree/TreeMilestoneNode` and `tree/TreeEpicNode`).
  */
 export type CelebrationActive = {
   tasks: Set<string>;
@@ -34,9 +35,10 @@ export type CelebrationActive = {
 
 /**
  * The celebration context. Its default is the still screen — every set empty and no milestone — so
- * a row, a card or a station drawn under no provider reads "nothing is playing" rather than failing.
- * Provided by `RoadmapPath` (the tab's face) and `RoadmapWidgetBody` (the chat gutter's widget), each
- * from its own `useCelebrations`; read by `FeatureRow`, `EpicCard` and `MilestonePath`.
+ * a row, a card, a station or a tree node drawn under no provider reads "nothing is playing" rather
+ * than failing. Provided by `RoadmapPath` (the tab's face) and `RoadmapWidgetBody` (the chat gutter's
+ * widget), each from its own `useCelebrations`; read by `FeatureRow`, `EpicCard`, `MilestonePath` and
+ * the tree's nodes (`tree/TreeGoal`'s connectors, `tree/TreeMilestoneNode` and `tree/TreeEpicNode`).
  */
 export const CelebrationContext = createContext<CelebrationActive>({
   tasks: new Set(),

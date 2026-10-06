@@ -1,6 +1,6 @@
 import type { DispatcherEvent, DispatcherPhase, DispatcherPlan, DispatcherStage } from '@/shared/types.js';
 
-import { each, countOrNullSince, countSince, field, flagSince, isCount, isCountOrNull, isFlag, isRecord, isText, isTextOrNull, modelSince, names, need, oneOf, textSince } from './dispatcher-state.transport.js';
+import { each, countOrNullSince, countSince, field, flagSince, isCount, isCountOrNull, isFlag, isRecord, isText, isTextOrNull, modelSince, names, need, oneOf, stallSince, textSince } from './dispatcher-state.transport.js';
 import { askingSince } from './dispatcher-ask.reader.js';
 import { plannerSince } from './dispatcher-planner.reader.js';
 
@@ -26,8 +26,8 @@ import { plannerSince } from './dispatcher-planner.reader.js';
  */
 export type DocumentPlan = Omit<DispatcherPlan, 'session_app_id'>;
 
-/** The seven words a plan's status may be (`report.status_word`'s one precedence). Anything else is a build this lane cannot draw. */
-export const PLAN_STATUSES: readonly DispatcherPlan['status'][] = ['idle', 'parked', 'queued', 'scheduled', 'paused', 'live', 'complete'];
+/** The eight words a plan's status may be (`report.status_word`'s one precedence). Anything else is a build this lane cannot draw. */
+export const PLAN_STATUSES: readonly DispatcherPlan['status'][] = ['idle', 'parked', 'queued', 'scheduled', 'paused', 'stalled', 'live', 'complete'];
 
 /** The three words a phase's status may be (`phase_chain`'s own column). */
 export const PHASE_STATUSES: readonly DispatcherPhase['status'][] = ['not started', 'running', 'done'];
@@ -97,6 +97,10 @@ function phaseOf(raw: unknown): DispatcherPhase {
     done_at: need(field(phase, 'done_at'), isTextOrNull, 'phase.done_at'),
     waits_on: names(field(phase, 'waits_on'), 'phase.waits_on'),
     busy: need(field(phase, 'busy'), isFlag, 'phase.busy'),
+    // Why the phase's run has ended with nothing to record it (`report_stall`), or `null` — the
+    // dispatcher's own word, never re-derived from `status` and `busy` here. Read tolerantly, so a
+    // build older than the field draws what it always drew.
+    stalled: stallSince(field(phase, 'stalled'), 'phase.stalled'),
     rounds: need(field(phase, 'rounds'), isCount, 'phase.rounds'),
     cost_usd: need(field(phase, 'cost_usd'), isCount, 'phase.cost_usd'),
     tokens: countSince(field(phase, 'tokens'), 'phase.tokens'),
@@ -166,6 +170,9 @@ export function planOf(raw: unknown): DocumentPlan {
     // own primary button, which is Resume for the first and Start for the second. Read tolerantly,
     // so a dispatcher build older than the field draws its cards' gate verb rather than blank ones.
     launched: flagSince(field(plan, 'launched'), 'plan.launched'),
+    // Why the plan's only running work has ended with nothing to record it (`report_stall`), beside
+    // the `stalled` status word: the line the card says it by. Tolerant for a build older than it.
+    stalled: stallSince(field(plan, 'stalled'), `plan.stalled of ${name}`),
     approved: approvedOf(field(plan, 'approved')),
     // The prompt CloudCLI has put up for this plan and is waiting on — the one key the plan's card is
     // drawn from and the book is raised off (`dispatcher-asks.service.ts`). Tolerant for a build

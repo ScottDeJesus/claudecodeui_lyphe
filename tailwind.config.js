@@ -84,6 +84,15 @@ export default {
         "ink-faint": "color-mix(in srgb, var(--ink-faint) calc(<alpha-value> * 100%), transparent)",
         "warn-ink": "color-mix(in srgb, var(--warn-ink) calc(<alpha-value> * 100%), transparent)",
         "accent-ink": "color-mix(in srgb, var(--accent-ink) calc(<alpha-value> * 100%), transparent)",
+        // The tone swap's own properties (tokens.css, the `[data-tone]` rules), named. A container
+        // that sets `data-tone` hands `--tone-soft`, `--tone-ink` and `--tone-dot` to everything inside
+        // it, and these three let that content spell them as Tailwind names: a status mark is
+        // `<span data-tone="warn" className="bg-tone-dot">`, its wash `bg-tone-soft`, its word
+        // `text-tone-ink`. They are not a sixth palette — they carry whichever of the five tones the
+        // nearest `data-tone` chose, and with none above them they resolve to nothing.
+        "tone-soft": "color-mix(in srgb, var(--tone-soft) calc(<alpha-value> * 100%), transparent)",
+        "tone-ink": "color-mix(in srgb, var(--tone-ink) calc(<alpha-value> * 100%), transparent)",
+        "tone-dot": "color-mix(in srgb, var(--tone-dot) calc(<alpha-value> * 100%), transparent)",
       },
       borderRadius: {
         lg: "var(--radius-input)",
@@ -155,6 +164,43 @@ export default {
           '40%': { transform: 'scale(1.6)' },
           '100%': { transform: 'scale(1.1)' },
         },
+        // The Cerberus tab's six motions, ported from its prototype (`cb-*` in `Cerberus Tab.dc.html`).
+        // Colour in them is `--warn-dot` through `color-mix` and nothing else: the ring is that dot's
+        // halo, and the rest move or fade an element that keeps its own ink.
+        //
+        // A status mark that needs you: a halo of the warn dot going out 8px as it fades.
+        'cerberus-ring-warn': {
+          '0%': { boxShadow: '0 0 0 0 color-mix(in srgb, var(--warn-dot) 50%, transparent)' },
+          '100%': { boxShadow: '0 0 0 8px color-mix(in srgb, var(--warn-dot) 0%, transparent)' },
+        },
+        // A heartbeat dot while its warden is reporting: opacity 1 down to .5 and back.
+        'cerberus-breathe': {
+          '0%, 100%': { opacity: '1' },
+          '50%': { opacity: '.5' },
+        },
+        // A beat riding a spoke from its node to the hub. It starts at the node's end (`left: 100%`),
+        // fades in over the first 12% and out over the last 15%, so it never pops at either end.
+        'cerberus-travel': {
+          '0%': { left: '100%', opacity: '0' },
+          '12%': { opacity: '1' },
+          '85%': { opacity: '1' },
+          '100%': { left: '0', opacity: '0' },
+        },
+        // A ✓ arriving: it grows from .4 to full while it fades in.
+        'cerberus-check': {
+          '0%': { opacity: '0', transform: 'scale(.4)' },
+          '100%': { opacity: '1', transform: 'none' },
+        },
+        // A line of output arriving: a short rise from 5px below.
+        'cerberus-line': {
+          from: { opacity: '0', transform: 'translateY(5px)' },
+          to: { opacity: '1', transform: 'none' },
+        },
+        // A terminal caret: on for the first half of the second, off for the second, no tween.
+        'cerberus-caret': {
+          '0%, 49%': { opacity: '1' },
+          '50%, 100%': { opacity: '0' },
+        },
       },
       animation: {
         shimmer: 'shimmer 2s linear infinite',
@@ -177,6 +223,14 @@ export default {
         // halo on a node whose walk is out right now, breathing for as long as it is. An arc deck's
         // plans are paged, not jumped to, so the one-shot flavour the tab's wall used is gone.
         'live-ring': 'vv-ring 2.4s ease-out infinite',
+        // The Cerberus tab's motions, the keyframes above, at the prototype's timings. `both` on the
+        // two one-shots keeps the first frame (invisible) through any delay and the last (settled) after.
+        'cerberus-ring-warn': 'cerberus-ring-warn 1.8s ease-out infinite',
+        'cerberus-breathe': 'cerberus-breathe 2.6s ease-in-out infinite',
+        'cerberus-travel': 'cerberus-travel 3.2s linear infinite',
+        'cerberus-check': 'cerberus-check .6s var(--ease-spring) both',
+        'cerberus-line': 'cerberus-line .35s var(--ease-enter) both',
+        'cerberus-caret': 'cerberus-caret 1s steps(1) infinite',
         // The roadmap's celebrations. Three run Verve's own keyframes (`vv-pop`, `vv-ring`, `vv-draw`
         // in `src/shared/ui/verve/tokens.css`), because Verve draws that motion; the other three run
         // the keyframes above.

@@ -60,7 +60,10 @@ type ActionMenuProps = {
   onOpenChange?: (open: boolean) => void;
 };
 
-/** Used by the mcp and sidebar modules for the "…" overflow menu on a server or session row. */
+/**
+ * The "…" overflow menu on a row, card or panel. Used by the app-switcher, chat, dispatcher, kanban, mcp,
+ * roadmap and sidebar modules.
+ */
 export function ActionMenu({
   label,
   items,

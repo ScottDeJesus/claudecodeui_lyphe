@@ -4,7 +4,7 @@
 // tells the tab to read again. One home, so every plan of the arc adds here and none redefines.
 //
 // It is a SIBLING of `server/shared/types.ts` rather than an addition to it, for the reason every
-// other sibling here exists: that file is 2077 lines, the house ceiling for a module is 300, and
+// other sibling here exists: that file is far past the house ceiling of 300 lines for a module, and
 // the Kanban board established the pattern (`server/shared/kanban-types.ts` beside ten more).
 //
 // Four readings the whole contract stands on:
@@ -25,10 +25,11 @@
 //----------------- VOCABULARY ------------
 
 /**
- * The four statuses a result row can carry in the store: the only ones ever written. `ok`, `warn`
- * and `failing` come from a probe's own verdict or a health document's green, yellow and red;
- * `denied` is the only red — a command the warden refused or a credential that was said no to.
- * A result with no status at all (`null`) means "not enabled" and is stored as null, never spelled.
+ * The four statuses a result row's `status` can carry in the store: the only ones ever written
+ * there. `ok`, `warn` and `failing` come from a probe's own verdict or a health document's green,
+ * yellow and red; `denied` is the only red — a command the warden refused or a credential that was
+ * said no to. A result with no status at all (`null`) means "not enabled" and `status` stores it as
+ * null; only a row's `prev_status` spells it, as `not_enabled`, when the row before it had none.
  */
 export type CerberusStoredStatus = 'ok' | 'warn' | 'failing' | 'denied';
 
@@ -123,7 +124,12 @@ export type CerberusHelloBody = {
  * The certificate center issues a node at enrollment: its name and the fingerprint (sha256 hex of
  * the DER bytes) of the public key it enrolled with, when it was issued, and center's own public key
  * (base64 SPKI DER) so the warden can verify every signed frame it is sent. `sig` is center's base64
- * ed25519 signature over the other fields. Sent once, inside the enrollment's `welcome`.
+ * ed25519 signature of the UTF-8 bytes of the text `cerberus-cert\n<node>\n<fingerprint>\n<issuedAt>`
+ * (`issuedAt` in decimal milliseconds), the shape of the connect header's
+ * `cerberus-connect\n<node>\n<at>`; the warden verifies those exact bytes. `centerKey` is not in
+ * that text: it is the key being pinned, and every frame after the cert is verified against it.
+ * Sent in the enrollment's `welcome` and again in every connect's: it is a pure function of the node
+ * row and ed25519 signs deterministically, so each copy is byte for byte the first.
  */
 export type CerberusNodeCert = {
   node: string;
@@ -136,8 +142,10 @@ export type CerberusNodeCert = {
 /**
  * `welcome` — center's answer to `hello`, center → warden. `ackedUpto` is the highest `result` seq
  * center has stored for this node (0 on enrollment), so the warden resends only what is above it.
- * `cert` is present on an enrollment only. `checks` is present on enrollment and whenever the
- * warden's `hello.checksVersion` differs from center's definition.
+ * `cert` is present on enrollment and on every connect (the same bytes each time: a warden whose
+ * enrollment `welcome` was lost still learns the key to pin; one that already holds a cert ignores
+ * a repeat). `checks` is present on enrollment and whenever the warden's `hello.checksVersion`
+ * differs from center's definition.
  */
 export type CerberusWelcomeBody = {
   node: string;
@@ -153,9 +161,13 @@ export type CerberusWelcomeBody = {
  * `cadence` is how often a health_doc service republishes its document, when that differs from
  * `every`. `pass` and `warn` are the check's expressions, evaluated on the warden (`age < 26h`);
  * `staleAfter` is the seconds after which a result no longer counts as fresh, when it differs from
- * the default of three times `cadence ?? every`. Sent by center inside `CerberusChecksSet`, kept as
- * the `probes` table's row and read by the warden's scheduler. It is also the one wire-born shape the
- * browser file repeats, because the definition document carries probes as their spec.
+ * the default of three times `cadence ?? every`. At rest the spec is split across two tables:
+ * `probes` holds the probe's own fields (the kind's fields as JSON, `every`, `timeout`, `cadence`)
+ * and the `checks` row of the check it reports holds `pass`, `warn` and `staleAfter`, so a
+ * `checks.set` is built by joining the two; a `file_age` spec without its `pass` cannot be judged.
+ * Sent by center inside `CerberusChecksSet`, read by the warden's scheduler. It is also the one
+ * wire-born shape the browser file repeats, because the definition document carries probes as their
+ * spec.
  */
 export type CerberusProbeSpec = {
   key: string;
@@ -326,10 +338,14 @@ export type CerberusServiceView = {
 
 /**
  * One node as the fleet shows it. `role` is `hub` for center's own node and `node` for every warden.
- * `link` is `reporting` (heard within 90 s), `silent` (a warden that has reported before and is
- * not heard now, which is every node from boot until its warden is heard again) or `never` (enrolled,
- * and its warden has not yet sent a first heartbeat). `silentSince` is when the silence began and
- * `lastHeardAt` the last frame of any kind; `enrolledAt` is null for the hub.
+ * The hub has no warden and no link state: its `link` is `reporting`, its `lastHeardAt` is the
+ * moment of its newest self-check, its `wardenVersion`, `silentSince` and `enrolledAt` are null, and
+ * no silence is laid over its checks.
+ * For a warden, `link` is decided in this order: `never` when the node has no first heartbeat on
+ * record (the tab says "Waiting for the first heartbeat"; it wins over `silent`, so a boot does not
+ * turn it into one), else `reporting` when heard within 90 s, else `silent`. `lastHeardAt` is the
+ * last frame of any kind, and when nothing has been heard since this boot it is the node row's
+ * stored last heartbeat; `silentSince` is that plus 90 000 while silent, null otherwise.
  */
 export type CerberusNodeView = {
   id: string;
@@ -410,12 +426,16 @@ export type CerberusResultRow = {
 };
 
 /**
- * What a check was at one asked moment `at`. `verdict` is `result` (a stored row was fresh then),
- * `stale` (the latest row at or before it was older than `staleAfter` then, so the answer is "no
- * result" and never the old status), `too_early` (no result is recorded at or before it) or
- * `future` (the moment has not happened). `resultAt` is the `at` of the row the answer rests on and
- * `mute` the mute that covered the moment, if any. Answered by `GET /api/cerberus/lookup` and
- * carried inside `CerberusCheckDetail`.
+ * What a check was at one asked moment `at`. `verdict` is `result` (the check was fresh then — no
+ * row need have been stored at that very moment, since a quiet check stores only a change or a
+ * keep-alive), `stale` (no result had reached center within `staleAfter` of the moment, so the
+ * answer is "no result" and never the old status), `too_early` (no result is recorded at or before
+ * it) or `future` (the moment has not happened). Freshness rests on continuity, never on the stored
+ * row's own age: between two stored rows a moment is fresh while it is no later than the next row's
+ * `prevAt` + `staleAfter`, and past the latest row while it is no later than center's in-memory
+ * last-received time for the check + `staleAfter`. `resultAt` is the `at` of the stored row the
+ * answer rests on and `mute` the mute that covered the moment, if any. Answered by
+ * `GET /api/cerberus/lookup` and carried inside `CerberusCheckDetail`.
  */
 export type CerberusLookup = {
   node: string;
@@ -429,9 +449,10 @@ export type CerberusLookup = {
 };
 
 /**
- * What `GET /api/cerberus/checks/:node/:service/:check` answers: the check, its sibling checks of
- * the same service, a strip of 60 cells, the most recent stored results and the lookup at the
- * moment the caller asked about (or now).
+ * What `GET /api/cerberus/checks/:node/:service/:check` answers: the check and its sibling checks of
+ * the same service (both as they read now), a strip of 60 cells, the stored change rows of the 3 h
+ * before the strip's end and the lookup at the moment the caller asked about. The strip and the rows
+ * stand at the caller's `end` — now unless one earlier is asked — and the lookup defaults to it.
  */
 export type CerberusCheckDetail = {
   check: CerberusCheckView;
@@ -543,10 +564,11 @@ export type CerberusChangedEvent = {
 /**
  * One node's link as `wardenLinks.states()` answers it: whether a socket is open now, the last time
  * any frame was heard (null until the first since boot), when the silence began (`lastHeardAt` +
- * 90 000, null while reporting), the clock offset (the median of the last five `receivedAt −
- * env.at`, null until a frame has been heard) and the warden's version from its `hello`. A node is
- * silent whether or not its socket is still open. Built by `warden-links.ts`; read by the read
- * model.
+ * 90 000; null while reporting, and null while `lastHeardAt` is), the clock offset (the median of
+ * the last five `receivedAt − env.at`, null until a frame has been heard) and the warden's version
+ * from its `hello`. A node is silent whether or not its socket is still open, and every enrolled
+ * node is silent from boot until it is heard; the read model fills a null `lastHeardAt` from the
+ * node row's stored last heartbeat (see `CerberusNodeView`). Built by `warden-links.ts`.
  */
 export type CerberusLinkState = {
   linked: boolean;

@@ -65,8 +65,8 @@ function wipClause(hold: string): string {
  * the store prunes against.
  *
  * DELETE IS THE MENU'S, AND ONLY WHERE THE DISPATCHER WOULD TAKE IT. `⋯` carries `Delete feature…`
- * exactly when `planDroppable(plan, planners)` holds. It is never drawn disabled on a `live` plan, a
- * walking phase or a planner out on the plan or its arc. Delete is the menu's only item, so those cards
+ * exactly when `planDroppable(plan, planners)` holds. It is never drawn disabled on a `live` or `stalled` plan,
+ * a walking phase or a planner out on the plan or its arc. Delete is the menu's only item, so those cards
  * draw no `⋯` at all. The planner half of that gate needs the lane's `planners` list, so the card reads
  * the lane (`useDispatcherPlans`) for it: `plan.planner` gives a plan's own ended row ahead of its arc's live one, so it cannot answer what
  * `drop` asks. The press opens `DeletePlanDialog`, the
@@ -89,6 +89,10 @@ function wipClause(hold: string): string {
  * FEATURE-WIP clause the gate returned for this plan's first ready phase, so a feature that is eligible
  * and standing still because its epic already has its limit in progress says why, in the gate's own
  * words, beside `waits on …`. A frame without the key (an older dispatcher) draws no line.
+ *
+ * A STALLED PLAN SAYS WHY (`plan.stalled`, the dispatcher's own cause word — `report_stall`): the head's
+ * second row carries one line, `data-plan-stalled`, naming whether the dispatcher is down or the run
+ * ended unrecorded, and that Resume starts things again. The card words the cause and decides none of it.
  *
  * `data-dispatcher-card`, `data-plan-name`, `data-plan-status` and `data-collapsed` are the browser
  * harness's handles, on the ROOT so a probe scopes every reading and every press to ONE plan — the
@@ -160,7 +164,7 @@ export function PlanCard({
                 {/* WHO IS OUT ON THIS PLAN and what it waits on, under its description: the word says
                     what the PLAN is (`designing`), the badge who is doing something about it; the wait is
                     a fact about THIS plan ("before this, that"). Neither draws anything when absent. */}
-                {(plan.planner || waitsOn.length > 0 || plan.wip_hold) && (
+                {(plan.planner || waitsOn.length > 0 || plan.wip_hold || plan.stalled) && (
                   <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
                     {plan.planner && <PlannerBadge planner={plan.planner} />}
                     {waitsOn.length > 0 && (
@@ -171,6 +175,11 @@ export function PlanCard({
                     {plan.wip_hold && (
                       <span data-plan-wip-hold className="min-w-0 break-words text-xs text-muted-foreground">
                         {t('dispatcher.wipHold', { clause: wipClause(plan.wip_hold) })}
+                      </span>
+                    )}
+                    {plan.stalled && (
+                      <span data-plan-stalled={plan.stalled} className="min-w-0 break-words text-xs text-foreground">
+                        {t(`dispatcher.stalled.${plan.stalled}`)}
                       </span>
                     )}
                   </div>

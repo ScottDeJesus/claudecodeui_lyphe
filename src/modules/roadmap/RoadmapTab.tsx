@@ -39,7 +39,9 @@ type RoadmapTabProps = {
  * roadmap and retires the request. A name the picture lacks selects nothing and is retired all the same:
  * the tab opens on the roadmap that was already on screen.
  *
- * Used by `WorkspaceMain` (project-workspace) as the `runner` tab's pane, through the module's barrel.
+ * Used by `WorkspaceMain` (project-workspace) as the `runner` tab's pane, through the module's barrel (lazily,
+ * `lazyRoadmapTab`), and by `RoadmapWidgetFullscreenBody` as what the chat gutter's Roadmap widget draws at
+ * full screen, handed no landing.
  */
 export function RoadmapTab({ revealPlan, onRevealed, openRoadmap, onRoadmapOpened }: RoadmapTabProps) {
   const { t } = useTranslation();

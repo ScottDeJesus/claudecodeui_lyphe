@@ -1,0 +1,46 @@
+# Cerberus warden — the node-side agent that reports this machine's checks to Cerberus.
+#
+# WHAT THIS IS. The long-running `warden run` process: it holds one websocket to Cerberus center
+# (the address in ~/.cerberus-warden/identity.json), runs the probes center hands it, and sends
+# their results back. It is the whole of Cerberus on this machine.
+#
+# WHY IT RUNS AS THE OPERATOR'S ACCOUNT, NOT ROOT. The warden needs exactly what the operator's own
+# services give the operator: the `~/.pgpass` that lets a `sql` probe log in, the state directories
+# an `exec` or `file_age` probe reads, the loopback ports of services that run as that account. It
+# writes only under ~/.cerberus-warden, mode 0700, and its key there is that account's, never
+# root's. A root warden would turn every command center can schedule into a root command.
+#
+# Type=simple: `node ... run` is the daemon itself and stays in the foreground. Restart=always
+# brings it back after ANY exit — a crash, a kill, a clean exit — five seconds later, and the link
+# redials by itself. Results not yet acknowledged live in memory only, so a restart drops them and the
+# probes simply run again. The log is journald's: every line the warden prints is `[warden] …`
+# (`journalctl -u cerberus-warden`).
+#
+# ExecStart goes through the `current` symlink, which `enroll.sh` swaps atomically when it installs a
+# release, so `systemctl restart cerberus-warden` is all it takes to run the new one.
+#
+# The three double-underscore words below (the user, the home directory and the node binary) are
+# filled in by `enroll.sh`, never by hand: the operator's account, its home, and the absolute path
+# of the `node` found on this machine.
+#
+# DEPLOY (installed and refreshed by the script; nothing here is copied or enabled by hand):
+#   first install:  curl -fsSL http://<center>/cerberus/enroll.sh | sudo sh -s -- --name <node> --token <token>
+#   a newer warden: curl -fsSL http://<center>/cerberus/enroll.sh | sudo sh -s -- --refresh
+#   systemctl is-active cerberus-warden   # → active
+
+[Unit]
+Description=Cerberus warden (reports this machine's health checks to Cerberus)
+After=network-online.target
+
+[Service]
+Type=simple
+User=__USER__
+WorkingDirectory=__HOME__
+Environment=HOME=__HOME__
+Environment=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+ExecStart=__NODE__ __HOME__/.cerberus-warden/current/warden/src/main.mjs run
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

@@ -20,6 +20,8 @@ APPS_PID_FILE="/tmp/apps-server.pid"
 APPS_LOG="/tmp/apps-server.log"
 APPS_MARKER="/tmp/apps-marker.json"
 APPS_SESSIONS_DIR="/tmp/apps-sessions"
+APPS_CERBERUS_DB="/tmp/apps-cerberus.db"
+APPS_CERBERUS_KEY="/tmp/apps-cerberus.key"
 APPS_STATUS_URL="http://127.0.0.1:${PROBE_PORT}/api/auth/status"
 
 # Two redirects protect the operator's own server. The server writes its marker on boot and DELETES
@@ -32,7 +34,11 @@ APPS_STATUS_URL="http://127.0.0.1:${PROBE_PORT}/api/auth/status"
 # its socket (newest wins) or, finding no session row, retires it. So the probe gets an empty
 # sessions directory of its own (`CLOUDCLI_SESSIONS_DIR`). The tmux server is still the shared one
 # (its socket name is a constant), so the scratch directory is deleted at stop.
-# NOTE: this harness still runs against the LIVE database — neither redirect isolates that.
+# NOTE: this harness still runs against the LIVE auth database — neither redirect isolates that.
+# The Cerberus roots ARE redirected (`APPS_CERBERUS_*` below): `.env` carries `CERBERUS_LISTEN`, which
+# every server booted from this repo reads, and the store defaults to "beside the auth database" — so
+# without them this server would open the live `cerberus.db`, try to bind the live tailnet address
+# and tick its own self-checks into the operator's store. Port 0 gives its gateway any free port.
 #
 # mint_token: proven on this box during the Kanban build (2026-09-15). `jwt_secret` and the first
 # `users` row come from the real `~/.cloudcli/auth.db`, so the token is one the live
@@ -81,6 +87,9 @@ boot_probe_server() {
     export SERVER_PORT="$PROBE_PORT"
     export CLOUDCLI_LOCAL_SERVER_MARKER="$APPS_MARKER"
     export CLOUDCLI_SESSIONS_DIR="$APPS_SESSIONS_DIR"
+    export CERBERUS_DB_PATH="$APPS_CERBERUS_DB"
+    export CERBERUS_KEY_PATH="$APPS_CERBERUS_KEY"
+    export CERBERUS_LISTEN="127.0.0.1:0"
     exec node_modules/.bin/tsx --tsconfig server/tsconfig.json server/index.ts
   ) >"$APPS_LOG" 2>&1 &
   echo $! >"$APPS_PID_FILE"
@@ -113,4 +122,5 @@ stop_probe_server() {
     rm -f "$APPS_PID_FILE"
   fi
   rm -rf /tmp/apps-marker.json /tmp/apps-sessions
+  rm -f /tmp/apps-cerberus.db /tmp/apps-cerberus.db-wal /tmp/apps-cerberus.db-shm /tmp/apps-cerberus.key
 }
