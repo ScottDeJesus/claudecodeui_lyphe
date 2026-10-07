@@ -3,12 +3,10 @@ import { useTranslation } from 'react-i18next';
 
 import { StatusGlyph } from '@/modules/cerberus/StatusMarks';
 import { STATUS_TABLE } from '@/modules/cerberus/utils/cerberusStatus';
-import { hms } from '@/modules/cerberus/utils/cerberusTime';
+import { hms, isWholeTime, stampOf, stretchKey } from '@/modules/cerberus/utils/cerberusTime';
 import type { CerberusCheckView, CerberusLookup, CerberusStatus } from '@/shared/cerberus-types';
 import { Input } from '@/shared/ui';
-
-/** A time the input holds once it is whole: "17:52" or "17:52:10". While one is half typed, the input holds "". */
-const WHOLE_TIME = /^\d{2}:\d{2}(:\d{2})?$/;
+import { cn } from '@/shared/utils';
 
 /**
  * What the sentence reads off the check it is about. The lookup alone is not enough: `staleAfter` is
@@ -18,17 +16,13 @@ const WHOLE_TIME = /^\d{2}:\d{2}(:\d{2})?$/;
  */
 type LookupCheck = Pick<CerberusCheckView, 'at' | 'origin' | 'staleAfter'>;
 
-/** "90 s", "15 min", "1 h": a number of seconds in the largest unit that says it exactly. */
-function stretchOf(t: TFunction, seconds: number): string {
-  if (seconds >= 3600 && seconds % 3600 === 0) return t('cerberus.time.hours', { count: seconds / 3600 });
-  if (seconds >= 60 && seconds % 60 === 0) return t('cerberus.time.minutes', { count: seconds / 60 });
-  return t('cerberus.time.seconds', { count: seconds });
-}
+/** How the sentence prints a moment: `hms`, or `stampOf` against a `now` its caller gave. */
+type Stamp = (ms: number) => string;
 
 /** "From the result recorded 17:52:00 by the warden on eis1", with "· muted then: <reason>" when a mute covered the moment. */
-function resultMeta(t: TFunction, lookup: CerberusLookup, fromCerberus: boolean): string | null {
+function resultMeta(t: TFunction, lookup: CerberusLookup, fromCerberus: boolean, stamp: Stamp): string | null {
   if (lookup.resultAt === null) return null;
-  const time = hms(lookup.resultAt);
+  const time = stamp(lookup.resultAt);
   if (lookup.mute !== null) {
     const reason = lookup.mute.reason;
     return fromCerberus
@@ -45,21 +39,22 @@ type Answer = { status: CerberusStatus; sentence: string; meta: string | null };
  * Each verdict in words. Only `result` has a status of its own. The other three show the neutral —,
  * because "no result" is never passing, and say why under it.
  */
-function answerOf(t: TFunction, language: string | undefined, lookup: CerberusLookup, check: LookupCheck): Answer {
+function answerOf(t: TFunction, language: string | undefined, lookup: CerberusLookup, check: LookupCheck, stamp: Stamp): Answer {
   const unknownMeta = t('cerberus.lookup.unknownMeta');
   if (lookup.verdict === 'future') {
-    const meta = check.at === null ? null : t('cerberus.lookup.futureMeta', { time: hms(check.at) });
+    const meta = check.at === null ? null : t('cerberus.lookup.futureMeta', { time: stamp(check.at) });
     return { status: 'unknown', sentence: t('cerberus.lookup.future'), meta };
   }
   if (lookup.verdict === 'too_early') {
     return { status: 'unknown', sentence: t('cerberus.lookup.tooEarly'), meta: unknownMeta };
   }
   if (lookup.verdict === 'stale') {
-    const sentence = t('cerberus.lookup.stale', { staleAfter: stretchOf(t, check.staleAfter) });
+    const stretch = stretchKey(check.staleAfter);
+    const sentence = t('cerberus.lookup.stale', { staleAfter: t(stretch.key, { count: stretch.count }) });
     return { status: 'unknown', sentence, meta: unknownMeta };
   }
   const status = lookup.status ?? 'unknown';
-  const time = hms(lookup.at);
+  const time = stamp(lookup.at);
   const word = t(STATUS_TABLE[status].wordKey).toLocaleLowerCase(language);
   // The reported value sits mid-sentence and the sentence brings its own full stop, so the value's
   // own stop is dropped. "…expired.." would read as a typo.
@@ -67,21 +62,37 @@ function answerOf(t: TFunction, language: string | undefined, lookup: CerberusLo
   const sentence = value
     ? t('cerberus.lookup.was', { time, word, value })
     : t('cerberus.lookup.wasNoValue', { time, word });
-  return { status, sentence, meta: resultMeta(t, lookup, check.origin === 'self') };
+  return { status, sentence, meta: resultMeta(t, lookup, check.origin === 'self', stamp) };
 }
 
 /**
- * The glyph, then the sentence over its meta: one layout for every answer, and for the prompt to
- * type a time. The glyph is `still` because the moment may be long past, and `decorative` because
- * the sentence says the word. `text-pretty` keeps a lone "s." or "out." off a line of its own.
+ * The two sizes an answer is drawn at. `md` is the sheet's: one line among the sheet's sections, in the
+ * body face. `lg` is History's, where the answer is what the card is for. There the sentence is the
+ * card's headline, in the serif display face at the prototype's 21 px, with the round glyph at its
+ * large size beside it.
  */
-function SentenceRow({ status, sentence, meta }: Answer) {
+const ROW_SIZE = {
+  md: { gap: 'gap-2.5', glyph: 'md', sentence: 'text-sm', meta: 'text-xs' },
+  lg: { gap: 'gap-3', glyph: 'lg', sentence: 'font-serif text-[21px] leading-[1.25]', meta: 'mt-1 text-[12.5px]' },
+} as const;
+
+/**
+ * The glyph, then the sentence over its meta: one layout for every answer, and for every prompt drawn
+ * where an answer goes (type a time, pick a date, choose a check). The glyph is `still` because the
+ * moment may be long past, and `decorative` because the sentence says the word. `text-pretty` keeps a
+ * lone "s." or "out." off a line of its own.
+ *
+ * Used by `LookupMoment` and `LookupSentence` here, and by History's look-up card (`LookupCard`) for
+ * the prompts it draws in the answer's place, at `size="lg"`.
+ */
+export function SentenceRow({ status, sentence, meta, size = 'md' }: Answer & { size?: keyof typeof ROW_SIZE }) {
+  const look = ROW_SIZE[size];
   return (
-    <div className="flex min-w-0 items-start gap-2.5">
-      <StatusGlyph status={status} decorative still />
+    <div className={cn('flex min-w-0 items-start', look.gap)}>
+      <StatusGlyph status={status} size={look.glyph} decorative still />
       <div className="min-w-0">
-        <p className="text-pretty text-sm text-foreground [overflow-wrap:anywhere]">{sentence}</p>
-        {meta !== null && <p className="text-pretty text-xs text-ink-faint [overflow-wrap:anywhere]">{meta}</p>}
+        <p className={cn('text-pretty text-foreground [overflow-wrap:anywhere]', look.sentence)}>{sentence}</p>
+        {meta !== null && <p className={cn('text-pretty text-muted-foreground [overflow-wrap:anywhere]', look.meta)}>{meta}</p>}
       </div>
     </div>
   );
@@ -98,13 +109,24 @@ function SentenceRow({ status, sentence, meta }: Answer) {
  * on eis1 · muted then: <reason>". Each sentence names its own moment, so while a newly typed time is
  * being read, the answer still on screen stays true about the time it names.
  *
- * Used by `LookupMoment` (the sheet) and by History's "Look up a check" card, which has inputs of its
- * own. It is no live region itself: a caller that draws it alone puts it inside a stable
- * `aria-live="polite"` element, as `LookupMoment` does, so a new answer is announced.
+ * `now` is for a caller whose moments can fall on any date: given it, every time the sentence prints
+ * carries its date when it is not on `now`'s day ("At 2026-10-02 17:52:10 it was …"), so a time alone
+ * always means today. The sheet looks up today only and passes none.
+ *
+ * Used by `LookupMoment` (the sheet, at the `md` size) and by History's "Look up a check" card
+ * (`LookupCard`, at `lg`, with `now`), which has inputs of its own. It is no live region itself: a
+ * caller that draws it alone puts it inside a stable `aria-live="polite"` element, as `LookupMoment`
+ * does, so a new answer is announced.
  */
-export function LookupSentence({ lookup, check }: { lookup: CerberusLookup; check: LookupCheck }) {
+export function LookupSentence({ lookup, check, size = 'md', now }: {
+  lookup: CerberusLookup;
+  check: LookupCheck;
+  size?: keyof typeof ROW_SIZE;
+  now?: number;
+}) {
   const { t, i18n } = useTranslation();
-  return <SentenceRow {...answerOf(t, i18n.resolvedLanguage, lookup, check)} />;
+  const stamp: Stamp = now === undefined ? hms : (ms) => stampOf(ms, now);
+  return <SentenceRow {...answerOf(t, i18n.resolvedLanguage, lookup, check, stamp)} size={size} />;
 }
 
 /**
@@ -113,7 +135,7 @@ export function LookupSentence({ lookup, check }: { lookup: CerberusLookup; chec
  * reading the lookup is the caller's, and `lookup` is whatever that read last answered. A cleared or
  * half-typed time shows "Type a time like 17:52:10." instead of an answer for a time that isn't there.
  *
- * Used by the sheet (`CheckSheet`), whose fill wires `onTimeChange` and the read behind `lookup`.
+ * Used by the sheet (`CheckSheet`), which wires `onTimeChange` and the read behind `lookup`.
  */
 export function LookupMoment({ time, onTimeChange, lookup, check }: {
   time: string;
@@ -137,7 +159,7 @@ export function LookupMoment({ time, onTimeChange, lookup, check }: {
           answer to a typed time is announced. History, which draws `LookupSentence` alone, wraps it in
           a region of its own the same way. */}
       <div aria-live="polite" aria-atomic="true" className="min-w-0 flex-[1_1_220px]">
-        {WHOLE_TIME.test(time)
+        {isWholeTime(time)
           ? <LookupSentence lookup={lookup} check={check} />
           : <SentenceRow status="unknown" sentence={t('cerberus.lookup.typeATime')} meta={null} />}
       </div>

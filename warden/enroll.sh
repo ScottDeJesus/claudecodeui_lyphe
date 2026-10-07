@@ -130,11 +130,29 @@ render_units() {
   [ -n "$RENDERED" ] || die "The release carries no unit to install."
 }
 
-# A unit that starts and falls over again must not be reported as running.
-require_running() {
-  sleep 3
-  systemctl is-active --quiet cerberus-warden.service ||
-    die "The cerberus-warden unit did not stay up — read why with: journalctl -u cerberus-warden -n 20"
+# The last line claims the warden is reporting, so it waits for the daemon's own word that center let it in:
+# `run.json` is rewritten on every welcome, heartbeat and close, and a record written after the restart that
+# says `linked: true` is that word. A unit that falls over, or runs but is refused (a clock more than 60 s off
+# is the usual reason, and the enrollment itself does not check it), stops the script with the reason center gave.
+# Called straight after the restart returns, when only the new daemon is alive to write the record.
+require_linked() {
+  restarted_ms=$(( $(date +%s) * 1000 ))
+  linked_waited=0
+  while [ "$linked_waited" -lt 30 ]; do
+    systemctl is-active --quiet cerberus-warden.service ||
+      die "The cerberus-warden unit did not stay up — read why with: journalctl -u cerberus-warden -n 20"
+    if "$NODE" -e '
+      const run = JSON.parse(require("node:fs").readFileSync(process.argv[1], "utf8"));
+      process.exit(run.linked === true && run.at >= Number(process.argv[2]) ? 0 : 1);
+    ' "$WARDEN_HOME/run.json" "$restarted_ms" 2> /dev/null; then
+      return 0
+    fi
+    sleep 1
+    linked_waited=$((linked_waited + 1))
+  done
+  refusal=$(journalctl -u cerberus-warden.service --since "@$((restarted_ms / 1000))" --no-pager -o cat 2> /dev/null |
+    grep -E '^\[warden\] center (refused|answered|is unreachable|did not)' | tail -n 1) || refusal=''
+  die "The warden is installed and running but has not linked to Cerberus at $CENTER${refusal:+ — ${refusal#\[warden\] }} — read more with: journalctl -u cerberus-warden -n 20"
 }
 
 main() {
@@ -208,7 +226,7 @@ main() {
       systemctl is-enabled --quiet "$unit" || systemctl enable --now "$unit"
     done
     systemctl restart cerberus-warden.service
-    require_running
+    require_linked
     say "The warden on $NODE_NAME runs $(installed_version)."
     return 0
   fi
@@ -226,7 +244,7 @@ main() {
   systemctl enable --now cerberus-warden.service
   # `enable --now` starts nothing on a unit that is already running; the restart makes it read the identity just written.
   systemctl restart cerberus-warden.service
-  require_running
+  require_linked
   say "The warden on $NAME is reporting to Cerberus at $CENTER."
 }
 

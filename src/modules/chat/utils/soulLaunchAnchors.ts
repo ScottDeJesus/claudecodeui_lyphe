@@ -33,6 +33,12 @@ import type { ChatMessage, SoulLaunchSnapshot } from '@/shared/types';
  * `collectStampedSoulLaunches` applies to a latest page. It is never read off prose or off an id a
  * result printed, so it keeps the rule above intact.
  *
+ * THE STAMP IS NOT THE WHOLE TEST: a launch the dispatcher runs for an epic is stamped with the chat
+ * the epic was started from, exactly as a soul that chat launched itself is. The lane flags those
+ * (`dispatcher_work`, from the mark on `spec.json` or the dispatcher's own records), and they are not
+ * this chat's to list — the epic and feature cards show them, with their task — so both anchoring
+ * halves leave them out: this one by the flag, the server's by the same answer.
+ *
  * The ids are only ever used to LOOK UP a launch in the lane's picture (`useSoulLaunches`), so an
  * id nothing answers for draws nothing at all.
  */
@@ -130,7 +136,8 @@ export function mergeSoulLaunchIds(stored: string[], scanned: string[]): string[
  * just launched is anchored the moment the lane carries it — no message, no page refetch. Ownership
  * is an EXACT string match against the stamp the launcher wrote: `null` on either side matches
  * nothing, so a chat whose CLI id is not yet known (a brand-new one) and a launch with no stamp can
- * never be paired by accident.
+ * never be paired by accident. A launch flagged `dispatcher_work` is never anchored, whatever its
+ * stamp says — the stamp is where the epic was started from, not who ran the launch.
  */
 export function readStampedLaunchIds(
   launches: Iterable<SoulLaunchSnapshot>,
@@ -139,7 +146,7 @@ export function readStampedLaunchIds(
   if (!cliSessionId) return [];
   const ids: string[] = [];
   for (const launch of launches) {
-    if (launch.launched_by === cliSessionId) ids.push(launch.launch_id);
+    if (launch.launched_by === cliSessionId && !launch.dispatcher_work) ids.push(launch.launch_id);
   }
   return ids;
 }

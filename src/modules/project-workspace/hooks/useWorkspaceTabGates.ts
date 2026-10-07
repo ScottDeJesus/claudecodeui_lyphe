@@ -1,4 +1,5 @@
 import { useBrowserUseEnabled } from '@/modules/browser-use';
+import { useCerberusNeeds } from '@/modules/cerberus';
 import { useDispatcherPlans } from '@/modules/dispatcher';
 import { useHeal } from '@/modules/heal';
 import { useMemoryIntake } from '@/modules/memory-intake';
@@ -32,6 +33,8 @@ export type WorkspaceTabGates = {
   shouldShowHealTab: boolean;
   /** How much live friction the ledger holds, for the tab's count pill. */
   healCount: number;
+  /** How many checks need a person right now, for the Cerberus tab's count pill. Zero until the first read answers. The tab itself is never gated: it is on the bar whatever the fleet says. */
+  cerberusNeeds: number;
   /**
    * Always true. The Universe tab is GLOBAL — not per project or per session, exactly as the
    * kanban board is — so it is here whatever the workspace is pointed at and nothing can take it
@@ -88,6 +91,9 @@ export function useWorkspaceTabGates(activeTab: AppTab): WorkspaceTabGates {
   // not friction, and the tab is reachable all the same by pressing where it sat.
   const { summary } = useHeal();
   const healCount = summary?.live ?? 0;
+  // The fleet's count off Cerberus's own provider — the one read of the overview, shared with the tab's
+  // header, so the strip's pill and the tab's headline are the same number. Zero until a read has landed.
+  const cerberusNeeds = useCerberusNeeds();
 
   return {
     shouldShowTasksTab: Boolean(tasksEnabled && isTaskMasterInstalled),
@@ -101,6 +107,7 @@ export function useWorkspaceTabGates(activeTab: AppTab): WorkspaceTabGates {
     runnerWaiting,
     shouldShowHealTab: healCount > 0 || activeTab === 'heal',
     healCount,
+    cerberusNeeds,
     // The literal true, never a reading: the Universe tab is global, the way the kanban board is.
     shouldShowUniverseTab: true,
     preferencesSettled,

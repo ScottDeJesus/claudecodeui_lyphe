@@ -151,8 +151,10 @@ type TabsProps = TabsBaseProps & (
  * Used by the project-workspace module for the workspace's two rows under the wordmark —
  * `underline` with overflow, since they sit in the sidebar — by the git-panel module for the
  * git tab's repository strip (`underline` + `equal`) and each panel's own two views, by the
- * file-manager and document-preview modules for their view and sheet strips, and by the chat
- * module's tabbed code block. The same shape each time, so none hand-rolls it.
+ * file-manager and document-preview modules for their view and sheet strips, by the api-tab module
+ * for its sub-views, by the roadmap module for its two faces, by the cerberus module for its tab's
+ * Fleet · History strip (`CerberusPanel`) and Fleet's Grid · List · Rings (`FleetToolbar`), and by
+ * the chat module's tabbed code block. The same shape each time, so none hand-rolls it.
  *
  * The `underline` register slides ONE indicator between tabs; the `segmented` one still paints
  * its own background and moves nothing. The objection this file used to record — that an

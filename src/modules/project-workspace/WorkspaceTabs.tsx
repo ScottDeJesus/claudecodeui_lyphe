@@ -10,6 +10,7 @@ import {
   ListTodo,
   MessageSquare,
   Orbit,
+  Radar,
   Route,
   StickyNote,
   Terminal,
@@ -37,6 +38,8 @@ type WorkspaceTabsProps = {
   shouldShowHealTab: boolean;
   /** How much live friction the ledger holds, for the tab's count pill. Zero draws no pill at all. */
   healCount: number;
+  /** How many checks need a person right now, for the Cerberus tab's count pill. Zero draws no pill at all. */
+  cerberusNeeds: number;
   /** Run after the tab actually changes — the mobile drawer closes on it. */
   onTabChange?: () => void;
 };
@@ -54,8 +57,9 @@ type BuiltInTab = {
 // brain for memory, an orbit for the sky, a route for the roadmap, the path the work is on,
 // a clock for what the box runs on a schedule, a sticky note for the notes a person jots down
 // and comes back to, a heartbeat for the heal reflex, the view whose subject is the house
-// mending itself, and coins for the API tab, the view whose subject is what the house spends
-// on third-party services — Jev and DeepSeek.
+// mending itself, coins for the API tab, the view whose subject is what the house spends
+// on third-party services — Jev and DeepSeek — and a radar for Cerberus, the view whose subject
+// is the fleet's health: what is being watched, and what needs a person.
 
 // Row one — views of THIS project: what each one shows changes with the project selected.
 const PROJECT_BASE_TABS: BuiltInTab[] = [
@@ -99,20 +103,25 @@ const HEAL_TAB: BuiltInTab = { id: 'heal', labelKey: 'tabs.heal', icon: HeartPul
 // hide on a quiet day.
 const API_TAB: BuiltInTab = { id: 'api', labelKey: 'tabs.api', icon: Coins };
 
+// Ungated, like the API tab: the fleet's health is a fact about the house whichever project is open,
+// and a monitor that hid on a quiet day could never say "All quiet". Last of the built-ins, so no tab
+// a hand already knows the position of has moved.
+const CERBERUS_TAB: BuiltInTab = { id: 'cerberus', labelKey: 'tabs.cerberus', icon: Radar };
+
 /**
  * Rendered by ProjectSidebarRegion, under the wordmark, to show the built-in workspace tabs plus
  * any enabled plugin tabs — in TWO rows, split by kind.
  *
  * Row one is this project: Chat, Shell, Files, Git, Browser, Tasks — views whose content changes
  * with the project selected. Row two is the house: Roadmap, Kanban, Universe, Schedules, Notes,
- * Memory, Heal, API, then plugin tabs — surfaces that read the same whichever project is open,
+ * Memory, Heal, API, Cerberus, then plugin tabs — surfaces that read the same whichever project is open,
  * which is why every count dot the strip carries lives there. One row held both kinds until it
  * outgrew the sidebar: measured at 328px (a 304px strip, 36px a glyph), nine tabs made 340px of
  * content and the ninth sat past the edge with no affordance at all, three more tabs still to
- * come. Split by kind, each row answers one question, and the house row now holds eight glyphs
+ * come. Split by kind, each row answers one question, and the house row now holds nine glyphs
  * with both gates on (Memory and Heal; the Roadmap tab is ungated and always one of them):
- * 8 × 36 + 7 × 2 = 302px of the 304px strip, so a narrower strip holds fewer and hands the
- * trailing tabs to the More trigger (`overflowLabel`).
+ * 9 × 36 + 8 × 2 = 340px against the 304px strip, so the More trigger (`overflowLabel`) takes the
+ * trailing tabs there, and a narrower strip hands it more.
  *
  * Both rows are `underline`, the sidebar's register, and share ONE `activeTab`: the row that
  * does not hold it draws no indicator. Neither row wraps — a row that reflowed would move every
@@ -136,6 +145,7 @@ export default function WorkspaceTabs({
   runnerWaiting,
   shouldShowHealTab,
   healCount,
+  cerberusNeeds,
   onTabChange,
 }: WorkspaceTabsProps) {
   const { t } = useTranslation();
@@ -154,17 +164,19 @@ export default function WorkspaceTabs({
     ...(shouldShowMemoryTab ? [MEMORY_TAB] : []),
     ...(shouldShowHealTab ? [HEAL_TAB] : []),
     API_TAB,
+    CERBERUS_TAB,
   ];
 
-  // Three tabs carry a count, and each only while there is something to count: `undefined` is what
+  // Four tabs carry a count, and each only while there is something to count: `undefined` is what
   // tells `Tabs` to draw no pill at all, so a queue that has just been emptied — or a lane whose
   // last run has just ended under the person standing in the tab — leaves a bare glyph rather
   // than a zero nobody needs to read. Each outlives its own count: Memory and Heal are sticky, and
-  // the Roadmap tab is never off the row at all.
+  // the Roadmap and Cerberus tabs are never off the row at all.
   const countFor = (id: AppTab): number | undefined => {
     if (id === 'memory') return memoryPendingCount > 0 ? memoryPendingCount : undefined;
     if (id === 'runner') return runnerCount > 0 ? runnerCount : undefined;
     if (id === 'heal') return healCount > 0 ? healCount : undefined;
+    if (id === 'cerberus') return cerberusNeeds > 0 ? cerberusNeeds : undefined;
     return undefined;
   };
 

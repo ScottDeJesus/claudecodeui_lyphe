@@ -13,6 +13,7 @@ import type {
   CerberusStoredStatus,
 } from '@/shared/cerberus-types.js';
 
+import { checksReportingAtBoot } from './boot-vouch.js';
 import { hintChanged } from './cerberus-broadcast.js';
 import { CHECK_ID_PATTERN, SERVICE_ID_PATTERN } from './definition-document.js';
 import { discoverComponent } from './definitions.service.js';
@@ -31,8 +32,9 @@ import { discoverComponent } from './definitions.service.js';
  *     `at − prevAt > staleAfter`  CHANGE;
  *   - else `at − lastStored.at ≥ 300 000`, or a keepalive was asked for  KEEPALIVE; else nothing is stored.
  * A stored row's `prev_status` is `lastStored`'s status (`not_enabled` for a null one) and NULL when
- * there was none; every accepted result — stored or not — sets `lastReceivedAt`; `since` moves when
- * a stored row's status differs from its `prev_status`.
+ * there was none; every accepted result — stored or not — sets `lastReceivedAt` (at boot, a check
+ * that was reporting just before it gets the boot's moment, so a handover does not blank the board);
+ * `since` moves when a stored row's status differs from its `prev_status`.
  *
  * ONE TRANSACTION PER CALL, MEMORY AFTER IT. A frame is stored whole or not at all, and memory
  * advances only once it has committed, so a rolled-back frame's resend is judged against the truth.
@@ -72,6 +74,8 @@ const sinceByCheck = new Map<string, number>();
 const lastReceivedByCheck = new Map<string, number>();
 const listeners = new Set<StatusChangeListener>();
 const refusalsLogged = new Set<string>();
+/** Whether `seedMemory` has filled the maps above from the store: it runs once per process. */
+let memorySeeded = false;
 
 /** `<node>/<key>`: unambiguous because a node never holds a `/`, and the same spelling the hint uses. */
 function memoryKey(node: string, key: string): string {
@@ -268,8 +272,11 @@ function ingestResults(node: string, seq: number | null, results: CerberusResult
 
 /**
  * Ingest's four doors: `ingestResults`; `onChange` (status moves; answers its unsubscribe);
- * `seedMemory` (fills `lastStored` and `since` from the store at start); and `memory`, the read
- * model's `CerberusCheckMemory` — `lastReceivedAt` is null until a result arrives after this boot.
+ * `seedMemory` (once per process, before the first read or the module's `start()`, whichever comes
+ * first: fills `lastStored` and `since` from the store, and `lastReceivedAt` with the boot's own
+ * moment for each check that was reporting just before it — `boot-vouch.ts`); and `memory`,
+ * the read model's `CerberusCheckMemory` — `lastReceivedAt` is null for a check not vouched at boot
+ * until a result of it arrives.
  */
 export const ingest = {
   ingestResults,
@@ -280,7 +287,14 @@ export const ingest = {
   },
 
   seedMemory(): void {
-    for (const row of cerberusResultsDb.latestPerCheck()) {
+    // Once per process: a second pass would overwrite what real results have since written (and vouch
+    // again for checks that have been quiet since). Set only after the store answered, so a failed read retries.
+    if (memorySeeded) return;
+    const latest = cerberusResultsDb.latestPerCheck();
+    for (const { node, key, at } of checksReportingAtBoot(latest, Date.now(), KEEPALIVE_AFTER_MS)) {
+      lastReceivedByCheck.set(memoryKey(node, key), at);
+    }
+    for (const row of latest) {
       const slot = memoryKey(row.node, row.check_key);
       lastStored.set(slot, {
         at: row.at,
@@ -290,6 +304,7 @@ export const ingest = {
       });
       sinceByCheck.set(slot, row.since);
     }
+    memorySeeded = true;
   },
 
   memory(node: string, key: string): CerberusCheckMemory {

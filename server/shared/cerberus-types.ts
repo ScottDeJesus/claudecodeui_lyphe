@@ -591,9 +591,10 @@ export type CerberusGatewayState = {
 
 /**
  * Ingest's in-memory facts for one check: `lastReceivedAt` is the open end of the freshness rule —
- * the `at` of the latest accepted result, stored or not — and `since` the moment the check's
- * current status began. Both null for a check ingest has not heard of since boot. Built by
- * `ingest.service.ts`; read by the read model.
+ * the `at` of the latest accepted result, stored or not, or — for a check that was reporting just
+ * before this boot — the boot's own moment until its next result arrives — and `since` the moment
+ * the check's current status began. Both null for a check ingest has neither heard of since boot nor
+ * vouched for at boot. Built by `ingest.service.ts`; read by the read model.
  */
 export type CerberusCheckMemory = { lastReceivedAt: number | null; since: number | null };
 

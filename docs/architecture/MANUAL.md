@@ -4073,6 +4073,25 @@ equals the chat's CLI session id (`readStampedLaunchIds`, `useCliSessionId`; doc
 a new stage pins the moment the lane pushes it. **Liveness comes from the dispatch-souls lane**, polled server-side and
 pushed as `soul_launch_state` — an id the lane does not answer for draws nothing at all.
 
+**Epic work is left out of a chat's list.** The stamp names the chat an epic was STARTED from, and the
+dispatcher runs every designer, planner, builder and reviewer of that epic under it — so by the stamp
+alone the chat that starts an epic would list every agent the epic runs, for the epic's whole life, next
+to the souls that chat launched itself. A launch the dispatcher makes is therefore marked on its own
+`spec.json` (`dispatcher: {plan, phase}`, written by `plan_runner/solo/dispatch_mark.py`) and both stamp
+anchors skip it: the lane flags it (`SoulLaunchSnapshot.dispatcher_work`) and `readStampedLaunchIds`
+passes over a flagged launch; `collectStampedSoulLaunches` asks the same `isDispatcherWork` before it
+caps the list. A soul the chat launched itself — a `plan-runner soul`, an `/inline` chain — carries no
+mark and stays. A launch written before the mark existed is recognised from the dispatcher's own
+records instead: a stage of a chain whose record says `until_pass: true` (the mode the dispatcher walks
+a phase's chain in — `cases cure` walks its fixes in it too, so a cure walk's unmarked stages are
+hidden from the chat that started it while this reading lasts), or a `planner`-role launch. **Those agents are shown on the epic and feature
+cards** (the Roadmap tab's In flight face — `PlanFace` and `PlanPhaseRow` draw each task's stages and
+the soul that ran each) and not in the chat's Subagents widget or strip; Clear completed acts on the
+rows the list still holds. The sidebar's purple dot is not part of this: it still lights for the chat
+while its epic has a soul or chain out, because it reads the stamp as written (MAN-6228). Proof:
+`.verify/probe-subagent-epic-work.mjs` reads both lists in-process for the chat an epic was started
+from and for one that launched souls by hand.
+
 The soul row's own contract — what a launch directory holds, how a soul's state and provider are
 decided, the six-hour lane window, and why a soul needs none of the four-hour "still believed
 running" discount an agent does — is [docs/MANUAL.md (dispatch-souls)](../MANUAL.md). Dismissals are shared:

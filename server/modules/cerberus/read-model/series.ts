@@ -34,8 +34,9 @@ export type CheckSeries = {
  * A check's staleness in seconds — the resolved `stale_after_s` of the active-checks index — or the
  * fallback when neither an override nor a probe gives one.
  *
- * Consumers: `check-views.ts` (the view's `staleAfter`, in seconds) and `lookup.ts` (the same rule
- * in milliseconds, for a check whose series it does not load).
+ * Consumers: `check-views.ts` (the view's `staleAfter`, in seconds), `lookup.ts` (the same rule
+ * in milliseconds, for a check whose series it does not load) and `../boot-vouch.ts` (how long a
+ * check may have been quiet before a boot and still be vouched for).
  */
 export function staleAfterSecondsOf(check: CerberusActiveCheckRow): number {
   return check.stale_after_s ?? FALLBACK_STALE_AFTER_S;

@@ -55,6 +55,9 @@ function frameNamesCheck(event: { kind?: string; checks?: unknown }, checkPath: 
  *
  * A caller holds `lookupAt` and `end` in state: a `Date.now()` passed from render is a new read on
  * every render.
+ *
+ * A blank `node` means no check is chosen yet (History's picker before its index answers): nothing
+ * is asked, `detail` stays `null` and `loading` is false.
  */
 export function useCheckDetail({ node, service, id, lookupAt, end }: {
   node: string;
@@ -102,6 +105,8 @@ export function useCheckDetail({ node, service, id, lookupAt, end }: {
   }, [checkPath]);
 
   const refresh = useCallback(async () => {
+    // No check chosen: a read of `/checks///` would only log a 404 for a question nobody asked.
+    if (node === '') return;
     const ticket = ++newestReadRef.current;
     let detail: CerberusCheckDetail | null = null;
     let kind: CheckDetailFailure = 'unreachable';
@@ -138,5 +143,5 @@ export function useCheckDetail({ node, service, id, lookupAt, end }: {
   const detail = answer !== null && answer.check.node === node && answer.check.key === `${service}/${id}` ? answer : null;
   const error = failure !== null && failure.checkPath === checkPath ? failure.kind : null;
 
-  return { detail, loading: detail === null && error === null, error, refresh };
+  return { detail, loading: node !== '' && detail === null && error === null, error, refresh };
 }

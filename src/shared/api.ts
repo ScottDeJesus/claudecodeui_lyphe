@@ -819,7 +819,9 @@ export const api = {
   // The mute and the lift answer the `CerberusMute` they wrote and the label answers 204; nobody
   // draws from those answers, because the screen is drawn from the read that follows the write.
   cerberus: {
-    overview: () => get('/api/cerberus/overview'),
+    // `options.signal` lets the one caller that must judge a hung read (the provider's stale rule) bring a deadline
+    // of its own: a signal handed in replaces `REQUEST_TIMEOUT_MS`'s, which older WebKit cannot build.
+    overview: (options: ApiRequestOptions = {}) => get('/api/cerberus/overview', options),
     checks: () => get('/api/cerberus/checks'),
     check: (node: string, service: string, id: string, { lookup, end }: { lookup?: number; end?: number } = {}) =>
       get(`/api/cerberus/checks/${encodeURIComponent(node)}/${encodeURIComponent(service)}/${encodeURIComponent(id)}${query({ lookup, end })}`),

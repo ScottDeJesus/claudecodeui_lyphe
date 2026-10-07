@@ -51,7 +51,7 @@ type ItemDialogProps = {
   | {
       /** An edit, of the item as the picture has it. */
       item: EditedItem;
-      /** The goal first, and asked for: `FeatureDialog` on a feature with no goal, `then` naming what follows its Save; the roadmap header's missing goal, `then: null`. */
+      /** The goal first, and asked for: `FeatureDialog` on a feature with no goal, `then` naming what follows its Save; the roadmap panel's missing-goal press, `then: null`. */
       goalFirst?: { then: 'propose' | 'promote' | null };
       parent?: never;
     }

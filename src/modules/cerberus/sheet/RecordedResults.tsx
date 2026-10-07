@@ -22,10 +22,14 @@ const FIRST_ROWS = 12;
  * On a narrow sheet the value wraps under the pill and stays clear of the time column, so the times
  * stay one clean column to scan.
  *
+ * `emptyText` is the line drawn when the 3 h hold no change. It defaults to the sheet's "No change
+ * recorded in the last 3 h.", which is true of a window ending now. History's window ends at the moment
+ * it looks up, so History passes a line that names that moment.
+ *
  * Used by the sheet (`CheckSheet`) under "Recorded results · last 3 h", and by History under its
  * lookup.
  */
-export function RecordedResults({ rows }: { rows: CerberusResultRow[] }) {
+export function RecordedResults({ rows, emptyText }: { rows: CerberusResultRow[]; emptyText?: string }) {
   const { t } = useTranslation();
 
   // Whether the reader asked for every row. Essential: only the newest twelve show until asked,
@@ -35,7 +39,7 @@ export function RecordedResults({ rows }: { rows: CerberusResultRow[] }) {
   const newestFirst = useMemo(() => [...rows].sort((a, b) => b.at - a.at), [rows]);
 
   if (newestFirst.length === 0) {
-    return <p className="border-t border-border py-2 text-[13px] text-muted-foreground">{t('cerberus.sheet.noChanges')}</p>;
+    return <p className="border-t border-border py-2 text-[13px] text-muted-foreground">{emptyText ?? t('cerberus.sheet.noChanges')}</p>;
   }
 
   const shown = showingAll ? newestFirst : newestFirst.slice(0, FIRST_ROWS);
@@ -46,7 +50,7 @@ export function RecordedResults({ rows }: { rows: CerberusResultRow[] }) {
       <ol className="flex flex-col">
         {shown.map((row, index) => (
           <li key={`${row.at}:${index}`} className="flex items-baseline gap-3 border-t border-border py-[7px] text-[13px]">
-            <time dateTime={new Date(row.at).toISOString()} className="w-16 flex-none tabular-nums text-ink-faint">
+            <time dateTime={new Date(row.at).toISOString()} className="w-16 flex-none tabular-nums text-muted-foreground">
               {hms(row.at)}
             </time>
             <div className="flex min-w-0 flex-1 flex-wrap items-baseline gap-x-3 gap-y-1">

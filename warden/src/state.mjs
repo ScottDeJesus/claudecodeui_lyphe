@@ -4,6 +4,7 @@
 //   <home>/keys/node.pub    its public half, SPKI PEM, a convenience copy derived from node.key
 //   <home>/identity.json    { node, center, centerKey, cert, enrolledAt }, 0600 — written once, by `enroll`
 //   <home>/state.json       { seqFloor } — the reserved ceiling of the result sequence (outbox.mjs)
+//   <home>/chain.json       { <check>: at } — the last result per check center has acked, so a restart keeps each `prevAt` chain (chain.mjs)
 //   <home>/run.json         what the daemon last said about itself — `run` rewrites it on every heartbeat (daemon.mjs)
 //
 // The home is `CERBERUS_WARDEN_HOME` when set, else `~/.cerberus-warden`, and is forced to 0700:
@@ -38,6 +39,7 @@ export function homePaths(home = homeDir()) {
     pubFile: path.join(home, 'keys', 'node.pub'),
     identityFile: path.join(home, 'identity.json'),
     stateFile: path.join(home, 'state.json'),
+    chainFile: path.join(home, 'chain.json'),
     runFile: path.join(home, 'run.json'),
   };
 }
@@ -173,6 +175,17 @@ export function writeState(patch, home = homeDir()) {
   const next = { ...readState(home), ...patch };
   writeFileDurably(homePaths(ensureHome(home)).stateFile, `${JSON.stringify(next)}\n`, 0o600);
   return next;
+}
+
+/** `chain.json` as a plain object (`{ <check>: at }`); `{}` when there is none. A file that is there and unreadable throws, for the caller to word. */
+export function readChain(home = homeDir()) {
+  const parsed = readJsonFile(homePaths(home).chainFile);
+  return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
+}
+
+/** Replaces `chain.json` with `chain` (`{ <check>: at }`), whole or not at all. */
+export function writeChain(chain, home = homeDir()) {
+  writeFileDurably(homePaths(ensureHome(home)).chainFile, `${JSON.stringify(chain)}\n`, 0o600);
 }
 
 /** Replaces `run.json` with `record`, the daemon's account of itself. Readable by its owner only, like everything else in the home. */

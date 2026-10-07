@@ -23,14 +23,18 @@ const SCROLLBAR_ALLOWANCE = 8;
 /** The tip's gap from the pointer, right of it and below it, in px. */
 const TIP_GAP = 14;
 
-/** The tip's widest: the chip is `max-w-60`, so flipped left of the pointer it ends a gap short of it. */
-const TIP_MAX_WIDTH = 240;
-
 /** Nearer than this to the wrapper's right edge, the pointer's tip flips to its left (the prototype's own rule). */
 const TIP_FLIP_WITHIN = 250;
 
-/** Where the tip stands and what it names: the item under the pointer, and the chip's corner in the wrapper, in px. */
-type TipSpot = { item: RoadmapTreeSelection; left: number; top: number };
+/** The least room a flipped chip is given left of the pointer: with less, it stays right of it and wraps to the room it has there. */
+const TIP_FLIP_MIN_ROOM = 120;
+
+/**
+ * Where the tip stands and what it names: the item under the pointer, and the chip's place in the wrapper, in px.
+ * Right of the pointer it is `left` from the wrapper's left edge; flipped, it is `right` from the wrapper's right
+ * edge, so its own right edge stands the gap left of the pointer whatever its width.
+ */
+type TipSpot = { item: RoadmapTreeSelection; top: number; left?: number; right?: number };
 
 type RoadmapTreeProps = {
   roadmap: Roadmap;
@@ -61,7 +65,7 @@ function selectedOf(selected: RoadmapTreeSelection | null, kind: 'milestone' | '
  * (its viewBox the layout's own), centred while it is narrower than its pane. The pane (`data-roadmap-tree`)
  * scrolls sideways in its own thin bar, and only while the 0.6 floor holds the scale does it take `maxHeight`
  * and scroll down as well. A swipe past its sideways end stays in it (`overscroll-x-contain`), never chaining to
- * the page's back gesture. It bleeds 4px above the drawing (`-mt-1 pt-1`, as the old path's track did) and
+ * the page's back gesture. It bleeds 4px above the drawing (`-mt-1 pt-1`) and
  * the svg paints past its box, so the goal's halo, whose top stands above the drawing's, is not cut flat. The
  * drawing's words are not selectable (`select-none`): a double press is a press, never a highlighted title.
  *
@@ -77,7 +81,7 @@ function selectedOf(selected: RoadmapTreeSelection | null, kind: 'milestone' | '
  * and the probes; `data-selected` the selected item; `data-celebrating` what a moment names. The tip
  * (`data-roadmap-tip`) stands in the tree's `relative` wrapper, out of the pane's clip.
  *
- * Used by the roadmap module's Roadmap face, `RoadmapPath`, between its header and its stage.
+ * Used by the roadmap module's Roadmap face, `RoadmapTreeFace`, under its picker row, in both fits.
  */
 export function RoadmapTree({ roadmap, layout, maxHeight, selected, onSelect, paneRef }: RoadmapTreeProps) {
   const { t } = useTranslation();
@@ -93,7 +97,7 @@ export function RoadmapTree({ roadmap, layout, maxHeight, selected, onSelect, pa
   // the pane on the current milestone and scrolls it to a selection.
   const goalX = useTreePane({ paneRef, layout, scale, roadmapName: roadmap.name, current: roadmap.current, selected });
 
-  // The `relative` box the tip stands in: its corner is the origin of the tip's left and top.
+  // The `relative` box the tip stands in: its corner is the origin of the tip's left and top, and its right edge of the tip's right.
   const wrapperRef = useRef<HTMLDivElement>(null);
   // The chip the pointer raises over a node or a dot: the item it names and where it stands in the wrapper,
   // 14px off the pointer and flipped to its left within 250px of the wrapper's right edge; null while the
@@ -110,11 +114,12 @@ export function RoadmapTree({ roadmap, layout, maxHeight, selected, onSelect, pa
     }
     const box = wrapper.getBoundingClientRect();
     const x = event.clientX - box.left;
-    const flips = box.width - x < TIP_FLIP_WITHIN;
-    // Flipped, the chip stands left of the pointer; held at the wrapper's own left edge, so a narrow pane never
-    // pushes it out of view (it may then stand over the pointer, which it never takes).
-    const left = flips ? Math.max(0, x - TIP_GAP - TIP_MAX_WIDTH) : x + TIP_GAP;
-    setTip({ item, left, top: event.clientY - box.top + TIP_GAP });
+    const top = event.clientY - box.top + TIP_GAP;
+    // Flipped, the chip is anchored by its right edge, so it grows leftward and wraps to the room the pointer
+    // leaves it: it never crosses the wrapper's left edge. A pointer too near that edge to leave it a useful
+    // chip keeps the chip on its right, where it wraps to the room instead.
+    const flips = box.width - x < TIP_FLIP_WITHIN && x - TIP_GAP >= TIP_FLIP_MIN_ROOM;
+    setTip(flips ? { item, top, right: box.width - x + TIP_GAP } : { item, top, left: x + TIP_GAP });
   };
 
   // Enter and Space press a focused node as a click does. The target must be the node itself (a button of the
@@ -163,6 +168,8 @@ export function RoadmapTree({ roadmap, layout, maxHeight, selected, onSelect, pa
   }, [layout, current, selected, words]);
 
   const goal = words({ kind: 'roadmap' });
+  // The words of the item the pointer last rested on: empty once a frame has taken that item away, and an empty chip is never drawn.
+  const tipWords = tip === null ? null : words(tip.item);
 
   return (
     <div ref={wrapperRef} className="relative">
@@ -202,7 +209,7 @@ export function RoadmapTree({ roadmap, layout, maxHeight, selected, onSelect, pa
           {nodes}
         </svg>
       </div>
-      {tip !== null && <TreeTip {...words(tip.item)} left={tip.left} top={tip.top} />}
+      {tip !== null && tipWords !== null && tipWords.head !== '' && <TreeTip {...tipWords} left={tip.left} right={tip.right} top={tip.top} />}
     </div>
   );
 }

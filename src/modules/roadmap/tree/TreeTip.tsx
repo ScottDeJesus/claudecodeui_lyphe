@@ -3,9 +3,12 @@ type TreeTipProps = {
   head: string;
   /** What it stands at: its word and its counts. */
   line: string;
-  /** The chip's top-left corner in the tree's `relative` wrapper, in px. */
-  left: number;
+  /** The chip's top edge in the tree's `relative` wrapper, in px. */
   top: number;
+  /** The chip's left edge from the wrapper's left edge, in px: the chip stands right of that point. */
+  left?: number;
+  /** Or its right edge from the wrapper's right edge, in px: the chip stands left of that point and wraps to the room there. */
+  right?: number;
 };
 
 /**
@@ -16,9 +19,9 @@ type TreeTipProps = {
  *
  * Used by the roadmap module's tree, `tree/RoadmapTree`, as the last child of its wrapper.
  */
-export function TreeTip({ head, line, left, top }: TreeTipProps) {
+export function TreeTip({ head, line, left, right, top }: TreeTipProps) {
   return (
-    <div data-roadmap-tip aria-hidden="true" className="vv-tooltip pointer-events-none absolute z-10 max-w-60" style={{ left, top }}>
+    <div data-roadmap-tip aria-hidden="true" className="vv-tooltip pointer-events-none absolute z-10 max-w-60" style={{ left, right, top }}>
       <span className="block font-semibold leading-snug">{head}</span>
       <span className="block text-xs font-normal leading-snug">{line}</span>
     </div>

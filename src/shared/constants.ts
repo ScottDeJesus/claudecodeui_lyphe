@@ -381,11 +381,10 @@ export const ROADMAP_FEATURE_WORD_KEYS: Record<RoadmapFeatureWord, string> = {
 
 /**
  * Each milestone word's key in the locale, which spells `not started` and `in progress` as `notStarted` and
- * `inProgress`: the one way a milestone's word is put into words. Used by the roadmap module's
- * `MilestonePath` (each station's line and label), `MilestoneFocus` (the stage's eyebrow),
- * `RoadmapWidgetBody` (the widget's line under its rail), the tree's `tree/TreeMilestoneNode` (the
- * line under a milestone's ring) and `tree/treeWords` (a milestone's tip and label), and the tree's panel:
- * `panel/RoadmapPanel` (a milestone row's meta) and `panel/MilestonePanel` (the sub line).
+ * `inProgress`: the one way a milestone's word is put into words. Used by the roadmap module's tree:
+ * `tree/TreeMilestoneNode` (the line under a milestone's ring) and `tree/treeWords` (a milestone's tip
+ * and label), and its panel: `panel/RoadmapPanel` (a milestone row's meta) and `panel/MilestonePanel`
+ * (the sub line).
  */
 export const ROADMAP_MILESTONE_WORD_KEYS: Record<RoadmapMilestoneWord, string> = {
   empty: 'roadmap.milestoneWord.empty',
@@ -400,10 +399,9 @@ export const ROADMAP_MILESTONE_WORD_KEYS: Record<RoadmapMilestoneWord, string> =
 
 /**
  * Each epic word's key in the locale, which spells `not started` and `in progress` as `notStarted` and
- * `inProgress`: the one way an epic's word is put into words. Used by the roadmap module's `EpicCard` (its
- * word badge), the tree's `tree/TreeEpicNode` (the line under an epic's title) and `tree/treeWords` (an
- * epic's tip and label), and the tree's panel: `panel/MilestonePanel` (an epic row's meta) and
- * `panel/EpicPanel` (the sub line).
+ * `inProgress`: the one way an epic's word is put into words. Used by the roadmap module's tree:
+ * `tree/TreeEpicNode` (the line under an epic's title) and `tree/treeWords` (an epic's tip and label), and
+ * its panel: `panel/MilestonePanel` (an epic row's meta) and `panel/EpicPanel` (the sub line).
  */
 export const ROADMAP_EPIC_WORD_KEYS: Record<RoadmapEpicWord, string> = {
   empty: 'roadmap.epicWord.empty',

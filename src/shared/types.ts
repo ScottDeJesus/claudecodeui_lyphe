@@ -4,7 +4,7 @@ import type { ComponentType, ReactNode } from 'react';
 import type { NavigateFunction } from 'react-router-dom';
 
 import type { AppEntry } from '@/shared/app-types';
-import type { CerberusServiceView, CerberusStatus } from '@/shared/cerberus-types';
+import type { CerberusNodeView, CerberusServiceView, CerberusStatus } from '@/shared/cerberus-types';
 
 //----------------- LLM PROVIDER MODEL CATALOG ------------
 
@@ -60,7 +60,7 @@ export type ProviderModelActions = {
 //----------------- PROJECTS AND SESSIONS ------------
 
 /** Identifies the workspace pane the user is looking at; plugin panes are namespaced by plugin id. */
-export type AppTab = 'chat' | 'files' | 'shell' | 'git' | 'tasks' | 'browser' | 'memory' | 'runner' | 'heal' | 'api' | 'kanban' | 'universe' | 'schedules' | 'notes' | `plugin:${string}`;
+export type AppTab = 'chat' | 'files' | 'shell' | 'git' | 'tasks' | 'browser' | 'memory' | 'runner' | 'heal' | 'api' | 'cerberus' | 'kanban' | 'universe' | 'schedules' | 'notes' | `plugin:${string}`;
 
 /** A message queued to be sent to a session at a future time. */
 export type ScheduledMessage = {
@@ -2402,6 +2402,74 @@ export type RingsLayout = {
   total: number;
 };
 
+/**
+ * How the Fleet view lays its nodes out: the toolbar's Grid · List · Rings. The view holds the choice;
+ * the toolbar draws it.
+ */
+export type FleetLayout = 'grid' | 'list' | 'rings';
+
+/**
+ * One node as a page of the Fleet view draws it: its item, the overview's own node behind it (its
+ * warden, its services and their minutes, which the item leaves behind), and whether it stands open.
+ * The view builds the page; Grid and List draw it.
+ */
+export type FleetEntry = { item: FleetItem; node: CerberusNodeView; open: boolean };
+
+/**
+ * What opens the Cerberus check sheet, in `CheckSheet`'s own terms: the node, the service, the check
+ * by its ID within the service (`session.valid`, its key after the first `/`), and the moment to look
+ * up, epoch ms, left out for now. The caller resolves the check where it holds the data, so it is
+ * never empty. A Fleet minute cell hands the check that set the minute — the service's worst check,
+ * else its first, for a minute no check set — looked up at the minute's last second, the moment the
+ * sheet's own strip uses, and now for the minute still running. That second is not always the cell's
+ * word, the worst over the whole minute: it answers a run's first minute, but on a run's last minute it
+ * reads the word that came after. The moment each minute's word was reached is the read model's to hand
+ * over, and `CerberusCell` does not carry it yet. A Needs-you card, or a service row pressed as a whole,
+ * hands its check and now. The tab's root holds one and hands its fields to `CheckSheet` as they are.
+ */
+export type CerberusSheetTarget = { node: string; service: string; check: string; lookupAt?: number };
+
+// ---------------------------
+
+//----------------- CERBERUS HISTORY FEED ------------
+
+/**
+ * Where the foot of History's "Everything since" feed stands: `more` may be earlier, a page of them is
+ * being read (`reading`), that read did not answer (`failed`), or the record starts at the oldest row
+ * shown (`none`). `useActivityFeed` holds it and `EventsCard` draws it.
+ */
+export type CerberusFeedFoot = 'more' | 'reading' | 'failed' | 'none';
+
+// ---------------------------
+
+//----------------- CERBERUS DIALOGS ------------
+// What the Cerberus tab's Enroll dialog (`src/modules/cerberus/modals/`) says about an ask that came back
+// without a command. It is the client's own, read by the dialog, its install step and the ask.
+
+/**
+ * Why the Enroll dialog's last ask for an install command came back without one, as the dialog says
+ * it: `notListening` is center's 409 `CERBERUS_NOT_LISTENING` (the warden gateway is not bound, so a
+ * new machine would have nothing to reach); `unreachable` is no answer at all; `refused` is any other
+ * refusal, with the server's own sentence when it sent one. A 409 `CERBERUS_NAME_TAKEN` is not here:
+ * the name field says that one.
+ */
+export type CerberusEnrollRefusal =
+  | { kind: 'notListening' }
+  | { kind: 'unreachable' }
+  | { kind: 'refused'; sentence: string | null };
+
+// ---------------------------
+
+//----------------- CERBERUS TAB ROOT ------------
+// What the Cerberus tab's root (`src/modules/cerberus/CerberusPanel.tsx`) holds between presses.
+
+/**
+ * The Cerberus tab's views, in the order its strip offers them: Fleet, then History. The root's view
+ * table gives each its name and its hint. The fixes plan inserts `'catalog'` between the two, here and
+ * as a row of that table.
+ */
+export type CerberusView = 'fleet' | 'history';
+
 // ---------------------------
 
 //----------------- CLI VERSION ------------
@@ -2683,7 +2751,7 @@ export type LaneFlow = { nodes: LaneFlowNode[]; doneCount: number; ariaLabel: st
 /** How a launcher soul is going while it is out, and how it ended once its receipt landed. `stopped` is a cap, not a fault; the pinned agents keep the same two words apart for the same reason. */
 export type SoulLaunchState = 'running' | 'completed' | 'failed' | 'stopped';
 /** One launcher soul — a soul a session started by hand through `plan-runner soul` — as its pin draws it. `provider` is the one the pin PAINTS: `result.json`'s word once it landed, `spec.json`'s pin before then. `launched_by` is the CLI session id the launcher stamped into `spec.json` when it minted the launch (`null` when none) — the one ownership fact a chat may anchor on live, by EXACT match with its own CLI session id, since a chain's later stages leave no receipt in any transcript. `cost_usd`, `tokens`, `tokens_in`/`tokens_out` and `duration_s` are `null` until the receipt lands. AND ONE HALF OR THE OTHER, NEVER BOTH (operator rule, 2026-09-24): `cost_usd` is PAID dollars, `0` on a soul that rode the operator's Claude subscription, and `tokens*` are THE SUBSCRIPTION'S — `null` throughout on a soul a vendor billed, whose tokens are that vendor's own business. So the pin draws `$0.28 DeepSeek` with no tokens or `1.2M in · 48k out` with no `$`. */
-export type SoulLaunchSnapshot = { launch_id: string; launched_by: string | null; role: string; agent: string; brief: string; provider: 'deepseek' | 'claude'; blocked: boolean; state: SoulLaunchState; status: string; cause: string; started_at: number; ended_at: number | null; duration_s: number | null; cost_usd: number | null; tokens: number | null; tokens_in: number | null; tokens_out: number | null };
+export type SoulLaunchSnapshot = { launch_id: string; launched_by: string | null; dispatcher_work: boolean; role: string; agent: string; brief: string; provider: 'deepseek' | 'claude'; blocked: boolean; state: SoulLaunchState; status: string; cause: string; started_at: number; ended_at: number | null; duration_s: number | null; cost_usd: number | null; tokens: number | null; tokens_in: number | null; tokens_out: number | null };
 /** The whole picture, pushed on change over `/ws`. `launches` is ordered by `started_at` ascending. `at` is epoch MILLISECONDS, unlike every field inside a snapshot. */
 export type SoulLaunchStateEvent = { kind: 'soul_launch_state'; launches: SoulLaunchSnapshot[]; at: number };
 

@@ -15,8 +15,10 @@ type FieldProps = {
 
 /**
  * The label / control / message stack every form row in the app repeats by hand today.
- * Used by settings (Phase 4) for the git, API and agent forms and by the accounts module
- * (Phase 13); both need the same three-part row and the same amber error line.
+ * Used by settings (Phase 4) for the git, API and agent forms, by the cerberus module for
+ * History's Check, Date and At and for the Mute and Enroll dialogs' fields, and by the
+ * app-switcher, auth, heal, kanban, roadmap, task-master and universe modules; each needs the
+ * same three-part row and the same amber error line.
  *
  * An error replaces the helper rather than stacking under it: two lines of guidance where
  * one of them is now wrong is how a reader ends up following the wrong one. It carries

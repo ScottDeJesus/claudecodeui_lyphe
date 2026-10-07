@@ -62,8 +62,9 @@ export type SortableList = {
  * caught up (`useDropHold`). A synchronous `onReorder` is untouched.
  *
  * Used by `RunnerPanel` and `RunnerWidgetBody` (runner-tab): the tab's wall and decks, and the widget's
- * column, reordering the lane's cards; and by `MilestoneFocus` and `EpicCard` (roadmap): the milestone's
- * epics and an epic's features, a list nested inside an item of the other.
+ * column, reordering the lane's cards; and by `MilestonePanel` and `EpicPanel` (the roadmap tree's panel),
+ * which hand their list to `PanelRows`' `RowList`: a milestone's epics and an epic's features, as rows the
+ * operator carries by their free surface.
  */
 export function useSortable({ keys, onReorder }: {
   keys: readonly string[];                                              // the items' keys in their committed order

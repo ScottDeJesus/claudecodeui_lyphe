@@ -5,7 +5,7 @@
 import type { TFunction } from 'i18next';
 
 import { STATUS_TABLE } from '@/modules/cerberus/utils/cerberusStatus';
-import { dayAndTime, hm, hms } from '@/modules/cerberus/utils/cerberusTime';
+import { dayAndTime, hm, hms, sameLocalDay } from '@/modules/cerberus/utils/cerberusTime';
 import type { CerberusActivity, CerberusStatus } from '@/shared/cerberus-types';
 import type { TimelineEvent } from '@/shared/types';
 
@@ -22,13 +22,6 @@ function statusWord(t: TFunction, status: CerberusStatus): string {
 function serviceOfKey(checkKey: string): string {
   const slash = checkKey.indexOf('/');
   return slash === -1 ? checkKey : checkKey.slice(0, slash);
-}
-
-/** True when two moments fall on the same local calendar day. */
-function sameLocalDay(first: number, second: number): boolean {
-  const a = new Date(first);
-  const b = new Date(second);
-  return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
 }
 
 /** The words a check can move to that have a sentence of their own under `cerberus.activity.check`. */

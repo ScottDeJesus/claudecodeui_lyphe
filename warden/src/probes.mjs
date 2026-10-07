@@ -16,10 +16,11 @@
 //             4 MiB (center closes a socket on a frame past 8 MiB); a result alone over 1 MiB is
 //             sent as a refusal sentence instead of its content.
 //   PREVAT    each result carries the `at` of that check's previous result, which is how center tells
-//             a quiet stretch from a lapse. It is stamped at flush, in memory: null at start, and null
-//             again for a check whose results were dropped — by an overflowed outbox, or by a frame
-//             that could not be queued — since center never judges a `prevAt` against what it
-//             stored: a chain that names a lost result reads as an unbroken stretch.
+//             a quiet stretch from a lapse. It is stamped at flush from `previousAt`, which the daemon
+//             seeds with what center had acked before the last stop (`chain.mjs`), so a restart bridges
+//             to it; a check whose results were dropped — by an overflowed outbox, or by a frame
+//             that could not be queued — is forgotten (null), since center never judges a `prevAt`
+//             against what it stored: a chain that names a lost result reads as an unbroken stretch.
 //
 // What a probe says is the kind's affair (`probe-kinds/*`); this file only schedules, wraps and sends.
 import { log } from './log.mjs';
@@ -103,13 +104,13 @@ function waitFor(entry, ms, then) {
  *   on(type: string, handler: (body: object) => void): unknown,
  *   send(type: string, body: object, options?: { reliable?: boolean }): unknown,
  *   outbox?: { overflowing: boolean, keepLatest(result: object): void },
- * } }} options `link` is the warden's link, or anything with `on` and `send`; `outbox` is read through it when it has one.
+ * }, previousAt?: Map<string, number> }} options `link` is the warden's link, or anything with `on` and `send`; `outbox` is read through it when it has one.
+ *   `previousAt` (check key → the `at` of its last result) is the chain the daemon keeps across restarts; absent, a fresh one.
  */
-export function createProbes({ link }) {
+export function createProbes({ link, previousAt = new Map() }) {
   const schedule = new Map(); // probe key → { spec, fingerprint, timer }
   const memories = new Map(); // probe key → the object the kind keeps between runs
   const running = new Set(); // probe keys whose run is in flight
-  const previousAt = new Map(); // check key → the `at` of the last result flushed for it
   let batch = [];
   let flushTimer = null;
   let checksVersion = null;

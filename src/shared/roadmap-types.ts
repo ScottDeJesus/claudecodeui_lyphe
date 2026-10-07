@@ -74,8 +74,8 @@ export type RoadmapCaseWord = 'holding' | 'broken' | 'regressed' | 'not run' | "
  * A feature's, an epic's or a roadmap's ACTIVE cases counted by word: `total` is every active case, and
  * the five others are `RoadmapCaseWord`'s words (`not_run` for `not run`, `cant_run` for `can't run`,
  * since a key cannot carry the space or the quote). The five sum to `total`. Zero across the board
- * where the dispatcher has no cases for the item. Read by the feature row, the epic card, the header and
- * the feature dialog.
+ * where the dispatcher has no cases for the item. Read by the roadmap's panels (the feature's, the epic's and
+ * the roadmap's) and the feature dialog.
  */
 export type RoadmapCases = {
   total: number;

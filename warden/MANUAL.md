@@ -1,5 +1,34 @@
 <!-- docstore export; edit rows with docstore write, never this file -->
 
+## MAN-7839 — Warden — the node-side agent: enroll, link, outbox, probe kinds, state directory, unit, eis1; the row that holds each
+
+`warden/` is Cerberus's node-side agent: one daemon per machine, holding one signed websocket to center, running the probes center sends and returning their results. Plain `.mjs` run by bare `node` ≥ 22, no loader and no dependency (the reason of MAN-692). Center's half: `cloudcli:server/modules/cerberus` (MAN-7815, MAN-7816). A plan that changes `warden/` bumps the minor version in `warden/package.json` before it builds (MAN-7826).
+
+## Where each subject lives
+| subject | row | files |
+|---|---|---|
+| the verbs `enroll`, `run`, `status`, exit codes, `run.json`, lost-welcome recovery | MAN-7825 | `main.mjs`, `daemon.mjs`, `enroll.mjs`, `status.mjs`, `home-lock.mjs` |
+| the state directory, `releases/`, `current`, what survives a restart | MAN-7836 | `state.mjs`, `chain.mjs` |
+| the link: headers, connect signature, pinned center key, welcome, heartbeat, backoff, `readRefusal` | MAN-7824 | `link.mjs`, `wire.mjs` |
+| the outbox: resend, seq floor, the 20 000-result cap | MAN-7835 | `outbox.mjs` |
+| the scheduler: `checks.set`, timers, the batch, `prevAt` | MAN-7821 | `probes.mjs` |
+| the probe kinds `http` `tcp` `exec` `file_age` `sql`, the expression grammar, `judge` | MAN-7818 | `expr.mjs`, `probe-support.mjs`, `probe-kinds/` |
+| the `health_doc` kind | MAN-7820 | `probe-kinds/health-doc.mjs` |
+| the artifact, the three routes, the enrollment token, `enroll.sh` | MAN-7826 | `build.mjs`, `enroll.sh`, `server/modules/cerberus/warden-files.ts` |
+| the unit `cerberus-warden.service` | MAN-7837 | `systemd/cerberus-warden.service` |
+| eis1, the first node: seven probes, 74 labels | MAN-7838 | `.verify/probe-warden-probes.mjs` |
+| rules an edit keeps | INV-7017 kinds · INV-7028 scheduler · INV-7039 link and outbox · INV-7042 install · INV-7043 daemon | |
+
+## Rules of the package
+- Checks stay in the services: a probe exists only for a fact no service reports itself; the one overlap, `system/disk.used`, is named in MAN-7838.
+- `denied` is HTTP 401 or 403 only; every other failure is `failing` (MAN-7818).
+- No warden code path defaults to a loopback center; `enroll` takes `--center`.
+- The warden reads no service's `.env`. `sql` takes its password from `~/.pgpass` through libpq; no probe writes a credential into `value` or `data` (INV-7017).
+- Every log line is `[warden] …` on stdout (`journalctl -u cerberus-warden`).
+- Mechanical checks: `node --check` and `oxlint warden/`.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/warden/package.json, /home/lyphe/.claude/claudecodeui_lyphe/warden/src/main.mjs
+
 ## MAN-7818 — Warden probe kinds — the expression grammar, `judge`, and each kind's fields, metrics and sentences
 
 The five kinds a warden runs itself, and the one comparison they are judged by. `health_doc` (one GET, one result per component, dead-poller rule): MAN-7820. Definitions and what center refuses: MAN-7812.
@@ -198,7 +227,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/warden/src/probe-kinds/health-do
 
 ## The batch and `prevAt`
 - Results wait in a batch. The first result into an empty batch arms a 1 s timer (no timer ticks while nothing waits); a batch that reaches 500 flushes at once. A flush cuts the batch into frames of at most 500 results and 4 MiB (`FRAME_BYTES_LIMIT`; center closes a socket on a frame past 8 MiB). A result alone over 1 MiB (`RESULT_BYTES_LIMIT`) is sent as `failing`, "The result was too large to send (<n> MB)", `data` `{ error: 'oversize', bytes }`.
-- `prevAt` is stamped at flush: the `at` of the last result flushed for that check, in memory. Null at start.
+- `prevAt` is stamped at flush: the `at` of the last result flushed for that check, read from the `previousAt` map. `createProbes({ link, previousAt })` takes that map from the daemon, which seeds it from `chain.json` — what center had acked before the last stop (INV-7028, `chain.mjs`) — so the first result after a restart carries the `at` it bridges to, and center's reader keeps vouching for the minutes before the stop. A bare `createProbes({ link })` starts an empty map, and a first result then carries null.
 - When `link.outbox.overflowing` is true at a flush, every result goes to `outbox.keepLatest` instead of a frame and the `prevAt` memory is cleared; the first result per check after the drain therefore carries `prevAt` null. A link with no `outbox` never overflows.
 - `link.send` throwing (the outbox could not reserve a seq on a full disk) drops that frame's results with one log line and forgets those checks' `prevAt` memory, so each one's next result carries `prevAt` null and center records a lapse. (Center never compares a `prevAt` with what it stored: a chain left naming the lost result would read as an unbroken stretch and vouch for the old status across the gap.)
 - `stop()` clears every timer, kills the process group of every probe command still going (`killLiveProcesses`, MAN-7818), and flushes what waits; runs still going are dropped.
@@ -210,16 +239,16 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/warden/src/probe-kinds/health-do
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/warden/src/probes.mjs
 
-## MAN-7824 — Warden link — `createLink`: connect, welcome and resend, heartbeat, backoff and deadlines, the outbox and its seq floor, `wire.mjs`
+## MAN-7824 — Warden link — `createLink`: connect headers and signature, the pinned center key, welcome and resend, heartbeat, backoff and deadlines, `readRefusal`, `wire.mjs`
 
-`warden/src/link.mjs` is the warden's one socket to center; `warden/src/wire.mjs` is the envelope, the headers and the frame check it shares with `enroll`; `warden/src/outbox.mjs` holds what center has not acked. Wire shapes: `server/shared/cerberus-types.ts`. Center's half: MAN-7800 (signing), MAN-7803 (gateway), MAN-7814 (registry). Rules an edit keeps: INV-7039. The scheduler on top: MAN-7821. Enrollment and the home: MAN-7825.
+`warden/src/link.mjs` is the warden's one socket to center; `warden/src/wire.mjs` is the envelope, the headers and the frame check it shares with `enroll`; `warden/src/outbox.mjs` holds what center has not acked (MAN-7835). Wire shapes: `server/shared/cerberus-types.ts`. Center's half: MAN-7800 (signing), MAN-7803 (gateway), MAN-7814 (registry). Rules an edit keeps: INV-7039. The scheduler on top: MAN-7821. Enrollment: MAN-7825. The home: MAN-7836. The unit: MAN-7837.
 
 ## `createLink({ identity, state?, outbox?, home?, onReport? })` → `{ outbox, linked, start(), stop(), on(type, handler), send(type, body, { reliable }) }`
 | field | meaning |
 |---|---|
 | `identity` | `{ node, center, centerKey }` from `identity.json` |
 | `state()` | read afresh for every `hello` and heartbeat → `{ checksVersion, catalogVersion, active, probesRunning }` |
-| `outbox` | default `createOutbox()`; exposed as `link.outbox` so a caller reads `overflowing` and calls `keepLatest` |
+| `outbox` | default `createOutbox()` (MAN-7835); exposed as `link.outbox` so a caller reads `overflowing` and calls `keepLatest` |
 | `home` | where the node key lives |
 | `onReport()` | called after every heartbeat (the one sent at `welcome` included) and each time a retry is scheduled — a link that was up going down, a connect that failed, an attempt that missed its deadline; never on `stop()`. A throw is logged, `the status report failed: <message>`, and goes no further. The daemon rewrites `run.json` from it (MAN-7825) |
 | `on(type, fn)` | `fn(body, envelope)` runs after the link's own handling of that type; returns a remover. A throw or rejected promise is logged, "the handler of a "<type>" frame failed", and never ends the process |
@@ -229,9 +258,9 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/warden/src/probes.mjs
 `warden/src/link.mjs` re-exports `verifyFrame` and `readRefusal` from `wire.mjs`.
 
 ## Connect and trust
-1. `WebSocket(<center as ws>/cerberus/ws)` with `X-Cerberus-Node`, `X-Cerberus-At`, `X-Cerberus-Sig`, built fresh for EVERY attempt (`connectHeaders`). `at` rises within the process even when two attempts share a millisecond, and runs at most 1 s (`MAX_AT_BUMP_MS`) ahead of the clock.
-2. On open, `hello` is the first frame (`buildHello`: `version`, `startedAt`, `facts`, `checksVersion`, `catalogVersion`, `active`).
-3. Every frame from center is `{ env, sig }`. `verifyFrame` checks `sig` over the exact bytes of `env` against the pinned `centerKey` BEFORE `env` is parsed. A frame whose `env.node` is another node is dropped.
+1. `WebSocket(<center as ws>/cerberus/ws)` with `X-Cerberus-Node`, `X-Cerberus-At` (epoch ms) and `X-Cerberus-Sig` (base64 ed25519 of `cerberus-connect\n<node>\n<at>`, signed with `keys/node.key`), built fresh for EVERY attempt (`connectHeaders`): center refuses a `(node, at)` pair it saw in the last 2 minutes. `at` rises within the process even when two attempts share a millisecond, and runs at most 1 s (`MAX_AT_BUMP_MS`) ahead of the clock.
+2. On open, `hello` is the first frame (`buildHello`: `version`, `startedAt`, `facts`, `checksVersion`, `catalogVersion`, `active`). `facts` = `hostname`, `platform`, `arch`, `nodeVersion`, `machineId` (first line of `/etc/machine-id`, null when absent), `cpus`, `memMb`.
+3. Every frame from center is `{ env, sig }`. `verifyFrame` checks `sig` over the exact bytes of `env` against the pinned `centerKey` (the one in `identity.json`, taken from the certificate at enrollment; no other is trusted) BEFORE `env` is parsed. A frame whose `env.node` is another node is dropped.
 4. Frames with their own handling: `welcome`, `ack`, `error`. Every type then reaches its `on(type)` handlers.
 
 Drops are logged once per kind per link, not per frame:
@@ -257,36 +286,21 @@ Drops are logged once per kind per link, not per frame:
 - A link that was up and closes logs `link lost — retrying in <n> s` — `<n>` is the next backoff step, always 1 after a `welcome`. Every scheduled retry, that one included, calls `onReport`. `stop()` is not a loss: neither.
 
 ## `readRefusal(url, headers)` → `{ status, reason }`
-Resolves, never rejects. Repeats the upgrade by hand and reads the 401 body (a websocket client cannot see it). `status` is null when nothing answered. `reason` is `oneLine(body)`: first line, control characters removed, at most 200 characters; else `HTTP <n>`. A 101 destroys the socket at once. Waits at most 5 s (`REFUSAL_TIMEOUT_MS`).
-
-## `createOutbox({ home?, maxResults = 20000 })`
-| call | does |
-|---|---|
-| `push(type, body)` → seq | numbers and queues; a `result` body without a `results` array throws `TypeError` before anything is numbered |
-| `pending(afterSeq)` | queued frames above `afterSeq`, seq order |
-| `ack(upto)` | trims frames at or below `upto`; ignores a non-integer or negative `upto`; raises the counter above `upto`; renumbers frames queued under numbers center already holds (`renumberAbove`); releases an overflow below the cap |
-| `keepLatest(result)` | while overflowing: holds the newest result per `check`, `prevAt` forced to null |
-| `overflowing`, `size`, `queuedResults` | read-only |
-| `ackedUpto` | read-only: the highest `upto` center has sent (an `ack`, or `welcome.ackedUpto`); 0 until one arrives. The daemon writes it to `run.json` |
-
-- `seqFloor` in `<home>/state.json` is a ceiling every handed-out number stays below. To hand out a number at or past it, `seqFloor + 1000` (`FLOOR_STEP`) is written and fsynced first. After a restart the counter starts at the persisted floor (at least 1: center refuses `seq` < 1).
-- Overflow: once the results inside queued frames pass `maxResults`, the caller reads `overflowing` and sends `keepLatest` instead of `push`; one log line. When acks bring the queue under the cap, what was kept goes out as ONE frame (`outbox drained; <n> kept results queued as one frame`) and `push` resumes. A failed push at release keeps `overflowing` true and the next ack retries.
-- The queue is in memory: a restart forgets unacked frames; the probes that made them run again.
+Resolves, never rejects. Repeats the upgrade by hand and reads the 401 body. why: Node's `WebSocket` reports a failed upgrade as a bare error with no status and no body, and the body holds the sentence a person can act on (`token used`, `clock skew 75 s`). `status` is null when nothing answered. `reason` is `oneLine(body)`: first line, control characters removed, at most 200 characters; else `HTTP <n>`. A 101 destroys the socket at once. Waits at most 5 s (`REFUSAL_TIMEOUT_MS`).
 
 ## Open
 - A center that keeps the socket open and answers no reliable frame is not recycled: no deadline runs from a reliable send to its ack. It needs a constant and carries a false-trip risk against a slow ingest; `link.mjs` is at the 300-line ceiling, so it follows the receive-path extraction.
 
 ## Measured
-- 2026-10-06, slot-1 probe server (`scripts/sunset-probe.sh`): results 1–3 acked; server killed, results 4–5 queued `sent=false`; on reconnect `welcome ackedUpto=3`, `resending 2 unacked frame(s)`, `ack upto=4`, `ack upto=5`; `state.json` `{"seqFloor":1001}`.
 - Same day: `verifyFrame` true on a real center-signed frame; false after `"ackedUpto":5` became `95`, and false after the same JSON was re-spaced.
 - Same day, scripted fake center: backoff gaps 1.09, 2.08, 4.53, 9.04, 15.2 s and 1.07 s after a `welcome`; heartbeats every 15 s; an unsigned frame, a frame for another node and an unknown type each logged once.
 - Same day: `readRefusal` against the real center answered `101`, `clock skew 75 s`, `unknown node`, `bad signature`, `unknown token`, `ECONNREFUSED`. Node 22.23.3: enroll and connect both work.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/warden/src/link.mjs, /home/lyphe/.claude/claudecodeui_lyphe/warden/src/outbox.mjs, /home/lyphe/.claude/claudecodeui_lyphe/warden/src/wire.mjs
+governs: /home/lyphe/.claude/claudecodeui_lyphe/warden/src/link.mjs, /home/lyphe/.claude/claudecodeui_lyphe/warden/src/wire.mjs
 
-## MAN-7825 — Warden verbs and home — `enroll`, `run`, `status`, exit codes, `run.json`, the files under `CERBERUS_WARDEN_HOME`, lost-welcome recovery
+## MAN-7825 — Warden verbs — `enroll`, `run`, `status`, exit codes, `run.json`, lost-welcome recovery
 
-`node warden/src/main.mjs <verb> [--flag value …]` — bare `node` ≥ 22, no loader, no dependency. Verb output goes to stdout with no `[warden]` prefix; only link and daemon lines carry it. The link: MAN-7824. Center's half of enrollment: MAN-7800 (certificate), MAN-7803 (gateway).
+`node warden/src/main.mjs <verb> [--flag value …]` — bare `node` ≥ 22, no loader, no dependency. Verb output goes to stdout with no `[warden]` prefix; only link and daemon lines carry it. The link: MAN-7824. The home: MAN-7836. The unit: MAN-7837. Center's half of enrollment: MAN-7800 (certificate), MAN-7803 (gateway).
 
 ## Verbs
 | verb | run | does |
@@ -297,16 +311,24 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/warden/src/link.mjs, /home/lyphe
 
 Exit codes: 0 done · 1 refused or failed (the reason printed; `status` on a home that is not enrolled) · 2 misused (unknown verb or flag, missing flag or value, bad `--center`).
 
-## `run` — `runDaemon()` → exit code
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/warden-daemon.sh, /home/lyphe/.claude/claudecodeui_lyphe/warden/src/daemon.mjs, /home/lyphe/.claude/claudecodeui_lyphe/warden/src/enroll.mjs, /home/lyphe/.claude/claudecodeui_lyphe/warden/src/home-lock.mjs, /home/lyphe/.claude/claudecodeui_lyphe/warden/src/main.mjs, /home/lyphe/.claude/claudecodeui_lyphe/warden/src/state.mjs, /home/lyphe/.claude/claudecodeui_lyphe/warden/src/status.mjs
+
+## MAN-7832 — Warden verbs — `enroll`, `run`, `status`, exit codes, `run.json`, lost-welcome recovery — `run` — `runDaemon()` → exit code
+section: Warden verbs — `enroll`, `run`, `status`, exit codes, `run.json`, lost-welcome recovery/001 `run` — `runDaemon()` → exit code
+
 1. No `identity.json` prints `This node is not enrolled — run enroll.sh with a token from Cerberus` and exits 1 before anything is created. An identity without `node`, `center` or `centerKey` prints `The identity in <file> is incomplete`; a home without `keys/node.key` prints `The node key <file> is missing`; both exit 1. A home another daemon already runs on prints ``A warden is already running on <home> — `node warden/src/main.mjs status` shows what it reports`` and exits 1 (`home-lock.mjs`, below).
 2. It builds the outbox, the link and the scheduler. The link's `state()` is read from the scheduler: `{ checksVersion, catalogVersion: null, active: { runs: [], diags: [] }, probesRunning }`, where `probesRunning` is `probes.scheduled` — the wire's "how many probes it has scheduled", so a heartbeat between two turns reads the same as `run.json`'s `probes`. A later plan adds its field there and its `link.on(type, fn)` beside `createProbes`, before `link.start()`.
 3. `run.json` is `{ at, linked, ackedUpto, outbox, overflowing, probes, checksVersion, version }`: `at` the daemon's clock in ms, `outbox` the frames queued (`outbox.size`), `ackedUpto` `outbox.ackedUpto`, `probes` `probes.scheduled`. It is written (0600, durably) once at start, after every heartbeat and each time the link schedules a retry (the link's `onReport`, MAN-7824), after a `welcome` or a `checks.set` has been applied (`link.on` handlers registered after `createProbes`, so the scheduler has applied the checks first), and once after stop — so a record says `linked: false` as soon as the link is lost, shows the queue growing at each failed reconnect, and a `linked: true` one more than three heartbeats old is a daemon that is gone. A write that fails (a full disk, a directory in `run.json`'s place) is one log line, `could not write run.json: <reason>`, at start, at a beat and at stop alike; the daemon goes on. `ackedUpto` and the queue still move only at those events: an `ack` does not rewrite the file.
 4. Log lines: `warden <version> running as <node>, reporting to <center>`; the link's own `linked to <center> as <node>` and `link lost — retrying in <n> s`; `<SIGNAL> received; stopping`.
-5. SIGTERM or SIGINT, once: `probes.stop()` (clears the timers, kills the probe commands still going, flushes the batch while the link is up), `link.stop()`, the final `run.json`, 250 ms for the close handshake, exit 0. A second signal is ignored.
+5. SIGTERM or SIGINT, once: `probes.stop()` (clears the timers, kills the probe commands still going, flushes the batch while the link is up), `link.stop()`, `chain.save()` (the acked `prevAt` chain to `chain.json`), the final `run.json`, 250 ms for the close handshake, exit 0. A second signal is ignored.
 
 `home-lock.mjs` — `takeHomeLock(home)` → `'held'` · `'taken'` · an error code. One daemon per home: center closes the older link of a node when a newer one connects, so two daemons on one home took it from each other about once a second and both rewrote `state.json`. The lock is a listener on an abstract unix socket named for the home's real path (`\0cerberus-warden:` + the first 32 hex characters of its sha256): the kernel frees it when the process dies, however it dies, so there is no file to go stale and nothing polls. On a platform that cannot bind one (any error but `EADDRINUSE`) `run` logs `could not take the one-daemon lock on this home (<code>); going on without it` and runs.
 
-## `enroll` — `runEnroll({ center, name, token })` → exit code
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/warden-daemon.sh, /home/lyphe/.claude/claudecodeui_lyphe/warden/src/chain.mjs, /home/lyphe/.claude/claudecodeui_lyphe/warden/src/daemon.mjs, /home/lyphe/.claude/claudecodeui_lyphe/warden/src/enroll.mjs, /home/lyphe/.claude/claudecodeui_lyphe/warden/src/home-lock.mjs, /home/lyphe/.claude/claudecodeui_lyphe/warden/src/main.mjs, /home/lyphe/.claude/claudecodeui_lyphe/warden/src/state.mjs, /home/lyphe/.claude/claudecodeui_lyphe/warden/src/status.mjs
+
+## MAN-7833 — Warden verbs — `enroll`, `run`, `status`, exit codes, `run.json`, lost-welcome recovery — `enroll` — `runEnroll({ center, name, token })` → exit code
+section: Warden verbs — `enroll`, `run`, `status`, exit codes, `run.json`, lost-welcome recovery/002 `enroll` — `runEnroll({ center, name, token })` → exit code
+
 1. A home holding `identity.json` prints `This home is already enrolled as <node> with <center>` and exits 1, before anything is written.
 2. The home is created (0700). A key already in it is reused and never replaced (log `reusing the key an earlier enrollment attempt left in this home`); else the ed25519 pair is generated and BOTH halves are written before any socket opens.
 3. Key already here: a plain connect handshake first (`connectHeaders(name, home)`); on success the log says `center already knew this node and key; its certificate is recovered`. Else, or on any failure of that try: the enroll handshake (`X-Cerberus-Enroll`, `X-Cerberus-Node`, `X-Cerberus-Key`).
@@ -328,17 +350,13 @@ Failure sentences (each exit 1):
 
 An `error` frame's message is unsigned before the key is pinned: it is shown through `oneLine`, never trusted.
 
-## The home — `homeDir()` = `CERBERUS_WARDEN_HOME`, else `~/.cerberus-warden`
-| path | holds | mode |
-|---|---|---|
-| `keys/node.key` | private key, PKCS8 PEM; the source of truth | 0600 |
-| `keys/node.pub` | public half, derived copy | 0644 |
-| `identity.json` | `{ node, center, centerKey, cert, enrolledAt }`, written once by `enroll` | 0600 |
-| `state.json` | `{ seqFloor }` (MAN-7824 §"`createOutbox`") | 0600 |
-| `run.json` | what the daemon last wrote about itself (`run`, above) | 0600 |
-The home and `keys/` are 0700. Every write is temp file → fsync → rename → fsync of the directory. A `state.json` that cannot be read is logged and its floor starts at 0.
+The home — its location, layout and what survives a restart: MAN-7836.
 
-## Measured
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/warden-daemon.sh, /home/lyphe/.claude/claudecodeui_lyphe/warden/src/daemon.mjs, /home/lyphe/.claude/claudecodeui_lyphe/warden/src/enroll.mjs, /home/lyphe/.claude/claudecodeui_lyphe/warden/src/home-lock.mjs, /home/lyphe/.claude/claudecodeui_lyphe/warden/src/main.mjs, /home/lyphe/.claude/claudecodeui_lyphe/warden/src/state.mjs, /home/lyphe/.claude/claudecodeui_lyphe/warden/src/status.mjs
+
+## MAN-7834 — Warden verbs — `enroll`, `run`, `status`, exit codes, `run.json`, lost-welcome recovery — Measured
+section: Warden verbs — `enroll`, `run`, `status`, exit codes, `run.json`, lost-welcome recovery/003 Measured
+
 - 2026-10-06, slot-1 probe server: `enroll` printed `Enrolled as probe-node with Cerberus at http://127.0.0.1:7896`, exit 0; a second home with the spent token exit 1 `token used`; the first home again exit 1 `This home is already enrolled…`; `identity.json` and `keys/node.key` 0600.
 - Same day, `identity.json` deleted after an enrollment and `enroll` re-run with the spent token: exit 0 by the plain connect (lost-welcome recovery).
 - Same day, scripted hostile center: a `welcome` signed by another key, a certificate for another key, a bad certificate signature, no certificate, and a silent center each exit 1 (the silent one after 10 s), keys on disk each time.
@@ -348,7 +366,7 @@ The home and `keys/` are 0700. Every write is temp file → fsync → rename →
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/warden-daemon.sh, /home/lyphe/.claude/claudecodeui_lyphe/warden/src/daemon.mjs, /home/lyphe/.claude/claudecodeui_lyphe/warden/src/enroll.mjs, /home/lyphe/.claude/claudecodeui_lyphe/warden/src/home-lock.mjs, /home/lyphe/.claude/claudecodeui_lyphe/warden/src/main.mjs, /home/lyphe/.claude/claudecodeui_lyphe/warden/src/state.mjs, /home/lyphe/.claude/claudecodeui_lyphe/warden/src/status.mjs
 
-## MAN-7826 — Warden install path — `npm run build:warden`, the three gateway routes, `enroll.sh` (enroll and `--refresh`) and the unit
+## MAN-7826 — Warden install path — `npm run build:warden`, the three gateway routes, the enrollment token, `enroll.sh` (enroll and `--refresh`)
 
 How `warden/` becomes a running unit on a node: the artifact, the routes center serves it on, the script that installs and refreshes it, and the unit it writes. Rules an edit keeps: INV-7042. The verbs the installed warden runs: MAN-7825. Where the gateway routes live: MAN-7803.
 
@@ -379,7 +397,9 @@ How `warden/` becomes a running unit on a node: the artifact, the routes center 
 - The root is `findApplicationRoot`, the same in source and compiled; a gateway that never bound (no `CERBERUS_LISTEN`, or the API's own port) registers nothing.
 
 ## `enroll.sh`
-Run as `curl -fsSL http://<center>/cerberus/enroll.sh | sudo sh -s -- --name <node> --token <token>` (the command `POST /api/cerberus/enrollments` prints), or `… | sudo sh -s -- --refresh`.
+Run as `curl -fsSL http://<center>/cerberus/enroll.sh | sudo sh -s -- --name <node> --token <token>` or `… | sudo sh -s -- --refresh`. Center prints the first: `POST /api/cerberus/enrollments` `{ name, desc? }` → `{ name, token, command, expiresAt }` (MAN-7802), `command` built from the gateway's listen address.
+- The token is `XXXX-XXXX-XXXX`, lives 15 minutes (`TOKEN_LIFETIME_MS`) and is single-use: the gateway checks it at the upgrade and spends it when the warden's `hello` arrives, in one transaction with the node's row (a failed enrollment burns nothing). Center stores only its sha256. A spent, late or unknown token fails the enroll step with center's own word: `token used`, `token expired`, `unknown token` (MAN-7803).
+- `--name`: lower-case letters, digits and hyphens, at most 32 characters, never `center`.
 | step | enroll | `--refresh` |
 |---|---|---|
 | refuses | no root; `SUDO_USER` empty or `root`; no `node` ≥ 22, `curl`, `tar`, `sha256sum`, `systemctl`; a copy with no center address; an `identity.json` already there (before any release is fetched or swapped) | the same, except the identity: it refuses when `identity.json` is MISSING, or when given a `--name`/`--token` |
@@ -387,17 +407,179 @@ Run as `curl -fsSL http://<center>/cerberus/enroll.sh | sudo sh -s -- --name <no
 | enroll | `node current/warden/src/main.mjs enroll --center … --name … --token …` as the account | never; identity and keys are untouched |
 | unit | renders EVERY `warden/systemd/*.service` the release carries, `daemon-reload`, `enable --now cerberus-warden`, `restart cerberus-warden` (`enable --now` starts nothing on a unit already running) | renders EVERY `warden/systemd/*.service` the release carries, `daemon-reload`, `enable --now` any unit not yet enabled, `restart cerberus-warden` |
 | last line | "The warden on <name> is reporting to Cerberus at <center>." | "The warden on <node> runs <version>." |
-- The account is `SUDO_USER`, its home from `getent passwd`; everything under `~/.cerberus-warden` is made as that account (`sudo -n -H -u`), so it owns its home and keys.
-- Before the last line the script waits 3 s and requires `systemctl is-active`: a unit that falls over is reported, not claimed running.
+- The account is `SUDO_USER`, its home from `getent passwd`; everything under `~/.cerberus-warden` is made as that account (`sudo -n -H -u`), so it owns its home and keys. why: writing a unit takes root and the warden must not be root: its probes need that account's `~/.pgpass` and services (MAN-7837).
+- Before the last line `require_linked` waits up to 30 s for the daemon's own word that center let it in: a `run.json` written after the restart with `linked: true`. A unit that falls over is reported, and a unit that runs but is refused (a clock more than 60 s off is the usual cause: the enrollment connect has no clock check, every later connect does) stops the script with center's own reason from the journal (`center refused: clock skew 120 s`) and exit 1. The unit stays installed and enabled; the last line is never printed for a warden that is not linked.
 - An enrollment whose later steps fail leaves a home that `--refresh` finishes (identity exists, unit missing).
 - Releases accumulate under `releases/`; nothing prunes them (the script removes no path it did not make itself).
 - Measured 2026-10-06 on a scratch center (slot 2) with a private mount namespace over `/etc/systemd/system`, a stubbed `systemctl` and the real `sudo -u`: wrong token → "unknown token", then "Cerberus did not enroll this machine, so no unit was installed."; enroll, enroll again, refresh with nothing newer, refresh from 0.0.9; a wrong SHA-256, a closed port and a 404 each stop with one sentence and leave no `/tmp/cerberus-warden.*`.
 
-- Measured 2026-10-06 on eis1 itself, over its tailnet address: `npm run build:warden -- --force` (0.1.0 had been built before several `warden/src` changes and no node had installed it), then the printed command `curl -fsSL http://100.103.222.79:3012/cerberus/enroll.sh | sudo sh -s -- --name eis1 --token <token>` ran as the operator and ended "The warden on eis1 is reporting to Cerberus at http://100.103.222.79:3012." on the first try. `identity.json` names the tailnet address; `systemctl show cerberus-warden -p ExecStart` runs `/usr/bin/node /home/lyphe/.cerberus-warden/current/warden/src/main.mjs run` as `lyphe`; `ss -tnp` shows the warden connected from 100.103.222.79 to 100.103.222.79:3012. A `touch server/index.ts` handover: `link lost — retrying in 1 s`, `linked` 1 s later, a lookup inside the gap answered `result`. The unit stopped 135 s: the overview read eis1 `silent` 90 s after the last frame heard and all 81 checks `unknown`; a lookup inside the stop answered `stale` for the 30 s checks and `result` for `system/disk.used` (its `staleAfter` is 900 s).
+- The first install on eis1, the handover and the two-minute stop: MAN-7838.
+- Measured 2026-10-06 on eis1: 0.2.0 (the chain kept across a restart, and `require_linked`) built with `npm run build:warden` and installed with the printed `curl -fsSL http://100.103.222.79:3012/cerberus/enroll.sh | sudo sh -s -- --refresh` — the first `--refresh` run live: "Fetching the warden 0.2.0 from http://100.103.222.79:3012", "The warden on eis1 runs 0.2.0.", exit 0, `current` -> `releases/0.2.0` beside the kept `releases/0.1.0`, the identity fingerprint unchanged, the daemon linked within its first seconds, and `chain.json` (0600) written within 30 s of the first ack.
 
 ## The unit — `cerberus-warden.service`
-`Type=simple`, `User=__USER__`, `WorkingDirectory=__HOME__`, `ExecStart=__NODE__ __HOME__/.cerberus-warden/current/warden/src/main.mjs run`, `Restart=always`, `RestartSec=5`, `After=network-online.target`, `WantedBy=multi-user.target`.
-- why the operator's account: the probes need that account's `~/.pgpass`, state directories and loopback services; a root warden would make every command center can schedule a root command.
-- `systemd-analyze verify` passes on a rendered copy.
+Directives, the account and why, the restart policy: MAN-7837. The state directory it runs against: MAN-7836.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/warden-files.ts, /home/lyphe/.claude/claudecodeui_lyphe/warden/build.mjs, /home/lyphe/.claude/claudecodeui_lyphe/warden/enroll.sh, /home/lyphe/.claude/claudecodeui_lyphe/warden/systemd/cerberus-warden.service
+
+## MAN-7835 — Warden outbox — `createOutbox`: probe results queued for center, re-sent after `welcome.ackedUpto`, seqs reserved 1 000 at a time, the 20 000-result cap with `keepLatest` and `prevAt: null`
+
+`warden/src/outbox.mjs` holds what the warden has said that center has not acked. The daemon builds one and hands it to the link as `link.outbox`; the link resends from it (MAN-7824) and the scheduler pushes results into it (MAN-7821). Wire shapes (`ack`, `welcome.ackedUpto`): `server/shared/cerberus-types.ts`. Rules an edit keeps: INV-7039.
+
+## `createOutbox({ home?, maxResults = 20000 })`
+| call | does |
+|---|---|
+| `push(type, body)` → seq | numbers and queues; a `result` body without a `results` array throws `TypeError` before anything is numbered |
+| `pending(afterSeq)` | queued frames above `afterSeq`, seq order |
+| `ack(upto)` | trims frames at or below `upto`; ignores a non-integer or negative `upto`; raises the counter above `upto`; renumbers frames queued under numbers center already holds (`renumberAbove`); leaves overflow when the queue is under the cap |
+| `keepLatest(result)` | while overflowing: holds the newest result per `check` (by `at`), `prevAt` forced to null |
+| `overflowing`, `size`, `queuedResults` | read-only: the flag, frames queued, results inside them |
+| `ackedUpto` | read-only: the highest `upto` center has sent (an `ack`, or `welcome.ackedUpto`); 0 until one arrives. The daemon writes it to `run.json` |
+
+## Reliable frames and resend
+1. `link.send(type, body, { reliable: true })` → `outbox.push`: numbered and queued, link up or down. A frame sent without `reliable` never enters the outbox.
+2. While linked the link puts the queued frame on the socket at once.
+3. Center answers `ack { upto }`: frames at or below `upto` leave the queue.
+4. After a reconnect, `welcome.ackedUpto` trims the queue the same way, then every frame above it is re-sent in seq order.
+5. The queue is memory only. A restart forgets unacked frames and the probes that made them run again; the one thing persisted is the seq floor.
+
+## Seqs reserved 1 000 at a time
+- `seqFloor` in `<home>/state.json` (the home: MAN-7836) is a ceiling every handed-out number stays below. To hand out a number at or past it, `<number> + 1000` (`FLOOR_STEP`) is written and fsynced first. A write that fails (full disk) throws from `push` before any number leaves, and the counter stays.
+- The first number is 1 (center refuses `seq` < 1). After a restart the counter starts at the persisted floor, so it skips whatever the last run may have used. why: center treats a seq at or below what it acked as a resend and answers without storing, so a repeated seq silently loses a batch.
+- `state.json` lost: the floor reads 0, and the next `ack(upto)` or `welcome.ackedUpto` raises the counter above what center holds. Frames already queued under numbers center holds are renumbered above them, not trimmed as stored; one log line, `center holds results up to #<n>, past this warden's sequence; renumbering <k> queued frame(s) above it`.
+
+## The 20 000-result cap
+| step | what happens |
+|---|---|
+| enter | after a `push`, queued results (counted inside `result` frames, not frames) exceed `maxResults`: `overflowing` true, log `outbox holds <n> unacked results; keeping only the latest per check until center acks` |
+| while | the scheduler reads `overflowing` at each flush and calls `keepLatest` instead of sending frames, and clears its `prevAt` memory (MAN-7821). The first result per check after the drain carries `prevAt: null` |
+| leave | an `ack` leaves `queuedResults` below `maxResults`: `overflowing` is false, the kept results, sorted by `at`, go out as ONE `result` frame through `push`, and `push` resumes; log `outbox drained; <n> kept results queued as one frame`. That frame can lift `queuedResults` back over the cap (at most one result per check): `push` then re-enters overflow in the same `ack`, with its `enter` log line before the `drained` one |
+| leave fails | the push at release throws (the floor could not be reserved): `overflowing` stays true and the next `ack` retries |
+- `prevAt: null` tells center the chain before the kept result is gone, so it records a lapse. why: the results in between were dropped, and a chain naming a dropped result would read as an unbroken stretch.
+- The caller chooses `push` or `keepLatest`; the outbox does not guess which results a frame holds.
+
+## Measured
+- 2026-10-06, slot-1 probe server (`scripts/sunset-probe.sh`): results 1–3 acked; server killed, results 4–5 queued `sent=false`; on reconnect `welcome ackedUpto=3`, `resending 2 unacked frame(s)`, `ack upto=4`, `ack upto=5`; `state.json` `{"seqFloor":1001}`.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/warden/src/outbox.mjs
+
+## MAN-7836 — Warden home — `~/.cerberus-warden` (`CERBERUS_WARDEN_HOME`): `releases/`, `current`, `keys/`, `identity.json`, `state.json`, `chain.json`, `run.json`, and what survives a restart
+
+The one directory a warden keeps its state in. `enroll`, `run`, `status` and `enroll.sh` all read or write it; `warden/src/state.mjs` owns every path in it except `releases/` and `current`, which `enroll.sh` makes. Verbs and exit codes: MAN-7825. Install: MAN-7826. Link: MAN-7824. Outbox: MAN-7835. Unit: MAN-7837. The first node: MAN-7838.
+
+## Location
+| who | home |
+|---|---|
+| `enroll`, `run`, `status` | `CERBERUS_WARDEN_HOME` when set and non-empty (made absolute), else `~/.cerberus-warden` (`homeDir()`) |
+| `enroll.sh` and the unit | always `<account home>/.cerberus-warden`: neither passes `CERBERUS_WARDEN_HOME`, so the variable serves scratch homes, never the installed one |
+
+The home and `keys/` are created 0700 and `chmod`ed 0700 on every use. Every write is temp file → fsync → rename → fsync of the directory.
+
+## Layout
+| path | made by | holds | mode |
+|---|---|---|---|
+| `releases/<version>/` | `enroll.sh` | one extracted release, at its repo paths: `warden/package.json`, `warden/enroll.sh`, `warden/src/**`, `warden/systemd/**` | — |
+| `current` | `enroll.sh` | relative symlink `releases/<version>`, swapped atomically (`current.next`, then `mv -T`); the unit's `ExecStart` runs through it | — |
+| `keys/node.key` | `enroll` | private key, PKCS8 PEM; the source of truth | 0600 |
+| `keys/node.pub` | `enroll` | public half, a derived copy | 0644 |
+| `identity.json` | `enroll`, once | `{ node, center, centerKey, cert, enrolledAt }` | 0600 |
+| `state.json` | the outbox | `{ seqFloor }` (MAN-7835) | 0600 |
+| `chain.json` | the daemon | `{ <check>: at }` — the last result per check center has acked, so a restart keeps each `prevAt` chain (INV-7028); written on acks, at most every 30 s, and at a clean stop | 0600 |
+| `run.json` | the daemon | `{ at, linked, ackedUpto, outbox, overflowing, probes, checksVersion, version }`, rewritten at every heartbeat and link event (MAN-7825) | 0600 |
+
+## What persists
+| survives a restart, a `--refresh` and a reboot | if lost |
+|---|---|
+| `keys/`, `identity.json` | `identity.json` alone: `enroll` re-run on the same home recovers it with a plain connect (MAN-7833). The key is the node's identity; `--refresh` never touches either |
+| `state.json` | the floor reads 0; the next `welcome.ackedUpto` raises the counter above what center holds and queued frames are renumbered |
+| `chain.json` | every first result per check carries `prevAt: null`: one lapse each |
+| `releases/`, `current` | nothing prunes `releases/`; `--refresh` adds a version beside the old |
+
+| memory only, gone at every restart | what rebuilds it |
+|---|---|
+| the outbox queue, and results `keepLatest` held | the probes run again |
+| the probe schedule and each probe's `memory` (`health_doc`: `lastCheckedAt`, `stillSince`) | `hello` reports `checksVersion: null`, so `welcome.checks` carries the set |
+| the `prevAt` map beyond what `chain.json` saved | the first result per check carries the saved `at`, or null |
+| backoff, deadlines, `linked` | the link redials |
+| the one-daemon lock | none: an abstract unix socket the kernel frees when the process dies (MAN-7832) |
+
+- `run.json` is never read by the daemon: `status` and `enroll.sh`'s `require_linked` read it.
+- Unreadable files: `state.json` is logged and its floor starts at 0; `chain.json` is logged and every first result starts a new chain.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/warden/enroll.sh, /home/lyphe/.claude/claudecodeui_lyphe/warden/src/chain.mjs, /home/lyphe/.claude/claudecodeui_lyphe/warden/src/state.mjs
+
+## MAN-7837 — Warden unit — `cerberus-warden.service`: `User=` the operator, `Restart=always`, the installed release, no TCP listener
+
+The one systemd unit a node runs for Cerberus. Template: `warden/systemd/cerberus-warden.service`. Installed copy: `/etc/systemd/system/cerberus-warden.service`, rendered by `enroll.sh` per machine and never edited by hand. Install and refresh: MAN-7826. What `run` does: MAN-7825. Rules an edit keeps: INV-7042.
+
+## Directives
+| line | value | why |
+|---|---|---|
+| `Type=simple` | `node … run` is the daemon and stays in the foreground | |
+| `User=__USER__` | the account that ran `sudo` (`SUDO_USER`), never root | the probes need that account's `~/.pgpass`, state directories and loopback services; a root warden would make every command center can schedule a root command |
+| `WorkingDirectory=__HOME__`, `Environment=HOME=__HOME__` | that account's home from `getent passwd` | `exec` probes run with cwd `$HOME`; the warden's home is `$HOME/.cerberus-warden` (MAN-7836) |
+| `Environment=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin` | system directories only | |
+| `ExecStart=__NODE__ __HOME__/.cerberus-warden/current/warden/src/main.mjs run` | `__NODE__` = `command -v node` at install; the path runs through `current` | `--refresh` swaps `current`, so `systemctl restart cerberus-warden` is all it takes to run the new release |
+| `Restart=always`, `RestartSec=5` | every exit — a crash, a kill, a clean exit — restarts 5 s later | the link redials by itself; only `systemctl stop` keeps it down |
+| `After=network-online.target` | | |
+| `WantedBy=multi-user.target` | `enable` starts it at boot | |
+
+- `enroll.sh` fills `__USER__`, `__HOME__`, `__NODE__` with `sed`, after checking all three to `A-Za-z0-9._/+@-`; a rendered unit that still holds a `__WORD__` marker stops the install.
+- No `CERBERUS_WARDEN_HOME` in the unit: the daemon's home is `$HOME/.cerberus-warden`.
+- A release that carries a second `warden/systemd/*.service` gets it rendered and `enable --now`ed by the next `--refresh`.
+
+## Network and log
+- Dials `identity.json`'s `center` (eis1: `http://100.103.222.79:3012`, the gateway). Listens on no TCP port; its one listener is an abstract unix socket that keeps a second daemon off the home (MAN-7832).
+- Every log line is `[warden] …` on stdout: `journalctl -u cerberus-warden`.
+
+## Commands
+| when | do |
+|---|---|
+| is it up | `systemctl is-active cerberus-warden` → `active` |
+| what it reports | `node ~/.cerberus-warden/current/warden/src/main.mjs status` |
+| take it down | `sudo systemctl stop cerberus-warden`: center reads the node `silent` and its checks `unknown`; `start` resumes (MAN-7838) |
+| run a newer release | `curl -fsSL http://<center>/cerberus/enroll.sh \| sudo sh -s -- --refresh` |
+
+## Measured
+- 2026-10-06, eis1: `systemctl show cerberus-warden -p User -p Restart -p RestartUSec -p ExecStart` → `User=lyphe`, `Restart=always`, `RestartUSec=5s`, `/usr/bin/node /home/lyphe/.cerberus-warden/current/warden/src/main.mjs run`; `current` → `releases/0.2.0`; `systemctl is-active` → `active`; `systemd-analyze verify` on the installed copy prints nothing; `ss -tlnp` holds no listener for the warden's pid.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/warden/systemd/cerberus-warden.service
+
+## MAN-7838 — eis1 — the first node: its seven probes and why each exists, shadow-connector's 74 labels, and the measured install
+
+eis1 is the host Cerberus runs on, enrolled as a remote node: the first warden and the proof of the install path. Its definition is one document in Cerberus's store (`GET` / `PUT /api/cerberus/definitions/eis1`, MAN-7812); `.verify/probe-warden-probes.mjs` carries the seven probe specs as its verification copy. Probe kinds: MAN-7818, MAN-7820. Unit: MAN-7837. Home: MAN-7836. Install: MAN-7826.
+
+## Facts
+| item | value |
+|---|---|
+| node | `eis1` |
+| center | `http://100.103.222.79:3012` (`identity.json`), the tailnet address; no warden code path defaults to a loopback center, so the first node is remote in every way but geography |
+| installed | `current` → `releases/0.2.0`; unit `cerberus-warden.service` as `lyphe` |
+| checks | 81 = 74 components + 7 probes' own checks (`shadow-connector/health` is one of the 7) |
+
+## The seven probes
+Rule: a probe exists only for a fact no service reports itself, with one exception, `system/disk.used` (its row). shadow-connector reports its own 74 components in its health document; the warden carries that document and probes nothing else it already reports (Supabase, Postgres, n8n, the Xact tokens). `staleAfter` is 3 × `every`, so a quiet check stays vouched for between runs (the two 300 s probes state 900 explicitly).
+| key | kind · target | every / timeout | judged by | label | why it exists |
+|---|---|---|---|---|---|
+| `shadow-connector/health` | `health_doc` `http://127.0.0.1:8001/status/infrastructure`, `cadence` 30 | 30 / 15 | the document's own words; own check `ok` when it reads | Health document is readable | the one door for shadow-connector's verdicts: the service computes each component's status and reason, the warden carries them |
+| `cloudcli/http.ok` | `http` `http://127.0.0.1:3011/health` | 30 / 5 | `status == 200` | Answers its health check | CloudCLI reports nothing about itself to Cerberus |
+| `archpulse/http.ok` | `http` `http://127.0.0.1:8005/health` | 60 / 5 | `status == 200` | Answers its health check | ArchPulse reports nothing about itself to Cerberus |
+| `docstore/tcp.up` | `tcp` `127.0.0.1:8006` | 60 / 5 | connected | Answers on its port | the docstore door's listener; its database is a separate process |
+| `docstore/db.connect` | `sql` `postgresql://docstore@127.0.0.1:5433/docstore`, `select 1` | 60 / 10 | `exit == 0` | Its database accepts connections | the database listens on its own port (5433), so the door's port can stay up while it is down; the password comes from `~/.pgpass` |
+| `docstore/backup.age` | `file_age` `/home/lyphe/.claude/state/docstore/backups` | 300 / 10 | `age < 26h`, `staleAfter` 900 | Backed up in the last day | a cron backup (`30 3 * * *`, a rotating set `docstore-1..7.dump`) that stops leaves everything else green; 26 h is the daily run plus slack |
+| `system/disk.used` | `exec` `df -P / \| awk 'NR==2{sub("%","",$5); print $5"% full"}'` | 300 / 10 | `pass value < 85`, `warn value >= 80`, `staleAfter` 900 | Disk under 85% full | the one overlap: shadow-connector's `system_resources` component also carries `disk.percent` for `/` (yellow past 85 %, red past 95 %, `health.py`), but only while its document reads and on its own lines. This probe is the machine's disk on its own lines (pass `< 85`, warn `>= 80`) and does not depend on shadow-connector being up; `value` is the leading number of the last stdout line |
+
+## shadow-connector's 74 labels
+- A component's label is its PASSING condition in plain English, six words or fewer (74 labels, 3–6 words): `approval_v2_hmac` → "Approval webhook signatures are accepted", `xactimate_token` → "Xactimate token is valid", `xactanalysis_session` → "XactAnalysis polls are succeeding", `supabase` → "Supabase is reachable".
+- Source: the docstring of the component's check function, read for its passing condition (its `GREEN:` line where it has one), in `/opt/shadow-connector/cerberus/health.py` (`_check_<id>`); for eight components in a sibling module: `abatement_mail_sweep`, `demo_adoption_integrity`, `demo_extraction_breaker`, `gemini_usage`, `route_auth_census`, `slack_signature` (`check_<id>` in `health_<name>.py`), `corporate_monday_link` (`_check_<id>` in `health_corporate_link.py`) and `eis_backend_auth_posture` (`_check_<id>` in `health_eis_backend.py`) — `health.py` only imports those two. That tree is read and never edited.
+- Home: Cerberus's store, as the `label` of each component's check row (`services[shadow-connector].labels.<id>` in the definition). shadow-connector's document carries no label, and neither does the warden.
+- A label never clears by omission (MAN-7813). A `labels.<id>` for a component Cerberus has not yet seen is refused (MAN-7812), so the definition went in two `PUT`s: the probes, then, once the 74 components appeared in the overview, the whole document with the labels. Labels do not bump the definition `version`.
+- Change one label: `PUT /api/cerberus/labels` `{ node, key, label }` (MAN-7802), or the definition `PUT` with that entry.
+
+## Measured
+- 2026-10-06, `npm run build:warden -- --force` (0.1.0 predated several `warden/src` changes and no node had installed it), then the printed `curl -fsSL http://100.103.222.79:3012/cerberus/enroll.sh | sudo sh -s -- --name eis1 --token <token>` ran as the operator and ended "The warden on eis1 is reporting to Cerberus at http://100.103.222.79:3012." on the first try. `ss -tnp` showed the warden connected from 100.103.222.79 to 100.103.222.79:3012.
+- Same day, `touch server/index.ts` (a handover): `link lost — retrying in 1 s`, `linked` 1 s later; a lookup inside the gap answered `result`.
+- Same day, the unit stopped 135 s: the overview read eis1 `silent` 90 s after the last frame heard and all 81 checks `unknown`; a lookup inside the stop answered `stale` for the 30 s checks and `result` for `system/disk.used` (its `staleAfter` is 900 s).
+- Same day, 0.2.0 installed with `… | sudo sh -s -- --refresh`: "The warden on eis1 runs 0.2.0.", `current` → `releases/0.2.0` beside the kept `releases/0.1.0`, identity fingerprint unchanged, linked within seconds.
+- Same day, after the pass: `GET /api/cerberus/overview` → eis1 `reporting`, `wardenVersion` 0.2.0, 81 checks; the live document `http://127.0.0.1:8001/status/infrastructure` carried 74 components.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-warden-probes.mjs

@@ -8,8 +8,10 @@ type InputProps = React.InputHTMLAttributes<HTMLInputElement> & {
 };
 
 /**
- * The application-wide text input, used by the chat, file-tree, mcp, project-creation-wizard,
- * settings, sidebar and skills modules.
+ * The application-wide text input, used by the app-switcher, auth, cerberus, chat, dispatcher,
+ * file-tree, heal, kanban, mcp, notes, project-creation-wizard, roadmap, settings, sidebar, skills,
+ * task-master and universe modules — in cerberus, Fleet's search, the time and date fields of a
+ * lookup, the sheet's name for a check, and the Enroll dialog's name and description.
  *
  * Paint is `.vv-input` in verve/controls.css. The sizing utilities stay because they are the
  * app's own scale — Verve's padding would resize every input in the app. `invalid` is amber,

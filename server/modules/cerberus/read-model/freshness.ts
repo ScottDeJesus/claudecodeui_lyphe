@@ -16,7 +16,9 @@ import { shownRow, worst } from './status-rules.js';
  *     had no previous result — a lapse ended at `n` — so only `r.at` itself vouches for the stretch;
  *   - past the last stored row there is no `n`, and the vouching moment is center's own memory of
  *     the latest result it RECEIVED (`liveLastAt`, ingest's in-memory last-received time): `x` is
- *     fresh while `x <= (liveLastAt ?? r.at) + staleAfter`.
+ *     fresh while `x <= (liveLastAt ?? r.at) + staleAfter`. A boot empties that memory, so ingest
+ *     seeds it with the boot's own moment for each check that was reporting just before it
+ *     (`boot-vouch.ts`); a check it did not seed has `liveLastAt` null until a result of it arrives.
  *
  * A moment that is not fresh is "no result", never the old status: a stale moment is never passing.
  *

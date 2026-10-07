@@ -50,7 +50,7 @@ function clippingAncestorOf(element: HTMLElement): HTMLElement | null {
  * nearer one. That matters on a phone, where 60 cells are 4px wide each. `selectedFrom` marks the
  * minute whose `from` it names (the one being looked up) with an accent outline.
  *
- * Used by the sheet (`CheckSheet`) and by History (`HistoryView`), whose fills wire `onPick`.
+ * Used by the sheet (`CheckSheet`) and by History's look-up card (`LookupCard`), which each wire `onPick`.
  */
 export function MinuteCells({ cells, selectedFrom, onPick }: {
   cells: CerberusCell[];
@@ -213,7 +213,7 @@ export function MinuteCells({ cells, selectedFrom, onPick }: {
           ))}
         </div>
       </div>
-      <div aria-hidden className="flex justify-between text-[11.5px] tabular-nums text-ink-faint">
+      <div aria-hidden className="flex justify-between text-[11.5px] tabular-nums text-muted-foreground">
         <span>{hm(cells[0].from)}</span>
         <span>{hm(cells[middleIndex].from)}</span>
         <span>{hm(cells[count - 1].from)}</span>

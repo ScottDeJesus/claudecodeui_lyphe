@@ -1,5 +1,5 @@
 import type { CerberusStatus } from '@/shared/cerberus-types';
-import type { CerberusCellShape, Tone } from '@/shared/types';
+import type { CerberusCellShape, FleetStatus, Tone } from '@/shared/types';
 
 /**
  * How one status is drawn. `tone` goes onto the mark as `data-tone`, and the `[data-tone]` rules
@@ -49,3 +49,15 @@ export const STATUS_TABLE: Record<CerberusStatus, StatusLook> = {
   muted: { tone: 'neutral', glyph: '—', wordKey: 'cerberus.status.muted', cell: 'surface' },
   paused: { tone: 'neutral', glyph: '—', wordKey: 'cerberus.status.paused', cell: 'dashed' },
 };
+
+/**
+ * The status a NODE's word draws its marks with, or `null` for a word with no mark. `empty` has none:
+ * nothing is on the node to read. `fixing` and `enrolling` are the fixes and updates plans' places, fed
+ * by nothing yet, and each plan gives its word a mark when it does.
+ *
+ * Read by Fleet's node card (its glyph and its tile's edge) and by the rings (each node's dot, its
+ * label's glyph, and the hub), so a node is drawn the same in every layout.
+ */
+export function nodeMark(status: FleetStatus): CerberusStatus | null {
+  return status === 'empty' || status === 'fixing' || status === 'enrolling' ? null : status;
+}

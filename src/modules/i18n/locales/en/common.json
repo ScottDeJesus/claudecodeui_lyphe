@@ -899,9 +899,7 @@
       "reached": "Reached"
     },
     "roadmapWord": {
-      "noPath": "No path yet",
-      "onTheWay": "On the way",
-      "allReached": "Every milestone reached"
+      "noPath": "No path yet"
     },
     "standing": {
       "reached_one": "{{reached}} of {{count}} milestone reached",
@@ -917,15 +915,6 @@
       "waiting_one": "{{count}} waiting on you",
       "waiting_other": "{{count}} waiting on you"
     },
-    "rail": {
-      "label": "Waiting on you, in flight, next up and blocked",
-      "waiting": "Waiting on you",
-      "inFlight": "In flight",
-      "next": "Next up",
-      "blocked": "Blocked",
-      "more_one": "+{{count}} more",
-      "more_other": "+{{count}} more"
-    },
     "goal": {
       "missing": "Write where this roadmap leads",
       "showAll": "Show all"
@@ -934,7 +923,6 @@
       "none": "Start a roadmap",
       "noneMessage": "A roadmap is the path to a goal: the milestones on the way, the epics that make each one, and their features.",
       "noPath": "Draw the path: add the first milestone",
-      "nextMilestone": "Every milestone reached. Add the next one",
       "noEpics": "No epics yet"
     },
     "picker": {
@@ -956,26 +944,12 @@
       "delete": "Delete…",
       "actions": "Actions for {{title}}"
     },
-    "path": {
-      "label": "Milestones on the way to the goal",
-      "goalFlag": "Goal",
-      "station": "Milestone {{n}}: {{title}} — {{word}}",
-      "wordBlocked": "{{word}}, blocked",
-      "blocked": "Blocked",
-      "reachedOn": "reached {{date}}",
-      "features_one": "{{shipped}} of {{count}} feature",
-      "features_other": "{{shipped}} of {{count}} features"
-    },
     "milestone": {
       "eyebrow": "Milestone {{n}} · {{word}}"
-    },
-    "epic": {
-      "count": "{{shipped}} of {{count}} shipped"
     },
     "feature": {
       "waitingAccept": "Waiting on you: Accept",
       "waitingQuestions": "Waiting on you: answer its questions",
-      "answer": "Answer",
       "done": "Done",
       "tasks_one": "{{done}} of {{count}} task",
       "tasks_other": "{{done}} of {{count}} tasks"
@@ -1144,8 +1118,6 @@
       "shipped": "Shipped {{date}}"
     },
     "celebrate": {
-      "shipped": "Shipped",
-      "epicComplete": "Epic complete",
       "milestoneReached": "Milestone reached",
       "epics_one": "{{count}} epic",
       "epics_other": "{{count}} epics",
@@ -1175,13 +1147,7 @@
       "promote": "{{title}} sent to design"
     },
     "widget": {
-      "open": "Open the roadmap",
-      "more_one": "+{{count}} more",
-      "more_other": "+{{count}} more",
-      "focus_one": "Milestone {{n}} · {{title}} · {{complete}} of {{count}} epic complete",
-      "focus_other": "Milestone {{n}} · {{title}} · {{complete}} of {{count}} epics complete",
-      "focusWord": "Milestone {{n}} · {{title}} · {{word}}",
-      "quiet": "Nothing waiting on you, in flight or next up"
+      "open": "Open the roadmap"
     },
     "tree": {
       "label": "The roadmap as a tree: its goal, milestones, epics and features",
@@ -1196,6 +1162,7 @@
       "blocked": "Blocked"
     },
     "panel": {
+      "label": "Details",
       "hint": "Press the goal, a milestone, an epic or a feature dot: its details open here, below the tree, so nothing is covered.",
       "roadmap": "Roadmap",
       "epicLine": "Epic · Milestone {{n}} · {{word}}",
@@ -1727,7 +1694,8 @@
       "layouts": {
         "grid": "Grid",
         "list": "List",
-        "rings": "Rings"
+        "rings": "Rings",
+        "label": "Fleet layout"
       },
       "filters": {
         "all": "All",
@@ -1736,7 +1704,8 @@
         "muted": "Muted",
         "updating": "Updating",
         "empty": "Nothing assigned",
-        "label": "{{name}} · {{count}}"
+        "label": "{{name}} · {{count}}",
+        "title": "Filter the fleet"
       },
       "searchPlaceholder": "Find a node or service",
       "expandAll": "Expand all",
@@ -1783,6 +1752,7 @@
       "count_other": "{{count}} checks",
       "word": "· {{word}}",
       "where": "{{service}} · {{node}} · since {{time}}",
+      "whereNoSince": "{{service}} · {{node}}",
       "mute": "Mute",
       "unmute": "Unmute",
       "quiet": "Nothing needs you",
@@ -1795,9 +1765,11 @@
     "node": {
       "hub": "Cerberus · this server",
       "heard": "Warden {{version}} · heard {{ago}}",
-      "silent": "silent since {{time}}",
+      "silent": "Warden {{version}} · silent since {{time}}",
+      "wardenRestarting": "Warden {{version}} · restarting",
       "waiting": "Waiting for the first heartbeat",
       "nothingAssigned": "Nothing assigned yet",
+      "restarting": "Warden restarting",
       "bad": "{{label}} — {{word}}",
       "mutedCheck": "Passing · muted check",
       "allPassing_one": "Its service is passing",
@@ -1805,8 +1777,10 @@
       "squareTip": "{{label}} · {{text}}",
       "moreSquares": "+{{count}}",
       "emptyTitle": "Nothing to watch yet",
+      "emptyLead": "Nothing to watch yet.",
       "emptyMessage": "Its warden is reporting. Assign a service to {{node}} and its checks show up here.",
       "waitingTitle": "Waiting to hear from it",
+      "waitingLead": "Waiting to hear from it.",
       "waitingMessage": "It shows up here as soon as its warden says hello."
     },
     "service": {
@@ -1814,13 +1788,17 @@
       "needYou_one": "{{count}} check needs you",
       "needYou_other": "{{count}} checks need you",
       "someMuted": "{{passing}} of {{total}} passing · {{muted}} muted",
+      "noResult_one": "Its check has no result",
+      "noResult_other": "No result from its {{count}} checks",
+      "someNoResult": "{{passing}} of {{total}} passing · {{unknown}} no result",
+      "paused": "Paused while its warden restarts",
       "allPassing_one": "Its check is passing",
       "allPassing_other": "All {{count}} checks passing",
       "cellTip": "{{time}} · {{word}}"
     },
     "activity": {
       "title": "What happened",
-      "nothingSince": "Nothing since {{time}}.",
+      "nothingYet": "Nothing has happened yet.",
       "source": {
         "check": "Check",
         "mute": "Mute",
@@ -1858,7 +1836,14 @@
       "cells": "Minutes, oldest to newest",
       "recorded": "Recorded results · last 3 h",
       "noChanges": "No change recorded in the last 3 h.",
-      "moreResults": "Show {{count}} more"
+      "moreResults": "Show {{count}} more",
+      "checksOf": "Checks in {{service}}",
+      "rename": "Rename this check",
+      "clearsName": "Saved empty, it shows its key again.",
+      "notChecked": "No result yet · every {{every}} · by the warden on {{node}}",
+      "notCheckedHub": "No result yet · every {{every}} · by Cerberus on this server",
+      "loading": "Reading this check…",
+      "gone": "Cerberus no longer watches this check."
     },
     "lookup": {
       "title": "Look up a moment",
@@ -1884,7 +1869,25 @@
       "option": "{{service}} · {{check}}",
       "raw": "{{key}} · {{node}} · every {{every}}",
       "since": "Everything since {{time}}",
-      "showEarlier": "Show earlier"
+      "showEarlier": "Show earlier",
+      "optionOnNode": "{{service}} · {{check}} · {{node}}",
+      "choose": "Choose a check",
+      "readingChecks": "Reading the checks…",
+      "hour": "The hour up to {{time}} · click a minute",
+      "recorded": "Recorded results · 3 h up to {{time}}",
+      "noChanges": "No change recorded in the 3 h up to {{time}}.",
+      "lookingUp": "Looking it up…",
+      "chooseCheck": "Choose a check to look up.",
+      "pickADate": "Pick a date to look up.",
+      "goneMeta": "Choose another one above.",
+      "noChecks": "Nothing to look up yet.",
+      "noChecksMeta": "Checks appear here as soon as a node reports them.",
+      "everything": "Everything that happened",
+      "readingEvents": "Reading what happened…",
+      "empty": "Nothing has happened yet",
+      "emptyMessage": "Every change, mute and enrolment lands here as it happens.",
+      "readingEarlier": "Reading earlier events…",
+      "nothingEarlier": "Nothing earlier on record."
     },
     "mute": {
       "title": "Mute",
@@ -1917,17 +1920,17 @@
         "install": "Install",
         "hello": "Say hello"
       },
-      "intro": "A node is any machine with a warden on it. The warden runs checks there, reports to Cerberus on center, and runs fixes when asked.",
+      "intro": "A node is any machine with a warden on it. The warden runs checks there and reports to Cerberus on center.",
       "name": "Name",
       "nameHelper": "Lowercase letters, numbers and dashes. Shown on every check from this node.",
       "nameEmpty": "Give it a name",
       "nameTaken": "A node called {{name}} is already enrolled",
-      "desc": "What it is",
-      "descOptional": "optional",
+      "desc": "What it is (optional)",
       "descPlaceholder": "Office mini PC",
       "descHelper": "Shown under the name in Fleet.",
       "cancel": "Cancel",
       "getCommand": "Get the install command",
+      "notListening": "Cerberus isn't listening for wardens, so a new machine would have nothing to reach.",
       "run": "Run this on the machine as a user who can sudo. It installs the warden, which then says hello to Cerberus.",
       "copy": "Copy",
       "copied": "✓ Copied",
@@ -1964,6 +1967,7 @@
     "errors": {
       "unreachable": "Cerberus can't be reached",
       "retry": "Try again",
+      "lastAnswer": "Showing the last answer it gave.",
       "writeFailed": "Cerberus didn't take that"
     }
   },

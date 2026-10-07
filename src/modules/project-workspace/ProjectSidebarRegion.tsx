@@ -28,6 +28,7 @@ function ProjectSidebarRegion({
     runnerWaiting,
     shouldShowHealTab,
     healCount,
+    cerberusNeeds,
   } = useWorkspaceTabGates(activeTab);
 
   // Choosing a tab on a phone means choosing a pane the drawer is covering, so the drawer gets
@@ -53,6 +54,7 @@ function ProjectSidebarRegion({
       runnerWaiting={runnerWaiting}
       shouldShowHealTab={shouldShowHealTab}
       healCount={healCount}
+      cerberusNeeds={cerberusNeeds}
       onTabChange={handleTabChange}
     />
   ) : null;

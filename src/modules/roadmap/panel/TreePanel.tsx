@@ -1,4 +1,5 @@
 import { Pointer } from 'lucide-react';
+import { useEffect, useId, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { EpicPanel } from '@/modules/roadmap/panel/EpicPanel';
@@ -63,23 +64,48 @@ type TreePanelProps = {
  * what to press; otherwise the selected item's own panel, `data-roadmap-panel` naming which. Each item's panel
  * is drawn afresh (its scroller keyed by the item), so a new selection opens at its head and its quote folded.
  *
- * Used by the roadmap module's Roadmap face, `RoadmapPath`, directly under its tree.
+ * A REGION A READER CAN FIND. The frame is a landmark named by the open panel's heading ("Details" while the hint
+ * shows), so a screen reader that pressed the tree can jump to what the press filled. A row's press hands the
+ * keyboard to the new panel's heading (`selectFromRow` names the panel, the effect on `shownKey` focuses it once
+ * drawn), since the pressed row goes with the panel it stood in; a press on the tree leaves it on the tree's node.
+ *
+ * Used by the roadmap module's Roadmap face, `RoadmapTreeFace`, directly under its tree, in both fits.
  */
 export function TreePanel({ roadmap, layout, selected, onSelect, fit }: TreePanelProps) {
   const { t } = useTranslation();
   const subject = findSubject(layout, selected);
   const viewport = fit === 'viewport';
+  // The open panel's heading id: the frame is named by it, and a feature's Open is described by it.
+  const headingId = useId();
+  // The frame: the heading a row's press hands the keyboard to is found in it.
+  const panelRef = useRef<HTMLDivElement>(null);
+  // The item on show, as the scroller's key: a new item draws its panel afresh, at its head.
+  const shownKey = selected === null || subject === null ? 'hint' : selected.kind === 'roadmap' ? 'roadmap' : `${selected.kind}:${selected.name}`;
+  // The key the panel a row's press selects will be drawn under, held until that panel is on screen; null when no
+  // row pressed (the tree's own presses never set it, so they leave focus on the tree's node). A ref: the effect
+  // below reads it once the new panel is committed, and nothing is drawn from it.
+  const focusKeyRef = useRef<string | null>(null);
+  useEffect(() => {
+    const wanted = focusKeyRef.current;
+    // Spent on the first panel drawn after the press: a press whose item the picture no longer holds draws the hint, and must not leave a claim for a later tree press.
+    focusKeyRef.current = null;
+    if (wanted === shownKey) panelRef.current?.querySelector('h2')?.focus();
+  }, [shownKey]);
+  const selectFromRow = (selection: RoadmapTreeSelection) => {
+    focusKeyRef.current = selection.kind === 'roadmap' ? 'roadmap' : `${selection.kind}:${selection.name}`;
+    onSelect(selection);
+  };
 
   const body = (() => {
     switch (subject?.kind) {
       case 'roadmap':
-        return <RoadmapPanel roadmap={roadmap} onSelect={onSelect} />;
+        return <RoadmapPanel roadmap={roadmap} headingId={headingId} onSelect={selectFromRow} />;
       case 'milestone':
-        return <MilestonePanel roadmap={roadmap} milestone={subject.spot.milestone} n={subject.spot.n} onSelect={onSelect} />;
+        return <MilestonePanel roadmap={roadmap} milestone={subject.spot.milestone} n={subject.spot.n} headingId={headingId} onSelect={selectFromRow} />;
       case 'epic':
-        return <EpicPanel epic={subject.row.epic} n={subject.spot.n} dots={layout.dots} onSelect={onSelect} />;
+        return <EpicPanel epic={subject.row.epic} n={subject.spot.n} dots={layout.dots} headingId={headingId} onSelect={selectFromRow} />;
       case 'feature':
-        return <FeaturePanel feature={subject.dot.feature} epic={subject.row.epic} milestone={subject.spot.milestone} n={subject.spot.n} dot={subject.dot.state} />;
+        return <FeaturePanel feature={subject.dot.feature} epic={subject.row.epic} milestone={subject.spot.milestone} n={subject.spot.n} dot={subject.dot.state} headingId={headingId} />;
       default:
         return null;
     }
@@ -87,11 +113,15 @@ export function TreePanel({ roadmap, layout, selected, onSelect, fit }: TreePane
 
   return (
     <Card
+      ref={panelRef}
+      role="region"
+      aria-labelledby={body === null ? undefined : headingId}
+      aria-label={body === null ? t('roadmap.panel.label') : undefined}
       data-roadmap-panel={subject?.kind ?? 'hint'}
       className={cn('mx-auto flex w-full min-w-0 max-w-3xl flex-col', viewport && 'h-[clamp(9rem,26vh,16rem)] shrink-0 overflow-hidden')}
     >
       <div
-        key={selected === null || subject === null ? 'hint' : selected.kind === 'roadmap' ? 'roadmap' : `${selected.kind}:${selected.name}`}
+        key={shownKey}
         className={cn('min-w-0', viewport && 'min-h-0 flex-1 overflow-y-auto overscroll-contain scrollbar-thin')}
       >
         {body === null ? (

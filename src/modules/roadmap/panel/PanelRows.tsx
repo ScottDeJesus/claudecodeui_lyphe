@@ -1,5 +1,5 @@
 import { Plus } from 'lucide-react';
-import { useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -17,6 +17,8 @@ import { cn } from '@/shared/utils';
 type PanelRowItem = { name: string; title: string; dot: RoadmapDotState; meta: string };
 
 type PanelHeadProps = {
+  /** The heading's id: the panel's frame is named by it, and a feature's Open is described by it. */
+  id: string;
   title: string;
   /** The muted line under the heading: what the item is and where it stands. */
   sub: ReactNode;
@@ -27,16 +29,22 @@ type PanelHeadProps = {
 /**
  * A panel's head: the item's title in the house's display serif, never bold, with its muted line under it,
  * and its one press at the right, held to the title's first line. A size and its leading are ONE class
- * (`text-xl/tight`): `cn` drops a `leading-*` spelled before a later size.
+ * (`text-xl/tight`): `cn` drops a `leading-*` spelled before a later size. The sub line carries titles, so
+ * its figures stay proportional (tabular ones give a title's comma a figure's width: "requested ,"), and it
+ * wraps without leaving one short word alone ("Milestone" / "1").
+ *
+ * The heading is where the keyboard lands after a row's press (`TreePanel`'s `selectFromRow` and its effect on `shownKey`): the pressed row goes
+ * with the panel it stood in. It is a focus target and never a tab stop (`tabIndex={-1}`), and it draws no ring;
+ * `outline-none` alone loses to tokens.css's `[tabindex]:focus-visible` outline (0,2,0).
  *
  * Used by the roadmap module's panel bodies (`panel/RoadmapPanel`, `MilestonePanel`, `EpicPanel`, `FeaturePanel`).
  */
-export function PanelHead({ title, sub, action }: PanelHeadProps) {
+export function PanelHead({ id, title, sub, action }: PanelHeadProps) {
   return (
     <header className="flex min-w-0 items-start gap-3">
       <div className="min-w-0 flex-1">
-        <h2 className="break-words font-serif text-xl/tight font-normal text-foreground">{title}</h2>
-        <p className="mt-1 text-xs tabular-nums text-muted-foreground">{sub}</p>
+        <h2 id={id} tabIndex={-1} className="break-words font-serif text-xl/tight font-normal text-foreground outline-none focus-visible:outline-none">{title}</h2>
+        <p className="mt-1 text-pretty text-xs text-muted-foreground">{sub}</p>
       </div>
       <div className="-mr-1.5 -mt-0.5 shrink-0">{action}</div>
     </header>
@@ -62,12 +70,14 @@ export function PanelDot({ state }: { state: RoadmapDotState }) {
 }
 
 /**
- * One row, `FeatureRow`'s shape: a free surface whose click selects, so `useSortable` can lift it from a free
+ * One row: a free surface whose click selects, so `useSortable` can lift it from a free
  * press (`freePress.ts`: never from a control), and whose title is the real `<button>`, the keyboard's and the
- * screen reader's way in; its click bubbles to the row's one handler. The meta stands at the right while the
- * row has the width, and wraps under the title when it has not.
+ * screen reader's way in; its click bubbles to the row's one handler, and the meta describes it, so a screen
+ * reader says the item's state with its name. The meta stands at the right while the row has the width, and
+ * wraps under the title when it has not.
  */
 function PanelRow({ item, onPress }: { item: PanelRowItem; onPress: () => void }) {
+  const metaId = useId();
   return (
     <div
       data-roadmap-panel-row={item.name}
@@ -79,10 +89,10 @@ function PanelRow({ item, onPress }: { item: PanelRowItem; onPress: () => void }
         <PanelDot state={item.dot} />
       </span>
       <div className="flex min-w-0 flex-1 flex-wrap items-baseline justify-between gap-x-3">
-        <button type="button" className="min-w-0 max-w-full rounded-sm text-left text-sm leading-5 text-foreground">
+        <button type="button" aria-describedby={metaId} className="min-w-0 max-w-full rounded-sm text-left text-sm leading-5 text-foreground">
           <span className="line-clamp-2 break-words">{item.title}</span>
         </button>
-        <span className="text-xs tabular-nums leading-5 text-muted-foreground">{item.meta}</span>
+        <span id={metaId} className="text-xs tabular-nums leading-5 text-muted-foreground">{item.meta}</span>
       </div>
     </div>
   );
@@ -129,6 +139,10 @@ export function RowList({ rows, sortable, empty, onSelect }: RowListProps) {
  * band's fold, and offers Show all only when the fold hides something. The panel draws each item afresh
  * (`TreePanel` keys its scroller by the item), so the next item's quote opens folded again.
  *
+ * Show all leaves with the fold, so the press hands the keyboard to the quote it opened: a focus target and
+ * never a tab stop (`tabIndex={-1}`), drawing no ring (as the heading does, for the same `[tabindex]:focus-visible`
+ * reason), so a reader does not fall to the page behind the panel.
+ *
  * Used by the roadmap module's panel bodies (`panel/RoadmapPanel`, `MilestonePanel`, `EpicPanel`).
  */
 export function PanelQuote({ text }: { text: string }) {
@@ -136,27 +150,42 @@ export function PanelQuote({ text }: { text: string }) {
   // The quote's box: the fold is measured off it.
   const quoteRef = useRef<HTMLQuoteElement>(null);
   // Whether the quote is drawn whole, once Show all is pressed. Local: nothing else asks for it.
-  // FILL: whole — set by Show all's press.
-  const [whole] = useState(false);
+  const [whole, setWhole] = useState(false);
   // Whether the folded quote hides lines, so Show all is offered only when there is more to read.
-  // FILL: long — measured off the laid-out quote, its content taller than its box by more than half a line, when its text changes and whenever it is resized (RoadmapHeader's goal fold).
-  const long = false;
+  const [long, setLong] = useState(false);
+  useEffect(() => {
+    const quote = quoteRef.current;
+    if (quote === null) return;
+    // `observe` delivers a first reading of its own, so the fold is measured as soon as the quote is laid out.
+    // More than half a line of content below the box is hidden lines; less is only glyphs reaching past the leading.
+    const observer = new ResizeObserver(() => {
+      const line = Number.parseFloat(getComputedStyle(quote).lineHeight);
+      setLong(quote.scrollHeight - quote.clientHeight > line / 2);
+    });
+    observer.observe(quote);
+    return () => observer.disconnect();
+  }, [text]);
 
   return (
     <div className="flex min-w-0 flex-col items-start">
       <blockquote
         ref={quoteRef}
-        className={cn('w-full whitespace-pre-wrap break-words border-l-2 border-border pl-2 text-sm text-muted-foreground', !whole && 'line-clamp-3')}
+        tabIndex={-1}
+        className={cn('w-full whitespace-pre-wrap break-words border-l-2 border-border pl-2 text-sm text-muted-foreground outline-none focus-visible:outline-none', !whole && 'line-clamp-3')}
       >
         {text.replace(/^\s*>\s?/gm, '')}
       </blockquote>
       {long && !whole && (
+        // On the quote's own text (its 2px rule and 8px inset: 4px of margin plus the press's 6px), a press of the quote's.
         <Button
           variant="link"
           size="sm"
-          className="-ml-1 h-7 px-1.5"
-          // FILL: onShowAll — draws the quote whole.
-          onClick={() => {}}
+          className="ml-1 h-7 px-1.5"
+          onClick={() => {
+            setWhole(true);
+            // The button is gone once the quote is whole; the folded quote is already in view, so nothing scrolls.
+            quoteRef.current?.focus({ preventScroll: true });
+          }}
         >
           {t('roadmap.goal.showAll')}
         </Button>

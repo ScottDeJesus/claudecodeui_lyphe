@@ -21,6 +21,12 @@ export type CerberusValue = {
   overview: CerberusOverview | null;
   /** True while no read has ever answered and the last one failed. A read that fails after a good one keeps the overview it had, so this never turns true over one. */
   unreachable: boolean;
+  /**
+   * True once a read has failed while the overview held was answered more than 90 s before (three missed
+   * polls): what is on screen is the last answer center gave, not this minute's. False again with the next
+   * good answer, and judged only when a read fails, never on a timer. `overview` is never null while this is true.
+   */
+  stale: boolean;
   /** Reads the overview again. Resolves when the read has been answered or has failed; never rejects. */
   refresh: () => Promise<void>;
   /** Each write answers `true` when it landed — and by then the overview has been re-read. On `false` it has already raised the toast. */
@@ -42,8 +48,8 @@ export function useCerberus(): CerberusValue {
 
 /**
  * How many checks need a person right now: the overview's own count, `0` while it has not been read.
- * Meant for src/modules/project-workspace, through the module's barrel, as the tab strip's count
- * pill — the workspace phase of this plan wires it; until then nothing outside the module reads it.
+ * Read by src/modules/project-workspace, through the module's barrel, as the Cerberus tab's count
+ * pill on the strip — the same number the tab's headline says.
  */
 export function useCerberusNeeds(): number {
   return useCerberus().overview?.counts.needsYou ?? 0;

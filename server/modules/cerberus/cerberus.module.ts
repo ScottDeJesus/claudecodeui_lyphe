@@ -23,7 +23,8 @@ import { wardenLinks } from './warden-links.js';
  * fails HERE, loudly, not on the first warden's enrollment), seeds the hub's own definitions, makes
  * every enrolled node known to the link registry (silent until heard) and fills ingest's memory from
  * the store — and only then binds the gateway, so the first warden to dial in finds a center that
- * knows its nodes; the warden's file routes (the enroll script and the release) are registered just
+ * knows its nodes (ingest's memory is also filled by the first read, whichever comes first — a
+ * handover's new process is asked before `start()` runs); the warden's file routes (the enroll script and the release) are registered just
  * before that bind, so the gateway never answers a request they should have taken. A failure in any
  * step is logged and leaves the API serving: Cerberus is how the fleet is watched, never a reason for
  * the API to be down.
@@ -73,6 +74,10 @@ export function createCerberusModule(dependencies: { supervised: boolean }): {
 
   /** Everything the read model is handed with the store: one instant, the links, the gateway, ingest's memory. */
   function readInputs(): CerberusReadInputs {
+    // A new process answers requests from the moment it signals ready, a couple of seconds BEFORE
+    // `start()` runs; unseeded, every quiet check would read `stale` for that stretch (a handover's
+    // blank board). Seeding is once per process, so `start()`'s own call is then a no-op.
+    ingest.seedMemory();
     return {
       now: Date.now(),
       links: wardenLinks.states(),

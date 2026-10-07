@@ -7,3 +7,8 @@ export { createDispatchSoulsModule } from './dispatch-souls.module.js';
 // that never appears in the conversation's own transcript.
 export { listRunningLaunchers } from './running-launchers.service.js';
 export type { RunningLauncher } from './running-launchers.service.js';
+// isDispatcherWork, readDispatcherChainLaunchIds: used by the providers module's chat-list reader
+// (`session-soul-launches.service.ts`), which names the launches a chat's stamp points at and must
+// leave out the ones that are the dispatcher's epic work — the stamp is the chat the epic was
+// started from, so it cannot tell them from the chat's own.
+export { isDispatcherWork, readDispatcherChainLaunchIds } from './dispatcher-work.service.js';

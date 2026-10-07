@@ -89,6 +89,7 @@ const NAV_TABS: Array<{ id: AppTab; label: string; keywords: string }> = [
   { id: 'runner', label: 'Go to Roadmap', keywords: 'roadmap milestone epic feature task goal path in flight runner feature epic task run live plan phases' },
   { id: 'heal', label: 'Go to Heal', keywords: 'heal friction ledger reflex regression ignore' },
   { id: 'api', label: 'Go to API', keywords: 'api jev deepseek spend balance burn tokens consumers usage outings typesafe' },
+  { id: 'cerberus', label: 'Go to Cerberus', keywords: 'cerberus fleet health monitoring checks wardens nodes' },
 ];
 
 /** Rendered by the project-workspace module to search projects, sessions, files, branches and commits and run their actions. */

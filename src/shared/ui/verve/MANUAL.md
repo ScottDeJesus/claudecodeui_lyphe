@@ -42,7 +42,12 @@ section: README/001 The rules that keep it one source
    first two for the task board, the third for accent TEXT — each one `color-mix` over a token
    `tokens.css` already declared. `accent-ink` is the readable half of a pair, because `primary`
    is the accent FILL: a green WORD is `text-accent-ink`, a green SHAPE is `text-primary`, and
-   the wrong way round is how the sidebar's most important label went under AA. A name whose
+   the wrong way round is how the sidebar's most important label went under AA. `tone-soft`,
+   `tone-ink` and `tone-dot` joined as names over the tone swap's own properties, not over a palette
+   token: each is `color-mix` over `--tone-soft`, `--tone-ink` or `--tone-dot`, which the
+   `[data-tone]` rules of rule 4 hand to everything inside a container. `bg-tone-dot` is the dot of
+   whichever of the five tones the nearest `data-tone` chose, and resolves to nothing with none above
+   it. `--tone-glyph` has no name: it holds a string, not a colour. A name whose
    `var()` points at no existing token is rule 2's second palette in a Tailwind spelling.
 
    A module carries its own stylesheet only where a selector must reach markup no className can: a
@@ -94,32 +99,40 @@ section: README/001 The rules that keep it one source
    side of the swap, and the five named sizes it stands beside, is
    [docs/architecture/MANUAL.md (08-rendered-shapes)](../../../../docs/architecture/MANUAL.md) §"Header, type and motion".
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/main.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/shell/utils/terminalTheme.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/main.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/shell/utils/terminalTheme.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/tailwind.config.js
 
 ## MAN-740 — The library those tokens paint
 section: README/002 The library those tokens paint
 
-Twenty-nine components carry Verve paint today — Phase 2's twelve, then Phase 3's six new and
-three restyled, then DockableFab and SplitPane for the application switcher's kit scaffold,
-admitted on the barrel's *mechanism* test rather than its two-module rule (`index.ts`'s own
-header), then `ResizeGrip` for chat-host's floating panel, admitted on that same mechanism test
-(its one consumer is `ChatHostPanel`), then `ConfirmDialog` for the files editor's and file manager's unsaved-changes guards —
-admitted on the ordinary two-module rule (the file-editor and file-manager modules both render it)
-and painting nothing of its own: it is `Dialog` and `Button` underneath, both already painted;
-then `TextArea` for the roadmap's goal field, which wears `Input`'s own `.vv-input` paint and adds
-its geometry in `panels.css`; then `Sheet`, `Timeline` and `Steps` for the Cerberus tab's detail,
-painted in that same `panels.css` (`Steps` and not `Stepper`, which is the numeric minus/plus control).
+30 components carry Verve paint (2026-10-06: a file in `src/shared/ui/` that puts a `.vv-*` class in its markup; a comment naming one does not count, and `Toast` with `ToastStack`, `Tabs` with `TabsMore` count once). The sheet that paints each (rule 6):
+
+| sheet | components |
+|---|---|
+| `controls.css` | Button, Badge, Input, Card, Shimmer, Chip, Switch, Avatar, Meter, Spinner, Field, Select, Stepper |
+| `feedback.css` | Banner, Toast, Tabs, EmptyState, Menu, Dialog, Tooltip, ActionMenu |
+| `surfaces.css` | DockableFab, SplitPane, ResizeGrip |
+| `panels.css` | TextArea, Sheet, Timeline, Steps |
+| `board.css` | KanbanLane, KanbanCard |
+
+- `Sheet` (a panel on the right edge over a scrim), `Timeline` (an event feed, dense or full; props and open-row rules: MAN-7847) and `Steps` (Verve's navigation stepper) joined for the Cerberus tab: `CheckSheet`, Fleet's "What happened" and History's feed, the Enroll dialog. `TextArea` joined for the roadmap's goal field; the Mute dialog's reason takes it too.
+- `Steps`, not `Stepper`: `Stepper` is the house's numeric minus/plus control and has its own consumers, and Verve's bundle gives its navigation component the same name. `Steps` shows where a flow stands: numbered rounds, a ✓ once done, an accent rail between; a step is not pressable.
+- `TextArea` wears `Input`'s `.vv-input` paint (`controls.css`) and adds only its geometry in `panels.css`.
+- `DockableFab`, `SplitPane` and `ResizeGrip` were admitted on the barrel's *mechanism* test, not its two-module rule (`index.ts`'s own header). `ResizeGrip`'s one consumer is `ChatHostPanel`.
+- `ConfirmDialog` was admitted on the two-module rule and paints nothing of its own: it is `Dialog` and `Button`, both already painted. It is not in the table.
+
 What they share is the contract every later one joins:
 
 1. **A component is a flat file in `src/shared/ui/`.** `verve/` holds stylesheets and nothing
    else: no component, no module, no `verve/components/` to grow into.
 2. **Paint is a `.vv-*` rule; the component carries layout.** Colour, border, shadow and radius
-   live in `controls.css` as `.vv-<name>` / `.vv-<name>--<variant>`; the `className` spells only
-   size and flow (`inline-flex`, `h-10 px-4`). A colour utility inside a library file is a second
-   paint mechanism, and the harness greps every file it has restyled for one. The ban is on the
-   library file, not the call site: a caller's own `className` still wins over `.vv-*`, by design — except `TextArea`'s colours (rule 6). One library file does spell a colour name: `Timeline`'s
-dot is `data-tone` + `bg-tone-dot`, the tone swap's own dot, which is what keeps it and a status mark
-drawn the same way elsewhere from drifting (`panels.css`'s header).
+   live in the piece's own sheet (rule 6) as `.vv-<name>` / `.vv-<name>--<variant>`; the `className`
+   spells only size and flow (`inline-flex`, `h-10 px-4`). A colour utility inside a library file is a
+   second paint mechanism, and the harness greps every file it has restyled for one. The ban is on
+   the library file, not the call site: a caller's own `className` still wins over `.vv-*`, by
+   design — except `TextArea`'s colours (rule 6). `panels.css` holds two departures, each named in its
+   header: `.vv-textarea` invents no paint, it is `Input`'s `.vv-input`; and `.vv-timeline__dot`
+   carries no colour, because `Timeline`'s dot is `data-tone` + `bg-tone-dot`, the tone swap's own dot,
+   so a timeline dot and a status mark drawn the same way elsewhere cannot drift.
 3. **Marker classes are surface, not decoration.** `vv-button--<variant>`, `vv-badge--<variant>`
    and `data-tone` are what a verify script queries to prove a variant painted; rename one and a
    gate that never reads your source goes quiet. A variant emitting no marker is unprovable.
@@ -129,30 +142,31 @@ drawn the same way elsewhere from drifting (`panels.css`'s header).
 5. **Props come from a site you can point at** — the integration plan's §4 table
    (`~/.claude/plans/cloudcli-verve-integration.md`), or a real call. A prop nobody passes is a
    prop nobody proves: `Card`'s `interactive` has no consumer today.
-6. **`controls.css` is 440 lines — past its stated ceiling — and `feedback.css` 386, at its.**
-   Phase 3's paint went into `feedback.css` beside `controls.css`; the board's paint went into a
-   THIRD file, `board.css` — the `.vv-lane`, `.vv-lane__head` and `.vv-lane-card` rules and their
-   variants; and the application switcher's kit scaffold opened a FOURTH,
-   [`surfaces.css`](surfaces.css) — DockableFab's, SplitPane's and ResizeGrip's own paint, plus the
-   `body.vv-dragging` / `vv-drag-fab` / `vv-drag-split` / `vv-drag-resize` classes a drag of any
-   one sets for its length (why a new file rather than a squeeze is that stylesheet's own header); and
-   `TextArea` opened a FIFTH, [`panels.css`](panels.css) — its line height, floor and handle, and the
-   rules that say `.vv-input`'s colours and ground back over `src/index.css`'s `!important` pins on every bare
-   `textarea` (the piece's own header says why): every rule there that must beat `index.css` sits at three
-   class-level parts (`.vv-input.vv-textarea.vv-textarea`), so a new one needs the same height, and a
-   caller's `text-*` class loses to a TextArea's colours — only its ground defers to `bg-transparent`.
-   `Sheet`, `Timeline` and `Steps` joined it there, sharing no selector with any other sheet; the header of
-   `panels.css` names the two departures from rule 2 the file holds. Each is imported
-   from the barrel exactly as the ones before it, and the order is load-bearing at both ends:
-   `surfaces.css` and `panels.css` share no selector with their neighbours (`panels.css` wins its ties
-   by specificity, never by order), so they only have to land before
-   `board.css`, which stays LAST because a lane card composes `.vv-card`'s ground and overrides
-   its background, shadow and transition, and at equal specificity the LATER rule wins, so imported
-   any earlier `board.css` would lose all three to `.vv-card`. A stylesheet at its ceiling opens a new file rather than winning lines back by
-   squeezing what's there; the next one will too.
+6. **A stylesheet at its ceiling opens a new file; it never wins lines back by squeezing what is
+   there.** The barrel imports five sheets, in this order (lines measured 2026-10-06):
+
+   | import | sheet | opened | lines | also holds |
+   |---|---|---|---|---|
+   | 1 | `controls.css` | 1st | 493 | past its stated ceiling (the headers of `surfaces.css` and `panels.css` say so) |
+   | 2 | `feedback.css` | 2nd | 438 | — |
+   | 3 | [`surfaces.css`](surfaces.css) | 4th | 367 | the `body.vv-dragging` / `vv-drag-fab` / `vv-drag-split` / `vv-drag-resize` classes a drag of any piece sets for its length (why a new file: that sheet's own header) |
+   | 4 | [`panels.css`](panels.css) | 5th | 220 | `.vv-input`'s colours and ground said back over `src/index.css`'s `!important` pins on every bare `textarea` (the piece's own header says why) |
+   | 5 | `board.css` | 3rd | 227 | the `.vv-lane`, `.vv-lane__head` and `.vv-lane-card` rules and their variants |
+
+   `panels.css` is the fifth sheet opened and the fourth imported. The order is load-bearing at one end:
+   - `board.css` stays LAST. A lane card composes `.vv-card`'s ground and overrides its background,
+     shadow and transition, and at equal specificity the LATER rule wins, so imported any earlier
+     `board.css` would lose all three to `.vv-card`.
+   - `surfaces.css` and `panels.css` share no selector with their neighbours, so they only have to
+     land before `board.css`. `panels.css` wins every tie it has by specificity, never by order.
+   - A rule in `panels.css` that must beat `index.css`'s pins sits at three class-level parts
+     (`.vv-input.vv-textarea.vv-textarea`); a new one needs the same height. A caller's `text-*` class
+     loses to a TextArea's colours; only its ground defers to `bg-transparent`.
 
 Which components exist at all, and when a screen composes instead of asking for a new one, is
 doctrine §1–§3. Read it there, not here.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Sheet.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Steps.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/TextArea.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Timeline.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/verve/panels.css
 
 ## MAN-741 — The overlay half
 section: README/003 The overlay half

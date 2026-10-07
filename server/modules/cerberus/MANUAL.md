@@ -99,19 +99,25 @@ Each result is judged against `lastStored[node/key]`: that check's last stored r
 | memory | moves when | read as |
 |---|---|---|
 | `lastStored` | a row is stored | the rule's comparison |
-| `lastReceivedAt` | EVERY accepted result, stored or not; never lowered | `liveLastAt` of the freshness rule; null after a boot until a result arrives |
+| `lastReceivedAt` | EVERY accepted result, stored or not; never lowered. Seeded at boot (Boot vouch, below) | `liveLastAt` of the freshness rule; after a boot null until a result arrives, except for a check seeded at boot |
 | `since` | a stored row's status differs from its `prev_status`, or there was no `lastStored`; seeded from `latestPerCheck()` | a check view's `since`; the order of "Needs you" |
 
 Memory moves only after the frame's transaction commits.
+
+## Boot vouch — `boot-vouch.ts`, called by `ingest.seedMemory()`
+- when: `seedMemory()` runs once per process, from whichever comes first — the module's `start()` or the first read (`readInputs()` in `cerberus.module.ts`). A handover's new process signals ready and starts answering about 1–3 s before `start()` runs (the sessions watcher, the dispatcher and the roadmap start first), and a seed that waited for `start()` left that stretch unseeded: measured 2026-10-06, a read at handover + 3.3 s still showed 64 of 81 checks `unknown` with the vouch in place.
+- why: `lastReceivedAt` is per process, so a handover (every save under `server/`) or a restart empties it, and the freshness rule falls back to the check's last STORED row — which on a quiet check is up to five minutes old, older than `staleAfter`. Before this, a handover blanked the board: measured 2026-10-06 after `touch server/index.ts`, 67 of eis1's 81 checks read `unknown` for 24–40 s, and a lookup at a moment inside the handover answered `stale` for every check that had no result in flight.
+- what: at boot a check gets `lastReceivedAt = max(boot, its newest row's at)` when (1) its node's `nodes.last_heartbeat_at` is within 120 s of the boot (the store writes it once a minute, a heartbeat comes every 15 s), (2) its newest stored row is at most `KEEPALIVE_AFTER_MS + staleAfter` older than that heard time (a reporting check stores a keep-alive every five quiet minutes, so an older newest row means it had stopped before the restart), and (3) the check is still active (a retired check's rows are history). The hub has no node row and is not seeded: its own self-checks report right after the duties arm.
+- bound: the vouch lapses `staleAfter` after the boot, exactly as a result received at the boot would, and the first real result replaces it. A probe that died in the five minutes before a handover reads fresh for at most its own `staleAfter` after it, then `stale`; a lookup of a moment between that death and the boot answers `result` too, for as long as this process lives or until the check's next stored row arrives (its `prev_at` then shows the lapse) — the store holds one row per five quiet minutes, so a dead quiet check cannot be told from a live one. A center that was down more than two minutes seeds nothing.
 
 ## Retention — `store-prune.service.ts`
 - Once a day, first run 60 s after the duties arm; started by `soleDuties()`, so only the process holding the takeover prunes.
 - Deletes `keepalive` rows with `at < now − 90 days` (`cerberusResultsDb.pruneKeepalivesBefore`, the only delete on `results`) and enrollment tokens with `issued_at < now − 30 days`, spent or not.
 - `change` rows are never deleted. why: they are the record of every status a past moment can be read from (`rowsInWindow` needs the last row before any window), and "What happened" is built on them. A keep-alive is a copy written to say "still the same". Retention per `design/cerberus/Cerberus Spec.dc.html` Table 4: results "Changes forever · keep-alives 90 days".
-- Volume: about 3.7 million `change` rows a year for one node on the real health document (earlier estimate, not re-measured): a value that carries a changing number is a change at every new value.
+- Volume, measured 2026-10-06 on eis1 (the first real node: 7 probes, the 74-component shadow-connector document): about 1 100 `change` and 660 `keepalive` rows an hour (1 759 rows, ≈ 760 KB, in the hour to 14:56 PDT), so ≈ 26 000 `change` rows a day (≈ 9.6 million a year at ≈ 430 bytes each, never pruned) and ≈ 16 000 `keepalive` rows a day (pruned at 90 days) — about 18 MB a day for this one node. A value that carries a changing number is a change at every new value, and two sources do it: the warden's own sentences with a timing (`HTTP 200 in 84 ms`, `Answered in 6 ms`, `Read 74 components in 3.2 s` — `cloudcli/http.ok`, `docstore/db.connect`, `shadow-connector/health` change on nearly every read), and — the larger share — components whose `reason` carries a counter or an age (`abatement_mail_sweep`, `edge_origin_census`, `drybook_readings_sweep`, `scope_checklist_engine`, `servpro_kpm_reference`, `system_resources`: 83–112 an hour each, all `change` rows, in the hour to 15:20 PDT). Each node added multiplies it. The rule above stays as written; whether a moved value alone should stay a `change` is an open decision.
 - 2026-10-06, live store: `center` held 56 rows, 17 `change` and 39 `keepalive`.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/ingest.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/store-prune.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/cerberus-results.db.ts
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/boot-vouch.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/ingest.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/store-prune.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/cerberus-results.db.ts
 
 ## MAN-7802 — The REST surface at `/api/cerberus` — thirteen routes, their error codes, mutes, enrollment minting, and the `cerberus_changed` hint
 
@@ -140,7 +146,7 @@ What a browser (or a probe) calls. Mounted in `server/index.ts`: `app.use('/api/
 |---|---|---|
 | `GET /overview` | `CerberusOverview` | |
 | `GET /checks` | `CerberusCheckIndexEntry[]` | |
-| `GET /checks/:node/:service/:check?lookup=<ms>&end=<ms>` | `CerberusCheckDetail`; `end` (default now, clamped to now) is where the 60 cells and `recent` stand, `lookup` defaults to `end` | 400 `CERBERUS_BAD_REQUEST` (a query number not whole digits); 404 `CERBERUS_UNKNOWN_CHECK` |
+| `GET /checks/:node/:service/:check?lookup=<ms>&end=<ms>` | `CerberusCheckDetail`; `end` (default now, clamped to now) is where the 60 cells and `recent` stand (`recent` = the newest 100 change rows of the 3 h before `end`, `RECENT_LIMIT`), `lookup` defaults to `end` | 400 `CERBERUS_BAD_REQUEST` (a query number not whole digits); 404 `CERBERUS_UNKNOWN_CHECK` |
 | `GET /lookup?node&key&at` | `CerberusLookup` | 400 `CERBERUS_BAD_REQUEST` (any of the three missing, `at` not whole digits); 404 `CERBERUS_UNKNOWN_CHECK` |
 | `GET /activity?before&limit` | `CerberusActivity[]`; `limit` default 40, capped at 100; `before` default now + 1 | 400 `CERBERUS_BAD_REQUEST` |
 | `POST /mutes {node,key,until,reason?}` | `CerberusMute` | 404 `CERBERUS_UNKNOWN_CHECK`; 400 `CERBERUS_BAD_MUTE` (`until` not whole ms, not in `(now, now + 24 h]`, reason over 500 characters); 400 `CERBERUS_BAD_REQUEST` (shapes) |
@@ -280,7 +286,7 @@ The Cerberus module as a running API process sees it: what `server/index.ts` cal
 ## Who runs what
 | work | every process | only the takeover holder |
 |---|---|---|
-| `start()`: open the store (migrations run), `loadCenterKey()`, `seedHub()`, `wardenLinks.seedFromStore()`, `ingest.seedMemory()`, then bind the gateway | yes | |
+| `start()`: open the store (migrations run), `loadCenterKey()`, `seedHub()`, `wardenLinks.seedFromStore()`, `ingest.seedMemory()` (once per process: the first read through `readInputs()` runs it too, whichever comes first — a handover's new process answers requests a couple of seconds before `start()`), then bind the gateway | yes | |
 | the `/api/cerberus` router: every read and write route | yes | |
 | ingest of a warden's results | the process that holds the warden's link | |
 | `stop()`: stop the self-checks and the prune, stop the gateway accepting (open links end with the process) | yes | |
@@ -512,7 +518,7 @@ Both files are siblings of the over-ceiling `types.ts`, the `kanban-types.ts` pa
 | `CerberusNodeView.lastHeardAt` | last frame of any kind; falls back to the node row's stored last heartbeat when nothing was heard since boot. `silentSince` = that + 90 000 while silent, else null |
 | `CerberusLinkState.lastHeardAt` | null until a frame is heard since boot; `silentSince` null with it. The read model fills the node's `lastHeardAt` from `nodes.last_heartbeat_at` |
 | `CerberusLookup.verdict` | `result` (fresh then; no row need exist at that very moment), `stale` (past what the rows vouch for, or on or after a current silence's start), `too_early` (no row at or before it), `future` |
-| freshness rule | between two stored rows: fresh while moment ≤ (next row's `prevAt`, else the earlier row's `at`) + `staleAfter`; past the latest row: fresh while ≤ (center's in-memory last-received time for the check (`CerberusCheckMemory.lastReceivedAt`), else the row's `at`) + `staleAfter`. A stored row's own age proves nothing. Implemented in MAN-7808 |
+| freshness rule | between two stored rows: fresh while moment ≤ (next row's `prevAt`, else the earlier row's `at`) + `staleAfter`; past the latest row: fresh while ≤ (center's in-memory last-received time for the check (`CerberusCheckMemory.lastReceivedAt`), else the row's `at`) + `staleAfter`; a boot seeds that memory with its own moment for each check that was reporting just before it (MAN-7801, Boot vouch). A stored row's own age proves nothing. Implemented in MAN-7808 |
 | `CerberusStoredStatus` | only `status` is limited to its four words; a null status is stored null; only `prev_status` spells it `not_enabled` |
 | `CerberusProbeSpec` at rest | `probes` row holds the kind's fields as JSON, `every`, `timeout`, `cadence`; the `checks` row holds `pass`, `warn`, `staleAfter`; a `checks.set` joins the two |
 | `CerberusNodeCert.sig` | ed25519 over the UTF-8 bytes of `cerberus-cert\n<node>\n<fingerprint>\n<issuedAt>` (`issuedAt` decimal ms); `centerKey` is not in the text. `issueCert` (MAN-7800) signs these bytes and the warden's verification must use exactly them; change the comment first if the layout changes. The cert rides the enrollment `welcome` AND every connect `welcome` (same bytes each time); a warden that holds one ignores a repeat |
@@ -564,7 +570,7 @@ Rows are ONE check's, oldest first, as `rowsInWindow` returns them (last row bef
 | moment `x` | rule |
 |---|---|
 | row `r` at or before `x`, next row `n` exists | fresh while `x <= (n.prev_at ?? r.at) + staleAfterMs`; null `prev_at` ⇒ only `r.at` vouches |
-| `r` is the last row | fresh while `x <= (liveLastAt ?? r.at) + staleAfterMs`; `liveLastAt` = `inputs.memory(node, key).lastReceivedAt` |
+| `r` is the last row | fresh while `x <= (liveLastAt ?? r.at) + staleAfterMs`; `liveLastAt` = `inputs.memory(node, key).lastReceivedAt`, which a boot seeds with its own moment for a check that was reporting just before it (MAN-7801, Boot vouch) |
 | no row at or before `x` | `too_early` |
 | `x > now` | `future`; rows not read |
 | not fresh | `stale`; the status shown is `unknown`, never the old word |
@@ -572,7 +578,7 @@ Rows are ONE check's, oldest first, as `rowsInWindow` returns them (last row bef
 - `windowStatus` = `worst` of: status at `a`; every row with `a < at < b`; `unknown` if any lapse overlaps the window; status at `b - 1`.
 - A lapse is `(freshUntil, next.at)`, open-ended after the last row.
 - `b <= a` reads as the single moment `a`. A window ends at or before `now`; the caller clips.
-- Staleness (`stale_after`) resolves ONCE, in `cerberusDefinitionsDb.activeChecks` (`STALE_AFTER_SQL`, MAN-7806): the check's own `stale_after` override, else 3 × the probe's `cadence ?? every`, in seconds, as `stale_after_s`. The read model only reads `stale_after_s` (`staleAfterSecondsOf`), else 300 s when the probe row is gone. Ingest mirrors the rule only for a component with no check row yet.
+- Staleness (`stale_after`) resolves ONCE, in `cerberusDefinitionsDb.activeChecks` (`STALE_AFTER_SQL`, MAN-7806): the check's own `stale_after` override, else 3 × the probe's `cadence ?? every`, in seconds, as `stale_after_s`. The read model only reads `stale_after_s` (`staleAfterSecondsOf`), else 300 s when the probe row is gone; `boot-vouch.ts` (MAN-7801) reads it the same way. Ingest mirrors the rule only for a component with no check row yet.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/read-model/activity.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/read-model/cells.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/read-model/check-detail.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/read-model/check-views.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/read-model/freshness.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/read-model/lookup.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/read-model/node-links.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/read-model/overlays.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/read-model/overview.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/read-model/series.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/read-model/status-rules.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-cerberus-read-model.mjs
 
@@ -693,10 +699,10 @@ A warden whose clock runs more than 5 minutes fast has all its results refused (
 A probe's own check must report `source` = its key: center's self-checks send `source = key`; any other source is refused.
 
 Outputs after the commit: `hintChanged` for the stored `change` keys and the discovered keys; `onChange` listeners get one call per frame, `{ node, changed: CerberusStatusChange[] }` (`from` null at first sight), a throwing listener is logged and skipped.
-`seedMemory()` fills `lastStored` and `since` from `latestPerCheck()`; `memory(node, key)` → `CerberusCheckMemory`.
+`seedMemory()` (once per process: `start()` or the first read, whichever comes first) fills `lastStored` and `since` from `latestPerCheck()` and `lastReceivedAt` for each check that was reporting just before the boot (`boot-vouch.ts`, MAN-7801); `memory(node, key)` → `CerberusCheckMemory`.
 
 ## Open
-- `ingest.service.ts` is 299 of 300 lines: growth means an extraction first (`storeFrame`'s judging).
+- `ingest.service.ts` is 314 lines, over the 300 cap: the next change to it starts with an extraction (`storeFrame`'s judging).
 - Ingest memory is per process: two processes ingesting one node during a handover drift apart.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/ingest.service.ts
@@ -803,7 +809,7 @@ Design: `design/cerberus/Cerberus Spec.dc.html`. Time is epoch milliseconds on e
 | identity and signing: center's key, connect signature, signed frames, node certificate, enrollment write | MAN-7800 | `center-key.ts`, `warden-enrollment.ts` |
 | the link registry `wardenLinks`: silence, handlers | MAN-7814 | `warden-links.ts` |
 | ingest: one transaction per frame, refusals | MAN-7811 | `ingest.service.ts` |
-| the storage rule: change or keep-alive, `prev_status`, `since`, retention | MAN-7801 | `ingest.service.ts`, `store-prune.service.ts` |
+| the storage rule: change or keep-alive, `prev_status`, `since`, the boot vouch, retention | MAN-7801 | `ingest.service.ts`, `boot-vouch.ts`, `store-prune.service.ts` |
 | definitions, `putDefinition`, `checks.set` | MAN-7812 | `definition-document.ts`, `definition-rows.ts`, `definitions.service.ts` |
 | labels, discovered components, `seedHub` | MAN-7813 | `definitions.service.ts` |
 | the read model: status words, freshness | MAN-7808 | `read-model/status-rules.ts`, `freshness.ts`, `series.ts` |
@@ -817,6 +823,8 @@ Design: `design/cerberus/Cerberus Spec.dc.html`. Time is epoch milliseconds on e
 | the whole system, once: enroll, link, ack on a scratch center; the hub through a live handover | MAN-7804 | `.verify/cerberus-whole.sh`, `.verify/cerberus-whole.mjs`, `.verify/cerberus-whole-live.mjs` |
 | the scratch probe server and its slots | MAN-673 (`cloudcli:docs`) | `scripts/sunset-probe.sh` |
 | the API process's second port | MAN-553 (`cloudcli:docs`) | `deploy/systemd/` |
+| the enroll script and warden release routes on the gateway | MAN-7826 | `warden-files.ts` |
+| the node-side agent, package `cloudcli:warden`: its map MAN-7839 (link MAN-7824, outbox MAN-7835, home MAN-7836, unit MAN-7837, the first node MAN-7838) | `cloudcli:warden` | `warden/` |
 
 ## Rules of the module
 - Other modules reach it only through `server/modules/cerberus/index.ts`: `createCerberusModule`, `wardenLinks`, `ingest`.

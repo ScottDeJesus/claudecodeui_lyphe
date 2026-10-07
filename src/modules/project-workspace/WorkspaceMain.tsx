@@ -15,6 +15,7 @@ import { MemoryIntakePanel } from '@/modules/memory-intake';
 import { RoadmapTab } from '@/modules/roadmap';
 import { HealPanel } from '@/modules/heal';
 import { ApiPanel } from '@/modules/api-tab';
+import { CerberusPanel } from '@/modules/cerberus';
 import { TaskMasterPanel, useTaskMasterProjectSync } from '@/modules/task-master';
 import { UniversePanel } from '@/modules/universe';
 import { SchedulesPanel } from '@/modules/schedules';
@@ -452,6 +453,14 @@ function WorkspaceMain({
           {activeTab === 'api' && (
             <div className="h-full overflow-hidden">
               <ApiPanel />
+            </div>
+          )}
+
+          {/* No gate either, for the same reason: the fleet's health is a fact about the house whichever
+              project is open, and a monitor that hid on a quiet day could never say "All quiet". */}
+          {activeTab === 'cerberus' && (
+            <div className="h-full overflow-hidden">
+              <CerberusPanel />
             </div>
           )}
 

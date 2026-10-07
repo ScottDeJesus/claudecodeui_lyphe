@@ -13,11 +13,11 @@ const PLAIN_STEPS: ReadonlySet<RoadmapFeatureStep> = new Set<RoadmapFeatureStep>
 
 /**
  * A feature's step in plain words: `being designed`, `waiting on you: Accept`, `waiting on The day
- * sheet`, `shipped Oct 3 · 3h 42m` (the time agents worked on it, once any did). Used by `FeatureRow`, which shows it beside the feature's step line and hands
- * it to `StateLine` for its label, by `FeatureFacts` (`FeatureDialog`'s body), under the large step
- * line, and by the tree's feature panel (`panel/FeaturePanel`), after the word in its State fact.
+ * sheet`, `shipped Oct 3 · 3h 42m` (the time agents worked on it, once any did). Used by `FeatureFacts`
+ * (`FeatureDialog`'s body), which hands it to `StateLine` for its label and shows it under the step line,
+ * and by the tree's feature panel (`panel/FeaturePanel`), after the word in its State fact.
  *
- * `building` names no count: the row's meter, right under it, carries "3 of 13 tasks", and the dialog's
+ * `building` names no count: the panel's Tasks fact, right under it, carries "3 of 13 done", and the dialog's
  * task list does. A `waiting` feature names the first feature it waits on that has not shipped, found
  * anywhere in the picture; one the picture cannot name — a feature under an epic no milestone holds is
  * in neither `roadmaps` nor `unplaced` — reads "waiting on another feature", never its slug. A step this

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 
 import { useHostWindow } from '@/shared/context/HostWindowContext';
 import { OWNS_ESCAPE } from '@/shared/ui/overlayEscape';
@@ -28,9 +28,10 @@ type SelectProps = {
 
 /**
  * A single-choice picker with a chevron trigger and an overlay list.
- * Used by settings (Phase 4) for the language, theme and provider choices and by the file
- * manager (Phase 8) for its sort order — the native `<select>` cannot be painted in Verve's
- * shape, so this is the one place the app spells a styled one.
+ * Used by settings (Phase 4) for the language, theme and provider choices, by the file
+ * manager (Phase 8) for its sort order, and by the cerberus module for History's check — the
+ * native `<select>` cannot be painted in Verve's shape, so this is the one place the app spells a
+ * styled one.
  *
  * An optional `action` draws ONE row under the list, behind a hairline and outside the listbox —
  * the kanban board switcher's "New board". It is a button and not an option, because choosing it
@@ -43,6 +44,9 @@ type SelectProps = {
  * unmounts under the focused option and focus would otherwise fall to <body>, sending the
  * reader back to the top of the page. An outside pointerdown does NOT take focus: the pointer
  * has already chosen where to go.
+ *
+ * A list that scrolls opens on its chosen row, centred, not at its top. History's picker of every
+ * Cerberus check holds dozens, and a list opened at its top hid the very choice being reconsidered.
  */
 export function Select({ options, value, onChange, placeholder = 'Choose…', ariaLabel, size = 'md', action }: SelectProps) {
   const hostWindow = useHostWindow();
@@ -51,6 +55,18 @@ export function Select({ options, value, onChange, placeholder = 'Choose…', ar
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
+  const listRef = useRef<HTMLUListElement>(null);
+
+  // Before the panel paints, its list scrolls to the chosen row. The list's own `scrollTop` is set
+  // rather than `scrollIntoView`, which would scroll the page under the panel as well. Both offsets are
+  // measured from the panel, the rows' positioned ancestor, so their difference is the row's place
+  // in the list. A list that does not scroll is untouched, and the browser clamps the ends.
+  useLayoutEffect(() => {
+    const list = listRef.current;
+    const chosen = list?.querySelector<HTMLElement>('[aria-selected="true"]');
+    if (!open || !list || !chosen) return;
+    list.scrollTop = chosen.offsetTop - list.offsetTop - (list.clientHeight - chosen.offsetHeight) / 2;
+  }, [open]);
 
   useEffect(() => {
     if (!open) return;
@@ -102,7 +118,7 @@ export function Select({ options, value, onChange, placeholder = 'Choose…', ar
         // is not a thing a listbox may contain. The list is what scrolls, so the action stays put
         // at the bottom of a panel of thirty boards instead of hiding under the thirtieth.
         <div className="vv-select__panel" {...OWNS_ESCAPE}>
-          <ul className="vv-select__list" role="listbox" aria-label={ariaLabel}>
+          <ul ref={listRef} className="vv-select__list" role="listbox" aria-label={ariaLabel}>
             {options.map((option) => (
               <li
                 key={option.value}

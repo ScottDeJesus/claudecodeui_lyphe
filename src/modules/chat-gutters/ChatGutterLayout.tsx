@@ -302,7 +302,7 @@ export function ChatGutterLayout({
       countTone: roadmapWaiting > 0 ? 'warn' : undefined,
       icon: RouteIcon,
       Body: RoadmapWidgetBody,
-      // At full screen the widget is the Roadmap tab itself — both faces — where a column holds the digest.
+      // At full screen the widget is the Roadmap tab itself — both faces; in a column it is the roadmap face alone, in its column fit.
       FullscreenBody: RoadmapWidgetFullscreenBody,
       // A body that scrolls its own content and carries its own celebrations box: the card gives it its
       // whole inside, with no padding and no scroll area of its own (as the Embed widget's is).

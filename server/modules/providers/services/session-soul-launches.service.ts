@@ -1,6 +1,7 @@
 import { readdir, readFile } from 'node:fs/promises';
 import path from 'node:path';
 
+import { isDispatcherWork, readDispatcherChainLaunchIds } from '@/modules/dispatch-souls/index.js';
 import type { NormalizedMessage } from '@/shared/types.js';
 import { dispatchSoulsStateDir } from '@/shared/utils.js';
 
@@ -111,13 +112,31 @@ export function collectSessionSoulLaunches(messages: NormalizedMessage[]): strin
 const MAX_SPECS_READ = 200;
 
 /**
+ * How far before a launch's own start a chain directory may have been written and still be asked
+ * about: a minute, for the gap between the walker minting a launch and saving the chain record that
+ * names it. The chain's directory is rewritten after the launch it lists, so it is never OLDER than
+ * that launch — the minute is slack against a clock read in two processes, not a measured gap.
+ */
+const CHAIN_WINDOW_SLACK_MS = 60_000;
+
+/**
  * The launches whose `spec.json` names this conversation as the caller (`launched_by`, stamped by
- * the launcher from its own environment), oldest first.
+ * the launcher from its own environment), oldest first — LEAVING OUT the dispatcher's own work.
  *
  * The receipt rule above cannot see a launch made through a wrapper script: the Bash command is
  * the wrapper's name, so its receipt fails the ownership test and the soul is never pinned. The
  * stamp is ownership recorded at the door itself, by the process that minted the id — it holds
  * however the launcher was called, and a transcript that merely quotes an id cannot forge it.
+ *
+ * THE STAMP IS NOT OWNERSHIP OF AN EPIC'S SOULS, though, and this is where it stops being read as
+ * such. The dispatcher launches a plan's builders and reviewers and its planners under the session
+ * the epic was started from (`phase_chain.launch_env`, `planners.launch_env`), so that chat carries
+ * the same stamp on every one of them for the epic's whole life — a list of agents it never ran, and
+ * not the chat's to show: the epic and feature cards show them, with their task. `isDispatcherWork`
+ * is the dispatcher's own answer to which launches those are (the mark on `spec.json`, or the
+ * dispatcher's records for a launch that predates it), asked BEFORE the cap on how many
+ * are returned, so an epic's launches cannot push the chat's own out of it. A soul the chat launched by hand carries neither
+ * and stays.
  */
 export async function collectStampedSoulLaunches(providerSessionId: string | null | undefined): Promise<string[]> {
   if (!providerSessionId) {
@@ -133,17 +152,32 @@ export async function collectStampedSoulLaunches(providerSessionId: string | nul
   // `dispatch-<agent>-<YYYYMMDD>-<HHMMSS>-<hex>`: the stamp after the agent orders them.
   const stampOf = (name: string): string => name.match(/-(\d{8}-\d{6})-/)?.[1] ?? '';
   names.sort((a, b) => stampOf(a).localeCompare(stampOf(b)));
-  const owned: string[] = [];
+  const stamped: Array<{ id: string; spec: unknown }> = [];
   await Promise.all(names.slice(-MAX_SPECS_READ).map(async (name) => {
     try {
       const spec = JSON.parse(await readFile(path.join(root, name, 'spec.json'), 'utf8'));
       if (spec?.launched_by === providerSessionId && typeof spec.id === 'string') {
-        owned.push(spec.id);
+        stamped.push({ id: spec.id, spec });
       }
     } catch {
       // A dir mid-creation or a torn spec is a launch not yet pinned, never an error.
     }
   }));
+  if (stamped.length === 0) {
+    return [];
+  }
+
+  // The chain index is read once, back to the oldest launch the stamp named — a chat with no
+  // stamped launch never reads a chain.
+  const oldestStartMs = Math.min(...stamped.map(({ spec }) => {
+    const startedAt = (spec as { started_at?: unknown }).started_at;
+    return typeof startedAt === 'number' && Number.isFinite(startedAt) ? startedAt * 1000 : 0;
+  }));
+  const dispatcherChainLaunchIds = readDispatcherChainLaunchIds(root, oldestStartMs - CHAIN_WINDOW_SLACK_MS);
+
+  const owned = stamped
+    .filter(({ id, spec }) => !isDispatcherWork(id, spec, dispatcherChainLaunchIds))
+    .map(({ id }) => id);
   owned.sort((a, b) => stampOf(a).localeCompare(stampOf(b)));
   return owned.slice(-MAX_LAUNCHES);
 }

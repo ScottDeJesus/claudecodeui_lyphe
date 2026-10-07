@@ -1,7 +1,9 @@
+import { useContext } from 'react';
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { caseMark } from '@/modules/roadmap/caseMark';
+import { RoadmapFaceContext } from '@/modules/roadmap/faceContext';
 import { useStepPhrase } from '@/modules/roadmap/hooks/useStepPhrase';
 import { PanelDot, PanelHead } from '@/modules/roadmap/panel/PanelRows';
 import { ROADMAP_FEATURE_WORD_KEYS } from '@/shared/constants';
@@ -19,6 +21,8 @@ type FeaturePanelProps = {
   n: number;
   /** Its dot's state, the tree's own (`TreeLayout.dots`): the State fact wears it, and it alone says blocked. */
   dot: RoadmapDotState;
+  /** The open panel's heading id (`TreePanel`'s): the panel's frame is named by it, and Open is described by it, so a screen reader says which feature it opens. */
+  headingId: string;
 };
 
 /** One fact: its name in the muted ink, what it says beside it, over a top hairline. */
@@ -43,16 +47,17 @@ function Fact({ label, children }: { label: string; children: ReactNode }) {
  *
  * Used by the roadmap module's panel, `panel/TreePanel`, for a feature's selection.
  */
-export function FeaturePanel({ feature, epic, milestone, n, dot }: FeaturePanelProps) {
+export function FeaturePanel({ feature, epic, milestone, n, dot, headingId }: FeaturePanelProps) {
   const { t } = useTranslation();
-  // FILL: openDialog — the face's dialog opener (`RoadmapFaceContext`), which Open opens the feature's dialog through.
+  // The face's dialog opener, which Open opens the feature's dialog through.
+  const { openDialog } = useContext(RoadmapFaceContext);
   const phrase = useStepPhrase(feature);
 
   const owed = feature.waiting_on_you;
   const blocked = dot === 'blocked' ? feature.blocked ?? epic.blocked ?? milestone.blocked : null;
   const word = t(ROADMAP_FEATURE_WORD_KEYS[feature.word]);
   const done = feature.tasks.filter((task) => task.status === 'done').length;
-  // The cases' one phrase (FeatureRow's rule): the key is the FULL locale key, `count` the number it is said with.
+  // The cases' one phrase (`caseMark`'s): the key is the FULL locale key, `count` the number it is said with.
   const mark = caseMark(feature.cases);
   const casePhrase = mark === null ? null : t(mark.key, {
     count: mark.count,
@@ -64,6 +69,7 @@ export function FeaturePanel({ feature, epic, milestone, n, dot }: FeaturePanelP
   return (
     <>
       <PanelHead
+        id={headingId}
         title={feature.title}
         sub={t('roadmap.panel.featureLine', { epic: epic.title, n })}
         action={(
@@ -71,8 +77,8 @@ export function FeaturePanel({ feature, epic, milestone, n, dot }: FeaturePanelP
             variant="outline"
             size="sm"
             data-roadmap-panel-open
-            // FILL: openDialog feature — openDialog({ dialog: 'feature', name: feature.name }).
-            onClick={() => {}}
+            aria-describedby={headingId}
+            onClick={() => openDialog({ dialog: 'feature', name: feature.name })}
           >
             {t('roadmap.panel.open')}
           </Button>

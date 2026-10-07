@@ -1,6 +1,8 @@
 // `run`: the daemon `cerberus-warden.service` keeps alive. It owns no behaviour of its own — it plugs
 // the outbox, the link and the scheduler together, keeps `run.json` current, and ends on a signal.
 //
+//   CHAIN        `chain.mjs` keeps each check's `prevAt` across restarts (what center acked, saved on acks and at a
+//                clean stop), so a restart does not blank the minutes before it for a quiet check.
 //   COMPOSITION  the link asks the scheduler what to put in `hello` and every heartbeat (`state()`), and the
 //                scheduler sends and receives through the link (`checks.set` in, `result` out). Every later plan's
 //                frame joins the same way: a `link.on(type, fn)` registered here, before the link starts, and a
@@ -11,6 +13,7 @@
 //                at stop too. A write that fails is one log line, never the end of the daemon.
 //   LOG          the link says its own changes (`linked to …`, `link lost — retrying in 1 s`); this file adds
 //                one line at start and one at stop.
+import { createChain } from './chain.mjs';
 import { takeHomeLock } from './home-lock.mjs';
 import { createLink } from './link.mjs';
 import { log } from './log.mjs';
@@ -78,7 +81,9 @@ export async function runDaemon() {
     }
   };
   const link = createLink({ identity, home, outbox, state, onReport: report });
-  const probes = createProbes({ link });
+  const chain = createChain({ home, outbox });
+  const probes = createProbes({ link, previousAt: chain.previousAt });
+  link.on('ack', chain.noteAck);
   // After `createProbes`: handlers of one frame run in registration order, so the scheduler has applied
   // the checks a `welcome` or a `checks.set` carries by the time the record is written.
   link.on('welcome', report);
@@ -96,6 +101,7 @@ export async function runDaemon() {
       log(`${signal} received; stopping`);
       probes.stop(); // flushes the batch while the link is still up
       link.stop();
+      chain.save(); // what the outbox still holds is not acked, so the saved chain stops short of it
       report();
       setTimeout(() => resolve(0), SHUTDOWN_GRACE_MS);
     };

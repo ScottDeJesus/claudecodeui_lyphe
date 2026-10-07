@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 
 import { CerberusContext, type CerberusValue } from '@/modules/cerberus/context/CerberusContext';
 import { hm } from '@/modules/cerberus/utils/cerberusTime';
-import { api, refusalSentence } from '@/shared/api';
+import { api, refusalSentence, REQUEST_TIMEOUT_MS } from '@/shared/api';
 import type { CerberusOverview } from '@/shared/cerberus-types';
 import { useToast } from '@/shared/context/ToastContext';
 import { useWebSocket } from '@/shared/context/WebSocketContext';
@@ -22,6 +22,15 @@ const FRAME_READ_GAP_MS = 1_000;
  * stale without a single row being written for center to hint about.
  */
 const CLOCK_READ_MS = 30_000;
+
+/**
+ * How long the overview held may go unanswered before a FAILED read calls it stale: three clock reads.
+ * One dropped poll is noise; three in a row is a monitor that cannot see, and must stop looking live.
+ * Every read here carries a 30 s deadline of its own (an abort timer in `refresh`, not the api layer's
+ * `AbortSignal.timeout`, which older WebKit lacks), so one left hanging fails, and is judged, rather than
+ * keeping the picture "fresh" forever.
+ */
+const STALE_AFTER_MS = 3 * CLOCK_READ_MS;
 
 /**
  * The label a check goes by on screen — its plain name, or its key when it has none — read off the
@@ -88,6 +97,16 @@ export function CerberusProvider({ children }: { children: ReactNode }) {
   // one keeps the fleet on screen, so this never turns true over one.
   const [unreachable, setUnreachable] = useState(false);
 
+  // True once a read fails while the overview held was answered over STALE_AFTER_MS before. Essential:
+  // it is what stops the header's pill saying Live and puts the "last answer" banner over a fleet that
+  // may no longer be true. Set only by a failed read and cleared only by a good answer, so it never
+  // needs a timer of its own.
+  const [stale, setStale] = useState(false);
+
+  // When the overview held was last answered (epoch ms), 0 before any answer. A ref beside the state:
+  // a failed read judges against it, and a read that never changes the picture must not re-render.
+  const lastAnswerAtRef = useRef(0);
+
   // Mount flag: a read or a write that lands after this provider is gone must not set state or
   // raise a toast about a fleet nobody is looking at any more.
   const mountedRef = useRef(true);
@@ -117,8 +136,10 @@ export function CerberusProvider({ children }: { children: ReactNode }) {
   const apply = useCallback((next: CerberusOverview) => {
     if (!mountedRef.current) return;
     overviewRef.current = next;
+    lastAnswerAtRef.current = Date.now();
     setOverview(next);
     setUnreachable(false);
+    setStale(false);
   }, []);
 
   /**
@@ -129,23 +150,33 @@ export function CerberusProvider({ children }: { children: ReactNode }) {
   const refresh = useCallback(async () => {
     const ticket = ++newestReadRef.current;
     let answer: CerberusOverview | null = null;
+    // The read's own deadline, over the headers AND the body: a half-open connection never fails by
+    // itself, and `stale` is judged only at a failed read. The timer outlives `response.json()`.
+    const deadline = new AbortController();
+    const deadlineTimer = window.setTimeout(() => deadline.abort(), REQUEST_TIMEOUT_MS);
     try {
-      const response = await api.cerberus.overview();
+      const response = await api.cerberus.overview({ signal: deadline.signal });
       if (response.ok) {
         const body: unknown = await response.json();
         if (isOverview(body)) answer = body;
       }
     } catch {
-      // A throw here is this app's own network, or a body that is not JSON — the same "no answer"
-      // a refusal leaves behind.
+      // A throw here is this app's own network, the deadline above, or a body that is not JSON — the
+      // same "no answer" a refusal leaves behind.
+    } finally {
+      window.clearTimeout(deadlineTimer);
     }
     if (answer === null) {
       // A failure judges BEFORE the ticket mark and never moves it: it published nothing, so an
       // older read still in flight whose answer is good must still be allowed to land. The last
       // good reading is worth more than a box about this minute's network, so only a fleet that has
-      // never been answered says it could not be read — and that box is taken down by whichever
-      // good answer lands next. The next frame, the clock, or Try again reads again.
-      if (mountedRef.current && overviewRef.current === null) setUnreachable(true);
+      // never been answered says it could not be read, and one held for over STALE_AFTER_MS says it
+      // is the last answer — both taken down by whichever good answer lands next. The next frame,
+      // the clock, or Try again reads again.
+      if (mountedRef.current) {
+        if (overviewRef.current === null) setUnreachable(true);
+        else if (Date.now() - lastAnswerAtRef.current > STALE_AFTER_MS) setStale(true);
+      }
       return;
     }
     // A good reading, but not the newest one applied: something newer is already on screen, and the
@@ -273,15 +304,16 @@ export function CerberusProvider({ children }: { children: ReactNode }) {
   }, [refresh, subscribe]);
 
   // Anything that reads the fleet re-draws when a read lands. The four verbs keep one identity, so
-  // in practice only `overview` and `unreachable` ever make a new value here.
+  // in practice only `overview`, `unreachable` and `stale` ever make a new value here.
   const value = useMemo<CerberusValue>(() => ({
     overview,
     unreachable,
+    stale,
     refresh,
     mute,
     liftMute,
     setLabel,
-  }), [overview, unreachable, refresh, mute, liftMute, setLabel]);
+  }), [overview, unreachable, stale, refresh, mute, liftMute, setLabel]);
 
   return <CerberusContext.Provider value={value}>{children}</CerberusContext.Provider>;
 }

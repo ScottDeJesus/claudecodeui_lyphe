@@ -5,7 +5,11 @@ import type { TimelineEvent } from '@/shared/types';
 
 type TimelineProps = {
   events: TimelineEvent[];
-  /** `dense` is one line per row — no summary, the title cut with an ellipsis — for a card's margin. */
+  /**
+   * `dense` is one line per row — no summary, the title cut with an ellipsis — for a card's margin. On
+   * a row too narrow for the source and a readable title side by side, the title drops under the
+   * source in either density, still one line when dense.
+   */
   density?: 'full' | 'dense';
   /**
    * The open row's POSITION, when the caller owns it; `null` is "none open". Left out, the timeline
@@ -62,10 +66,15 @@ export function Timeline({ events, density = 'full', openIndex, onToggle }: Time
               onClick={() => toggle(index)}
             >
               <span data-tone={event.tone} className="vv-timeline__dot bg-tone-dot" aria-hidden />
-              <span className="vv-timeline__source">{event.source}</span>
-              <span className="min-w-0 flex-1">
-                <span className="vv-timeline__title block">{event.title}</span>
-                {!dense && event.summary ? <span className="vv-timeline__summary block">{event.summary}</span> : null}
+              {/* The source and the words share one line that wraps: a row with less than 10rem left
+                  for the words beside the pill drops them under it at the row's width. Side by side,
+                  a phone's row gave "Shadow connector" its pill and the title ~90px. */}
+              <span className="flex min-w-0 flex-1 flex-wrap items-start gap-x-2.5 gap-y-1">
+                <span className="vv-timeline__source max-w-full truncate">{event.source}</span>
+                <span className="min-w-0 flex-[1_1_10rem]">
+                  <span className="vv-timeline__title block">{event.title}</span>
+                  {!dense && event.summary ? <span className="vv-timeline__summary block">{event.summary}</span> : null}
+                </span>
               </span>
               <span className="vv-timeline__when">{event.when}</span>
               <span className="vv-timeline__chevron" aria-hidden>▼</span>
