@@ -49,6 +49,10 @@ import { wardenLinks } from './warden-links.js';
  * the start every process leaves a row, and a burst is rows less than 90 s apart, not a hole. A
  * process that dies uncleanly leaves no keepalive, and the gap reads as the gap it is.
  *
+ * A handover's retiring process ticks until it exits, so rows of `center` land after this process
+ * has seeded ingest's memory; `startSelfChecks` re-reads center's rows from the store (`reseedNode`)
+ * before the first tick, so that tick's `prev_status` and `since` are judged against what is stored.
+ *
  * `store.write` TRIES THE LOCK WITHOUT WAITING. The connection waits five seconds on a lock held
  * elsewhere, and it waits on the event loop's own thread — every route of the API would freeze for
  * those five seconds at every tick. A lock that is not free at once throws, the tick stores nothing,
@@ -159,6 +163,13 @@ function tick(getGateway: () => CerberusGatewayState): void {
  */
 export function startSelfChecks(getGateway: () => CerberusGatewayState): void {
   if (tickTimer) return;
+  // A handover's retiring process wrote center's rows until it exited, after this one had seeded: the
+  // first tick is judged against the store's own newest rows, not the seed's.
+  try {
+    ingest.reseedNode(HUB_NODE_ID);
+  } catch (error) {
+    console.error(`[Cerberus] could not re-read center's own checks before the self-checks: ${error instanceof Error ? error.message : String(error)}`);
+  }
   // The first tick is the start of the chain: it leaves a row even if this process is gone in seconds.
   tick(getGateway);
   tickTimer = setInterval(() => tick(getGateway), TICK_INTERVAL_MS);

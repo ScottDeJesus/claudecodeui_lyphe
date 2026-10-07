@@ -162,9 +162,12 @@ export function Tooltip({
     return () => hostDocument.removeEventListener('pointerdown', handlePointerDown, true);
   }, [isVisible, hostWindow]);
 
+  // A tooltip that goes away forgets where it stood, so the next one never flashes its old place before its own frame
+  // measures the new. A cleanup, which runs as `isVisible` changes, rather than a set in the body of the effect below.
+  useEffect(() => () => setTooltipStyle(null), [isVisible]);
+
   useEffect(() => {
     if (!isVisible) {
-      setTooltipStyle(null);
       return;
     }
 

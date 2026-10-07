@@ -2263,7 +2263,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/panel/EpicPa
 ## Traps
 | trap | do |
 |---|---|
-| the side-by-side or stacked choice is made per ROW from that row's pill width: one list can mix both | known; the cure is one decision per list, a container query on `.vv-timeline` in `panels.css`; changes Fleet's card too, so it needs its own review |
+| a rule that decides stacked or side by side per ROW, from that row's pill width | one list mixes both and its titles start in two places; keep the decision on the list: the `@container vv-timeline (min-width: 32rem)` rule on `.vv-timeline` in `panels.css`, which Fleet's card and History's feed share |
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Timeline.tsx
 
@@ -2315,7 +2315,7 @@ The fixes screen, the catalog and the auto-run rule shown end to end: a real Run
 - No guard for the 03:25–03:35 backup `flock` (`state/docstore/backup.lock`): a press then ends `failed` (MAN-7925).
 
 ## `cerberus-fixes-whole-scratch.sh`
-1. A held slot (a server answering, a port listening, `server.pid` or `probe.db` on file) exits 1 before anything is written.
+1. The slot is claimed by the harness's `probe_db` (`mkdir "<prefix>claim"`) before anything of it is written; a slot another probe holds is refused ("slot <N> is held by another probe") and the script exits 1, its trap leaving the holder alone.
 2. Boots the scratch center, enrolls a warden from this checkout with its own `CERBERUS_WARDEN_HOME` as a background job, sets a `file_age` probe `pass: "age < 1m"` every 10 s.
 3. Entry A touches the file (auto on, 1 run per 3 600 s, `recheck`). Entry B is on another check, auto off.
 4. Timeline until the check has moved into failing twice (counted from stored `change` rows) plus 25 s: A must have exactly one run.
@@ -2348,3 +2348,75 @@ The fixes screen, the catalog and the auto-run rule shown end to end: a real Run
 - The scratch script runs in a slot of its own (`SUNSET_SLOT`, default 4 here) and never opens `~/.cloudcli/cerberus.db` or binds 3012; the live script only reads that store (`sqlite3 -readonly`).
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/cerberus-fixes-refused-shot.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/cerberus-fixes-whole-live.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/cerberus-fixes-whole-scratch.sh
+
+## MAN-7956 — Node-updating probe — .verify/cerberus-node-updating.sh, .verify/lib/signed-hello.mjs
+
+Shows MAN-7933's two rules live: a node whose update is the active one takes no new work, and a `failed` hello heard after center ended the update `updated` turns it `rolled_back`. A scratch center, one scratch warden (`probe-node`) under its launcher, no real store.
+
+```
+bash .verify/cerberus-node-updating.sh        # repo root; slot 2 unless SUNSET_SLOT says otherwise; about 6 min
+```
+
+Slot claimed by `probe_db` (`scripts/sunset-probe.sh`); a slot another probe holds is refused and the trap leaves it alone. Opens no `~/.cloudcli/cerberus.db`, writes no `dist-warden/`, binds no 3012; releases N, N+1, N+2 are built through scratch copies of the tree (`.verify/lib/scratch-wardens.sh`).
+
+| Step | Shown |
+|---|---|
+| 1 | `probe-node` on N; checks `probe/file.age`, `probe/stale.age`; entry A (a 60 s fix on the first), entry B (auto, limit 1 an hour, on the second) |
+| 2 | A's run started, N+1 offered: the warden answers `waiting`, the update stays active until the fix ends. Meanwhile `POST /catalog/<A or B>/run` → 409 `CERBERUS_NODE_UPDATING`, no `runs` row; `POST /diagnoses` first step "probe-node's warden is updating: this diagnosis reads Cerberus history only"; the stale check moves into failing and no auto run starts, nothing logged "was not run on its own" |
+| 3 | update ended `updated`, launcher stopped, a hello signed with the warden's own key carrying `failed`: +5 s naming another release → left `updated`; +10 s naming N+1 → `rolled_back`, `ended_at` unchanged, one `failed` step "Rolled back to N · <reason>"; the same hello again adds no second step |
+| 4 | launcher started, N+2 offered with no fix running: ends `updated` at once; the stale check moving into failing starts B's one run of the hour (step 2 spent none); a `failed` hello 125 s after the end amends nothing |
+
+## `.verify/lib/signed-hello.mjs`
+```
+node .verify/lib/signed-hello.mjs <scratch warden home> <version the hello reports> <updateId> <failed version> <reason>
+```
+- Connects as a warden's link does (upgrade signed over `cerberus-connect\n<node>\n<at>` with `<home>/keys/node.key`), sends ONE hello whose `update` is `{ updateId, failed, reason }`, waits for `welcome`, hangs up.
+- Prints `welcomed`, else the reason and exit 1; exit 2 on bad usage or a home outside `/tmp` (it reads a private key; nothing of it is printed).
+- The warden of that home must NOT be running: a node holds one link and a second replaces the first. Stop its launcher first.
+- The hello lists no live run (`active.runs` empty): center's reconcile ends any live run of that node `failed`. Send it only when the node has no run going.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/cerberus-node-updating.sh, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/signed-hello.mjs
+
+## MAN-7957 — The Cerberus repositories — cerberusUpdatesDb.activeNode and rolledBackAfterUpdated
+
+Two verbs of `cerberusUpdatesDb` (`repositories/cerberus-updates.db.ts`) beside those of MAN-7806. Behaviour on top of them: MAN-7933.
+
+| Verb | Does |
+|---|---|
+| `activeNode()` | the `node` of the oldest live update (`ended_at IS NULL ORDER BY started_at, rowid LIMIT 1`, the order of `running()[0]`), else `null`. A node is "updating" from the moment its update is the active one until it ends; the update behind it in its batch is not, until its turn. Read from the store, never the driver's memory, so a handover's two processes agree. Consumers: `startRun` (409 `CERBERUS_NODE_UPDATING`), `auto-run.ts`, the diagnosis service's `openSession` |
+| `rolledBackAfterUpdated(id, at, text, since, note)` | the ONE amendment of an ended update; `true` when it did it. In ONE transaction (nested into the caller's): `UPDATE updates SET result = 'rolled_back', step = 'failed', note = @note WHERE id = @id AND result = 'updated' AND ended_at >= @since`; only when that changed the row, `INSERT INTO update_steps (…, 'failed', @text) ON CONFLICT (update_id, at, step) DO NOTHING`. `ended_at` is left as it was. `at` and `since` that are not whole epoch ms THROW |
+
+- `rolledBackAfterUpdated` is the exception to "opens no transaction" (MAN-7806 Contract): its two writes are one unit however it is called.
+- An update never `updated`, one `updated` before `since`, one already `rolled_back` (a resent hello) or a failure is left as it was and answers `false`.
+- The step does not go through `insertStep`: that one keeps its `ended_at IS NULL` guard and would refuse it. No other path writes a step under an ended update or reopens one.
+- `note` is the launcher's bare reason, what a live rollback files; `text` is the whole sentence "Rolled back to <from> · <reason>".
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/cerberus-updates.db.ts
+
+## MAN-7958 — Cerberus diagnosis words — .verify/cerberus-diagnosis-words-shot.mjs: what it proves, how to run it, the write guard, the verdicts
+
+Photographs the two words a diagnosis tells the sheet — `when` (what promotion writes) and `scope` (whether the node's reads were given) — on the REAL Cerberus tab of the running :5183 client. The screen: MAN-7932. The words: MAN-7870. `.verify/` is gitignored.
+
+## Run it
+`node .verify/cerberus-diagnosis-words-shot.mjs <evidence dir> [node/service/check]` — default check `eis1/shadow-connector/approval_engine`.
+| exit | when |
+|---|---|
+| 0 | every verdict PASS |
+| 1 | any FAIL, or the check is not in `GET /api/cerberus/checks` (stops at once with a sentence naming it) |
+| 2 | no evidence dir |
+
+## What is answered, what is aborted
+- One handler on `**/api/cerberus/**` (`page.route`) decides by METHOD first: a non-GET is counted in `refusedWrites` and aborted, whatever URL it names — the fixture URLs included. why: a separate route per URL let the answering routes beat an abort route; the check route's `route.fetch()` would replay a `DELETE` to the live store.
+- Then `GET /api/cerberus/diagnoses/fixture0diagwords` is answered with the fixture (`diagnosisFixture({ when, scope })`: steps count from 1; the history step quotes its subject in “ ”); `GET /api/cerberus/checks/<node>/<service>/<check>` is the real answer with `diagnosis` put in; anything else falls through.
+- The service row on the node card is matched by the check's own `serviceLabel`, read from `GET /api/cerberus/checks` (the word the card draws), never a fixed label.
+
+## Scenarios and verdicts (each at 1440×900 and 390×844)
+| scenario | fixture | verdicts |
+|---|---|---|
+| 1 Add to catalog → Promote dialog | `when: 'warn'`, `scope: 'node'`, the check reading `failing` now | the trigger line reads "nears its limit"; the raw line ends "· warn" |
+| 2 Diagnosis panel | `when: 'failing'`, `scope: 'history'` | the panel reads "Read-only. It reads Cerberus history: <node>'s logs and status were not reachable."; it does not say "It reads logs, status and Cerberus history" |
+| both | | `refusedWrites === 0`; no console error or page error |
+
+Photographs, into the evidence dir: `promote-when-warn-<w>x<h>.png`, `diagnosis-scope-history-<w>x<h>.png`; `sheet-did-not-open.png` when the sheet never opens.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/cerberus-diagnosis-words-shot.mjs

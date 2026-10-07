@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 
 import { api, REQUEST_TIMEOUT_MS } from '@/shared/api';
 import { freshestBatch } from '@/modules/cerberus/utils/wardenUpdates';
-import type { CerberusUpdateView } from '@/shared/cerberus-types';
+import type { CerberusStartedBatch, CerberusUpdateView } from '@/shared/cerberus-types';
 
 /** How long after one read of the batch answers the next is asked: the dialog's "every 2 s while open". */
 const POLL_MS = 2_000;
@@ -29,7 +29,7 @@ function isBatch(body: unknown): body is CerberusUpdateView[] {
 export function useUpdateBatch(batch: string | null, seed: CerberusUpdateView[]): CerberusUpdateView[] | null {
   // The newest good answer, tagged with the batch it is for. Essential: the dialog draws its rows from it,
   // and tagging it lets a followed batch's answer never be shown under another batch's id.
-  const [polled, setPolled] = useState<{ batch: string; updates: CerberusUpdateView[] } | null>(null);
+  const [polled, setPolled] = useState<CerberusStartedBatch | null>(null);
 
   useEffect(() => {
     if (batch === null) return undefined;

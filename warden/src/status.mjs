@@ -1,6 +1,8 @@
 // `status`: what this home is — who it enrolled as, with whom, which build runs, and the last thing
 // the daemon wrote about itself. It reads files and speaks to no one, so it is safe to run while
-// the daemon runs, and it answers the same question whether or not center is reachable.
+// the daemon runs, and it answers the same question whether or not center is reachable. Every time it prints is
+// this machine's local time with its offset (`local-time.mjs`).
+import { localStamp } from './local-time.mjs';
 import { fingerprint, homeDir, readIdentity, readRun, version } from './state.mjs';
 
 /** A linked daemon heartbeats every 15 s; a record this much older than that says it has stopped. */
@@ -25,7 +27,7 @@ function recorded(value) {
 function printRun({ run, writtenAt }) {
   const at = Number.isSafeInteger(run.at) ? run.at : writtenAt;
   const age = Date.now() - at;
-  printLine('run', `written ${new Date(at).toISOString()} (${agoWords(age)})`);
+  printLine('run', `written ${localStamp(at)} (${agoWords(age)})`);
   printLine('  linked', recorded(run.linked));
   // The link is up, so a heartbeat is due every 15 s: a record this old is the daemon's last word, not its state.
   if (run.linked === true && age > SILENT_AFTER_MS) printLine('  note', 'no heartbeat since — the daemon is not running');
@@ -49,7 +51,7 @@ export function runStatus() {
   }
   printLine('node', identity.node);
   printLine('center', identity.center);
-  printLine('enrolled', new Date(identity.enrolledAt).toISOString());
+  printLine('enrolled', localStamp(identity.enrolledAt));
   printLine('fingerprint', fingerprint(home));
 
   const record = readRun(home);

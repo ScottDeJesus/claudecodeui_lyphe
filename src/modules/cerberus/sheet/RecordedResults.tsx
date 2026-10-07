@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { StatusPill } from '@/modules/cerberus/StatusMarks';
-import { hms } from '@/modules/cerberus/utils/cerberusTime';
+import { hms, localIso } from '@/modules/cerberus/utils/cerberusTime';
 import type { CerberusResultRow } from '@/shared/cerberus-types';
 import { Button } from '@/shared/ui';
 
@@ -50,7 +50,7 @@ export function RecordedResults({ rows, emptyText }: { rows: CerberusResultRow[]
       <ol className="flex flex-col">
         {shown.map((row, index) => (
           <li key={`${row.at}:${index}`} className="flex items-baseline gap-3 border-t border-border py-[7px] text-[13px]">
-            <time dateTime={new Date(row.at).toISOString()} className="w-16 flex-none tabular-nums text-muted-foreground">
+            <time dateTime={localIso(row.at)} className="w-16 flex-none tabular-nums text-muted-foreground">
               {hms(row.at)}
             </time>
             <div className="flex min-w-0 flex-1 flex-wrap items-baseline gap-x-3 gap-y-1">

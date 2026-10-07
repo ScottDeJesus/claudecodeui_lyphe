@@ -1740,7 +1740,6 @@
         "partial": "Rings show {{shown}} of {{total}}. The rest are in Grid.",
         "note_one": "{{count}} node around center · problems sit on the inner ring",
         "note_other": "{{count}} nodes around center · problems sit on the inner ring",
-        "close": "Close",
         "legend": {
           "title": "Every warden reports to center",
           "body": "Each dot is a node; its line is the warden's connection. The worst nodes sit on the inner ring. Click any dot for its services.",
@@ -1791,6 +1790,8 @@
       "sessions_other": "{{count}}\u00a0sessions\u00a0running\u00a0here",
       "projects": {
         "title": "Projects that run here",
+        "titleAway": "Projects assigned here",
+        "awayNote": "{{node}} is no longer on this machine, so these projects' chats can't run there. Move each back to this server.",
         "emptyLead": "Nothing runs here yet.",
         "emptyMessage": "Pick a project below and its Claude chats run on {{node}}.",
         "moveBack": "Move {{name}} back to this server",
@@ -2033,6 +2034,7 @@
       "ready": "Ready {{time}}",
       "failed": "Failed",
       "scope": "Read-only on {{node}}. It reads logs, status and Cerberus history. It can't run fixes or change files.",
+      "scopeHistory": "Read-only. It reads Cerberus history: {{node}}'s logs and status were not reachable.",
       "steps_one": "{{count}} step · {{from}}",
       "steps_other": "{{count}} steps · {{from}}–{{to}}",
       "proposal": {

@@ -1,6 +1,6 @@
 import crypto from 'node:crypto';
 
-import { cerberusDiagnosesDb } from '@/modules/database/index.js';
+import { cerberusDiagnosesDb, cerberusUpdatesDb } from '@/modules/database/index.js';
 import type {
   CerberusCheckView,
   CerberusDiagnosisSubmission,
@@ -21,6 +21,7 @@ import { buildDiagnosisToolDeps } from './diagnosis-deps.js';
 import { unknownDiagnosis } from './diagnosis-proposal.js';
 import { CLOSED_SESSION_STEP, historyOnlyStep, openedSessionStep } from './diagnosis-step-words.js';
 import { createDiagnosisStepLog, type DiagnosisStepLog } from './diagnosis-steps.js';
+import { maskedConclusion } from './diagnosis-text.js';
 import { buildDiagnosisTools } from './diagnosis-tools.js';
 import { abandonCallsOf, closeNodeSession, openNodeSession, registerDiagnosisFrames } from './diagnosis-wire.js';
 
@@ -40,8 +41,10 @@ import { abandonCallsOf, closeNodeSession, openNodeSession, registerDiagnosisFra
  * makes the session real — only then does the first step say "Opened a read-only session on <node>" and
  * do the node's three reads exist for the agent. The hub (`center`) has no warden, a node that is not
  * linked has no link, a node another diagnosis already holds a session on is refused by its warden (which
- * still sends the receipt), and a warden that never answers the open is one from before diagnoses; all four
- * run on history alone, and the FIRST STEP says so, in words. `diag.close` goes whenever a session was
+ * still sends the receipt), a warden that never answers the open is one from before diagnoses, and a node
+ * whose warden is updating (its update is the batch's active one, `cerberusUpdatesDb.activeNode()`) takes
+ * no `diag.open` — a session opened after the warden's last idle check would be killed by its clean stop;
+ * all five run on history alone, and the FIRST STEP says so, in words. `diag.close` goes whenever a session was
  * asked for, however the diagnosis ends, and the closing step ("Closed the session · nothing was
  * changed") is written only for a session that opened and was closed on a live link.
  *
@@ -152,7 +155,8 @@ function storeOutcome(diagId: string, outcome: Outcome): 'done' | 'failed' | nul
     if (outcome.status === 'failed') {
       return cerberusDiagnosesDb.end(diagId, 'failed', { endedAt, error: outcome.error }) ? 'failed' : null;
     }
-    const { summary, evidence, proposal } = outcome.submission;
+    // The agent's words are masked as they are stored (`diagnosis-text.ts`): a model can reassemble a credential it was never shown.
+    const { summary, evidence, proposal } = maskedConclusion(outcome.submission);
     const ended = cerberusDiagnosesDb.end(diagId, 'done', {
       endedAt,
       summary,
@@ -192,6 +196,11 @@ async function openSession(diag: LiveDiagnosis): Promise<boolean> {
   const { node } = diag;
   if (node === HUB_NODE_ID) {
     diag.steps.say(historyOnlyStep(node, 'hub'));
+    return false;
+  }
+  // Read from the store: this node's update is the active one, so its warden is about to restart and takes no session.
+  if (cerberusUpdatesDb.activeNode() === node) {
+    diag.steps.say(historyOnlyStep(node, 'updating'));
     return false;
   }
   if (!wardenLinks.isLinked(node)) {

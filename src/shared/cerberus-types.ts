@@ -268,6 +268,13 @@ export type CerberusUpdateView = {
 };
 
 /**
+ * What `POST /api/cerberus/updates` answers when a warden update batch starts: the batch's id and its
+ * updates as they stood, one per node named, all `queued`. The same updates come back from
+ * `GET /api/cerberus/updates/:batch`, which the Update wardens dialog reads again to follow the batch.
+ */
+export type CerberusStartedBatch = { batch: string; updates: CerberusUpdateView[] };
+
+/**
  * What `GET /api/cerberus/wardens` answers: where the fleet's wardens stand against the release
  * center holds. `latest` is the newest release built (null when none has been); `nodes` lists every
  * enrolled node with the warden version it last reported (null before it has) and `behind` — true
@@ -403,11 +410,13 @@ export type CerberusRunView = {
  * `fix` is the catalog entry offered for it: the first unretired entry on the check — oldest first —
  * whose `when` the current status satisfies. A failing check satisfies `failing` and `warn` entries,
  * a warn check satisfies `warn` entries, and a denied check is offered what a failing one is but is
- * never run on its own. Null when no entry applies. `run` is the check's newest run requested since
- * the check's `since`, while it runs or for 90 s after it ended — null when there is none, or when
- * `since` is. `since` is on the warden's clock (`since` of a health document's check, on its
- * service's) and a run's times and now on center's, so the one comparison across them applies the
- * node's clock offset to `since`. The card draws its strip from `run` and offers `fix` only
+ * never run on its own. Null when no entry applies. `run` is the check's active run (the newest whose
+ * `ended_at` is NULL) whatever its `since`, so the card never offers Run beside a run that is going;
+ * failing that, the check's newest run requested since the check's `since`, for 90 s after it ended —
+ * null when there is none (a check whose `since` is null shows no ended run). `since` is on the
+ * warden's clock (`since` of a health document's check, on its service's) and a run's times and now
+ * on center's, so the one comparison across them applies the node's clock offset to `since`. The
+ * card draws its strip from `run` and offers `fix` only
  * while no run is going. `diagnosis` is the check's newest diagnosis requested since the same
  * `since` — running or ended, whatever its outcome, with the same clock rule as `run` — null when
  * there is none, or when `since` is: the card says "Diagnose" while it is null and "Diagnosing…" or
@@ -465,6 +474,14 @@ export type CerberusDiagnosisStep = { n: number; t: number; text: string };
  * entries it holds to show the entry's current name — the person may have renamed it in the dialog,
  * so `proposal.name` is not it — and shows the id itself when that entry has since been retired and
  * is no longer there. Diagnoses are kept for good; so are their steps.
+ *
+ * Two words are worked out by center, not stored with the diagnosis. `when` is the word an entry made of
+ * this diagnosis would carry: `warn` when the check was only nearing its limit when the diagnosis began,
+ * else `failing` — the check's STORED status at the diagnosis's start, the very word promotion writes, so
+ * the Promote dialog shows what will be written and not a guess from the check's status now. `scope` is
+ * `node` when the diagnosis was given the node's reads and `history` when it could read only Cerberus
+ * history (the hub, a node that was not connected, busy or updating, or whose warden did not answer): its
+ * first step says which, and a diagnosis with no step yet reads `node`.
  * Answered by `GET /api/cerberus/diagnoses/:id` and carried by `CerberusNeed.diagnosis` and
  * `CerberusCheckDetail.diagnosis`; `POST /api/cerberus/diagnoses` answers only its `id`.
  */
@@ -482,6 +499,8 @@ export type CerberusDiagnosisView = {
   proposal: { name: string; cmd: string; general: string } | null;
   error: string | null;
   steps: CerberusDiagnosisStep[];
+  when: 'failing' | 'warn';
+  scope: 'node' | 'history';
   oneOffExpiresAt: number | null;
   run: CerberusRunView | null;
   promotedTo: string | null;
@@ -609,8 +628,10 @@ export type CerberusResultRow = {
  * it) or `future` (the moment has not happened). Freshness rests on continuity, never on the stored
  * row's own age: between two stored rows a moment is fresh while it is no later than the next row's
  * `prevAt` + `staleAfter`, and past the latest row while it is no later than center's in-memory
- * last-received time for the check + `staleAfter`. `resultAt` is the `at` of the stored row the
- * answer rests on and `mute` the mute that covered the moment, if any. Answered by
+ * last-received time for the check + `staleAfter`. `resultAt` is the `at` of the result the answer
+ * rests on — the stored row, or, for a moment at or after center's newest received result when that
+ * is newer than the row, that result (the store keeps a moving value only in its keep-alives) — and
+ * `mute` the mute that covered the moment, if any. Answered by
  * `GET /api/cerberus/lookup` and carried inside `CerberusCheckDetail`.
  */
 export type CerberusLookup = {
@@ -792,8 +813,9 @@ export type CerberusChangedEvent = {
  * 'cerberus_run_output'`. Unlike `cerberus_changed` it is a PICTURE, not a hint: a line must appear
  * the moment it arrives and a re-read cannot give it, so the frame holds the lines themselves — the
  * ones center has just stored for `runId`, in order, never coalesced with another run's. A sheet
- * that is open on the run appends them (by `n`, dropping one it already has); every other screen
- * ignores the frame. Whatever it missed, `GET /api/cerberus/runs/:id` answers with every line.
+ * that is open on the run appends them (by `n`, dropping one it already has) and a need's card on
+ * the Needs-you list shows the newest line of its run; no other screen reads the frame. Whatever
+ * it missed, `GET /api/cerberus/runs/:id` answers with every line.
  */
 export type CerberusRunOutputEvent = {
   kind: 'cerberus_run_output';

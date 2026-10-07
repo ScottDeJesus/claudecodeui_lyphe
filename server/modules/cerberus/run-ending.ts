@@ -12,8 +12,9 @@ import { hintChanged } from './cerberus-broadcast.js';
  * center's own (a run the warden lost, a run that could not be sent) — goes through here, so the screen
  * is hinted the same way whoever decided.
  *
- * Consumers: `run-frames.ts` (`hintRun` for each write, `endRun` for a refusal and an end),
- * `run-reconcile.ts` and `runs.service.ts` (`endRun` for the ends center decides).
+ * Consumers: `run-frames.ts` (`hintRun` for a run's start, `endRun` for a refusal and an end — a batch of
+ * output hints nothing), `run-reconcile.ts` (`endRun` for the runs a hello shows lost) and `runs.service.ts`
+ * (`hintRun` for the request, `endRun` for the ends center decides).
  */
 
 /** Tells the screens the run's check moved: its need, its sheet, its node's fixing mark. */

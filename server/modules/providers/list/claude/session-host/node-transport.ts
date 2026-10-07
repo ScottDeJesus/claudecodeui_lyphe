@@ -20,6 +20,15 @@
  *   a re-adoption that has heard no `out` yet (only `live`): its cursor is still `"acked"`, because
  *   `0` would replay the host's whole journal into an SDK that consumed none of it, and put every
  *   retired `result` back among the host's unacked ones.
+ * - CO-LOCATED AT EVERY PLACEMENT, fresh and re-attach alike. The CLI runs this machine's command with this
+ *   machine's environment, in a folder that is a path on this machine's disk, so a node that is not on this
+ *   machine (`nodeSessions.isColocated`: its last hello's machine id is not this one's) is refused with the way
+ *   back, whatever it was when the project was assigned (`project-node.service.ts` checks only then).
+ * - A FRESH PLACEMENT THAT IS REFUSED AFTER ITS `spawn` WENT OUT RETIRES ITS HOST. Detaching the channel leaves
+ *   the CLI running, the person is told the turn failed, and the next link-up would re-adopt the orphan as a
+ *   live run; so the host is asked to wind down and the node's count is listed again. When the refusal IS the
+ *   link going away the retire cannot go: `refused-hosts.ts` keeps it for the node's next link-up and has the
+ *   re-adoption leave that host alone. A refused re-attach keeps its host: it still belongs to a live session.
  * - NO FRESH HOST BESIDE ONE THE RE-ADOPTION HAS NOT HANDED BACK. A node's live host is re-adopted when
  *   its warden links, a moment after which a message can already start a turn here; a fresh spawn
  *   then would sit beside the live host, orphan it, and put two CLIs on one transcript. The
@@ -41,6 +50,7 @@ import { isApiExiting } from './facade.js';
 import type { Facade } from './facade.js';
 import { noteNodeHostsChanged } from './colocated-hosts.js';
 import { deliverHostFrame, hostTransport, plainEnv } from './host-frames.js';
+import { retireRefusedHost } from './refused-hosts.js';
 
 /** A warden that has not said one word about a session this long after the open is not going to. */
 const FIRST_FRAME_TIMEOUT_MS = 15_000;
@@ -96,15 +106,32 @@ const notConnected = (node: string): Error =>
   new Error(`${node}'s warden is not connected — this project's sessions run on ${node}`);
 
 /**
+ * The sentence that refuses a placement on a node that is not on this machine, or null when it is. The
+ * answer reads the node's stored machine id, which can fail with the store: that is a refusal too, since a
+ * turn that cannot be placed must reject here rather than throw out of the spawn function.
+ */
+function colocationRefusal(node: string): string | null {
+  try {
+    if (nodeSessions.isColocated(node)) return null;
+  } catch (error) {
+    const why = error instanceof Error ? error.message : String(error);
+    return `Could not tell whether ${node} is on this machine (${why})`;
+  }
+  return `${node} is no longer this machine — move this project back to this server from its card on the Cerberus tab`;
+}
+
+/**
  * Opens the turn's channel on its node and wires it to the facade. The promise settles ONCE: it
  * resolves at the first frame the warden sends back, and rejects with the sentence when the turn
- * cannot be placed — the node is not linked, the warden refused the open, or it was silent for
- * 15 s. After it resolves the turn is the host's and its trouble ends the facade itself.
+ * cannot be placed — the node is not on this machine, it is not linked, the warden refused the open, or it
+ * was silent for 15 s. After it resolves the turn is the host's and its trouble ends the facade itself.
  *
  * consumer: spawner.ts
  */
 export function placeInNodeHost(facade: Facade, options: SpawnOptions, ctx: NodePlacement): Promise<void> {
   const { node } = ctx;
+  const notHere = colocationRefusal(node);
+  if (notHere !== null) return Promise.reject(new Error(notHere));
   if (!nodeSessions.isLinked(node)) return Promise.reject(notConnected(node));
 
   const cwd = options.cwd ?? null;
@@ -167,9 +194,15 @@ export function placeInNodeHost(facade: Facade, options: SpawnOptions, ctx: Node
     facade.settleExit(null, 'SIGHUP');
   }
 
-  /** The turn could not be placed: nothing of it reached a host that will be heard from. */
+  /**
+   * The turn could not be placed: nothing of it reached a host that will be heard from. A fresh placement
+   * has already put its `spawn` on the wire, so the host it may have started is retired (at the node's next
+   * link-up when its link is gone) and the node's hosts are listed again; a re-attach keeps its host, which
+   * still belongs to a live session.
+   */
   function refuse(reason: string): void {
     release();
+    if (!ctx.reattach && retireRefusedHost(node, hostId)) noteNodeHostsChanged(node);
     rejectPlaced(new Error(reason));
   }
 

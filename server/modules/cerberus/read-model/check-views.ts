@@ -90,6 +90,12 @@ function unknownSince(
  * `status` is the latest row's word when it is still fresh (`statusAt`), `unknown` when it is not or
  * when no row exists, then the overlays. `stored`, `value` and `at` stay the latest row's own even
  * when the status over them is `unknown` or `muted` — the screen can say what was last heard.
+ * `value` and `at` are the exception to "the row's own": the store keeps a value that moves under an
+ * unchanged status only in a keep-alive every five minutes, so when ingest's memory holds a result
+ * NEWER than the stored row (`newest`), its value and `at` are shown instead. After a boot the memory
+ * is empty and the stored row speaks until the check's next result arrives. The status, `since` and
+ * every staleness rule still read the stored row and `lastReceivedAt`: a result that was not stored
+ * moved neither status nor document status.
  * `since` is when `status` began: ingest's memory for a stored status, the moment it went stale
  * or silent for `unknown`, and the restart's first step for `paused`. `mute` is the unexpired mute covering the check, whatever its status.
  * `every` and `staleAfter` are seconds.
@@ -108,6 +114,8 @@ export function buildCheckView(
   const raw = verdict === 'result' && row ? shownRow(row) : 'unknown';
   const status = layerCurrent(raw, now, series.mutes, overlay);
   const mute = muteActiveAt(series.mutes, now);
+  const { newest, since: statusSince } = inputs.memory(check.node, check.key);
+  const heard = newest && (!row || newest.at > row.at) ? newest : row;
 
   return {
     node: check.node,
@@ -118,14 +126,14 @@ export function buildCheckView(
     serviceLabel: check.service_label,
     status,
     stored: row ? storedStatusOf(row) : null,
-    value: row?.value ?? null,
-    at: row?.at ?? null,
+    value: heard?.value ?? null,
+    at: heard?.at ?? null,
     since:
       status === 'unknown'
         ? unknownSince(series, row?.at ?? null, overlay.silentSince, now)
         : status === 'paused'
           ? pausedSince(overlay.pauses, now)
-          : inputs.memory(check.node, check.key).since,
+          : statusSince,
     every: check.probe_every ?? 0,
     staleAfter: staleAfterSecondsOf(check),
     origin: originOf(check),

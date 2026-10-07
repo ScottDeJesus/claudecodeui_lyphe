@@ -168,7 +168,7 @@ expect: `two-presses: A-reads="Running…" B-reads="Running…"` once cured; tod
 measured 2026-10-07 by chain chain-cerberus--fixes--fixes-fill-20261006-234909-a012, finding L4, LOW
 probe-key: c6293f82511f1f77f7dbba98af813918c3fc2370
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/hooks/useCatalogRead.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/hooks/useRunLastLine.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/hooks/useRunOutput.ts
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/context/CerberusProvider.tsx
 
 ## INV-7123 — probe — `fleetModel.ts` / `isOverview` (outside the 7 paths): an overview with no `running` takes the whole Cerberus panel down
 
@@ -186,7 +186,7 @@ expect: `no-running-field: cerberus-panel=1 pageerrors=0` once cured; today cerb
 measured 2026-10-07 by chain chain-cerberus--fixes--fixes-fill-20261006-234909-a012, finding L5, LOW
 probe-key: 7af96a83507289dd58e94a442f418157ba125f76
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/hooks/useCatalogRead.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/hooks/useRunLastLine.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/hooks/useRunOutput.ts
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/context/CerberusProvider.tsx
 
 ## INV-7124 — probe — `WhatHappenedCard.tsx` (outside the 7 paths): two lines of one run in one millisecond share a row key, and the second row opens the first
 
@@ -204,7 +204,7 @@ expect: `same-ms-activity: pressed-row=1 opened-row0=0 opened-row1=1` once cured
 measured 2026-10-07 by chain chain-cerberus--fixes--fixes-fill-20261006-234909-a012, finding L6, LOW
 probe-key: e5be42987bc3ef10100496cf5c0c1304da7a1500
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/hooks/useCatalogRead.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/hooks/useRunLastLine.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/hooks/useRunOutput.ts
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/fleet/WhatHappenedCard.tsx
 
 ## INV-7125 — probe — `/tmp/heph-fixes-report.mjs`: the replay step needs a run under an hour old, and fails with a Playwright timeout when there is none
 
@@ -278,7 +278,7 @@ expect: the `from===to` line reads "Warden on eis1 updated to 0.8.0 · 0.8.0 kep
 measured 2026-10-07 by chain chain-cerberus--updates--dialog-fill-20261007-043110-22d1, finding L1, LOW
 probe-key: da847b2ce411ed700701a8329254875f37b2fe71
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/fleet/UpdatingPill.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/hooks/useUpdateBatch.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/hooks/useWardensRead.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/utils/wardenUpdates.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/modals/UpdateWardensDialog.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/utils/activityEvents.ts
 
 ## INV-7179 — probe — LOW — the dialog's ending names the newest release on disk, not the one the batch took the nodes to
 
@@ -320,7 +320,7 @@ expect: footer reads "✓ Every selected warden is on 0.8.0." while the defect s
 measured 2026-10-07 by chain chain-cerberus--updates--dialog-fill-20261007-043110-22d1, finding L2, LOW
 probe-key: 6f65973514ce8f6d3a0bd82b428b6b67db14852f
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/fleet/UpdatingPill.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/hooks/useUpdateBatch.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/hooks/useWardensRead.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/utils/wardenUpdates.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/modals/UpdateWardensDialog.tsx
 
 ## INV-7187 — probe — The sheet's Diagnose button comes back as an enabled "Diagnose" for the ~0.8 s before the sheet hears the diagnosis exists; a second press there is a refused POST and a warn toast, and the button then disappears under the pressing hand
 

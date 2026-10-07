@@ -153,8 +153,8 @@ function sinceThenKey(a: CerberusNeed, b: CerberusNeed): number {
  * restarts for an update (see `resolveNodeLink`). A node's silence and its pauses are laid over its cells
  * and its checks' current statuses.
  *
- * Consumers: the overview route (`GET /overview`) and, through the cerberus barrel, the `fixes`
- * plan's auto-run.
+ * Consumers: `cerberus.routes.ts` (`GET /overview`). Auto-run does not read it: it is handed the
+ * status moves ingest announces (`ingest.onChange`).
  */
 export function buildOverview(inputs: CerberusReadInputs): CerberusOverview {
   const { now } = inputs;

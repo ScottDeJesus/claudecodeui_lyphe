@@ -40,6 +40,19 @@ import { readLatestBuild, type WardenBuild } from './warden-release.js';
  * An end that is not the warden's own word (a rollback, the silence) is also written as the update's
  * last step, filed under `failed`, so the dialog's list of steps says how it ended.
  *
+ * THE ONE AMENDMENT. Center ends an update `updated` on the hello that names the new release, but the
+ * launcher's probation ends only when the release has answered its welcome and written its own mark: a
+ * release that dies between the two is taken back, and the old release's hello then carries `failed` for
+ * an update that is already over. A `failed` hello for an update that ended `updated` less than
+ * `LATE_ROLLBACK_WINDOW_MS` ago (the launcher's 60 s probation and its restart, with room), whose release
+ * is the one that `failed` names, amends it: `rolled_back`, with the same sentence a live rollback files
+ * (`cerberusUpdatesDb.rolledBackAfterUpdated`, one transaction). Nothing else reopens an ended update.
+ *
+ * THE NODE IS CLOSED TO NEW WORK while its update is the active one (`cerberusUpdatesDb.activeNode()`):
+ * a warden does not restart under its own work, and a `run.start` or `diag.open` sent after its last idle
+ * check would be killed by the clean stop. `runs.service.ts`, `auto-run.ts` and the diagnosis service each
+ * hold their start to it; this file only keeps the update active until it ends.
+ *
  * Consumers: `updates.service.ts` (`advanceUpdates`, `setOfferAddress`, the two frame handlers and
  * `reportedWardenVersion`).
  */
@@ -54,6 +67,12 @@ const SILENCE_LIMIT_MS = 3 * 60 * 1000;
  * does not restart, so its give-up still comes first.
  */
 const WAITING_LIMIT_MS = 10 * 60 * 1000 + 30_000;
+/**
+ * How long after an update ended `updated` a hello's `failed` for it still turns it `rolled_back`: the
+ * launcher's probation (60 s, ended by the new release's own mark) and its restart onto the old release,
+ * with room to spare.
+ */
+const LATE_ROLLBACK_WINDOW_MS = 120_000;
 
 const STEP_WORDS: ReadonlySet<string> = new Set<CerberusUpdateStep>([
   'waiting',
@@ -233,17 +252,44 @@ export function onUpdateProgress(node: string, body: unknown): void {
   else hintUpdateMoved({ nodes: [node] });
 }
 
-/** Ends the update a hello names, when it is a live one of this node's; anything else is a repeat or a stranger's and ends nothing. */
+/** The sentence a rollback files as the update's last step: the release it went back to, and why. */
+function rollbackText(row: CerberusUpdateRow, reason: string): string {
+  const back = row.from_version ? `Rolled back to ${row.from_version}` : 'Rolled back';
+  return `${back} · ${reason}`;
+}
+
+/**
+ * A `failed` hello for an update that is already over. Only an update that ended `updated` within the
+ * window, and whose release is the one the launcher says it took back, is amended; the store's guard
+ * repeats the same two tests in the statement itself, so a second process or a resent hello cannot
+ * amend it twice.
+ */
+function amendLateRollback(row: CerberusUpdateRow, update: { failed: string; reason: string }): void {
+  const now = Date.now();
+  const since = now - LATE_ROLLBACK_WINDOW_MS;
+  if (row.result !== 'updated' || row.ended_at === null || row.ended_at < since || update.failed !== row.to_version) return;
+  if (!cerberusUpdatesDb.rolledBackAfterUpdated(row.id, now, rollbackText(row, update.reason), since, update.reason)) return;
+  console.log(`[Cerberus] the update of ${row.node} to ${row.to_version} was taken back after it ended updated: ${update.reason}`);
+  hintUpdateMoved({ nodes: [row.node] });
+}
+
+/**
+ * Ends the update a hello names, when it is a live one of this node's — or, for a `failed` hello, amends
+ * one that ended `updated` moments ago; anything else is a repeat or a stranger's and ends nothing.
+ */
 function settleFromHello(node: string, update: NonNullable<CerberusHelloReport['update']>): void {
   const row = cerberusUpdatesDb.get(update.updateId);
-  if (!row || row.node !== node || row.ended_at !== null) return;
+  if (!row || row.node !== node) return;
+  if (row.ended_at !== null) {
+    if ('failed' in update) amendLateRollback(row, update);
+    return;
+  }
   if ('to' in update) {
     if (update.to === row.to_version) endUpdate(row.id, 'updated', null, null);
     return;
   }
   if (update.failed !== row.to_version) return;
-  const back = row.from_version ? `Rolled back to ${row.from_version}` : 'Rolled back';
-  endUpdate(row.id, 'rolled_back', update.reason, `${back} · ${update.reason}`);
+  endUpdate(row.id, 'rolled_back', update.reason, rollbackText(row, update.reason));
 }
 
 /**

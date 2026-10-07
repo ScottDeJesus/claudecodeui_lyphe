@@ -3,11 +3,10 @@ import { useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { useCerberus } from '@/modules/cerberus/context/CerberusContext';
-import { DialogFrame } from '@/modules/cerberus/modals/DialogFrame';
 import { hms } from '@/modules/cerberus/utils/cerberusTime';
 import type { CerberusCheckView, CerberusDiagnosisView } from '@/shared/cerberus-types';
 import { useReturnFocus } from '@/shared/hooks/useReturnFocus';
-import { Button, Chip, Field, Input, Switch } from '@/shared/ui';
+import { Button, Chip, DialogFrame, Field, Input, Switch } from '@/shared/ui';
 
 /** The limits the dialog offers, in runs an hour: the prototype's three chips. */
 const LIMITS = [1, 2, 4] as const;
@@ -54,7 +53,7 @@ type PromoteDialogProps = {
   open: boolean;
   /** The diagnosis whose Add to catalog was pressed. `null`, or one with no proposal, draws nothing. */
   diagnosis: CerberusDiagnosisView | null;
-  /** The check it diagnosed, as the fleet holds it: the entry's check and its `when` come from it. */
+  /** The check it diagnosed, as the fleet holds it: the entry's check and the words that name it come from it. */
   check: CerberusCheckView | null;
   /** Cancel, the ✕, Escape and the backdrop: closed with nothing written. */
   onClose: () => void;
@@ -121,8 +120,9 @@ function PromoteForm({ diagnosis, proposal, check, onClose, onPromoted }: Promot
     if (landed) onPromoted();
   };
 
-  // The entry's check and `when` come from the diagnosed check (spec §3): a check near its limit is a `warn` entry, any other a `failing` one.
-  const when = check.status === 'warn' ? 'warn' : 'failing';
+  // The entry's `when` is the word the server will write: the check's STORED status when the diagnosis began (a `warn` entry for a
+  // check that was only near its limit, else `failing`), never its status now — a fix that worked has turned the check green by now.
+  const { when } = diagnosis;
   const service = check.serviceLabel ?? check.service;
   const generalized = proposal.general !== proposal.cmd ? changedSpans(proposal.cmd, proposal.general) : null;
   const blank = name.trim() === '';
@@ -135,7 +135,7 @@ function PromoteForm({ diagnosis, proposal, check, onClose, onPromoted }: Promot
   return (
     <DialogFrame
       size="lg"
-      marker="promote"
+      data-cerberus-dialog="promote"
       title={t('cerberus.promote.title')}
       accent={{ words: t('cerberus.promote.accent') }}
       busy={busy}

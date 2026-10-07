@@ -75,6 +75,20 @@ export const dateOf = (ms: number): string => {
 };
 
 /**
+ * "2026-10-07T08:59:32.469-07:00": a moment as an ISO stamp in LOCAL time, with the offset it had at that
+ * moment, never a `Z`. For what a machine also reads — a `<time dateTime>`, or a stamp handed to
+ * `formatShortDate` — while `hms` and `dayAndTime` stay the words a person reads.
+ */
+export function localIso(ms: number): string {
+  const moment = new Date(ms);
+  const minutesEast = -Math.round(moment.getTimezoneOffset());
+  const offsetMinutes = Math.abs(minutesEast);
+  const offset = `${minutesEast < 0 ? '-' : '+'}${twoDigits(Math.floor(offsetMinutes / 60))}:${twoDigits(offsetMinutes % 60)}`;
+  const milliseconds = String(moment.getMilliseconds()).padStart(3, '0');
+  return `${dateOf(ms)}T${hms(ms)}.${milliseconds}${offset}`;
+}
+
+/**
  * The local moment a date input and a time input name together, in epoch ms: "2026-10-05" and
  * "17:52:10" is that second of that day. `null` while either field is not whole (a cleared date, a
  * half-typed time) or the two name no real day, so a lookup that already has a moment keeps it.

@@ -16,8 +16,8 @@ import { oneMaskedLine } from './diagnosis-text.js';
  * on one line, cut, and credential-looking values masked — the same door every other stored text of a
  * diagnosis goes through.
  *
- * Consumers: `diagnosis.service.ts` (the session's own lines) and `diagnosis-deps.ts` (one line per
- * read).
+ * Consumers: `diagnosis.service.ts` (the session's own lines), `diagnosis-deps.ts` (one line per
+ * read) and `read-model/diagnosis-views.ts` (`scopeOfDiagnosis`).
  */
 
 /** The longest a path or filter is quoted in a step line before it is cut. */
@@ -39,14 +39,25 @@ export function openedSessionStep(node: string): string {
 
 /**
  * The first line of a diagnosis that reads history only, and why: the hub has no warden, a node is
- * not linked, another diagnosis holds the node's one session, or its warden did not answer the session
- * (a release from before diagnoses).
+ * not linked, another diagnosis holds the node's one session, its warden did not answer the session
+ * (a release from before diagnoses), or its warden is updating and takes no new work.
  */
-export function historyOnlyStep(node: string, reason: 'hub' | 'not_linked' | 'busy' | 'no_answer'): string {
+export function historyOnlyStep(node: string, reason: 'hub' | 'not_linked' | 'busy' | 'no_answer' | 'updating'): string {
   if (reason === 'hub') return `${node} is Cerberus's own host and runs no warden: this diagnosis reads Cerberus history only`;
+  if (reason === 'updating') return `${node}'s warden is updating: this diagnosis reads Cerberus history only`;
   if (reason === 'not_linked') return `${node}'s warden is not connected: this diagnosis reads Cerberus history only`;
   if (reason === 'busy') return `Another diagnosis already has the read-only session on ${node}: this diagnosis reads Cerberus history only`;
   return `${node}'s warden did not answer the session — it may be older than diagnoses: this diagnosis reads Cerberus history only`;
+}
+
+/**
+ * Whether a diagnosis was given the node's reads (`node`) or only Cerberus history (`history`), told from its FIRST step.
+ * `diagnoses` has no column for it, and the first step is the one place the service says it: "Opened a read-only session on
+ * <node>" when the session opened, else one of `historyOnlyStep`'s sentences. A diagnosis with no step yet has not said, and
+ * reads `node`. Consumers: `read-model/diagnosis-views.ts`, which tells the screen (`CerberusDiagnosisView.scope`).
+ */
+export function scopeOfDiagnosis(node: string, firstStep: string | undefined): 'node' | 'history' {
+  return firstStep !== undefined && firstStep !== openedSessionStep(node) ? 'history' : 'node';
 }
 
 const lastWindow = (minutes: number): string => `last ${durationText(minutes * 60_000)}`;
@@ -57,11 +68,15 @@ const wholeNumberOr = (value: unknown, fallback: number): number =>
 /** The line for one read of the node, from the tool and the arguments as they went to the warden. */
 export function nodeReadStep(tool: CerberusDiagTool, args: Record<string, unknown>): string {
   if (tool === 'log.read') {
-    const filter = typeof args.contains === 'string' ? ` · lines containing “${quoted(args.contains)}”` : '';
+    const lines = wholeNumberOr(args.lines, LOG_READ_DEFAULT_LINES);
+    // The warden filters only the last `lines` lines of its window (journal and file alike), so a filter that found nothing says
+    // nothing of what lies before them: the line names the lines it looked through.
+    const filtered = typeof args.contains === 'string' ? `lines containing “${quoted(args.contains)}” among the last ${lines} lines` : null;
     if (typeof args.unit === 'string') {
-      return `Reading the journal of ${quoted(args.unit)} · ${lastWindow(wholeNumberOr(args.sinceMin, LOG_READ_DEFAULT_MINUTES))}${filter}`;
+      const window = lastWindow(wholeNumberOr(args.sinceMin, LOG_READ_DEFAULT_MINUTES));
+      return `Reading the journal of ${quoted(args.unit)} · ${window}${filtered === null ? '' : ` · ${filtered}`}`;
     }
-    return `Reading the end of ${quoted(args.path)} · last ${wholeNumberOr(args.lines, LOG_READ_DEFAULT_LINES)} lines${filter}`;
+    return `Reading the end of ${quoted(args.path)} · ${filtered ?? `last ${lines} lines`}`;
   }
   if (tool === 'file.read') return `Reading ${quoted(args.path)}`;
 

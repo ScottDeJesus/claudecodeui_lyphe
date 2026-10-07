@@ -7,18 +7,32 @@ import type { FleetFilter, FleetFilterGroup, FleetGroup, Tone } from '@/shared/t
 import { cn } from '@/shared/utils';
 
 /**
- * The bar's segments in the order they run, each in the look its nodes wear: passing the positive
- * wash, needs you the warn dot, updating the info dot (work in progress), muted the raised ground, no
- * result and nothing assigned an empty dashed box. Tone arrives only as `data-tone` and a `tone-*` name.
+ * One segment of the bar. Four of the six fleet words are a status, and each draws as that status's own cell
+ * (`StatusCell`, painted from `STATUS_TABLE`): so the bar, the legend under it and the strips in the cards cannot
+ * disagree about what a passing, needs-a-look, muted or no-result minute looks like. The segment names the status
+ * and carries no paint of its own. The other two are fleet words, no status behind them, and keep theirs.
  */
-const SEGMENTS: { group: FleetGroup; tone?: Tone; paint: string }[] = [
-  { group: 'ok', tone: 'positive', paint: 'bg-tone-soft' },
-  { group: 'needs', tone: 'warn', paint: 'bg-tone-dot' },
+type Segment =
+  | { group: FleetGroup; status: CerberusStatus }
+  | { group: FleetGroup; tone?: Tone; paint: string };
+
+/**
+ * The bar's segments in the order they run: passing is `ok`, needs you is `warn`, muted is `muted` and no result
+ * is `unknown`, each in the table's look. Updating is the info dot (work in progress) and nothing assigned is an
+ * empty dashed box, the two words of the fleet that are not a status. Tone reaches those two only as `data-tone`
+ * and a `tone-*` name.
+ */
+const SEGMENTS: Segment[] = [
+  { group: 'ok', status: 'ok' },
+  { group: 'needs', status: 'warn' },
   { group: 'updating', tone: 'info', paint: 'bg-tone-dot' },
-  { group: 'muted', paint: 'border border-input bg-muted' },
-  { group: 'unknown', paint: 'border border-dashed border-ink-faint' },
+  { group: 'muted', status: 'muted' },
+  { group: 'unknown', status: 'unknown' },
   { group: 'empty', paint: 'border border-dashed border-input' },
 ];
+
+/** What every segment shares: its share of the bar sliding as the counts move, never thinner than a sliver. */
+const SEGMENT_SHAPE = 'min-w-1 shrink rounded-[3px] transition-[width] duration-[600ms] ease-enter';
 
 /** Each group's words: in the line under the bar, and as its segment's tooltip. */
 const WORDS: Record<FleetGroup, { line: string; tip: string }> = {
@@ -74,15 +88,16 @@ export function FleetStatusBar({ groups, listed, drawn }: {
   return (
     <div className="flex flex-col gap-1.5">
       <div aria-hidden className="flex h-2 gap-0.5">
-        {SEGMENTS.filter(({ group }) => counts[group] > 0).map(({ group, tone, paint }) => (
-          <div
-            key={group}
-            data-tone={tone}
-            title={t(WORDS[group].tip, { count: counts[group] })}
-            style={{ width: `${(counts[group] / Math.max(total, 1)) * 100}%` }}
-            className={cn('min-w-1 shrink rounded-[3px] transition-[width] duration-[600ms] ease-enter', paint)}
-          />
-        ))}
+        {SEGMENTS.filter(({ group }) => counts[group] > 0).map((segment) => {
+          const { group } = segment;
+          const share = {
+            title: t(WORDS[group].tip, { count: counts[group] }),
+            style: { width: `${(counts[group] / Math.max(total, 1)) * 100}%` },
+          };
+          return 'status' in segment
+            ? <StatusCell key={group} status={segment.status} {...share} className={SEGMENT_SHAPE} />
+            : <div key={group} data-tone={segment.tone} {...share} className={cn(SEGMENT_SHAPE, segment.paint)} />;
+        })}
       </div>
       <div className="flex flex-wrap justify-between gap-x-3 gap-y-1 text-xs tabular-nums text-muted-foreground">
         <span>{words}</span>

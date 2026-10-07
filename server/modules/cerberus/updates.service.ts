@@ -8,6 +8,7 @@ import {
 } from '@/modules/database/index.js';
 import type {
   CerberusPauseWindow,
+  CerberusStartedBatch,
   CerberusUpdateStep,
   CerberusUpdateView,
   CerberusWardenRelease,
@@ -98,7 +99,7 @@ async function latestRelease(): Promise<CerberusWardenRelease | null> {
  * starts its first turn. Answers the batch's id and its updates as they stand. Throws the refusals in the
  * file header.
  */
-export async function startBatch(requested: string[]): Promise<{ batch: string; updates: CerberusUpdateView[] }> {
+export async function startBatch(requested: string[]): Promise<CerberusStartedBatch> {
   const nodes = [...new Set(requested)];
   if (nodes.length === 0) throw new AppError('Name at least one node to update.', { code: 'CERBERUS_BAD_UPDATE', statusCode: 400 });
   for (const node of nodes) {

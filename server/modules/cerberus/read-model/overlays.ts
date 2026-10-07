@@ -23,7 +23,10 @@ import { needsAttention, type WindowWord } from './status-rules.js';
  *     (`updates.service.ts`), so a rollback that takes longer is a real silence and reads as one.
  *
  * Silence wins over a mute: the mute only ever quiets a problem, and a silent node has none it can
- * vouch for. A mute and a pause never meet: one needs a status of warn or worse, the other below it.
+ * vouch for. A mute and a pause do meet. In a window, a word of warn or worse that a mute covers
+ * reads `muted` and a pause only moves the word's moment past the restart; a word below warn that
+ * overlaps a pause reads `paused`. The current status and a lookup read `paused` whatever a mute
+ * says, because a pause that holds beats everything (`layerCurrent`).
  *
  * Consumers: `cells.ts` (every window), `check-views.ts` (the current status) and `lookup.ts` (the
  * mute that was active at an asked moment, and the pause around it).

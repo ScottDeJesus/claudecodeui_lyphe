@@ -10,11 +10,16 @@
 //             warden's own `<home>/keys`, `~/.claude/.credentials.json`, `~/.docker/config.json`, `~/.npmrc`, `/etc/shadow`,
 //             `/etc/ssh`, `/root`, and the transcripts of the operator's sessions: the journals in `~/.cerberus-warden/sessions`
 //             and `<home>/sessions`, `~/.claude/projects`, `~/.claude/history.jsonl`, `~/.codex/sessions`,
-//             `~/.openclaw/agents/<agent>/sessions` and `~/.cloudcli` (its accounts and its database). The answer is
-//             "Refused: <path> may hold a secret" and nothing of the file is read.
+//             `~/.openclaw/agents/<agent>/sessions` and `~/.cloudcli` (its accounts and its database); and, in
+//             `~/.claude/state`, the stores of the house's own sessions and briefs — `dispatch-souls` (a stream-json `child.log`
+//             per soul), `dispatch-chains`, `briefs`, `dispatcher`, and `episodic.db` with its `-wal` and `-shm`. The rest of
+//             `~/.claude/state` stays readable. The answer is "Refused: <path> may hold a secret" and nothing of the file is read.
 //   MASKING   every text a diagnosis returns goes through `maskSecrets`: `password=hunter2` becomes `password=<masked>`, and so does
 //             any name that carries a credential word (`DB_PASS=`, `SECRET_ACCESS_KEY=`, a JSON `"key":`); a URL's password
-//             (`scheme://user:<masked>@host`), a `Bearer` or `Basic` value, a JWT and a private-key block go too.
+//             (`scheme://user:<masked>@host`), a `Bearer` or `Basic` value, a JWT and a private-key block go too. A block whose
+//             `BEGIN` line a tail window began after goes from the start of the text through its `END` line.
+//             Masking comes BEFORE any cut: a read takes more than it will return, masks it, and only then ends on a whole line
+//             (`diag-reads.mjs`, `diag-argv.mjs`), so a cut never leaves half a secret for the mask to miss.
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -65,6 +70,12 @@ function secretRoots(wardenHome) {
     path.join(account, '.codex', 'sessions'),
     path.join(account, '.cloudcli'),
     ...openclawSessionRoots(account),
+    // The house's own session transcripts and the briefs the operator's words were sent in: INV-7130's class, where the mask
+    // cannot be the only guard. Named one by one — the rest of `~/.claude/state` stays readable, so a backup can be listed.
+    // `episodic.db` and its two SQLite side files are three roots: `isUnder` takes a root or what lies inside it, never a sibling.
+    ...['dispatch-souls', 'dispatch-chains', 'briefs', 'dispatcher', 'episodic.db', 'episodic.db-wal', 'episodic.db-shm'].map((name) =>
+      path.join(account, '.claude', 'state', name),
+    ),
     path.join(account, '.claude', '.credentials.json'),
     path.join(account, '.docker', 'config.json'),
     path.join(account, '.npmrc'),
@@ -138,19 +149,27 @@ const KEY_WORD_VALUE =
  * text (spaces and all) or the next run of non-space characters. The key word may sit inside a longer name: a separator, or
  * a camelCase `Key`/`Id`/`Value`/`Access`, and up to 40 more characters of it (`DB_PASS`, `SECRET_KEY`, `secretKey`,
  * `AWS_SECRET_ACCESS_KEY`, `token_secret`), and the credential words take a plural (`API_KEYS`, `secrets`); `passed`,
- * `bypass` and `max_tokens` are words, not names, and stay. A closing quote of a JSON key stays. Beyond the key words, four shapes
+ * `bypass` and `max_tokens` are words, not names, and stay. A closing quote of a JSON key stays. Beyond the key words, five shapes
  * that carry a credential with no key word beside them:
  *   `scheme://user:pw@host`   the password (a lone userinfo of 20 or more characters is a token and goes whole)
  *   `Bearer <t>`, `Basic <t>`  the value, from 16 characters
  *   `eyJ….….…`                 a JWT
- *   `-----BEGIN … PRIVATE KEY-----` to its END line, or to the end of the text when a cut took the END line
+ *   `-----BEGIN … PRIVATE KEY-----` to its END line, or to the end of the text when a cut took the END line; an armored PGP
+ *                              block is the same with `PRIVATE KEY BLOCK-----` on both lines
+ *   `-----END … PRIVATE KEY-----` with no BEGIN line before it (a window that began inside the key): from the START of the text
+ *                              through the LAST such END line. A tail window runs to the newest line, so it holds the END of
+ *                              any key whose body it shows
  * Running it twice changes nothing more, which is what lets a text be masked at its source and again as it leaves. Every
  * quantifier that can start at many places is bounded (a scheme is at most 16 characters, a JWT part at most 8 KB), so a
- * log line made of `a.a.a.a…` or `eyJeyJ…` costs a scan, never a stall of the event loop the heartbeat shares.
+ * log line made of `a.a.a.a…` or `eyJeyJ…` costs a scan, never a stall of the event loop the heartbeat shares; the
+ * END-without-BEGIN rule is anchored at the text's start, so it is one scan.
  */
 export function maskSecrets(text) {
   return String(text)
-    .replace(/-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?(?:-----END [A-Z ]*PRIVATE KEY-----|$)/g, MASKED)
+    .replace(/-----BEGIN [A-Z ]*PRIVATE KEY(?: BLOCK)?-----[\s\S]*?(?:-----END [A-Z ]*PRIVATE KEY(?: BLOCK)?-----|$)/g, MASKED)
+    // Every complete block is `<masked>` by now, so an END line still here has no BEGIN before it. Greedy: through the LAST
+    // such line, so one pass leaves nothing for a second to mask (a lazy rule would stop at the first and break idempotence).
+    .replace(/^[\s\S]*-----END [A-Z ]*PRIVATE KEY(?: BLOCK)?-----/, MASKED)
     .replace(KEY_WORD_VALUE, `$1$2${MASKED}`)
     .replace(/(\b[a-z][a-z0-9+.-]{0,15}:\/\/)([^\s/@]{1,512})@/gi, (whole, scheme, userinfo) => {
       const colon = userinfo.indexOf(':');

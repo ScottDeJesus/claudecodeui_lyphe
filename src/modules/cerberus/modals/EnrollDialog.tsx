@@ -3,7 +3,6 @@ import { useTranslation } from 'react-i18next';
 
 import { useCerberus } from '@/modules/cerberus/context/CerberusContext';
 import { useEnrollmentStatus } from '@/modules/cerberus/hooks/useEnrollmentStatus';
-import { DialogFrame } from '@/modules/cerberus/modals/DialogFrame';
 import { EnrollInstall, EnrollRefusal } from '@/modules/cerberus/modals/EnrollInstall';
 import { hms } from '@/modules/cerberus/utils/cerberusTime';
 import { askForCommand } from '@/modules/cerberus/utils/enrollAsk';
@@ -11,7 +10,7 @@ import type { CerberusEnrollment, CerberusOverview } from '@/shared/cerberus-typ
 import { useHostWindow } from '@/shared/context/HostWindowContext';
 import { useReturnFocus } from '@/shared/hooks/useReturnFocus';
 import type { CerberusEnrollRefusal } from '@/shared/types';
-import { Button, Field, Input, Steps } from '@/shared/ui';
+import { Button, DialogFrame, Field, Input, Steps } from '@/shared/ui';
 import { copyTextToClipboard } from '@/shared/utils';
 
 /** The server's node grammar (`NODE_ID_PATTERN`) allows 32 characters; the field stops there as it is typed. */
@@ -94,6 +93,9 @@ function EnrollFlow({ onClose }: { onClose: () => void }) {
   const [issuing, setIssuing] = useState(false);
   // Why the last ask came back without a command, null before one fails and cleared by each ask.
   const [refusal, setRefusal] = useState<CerberusEnrollRefusal | null>(null);
+  // The overview reading this dialog last looked at. Essential: a refusal is judged against the readings that
+  // arrive after it, so the render that first sees a new one has to know it is new.
+  const [lastOverview, setLastOverview] = useState(overview);
   // The name the server last refused as already enrolled. The overview is read on its own clock, so a node
   // enrolled since is known only by this answer; it holds for exactly that name, and typing another clears it.
   const [takenName, setTakenName] = useState<string | null>(null);
@@ -118,6 +120,15 @@ function EnrollFlow({ onClose }: { onClose: () => void }) {
     const hold = window.setTimeout(() => setCopiedAt(null), COPIED_MS);
     return () => window.clearTimeout(hold);
   }, [copiedAt]);
+
+  // A "not listening" answer is true of the moment center gave it. A reading of the overview that arrives after
+  // it and says the gateway listens makes it untrue, and the banner goes without another ask. Keyed on the
+  // reading and not on the boolean: an answer that lands after the gateway came back is cleared by the next
+  // reading, which a flag that never changed would not give.
+  if (overview !== lastOverview) {
+    setLastOverview(overview);
+    if (overview?.gateway.listening && refusal?.kind === 'notListening') setRefusal(null);
+  }
 
   const nameError = name === '' ? 'empty' : overview?.nodes.some((node) => node.id === name) || takenName === name ? 'taken' : null;
 
@@ -161,7 +172,7 @@ function EnrollFlow({ onClose }: { onClose: () => void }) {
   const problem = refusal ?? (gatewayDown ? NOT_LISTENING : null);
 
   return (
-    <DialogFrame size="lg" marker="enroll" title={t('cerberus.enroll.title')} accent={{ words: t('cerberus.enroll.titleAccent') }} onDismiss={onClose}>
+    <DialogFrame size="lg" data-cerberus-dialog="enroll" title={t('cerberus.enroll.title')} accent={{ words: t('cerberus.enroll.titleAccent') }} onDismiss={onClose}>
       <div className="flex flex-col gap-5">
         {/* Past the last step once it said hello, so all three wear their ✓. */}
         <Steps steps={stepNames} current={step === 'name' ? 0 : step === 'install' ? 1 : stepNames.length} />
@@ -212,10 +223,11 @@ function EnrollFlow({ onClose }: { onClose: () => void }) {
               <Button type="button" variant="outline" className="max-md:h-11" onClick={onClose}>
                 {t('cerberus.enroll.cancel')}
               </Button>
-              {/* A name that cannot be sent or a gateway that is down disables the button outright; while the ask is
-                  out it is `busy` instead, because a disabled button gives up the focus it holds and a
-                  refusal would hand the person back a page with none. */}
-              <Button type="submit" className="max-md:h-11" disabled={nameError !== null || gatewayDown} busy={issuing}>
+              {/* Never `disabled`: a disabled button gives up the focus it holds, and the 409 that says the name
+                  is taken turns `nameError` on under the very press that is holding it. A name that cannot be
+                  sent or a gateway that is down is `aria-disabled`, and the ask in flight is `busy`; either
+                  way the button refuses the press itself and keeps its place in the tab order. */}
+              <Button type="submit" className="max-md:h-11" aria-disabled={nameError !== null || gatewayDown} busy={issuing}>
                 {t('cerberus.enroll.getCommand')}
               </Button>
             </div>

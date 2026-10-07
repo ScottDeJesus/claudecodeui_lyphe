@@ -13,8 +13,11 @@ import type { CerberusActivity, CerberusCheckView, CerberusReadInputs, CerberusR
  * clock offset (`links`' `clockOffsetMs`, center minus warden; 0 when no frame has been heard yet or the
  * node has no warden):
  *
- *   - A NEED'S RUN is the check's newest run requested since the check's `since` — `since` plus the
- *     offset — while it runs or for 90 s after it ended. A check with no known `since` shows none.
+ *   - A NEED'S RUN is the check's active run (the newest whose `ended_at` is NULL) whatever its `since`,
+ *     so its card never offers Run while one is going — a status that moves while its fix runs takes
+ *     `since` past the run's request. Failing that, the check's newest run requested since the check's
+ *     `since` — `since` plus the offset — for 90 s after it ended. A check with no known `since` shows
+ *     no ended run.
  *   - A SHEET'S RUN is the check's newest run requested within the last hour, running or ended, with its
  *     lines: the sheet shows a fix's output beside the reading it produced, so `since` does not bound it.
  *
@@ -133,9 +136,12 @@ export function clockOffsetOf(node: string, inputs: CerberusReadInputs): number 
 export function needRuns(checks: CerberusCheckView[], inputs: CerberusReadInputs): Map<string, CerberusRunView> {
   const chosen: { mark: string; row: CerberusRunRow }[] = [];
   for (const check of checks) {
-    if (check.since === null) continue;
-    const offsetMs = clockOffsetOf(check.node, inputs);
-    const row = cerberusRunsDb.latestForCheck(check.node, check.key, check.since + offsetMs);
+    // A run that is going always shows, whatever the check's `since`: a status that moves while its fix runs
+    // (warn to failing as the service restarts) takes `since` past the run's request, and the card must never
+    // offer Run beside a fix that is running (the press would meet a 409). `since` bounds only an ended run.
+    const row =
+      cerberusRunsDb.activeForCheck(check.node, check.key) ??
+      (check.since === null ? null : cerberusRunsDb.latestForCheck(check.node, check.key, check.since + clockOffsetOf(check.node, inputs)));
     if (!row) continue;
     if (row.ended_at !== null && row.ended_at < inputs.now - NEED_RUN_LINGER_MS) continue;
     chosen.push({ mark: `${check.node}/${check.key}`, row });

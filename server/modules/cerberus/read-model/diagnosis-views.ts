@@ -1,7 +1,9 @@
 import { cerberusCatalogDb, cerberusDiagnosesDb, type CerberusDiagnosisRow } from '@/modules/database/index.js';
 import type { CerberusActivity, CerberusCheckView, CerberusDiagnosisView, CerberusReadInputs } from '@/shared/cerberus-types.js';
 
+import { whenDiagnosed } from '../diagnosis/diagnosis-promotion.js';
 import { oneOffLapsesAt } from '../diagnosis/diagnosis-proposal.js';
+import { scopeOfDiagnosis } from '../diagnosis/diagnosis-step-words.js';
 
 import { clockOffsetOf, diagnosisRunViews } from './run-views.js';
 
@@ -21,6 +23,11 @@ import { clockOffsetOf, diagnosisRunViews } from './run-views.js';
  *     and the check's `since`, so a sheet opened from a need always holds what its card said "See
  *     diagnosis" for, and a fix that worked still shows the diagnosis that proposed it after the check
  *     turned green. It carries `steps` and its `run` with `lines`.
+ *
+ * TWO WORDS ARE WORKED OUT, not stored. `when` is `whenDiagnosed`'s (the check's stored status as of the diagnosis's start,
+ * the very word promotion writes into the entry), so the Promote dialog shows what will be written and not a guess from the
+ * check's status now. `scope` is `node` or `history`, told from the diagnosis's first step (`scopeOfDiagnosis`): `diagnoses`
+ * has no column for whether the node's reads were given.
  *
  * Everything is read from the store as it is now. `promotedTo` is the entry the diagnosis was promoted
  * into, retired or not; `oneOffExpiresAt` is when the warden's one-off lapses, whether or not that
@@ -66,24 +73,29 @@ function diagnosisViews(rows: CerberusDiagnosisRow[], withRunLines: boolean): Ce
   const runs = diagnosisRunViews(ids, withRunLines);
   const promoted = cerberusCatalogDb.promotedFrom(ids);
 
-  return rows.map((row) => ({
-    id: row.id,
-    node: row.node,
-    check: row.check_key,
-    askedBy: row.asked_by,
-    model: row.model,
-    startedAt: row.started_at,
-    endedAt: row.ended_at,
-    status: row.status,
-    summary: row.summary,
-    evidence: readJson(row, 'evidence', isTextList, []),
-    proposal: row.proposal === null ? null : readJson(row, 'proposal', isProposal, null),
-    error: row.error,
-    steps: cerberusDiagnosesDb.steps(row.id),
-    oneOffExpiresAt: oneOffLapsesAt(row),
-    run: runs.get(row.id) ?? null,
-    promotedTo: promoted.get(row.id) ?? null,
-  }));
+  return rows.map((row) => {
+    const steps = cerberusDiagnosesDb.steps(row.id);
+    return {
+      id: row.id,
+      node: row.node,
+      check: row.check_key,
+      askedBy: row.asked_by,
+      model: row.model,
+      startedAt: row.started_at,
+      endedAt: row.ended_at,
+      status: row.status,
+      summary: row.summary,
+      evidence: readJson(row, 'evidence', isTextList, []),
+      proposal: row.proposal === null ? null : readJson(row, 'proposal', isProposal, null),
+      error: row.error,
+      steps,
+      when: whenDiagnosed(row),
+      scope: scopeOfDiagnosis(row.node, steps[0]?.text),
+      oneOffExpiresAt: oneOffLapsesAt(row),
+      run: runs.get(row.id) ?? null,
+      promotedTo: promoted.get(row.id) ?? null,
+    };
+  });
 }
 
 /** One diagnosis with its steps and its run's lines, or `null` when none carries the id. */

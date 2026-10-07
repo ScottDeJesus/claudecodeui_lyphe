@@ -11,7 +11,7 @@
  * THE RULE, which the counter makes absolute: a step that has run on the live store is NEVER
  * edited. Editing it changes nothing there and builds a different shape on every scratch file, so
  * a probe passes and the live store is wrong. A change is a NEW step appended at the end of
- * `CERBERUS_MIGRATIONS` — the arc's `fixes`, `updates`, `diagnosis` and `sessions` plans each
+ * `CERBERUS_MIGRATIONS` — the arc's `fixes`, `updates`, `diagnosis` and `judgment` plans each
  * append one — and a step is never reordered or removed, for the position is the version.
  *
  * Plain `CREATE TABLE`, not `IF NOT EXISTS`: a step runs against the exact shape the steps before
@@ -286,5 +286,19 @@ CREATE TABLE diag_steps (
     text TEXT NOT NULL,
     PRIMARY KEY(diagnosis, n)
 );
+`,
+
+  // Step 4 (user_version 4 → 5) — the `cerberus--judgment` plan: the two reads that scanned the whole
+  // `results` table get an index each. Both are PARTIAL, so each holds only the rows its read wants:
+  // ingest now stores a change only for a move of status or document status (or a lapse), and a
+  // keep-alive every five minutes, so the first holds the status moves alone and the second the
+  // keep-alives alone. SQLite uses a partial index only when the query carries its terms, so
+  // `cerberus-results.db.ts` spells the same WHERE in `transitions` (What happened) and
+  // `pruneKeepalivesBefore` (the 04:10 prune). Additive: no row is read or rewritten.
+  `
+CREATE INDEX ix_results_moves ON results(at)
+    WHERE kind = 'change' AND prev_status IS NOT NULL AND prev_status <> COALESCE(status, 'not_enabled');
+
+CREATE INDEX ix_results_keepalives ON results(at) WHERE kind = 'keepalive';
 `,
 ];

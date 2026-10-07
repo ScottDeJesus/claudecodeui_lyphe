@@ -104,20 +104,21 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/main.tsx, /home/lyphe/.claud
 ## MAN-740 — The library those tokens paint
 section: README/002 The library those tokens paint
 
-31 components carry Verve paint (2026-10-07: a file in `src/shared/ui/` that puts a `.vv-*` class in its markup; a comment naming one does not count, and `Toast` with `ToastStack`, `Tabs` with `TabsMore` count once). The sheet that paints each (rule 6):
+32 components carry Verve paint (2026-10-07: a file in `src/shared/ui/` that puts a `.vv-*` class in its markup; a comment naming one does not count, and `Toast` with `ToastStack`, `Tabs` with `TabsMore` count once). The sheet that paints each (rule 6):
 
 | sheet | components |
 |---|---|
 | `controls.css` | Button, Badge, Input, Card, Shimmer, Chip, Switch, Avatar, Meter, Spinner, Field, Select, Stepper |
 | `feedback.css` | Banner, Toast, Tabs, EmptyState, Menu, Dialog, Tooltip, ActionMenu |
 | `surfaces.css` | DockableFab, SplitPane, ResizeGrip |
-| `panels.css` | TextArea, Sheet, Timeline, Steps, Checkbox |
+| `panels.css` | TextArea, Sheet, Timeline, Steps, Checkbox, DialogFrame |
 | `board.css` | KanbanLane, KanbanCard |
 
 - `Sheet` (a panel on the right edge over a scrim), `Timeline` (an event feed, dense or full; props and open-row rules: MAN-7847) and `Steps` (Verve's navigation stepper) joined for the Cerberus tab: `CheckSheet`, Fleet's "What happened" and History's feed, the Enroll dialog. `TextArea` joined for the roadmap's goal field; the Mute dialog's reason takes it too.
 - `Steps`, not `Stepper`: `Stepper` is the house's numeric minus/plus control and has its own consumers, and Verve's bundle gives its navigation component the same name. `Steps` shows where a flow stands: numbered rounds, a ✓ once done, an accent rail between; a step is not pressable.
 - `TextArea` wears `Input`'s `.vv-input` paint (`controls.css`) and adds only its geometry in `panels.css`.
 - `Checkbox` is Verve's `forms/Checkbox`, in the library because Verve draws it; its first consumer is the Cerberus Update wardens dialog. A real `<input type="checkbox">` hidden with `sr-only`, its box and ✓ painted from the input's own `:checked`, `:disabled` and `:focus-visible` by sibling selectors, so the state has one home. The focus ring is `Input`'s (2px `--accent`, 2px offset) moved onto the box; the rule that silences the hidden input's own ring has three class-level parts because `src/index.css` pins `input[type="checkbox"]:focus` at (0,2,1). Its `className` is size and flow on the `<label>`, the press target, never paint: the dialog's rows pass `py-3`, so a whole row is one 44 px target.
+- `DialogFrame` is Verve's `overlays/Modal` on the house `Dialog`, in the library because Verve draws it (MAN-571): its props, behaviour and paint are MAN-7963.
 - `DockableFab`, `SplitPane` and `ResizeGrip` were admitted on the barrel's *mechanism* test, not its two-module rule (`index.ts`'s own header). `ResizeGrip`'s one consumer is `ChatHostPanel`.
 - `ConfirmDialog` was admitted on the two-module rule and paints nothing of its own: it is `Dialog` and `Button`, both already painted. It is not in the table.
 
@@ -151,7 +152,7 @@ What they share is the contract every later one joins:
    | 1 | `controls.css` | 1st | 496 | past its stated ceiling (the headers of `surfaces.css` and `panels.css` say so) |
    | 2 | `feedback.css` | 2nd | 438 | — |
    | 3 | [`surfaces.css`](surfaces.css) | 4th | 367 | the `body.vv-dragging` / `vv-drag-fab` / `vv-drag-split` / `vv-drag-resize` classes a drag of any piece sets for its length (why a new file: that sheet's own header) |
-   | 4 | [`panels.css`](panels.css) | 5th | 284 | `.vv-input`'s colours and ground said back over `src/index.css`'s `!important` pins on every bare `textarea` (the piece's own header says why) |
+   | 4 | [`panels.css`](panels.css) | 5th | 341 | `.vv-input`'s colours and ground said back over `src/index.css`'s `!important` pins on every bare `textarea` (the piece's own header says why) |
    | 5 | `board.css` | 3rd | 227 | the `.vv-lane`, `.vv-lane__head` and `.vv-lane-card` rules and their variants |
 
    `panels.css` is the fifth sheet opened and the fourth imported. The order is load-bearing at one end:
@@ -167,7 +168,7 @@ What they share is the contract every later one joins:
 Which components exist at all, and when a screen composes instead of asking for a new one, is
 doctrine §1–§3. Read it there, not here.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Checkbox.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Sheet.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Steps.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/TextArea.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Timeline.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/verve/panels.css
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Checkbox.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/DialogFrame.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Sheet.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Steps.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/TextArea.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Timeline.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/verve/panels.css
 
 ## MAN-741 — The overlay half
 section: README/003 The overlay half
@@ -195,10 +196,20 @@ Tabs, EmptyState and Menu new, Dialog, Tooltip and ActionMenu restyled.
   shared: cmdk's list carries `role="listbox"` as static content of the dialog it sits in, and a
   role-keyed rule left the command palette unable to be dismissed from the keyboard.
 
-  **Five panels carry the marker today**: `ActionMenu`, `Menu`, `Select`, the file tree's
-  `FileContextMenu` and the composer's `ComposerMenuPrimitives`. Each is rendered SOLELY while it
-  is open, which is what lets the marker's mere presence in the document stand for the fact
-  itself — a panel that stayed mounted closed could not honestly carry it.
+  **Six panels carry the marker in the library and the menus**: `ActionMenu`, `Menu`, `Select`,
+  `Sheet`, the file tree's `FileContextMenu` and the composer's `ComposerMenuPrimitives`. The
+  Lightbox, the fullscreen frames (`ShapeFrame`, `GutterWidgetFrame`), the application switcher's
+  radial, rows and picker, the session picker popover and the check label editor claim it the same
+  way. Each is rendered SOLELY while it is open, which is what lets the marker's mere presence in the
+  document stand for the fact itself — a panel that stayed mounted closed could not honestly carry it.
+
+  **`Sheet` also asks `modalInFrontHoldsEscape`** (`overlayEscape.ts`), the same question with a modal
+  dialog (`[role="dialog"][aria-modal="true"]`) among the candidates. A `Dialog` carries no marker, since
+  it is the thing that takes the key, so the marker rule alone leaves a sheet blind to the dialog its own
+  button opens in front of it; and as both listen on `window` in the capture phase, where
+  `stopPropagation` does not keep the second listener from running, one press would close the dialog
+  AND the sheet. A dialog drawn BEHIND the sheet is no candidate (document order): the key is the
+  sheet's. `Dialog` asks `overlayInFrontHoldsEscape`, markers only.
 
   **The failure direction is silent, not broken.** A new overlay that closes itself on Escape but
   forgets `OWNS_ESCAPE` (`overlayEscape.ts`) is invisible to `overlayInFrontHoldsEscape`, so the
@@ -253,3 +264,36 @@ section: README/006 Where the rest lives
 
 - How the numbers above are measured, and the baselines a change must not regress:
   [`docs/MANUAL.md (verification)`](../../../../docs/MANUAL.md)
+
+## MAN-7963 — `DialogFrame` — Verve's `overlays/Modal` on the house `Dialog`: two widths, the accent, the ✕ last in focus order, `busy`
+
+`src/shared/ui/DialogFrame.tsx` is Verve's `overlays/Modal` composed on the house `Dialog` (MAN-741). It is in the library because Verve draws it (MAN-571); a screen composes it and never builds a frame of its own (MAN-575). Consumers: the Cerberus tab's Mute, Enroll, Promote and Update wardens dialogs (MAN-7884).
+
+## Props
+| prop | meaning |
+|---|---|
+| `size` | `md` = 520 px, `lg` = 600 px; never wider than the screen less 2 rem; the panel scrolls as a whole (`max-h-[calc(100dvh-2rem)]`) |
+| `title` | the serif heading's first words |
+| `accent?` | `{ words }`: italic, in the accent ink. `{ key }`: a raw key, mono, upright, `0.62em`. Omitted: the title stands alone |
+| `busy?` | a write is out: the ✕ is `disabled` (dimmed, takes no press); the dialog's own buttons are the caller's |
+| `onDismiss` | Escape, the backdrop and the ✕ all call it; the caller decides whether that closes the dialog |
+| `children` | the body |
+| `...rest` | any `data-*` and any `aria-*` but `aria-labelledby` (the title's id is the frame's own) land on the panel; the Cerberus dialogs pass `data-cerberus-dialog="mute" \| "enroll" \| "promote" \| "update"` |
+
+## Behaviour
+- Mounted only while its dialog is open (`<Dialog open>`): it opens clean every time, and the house `Dialog`'s Escape, backdrop, focus trap and first focus hold (MAN-741).
+- The ✕ is LAST in panel order though drawn first (absolute, top right). why: first focus lands on the dialog's first field or chip, not on the way out, and Escape still closes from anywhere.
+- The ✕ is the round close, `aria-label` `buttons.close`: 32 px at a desk, 44 px below md (Verve's touch minimum).
+
+## Paint — `verve/panels.css`
+| class | holds |
+|---|---|
+| `.vv-dialogframe` | padding `clamp(20px,5vw,30px)` by `var(--vv-dialogframe-gutter)`; the gutter is `clamp(18px,5vw,32px)` |
+| `.vv-dialogframe__title` | `var(--font-display)` 28 px (25 px below 640 px); `overflow-wrap: anywhere`, so a long key wraps instead of widening the title under the ✕ |
+| `.vv-dialogframe__accent`, `__key` | the italic accent ink; the mono key in the accent ink |
+| `.vv-dialogframe__close` | a 32 px circle on `--surface2`; below md 44 px, its top and right offsets 6 px smaller about its own centre so it stays where it was |
+
+- The ✕'s phone-size offsets are computed from the frame's padding and gutter: change them together.
+- The panel's width and scroll are layout, spelled in the component; the paint is the `.vv-dialogframe*` rules (MAN-740).
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/DialogFrame.tsx

@@ -63,8 +63,8 @@ const GLYPH_SIZE = {
  * the ring means now. Pass `label` when the mark stands for more than one word: a node updating draws
  * the fixing ●, and says "Updating its warden", never "Fix running".
  *
- * Used by the sheet's `LookupSentence` today, and by the fleet's cards, the sheet's check rows and
- * History as they are composed.
+ * Used by `SentenceRow` in `sheet/LookupMoment.tsx` (the status at an asked moment: `LookupSentence` and
+ * `LookupMoment`), `sheet/CheckRows`, `fleet/NodeCard` and `fleet/NeedsYouCard`.
  */
 export function StatusGlyph({ status, size = 'md', decorative = false, still = false, label }: {
   status: CerberusMark;
@@ -105,8 +105,8 @@ type StatusCellProps = Omit<HTMLAttributes<HTMLSpanElement>, 'children'> & {
  * stretches it (`flex-1`), a service row fixes it (7×22). The caller also gives it its role. It is
  * an image named by its word unless the caller makes it an option of a list, as `MinuteCells` does.
  *
- * Used by the sheet's `MinuteCells` (the sheet and History), and by Fleet's service rows as they are
- * composed.
+ * Used by `sheet/MinuteCells` (the sheet and History), `fleet/ServiceRow` and `fleet/FleetStatusBar`
+ * (its segments and the legend's key cells, drawn the same way).
  */
 export function StatusCell({ status, label, className, ...spanProps }: StatusCellProps) {
   const { t } = useTranslation();
@@ -127,7 +127,7 @@ export function StatusCell({ status, label, className, ...spanProps }: StatusCel
  * hover and to assistive tech. `label` is the service and how it stands ("Shadow connector · All 4
  * checks passing"), and defaults to the bare word.
  *
- * Used by Fleet's node cards as they are composed. The fixture sheet draws every status in it.
+ * Used by `fleet/NodeCard` (a collapsed card's services).
  */
 export function StatusSquare({ status, label }: { status: CerberusMark; label?: string }) {
   const { t } = useTranslation();
@@ -150,8 +150,8 @@ export function StatusSquare({ status, label }: { status: CerberusMark; label?: 
  * whose `tone` lands as `data-tone`, so a status pill and every other tone pill in the app share one
  * paint.
  *
- * Used by the sheet's `RecordedResults` (the sheet and History), and by Fleet's service rows and the
- * sheet's check header as they are composed.
+ * Used by `sheet/RecordedResults` (the sheet and History), `sheet/SelectedCheck` (the check header)
+ * and `fleet/ServiceRow`.
  */
 export function StatusPill({ status, text }: { status: CerberusMark; text?: string }) {
   const { t } = useTranslation();

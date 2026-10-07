@@ -5,7 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { useCerberus } from '@/modules/cerberus/context/CerberusContext';
 import { useClock } from '@/modules/cerberus/hooks/useClock';
 import { UnreachableBanner } from '@/modules/cerberus/UnreachableBanner';
-import { hm, sameLocalDay } from '@/modules/cerberus/utils/cerberusTime';
+import { hm, localIso, sameLocalDay } from '@/modules/cerberus/utils/cerberusTime';
 import type { CerberusCatalogEntryView } from '@/shared/cerberus-types';
 import { Badge, Button, Card, Switch } from '@/shared/ui';
 import { cn, formatShortDate } from '@/shared/utils';
@@ -19,7 +19,7 @@ const STAGGER_ROWS = 12;
 
 /** A moment as its time when it is on `now`'s local day ("09:14"), else as its short date ("Sep 12"). */
 function dayOrTime(ms: number, now: number): string {
-  return sameLocalDay(ms, now) ? hm(ms) : formatShortDate(new Date(ms).toISOString()) ?? hm(ms);
+  return sameLocalDay(ms, now) ? hm(ms) : formatShortDate(localIso(ms)) ?? hm(ms);
 }
 
 /** "3 runs · all succeeded", "3 runs · 2 succeeded" or "Never run": the runs that have ended, and how many succeeded. */

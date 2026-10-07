@@ -43,10 +43,10 @@ import '@/shared/ui/verve/feedback.css';
 // The FAB and split-pane paint shares no selector with the files either side of it, so its only
 // constraint is that board.css stays last, below.
 import '@/shared/ui/verve/surfaces.css';
-// panels.css holds the paint of TextArea, Sheet, Timeline, Steps and Checkbox. `.vv-textarea` composes
+// panels.css holds the paint of TextArea, Sheet, Timeline, Steps, Checkbox and DialogFrame. `.vv-textarea` composes
 // `.vv-input` (controls.css) and wins each tie it has — against `.vv-input`'s colours, against
 // src/index.css's pins on every `textarea` and against `text-sm`'s line height — by specificity, never by
-// order. The Sheet, Timeline, Steps and Checkbox rules share no selector with any sibling. So nothing
+// order. The Sheet, Timeline, Steps, Checkbox and DialogFrame rules share no selector with any sibling. So nothing
 // here depends on its place against controls.css, feedback.css or surfaces.css, and the one constraint
 // is that board.css stays last, below.
 import '@/shared/ui/verve/panels.css';
@@ -58,9 +58,11 @@ import '@/shared/ui/verve/board.css';
 export { ActionMenu } from '@/shared/ui/ActionMenu';
 export type { ActionMenuItem } from '@/shared/ui/ActionMenu';
 export { Avatar } from '@/shared/ui/Avatar';
-export { Badge, badgeVariants } from '@/shared/ui/Badge';
+export { Badge } from '@/shared/ui/Badge';
+export { badgeVariants } from '@/shared/ui/badgeVariants';
 export { Banner } from '@/shared/ui/Banner';
-export { Button, buttonVariants } from '@/shared/ui/Button';
+export { Button } from '@/shared/ui/Button';
+export { buttonVariants } from '@/shared/ui/buttonVariants';
 export { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/shared/ui/Card';
 // The one fold a card's header can wear: the chevron glyph every foldable surface draws, the button
 // the four lane cards press, and the body slot that puts `inert` + `aria-hidden` on a folded card's
@@ -79,6 +81,11 @@ export { DarkModeToggle } from '@/shared/ui/DarkModeToggle';
 export { AppLogo } from '@/shared/ui/AppLogo';
 export { default as DeepSeekLogo } from '@/shared/ui/DeepSeekLogo';
 export { Dialog, DialogTrigger, DialogContent, DialogTitle } from '@/shared/ui/Dialog';
+// Verve's overlays/Modal on the Dialog above: a 520 or 600 wide panel with the serif title and its accent word and the
+// round ✕, closing from Escape, the backdrop and the ✕, whose paint is `.vv-dialogframe*`. The cerberus tab's Mute, Enroll,
+// Promote and Update wardens dialogs are framed by it: a kit piece rather than the module's own because Verve draws it, so
+// the next module with a form to raise composes the frame instead of building another.
+export { DialogFrame } from '@/shared/ui/DialogFrame';
 export { DockableFab } from '@/shared/ui/DockableFab';
 export type { DockableFabPosition } from '@/shared/ui/DockableFab';
 export { ResizeGrip } from '@/shared/ui/ResizeGrip';

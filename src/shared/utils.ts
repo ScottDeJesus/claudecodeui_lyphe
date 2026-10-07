@@ -353,11 +353,11 @@ export function formatRelativeTime(iso: string | null | undefined): string {
 }
 
 /**
- * A UTC stamp as the reader's own short date — `Oct 3`, with the year once it is not this year's —
- * or `null` for no stamp, or one that is not a time. The roadmap's one spelling of a day, so a step
- * phrase (`useStepPhrase`), the milestone banner (`CelebrationLayer`), a feature's dates
- * (`FeatureFacts`) and a reached milestone's panel (`panel/MilestonePanel`) all name it alike, in the
- * browser's own locale.
+ * An ISO stamp (the roadmap's UTC one, or a local one with its offset) as the reader's own short
+ * date — `Oct 3`, with the year once it is not this year's — or `null` for no stamp, or one that is
+ * not a time. The roadmap's one spelling of a day, so a step phrase (`useStepPhrase`), the milestone
+ * banner (`CelebrationLayer`), a feature's dates (`FeatureFacts`) and a reached milestone's panel
+ * (`panel/MilestonePanel`) all name it alike, in the browser's own locale.
  */
 export function formatShortDate(stamp: string | null | undefined): string | null {
   if (!stamp) return null;

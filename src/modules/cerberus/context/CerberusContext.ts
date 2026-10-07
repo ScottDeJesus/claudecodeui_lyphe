@@ -1,7 +1,7 @@
 import { createContext, useContext } from 'react';
 
-import type { CerberusCatalogEntryView, CerberusNodeProject, CerberusOverview, CerberusWardens } from '@/shared/cerberus-types';
-import type { CerberusLabelInput, CerberusMuteInput, CerberusProjectMove, CerberusPromoteInput, CerberusStartedBatch } from '@/shared/types';
+import type { CerberusCatalogEntryView, CerberusNodeProject, CerberusOverview, CerberusStartedBatch, CerberusWardens } from '@/shared/cerberus-types';
+import type { CerberusLabelInput, CerberusMuteInput, CerberusProjectMove, CerberusPromoteInput } from '@/shared/types';
 
 /**
  * The fleet as center's read model last answered it, the catalog beside it, and the writes the tab presses. No
@@ -55,8 +55,11 @@ export type CerberusValue = {
   /**
    * Runs a catalog entry now, by you. Answers `true` when it started, and by then the overview holds the
    * run; on `false` the toast has said why (a run already going on the check, the node's warden not linked).
+   * `onStarted`, when given, is called with the id of the run the press started as soon as the answer names it,
+   * before the re-read (the check sheet pins its Fix output to that run); it is not called when the answer
+   * cannot be read, nor for a second press that joins the first's write.
    */
-  runEntry: (id: string) => Promise<boolean>;
+  runEntry: (id: string, onStarted?: (runId: string) => void) => Promise<boolean>;
   /** Switches an entry's auto-run on or off. Answers `true` when it landed, with the catalog re-read; a capped entry is refused and the toast says so. */
   setAuto: (id: string, on: boolean) => Promise<boolean>;
   /**
@@ -68,7 +71,9 @@ export type CerberusValue = {
   /**
    * Starts a batch that takes `nodes` to the release, one at a time. Answers the batch's id and its updates as they
    * stood, which the Update wardens dialog follows; `null` when it was refused (a batch already going, nothing
-   * built): the toast has said why, and the wardens are read again so a batch started elsewhere shows.
+   * built): the toast has said why, and the wardens are read again so a batch started elsewhere shows. Also `null`
+   * when the start landed and its answer could not be read: no toast, and the dialog follows the batch through
+   * `wardens.running`.
    */
   startUpdate: (nodes: string[]) => Promise<CerberusStartedBatch | null>;
   /**

@@ -27,6 +27,7 @@ import { sessionsDb } from '@/modules/database/index.js';
 import { chatRunRegistry, runDetachedChatTurn } from '@/modules/websocket/index.js';
 import type { ProviderRuntimeGateway } from '@/modules/websocket/index.js';
 
+import { noteNodeHostsChanged } from './colocated-hosts.js';
 import { lastTurnFinishedAt, retireHost } from './hosts.js';
 import type { LiveHost } from './hosts.js';
 
@@ -56,8 +57,13 @@ export function readoptHost(host: ReadoptableHost, deps: ReadoptDeps, node: stri
   const row = sessionsDb.getSessionById(host.appSessionId);
   if (!row) {
     console.log(`[keepalive] host ${host.hostId}${where} has no session row left — retiring it`);
-    if (node === null) retireHost(host.hostId);
-    else nodeSessions.retireHost(node, host.hostId);
+    if (node === null) {
+      retireHost(host.hostId);
+    } else {
+      nodeSessions.retireHost(node, host.hostId);
+      // The node's last list still names the host just retired, and its card counts that list.
+      noteNodeHostsChanged(node);
+    }
     return false;
   }
 

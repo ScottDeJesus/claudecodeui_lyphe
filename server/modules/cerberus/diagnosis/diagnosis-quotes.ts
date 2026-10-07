@@ -20,7 +20,7 @@
  * EVIDENCE), and the operator's to judge on the sheet. The refusal therefore never offers "take the marks off" as the
  * way out — it would teach the gate's one blind spot — and says to copy exactly or leave the claim out.
  *
- * Consumers: `diagnosis-deps.ts`, whose `submit` refuses a submission, and `note` a finding, with a quotation no read
+ * Consumers: `diagnosis-absence.ts` (`flatten`) and `diagnosis-deps.ts`, whose `submit` refuses a submission, and `note` a finding, with a quotation no read
  * holds, so the agent hears which and tries again.
  */
 
@@ -32,11 +32,11 @@ const CLOSERS: Readonly<Record<string, string>> = { "'": "'", '"': '"', '“': '
 
 const isWordCharacter = (character: string | undefined): boolean => character !== undefined && /[\p{L}\p{N}]/u.test(character);
 
-/** Lower-cased, every run of whitespace one space: how a quotation and a read are compared. */
-const flatten = (text: string): string => text.replace(/\s+/g, ' ').trim().toLowerCase();
+/** Lower-cased, every run of whitespace one space: how a quotation and a read are compared (and `diagnosis-absence.ts` compares a line to a phrase). */
+export const flatten = (text: string): string => text.replace(/\s+/g, ' ').trim().toLowerCase();
 
 /** The text between quotes in `line`, in order of appearance. */
-export function quotationsIn(line: string): string[] {
+function quotationsIn(line: string): string[] {
   const found: string[] = [];
   for (let open = 0; open < line.length; open += 1) {
     const closer = CLOSERS[line[open]];

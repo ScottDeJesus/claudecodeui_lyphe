@@ -1,9 +1,9 @@
 {
   "name": "cerberus-warden",
-  "version": "0.10.0",
+  "version": "0.11.0",
   "private": true,
   "cerberus": {
-    "note": "Same warden as 0.9.0; cut to deliver it through the Update wardens dialog"
+    "note": "health_doc honours a timeout above 2,147,483 s; the diagnosis masks before it cuts and refuses more stores; times are local with their offset"
   },
   "type": "module",
   "engines": {

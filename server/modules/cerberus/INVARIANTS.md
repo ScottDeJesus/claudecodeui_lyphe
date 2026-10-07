@@ -11,6 +11,8 @@ Behaviour of each: MAN-7805 (connection, steps), MAN-7806 (repositories, updates
 | Replace the two `CROSS JOIN`s in `rowsInWindow` with plain `JOIN` | a window read walks every row of the node | no `ANALYZE` ever runs on this store, so the planner drives from `results` on `node` alone: 200 ms a part against 0.1 ms pinned, 466k rows |
 | Turn `results.insert`'s `ON CONFLICT … DO NOTHING` into `INSERT OR IGNORE` | a malformed row answers `false` exactly as a resend does, so a lost row is acked as a duplicate | a `false` is a resend, which the caller acks |
 | Change `transitions`' whole-instant return or the activity cursor (`before = last.at`, strict `<`) without the other | rows sharing one `at` are skipped at a page boundary | a health document stamps every component with one `at` |
+| Edit `transitions`' CTE WHERE (`kind = 'change' AND prev_status IS NOT NULL AND ${statusDiffers()}`) or `pruneKeepalivesBefore`'s (`kind = 'keepalive'`) so it no longer carries its partial index's terms, or edit `ix_results_moves` / `ix_results_keepalives` in step 4 | What happened walks every row of `results` again, and the 04:10 prune scans the table to find keep-alives | SQLite uses a partial index only when the query states the index's WHERE, so the two sides are spelled to match word for word (`statusDiffers()` spells the third term); step 4 has run on the live store, so a changed index is a step 5 |
+| Start the prune at `start()` or on a timer measured from the last run, instead of at the next 04:10 (`nextPruneAt`) | every handover pays a full `DELETE` (the server hands over about 170 times a day: 56 runs measured 2026-10-06), and a daylight-saving change moves the hour | an hour of the day is a fixed point, not a wait a restart resets; each run arms the next from the clock |
 | Pass an unclamped `limit` to SQL | `LIMIT -1` dumps the table | SQLite reads a negative limit as no limit |
 | Let a new `results.at` be a string or fraction | that row is the check's latest for ever | TEXT sorts above every number; the column's affinity cannot refuse it |
 | Drop the JS line check or the run-exists read in `cerberusRunsDb.insertOutput` | a malformed line answers as a resend; output filed under no `runs` row is kept for ever | `INSERT OR IGNORE` swallows a NOT NULL / CHECK violation; the prune reaches output only through `runs.requested_at` |
@@ -21,6 +23,7 @@ Behaviour of each: MAN-7805 (connection, steps), MAN-7806 (repositories, updates
 | Turn `cerberusDiagnosesDb.insertStep`'s `ON CONFLICT … DO NOTHING` into `INSERT OR IGNORE`, or drop its diagnosis read | a malformed step answers as a repeat; a step filed under no diagnosis is kept for ever; a step lands under a "Ready" pill | `OR IGNORE` swallows a NOT NULL violation; `diag_steps` has no foreign key; the read is also what answers `false` for an ended diagnosis |
 | Cut `cerberusCatalogDb.changes` or `cerberusRunsDb.recent` at `limit` inside a group sharing one instant | a feed cursor (`before` = last row's moment, strict `<`) skips the rest of the group | a health document that flips many checks starts several runs in one millisecond |
 | Delete an `updates` or `update_steps` row, prune either table, or turn `cerberusUpdatesDb.insertStep`'s `ON CONFLICT … DO NOTHING` into `INSERT OR IGNORE` | an update loses its history, or a malformed step answers `false` exactly as a resent one does and is lost | updates are kept for ever (spec Table 4); the primary key is the only conflict a resend may meet |
+| Drop `result = 'updated' AND ended_at >= @since` from `cerberusUpdatesDb.rolledBackAfterUpdated`, write its step outside its transaction or when the statement changed nothing, or move `ended_at` in it | an `updated` of any age turns `rolled_back` on a stale or resent hello, a second step per resent hello, a `rolled_back` update with no `failed` step, or an activity feed and pause window that lose the moment center heard the release | the guard is the statement's own, so two processes cannot amend twice; it is the one verb that moves an ended update (MAN-7957) |
 | Drop the `ended_at IS NULL` guard in `cerberusUpdatesDb.insertStep`, the `MAX(…)` clamp in `end`, or the id / `result` checks in `insert` / `end` | a `restarting` step filed after the end, or an end stored before the start, gives `pauseWindows` a span that ends before it begins; a NULL `result` ends an update with no verdict; a NULL id makes a live update nothing can end, which blocks every later batch | the table lets all four through: no `NOT NULL` on a `PRIMARY KEY`, a `CHECK … IN` passes NULL, and the step 2 DDL that has run on the live store is never edited |
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/cerberus-connection.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/cerberus-schema.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/cerberus-catalog.db.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/cerberus-diagnoses.db.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/cerberus-mutes.db.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/cerberus-results.db.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/cerberus-runs.db.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/cerberus-updates.db.ts
@@ -198,10 +201,13 @@ Behaviour of each: MAN-7904 (runs), MAN-7803 (the link that acks run frames), MA
 | Recheck on anything but a first `ok` end of an entry with `recheck`, or run any probe but the run's own check's | a failed fix re-measures nothing worth measuring; one fix triggers other checks (entries never chain) | one check, one fix, one probe; `reporting_probe` is the probe that reports the check |
 | Conclude from a hello that does not say (`active.runs` null), end a run the hello names in `runs` or `owed`, or end an unnamed run by the process's start when the warden DOES report `owed` | a warden older than the runner has every live run ended `failed`; a run that ended while the link was down loses the outbox frames that would have ended it; a `run.start` lost on a dropped link while the process lived on holds its check for ever | `owed` is the warden's own account of what it still owes: with it, a run named in neither list is lost; without it (an older build) only a run of a process that is gone, told by `startedAt`, is ended |
 | Drop `owed` from the warden's `state()` (`daemon.mjs` `runsOwed`), or name in it a run whose frames center already acked | every lost `run.start` is back to holding its check until a warden restart, or a finished run is left live for ever | the list is exactly the run ids in unacked `run.*` frames of the outbox that are not running |
-| Act on every move ingest hands over (`auto-run.ts` without the last-move-per-check and staleness tests) | a failure that healed hours ago, replayed from a warden's outbox, runs a fix on a healthy node and spends one of the entry's runs | a move is an event only while it is news: the last move of a frame is the state it left, and a result older than the check's `stale_after` is history |
+| Act on every move ingest hands over (`auto-run.ts` without the net-move-per-check and staleness tests) | a failure that healed hours ago, replayed from a warden's outbox, runs a fix on a healthy node and spends one of the entry's runs | a move is an event only while it is news: a frame's moves of one check are judged as ONE net move (the first `from` to the last `to`: `[ok, failing, ok]` is no move, `[ok, warn, failing]` is ok into failing, which a `when: warn` entry must see), and a result older than the check's `stale_after` is history |
 | Store a warden's `startedAt` / `endedAt` as it sent them, or stop clamping them (`run-frames.ts` `onCenterClock`) | a warden clock behind by more than a run's length loses the run's `ended` line when the feed is paged; one reading far ahead keeps the run on its need for ever | all of a run's moments are center's clock, between the request and now |
 | Let `ackedVersionCovering` answer from the newest ACKED set instead of the newest set | a press in the round trip after a catalog write names a version the warden has already moved past and is refused, and an auto run spends its slot | a `run.start` reaches the warden behind the `catalog.set` sent before it |
 | Hint a run's check before its write commits, or coalesce `cerberus_run_output` | a screen re-reads before the row exists; a running fix's lines arrive a second late and in clumps | output is a picture sent once per stored batch; the hint is coalesced and follows the write |
+| Hint a run's check on every `run.output` batch | an open sheet re-reads three routes once a second for as long as a fix prints; a 12-line run costs a round trip per second | a run's start and end hint; its lines are the `cerberus_run_output` frame (`useRunOutput`, `useRunLastLine`) |
+| Start an auto run on the entry as the rule chose it, without reading it again after the ack wait (`startRun`) | an entry switched off, capped or retired in the 10 s wait still runs, or is written `failed`: a run that never was is in the history and spends the entry's limit | `startRun` reads the entry after the wait; an auto run whose entry is off, capped or retired is not written or sent, and leaves one log line |
+| Bound a need's going run by the check's `since` (`needRuns` in `run-views.ts`) | a status that moves while its fix runs (warn to failing as the service restarts) takes `since` past the run's request, and the card offers Run beside a fix that is running: the press meets a 409 | an active run (`ended_at` NULL) always shows; `since` bounds only an ended run's linger |
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/auto-run.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/catalog-ack.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/read-model/run-views.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/run-ending.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/run-frames.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/run-reconcile.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/runs.service.ts
 
@@ -709,13 +715,14 @@ Behaviour of each: MAN-7930 (the agent), MAN-7806 (the history statements). The 
 | Drop `persistSession: false`, or move `cwd` out of a hidden project root | a diagnosis becomes a chat in a project list, and its prompt is walked by the heal reading as if the operator had said it | the prompt is Cerberus's, not the operator's (`hidden-project-paths.ts`, AGENTS.md) |
 | Build the node's three reads when `deps.linked` is false, or add a tool that runs a command, writes a file or reaches another node | a diagnosis of an unreachable node asks a link that is not there, or the agent can change something | the node's reads are a fixed menu of argv reads that exist only while the node's diagnosis is open; `history_read` is the only thing read across nodes (spec Table 7) |
 | Make `submit_diagnosis` a plain tool whose argument the loop reads off the stream, or count a submission its handler refused | the loop answers a conclusion the store's `end` or the service refused, or one the schema never validated | `captureSubmission` counts only a call the tool's own handler accepted |
-| Return `keepalive` or value-only rows from `history_read`'s `results`, or fetch `limit` and no more per kind | a long-red check's window is a page of the same ticking line and never reaches the moment it went red; an exact fit reads as a cut | measured 2026-10-07: `servpro_kpm_reference` stored 1 341 change rows in 14 h, 1 of them a status move |
+| Return `keepalive` or value-only rows from `history_read`'s `results`, or fetch `limit` and no more per kind | a long-red check's window is a page of the same ticking line and never reaches the moment it went red; an exact fit reads as a cut | measured 2026-10-07: `servpro_kpm_reference` stored 1 341 change rows in 14 h, 1 of them a status move; rows stored before that day's rule (a moved value is no change) stay in the store |
 | Let a tool throw instead of answering an error result, or interpolate an argument into SQL | the SDK reports a failed tool as a protocol error the agent cannot work around; or the agent's text reaches the store as SQL | `historyConditions` binds every value and interpolates only the repository's own column |
 | Let a text reach the agent without `oneMaskedLine` (a new field in the prompt or in a history line), or change the warden's `maskSecrets` without `diagnosis-text.ts` | a credential-looking value in a check's value, a result, a fix's command, a run or a summary reaches the model, which can quote it into `evidence` or a `proposal` that is stored for ever and drawn on the sheet | the two doors are masked by two copies of one set of patterns; the warden's file cannot be imported here |
 | Drop `submit_diagnosis`'s once-guard, its "no proposal without evidence" refusal, or let `captureSubmission` overwrite the first accepted call | two parallel submissions reach `deps.submit` and the agent answers the second while a first-end-wins store keeps the first; a fix proposed with no cause found is stored and offered as a one-off | the gate is the only place that can refuse a conclusion the agent can still correct |
 | Let `callNode` run unbounded in `readFromNode` | a read the warden never answers (a lost frame) blocks the agent until the loop's 3-minute ceiling, and it never learns to go on with history | the warden answers a read at 10 s, so 15 s of silence is a lost frame |
 | Add a read the budget does not count, drop `DIAGNOSIS_READ_BUDGET`'s refusal, or put the probe's `dsn` in `describeMeasurement` | an exploring model reads until its turns end and the diagnosis "failed" for want of a conclusion (measured 2026-10-07: 24 turns on Haiku, never submitted); or a connection string reaches the model | the budget and the refusal bound the reads well inside the turn ceiling; the prompt names what a check measures so the first read has somewhere to go, and a credential is never among the fields |
 | Pass `model` through a second default | the row says one model and the run used another | `resolveDiagnosisModel` is the one place `CERBERUS_DIAG_MODEL` and `sonnet` are named |
+| Drop `keepAnswersInline` (`_meta['anthropic/maxResultSizeChars']` 72 000 on a tool definition), or return a definition without it | an answer past the CLI's default per-tool limit is written under `~/.claude/projects/<cwd>/<session>/tool-results/` and the model gets a preview and a path it has no Read tool to open; measured 2026-10-07: a 64 KB `file_read` left 65 514 bytes of masked text there and the next step re-read the log as a 100-line tail | the warden caps an answer at 64 KiB and the tool frames it, so 72 000 holds the largest read; the limit is put on once where the list returns, so a seventh tool cannot miss it |
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/diagnosis/diagnosis-agent.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/diagnosis/diagnosis-history.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/diagnosis/diagnosis-measurement.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/diagnosis/diagnosis-prompt.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/diagnosis/diagnosis-text.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/diagnosis/diagnosis-tools.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/cerberus-history-filter.ts
 
@@ -730,7 +737,9 @@ Behaviour of each: MAN-7933 (center's updates), MAN-7929 (the warden's updater a
 | Let the silence callback throw, or drop its `try`/`catch` | a store error inside a timer ends the whole API process | the clock is the net under every other way an update ends |
 | Arm the silence clock at 3 minutes after a `waiting` step | a warden legitimately waiting on a fix for more than 3 minutes is failed, its batch moves a second node on while it is still working, and it then restarts onto the release with no `restarting` step stored, no pause laid and the row `failed` | `waiting` is the warden's promise of another step for up to 10 minutes (`WAIT_LIMIT_MS`); `armSilenceTimer` reads the newest stored step, so a restarted center arms the long limit too |
 | Write the closing step (a rollback's, the silence's) after `cerberusUpdatesDb.end`, or outside its transaction | the step is refused (`insertStep` writes nothing for an ended update), or the update shows its last step while still running | the step and the end are one transaction, step first |
-| End an update from a hello that does not name a LIVE update of THIS node and its own `to` / `failed`, or take `reason` from anywhere but the hello | another node's, a repeated or a pre-restart hello ends an update that is still running, or ends it with a reason it never had | `settleFromHello`: the first end wins, and a hello naming an ended or unknown update ends nothing |
+| End an update from a hello that does not name a LIVE update of THIS node and its own `to` / `failed`, or take `reason` from anywhere but the hello | another node's, a repeated or a pre-restart hello ends an update that is still running, or ends it with a reason it never had | `settleFromHello`: the first end wins, and a hello naming an ended or unknown update ends nothing — but a `failed` one for an update that ended `updated` under 120 s ago whose `to` it names (`amendLateRollback`) |
+| Amend an ended update by any path but `cerberusUpdatesDb.rolledBackAfterUpdated`, widen `LATE_ROLLBACK_WINDOW_MS`, or write its step apart from the `result` change | a stale or resent hello rewrites history: an `updated` from days ago turns `rolled_back`, a second step per resent hello, or a `rolled_back` update with no `failed` step | the statement's own guard (`result = 'updated' AND ended_at >= since`) and the step in the same transaction; `ended_at` stays, so the activity feed and the pause window keep the moment center heard the new release |
+| Start a run (`startRun`, `auto-run.ts`) or open a diagnosis session (`openSession`) on a node without asking `cerberusUpdatesDb.activeNode()`, or keep that answer in the driver's memory | a run or `diag.open` lands after the warden's last idle check and dies in its clean stop; a handover's two processes disagree on which node is closed | `activeNode()` reads the oldest live update from the store; the update behind it in its batch is not closed until its turn |
 | Offer a release other than the update's `to_version`, or read `latest.json` once and keep it | a batch toward N is offered N+1's hash, or a build that landed is not seen until a restart | `readLatestBuild` reads the disk on every call and the driver ends the update `failed` when the latest has moved on |
 | Move the `running()` check of `startBatch` out of its transaction | two presses both pass it and two batches run at once | the check and the inserts are one synchronous transaction |
 | Drop the 90 s cut of `pauseWindows`, or `buildNodeOverlay`'s move of a silence out of a pause | a rollback that takes longer reads `paused` for ever instead of silent, or a node is silent inside a pause | a node is silent after 90 s unheard; the pause is for a restart, not for an outage |
@@ -764,8 +773,119 @@ Behaviour of each: MAN-7936 (the lifecycle), MAN-7937 (the one-off, run, promoti
 | Judge a promotion's 409s before its 400s, or let `limit` through unchecked | a bad body is answered with the diagnosis's state; a limit the dialog never offers reaches the catalog | the body is judged first: 404, 400 (`limit.runs` 1, 2 or 4, `limit.per` 3600), then 409 |
 | Remove the hub's `canRunFixes` refusal in `submit` | a hub diagnosis proposes a fix no warden can run, and a promotion of it fails at `node` | `center` runs no warden; `proposal: null` is the only honest ending |
 | Put text the agent typed (a path, a `contains`, a unit) into a step without `oneMaskedLine` | a credential-looking value is stored for ever and drawn on the sheet | the step is the one stored text that comes straight from the model's arguments |
+| File a `note` as a step without `oneMaskedLine`, or store a submission's summary, evidence or fix-button name without `maskedConclusion` (`diagnosis.service.ts`) | a credential the model reassembled from pieces is drawn on the sheet and kept for ever | every input the model sees is masked, but its own words are not; the mask runs on the way out too, before any cut |
+| Mask a proposal's `cmd` or `general` instead of refusing it, or drop the `carriesCredential` refusal in `submit` | the masked command does not run; an unmasked one is stored and offered to a warden | `submit` throws "A proposed command may not carry a credential" to the agent, which resubmits without it; a proposal the mask would change is never stored |
+| Drop `submit`'s `unquotedLines` refusal (`diagnosis-absence.ts`), hold an evidence line to the prompt as a source, count a read's own empty sentence (`EMPTY_ANSWERS`, `ABSENCE_PHRASES`) as a line, or accept a line that is a share of a line, a label before one, or a word list's idea of what is not an absence | a run files the read's own empty answer ("journal: -- No entries --", "Nothing recorded since …"), the check's own value, a count of what was not there ("zero approval-engine sweep entries found"), a paraphrase of a file, a journal line cut in the middle with `...`, its time moved or two lines spliced, or "approval sweeper silent;" before a real line, as evidence, and may propose a fix on it | measured 2026-10-07 (INV-7169): three Haiku runs on empty reads filed 0, 0 and 3 absence lines, one proposing a restart; a live diagnosis of `shadow-connector/approval_engine` filed "zero approval-engine sweep entries found" and a paraphrase of a drift report; a gate on "a quoted piece of 8 characters" passed the check's own value, another engine's line decorated with its dict keys and an absence behind one quoted identifier; a gate on a share of the line plus a negative-word list passed a line cut with `...`, its time moved and its own conclusion on the end. An absence has nothing to copy and an edited line is not a line of a read, so an evidence line is held to ONE rule: one verbatim stretch of one line of an answer of a read that SUCCEEDED (never the prompt, the reads' empty sentences dropped), at least 20 characters, the punctuation at its two ends let go, nothing of the agent's own on it |
 | Send a read after the diagnosis ended (drop `isOver`), or write a `diag.call` frame from anywhere but `diagnosis-wire.ts` | a late tool call reaches a warden that closed the session; a second place speaks the wire | one file owns the five frames' center side |
 | Recheck only entries (drop `run.diagnosis !== null` in `run-frames.ts`) | a one-off that fixed the check leaves it red until its next cadence, and the sheet shows a green fix beside a red check | a one-off was proposed for this very check |
 | Name the run of a one-off by its diagnosis id | the sheet and the feed say "ran 61d4ee4f…" | `run-views.ts` reads the proposal's name |
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/diagnosis/diagnosis-deps.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/diagnosis/diagnosis-promotion.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/diagnosis/diagnosis-proposal.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/diagnosis/diagnosis.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/diagnosis/diagnosis.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/diagnosis/diagnosis-steps.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/diagnosis/diagnosis-step-words.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/diagnosis/diagnosis-wire.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/read-model/diagnosis-views.ts
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/diagnosis/diagnosis-absence.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/diagnosis/diagnosis-deps.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/diagnosis/diagnosis-promotion.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/diagnosis/diagnosis-proposal.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/diagnosis/diagnosis.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/diagnosis/diagnosis.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/diagnosis/diagnosis-steps.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/diagnosis/diagnosis-step-words.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/diagnosis/diagnosis-wire.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/read-model/diagnosis-views.ts
+
+## INV-7231 — The hub and ingest — edits that break them: `start()` before READY, the re-seed at hello, the storage rule, the newest value
+
+Behaviour of each: MAN-7804 (the hub, READY), MAN-7801 (the storage rule), MAN-7811 (ingest, `reseedNode`), MAN-7955 (`newest`), MAN-7808 (the read model).
+
+| Edit | Breaks | Why |
+|---|---|---|
+| Move `cerberus.start()` after `signalReady()`, take the 3 s race out of `Promise.race([cerberus.start(), delay(3_000)])`, or make it an unbounded `await` | the successor's gateway binds after the supervisor retired the predecessor: `CERBERUS_LISTEN` is unbound 0.74–1.21 s a handover (six handovers, 2026-10-06) and a warden's first redial is refused; unbounded, a store that blocks holds READY for ever | READY is the supervisor's cue to retire the old process; `start()` first stands the successor's gateway beside it under `reusePort`; the 3 s bounds the wait for the bind and nothing before it |
+| Ingest a connect hello's results before `ingest.reseedNode(node)` has run (it follows `recordHello` and precedes `wardenLinks.attach` and the `welcome`), skip it for `center` before the first self-check tick, open a transaction in it, or let it lower `lastReceivedAt` | a result is judged against a retiring process's memory: a wrong `prev_status`, a `since` and an auto-run move that never happened (measured 2026-10-06: `eis1 shadow-connector/system_resources` stored `ok` where the real previous was `warn`); a lowered `lastReceivedAt` throws away the boot vouch | the retiring process keeps its warden links until it exits and stores rows after its successor seeded; the re-seed runs in whichever process takes the hello, and `seedMemory` stays once per process |
+| Put `value` back into `storeFrame`'s change test, or store a keep-alive without the result's newest `value` and `data` | a value that moves under an unchanged status is a `change` row again (≈ 26 000 a day on eis1, 97 % of the `change` rows) and What happened, Needs you, `since` and auto-run read noise; or the only stored copy of a value goes stale | a `change` is a move of status or document status, a lapse (`prevAt` null, or `at − prevAt > staleAfter`) or a first sight; a value rides the 300 s keep-alive and `newest` in memory |
+| Show a check's value, or answer a lookup, from the stored row alone, or let `newest` move `status`, `stored`, `since` or staleness | the screen shows a value up to five minutes old; or a status move that nothing stored | `newest` is the newest accepted result, stored or not; it speaks for `value`, `at` and `resultAt` only, and only while newer than the stored row; a boot starts it empty |
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/cerberus.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/ingest.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/read-model/check-views.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/read-model/lookup.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/self-checks.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/warden-link.ts
+
+## INV-7232 — probe — LOW — the `start()` and `readInputs` comments name a window that cannot happen
+
+LOW — the `start()` and `readInputs` comments name a window that cannot happen
+
+```probe
+D=$(mktemp -d /tmp/athena-p1.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+D=$(dirname "$0")
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+F=server/modules/cerberus/cerberus.module.ts
+echo "comment lines naming the window: $(grep -c 'opening the store; unseeded\|first read, whichever comes first' $F)"
+echo "awaits in start() up to the gateway bind: $(awk '/async function start\(\)/,/startWardenGateway/' $F | grep -c '^[^/]*await ')"
+cat > "$D/listen.mjs" <<'JS'
+import http from 'node:http';
+let t0 = 0, syncEnd = null, handlerAt = null;
+const server = http.createServer((req, res) => { handlerAt = Date.now() - t0; res.end('ok'); });
+async function start() { const until = Date.now() + 300; while (Date.now() < until) {} syncEnd = Date.now() - t0; await new Promise((r) => setTimeout(r, 30)); }
+server.once('listening', () => {
+  t0 = Date.now();
+  http.get({ port: server.address().port, host: '127.0.0.1', path: '/' }, (res) => { res.resume(); res.on('end', () => {
+    console.log(handlerAt >= syncEnd ? 'request dialed at the bind was handled AFTER start() synchronous part' : 'request was handled DURING start() synchronous part'); process.exit(0); }); });
+});
+server.listen({ port: 0, host: '127.0.0.1' }, async () => { await Promise.race([start(), new Promise((r) => setTimeout(r, 3000))]); });
+JS
+node "$D/listen.mjs"
+EOF
+bash "$D/p.sh"
+expect: "comment lines naming the window: 2" (0 once the comment is cured), "awaits in start() up to the gateway bind: 1" (the bind itself), and "request dialed at the bind was handled AFTER start() synchronous part"
+```
+
+measured 2026-10-07 by chain chain-cerberus--judgment--docs-20261007-123144-1ebe, finding L1, LOW
+probe-key: 3284ecf3b0b61fa5a3cf29880606c0c55bd7da6a
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/cerberus.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/cerberus-types.ts, /home/lyphe/.claude/claudecodeui_lyphe/warden/src/local-time.mjs
+
+## INV-7233 — probe — LOW — `CerberusDiagnosisToolDeps` says `linked` is "whether its warden is connected"; it is whether the node's session opened
+
+LOW — `CerberusDiagnosisToolDeps` says `linked` is "whether its warden is connected"; it is whether the node's session opened
+
+```probe
+D=$(mktemp -d /tmp/athena-p2.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+grep -n 'and `linked` whether its warden is connected' server/shared/cerberus-types.ts || echo "doc line: none"
+grep -n -A1 "historyOnlyStep(node, '\(updating\|busy\)')" server/modules/cerberus/diagnosis/diagnosis.service.ts
+EOF
+bash "$D/p.sh"
+expect: the doc line at 1613 (reads "doc line: none" once cured) and, beside it, the `updating` and `busy` branches each followed by `return false`
+```
+
+measured 2026-10-07 by chain chain-cerberus--judgment--docs-20261007-123144-1ebe, finding L2, LOW
+probe-key: 0e066b757f6b19a455290a570020ac001ebb931d
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/cerberus.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/cerberus-types.ts, /home/lyphe/.claude/claudecodeui_lyphe/warden/src/local-time.mjs
+
+## INV-7234 — probe — LOW — `localStamp(null)` prints the epoch, against its own header's promise
+
+LOW — `localStamp(null)` prints the epoch, against its own header's promise
+
+```probe
+D=$(mktemp -d /tmp/athena-p3.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+TZ=UTC node --input-type=module -e "
+import { localStamp } from './warden/src/local-time.mjs';
+for (const v of [undefined, null]) { try { console.log(String(v).padEnd(10), '->', localStamp(v)); } catch (e) { console.log(String(v).padEnd(10), '-> throws', e.constructor.name); } }"
+EOF
+bash "$D/p.sh"
+expect: "undefined  -> throws RangeError" and "null       -> 1970-01-01 00:00:00 +00:00" (the second reads "-> throws RangeError" once cured)
+```
+
+measured 2026-10-07 by chain chain-cerberus--judgment--docs-20261007-123144-1ebe, finding L3, LOW
+probe-key: d793f7a3c84a4a09e27107bd75b6d6db2a4fd6b1
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/cerberus.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/cerberus-types.ts, /home/lyphe/.claude/claudecodeui_lyphe/warden/src/local-time.mjs
+
+## INV-7235 — probe — LOW — the tree's `warden/` no longer equals the shipped 0.11.0
+
+LOW — the tree's `warden/` no longer equals the shipped 0.11.0
+
+```probe
+D=$(mktemp -d /tmp/athena-p4.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+diff -rq warden ~/.cerberus-warden/releases/0.11.0/warden | grep -v '^Only in warden' || echo none
+EOF
+bash "$D/p.sh"
+expect: "Files warden/src/local-time.mjs and …/releases/0.11.0/warden/src/local-time.mjs differ" ("none" once a warden release carries the edit)
+```
+
+measured 2026-10-07 by chain chain-cerberus--judgment--docs-20261007-123144-1ebe, finding L4, LOW
+probe-key: ea86ab2f73f3f49218b46aad57b7834158f6596f
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/cerberus.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/cerberus-types.ts, /home/lyphe/.claude/claudecodeui_lyphe/warden/src/local-time.mjs

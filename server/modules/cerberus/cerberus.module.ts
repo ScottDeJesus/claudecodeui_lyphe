@@ -23,19 +23,25 @@ import { wardenLinks } from './warden-links.js';
  * rather than called — the store and the gateway (`start`), the self-checks and the prune
  * (`soleDuties`), and their shutdown (`stop`).
  *
- * `start()` runs in the entrypoint's `listen` callback and does, in this order: opens the store
- * (its migrations run on the first open), loads the center key (a key that cannot be read or written
- * fails HERE, loudly, not on the first warden's enrollment), seeds the hub's own definitions, makes
- * every enrolled node known to the link registry (silent until heard), fills ingest's memory from
- * the store, registers the frames the services take from a warden (the catalog's, the runs', the
- * diagnoses' — which also ends the diagnoses a restart left running — and the updates', which also
- * picks up a batch a restart left half done) and arms Cerberus's own auto-run
- * rule on ingest's status changes — and only then binds the gateway, so the first warden to dial in
- * finds a center that knows its nodes (ingest's memory is also filled by the first read, whichever comes first — a
- * handover's new process is asked before `start()` runs); the warden's file routes (the enroll script and the release) are registered just
- * before that bind, so the gateway never answers a request they should have taken. A failure in any
- * step is logged and leaves the API serving: Cerberus is how the fleet is watched, never a reason for
- * the API to be down.
+ * `start()` runs in the entrypoint's `listen` callback BEFORE it signals READY (the entrypoint waits
+ * for the gateway's bind, at most 3 s; every step before the bind is synchronous): the supervisor
+ * retires the predecessor on READY, so a gateway bound first sits beside the retiring one under
+ * `reusePort` and the warden's address is never left unbound across a handover. It does, in this
+ * order: opens the store (its migrations run on the first open), loads the center key (a key that
+ * cannot be read or written fails HERE, loudly, not on the first warden's enrollment), seeds the
+ * hub's own definitions, makes every enrolled node known to the link registry (its `lastHeardAt`
+ * seeded from `nodes.last_heartbeat_at`, so it reads silent from boot only when that stamp is
+ * already more than 90 s old), fills ingest's memory from the store, registers the frames the
+ * catalog, the runs and the diagnoses take from a warden (the diagnoses' registration also ends the
+ * diagnoses a restart left running), arms Cerberus's own auto-run rule on ingest's status changes,
+ * registers the warden's file routes (the enroll script and the release) and the updates' frames (which
+ * also pick up a batch a restart left half done) — and only then binds the gateway, so the first
+ * warden to dial in finds a center that knows its nodes, and the gateway never answers a request those
+ * routes should have taken. A request dialed the moment the listener binds is queued by the kernel and
+ * handled after this synchronous part, so no read meets an unseeded memory; `readInputs()` still seeds,
+ * for a `start()` that failed before it did (an unreadable center key). A failure in any step is
+ * logged and leaves the API serving: Cerberus is how the fleet is watched, never a reason for the API
+ * to be down.
  *
  * `soleDuties()` is the entrypoint's `soleServerDuties` calling in, and it arms the self-checks and
  * the prune only in the process that holds the port: a second API process on the same store would
@@ -84,9 +90,10 @@ export function createCerberusModule(dependencies: { supervised: boolean }): {
 
   /** Everything the read model is handed with the store: one instant, the links, the gateway, ingest's memory. */
   function readInputs(): CerberusReadInputs {
-    // A new process answers requests from the moment it signals ready, a couple of seconds BEFORE
-    // `start()` runs; unseeded, every quiet check would read `stale` for that stretch (a handover's
-    // blank board). Seeding is once per process, so `start()`'s own call is then a no-op.
+    // `start()` seeds before the gateway binds, and a request waits for that synchronous part, so this
+    // call is a no-op while it works. It is here for a `start()` that failed before it seeded (an
+    // unreadable center key): the API serves on, and unseeded, every quiet check would read `stale`.
+    // Seeding is once per process.
     ingest.seedMemory();
     return {
       now: Date.now(),

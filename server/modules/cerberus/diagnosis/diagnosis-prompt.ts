@@ -19,11 +19,24 @@ import { oneMaskedLine } from './diagnosis-text.js';
  * operator on the sheet.
  *
  * Consumers: `diagnosis-agent.ts`, which builds it once per diagnosis from the check, its last stored
- * changes and its fixes.
+ * changes and its fixes; `diagnosis-absence.ts`, which reads `ABSENCE_PHRASES` to drop an answer line that says nothing from what an evidence line is held to.
  */
 
 /** The rule that keeps a diagnosis honest — spec §3, word for word, so the prompt and the spec cannot drift. */
 const EVIDENCE_RULE = 'Evidence is what was found, not what was assumed — absence of an error is never listed as evidence';
+
+/**
+ * The phrases the prompt names as never being evidence ("an empty read is not evidence"). One list, so the sentence the
+ * agent is told and the answer lines `diagnosis-absence.ts` refuses to count as a source (a line that is only one of them) cannot drift apart.
+ */
+export const ABSENCE_PHRASES: readonly string[] = [
+  'no entries',
+  'no failed units',
+  'no runs or diagnoses recorded',
+  'the journal is empty',
+  'nothing found',
+  'no errors',
+];
 
 /** Free text from the store (a check's value, a command) is cut to this before it enters the prompt. */
 const PROMPT_TEXT_LIMIT = 240;
@@ -60,10 +73,12 @@ function resultsSection(changes: CerberusStoredResultRow[]): string {
       : changes.map(
           (row) => `  ${localStamp(row.at)}  ${row.prev_status ?? 'first seen'} → ${row.status ?? 'not_enabled'}  ${oneLine(row.value)}`
         );
-  // Keep-alives are left out on purpose: twenty of them on a long-red check are one line said twenty times,
-  // while the changes carry the moves of the value (and of the status) the keep-alives repeat.
+  // Keep-alives are left out on purpose: twenty of them on a long-red check are one line said twenty times.
+  // A change is a move of the status or document status, a first sight, or the first reading after a gap in
+  // reporting; a value that moves under a steady status is stored in no change row (only in the keep-alives,
+  // whole, every five minutes), so the prompt says so rather than let the model hunt for a value history here.
   return [
-    `ITS LAST ${changes.length} CHANGES (newest first; each is a reading that differed from the one before it — keep-alives, the repeats stored every five minutes while nothing moved, are left out, and the check's current reading is above)`,
+    `ITS LAST ${changes.length} CHANGES (newest first; each is a move of status, a first sight, or the first reading after a gap in reporting — a value that moves under a steady status is not listed, keep-alives, the whole copies stored every five minutes while nothing moved, are left out, and the check's current reading is above)`,
     ...body,
   ].join('\n');
 }
@@ -91,7 +106,7 @@ function scopeSection(node: string, nodeToolsOpen: boolean): string {
           `  ${node} is Cerberus's own host and runs no warden, so log_read, file_read and status_read do not exist in this diagnosis: you read Cerberus history only. Say so in the summary if it limits what you can conclude. No fix can be run there, so submit proposal: null.`,
         ]
       : [
-          `  ${node}'s warden cannot be read in this diagnosis (it is not connected, or another diagnosis already holds its one session), so log_read, file_read and status_read do not exist: you read Cerberus history only. Say so in the summary if it limits what you can conclude.`,
+          `  ${node}'s warden cannot be read in this diagnosis (it is not connected, it is updating, or another diagnosis already holds its one session), so log_read, file_read and status_read do not exist: you read Cerberus history only. Say so in the summary if it limits what you can conclude.`,
         ];
   return [
     'WHAT YOU CAN READ — AND NOTHING ELSE',
@@ -138,10 +153,10 @@ export function buildDiagnosisSystemPrompt(input: {
     [
       'EVIDENCE',
       `${EVIDENCE_RULE}.`,
-      'Each evidence line cites what a journal, file, status or history actually said — quote the line, with its time or its file, in one line.',
-      'A quotation is copied character for character from ONE line of ONE answer: never two lines joined, never your own words between quotation marks, and never a "Note from Cerberus" — those notes under an answer are Cerberus talking to you, not the node. Cerberus refuses a submission whose quotation no read returned.',
-      'Say how much you saw: one error line is "one error at 07:12:11", not "consistently failing"; a figure you worked out yourself ("30 hours" from seconds) is yours, so say "about" or leave it out; and never say two things "match" unless a read said so.',
-      'An empty read is not evidence. These never go in the list, however you word them: "no entries", "no failed units", "no runs or diagnoses recorded", "the journal is empty", "nothing found", "no errors". They say only that nothing was seen in the place you looked, not what is wrong.',
+      'Each evidence line IS what a journal, file, status or history actually said: ONE line of ONE answer, copied character for character and nothing else — no label, no sentence of your own before or after it, no "..." in the middle, no time or figure changed, two lines never joined (it may stop short of the end of a long line). Your own conclusion goes in the summary.',
+      'A quotation is copied character for character from ONE line of ONE answer: never two lines joined, never your own words between quotation marks, and never a "Note from Cerberus" — those notes under an answer are Cerberus talking to you, not the node. Cerberus refuses a submission whose quotation no read returned, and refuses an evidence line that is not a line of a read: the check\'s own value and everything in this prompt are not reads, and an answer\'s empty sentence ("Nothing recorded since…", "the file is empty", "(no output)") is not a line.',
+      'In the summary, say how much you saw: one error line is "one error at 07:12:11", not "consistently failing"; a figure you worked out yourself ("30 hours" from seconds) is yours, so say "about" or leave it out; and never say two things "match" unless a read said so.',
+      `An empty read is not evidence, and neither is a count of what was not there ("zero entries found", "no sweep lines"). These never go in the list, however you word them: ${ABSENCE_PHRASES.map((phrase) => `"${phrase}"`).join(', ')}. They say only that nothing was seen in the place you looked, not what is wrong.`,
       'If you found nothing that explains the check, say so in the summary and submit an empty evidence list with proposal: null. Do not pad the list, and do not guess a cause to fill the gap.',
     ].join('\n'),
     [
@@ -154,7 +169,7 @@ export function buildDiagnosisSystemPrompt(input: {
     ].join('\n'),
     [
       'FINISHING',
-      'End by calling submit_diagnosis exactly once, with a summary (one or two sentences: what is wrong), the evidence list and the proposal (or null). Nothing after it is read.',
+      'End by calling submit_diagnosis exactly once, with a summary (one or two sentences: what is wrong; state as found only what an evidence line copies, and say "suggests" for a cause you infer), the evidence list and the proposal (or null). Nothing after it is read.',
     ].join('\n'),
   ]
     .filter((section): section is string => section !== null)

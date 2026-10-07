@@ -49,9 +49,12 @@ function frameNamesCheck(event: { kind?: string; checks?: unknown }, checkPath: 
  *
  * `detail` is `null` until a read for THIS check has answered: an answer for another check is never
  * shown, so switching rows in the sheet never flashes the old row's cells. `loading` is that same
- * wait. `error` is set when the latest read failed, and `detail` keeps the last good answer for the
- * same check beside it, so a blip leaves the sheet readable. Reads overlap, so each takes a ticket
- * and only the newest one's answer is published.
+ * wait. `error` is set when a read failed, and `detail` keeps the last good answer for the same check
+ * beside it, so a blip leaves the sheet readable. Reads overlap, so each takes a ticket and the question
+ * it was made for (the check, the moment, the strip's end): an outcome for any question but the one asked
+ * now is dropped, a good answer lands when its ticket is newer than the newest good one applied, and a
+ * failed read never discards one — it is published only while no newer good answer stands and no newer
+ * failure has been said, as the provider's overview read does.
  *
  * A caller holds `lookupAt` and `end` in state: a `Date.now()` passed from render is a new read on
  * every render.
@@ -86,20 +89,42 @@ export function useCheckDetail({ node, service, id, lookupAt, end }: {
   // Mount flag: an answer that lands after the sheet closed must not set state.
   const mountedRef = useRef(true);
 
-  // Which read this is. Only the newest ticket's answer is published: an answer for a time the
-  // person has already typed past must not land over the one for the time now on screen.
+  // The question being asked now: the check, the moment looked up and where the strip ends. A read carries the
+  // question it was made for, and an outcome for any other question is dropped on arrival: a read that
+  // left for the row or the time just left (a press on a sibling row, a typed time) says nothing about the
+  // one now on screen, whichever way it came out. Assigned by the effect below, before its first read.
+  const readKey = `${checkPath}@${lookupAt ?? 'now'}@${end ?? 'now'}`;
+  const askedKeyRef = useRef(readKey);
+
+  // Which read this is. Reads overlap, so each takes a ticket.
   const newestReadRef = useRef(0);
 
+  // The newest ticket whose GOOD answer has been applied; a failed read never moves it. An older good
+  // answer landing after a newer one is dropped, and one landing after a newer read that FAILED still
+  // lands: that is the provider's rule (`CerberusProvider`'s `newestAnswerRef`).
+  const newestAnswerRef = useRef(0);
+
+  // The newest ticket whose FAILURE has been published. A failure older than one already said is dropped,
+  // so a slow 500 never turns a newer 404 ("gone") into "can't be reached".
+  const newestFailureRef = useRef(0);
+
   /**
-   * One read's outcome, published — or dropped. Only the newest read of a sheet that is still open
-   * speaks; a read overtaken by a newer one (a time typed past, a row switched) says nothing.
+   * One read's outcome, published — or dropped. Only a read of the question asked now speaks. A good
+   * answer lands when its ticket is newer than the newest one applied, and clears the failure. A failure
+   * is published only while no newer good answer stands and no newer failure has been said, and it never
+   * throws a good answer away: `answer` stays beside it, and an older read still in flight whose answer
+   * is good may yet land over it.
    */
-  const publish = useCallback((ticket: number, detail: CerberusCheckDetail | null, kind: CheckDetailFailure) => {
-    if (!mountedRef.current || ticket !== newestReadRef.current) return;
+  const publish = useCallback((ticket: number, askedKey: string, detail: CerberusCheckDetail | null, kind: CheckDetailFailure) => {
+    if (!mountedRef.current || askedKey !== askedKeyRef.current) return;
     if (detail === null) {
+      if (ticket <= newestAnswerRef.current || ticket <= newestFailureRef.current) return;
+      newestFailureRef.current = ticket;
       setFailure({ kind, checkPath });
       return;
     }
+    if (ticket <= newestAnswerRef.current) return;
+    newestAnswerRef.current = ticket;
     setAnswer(detail);
     setFailure(null);
   }, [checkPath]);
@@ -122,11 +147,12 @@ export function useCheckDetail({ node, service, id, lookupAt, end }: {
       // A throw here is this app's own network, or a body that is not JSON — "unreachable", as a
       // refusal that is not a 404 is.
     }
-    publish(ticket, detail, kind);
-  }, [node, service, id, lookupAt, end, publish]);
+    publish(ticket, readKey, detail, kind);
+  }, [node, service, id, lookupAt, end, readKey, publish]);
 
   useEffect(() => {
     mountedRef.current = true;
+    askedKeyRef.current = readKey;
     const unsubscribe = subscribe((event) => {
       if (frameNamesCheck(event, checkPath) || event.kind === 'websocket_reconnected') void refresh();
     });
@@ -137,7 +163,7 @@ export function useCheckDetail({ node, service, id, lookupAt, end }: {
       unsubscribe();
       window.clearInterval(clock);
     };
-  }, [refresh, subscribe, checkPath]);
+  }, [refresh, subscribe, checkPath, readKey]);
 
   // An answer is for the check whose node and key it carries; any other is the row just left.
   const detail = answer !== null && answer.check.node === node && answer.check.key === `${service}/${id}` ? answer : null;

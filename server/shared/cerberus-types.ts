@@ -161,9 +161,11 @@ export type CerberusHostFacts = {
  * release it replaced — and ends the update `updated`. `{ updateId, failed, reason }` is the launcher
  * having taken the new release back — this hello is the OLD release's, `failed` the version that did
  * not hold, `reason` the launcher's own sentence ("no hello within 60 s", "1.4.0 exited with code 1
- * on start") — and ends the update `rolled_back`. A hello without `update` ends nothing, and so does
- * one naming an `updateId` center holds as already ended or does not hold at all (a repeat; a pending
- * file from before a center restart): the first end wins, as a run's does.
+ * on start") — and ends the update `rolled_back`; so does that `failed` for an update center ended
+ * `updated` under 120 s ago whose `to` it names (the new release died after center heard its hello).
+ * A hello without `update` ends nothing, and so does one naming an `updateId` center holds as already
+ * ended (but for that late `failed`) or does not hold at all (a repeat; a pending file from before a
+ * center restart): the first end wins, as a run's does.
  */
 export type CerberusHelloBody = {
   version: string;
@@ -958,6 +960,13 @@ export type CerberusUpdateView = {
 };
 
 /**
+ * What `POST /api/cerberus/updates` answers when a warden update batch starts: the batch's id and its
+ * updates as they stood, one per node named, all `queued`. The same updates come back from
+ * `GET /api/cerberus/updates/:batch`, which the Update wardens dialog reads again to follow the batch.
+ */
+export type CerberusStartedBatch = { batch: string; updates: CerberusUpdateView[] };
+
+/**
  * What `GET /api/cerberus/wardens` answers: where the fleet's wardens stand against the release
  * center holds. `latest` is the newest release built (null when none has been); `nodes` lists every
  * enrolled node with the warden version it last reported (null before it has) and `behind` — true
@@ -1094,11 +1103,13 @@ export type CerberusRunView = {
  * `fix` is the catalog entry offered for it: the first unretired entry on the check — oldest first —
  * whose `when` the current status satisfies. A failing check satisfies `failing` and `warn` entries,
  * a warn check satisfies `warn` entries, and a denied check is offered what a failing one is but is
- * never run on its own. Null when no entry applies. `run` is the check's newest run requested since
- * the check's `since`, while it runs or for 90 s after it ended — null when there is none, or when
- * `since` is. `since` is on the warden's clock (`since` of a health document's check, on its
- * service's) and a run's times and now on center's, so the one comparison across them applies the
- * node's clock offset to `since`. The card draws its strip from `run` and offers `fix` only
+ * never run on its own. Null when no entry applies. `run` is the check's active run (the newest whose
+ * `ended_at` is NULL) whatever its `since`, so the card never offers Run beside a run that is going;
+ * failing that, the check's newest run requested since the check's `since`, for 90 s after it ended —
+ * null when there is none (a check whose `since` is null shows no ended run). `since` is on the
+ * warden's clock (`since` of a health document's check, on its service's) and a run's times and now
+ * on center's, so the one comparison across them applies the node's clock offset to `since`. The
+ * card draws its strip from `run` and offers `fix` only
  * while no run is going. `diagnosis` is the check's newest diagnosis requested since the same
  * `since` — running or ended, whatever its outcome, with the same clock rule as `run` — null when
  * there is none, or when `since` is: the card says "Diagnose" while it is null and "Diagnosing…" or
@@ -1156,6 +1167,14 @@ export type CerberusDiagnosisStep = { n: number; t: number; text: string };
  * entries it holds to show the entry's current name — the person may have renamed it in the dialog,
  * so `proposal.name` is not it — and shows the id itself when that entry has since been retired and
  * is no longer there. Diagnoses are kept for good; so are their steps.
+ *
+ * Two words are worked out by center, not stored with the diagnosis. `when` is the word an entry made of
+ * this diagnosis would carry: `warn` when the check was only nearing its limit when the diagnosis began,
+ * else `failing` — the check's STORED status at the diagnosis's start, the very word promotion writes, so
+ * the Promote dialog shows what will be written and not a guess from the check's status now. `scope` is
+ * `node` when the diagnosis was given the node's reads and `history` when it could read only Cerberus
+ * history (the hub, a node that was not connected, busy or updating, or whose warden did not answer): its
+ * first step says which, and a diagnosis with no step yet reads `node`.
  * Answered by `GET /api/cerberus/diagnoses/:id` and carried by `CerberusNeed.diagnosis` and
  * `CerberusCheckDetail.diagnosis`; `POST /api/cerberus/diagnoses` answers only its `id`.
  */
@@ -1173,6 +1192,8 @@ export type CerberusDiagnosisView = {
   proposal: { name: string; cmd: string; general: string } | null;
   error: string | null;
   steps: CerberusDiagnosisStep[];
+  when: 'failing' | 'warn';
+  scope: 'node' | 'history';
   oneOffExpiresAt: number | null;
   run: CerberusRunView | null;
   promotedTo: string | null;
@@ -1300,8 +1321,10 @@ export type CerberusResultRow = {
  * it) or `future` (the moment has not happened). Freshness rests on continuity, never on the stored
  * row's own age: between two stored rows a moment is fresh while it is no later than the next row's
  * `prevAt` + `staleAfter`, and past the latest row while it is no later than center's in-memory
- * last-received time for the check + `staleAfter`. `resultAt` is the `at` of the stored row the
- * answer rests on and `mute` the mute that covered the moment, if any. Answered by
+ * last-received time for the check + `staleAfter`. `resultAt` is the `at` of the result the answer
+ * rests on — the stored row, or, for a moment at or after center's newest received result when that
+ * is newer than the row, that result (the store keeps a moving value only in its keep-alives) — and
+ * `mute` the mute that covered the moment, if any. Answered by
  * `GET /api/cerberus/lookup` and carried inside `CerberusCheckDetail`.
  */
 export type CerberusLookup = {
@@ -1453,8 +1476,9 @@ export type CerberusChangedEvent = {
  * 'cerberus_run_output'`. Unlike `cerberus_changed` it is a PICTURE, not a hint: a line must appear
  * the moment it arrives and a re-read cannot give it, so the frame holds the lines themselves — the
  * ones center has just stored for `runId`, in order, never coalesced with another run's. A sheet
- * that is open on the run appends them (by `n`, dropping one it already has); every other screen
- * ignores the frame. Whatever it missed, `GET /api/cerberus/runs/:id` answers with every line.
+ * that is open on the run appends them (by `n`, dropping one it already has) and a need's card on
+ * the Needs-you list shows the newest line of its run; no other screen reads the frame. Whatever
+ * it missed, `GET /api/cerberus/runs/:id` answers with every line.
  */
 export type CerberusRunOutputEvent = {
   kind: 'cerberus_run_output';
@@ -1483,12 +1507,14 @@ export type CerberusDiagStepEvent = {
 
 /**
  * One node's link as `wardenLinks.states()` answers it: whether a socket is open now, the last time
- * any frame was heard (null until the first since boot), when the silence began (`lastHeardAt` +
- * 90 000; null while reporting, and null while `lastHeardAt` is), the clock offset (the median of
- * the last five `receivedAt − env.at`, null until a frame has been heard) and the warden's version
- * from its `hello`. A node is silent whether or not its socket is still open, and every enrolled
- * node is silent from boot until it is heard; the read model fills a null `lastHeardAt` from the
- * node row's stored last heartbeat (see `CerberusNodeView`). Built by `warden-links.ts`.
+ * any frame was heard (seeded at start from the node row's `last_heartbeat_at` by `seedFromStore`,
+ * so a boot does not erase it; null only for a node that has never sent a heartbeat and has not
+ * been heard since), when the silence began (`lastHeardAt` + 90 000; null while reporting, and null
+ * while `lastHeardAt` is), the clock offset (the median of the last five `receivedAt − env.at`,
+ * null until a frame has been heard) and the warden's version from its `hello`. A node is silent
+ * whether or not its socket is still open; from boot it is silent only when that stored heartbeat
+ * is already more than 90 s old. For a node the registry holds no state for, the read model reads
+ * the node row's stored last heartbeat (see `CerberusNodeView`). Built by `warden-links.ts`.
  */
 export type CerberusLinkState = {
   linked: boolean;
@@ -1514,9 +1540,17 @@ export type CerberusGatewayState = {
  * the `at` of the latest accepted result, stored or not, or — for a check that was reporting just
  * before this boot — the boot's own moment until its next result arrives — and `since` the moment
  * the check's current status began. Both null for a check ingest has neither heard of since boot nor
- * vouched for at boot. Built by `ingest.service.ts`; read by the read model.
+ * vouched for at boot. `newest` is the newest accepted result's `at` and `value`, stored or not: the
+ * store keeps a value that moves under an unchanged status only in a keep-alive every five minutes,
+ * so the read model shows `newest` when it is newer than the check's stored row. Null until the
+ * check's first result of this process arrives (a boot starts it empty), and the read model then
+ * falls back to the stored row. Built by `ingest.service.ts`; read by the read model.
  */
-export type CerberusCheckMemory = { lastReceivedAt: number | null; since: number | null };
+export type CerberusCheckMemory = {
+  lastReceivedAt: number | null;
+  since: number | null;
+  newest: { at: number; value: string | null } | null;
+};
 
 /**
  * One span a node's checks read `paused` — the half-open `[from, to)` its warden is expected to be away
@@ -1561,9 +1595,9 @@ export type CerberusDiagnosisSubmission = {
 /**
  * One `history_read` as the agent asked it: `sinceMin` minutes back from now, optionally narrowed to
  * one `node` and one `check` key, to some of the three `kinds` (all when absent) and at most `limit`
- * lines IN ALL, the newest across the kinds. Always whole numbers; `diagnosis-tools.ts` has already applied its defaults and
- * ceilings by the time a reader sees it. Read from the store, every node at once — history is the one
- * thing a diagnosis reads beyond its own node (spec Table 7).
+ * lines IN ALL, the newest across the kinds. Always whole numbers; `diagnosis-tools.ts` has already
+ * applied its defaults and ceilings by the time a reader sees it. Read from the store, every node at
+ * once — history is the one thing a diagnosis reads beyond its own node (spec Table 7).
  */
 export type CerberusDiagnosisHistoryQuery = {
   node?: string;
@@ -1576,19 +1610,31 @@ export type CerberusDiagnosisHistoryQuery = {
 /**
  * Everything the diagnosing agent's six tools reach, handed in by whoever runs the diagnosis — the
  * seam that keeps `diagnosis-tools.ts` free of the link, the store and the loop's bookkeeping:
- *   - `node` is the node the diagnosis is open on, and `linked` whether its warden is connected. A
- *     node that is not linked has no `log_read`, `file_read` or `status_read` at all.
+ *   - `node` is the node the diagnosis is open on, and `linked` whether the node's session opened:
+ *     false for the hub, for a node whose warden is updating, for one another diagnosis holds, and
+ *     for a warden that is not connected or did not answer. A node that is not linked has no
+ *     `log_read`, `file_read` or `status_read` at all.
  *   - `callNode` sends one read to that node's warden and resolves with its answer (`ok`, `text`,
- *     `truncated` as in `CerberusDiagResultBody`); it rejects only when the read could not be asked
- *     (the link is gone), which fails the diagnosis.
+ *     `truncated` as in `CerberusDiagResultBody`); it rejects when the frame could not be put on the
+ *     link, when nobody answered within 20 s, and when the diagnosis has already ended. A rejected
+ *     read ends nothing: the tool hands the agent the reason, and a diagnosis fails on its link going
+ *     down (the diagnosis service's rule), not on a read.
  *   - `historyRead` answers from the store as compact lines, whatever the node.
- *   - `note` files one finding; `submit` takes the conclusion.
+ *   - `note` files one finding, masked, as a step; `submit` takes the conclusion and refuses what cannot
+ *     be kept: a proposal for a node that runs no warden, a proposed command (`cmd` or `general`) that
+ *     carries a credential — masking would break the command, so it is refused to the agent, never
+ *     altered — an evidence line that is not one stretch of one line of a read's answer, verbatim (an
+ *     absence, the check's own value, a paraphrase, a spliced or edited line), and a quotation no read
+ *     returned. The summary and evidence it takes are stored masked.
  * Each call may throw; the tool turns that into an error the agent reads, never a crash of the loop.
  */
 export type CerberusDiagnosisToolDeps = {
   node: string;
   linked: boolean;
-  callNode: (tool: CerberusDiagTool, args: Record<string, unknown>) => Promise<Pick<CerberusDiagResultBody, 'ok' | 'text' | 'truncated'>>;
+  callNode: (
+    tool: CerberusDiagTool,
+    args: Record<string, unknown>,
+  ) => Promise<Pick<CerberusDiagResultBody, 'ok' | 'text' | 'truncated'>>;
   historyRead: (query: CerberusDiagnosisHistoryQuery) => string | Promise<string>;
   note: (text: string) => void;
   submit: (submission: CerberusDiagnosisSubmission) => void;

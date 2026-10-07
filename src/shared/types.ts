@@ -4,7 +4,7 @@ import type { ComponentType, ReactNode } from 'react';
 import type { NavigateFunction } from 'react-router-dom';
 
 import type { AppEntry } from '@/shared/app-types';
-import type { CerberusNodeView, CerberusServiceView, CerberusStatus, CerberusUpdateView } from '@/shared/cerberus-types';
+import type { CerberusNodeView, CerberusServiceView, CerberusStatus } from '@/shared/cerberus-types';
 
 //----------------- LLM PROVIDER MODEL CATALOG ------------
 
@@ -2313,9 +2313,6 @@ export type CerberusPromoteInput = { name: string; auto: boolean; limit: { runs:
 
 /** What minting an enrollment token takes: the node's name (lowercase letters, numbers and dashes) and, optionally, a line saying what the machine is — shown under the name in Fleet. */
 export type CerberusEnrollInput = { name: string; desc?: string };
-
-/** What `POST /api/cerberus/updates` answers when a warden update batch starts: the batch's id and its updates as they stood, one per node named, all queued. The Cerberus provider's `startUpdate` hands it to the Update wardens dialog, which follows the batch from it. */
-export type CerberusStartedBatch = { batch: string; updates: CerberusUpdateView[] };
 
 // ---------------------------
 

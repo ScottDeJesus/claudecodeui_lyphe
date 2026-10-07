@@ -863,7 +863,8 @@ export const api = {
     // The fixes (server/modules/cerberus/MANUAL.md): the catalog read answers every unretired entry; a write
     // answers the entry it wrote, which nobody draws from (the screen is the read that follows). `runEntry`
     // answers `{ runId }` once the warden has accepted, up to 10 s after the press; a 409 says why not
-    // (`CERBERUS_RUN_ACTIVE`: the check has a run going, `CERBERUS_NODE_SILENT`: its warden is not linked).
+    // (`CERBERUS_RUN_ACTIVE`: the check has a run going, `CERBERUS_NODE_SILENT`: its warden is not linked,
+    // `CERBERUS_NODE_UPDATING`: its warden is updating).
     // `run(id)` is one run with every line it holds, which `useRunOutput` reads before its frames append.
     catalog: (options: ApiRequestOptions = {}) => get('/api/cerberus/catalog', options),
     writeEntry: (input: CerberusCatalogEntryInput) => post('/api/cerberus/catalog', input),

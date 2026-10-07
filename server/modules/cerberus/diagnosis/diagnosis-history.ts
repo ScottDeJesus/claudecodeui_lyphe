@@ -18,11 +18,12 @@ import { oneMaskedLine } from './diagnosis-text.js';
  * their node; this is the one thing a diagnosis reads beyond it.
  *
  * Only status MOVES are read from `results` (`ok → failing`), never keep-alives or a value that merely
- * changed: a check that says "last sweep failed 17.6h ago" stores a new row every half-minute, and a
- * window of those would never reach the moment it went red. What a check says NOW, and its recent
- * changes, are in the prompt. The lines are text for a model, so each free-text field goes through
- * `oneMaskedLine`: credential-looking values masked the way the warden masks what it reads
- * (`password=<masked>`), folded onto one line and cut — the same words reach the same model by every door.
+ * changed: a check that says "last sweep failed 17.6h ago" moved its value every half-minute (the
+ * store kept a row for each until 2026-10-07), and a window of those would never reach the moment it
+ * went red. What a check says NOW, and its recent changes, are in the prompt. The lines are text for
+ * a model, so each free-text field goes through `oneMaskedLine`: credential-looking values masked the
+ * way the warden masks what it reads (`password=<masked>`), folded onto one line and cut — the same
+ * words reach the same model by every door.
  *
  * Consumers: the diagnosis service, which hands it to `buildDiagnosisTools` as `historyRead`.
  */

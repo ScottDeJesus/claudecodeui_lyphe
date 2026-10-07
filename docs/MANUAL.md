@@ -4692,7 +4692,7 @@ the commands in the service's header. The dev client (:5183) is for watching an 
 client (:5184) is the fast one for everyday use, at most one rebuild (≈2.5 min) behind the source.
 
 The clients are the only ports the LAN needs: `vite.config.js` proxies `/api`, `/ws`, `/shell` and
-`/plugin-ws` to the API on loopback, so the API never faces the LAN. The API process owns one more port, the warden gateway on `CERBERUS_LISTEN` (`100.103.222.79:3012` in `.env`, the `tailscale0` address — never `0.0.0.0`): it carries only the warden websocket `/cerberus/ws` and the public install files (`/cerberus/enroll.sh` and `/cerberus/warden/…`, served by `warden-files.ts`; every other GET answers 404), no API route and no login, and under the supervisor it binds with `reusePort` so a handover's successor listens beside the retiring process. Its design: MAN-7803. The app is reachable at
+`/plugin-ws` to the API on loopback, so the API never faces the LAN. The API process owns one more port, the warden gateway on `CERBERUS_LISTEN` (`100.103.222.79:3012` in `.env`, the `tailscale0` address — never `0.0.0.0`): it carries only the warden websocket `/cerberus/ws` and the public install files (`/cerberus/enroll.sh` and `/cerberus/warden/…`, served by `warden-files.ts`; every other GET answers 404), no API route and no login, and under the supervisor it binds with `reusePort` so a handover's successor listens beside the retiring process: its `start()` binds the gateway before the process signals READY, and the supervisor retires the old process on READY (MAN-7804). Its design: MAN-7803. The app is reachable at
 `http://<this host>:5183` on the LAN and over Tailscale, and as the **CloudCLI** row of the
 application drawer this app serves — `apps.local.json`, git-ignored; the drawer's one
 documentation home is [`docs/MANUAL.md (applications)`](MANUAL.md).
@@ -7961,9 +7961,31 @@ TOK=$(mint_token)
 ```
 
 `scripts/sunset-probe.sh` is the harness the sunset work is proven with, and it is four SOURCEABLE
-functions and one helper they share, with no top-level side effects of their own — it sets no shell
+functions and the helpers they share, with no top-level side effects of their own — it sets no shell
 option and boots nothing on source, so a probe sources it, calls what it needs and traps its own
 teardown.
+
+**The claim.** A slot is claimed before anything of it is touched, and the claim is what tells a
+probe's own boot from another plan's. `probe_db` claims the slot with `mkdir "<prefix>claim"`, which
+is atomic: of two probes starting together exactly one succeeds. The winner holds `SUNSET_CLAIMED=yes` with `SUNSET_CLAIMED_PREFIX` (the prefix it claimed)
+in its OWN shell (never exported, so a child never inherits a claim it did not make) until
+`stop_probe_server` ends it. The loser's `probe_db` prints "slot <N> is held by another probe"
+(`the default slot` for the unset slot), names the claim's path, returns 1 and touches nothing — not
+the database, not a journal, not the holder's server. A listener bound on the slot's API or gateway
+port with no claim (an older harness's probe, one started by hand, an orphan) is the holder too,
+whatever it answers — a 404, a wedge, nothing within 2 s: `probe_db` gives its claim back and refuses
+before it copies anything ("Port <api> or <gateway> of slot <N> is already listening and no claim
+holds it"). A leftover FILE with nothing listening is a crashed run's, and is overwritten. A shell
+holds ONE claim: `probe_db` for a second slot in a shell that holds another refuses. A probe whose claim was refused still exits through its own trap
+(set before `probe_db`), because `stop_probe_server` acts only on a claim its shell holds and answers
+0 for any other. A probe SIGKILLed past its trap leaves its claim: once nothing of it still runs, kill
+its server by hand and `rmdir` the claim the refusal names. The claim lives until
+`stop_probe_server`, not until the server stops, so a probe that stops its server by hand and boots
+again (`boot_probe_server --keep-store`) keeps it across the restart. Call `probe_db`,
+`boot_probe_server` and `stop_probe_server` in the probe's own shell, never inside `$( )`, a pipeline or
+`( … )`: the claim is the shell's. A subshell's stop removes the roots and the claim but cannot clear
+its parent's flag, so the parent's later trap would remove a successor's claim and roots; the claim
+carries no owner token to tell them apart.
 
 **The slot.** Plans run side by side and several of their phases boot a scratch center at the same
 moment, so every function reads `SUNSET_SLOT`. Unset, it is the default slot: API on **7893**, warden
@@ -7972,12 +7994,14 @@ the API to `7893 + 2N`, the gateway to `7894 + 2N` and every scratch path to `/t
 (`/tmp/sunset3-probe.db`, `/tmp/sunset3-state`, …). Any other value — an empty one too — makes the
 function print one sentence and return 2. **Export the slot once, before the trap, and never prefix a
 single call** (`SUNSET_SLOT=1 boot_probe_server`): the prefix is gone when the call returns, and the
-bare `stop_probe_server` the trap then runs acts on the DEFAULT slot — another plan's probe. The
+bare `stop_probe_server` the trap then runs names the DEFAULT slot, which this shell never claimed, so
+it stops nothing (and says so when the shell holds a claim on another slot). The
 helper `sunset_paths`, called first by each function, exports `SUNSET_API`
-(`http://127.0.0.1:<api port>`), `SUNSET_GATEWAY` (`127.0.0.1:<gateway port>`) and `SUNSET_PREFIX`
-(`/tmp/sunset-` or `/tmp/sunset<N>-`), which a probe reads after any function has run.
+(`http://127.0.0.1:<api port>`), `SUNSET_GATEWAY` (`127.0.0.1:<gateway port>`), `SUNSET_PREFIX`
+(`/tmp/sunset-` or `/tmp/sunset<N>-`) and `SUNSET_SLOT_NAME` (`slot <N>` or `the default slot`), which a
+probe reads after any function has run.
 
-- **`probe_db`** copies the live `~/.cloudcli/auth.db` to `<prefix>probe.db` and then DISARMS it
+- **`probe_db`** first CLAIMS the slot (above), then copies the live `~/.cloudcli/auth.db` to `<prefix>probe.db` and then DISARMS it
   (`update kanban_boards set autonomy=0`), so no board on the scratch copy can spawn a Metis while a
   probe drives it. It COPIES the live file; nothing here opens it. A `-journal`, `-wal` or `-shm`
   a killed run left beside the old copy is removed first, so it is never replayed onto the new one.
@@ -7990,6 +8014,8 @@ helper `sunset_paths`, called first by each function, exports `SUNSET_API`
   `CLOUDCLI_LOCAL_SERVER_MARKER` and the three Cerberus roots — `CERBERUS_DB_PATH`
   (`<prefix>cerberus.db`), `CERBERUS_KEY_PATH` (`<prefix>cerberus.key`) and `CERBERUS_LISTEN`
   (`127.0.0.1:<gateway port>`), all under `/tmp` — and waits for `/api/auth/status` before returning.
+  It REFUSES a shell that holds no claim (a sentence on stderr, return 1, nothing started) and
+  records the pid it starts in the shell (`SUNSET_BOOTED_PID`) as well as in `<prefix>server.pid`.
   Every runtime root the server reads is redirected by an environment variable; the operator's own
   server on 3011 never sees the scratch copy, no probe ever opens `~/.cloudcli/cerberus.db` or binds
   3012, and the probe server is started with `tsx` directly rather than through `npm run dev`. The
@@ -8005,12 +8031,14 @@ helper `sunset_paths`, called first by each function, exports `SUNSET_API`
   lacks, taking the socket of each one it finds; and `CLOUDCLI_LOCAL_SERVER_MARKER`, because a probe
   that writes the real `~/.cloudcli/local-server.json` deletes it again at shutdown (measured
   2026-09-18).
-- **`stop_probe_server`** kills the slot's own probe server, waits for it to exit (SIGKILL after
-  10 s), and deletes every scratch root — the Cerberus store with its `-wal` and `-shm`, the key, the
-  probe database's sidecars, the pid and the log among them (read `<prefix>server.log` before the
-  stop when a boot fails). Each removal passes
+- **`stop_probe_server`** acts only when THIS shell holds the claim. It kills the probe server its
+  own boot recorded (`SUNSET_BOOTED_PID`, never whatever `<prefix>server.pid` names), waits for it to
+  exit (SIGKILL after 10 s), deletes every scratch root — the Cerberus store with its `-wal` and `-shm`,
+  the key, the probe database's sidecars, the pid and the log among them (read `<prefix>server.log`
+  before the stop when a boot fails) — and last of all `rmdir`s the claim and unsets
+  `SUNSET_CLAIMED`. Each removal passes
   `case "$path" in /tmp/sunset-*|/tmp/sunset[1-9]-*) rm -rf -- "$path" ;; esac`. It signals a pid only
-  when the pid file holds plain digits (never `0`, `1` or a `-1`, which would reach every process the
+  when it holds plain digits (never `0`, `1` or a `-1`, which would reach every process the
   user owns — measured 2026-10-05) AND `/proc/<pid>/cmdline` names `server/index.ts`, so a recycled
   pid is never killed. That read is `tr … 2>/dev/null < /proc/<pid>/cmdline` — the `2>/dev/null` BEFORE the
   `<`: bash opens the file first and writes its own "No such file or directory" for a server that already

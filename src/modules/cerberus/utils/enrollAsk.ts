@@ -1,4 +1,4 @@
-import { api, refusalSentence } from '@/shared/api';
+import { api, refusalCode, refusalSentence } from '@/shared/api';
 import type { CerberusEnrollment } from '@/shared/cerberus-types';
 import type { CerberusEnrollRefusal } from '@/shared/types';
 
@@ -10,22 +10,6 @@ function isEnrollment(body: unknown): body is CerberusEnrollment {
     && typeof candidate.token === 'string'
     && typeof candidate.command === 'string'
     && typeof candidate.expiresAt === 'number';
-}
-
-/**
- * The `code` the error middleware put on a refusal (`{ error: { code, message } }`), or `null` when the body
- * carries none or is not JSON. Told apart by code and not by status: 409 is both "that name is taken" and
- * "the gateway is not listening", and the dialog says each in a different place.
- */
-async function refusalCode(response: Response): Promise<string | null> {
-  try {
-    const body = (await response.json()) as { error?: { code?: unknown } | null } | null;
-    const code = body?.error?.code;
-    return typeof code === 'string' ? code : null;
-  } catch {
-    // Not JSON: a refusal with no code is read as any other refusal, with whatever sentence it has.
-    return null;
-  }
 }
 
 /**
@@ -53,8 +37,8 @@ export async function askForCommand(name: string, desc: string): Promise<
         ? { kind: 'issued', enrollment: body }
         : { kind: 'refused', refusal: { kind: 'refused', sentence: null } };
     }
-    // The body is read twice, for its code and for its sentence; the clone leaves the second read its own copy.
-    const code = await refusalCode(response.clone());
+    // The body is read twice, for its code and for its sentence; `refusalCode` reads a clone, so the second read has its own copy.
+    const code = await refusalCode(response);
     if (code === 'CERBERUS_NAME_TAKEN') return { kind: 'taken', sentence: await refusalSentence(response) };
     if (code === 'CERBERUS_NOT_LISTENING') return { kind: 'refused', refusal: { kind: 'notListening' } };
     return { kind: 'refused', refusal: { kind: 'refused', sentence: await refusalSentence(response) } };

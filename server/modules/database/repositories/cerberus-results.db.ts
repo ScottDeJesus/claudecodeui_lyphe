@@ -15,9 +15,12 @@ import {
  * acked as a duplicate. Here a duplicate is the ONE quiet `false`; every other refusal throws.
  * The one thing ever deleted is a `keepalive` row, by `pruneKeepalivesBefore`.
  *
- * A row is a `change` (the first sight of a check, or its status, document status or value moved,
- * or a lapse in reporting ended) or a `keepalive` (a copy written when nothing changed for five
- * minutes). Every row carries `prev_status` — what the check last stored before it, `not_enabled`
+ * A row is a `change` (the first sight of a check, or its status or document status moved, or a lapse
+ * in reporting ended — a VALUE moving under an unchanged status is no change) or a `keepalive` (the
+ * result whole, its newest value and data, written when nothing changed for five minutes). Rows
+ * stored before 2026-10-07 also hold a `change` for every value move; none of them is a status move,
+ * so `transitions` and `transitionsSince` skip them, while `recentChanges` (a check's detail and the
+ * diagnosis prompt) still lists them until newer changes push them out. Every row carries `prev_status` — what the check last stored before it, `not_enabled`
  * for a stored NULL, NULL only for the check's first row — which is what makes `transitions` and a
  * check's `since` plain SQL rather than a replay.
  *
@@ -28,11 +31,16 @@ import {
  * `LIMIT -1` as "no limit", so an unclamped negative would dump the table. A caller owns the upper bound.
  *
  * Consumers: `server/modules/cerberus/` — ingest (`insert`, and `latestPerCheck` to seed its memory at
- * start), the read model (`rowsInWindow` for cells and lookups, `recentChanges` for a check's detail,
- * `transitions` for What happened), the diagnosis agent (`recentChanges` for its prompt,
- * `transitionsSince` for its `history_read`) and the daily prune (`pruneKeepalivesBefore`). Reach it through
- * `@/modules/database/index.js`. Every statement runs on the caller's connection and opens no
- * transaction of its own — ingest's "one transaction per frame" is its own.
+ * start and to re-read one node's at its hello), the read model (`rowsInWindow` for cells and
+ * lookups, `recentChanges` for a check's detail, `transitions` for What happened), the diagnosis
+ * agent (`recentChanges` for its prompt, `transitionsSince` for its `history_read`) and the daily
+ * prune (`pruneKeepalivesBefore`). Reach it through `@/modules/database/index.js`. Every statement
+ * runs on the caller's connection and opens no transaction of its own — ingest's "one transaction
+ * per frame" is its own.
+ *
+ * Two reads are served by PARTIAL indexes (`cerberus-schema.ts`, step 4), which SQLite uses only when
+ * the query carries the index's own terms: `transitions` spells `ix_results_moves`'s WHERE out and
+ * `pruneKeepalivesBefore` `ix_results_keepalives`'s. Change either side and the read scans the table.
  */
 
 /** One `results` row, exactly as the table stores it. */
@@ -142,27 +150,30 @@ export const cerberusResultsDb = {
   },
 
   /**
-   * Each check's last stored row, with its `since`, for every `(node, check_key)` that has any row.
-   * Read once at start to seed ingest's memory. `since` walks the check's rows backwards from the
-   * newest and stops at the first status change, so it reads only the keep-alives since then.
+   * Each check's last stored row, with its `since`, for every `(node, check_key)` that has any row —
+   * or, with `node`, for that node's checks alone (the same statement, its `k` limited to the node).
+   * Read once at start to seed ingest's memory, and again for one node at each of its hellos to
+   * re-read it (`ingest.reseedNode`). `since` walks the check's rows backwards from the newest and
+   * stops at the first status change, so it reads only the keep-alives since then.
    */
-  latestPerCheck(): CerberusLatestResultRow[] {
-    return getCerberusConnection()
-      .prepare(
-        `SELECT ${resultColumns('r')},
-                COALESCE(
-                  (SELECT s.at FROM results s
-                    WHERE s.node = r.node AND s.check_key = r.check_key
-                      AND (s.prev_status IS NULL OR ${statusDiffers('s')})
-                    ORDER BY s.at DESC LIMIT 1),
-                  (SELECT MIN(f.at) FROM results f WHERE f.node = r.node AND f.check_key = r.check_key)
-                ) AS since
-           FROM (SELECT DISTINCT node, check_key FROM results) k
-           JOIN results r ON r.node = k.node AND r.check_key = k.check_key
-            AND r.at = (SELECT MAX(m.at) FROM results m WHERE m.node = k.node AND m.check_key = k.check_key)
-          ORDER BY r.node, r.check_key`
-      )
-      .all() as CerberusLatestResultRow[];
+  latestPerCheck(node?: string): CerberusLatestResultRow[] {
+    // Without a node the statement has no `@node` at all, so each spelling is run with what it names.
+    const checksOfScope = node === undefined ? 'results' : 'results WHERE node = @node';
+    const statement = getCerberusConnection().prepare(
+      `SELECT ${resultColumns('r')},
+              COALESCE(
+                (SELECT s.at FROM results s
+                  WHERE s.node = r.node AND s.check_key = r.check_key
+                    AND (s.prev_status IS NULL OR ${statusDiffers('s')})
+                  ORDER BY s.at DESC LIMIT 1),
+                (SELECT MIN(f.at) FROM results f WHERE f.node = r.node AND f.check_key = r.check_key)
+              ) AS since
+         FROM (SELECT DISTINCT node, check_key FROM ${checksOfScope}) k
+         JOIN results r ON r.node = k.node AND r.check_key = k.check_key
+          AND r.at = (SELECT MAX(m.at) FROM results m WHERE m.node = k.node AND m.check_key = k.check_key)
+        ORDER BY r.node, r.check_key`
+    );
+    return (node === undefined ? statement.all() : statement.all({ node })) as CerberusLatestResultRow[];
   },
 
   /**
@@ -229,10 +240,11 @@ export const cerberusResultsDb = {
    * Status moves with `at >= since`, newest first, at most `limit` — across every node, or one node's
    * (`node`), or one check key's (`check`, on any node unless `node` narrows it). A move is a `change`
    * row whose status differs from the one stored before it, or a check's first row. A change of the
-   * VALUE alone is not one: a check that says "last sweep failed 17.6h ago" stores a row every
-   * half-minute, and a window of those would never reach the moment the check went red. A diagnosis's
-   * `history_read` is the one caller. The WHERE is assembled from fixed fragments with every value
-   * bound, and a given `node` keeps the primary key's leading column in play.
+   * VALUE alone is not one: a check that says "last sweep failed 17.6h ago" moved its value every
+   * half-minute, the rows stored before 2026-10-07 hold one each, and a window of those would never
+   * reach the moment the check went red. A diagnosis's `history_read` is the one caller. The WHERE is
+   * assembled from fixed fragments with every value bound, and a given `node` keeps the primary key's
+   * leading column in play.
    */
   transitionsSince(filter: CerberusHistoryFilter, limit: number): CerberusStoredResultRow[] {
     const { conditions, params } = historyConditions(filter, 'at', limit);
@@ -255,6 +267,10 @@ export const cerberusResultsDb = {
    * component with the same `at`, so a mass flip is exactly such a group, and the caller's cursor is
    * `before = <last row's at>` with a strict `<` — a row left behind at that `at` would be skipped
    * for ever. A page is therefore always a whole number of instants, and the next page starts clean.
+   *
+   * The CTE's first three terms are `ix_results_moves`'s own, word for word (`statusDiffers()` spells
+   * the third): the index holds only status moves, so both reads of the CTE walk it by `at` instead of
+   * scanning every row of `results`.
    */
   transitions(before: number, limit: number): CerberusTransitionRow[] {
     return getCerberusConnection()
@@ -270,10 +286,13 @@ export const cerberusResultsDb = {
       .all({ before, limit: Math.max(0, Math.trunc(limit)) }) as CerberusTransitionRow[];
   },
 
-  /** Deletes `keepalive` rows older than `at` — the only rows ever deleted. Answers how many went. */
+  /**
+   * Deletes `keepalive` rows older than `at` — the only rows ever deleted. Answers how many went.
+   * `kind = 'keepalive'` is `ix_results_keepalives`'s own term, so the delete walks that index.
+   */
   pruneKeepalivesBefore(at: number): number {
     return getCerberusConnection()
-      .prepare("DELETE FROM results WHERE kind = 'keepalive' AND at < ?")
-      .run(at).changes;
+      .prepare("DELETE FROM results WHERE kind = 'keepalive' AND at < @at")
+      .run({ at }).changes;
   },
 };

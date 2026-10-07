@@ -41,7 +41,7 @@ type CheckSheetProps = {
   check: string;
   /** The moment the lookup opens on, epoch ms: the minute a service row's cell was pressed on. Omitted, now. */
   lookupAt?: number;
-  /** The run a Needs-you card's strip opened the sheet on, which its Fix output shows first. Omitted, the check's latest run within the hour. */
+  /** The run a Needs-you card's strip or a What happened row opened the sheet on, which its Fix output shows until a Run now is pressed in the sheet. Omitted, the check's latest run within the hour. */
   run?: string;
   /** Mute, pressed for the check the sheet shows. The root opens its Mute dialog in front of the sheet. */
   onMute: (check: CerberusCheckView) => void;
@@ -121,6 +121,10 @@ function CheckSheetBody({ node, service, check, lookupAt, run, nodeView, service
   // The check whose label write is in flight, by id, or null: the editor's `busy` for that check alone.
   // Essential: a write outlives a press on another row, and only this body knows which check it was for.
   const [savingId, setSavingId] = useState<string | null>(null);
+  // The run each Run now pressed in this sheet started, by the id of the check it was pressed on. Essential:
+  // it moves Fix output off the run the sheet opened on and onto that run, and holds it there when a newer
+  // run of the check begins; only this body saw the press, and the check's read does not say which run it was.
+  const [startedRuns, setStartedRuns] = useState<Record<string, string>>({});
   const { detail, error, refresh } = useCheckDetail({ node, service, id: selectedId, lookupAt: moment });
   const { liftMute, setLabel } = useCerberus();
 
@@ -148,6 +152,16 @@ function CheckSheetBody({ node, service, check, lookupAt, run, nodeView, service
     if (landed) setEditingId((open) => (open === id ? null : open));
   };
 
+  /**
+   * A Run now pressed on check `id` started the run `runId`: Fix output shows it from here on, and the check is
+   * read again so "Running…" and the going run stand. A read for a row the sheet has left since the press says
+   * nothing (`useCheckDetail` drops it), and the pin waits under that row's id for the person's return.
+   */
+  const followStartedRun = (id: string, runId: string) => {
+    setStartedRuns((held) => ({ ...held, [id]: runId }));
+    void refresh();
+  };
+
   const selectedKey = `${service}/${selectedId}`;
   // The rows are the fleet's copy of the service, so they hold still while a row's own read is out.
   // The read's check and siblings stand in only where the fleet has no copy.
@@ -162,15 +176,17 @@ function CheckSheetBody({ node, service, check, lookupAt, run, nodeView, service
   const announcement = error === 'gone'
     ? t('cerberus.sheet.gone')
     : detail === null && error === null ? t('cerberus.sheet.loading') : '';
-  // The run Fix output shows. The run the sheet was opened on shows at once, while the sheet still stands on
-  // the check it opened on; once the check's own read has answered, its newest run takes over, which is the
-  // same run unless a newer one has begun since — the Run now just pressed. With neither, no Fix output.
+  // The run Fix output shows, in this order: the run the last Run now pressed in this sheet started; else the
+  // run the sheet was opened on, whatever newer run the check's read names, so opening an older run from What
+  // happened never lands on a newer one; with neither, the check's newest run within the hour. No run, no Fix
+  // output.
   // A run of the shown diagnosis's proposal draws under its proposal (`DiagnosisPanel`, "Running now — output below"),
   // so Fix output leaves that run out, and a run of that diagnosis is never the one that holds the check against it.
   // `?? null`: an older server's answer has no diagnosis.
   const diagnosis = detail?.diagnosis ?? null;
   const proposalRunId = diagnosis?.run?.id ?? null;
-  const shownRunId = detail?.run?.id ?? (selectedId === check ? run : undefined) ?? null;
+  const openedRunId = selectedId === check ? run : undefined;
+  const shownRunId = startedRuns[selectedId] ?? openedRunId ?? detail?.run?.id ?? null;
   const outputRunId = shownRunId === proposalRunId ? null : shownRunId;
   // Another run holds the check: going, and not this diagnosis's own one-off.
   const goingRun = detail?.run ?? null;
@@ -240,7 +256,7 @@ function CheckSheetBody({ node, service, check, lookupAt, run, nodeView, service
         <DiagnosisPanel key={diagnosis.id} diagnosisId={diagnosis.id} held={heldByOther} onPromote={(promoted) => onPromote(promoted, shown)} />
       )}
       {/* `?? []` and `?? null`: an older server's answer has neither field. */}
-      {detail !== null && <CheckFixes fixes={detail.fixes ?? []} run={detail.run ?? null} />}
+      {detail !== null && <CheckFixes fixes={detail.fixes ?? []} run={detail.run ?? null} onRunStarted={(runId) => followStartedRun(selectedId, runId)} />}
 
       {error === 'gone' ? (
         <p className="rounded-xl border border-dashed border-input px-4 py-3.5 text-[13px] text-muted-foreground">

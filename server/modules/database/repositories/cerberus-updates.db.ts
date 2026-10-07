@@ -8,9 +8,11 @@ import { getCerberusConnection } from '@/modules/database/cerberus-connection.js
  * person starts a batch, moves its `step` as the warden's progress frames arrive (`setStep`), and
  * ends exactly once (`end`): `updated`, `rolled_back` or `failed`. Both movers are one `UPDATE` that
  * only fires while the update has not ended, and its `changes` is the verdict — a resent frame or a
- * late hello cannot move a finished update. An update is LIVE from `insert` until `end`
+ * late hello cannot move a finished update through them. An update is LIVE from `insert` until `end`
  * (`ended_at IS NULL`). Updates and their steps are kept forever (spec Table 4: "updates … Forever"):
- * no statement here deletes a row, and the daily prune reaches neither table.
+ * no statement here deletes a row, and the daily prune reaches neither table. The ONE statement that
+ * moves an ended update is `rolledBackAfterUpdated`: an `updated` that the launcher took back within
+ * the window, heard on the old release's hello.
  *
  * STEPS are the progress frames, one row each, stamped on the center's clock. `insertStep` is
  * `ON CONFLICT DO NOTHING` — the primary key `(update_id, at, step)` is the ONLY conflict it
@@ -18,8 +20,9 @@ import { getCerberusConnection } from '@/modules/database/cerberus-connection.js
  * fractional `at`) still THROWS rather than answering `false` as a resend does — the hazard
  * `cerberus-results.db.ts` documents. The update a step is filed under must exist, or it THROWS: a
  * step under no `updates` row is read by nothing. A step that arrives after the update ended is
- * REFUSED like a resend (`false`): a finished update's history does not grow, and a `restarting`
- * step filed after the end would give `pauseWindows` a span that ends before it begins.
+ * REFUSED like a resend (`false`): `insertStep` never grows a finished update's history (the one
+ * writer that adds a step after the end is `rolledBackAfterUpdated`, and its step is a `failed`), and a
+ * `restarting` step filed after the end would give `pauseWindows` a span that ends before it begins.
  *
  * VALUES THE TYPES FORBID, which a table cannot: SQLite lets a `PRIMARY KEY` column be NULL, and a
  * `CHECK (result IN (…))` passes NULL. So `insert` THROWS on an id that is not a non-empty string
@@ -43,10 +46,12 @@ import { getCerberusConnection } from '@/modules/database/cerberus-connection.js
  *
  * Consumers: `server/modules/cerberus/` — the updates service (`insert` for a batch, `get`, `forBatch`
  * and `running` for its 409 and its driver, `setStep` and `insertStep` for every progress frame,
- * `end` for the verdict), the read model (`running` and `forBatch` with `steps` for the views,
- * `pauseWindows` for the paused overlay, `recent` for What happened). Reach it through
- * `@/modules/database/index.js`. Every statement runs on the caller's connection and opens no
- * transaction of its own.
+ * `end` for the verdict, `rolledBackAfterUpdated` for a rollback heard after the end), the runs
+ * service, the auto-run rule and the diagnosis service (`activeNode`, the node closed to new work),
+ * the read model (`running` and `forBatch` with `steps` for the views, `pauseWindows` for the paused
+ * overlay, `recent` for What happened). Reach it through `@/modules/database/index.js`. Every
+ * statement runs on the caller's connection and opens no transaction of its own — except
+ * `rolledBackAfterUpdated`, whose two writes are one unit by construction.
  */
 
 // The three outcomes `updates.result` allows — the table's CHECK, written out once so `end` can refuse
@@ -162,6 +167,20 @@ export const cerberusUpdatesDb = {
   },
 
   /**
+   * The node of `running()[0]` — the update the driver treats as the batch's ACTIVE one (the one whose
+   * offer is out) — or `null` when no update is live. The same order as `running`, one row read. A node
+   * is "updating" from the moment its update is the active one until it ends; the update behind it in
+   * its batch is not, until its turn. Read from the store, never from the driver's memory, so the two
+   * processes of a handover agree on which node is closed to new work.
+   */
+  activeNode(): string | null {
+    const row = getCerberusConnection()
+      .prepare('SELECT node FROM updates WHERE ended_at IS NULL ORDER BY started_at, rowid LIMIT 1')
+      .get() as { node: string } | undefined;
+    return row?.node ?? null;
+  },
+
+  /**
    * Records the update's latest step. Answers whether this call did: an update that already ended is
    * left as it was, so a progress frame that crossed the end moves nothing.
    */
@@ -197,6 +216,41 @@ export const cerberusUpdatesDb = {
       )
       .run({ id, result, endedAt, note });
     return outcome.changes > 0;
+  },
+
+  /**
+   * THE ONE AMENDMENT of an ended update: an update that ended `updated` at `since` or later turns
+   * `rolled_back`, with `note` (the reason a live rollback files too), its `step` word `failed` (what a
+   * live rollback leaves) and a closing `failed` step `text` stamped `at`. It answers whether this call did it. Center ends an update `updated` on the
+   * hello that names the new release, while the launcher's probation runs on until the release has
+   * answered its welcome; a release that dies in between is taken back, and the old release's hello
+   * says so to an update that is already over.
+   *
+   * Both writes are ONE transaction (nested into the caller's, when there is one): the `result`
+   * statement is guarded `result = 'updated' AND ended_at >= @since` — an update that was never
+   * `updated`, one `updated` longer ago, one already `rolled_back` (a resent hello) or a failure is
+   * left as it was — and the step is written only when that statement changed the row. The step is
+   * inserted here, not through `insertStep`, because that one keeps its `ended_at IS NULL` guard and
+   * would refuse it: no other path writes a step under an ended update, and no other path reopens one.
+   * `ended_at` stays what it was, so the activity feed and the pause window keep the moment center
+   * heard the new release; the step carries the later moment the rollback was heard.
+   */
+  rolledBackAfterUpdated(id: string, at: number, text: string, since: number, note: string): boolean {
+    assertEpochMs(`Update ${id}'s rollback time`, at);
+    assertEpochMs(`Update ${id}'s rollback window start`, since);
+    const connection = getCerberusConnection();
+    return connection.transaction(() => {
+      const amended = connection
+        .prepare(`UPDATE updates SET result = 'rolled_back', step = 'failed', note = @note WHERE id = @id AND result = 'updated' AND ended_at >= @since`)
+        .run({ id, note, since });
+      if (amended.changes === 0) return false;
+      // DO NOTHING on the key (`update_id, at, step`): a step of this very millisecond is already there,
+      // and the verdict above must not be undone for a line that says it twice.
+      connection
+        .prepare(`INSERT INTO update_steps (update_id, at, step, text) VALUES (@id, @at, 'failed', @text) ON CONFLICT (update_id, at, step) DO NOTHING`)
+        .run({ id, at, text });
+      return true;
+    })();
   },
 
   /**

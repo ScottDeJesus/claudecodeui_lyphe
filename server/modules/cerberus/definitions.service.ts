@@ -256,11 +256,17 @@ export function discoverComponent(node: string, key: string, sourceProbeKey: str
 /**
  * Writes center's own definition: node `center`, service `cerberus`, three `self` probes every 30
  * seconds — so a check goes unknown after 90 s without a result. Idempotent, run at every start.
- * Labels a person has changed since are kept: a seed gives the words only to a row that has none.
+ * The default words are written only when a check is INSERTED: a row that exists keeps both its
+ * labels as they are, a cleared one (NULL) included, so a boot never undoes the clearing `setLabel`
+ * stored. `upsertCheck` leaves a stored label alone when it is handed `null`, so an existing row is.
  * The hub has no `nodes` row, so its probes sit at version 0 and no warden is ever sent them.
  */
 export function seedHub(): void {
-  const existing = new Map(cerberusDefinitionsDb.checksOf(HUB_NODE_ID).map((check) => [check.key, check]));
+  const existingKeys = new Set(cerberusDefinitionsDb.checksOf(HUB_NODE_ID).map((check) => check.key));
+  // A service has one name, kept on every check of it. Once any check of the service has a row, the
+  // service name is whatever the rows carry (a cleared one stays cleared), and a check added later takes
+  // its siblings' name through `upsertCheck`; only a service with no row at all is named from the default.
+  const serviceHasRows = existingKeys.size > 0;
 
   getCerberusConnection()
     .transaction(() => {
@@ -281,8 +287,8 @@ export function seedHub(): void {
           node: HUB_NODE_ID,
           key,
           service: HUB_SERVICE,
-          service_label: existing.get(key)?.service_label ?? HUB_SERVICE_LABEL,
-          label: existing.get(key)?.label ?? label,
+          service_label: serviceHasRows ? null : HUB_SERVICE_LABEL,
+          label: existingKeys.has(key) ? null : label,
           source: null,
           probe: key,
           pass: null,
@@ -295,5 +301,5 @@ export function seedHub(): void {
     })
     .immediate();
 
-  if (existing.size < HUB_CHECKS.length) hintChanged({ nodes: [HUB_NODE_ID] });
+  if (existingKeys.size < HUB_CHECKS.length) hintChanged({ nodes: [HUB_NODE_ID] });
 }

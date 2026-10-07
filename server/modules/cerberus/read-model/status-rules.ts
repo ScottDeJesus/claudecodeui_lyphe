@@ -13,8 +13,9 @@ import type { CerberusStatus, CerberusStoredStatus } from '@/shared/cerberus-typ
  * in it is never read as passing.
  *
  * Consumers: `cells.ts` (a cell keeps the first check to reach its worst word), `freshness.ts` (a
- * window's word and the moment it rose) and, through the cerberus barrel, the `fixes` plan's auto-run,
- * so the tab and the auto-run read one set of rules.
+ * window's word and the moment it rose), `overlays.ts`, `activity.ts`, `check-views.ts`,
+ * `check-detail.ts`, `lookup.ts` and `overview.ts`. Auto-run reads none of them: it is handed the
+ * status moves ingest announces (`ingest.onChange`).
  */
 export const SEV: Record<CerberusStatus, number> = {
   not_enabled: -1,
@@ -50,7 +51,7 @@ export function worst(a: CerberusStatus, b: CerberusStatus): CerberusStatus {
  * document's `muted` — the service has the feature switched off, which is never Cerberus's mute).
  *
  * Consumers: `shownRow` below, which every reading of a stored row goes through; exported as the
- * rule the contract names, for the `fixes` plan's auto-run to read through the cerberus barrel.
+ * rule the contract names.
  */
 export function shown(stored: CerberusStoredStatus | null): CerberusStatus {
   return stored ?? 'not_enabled';

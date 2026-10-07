@@ -1,23 +1,29 @@
 // The three reads a diagnosis has — `log.read`, `file.read`, `status.read` — as a fixed menu. There is no tool that
 // runs a string: a read is one of the argv lines in `STATUS_MENU`, `journalctl` for one validated unit, or this
-// process opening a path that passed `diag-guard.mjs`. Each answers `{ ok, text, truncated }`; masking is the caller's
-// (`diag-tools.mjs` masks every text it sends), but `contains` filters the MASKED text, so a filter can never confirm a
-// guess at a secret.
+// process opening a path that passed `diag-guard.mjs`. Each answers `{ ok, text, truncated }`. `diag-tools.mjs` masks every
+// text it sends, but a read that CUTS a text masks it first and cuts only on a whole line, so no cut leaves half a secret
+// for that later mask to miss; `contains` filters the MASKED text, so a filter can never confirm a guess at a secret.
 //
 //   log.read     { unit | path, sinceMin = 15 (1..1440), lines = 200 (1..500), contains? }
 //                unit → `journalctl -u <unit> --since "-<n> min" -n <lines> --no-pager -o short-iso`
 //                path → the last `lines` lines of the file; `contains` keeps the lines holding it (any case)
-//   file.read    { path, maxBytes = 65536 (1..65536) } → a regular text file's head, or a directory's listing (200 entries)
+//   file.read    { path, maxBytes = 65536 (1..65536) } → a regular text file's head, or a directory's listing (200 entries,
+//                each with its mtime as local time and offset — the form center gives the model for every other moment).
+//                The head is whole lines: `maxBytes` and up to 4 KiB more are read and masked, then it ends on the last line
+//                that fits `maxBytes`; a file whose first line runs past `maxBytes` answers "(its first line runs past … bytes)"
 //   status.read  { what, name? } → one line of `STATUS_MENU`; `name` only for `unit`
 import fs from 'node:fs';
 
 import { maskSecrets, resolveReadable } from './diag-guard.mjs';
 import { OUTPUT_CAP_BYTES } from './diag-argv.mjs';
+import { localStamp } from './local-time.mjs';
 
 const UNIT_NAME = /^[A-Za-z0-9@._-]+$/;
 const MAX_LISTING_ENTRIES = 200;
 /** How much of a file's end `log.read` looks at: the last lines of any log live inside it. */
 const TAIL_WINDOW_BYTES = 256 * 1024;
+/** How far past `maxBytes` `file.read` reads before it masks: a secret the cut would halve is whole in what the mask sees. */
+const MASK_ROOM_BYTES = 4 * 1024;
 const MAX_CONTAINS_CHARS = 200;
 /** What an empty file answers: an `ok: true` with no text at all could not be told from a read that went wrong. */
 const EMPTY_FILE = '(the file is empty)';
@@ -100,7 +106,7 @@ function listDirectory(target) {
     try {
       const entry = fs.lstatSync(`${target.real}/${name}`);
       const type = entry.isDirectory() ? 'dir' : entry.isSymbolicLink() ? 'symlink' : entry.isFile() ? 'file' : 'other';
-      lines.push(`${label}\t${type}\t${entry.size}\t${entry.mtime.toISOString()}`);
+      lines.push(`${label}\t${type}\t${entry.size}\t${localStamp(entry.mtimeMs)}`);
     } catch (error) {
       lines.push(`${label}\t?\t?\t(${error.code ?? error.name})`);
     }
@@ -118,20 +124,46 @@ async function readFileTool(args, { wardenHome }) {
   const found = statReadable(target);
   if (found.refusal) return refuse(found.refusal);
   if (found.stats.isDirectory()) return listDirectory(target);
-  // One byte more than asked for tells a file that goes on from one that ends exactly here.
-  const read = readSlice(target.real, 0, limit.number + 1);
+  // `maxBytes` plus the room the mask needs to see a secret the cut would halve; one byte more tells a file that goes on
+  // from one that ends exactly here.
+  const reach = limit.number + MASK_ROOM_BYTES;
+  const read = readSlice(target.real, 0, reach + 1);
   if (read.length === 0) return { ok: true, text: EMPTY_FILE, truncated: false };
-  if (looksBinary(read)) return refuse(`Refused: ${target.requested} is a binary file`);
-  const head = read.subarray(0, limit.number);
-  return { ok: true, text: head.toString('utf8').replace(/\uFFFD$/, ''), truncated: read.length > limit.number };
+  // Binary is judged on the head that can be returned: a NUL only in the mask's lookahead is not in the answer.
+  if (looksBinary(read.subarray(0, limit.number))) return refuse(`Refused: ${target.requested} is a binary file`);
+  return headOfFile(read.subarray(0, reach), read.length > reach, limit.number);
+}
+
+/**
+ * A file's head as whole lines of at most `maxBytes` bytes. `window` is what was read — `maxBytes` and up to `MASK_ROOM_BYTES`
+ * more — and `goesOn` says the file continues past it. The window is masked BEFORE the cut, so a secret that straddles
+ * `maxBytes` (`postgres://app:S3cret` with its `@host` just past it) is whole when the mask meets it; then the head ends on the
+ * last whole line that fits. `truncated` is true whenever the file goes on past what is returned.
+ */
+function headOfFile(window, goesOn, maxBytes) {
+  // A read that stopped mid-file stopped mid-line too: that last line is not whole, so it is not part of the head.
+  const read = goesOn ? window.subarray(0, window.lastIndexOf(10) + 1) : window;
+  const masked = Buffer.from(maskSecrets(read.toString('utf8')), 'utf8');
+  let kept = masked;
+  if (masked.length > maxBytes) {
+    // The last line break within reach of the cap ends the last whole line that fits (one at `maxBytes` ends a line of exactly that size).
+    kept = masked.subarray(0, Math.max(masked.subarray(0, maxBytes + 1).lastIndexOf(10), 0));
+  } else if (goesOn && masked.at(-1) === 10) {
+    kept = masked.subarray(0, -1);
+  }
+  const truncated = goesOn || kept.length < masked.length;
+  if (truncated && kept.length === 0) return { ok: true, text: `(its first line runs past ${maxBytes} bytes)`, truncated: true };
+  return { ok: true, text: kept.toString('utf8'), truncated };
 }
 
 /**
  * The last `lines` lines of a file; the window's first line is dropped when the window began mid-file, since it is cut.
  * The whole window is masked BEFORE either cut — the last `lines` lines, then 64 KB from its front (the newest lines stay)
- * with the line the cut went through dropped — so a private-key block whose `BEGIN` line the line cut would leave out is
+ * with the line the cut went through dropped (a newest line that alone passes 64 KB answers "(its last line runs past …)") —
+ * so a private-key block whose `BEGIN` line the line cut would leave out is
  * masked while it is still whole, and a secret the 64 KB cut halves cannot keep its value's tail with its key word gone.
- * Only a block that began before the window's own first byte shows its body lines.
+ * A block that began before the window's own first byte is masked from the window's start through its `END` line
+ * (`maskSecrets`): a tail window runs to the newest line, so it holds the `END` of any key whose body it shows.
  */
 function tailOfFile(target, stats, lines) {
   if (!stats.isFile()) return refuse(`${target.requested} is a directory: log.read reads a file or a unit`);
@@ -147,8 +179,12 @@ function tailOfFile(target, stats, lines) {
   if (bytes.length <= OUTPUT_CAP_BYTES) return { ok: true, text: bytes.toString('utf8'), truncated: false };
   const cutAt = bytes.length - OUTPUT_CAP_BYTES;
   let kept = bytes.subarray(cutAt);
-  const cutLine = bytes[cutAt - 1] === 10 ? 0 : kept.indexOf(10) + 1;
-  kept = kept.subarray(cutLine);
+  if (bytes[cutAt - 1] !== 10) {
+    // The cut went through a line: it is dropped. No line break in what is left means the newest line alone is past the cap.
+    const lineBreak = kept.indexOf(10);
+    if (lineBreak < 0) return { ok: true, text: `(its last line runs past ${OUTPUT_CAP_BYTES} bytes)`, truncated: true };
+    kept = kept.subarray(lineBreak + 1);
+  }
   return { ok: true, text: kept.toString('utf8'), truncated: true };
 }
 

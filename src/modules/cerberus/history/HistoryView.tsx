@@ -69,8 +69,7 @@ function checkOf(chosen: string | null): { node: string; service: string; id: st
  * The look-up's reads and presses are here; the feed's, with its paging, are `useActivityFeed`'s.
  * The cards only draw what they are handed.
  *
- * Mounted by the tab's root, `CerberusPanel`, as its History view. Until that phase lands, only
- * fixtures render it.
+ * Mounted by the tab's root, `CerberusPanel`, as its History view.
  */
 export function HistoryView() {
   const { t } = useTranslation();

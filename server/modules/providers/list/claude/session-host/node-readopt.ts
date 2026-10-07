@@ -8,7 +8,14 @@
  * `replay` covers the nodes already linked when this subscribes, which is a handover's takeover.
  * What runs on a co-located node's link is the boot pipeline, on the node's own answer: list its
  * hosts, keep the newest per app session (`retireOlderHosts`), wind down the idle ones left on an
- * older build (`retireStaleIdleHosts`), and hand each keeper back (`readoptHost`).
+ * older build (`retireStaleIdleHosts`), and hand each keeper back (`readoptHost`). Every host the
+ * pipeline retires lists the node again (`noteNodeHostsChanged`): the node card's "N sessions" is the
+ * last list, and the list the pipeline began with still names what it just retired.
+ *
+ * WHAT IT LEAVES ALONE besides those: a host whose fresh placement this process refused after its `spawn`
+ * (`refused-hosts.ts`). A retire the link could not carry then is sent first thing here, before the list is
+ * asked, and the list is read without those hosts — a retired host stays listed until its CLI has exited, and
+ * adopting it would hand an orphan back as a live run.
  *
  * WHAT IT SKIPS. A host a live facade is waiting for (`waitingHostIds`): its turn lost the link and
  * re-attaches to its host by itself on the same link-up, at the exact seq its SDK last read — a second
@@ -45,13 +52,14 @@ import type { CerberusNodeHost } from '@/shared/cerberus-types.js';
 
 import { installedCliVersionForLaunch } from '../installed-cli-version.js';
 
-import { colocatedNodeIds } from './colocated-hosts.js';
+import { colocatedNodeIds, noteNodeHostsChanged } from './colocated-hosts.js';
 import { isApiExiting } from './facade.js';
 import { retireOlderHosts } from './hosts.js';
 import { retireStaleIdleHosts } from './idle-version-sweep.js';
 import { gateFreshNodeHosts, waitingHostIds } from './node-transport.js';
 import { readoptHost } from './readopt-host.js';
 import type { ReadoptableHost, ReadoptDeps } from './readopt-host.js';
+import { sendPendingRetires, withoutRefusedHosts } from './refused-hosts.js';
 
 /** How far before this boot a node may last have been heard and still be one this boot waits for. */
 const HEARD_BEFORE_BOOT_MS = 10 * 60_000;
@@ -151,16 +159,24 @@ function adoptWhenSessionIdle(node: string, host: ReadoptableHost, deps: Readopt
 async function readoptNode(node: string, deps: ReadoptDeps, run: number): Promise<number | null> {
   // Before the first await: a facade's own re-attach is on this very link-up and must not be adopted twice.
   const waitingBefore = waitingHostIds();
-  let listed: CerberusNodeHost[];
+  // Ahead of the list on the wire: a refused placement's host the link could not retire earlier is asked to leave now.
+  sendPendingRetires(node);
+  let answered: CerberusNodeHost[];
   try {
-    listed = await nodeSessions.listHosts(node);
+    answered = await nodeSessions.listHosts(node);
   } catch (error) {
     console.warn(`[keepalive] node ${node}: could not list its hosts (${errorText(error)}) — nothing re-adopted until its link comes up again`);
     return null;
   }
+  const listed = withoutRefusedHosts(node, answered);
+  // The answer still names a host that is on its way out, and the node card counts that answer.
+  if (listed.length !== answered.length) noteNodeHostsChanged(node);
 
   const retire = (hostId: string): void => {
     nodeSessions.retireHost(node, hostId);
+    // The list this pass asked for still names the host just retired, and the node card's count and the
+    // activity reading read that list: it is taken again once the burst settles.
+    noteNodeHostsChanged(node);
   };
   const keepers = retireOlderHosts(listed, retire);
   const fresh = retireStaleIdleHosts(keepers, await installedCliVersionForLaunch(), retire);

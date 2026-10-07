@@ -68,7 +68,7 @@ a by-hand `npm run server:dev`, must never make a plain boot share `:3011` with 
 
 | Bit | Set on | Effect in the child |
 | --- | ------ | ------------------- |
-| `CLOUDCLI_SUPERVISED=1` | every child | listens with `reusePort: true`, and sends `ready` as the first statement of the listen callback |
+| `CLOUDCLI_SUPERVISED=1` | every child | listens with `reusePort: true`, and sends `ready` from the listen callback once `cerberus.start()` has bound the warden gateway (waited for at most 3 s; MAN-7804) |
 | `CLOUDCLI_HANDOVER=1` | only a child spawned beside a serving one | defers re-adoption, the scheduled-message dispatcher and plugin startup until `takeover` |
 
 `child.mjs` **deletes** the handover bit when it does not apply rather than leaving it unset: a

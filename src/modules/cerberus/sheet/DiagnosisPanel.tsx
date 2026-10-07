@@ -206,7 +206,12 @@ export function DiagnosisPanel({ diagnosisId, held, onPromote }: DiagnosisPanelP
       </div>
 
       <div className="flex flex-col gap-3 px-3.5 pb-3.5 pt-3">
-        <p className="text-[12.5px] text-muted-foreground">{t('cerberus.diagnosis.scope', { node: diagnosis.node })}</p>
+        {/* A diagnosis that was not given the node's reads says so: its answer rests on Cerberus's record alone. */}
+        <p className="text-[12.5px] text-muted-foreground">
+          {diagnosis.scope === 'history'
+            ? t('cerberus.diagnosis.scopeHistory', { node: diagnosis.node })
+            : t('cerberus.diagnosis.scope', { node: diagnosis.node })}
+        </p>
 
         {first !== undefined && last !== undefined && (
           // Open while it runs; once over, the one line opens it. `CardFoldBody` takes a folded trail out of the tab order and the accessibility tree.

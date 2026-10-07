@@ -11,9 +11,10 @@
  * - THE LIST MOVES ON EVENTS, never on a clock. A cache that a timer refreshes is a poll that reads
  *   wrong between its ticks — in the one direction the activity reading may never be wrong in. The
  *   relay keeps every `sessions.listed`, so the cache is current after: a node's link-up
- *   (re-adoption, `node-readopt.ts`); a host placed on or ended on a node (`noteNodeHostsChanged`,
- *   told by `node-transport.ts`) — which is also what keeps the node card's session count true; and the
- *   reading itself, which asks every linked co-located warden first (`refreshColocatedNodeHosts`).
+ *   (re-adoption, `node-readopt.ts`); a host placed on, ended on or retired from a node
+ *   (`noteNodeHostsChanged`, told by `node-transport.ts` and by the re-adoption's own retirements) —
+ *   which is also what keeps the node card's session count true; and the reading itself, which asks
+ *   every linked co-located warden first (`refreshColocatedNodeHosts`).
  * - ONLY WHAT WAS JUST READ COUNTS. A co-located node whose link is down contributes nothing, so its
  *   CLIs show as "other Claude processes" in the activity reading and hold an install, exactly as a
  *   process nothing here knows about does: a list that was true a minute ago says nothing about now.
@@ -41,12 +42,14 @@ const HOSTS_CHANGED_SETTLE_MS = 1_500;
 const settling = new Map<string, NodeJS.Timeout>();
 
 /**
- * A host was placed on `node` or ended there, so the hosts it holds have moved: lists them again once
+ * A host was placed on `node`, ended there or retired from it, so the hosts it holds have moved: lists them again once
  * the burst has settled (a turn that ends and the next that starts are one listing, not two) and
  * tells open Fleet screens to re-read, since the node card shows how many run there. A listing that
  * fails is logged; the next event, or the activity reading, lists again.
  *
- * consumer: node-transport.ts, when a fresh host answers and when a host's `exit` is delivered
+ * consumer: node-transport.ts, when a fresh host answers, when a host's `exit` is delivered and when a
+ * refused fresh placement retires its host; node-readopt.ts and readopt-host.ts, when a re-adoption
+ * retires a host
  */
 export function noteNodeHostsChanged(node: string): void {
   if (settling.has(node)) return;

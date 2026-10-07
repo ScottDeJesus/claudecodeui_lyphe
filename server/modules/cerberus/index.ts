@@ -22,14 +22,19 @@
 // at `/api/cerberus`, to start the store and the gateway after `listen`, to start the self-checks and
 // the prune from `soleServerDuties`, and to stop them first on shutdown.
 export { createCerberusModule } from './cerberus.module.js';
-// wardenLinks: used by the later plans that talk to a warden — `send` and `registerHandler` for the
-// frames of `run.*`, `diag.*`, `update.*` and `session.*`, `onChange` for a node's link moving.
+// wardenLinks: the registry of warden links (`send`, `registerHandler`, `onChange`). The handlers of
+// `run.*`, `diag.*`, `update.*`, `session.*` and `catalog.ack` register from inside this directory;
+// no module outside it imports this export.
 export { wardenLinks } from './warden-links.js';
-// nodeSessions: used by the session host (`session-host/node-transport.ts`, `node-readopt.ts`, `readopt-host.ts`, `colocated-hosts.ts`)
-// and the projects routes, through this barrel: `openChannel` carries a session's host frames over a
-// node's link, `listHosts` / `retireHost` / `lastListed` adopt and tidy what runs there, `isColocated`
-// tells a node on this machine from a remote one, and `onLinkUp` re-adopts when a warden reconnects.
+// nodeSessions: used by the session host (`session-host/node-transport.ts`, `node-readopt.ts`,
+// `readopt-host.ts`, `colocated-hosts.ts`, `refused-hosts.ts`) and the projects module
+// (`services/project-node.service.ts`), through this barrel: `openChannel` carries a session's host
+// frames over a node's link, `listHosts` / `retireHost` / `lastListed` adopt and tidy what runs
+// there, `isColocated` tells a node on this machine from a remote one, and `onLinkUp` re-adopts when
+// a warden reconnects.
 export { nodeSessions } from './node-sessions.js';
 // hintChanged: used by the projects module's `setProjectNode`, which writes what a node card shows
-// (`projects`) without any Cerberus store write, so no other path would tell open screens to re-read.
+// (`projects`) without any Cerberus store write, and by the session host (`node-readopt.ts`,
+// `colocated-hosts.ts`) after a node's hosts are listed (the card's session count); no other path
+// would tell open screens to re-read.
 export { hintChanged } from './cerberus-broadcast.js';

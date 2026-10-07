@@ -2,7 +2,8 @@ import { ChevronDownIcon } from 'lucide-react';
 import type { HTMLAttributes, ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { CollapsibleContent, CollapsibleTrigger, useCollapsible } from '@/shared/ui/Collapsible';
+import { CollapsibleContent, CollapsibleTrigger } from '@/shared/ui/Collapsible';
+import { useCollapsible } from '@/shared/ui/collapsibleContext';
 import { cn } from '@/shared/utils';
 
 /**

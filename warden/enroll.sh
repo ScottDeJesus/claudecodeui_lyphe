@@ -21,14 +21,16 @@
 #   enroll   (--name, --token)  refused when identity.json already exists (that is a refresh). Fetches
 #            latest.json and the release from center, checks the SHA-256, unpacks into
 #            ~/.cerberus-warden/releases/<version>/, points `current` at it, runs `enroll`, copies the
-#            release's launcher to ~/.cerberus-warden/launcher.mjs, then writes every unit the release carries, enables them and restarts cerberus-warden so the
+#            release's launcher to ~/.cerberus-warden/launcher.mjs, then writes every unit the release carries,
+#            pins the sessions unit against needrestart, enables the units and restarts cerberus-warden so the
 #            daemon reads the identity just made.
 #   refresh  (--refresh)        refused unless identity.json exists. Fetches a release only when it is
 #            NEWER than `current`'s, points `current` at it, copies the launcher out of `current` to
 #            ~/.cerberus-warden/launcher.mjs (the unit runs that copy, which lives outside every release),
-#            writes every unit template the release carries, enables (and so starts) any unit not yet enabled, restarts cerberus-warden — and only
-#            that: cerberus-warden-sessions holds the node's running chat sessions and is never restarted by
-#            a refresh. Identity and keys are never touched.
+#            writes every unit template the release carries, writes the needrestart pin of the sessions unit, enables (and so
+#            starts) any unit not yet enabled, restarts cerberus-warden — and only that: cerberus-warden-sessions
+#            holds the node's running chat sessions and is never restarted by a refresh. Identity and keys are
+#            never touched.
 #
 # TOOLS. node 22+, curl, tar, sha256sum, systemctl, and tmux at /usr/bin/tmux (the sessions unit's ExecStart).
 #
@@ -144,6 +146,39 @@ render_units() {
   [ -n "$RENDERED" ] || die "The release carries no unit to install."
 }
 
+# Keeps needrestart from restarting cerberus-warden-sessions. That unit's ExecStop is `tmux kill-server`, so a restart
+# of it ends EVERY chat the node hosts, and an unattended upgrade's needrestart pass restarts what it thinks a library
+# update touched. This script is the one place that knows the unit is on this machine, and the pin is root's to write,
+# which the warden's signed update path is not. Where needrestart is absent there is nothing to pin, and the line says
+# so. A pin that cannot be written is a warning and not the end of the script, for the reason `enable_units` gives:
+# `set -e` here would stop a refresh with `current` already swapped and the warden never restarted.
+pin_needrestart() {
+  pin_dir=/etc/needrestart/conf.d
+  pin_name=99-cerberus-warden-sessions.conf
+  if [ ! -d "$pin_dir" ]; then
+    say "needrestart is not installed here ($pin_dir does not exist), so cerberus-warden-sessions has no restart pin to write."
+    return 0
+  fi
+  cat > "$TMP/$pin_name" <<'EOF'
+# Skip needrestart's auto-restart of the Cerberus warden's session keepalive during
+# unattended-upgrades. Restarting cerberus-warden-sessions.service runs its ExecStop, which is
+# `tmux -L cerberus-warden kill-server`: the tmux server and EVERY node chat pane inside it end,
+# mid-turn — and the unit links no perl/libc a security update would actually require a restart for.
+#
+# Same failure class as 99-cloudcli-sessions.conf (pinned after needrestart twice killed every
+# tmux session) and 99-descent-pm.conf.
+#
+# Written by the warden's enroll.sh on install and on every --refresh; do not edit it by hand.
+# Security updates keep flowing; the unit restarts on its own schedule.
+$nrconf{override_rc}{qr(^cerberus-warden-sessions\.service$)} = 0;
+EOF
+  if install -m 0644 "$TMP/$pin_name" "$pin_dir/$pin_name"; then
+    say "Pinned cerberus-warden-sessions against needrestart ($pin_dir/$pin_name)."
+  else
+    printf '%s\n' "Warning: could not write $pin_dir/$pin_name — an unattended upgrade's needrestart may restart cerberus-warden-sessions and end every chat this node hosts. Once the cause is gone, run this again with --refresh." >&2
+  fi
+}
+
 # Enables, and so starts, every rendered unit that is not enabled yet — the warden's, and the session keepalive that
 # holds the node's chat sessions. A unit that is already enabled is left running: only the warden is restarted, below.
 # The keepalive failing to start (another tmux server already holds its socket, say) is a warning and not the end of
@@ -253,6 +288,7 @@ main() {
     fi
     install_launcher
     render_units
+    pin_needrestart
     systemctl daemon-reload
     enable_units
     systemctl restart cerberus-warden.service
@@ -271,6 +307,7 @@ main() {
     die "Cerberus did not enroll this machine, so no unit was installed."
   install_launcher
   render_units
+  pin_needrestart
   systemctl daemon-reload
   enable_units
   # `enable --now` starts nothing on a unit that is already running; the restart makes it read the identity just written.

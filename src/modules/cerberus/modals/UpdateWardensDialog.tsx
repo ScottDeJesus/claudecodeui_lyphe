@@ -4,13 +4,12 @@ import { useTranslation } from 'react-i18next';
 
 import { useCerberus } from '@/modules/cerberus/context/CerberusContext';
 import { useUpdateBatch } from '@/modules/cerberus/hooks/useUpdateBatch';
-import { DialogFrame } from '@/modules/cerberus/modals/DialogFrame';
 import { hms } from '@/modules/cerberus/utils/cerberusTime';
 import { canTake, freshestBatch } from '@/modules/cerberus/utils/wardenUpdates';
-import type { CerberusUpdateView, CerberusWardens } from '@/shared/cerberus-types';
+import type { CerberusStartedBatch, CerberusUpdateView, CerberusWardens } from '@/shared/cerberus-types';
 import { useReturnFocus } from '@/shared/hooks/useReturnFocus';
-import type { CerberusStartedBatch, Tone } from '@/shared/types';
-import { Button, Checkbox } from '@/shared/ui';
+import type { Tone } from '@/shared/types';
+import { Button, Checkbox, DialogFrame } from '@/shared/ui';
 import { cn } from '@/shared/utils';
 
 /** One enrolled node as `GET /wardens` lists it: its warden's version (null before its first hello) and whether that is behind. */
@@ -170,7 +169,7 @@ function UpdateWardensFlow({ onClose }: { onClose: () => void }) {
   return (
     <DialogFrame
       size="lg"
-      marker="update"
+      data-cerberus-dialog="update"
       title={t('cerberus.updates.title')}
       accent={{ words: t('cerberus.updates.titleAccent') }}
       busy={starting}

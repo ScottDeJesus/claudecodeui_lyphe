@@ -2,11 +2,10 @@ import { useEffect, useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { useCerberus } from '@/modules/cerberus/context/CerberusContext';
-import { DialogFrame } from '@/modules/cerberus/modals/DialogFrame';
 import { hm, sameLocalDay } from '@/modules/cerberus/utils/cerberusTime';
 import type { CerberusCheckView } from '@/shared/cerberus-types';
 import { useReturnFocus } from '@/shared/hooks/useReturnFocus';
-import { Button, Chip, Field, TextArea } from '@/shared/ui';
+import { Button, Chip, DialogFrame, Field, TextArea } from '@/shared/ui';
 
 /**
  * How long a mute lasts, as the chips offer it: 15 min, 1 hour, 4 hours, or until the next 08:00 local —
@@ -155,7 +154,7 @@ function MuteForm({ check, onClose }: { check: CerberusCheckView; onClose: () =>
   return (
     <DialogFrame
       size="md"
-      marker="mute"
+      data-cerberus-dialog="mute"
       title={t('cerberus.mute.title')}
       accent={check.label === null ? { key: check.key } : { words: lowerFirst(check.label) }}
       busy={busy}

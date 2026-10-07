@@ -2,8 +2,10 @@
 #
 # WHAT THIS IS. A do-nothing keepalive whose ONLY job is to hold a tmux server alive on the
 # private `-L cloudcli-sessions` socket, in its OWN cgroup, OUTSIDE
-# cloudcli-server-dev.service's lifecycle. A chat session is a tmux `new-session` on THIS
-# server — so the `claude` process lives in THIS unit's cgroup, not the API's. That is what
+# cloudcli-server-dev.service's lifecycle. A chat session of a project on no node is a tmux
+# `new-session` on THIS server — so the `claude` process lives in THIS unit's cgroup, not the
+# API's. (A chat of a project assigned to a node runs under that node's warden, on the warden's
+# own `-L cerberus-warden` tmux server; this unit never holds it.) That is what
 # lets a `tsx watch` reload (or a full `systemctl restart cloudcli-server-dev`) leave a
 # running chat session untouched: the API's restart tears down only the API's own cgroup;
 # this server, and every session pane it owns, is a different cgroup entirely — so the
@@ -49,8 +51,8 @@ Group=__USER__
 # server reparents to PID 1; Type=forking + RemainAfterExit keep the unit ACTIVE.
 ExecStart=/usr/bin/tmux -L cloudcli-sessions -f /dev/null new-session -d -s _keepalive sleep infinity
 # Tear the WHOLE server down on stop — every chat-session pane it owns goes with it. (An
-# operator `systemctl stop cloudcli-sessions-tmux` is the deliberate "kill every live chat
-# session" switch.)
+# operator `systemctl stop cloudcli-sessions-tmux` is the deliberate "kill every live chat of a
+# project on no node" switch.)
 # The `-` prefix: ignore a failing kill-server. Stopping when the server is ALREADY dead (the
 # silent-death state) makes kill-server exit 1 ("no server running"), and without the `-`
 # that lands the unit in FAILED — indistinguishable from crash residue. With it a deliberate
@@ -63,7 +65,8 @@ RestartSec=2
 # OOMPolicy=continue: when the kernel OOM-killer reaps ONE process in this unit's cgroup
 # (a single runaway chat session), keep the unit — and every SIBLING session — running. The
 # default (OOMPolicy=stop) tears the WHOLE cgroup down on ANY single OOM kill, which would
-# turn one oversized session's death into the simultaneous loss of every live chat.
+# turn one oversized session's death into the simultaneous loss of every live chat of a project
+# on no node.
 # `continue` confines the blast radius to the process the kernel actually killed.
 OOMPolicy=continue
 

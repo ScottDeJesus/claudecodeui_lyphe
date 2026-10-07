@@ -33,7 +33,7 @@ import {
  * Consumers: `server/modules/cerberus/` — the runs service (`insert`, `get`, the two marks, the
  * output statements, `activeForCheck` for its 409, `activeForNode` to reconcile a hello), the
  * auto-run rule (`autoRunsSince`, `activeForCheck`), the read model (`activeForNode`,
- * `latestForCheck`, `recent` for What happened, `output` for a run's lines, `lastLines` for the line a
+ * `activeForCheck` for a need's going run, `latestForCheck`, `recent` for What happened, `output` for a run's lines, `lastLines` for the line a
  * strip quotes, `statsFor` for an entry's counts, `latestForDiagnoses` for the run of a diagnosis's
  * one-off), the diagnosis agent (`requestedSince` for its `history_read`) and the daily prune
  * (`pruneOutputBefore`). Reach it through `@/modules/database/index.js`. Every statement runs on

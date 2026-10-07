@@ -1,3 +1,4 @@
+import { useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { groupOf } from '@/modules/cerberus/fleet/fleetModel';
@@ -8,7 +9,7 @@ import { markLook, nodeMark } from '@/modules/cerberus/utils/cerberusStatus';
 import { nodeLine, sessionsTail, wardenLine } from '@/modules/cerberus/utils/fleetWords';
 import type { CerberusNodeView } from '@/shared/cerberus-types';
 import type { CerberusSheetTarget, FleetItem } from '@/shared/types';
-import { Card } from '@/shared/ui';
+import { Button, Card } from '@/shared/ui';
 import { cn } from '@/shared/utils';
 
 type RingsNodePanelProps = {
@@ -33,7 +34,8 @@ type RingsNodePanelProps = {
  * first heartbeat that line is the node's own line, so it is said once, in the head. Then come its
  * services, one `ServiceRow` each, the rows its card opens to in Grid. A row's name opens the sheet at
  * now, and a minute opens it at that minute. A node with nothing to watch says so in one sentence. A node
- * that runs on this machine ends with `NodeProjects`, "Projects that run here", as its card does in Grid.
+ * that runs on this machine, or holds a project, ends with `NodeProjects`, "Projects that run here", as its
+ * card does in Grid.
  *
  * It rises with `vv-pop`. The rings key it by node, so each new selection rises again.
  *
@@ -50,7 +52,8 @@ export function RingsNodePanel({ item, node, now, onClose, onOpenCell }: RingsNo
   // " · N sessions running here", drawn after the warden line.
   const sessionsCount = sessionsTail(t, node);
   const waiting = node.link === 'never';
-  const close = t('cerberus.fleet.rings.close');
+  // Where focus goes when a node's last project moves back and its section is gone: the panel's own close.
+  const closeRef = useRef<HTMLButtonElement>(null);
 
   return (
     <Card className="overflow-hidden shadow-md motion-safe:animate-[vv-pop_.45s_theme(transitionTimingFunction.enter)_both]">
@@ -65,15 +68,18 @@ export function RingsNodePanel({ item, node, now, onClose, onOpenCell }: RingsNo
             {line}
           </p>
         </div>
-        <button
-          type="button"
+        {/* The library's icon Button: 40 px at a desk and 44 below md, Verve's touch minimum. The negative margin keeps the
+            ✕ glyph where the old 28 px one stood, so the head's row does not grow. */}
+        <Button
+          ref={closeRef}
+          variant="ghost"
+          size="icon"
           onClick={onClose}
-          aria-label={close}
-          title={close}
-          className="flex size-7 flex-none items-center justify-center rounded-full text-[13px] text-muted-foreground transition-colors duration-quick hover:bg-muted hover:text-foreground"
+          aria-label={t('buttons.close')}
+          className="-mr-1.5 flex-none text-muted-foreground max-md:h-11 max-md:w-11"
         >
-          ✕
-        </button>
+          <span aria-hidden>✕</span>
+        </Button>
       </div>
       {warden !== line && (
         <p className="flex items-center gap-[7px] px-4 pb-3 text-xs text-muted-foreground">
@@ -92,7 +98,7 @@ export function RingsNodePanel({ item, node, now, onClose, onOpenCell }: RingsNo
           <ServiceRow key={service.service} node={node.id} service={service} face="grid" onOpenCell={onOpenCell} />
         ))
       )}
-      {node.colocated && <NodeProjects node={node.id} link={node.link} projects={node.projects} face="grid" />}
+      <NodeProjects node={node.id} colocated={node.colocated} link={node.link} projects={node.projects} face="grid" returnFocus={() => closeRef.current?.focus()} />
     </Card>
   );
 }

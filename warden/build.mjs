@@ -4,7 +4,8 @@
 //                                                  session-host files (`HOST_FILES`) at their repo paths, plus a root package.json
 //   dist-warden/cerberus-warden-<version>.tar.gz.sha256   `sha256sum -c` format
 //   dist-warden/latest.json   { version, file, sha256, size, note, builtAt } — the release a node fetches first;
-//                                                  `note` is the one line `warden/package.json` carries under `cerberus.note`
+//                                                  `note` is the one line `warden/package.json` carries under `cerberus.note`;
+//                                                  `builtAt` is local time with its offset (`2026-10-07T08:59:32.469-07:00`), never a `Z`
 //
 // Center serves these three from `CERBERUS_WARDEN_DIST`, else `dist-warden/` (`server/modules/cerberus/warden-files.ts`).
 // This script always writes `dist-warden/`, so a build is live the moment it lands only while that variable is
@@ -107,7 +108,10 @@ try {
 
 const sha256 = sha256Of(tarball);
 fs.writeFileSync(`${tarball}.sha256`, `${sha256}  ${fileName}\n`);
-const latest = { version, file: fileName, sha256, size: fs.statSync(tarball).size, note: note.trim(), builtAt: new Date().toISOString() };
+// Imported here, not at the top: everything above this line (the refusals) needs nothing from `src/`, so a copy of
+// this script alone still reaches them — `INV-7184`'s probe runs exactly that.
+const { localIso } = await import('./src/local-time.mjs');
+const latest = { version, file: fileName, sha256, size: fs.statSync(tarball).size, note: note.trim(), builtAt: localIso(Date.now()) };
 const latestFile = path.join(OUTPUT_DIR, 'latest.json');
 fs.writeFileSync(`${latestFile}.next`, `${JSON.stringify(latest, null, 2)}\n`);
 fs.renameSync(`${latestFile}.next`, latestFile);

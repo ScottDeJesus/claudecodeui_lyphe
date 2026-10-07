@@ -20,8 +20,11 @@ import {
  *
  * ACTIVE runs from `insert` to `end`. One check has at most one running diagnosis, held in the
  * `insert` statement itself — it writes only when none is running — so two API processes overlapping
- * at a handover cannot both start one. `running` lists the active ones: what a restart must end (its
- * loop died with the process) and what a hello's `active.diags` is held against.
+ * at a handover cannot both start one, and the service's 409 is `insert` answering false. `running`
+ * lists the active ones and has one caller: the boot sweep that ends what a restart left (its loop died
+ * with the process). A hello's `active.diags` is held against neither statement but against the
+ * service's own set of loops (a diagnosis lives in the process that started it), so a warden listing
+ * a diagnosis this process holds no loop for is told to close it.
  *
  * STEPS are one row per step, `(diagnosis, n)` its key, `t` the offset in seconds from the start.
  * `insertStep` is `ON CONFLICT … DO NOTHING`, not `INSERT OR IGNORE`, which would swallow a malformed
@@ -33,11 +36,13 @@ import {
  * seconds), `evidence` and `proposal` as JSON text. Parsing and camelCase belong to the caller. `recent`'s
  * `limit` is clamped to a whole number of at least 0: SQLite reads `LIMIT -1` as "no limit".
  *
- * Consumers: `server/modules/cerberus/` — the diagnosis service (`insert` and `runningForCheck` for its
- * 409, `get`, `end`, `insertStep`, `running` for a restart's orphans and a hello, `openOneOffs` for the
- * catalog it publishes) and the read model (`latestForCheck` for a need's diagnosis, `steps` for the
- * sheet, `recent` for What happened) and the diagnosis agent (`startedSince` for its `history_read`). Reach it through `@/modules/database/index.js`. Every statement
- * runs on the caller's connection and opens no transaction of its own.
+ * Consumers: `server/modules/cerberus/` — the diagnosis service (`insert` for its 409, `end`, `running`
+ * for a restart's orphans), `diagnosis/diagnosis-steps.ts` (`insertStep`), `diagnosis/diagnosis-proposal.ts`
+ * and `read-model/run-views.ts` (`get`), the catalog service (`openOneOffs` for the catalog it publishes),
+ * the read model's `diagnosis-views.ts` (`get`, `latestForCheck` for a need's diagnosis, `steps` for the
+ * sheet, `recent` for What happened) and `diagnosis/diagnosis-history.ts` (`startedSince` for the agent's
+ * `history_read`). Reach it through `@/modules/database/index.js`. Every statement runs on the caller's
+ * connection and opens no transaction of its own.
  */
 
 /**
@@ -156,18 +161,6 @@ export const cerberusDiagnosesDb = {
     const row = getCerberusConnection()
       .prepare(`SELECT ${DIAGNOSIS_COLUMNS} FROM diagnoses WHERE id = ?`)
       .get(id) as CerberusDiagnosisRow | undefined;
-    return row ?? null;
-  },
-
-  /** The diagnosis of a check that has not ended — at most one is ever started — or `null`. */
-  runningForCheck(node: string, key: string): CerberusDiagnosisRow | null {
-    const row = getCerberusConnection()
-      .prepare(
-        `SELECT ${DIAGNOSIS_COLUMNS} FROM diagnoses
-          WHERE node = ? AND check_key = ? AND status = 'running'
-          ORDER BY started_at DESC, id LIMIT 1`
-      )
-      .get(node, key) as CerberusDiagnosisRow | undefined;
     return row ?? null;
   },
 

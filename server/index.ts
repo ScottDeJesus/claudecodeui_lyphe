@@ -5,6 +5,7 @@ import fs, { promises as fsPromises } from 'fs';
 import path from 'path';
 import os from 'os';
 import http from 'http';
+import { setTimeout as delay } from 'node:timers/promises';
 
 import express, { type NextFunction, type Request, type Response } from 'express';
 import cors from 'cors';
@@ -638,6 +639,16 @@ async function startServer() {
         if (!handover) await soleServerDuties();
         else console.log('[keepalive] re-adoption deferred until the previous server exits (handover boot)');
         server.listen({ port: SERVER_PORT, host: HOST, reusePort: supervised }, async () => {
+            // The fleet's health: the store, the center key and the warden gateway, opened here
+            // because the gateway is a second listener and this boot has only now begun serving.
+            // It runs BEFORE READY, because the supervisor retires the predecessor on READY: the
+            // successor's gateway then binds beside the retiring one under `reusePort`, as center
+            // D3 and D12 promised, and the gateway's address is never unbound across a handover.
+            // Never rejects — a failure is logged and the API keeps serving. The race bounds the wait
+            // for the gateway's bind: past 3 s READY goes out and only the old gap returns. What
+            // `start()` does before the bind (store, key, seeds, registrations) is synchronous and
+            // nothing cuts it, so a store that blocks there holds READY for as long as it blocks.
+            await Promise.race([cerberus.start(), delay(3_000)]);
             signalReady();
             const appInstallPath = APP_ROOT;
             await writeLocalServerMarker().catch((error) => {
@@ -662,11 +673,6 @@ async function startServer() {
             dispatcher.start();
             roadmap.start();
 
-            // The fleet's health: the store, the center key and the warden gateway, opened here
-            // because the gateway is a second listener and this boot has only now begun serving.
-            // Never rejects — a failure is logged and the API keeps serving.
-            void cerberus.start();
-
             // The Claude update check: armed here rather than at module build, because its first
             // tick writes a file and asks the registry, and a boot that never got this far has no
             // business doing either.
@@ -686,8 +692,9 @@ async function startServer() {
 
         // Clean up plugin processes on shutdown
         const shutdownRuntimeServices = async () => {
-            // The self-checks, the prune and the gateway's accepting stop before anything else: a
-            // tick or a new warden link on a process that is leaving would only meet its successor's.
+            // The auto-run rule, the running diagnoses, the self-checks, the prune and the gateway's
+            // accepting stop before anything else: a tick, a fix or a new warden link on a process that
+            // is leaving would only meet its successor's.
             cerberus.stop();
             // Stop accepting first and close idle sockets; websockets stay open until the exit (http-drain.ts).
             const drained = drainHttpServer();

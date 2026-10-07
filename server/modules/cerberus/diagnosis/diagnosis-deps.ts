@@ -1,10 +1,12 @@
 import { cerberusDefinitionsDb } from '@/modules/database/index.js';
 import type { CerberusDiagnosisToolDeps } from '@/shared/cerberus-types.js';
 
+import { unquotedLines, unquotedSentence } from './diagnosis-absence.js';
 import { historyReadStep, nodeReadStep } from './diagnosis-step-words.js';
 import type { DiagnosisStepLog } from './diagnosis-steps.js';
 import { readDiagnosisHistory } from './diagnosis-history.js';
 import { unreadQuotations, unreadQuotationsSentence } from './diagnosis-quotes.js';
+import { carriesCredential, oneMaskedLine } from './diagnosis-text.js';
 import { callNode } from './diagnosis-wire.js';
 
 /**
@@ -27,12 +29,27 @@ import { callNode } from './diagnosis-wire.js';
  * answers (nor the system prompt, `told`) holds (`diagnosis-quotes.ts`): the agent hears which, and tries again with the
  * words copied exactly or the claim left out.
  *
+ * THE AGENT'S OWN WORDS ARE MASKED (`diagnosis-text.ts`). Every input the agent sees is masked, but a model can reassemble or
+ * invent a credential, and a step is drawn and kept for ever: a `note` goes through `oneMaskedLine` before it becomes a step,
+ * and the summary and evidence of a submission are masked as `conclude` stores them. A proposed command is the exception, since
+ * the masked command would not run and the unmasked one is dangerous: `submit` refuses a `cmd` or `general` the mask would
+ * change, and the agent resubmits without the credential.
+ *
+ * EVIDENCE IS WHAT WAS FOUND. `submit` also refuses an evidence line that is not one stretch of one line of an answer of a read that
+ * succeeded (`diagnosis-absence.ts`): verbatim, at least 20 characters, nothing of the agent's own on it, and never the prompt (the
+ * check's value, its recent results) or a read's own empty sentence as the source. An absence has nothing to copy, and an edited,
+ * spliced or decorated line is not a line of a read, so "zero sweep entries found", a paraphrase of a file and a journal line with
+ * its time moved all fall to the one rule, which a share of the line or a list of words could not hold (INV-7169, measured four times).
+ *
  * `canRunFixes` is false for the hub: `center` runs no warden, so a proposal made for it could never be
  * run or promoted. `submit` refuses one with a sentence the agent reads and answers by resubmitting
  * with `proposal: null`, which is a better ending than a fix button that cannot work.
  *
  * Consumers: `diagnosis.service.ts`, which hands the result to `buildDiagnosisTools`.
  */
+
+/** A note is one sentence of at most 300 characters (`diagnosis-tools.ts`); the room above is for what masking adds, so a note is not cut for being masked. */
+const NOTE_LIMIT = 400;
 
 /** What a `history_read` was narrowed to, in the words of its step: the check's plain label (else its key), else the node, else every node. */
 function historySubject(node: string | undefined, check: string | undefined): string {
@@ -56,8 +73,10 @@ export function buildDiagnosisToolDeps(input: {
   told: { prompt: string };
 }): CerberusDiagnosisToolDeps {
   const { diagId, node, linked, canRunFixes, steps, isOver, told } = input;
-  // What the reads of this diagnosis returned, as the agent was handed it.
+  // What the reads of this diagnosis returned, as the agent was handed it — and, apart, what the reads that SUCCEEDED returned:
+  // a refusal or a failure is something the agent may quote in a note, but is no source for an evidence line.
   const answers: string[] = [];
+  const found: string[] = [];
   /** Throws, with the sentence the agent reads, when any of `texts` quotes words no read returned and the prompt does not hold. */
   const refuseUnreadQuotations = (texts: string[]): void => {
     const unread = unreadQuotations(texts, [...answers, told.prompt]);
@@ -71,24 +90,31 @@ export function buildDiagnosisToolDeps(input: {
       steps.say(nodeReadStep(tool, args));
       const answer = await callNode(node, diagId, tool, args);
       answers.push(answer.text);
+      if (answer.ok) found.push(answer.text);
       return answer;
     },
     historyRead: async (query) => {
       steps.say(historyReadStep(query, historySubject(query.node, query.check), Date.now()));
       const answer = readDiagnosisHistory(query);
       answers.push(answer);
+      found.push(answer);
       return answer;
     },
     // A note is a finding on the sheet as the diagnosis runs — the live row's two notes carried the invented figure the
     // summary later did — so it is held to the reads and the prompt like the submission, and filed only when it passes.
     note: (text) => {
       refuseUnreadQuotations([text]);
-      steps.say(text);
+      steps.say(oneMaskedLine(text, NOTE_LIMIT));
     },
     submit: (submission) => {
       if (!canRunFixes && submission.proposal !== null) {
         throw new Error(`${node} runs no warden, so no fix can be run there. Submit proposal: null`);
       }
+      if (submission.proposal !== null && [submission.proposal.cmd, submission.proposal.general].some(carriesCredential)) {
+        throw new Error('A proposed command may not carry a credential');
+      }
+      const unquoted = unquotedLines(submission.evidence, found);
+      if (unquoted.length > 0) throw new Error(unquotedSentence(unquoted));
       refuseUnreadQuotations([submission.summary, ...submission.evidence]);
     },
   };

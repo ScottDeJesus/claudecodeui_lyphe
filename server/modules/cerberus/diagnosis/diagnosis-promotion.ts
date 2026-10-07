@@ -30,7 +30,7 @@ import { findDiagnosis, proposalOf } from './diagnosis-proposal.js';
  * since (a withdrawn fix is not quietly written again by the same button); the person writes it by hand.
  * The check and the write happen in one synchronous run, so two presses cannot both pass.
  *
- * Consumers: `diagnosis.routes.ts` (`POST /diagnoses/:id/promote`).
+ * Consumers: `diagnosis.routes.ts` (`POST /diagnoses/:id/promote`); `whenDiagnosed` also `read-model/diagnosis-views.ts`.
  */
 
 /** The limits the dialog offers, runs in an hour. */
@@ -41,8 +41,10 @@ const HOUR_SECONDS = 3600;
  * `warn` when the check's stored status at the moment the diagnosis began was `warn`, else `failing`.
  * Results are on the warden's clock and the diagnosis's start is center's, so the start is brought
  * onto the warden's with the node's offset; a check with no change stored by then is `failing`.
+ * Consumers: this file's promotion, which writes the word, and `read-model/diagnosis-views.ts`, which tells the screen
+ * the same word (`CerberusDiagnosisView.when`) so the Promote dialog shows what will be written.
  */
-function whenDiagnosed(diagnosis: CerberusDiagnosisRow): CerberusCatalogEntryView['when'] {
+export function whenDiagnosed(diagnosis: CerberusDiagnosisRow): CerberusCatalogEntryView['when'] {
   const startedOnWardenClock = diagnosis.started_at - wardenLinks.clockOffsetMs(diagnosis.node);
   const [change] = cerberusResultsDb.recentChanges(diagnosis.node, diagnosis.check_key, 0, 1, startedOnWardenClock);
   return change?.status === 'warn' ? 'warn' : 'failing';

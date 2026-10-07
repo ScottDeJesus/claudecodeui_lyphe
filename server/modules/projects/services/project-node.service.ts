@@ -12,9 +12,9 @@ import { AppError } from '@/shared/utils.js';
  * Only a node on THIS machine may take a project: a session's working folder is a path on this
  * server's disk, and the warden reads it from its own, so a remote node would run the session in a
  * folder that is not the project. "On this machine" is the relay's judgement (`isColocated`: the
- * node's reported machine id is this machine's). The check is made here, at the assignment, and not
- * again when a session is placed; a node that later moves machines keeps its projects until someone
- * moves them back.
+ * node's reported machine id is this machine's). The check is made here, at the assignment, and again
+ * at every placement (`node-transport.ts`): a node that later moves machines keeps its projects, its
+ * card keeps their rows with the ✕ that moves each back, and a turn in one is refused with that way back.
  *
  * Order of refusals: an unknown project is a 404 whatever the node says, so a mistyped id is never
  * answered with a sentence about nodes. Moving back to this server needs no node at all.

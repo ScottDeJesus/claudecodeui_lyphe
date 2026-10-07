@@ -16,6 +16,8 @@
 //               lastCheckedAt (ms, the document's clock) and stillSince (ms, this clock: when
 //               the warden first saw that checked_at).
 
+import { deadlineMs } from '../probe-support.mjs';
+
 // The check-id grammar the center enforces on every check key's second half.
 const CHECK_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,79}$/;
 
@@ -107,19 +109,21 @@ const ownResult = (status, value, data, tookMs) => ({ status, value, data, tookM
 const failingOwn = (value, data, tookMs) => ownResult('failing', value, data, tookMs);
 
 // One GET, the timeout covering the body as well as the headers. Never throws: a read that
-// cannot complete comes back as { failure } so the caller words it once.
-async function readDocument(url, timeoutSeconds) {
+// cannot complete comes back as { failure } so the caller words it once. The timer's delay comes
+// from `deadlineMs` (INV-7017): a timeout past Node's 32-bit timer limit would otherwise abort
+// the read within milliseconds. The sentence still names the seconds the definition carries.
+async function readDocument(spec) {
   const startedAt = performance.now();
   const elapsed = () => Math.round(performance.now() - startedAt);
   try {
-    const response = await fetch(url, {
+    const response = await fetch(spec.url, {
       headers: { Accept: 'application/json' },
-      signal: AbortSignal.timeout(timeoutSeconds * 1000),
+      signal: AbortSignal.timeout(deadlineMs(spec)),
     });
     const text = await response.text();
     return { http: response.status, text, tookMs: elapsed() };
   } catch (error) {
-    return { failure: describeReadFailure(error, timeoutSeconds), tookMs: elapsed() };
+    return { failure: describeReadFailure(error, spec.timeout), tookMs: elapsed() };
   }
 }
 
@@ -158,7 +162,7 @@ function fanOutComponents(service, ownKey, components, checkedAt, fetchedAt) {
 }
 
 export async function run(spec, memory = {}) {
-  const read = await readDocument(spec.url, spec.timeout);
+  const read = await readDocument(spec);
   const { http, tookMs } = read;
 
   if (read.failure) {

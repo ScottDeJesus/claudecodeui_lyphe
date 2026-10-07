@@ -31,12 +31,15 @@ import { wardenLinks, type CerberusWardenLink } from './warden-links.js';
  * ENROLLMENT — the `hello` of a node that has no row yet. `warden-enrollment.ts` spends the token and
  * writes the node in ONE transaction (two sockets with one token cannot both win); the link then
  * attaches and `welcome` carries the certificate and the checks. A refused enrollment sends `error`
- * and closes. CONNECT — an enrolled node: its hello is recorded, the link is attached (closing
- * any older link of the node) and `welcome` carries `ackedUpto`, the certificate again (so a warden
- * whose enrollment `welcome` was lost can still learn the key to pin), the checks only when the
- * warden's `checksVersion` differs from center's, and the catalog only when the node has a published
- * set that differs from the warden's `catalogVersion` (`catalog.service.ts` decides, and notes the
- * version the warden says it holds as acked).
+ * and closes. CONNECT — an enrolled node: its hello is recorded, its memory in ingest is re-read
+ * from the store (a handover's retiring process stored rows its successor never saw), the link is
+ * attached (closing any older link of the node) and `welcome` carries `ackedUpto`, the certificate
+ * again (so a warden whose enrollment `welcome` was lost can still learn the key to pin), the checks
+ * only when the warden's `checksVersion` differs from center's, and the catalog only when the node
+ * has a published set that differs from the warden's `catalogVersion` (`catalog.service.ts` decides,
+ * and notes the version the warden says it holds as acked). A hello that THROWS before its `welcome`
+ * has gone out is refused like any other (`error`, close 4002) rather than left open: its deadline
+ * is already cleared, and the warden would wait out its own 10 s for a welcome that is not coming.
  *
  * AFTER THE HANDSHAKE every frame counts as hearing the node (`wardenLinks.heard`), then is checked as
  * an envelope for THIS node. `heartbeat` keeps the clock offset, `checks.ack` the checks-acked
@@ -136,6 +139,8 @@ export function runWardenLink(ws: WebSocket, admitted: AdmittedUpgrade): void {
   const clockSamples: number[] = [];
   const unknownTypesLogged = new Set<string>();
   let helloTaken = false;
+  /** Whether center's `welcome` has gone out: until it has, a throw in the hello leaves the warden waiting for nothing. */
+  let welcomeSent = false;
   let heartbeatsSeen = 0;
   let badFrameLogged = false;
 
@@ -154,6 +159,7 @@ export function runWardenLink(ws: WebSocket, admitted: AdmittedUpgrade): void {
     ws.send(JSON.stringify(frame), (error) => {
       if (error) console.warn(`[Cerberus] could not send a "${type}" frame to node ${node}: ${error.message}`);
     });
+    if (type === 'welcome') welcomeSent = true;
     return true;
   }
 
@@ -198,6 +204,9 @@ export function runWardenLink(ws: WebSocket, admitted: AdmittedUpgrade): void {
       machine_id: hello.machineId,
       facts: JSON.stringify(hello.facts),
     });
+    // Before the attach and the welcome, so no result of this link is judged against a memory the
+    // retiring process has outdated: the old socket has closed, and the store holds all it stored.
+    ingest.reseedNode(node);
     helloTaken = true;
     wardenLinks.attach(link);
     wardenLinks.heard(node, receivedAt);
@@ -331,6 +340,11 @@ export function runWardenLink(ws: WebSocket, admitted: AdmittedUpgrade): void {
       routeFrame(envelope, receivedAt);
     } catch (error) {
       console.error(`[Cerberus] handling a frame of node ${node} failed: ${error instanceof Error ? error.message : String(error)}`);
+      // A hello that threw (the hello's write, the re-read of the node's memory, an enrollment, the
+      // welcome's own reads) leaves no welcome coming, and its deadline is already cleared: the socket
+      // would sit open until the warden's own 10 s wait for a welcome ended it. Refused, it closes now
+      // and the warden redials on its backoff. Only the hello can throw before the welcome has gone out.
+      if (!welcomeSent) refuse('center could not take the hello; it will be tried again');
     }
   });
 

@@ -21,10 +21,14 @@ import { wardenLinks } from './warden-links.js';
  * is logged once per run and ignored — and still acked by the link, because a frame that was never going
  * to be understood would otherwise be resent for ever.
  *
- * WRITES AND TELLING. Each write is followed by `hintChanged` naming the run's check (coalesced to a
- * second, like every hint). `run.output` is additionally a PICTURE: once the batch is stored it goes to
- * every open browser as one `cerberus_run_output` frame, uncoalesced, so a line appears as it arrives.
- * A batch that stored nothing (every line a resend) is told to no one.
+ * WRITES AND TELLING. A run's start (`run.accepted`) and end (`run.end`, `run.refused`) are followed by
+ * `hintChanged` naming the run's check (coalesced to a second, like every hint): they move what a screen
+ * reads — the check's card, Needs you, What happened. `run.output` hints NOTHING: it is a PICTURE, and once
+ * the batch is stored it goes to every open browser as one `cerberus_run_output` frame, uncoalesced, so a
+ * line appears as it arrives — the sheet's lines and a card's newest line both ride the frame
+ * (`useRunOutput`, `useRunLastLine`). A hint per batch would make an open sheet re-read three routes once
+ * a second for as long as a fix prints, to learn what the frames already drew. A batch that stored
+ * nothing (every line a resend) is told to no one.
  *
  * TIMES ARE CENTER'S CLOCK. A warden reports `startedAt` and `endedAt` on its own clock; they are
  * stored shifted by the node's clock offset, never later than the moment they were heard and never
@@ -132,7 +136,6 @@ function onOutput(node: string, frame: unknown): void {
   const lines = wellFormedLines(node, held.run.id, held.body.lines);
   // Zero written: every line was a resend. The screens were told of them the first time.
   if (cerberusRunsDb.insertOutput(held.run.id, lines) === 0) return;
-  hintRun(held.run);
   sendRunOutput(held.run.id, lines);
 }
 

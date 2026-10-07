@@ -27,9 +27,10 @@ function isDiagnosis(body: unknown): body is CerberusDiagnosisView {
 
 /**
  * The diagnosis with every field the panel dereferences filled in where a server that drifted from this client left it
- * out: `evidence` as none, `proposal` and `run` as null. One missing field must not stand the error boundary in place of
- * the whole Cerberus tab, as the overview's own `withFixFields` keeps it from doing. The fields it leaves alone
- * (`summary`, `error`, `endedAt`, `oneOffExpiresAt`, `promotedTo`) the panel already reads as absent.
+ * out: `evidence` as none, `proposal` and `run` as null, and `when` as `failing` (the Promote dialog spells a trigger from it).
+ * One missing field must not stand the error boundary in place of the whole Cerberus tab, as the overview's own `withFixFields`
+ * keeps it from doing. The fields it leaves alone (`summary`, `error`, `endedAt`, `oneOffExpiresAt`, `promotedTo`, `scope`) the
+ * panel already reads as absent.
  */
 function withDiagnosisFields(body: CerberusDiagnosisView): CerberusDiagnosisView {
   return {
@@ -37,6 +38,7 @@ function withDiagnosisFields(body: CerberusDiagnosisView): CerberusDiagnosisView
     evidence: Array.isArray(body.evidence) ? body.evidence : [],
     proposal: body.proposal ?? null,
     run: body.run ?? null,
+    when: body.when ?? 'failing',
   };
 }
 

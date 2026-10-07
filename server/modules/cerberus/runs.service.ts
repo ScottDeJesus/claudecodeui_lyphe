@@ -1,6 +1,6 @@
 import crypto from 'node:crypto';
 
-import { cerberusRunsDb } from '@/modules/database/index.js';
+import { cerberusCatalogDb, cerberusRunsDb, cerberusUpdatesDb } from '@/modules/database/index.js';
 import type { CerberusRunStartBody, CerberusRunView } from '@/shared/cerberus-types.js';
 import { AppError } from '@/shared/utils.js';
 
@@ -25,6 +25,14 @@ import { wardenLinks } from './warden-links.js';
  *   409 `CERBERUS_NO_PROPOSAL`        the diagnosis proposed no fix (or has not finished, or failed);
  *   409 `CERBERUS_ONE_OFF_EXPIRED`    the diagnosis's one-off is past its hour — the warden no longer holds it;
  *   400 `CERBERUS_BAD_RUN`            neither or both of an entry and a diagnosis named;
+ *   409 `CERBERUS_NODE_UPDATING`      the node's warden is updating (its update is the batch's active one, until
+ *                                     it ends) — a warden does not restart under its own work, and a run started
+ *                                     after its last idle check would be killed by the clean stop. Asked again after
+ *                                     the ack wait, because an update can become active while a start waits;
+ *   409 `CERBERUS_AUTO_SWITCHED_OFF`  an AUTO run only: its entry was switched off, capped or retired while the
+ *                                     ack was awaited, so nothing is written or sent and the run never was — not in
+ *                                     the history, not in the entry's limit. One log line, `"<name>" was switched off
+ *                                     while the warden confirmed the catalog`; never reached by a person's press;
  *   409 `CERBERUS_RUN_ACTIVE`         the check already has a run that has not ended (or one being asked for);
  *   409 `CERBERUS_NODE_SILENT`        the node has no open link, so nothing could be started — a
  *                                     `run.start` is never queued for a warden that is away.
@@ -53,7 +61,7 @@ import { wardenLinks } from './warden-links.js';
  *
  * Consumers: `cerberus.routes.ts` (`startRun` for `POST /catalog/:id/run`, `getRun` for
  * `GET /runs/:id`), `diagnosis/diagnosis.routes.ts` (`startRun` for `POST /diagnoses/:id/run`),
- * `auto-run.ts` (`startRun`, `checkHasRun`), `cerberus.module.ts` (`registerRunsService`).
+ * `auto-run.ts` (`startRun`, `checkHasRun`, `isAutoRunSwitchedOff`), `cerberus.module.ts` (`registerRunsService`).
  */
 
 /** How long a run waits for the warden to ack a catalog that holds its fix. */
@@ -69,6 +77,34 @@ function badRun(message: string): AppError {
 /** Whether the check has a run that has not ended, or one `startRun` is still asking a warden for. */
 export function checkHasRun(node: string, check: string): boolean {
   return starting.has(`${node}/${check}`) || cerberusRunsDb.activeForCheck(node, check) !== null;
+}
+
+function nodeUpdating(node: string): AppError {
+  return new AppError(`${node}'s warden is updating — run it once it is back`, {
+    code: 'CERBERUS_NODE_UPDATING',
+    statusCode: 409,
+  });
+}
+
+const AUTO_SWITCHED_OFF_CODE = 'CERBERUS_AUTO_SWITCHED_OFF';
+
+/** Whether `error` is the refusal `startRun` makes of an auto run whose entry was switched off in the ack wait (it has already logged it). Consumer: `auto-run.ts`. */
+export function isAutoRunSwitchedOff(error: unknown): boolean {
+  return error instanceof AppError && error.code === AUTO_SWITCHED_OFF_CODE;
+}
+
+/**
+ * Throws, after logging the one line that says why, when the entry an auto run was asked for is no longer
+ * one that may run on its own: switched off, capped or retired while the warden confirmed the catalog.
+ * Nothing was written and nothing was sent, so the run never was — it is not in the history and not
+ * in the entry's limit. `fallbackName` names an entry that cannot be read at all.
+ */
+function refuseIfSwitchedOff(entryId: string, fallbackName: string): void {
+  const entry = cerberusCatalogDb.get(entryId);
+  if (entry && entry.retired_at === null && entry.auto === 1 && entry.capped === null) return;
+  const name = entry?.name ?? fallbackName;
+  console.warn(`[Cerberus] "${name}" was switched off while the warden confirmed the catalog`);
+  throw new AppError(`"${name}" was switched off while the warden confirmed the catalog`, { code: AUTO_SWITCHED_OFF_CODE, statusCode: 409 });
 }
 
 function runActive(entryName: string, node: string): AppError {
@@ -147,6 +183,8 @@ export async function startRun(input: { entryId?: string; diagnosisId?: string; 
   const requestedAt = Date.now();
   const first = resolve();
   const slot = `${first.node}/${first.check}`;
+  // Read from the store, so a handover's two processes agree: while this node's update is the active one it takes no new work.
+  if (cerberusUpdatesDb.activeNode() === first.node) throw nodeUpdating(first.node);
   if (checkHasRun(first.node, first.check)) throw runActive(first.name, first.node);
   if (!wardenLinks.isLinked(first.node)) throw nodeSilent(first.node);
 
@@ -154,8 +192,11 @@ export async function startRun(input: { entryId?: string; diagnosisId?: string; 
   try {
     const acked = await waitForCoveringAck(first.node, first.id, ACK_WAIT_MS);
 
-    // Read again after a wait: an entry may have been retired and a one-off may have lapsed.
+    // Read again after a wait: an entry may have been retired, a one-off may have lapsed, and the node's update may have become the active one.
+    // An auto run's own conditions — switched on, not capped, not retired — must hold WHEN IT STARTS, not only when the rule chose it.
+    if (by === 'auto' && entryId !== undefined) refuseIfSwitchedOff(entryId, first.name);
     const target = resolve();
+    if (cerberusUpdatesDb.activeNode() === target.node) throw nodeUpdating(target.node);
     const run = {
       id: crypto.randomBytes(8).toString('hex'),
       entry: target.entry,

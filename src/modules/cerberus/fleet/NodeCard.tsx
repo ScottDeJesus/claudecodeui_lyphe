@@ -1,3 +1,4 @@
+import { useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { useCerberus } from '@/modules/cerberus/context/CerberusContext';
@@ -127,7 +128,8 @@ const STAGGER_PLACES = 24;
  * heartbeat", or for the hub, "Cerberus · this server"), which ends " · 2 sessions running here" while
  * the warden reports and hosts chats; then a `ServiceRow` per service, or "Nothing to
  * watch yet" when it has none ("Waiting to hear from it" before its first heartbeat); then, on a node
- * that runs on this machine, `NodeProjects`, "Projects that run here". In Grid it spans
+ * that runs on this machine or holds a project, `NodeProjects`, "Projects that run here" (on a node that is
+ * not on this machine, only the rows, each with the ✕ that moves its project back). In Grid it spans
  * the grid and lifts off it, and an empty node draws the kit's `EmptyState`; in List it opens a canvas
  * band under its row, where an empty node is one sentence at the band's indent, as the list's rows are.
  *
@@ -143,6 +145,9 @@ const STAGGER_PLACES = 24;
  */
 export function NodeCard({ item, node, open, face, index, narrow = false, now, onToggle, onOpenCell }: NodeCardProps) {
   const { t } = useTranslation();
+  // The open card's header button: where focus goes when a node's last project moves back and its section is gone.
+  const headerRef = useRef<HTMLButtonElement>(null);
+  const returnFocus = () => headerRef.current?.focus();
   const mark = nodeMark(item.status);
   const tone = mark === null ? undefined : markLook(mark).tone;
   const line = nodeLine(t, item, node);
@@ -180,6 +185,7 @@ export function NodeCard({ item, node, open, face, index, narrow = false, now, o
     return (
       <div className="border-t border-border first:border-t-0 motion-safe:animate-shape-rise" style={entrance}>
         <button
+          ref={headerRef}
           type="button"
           aria-expanded={open}
           onClick={() => onToggle(item.id, !open)}
@@ -218,7 +224,7 @@ export function NodeCard({ item, node, open, face, index, narrow = false, now, o
               </div>
             )}
             {services}
-            {node.colocated && <NodeProjects node={node.id} link={node.link} projects={node.projects} face="list" />}
+            <NodeProjects node={node.id} colocated={node.colocated} link={node.link} projects={node.projects} face="list" returnFocus={returnFocus} />
           </div>
         )}
       </div>
@@ -230,6 +236,7 @@ export function NodeCard({ item, node, open, face, index, narrow = false, now, o
       {open ? (
         <div className="overflow-hidden rounded-xl border border-border bg-card shadow-md motion-safe:animate-[vv-pop_.45s_theme(transitionTimingFunction.enter)_both]">
           <button
+            ref={headerRef}
             type="button"
             aria-expanded
             onClick={() => onToggle(item.id, false)}
@@ -251,7 +258,7 @@ export function NodeCard({ item, node, open, face, index, narrow = false, now, o
             </span>
           </button>
           {services}
-          {node.colocated && <NodeProjects node={node.id} link={node.link} projects={node.projects} face="grid" />}
+          <NodeProjects node={node.id} colocated={node.colocated} link={node.link} projects={node.projects} face="grid" returnFocus={returnFocus} />
         </div>
       ) : (
         <button

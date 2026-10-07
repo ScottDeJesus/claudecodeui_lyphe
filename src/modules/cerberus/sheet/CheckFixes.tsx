@@ -18,6 +18,8 @@ type CheckFixesProps = {
   fixes: CerberusCatalogEntryView[];
   /** The check's latest run within the hour (`CerberusCheckDetail.run`): while it is going, the check takes no other. */
   run: CerberusRunView | null;
+  /** A Run now of one of these entries started the run `runId`: the sheet's Fix output moves to that run and the sheet reads the check again. */
+  onRunStarted: (runId: string) => void;
 };
 
 /**
@@ -33,14 +35,14 @@ type CheckFixesProps = {
  *
  * For the check sheet (`CheckSheet`), with the check's read.
  */
-export function CheckFixes({ fixes, run }: CheckFixesProps) {
+export function CheckFixes({ fixes, run, onRunStarted }: CheckFixesProps) {
   const { t } = useTranslation();
   const headingId = useId();
   // `starting` holds the entries whose Run press is still out (`runEntry` waits up to 10 s for the warden's ack).
   const { starting, runEntry } = useCerberus();
-  // The sheet re-reads on the run's hint, and its Fix output opens on the run it finds there.
+  // The run a press started is the sheet's to show: the answer names it, and the sheet's Fix output opens on that run.
   const onRun = (entry: CerberusCatalogEntryView) => {
-    void runEntry(entry.id);
+    void runEntry(entry.id, onRunStarted);
   };
   const going = run !== null && run.result === null ? run : null;
 

@@ -3,6 +3,7 @@ import {
   cerberusResultsDb,
   getCerberusConnection,
   type CerberusActiveCheckRow,
+  type CerberusLatestResultRow,
   type CerberusProbeRow,
 } from '@/modules/database/index.js';
 import type {
@@ -22,19 +23,26 @@ import { discoverComponent } from './definitions.service.js';
  * Ingest: where a warden's results become rows — or, most of the time, deliberately do not.
  *
  * A healthy check repeats itself every 30 seconds for months, and storing each repeat would bury
- * the rows that say something: only a CHANGE is stored, plus a KEEPALIVE copy every five minutes.
- * A quiet stretch is continuity (the warden's `prevAt` chain unbroken), worked out by the reader;
- * a LAPSE — `prevAt` null, or a gap past `staleAfter` — is itself a change.
+ * the rows that say something: only a CHANGE is stored — a move of status or document status, or a
+ * LAPSE — plus a KEEPALIVE copy every five minutes. A quiet stretch is continuity (the warden's
+ * `prevAt` chain unbroken), worked out by the reader; a LAPSE — `prevAt` null, or a gap past
+ * `staleAfter` — is itself a change. A VALUE that moves under an unchanged status is NOT a change:
+ * the sentences the checks carry hold timings and counters, which would make nearly every result one
+ * (measured: 97 % of the change rows). The store keeps such a value in its keep-alive only; the newest
+ * one lives in memory (`newest`), and the read model shows it while it is newer than the stored row.
  *
  * THE STORAGE RULE, against `lastStored` (the check's last stored row, held in memory):
  *   - `at ≤ lastStored.at`        skip: a resend, or an older result than the store holds;
- *   - no `lastStored`, or status, doc status or value differ, or `prevAt` is null, or
+ *   - no `lastStored`, or status or doc status differ, or `prevAt` is null, or
  *     `at − prevAt > staleAfter`  CHANGE;
- *   - else `at − lastStored.at ≥ 300 000`, or a keepalive was asked for  KEEPALIVE; else nothing is stored.
+ *   - else `at − lastStored.at ≥ 300 000`, or a keepalive was asked for  KEEPALIVE, the result whole
+ *     (its newest value and data); else nothing is stored.
  * A stored row's `prev_status` is `lastStored`'s status (`not_enabled` for a null one) and NULL when
  * there was none; every accepted result — stored or not — sets `lastReceivedAt` (at boot, a check
- * that was reporting just before it gets the boot's moment, so a handover does not blank the board);
- * `since` moves when a stored row's status differs from its `prev_status`.
+ * that was reporting just before it gets the boot's moment, so a handover does not blank the board)
+ * and, when its `at` is newer than the one held, `newest` (empty at boot: the read model falls back
+ * to the stored row until the check's next result); `since` moves when a stored row's status differs
+ * from its `prev_status`.
  *
  * ONE TRANSACTION PER CALL, MEMORY AFTER IT. A frame is stored whole or not at all, and memory
  * advances only once it has committed, so a rolled-back frame's resend is judged against the truth.
@@ -43,7 +51,8 @@ import { discoverComponent } from './definitions.service.js';
  * threw would never be acked, and the warden would resend the same bad result for ever.
  *
  * Consumers: `warden-link.ts` (`ingestResults` for a `result` frame, acking after it returns),
- * `self-checks.service.ts` (center's own results, `seq` null), the read model (`memory`), the boot
+ * `self-checks.service.ts` (center's own results, `seq` null; `reseedNode` before its first tick),
+ * `warden-link.ts` (`reseedNode` at a connect's hello), the read model (`memory`), the boot
  * (`seedMemory`) and `auto-run.ts` (`onChange`).
  */
 
@@ -61,7 +70,10 @@ const STORED_STATUSES: readonly string[] = ['ok', 'warn', 'failing', 'denied'];
 const DOC_STATUSES: readonly string[] = ['green', 'yellow', 'red', 'muted'];
 
 /** The part of a check's last stored row the next result is judged against. */
-type LastStored = { at: number; status: CerberusStoredStatus | null; docStatus: CerberusDocStatus | null; value: string | null };
+type LastStored = { at: number; status: CerberusStoredStatus | null; docStatus: CerberusDocStatus | null };
+
+/** A check's newest accepted result, stored or not: what the read model shows while it is newer than the stored row. */
+type NewestResult = { at: number; value: string | null };
 
 /** One status that moved (`from` null at first sight; `not_enabled` spells a null). Consumer: `auto-run.ts`, via `onChange`. */
 export type CerberusStatusChange = { key: string; from: CerberusStatus | null; to: CerberusStatus; at: number };
@@ -72,6 +84,7 @@ type StatusChangeListener = (change: { node: string; changed: CerberusStatusChan
 const lastStored = new Map<string, LastStored>();
 const sinceByCheck = new Map<string, number>();
 const lastReceivedByCheck = new Map<string, number>();
+const newestByCheck = new Map<string, NewestResult>();
 const listeners = new Set<StatusChangeListener>();
 const refusalsLogged = new Set<string>();
 /** Whether `seedMemory` has filled the maps above from the store: it runs once per process. */
@@ -80,6 +93,17 @@ let memorySeeded = false;
 /** `<node>/<key>`: unambiguous because a node never holds a `/`, and the same spelling the hint uses. */
 function memoryKey(node: string, key: string): string {
   return `${node}/${key}`;
+}
+
+/** Sets what memory holds of a check from the store's own newest row for it: `lastStored` and `since`. */
+function rememberStoredRow(row: CerberusLatestResultRow): void {
+  const slot = memoryKey(row.node, row.check_key);
+  lastStored.set(slot, {
+    at: row.at,
+    status: row.status as CerberusStoredStatus | null,
+    docStatus: row.doc_status as CerberusDocStatus | null,
+  });
+  sinceByCheck.set(slot, row.since);
 }
 
 function logRefusalOnce(node: string, key: string, reason: string): void {
@@ -153,7 +177,12 @@ type FrameOutcome = {
   /** Keys of the components this frame filed; hinted after the commit, never before it. */
   discoveredKeys: string[];
   moved: CerberusStatusChange[];
-  staged: { lastStored: Map<string, LastStored>; since: Map<string, number>; received: Map<string, number> };
+  staged: {
+    lastStored: Map<string, LastStored>;
+    since: Map<string, number>;
+    received: Map<string, number>;
+    newest: Map<string, NewestResult>;
+  };
 };
 
 /** The body of one frame's transaction: judges and inserts every result, and stages what memory will become. */
@@ -165,7 +194,7 @@ function storeFrame(node: string, seq: number | null, results: CerberusResultWir
     changedKeys: [],
     discoveredKeys: [],
     moved: [],
-    staged: { lastStored: new Map(), since: new Map(), received: new Map() },
+    staged: { lastStored: new Map(), since: new Map(), received: new Map(), newest: new Map() },
   };
   const now = Date.now();
 
@@ -193,14 +222,16 @@ function storeFrame(node: string, seq: number | null, results: CerberusResultWir
 
     const slot = memoryKey(node, key);
     outcome.staged.received.set(slot, Math.max(outcome.staged.received.get(slot) ?? lastReceivedByCheck.get(slot) ?? result.at, result.at));
+    const value = result.value ?? null;
+    const heldNewest = outcome.staged.newest.get(slot) ?? newestByCheck.get(slot);
+    if (!heldNewest || result.at > heldNewest.at) outcome.staged.newest.set(slot, { at: result.at, value });
     const last = outcome.staged.lastStored.get(slot) ?? lastStored.get(slot);
     if (last && result.at <= last.at) continue;
 
     const prevAt = isWholeNumber(result.prevAt) ? result.prevAt : null;
     const lapsed = prevAt === null || result.at - prevAt > staleAfterMs(activeByKey.get(key), owner.probe);
-    const value = result.value ?? null;
     const docStatus = result.docStatus ?? null;
-    const changed = !last || result.status !== last.status || docStatus !== last.docStatus || value !== last.value || lapsed;
+    const changed = !last || result.status !== last.status || docStatus !== last.docStatus || lapsed;
     if (!changed && !keepalive && result.at - (last?.at ?? 0) < KEEPALIVE_AFTER_MS) continue;
 
     const previousStatus = last ? (last.status ?? 'not_enabled') : null;
@@ -225,7 +256,7 @@ function storeFrame(node: string, seq: number | null, results: CerberusResultWir
     if (!inserted) continue;
 
     outcome.stored += 1;
-    outcome.staged.lastStored.set(slot, { at: result.at, status: result.status, docStatus, value });
+    outcome.staged.lastStored.set(slot, { at: result.at, status: result.status, docStatus });
     if (changed) outcome.changedKeys.push(key);
     if (previousStatus === null || previousStatus !== shownStatus) {
       outcome.staged.since.set(slot, result.at);
@@ -254,6 +285,7 @@ function ingestResults(node: string, seq: number | null, results: CerberusResult
   for (const [slot, entry] of outcome.staged.lastStored) lastStored.set(slot, entry);
   for (const [slot, at] of outcome.staged.since) sinceByCheck.set(slot, at);
   for (const [slot, at] of outcome.staged.received) lastReceivedByCheck.set(slot, at);
+  for (const [slot, entry] of outcome.staged.newest) newestByCheck.set(slot, entry);
 
   // A frame that rolled back threw above and hinted nothing.
   const hintedKeys = [...new Set([...outcome.changedKeys, ...outcome.discoveredKeys])];
@@ -271,12 +303,15 @@ function ingestResults(node: string, seq: number | null, results: CerberusResult
 }
 
 /**
- * Ingest's four doors: `ingestResults`; `onChange` (status moves; answers its unsubscribe);
+ * Ingest's five doors: `ingestResults`; `onChange` (status moves; answers its unsubscribe);
  * `seedMemory` (once per process, before the first read or the module's `start()`, whichever comes
  * first: fills `lastStored` and `since` from the store, and `lastReceivedAt` with the boot's own
- * moment for each check that was reporting just before it — `boot-vouch.ts`); and `memory`,
+ * moment for each check that was reporting just before it — `boot-vouch.ts`); `reseedNode` (one
+ * node's memory re-read from the store, at each of its hellos and before center's own first
+ * self-check tick: the store, not this process, knows what a retiring process stored); and `memory`,
  * the read model's `CerberusCheckMemory` — `lastReceivedAt` is null for a check not vouched at boot
- * until a result of it arrives.
+ * until a result of it arrives, and `newest` is null for every check until its first result of this
+ * process (a boot does not seed it: the store holds no value newer than its own rows).
  */
 export const ingest = {
   ingestResults,
@@ -294,21 +329,43 @@ export const ingest = {
     for (const { node, key, at } of checksReportingAtBoot(latest, Date.now(), KEEPALIVE_AFTER_MS)) {
       lastReceivedByCheck.set(memoryKey(node, key), at);
     }
-    for (const row of latest) {
-      const slot = memoryKey(row.node, row.check_key);
-      lastStored.set(slot, {
-        at: row.at,
-        status: row.status as CerberusStoredStatus | null,
-        docStatus: row.doc_status as CerberusDocStatus | null,
-        value: row.value,
-      });
-      sinceByCheck.set(slot, row.since);
-    }
+    for (const row of latest) rememberStoredRow(row);
     memorySeeded = true;
+  },
+
+  /**
+   * Re-reads one node's memory from the store, at its hello. A retiring process keeps its warden links
+   * until it exits (center D12), so it stores rows after its successor has seeded, and the successor
+   * never saw them: judged against that stale memory, a result is stamped with the wrong `prev_status`
+   * and a `since` and an auto-run move that never happened follow. One process at a time holds a node's
+   * link and the warden reconnects only after the old socket has closed, so at the hello the store
+   * holds every row any process stored for the node. For each of the node's checks the store has a
+   * row for, `lastStored` and `since` become the store's own and `lastReceivedAt` is RAISED to the
+   * row's `at` where memory is older (never lowered: the boot vouch and live receipts stand); a check
+   * of the node the store has no row for is dropped from every map. Opens no transaction: it reads.
+   */
+  reseedNode(node: string): void {
+    const stored = new Set<string>();
+    for (const row of cerberusResultsDb.latestPerCheck(node)) {
+      const slot = memoryKey(row.node, row.check_key);
+      stored.add(slot);
+      rememberStoredRow(row);
+      if ((lastReceivedByCheck.get(slot) ?? Number.NEGATIVE_INFINITY) < row.at) lastReceivedByCheck.set(slot, row.at);
+    }
+    const nodePrefix = `${node}/`;
+    for (const perCheckMap of [lastStored, sinceByCheck, lastReceivedByCheck, newestByCheck]) {
+      for (const slot of perCheckMap.keys()) {
+        if (slot.startsWith(nodePrefix) && !stored.has(slot)) perCheckMap.delete(slot);
+      }
+    }
   },
 
   memory(node: string, key: string): CerberusCheckMemory {
     const slot = memoryKey(node, key);
-    return { lastReceivedAt: lastReceivedByCheck.get(slot) ?? null, since: sinceByCheck.get(slot) ?? null };
+    return {
+      lastReceivedAt: lastReceivedByCheck.get(slot) ?? null,
+      since: sinceByCheck.get(slot) ?? null,
+      newest: newestByCheck.get(slot) ?? null,
+    };
   },
 };

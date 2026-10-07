@@ -71,6 +71,25 @@ const BUDGET_NUDGE_FROM = 8;
  */
 const BUDGET_NOTE_LEAD = '\n\nNote from Cerberus — not part of the answer above:';
 
+/**
+ * How large one tool answer may be before the bundled CLI stops handing it to the model inline. The CLI keeps an MCP tool
+ * result in the conversation only up to a per-tool limit (`_meta['anthropic/maxResultSizeChars']`); a larger one is written
+ * under `~/.claude/projects/<cwd>/<session>/tool-results/` and the model is given a preview with a path it has no Read tool to
+ * open (the live 64 KB `file_read` left 65,514 bytes of masked text there, and the next step re-read the log as a 100-line
+ * tail). The warden caps an answer at 64 KiB (`OUTPUT_CAP_BYTES`, so at most 65,536 characters) and the tool adds its own
+ * framing under it, so 72,000 holds the biggest answer a read can make.
+ */
+const MAX_RESULT_SIZE_CHARS = 72_000;
+
+/**
+ * `definition` with the result limit above. The SDK's `tool()` takes no `_meta`, but the definition object it returns
+ * carries one (`SdkMcpToolDefinition._meta`) and the CLI reads that key; `tool()` builds a plain object, so spreading it
+ * loses nothing.
+ */
+function keepAnswersInline(definition: SdkMcpToolDefinition<any>): SdkMcpToolDefinition<any> {
+  return { ...definition, _meta: { ...definition._meta, 'anthropic/maxResultSizeChars': MAX_RESULT_SIZE_CHARS } };
+}
+
 /** `history_read` without a `limit` answers this many lines. */
 const DEFAULT_HISTORY_LIMIT = 50;
 
@@ -168,11 +187,11 @@ export function buildDiagnosisTools(deps: CerberusDiagnosisToolDeps): Array<SdkM
 
   const fileRead = tool(
     'file_read',
-    `Read a regular text file on ${deps.node} (its first maxBytes bytes, default 65536) or list a directory (name, type, size, modified; up to 200 entries). ` +
+    `Read a regular text file on ${deps.node} (its first whole lines within maxBytes bytes, default 65536) or list a directory (name, type, size, modified; up to 200 entries). ` +
       'Binary files are refused, and so is anything that may hold a secret; values that look like credentials come back masked.',
     {
       path: z.string().min(1).max(4096).describe('An absolute path to a file or a directory'),
-      maxBytes: z.number().int().min(1).max(65536).optional().describe('How many bytes of the file to return'),
+      maxBytes: z.number().int().min(1).max(65536).optional().describe('The most bytes of the file to return, ending on a whole line'),
     },
     (args) => withinBudget(() => readFromNode('file.read', args))
   );
@@ -233,7 +252,7 @@ export function buildDiagnosisTools(deps: CerberusDiagnosisToolDeps): Array<SdkM
   const submitDiagnosis = tool(
     DIAGNOSIS_SUBMIT_TOOL_NAME,
     'End the diagnosis. summary: one or two sentences saying what is wrong. evidence: each thing you FOUND that says so, one line each, quoting what the journal, file, status or history said — ' +
-      'never what you assumed, and never the absence of an error ("no entries" is not evidence); an empty list when you found nothing. proposal: the one command the operator could run on the node ' +
+      'a line that is not ONE line of ONE answer copied character for character, with nothing of your own on it, is refused (the check\'s value and the prompt are not reads); never what you assumed, and never the absence of an error ("no entries" is not evidence); an empty list when you found nothing. proposal: the one command the operator could run on the node ' +
       '(name = the button\'s words, cmd = the exact command now, general = the same command with absolute times made relative), or null when no fix is warranted — ' +
       'a proposal needs evidence behind it, and is refused with none.',
     {
@@ -266,5 +285,6 @@ export function buildDiagnosisTools(deps: CerberusDiagnosisToolDeps): Array<SdkM
     }
   );
 
-  return [...(deps.linked ? [logRead, fileRead, statusRead] : []), historyRead, note, submitDiagnosis];
+  // The limit is put on at the one place the list leaves, so a seventh tool cannot be added without it.
+  return [...(deps.linked ? [logRead, fileRead, statusRead] : []), historyRead, note, submitDiagnosis].map(keepAnswersInline);
 }

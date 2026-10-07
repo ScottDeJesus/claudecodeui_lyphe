@@ -258,11 +258,13 @@ function thisMachineId(): string | null {
   return localMachineId;
 }
 
-// nodeSessions: used by the session host (`session-host/node-transport.ts`, `readopt.ts`, `spawner.ts`)
-// and the projects routes, through `@/modules/cerberus/index.js`, to run a project's Claude sessions
-// on a node's machine: `openChannel` holds a host, `listHosts` / `retireHost` adopt and tidy what runs
-// there, `isColocated` tells a node on this machine from a remote one, `onLinkUp` re-adopts when a
-// warden reconnects, and `lastListed` feeds the node card's session count.
+// nodeSessions: used, through `@/modules/cerberus/index.js`, by the session host
+// (`session-host/node-transport.ts`, `node-readopt.ts`, `readopt-host.ts`, `colocated-hosts.ts`,
+// `refused-hosts.ts`) and the projects module (`services/project-node.service.ts`), and, by direct
+// import, by this module's `read-model/overview.ts`, to run a project's Claude sessions on a node's
+// machine: `openChannel` holds a host, `listHosts` / `retireHost` adopt and tidy what runs there,
+// `isColocated` tells a node on this machine from a remote one, `onLinkUp` re-adopts when a warden
+// reconnects, and `lastListed` feeds the node card's session count.
 export const nodeSessions = {
   /** Whether a warden socket is open for the node now. */
   isLinked(node: string): boolean {

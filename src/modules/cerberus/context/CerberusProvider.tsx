@@ -7,10 +7,10 @@ import { useDiagnosisVerbs } from '@/modules/cerberus/hooks/useDiagnosisVerbs';
 import { useWardensRead } from '@/modules/cerberus/hooks/useWardensRead';
 import { hm } from '@/modules/cerberus/utils/cerberusTime';
 import { api, refusalCode, refusalSentence, REQUEST_TIMEOUT_MS } from '@/shared/api';
-import type { CerberusNodeProject, CerberusNodeView, CerberusOverview } from '@/shared/cerberus-types';
+import type { CerberusNodeProject, CerberusNodeView, CerberusOverview, CerberusStartedBatch } from '@/shared/cerberus-types';
 import { useToast } from '@/shared/context/ToastContext';
 import { useWebSocket } from '@/shared/context/WebSocketContext';
-import type { CerberusLabelInput, CerberusMuteInput, CerberusProjectMove, CerberusStartedBatch } from '@/shared/types';
+import type { CerberusLabelInput, CerberusMuteInput, CerberusProjectMove } from '@/shared/types';
 
 /**
  * The least gap between two reads that `cerberus_changed` frames may start. Center already coalesces
@@ -399,14 +399,27 @@ export function CerberusProvider({ children }: { children: ReactNode }) {
    * that follows, so by the time it answers the overview holds the run and the card's strip is there. Silent
    * when it lands, since the strip is the proof; a refusal (a run already going on the check, the node's
    * warden not linked) raises the write's own toast with the server's sentence. A second press of the same
-   * entry answers the first's verdict.
+   * entry answers the first's verdict. `onStarted` is handed the id of the run the press started, as soon as
+   * the answer names it and before the re-read; a landed press whose answer cannot be read never calls it,
+   * and a second press that joins the first's write never does either.
    */
-  const runEntry = useCallback((id: string): Promise<boolean> => writeOnce(
+  const runEntry = useCallback((id: string, onStarted?: (runId: string) => void): Promise<boolean> => writeOnce(
     `run:${id}`,
     async () => {
       setStarting((current) => [...current, id]);
       try {
-        return await sendWrite(() => api.cerberus.runEntry(id));
+        return await sendWrite(async () => {
+          const response = await api.cerberus.runEntry(id);
+          if (response.ok && onStarted) {
+            try {
+              const body = (await response.json()) as { runId?: unknown } | null;
+              if (typeof body?.runId === 'string') onStarted(body.runId);
+            } catch {
+              // The run started (`response.ok` is the verdict) and only its answer is unreadable: no id to hand on.
+            }
+          }
+          return response;
+        });
       } finally {
         // Only this entry leaves: a press on another entry meanwhile is still out.
         if (mountedRef.current) setStarting((current) => current.filter((held) => held !== id));
@@ -424,7 +437,9 @@ export function CerberusProvider({ children }: { children: ReactNode }) {
    * A batch of warden updates started: answers the batch and its updates as they stood, which the dialog follows
    * (the screen itself comes from the re-read, where `wardens.running` holds them). A refusal (409 `CERBERUS_UPDATE_RUNNING`, a batch already
    * going, perhaps from another window) raises the write's own toast and reads the wardens again, so the dialog
-   * can follow the batch that is running. A second press answers the first's verdict.
+   * can follow the batch that is running. A start that landed whose answer cannot be read (a 200 whose body is not
+   * JSON) is still a landed start: it answers `null`, with no toast, and the dialog follows the batch through
+   * `wardens.running`, which the re-read after every landed write brings. A second press answers the first's verdict.
    */
   const startUpdate = useCallback((nodes: string[]): Promise<CerberusStartedBatch | null> => writeOnce(
     'update:start',
@@ -433,7 +448,15 @@ export function CerberusProvider({ children }: { children: ReactNode }) {
       const verdict = await settleWrite(async () => {
         const response = await api.cerberus.startUpdate(nodes);
         // Read only from a landed start: a refusal's body is `settleWrite`'s to read for its sentence.
-        if (response.ok) started = (await response.json()) as CerberusStartedBatch;
+        if (response.ok) {
+          try {
+            const body = (await response.json()) as Partial<CerberusStartedBatch> | null;
+            // A body that parses but is not a batch is as unreadable as one that does not parse.
+            if (typeof body?.batch === 'string' && Array.isArray(body.updates)) started = { batch: body.batch, updates: body.updates };
+          } catch {
+            // The start landed (`response.ok` is its verdict) and only its answer is unreadable; the dialog follows the batch the wardens read holds.
+          }
+        }
         return response;
       });
       if (verdict !== 'landed') void refresh();

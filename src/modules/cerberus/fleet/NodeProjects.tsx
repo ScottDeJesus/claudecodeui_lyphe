@@ -37,6 +37,14 @@ type NodeProjectsProps = {
   /** The node, by id: the words name it, and a project picked moves to it. */
   node: string;
   /**
+   * Whether the node can take a project: it runs on this machine (`CerberusNodeView.colocated`). A node that
+   * cannot still holds the projects it was given while it was here, and this section is their way back: only
+   * the rows are drawn, each with the ✕ that moves it to this server, with no picker and no "refused until its
+   * warden reports" (the node would refuse them reporting or not). The heading says "assigned" and not "run",
+   * and one line says why the rows are all there is.
+   */
+  colocated: boolean;
+  /**
    * Its warden's link, as the overview reads it (`CerberusNodeView.link`). While it is not `reporting`
    * (silent, or never heard), a message in any of these projects is refused, and the section says so.
    */
@@ -48,12 +56,20 @@ type NodeProjectsProps = {
    * list row's open band, at the indent its service rows keep.
    */
   face: 'grid' | 'list';
+  /**
+   * Where focus goes when the last project of a node that is not co-located has moved back and this section,
+   * with the ✕ that held focus, is gone: the card's own header button. Without it, or while the section stays
+   * drawn, the heading takes focus.
+   */
+  returnFocus?: () => void;
 };
 
 /**
  * PROJECTS THAT RUN HERE: the projects whose Claude chats a co-located node's warden hosts, and the
  * menu that puts one more there. It follows the node's services on its open card, in both faces, and is
- * drawn only for a node on this machine: no other node can take a project yet.
+ * drawn for a node on this machine and for any node that still holds projects, and for no other: a node that
+ * is no longer on this machine (`colocated` false) draws its rows alone, so each project can be moved back,
+ * under "Projects assigned here" and one line saying the node is no longer on this machine.
  *
  * - Each project is a tile, its name over its path (both data, wrapped rather than cut), with ✕ to move
  *   it back to this server. The tiles wrap, so ✕ stays beside its own name at any width. The name is the
@@ -70,13 +86,15 @@ type NodeProjectsProps = {
  *   menu's trigger stands disabled, so no "nothing left" is said of a list nobody has read.
  * - A move shows on its tile until it answers: a project picked appears at once, dashed, "Moving
  *   here…"; a ✕ pressed reads "Moving back…" and keeps focus, taking no second press (`aria-disabled`,
- *   never `disabled`). Moves answer one by one, so the rest of the section stays live.
+ *   never `disabled`). Moves answer one by one, so the rest of the section stays live. When a move back
+ *   empties a node that is not co-located the section goes with the ✕ that held focus, and focus goes to
+ *   `returnFocus`, the card's header; where the section stays, its heading takes focus.
  * - When the server refuses a move here (409 `PROJECT_NODE_NOT_COLOCATED`), a warn banner under the
  *   menu says so in words, until the next press. Any other failure is the write's own toast.
  *
- * For Fleet's `NodeCard` (Grid and List) and the rings' `RingsNodePanel`, on a co-located node's open card.
+ * For Fleet's `NodeCard` (Grid and List) and the rings' `RingsNodePanel`, on every node's open card.
  */
-export function NodeProjects({ node, link, projects, face }: NodeProjectsProps) {
+export function NodeProjects({ node, colocated, link, projects, face, returnFocus }: NodeProjectsProps) {
   const { t } = useTranslation();
   const headingId = useId();
   const headingRef = useRef<HTMLHeadingElement>(null);
@@ -104,7 +122,8 @@ export function NodeProjects({ node, link, projects, face }: NodeProjectsProps) 
   // Essential: a refusal is an answer, and no re-read of the overview carries it.
   const [refused, setRefused] = useState<string | null>(null);
   // The project whose move back has landed: once the overview drops its tile, the ✕ that held focus
-  // has gone with it, and the heading takes focus rather than the top of the page.
+  // has gone with it, and the heading takes focus rather than the top of the page — or, when the section
+  // went too (a node that is not co-located, its last project), the card's header does.
   const leftRef = useRef<string | null>(null);
 
   useEffect(() => {
@@ -112,8 +131,10 @@ export function NodeProjects({ node, link, projects, face }: NodeProjectsProps) 
     if (left === null || projects.some((listed) => listed.projectId === left)) return;
     leftRef.current = null;
     const heading = headingRef.current;
-    const page = heading?.ownerDocument;
-    if (heading && page && (page.activeElement === null || page.activeElement === page.body)) heading.focus();
+    const page = heading?.ownerDocument ?? document;
+    if (page.activeElement !== null && page.activeElement !== page.body) return;
+    if (heading) heading.focus();
+    else returnFocus?.();
   });
 
   const movingOf = (projectId: string) => busy.find((entry) => entry.project.projectId === projectId)?.to ?? null;
@@ -136,6 +157,10 @@ export function NodeProjects({ node, link, projects, face }: NodeProjectsProps) 
     .filter((choice) => movingOf(choice.projectId) === null && !isListed(choice.projectId))
     .sort((a, b) => a.name.localeCompare(b.name) || byPath(a, b));
 
+  // The one decision of whether a node has this section: a node that cannot take a project and holds none (the
+  // hub, a remote node) has nothing to draw, so its card and the rings' panel draw this for every node.
+  if (!colocated && tiles.length === 0) return null;
+
   return (
     <section
       aria-labelledby={headingId}
@@ -145,11 +170,12 @@ export function NodeProjects({ node, link, projects, face }: NodeProjectsProps) 
       )}
     >
       <h3 ref={headingRef} id={headingId} tabIndex={-1} className="text-xs uppercase tracking-[.14em] text-muted-foreground">
-        {t('cerberus.node.projects.title')}
+        {t(colocated ? 'cerberus.node.projects.title' : 'cerberus.node.projects.titleAway')}
       </h3>
 
       {/* Silent, or never heard: the warden line above says how; this says what it costs these projects. */}
-      {link !== 'reporting' && <Banner tone="warn">{t('cerberus.node.projects.notReporting', { node })}</Banner>}
+      {colocated && link !== 'reporting' && <Banner tone="warn">{t('cerberus.node.projects.notReporting', { node })}</Banner>}
+      {!colocated && <p className="text-[12.5px] text-muted-foreground">{t('cerberus.node.projects.awayNote', { node })}</p>}
 
       {tiles.length === 0 ? (
         <p className="rounded-[10px] border border-dashed border-input px-3.5 py-3 text-[13px] text-muted-foreground">
@@ -203,7 +229,7 @@ export function NodeProjects({ node, link, projects, face }: NodeProjectsProps) 
         </ul>
       )}
 
-      {choices !== null && offered.length === 0 ? (
+      {!colocated ? null : choices !== null && offered.length === 0 ? (
         <p className="text-[12.5px] text-muted-foreground">{t('cerberus.node.projects.noChoices')}</p>
       ) : (
         <ActionMenu
