@@ -51,8 +51,8 @@ type ActionMenuProps = {
    *
    * Pass `false` in the two cases the default cannot serve, both measured rather than assumed:
    * when the menu must scroll with its trigger rather than the viewport (the portal path closes
-   * on the first scroll), and when the trigger sits inside an overlay whose own layer outranks
-   * the portal's `z-[70]` — a menu portalled out of Settings' `fixed z-[9999]` panel is drawn
+   * on the page's first scroll; a scroll inside the menu's own list does not close it), and
+   * when the trigger sits inside an overlay whose own layer outranks the portal's `z-[70]` — a menu portalled out of Settings' `fixed z-[9999]` panel is drawn
    * under that panel's content, which is why `McpServers` asks for the in-place menu.
    */
   portal?: boolean;
@@ -62,7 +62,8 @@ type ActionMenuProps = {
 
 /**
  * The "…" overflow menu on a row, card or panel. Used by the app-switcher, chat, dispatcher, kanban, mcp,
- * roadmap and sidebar modules.
+ * roadmap and sidebar modules, and by the cerberus module for a node card's "Run a project here", whose
+ * items are the projects that can move onto the node.
  */
 export function ActionMenu({
   label,
@@ -143,11 +144,18 @@ export function ActionMenu({
     }
 
     const closeOnViewportChange = () => setMenuOpen(false);
+    // The capture listener hears EVERY scroll under the window, the menu's own list among them. A list
+    // capped to scroll (the cerberus node card's "Run a project here") closed the moment the reader
+    // scrolled it, so a scroll inside the menu is the reader moving through it, not the page moving.
+    const closeOnPageScroll = (event: Event) => {
+      if (menuRef.current?.contains(event.target as Node)) return;
+      setMenuOpen(false);
+    };
     hostWindow.addEventListener('resize', closeOnViewportChange);
-    hostWindow.addEventListener('scroll', closeOnViewportChange, true);
+    hostWindow.addEventListener('scroll', closeOnPageScroll, true);
     return () => {
       hostWindow.removeEventListener('resize', closeOnViewportChange);
-      hostWindow.removeEventListener('scroll', closeOnViewportChange, true);
+      hostWindow.removeEventListener('scroll', closeOnPageScroll, true);
     };
   }, [isOpen, portal, setMenuOpen, hostWindow]);
 
@@ -218,9 +226,9 @@ export function ActionMenu({
     const gap = 6;
     const margin = 8;
     // `align` is a horizontal anchor, so the portal path clamps the same two edges the in-place
-    // `right-0` / `left-0` do. No mount passes `align` today — `right` is what every caller wants —
-    // so this is a guard rather than a cure: without it a portalled menu would answer a future
-    // `left` with a right-aligned box and never say so.
+    // `right-0` / `left-0` do. One mount passes `align="left"`: the cerberus node card's "Run a project
+    // here", whose trigger stands at its section's left edge. Every other caller takes the default
+    // `right`. Without this, that menu would open right-aligned against its trigger and never say so.
     const anchor = align === 'left' ? trigger.left : trigger.right - width;
     return {
       // Below when the whole menu fits there, above when it does not. A menu too tall for either

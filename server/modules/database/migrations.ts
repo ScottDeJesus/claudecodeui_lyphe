@@ -138,6 +138,7 @@ const rebuildProjectsTableWithPrimaryKeySchema = (db: Database): void => {
     addColumnToTableIfNotExists(db, 'projects', columnNames, 'custom_project_name', 'TEXT DEFAULT NULL');
     addColumnToTableIfNotExists(db, 'projects', columnNames, 'isStarred', 'BOOLEAN DEFAULT 0');
     addColumnToTableIfNotExists(db, 'projects', columnNames, 'isArchived', 'BOOLEAN DEFAULT 0');
+    addColumnToTableIfNotExists(db, 'projects', columnNames, 'node', 'TEXT DEFAULT NULL');
     db.exec(`
       UPDATE projects
       SET project_id = ${SQLITE_UUID_SQL}
@@ -164,6 +165,8 @@ const rebuildProjectsTableWithPrimaryKeySchema = (db: Database): void => {
 
   const isArchivedExpression = columnNames.includes('isArchived') ? 'COALESCE(isArchived, 0)' : '0';
 
+  const nodeExpression = columnNames.includes('node') ? 'node' : 'NULL';
+
   const projectIdExpression = columnNames.includes('project_id')
     ? `CASE
          WHEN project_id IS NULL OR trim(project_id) = ''
@@ -182,7 +185,8 @@ const rebuildProjectsTableWithPrimaryKeySchema = (db: Database): void => {
         project_path TEXT NOT NULL UNIQUE,
         custom_project_name TEXT DEFAULT NULL,
         isStarred BOOLEAN DEFAULT 0,
-        isArchived BOOLEAN DEFAULT 0
+        isArchived BOOLEAN DEFAULT 0,
+        node TEXT DEFAULT NULL
       )
     `);
     db.exec(`
@@ -192,6 +196,7 @@ const rebuildProjectsTableWithPrimaryKeySchema = (db: Database): void => {
           ${customProjectNameExpression} AS custom_project_name,
           ${isStarredExpression} AS isStarred,
           ${isArchivedExpression} AS isArchived,
+          ${nodeExpression} AS node,
           ${projectIdExpression} AS candidate_project_id,
           rowid AS source_rowid
         FROM projects
@@ -203,6 +208,7 @@ const rebuildProjectsTableWithPrimaryKeySchema = (db: Database): void => {
           custom_project_name,
           isStarred,
           isArchived,
+          node,
           candidate_project_id,
           source_rowid,
           ROW_NUMBER() OVER (PARTITION BY project_path ORDER BY source_rowid) AS project_path_rank
@@ -218,7 +224,8 @@ const rebuildProjectsTableWithPrimaryKeySchema = (db: Database): void => {
           project_path,
           custom_project_name,
           isStarred,
-          isArchived
+          isArchived,
+          node
         FROM deduped_paths
         WHERE project_path_rank = 1
       )
@@ -227,14 +234,16 @@ const rebuildProjectsTableWithPrimaryKeySchema = (db: Database): void => {
         project_path,
         custom_project_name,
         isStarred,
-        isArchived
+        isArchived,
+        node
       )
       SELECT
         project_id,
         project_path,
         custom_project_name,
         isStarred,
-        isArchived
+        isArchived,
+        node
       FROM prepared_rows
     `);
     db.exec('DROP TABLE projects');

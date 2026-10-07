@@ -11,6 +11,7 @@ import type {
   CerberusWelcomeBody,
 } from '@/shared/cerberus-types.js';
 
+import { catalogForWelcome, markCatalogSent } from './catalog.service.js';
 import { hintChanged } from './cerberus-broadcast.js';
 import { signText } from './center-key.js';
 import { checksSetFor } from './definitions.service.js';
@@ -31,14 +32,21 @@ import { wardenLinks, type CerberusWardenLink } from './warden-links.js';
  * attaches and `welcome` carries the certificate and the checks. A refused enrollment sends `error`
  * and closes. CONNECT — an enrolled node: its hello is recorded, the link is attached (closing
  * any older link of the node) and `welcome` carries `ackedUpto`, the certificate again (so a warden
- * whose enrollment `welcome` was lost can still learn the key to pin) and, only when the warden's
- * `checksVersion` differs from center's, the checks.
+ * whose enrollment `welcome` was lost can still learn the key to pin), the checks only when the
+ * warden's `checksVersion` differs from center's, and the catalog only when the node has a published
+ * set that differs from the warden's `catalogVersion` (`catalog.service.ts` decides, and notes the
+ * version the warden says it holds as acked).
  *
  * AFTER THE HANDSHAKE every frame counts as hearing the node (`wardenLinks.heard`), then is checked as
  * an envelope for THIS node. `heartbeat` keeps the clock offset, `checks.ack` the checks-acked
  * version, `result` goes through ingest and is acked once stored; a frame of any other type goes to
  * the handler a later plan registered for it, or is logged once per link and ignored (a newer warden
- * may speak frames this center does not).
+ * may speak frames this center does not). A frame the warden NUMBERED (its outbox: every `run.*`) shares
+ * `result`'s counter, so it is judged against `acked_seq` the same way — a resend is answered and never
+ * handled twice — and acked once its handler has returned; a frame whose handler threw is left unacked.
+ *
+ * After a connect's `welcome` the link announces the hello (`wardenLinks.announceHello`): the warden
+ * says there which runs it still holds, which nothing else does.
  *
  * EVERY frame center sends goes through `send`: the envelope is serialised ONCE and signed as exactly
  * those bytes, so the warden verifies what it received and not a re-serialisation of it.
@@ -60,7 +68,19 @@ const CLOCK_SAMPLES = 5;
 type AdmittedUpgrade = Exclude<WardenAuthResult, { refused: unknown }>;
 
 /** What center reads out of a `hello`: the parts it acts on, already checked for shape. */
-type ReadHello = { version: string; facts: Record<string, unknown>; machineId: string | null; checksVersion: number | null };
+type ReadHello = {
+  version: string;
+  facts: Record<string, unknown>;
+  machineId: string | null;
+  checksVersion: number | null;
+  catalogVersion: number | null;
+  /** When the warden process started, on its clock; null when it did not say. */
+  startedAt: number | null;
+  /** The runs whose child the warden still holds; null when it did not say (a build older than the runner). */
+  activeRuns: string[] | null;
+  /** The runs that are over but whose frames still wait on the warden's outbox; null when it does not report them. */
+  owedRuns: string[] | null;
+};
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -77,12 +97,24 @@ function readHello(body: unknown): ReadHello | null {
   if (!isRecord(body) || typeof body.version !== 'string' || !isRecord(body.facts)) return null;
   const checksVersion = body.checksVersion;
   if (checksVersion !== null && checksVersion !== undefined && !Number.isSafeInteger(checksVersion)) return null;
+  const catalogVersion = body.catalogVersion;
+  if (catalogVersion !== null && catalogVersion !== undefined && !Number.isSafeInteger(catalogVersion)) return null;
   const machineId = body.facts.machineId;
+  const runs = isRecord(body.active) ? body.active.runs : undefined;
+  const owed = isRecord(body.active) ? body.active.owed : undefined;
+  const textList = (value: unknown): string[] | null =>
+    Array.isArray(value) && value.every((item) => typeof item === 'string') ? (value as string[]) : null;
   return {
     version: body.version,
     facts: body.facts,
     machineId: typeof machineId === 'string' ? machineId : null,
     checksVersion: (checksVersion as number | null | undefined) ?? null,
+    catalogVersion: (catalogVersion as number | null | undefined) ?? null,
+    // Lenient on purpose: a hello that cannot say what it holds is still a hello, and a listener that
+    // is told "unknown" concludes nothing, where a refusal here would keep the warden from linking.
+    startedAt: typeof body.startedAt === 'number' && Number.isFinite(body.startedAt) ? body.startedAt : null,
+    activeRuns: textList(runs),
+    owedRuns: textList(owed),
   };
 }
 
@@ -99,11 +131,11 @@ export function runWardenLink(ws: WebSocket, admitted: AdmittedUpgrade): void {
   let heartbeatsSeen = 0;
   let badFrameLogged = false;
 
-  function send(type: string, body: unknown): boolean {
+  function send(type: string, body: unknown, id?: string): boolean {
     if (ws.readyState !== WS_OPEN_STATE) return false;
     const envelope: CerberusEnvelope<unknown> = {
       type,
-      id: crypto.randomBytes(6).toString('hex'),
+      id: id ?? crypto.randomBytes(6).toString('hex'),
       node,
       seq: null,
       at: Date.now(),
@@ -169,7 +201,10 @@ export function runWardenLink(ws: WebSocket, admitted: AdmittedUpgrade): void {
       cert: issueCert(node, row.cert_fingerprint, row.enrolled_at),
     };
     if (hello.checksVersion !== row.checks_version) welcome.checks = checksSetFor(node);
-    send('welcome', welcome);
+    const catalog = catalogForWelcome(node, hello.catalogVersion, receivedAt);
+    if (catalog) welcome.catalog = catalog;
+    if (send('welcome', welcome) && catalog) markCatalogSent(node, catalog.version);
+    wardenLinks.announceHello(node, hello);
   }
 
   function onHeartbeat(env: CerberusEnvelope<unknown>, receivedAt: number): void {
@@ -227,9 +262,21 @@ export function runWardenLink(ws: WebSocket, admitted: AdmittedUpgrade): void {
           }
           return;
         }
-        Promise.resolve(handler(node, env.body, env)).catch((error) => {
-          console.error(`[Cerberus] the "${env.type}" handler threw for node ${node}: ${error instanceof Error ? error.message : String(error)}`);
-        });
+        const seq = env.seq !== null && env.seq >= 1 ? env.seq : null;
+        // Already handled (a resend after a dropped ack): answer it, handle nothing.
+        if (seq !== null && seq <= (cerberusNodesDb.get(node)?.acked_seq ?? 0)) {
+          send('ack', { upto: seq });
+          return;
+        }
+        Promise.resolve(handler(node, env.body, env))
+          .then(() => {
+            if (seq === null) return;
+            cerberusNodesDb.setAckedSeq(node, seq);
+            send('ack', { upto: seq });
+          })
+          .catch((error) => {
+            console.error(`[Cerberus] the "${env.type}" handler threw for node ${node}: ${error instanceof Error ? error.message : String(error)}`);
+          });
       }
     }
   }

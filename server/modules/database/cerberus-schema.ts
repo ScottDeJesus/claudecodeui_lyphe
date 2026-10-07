@@ -122,4 +122,95 @@ CREATE TABLE mutes (
 
 CREATE INDEX ix_mutes_check ON mutes(node, check_key, until_at);
 `,
+
+  // Step 1 (user_version 1 → 2) — the `cerberus--fixes` plan: what Cerberus may run, who was told,
+  // and what came of it. The tables are `design/cerberus/Cerberus Spec.dc.html` Table 4 (the store):
+  // `catalog`, `catalog_sets` and `catalog_changes` are kept forever; `runs` is kept forever and
+  // `run_output` for 90 days (the daily prune).
+  `
+-- A fix an operator wrote for one check. The id is the name's slug. run_when is the status that
+-- makes the check need a fix (failing, or warn when it nears its limit). cmd is run as written,
+-- byte for byte, and timeout is seconds. auto is 0 until a person switches it on; limit_runs runs
+-- in limit_per seconds (3600 or 86400) bound it, and capped holds the reason a fix may never run
+-- on its own (NULL when it may). recheck asks for the check's probe to run again once the fix ends.
+-- origin is how it came to be, as JSON — written by a person, or lifted from a diagnosis. Never
+-- deleted: retired_at hides an entry and keeps its runs' history readable.
+CREATE TABLE catalog (
+    id TEXT PRIMARY KEY,
+    node TEXT NOT NULL,
+    check_key TEXT NOT NULL,
+    name TEXT NOT NULL,
+    run_when TEXT NOT NULL CHECK(run_when IN ('failing','warn')),
+    cmd TEXT NOT NULL,
+    timeout INTEGER NOT NULL,
+    auto INTEGER NOT NULL DEFAULT 0,
+    limit_runs INTEGER NOT NULL,
+    limit_per INTEGER NOT NULL,
+    capped TEXT,
+    recheck INTEGER NOT NULL DEFAULT 1,
+    origin TEXT NOT NULL,
+    created_at INTEGER NOT NULL,
+    retired_at INTEGER
+);
+
+-- The catalog as one node was told it: a new version row each time the node's entries change.
+-- entries and one_offs are the wire's lists as JSON. sent_at is when the signed set went down the
+-- link, acked_at when the warden answered catalog.ack for that version.
+CREATE TABLE catalog_sets (
+    node TEXT NOT NULL,
+    version INTEGER NOT NULL,
+    entries TEXT NOT NULL,
+    one_offs TEXT NOT NULL,
+    sent_at INTEGER,
+    acked_at INTEGER,
+    PRIMARY KEY(node, version)
+);
+
+-- Append-only: every edit of an entry, one row per field (a new entry is field 'added'; an
+-- auto-run toggle is field 'auto'). from_value and to_value are the field's text, NULL for none.
+CREATE TABLE catalog_changes (
+    entry TEXT NOT NULL,
+    at INTEGER NOT NULL,
+    field TEXT NOT NULL,
+    from_value TEXT,
+    to_value TEXT,
+    by TEXT NOT NULL,
+    PRIMARY KEY(entry, at, field)
+);
+
+-- One attempt to run a fix. entry or diagnosis names what it came from (a one-off from a diagnosis
+-- has no catalog entry). cmd is the exact command sent and catalog_version the version it was
+-- verified against. The row is written when Cerberus asks (requested_at); started_at is the
+-- warden's accepted, ended_at its end; result is NULL while the run is live. A warden that refuses
+-- the run ends it as 'refused' with the reason in note.
+CREATE TABLE runs (
+    id TEXT PRIMARY KEY,
+    entry TEXT,
+    diagnosis TEXT,
+    node TEXT NOT NULL,
+    check_key TEXT NOT NULL,
+    by TEXT NOT NULL CHECK(by IN ('auto','you')),
+    cmd TEXT NOT NULL,
+    catalog_version INTEGER NOT NULL,
+    requested_at INTEGER NOT NULL,
+    started_at INTEGER,
+    ended_at INTEGER,
+    result TEXT CHECK(result IN ('ok','failed','refused','timed_out')),
+    exit INTEGER,
+    note TEXT
+);
+
+CREATE INDEX ix_runs_check ON runs(node, check_key, requested_at);
+
+-- A run's output, one row per line. n is the line's number within the run and t its offset in
+-- seconds from the start; the primary key makes a resent batch a no-op.
+CREATE TABLE run_output (
+    run TEXT NOT NULL,
+    n INTEGER NOT NULL,
+    t REAL NOT NULL,
+    stream TEXT NOT NULL CHECK(stream IN ('out','err')),
+    line TEXT NOT NULL,
+    PRIMARY KEY(run, n)
+);
+`,
 ];

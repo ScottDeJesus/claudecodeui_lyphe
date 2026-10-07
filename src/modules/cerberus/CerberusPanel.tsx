@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { CatalogView } from '@/modules/cerberus/catalog/CatalogView';
 import { CerberusHeader } from '@/modules/cerberus/CerberusHeader';
 import { useCerberus } from '@/modules/cerberus/context/CerberusContext';
+import { ProjectChoicesContext } from '@/modules/cerberus/context/ProjectChoicesContext';
 import { FleetView } from '@/modules/cerberus/fleet/FleetView';
 import { HistoryView } from '@/modules/cerberus/history/HistoryView';
 import { EnrollDialog } from '@/modules/cerberus/modals/EnrollDialog';
@@ -11,9 +13,18 @@ import { CheckSheet } from '@/modules/cerberus/sheet/CheckSheet';
 import { UnreachableBanner } from '@/modules/cerberus/UnreachableBanner';
 import type { CerberusCheckView } from '@/shared/cerberus-types';
 import { useHostWindow } from '@/shared/context/HostWindowContext';
-import type { CerberusSheetTarget, CerberusView } from '@/shared/types';
+import type { CerberusSheetTarget, CerberusView, ProjectChoice } from '@/shared/types';
 import { ScrollArea, Tabs } from '@/shared/ui';
 import { cn, resizeObserverIn } from '@/shared/utils';
+
+type CerberusPanelProps = {
+  /**
+   * The projects in the workspace's sidebar, which "Run a project here" offers (those on no node). The
+   * workspace draws its loading state until its first read of them has answered, so a panel is only ever
+   * mounted with a list that was read.
+   */
+  projectChoices: ProjectChoice[];
+};
 
 /** The panel's own width below which it draws narrow. */
 const NARROW_BELOW_PX = 620;
@@ -21,13 +32,10 @@ const NARROW_BELOW_PX = 620;
 /** The width it must rise above to draw wide again: 40 px past the line it fell under, so a panel dragged to the edge never flickers. */
 const WIDE_ABOVE_PX = 660;
 
-/**
- * The tab's views in the strip's order, each with its name and the hint beside the strip. The fixes plan
- * inserts Catalog between the two: `{ id: 'catalog', … }` here, with its hint "Fixes Cerberus can offer,
- * or run on its own", and its view in the body below between Fleet's and History's.
- */
+/** The tab's views in the strip's order, each with its name and the hint beside the strip. */
 const VIEWS: readonly { id: CerberusView; labelKey: string; hintKey: string }[] = [
   { id: 'fleet', labelKey: 'cerberus.fleet.tabs.fleet', hintKey: 'cerberus.fleet.tabs.fleetHint' },
+  { id: 'catalog', labelKey: 'cerberus.catalog.tab', hintKey: 'cerberus.catalog.tabHint' },
   { id: 'history', labelKey: 'cerberus.fleet.tabs.history', hintKey: 'cerberus.fleet.tabs.historyHint' },
 ];
 
@@ -45,7 +53,7 @@ const GUTTER = 'px-[clamp(16px,4cqi,32px)]';
  * 1. `CerberusHeader`: the headline, the summary, the clock pill and Enroll a node.
  * 2. Only while the fleet on screen is stale: "Cerberus can't be reached · Showing the last answer it
  *    gave." with Try again.
- * 3. The strip, Fleet · History, with a hint beside it saying how the view shown is read.
+ * 3. The strip, Fleet · Catalog · History, with a hint beside it saying how the view shown is read.
  * 4. The view shown.
  *
  * WHILE THERE IS NO FLEET, TWO STATES. Until the first read answers: "Loading Cerberus…", held back
@@ -64,10 +72,14 @@ const GUTTER = 'px-[clamp(16px,4cqi,32px)]';
  * gutter follows it. The narrow flag has the prototype's hysteresis (narrow below 620 px, wide again only
  * above 660 px), so a panel dragged to the edge never flickers between the two. Fleet reads it.
  *
- * FLEET STAYS MOUNTED WHILE HISTORY SHOWS. Its layout, filter, search and open nodes are the person's
+ * FLEET STAYS MOUNTED WHILE ANOTHER VIEW SHOWS. Its layout, filter, search and open nodes are the person's
  * place in the fleet, and they come back as they were left, as the prototype keeps them. Fleet reads
- * nothing of its own, so hidden it costs nothing. History reads its index, its feed and a check every
- * 30 s, so it is mounted only while it shows. A view shown again plays its entrance again.
+ * nothing of its own, so hidden it costs nothing. Catalog holds no place of its own, and History reads its
+ * index, its feed and a check every 30 s, so each is mounted only while it shows. A view shown again plays
+ * its entrance again.
+ *
+ * THE PROJECTS A NODE CAN TAKE come in as a prop and reach the Fleet view through `ProjectChoicesContext`:
+ * the workspace owns that list and imports this module, so the panel is handed it, never reads it.
  *
  * THE HOSTS. One check sheet, opened from a Fleet minute, a service row or a Needs-you card. One Mute
  * dialog, opened from a Needs-you card or the sheet; it opens in front of the sheet, which waits beneath
@@ -76,7 +88,7 @@ const GUTTER = 'px-[clamp(16px,4cqi,32px)]';
  * For src/modules/project-workspace's `WorkspaceMain`, which draws it as the Cerberus tab, through this
  * module's barrel.
  */
-export function CerberusPanel() {
+export function CerberusPanel({ projectChoices }: CerberusPanelProps) {
   const { t } = useTranslation();
   // The element the container query measures: the panel's own box.
   const rootRef = useRef<HTMLDivElement>(null);
@@ -176,8 +188,15 @@ export function CerberusPanel() {
 
             {/* `hidden` rather than unmounted, so Fleet keeps its place; nothing on its wrapper sets a display. */}
             <div role="tabpanel" aria-label={t('cerberus.fleet.tabs.fleet')} hidden={view !== 'fleet'} className={VIEW_ENTER}>
-              <FleetView overview={overview} narrow={narrow} onOpenCell={onOpenSheet} onMute={onMute} />
+              <ProjectChoicesContext.Provider value={projectChoices}>
+                <FleetView overview={overview} narrow={narrow} onOpenCell={onOpenSheet} onMute={onMute} />
+              </ProjectChoicesContext.Provider>
             </div>
+            {view === 'catalog' && (
+              <div role="tabpanel" aria-label={t('cerberus.catalog.tab')} className={VIEW_ENTER}>
+                <CatalogView />
+              </div>
+            )}
             {view === 'history' && (
               <div role="tabpanel" aria-label={t('cerberus.fleet.tabs.history')} className={VIEW_ENTER}>
                 <HistoryView />
@@ -197,6 +216,7 @@ export function CerberusPanel() {
           service={sheet.service}
           check={sheet.check}
           lookupAt={sheet.lookupAt}
+          run={sheet.run}
           onMute={onMute}
         />
       )}

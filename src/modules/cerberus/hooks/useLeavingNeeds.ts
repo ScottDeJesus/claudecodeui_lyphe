@@ -1,19 +1,20 @@
 import { useEffect, useRef, useState } from 'react';
 
-import type { CerberusCheckView, CerberusNeed } from '@/shared/cerberus-types';
+import type { CerberusNeed } from '@/shared/cerberus-types';
 
 /** How long a card that stopped needing you stays drawn: the length of `vv-toast-out` that it leaves on. */
 const LEAVE_MS = 550;
 
 /**
- * A check that stopped needing you, and the place in the list DRAWN at that moment (cards still
- * leaving counted) that it held, so its card leaves from where it stood.
+ * A need that stopped needing you — the check with the fix and run its card was drawn from — and the place
+ * in the list DRAWN at that moment (cards still leaving counted) that it held, so its card leaves from
+ * where it stood, with its run's strip as it was.
  */
-type Leaver = { check: CerberusCheckView; place: number };
+type Leaver = { need: CerberusNeed; place: number };
 
-type DrawnCard = { check: CerberusCheckView; leaving: boolean };
+type DrawnCard = { need: CerberusNeed; leaving: boolean };
 
-const checkKey = ({ node, key }: CerberusCheckView): string => `${node}/${key}`;
+const checkKey = ({ check: { node, key } }: CerberusNeed): string => `${node}/${key}`;
 
 /**
  * The list Needs you draws for these `needs` and these leavers: the needs in their order, each leaver
@@ -21,10 +22,10 @@ const checkKey = ({ node, key }: CerberusCheckView): string => `${node}/${key}`;
  * that left together keep their order.
  */
 function drawnCards(needs: CerberusNeed[], leavers: Leaver[]): DrawnCard[] {
-  const cards: DrawnCard[] = needs.map(({ check }) => ({ check, leaving: false }));
+  const cards: DrawnCard[] = needs.map((need) => ({ need, leaving: false }));
   [...leavers]
     .sort((a, b) => a.place - b.place)
-    .forEach(({ check, place }) => cards.splice(Math.min(place, cards.length), 0, { check, leaving: true }));
+    .forEach(({ need, place }) => cards.splice(Math.min(place, cards.length), 0, { need, leaving: true }));
   return cards;
 }
 
@@ -35,7 +36,8 @@ function drawnCards(needs: CerberusNeed[], leavers: Leaver[]): DrawnCard[] {
  * you again before its card is gone takes its place back, and its card stays.
  *
  * A check that stops needing you is a check that was muted, healed or retired; the card kept is the
- * last one drawn, so it still reads what it read. Keyed by `<node>/<key>` by the caller.
+ * last one drawn, so it still reads what it read — its fix and its run's strip with it. Keyed by
+ * `<node>/<key>` by the caller.
  *
  * A place counts in the list as it was DRAWN, cards still leaving included, so a second card that
  * leaves while the first is on its way out is kept where it stood and not one slot above.
@@ -54,25 +56,25 @@ export function useLeavingNeeds(needs: CerberusNeed[]): DrawnCard[] {
   const timers = useRef(new Map<string, number>());
 
   if (needs !== seen) {
-    const stillNeeded = new Set(needs.map(({ check }) => checkKey(check)));
+    const stillNeeded = new Set(needs.map(checkKey));
     // Places are read off the list the last render drew, which holds the cards still leaving.
-    const departed = drawnCards(seen, leavers).flatMap(({ check, leaving }, place) => (
-      leaving || stillNeeded.has(checkKey(check)) ? [] : [{ check, place }]
+    const departed = drawnCards(seen, leavers).flatMap(({ need, leaving }, place) => (
+      leaving || stillNeeded.has(checkKey(need)) ? [] : [{ need, place }]
     ));
     setSeen(needs);
     // A leaver whose check needs you again is no longer leaving: its card is a card again.
-    setLeavers((current) => [...current.filter(({ check }) => !stillNeeded.has(checkKey(check))), ...departed]);
+    setLeavers((current) => [...current.filter(({ need }) => !stillNeeded.has(checkKey(need))), ...departed]);
   }
 
   useEffect(() => {
-    const leaving = new Set(leavers.map(({ check }) => checkKey(check)));
+    const leaving = new Set(leavers.map(({ need }) => checkKey(need)));
     for (const key of leaving) {
       if (timers.current.has(key)) continue;
       timers.current.set(key, window.setTimeout(() => {
         timers.current.delete(key);
         // The list is one card shorter once this one is gone: every place after it moves up a slot.
         setLeavers((current) => {
-          const gone = current.find(({ check }) => checkKey(check) === key);
+          const gone = current.find(({ need }) => checkKey(need) === key);
           if (gone === undefined) return current;
           return current
             .filter((entry) => entry !== gone)

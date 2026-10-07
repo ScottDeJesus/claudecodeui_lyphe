@@ -6083,3 +6083,841 @@ expect: 1 then 0 — the narrowed rule is present once and the bare `.overflow-y
 ```
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/index.css, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/tree/RoadmapTree.tsx
+
+## INV-7083 — probe — MEDIUM — a late older signed `catalog.set` replaces the held catalog and is acked: a retired command runs again
+
+MEDIUM — a late older signed `catalog.set` replaces the held catalog and is acked: a retired command runs again
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOP'
+D=$(dirname "$0")
+cat > "$D/p.mjs" <<'EOJ'
+const R = '/home/lyphe/.claude/claudecodeui_lyphe/warden/src/', dir = process.argv[2];
+const { createCatalog } = await import(R + 'catalog.mjs'), { createRunner } = await import(R + 'runner.mjs'), fs = await import('node:fs');
+const handlers = new Map(), sent = [];
+const link = { on: (t, f) => handlers.set(t, [...(handlers.get(t) ?? []), f]), send: (t, b) => { sent.push({ t, b }); return { seq: 1, sent: true }; } };
+const catalog = createCatalog({ link }); createRunner({ link, catalog, home: dir });
+const deliver = (t, b) => Promise.all((handlers.get(t) ?? []).map((f) => f(b)));
+await deliver('catalog.set', { version: 5, entries: [{ id: 'echo', cmd: 'echo hi', timeout: 5 }], oneOffs: [] });
+const mark = dir + '/retired-ran', old = 'touch ' + mark;
+await deliver('catalog.set', { version: 3, entries: [{ id: 'old', cmd: old, timeout: 5 }], oneOffs: [] });
+await deliver('run.start', { runId: 'v3', catalogVersion: 3, entryId: 'old', proposalId: null, cmd: old, timeout: 5, by: 'you' });
+await new Promise((r) => setTimeout(r, 600));
+console.log('held version:', catalog.version, '| acks sent:', JSON.stringify(sent.filter((s) => s.t === 'catalog.ack').map((s) => s.b.version)), '| retired v3 command ran:', fs.existsSync(mark));
+process.exit(0);
+EOJ
+node "$D/p.mjs" "$D" 2>&1 | grep -v '^\[warden\]'
+EOP
+bash "$D/p.sh"
+case "$D" in /tmp/athena-probe.*) rm -rf "$D";; esac
+expect: `held version: 3 | acks sent: [5,3] | retired v3 command ran: true` while the defect stands; cured reads `held version: 5 | acks sent: [5] | retired v3 command ran: false`
+```
+
+measured 2026-10-06 by chain chain-cerberus--fixes--warden-runner-20261006-205329-df76, finding M1, MEDIUM
+probe-key: 0a47849076ce1d986cc5b0b1a4207a56d1fb607e
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/warden-catalog-runner.mjs, /home/lyphe/.claude/claudecodeui_lyphe/warden/src/catalog.mjs, /home/lyphe/.claude/claudecodeui_lyphe/warden/src/run-lines.mjs, /home/lyphe/.claude/claudecodeui_lyphe/warden/src/runner.mjs
+
+## INV-7084 — probe — MEDIUM — a run id is remembered only while it runs: the same signed `run.start` delivered again after the run ended starts another child
+
+MEDIUM — a run id is remembered only while it runs: the same signed `run.start` delivered again after the run ended starts another child
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOP'
+D=$(dirname "$0")
+cat > "$D/p.mjs" <<'EOJ'
+const R = '/home/lyphe/.claude/claudecodeui_lyphe/warden/src/', dir = process.argv[2];
+const { createCatalog } = await import(R + 'catalog.mjs'), { createRunner } = await import(R + 'runner.mjs'), fs = await import('node:fs');
+const handlers = new Map(), sent = [];
+const link = { on: (t, f) => handlers.set(t, [...(handlers.get(t) ?? []), f]), send: (t, b) => { sent.push({ t, b }); return { seq: 1, sent: true }; } };
+const catalog = createCatalog({ link }); createRunner({ link, catalog, home: dir });
+const deliver = (t, b) => Promise.all((handlers.get(t) ?? []).map((f) => f(b)));
+const count = dir + '/count', cmd = `echo x >> ${count}`;
+await deliver('catalog.set', { version: 1, entries: [{ id: 'cnt', cmd, timeout: 5 }], oneOffs: [] });
+for (let i = 0; i < 3; i++) { await deliver('run.start', { runId: 'same', catalogVersion: 1, entryId: 'cnt', proposalId: null, cmd, timeout: 5, by: 'auto' }); await new Promise((r) => setTimeout(r, 500)); }
+console.log('one runId delivered 3 times, each after the last ended → child starts:', fs.readFileSync(count, 'utf8').trim().split('\n').length, '| run.accepted frames:', sent.filter((s) => s.t === 'run.accepted').length);
+process.exit(0);
+EOJ
+node "$D/p.mjs" "$D" 2>&1 | grep -v '^\[warden\]'
+EOP
+bash "$D/p.sh"
+case "$D" in /tmp/athena-probe.*) rm -rf "$D";; esac
+expect: `child starts: 3 | run.accepted frames: 3` while the defect stands; cured reads `child starts: 1 | run.accepted frames: 1`
+```
+
+measured 2026-10-06 by chain chain-cerberus--fixes--warden-runner-20261006-205329-df76, finding M2, MEDIUM
+probe-key: 76b4be07af6d44d03e6f45ca698533dc6639497b
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/warden-catalog-runner.mjs, /home/lyphe/.claude/claudecodeui_lyphe/warden/src/catalog.mjs, /home/lyphe/.claude/claudecodeui_lyphe/warden/src/run-lines.mjs, /home/lyphe/.claude/claudecodeui_lyphe/warden/src/runner.mjs
+
+## INV-7085 — probe — LOW — a command that finished in time is called `timed_out` when a background child still holds its pipes
+
+LOW — a command that finished in time is called `timed_out` when a background child still holds its pipes
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOP'
+D=$(dirname "$0")
+cat > "$D/p.mjs" <<'EOJ'
+const R = '/home/lyphe/.claude/claudecodeui_lyphe/warden/src/', dir = process.argv[2];
+const { createCatalog } = await import(R + 'catalog.mjs'), { createRunner } = await import(R + 'runner.mjs');
+const handlers = new Map(), sent = [];
+const link = { on: (t, f) => handlers.set(t, [...(handlers.get(t) ?? []), f]), send: (t, b) => { sent.push({ t, b }); return { seq: 1, sent: true }; } };
+const catalog = createCatalog({ link }); createRunner({ link, catalog, home: dir });
+const deliver = (t, b) => Promise.all((handlers.get(t) ?? []).map((f) => f(b)));
+const cmd = '(sleep 3) & sleep 0.9; echo finished';
+await deliver('catalog.set', { version: 1, entries: [{ id: 'e', cmd, timeout: 1 }], oneOffs: [] });
+await deliver('run.start', { runId: 'r', catalogVersion: 1, entryId: 'e', proposalId: null, cmd, timeout: 1, by: 'you' });
+await new Promise((r) => setTimeout(r, 3500));
+const end = sent.find((s) => s.t === 'run.end')?.b;
+console.log('shell exited 0 at 0.9 s of a 1 s timeout, a background child still holding the pipes → result:', end?.result ?? 'no run.end', '| exit:', end?.exit ?? 'none');
+process.exit(0);
+EOJ
+node "$D/p.mjs" "$D" 2>&1 | grep -v '^\[warden\]'
+EOP
+bash "$D/p.sh"
+case "$D" in /tmp/athena-probe.*) rm -rf "$D";; esac
+expect: `result: timed_out | exit: 0` while the defect stands; cured reads `result: ok | exit: 0`
+```
+
+measured 2026-10-06 by chain chain-cerberus--fixes--warden-runner-20261006-205329-df76, finding L1, LOW
+probe-key: f1859ae990f9a92882016cd6b301a39bc2cc8b42
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/warden-catalog-runner.mjs, /home/lyphe/.claude/claudecodeui_lyphe/warden/src/catalog.mjs, /home/lyphe/.claude/claudecodeui_lyphe/warden/src/run-lines.mjs, /home/lyphe/.claude/claudecodeui_lyphe/warden/src/runner.mjs
+
+## INV-7086 — probe — LOW — before any catalog, `catalogVersion: null` passes the version check and the sentence reads "catalog vnull"
+
+LOW — before any catalog, `catalogVersion: null` passes the version check and the sentence reads "catalog vnull"
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOP'
+D=$(dirname "$0")
+cat > "$D/p.mjs" <<'EOJ'
+const R = '/home/lyphe/.claude/claudecodeui_lyphe/warden/src/', dir = process.argv[2];
+const { createCatalog } = await import(R + 'catalog.mjs'), { createRunner } = await import(R + 'runner.mjs');
+const handlers = new Map(), sent = [];
+const link = { on: (t, f) => handlers.set(t, [...(handlers.get(t) ?? []), f]), send: (t, b) => { sent.push({ t, b }); return { seq: 1, sent: true }; } };
+const catalog = createCatalog({ link }); createRunner({ link, catalog, home: dir });
+for (const f of handlers.get('run.start')) await f({ runId: 'pre', catalogVersion: null, entryId: 'echo', proposalId: null, cmd: 'echo hi', timeout: 5, by: 'you' });
+console.log('run.start naming catalogVersion null, before any catalog.set →', sent.find((s) => s.t === 'run.refused')?.b.reason ?? 'no refusal');
+process.exit(0);
+EOJ
+node "$D/p.mjs" "$D" 2>&1 | grep -v '^\[warden\]'
+EOP
+bash "$D/p.sh"
+case "$D" in /tmp/athena-probe.*) rm -rf "$D";; esac
+expect: `→ No entry 'echo' in catalog vnull` while the defect stands; cured reads `→ Catalog version null is not the one this warden acked (none)`
+```
+
+measured 2026-10-06 by chain chain-cerberus--fixes--warden-runner-20261006-205329-df76, finding L2, LOW
+probe-key: a5d4fa5331fef3d93ec554defec9c89e05862172
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/warden-catalog-runner.mjs, /home/lyphe/.claude/claudecodeui_lyphe/warden/src/catalog.mjs, /home/lyphe/.claude/claudecodeui_lyphe/warden/src/run-lines.mjs, /home/lyphe/.claude/claudecodeui_lyphe/warden/src/runner.mjs
+
+## INV-7087 — probe — LOW — the proof script's "changed command" is `rm -rf /`, run from the operator's real home
+
+LOW — the proof script's "changed command" is `rm -rf /`, run from the operator's real home
+
+```probe
+cd /home/lyphe/.claude/claudecodeui_lyphe && grep -n 'rm -rf' .verify/warden-catalog-runner.mjs || echo "no rm -rf in the proof script"
+expect: `55:await deliver('run.start', start('r-command', { entryId: 'echo', cmd: ...; rm -rf /...` while it stands; cured reads `no rm -rf in the proof script`
+```
+
+measured 2026-10-06 by chain chain-cerberus--fixes--warden-runner-20261006-205329-df76, finding L3, LOW
+probe-key: aa375554c87274db9c1385b7b23193164ec8beb3
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/warden-catalog-runner.mjs, /home/lyphe/.claude/claudecodeui_lyphe/warden/src/catalog.mjs, /home/lyphe/.claude/claudecodeui_lyphe/warden/src/run-lines.mjs, /home/lyphe/.claude/claudecodeui_lyphe/warden/src/runner.mjs
+
+## INV-7088 — probe — LOW — `.verify/probe-cerberus-open-race.mjs` now FAILs on a correct build, because it pins a literal `user_version=1`
+
+LOW — `.verify/probe-cerberus-open-race.mjs` now FAILs on a correct build, because it pins a literal `user_version=1`
+
+```probe
+P=$(mktemp /tmp/athena-p.XXXXXX) || exit 1
+cat > "$P" <<'EOF'
+S=$(mktemp -d /tmp/cerberus-race.XXXXXX) || exit 1
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+CERBERUS_DB_PATH="$S/cerberus.db" DATABASE_PATH="$S/auth.db" TSX_TSCONFIG_PATH=server/tsconfig.json timeout 170 node --import tsx .verify/probe-cerberus-open-race.mjs 2>&1 | grep -E "^REAL"
+grep -n "user_version=1'" .verify/probe-cerberus-open-race.mjs || echo "pin: derived, no literal"
+cd /tmp && case "$S" in /tmp/cerberus-race.*) rm -rf "$S";; esac
+EOF
+bash "$P"; rm -f "$P"
+```
+
+measured 2026-10-06 by chain chain-cerberus--fixes--store-20261006-205329-d176, finding L2, LOW
+probe-key: d3f02407e7e69ccf03d780149a2507b1c55b74ef
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-cerberus-open-race.mjs
+
+## INV-7091 — probe — LOW — `prettier --check` fails on `server/shared/cerberus-types.ts` (the contract's own formatting rule)
+
+LOW — `prettier --check` fails on `server/shared/cerberus-types.ts` (the contract's own formatting rule)
+
+```probe
+cd /home/lyphe/.claude/claudecodeui_lyphe && npx prettier --single-quote --print-width 100 --check server/shared/cerberus-types.ts src/shared/cerberus-types.ts 2>&1 | tail -3; echo "rc=${PIPESTATUS[0]}"
+```
+
+measured 2026-10-06 by chain chain-cerberus--fixes--contract-20261006-205328-d4ab, finding L1, LOW
+probe-key: fd2cfa2d647d1a029ef13d0fdfa6fdfb30c3b36b
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/shared/cerberus-types.ts
+
+## INV-7097 — probe — a host `out` line over center's 8 MiB frame cap is forwarded whole; center closes the link, the warden redials, center re-attaches and replays the same line — a permanent flap that blinds the node
+
+a host `out` line over center's 8 MiB frame cap is forwarded whole; center closes the link, the warden redials, center re-attaches and replays the same line — a permanent flap that blinds the node
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) && cat > "$D/p.sh" <<'EOF'
+#!/usr/bin/env bash
+# A host `out` line over the center gateway's per-frame cap is forwarded whole by sessions.mjs (no refusal, no chunking).
+set -u
+REPO=/home/lyphe/.claude/claudecodeui_lyphe
+if tmux -L cerberus-warden ls >/dev/null 2>&1; then echo "REFUSED: a cerberus-warden server is already up"; exit 0; fi
+W=$(mktemp -d /tmp/athena-probe-home.XXXXXX) || exit 1
+tmux -L cerberus-warden -f /dev/null new-session -d -s _keepalive sleep infinity || { rmdir "$W"; exit 1; }
+CAP=$(grep -oE 'MAX_FRAME_BYTES = [0-9* ]+' "$REPO/server/modules/cerberus/warden-gateway.ts" | head -1 | sed 's/.*= //' | awk '{print $1*$3*$5}')
+cat > "$W/run.mjs" <<'JS'
+const { createSessions } = await import(`${process.env.REPO}/warden/src/sessions.mjs`);
+const { makeEnvelope } = await import(`${process.env.REPO}/warden/src/wire.mjs`);
+const keep = setInterval(() => {}, 1000);
+const handlers = new Map(); let biggest = 0; const closed = [];
+const link = { on(t, f) { handlers.set(t, f); },
+  send(type, body) { if (type === 'session.closed') closed.push(body.reason);
+    if (type === 'session.frame') biggest = Math.max(biggest, JSON.stringify(makeEnvelope('n', type, null, body)).length); return { seq: null, sent: true }; } };
+createSessions({ link, home: process.env.H_HOME });
+await handlers.get('session.open')({ chan: 'c1', op: 'spawn', hostId: 'athena-probe-big', cwd: '/tmp',
+  frame: { t: 'spawn', command: process.execPath, args: ['-e', "process.stdout.write('a'.repeat(9e6) + '\\n'); setTimeout(() => {}, 3000)"], cwd: '/tmp', appSessionId: 'p', userId: 1, profile: null, env: { PATH: process.env.PATH } } });
+await new Promise((r) => setTimeout(r, 3500));
+console.log(`largest session.frame envelope handed to the link: ${biggest} bytes | gateway cap: ${process.env.CAP} | over the cap: ${biggest > Number(process.env.CAP)} | session.closed: ${JSON.stringify(closed)}`);
+clearInterval(keep); process.exit(0);
+JS
+REPO="$REPO" CAP="$CAP" H_HOME="$W/home" timeout 60 node "$W/run.mjs" 2>&1 | tail -3
+tmux -L cerberus-warden kill-server 2>/dev/null
+case "$W" in /tmp/athena-probe-home.*) rm -rf "$W";; esac
+EOF
+bash "$D/p.sh"; case "$D" in /tmp/athena-probe.*) rm -rf "$D";; esac
+expect: `largest session.frame envelope handed to the link: 9000163 bytes | gateway cap: 8388608 | over the cap: true | session.closed: []` while the defect stands; `over the cap: false` (or a non-empty `session.closed`) once the warden refuses or splits the line
+```
+
+measured 2026-10-06 by chain chain-cerberus--sessions--warden-sessions-20261006-212226-1b30, finding M1, MEDIUM
+probe-key: 62b3efb447177511299eac4e52f0edfb50bf46eb
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/warden-sessions-link.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/warden-sessions.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/warden-sessions.sh, /home/lyphe/.claude/claudecodeui_lyphe/warden/enroll.sh, /home/lyphe/.claude/claudecodeui_lyphe/warden/src/sessions.mjs, /home/lyphe/.claude/claudecodeui_lyphe/warden/systemd/cerberus-warden-sessions.service
+
+## INV-7098 — probe — `.verify/warden-sessions.sh` kills a server it did not start when its guard loses a race
+
+`.verify/warden-sessions.sh` kills a server it did not start when its guard loses a race
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) && cat > "$D/p.sh" <<'EOF'
+#!/usr/bin/env bash
+# A foreign keepalive appears on -L cerberus-warden between warden-sessions.sh's `ls` guard and its own new-session:
+# a tmux shim answers the guard's first `ls` as "no server" (the race), everything else passes through.
+set -u
+REPO=/home/lyphe/.claude/claudecodeui_lyphe
+if tmux -L cerberus-warden ls >/dev/null 2>&1; then echo "REFUSED: a cerberus-warden server is already up"; exit 0; fi
+S=$(mktemp -d /tmp/athena-shim.XXXXXX) || exit 1
+REAL=$(command -v tmux)
+cat > "$S/tmux" <<SH
+#!/bin/sh
+if [ "\$1 \$2 \$3" = "-L cerberus-warden ls" ] && [ ! -e "$S/seen" ]; then : > "$S/seen"; exit 1; fi
+exec "$REAL" "\$@"
+SH
+chmod +x "$S/tmux"
+"$REAL" -L cerberus-warden -f /dev/null new-session -d -s _keepalive sleep infinity   # the other holder's server
+PATH="$S:$PATH" bash "$REPO/.verify/warden-sessions.sh" 2>&1 | head -5
+if "$REAL" -L cerberus-warden ls >/dev/null 2>&1; then echo "foreign server: STILL UP"; else echo "foreign server: KILLED by the script's cleanup"; fi
+"$REAL" -L cerberus-warden kill-server 2>/dev/null
+case "$S" in /tmp/athena-shim.*) rm -rf "$S";; esac
+EOF
+bash "$D/p.sh"; case "$D" in /tmp/athena-probe.*) rm -rf "$D";; esac
+expect: `duplicate session: _keepalive` then `foreign server: KILLED by the script's cleanup` while the defect stands; `foreign server: STILL UP` once cleanup kills only a server this run started
+```
+
+measured 2026-10-06 by chain chain-cerberus--sessions--warden-sessions-20261006-212226-1b30, finding L1, LOW
+probe-key: eb18d9d1244d539bc3c201f5c4f90538493c643c
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/warden-sessions.sh
+
+## INV-7099 — probe — `enroll.sh --refresh` dies half-done under `set -e` when the new sessions unit cannot start
+
+`enroll.sh --refresh` dies half-done under `set -e` when the new sessions unit cannot start
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) && cat > "$D/p.sh" <<'EOF'
+#!/bin/sh
+# enroll.sh's refresh: when `enable --now` of the sessions unit fails (a foreign server already holds -L cerberus-warden,
+# so the unit's `new-session -s _keepalive` says "duplicate session"), `set -e` ends the script inside enable_units():
+# the warden restart and require_linked after it never run, though `current` was already swapped.
+REPO=/home/lyphe/.claude/claudecodeui_lyphe
+S=$(mktemp -d /tmp/athena-enable.XXXXXX) || exit 1
+{
+  echo 'set -eu'
+  sed -n '/^enable_units() {/,/^}/p' "$REPO/warden/enroll.sh"
+  cat <<'SH'
+systemctl() {
+  echo "systemctl $*"
+  case "$*" in
+    "is-enabled --quiet "*) return 1 ;;
+    "enable --now cerberus-warden-sessions.service") echo "Job failed: duplicate session: _keepalive" >&2; return 1 ;;
+  esac
+  return 0
+}
+RENDERED=' cerberus-warden-sessions.service cerberus-warden.service'
+enable_units
+echo "enable_units returned; the script goes on to: systemctl restart cerberus-warden.service"
+SH
+} > "$S/t.sh"
+sh "$S/t.sh" 2>&1; echo "exit status $?  (a 0 with the 'goes on' line above would mean the refresh survives)"
+case "$S" in /tmp/athena-enable.*) rm -rf "$S";; esac
+EOF
+sh "$D/p.sh"; case "$D" in /tmp/athena-probe.*) rm -rf "$D";; esac
+expect: `Job failed: duplicate session: _keepalive` then `exit status 1` with no `goes on` line while the defect stands; the `goes on` line and exit status 0 once a sessions unit that will not start no longer ends the refresh before the warden restart
+```
+
+measured 2026-10-06 by chain chain-cerberus--sessions--warden-sessions-20261006-212226-1b30, finding L2, LOW
+probe-key: 450ad0fbe7032b2af98e667badeadb046c75e06d
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/warden-sessions-link.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/warden-sessions.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/warden-sessions.sh, /home/lyphe/.claude/claudecodeui_lyphe/warden/enroll.sh, /home/lyphe/.claude/claudecodeui_lyphe/warden/src/sessions.mjs, /home/lyphe/.claude/claudecodeui_lyphe/warden/systemd/cerberus-warden-sessions.service
+
+## INV-7100 — probe — `listByNode`'s `name` is not "the name the sidebar shows" for a project whose custom name was reset
+
+`listByNode`'s `name` is not "the name the sidebar shows" for a project whose custom name was reset
+
+```probe
+D=$(mktemp -d /tmp/athena-pin.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+#!/usr/bin/env bash
+W=$(mktemp -d /tmp/athena-pin2.XXXXXX) || exit 1
+mkdir -p "$W/myfolder" && echo '{"name":"pkg-display-name"}' > "$W/myfolder/package.json"
+cat > "$W/n.mjs" <<JS
+const m = await import("@/modules/database/index.js"); await m.initializeDatabase(); const p = m.projectsDb;
+const { generateDisplayName } = await import("@/modules/projects/services/projects-with-sessions-fetch.service.js");
+const dir = "$W/myfolder";
+const id = p.createProjectPath(dir, null).project.project_id; p.setNode(id, "eis1");
+p.updateCustomProjectNameById(id, null);
+console.log("PROBE sidebar:", await generateDisplayName(dir.split("/").pop(), dir), "| card:", p.listByNode("eis1")[0].name);
+JS
+: > "$W/auth.db"
+( cd /home/lyphe/.claude/claudecodeui_lyphe && DATABASE_PATH="$W/auth.db" TSX_TSCONFIG_PATH=server/tsconfig.json timeout 90 node --import tsx "$W/n.mjs" 2>&1 | grep -E '^PROBE|Error' || echo "PROBE: no output" )
+case "$W" in /tmp/athena-pin2.*) rm -rf "$W";; esac
+EOF
+bash "$D/p.sh"; case "$D" in /tmp/athena-pin.*) rm -rf "$D";; esac
+expect: PROBE sidebar: pkg-display-name | card: myfolder   (the defect stands while the two names differ; cured when they match or the claim is gone from the doc)
+```
+
+measured 2026-10-06 by chain chain-cerberus--sessions--project-node-20261006-215420-fadd, finding L1, LOW
+probe-key: bb7e695842749df4ad233864e6b3bba1da280daa
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/migrations.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/projects.db.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/schema.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/projects/services/project-node.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts
+
+## INV-7101 — probe — `nodeForPath` names a consumer that does not exist; the assignment is inert and the report does not say so
+
+`nodeForPath` names a consumer that does not exist; the assignment is inert and the report does not say so
+
+```probe
+grep -c nodeForPath /home/lyphe/.claude/claudecodeui_lyphe/server/modules/websocket/services/chat-websocket.service.ts
+expect: 0   (the defect stands while it is 0; once dispatch reads the node, the count is ≥1 and the comment is true)
+```
+
+measured 2026-10-06 by chain chain-cerberus--sessions--project-node-20261006-215420-fadd, finding L2, LOW
+probe-key: a210cc480d5484bd3d86d27be87cd9af480576cc
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/migrations.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/projects.db.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/schema.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/projects/services/project-node.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts
+
+## INV-7102 — probe — the assignment sends no `cerberus_changed` hint, so a second tab keeps the old project list
+
+the assignment sends no `cerberus_changed` hint, so a second tab keeps the old project list
+
+```probe
+grep -rn "hintChanged\|cerberus_changed" /home/lyphe/.claude/claudecodeui_lyphe/server/modules/projects || echo none
+expect: none   (the defect stands while it prints none; cured when the projects path hints)
+```
+
+measured 2026-10-06 by chain chain-cerberus--sessions--project-node-20261006-215420-fadd, finding L3, LOW
+probe-key: b24dfb6e6726df2ea14bf71304a2c173f835dc13
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/migrations.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/projects.db.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/schema.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/projects/services/project-node.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts
+
+## INV-7103 — probe — LOW — `setAuto` throws `SQLITE_CONSTRAINT_PRIMARYKEY` after about 6 same-millisecond flips, while the manual says "never refused"
+
+LOW — `setAuto` throws `SQLITE_CONSTRAINT_PRIMARYKEY` after about 6 same-millisecond flips, while the manual says "never refused"
+
+```probe
+D=$(mktemp -d /tmp/athena-p1.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+D=$1
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+cat > "$D/s.mjs" <<'JS'
+const db = await import("@/modules/database/index.js");
+const Defs = await import("@/modules/cerberus/definitions.service.js");
+const C = await import("@/modules/cerberus/catalog.service.js");
+db.cerberusNodesDb.insert({ id: "probe-node", desc: null, public_key: "k", cert_fingerprint: "f", warden_version: null, machine_id: null, facts: null, enrolled_at: Date.now() });
+Defs.putDefinition("probe-node", { services: [{ service: "scratch", label: null, probes: [{ key: "scratch/file.age", kind: "file_age", every: 5, timeout: 5, path: "/tmp/x", pass: "age < 1m" }] }] });
+const e = C.writeEntry({ node: "probe-node", check: "scratch/file.age", name: "Flip", when: "failing", cmd: "true", timeout: 30, limit: { runs: 2, per: 3600 } }, { kind: "written", by: "athena", at: Date.now() });
+let threw = "none";
+for (let i = 0; i < 200 && threw === "none"; i++) { try { C.setAuto(e.id, i % 2 === 0, "athena"); } catch (error) { threw = `flip ${i}: ${error.code}`; } }
+console.log("PROBE back-to-back setAuto flips, first throw:", threw);
+process.exit(0);
+JS
+CERBERUS_DB_PATH="$D/c.db" DATABASE_PATH="$D/auth.db" TSX_TSCONFIG_PATH=server/tsconfig.json timeout 120 node --import tsx "$D/s.mjs" 2>&1 | grep '^PROBE\|Error' | cut -c1-200
+EOF
+bash "$D/p.sh" "$D"; case "$D" in /tmp/athena-p1.*) rm -r "$D" ;; esac
+expect: "first throw: flip 9: SQLITE_CONSTRAINT_PRIMARYKEY" while the defect stands (measured at flip 9 and flip 11 on two runs); "first throw: none" once cured
+```
+
+measured 2026-10-06 by chain chain-cerberus--fixes--catalog-20261006-212355-a991, finding L1, LOW
+probe-key: a4169d24531889d0387d0358b946b390e421b3fc
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/catalog-entry-input.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/catalog.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/read-model/catalog-views.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/cerberus-catalog.sh
+
+## INV-7104 — probe — LOW — a set that was superseded before the warden saw it stays `sent_at NULL, acked_at NULL` for ever, so "every set acked" cannot hold after any write made while the link was down
+
+LOW — a set that was superseded before the warden saw it stays `sent_at NULL, acked_at NULL` for ever, so "every set acked" cannot hold after any write made while the link was down
+
+```probe
+D=$(mktemp -d /tmp/athena-p2.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+D=$1
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+cat > "$D/s.mjs" <<'JS'
+const db = await import("@/modules/database/index.js");
+const Defs = await import("@/modules/cerberus/definitions.service.js");
+const C = await import("@/modules/cerberus/catalog.service.js");
+const { wardenLinks } = await import("@/modules/cerberus/warden-links.js");
+db.cerberusNodesDb.insert({ id: "probe-node", desc: null, public_key: "k", cert_fingerprint: "f", warden_version: null, machine_id: null, facts: null, enrolled_at: Date.now() });
+Defs.putDefinition("probe-node", { services: [{ service: "scratch", label: null, probes: [{ key: "scratch/file.age", kind: "file_age", every: 5, timeout: 5, path: "/tmp/x", pass: "age < 1m" }] }] });
+const origin = { kind: "written", by: "athena", at: Date.now() };
+const input = (name) => ({ node: "probe-node", check: "scratch/file.age", name, when: "failing", cmd: "true", timeout: 30, limit: { runs: 2, per: 3600 } });
+for (const name of ["One", "Two", "Three"]) C.writeEntry(input(name), origin);
+const carried = C.catalogForWelcome("probe-node", null, Date.now());
+C.registerCatalogHandlers();
+wardenLinks.handlerFor("catalog.ack")("probe-node", { version: carried.version });
+const rows = db.getCerberusConnection().prepare("select version, sent_at is not null s, acked_at is not null a from catalog_sets order by version").all();
+console.log("PROBE sets after the warden acked the newest:", rows.map((r) => `v${r.version}:${r.a}`).join(" "), "| never acked:", rows.filter((r) => !r.a).length);
+process.exit(0);
+JS
+CERBERUS_DB_PATH="$D/c.db" DATABASE_PATH="$D/auth.db" TSX_TSCONFIG_PATH=server/tsconfig.json timeout 120 node --import tsx "$D/s.mjs" 2>&1 | grep '^PROBE\|Error' | cut -c1-200
+EOF
+bash "$D/p.sh" "$D"; case "$D" in /tmp/athena-p2.*) rm -r "$D" ;; esac
+expect: "v1:0 v2:0 v3:1 | never acked: 2" while it stands; "never acked: 0" once the superseded versions are covered or a decision is documented
+```
+
+measured 2026-10-06 by chain chain-cerberus--fixes--catalog-20261006-212355-a991, finding L2, LOW
+probe-key: 094fbe54ba740cf5d43291a0182b6e2733f2f4d0
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/catalog-entry-input.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/catalog.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/read-model/catalog-views.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/cerberus-catalog.sh
+
+## INV-7105 — probe — LOW — text holding a lone surrogate is accepted and stored as U+FFFD, so the command the person typed is not the one that is signed
+
+LOW — text holding a lone surrogate is accepted and stored as U+FFFD, so the command the person typed is not the one that is signed
+
+```probe
+D=$(mktemp -d /tmp/athena-p3.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+D=$1
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+cat > "$D/s.mjs" <<'JS'
+const db = await import("@/modules/database/index.js");
+const Defs = await import("@/modules/cerberus/definitions.service.js");
+const C = await import("@/modules/cerberus/catalog.service.js");
+db.cerberusNodesDb.insert({ id: "probe-node", desc: null, public_key: "k", cert_fingerprint: "f", warden_version: null, machine_id: null, facts: null, enrolled_at: Date.now() });
+Defs.putDefinition("probe-node", { services: [{ service: "scratch", label: null, probes: [{ key: "scratch/file.age", kind: "file_age", every: 5, timeout: 5, path: "/tmp/x", pass: "age < 1m" }] }] });
+const typed = "echo \ud83d";
+let answer;
+try {
+  const view = C.writeEntry({ node: "probe-node", check: "scratch/file.age", name: "Lone", when: "failing", cmd: typed, timeout: 30, limit: { runs: 2, per: 3600 } }, { kind: "written", by: "athena", at: Date.now() });
+  answer = `accepted; stored cmd equals the typed one: ${view.cmd === typed} (code points ${[...view.cmd].map((c) => c.codePointAt(0).toString(16)).join(",")})`;
+} catch (error) { answer = `refused ${error.code} at ${error.details?.field}`; }
+console.log("PROBE a cmd holding a lone surrogate:", answer);
+process.exit(0);
+JS
+CERBERUS_DB_PATH="$D/c.db" DATABASE_PATH="$D/auth.db" TSX_TSCONFIG_PATH=server/tsconfig.json timeout 120 node --import tsx "$D/s.mjs" 2>&1 | grep '^PROBE\|Error' | cut -c1-240
+EOF
+bash "$D/p.sh" "$D"; case "$D" in /tmp/athena-p3.*) rm -r "$D" ;; esac
+expect: "accepted; stored cmd equals the typed one: false (code points 65,63,68,6f,20,fffd)" while it stands; "refused CERBERUS_BAD_ENTRY at cmd" once cured
+```
+
+measured 2026-10-06 by chain chain-cerberus--fixes--catalog-20261006-212355-a991, finding L3, LOW
+probe-key: 5410b49d02a6bebc20b1fa2747dce370427d91d6
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/catalog-entry-input.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/catalog.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/read-model/catalog-views.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/cerberus-catalog.sh
+
+## INV-7107 — probe — A re-adopted facade that has heard only `live` re-opens at `fromSeq: 0`, which replays the host's whole journal
+
+A re-adopted facade that has heard only `live` re-opens at `fromSeq: 0`, which replays the host's whole journal
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+D=$1
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+cat > "$D/f1.mjs" <<'JS'
+const db = await import('@/modules/database/index.js');
+const { wardenLinks } = await import('@/modules/cerberus/index.js');
+const { createFacade } = await import('@/modules/providers/list/claude/session-host/facade.js');
+const { placeInNodeHost } = await import('@/modules/providers/list/claude/session-host/node-transport.js');
+db.cerberusNodesDb.insert({ id: 'hn', desc: null, public_key: 'k', cert_fingerprint: 'f', warden_version: null, machine_id: null, facts: null, enrolled_at: Date.now() });
+const sent = []; let n = 0, link;
+const up = () => { const k = ++n; link = { node: 'hn', send: (t, b) => { sent.push([k, t, b]); return true; }, close() {}, version: '0.4.0', clockOffsetMs: 0 }; wardenLinks.attach(link); };
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+up();
+placeInNodeHost(createFacade(), { command: '/bin/true', args: [], cwd: '/tmp', env: { PATH: '/bin' }, signal: new AbortController().signal },
+  { appSessionId: 'athena-probe', userId: 1, reattach: { hostId: 'athena-probe-abc' }, profile: null, node: 'hn' }).catch(() => {});
+await sleep(100);
+const chan = sent.find(([, t]) => t === 'session.open')[2].chan;
+wardenLinks.handlerFor('session.frame')('hn', { chan, frame: { t: 'live' } }, { id: 'x', seq: null, at: Date.now() });
+await sleep(50); wardenLinks.detach(link); await sleep(50); up(); await sleep(200);
+console.log('F1 opens:', sent.filter(([, t]) => t === 'session.open').map(([, , b]) => `${b.op}:${JSON.stringify(b.frame)}`).join(' ; '));
+process.exit(0);
+JS
+CERBERUS_DB_PATH="$D/c.db" DATABASE_PATH="$D/a.db" CLOUDCLI_SESSIONS_DIR="$D/s" TSX_TSCONFIG_PATH=server/tsconfig.json timeout 60 node --import tsx "$D/f1.mjs" 2>&1 | grep '^F1'
+EOF
+bash "$D/p.sh" "$D"
+cd /tmp && case "$D" in /tmp/athena-probe.*) rm -r "$D";; esac
+expect: F1 opens: attach:{"t":"hello","fromSeq":"acked"} ; attach:{"t":"hello","fromSeq":0}   (the second open is `"fromSeq":"acked"` once cured)
+```
+
+measured 2026-10-06 by chain chain-cerberus--sessions--transport-20261006-223106-10a2, finding M1, MEDIUM
+probe-key: 1ca99d69b5cada11627bd7a369d779605f1b24c3
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/session-host/host-frames.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/session-host/node-transport.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/cerberus-node-chat.mjs
+
+## INV-7108 — probe — After the first frame, the warden's reason for ending a channel is logged and never shown: the turn ends with a bare `SIGHUP`
+
+After the first frame, the warden's reason for ending a channel is logged and never shown: the turn ends with a bare `SIGHUP`
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+D=$1
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+cat > "$D/f2.mjs" <<'JS'
+const db = await import('@/modules/database/index.js');
+const { wardenLinks } = await import('@/modules/cerberus/index.js');
+const { armKeepaliveSpawn } = await import('@/modules/providers/list/claude/session-host/spawner.js');
+db.cerberusNodesDb.insert({ id: 'hn', desc: null, public_key: 'k', cert_fingerprint: 'f', warden_version: null, machine_id: null, facts: null, enrolled_at: Date.now() });
+const sent = [];
+wardenLinks.attach({ node: 'hn', send: (t, b) => { sent.push([t, b]); return true; }, close() {}, version: '0.4.0', clockOffsetMs: 0 });
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const sdk = {}; armKeepaliveSpawn(sdk, { appSessionId: 'athena-probe', userId: 1, reattach: null, profile: null, node: 'hn' });
+const lines = []; const p = sdk.spawnClaudeCodeProcess({ command: '/bin/true', args: [], cwd: '/tmp', env: { PATH: '/bin' }, signal: new AbortController().signal });
+p.on('error', (e) => lines.push('ERROR ' + e.message)); p.on('exit', (c, s) => lines.push(`EXIT ${c} ${s}`));
+await sleep(100);
+const chan = sent.find(([t]) => t === 'session.open')[1].chan;
+const env = { id: 'x', seq: null, at: Date.now() };
+wardenLinks.handlerFor('session.frame')('hn', { chan, frame: { t: 'out', seq: 1, line: '{"type":"system"}' } }, env);
+wardenLinks.handlerFor('session.closed')('hn', { chan, reason: 'A line from host athena-probe-x is 9.0 MiB or more, past the 8 MiB one frame of this link carries — the session cannot go on here' }, env);
+await sleep(2500);
+console.log('F2 what the SDK saw:', JSON.stringify(lines));
+process.exit(0);
+JS
+CERBERUS_DB_PATH="$D/c.db" DATABASE_PATH="$D/a.db" CLOUDCLI_SESSIONS_DIR="$D/s" TSX_TSCONFIG_PATH=server/tsconfig.json timeout 60 node --import tsx "$D/f2.mjs" 2>&1 | grep '^F2'
+EOF
+bash "$D/p.sh" "$D"
+cd /tmp && case "$D" in /tmp/athena-probe.*) rm -r "$D";; esac
+expect: F2 what the SDK saw: ["EXIT null SIGHUP"]   (an `ERROR …9.0 MiB…` entry before the EXIT once cured)
+```
+
+measured 2026-10-06 by chain chain-cerberus--sessions--transport-20261006-223106-10a2, finding M2, MEDIUM
+probe-key: e36c63bead0694dc9fbd0dd4c665f8dedf19659f
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/session-host/host-frames.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/session-host/node-transport.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/cerberus-node-chat.mjs
+
+## INV-7109 — probe — `.verify/cerberus-node-chat.mjs` leaves the scratch project assigned to eis1 and has no way back for the warden it stops
+
+`.verify/cerberus-node-chat.mjs` leaves the scratch project assigned to eis1 and has no way back for the warden it stops
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+sqlite3 -readonly ~/.cloudcli/auth.db "select coalesce(node,'none') from projects where project_path like '%/cerberus-node-probe'" || echo none
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+echo "puts node back to null: $(grep -c 'node: null' .verify/cerberus-node-chat.mjs)  signal handlers: $(grep -c 'SIGINT\|SIGTERM' .verify/cerberus-node-chat.mjs)"
+EOF
+bash "$D/p.sh"
+cd /tmp && case "$D" in /tmp/athena-probe.*) rm -r "$D";; esac
+expect: `eis1` then `puts node back to null: 0  signal handlers: 0` while it stands (`none` and non-zero counts once cured)
+```
+
+measured 2026-10-06 by chain chain-cerberus--sessions--transport-20261006-223106-10a2, finding L1, LOW
+probe-key: fcdfc73190226aed34667a63ddaf9940cad93c93
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/cerberus-node-chat.mjs
+
+## INV-7110 — probe — A true-then-false sentence left behind (outside the four paths)
+
+A true-then-false sentence left behind (outside the four paths)
+
+```probe
+cd /home/lyphe/.claude/claudecodeui_lyphe && grep -n "does not read the assignment yet" server/modules/projects/projects.routes.ts || echo none
+expect: line 244 prints while it stands; `none` once the sentence is purged
+```
+
+measured 2026-10-06 by chain chain-cerberus--sessions--transport-20261006-223106-10a2, finding L2, LOW
+probe-key: dd622c0046d8af370dd58bf766b1d8994b3da007
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/session-host/host-frames.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/session-host/node-transport.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/cerberus-node-chat.mjs
+
+## INV-7111 — probe — MEDIUM — a `run.start` the warden never received holds its check for ever; only a warden restart frees it
+
+MEDIUM — a `run.start` the warden never received holds its check for ever; only a warden restart frees it
+
+```probe
+D=$(mktemp -d /tmp/athena-pin-XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+D=$(dirname "$0")
+cat > "$D/body.mjs" <<'BODY'
+const db = await import('@/modules/database/index.js');
+const Defs = await import('@/modules/cerberus/definitions.service.js');
+const Cat = await import('@/modules/cerberus/catalog.service.js');
+const Runs = await import('@/modules/cerberus/runs.service.js');
+const Auto = await import('@/modules/cerberus/auto-run.js');
+const { ingest } = await import('@/modules/cerberus/ingest.service.js');
+const { wardenLinks } = await import('@/modules/cerberus/warden-links.js');
+const conn = db.getCerberusConnection();
+setInterval(() => {}, 1000);
+const sent = [];
+db.cerberusNodesDb.insert({ id: 'probe-node', desc: null, public_key: 'k', cert_fingerprint: 'f', warden_version: '0.4.0', machine_id: null, facts: null, enrolled_at: Date.now() });
+Defs.putDefinition('probe-node', { services: [{ service: 'scratch', label: null, probes: [{ key: 'scratch/file.age', kind: 'file_age', every: 10, timeout: 5, path: '/tmp/athena-x', pass: 'age < 1m' }] }] });
+wardenLinks.attach({ node: 'probe-node', send(type, body) { sent.push({ type, body }); return true; }, close() {}, version: '0.4.0', clockOffsetMs: 0 });
+wardenLinks.heard('probe-node', Date.now());
+Cat.registerCatalogHandlers(); Runs.registerRunsService(); Auto.startAutoRun();
+const entry = (name, { auto = false, ...o } = {}) => { const id = Cat.writeEntry({ node: 'probe-node', check: 'scratch/file.age', name, when: 'failing', cmd: 'touch /tmp/athena-x', timeout: 30, limit: { runs: 5, per: 3600 }, ...o }, { kind: 'written', by: 'athena', at: Date.now() }).id; if (auto) Cat.setAuto(id, true, 'athena'); return id; };
+const ack = () => wardenLinks.handlerFor('catalog.ack')('probe-node', { version: Cat.catalogSetFor('probe-node').version });
+const frame = (type, body) => wardenLinks.handlerFor(type)('probe-node', body, { type, id: 'x', node: 'probe-node', seq: null, at: Date.now(), body });
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const id = entry('Lost'); ack();
+const runId = await Runs.startRun({ entryId: id, by: 'you' });   // the link takes run.start; the socket dies before it is delivered, so no frame ever comes back
+const PROC = Date.now() - 3_600_000;                              // the warden process started an hour ago and is still the same one
+wardenLinks.announceHello('probe-node', { version: '0.4.0', startedAt: PROC, activeRuns: [], catalogVersion: 1 });  // the reconnect's hello names no run
+await sleep(50);
+const row = conn.prepare('select result from runs where id = ?').get(runId);
+const again = await Runs.startRun({ entryId: id, by: 'you' }).then(() => 'started', (e) => e.code);
+console.log('PROBE run.start lost on a dropped link, warden process alive, hello names no run → run is', row.result ?? 'active', '| a new ask on that check:', again);
+process.exit(0);
+BODY
+S=$(mktemp -d /tmp/athena-pins-XXXXXX) || exit 1
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+CERBERUS_DB_PATH="$S/c.db" CERBERUS_KEY_PATH="$S/center.key" DATABASE_PATH="$S/auth.db" TSX_TSCONFIG_PATH=server/tsconfig.json timeout 120 node --import tsx "$D/body.mjs" 2>&1 | grep -E '^PROBE|Error' | cut -c1-300
+case "$S" in /tmp/athena-pins-*) rm -r "$S";; esac
+EOF
+bash "$D/p.sh"
+case "$D" in /tmp/athena-pin-*) rm -r "$D";; esac
+expect: `run is active | a new ask on that check: CERBERUS_RUN_ACTIVE` while the defect stands; `failed | started` once a hello that names no run frees the check
+```
+
+measured 2026-10-06 by chain chain-cerberus--fixes--runs-20261006-222637-4e51, finding M1, MEDIUM
+probe-key: 7690f3ebbcf85149bc1c9aa09f3090ed5cec78e3
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/auto-run.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/catalog-ack.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/read-model/run-views.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/run-ending.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/run-frames.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/run-reconcile.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/runs.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/cerberus-runs.sh, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/cerberus-ws-tap.mjs
+
+## INV-7112 — probe — MEDIUM — the auto-run acts on delivery time: a failure replayed from the warden's outbox starts a fix on a check that has been `ok` for hours
+
+MEDIUM — the auto-run acts on delivery time: a failure replayed from the warden's outbox starts a fix on a check that has been `ok` for hours
+
+```probe
+D=$(mktemp -d /tmp/athena-pin-XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+D=$(dirname "$0")
+cat > "$D/body.mjs" <<'BODY'
+const db = await import('@/modules/database/index.js');
+const Defs = await import('@/modules/cerberus/definitions.service.js');
+const Cat = await import('@/modules/cerberus/catalog.service.js');
+const Runs = await import('@/modules/cerberus/runs.service.js');
+const Auto = await import('@/modules/cerberus/auto-run.js');
+const { ingest } = await import('@/modules/cerberus/ingest.service.js');
+const { wardenLinks } = await import('@/modules/cerberus/warden-links.js');
+const conn = db.getCerberusConnection();
+setInterval(() => {}, 1000);
+const sent = [];
+db.cerberusNodesDb.insert({ id: 'probe-node', desc: null, public_key: 'k', cert_fingerprint: 'f', warden_version: '0.4.0', machine_id: null, facts: null, enrolled_at: Date.now() });
+Defs.putDefinition('probe-node', { services: [{ service: 'scratch', label: null, probes: [{ key: 'scratch/file.age', kind: 'file_age', every: 10, timeout: 5, path: '/tmp/athena-x', pass: 'age < 1m' }] }] });
+wardenLinks.attach({ node: 'probe-node', send(type, body) { sent.push({ type, body }); return true; }, close() {}, version: '0.4.0', clockOffsetMs: 0 });
+wardenLinks.heard('probe-node', Date.now());
+Cat.registerCatalogHandlers(); Runs.registerRunsService(); Auto.startAutoRun();
+const entry = (name, { auto = false, ...o } = {}) => { const id = Cat.writeEntry({ node: 'probe-node', check: 'scratch/file.age', name, when: 'failing', cmd: 'touch /tmp/athena-x', timeout: 30, limit: { runs: 5, per: 3600 }, ...o }, { kind: 'written', by: 'athena', at: Date.now() }).id; if (auto) Cat.setAuto(id, true, 'athena'); return id; };
+const ack = () => wardenLinks.handlerFor('catalog.ack')('probe-node', { version: Cat.catalogSetFor('probe-node').version });
+const frame = (type, body) => wardenLinks.handlerFor(type)('probe-node', body, { type, id: 'x', node: 'probe-node', seq: null, at: Date.now(), body });
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const key = 'scratch/file.age', now = Date.now();
+entry('Backlog', { auto: true }); ack();
+const w = (status, at, prevAt) => ({ check: key, source: key, at, fetchedAt: at, status, docStatus: null, value: status, data: null, tookMs: 1, prevAt });
+// the warden was cut off for six hours; its outbox replays on reconnect, one frame per probe batch, oldest first
+ingest.ingestResults('probe-node', 1, [w('ok', now - 6 * 3600e3, null)]);
+ingest.ingestResults('probe-node', 2, [w('failing', now - 5 * 3600e3, now - 6 * 3600e3 + 10_000)]);
+ingest.ingestResults('probe-node', 3, [w('ok', now - 4 * 3600e3, now - 5 * 3600e3)]);
+await sleep(50);
+const last = conn.prepare('select status from results where check_key = ? order by at desc limit 1').get(key);
+console.log('PROBE replayed backlog [ok 6 h ago, failing 5 h ago, ok 4 h ago] → check now', last.status, '| run.start frames sent:', sent.filter((s) => s.type === 'run.start').length);
+process.exit(0);
+BODY
+S=$(mktemp -d /tmp/athena-pins-XXXXXX) || exit 1
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+CERBERUS_DB_PATH="$S/c.db" CERBERUS_KEY_PATH="$S/center.key" DATABASE_PATH="$S/auth.db" TSX_TSCONFIG_PATH=server/tsconfig.json timeout 120 node --import tsx "$D/body.mjs" 2>&1 | grep -E '^PROBE|Error' | cut -c1-300
+case "$S" in /tmp/athena-pins-*) rm -r "$S";; esac
+EOF
+bash "$D/p.sh"
+case "$D" in /tmp/athena-pin-*) rm -r "$D";; esac
+expect: `check now ok | run.start frames sent: 0` once the rule reads the check's state or the move's age; `run.start frames sent: 1` while it does not
+```
+
+measured 2026-10-06 by chain chain-cerberus--fixes--runs-20261006-222637-4e51, finding M2, MEDIUM
+probe-key: 8ccb964674a35cc4869eeb76656cfef699d08975
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/auto-run.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/catalog-ack.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/read-model/run-views.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/run-ending.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/run-frames.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/run-reconcile.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/runs.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/cerberus-runs.sh, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/cerberus-ws-tap.mjs
+
+## INV-7113 — probe — LOW — a press or an auto run in the round trip after a catalog write is signed with a version the warden has already moved past
+
+LOW — a press or an auto run in the round trip after a catalog write is signed with a version the warden has already moved past
+
+```probe
+D=$(mktemp -d /tmp/athena-pin-XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+D=$(dirname "$0")
+cat > "$D/body.mjs" <<'BODY'
+const db = await import('@/modules/database/index.js');
+const Defs = await import('@/modules/cerberus/definitions.service.js');
+const Cat = await import('@/modules/cerberus/catalog.service.js');
+const Runs = await import('@/modules/cerberus/runs.service.js');
+const Auto = await import('@/modules/cerberus/auto-run.js');
+const { ingest } = await import('@/modules/cerberus/ingest.service.js');
+const { wardenLinks } = await import('@/modules/cerberus/warden-links.js');
+const conn = db.getCerberusConnection();
+setInterval(() => {}, 1000);
+const sent = [];
+db.cerberusNodesDb.insert({ id: 'probe-node', desc: null, public_key: 'k', cert_fingerprint: 'f', warden_version: '0.4.0', machine_id: null, facts: null, enrolled_at: Date.now() });
+Defs.putDefinition('probe-node', { services: [{ service: 'scratch', label: null, probes: [{ key: 'scratch/file.age', kind: 'file_age', every: 10, timeout: 5, path: '/tmp/athena-x', pass: 'age < 1m' }] }] });
+wardenLinks.attach({ node: 'probe-node', send(type, body) { sent.push({ type, body }); return true; }, close() {}, version: '0.4.0', clockOffsetMs: 0 });
+wardenLinks.heard('probe-node', Date.now());
+Cat.registerCatalogHandlers(); Runs.registerRunsService(); Auto.startAutoRun();
+const entry = (name, { auto = false, ...o } = {}) => { const id = Cat.writeEntry({ node: 'probe-node', check: 'scratch/file.age', name, when: 'failing', cmd: 'touch /tmp/athena-x', timeout: 30, limit: { runs: 5, per: 3600 }, ...o }, { kind: 'written', by: 'athena', at: Date.now() }).id; if (auto) Cat.setAuto(id, true, 'athena'); return id; };
+const ack = () => wardenLinks.handlerFor('catalog.ack')('probe-node', { version: Cat.catalogSetFor('probe-node').version });
+const frame = (type, body) => wardenLinks.handlerFor(type)('probe-node', body, { type, id: 'x', node: 'probe-node', seq: null, at: Date.now(), body });
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const x = entry('X'); ack();                 // catalog v1 holds X and is acked
+entry('Y');                                  // v2 is published and sent down the link; the warden has not answered it
+await Runs.startRun({ entryId: x, by: 'you' });
+const order = sent.filter((s) => s.type === 'catalog.set' || s.type === 'run.start').map((s) => (s.type === 'catalog.set' ? `catalog.set v${s.body.version}` : `run.start v${s.body.catalogVersion}`));
+console.log('PROBE frames on the link, in order:', JSON.stringify(order));
+process.exit(0);
+BODY
+S=$(mktemp -d /tmp/athena-pins-XXXXXX) || exit 1
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+CERBERUS_DB_PATH="$S/c.db" CERBERUS_KEY_PATH="$S/center.key" DATABASE_PATH="$S/auth.db" TSX_TSCONFIG_PATH=server/tsconfig.json timeout 120 node --import tsx "$D/body.mjs" 2>&1 | grep -E '^PROBE|Error' | cut -c1-300
+case "$S" in /tmp/athena-pins-*) rm -r "$S";; esac
+EOF
+bash "$D/p.sh"
+case "$D" in /tmp/athena-pin-*) rm -r "$D";; esac
+expect: `["catalog.set v1","catalog.set v2","run.start v1"]` while the defect stands (a `run.start` naming a version the warden is about to leave); no `run.start` before v2's ack, or `run.start v2`, once cured
+```
+
+measured 2026-10-06 by chain chain-cerberus--fixes--runs-20261006-222637-4e51, finding L1, LOW
+probe-key: 4b0d2e6aec3dd9297f9d4cb116e9840934c2ce96
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/auto-run.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/catalog-ack.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/read-model/run-views.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/run-ending.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/run-frames.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/run-reconcile.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/runs.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/cerberus-runs.sh, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/cerberus-ws-tap.mjs
+
+## INV-7114 — probe — LOW — a warden's clock is stored verbatim as `started_at` / `ended_at` and then compared with center's
+
+LOW — a warden's clock is stored verbatim as `started_at` / `ended_at` and then compared with center's
+
+```probe
+D=$(mktemp -d /tmp/athena-pin-XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+D=$(dirname "$0")
+cat > "$D/body.mjs" <<'BODY'
+const db = await import('@/modules/database/index.js');
+const Defs = await import('@/modules/cerberus/definitions.service.js');
+const Cat = await import('@/modules/cerberus/catalog.service.js');
+const Runs = await import('@/modules/cerberus/runs.service.js');
+const Auto = await import('@/modules/cerberus/auto-run.js');
+const { ingest } = await import('@/modules/cerberus/ingest.service.js');
+const { wardenLinks } = await import('@/modules/cerberus/warden-links.js');
+const conn = db.getCerberusConnection();
+setInterval(() => {}, 1000);
+const sent = [];
+db.cerberusNodesDb.insert({ id: 'probe-node', desc: null, public_key: 'k', cert_fingerprint: 'f', warden_version: '0.4.0', machine_id: null, facts: null, enrolled_at: Date.now() });
+Defs.putDefinition('probe-node', { services: [{ service: 'scratch', label: null, probes: [{ key: 'scratch/file.age', kind: 'file_age', every: 10, timeout: 5, path: '/tmp/athena-x', pass: 'age < 1m' }] }] });
+wardenLinks.attach({ node: 'probe-node', send(type, body) { sent.push({ type, body }); return true; }, close() {}, version: '0.4.0', clockOffsetMs: 0 });
+wardenLinks.heard('probe-node', Date.now());
+Cat.registerCatalogHandlers(); Runs.registerRunsService(); Auto.startAutoRun();
+const entry = (name, { auto = false, ...o } = {}) => { const id = Cat.writeEntry({ node: 'probe-node', check: 'scratch/file.age', name, when: 'failing', cmd: 'touch /tmp/athena-x', timeout: 30, limit: { runs: 5, per: 3600 }, ...o }, { kind: 'written', by: 'athena', at: Date.now() }).id; if (auto) Cat.setAuto(id, true, 'athena'); return id; };
+const ack = () => wardenLinks.handlerFor('catalog.ack')('probe-node', { version: Cat.catalogSetFor('probe-node').version });
+const frame = (type, body) => wardenLinks.handlerFor(type)('probe-node', body, { type, id: 'x', node: 'probe-node', seq: null, at: Date.now(), body });
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const { activity } = await import('@/modules/cerberus/read-model/activity.js');
+const id = entry('Skew'); ack();
+const runId = await Runs.startRun({ entryId: id, by: 'you' });
+const now = Date.now(), behind = 5_000;      // the warden's clock is five seconds behind center's; the run lasts 100 ms
+await frame('run.accepted', { runId, startedAt: now - behind });
+await frame('run.end', { runId, result: 'ok', exit: 0, endedAt: now - behind + 100 });
+const inputs = () => ({ now: Date.now(), links: wardenLinks.states(), gateway: { listen: null, address: null, error: null }, memory: () => ({ lastReceivedAt: null, since: null }) });
+const events = (page) => page.filter((a) => a.kind === 'fix').map((a) => a.event);
+const whole = events(activity({ before: Date.now() + 1, limit: 50 }, inputs()));
+let before = Date.now() + 1; const paged = [];
+for (let guard = 0; guard < 10; guard++) { const page = activity({ before, limit: 1 }, inputs()); paged.push(...events(page)); if (page.length === 0) break; before = page[page.length - 1].at; }
+console.log('PROBE 5 s skew, 100 ms run → one read:', JSON.stringify(whole), '| paged one event at a time:', JSON.stringify(paged));
+const run2 = await Runs.startRun({ entryId: id, by: 'you' });   // a warden whose clock reads far ahead
+await frame('run.end', { runId: run2, result: 'ok', exit: 0, endedAt: 9e15 });
+console.log('PROBE run.end with endedAt 9e15 → stored ended_at minus now, in days:', Math.round((conn.prepare('select ended_at from runs where id = ?').get(run2).ended_at - Date.now()) / 864e5));
+process.exit(0);
+BODY
+S=$(mktemp -d /tmp/athena-pins-XXXXXX) || exit 1
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+CERBERUS_DB_PATH="$S/c.db" CERBERUS_KEY_PATH="$S/center.key" DATABASE_PATH="$S/auth.db" TSX_TSCONFIG_PATH=server/tsconfig.json timeout 120 node --import tsx "$D/body.mjs" 2>&1 | grep -E '^PROBE|Error' | cut -c1-300
+case "$S" in /tmp/athena-pins-*) rm -r "$S";; esac
+EOF
+bash "$D/p.sh"
+case "$D" in /tmp/athena-pin-*) rm -r "$D";; esac
+expect: `paged one event at a time: ["started"]` (the `ended` line lost) and `…in days: 104145933` while the defect stands; `["ended","started"]` and a small number of days once cured
+```
+
+measured 2026-10-06 by chain chain-cerberus--fixes--runs-20261006-222637-4e51, finding L2, LOW
+probe-key: 346f35eacef80ff3af0fc384a53525e8111f3e23
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/auto-run.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/catalog-ack.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/read-model/run-views.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/run-ending.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/run-frames.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/run-reconcile.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/runs.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/cerberus-runs.sh, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/cerberus-ws-tap.mjs
+
+## INV-7115 — probe — a message that starts a turn in the window between a node's link-up and its re-adoption runs a SECOND CLI beside the live host, and the live host is orphaned (S15)
+
+a message that starts a turn in the window between a node's link-up and its re-adoption runs a SECOND CLI beside the live host, and the live host is orphaned (S15)
+
+```probe
+bash /home/lyphe/.claude/state/pipeline-reviews/cerberus--sessions--readopt/athena-probes/run.sh p-race.mjs s15
+expect: while the defect stands the line shows two hosts for the session ("prov-s15-aaa" and "prov-s15-mux…"), "retires sent: []" and "runs started: 1"; cured, one of the two hosts is gone or the old one is the one the run holds
+```
+
+measured 2026-10-07 by chain chain-cerberus--sessions--readopt-20261006-231514-92cf, finding M1, MEDIUM
+probe-key: b14d6c6b2e5a5080c1a39e9f8a641f16399513d1
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/session-host/colocated-hosts.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/session-host/node-readopt.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/session-host/readopt-host.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/cerberus-node-readopt.mjs
+
+## INV-7116 — probe — `watchNodeLinks` is unguarded, so a relay that cannot arm rejects `readoptKeepaliveSessions` BEFORE the local re-adoption loop (S14)
+
+`watchNodeLinks` is unguarded, so a relay that cannot arm rejects `readoptKeepaliveSessions` BEFORE the local re-adoption loop (S14)
+
+```probe
+bash /home/lyphe/.claude/state/pipeline-reviews/cerberus--sessions--readopt/athena-probes/run.sh p-race.mjs s14
+expect: the line reads RESULT s14: "REJECTED: The node-session relay cannot arm: …" while the defect stands; cured, it prints {"readopted":0,"swept":0}
+```
+
+measured 2026-10-07 by chain chain-cerberus--sessions--readopt-20261006-231514-92cf, finding L1, LOW
+probe-key: 8ed717340323a3b943724ed7fc52995978a0b193
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/session-host/colocated-hosts.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/session-host/node-readopt.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/session-host/readopt-host.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/cerberus-node-readopt.mjs
+
+## INV-7117 — probe — a link-up after the process is marked exiting still re-adopts and attaches `hello { fromSeq: "acked" }` (S20, D-10)
+
+a link-up after the process is marked exiting still re-adopts and attaches `hello { fromSeq: "acked" }` (S20, D-10)
+
+```probe
+bash /home/lyphe/.claude/state/pipeline-reviews/cerberus--sessions--readopt/athena-probes/run.sh p-ad.mjs s20
+expect: "opens: [[\"attach\",{\"t\":\"hello\",\"fromSeq\":\"acked\"}]]" while the defect stands; cured, "opens: []"
+```
+
+measured 2026-10-07 by chain chain-cerberus--sessions--readopt-20261006-231514-92cf, finding L2, LOW
+probe-key: a34c0c98ebf1787974d6c11a88986d72b88cddae
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/session-host/colocated-hosts.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/session-host/node-readopt.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/session-host/readopt-host.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/cerberus-node-readopt.mjs

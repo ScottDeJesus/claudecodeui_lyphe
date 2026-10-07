@@ -3,10 +3,13 @@ import type { Router } from 'express';
 import { getCerberusConnection } from '@/modules/database/index.js';
 import type { CerberusGatewayState, CerberusReadInputs } from '@/shared/cerberus-types.js';
 
+import { startAutoRun } from './auto-run.js';
+import { registerCatalogHandlers } from './catalog.service.js';
 import { createCerberusRouter } from './cerberus.routes.js';
 import { loadCenterKey } from './center-key.js';
 import { seedHub } from './definitions.service.js';
 import { ingest } from './ingest.service.js';
+import { registerRunsService } from './runs.service.js';
 import { startSelfChecks, stopSelfChecks } from './self-checks.service.js';
 import { startDailyPrune, stopDailyPrune } from './store-prune.service.js';
 import { registerWardenFileRoutes } from './warden-files.js';
@@ -21,9 +24,10 @@ import { wardenLinks } from './warden-links.js';
  * `start()` runs in the entrypoint's `listen` callback and does, in this order: opens the store
  * (its migrations run on the first open), loads the center key (a key that cannot be read or written
  * fails HERE, loudly, not on the first warden's enrollment), seeds the hub's own definitions, makes
- * every enrolled node known to the link registry (silent until heard) and fills ingest's memory from
- * the store — and only then binds the gateway, so the first warden to dial in finds a center that
- * knows its nodes (ingest's memory is also filled by the first read, whichever comes first — a
+ * every enrolled node known to the link registry (silent until heard), fills ingest's memory from
+ * the store, registers the frames the services take from a warden and arms Cerberus's own auto-run
+ * rule on ingest's status changes — and only then binds the gateway, so the first warden to dial in
+ * finds a center that knows its nodes (ingest's memory is also filled by the first read, whichever comes first — a
  * handover's new process is asked before `start()` runs); the warden's file routes (the enroll script and the release) are registered just
  * before that bind, so the gateway never answers a request they should have taken. A failure in any
  * step is logged and leaves the API serving: Cerberus is how the fleet is watched, never a reason for
@@ -71,6 +75,8 @@ export function createCerberusModule(dependencies: { supervised: boolean }): {
   let startFinished = false;
   let dutiesAsked = false;
   let stopped = false;
+  /** Unsubscribes the auto-run rule from ingest; a no-op until `start()` has armed it. */
+  let stopAutoRun: () => void = () => {};
 
   /** Everything the read model is handed with the store: one instant, the links, the gateway, ingest's memory. */
   function readInputs(): CerberusReadInputs {
@@ -101,6 +107,11 @@ export function createCerberusModule(dependencies: { supervised: boolean }): {
       seedHub();
       wardenLinks.seedFromStore();
       ingest.seedMemory();
+      // Before the gateway binds: the first warden to dial in may answer its welcome with `catalog.ack`,
+      // say which runs it holds in its hello, and resend the `run.*` frames of a run that ended while it was away.
+      registerCatalogHandlers();
+      registerRunsService();
+      stopAutoRun = startAutoRun();
 
       const listen = readConfiguredListen();
       const refusal = listen !== null && isApiOwnPort(listen) ? `CERBERUS_LISTEN ${listen} is on the API's own port` : null;
@@ -127,6 +138,7 @@ export function createCerberusModule(dependencies: { supervised: boolean }): {
     },
     stop: () => {
       stopped = true;
+      stopAutoRun();
       stopSelfChecks();
       stopDailyPrune();
       gateway?.stop();

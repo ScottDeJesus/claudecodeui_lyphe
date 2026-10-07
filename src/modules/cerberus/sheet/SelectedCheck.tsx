@@ -106,8 +106,8 @@ export function SelectedCheck({ check, editor, onName, onMute, onUnmute }: Selec
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
-        {/* SLOT: actions — the diagnosis plan's Diagnose and the fixes plan's catalog fix go here, before
-            Mute, as the prototype orders them. Nothing is drawn for either until it lands. */}
+        {/* SLOT: actions — the diagnosis plan's Diagnose goes here, before Mute, as the prototype orders it
+            (:418). Nothing is drawn for it until it lands. */}
         {check.mute === null ? (
           <Button variant="ghost" size="sm" onClick={onMute}>
             {t('cerberus.sheet.mute')}

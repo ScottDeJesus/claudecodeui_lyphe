@@ -2313,6 +2313,21 @@ export type CerberusEnrollInput = { name: string; desc?: string };
 
 // ---------------------------
 
+//----------------- CERBERUS NODE PROJECTS ------------
+// What a node card's projects section (`src/modules/cerberus/fleet/NodeProjects.tsx`) hears back when it
+// moves a project onto its node, or back to this server (`PUT /api/projects/:projectId/node`).
+
+/**
+ * What one move came to. `moved`: it landed, and the overview has been read again, so the section's
+ * tiles already show it. `refused`: the server's 409 `PROJECT_NODE_NOT_COLOCATED` (the node is not on
+ * this machine, or no longer enrolled), which the section says in its own words under its menu.
+ * `failed`: any other refusal, or no answer at all, which the write's own toast has already said.
+ * Answered by the Cerberus provider's `setProjectNode`, which the section's assign and unassign press.
+ */
+export type CerberusProjectMove = 'moved' | 'refused' | 'failed';
+
+// ---------------------------
+
 //----------------- CERBERUS FLEET MODEL ------------
 // What the Cerberus tab's pure fleet model (`src/modules/cerberus/fleet/fleetModel.ts`) hands the
 // Fleet views: one item per node, the filter groups over them and the rings' layout. They are the
@@ -2321,10 +2336,17 @@ export type CerberusEnrollInput = { name: string; desc?: string };
 /**
  * The word a whole NODE stands at: the worst of its services' words, `empty` for a node with no
  * service, and two states no service carries. `not_enabled` never appears (a switched-off service
- * counts as passing at the node level), and `fixing` and `enrolling` are held places: the fixes and
- * updates plans feed them, and until then no node reads either.
+ * counts as passing at the node level). `fixing` is a node with a fix running on one of its services
+ * (fed from `overview.running`); `enrolling` is the updates plan's held place, which no node reads yet.
  */
 export type FleetStatus = Exclude<CerberusStatus, 'not_enabled'> | 'fixing' | 'enrolling' | 'empty';
+
+/**
+ * What a node's or a service's mark can be drawn as: any check status, or `fixing`, a fix running (info
+ * ●, `FLEET_FIXING_LOOK`). `nodeMark` answers it for a node's word; `markLook` turns it into the tone,
+ * glyph, shape and word every mark is painted from.
+ */
+export type CerberusMark = CerberusStatus | 'fixing';
 
 /**
  * The bucket a node's status falls in for counting and filtering: `needs` is failing, denied,
@@ -2359,6 +2381,8 @@ export type FleetItem = {
   role: 'hub' | 'node';
   link: 'reporting' | 'silent' | 'never';
   status: FleetStatus;
+  /** Who started the fix running on the node, while its `status` is `fixing`: "Fix running on its own" or "Fix running". Null otherwise. */
+  fixBy: 'auto' | 'you' | null;
   services: FleetService[];
   search: string;
 };
@@ -2426,8 +2450,10 @@ export type FleetEntry = { item: FleetItem; node: CerberusNodeView; open: boolea
  * reads the word that came after. The moment each minute's word was reached is the read model's to hand
  * over, and `CerberusCell` does not carry it yet. A Needs-you card, or a service row pressed as a whole,
  * hands its check and now. The tab's root holds one and hands its fields to `CheckSheet` as they are.
+ * A Needs-you card's run strip also hands `run`, the id of the run it shows, which the sheet's Fix output
+ * opens on.
  */
-export type CerberusSheetTarget = { node: string; service: string; check: string; lookupAt?: number };
+export type CerberusSheetTarget = { node: string; service: string; check: string; lookupAt?: number; run?: string };
 
 // ---------------------------
 
@@ -2464,11 +2490,10 @@ export type CerberusEnrollRefusal =
 // What the Cerberus tab's root (`src/modules/cerberus/CerberusPanel.tsx`) holds between presses.
 
 /**
- * The Cerberus tab's views, in the order its strip offers them: Fleet, then History. The root's view
- * table gives each its name and its hint. The fixes plan inserts `'catalog'` between the two, here and
- * as a row of that table.
+ * The Cerberus tab's views, in the order its strip offers them: Fleet, Catalog, then History. The root's
+ * view table gives each its name and its hint.
  */
-export type CerberusView = 'fleet' | 'history';
+export type CerberusView = 'fleet' | 'catalog' | 'history';
 
 // ---------------------------
 

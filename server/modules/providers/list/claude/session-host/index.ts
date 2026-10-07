@@ -28,6 +28,14 @@ export type { KeepaliveReattach } from './spawner.js';
 export { readoptKeepaliveSessions, releaseKeepaliveOwnership } from './readopt.js';
 
 /**
+ * The same re-adoption for the hosts a co-located node's warden holds, which can only happen once
+ * that warden has linked: the promise the running-sessions read waits on beside the boot's own, so a
+ * browser never reads a live node session as idle (MAN-690, D-11).
+ * consumer: server/index.ts, through the providers barrel
+ */
+export { whenNodeSessionsReadopted } from './node-readopt.js';
+
+/**
  * The sweep over idle hosts left on an older build by an install, and its subscription to the
  * installed reading. `readoptKeepaliveSessions` calls the subscription itself; this export is for a
  * PROBE, which never holds the keepalive claim and therefore cannot get it that way.
@@ -44,3 +52,10 @@ export { retireStaleIdleHosts, watchInstalledCliVersionChanges } from './idle-ve
 export { busyReason } from './idle-version-sweep.js';
 export { listLiveHosts } from './hosts.js';
 export type { LiveHost } from './hosts.js';
+
+/**
+ * The hosts a co-located node's warden holds — their CLIs are this machine's `claude` processes — and
+ * the ask that makes that list current. The claude-activity module reads them beside `listLiveHosts`.
+ * consumer: the claude-activity module, through the providers barrel
+ */
+export { listColocatedNodeHosts, refreshColocatedNodeHosts } from './colocated-hosts.js';

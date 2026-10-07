@@ -1,21 +1,20 @@
 import type { HTMLAttributes } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { STATUS_TABLE } from '@/modules/cerberus/utils/cerberusStatus';
-import type { CerberusStatus } from '@/shared/cerberus-types';
-import type { CerberusCellShape } from '@/shared/types';
+import { FLEET_FIXING_LOOK, markLook } from '@/modules/cerberus/utils/cerberusStatus';
+import type { CerberusCellShape, CerberusMark } from '@/shared/types';
 import { Badge } from '@/shared/ui';
 import { cn } from '@/shared/utils';
 
 /*
- * THE TAB'S STATUS MARKS. Each one reads `STATUS_TABLE` and nothing else. Tone reaches paint only as
+ * THE TAB'S STATUS MARKS. Each one reads the one look table (`markLook`: `STATUS_TABLE`, and a fix running) and nothing else. Tone reaches paint only as
  * `data-tone` plus a `tone-*` Tailwind name, which the `[data-tone]` swap (tokens.css) resolves to
  * the tone's soft, ink or dot. No hex, no `rgba(` and no `var(--` appear here (MAN-739 rules 3-4).
  *
  * Colour is never the whole signal (MAN-578). A glyph carries its ✓ ▲ ✕ — ·, a pill carries the glyph
  * and the word, and a cell or square, too small for a glyph, carries its shape and gives its word to
  * the tooltip and to assistive tech. Colour does not animate between statuses (MAN-739 rule 5). The
- * only motion is the failing glyph's ring.
+ * only motion is the failing glyph's ring, and the pulse of a fix running.
  */
 
 /**
@@ -56,7 +55,8 @@ const GLYPH_SIZE = {
 
 /**
  * A status as a round glyph: ✓ ▲ ✕ — or · in the tone's ink, on its soft fill. While a check is
- * failing it rings with `cerberus-ring-warn`, the halo that says it needs you now. With reduced
+ * failing it rings with `cerberus-ring-warn`, the halo that says it needs you now; a fix running (●) pulses
+ * instead, since one is already on it. With reduced
  * motion it is still. It names its word to assistive tech and on hover. Pass `decorative` when the
  * word is already written beside it, so it isn't read twice. Pass `still` for the status at an
  * asked moment rather than now (a lookup), which never rings: the moment may be long past, and
@@ -66,13 +66,13 @@ const GLYPH_SIZE = {
  * History as they are composed.
  */
 export function StatusGlyph({ status, size = 'md', decorative = false, still = false }: {
-  status: CerberusStatus;
+  status: CerberusMark;
   size?: keyof typeof GLYPH_SIZE;
   decorative?: boolean;
   still?: boolean;
 }) {
   const { t } = useTranslation();
-  const look = STATUS_TABLE[status];
+  const look = markLook(status);
   const word = t(look.wordKey);
   return (
     <span
@@ -82,6 +82,7 @@ export function StatusGlyph({ status, size = 'md', decorative = false, still = f
         'inline-flex flex-none select-none items-center justify-center rounded-full bg-tone-soft leading-none text-tone-ink',
         GLYPH_SIZE[size],
         status === 'failing' && !still && 'motion-safe:animate-cerberus-ring-warn',
+        status === 'fixing' && !still && FLEET_FIXING_LOOK.glyphMotion,
       )}
     >
       {/* A middle dot is optically a fraction of ✓ ▲ ✕ —, and alone in its round it reads as no mark at
@@ -92,7 +93,7 @@ export function StatusGlyph({ status, size = 'md', decorative = false, still = f
 }
 
 type StatusCellProps = Omit<HTMLAttributes<HTMLSpanElement>, 'children'> & {
-  status: CerberusStatus;
+  status: CerberusMark;
   /** Its accessible name. It must say the status in words. Defaults to the bare word ("Failing"). */
   label?: string;
 };
@@ -107,7 +108,7 @@ type StatusCellProps = Omit<HTMLAttributes<HTMLSpanElement>, 'children'> & {
  */
 export function StatusCell({ status, label, className, ...spanProps }: StatusCellProps) {
   const { t } = useTranslation();
-  const look = STATUS_TABLE[status];
+  const look = markLook(status);
   return (
     <span
       role="img"
@@ -126,9 +127,9 @@ export function StatusCell({ status, label, className, ...spanProps }: StatusCel
  *
  * Used by Fleet's node cards as they are composed. The fixture sheet draws every status in it.
  */
-export function StatusSquare({ status, label }: { status: CerberusStatus; label?: string }) {
+export function StatusSquare({ status, label }: { status: CerberusMark; label?: string }) {
   const { t } = useTranslation();
-  const look = STATUS_TABLE[status];
+  const look = markLook(status);
   const name = label ?? t(look.wordKey);
   return (
     <span
@@ -150,12 +151,12 @@ export function StatusSquare({ status, label }: { status: CerberusStatus; label?
  * Used by the sheet's `RecordedResults` (the sheet and History), and by Fleet's service rows and the
  * sheet's check header as they are composed.
  */
-export function StatusPill({ status, text }: { status: CerberusStatus; text?: string }) {
+export function StatusPill({ status, text }: { status: CerberusMark; text?: string }) {
   const { t } = useTranslation();
-  const look = STATUS_TABLE[status];
+  const look = markLook(status);
   return (
     <Badge as="span" tone={look.tone} className="max-w-full gap-1.5 whitespace-nowrap">
-      <span aria-hidden className="flex-none">{look.glyph}</span>
+      <span aria-hidden className={cn('flex-none', status === 'fixing' && FLEET_FIXING_LOOK.glyphMotion)}>{look.glyph}</span>
       <span className="truncate">{text ?? t(look.wordKey)}</span>
     </Badge>
   );

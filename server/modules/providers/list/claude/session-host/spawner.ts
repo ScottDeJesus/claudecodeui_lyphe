@@ -2,7 +2,7 @@
  * Arming the SDK's spawn seam: where a turn's CLI is put, and what happens when it cannot go
  * there.
  *
- * Three rules this file exists to keep:
+ * Four rules this file exists to keep:
  * - The note goes to the facade THIS call created, never through a map keyed by app session
  *   id (D-4/D-8). The provider's supersede path lets an old held CLI and a new one overlap on
  *   one session for seconds, and a session key would ack the wrong host's result.
@@ -11,36 +11,30 @@
  *   one session.
  * - Availability is asked per spawn, not once. The keepalive unit can be stopped between two
  *   turns, and the answer must be the truth at the moment the CLI is needed.
+ * - A turn in a node's project is placed by that node's warden (`node-transport.ts`) or ended with
+ *   the reason. It never falls back: that CLI runs on its node and nowhere else.
  *
  * consumer: index.ts
  */
 
 import net from 'node:net';
-import path from 'node:path';
 import { StringDecoder } from 'node:string_decoder';
-import { fileURLToPath } from 'node:url';
 
 import type { SpawnOptions, SpawnedProcess } from '@anthropic-ai/claude-agent-sdk';
 
+import type { CerberusHostFrame } from '@/shared/cerberus-types.js';
+
 import { attachLocalSpawn, createFacade, isApiExiting } from './facade.js';
-import type { Facade, HostTransport, TurnBits } from './facade.js';
-import {
-  hostSocketPath,
-  isKeepaliveServerUp,
-  isTmuxSessionAlive,
-  removeHostJournal,
-  sessionsDir,
-  tmuxCommand
-} from './hosts.js';
+import type { Facade, TurnBits } from './facade.js';
+import { deliverHostFrame, hostTransport, plainEnv } from './host-frames.js';
+import { isKeepaliveServerUp, isTmuxSessionAlive, registry, removeHostJournal } from './hosts.js';
+import { placeInNodeHost } from './node-transport.js';
 
 const GATE_ENV = 'CLOUDCLI_SESSION_KEEPALIVE';
 // D-13: a fresh host is exec'd by tmux and has to reach listen(); a re-attach is talking to a
 // socket that already exists or does not.
 const FRESH_CONNECT_TIMEOUT_MS = 5_000;
 const REATTACH_CONNECT_TIMEOUT_MS = 2_000;
-const CONNECT_RETRY_MS = 50;
-
-const HOST_SCRIPT = path.join(path.dirname(fileURLToPath(import.meta.url)), 'host.js');
 
 export type KeepaliveHandle = { note(bits: TurnBits): void };
 export type KeepaliveReattach = {
@@ -51,13 +45,15 @@ export type KeepaliveReattach = {
   profile: Record<string, unknown> | null;
   /**
    * The CLI version that host's own process announced at init, read from its journal by
-   * re-adoption (hosts.ts, `lastReportedCliVersion`); null when its journal holds no such line.
+   * re-adoption (host-registry.js, `lastReportedCliVersion`); null when its journal holds no such line.
    * It rides beside the profile rather than inside it because the two are recorded by different
    * hands: the meta is what the API launched the CLI with, the journal is what the CLI said.
    */
   cliVersion: string | null;
   /** The tool-call ids whose work was still outstanding when the meta was last written. */
   deferredTools: string[];
+  /** The node whose warden holds the host, or null for a host on this machine's own keepalive. */
+  node: string | null;
 };
 
 type SpawnContext = {
@@ -110,92 +106,30 @@ export function keepaliveReadopt(
   return reattach && armedFor(appSessionId) ? reattach : null;
 }
 
-/** Retries because the host is exec'd by tmux: ENOENT before the deadline means "not yet". */
-function connectToHost(sockPath: string, timeoutMs: number): Promise<net.Socket> {
-  const deadline = Date.now() + timeoutMs;
-  return new Promise((resolve, reject) => {
-    const attempt = (): void => {
-      const socket = net.connect(sockPath);
-      socket.once('connect', () => {
-        socket.removeAllListeners('error');
-        resolve(socket);
-      });
-      socket.once('error', (err: NodeJS.ErrnoException) => {
-        socket.destroy();
-        if (Date.now() >= deadline) {
-          reject(new Error(`socket ${path.basename(sockPath)}: ${err.message}`));
-          return;
-        }
-        setTimeout(attempt, CONNECT_RETRY_MS).unref();
-      });
-    };
-    attempt();
-  });
-}
-
-/** `env` is held by the host in memory only — it never reaches the meta or the journal. */
-function plainEnv(env: SpawnOptions['env']): Record<string, string> {
-  const copy: Record<string, string> = {};
-  for (const [key, value] of Object.entries(env)) {
-    if (typeof value === 'string') copy[key] = value;
-  }
-  return copy;
-}
-
 /** Wires the live socket to the facade and sends the frame that claims the host. */
 function bindSocket(
   facade: Facade,
   socket: net.Socket,
   hostId: string,
-  firstFrame: Record<string, unknown>
+  firstFrame: CerberusHostFrame
 ): void {
   socket.setNoDelay(true);
 
-  const send = (frame: Record<string, unknown>): void => {
+  const send = (frame: CerberusHostFrame): void => {
     if (socket.writable) socket.write(`${JSON.stringify(frame)}\n`);
-  };
-
-  const transport: HostTransport = {
-    write: (chunk) => send({ t: 'stdin', b64: chunk.toString('base64') }),
-    endInput: () => send({ t: 'end_input' }),
-    kill: (signal) => send({ t: 'kill', signal: signal === 'SIGKILL' ? 'SIGKILL' : 'SIGTERM' }),
-    note: (bits) =>
-      send({
-        t: 'note',
-        turnCompleteSent: bits.turnCompleteSent,
-        heldForBackgroundWork: bits.heldForBackgroundWork,
-        ...(Array.isArray(bits.deferredTools) ? { deferredTools: bits.deferredTools } : {}),
-        // A host from before these fields ignores them and retires nothing anyway (no result is
-        // outstanding when a message joins), so the frame stays readable by every host.
-        ...(bits.ack === false ? { ack: false } : {})
-      })
   };
 
   const decoder = new StringDecoder('utf8');
   let buffer = '';
 
-  const onFrame = (frame: Record<string, unknown>): void => {
-    switch (frame.t) {
-      case 'out':
-        if (typeof frame.line === 'string') facade.pushLine(frame.line);
-        return;
-      case 'exit':
-        // The host unlinks its own socket on the way out; the journal and the meta belong to
-        // whoever was attached when the CLI ended, which is this process.
-        removeHostJournal(hostId);
-        facade.settleExit(
-          typeof frame.code === 'number' ? frame.code : null,
-          typeof frame.signal === 'string' ? (frame.signal as NodeJS.Signals) : null
-        );
-        socket.end();
-        return;
-      case 'err':
-        console.warn(`[keepalive] host ${hostId} refused a frame: ${String(frame.message)}`);
-        return;
-      default:
-        // `live` (replay finished) and anything a newer host learns to say.
-        return;
-    }
+  // What a frame means is `deliverHostFrame`'s, shared with the node transport; what is owed when the
+  // host says `exit` is this socket's own.
+  const onFrame = (frame: CerberusHostFrame): void => {
+    if (!deliverHostFrame(facade, frame, hostId)) return;
+    // The host unlinks its own socket on the way out; the journal and the meta belong to
+    // whoever was attached when the CLI ended, which is this process.
+    removeHostJournal(hostId);
+    socket.end();
   };
 
   socket.on('data', (chunk: Buffer) => {
@@ -207,7 +141,7 @@ function bindSocket(
       if (raw.trim() !== '') {
         try {
           const parsed: unknown = JSON.parse(raw);
-          if (parsed && typeof parsed === 'object') onFrame(parsed as Record<string, unknown>);
+          if (parsed && typeof parsed === 'object') onFrame(parsed as CerberusHostFrame);
         } catch (err) {
           console.warn(
             `[keepalive] host ${hostId} sent an unparseable frame: ${err instanceof Error ? err.message : String(err)}`
@@ -229,7 +163,7 @@ function bindSocket(
   });
 
   send(firstFrame);
-  facade.attach(transport);
+  facade.attach(hostTransport(send));
 }
 
 async function placeInHost(facade: Facade, options: SpawnOptions, ctx: SpawnContext): Promise<void> {
@@ -239,7 +173,7 @@ async function placeInHost(facade: Facade, options: SpawnOptions, ctx: SpawnCont
   if (ctx.reattach) {
     const hostId = ctx.reattach.hostId;
     if (!isTmuxSessionAlive(hostId)) throw new Error(`host ${hostId} is no longer running`);
-    const socket = await connectToHost(hostSocketPath(hostId), REATTACH_CONNECT_TIMEOUT_MS);
+    const socket = await registry.connectToHost(hostId, REATTACH_CONNECT_TIMEOUT_MS);
     // D-3: "acked" is the host's own cursor — it replays any `result` this API never
     // confirmed handling, and nothing it already did.
     bindSocket(facade, socket, hostId, { t: 'hello', fromSeq: 'acked' });
@@ -249,23 +183,9 @@ async function placeInHost(facade: Facade, options: SpawnOptions, ctx: SpawnCont
   // D-8: never the bare app session id — a supersede overlap puts two hosts on one session,
   // and `tmux new-session -s <name>` refuses a duplicate.
   const hostId = `${ctx.appSessionId}-${Date.now().toString(36)}`;
-  const created = tmuxCommand([
-    '-f',
-    '/dev/null',
-    'new-session',
-    '-d',
-    '-s',
-    hostId,
-    '-c',
-    cwd,
-    process.execPath,
-    HOST_SCRIPT,
-    hostId,
-    sessionsDir
-  ]);
-  if (!created.ok) throw new Error(`tmux new-session failed: ${created.error}`);
+  registry.spawnHostSession(hostId, cwd);
 
-  const socket = await connectToHost(hostSocketPath(hostId), FRESH_CONNECT_TIMEOUT_MS);
+  const socket = await registry.connectToHost(hostId, FRESH_CONNECT_TIMEOUT_MS);
   bindSocket(facade, socket, hostId, {
     t: 'spawn',
     command: options.command,
@@ -278,22 +198,69 @@ async function placeInHost(facade: Facade, options: SpawnOptions, ctx: SpawnCont
   });
 }
 
+type ArmContext = {
+  appSessionId: string | null;
+  userId: string | number | null;
+  reattach: KeepaliveReattach | null;
+  profile?: Record<string, unknown> | null;
+  /** The node whose warden must run this turn's CLI, or null/absent for this machine. */
+  node?: string | null;
+};
+
+/** The handle a `result` is acked through: the facade the spawn function last created. */
+const handleFor = (facadeOf: () => Facade | null): KeepaliveHandle => ({
+  note: (bits: TurnBits) => facadeOf()?.note(bits)
+});
+
+/**
+ * A node's turn: placed by the node's warden, or ended with the reason. The reason reaches the SDK as
+ * the spawn error (as a CLI that failed to start does), then the turn ends as a killed process does.
+ * The gate does not disarm it: with the gate off the spawn function still exists, and refuses.
+ */
+function armNodeSpawn(sdkOptions: Record<string, unknown>, node: string, ctx: ArmContext): KeepaliveHandle {
+  let bound: Facade | null = null;
+
+  sdkOptions.spawnClaudeCodeProcess = (options: SpawnOptions): SpawnedProcess => {
+    const facade = createFacade();
+    bound = facade;
+
+    const appSessionId = ctx.appSessionId;
+    let placing: Promise<void>;
+    if (!keepaliveEnabled()) {
+      const off = `Session keepalive is off on this server (${GATE_ENV}), and ${node}'s sessions only run hosted`;
+      placing = Promise.reject(new Error(off));
+    } else if (appSessionId === null) {
+      placing = Promise.reject(new Error(`This turn has no session id to host, and ${node}'s sessions only run hosted`));
+    } else {
+      const { userId, reattach } = ctx;
+      placing = placeInNodeHost(facade, options, { node, appSessionId, userId, reattach, profile: ctx.profile ?? null });
+    }
+
+    placing.catch((err: unknown) => {
+      if (facade.settled) return;
+      const reason = err instanceof Error ? err.message : String(err);
+      // Always logged: this path ends a person's turn, so it is never silenced by a once-gate.
+      console.warn(`[keepalive] node ${node}: ${reason} — ending the turn`);
+      facade.emitError(new Error(reason));
+      facade.settleExit(null, 'SIGTERM');
+    });
+    return facade;
+  };
+
+  return handleFor(() => bound);
+}
+
 /**
  * Sets `sdkOptions.spawnClaudeCodeProcess` and returns the handle bound to the facade that
- * spawn function creates, or null when the gate is off or there is no app session id.
+ * spawn function creates, or null when the gate is off or there is no app session id — except a
+ * turn with a `node`, always armed: placed on the node or refused, never left to the SDK's own spawn.
  *
  * A note before that facade exists is dropped: no `result` can precede a spawn.
  * consumer: claude-runtime.provider.js
  */
-export function armKeepaliveSpawn(
-  sdkOptions: Record<string, unknown>,
-  ctx: {
-    appSessionId: string | null;
-    userId: string | number | null;
-    reattach: KeepaliveReattach | null;
-    profile?: Record<string, unknown> | null;
-  }
-): KeepaliveHandle | null {
+export function armKeepaliveSpawn(sdkOptions: Record<string, unknown>, ctx: ArmContext): KeepaliveHandle | null {
+  if (ctx.node) return armNodeSpawn(sdkOptions, ctx.node, ctx);
+
   const appSessionId = ctx.appSessionId;
   if (appSessionId === null || !armedFor(appSessionId)) return null;
 
@@ -328,9 +295,5 @@ export function armKeepaliveSpawn(
     return facade;
   };
 
-  return {
-    note(bits: TurnBits) {
-      bound?.note(bits);
-    }
-  };
+  return handleFor(() => bound);
 }

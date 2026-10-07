@@ -3,8 +3,10 @@ import { useTranslation } from 'react-i18next';
 
 import { useCerberus } from '@/modules/cerberus/context/CerberusContext';
 import { useCheckDetail } from '@/modules/cerberus/hooks/useCheckDetail';
+import { CheckFixes } from '@/modules/cerberus/sheet/CheckFixes';
 import { CheckLabelEditor } from '@/modules/cerberus/sheet/CheckLabelEditor';
 import { CheckRows } from '@/modules/cerberus/sheet/CheckRows';
+import { FixOutput } from '@/modules/cerberus/sheet/FixOutput';
 import { LookupMoment } from '@/modules/cerberus/sheet/LookupMoment';
 import { MinuteCells } from '@/modules/cerberus/sheet/MinuteCells';
 import { RecordedResults } from '@/modules/cerberus/sheet/RecordedResults';
@@ -38,19 +40,22 @@ type CheckSheetProps = {
   check: string;
   /** The moment the lookup opens on, epoch ms: the minute a service row's cell was pressed on. Omitted, now. */
   lookupAt?: number;
+  /** The run a Needs-you card's strip opened the sheet on, which its Fix output shows first. Omitted, the check's latest run within the hour. */
+  run?: string;
   /** Mute, pressed for the check the sheet shows. The root opens its Mute dialog in front of the sheet. */
   onMute: (check: CerberusCheckView) => void;
 };
 
 /**
  * THE CHECK SHEET: one service's checks at a glance and one of them in full, beside the screen on the
- * library's `Sheet` (`design/cerberus/Cerberus Tab.dc.html` :393-537, less the fixes' and diagnosis'
- * parts, which their own plans draw into the slot left for them).
+ * library's `Sheet` (`design/cerberus/Cerberus Tab.dc.html` :393-537, less the diagnosis' part, which its
+ * own plan draws into the slot left for it).
  *
  * Titled with the service's label (its id until it has one), then the raw line "<service> · <node> ·
  * warden <version>". Under it the service's checks as rows; then the check the sheet shows — its name,
- * its word, its value, when it was checked, Mute or its mute; then the slot; then its last 60 minutes,
- * a moment looked up, and the results recorded in the last 3 h.
+ * its word, its value, when it was checked, Mute or its mute; then Fix output (one run of a fix, as it
+ * happens or as it happened), the slot, and "Fixes in the catalog"; then its last 60 minutes, a moment
+ * looked up, and the results recorded in the last 3 h.
  *
  * TWO READS, and the sheet never blanks while one is out. The fleet the provider keeps already holds
  * the service, its checks and its node's warden, so the head, the rows and the check's own block are
@@ -59,9 +64,9 @@ type CheckSheetProps = {
  * the last good answer when there is one; a plain line when the check is gone.
  *
  * For the cerberus module's `CerberusPanel`, which hosts one and opens it from a service row's minute
- * and from Needs you; the panel phase of this plan composes it. Until then only fixtures mount it.
+ * and from Needs you.
  */
-export function CheckSheet({ open, onClose, node, service, check, lookupAt, onMute }: CheckSheetProps) {
+export function CheckSheet({ open, onClose, node, service, check, lookupAt, run, onMute }: CheckSheetProps) {
   // The fleet the provider keeps: it names the service and its node before the check is read.
   const { overview } = useCerberus();
   const nodeView = overview?.nodes.find((entry) => entry.id === node) ?? null;
@@ -79,6 +84,7 @@ export function CheckSheet({ open, onClose, node, service, check, lookupAt, onMu
         lookupAt={lookupAt}
         nodeView={nodeView}
         serviceView={serviceView}
+        run={run}
         onMute={onMute}
       />
     </Sheet>
@@ -91,7 +97,7 @@ type CheckSheetBodyProps = Omit<CheckSheetProps, 'open' | 'onClose'> & {
 };
 
 /** Everything under the sheet's head. The `Sheet` mounts it only while it is open, so its reads run only then. */
-function CheckSheetBody({ node, service, check, lookupAt, nodeView, serviceView, onMute }: CheckSheetBodyProps) {
+function CheckSheetBody({ node, service, check, lookupAt, run, nodeView, serviceView, onMute }: CheckSheetBodyProps) {
   const { t } = useTranslation();
 
   // The check the sheet shows, by its id within the service. Essential: a pressed row moves the sheet
@@ -153,6 +159,10 @@ function CheckSheetBody({ node, service, check, lookupAt, nodeView, serviceView,
   const announcement = error === 'gone'
     ? t('cerberus.sheet.gone')
     : detail === null && error === null ? t('cerberus.sheet.loading') : '';
+  // The run Fix output shows. The run the sheet was opened on shows at once, while the sheet still stands on
+  // the check it opened on; once the check's own read has answered, its newest run takes over, which is the
+  // same run unless a newer one has begun since — the Run now just pressed. With neither, no Fix output.
+  const outputRunId = detail?.run?.id ?? (selectedId === check ? run : undefined) ?? null;
   const version = nodeView?.wardenVersion ?? null;
   const raw = version === null
     ? t('cerberus.sheet.rawHub', { service, node })
@@ -207,9 +217,12 @@ function CheckSheetBody({ node, service, check, lookupAt, nodeView, serviceView,
         </div>
       )}
 
-      {/* SLOT: fixes and diagnosis — the fixes plan's "Fixes in the catalog" and a fix's output, and the
-          diagnosis plan's read-only diagnosis, go here: under the check and its actions, above its minutes
-          (the prototype's :429-504). Nothing is drawn for either until it lands. */}
+      {/* Keyed by the run, so another run's output starts blank and replays as its own. */}
+      {outputRunId !== null && <FixOutput key={outputRunId} runId={outputRunId} />}
+      {/* SLOT: diagnosis — the diagnosis plan's read-only diagnosis goes between Fix output and the fixes (the
+          prototype's :450-488). Nothing is drawn for it until it lands. */}
+      {/* `?? []` and `?? null`: an older server's answer has neither field. */}
+      {detail !== null && <CheckFixes fixes={detail.fixes ?? []} run={detail.run ?? null} />}
 
       {error === 'gone' ? (
         <p className="rounded-xl border border-dashed border-input px-4 py-3.5 text-[13px] text-muted-foreground">

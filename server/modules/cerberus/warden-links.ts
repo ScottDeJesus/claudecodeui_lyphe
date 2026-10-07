@@ -23,10 +23,14 @@ import type { CerberusEnvelope, CerberusLinkState } from '@/shared/cerberus-type
  *
  * Everything here is memory. The store is touched once, by `seedFromStore`.
  *
- * Consumers: `warden-link.ts` (one link per socket: `attach`, `detach`, `heard`, `handlerFor`),
- * `warden-gateway.ts` (nothing but through that link), the module's `start()` (`seedFromStore`),
- * `definitions.service.ts` (`send` of a `checks.set`), the read model (`states`), and every later
- * plan that talks to a warden (`send`, `registerHandler`, `onChange`).
+ * HELLO. A warden's `hello` says what it still holds across a reconnect (`active`), which no frame
+ * says again, so `onHello` hears it once per connect — after the link is attached, so a listener that
+ * answers by sending reaches the warden — and the runs service reconciles the runs it counts live.
+ *
+ * Consumers: `warden-link.ts` (one link per socket: `attach`, `detach`, `heard`, `handlerFor`,
+ * `announceHello`), `warden-gateway.ts` (nothing but through that link), the module's `start()`
+ * (`seedFromStore`), `definitions.service.ts` (`send` of a `checks.set`), the read model (`states`),
+ * and every later plan that talks to a warden (`send`, `registerHandler`, `onChange`, `onHello`).
  */
 
 /** The silence threshold: a node unheard for longer than this is silent. */
@@ -40,13 +44,15 @@ const REPLACED_LINK_CLOSE_CODE = 4000;
 
 /**
  * One open warden socket, as the registry sees it. `send` answers false when the frame could not
- * be put on the socket; `version` and `clockOffsetMs` are the link's own to keep current — the
+ * be put on the socket; `id` is the envelope's id when the caller needs to name it (a request whose
+ * answer carries it back, as `sessions.listed` carries `re`), else the link picks one.
+ * `version` and `clockOffsetMs` are the link's own to keep current — the
  * warden's version from its `hello`, and the median of the last five `receivedAt − env.at`.
  * Consumers: `warden-link.ts` builds it; every other reader goes through `wardenLinks`.
  */
 export type CerberusWardenLink = {
   node: string;
-  send(type: string, body: unknown): boolean;
+  send(type: string, body: unknown, id?: string): boolean;
   close(code: number, reason: string): void;
   version: string | null;
   clockOffsetMs: number | null;
@@ -63,6 +69,27 @@ export type CerberusFrameHandler = (node: string, body: unknown, env: CerberusEn
 /** Called with the node and its state whenever a link attaches or detaches or a node enters or leaves silence. */
 type LinkChangeListener = (node: string, state: CerberusLinkState) => void;
 
+/**
+ * What a connecting warden's `hello` said that a listener may act on, already checked for shape.
+ * `startedAt` is when the warden PROCESS started, on its own clock, and `activeRuns` the ids of the fix
+ * runs whose child it still holds; both are null when the warden did not say (a build older than the
+ * runner), and a listener must then conclude nothing from them. `owedRuns` is the ids of runs that are
+ * over but whose frames still wait on the warden's outbox; null when the warden does not report them
+ * (a build older than that list), which a listener must read as "this hello does not account for what
+ * is still owed". `catalogVersion` is the set it acked.
+ * Consumers: `warden-link.ts` builds it; `run-reconcile.ts` reads it.
+ */
+export type CerberusHelloReport = {
+  version: string;
+  startedAt: number | null;
+  activeRuns: string[] | null;
+  owedRuns: string[] | null;
+  catalogVersion: number | null;
+};
+
+/** Called with the node and what its hello said, after the link carrying it is attached. */
+type HelloListener = (node: string, hello: CerberusHelloReport) => void;
+
 type NodeRecord = {
   link: CerberusWardenLink | null;
   lastHeardAt: number | null;
@@ -76,6 +103,7 @@ type NodeRecord = {
 const records = new Map<string, NodeRecord>();
 const handlers = new Map<string, CerberusFrameHandler>();
 const listeners = new Set<LinkChangeListener>();
+const helloListeners = new Set<HelloListener>();
 let silenceTimer: NodeJS.Timeout | null = null;
 
 /** A node never heard is silent; so is one unheard for more than 90 seconds. */
@@ -146,17 +174,28 @@ export const wardenLinks = {
   },
 
   /**
+   * Center's clock minus the node's, in ms: add it to a warden's time to read it on center's clock. The
+   * open link's median of its last five heartbeats, else what the last link reported; 0 for a node
+   * never heard (no correction is better than a guessed one).
+   */
+  clockOffsetMs(node: string): number {
+    const record = records.get(node);
+    return record?.link?.clockOffsetMs ?? record?.lastClockOffsetMs ?? 0;
+  },
+
+  /**
    * Puts one frame on the node's link. Answers false when the node has no link, or when the link
    * could not take the frame — the caller decides whether that matters (a `checks.set` does not:
    * the warden's next `hello` asks for it again). A link whose `send` throws answers false and is
    * logged: callers send AFTER their own write committed, and a throw from a socket must not turn
-   * a committed write into a reported failure.
+   * a committed write into a reported failure. `id` names the envelope for a caller whose request
+   * is answered by a frame carrying it back.
    */
-  send(node: string, type: string, body: unknown): boolean {
+  send(node: string, type: string, body: unknown, id?: string): boolean {
     const link = records.get(node)?.link;
     if (!link) return false;
     try {
-      return link.send(type, body);
+      return link.send(type, body, id);
     } catch (error) {
       console.error(`[Cerberus] the link of node ${node} threw sending a "${type}" frame: ${error instanceof Error ? error.message : String(error)}`);
       return false;
@@ -167,6 +206,27 @@ export const wardenLinks = {
   onChange(listener: LinkChangeListener): () => void {
     listeners.add(listener);
     return () => listeners.delete(listener);
+  },
+
+  /** Subscribes to every connecting warden's `hello`; answers the function that unsubscribes. */
+  onHello(listener: HelloListener): () => void {
+    helloListeners.add(listener);
+    return () => helloListeners.delete(listener);
+  },
+
+  /**
+   * Tells the `onHello` listeners what a warden's hello said. The link calls it once per connect, after
+   * `attach`. A listener that throws is logged and the rest still hear: a hello is not undone by one
+   * listener's fault.
+   */
+  announceHello(node: string, hello: CerberusHelloReport): void {
+    for (const listener of helloListeners) {
+      try {
+        listener(node, hello);
+      } catch (error) {
+        console.error(`[Cerberus] a hello listener threw for node ${node}: ${error instanceof Error ? error.message : String(error)}`);
+      }
+    }
   },
 
   /**

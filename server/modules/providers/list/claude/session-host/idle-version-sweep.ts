@@ -20,7 +20,9 @@
  * - BOOT RE-ADOPTION — `readopt.ts` applies the same test to each keeper after `retireOlderHosts`,
  *   so an API restart after an update does not hand a conversation back to the old build. A boot
  *   covers the machine whose server was down when the install happened, and the server nobody has
- *   open a browser against.
+ *   open a browser against. A co-located node's warden link-up (`node-readopt.ts`) applies it the
+ *   same way to that node's hosts; the INSTALL trigger above walks this machine's keepalive only,
+ *   and a node host left on an old build is retired at its next message by `chat-process.ts`.
  *
  * The test is the message path's, not a second one: BOTH sides a version string (a process that has
  * not spoken, or a reading of `null`, is "not heard" — never a reason to replace anything), the
@@ -29,7 +31,7 @@
  * that is ahead of it), and no work in flight for its app session
  * (`busyReason` below — the registry where it can answer, the host's own meta where it cannot).
  *
- * consumer: readopt.ts (boot), and the observer this package registers with the reading
+ * consumer: readopt.ts (boot), node-readopt.ts (a node's link-up), and the observer this package registers with the reading
  */
 
 import { observeInstalledCliVersionChanges } from '@/modules/cli-version/index.js';
@@ -80,8 +82,15 @@ export function busyReason(host: LiveHost): string | null {
  * `null` — the CLI is chosen when a run starts, or `--version` did not answer — retires nothing at
  * all. That is the same "not heard" the message path reads it as, and the same reason a host with
  * no version in its journal is left alone rather than declared stale.
+ *
+ * `retire` is how a stale host is wound down — this machine's `retireHost` unless the host is
+ * reached some other way.
  */
-export function retireStaleIdleHosts(hosts: LiveHost[], installedVersion: string | null): LiveHost[] {
+export function retireStaleIdleHosts(
+  hosts: LiveHost[],
+  installedVersion: string | null,
+  retire: (hostId: string) => void = retireHost
+): LiveHost[] {
   if (typeof installedVersion !== 'string') return hosts;
 
   const standing: LiveHost[] = [];
@@ -104,10 +113,10 @@ export function retireStaleIdleHosts(hosts: LiveHost[], installedVersion: string
       standing.push(host);
       continue;
     }
-    // The journal is the version's source (`hosts.ts`'s `lastReportedCliVersion`), so this line can
+    // The journal is the version's source (`host-registry.js`'s `lastReportedCliVersion`), so this line can
     // only be printed for a version the process itself announced.
     console.log(`[keepalive] retiring idle host ${host.hostId}: cli ${reported} → ${installedVersion}`);
-    retireHost(host.hostId);
+    retire(host.hostId);
   }
   return standing;
 }

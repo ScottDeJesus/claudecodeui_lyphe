@@ -1885,7 +1885,7 @@ section: cli-version/001 The rules that bite
    A re-adopted run is stamped from its host's journal the moment it is adopted, so the retirement
    decision reads what that process actually announced rather than a blank. That stamp is not what
    puts a stale host in the report: `running[]` holds a run while a turn is in flight, and a host
-   adopted between turns is completed as it is registered (`readopt.ts`, the `turnCompleteSent`
+   adopted between turns is completed as it is registered (`readopt-host.ts`, the `turnCompleteSent`
    branch), so an IDLE stale host is listed by no report at all — it is retired by the server
    instead, on a version change or at boot (rule 9), and its next message spawns on the new build.
 
@@ -4667,8 +4667,9 @@ section: hosting/001 What runs
 | `cloudcli-client-prod.service` | `vite preview --host 0.0.0.0 --port 5184 --strictPort --outDir .prod-client/current` — the BUILT client: ~50 requests on a fresh load instead of ~700 unbundled modules, Brotli-precompressed at build time (the page document included), every `/assets/*` file cached for a year and everything else revalidated by ETag, by `vite-plugins/precompressedAssets.js`. Same `.env`, so it proxies `/api`, `/ws`, `/shell` and `/plugin-ws` to :3011 exactly as :5183 does. No HMR: an edit reaches it through the rebuild below | `0.0.0.0:5184`, minus the Docker bridges |
 | `cloudcli-client-prod-build.timer` → `.service` | every 2 min, `scripts/prod-client-build.sh`: builds only when a build input (`src`, `public`, `shared`, `index.html`, `vite.config.js`, `vite-plugins`, `tailwind.config.js`, `postcss.config.js`, `tsconfig.json`, `.env`, `package.json`, `package-lock.json`) changed since the last build's START (~30 s, `Nice=10`; one build at a time under `flock`, a failed build leaves nothing behind), into `.prod-client/builds/<id>`, then re-points the `.prod-client/current` symlink in one rename. The previous build's hashed assets are carried forward for two days, so a tab opened before a swap can still load its lazy chunks. `--force` builds regardless | — |
 | `cloudcli-dev-watchdog.timer` → `.service` | every 60 s, `/usr/local/bin/cloudcli-dev-watchdog.sh` re-asserts the bridge drops on :5183 and :5184, probes `/api/cli-version` on :3011 (any HTTP answer = alive; three misses 5 s apart = dead) `/src/main.tsx` on :5183 (200; two misses) and `/` on :5184 (200; two misses), and restarts the one unit whose canary failed — the supervisor survives a boot that never listened and never boots a replacement of its own, so a FIRST boot that fails leaves `:3011` unanswered with the supervisor still running (a later boot that fails is harmless: the previous server keeps serving), and Vite's transform can wedge, and in every case systemd still reads `active`. After three heals in a row it stops healing and leaves the unit `failed` with one distinct journal line | — |
-| `cloudcli-sessions-tmux.service` | `/usr/bin/tmux -L cloudcli-sessions -f /dev/null new-session -d -s _keepalive sleep infinity` — a do-nothing session holding the tmux server that every chat CLI is spawned into, in a cgroup of its own so the API's restart cannot reach them. Each live turn adds a `<app session id>-<base36>` session beside `_keepalive`, with its socket, journal and meta under `~/.cloudcli/sessions` (mode 0700; `CLOUDCLI_SESSIONS_DIR` moves the directory). `sudo systemctl stop cloudcli-sessions-tmux` is the deliberate "end every live chat session" switch, and `CLOUDCLI_SESSION_KEEPALIVE=0` (or `off`/`false`) in the API's `.env` — unset here, so the feature is on — puts new turns back inside the API process | — (unix sockets under `~/.cloudcli/sessions`) |
-| `cerberus-warden.service` | `/usr/bin/node /home/lyphe/.cerberus-warden/current/warden/src/main.mjs run` as `User=lyphe`, the operator's account and never root — the Cerberus warden: it runs the probes center pushes down its link and sends their results back. `Restart=always`, `RestartSec=5`, starts at boot. Neither `deploy/systemd/install.sh` nor a hand copy installs it: `warden/enroll.sh` renders `warden/systemd/cerberus-warden.service` into `/etc/systemd/system/`. Installed once with the command Cerberus prints for a new node (`POST /api/cerberus/enrollments`): `curl -fsSL http://100.103.222.79:3012/cerberus/enroll.sh \| sudo sh -s -- --name <node> --token <token>`. Each newer release (`npm run build:warden`, after a minor bump of `warden/package.json`) reaches it with the same URL and `sudo sh -s -- --refresh`: the script swaps `current` and restarts the unit. The unit: MAN-7837; the install: MAN-7826 | none — it listens on no TCP port and dials the warden gateway at `100.103.222.79:3012` (`CERBERUS_LISTEN`, above) |
+| `cloudcli-sessions-tmux.service` | `/usr/bin/tmux -L cloudcli-sessions -f /dev/null new-session -d -s _keepalive sleep infinity` — a do-nothing session holding the tmux server that the chat CLI of every project running on no node is spawned into, in a cgroup of its own so the API's restart cannot reach them. Each live turn adds a `<app session id>-<base36>` session beside `_keepalive`, with its socket, journal and meta under `~/.cloudcli/sessions` (mode 0700; `CLOUDCLI_SESSIONS_DIR` moves the directory). `sudo systemctl stop cloudcli-sessions-tmux` is the deliberate "end every live chat session of a project on no node" switch, and `CLOUDCLI_SESSION_KEEPALIVE=0` (or `off`/`false`) in the API's `.env` — unset here, so the feature is on — puts new turns of a project on no node back inside the API process; a turn of a project assigned to a node is refused instead (MAN-689) | — (unix sockets under `~/.cloudcli/sessions`) |
+| `cerberus-warden-sessions.service` | `/usr/bin/tmux -L cerberus-warden -f /dev/null new-session -d -s _keepalive sleep infinity` as `User=` the warden's account — the node-side twin of `cloudcli-sessions-tmux.service`, on its own tmux socket and directory: a do-nothing session holding the tmux server that the Cerberus warden spawns the chat CLIs of a project assigned to its node into, in a cgroup apart from `cerberus-warden.service`'s, so a warden restart or `--refresh` never reaches them. Each live turn adds a `<app session id>-<base36>` session beside `_keepalive`, with its socket, journal and meta under `~/.cerberus-warden/sessions` (mode 0700). On this machine (eis1) both session units run: a turn's CLI is in `tmux -L cerberus-warden` when its project is assigned to eis1, else in `tmux -L cloudcli-sessions`. Rendered and `enable --now`ed by `warden/enroll.sh` beside the warden's own unit, never restarted by `--refresh`; `sudo systemctl stop cerberus-warden-sessions` is the deliberate "end every live session on this node" switch (`ExecStop=-… kill-server`). The unit: MAN-7897 | — (unix sockets under `~/.cerberus-warden/sessions`) |
+| `cerberus-warden.service` | `/usr/bin/node /home/lyphe/.cerberus-warden/current/warden/src/main.mjs run` as `User=lyphe`, the operator's account and never root — the Cerberus warden: it runs the probes center pushes down its link and sends their results back, and relays the Claude sessions center places on its node (MAN-7897). `Restart=always`, `RestartSec=5`, starts at boot. Neither `deploy/systemd/install.sh` nor a hand copy installs it: `warden/enroll.sh` renders every `warden/systemd/*.service` (this unit and `cerberus-warden-sessions.service`) into `/etc/systemd/system/`. Installed once with the command Cerberus prints for a new node (`POST /api/cerberus/enrollments`): `curl -fsSL http://100.103.222.79:3012/cerberus/enroll.sh \| sudo sh -s -- --name <node> --token <token>`. Each newer release (`npm run build:warden`, after a minor bump of `warden/package.json`) reaches it with the same URL and `sudo sh -s -- --refresh`: the script swaps `current` and restarts this unit, never the sessions unit. The unit: MAN-7837; the install: MAN-7826 | none — it listens on no TCP port and dials the warden gateway at `100.103.222.79:3012` (`CERBERUS_LISTEN`, above) |
 
 The API and both client units read `.env` (`SERVER_PORT=3011`, `VITE_PORT=5183`, `HOST=127.0.0.1`,
 `CLAUDE_CLI_PATH`, …), run as the host's own user with `NODE_ENV=development` (the production client: `production`), the interactive shell's full
@@ -4696,7 +4697,7 @@ The clients are the only ports the LAN needs: `vite.config.js` proxies `/api`, `
 application drawer this app serves — `apps.local.json`, git-ignored; the drawer's one
 documentation home is [`docs/MANUAL.md (applications)`](MANUAL.md).
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/deploy/dev-supervisor/supervisor.mjs, /home/lyphe/.claude/claudecodeui_lyphe/deploy/systemd/install.sh, /home/lyphe/.claude/claudecodeui_lyphe/scripts/prod-client-build.sh, /home/lyphe/.claude/claudecodeui_lyphe/vite-plugins/compressResponses.js, /home/lyphe/.claude/claudecodeui_lyphe/vite-plugins/precompressedAssets.js, /home/lyphe/.claude/claudecodeui_lyphe/warden/enroll.sh, /home/lyphe/.claude/claudecodeui_lyphe/warden/systemd/cerberus-warden.service
+governs: /home/lyphe/.claude/claudecodeui_lyphe/deploy/dev-supervisor/supervisor.mjs, /home/lyphe/.claude/claudecodeui_lyphe/deploy/systemd/install.sh, /home/lyphe/.claude/claudecodeui_lyphe/scripts/prod-client-build.sh, /home/lyphe/.claude/claudecodeui_lyphe/vite-plugins/compressResponses.js, /home/lyphe/.claude/claudecodeui_lyphe/vite-plugins/precompressedAssets.js, /home/lyphe/.claude/claudecodeui_lyphe/warden/enroll.sh, /home/lyphe/.claude/claudecodeui_lyphe/warden/systemd/cerberus-warden.service, /home/lyphe/.claude/claudecodeui_lyphe/warden/systemd/cerberus-warden-sessions.service
 
 ## MAN-555 — Rules that bite
 section: hosting/002 Rules that bite
@@ -4808,7 +4809,7 @@ section: hosting/002 Rules that bite/002 ArchPulse's port 8005 must never be pro
   invariant and the gate that enforces it are at
   [docs/architecture/MANUAL.md (07-live-widgets)](architecture/MANUAL.md) §"The DocSpace kind".
 - **A server heal no longer kills an in-flight Claude session, and the API that comes back
-  re-adopts it.** A turn's CLI is now exec'd inside the `cloudcli-sessions` tmux server rather
+  re-adopts it.** A turn's CLI (of a project on no node; a node's is exec'd in its warden's `cerberus-warden` tmux server, MAN-695) is now exec'd inside the `cloudcli-sessions` tmux server rather
   than as a child of the API, so `systemctl restart cloudcli-server-dev` tears down only the
   API's own cgroup and the CLI keeps running: the socket it loses is read as a detach, never as
   end-of-input. On the way back up — *before* `server.listen` on a plain boot, so a browser
@@ -4849,7 +4850,7 @@ section: hosting/002 Rules that bite/003 The `.verify/` probes drive this same i
   ArchPulse restart mid-run does are in its §"What bites people".
 - **Never kill the client by pattern.** `pkill -f 'sleep infinity'` reaches every such process
   on the box, and this fork's chat-session server holds one on the private `-L cloudcli-sessions`
-  socket, which nothing watches. Use
+  socket, and this machine's warden holds another on `-L cerberus-warden`; nothing watches either. Use
   `systemctl restart cloudcli-client-dev` instead.
 - **A dead tmux keepalive still reads `active`.** The keepalive unit above sets
   `Restart=always` *and* `RemainAfterExit=yes`, and the second defeats the first: kill the
@@ -4887,8 +4888,10 @@ sudo journalctl -u cloudcli-server-dev -f       # the handover: `[supervisor] ch
                                                 # `[supervisor] reboot requested by pid <n>: …` = the API asking for its own handover, from Settings → Updates
 curl -s -o /dev/null -w '%{http_code}\n' http://127.0.0.1:5183/            # 200
 curl -s -o /dev/null -w '%{http_code}\n' http://127.0.0.1:5183/api/cli-version  # 401 = alive, auth-gated
-sudo systemctl restart cloudcli-sessions-tmux   # the only cure for a silently dead keepalive — takes every live chat CLI with it
-sudo systemctl stop cloudcli-sessions-tmux      # deliberate: end every live chat session at once
+sudo systemctl restart cloudcli-sessions-tmux   # the only cure for a silently dead keepalive — takes every chat CLI in this server's keepalive with it
+sudo systemctl stop cloudcli-sessions-tmux      # deliberate: end every live chat session in this server's keepalive at once
+tmux -L cerberus-warden ls                      # the same probe for the Cerberus warden's session server: `_keepalive` plus one session per chat of a project assigned to this node (MAN-7897)
+sudo systemctl stop cerberus-warden-sessions    # deliberate: end every live session on this node's warden (installed by warden/enroll.sh, never by install.sh)
 # installing the keepalive (new to systemd, so enable --now — install.sh renders the template and
 # daemon-reloads on its own):
 deploy/systemd/install.sh cloudcli-sessions-tmux.service
@@ -7727,7 +7730,7 @@ place every provider's terminal `complete` passes — and stamps `last_read_at` 
 when the chat was already on screen as the run ended, so a chat you were watching never goes
 unread. A server restart re-adopts every chat whose process outlived it. A re-adopted chat whose turn
 had already finished is closed without stamping when its host's journal shows no turn ending after
-the session's `last_completed_at` (`lastTurnFinishedAt` in `session-host/hosts.ts`) — a re-stamp
+the session's `last_completed_at` (`lastTurnFinishedAt` in `session-host/host-registry.js`) — a re-stamp
 there would make it unread again with no new activity — and stamped when one did, since a follow-up
 turn a background task pushed ends without a completion of its own. Otherwise the read comes from the chat's own `chat.presence` report: the presence handler in
 `chat-websocket.service.ts` marks the row read when a socket reports that chat `visible`, in either
@@ -9751,8 +9754,8 @@ Four things to know before running one:
   and `cloudcli-sessions-tmux`. This is the browser suite's "run it solo, when nobody is in the
   app" rule with teeth — a case takes the API down under anyone else's session. Six cases run in
   about five minutes.
-- **Every turn is a real `claude` turn** against the operator's own credentials, so a sweep
-  spends real tokens. The prompts are deliberately trivial ("reply with exactly the word
+- **Every turn is a real `claude` turn** against the operator's own credentials, on Haiku (the driver
+  sends `model: 'haiku'`), so a sweep spends real tokens. The prompts are deliberately trivial ("reply with exactly the word
   FINISHED") for that reason.
 - **Each case creates and deletes its own probe session** (D-12) however it ends, so a sweep
   leaves the sessions list as it found it. `probe-*` files left in `~/.cloudcli/sessions` mean an
@@ -12721,10 +12724,10 @@ section: The roadmap face — RoadmapTab, RoadmapTreeFace and RoadmapPicker (src
 - Body `div[ref=bodyRef]`: `flex min-h-0 flex-1 flex-col gap-3 px-4 pb-4 pt-3 lg:px-6`. It holds `RoadmapTree` with `maxHeight={treeRoom}`, then `TreePanel fit="viewport"`, a fixed band (MAN-7840).
 - `useTreeRoom(bodyRef, viewport && hasTree)` (`hooks/useTreeRoom.ts`) returns `treeRoom`: the body's content height (padding left out) less the panel's `offsetHeight` less `BODY_GAP` (12px, the `gap-3`), floored at 0; `null` until measured, which the tree reads as its natural size.
 - Measured in a layout effect (the first frame is already fitted) and again by a `ResizeObserver` on the body and on the panel (found by `[data-roadmap-panel]`). The band's height is fixed, so the room never moves as the panel fills.
-- The tree scales into `treeRoom` between 0.6 and 1 (MAN-7827 "Fit and pane"); below the floor its pane scrolls down.
+- The tree's fit scales into `treeRoom` between 0.6 and 1 (MAN-7827 "Fit and pane"); below the floor, or zoomed (MAN-7827 "Zoom"), its pane scrolls down.
 
 ## Column fit
-- The tree takes `maxHeight={null}` (natural size, in its own sideways pane); the panel `fit="column"` takes its natural height. They sit in `div.flex.min-w-0.flex-col.gap-3.p-3` inside the scroller.
+- The tree takes `maxHeight={null}` (natural size, in its own sideways pane; zoomed, the pane keeps the drawing's fit height and scrolls inside it, MAN-7827 "Fit and pane"); the panel `fit="column"` takes its natural height. They sit in `div.flex.min-w-0.flex-col.gap-3.p-3` inside the scroller.
 - A press on the TREE brings the panel's head into the scroller: `selectOnTree` sets `revealPanelRef` (`!viewport`), and an effect on `selection` scrolls the panel's `h2` (else the panel) into view, `block: 'nearest'`. A press on a panel row does not (it is already at the panel). Viewport fit never sets it.
 - A milestone moment scrolls `columnScrollRef`, the one scroller that can hide its ring (`useMilestoneMomentInView`, MAN-7792).
 

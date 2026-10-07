@@ -3,8 +3,10 @@
 //
 //   CHAIN        `chain.mjs` keeps each check's `prevAt` across restarts (what center acked, saved on acks and at a
 //                clean stop), so a restart does not blank the minutes before it for a quiet check.
-//   COMPOSITION  the link asks the scheduler what to put in `hello` and every heartbeat (`state()`), and the
-//                scheduler sends and receives through the link (`checks.set` in, `result` out). Every later plan's
+//   COMPOSITION  the link asks the scheduler, the catalog and the runner what to put in `hello` and every heartbeat
+//                (`state()`), and they send and receive through the link (`checks.set` and `catalog.set` and
+//                `run.start` in, `result` and `run.*` out; the session host's `session.*` frames both ways, and
+//                none of them through the outbox). Every later plan's
 //                frame joins the same way: a `link.on(type, fn)` registered here, before the link starts, and a
 //                field in `state()` when center must be told of it in `hello`.
 //   RUN.JSON     rewritten on the link's own events — after every heartbeat, whenever a socket closes (the link's
@@ -13,18 +15,36 @@
 //                at stop too. A write that fails is one log line, never the end of the daemon.
 //   LOG          the link says its own changes (`linked to …`, `link lost — retrying in 1 s`); this file adds
 //                one line at start and one at stop.
+import { createCatalog } from './catalog.mjs';
 import { createChain } from './chain.mjs';
 import { takeHomeLock } from './home-lock.mjs';
 import { createLink } from './link.mjs';
 import { log } from './log.mjs';
 import { createOutbox } from './outbox.mjs';
 import { createProbes } from './probes.mjs';
+import { createRunner } from './runner.mjs';
+import { createSessions } from './sessions.mjs';
 import { hasNodeKey, homeDir, homePaths, readIdentity, version, writeRun } from './state.mjs';
 
 const NOT_ENROLLED = 'This node is not enrolled — run enroll.sh with a token from Cerberus';
 
 /** After the link is closed, how long the process waits for the close handshake to carry the last batch out. */
 const SHUTDOWN_GRACE_MS = 250;
+
+/**
+ * The ids of the runs that are over but whose `run.*` frames still wait on the outbox for center's ack:
+ * `hello.active.owed`. Center ends a live run that neither `active.runs` nor this names (its child and its
+ * outbox are gone, or its `run.start` never arrived) and leaves one that is named here, because its frames
+ * are resent after the `welcome` and end it themselves.
+ */
+function runsOwed(outbox, running) {
+  const owed = new Set();
+  for (const frame of outbox.pending(0)) {
+    const runId = frame.body?.runId;
+    if (frame.type.startsWith('run.') && typeof runId === 'string' && !running.includes(runId)) owed.add(runId);
+  }
+  return [...owed];
+}
 
 /** The sentence saying why this home cannot run, or null when its identity and key are all there. */
 function homeProblem(identity, home) {
@@ -56,13 +76,16 @@ export async function runDaemon() {
   if (lock !== 'held') log(`could not take the one-daemon lock on this home (${lock}); going on without it`);
 
   const outbox = createOutbox({ home });
-  // `probes` exists once the link does; the link reads this only after `start()`, when both are built.
-  const state = () => ({
-    checksVersion: probes.checksVersion,
-    catalogVersion: null,
-    active: { runs: [], diags: [] },
-    probesRunning: probes.scheduled, // the wire's word for "how many probes it has scheduled" (cerberus-types.ts)
-  });
+  // `probes`, `catalog` and `runner` exist once the link does; the link reads this only after `start()`, when all are built.
+  const state = () => {
+    const running = runner.activeWork().runs;
+    return {
+      checksVersion: probes.checksVersion,
+      catalogVersion: catalog.version,
+      active: { runs: running, diags: [], owed: runsOwed(outbox, running) },
+      probesRunning: probes.scheduled, // the wire's word for "how many probes it has scheduled" (cerberus-types.ts)
+    };
+  };
   const report = () => {
     try {
       writeRun({
@@ -83,6 +106,9 @@ export async function runDaemon() {
   const link = createLink({ identity, home, outbox, state, onReport: report });
   const chain = createChain({ home, outbox });
   const probes = createProbes({ link, previousAt: chain.previousAt });
+  const catalog = createCatalog({ link });
+  const runner = createRunner({ link, catalog });
+  const sessions = createSessions({ link, home });
   link.on('ack', chain.noteAck);
   // After `createProbes`: handlers of one frame run in registration order, so the scheduler has applied
   // the checks a `welcome` or a `checks.set` carries by the time the record is written.
@@ -100,6 +126,8 @@ export async function runDaemon() {
       stopping = true;
       log(`${signal} received; stopping`);
       probes.stop(); // flushes the batch while the link is still up
+      runner.stop(); // kills the commands it started: none outlives its warden
+      sessions.stop(); // detaches every session channel; the hosts, in their own cgroup, keep running
       link.stop();
       chain.save(); // what the outbox still holds is not acked, so the saved chain stops short of it
       report();

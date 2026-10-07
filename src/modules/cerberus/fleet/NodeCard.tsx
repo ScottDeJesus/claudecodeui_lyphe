@@ -1,10 +1,12 @@
 import { useTranslation } from 'react-i18next';
 
-import { groupOf } from '@/modules/cerberus/fleet/fleetModel';
+import { useCerberus } from '@/modules/cerberus/context/CerberusContext';
+import { groupOf, runOnService } from '@/modules/cerberus/fleet/fleetModel';
+import { NodeProjects } from '@/modules/cerberus/fleet/NodeProjects';
 import { ServiceRow } from '@/modules/cerberus/fleet/ServiceRow';
 import { StatusGlyph, StatusSquare } from '@/modules/cerberus/StatusMarks';
-import { nodeMark, STATUS_TABLE } from '@/modules/cerberus/utils/cerberusStatus';
-import { isRestarting, nodeLine, serviceSentence, wardenLine } from '@/modules/cerberus/utils/fleetWords';
+import { markLook, nodeMark } from '@/modules/cerberus/utils/cerberusStatus';
+import { isRestarting, nodeLine, serviceSentence, sessionsTail, wardenLine } from '@/modules/cerberus/utils/fleetWords';
 import type { CerberusNodeView } from '@/shared/cerberus-types';
 import type { CerberusCellShape, CerberusSheetTarget, FleetItem, FleetStatus } from '@/shared/types';
 import { EmptyState, FoldChevron } from '@/shared/ui';
@@ -64,19 +66,25 @@ export function Heartbeat({ node, name }: { node: CerberusNodeView; name?: strin
 /** A collapsed node's services as squares, each named by its sentence; "+N" past eight; a dashed square for none. */
 function ServiceSquares({ node }: { node: CerberusNodeView }) {
   const { t } = useTranslation();
+  // A service with a fix running is the info square, named by "Fix running on its own" / "Fix running".
+  const { overview } = useCerberus();
+  const running = overview?.running ?? [];
   if (node.services.length === 0) {
     return <span aria-hidden className="block size-2.5 rounded-[3px] border border-dashed border-input" />;
   }
   const hidden = node.services.length - SQUARES_SHOWN;
   return (
     <>
-      {node.services.slice(0, SQUARES_SHOWN).map((service) => (
-        <StatusSquare
-          key={service.service}
-          status={service.status}
-          label={t('cerberus.node.squareTip', { label: service.label ?? service.service, text: serviceSentence(t, service) })}
-        />
-      ))}
+      {node.services.slice(0, SQUARES_SHOWN).map((service) => {
+        const run = runOnService(running, node.id, service);
+        return (
+          <StatusSquare
+            key={service.service}
+            status={run === null ? service.status : 'fixing'}
+            label={t('cerberus.node.squareTip', { label: service.label ?? service.service, text: serviceSentence(t, service, run) })}
+          />
+        );
+      })}
       {hidden > 0 && <span className="text-[10.5px] text-muted-foreground">{t('cerberus.node.moreSquares', { count: hidden })}</span>}
     </>
   );
@@ -113,23 +121,27 @@ const STAGGER_PLACES = 24;
  *
  * Open, it is the chevron, the name and description, and the warden line ("Warden 0.4.2 · heard 3 s
  * ago", "Warden 0.4.2 · restarting", "Warden 0.4.1 · silent since 17:41", "Waiting for the first
- * heartbeat", or for the hub, "Cerberus · this server"); then a `ServiceRow` per service, or "Nothing to
- * watch yet" when it has none ("Waiting to hear from it" before its first heartbeat). In Grid it spans
+ * heartbeat", or for the hub, "Cerberus · this server"), which ends " · 2 sessions running here" while
+ * the warden reports and hosts chats; then a `ServiceRow` per service, or "Nothing to
+ * watch yet" when it has none ("Waiting to hear from it" before its first heartbeat); then, on a node
+ * that runs on this machine, `NodeProjects`, "Projects that run here". In Grid it spans
  * the grid and lifts off it, and an empty node draws the kit's `EmptyState`; in List it opens a canvas
  * band under its row, where an empty node is one sentence at the band's indent, as the list's rows are.
  *
- * Every mark is the one table's: the glyph, the squares, and the tile's edge by its cell shape.
- * `fixing` and `enrolling` are words the fixes and updates plans feed. Until then no node reads either,
- * and each draws as a node with no mark.
+ * Every mark is the one table's: the glyph, the squares, and the tile's edge by its cell shape. A node
+ * with a fix running is `fixing`: the info ●, its tile edged in the info dot. `enrolling` is the updates
+ * plan's word; until it is fed, no node reads it, and it draws as a node with no mark.
  *
  * Used by Fleet's `FleetGrid` and `FleetList`, once per node of the page.
  */
 export function NodeCard({ item, node, open, face, index, narrow = false, now, onToggle, onOpenCell }: NodeCardProps) {
   const { t } = useTranslation();
   const mark = nodeMark(item.status);
-  const tone = mark === null ? undefined : STATUS_TABLE[mark].tone;
+  const tone = mark === null ? undefined : markLook(mark).tone;
   const line = nodeLine(t, item, node);
   const warden = wardenLine(t, node, now);
+  // " · N sessions running here", drawn after the warden line wherever it is drawn as words.
+  const sessionsCount = sessionsTail(t, node);
   // The words that ask for a look: needs you, and no result. Their line is written in their tone's ink.
   const loud = groupOf(item.status) === 'needs' || item.status === 'unknown';
   const entrance = { animationDelay: `${Math.min(index, STAGGER_PLACES) * STAGGER_MS}ms` };
@@ -185,6 +197,7 @@ export function NodeCard({ item, node, open, face, index, narrow = false, now, o
             <span className="inline-flex flex-none items-center gap-[7px] text-xs text-muted-foreground">
               <Heartbeat node={node} />
               {warden}
+              {sessionsCount}
             </span>
           )}
         </button>
@@ -194,10 +207,11 @@ export function NodeCard({ item, node, open, face, index, narrow = false, now, o
               <div className="flex items-center gap-[7px] px-4 py-2 text-xs text-muted-foreground">
                 <Heartbeat node={node} />
                 {warden}
+                {sessionsCount}
               </div>
             )}
             {services}
-            {/* SLOT: projects — the sessions plan's `NodeProjects` ("Projects that run here", "Run a project here") follows a co-located node's services. */}
+            {node.colocated && <NodeProjects node={node.id} link={node.link} projects={node.projects} face="list" />}
           </div>
         )}
       </div>
@@ -225,11 +239,12 @@ export function NodeCard({ item, node, open, face, index, narrow = false, now, o
               <span className="inline-flex items-center gap-[7px]">
                 <Heartbeat node={node} />
                 {warden}
+                {sessionsCount}
               </span>
             </span>
           </button>
           {services}
-          {/* SLOT: projects — the sessions plan's `NodeProjects` ("Projects that run here", "Run a project here") follows a co-located node's services. */}
+          {node.colocated && <NodeProjects node={node.id} link={node.link} projects={node.projects} face="grid" />}
         </div>
       ) : (
         <button
@@ -241,7 +256,7 @@ export function NodeCard({ item, node, open, face, index, narrow = false, now, o
           className={cn(
             'flex size-full min-w-0 flex-col gap-2 rounded-xl bg-card px-3 py-2.5 text-left',
             'transition-[transform,box-shadow] duration-[400ms] ease-enter hover:-translate-y-1 hover:shadow-md active:scale-[.96] motion-reduce:transform-none',
-            mark === null ? UNMARKED_EDGE : TILE_EDGE[STATUS_TABLE[mark].cell],
+            mark === null ? UNMARKED_EDGE : TILE_EDGE[markLook(mark).cell],
           )}
         >
           <span className="flex w-full min-w-0 items-center gap-2">

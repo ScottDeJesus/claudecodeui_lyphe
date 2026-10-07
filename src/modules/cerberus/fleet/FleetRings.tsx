@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { ringsLayout } from '@/modules/cerberus/fleet/fleetModel';
 import { RingDot, RingHub, RingsKey } from '@/modules/cerberus/fleet/RingMarks';
 import { RingsNodePanel } from '@/modules/cerberus/fleet/RingsNodePanel';
-import { nodeMark, STATUS_TABLE } from '@/modules/cerberus/utils/cerberusStatus';
+import { markLook, nodeMark } from '@/modules/cerberus/utils/cerberusStatus';
 import { nodeLine } from '@/modules/cerberus/utils/fleetWords';
 import type { CerberusNodeView } from '@/shared/cerberus-types';
 import { useHostWindow } from '@/shared/context/HostWindowContext';
@@ -238,8 +238,8 @@ export function FleetRings({ items, nodes, now, onOpenCell }: FleetRingsProps) {
                     )}
                   >
                     {mark !== null && (
-                      <span data-tone={STATUS_TABLE[mark].tone} className="mr-1 text-tone-ink">
-                        {STATUS_TABLE[mark].glyph}
+                      <span data-tone={markLook(mark).tone} className="mr-1 text-tone-ink">
+                        {markLook(mark).glyph}
                       </span>
                     )}
                     {item.id}

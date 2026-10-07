@@ -10,6 +10,9 @@
 //             set keeps its timer, its memory and its run in flight: editing one definition must not
 //             open a hole in the cadence of every other probe.
 //   OVERLAP   a probe never runs against itself — a turn that finds its run still going is skipped.
+//   RUN NOW   `probe.run { probe }` (center's recheck after a fix) runs that probe once, now, and sends its
+//             result at once; one already running finishes, then runs once more, so the answer is never the
+//             read that began before the fix. The cadence of its timer is not touched.
 //   RESULTS   a simple kind yields one result keyed by the probe; a health_doc yields its own check
 //             plus one result per component. They wait in a batch that goes out as reliable `result`
 //             frames after a second, or at once at 500. A frame holds at most 500 results and
@@ -111,6 +114,7 @@ export function createProbes({ link, previousAt = new Map() }) {
   const schedule = new Map(); // probe key → { spec, fingerprint, timer }
   const memories = new Map(); // probe key → the object the kind keeps between runs
   const running = new Set(); // probe keys whose run is in flight
+  const runAgain = new Set(); // probe keys asked to run now while their run was in flight
   let batch = [];
   let flushTimer = null;
   let checksVersion = null;
@@ -187,7 +191,7 @@ export function createProbes({ link, previousAt = new Map() }) {
 
   // --- one run ------------------------------------------------------------------------------------
 
-  async function fire(entry) {
+  async function fire(entry, { sendNow = false } = {}) {
     const { spec } = entry;
     if (running.has(spec.key)) return; // still going: this turn is skipped
     running.add(spec.key);
@@ -208,16 +212,19 @@ export function createProbes({ link, previousAt = new Map() }) {
       // A probe that left, or was redefined, while this run was going has nothing to say any more.
       if (stopped || schedule.get(spec.key) !== entry) return;
       enqueue(resultsOf(spec, outcome, Date.now()));
+      if (sendNow) flush();
     } finally {
       running.delete(spec.key);
+      const current = runAgain.delete(spec.key) && !stopped ? schedule.get(spec.key) : null;
+      if (current) turn(current, { sendNow: true });
     }
   }
 
   // --- the schedule -------------------------------------------------------------------------------
 
   // `fire` is not meant to reject, but a rejection nobody awaits would end the whole daemon.
-  function turn(entry) {
-    fire(entry).catch((error) => log(`probe ${entry.spec.key} turn failed: ${error?.code ?? error?.name ?? 'unknown'}`));
+  function turn(entry, options) {
+    fire(entry, options).catch((error) => log(`probe ${entry.spec.key} turn failed: ${error?.code ?? error?.name ?? 'unknown'}`));
   }
 
   // The first turn comes after a random 0–`every`; each turn re-arms the next before it runs, so a
@@ -267,10 +274,23 @@ export function createProbes({ link, previousAt = new Map() }) {
     log(`now running checks version ${set.version}: ${schedule.size} probe(s)`);
   }
 
+  /** Runs `probeKey` now (once more after the run in flight, when there is one); false when this warden does not schedule it. */
+  function runNow(probeKey) {
+    const entry = schedule.get(probeKey);
+    if (!entry) {
+      log(`ignoring probe.run for ${typeof probeKey === 'string' ? probeKey : 'a probe with no key'}: this warden does not schedule it`);
+      return false;
+    }
+    if (running.has(probeKey)) runAgain.add(probeKey);
+    else turn(entry, { sendNow: true });
+    return true;
+  }
+
   link.on('checks.set', apply);
   link.on('welcome', (welcome) => {
     if (welcome?.checks) apply(welcome.checks);
   });
+  link.on('probe.run', (body) => runNow(body?.probe));
 
   return {
     get checksVersion() {
@@ -282,10 +302,12 @@ export function createProbes({ link, previousAt = new Map() }) {
     get scheduled() {
       return schedule.size;
     },
+    runNow,
     stop() {
       stopped = true;
       for (const entry of schedule.values()) clearTimeout(entry.timer);
       schedule.clear();
+      runAgain.clear();
       killLiveProcesses();
       flush();
     },

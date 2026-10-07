@@ -47,7 +47,12 @@ import { wardenLinks } from './warden-links.js';
 /** The only path a websocket upgrade is taken on. */
 const WARDEN_WS_PATH = '/cerberus/ws';
 
-/** The largest frame a warden may send: a result batch is kilobytes, so this is a ceiling, not a target. */
+/**
+ * The largest frame a warden may send: a result batch is kilobytes, so for results this is a ceiling,
+ * not a target; a `session.frame` carries one CLI line verbatim and can be megabytes. A frame past it
+ * closes the whole link (1009), so the warden keeps what it relays under it (NODE SESSIONS in
+ * `cerberus-types.ts`).
+ */
 const MAX_FRAME_BYTES = 8 * 1024 * 1024;
 
 /** How long a refused socket may take to read its answer before it is destroyed regardless. */

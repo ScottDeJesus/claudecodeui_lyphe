@@ -21,11 +21,15 @@
 #   enroll   (--name, --token)  refused when identity.json already exists (that is a refresh). Fetches
 #            latest.json and the release from center, checks the SHA-256, unpacks into
 #            ~/.cerberus-warden/releases/<version>/, points `current` at it, runs `enroll`, then
-#            writes the unit, enables it and restarts it so the daemon reads the identity just made.
+#            writes every unit the release carries, enables them and restarts cerberus-warden so the
+#            daemon reads the identity just made.
 #   refresh  (--refresh)        refused unless identity.json exists. Fetches a release only when it is
 #            NEWER than `current`'s, points `current` at it, writes every unit template the release
-#            carries, enables any unit not yet enabled, restarts cerberus-warden. Identity and keys
-#            are never touched.
+#            carries, enables (and so starts) any unit not yet enabled, restarts cerberus-warden — and only
+#            that: cerberus-warden-sessions holds the node's running chat sessions and is never restarted by
+#            a refresh. Identity and keys are never touched.
+#
+# TOOLS. node 22+, curl, tar, sha256sum, systemctl, and tmux at /usr/bin/tmux (the sessions unit's ExecStart).
 #
 # The whole body sits in main(), called on the last line: `curl | sh` feeds this file to the shell as
 # it arrives, so a download cut short must not run half a script, and no command inside may read what
@@ -130,6 +134,21 @@ render_units() {
   [ -n "$RENDERED" ] || die "The release carries no unit to install."
 }
 
+# Enables, and so starts, every rendered unit that is not enabled yet — the warden's, and the session keepalive that
+# holds the node's chat sessions. A unit that is already enabled is left running: only the warden is restarted, below.
+# The keepalive failing to start (another tmux server already holds its socket, say) is a warning and not the end of
+# the script: `set -e` would stop here with `current` already swapped and the warden still the old one, never restarted.
+enable_units() {
+  for unit in $RENDERED; do
+    systemctl is-enabled --quiet "$unit" && continue
+    case "$unit" in
+      cerberus-warden.service) systemctl enable --now "$unit" ;;
+      *) systemctl enable --now "$unit" ||
+           printf '%s\n' "Warning: $unit did not start — read why with: journalctl -u ${unit%.service} -n 20. The warden goes on without it; once the cause is gone: systemctl start $unit" >&2 ;;
+    esac
+  done
+}
+
 # The last line claims the warden is reporting, so it waits for the daemon's own word that center let it in:
 # `run.json` is rewritten on every welcome, heartbeat and close, and a record written after the restart that
 # says `linked: true` is that word. A unit that falls over, or runs but is refused (a clock more than 60 s off
@@ -191,10 +210,12 @@ main() {
   WARDEN_HOME="$ACCOUNT_HOME/.cerberus-warden"
 
   missing=''
-  for tool in node curl tar sha256sum systemctl; do
+  for tool in node curl tar sha256sum systemctl tmux; do
     command -v "$tool" > /dev/null 2>&1 || missing="$missing $tool"
   done
   [ -z "$missing" ] || die "This machine is missing:$missing — install what is missing, then run this again."
+  # cerberus-warden-sessions starts tmux by this absolute path, as the API's own sessions unit does.
+  [ -x /usr/bin/tmux ] || die "tmux is installed as $(command -v tmux), but the cerberus-warden-sessions unit starts /usr/bin/tmux — install tmux with the system's package manager."
   NODE=$(command -v node)
   case "$NODE" in /*) ;; *) die "node was found as \"$NODE\", which is not an absolute path." ;; esac
   node_major=$("$NODE" -p 'process.versions.node.split(".")[0]')
@@ -222,9 +243,7 @@ main() {
     fi
     render_units
     systemctl daemon-reload
-    for unit in $RENDERED; do
-      systemctl is-enabled --quiet "$unit" || systemctl enable --now "$unit"
-    done
+    enable_units
     systemctl restart cerberus-warden.service
     require_linked
     say "The warden on $NODE_NAME runs $(installed_version)."
@@ -241,7 +260,7 @@ main() {
     die "Cerberus did not enroll this machine, so no unit was installed."
   render_units
   systemctl daemon-reload
-  systemctl enable --now cerberus-warden.service
+  enable_units
   # `enable --now` starts nothing on a unit that is already running; the restart makes it read the identity just written.
   systemctl restart cerberus-warden.service
   require_linked

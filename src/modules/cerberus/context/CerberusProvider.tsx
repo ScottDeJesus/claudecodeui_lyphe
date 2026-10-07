@@ -2,12 +2,13 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, typ
 import { useTranslation } from 'react-i18next';
 
 import { CerberusContext, type CerberusValue } from '@/modules/cerberus/context/CerberusContext';
+import { useCatalogRead } from '@/modules/cerberus/hooks/useCatalogRead';
 import { hm } from '@/modules/cerberus/utils/cerberusTime';
-import { api, refusalSentence, REQUEST_TIMEOUT_MS } from '@/shared/api';
-import type { CerberusOverview } from '@/shared/cerberus-types';
+import { api, refusalCode, refusalSentence, REQUEST_TIMEOUT_MS } from '@/shared/api';
+import type { CerberusNodeProject, CerberusNodeView, CerberusOverview } from '@/shared/cerberus-types';
 import { useToast } from '@/shared/context/ToastContext';
 import { useWebSocket } from '@/shared/context/WebSocketContext';
-import type { CerberusLabelInput, CerberusMuteInput } from '@/shared/types';
+import type { CerberusLabelInput, CerberusMuteInput, CerberusProjectMove } from '@/shared/types';
 
 /**
  * The least gap between two reads that `cerberus_changed` frames may start. Center already coalesces
@@ -48,6 +49,27 @@ function checkLabelIn(overview: CerberusOverview | null, node: string, key: stri
   return key;
 }
 
+/**
+ * The warden link of a node, read off the overview the provider holds, or `null` when the node is not in
+ * it. A toast about a project that moved onto a node says whether its warden is reporting, and the
+ * answer is the one the re-read just brought in, not the one at the press.
+ */
+function nodeLinkIn(overview: CerberusOverview | null, node: string): CerberusNodeView['link'] | null {
+  return overview?.nodes.find((nodeView) => nodeView.id === node)?.link ?? null;
+}
+
+/**
+ * The refusal a project move answers in words of its own, in the section's banner: the server's 409
+ * `PROJECT_NODE_NOT_COLOCATED` ("not enrolled" and "not on this machine" are one answer to the person:
+ * the project stays on this server). Anything else is a failed write, and the toast says it.
+ */
+async function isNotColocatedRefusal(response: Response): Promise<boolean> {
+  return response.status === 409 && (await refusalCode(response)) === 'PROJECT_NODE_NOT_COLOCATED';
+}
+
+/** How one write came out: it landed (and the overview was re-read), it was refused in words the caller says, or it failed (and the toast has said so). */
+type WriteVerdict = 'landed' | 'refused' | 'failed';
+
 /** True when a body is the overview shape: the two fields every view dereferences are there. */
 function isOverview(body: unknown): body is CerberusOverview {
   if (body === null || typeof body !== 'object') return false;
@@ -56,7 +78,20 @@ function isOverview(body: unknown): body is CerberusOverview {
 }
 
 /**
- * THE FLEET'S ONE READER, AND THE THREE WRITES THE TAB PRESSES.
+ * The overview with the fixes plan's fields filled in where an older server left them out (an older API
+ * answering a newer client): `running` as none, each need's `fix` and `run` as null. Every view dereferences
+ * them, and one missing field must not stand the error boundary in place of the whole panel.
+ */
+function withFixFields(body: CerberusOverview): CerberusOverview {
+  return {
+    ...body,
+    running: body.running ?? [],
+    needsYou: body.needsYou.map((need) => ({ ...need, fix: need.fix ?? null, run: need.run ?? null })),
+  };
+}
+
+/**
+ * THE FLEET'S ONE READER, AND THE WRITES THE TAB PRESSES.
  *
  * Mounted once by App, inside the auth gate and below WebSocketProvider: `api.cerberus` is an
  * authenticated route and must never be asked against the login screen, and the frames that move
@@ -64,7 +99,9 @@ function isOverview(body: unknown): body is CerberusOverview {
  *
  * ONE READ, EVERY READER. The tab's Fleet view, its header and the workspace strip's count pill all
  * draw from the one overview, so a mute pressed in the sheet is already in the strip's number when
- * the sheet closes, and no reader can hold a copy of the fleet the others cannot see.
+ * the sheet closes, and no reader can hold a copy of the fleet the others cannot see. The catalog is read
+ * with it, in the same `refresh`, so a run's press and an auto-run switch bring the entry and the run
+ * back together.
  *
  * THE READ IS THE PICTURE. A write answers the row it wrote and nothing reads that body: the screen
  * comes from the read that follows the write, so a card is never drawn from an answer center has
@@ -103,6 +140,14 @@ export function CerberusProvider({ children }: { children: ReactNode }) {
   // needs a timer of its own.
   const [stale, setStale] = useState(false);
 
+  // The catalog beside the overview, and the one read that brings it.
+  const { catalog, catalogFailed, readCatalog } = useCatalogRead();
+
+  // The entries whose Run press is out: center answers once the warden has accepted the run, which can take
+  // up to 10 s, and every Run now of those entries reads "Running…" for the wait. A list, since a press on
+  // another entry inside that wait must not take the first one's label back.
+  const [starting, setStarting] = useState<string[]>([]);
+
   // When the overview held was last answered (epoch ms), 0 before any answer. A ref beside the state:
   // a failed read judges against it, and a read that never changes the picture must not re-render.
   const lastAnswerAtRef = useRef(0);
@@ -123,11 +168,11 @@ export function CerberusProvider({ children }: { children: ReactNode }) {
   // write's re-read must not land after it and put the pre-write fleet back on screen.
   const newestAnswerRef = useRef(0);
 
-  // The write in flight per target (a check's mute, a mute's lift, a label). A second press on a
-  // target that is already writing answers this promise and starts no second write — a double click
-  // on Mute must not append two mutes; the entry leaves when the promise settles, which is after
-  // the re-read that follows a write that landed.
-  const writesInFlightRef = useRef(new Map<string, Promise<boolean>>());
+  // The write in flight per target (a check's mute, a mute's lift, a label, a project's node). A second
+  // press on a target that is already writing answers this promise and starts no second write — a double
+  // click on Mute must not append two mutes; the entry leaves when the promise settles, which is after
+  // the re-read that follows a write that landed. Each target's writes answer one kind of value.
+  const writesInFlightRef = useRef(new Map<string, Promise<unknown>>());
 
   /**
    * A good answer, applied wholesale: the overview IS the answer, so it replaces what was held. A
@@ -147,7 +192,7 @@ export function CerberusProvider({ children }: { children: ReactNode }) {
    * whose body has the overview's shape — replaces it; anything else, or a throw, leaves it as it
    * was and says "could not be read" only while there is none yet.
    */
-  const refresh = useCallback(async () => {
+  const readOverview = useCallback(async () => {
     const ticket = ++newestReadRef.current;
     let answer: CerberusOverview | null = null;
     // The read's own deadline, over the headers AND the body: a half-open connection never fails by
@@ -158,7 +203,7 @@ export function CerberusProvider({ children }: { children: ReactNode }) {
       const response = await api.cerberus.overview({ signal: deadline.signal });
       if (response.ok) {
         const body: unknown = await response.json();
-        if (isOverview(body)) answer = body;
+        if (isOverview(body)) answer = withFixFields(body);
       }
     } catch {
       // A throw here is this app's own network, the deadline above, or a body that is not JSON — the
@@ -186,9 +231,19 @@ export function CerberusProvider({ children }: { children: ReactNode }) {
     apply(answer);
   }, [apply]);
 
+  /**
+   * The overview and the catalog, read together; answers when the OVERVIEW has. The catalog is secondary
+   * data and follows on its own: a write's verdict waits for the picture it moved, never for a catalog read
+   * that hangs for its 30 s deadline.
+   */
+  const refresh = useCallback(async () => {
+    void readCatalog();
+    await readOverview();
+  }, [readOverview, readCatalog]);
+
   /** ONE WRITE PER TARGET: the promise is on the map before a second press can see it. */
-  const writeOnce = useCallback((target: string, write: () => Promise<boolean>): Promise<boolean> => {
-    const held = writesInFlightRef.current.get(target);
+  const writeOnce = useCallback(<Answer,>(target: string, write: () => Promise<Answer>): Promise<Answer> => {
+    const held = writesInFlightRef.current.get(target) as Promise<Answer> | undefined;
     if (held) return held;
     const promise = write().finally(() => {
       writesInFlightRef.current.delete(target);
@@ -203,15 +258,22 @@ export function CerberusProvider({ children }: { children: ReactNode }) {
    * followed by that re-read BEFORE this answers, so the card has already left Needs you when the
    * caller's toast speaks. A refusal's body is read for the SERVER'S OWN WORDS ("until must be
    * within the next 24 hours"), which go under the toast when it carried any.
+   *
+   * A caller whose screen says one particular refusal in words of its own passes `saysOwnRefusal`: that
+   * refusal is `refused`, with no toast, and every other one is `failed` as before.
    */
-  const sendWrite = useCallback(async (request: () => Promise<Response>): Promise<boolean> => {
+  const settleWrite = useCallback(async (
+    request: () => Promise<Response>,
+    saysOwnRefusal?: (response: Response) => Promise<boolean>,
+  ): Promise<WriteVerdict> => {
     let sentence: string | null = null;
     try {
       const response = await request();
       if (response.ok) {
         await refresh();
-        return true;
+        return 'landed';
       }
+      if (saysOwnRefusal && (await saysOwnRefusal(response))) return 'refused';
       sentence = await refusalSentence(response);
     } catch {
       // No answer at all — this app's own network — so there is no server sentence to carry; the
@@ -226,8 +288,14 @@ export function CerberusProvider({ children }: { children: ReactNode }) {
         ...(sentence === null ? {} : { message: sentence }),
       });
     }
-    return false;
+    return 'failed';
   }, [refresh, toast]);
+
+  /** A write whose only answers are "it landed" and "it did not": `settleWrite`, flattened. */
+  const sendWrite = useCallback(
+    async (request: () => Promise<Response>): Promise<boolean> => (await settleWrite(request)) === 'landed',
+    [settleWrite],
+  );
 
   /**
    * A mute. The one write that speaks when it lands — "Muted until 08:00 · <label> keeps running and
@@ -261,6 +329,62 @@ export function CerberusProvider({ children }: { children: ReactNode }) {
   const setLabel = useCallback((input: CerberusLabelInput): Promise<boolean> => writeOnce(
     `label:${input.node}/${input.key ?? input.service ?? ''}`,
     () => sendWrite(() => api.cerberus.setLabel(input)),
+  ), [writeOnce, sendWrite]);
+
+  /**
+   * A project's chats moved onto a node's warden, or back to this server (`node` null). It speaks when it
+   * lands, since the chat itself looks the same wherever its CLI runs: "<project> runs on eis1 now" (with
+   * the message that its messages are refused until eis1's warden reports, while it is not reporting),
+   * "<project> runs on this server again". The server's 409 `PROJECT_NODE_NOT_COLOCATED` is `refused` and
+   * silent: the section's banner says it. A project takes one write at a time, so a second press answers
+   * the first's verdict.
+   */
+  const setProjectNode = useCallback((project: CerberusNodeProject, node: string | null): Promise<CerberusProjectMove> => writeOnce(
+    `project-node:${project.projectId}`,
+    async () => {
+      const verdict = await settleWrite(() => api.projects.setNode(project.projectId, node), isNotColocatedRefusal);
+      // `refused` and `failed` are already said (by the banner, by the toast): they pass through.
+      if (verdict !== 'landed') return verdict;
+      if (mountedRef.current) {
+        if (node === null) {
+          toast({ tone: 'positive', title: tRef.current('cerberus.node.projects.toast.back', { name: project.name }) });
+        } else {
+          const reporting = nodeLinkIn(overviewRef.current, node) === 'reporting';
+          toast({
+            tone: 'positive',
+            title: tRef.current('cerberus.node.projects.toast.here', { name: project.name, node }),
+            ...(reporting ? {} : { message: tRef.current('cerberus.node.projects.toast.hereWaiting', { node }) }),
+          });
+        }
+      }
+      return 'moved';
+    },
+  ), [writeOnce, settleWrite, toast]);
+
+  /**
+   * A catalog entry run now, by you. The press waits for the warden's ack (up to 10 s) and for the re-read
+   * that follows, so by the time it answers the overview holds the run and the card's strip is there. Silent
+   * when it lands, since the strip is the proof; a refusal (a run already going on the check, the node's
+   * warden not linked) raises the write's own toast with the server's sentence. A second press of the same
+   * entry answers the first's verdict.
+   */
+  const runEntry = useCallback((id: string): Promise<boolean> => writeOnce(
+    `run:${id}`,
+    async () => {
+      setStarting((current) => [...current, id]);
+      try {
+        return await sendWrite(() => api.cerberus.runEntry(id));
+      } finally {
+        // Only this entry leaves: a press on another entry meanwhile is still out.
+        if (mountedRef.current) setStarting((current) => current.filter((held) => held !== id));
+      }
+    },
+  ), [writeOnce, sendWrite]);
+
+  /** An entry's auto-run switched. Silent when it lands: the switch and its line are the proof; a capped entry is refused with the server's sentence in the toast. */
+  const setAuto = useCallback((id: string, on: boolean): Promise<boolean> => writeOnce(
+    `auto:${id}`,
+    () => sendWrite(() => api.cerberus.setAuto(id, on)),
   ), [writeOnce, sendWrite]);
 
   useEffect(() => {
@@ -303,17 +427,23 @@ export function CerberusProvider({ children }: { children: ReactNode }) {
     };
   }, [refresh, subscribe]);
 
-  // Anything that reads the fleet re-draws when a read lands. The four verbs keep one identity, so
-  // in practice only `overview`, `unreachable` and `stale` ever make a new value here.
+  // Anything that reads the fleet re-draws when a read lands. The verbs keep one identity, so
+  // in practice only `overview`, `unreachable`, `stale`, `catalog` and `starting` ever make a new value here.
   const value = useMemo<CerberusValue>(() => ({
     overview,
     unreachable,
     stale,
+    catalog,
+    catalogFailed,
     refresh,
     mute,
     liftMute,
     setLabel,
-  }), [overview, unreachable, stale, refresh, mute, liftMute, setLabel]);
+    setProjectNode,
+    starting,
+    runEntry,
+    setAuto,
+  }), [overview, unreachable, stale, catalog, catalogFailed, refresh, mute, liftMute, setLabel, setProjectNode, starting, runEntry, setAuto]);
 
   return <CerberusContext.Provider value={value}>{children}</CerberusContext.Provider>;
 }

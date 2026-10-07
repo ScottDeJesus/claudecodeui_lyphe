@@ -1,6 +1,7 @@
 // `npm run build:warden`: packs the warden into the one tarball `enroll.sh` installs.
 //
-//   dist-warden/cerberus-warden-<version>.tar.gz   the release: warden/{package.json,enroll.sh,src,systemd} at their repo paths
+//   dist-warden/cerberus-warden-<version>.tar.gz   the release: warden/{package.json,enroll.sh,src,systemd} and the four
+//                                                  session-host files (`HOST_FILES`) at their repo paths, plus a root package.json
 //   dist-warden/cerberus-warden-<version>.tar.gz.sha256   `sha256sum -c` format
 //   dist-warden/latest.json   { version, file, sha256, size, builtAt } — the release a node fetches first
 //
@@ -26,8 +27,21 @@ import { fileURLToPath } from 'node:url';
 
 const OUTPUT_DIR = 'dist-warden';
 const STAGE_PREFIX = `${OUTPUT_DIR}/stage-`;
+/**
+ * The session host the warden runs, by the same relative path as in the checkout: `warden/src/sessions.mjs` imports
+ * `host-registry.js` as `../../server/...`, and `host-registry.js` names `host.js` beside itself, which imports the
+ * other two. Nothing of them is copied or rewritten for the warden; the files that ship are the files the API runs.
+ */
+const HOST_DIR = 'server/modules/providers/list/claude/session-host';
+const HOST_FILES = ['host.js', 'host-conn.js', 'host-journal.js', 'host-registry.js'].map((name) => `${HOST_DIR}/${name}`);
 /** What goes into a release, relative to the repo root. Everything else under `warden/` (the manuals, this script) stays home. */
-const RELEASE_PATHS = ['warden/package.json', 'warden/enroll.sh', 'warden/src', 'warden/systemd'];
+const RELEASE_PATHS = ['warden/package.json', 'warden/enroll.sh', 'warden/src', 'warden/systemd', ...HOST_FILES];
+/**
+ * The release root's own package.json. The four session-host files are plain `.js` ES modules, and Node reads a
+ * `.js` file's module type from the nearest package.json above it — which in the checkout is the app's, and in a
+ * release would be none: a Node before 22.7 would then read them as CommonJS and fail on their first `import`.
+ */
+const RELEASE_ROOT_PACKAGE = `${JSON.stringify({ name: 'cerberus-warden-release', private: true, type: 'module' }, null, 2)}\n`;
 
 const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 // Every path below is relative to the repo root, so the stage's prefix check reads the way it is written.
@@ -49,6 +63,7 @@ function stageRelease(stage) {
     fs.mkdirSync(path.dirname(target), { recursive: true });
     fs.cpSync(relative, target, { recursive: true });
   }
+  fs.writeFileSync(path.join(stage, 'package.json'), RELEASE_ROOT_PACKAGE);
 }
 
 const force = process.argv.includes('--force');

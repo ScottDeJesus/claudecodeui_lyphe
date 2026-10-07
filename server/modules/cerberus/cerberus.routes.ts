@@ -4,6 +4,7 @@ import type { Request, Response, Router } from 'express';
 import type { CerberusGatewayState, CerberusReadInputs } from '@/shared/cerberus-types.js';
 import { AppError, asyncHandler, readPathParam } from '@/shared/utils.js';
 
+import { listCatalog, setAuto, writeEntry } from './catalog.service.js';
 import { getDefinition, putDefinition, retireCheck, setLabel } from './definitions.service.js';
 import { enrollmentStatus, mintEnrollment } from './enrollments.service.js';
 import { createMute, liftMute } from './mutes.service.js';
@@ -11,9 +12,10 @@ import { activity } from './read-model/activity.js';
 import { checkDetail, checkIndex } from './read-model/check-detail.js';
 import { lookupAt } from './read-model/lookup.js';
 import { buildOverview } from './read-model/overview.js';
+import { getRun, startRun } from './runs.service.js';
 
 /**
- * Cerberus's thirteen routes, created by `cerberus.module.ts` for the server entrypoint's one mount
+ * Cerberus's eighteen routes, created by `cerberus.module.ts` for the server entrypoint's one mount
  * at `/api/cerberus`.
  *
  * WHAT A ROUTE DECIDES HERE. Transport SHAPE only: that a field is the kind of value the verb takes
@@ -27,8 +29,8 @@ import { buildOverview } from './read-model/overview.js';
  * failure is an `AppError` with a `CERBERUS_` code, which the entrypoint's error middleware turns into
  * `{ success: false, error: { code, message, details } }`.
  *
- * `by` — who muted — is the signed-in user's name, which `authenticateToken` (on the mount) put on
- * the request.
+ * `by` — who muted, who wrote a fix, who switched one's auto-run — is the signed-in user's name,
+ * which `authenticateToken` (on the mount) put on the request.
  *
  * A READ is `readInputs()` handed to the read model: the moment, every node's link, the gateway and
  * ingest's memory, gathered once per request by the module, so "now" is one instant for the whole
@@ -70,6 +72,28 @@ function optionalText(source: Record<string, unknown>, field: string): string | 
   if (value === undefined || value === null) return undefined;
   if (typeof value !== 'string') throw badRequest(`${field} must be text.`);
   return value;
+}
+
+/** A number field that must be there; whether it is in range is the service's refusal. */
+function requiredNumber(source: Record<string, unknown>, field: string): number {
+  const value = source[field];
+  if (typeof value !== 'number' || !Number.isFinite(value)) throw badRequest(`${field} must be a number.`);
+  return value;
+}
+
+/** A true/false field that may be absent; present, it must be one. */
+function optionalBoolean(source: Record<string, unknown>, field: string): boolean | undefined {
+  const value = source[field];
+  if (value === undefined) return undefined;
+  if (typeof value !== 'boolean') throw badRequest(`${field} must be true or false.`);
+  return value;
+}
+
+/** A nested JSON object field that must be there. */
+function requiredObject(source: Record<string, unknown>, field: string): Record<string, unknown> {
+  const value = source[field];
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) throw badRequest(`${field} must be an object.`);
+  return value as Record<string, unknown>;
 }
 
 /** A moment or count in a query string: whole digits, or absent. */
@@ -141,6 +165,60 @@ export function createCerberusRouter({ readInputs, gatewayState }: CerberusRoute
       const before = optionalWholeNumber(request, 'before') ?? inputs.now + 1;
       const limit = optionalWholeNumber(request, 'limit') ?? DEFAULT_ACTIVITY_LIMIT;
       response.json(activity({ before, limit: Math.min(MAX_ACTIVITY_LIMIT, limit) }, inputs));
+    })
+  );
+
+  router.get(
+    '/catalog',
+    asyncHandler(async (_request: Request, response: Response) => {
+      response.json(listCatalog());
+    })
+  );
+
+  router.post(
+    '/catalog',
+    asyncHandler(async (request: Request, response: Response) => {
+      const body = readBody(request);
+      const limit = requiredObject(body, 'limit');
+      const entry = writeEntry(
+        {
+          node: requiredText(body, 'node'),
+          check: requiredText(body, 'check'),
+          name: requiredText(body, 'name'),
+          when: requiredText(body, 'when'),
+          cmd: requiredText(body, 'cmd'),
+          timeout: requiredNumber(body, 'timeout'),
+          limit: { runs: requiredNumber(limit, 'runs'), per: requiredNumber(limit, 'per') },
+          recheck: optionalBoolean(body, 'recheck'),
+          capped: optionalText(body, 'capped'),
+        },
+        { kind: 'written', by: readUsername(request), at: Date.now() }
+      );
+      response.json(entry);
+    })
+  );
+
+  router.put(
+    '/catalog/:id/auto',
+    asyncHandler(async (request: Request, response: Response) => {
+      const on = optionalBoolean(readBody(request), 'on');
+      if (on === undefined) throw badRequest('on must be true or false.');
+      response.json(setAuto(readPathParam(request.params.id, 'id'), on, readUsername(request)));
+    })
+  );
+
+  router.post(
+    '/catalog/:id/run',
+    asyncHandler(async (request: Request, response: Response) => {
+      const runId = await startRun({ entryId: readPathParam(request.params.id, 'id'), by: 'you' });
+      response.json({ runId });
+    })
+  );
+
+  router.get(
+    '/runs/:id',
+    asyncHandler(async (request: Request, response: Response) => {
+      response.json(getRun(readPathParam(request.params.id, 'id')));
     })
   );
 

@@ -2,9 +2,10 @@ import { useTranslation } from 'react-i18next';
 
 import { groupOf } from '@/modules/cerberus/fleet/fleetModel';
 import { Heartbeat, NodeGlyph } from '@/modules/cerberus/fleet/NodeCard';
+import { NodeProjects } from '@/modules/cerberus/fleet/NodeProjects';
 import { ServiceRow } from '@/modules/cerberus/fleet/ServiceRow';
-import { nodeMark, STATUS_TABLE } from '@/modules/cerberus/utils/cerberusStatus';
-import { nodeLine, wardenLine } from '@/modules/cerberus/utils/fleetWords';
+import { markLook, nodeMark } from '@/modules/cerberus/utils/cerberusStatus';
+import { nodeLine, sessionsTail, wardenLine } from '@/modules/cerberus/utils/fleetWords';
 import type { CerberusNodeView } from '@/shared/cerberus-types';
 import type { CerberusSheetTarget, FleetItem } from '@/shared/types';
 import { Card } from '@/shared/ui';
@@ -27,10 +28,12 @@ type RingsNodePanelProps = {
  *
  * Its head is the glyph of its worst word, its name and description, its one line ("docstore — refused",
  * in its tone's ink when it asks for a look), and ✕. Under the head comes the warden line beside its
- * heartbeat: "Warden 0.4.1 · silent since 17:41", or "Cerberus · this server" for the hub. Before a node's
+ * heartbeat: "Warden 0.4.1 · silent since 17:41", or "Cerberus · this server" for the hub; a reporting
+ * warden that hosts chats ends it " · 2 sessions running here". Before a node's
  * first heartbeat that line is the node's own line, so it is said once, in the head. Then come its
  * services, one `ServiceRow` each, the rows its card opens to in Grid. A row's name opens the sheet at
- * now, and a minute opens it at that minute. A node with nothing to watch says so in one sentence.
+ * now, and a minute opens it at that minute. A node with nothing to watch says so in one sentence. A node
+ * that runs on this machine ends with `NodeProjects`, "Projects that run here", as its card does in Grid.
  *
  * It rises with `vv-pop`. The rings key it by node, so each new selection rises again.
  *
@@ -39,11 +42,13 @@ type RingsNodePanelProps = {
 export function RingsNodePanel({ item, node, now, onClose, onOpenCell }: RingsNodePanelProps) {
   const { t } = useTranslation();
   const mark = nodeMark(item.status);
-  const tone = mark === null ? undefined : STATUS_TABLE[mark].tone;
+  const tone = mark === null ? undefined : markLook(mark).tone;
   // The words that ask for a look, needs you and no result, write the line in their tone's ink, as a card does.
   const inked = tone !== undefined && (groupOf(item.status) === 'needs' || item.status === 'unknown');
   const line = nodeLine(t, item, node);
   const warden = wardenLine(t, node, now);
+  // " · N sessions running here", drawn after the warden line.
+  const sessionsCount = sessionsTail(t, node);
   const waiting = node.link === 'never';
   const close = t('cerberus.fleet.rings.close');
 
@@ -74,6 +79,7 @@ export function RingsNodePanel({ item, node, now, onClose, onOpenCell }: RingsNo
         <p className="flex items-center gap-[7px] px-4 pb-3 text-xs text-muted-foreground">
           <Heartbeat node={node} />
           {warden}
+          {sessionsCount}
         </p>
       )}
       {node.services.length === 0 ? (
@@ -86,8 +92,7 @@ export function RingsNodePanel({ item, node, now, onClose, onOpenCell }: RingsNo
           <ServiceRow key={service.service} node={node.id} service={service} face="grid" onOpenCell={onOpenCell} />
         ))
       )}
-      {/* SLOT: projects — the sessions plan's `NodeProjects` ("Projects that run here", "Run a project here")
-          follows a co-located node's services, as it does on the node's card in Grid. */}
+      {node.colocated && <NodeProjects node={node.id} link={node.link} projects={node.projects} face="grid" />}
     </Card>
   );
 }

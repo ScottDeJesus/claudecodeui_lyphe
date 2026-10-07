@@ -2,7 +2,7 @@ import path from 'node:path';
 
 import type { WebSocket } from 'ws';
 
-import { sessionUserStateDb, sessionsDb } from '@/modules/database/index.js';
+import { projectsDb, sessionUserStateDb, sessionsDb } from '@/modules/database/index.js';
 // Presence is recorded here and read by the notification channels, so a push is
 // never sent about the session the user is looking at right now.
 import { clearPresence, markPresence } from '@/modules/notifications/index.js';
@@ -281,6 +281,9 @@ async function dispatchRun(
     sessionId,
     cwd: clientOptions.cwd ?? session.project_path ?? undefined,
     projectPath: session.project_path ?? clientOptions.projectPath,
+    // Where the project's sessions run. Only the Claude runtime reads it (only Claude has a session
+    // host), and it is the server's answer, never the client's: set after the client's options.
+    node: session.project_path ? projectsDb.nodeForPath(session.project_path) : null,
   };
 
   let failure: string | null = null;

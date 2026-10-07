@@ -44,7 +44,7 @@ import { discoverComponent } from './definitions.service.js';
  *
  * Consumers: `warden-link.ts` (`ingestResults` for a `result` frame, acking after it returns),
  * `self-checks.service.ts` (center's own results, `seq` null), the read model (`memory`), the boot
- * (`seedMemory`) and the `fixes` plan's auto-run (`onChange`) — later phases of this arc.
+ * (`seedMemory`) and `auto-run.ts` (`onChange`).
  */
 
 /** Every `keepalive` copy waits at least this long after the last stored row. */
@@ -63,7 +63,7 @@ const DOC_STATUSES: readonly string[] = ['green', 'yellow', 'red', 'muted'];
 /** The part of a check's last stored row the next result is judged against. */
 type LastStored = { at: number; status: CerberusStoredStatus | null; docStatus: CerberusDocStatus | null; value: string | null };
 
-/** One status that moved (`from` null at first sight; `not_enabled` spells a null). Consumer: the `fixes` plan, via `onChange`. */
+/** One status that moved (`from` null at first sight; `not_enabled` spells a null). Consumer: `auto-run.ts`, via `onChange`. */
 export type CerberusStatusChange = { key: string; from: CerberusStatus | null; to: CerberusStatus; at: number };
 
 /** What `ingest.onChange` listeners receive: one call per ingested frame, naming every check that moved. */

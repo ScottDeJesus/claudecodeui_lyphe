@@ -17,8 +17,9 @@ import { Banner, Button } from '@/shared/ui';
  * second failure is neither repainted nor heard.
  *
  * Used by the tab's root (`CerberusPanel`) while its first read of the fleet has failed and while the
- * fleet it holds is stale, by History's two cards, `LookupCard` and `EventsCard`, and by the check sheet
- * (`CheckSheet`): one spelling of the state for the whole tab.
+ * fleet it holds is stale, by History's two cards, `LookupCard` and `EventsCard`, by the check sheet
+ * (`CheckSheet`), and by the sheet's Fix output (`FixOutput`) when its run's own read failed: one spelling
+ * of the state for the whole tab.
  */
 export function UnreachableBanner({ onRetry, detail }: { onRetry: () => void; detail?: string }) {
   const { t } = useTranslation();

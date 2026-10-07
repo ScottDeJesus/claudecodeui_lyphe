@@ -460,7 +460,7 @@ function WorkspaceMain({
               project is open, and a monitor that hid on a quiet day could never say "All quiet". */}
           {activeTab === 'cerberus' && (
             <div className="h-full overflow-hidden">
-              <CerberusPanel />
+              <CerberusPanel projectChoices={projectChoices} />
             </div>
           )}
 

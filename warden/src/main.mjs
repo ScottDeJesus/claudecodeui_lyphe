@@ -2,7 +2,7 @@
 // with no loader and no dependency, the posture of `deploy/dev-supervisor/*.mjs`.
 //
 //   enroll --center <url> --name <name> --token <token>   become a node of the Cerberus at <url>
-//   run                                                    the daemon: link, outbox and probes, until SIGTERM
+//   run                                                    the daemon: link, outbox, probes, fixes and the session host, until SIGTERM
 //   status                                                 print the identity, the version and the last run
 //
 // A verb answers with its exit code: 0 done, 1 refused or failed (the reason printed), 2 misused.

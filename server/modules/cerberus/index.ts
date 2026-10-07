@@ -25,6 +25,11 @@ export { createCerberusModule } from './cerberus.module.js';
 // wardenLinks: used by the later plans that talk to a warden — `send` and `registerHandler` for the
 // frames of `run.*`, `diag.*`, `update.*` and `session.*`, `onChange` for a node's link moving.
 export { wardenLinks } from './warden-links.js';
-// ingest: used by the `fixes` plan's auto-run, which subscribes to a check's status moving
-// (`onChange`); the same service takes every warden's results and center's own.
-export { ingest } from './ingest.service.js';
+// nodeSessions: used by the session host (`session-host/node-transport.ts`, `node-readopt.ts`, `readopt-host.ts`, `colocated-hosts.ts`)
+// and the projects routes, through this barrel: `openChannel` carries a session's host frames over a
+// node's link, `listHosts` / `retireHost` / `lastListed` adopt and tidy what runs there, `isColocated`
+// tells a node on this machine from a remote one, and `onLinkUp` re-adopts when a warden reconnects.
+export { nodeSessions } from './node-sessions.js';
+// hintChanged: used by the projects module's `setProjectNode`, which writes what a node card shows
+// (`projects`) without any Cerberus store write, so no other path would tell open screens to re-read.
+export { hintChanged } from './cerberus-broadcast.js';

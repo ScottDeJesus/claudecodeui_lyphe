@@ -1,5 +1,5 @@
 import type { CerberusStatus } from '@/shared/cerberus-types';
-import type { CerberusCellShape, FleetStatus, Tone } from '@/shared/types';
+import type { CerberusCellShape, CerberusMark, FleetStatus, Tone } from '@/shared/types';
 
 /**
  * How one status is drawn. `tone` goes onto the mark as `data-tone`, and the `[data-tone]` rules
@@ -51,13 +51,66 @@ export const STATUS_TABLE: Record<CerberusStatus, StatusLook> = {
 };
 
 /**
- * The status a NODE's word draws its marks with, or `null` for a word with no mark. `empty` has none:
- * nothing is on the node to read. `fixing` and `enrolling` are the fixes and updates plans' places, fed
- * by nothing yet, and each plan gives its word a mark when it does.
+ * How a fix's run is drawn, by where it stands: `going` (no result yet), then each result. `tone` goes on
+ * as `data-tone`; `glyph` carries it without colour (MAN-578): ● going, ✓ ok, ▲ failed or timed out — the
+ * fix did not do its part, which a person can look into — and ✕ refused, the only red: a command the
+ * warden would not run because no catalog it acked holds it. A refusal is the run's outcome, never a
+ * check's status, so it is not a row of the status table above.
+ *
+ * Read by the Needs-you card's run strip (`NeedFix`) and the sheet's Fix output (`FixOutput`), so a run
+ * reads the same on the card and in the sheet.
+ */
+export const RUN_LOOK: Record<'going' | 'ok' | 'failed' | 'timed_out' | 'refused', { tone: Tone; glyph: '●' | '✓' | '▲' | '✕' }> = {
+  going: { tone: 'info', glyph: '●' },
+  ok: { tone: 'positive', glyph: '✓' },
+  failed: { tone: 'warn', glyph: '▲' },
+  timed_out: { tone: 'warn', glyph: '▲' },
+  refused: { tone: 'danger', glyph: '✕' },
+};
+
+/**
+ * How the fleet draws a node or a service with a fix running (`fixing`; `design/cerberus/cerberus-fleet.js`
+ * :10 and :18): a running fix's tone and ● (`RUN_LOOK.going`), on the `solid` cell, so every paint map
+ * keyed by cell shape draws it as the prototype does — a node's tile edged 1.5px in the info dot
+ * (`TILE_EDGE`), its ring dot and a service's square filled with it (`DOT_PAINT`, `StatusSquare`), a
+ * service's pill in the info tone. Its glyph pulses (`glyphMotion`, `vv-pulse` 1.4 s) where a failing
+ * one rings: a fix is already on it. Its words go by who started the run: "Fix running on its own" /
+ * "Fix running" (`cerberus.fix.fleet.runningAuto` / `.running`); the rings' key says "Fix running or
+ * updating" (`cerberus.fix.fleet.legend`). `wordKey` is the bare "Fix running", the name a mark carries
+ * to assistive tech when no sentence names it.
+ *
+ * Fed from `overview.running` (`fleetModel`): a node and a service with a run going on one of its checks.
+ * Read through `markLook`, with every status.
+ */
+export const FLEET_FIXING_LOOK: { tone: Tone; glyph: '●'; cell: CerberusCellShape; wordKey: string; glyphMotion: string } = {
+  tone: RUN_LOOK.going.tone,
+  glyph: '●',
+  cell: 'solid',
+  wordKey: 'cerberus.fix.fleet.running',
+  glyphMotion: 'motion-safe:animate-[vv-pulse_1.4s_ease-in-out_infinite]',
+};
+
+/** How a mark is painted: a status's row of the table, or the fixing look. `wordKey` names it to assistive tech. */
+type MarkLook = { tone: Tone; glyph: string; cell: CerberusCellShape; wordKey: string };
+
+/**
+ * The look a mark is painted from: `STATUS_TABLE`'s row for a status, `FLEET_FIXING_LOOK` for `fixing`.
+ * Every mark of a node or a service reads it, so a fix running is the same info ● in a card, a square, a
+ * pill, a ring's dot and the key.
+ */
+export function markLook(mark: CerberusMark): MarkLook {
+  return mark === 'fixing' ? FLEET_FIXING_LOOK : STATUS_TABLE[mark];
+}
+
+/**
+ * The mark a NODE's word draws with, or `null` for a word with no mark. `empty` has none: nothing is on
+ * the node to read. `fixing` is a fix running on the node: the info ●, which pulses where a failing
+ * node rings. `enrolling` is the updates plan's place, fed by nothing yet; that plan gives its word a
+ * mark when it does.
  *
  * Read by Fleet's node card (its glyph and its tile's edge) and by the rings (each node's dot, its
  * label's glyph, and the hub), so a node is drawn the same in every layout.
  */
-export function nodeMark(status: FleetStatus): CerberusStatus | null {
-  return status === 'empty' || status === 'fixing' || status === 'enrolling' ? null : status;
+export function nodeMark(status: FleetStatus): CerberusMark | null {
+  return status === 'empty' || status === 'enrolling' ? null : status;
 }

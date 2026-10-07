@@ -2,7 +2,7 @@
 
 ## MAN-7839 — Warden — the node-side agent: enroll, link, outbox, probe kinds, state directory, unit, eis1; the row that holds each
 
-`warden/` is Cerberus's node-side agent: one daemon per machine, holding one signed websocket to center, running the probes center sends and returning their results. Plain `.mjs` run by bare `node` ≥ 22, no loader and no dependency (the reason of MAN-692). Center's half: `cloudcli:server/modules/cerberus` (MAN-7815, MAN-7816). A plan that changes `warden/` bumps the minor version in `warden/package.json` before it builds (MAN-7826).
+`warden/` is Cerberus's node-side agent: one daemon per machine, holding one signed websocket to center, running the probes center sends and returning their results, and hosting the Claude sessions center assigns it. Plain `.mjs` run by bare `node` ≥ 22, no loader and no dependency; the one exception is the four plain-`.js` session-host files it imports and execs from `server/modules/providers/list/claude/session-host/` (MAN-692). Center's half: `cloudcli:server/modules/cerberus` (MAN-7815, MAN-7816). A plan that changes `warden/` bumps the minor version in `warden/package.json` before it builds (MAN-7826).
 
 ## Where each subject lives
 | subject | row | files |
@@ -11,13 +11,15 @@
 | the state directory, `releases/`, `current`, what survives a restart | MAN-7836 | `state.mjs`, `chain.mjs` |
 | the link: headers, connect signature, pinned center key, welcome, heartbeat, backoff, `readRefusal` | MAN-7824 | `link.mjs`, `wire.mjs` |
 | the outbox: resend, seq floor, the 20 000-result cap | MAN-7835 | `outbox.mjs` |
-| the scheduler: `checks.set`, timers, the batch, `prevAt` | MAN-7821 | `probes.mjs` |
+| the scheduler: `checks.set`, `probe.run`, timers, the batch, `prevAt` | MAN-7821 | `probes.mjs` |
+| the catalog and the runner: `catalog.set` acked, `run.start` checked against it, `run.output`, the timeout | MAN-7895 | `catalog.mjs`, `runner.mjs`, `run-lines.mjs`, `.verify/warden-catalog-runner.mjs` |
 | the probe kinds `http` `tcp` `exec` `file_age` `sql`, the expression grammar, `judge` | MAN-7818 | `expr.mjs`, `probe-support.mjs`, `probe-kinds/` |
 | the `health_doc` kind | MAN-7820 | `probe-kinds/health-doc.mjs` |
 | the artifact, the three routes, the enrollment token, `enroll.sh` | MAN-7826 | `build.mjs`, `enroll.sh`, `server/modules/cerberus/warden-files.ts` |
 | the unit `cerberus-warden.service` | MAN-7837 | `systemd/cerberus-warden.service` |
+| the session host: `session.open`, the host registry the API runs, `cerberus-warden-sessions.service` | MAN-7897 | `sessions.mjs`, `systemd/cerberus-warden-sessions.service`, `.verify/warden-sessions.sh` |
 | eis1, the first node: seven probes, 74 labels | MAN-7838 | `.verify/probe-warden-probes.mjs` |
-| rules an edit keeps | INV-7017 kinds · INV-7028 scheduler · INV-7039 link and outbox · INV-7042 install · INV-7043 daemon | |
+| rules an edit keeps | INV-7017 kinds · INV-7028 scheduler · INV-7039 link and outbox · INV-7042 install · INV-7043 daemon · INV-7080 runner · INV-7095 session host | |
 
 ## Rules of the package
 - Checks stay in the services: a probe exists only for a fact no service reports itself; the one overlap, `system/disk.used`, is named in MAN-7838.
@@ -201,13 +203,14 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/warden/src/probe-kinds/health-do
 
 ## MAN-7821 — Warden scheduler — `createProbes({ link })`: checks.set applied and acked, one timer per probe, the batch and its prevAt
 
-`warden/src/probes.mjs` turns the probes center pushes into the results it stores. `createProbes({ link })` → `{ checksVersion, probesRunning, scheduled, stop() }`. `link` is anything with `on(type, handler)` and `send(type, body, { reliable })` — the warden's link, or a stand-in — and may carry `outbox`, which is read through it. The kinds it calls: MAN-7818 (`http`, `tcp`, `exec`, `file_age`, `sql`) and MAN-7820 (`health_doc`). The wire shapes: `server/shared/cerberus-types.ts` (`CerberusChecksSet`, `CerberusProbeSpec`, `CerberusResultWire`). Rules an edit keeps: INV-7028.
+`warden/src/probes.mjs` turns the probes center pushes into the results it stores. `createProbes({ link })` → `{ checksVersion, probesRunning, scheduled, runNow(probeKey), stop() }`. `link` is anything with `on(type, handler)` and `send(type, body, { reliable })` — the warden's link, or a stand-in — and may carry `outbox`, which is read through it. The kinds it calls: MAN-7818 (`http`, `tcp`, `exec`, `file_age`, `sql`) and MAN-7820 (`health_doc`). The wire shapes: `server/shared/cerberus-types.ts` (`CerberusChecksSet`, `CerberusProbeSpec`, `CerberusResultWire`). Rules an edit keeps: INV-7028.
 
 ## Frames
 | frame | what happens |
 |---|---|
 | in `checks.set { version, probes }` | `apply` |
 | in `welcome { checks }` | `apply(checks)` when the welcome carries one (center sends it when the warden's `hello.checksVersion` differs) |
+| in `probe.run { probe }` | `runNow(probe)` |
 | out `checks.ack { version }` | after every `apply`, not reliable (center sends `checks.set` only while linked) |
 | out `result { results }` | reliable, at most 500 results and 4 MiB a frame |
 
@@ -218,6 +221,9 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/warden/src/probe-kinds/health-do
 - `memory` is one object per probe key, passed to the kind as its second argument; `health_doc` keeps `lastCheckedAt` and `stillSince` in it.
 - A probe never overlaps itself: a run in flight (tracked by key, so a redefined probe's old run counts) makes the next turn skip. A run that ends after its probe left or was redefined is dropped, not sent.
 - `kind` is looked up in a `Map`; a kind this warden does not run is a `failing` result, "This warden does not know that kind of probe". A kind that throws is a `failing` result, "The warden could not run this probe", and the log line carries only the error's code or name.
+
+## `runNow(probeKey)` → boolean
+Center's recheck after a fix (`probe.run`). The probe runs once now and its result is flushed at once, not after the 1 s batch window; its timer is not touched. A probe whose run is in flight finishes, then runs once more (any number of asks meanwhile make ONE more run), so the answer is never the read that began before the fix. A key this warden does not schedule is logged, "ignoring probe.run for <key>: this warden does not schedule it", and answers false. `stop()` forgets a run asked for and not yet started.
 
 ## Results
 | source | results |
@@ -251,7 +257,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/warden/src/probes.mjs
 | `outbox` | default `createOutbox()` (MAN-7835); exposed as `link.outbox` so a caller reads `overflowing` and calls `keepLatest` |
 | `home` | where the node key lives |
 | `onReport()` | called after every heartbeat (the one sent at `welcome` included) and each time a retry is scheduled — a link that was up going down, a connect that failed, an attempt that missed its deadline; never on `stop()`. A throw is logged, `the status report failed: <message>`, and goes no further. The daemon rewrites `run.json` from it (MAN-7825) |
-| `on(type, fn)` | `fn(body, envelope)` runs after the link's own handling of that type; returns a remover. A throw or rejected promise is logged, "the handler of a "<type>" frame failed", and never ends the process |
+| `on(type, fn)` | `fn(body, envelope)` runs after the link's own handling of that type; returns a remover. The one type that is no frame from center is `link.down`: its handlers run, as `fn({}, { type: 'link.down', body: {} })`, when a LINKED socket is lost (never for `stop()`, never for an attempt that did not reach `welcome`) — the session host ends its channels on it (MAN-7897). A throw or rejected promise is logged, "the handler of a "<type>" frame failed", and never ends the process |
 | `send(type, body, { reliable: true })` | numbered by the outbox, kept until acked, resent after a reconnect; queued even while down → `{ seq, sent }`, `sent` = it left on this socket now. Throws what `outbox.push` throws |
 | `send(type, body)` | only while linked, `seq: null`, gone otherwise → `{ seq: null, sent }` |
 
@@ -317,10 +323,10 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/warden-daemon.sh, /home/
 section: Warden verbs — `enroll`, `run`, `status`, exit codes, `run.json`, lost-welcome recovery/001 `run` — `runDaemon()` → exit code
 
 1. No `identity.json` prints `This node is not enrolled — run enroll.sh with a token from Cerberus` and exits 1 before anything is created. An identity without `node`, `center` or `centerKey` prints `The identity in <file> is incomplete`; a home without `keys/node.key` prints `The node key <file> is missing`; both exit 1. A home another daemon already runs on prints ``A warden is already running on <home> — `node warden/src/main.mjs status` shows what it reports`` and exits 1 (`home-lock.mjs`, below).
-2. It builds the outbox, the link and the scheduler. The link's `state()` is read from the scheduler: `{ checksVersion, catalogVersion: null, active: { runs: [], diags: [] }, probesRunning }`, where `probesRunning` is `probes.scheduled` — the wire's "how many probes it has scheduled", so a heartbeat between two turns reads the same as `run.json`'s `probes`. A later plan adds its field there and its `link.on(type, fn)` beside `createProbes`, before `link.start()`.
+2. It builds the outbox, the link, the scheduler, the catalog, the runner (MAN-7895) and the session host `createSessions({ link, home })` (MAN-7897). The link's `state()` is read from them: `{ checksVersion: probes.checksVersion, catalogVersion: catalog.version, active: { runs: runner.activeWork().runs, diags: [], owed: runsOwed(outbox, running) }, probesRunning }`, where `probesRunning` is `probes.scheduled` — the wire's "how many probes it has scheduled", so a heartbeat between two turns reads the same as `run.json`'s `probes`. `owed` is the ids of runs that are over but whose `run.*` frames still wait on the outbox for center's ack (`runsOwed`): center ends a live run that neither `runs` nor `owed` names, so a `run.start` that never arrived does not hold its check. A later plan adds its field there and its `link.on(type, fn)` beside `createProbes`, before `link.start()`.
 3. `run.json` is `{ at, linked, ackedUpto, outbox, overflowing, probes, checksVersion, version }`: `at` the daemon's clock in ms, `outbox` the frames queued (`outbox.size`), `ackedUpto` `outbox.ackedUpto`, `probes` `probes.scheduled`. It is written (0600, durably) once at start, after every heartbeat and each time the link schedules a retry (the link's `onReport`, MAN-7824), after a `welcome` or a `checks.set` has been applied (`link.on` handlers registered after `createProbes`, so the scheduler has applied the checks first), and once after stop — so a record says `linked: false` as soon as the link is lost, shows the queue growing at each failed reconnect, and a `linked: true` one more than three heartbeats old is a daemon that is gone. A write that fails (a full disk, a directory in `run.json`'s place) is one log line, `could not write run.json: <reason>`, at start, at a beat and at stop alike; the daemon goes on. `ackedUpto` and the queue still move only at those events: an `ack` does not rewrite the file.
 4. Log lines: `warden <version> running as <node>, reporting to <center>`; the link's own `linked to <center> as <node>` and `link lost — retrying in <n> s`; `<SIGNAL> received; stopping`.
-5. SIGTERM or SIGINT, once: `probes.stop()` (clears the timers, kills the probe commands still going, flushes the batch while the link is up), `link.stop()`, `chain.save()` (the acked `prevAt` chain to `chain.json`), the final `run.json`, 250 ms for the close handshake, exit 0. A second signal is ignored.
+5. SIGTERM or SIGINT, once: `probes.stop()` (clears the timers, kills the probe commands still going, flushes the batch while the link is up), `runner.stop()` (kills the commands runs started), `sessions.stop()` (detaches every session channel; the hosts keep running in their own cgroup, MAN-7897), `link.stop()`, `chain.save()` (the acked `prevAt` chain to `chain.json`), the final `run.json`, 250 ms for the close handshake, exit 0. A second signal is ignored.
 
 `home-lock.mjs` — `takeHomeLock(home)` → `'held'` · `'taken'` · an error code. One daemon per home: center closes the older link of a node when a newer one connects, so two daemons on one home took it from each other about once a second and both rewrote `state.json`. The lock is a listener on an abstract unix socket named for the home's real path (`\0cerberus-warden:` + the first 32 hex characters of its sha256): the kernel frees it when the process dies, however it dies, so there is no file to go stale and nothing polls. On a platform that cannot bind one (any error but `EADDRINUSE`) `run` logs `could not take the one-daemon lock on this home (<code>); going on without it` and runs.
 
@@ -376,10 +382,10 @@ How `warden/` becomes a running unit on a node: the artifact, the routes center 
 | `warden/build.mjs` | `npm run build:warden` → `dist-warden/` |
 | `server/modules/cerberus/warden-files.ts` | `registerWardenFileRoutes(listen)`, called by `cerberus.module.ts` `start()` before the gateway binds |
 | `warden/enroll.sh` | POSIX `sh`: enroll and `--refresh` |
-| `warden/systemd/cerberus-warden.service` | the unit template; `enroll.sh` fills `__USER__`, `__HOME__`, `__NODE__` |
+| `warden/systemd/cerberus-warden.service`, `warden/systemd/cerberus-warden-sessions.service` | the unit templates; `enroll.sh` fills `__USER__`, `__HOME__`, `__NODE__` (the second uses `__USER__` alone) |
 
 ## The artifact — `npm run build:warden`
-- Stages `warden/{package.json,enroll.sh,src,systemd}` at their repo paths into `dist-warden/stage-XXXXXX` (`mkdtemp`), writes `dist-warden/cerberus-warden-<version>.tar.gz` (`tar -czf … -C <stage> .`, to `<name>.partial` first and renamed once `tar` exits 0), `<file>.sha256` (`sha256sum -c` format) and `latest.json` `{ version, file, sha256, size, builtAt }`. `latest.json` is renamed in last, so a node that reads it finds a whole tarball; a failed or killed build leaves the served name untouched.
+- Stages `warden/{package.json,enroll.sh,src,systemd}` and the four session-host files (`server/modules/providers/list/claude/session-host/{host.js,host-conn.js,host-journal.js,host-registry.js}`, MAN-7897) at their repo paths, plus a release-root `package.json` (`type: module`, so those `.js` files are read as ES modules on every Node ≥ 22), into `dist-warden/stage-XXXXXX` (`mkdtemp`), writes `dist-warden/cerberus-warden-<version>.tar.gz` (`tar -czf … -C <stage> .`, to `<name>.partial` first and renamed once `tar` exits 0), `<file>.sha256` (`sha256sum -c` format) and `latest.json` `{ version, file, sha256, size, builtAt }`. `latest.json` is renamed in last, so a node that reads it finds a whole tarball; a failed or killed build leaves the served name untouched.
 - The stage is removed only while its path still begins `dist-warden/stage-`. A missing release path is refused BEFORE the stage exists; a SIGKILL or SIGTERM mid-build (the work is synchronous, so no handler can run) leaves its `stage-*` and `.partial` in the git-ignored directory, and a later build does not sweep them.
 - A version already built is refused with one sentence unless `--force`; through npm that is `npm run build:warden -- --force` (npm keeps a bare `--force` for itself), and the sentence says so. why: a node holding that version never fetches changed files (`--refresh` installs only a NEWER version), so a plan that changes `warden/` bumps the minor version in `warden/package.json` first, and this refusal is what shows a forgotten bump.
 - `dist-warden/` is git-ignored.
@@ -402,10 +408,10 @@ Run as `curl -fsSL http://<center>/cerberus/enroll.sh | sudo sh -s -- --name <no
 - `--name`: lower-case letters, digits and hyphens, at most 32 characters, never `center`.
 | step | enroll | `--refresh` |
 |---|---|---|
-| refuses | no root; `SUDO_USER` empty or `root`; no `node` ≥ 22, `curl`, `tar`, `sha256sum`, `systemctl`; a copy with no center address; an `identity.json` already there (before any release is fetched or swapped) | the same, except the identity: it refuses when `identity.json` is MISSING, or when given a `--name`/`--token` |
+| refuses | no root; `SUDO_USER` empty or `root`; no `node` ≥ 22, `curl`, `tar`, `sha256sum`, `systemctl`, `tmux` (at `/usr/bin/tmux`, where the sessions unit starts it); a copy with no center address; an `identity.json` already there (before any release is fetched or swapped) | the same, except the identity: it refuses when `identity.json` is MISSING, or when given a `--name`/`--token` |
 | release | always: `latest.json`, tarball, SHA-256 check, extract AS the account into `~/.cerberus-warden/releases/<version>/`, swap `current` (a temporary symlink, then `mv -T`) | only when `latest.json`'s version is newer than `current`'s |
 | enroll | `node current/warden/src/main.mjs enroll --center … --name … --token …` as the account | never; identity and keys are untouched |
-| unit | renders EVERY `warden/systemd/*.service` the release carries, `daemon-reload`, `enable --now cerberus-warden`, `restart cerberus-warden` (`enable --now` starts nothing on a unit already running) | renders EVERY `warden/systemd/*.service` the release carries, `daemon-reload`, `enable --now` any unit not yet enabled, `restart cerberus-warden` |
+| unit | renders EVERY `warden/systemd/*.service` the release carries, `daemon-reload`, `enable --now` each unit not yet enabled (the warden and `cerberus-warden-sessions`), `restart cerberus-warden` (`enable --now` starts nothing on a unit already running) | renders EVERY `warden/systemd/*.service` the release carries, `daemon-reload`, `enable --now` any unit not yet enabled, `restart cerberus-warden` — and only that: `cerberus-warden-sessions` holds the node's running sessions and a refresh never restarts it (INV-7095); a sessions unit that will not start is a warning on stderr and the refresh goes on to restart the warden |
 | last line | "The warden on <name> is reporting to Cerberus at <center>." | "The warden on <node> runs <version>." |
 - The account is `SUDO_USER`, its home from `getent passwd`; everything under `~/.cerberus-warden` is made as that account (`sudo -n -H -u`), so it owns its home and keys. why: writing a unit takes root and the warden must not be root: its probes need that account's `~/.pgpass` and services (MAN-7837).
 - Before the last line `require_linked` waits up to 30 s for the daemon's own word that center let it in: a `run.json` written after the restart with `linked: true`. A unit that falls over is reported, and a unit that runs but is refused (a clock more than 60 s off is the usual cause: the enrollment connect has no clock check, every later connect does) stops the script with center's own reason from the journal (`center refused: clock skew 120 s`) and exit 1. The unit stays installed and enabled; the last line is never printed for a warden that is not linked.
@@ -416,8 +422,8 @@ Run as `curl -fsSL http://<center>/cerberus/enroll.sh | sudo sh -s -- --name <no
 - The first install on eis1, the handover and the two-minute stop: MAN-7838.
 - Measured 2026-10-06 on eis1: 0.2.0 (the chain kept across a restart, and `require_linked`) built with `npm run build:warden` and installed with the printed `curl -fsSL http://100.103.222.79:3012/cerberus/enroll.sh | sudo sh -s -- --refresh` — the first `--refresh` run live: "Fetching the warden 0.2.0 from http://100.103.222.79:3012", "The warden on eis1 runs 0.2.0.", exit 0, `current` -> `releases/0.2.0` beside the kept `releases/0.1.0`, the identity fingerprint unchanged, the daemon linked within its first seconds, and `chain.json` (0600) written within 30 s of the first ack.
 
-## The unit — `cerberus-warden.service`
-Directives, the account and why, the restart policy: MAN-7837. The state directory it runs against: MAN-7836.
+## The units
+`cerberus-warden.service` — directives, the account and why, the restart policy: MAN-7837; the state directory it runs against: MAN-7836. `cerberus-warden-sessions.service` — the session host's tmux server, rendered and enabled with it and never restarted by `--refresh`: MAN-7897.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/warden-files.ts, /home/lyphe/.claude/claudecodeui_lyphe/warden/build.mjs, /home/lyphe/.claude/claudecodeui_lyphe/warden/enroll.sh, /home/lyphe/.claude/claudecodeui_lyphe/warden/systemd/cerberus-warden.service
 
@@ -464,7 +470,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/warden/src/outbox.mjs
 
 ## MAN-7836 — Warden home — `~/.cerberus-warden` (`CERBERUS_WARDEN_HOME`): `releases/`, `current`, `keys/`, `identity.json`, `state.json`, `chain.json`, `run.json`, and what survives a restart
 
-The one directory a warden keeps its state in. `enroll`, `run`, `status` and `enroll.sh` all read or write it; `warden/src/state.mjs` owns every path in it except `releases/` and `current`, which `enroll.sh` makes. Verbs and exit codes: MAN-7825. Install: MAN-7826. Link: MAN-7824. Outbox: MAN-7835. Unit: MAN-7837. The first node: MAN-7838.
+The one directory a warden keeps its state in. `enroll`, `run`, `status` and `enroll.sh` all read or write it; `warden/src/state.mjs` owns every path in it except `releases/` and `current`, which `enroll.sh` makes, and `sessions/`, which `warden/src/sessions.mjs` makes (MAN-7897). Verbs and exit codes: MAN-7825. Install: MAN-7826. Link: MAN-7824. Outbox: MAN-7835. Unit: MAN-7837. The first node: MAN-7838.
 
 ## Location
 | who | home |
@@ -477,13 +483,14 @@ The home and `keys/` are created 0700 and `chmod`ed 0700 on every use. Every wri
 ## Layout
 | path | made by | holds | mode |
 |---|---|---|---|
-| `releases/<version>/` | `enroll.sh` | one extracted release, at its repo paths: `warden/package.json`, `warden/enroll.sh`, `warden/src/**`, `warden/systemd/**` | — |
+| `releases/<version>/` | `enroll.sh` | one extracted release, at its repo paths: `warden/package.json`, `warden/enroll.sh`, `warden/src/**`, `warden/systemd/**`, the four session-host files in `server/modules/providers/list/claude/session-host/`, and a root `package.json` (`type: module`) | — |
 | `current` | `enroll.sh` | relative symlink `releases/<version>`, swapped atomically (`current.next`, then `mv -T`); the unit's `ExecStart` runs through it | — |
 | `keys/node.key` | `enroll` | private key, PKCS8 PEM; the source of truth | 0600 |
 | `keys/node.pub` | `enroll` | public half, a derived copy | 0644 |
 | `identity.json` | `enroll`, once | `{ node, center, centerKey, cert, enrolledAt }` | 0600 |
 | `state.json` | the outbox | `{ seqFloor }` (MAN-7835) | 0600 |
 | `chain.json` | the daemon | `{ <check>: at }` — the last result per check center has acked, so a restart keeps each `prevAt` chain (INV-7028); written on acks, at most every 30 s, and at a clean stop | 0600 |
+| `sessions/` | the daemon, at start (`chmod`ed 0700) | per session host `<hostId>.json` (meta), `<hostId>.ndjson` (journal), `<hostId>.sock` (socket); MAN-7897 | 0700 |
 | `run.json` | the daemon | `{ at, linked, ackedUpto, outbox, overflowing, probes, checksVersion, version }`, rewritten at every heartbeat and link event (MAN-7825) | 0600 |
 
 ## What persists
@@ -502,6 +509,7 @@ The home and `keys/` are created 0700 and `chmod`ed 0700 on every use. Every wri
 | backoff, deadlines, `linked` | the link redials |
 | the one-daemon lock | none: an abstract unix socket the kernel frees when the process dies (MAN-7832) |
 
+- `sessions/` survives a warden restart and a `--refresh`: the hosts run in `cerberus-warden-sessions`' cgroup (MAN-7897). After a reboot its files are residue that `sweepDeadHosts()` removes at the next start.
 - `run.json` is never read by the daemon: `status` and `enroll.sh`'s `require_linked` read it.
 - Unreadable files: `state.json` is logged and its floor starts at 0; `chain.json` is logged and every first result starts a new chain.
 
@@ -509,7 +517,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/warden/enroll.sh, /home/lyphe/.c
 
 ## MAN-7837 — Warden unit — `cerberus-warden.service`: `User=` the operator, `Restart=always`, the installed release, no TCP listener
 
-The one systemd unit a node runs for Cerberus. Template: `warden/systemd/cerberus-warden.service`. Installed copy: `/etc/systemd/system/cerberus-warden.service`, rendered by `enroll.sh` per machine and never edited by hand. Install and refresh: MAN-7826. What `run` does: MAN-7825. Rules an edit keeps: INV-7042.
+One of the two systemd units a node runs for Cerberus; the other, `cerberus-warden-sessions.service`, holds the node's session-host tmux server (MAN-7897). Template: `warden/systemd/cerberus-warden.service`. Installed copy: `/etc/systemd/system/cerberus-warden.service`, rendered by `enroll.sh` per machine and never edited by hand. Install and refresh: MAN-7826. What `run` does: MAN-7825. Rules an edit keeps: INV-7042.
 
 ## Directives
 | line | value | why |
@@ -525,7 +533,7 @@ The one systemd unit a node runs for Cerberus. Template: `warden/systemd/cerberu
 
 - `enroll.sh` fills `__USER__`, `__HOME__`, `__NODE__` with `sed`, after checking all three to `A-Za-z0-9._/+@-`; a rendered unit that still holds a `__WORD__` marker stops the install.
 - No `CERBERUS_WARDEN_HOME` in the unit: the daemon's home is `$HOME/.cerberus-warden`.
-- A release that carries a second `warden/systemd/*.service` gets it rendered and `enable --now`ed by the next `--refresh`.
+- `enroll.sh` renders and `enable --now`s every `warden/systemd/*.service` the release carries: this unit and `cerberus-warden-sessions.service` (MAN-7897), the tmux server that holds the node's chat sessions in a cgroup apart from this unit's, so `systemctl restart cerberus-warden` never reaches one. The warden asks it over `tmux -L cerberus-warden` and refuses a session when it is down.
 
 ## Network and log
 - Dials `identity.json`'s `center` (eis1: `http://100.103.222.79:3012`, the gateway). Listens on no TCP port; its one listener is an abstract unix socket that keeps a second daemon off the home (MAN-7832).
@@ -540,7 +548,7 @@ The one systemd unit a node runs for Cerberus. Template: `warden/systemd/cerberu
 | run a newer release | `curl -fsSL http://<center>/cerberus/enroll.sh \| sudo sh -s -- --refresh` |
 
 ## Measured
-- 2026-10-06, eis1: `systemctl show cerberus-warden -p User -p Restart -p RestartUSec -p ExecStart` → `User=lyphe`, `Restart=always`, `RestartUSec=5s`, `/usr/bin/node /home/lyphe/.cerberus-warden/current/warden/src/main.mjs run`; `current` → `releases/0.2.0`; `systemctl is-active` → `active`; `systemd-analyze verify` on the installed copy prints nothing; `ss -tlnp` holds no listener for the warden's pid.
+- 2026-10-07, eis1: `systemctl show cerberus-warden -p User -p Restart -p RestartUSec -p ExecStart` → `User=lyphe`, `Restart=always`, `RestartUSec=5s`, `/usr/bin/node /home/lyphe/.cerberus-warden/current/warden/src/main.mjs run`; `current` → `releases/0.5.0`; `systemctl is-active` → `active`. 2026-10-06 on 0.2.0: `systemd-analyze verify` on the installed copy printed nothing; `ss -tlnp` held no listener for the warden's pid.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/warden/systemd/cerberus-warden.service
 
@@ -553,7 +561,7 @@ eis1 is the host Cerberus runs on, enrolled as a remote node: the first warden a
 |---|---|
 | node | `eis1` |
 | center | `http://100.103.222.79:3012` (`identity.json`), the tailnet address; no warden code path defaults to a loopback center, so the first node is remote in every way but geography |
-| installed | `current` → `releases/0.2.0`; unit `cerberus-warden.service` as `lyphe` |
+| installed | `current` → `releases/0.5.0`; unit `cerberus-warden.service` as `lyphe` |
 | checks | 81 = 74 components + 7 probes' own checks (`shadow-connector/health` is one of the 7) |
 
 ## The seven probes
@@ -583,3 +591,116 @@ Rule: a probe exists only for a fact no service reports itself, with one excepti
 - Same day, after the pass: `GET /api/cerberus/overview` → eis1 `reporting`, `wardenVersion` 0.2.0, 81 checks; the live document `http://127.0.0.1:8001/status/infrastructure` carried 74 components.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-warden-probes.mjs
+
+## MAN-7895 — Warden catalog and runner — `createCatalog`, `createRunner`: `catalog.set` acked, `run.start` checked against what was acked, `run.output` batches, the timeout ladder
+
+`warden/src/catalog.mjs`, `runner.mjs` and `run-lines.mjs` hold the fixes center has signed for this node and run exactly those, nothing else. `createCatalog({ link })` → `{ version, find(id) }`; `createRunner({ link, catalog, home? })` → `{ activeWork(), stop() }`, where `home` is the directory a command starts in (default `os.homedir()`, the same as an `exec` probe — not the warden's state home, whose `keys/` a command should not start in). `link` is anything with `on(type, handler)` and `send(type, body, { reliable })` — the warden's link, or a stand-in. The wire shapes: `server/shared/cerberus-types.ts` (`CerberusCatalogSet`, `run.start`, `run.accepted`, `run.refused`, `run.output`, `run.end`). The design: `design/cerberus/Cerberus Spec.dc.html` §4. Rules an edit keeps: INV-7080.
+
+## Frames
+| frame | what happens |
+|---|---|
+| in `catalog.set { version, entries, oneOffs }` | `apply` |
+| in `welcome { catalog }` | `apply(catalog)` when the welcome carries one (center sends it when `hello.catalogVersion` differs) |
+| out `catalog.ack { version }` | after every `apply`, not reliable |
+| in `run.start { runId, catalogVersion, entryId, proposalId, cmd, timeout, by }` | verified, then `run.refused` or a run |
+| out `run.accepted`, `run.refused`, `run.output`, `run.end` | all reliable (the outbox): a link that drops mid-run loses none, and they are resent in order |
+| in `probe.run { probe }` | not this file's: `probes.mjs` `runNow(probe)` runs that probe once now and flushes its result at once (MAN-7821 §"`runNow(probeKey)`"); center sends it after a good run with `recheck` (MAN-7909) |
+
+## The catalog
+- `apply` keeps `{ version, byId }` — each entry's `{ id, cmd, timeout }` and each one-off's with its `expiresAt` — REPLACING what it held; where an id is both, the entry wins. A `catalog.set` below the held version is logged, "ignoring a catalog.set of version <n>: this warden holds version <m>", and ignored with no ack: a signed frame carries no freshness, and an older one delivered late would bring a retired command back. The catalog in a `welcome` is applied whatever its version — center chose it for this connection, so a center whose store went back to a lower version still converges. A set without a safe-integer `version` and arrays of entries and one-offs is logged and ignored with no ack. An item without an id, a command or a whole-second timeout, or a one-off without a finite `expiresAt`, is logged and left out; the ack is still sent.
+- A one-off past its `expiresAt` is dropped when it is looked up (`find`) or when a set arrives already past it, and its id is remembered with the moment, so a refusal reads "expired at 18:54" and not "no such entry". No timer.
+- Nothing is written to disk. A restarted warden says `catalogVersion: null` in `hello` and center answers with the catalog in `welcome`; the daemon's `state()` reads `catalog.version` for it.
+
+## Verification — `run.start`, in this order; the first to fail is the run's whole outcome
+| # | what must hold | `run.refused { runId, reason }` |
+|---|---|---|
+| 1 | `catalogVersion` equals the version acked | `Catalog version 13 is not the one this warden acked (12)` — `(none)` before any ack, whatever version the frame names (a `catalogVersion` of null is refused here too, not at step 2) |
+| 2 | the id (`entryId`, else `proposalId`; exactly one) is in that version and not expired | `No entry 'x' in catalog v12` · `The one-off 'd1' expired at 18:54` (the warden's local time) · `The run names both an entry and a proposal` · `The run names no entry or proposal` |
+| 3 | `cmd` is that id's command, byte for byte (`===`) | `The command is not catalog v12's command for 'x'` |
+A frame without a `runId` is logged and ignored (there is nobody to answer); a `runId` that is running, or that ended in this process (the last 500 are remembered), is logged and ignored: one id starts one child, however often the frame arrives. A refusal is logged as `refused run <runId>: <reason>` — never the command.
+
+## The run
+1. `run.accepted { runId, startedAt }`, then `/bin/sh -c <catalog's cmd>` with the account's environment, cwd `home`, stdin closed, leading its own process group.
+2. Output: each stream is cut at newlines; a trailing CR, escape sequences and control characters are stripped, and text before a lone CR (a progress bar's overwritten part) goes. `n` counts from 1 across both streams in arrival order, `t` is seconds since the start. A batch leaves 250 ms after its first line (armed by a line, not ticking) and `finish()` sends the rest. Bounds: a line is cut at 2000 characters (a longer unbroken stream is cut into several), a run keeps its first 5000 lines or 512 KiB, and the count of what was not kept is one last stderr line.
+3. Timeout = the smaller of the catalog's and the frame's: SIGTERM to the process group, SIGKILL 5 s later, and one more SIGKILL to the group as the run is settled, so nothing that ignored the TERM is left; the run ends `timed_out` whatever the command did. The deadline stops when the shell exits: a command that finished in time, but left a child holding its pipes, ends `ok`.
+4. The run ends when the shell has exited and its pipes have drained, or 1 s after the shell exits (a command that left a daemon holding stdout does not hold the run open; the daemon is left alone). `run.end { runId, result, exit, endedAt }`: `ok` for exit 0, `failed` for anything else, `exit` null for a signal or a command that did not start (its stderr line says why).
+5. `activeWork()` → `{ runs: string[] }`, the daemon's `hello.active.runs` (the children still running; the daemon adds `hello.active.owed`, the runs that are over with frames still unacked on the outbox). `stop()` kills every child and sends nothing more; center reconciles the runs it still counts with the next `hello`.
+
+## Measured
+- 2026-10-06, `.verify/warden-catalog-runner.mjs` on a stand-in link: `catalog.set v1` acked; four `run.start`s refused, one sentence each; `echo` accepted, four lines in four batches (+0.00, +0.40, +0.80, +1.21 s), `ok`, `activeWork()` `["r-echo"]` while it ran and `[]` after; `slow` (timeout 1) `timed_out` at 1.0 s with exit null; `probe.run` answered with a `result` at once.
+- Same day, edges on real processes: `yes` for 2 s kept 5000 lines plus the count line and ended `timed_out`; `trap '' TERM; sleep 30 & wait` ended `timed_out` at 6.0 s with no `sleep` left; a command that backgrounded a `sleep` ended `ok` 1.0 s after its shell; a missing cwd ended `failed` with the one stderr line; `stop()` left neither the shell nor its `sleep`, and sent nothing.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/warden-catalog-runner.mjs, /home/lyphe/.claude/claudecodeui_lyphe/warden/src/catalog.mjs, /home/lyphe/.claude/claudecodeui_lyphe/warden/src/run-lines.mjs, /home/lyphe/.claude/claudecodeui_lyphe/warden/src/runner.mjs
+
+## MAN-7897 — Warden session host — `createSessions`: `session.open` spawn and attach over the host registry the API runs, one channel per host, a lost link is a DETACH, `cerberus-warden-sessions`
+
+`warden/src/sessions.mjs` is the node-side half of the session host: a Claude session that runs on this machine for a project center assigned here. `createSessions({ link, home })` → `{ stop() }`, built by `daemon.mjs` beside the scheduler and the runner. `link` is anything with `on(type, handler)` and `send(type, body)` — the warden's link, or a stand-in. The wire shapes: `server/shared/cerberus-types.ts` (`session.open`, `session.frame`, `session.detach`, `session.closed`, `sessions.list`, `sessions.listed`, `session.retire`). The host protocol: MAN-688 and `session-host/MANUAL.md`. Rules an edit keeps: INV-7095.
+
+## One implementation
+The warden runs the files the API runs. `sessions.mjs` imports `createHostRegistry` from `../../server/modules/providers/list/claude/session-host/host-registry.js` — the same relative path in the checkout and in the release, because `build.mjs` stages `host.js`, `host-conn.js`, `host-journal.js` and `host-registry.js` at their repo paths (MAN-692: why they are plain JavaScript) — and `spawnHostSession` execs that directory's `host.js` under tmux. Nothing of either is copied or rewritten in `warden/`.
+- The instance: `createHostRegistry({ tmuxSocketName: 'cerberus-warden', keepaliveSession: '_keepalive', sessionsDir: <home>/sessions })`. The directory is made 0700 at start (mode forced with `chmod`: `mkdir`'s is masked and ignored for one that exists). A directory that cannot be made is one log line, and an open that needs it fails with a sentence.
+- The tmux server is `cerberus-warden-sessions.service`'s (`systemd/cerberus-warden-sessions.service`, rendered and enabled by `enroll.sh`): its own cgroup, so `systemctl restart cerberus-warden` never reaches a session. `tmux -L cerberus-warden ls` lists `_keepalive` and one session per host.
+- The release root carries a `package.json` (`type: module`) that `build.mjs` writes: the four `.js` files take their module type from the nearest package.json above them, and a release has none of the app's.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/warden-sessions-link.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/warden-sessions.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/warden-sessions.sh, /home/lyphe/.claude/claudecodeui_lyphe/warden/src/sessions.mjs, /home/lyphe/.claude/claudecodeui_lyphe/warden/systemd/cerberus-warden-sessions.service
+
+## MAN-7921 — Warden session host — `createSessions`: `session.open` spawn and attach over the — The unit — `cerberus-warden-sessions.service`
+section: Warden session host — `createSessions`: `session.open` spawn and attach over the host registry the API runs, one channel per host, a lost link is a DETACH, `cerberus-warden-sessions`/001 The unit — `cerberus-warden-sessions.service`
+
+Template `warden/systemd/cerberus-warden-sessions.service`; installed copy `/etc/systemd/system/cerberus-warden-sessions.service`, rendered by `enroll.sh` (the template holds one marker, `__USER__`) and never edited by hand. It is a do-nothing keepalive that holds the node's own tmux server (`-L cerberus-warden`, beside the API's `cloudcli-sessions`) in a cgroup apart from `cerberus-warden.service`'s (MAN-7837).
+
+| line | value | why |
+|---|---|---|
+| `Type=forking`, `RemainAfterExit=yes` | `tmux new-session -d` forks the server and its client exits 0 | the unit stays `active` for the server's whole life |
+| `User=__USER__` | the warden's account | the socket and `~/.cerberus-warden/sessions` are that account's |
+| `ExecStart=/usr/bin/tmux -L cerberus-warden -f /dev/null new-session -d -s _keepalive sleep infinity` | holds the server with one no-op session; `-f /dev/null` skips `~/.tmux.conf` | the session holds no host, so no listing names it |
+| `ExecStop=-/usr/bin/tmux -L cerberus-warden kill-server` | stop kills every session pane: `sudo systemctl stop cerberus-warden-sessions` is the deliberate "end every live session on this node" switch | the `-`: a stop with the server already dead lands `inactive`, never `failed` |
+| `Restart=always`, `RestartSec=2` | | |
+| `OOMPolicy=continue` | one OOM kill in the cgroup keeps the unit and its sibling sessions | the default stops the whole cgroup |
+| `After=network.target`, `WantedBy=multi-user.target` | | |
+
+- No `RuntimeDirectory`: journals, sockets and metas live on disk (D-1), never on `/run`'s tmpfs.
+- `systemctl restart cerberus-warden` never reaches a session; `enroll.sh --refresh` never restarts this unit (INV-7095).
+- A dead tmux server still reads `active`: `RemainAfterExit=yes` defeats `Restart=always` (the trap of MAN-5704, same three directives). `systemctl is-active cerberus-warden-sessions` answers `active` and `start` is a no-op, while a new session is refused with "The warden's session server is not running (cerberus-warden-sessions)". The probe is `tmux -L cerberus-warden ls` (`no server running`); the cure is `sudo systemctl restart cerberus-warden-sessions`, which ends every pane. Nothing watches it: `cloudcli-dev-watchdog` does not know the unit. Measured 2026-10-07 on a twin unit with the same directives: after `kill-server` and 4 s, `is-active` → `active`, `tmux ls` → `no server running`.
+- An apt upgrade's `needrestart` restarts an unpinned unit and kills every pane in its cgroup. The unit MUST be pinned by one line, written by hand as root in an override conf under `/etc/needrestart/conf.d/`: `$nrconf{override_rc}{qr(^cerberus-warden-sessions\.service$)} = 0;` (the API's keepalive is pinned the same way in `99-cloudcli-sessions.conf`). Neither `enroll.sh` nor a release writes it, so a node has it only once someone adds it. Whether this machine has it is `python3 ~/.claude/hooks/gotchas_check.py`'s `needrestart_keepalive_override`: `[FAIL]` names the unit, `[PASS]` means every keepalive unit is pinned.
+- Measured 2026-10-07 on eis1: `systemctl show cerberus-warden-sessions` → `User=lyphe`, `Type=forking`, `Restart=always`, `RestartUSec=2s`, `RemainAfterExit=yes`, `OOMPolicy=continue`, `ExecStart` and `ExecStop` as above; `systemctl is-active` → `active`; `tmux -L cerberus-warden ls` → `_keepalive`.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/warden-sessions-link.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/warden-sessions.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/warden-sessions.sh, /home/lyphe/.claude/claudecodeui_lyphe/warden/src/sessions.mjs, /home/lyphe/.claude/claudecodeui_lyphe/warden/systemd/cerberus-warden-sessions.service
+
+## MAN-7922 — Warden session host — `createSessions`: `session.open` spawn and attach over the — Frames
+section: Warden session host — `createSessions`: `session.open` spawn and attach over the host registry the API runs, one channel per host, a lost link is a DETACH, `cerberus-warden-sessions`/002 Frames
+
+| frame | what the warden does |
+|---|---|
+| in `session.open { chan, op: 'spawn', hostId, cwd, frame }` | `isServerUp()`, else `session.closed` "The warden's session server is not running (cerberus-warden-sessions)"; `spawnHostSession(hostId, cwd)`; `connectToHost(hostId, 5000)`; writes `frame` (the host's `spawn`) as its first line |
+| in `session.open { op: 'attach', hostId, cwd: null, frame }` | `isTmuxSessionAlive(hostId)`, else `session.closed` "host <id> is no longer running"; `connectToHost(hostId, 2000)`; writes `frame` (`hello`) |
+| out `session.frame { chan, frame }` | one per line the host writes, verbatim; a line that is not a JSON object with a `t` is logged and dropped |
+| in `session.frame { chan, frame }` | written to the host's socket; one that arrives while the open is still connecting is kept and written after the first frame; one for a channel that is gone is dropped |
+| in `session.detach { chan }` | `socket.end()`; nothing is answered |
+| out `session.closed { chan, reason }` | the open failed (a bad body, no server, tmux refused, the socket would not connect), the host's socket closed with no `exit`, or a host line was too big for one frame |
+| in `sessions.list` → out `sessions.listed { re, hosts }` | `re` is the request envelope's `id`; `hosts` are `listLiveHosts()`, each with `lastTurnFinishedAt(hostId)` |
+| in `session.retire { hostId }` | `retireHost(hostId)`: the host's own socket, `end_input`, SIGTERM after 5 s |
+- None is an outbox frame: the host's journal and its cursor (`hello { fromSeq }`) are the replay, so a lost frame is replayed by the next attach and a second queue here would only disagree with it.
+- A host line over the link's frame ceiling (the gateway's 8 MiB, less 16 KiB for the envelope) is not sent: the channel ends with `session.closed` "A line from host <id> is <n> MiB or more, past the 8 MiB one frame of this link carries — the session cannot go on here", the host is detached (never ended) and the link stands. A line still unfinished past the ceiling is refused without waiting for its end. Without this the gateway closes the whole link on the frame and the host replays the line at every attach.
+- On an `exit` frame the warden relays it, then `removeHostJournal(hostId)` (it was the attached client, so the journal and meta are its), ends the socket and drops the channel; no `session.closed` follows.
+- A `session.open` is refused with a sentence, never silence, for an unknown `op`, a `hostId` outside `[A-Za-z0-9_-]{1,200}` (it is a file name and a tmux session name), a spawn without an absolute `cwd`, or no first frame. A second open on a live `chan` is logged and ignored: answering it would close the live channel at center.
+
+## The lost link — a DETACH, never end-of-file (MAN-688)
+`link.mjs` announces `link.down` to `link.on('link.down', fn)` handlers when a LINKED socket is lost (not for a stop, not for an attempt that never reached `welcome`). `sessions.mjs` then ends every channel's socket — and nothing more: no `end_input`, no `kill`. The host reads a client socket closing as a detach, so the CLI keeps working, and center attaches again when the link is back (`hello { fromSeq }` — the exact last seq it received after a blink, `acked` after a center restart). A channel is removed from the map BEFORE its socket ends, so a late `close` event cannot say `session.closed` on a link that has since come back. `daemon.mjs`'s stop does the same: the hosts are in another cgroup and outlive the warden.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/warden-sessions-link.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/warden-sessions.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/warden-sessions.sh, /home/lyphe/.claude/claudecodeui_lyphe/warden/src/sessions.mjs, /home/lyphe/.claude/claudecodeui_lyphe/warden/systemd/cerberus-warden-sessions.service
+
+## MAN-7923 — Warden session host — `createSessions`: `session.open` spawn and attach over the — Housekeeping — `sweepDeadHosts()`
+section: Warden session host — `createSessions`: `session.open` spawn and attach over the host registry the API runs, one channel per host, a lost link is a DETACH, `cerberus-warden-sessions`/003 Housekeeping — `sweepDeadHosts()`
+
+Removes the files of hosts whose tmux session is gone. It runs on events that say a host may be gone, never on a timer: at start, on every `welcome`, when an attach finds its host dead, and when a channel's socket closes with no `exit`. A host that dies while no channel is open and the link stays up leaves its journal and meta until the next such event (the next link-up, at the latest); `listLiveHosts` ignores them meanwhile, because liveness is the tmux session and never the files.
+
+## What it does not do
+- It never checks a command: a `spawn` frame is run as sent, by design — center, signed, decides to start a session, and the CLI's whole environment travels in that frame. No log line names a frame, a command or an environment.
+- It never writes a frame center did not send (`end_input` and `kill` included).
+- No backpressure: a host replaying a long journal is relayed as fast as the socket reads it.
+
+## Verification
+`bash .verify/warden-sessions.sh` (about 45 s): starts the unit's own command by hand on `-L cerberus-warden` (refusing when a server is already there), runs `createSessions` in process on a stand-in link and a scratch home — a spawn to `exit` with `tmux ls`, `sessions.listed` and the files after; an attach to a host that does not exist; a list with nothing running; a frame that beats the connect; a lost link with the CLI still running, a replay at `fromSeq: 'acked'` and a `session.retire`. Then `warden-sessions-link.mjs`: the same host over the REAL `createLink` against a stand-in center (a `ws` server that signs its frames) — a signed `session.open`, `sessions.listed` answering the envelope's own `id`, the socket dropped on purpose (`link lost; detaching 1 session channel(s)`, the tmux session still there, nothing sent), a redial, an attach at `fromSeq: 'acked'` and a retire. Last, `kill-server` (only for a server this run started) and the scratch home removed.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/warden-sessions-link.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/warden-sessions.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/warden-sessions.sh, /home/lyphe/.claude/claudecodeui_lyphe/warden/src/sessions.mjs, /home/lyphe/.claude/claudecodeui_lyphe/warden/systemd/cerberus-warden-sessions.service

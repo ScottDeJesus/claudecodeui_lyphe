@@ -607,3 +607,36 @@ export function resizeObserverIn(hostWindow: Window, callback: ResizeObserverCal
   const HostResizeObserver = (hostWindow as Window & typeof globalThis).ResizeObserver;
   return typeof HostResizeObserver === 'function' ? new HostResizeObserver(callback) : null;
 }
+
+// ---------------------------
+
+//----------------- ZOOM GESTURE READING ------------
+
+/** Exponential zoom rate per wheel-delta pixel: a 100px mouse-wheel notch is about 25%. */
+const WHEEL_ZOOM_RATE = 0.0022;
+
+/** A trackpad pinch arrives as `ctrl`+wheel with small deltas, so it needs a steeper rate. */
+const PINCH_WHEEL_ZOOM_RATE = 0.01;
+
+/**
+ * The most a single `ctrl`+wheel event may zoom by, in delta pixels. A pinch sends many events of a
+ * few pixels each, but a mouse-wheel notch with Ctrl held is one event of 100 or more — at the
+ * pinch rate that is 2.7× per notch, two notches from the ceiling. Capped, it lands beside a plain notch.
+ */
+const PINCH_WHEEL_MAX_DELTA_PX = 25;
+
+/** Firefox reports wheel deltas in lines; this converts them to the pixels the rates above expect. */
+const LINE_DELTA_PX = 16;
+
+/**
+ * The factor one wheel event multiplies a zoom by: above 1 for a wheel rolled up (or a pinch spread),
+ * below 1 for the other way. A plain wheel is `exp(−deltaY × 0.0022)`; a `ctrl`+wheel, which is what a
+ * trackpad pinch arrives as, is read at the steeper pinch rate with its delta capped, so a mouse-wheel
+ * notch held with Ctrl lands beside a plain one. Used by the kit's Lightbox (`useZoomPan`) and the
+ * roadmap module's tree zoom (`useTreeZoom`), so both zoom by the same wheel.
+ */
+export function wheelZoomRatio(event: WheelEvent): number {
+  const deltaPx = event.deltaY * (event.deltaMode === WheelEvent.DOM_DELTA_LINE ? LINE_DELTA_PX : 1);
+  const zoomPx = event.ctrlKey ? Math.min(PINCH_WHEEL_MAX_DELTA_PX, Math.max(-PINCH_WHEEL_MAX_DELTA_PX, deltaPx)) : deltaPx;
+  return Math.exp(-zoomPx * (event.ctrlKey ? PINCH_WHEEL_ZOOM_RATE : WHEEL_ZOOM_RATE));
+}

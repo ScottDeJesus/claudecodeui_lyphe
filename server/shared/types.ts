@@ -219,6 +219,7 @@ export type GatewayEventKind =
   | 'kanban_event'
   | 'notes_changed'
   | 'cerberus_changed'
+  | 'cerberus_run_output'
   | 'simple_list_changed'
   | 'universe_activity'
   | 'universe_map'

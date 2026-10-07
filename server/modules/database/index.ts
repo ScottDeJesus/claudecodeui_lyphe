@@ -1,7 +1,7 @@
 export { initializeDatabase } from '@/modules/database/init-db.js';
 export { closeConnection, getConnection, getDatabasePath } from '@/modules/database/connection.js';
 // The Cerberus store — a second SQLite file beside auth.db, with its own singleton and its own stepped
-// schema — and its five repositories: used by the cerberus module, whose services read and write the
+// schema — and its seven repositories: used by the cerberus module, whose services read and write the
 // store through them, and whose ingest and definition-write transactions open on its connection. It
 // is not auth.db and no other module reads it.
 export {
@@ -9,6 +9,12 @@ export {
   getCerberusConnection,
   getCerberusDatabasePath,
 } from '@/modules/database/cerberus-connection.js';
+export { cerberusCatalogDb } from '@/modules/database/repositories/cerberus-catalog.db.js';
+export type {
+  CerberusCatalogChangeRow,
+  CerberusCatalogRow,
+  CerberusCatalogSetRow,
+} from '@/modules/database/repositories/cerberus-catalog.db.js';
 export { cerberusDefinitionsDb } from '@/modules/database/repositories/cerberus-definitions.db.js';
 export type {
   CerberusActiveCheckRow,
@@ -31,6 +37,14 @@ export type {
   CerberusStoredResultRow,
   CerberusTransitionRow,
 } from '@/modules/database/repositories/cerberus-results.db.js';
+export { cerberusRunsDb } from '@/modules/database/repositories/cerberus-runs.db.js';
+export type {
+  CerberusRunInsert,
+  CerberusRunLineRow,
+  CerberusRunResult,
+  CerberusRunRow,
+  CerberusRunStatsRow,
+} from '@/modules/database/repositories/cerberus-runs.db.js';
 export { apiKeysDb } from '@/modules/database/repositories/api-keys.js';
 export { appConfigDb } from '@/modules/database/repositories/app-config.js';
 export { credentialsDb } from '@/modules/database/repositories/credentials.js';

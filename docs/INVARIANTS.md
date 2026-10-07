@@ -34,10 +34,10 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Collapsible.tsx, /
 
 - why: in place, the menu is clipped by the first `overflow:hidden` ancestor and painted inside the first ancestor that makes a stacking context; a `backdrop-filter` header scopes the menu's `z-50` to its own layer, so the transcript paints over it.
 - opt-out mount: `src/modules/mcp/McpServers.tsx` only — Settings' `fixed z-[9999]` panel draws a `z-[70]` portalled menu UNDER its own content.
-- a new mount inside an overlay whose layer is above `70` passes `portal={false}`; so does a menu that must scroll with its trigger (the portal path closes on the first scroll).
+- a new mount inside an overlay whose layer is above `70` passes `portal={false}`; so does a menu that must scroll with its trigger (the portal path closes on the page's first scroll). A scroll inside the menu's own list does not close it: the capture listener skips a scroll whose target the menu contains (2026-10-06, for the cerberus node card's capped "Run a project here", which closed the moment it was scrolled).
 - portal rungs: above fullscreen-card (`45`), Dialog (`50`) and the FAB (`60`); under Settings (`9999`), modals (`10000`) and the toast stack (`10001`).
-- `align` is honoured on the portal path (both edges clamped); no mount passes it.
-- proof: `node .verify/export-menu-layer.mjs <label>` — 4 sites × dark/light, exit 0 on `ALL PASS`. 2026-09-25: 94 ok / 0 FAIL; 70 ok / 20 FAIL with the old default.
+- `align` is honoured on the portal path (both edges clamped); one mount passes it: `align="left"`, the cerberus node card's "Run a project here" (`src/modules/cerberus/fleet/NodeProjects.tsx`).
+- proof: `node .verify/export-menu-layer.mjs <label>` — 4 sites × dark/light, exit 0 on `ALL PASS`. 2026-09-25: 94 ok / 0 FAIL; 70 ok / 20 FAIL with the old default. 2026-10-06: 94 ok / 0 FAIL again, once the download step hit-tests an item INSIDE the open menu (`[role="menu"] [role="menuitem"]`): the page now carries `role="menuitem"` rows outside any menu ("Chat Ctrl+.", "Apps"), and the document's first one had read as 4 FAILs.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/mcp/McpServers.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/ActionMenu.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/export-menu-layer.mjs
 

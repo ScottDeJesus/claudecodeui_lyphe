@@ -15,11 +15,18 @@
  * An IDLE session host does not count, on purpose: after a CLI install the idle-version sweep winds
  * those down and the next message starts them on the new binary. Its CLI is a `claude` process, so
  * the process leg drops the pids the live hosts own — a BUSY host is counted by the conversation leg
- * through `busyReason`, the sweep's own test, never a copy of it.
+ * through `busyReason`, the sweep's own test, never a copy of it. The hosts a co-located node's warden
+ * holds are read the same way, asked of the warden when the reading is taken: their CLIs are this
+ * machine's `claude` processes, and an install under one breaks the conversation as it would any other.
  */
 
 import { countRunningMetisSessions } from '@/modules/kanban-metis/index.js';
-import { busyReason, listLiveHosts } from '@/modules/providers/index.js';
+import {
+  busyReason,
+  listColocatedNodeHosts,
+  listLiveHosts,
+  refreshColocatedNodeHosts,
+} from '@/modules/providers/index.js';
 import { chatRunRegistry } from '@/modules/websocket/index.js';
 import type { ClaudeActivity } from '@/shared/claude-activity-types.js';
 
@@ -44,7 +51,9 @@ function countPhrase(count: number, singular: string, plural: string): string {
  *
  * A conversation is named by its app session id in BOTH sources, so one in flight in the run registry
  * AND busy in its host's meta is counted once. The run registry is filtered to `claude` runs: another
- * provider's turn is not Claude work, and an update to Claude's packages cannot disturb it.
+ * provider's turn is not Claude work, and an update to Claude's packages cannot disturb it. The hosts
+ * of the co-located nodes are the warden's list as `refreshColocatedNodeHosts` last read it, which the
+ * caller does just before this.
  */
 function readConversations(): { working: Set<string>; hostCliPids: Set<number> } {
   const working = new Set<string>();
@@ -53,7 +62,7 @@ function readConversations(): { working: Set<string>; hostCliPids: Set<number> }
   }
 
   const hostCliPids = new Set<number>();
-  for (const host of listLiveHosts()) {
+  for (const host of [...listLiveHosts(), ...listColocatedNodeHosts()]) {
     if (host.cliPid !== null) hostCliPids.add(host.cliPid);
     if (busyReason(host) !== null) working.add(host.appSessionId);
   }
@@ -72,6 +81,14 @@ function readConversations(): { working: Set<string>; hostCliPids: Set<number> }
 export async function readClaudeActivity(): Promise<ClaudeActivity> {
   const reasons: string[] = [];
   let hostCliPids = new Set<number>();
+
+  try {
+    await refreshColocatedNodeHosts();
+  } catch (error) {
+    // A co-located warden that cannot answer is a leg that cannot be read: busy, like the rest, and the
+    // conversations this server can read are still counted below.
+    reasons.push(messageOf(error));
+  }
 
   try {
     const conversations = readConversations();

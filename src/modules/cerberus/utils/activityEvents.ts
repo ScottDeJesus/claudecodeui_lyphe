@@ -4,7 +4,7 @@
 // are the data's own and go in as variables, never as keys.
 import type { TFunction } from 'i18next';
 
-import { STATUS_TABLE } from '@/modules/cerberus/utils/cerberusStatus';
+import { RUN_LOOK, STATUS_TABLE } from '@/modules/cerberus/utils/cerberusStatus';
 import { dayAndTime, hm, hms, sameLocalDay } from '@/modules/cerberus/utils/cerberusTime';
 import type { CerberusActivity, CerberusStatus } from '@/shared/cerberus-types';
 import type { TimelineEvent } from '@/shared/types';
@@ -12,6 +12,8 @@ import type { TimelineEvent } from '@/shared/types';
 type CheckActivity = Extract<CerberusActivity, { kind: 'check' }>;
 type MuteActivity = Extract<CerberusActivity, { kind: 'mute' }>;
 type NodeActivity = Extract<CerberusActivity, { kind: 'node' }>;
+type FixActivity = Extract<CerberusActivity, { kind: 'fix' }>;
+type CatalogActivity = Extract<CerberusActivity, { kind: 'catalog' }>;
 
 /** A status as the word the tab shows for it ("Close to the limit"), from the one status table. */
 function statusWord(t: TFunction, status: CerberusStatus): string {
@@ -94,6 +96,45 @@ function nodeEvent(activity: NodeActivity, t: TFunction, when: string): Timeline
 }
 
 /**
+ * A fix's run, at its two moments. As it starts: "Ran on its own: “X”" or "You ran “X”", in a going run's
+ * info tone. As it ends: "“X” finished · Succeeded in 12 s", "· Failed" or "· Timed out", in the result's
+ * tone (`RUN_LOOK`), or "The warden refused “X”" in the refusal's red. The feed's line carries the
+ * result and the seconds, not the exit code, so a failure reads "Failed"; the run's own strip and Fix
+ * output say "exit 1".
+ */
+function fixEvent(activity: FixActivity, t: TFunction, when: string): TimelineEvent {
+  const { name, result } = activity;
+  const base = {
+    source: t('cerberus.activity.source.fix'),
+    when,
+    meta: t('cerberus.activity.meta', { service: activity.check, node: activity.node }),
+  };
+  if (activity.event === 'started' || result === null) {
+    return {
+      ...base,
+      tone: RUN_LOOK.going.tone,
+      title: t(activity.by === 'auto' ? 'cerberus.activity.fix.ranAuto' : 'cerberus.activity.fix.ranYou', { name }),
+    };
+  }
+  if (result === 'refused') return { ...base, tone: RUN_LOOK.refused.tone, title: t('cerberus.activity.fix.refused', { name }) };
+  const outcome = result === 'ok'
+    ? activity.durationS === null ? t('cerberus.fix.output.ok') : t('cerberus.activity.fix.succeeded', { count: activity.durationS })
+    : result === 'timed_out' ? t('cerberus.activity.fix.timedOut') : t('cerberus.activity.fix.failed');
+  return { ...base, tone: RUN_LOOK[result].tone, title: t('cerberus.activity.fix.finished', { name, result: outcome }) };
+}
+
+/** A catalog entry added (positive) or its auto-run switched on or off (neutral): "Added “X”", "Auto-run on · “X”", "Auto-run off · “X”". */
+function catalogEvent(activity: CatalogActivity, t: TFunction, when: string): TimelineEvent {
+  const { name } = activity;
+  const title = {
+    added: t('cerberus.activity.catalog.added', { name }),
+    auto_on: t('cerberus.activity.catalog.autoOn', { name }),
+    auto_off: t('cerberus.activity.catalog.autoOff', { name }),
+  }[activity.event];
+  return { tone: activity.event === 'added' ? 'positive' : 'neutral', source: t('cerberus.activity.source.catalog'), title, when };
+}
+
+/**
  * One "What happened" line as a Timeline row. Used by the Fleet's What happened card (the overview's
  * newest seven) and by History's feed (pages of `GET /api/cerberus/activity`).
  *
@@ -102,11 +143,11 @@ function nodeEvent(activity: NodeActivity, t: TFunction, when: string): Timeline
  * is not. `now` is the caller's, not the clock's, so a row never changes between two renders of the
  * same overview.
  *
- * LATER PLANS ADD THEIR KINDS HERE. The union `CerberusActivity` gains `fix`, `catalog`, `diagnosis`
- * and `warden` as those plans land; each adds its case to this switch, its builder above, and its
- * words under `cerberus.activity`. Until a plan does, a kind this bundle does not know — a newer
- * server's line in an older tab — is shown as a neutral row naming the kind, never thrown on: a
- * screen must not go blank over one line it has no words for.
+ * LATER PLANS ADD THEIR KINDS HERE. The union `CerberusActivity` gains `diagnosis` and `warden` as those
+ * plans land; each adds its case to this switch, its builder above, and its words under
+ * `cerberus.activity`. Until a plan does, a kind this bundle does not know — a newer server's line in an
+ * older tab — is shown as a neutral row naming the kind, never thrown on: a screen must not go blank
+ * over one line it has no words for.
  */
 export function toTimelineEvent(activity: CerberusActivity, t: TFunction, now: number): TimelineEvent {
   const when = sameLocalDay(activity.at, now) ? hms(activity.at) : dayAndTime(activity.at);
@@ -117,6 +158,10 @@ export function toTimelineEvent(activity: CerberusActivity, t: TFunction, now: n
       return muteEvent(activity, t, when);
     case 'node':
       return nodeEvent(activity, t, when);
+    case 'fix':
+      return fixEvent(activity, t, when);
+    case 'catalog':
+      return catalogEvent(activity, t, when);
     default: {
       const unlearned: { kind: string } = activity;
       return { tone: 'neutral', source: unlearned.kind, title: unlearned.kind, when };

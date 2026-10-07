@@ -7,6 +7,7 @@ import { AppError, asyncHandler, createApiSuccessResponse } from '@/shared/utils
 import { getArchivedProjectsWithSessions, getProjectSessionsPage, getProjectsWithSessions } from '@/modules/projects/services/projects-with-sessions-fetch.service.js';
 import { deleteOrArchiveProject, restoreArchivedProject } from '@/modules/projects/services/project-delete.service.js';
 import { applyLegacyStarredProjectIds, toggleProjectStar } from '@/modules/projects/services/project-star.service.js';
+import { setProjectNode } from '@/modules/projects/services/project-node.service.js';
 
 const router = express.Router();
 
@@ -237,6 +238,28 @@ router.put('/:projectId/rename', (req, res) => {
     res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to rename project' });
   }
 });
+
+/**
+ * Assigns a project's Claude sessions to a node's warden (`{ node: "eis1" }`) or back to this server
+ * (`{ node: null }`); the chat dispatch reads the assignment on every turn, so the next CLI the project
+ * needs is spawned there (see `setProjectNode`). 204 on success; 404 for an unknown project; 409
+ * `PROJECT_NODE_NOT_COLOCATED` unless the node is enrolled and runs on this machine.
+ */
+router.put(
+  '/:projectId/node',
+  asyncHandler(async (req, res) => {
+    const projectId = typeof req.params.projectId === 'string' ? req.params.projectId : '';
+    const { node } = (req.body ?? {}) as { node?: unknown };
+    if (node !== null && (typeof node !== 'string' || node.trim() === '')) {
+      throw new AppError('node must be a node name, or null to run the project on this server', {
+        code: 'INVALID_PROJECT_NODE',
+        statusCode: 400,
+      });
+    }
+    setProjectNode(projectId, node);
+    res.status(204).end();
+  }),
+);
 
 router.post(
   '/:projectId/toggle-star',

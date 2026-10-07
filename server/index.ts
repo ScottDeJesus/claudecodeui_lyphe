@@ -17,6 +17,7 @@ import {
     providerRuntimeService,
     readoptKeepaliveSessions,
     releaseKeepaliveOwnership,
+    whenNodeSessionsReadopted,
 } from '@/modules/providers/index.js';
 import { createWebSocketServer, startRunStallWatchdog } from '@/modules/websocket/index.js';
 
@@ -355,19 +356,25 @@ app.use('/api/browser-use', authenticateToken, browserUseRoutes);
 // Unified provider MCP routes (protected)
 // Settles once this process holds the keepalive hosts: before `listen` on a plain boot, at the takeover
 // on a handover boot (`soleServerDuties`).
-let runsReadopted = false;
 let markRunsReadopted: () => void = () => {};
 const whenRunsReadopted = new Promise<void>((resolve) => { markRunsReadopted = resolve; });
+// The hosts a co-located node's warden holds come back when that warden's link does — after `listen`,
+// which is when the gateway opens — so they are a second thing to wait for, resolved by the claim
+// holder's link-up re-adoption (or at once when there is none to do).
+let hostsReadopted = false;
+void Promise.all([whenRunsReadopted, whenNodeSessionsReadopted()]).then(() => { hostsReadopted = true; });
 // The supervisor SIGKILLs a predecessor 10 s after its SIGTERM, which follows this process's READY at
 // once, and the re-adoption after the takeover measured under 0.4 s: past this, no takeover is coming.
+// A warden that has not linked by then is not coming soon either.
 const RUNS_READOPTED_WAIT_MS = 11_000;
 // A handover boot serves before its takeover — for as long as the predecessor drains (http-drain.ts) —
 // and until then its run registry holds none of the keepalive runs (D-11): this read would tell every
 // tab its live runs are idle, and the tab would drop their spinners and waiting marks. It waits for
 // the re-adoption instead, and past the bound answers as it always did, so a takeover that never
-// comes cannot hang the poll.
+// comes cannot hang the poll. The bound ends the hold for every poll after it too: a warden that is
+// down would otherwise cost each poll the whole bound, for as long as it stays down.
 app.use('/api/providers/sessions/running', (_req, _res, next) => {
-    if (runsReadopted) return next();
+    if (hostsReadopted) return next();
     // Once, never twice: a re-adoption landing after the bound must not run the route a second time.
     let released = false;
     const release = () => {
@@ -376,8 +383,11 @@ app.use('/api/providers/sessions/running', (_req, _res, next) => {
         clearTimeout(bound);
         next();
     };
-    const bound = setTimeout(release, RUNS_READOPTED_WAIT_MS);
-    void whenRunsReadopted.then(release);
+    const bound = setTimeout(() => {
+        hostsReadopted = true;
+        release();
+    }, RUNS_READOPTED_WAIT_MS);
+    void Promise.all([whenRunsReadopted, whenNodeSessionsReadopted()]).then(release);
 });
 app.use('/api/providers', authenticateToken, providerRoutes);
 app.use('/api/scheduled-messages', authenticateToken, scheduledMessagesRoutes);
@@ -580,7 +590,6 @@ async function soleServerDuties() {
         // version test logs its own `retiring idle host …` line and is not counted in this one.
         console.log(`[keepalive] re-adopted ${keepalive.readopted} host(s), swept ${keepalive.swept} dead host file(s)`);
     } catch (error) { console.error('[keepalive] re-adopt failed (continuing):', getErrorMessage(error)); }
-    runsReadopted = true;
     markRunsReadopted();
     // Sends anything that came due while the server was not running, then keeps polling.
     initializeScheduledMessageDispatcher(providerRuntimeService);

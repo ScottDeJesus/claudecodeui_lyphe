@@ -14,10 +14,12 @@ The Cerberus tab: the fleet's health on the house row. One provider reads `GET /
 | the Fleet's pure model: order, groups, search, default expansion, `ringsLayout`; `toTimelineEvent` | MAN-7872 | `fleet/fleetModel.ts`, `utils/activityEvents.ts` |
 | Fleet's sentences, the Needs-you card, status bar, legend, toolbar | MAN-7879 | `utils/fleetWords.ts`, `fleet/NeedsYouCard.tsx`, `fleet/FleetStatusBar.tsx`, `fleet/FleetToolbar.tsx` |
 | Fleet: view, Grid, List, node card, service row, Rings, What happened | MAN-7880 (reads MAN-7885, Rings MAN-7886, service row MAN-7887) | `fleet/FleetView.tsx`, `FleetGrid.tsx`, `FleetList.tsx`, `NodeCard.tsx`, `ServiceRow.tsx`, `FleetRings.tsx`, `RingMarks.tsx`, `RingsNodePanel.tsx`, `WhatHappenedCard.tsx`, `hooks/useLeavingNeeds.ts` |
+| a project's node: `projects.node`, the route and its co-location rule, "Projects that run here", `CerberusNodeView.colocated` / `projects` / `sessions` | MAN-7920 | `fleet/NodeProjects.tsx`, `utils/fleetWords.ts` (`sessionsTail`), `server/modules/projects/projects.routes.ts`, `server/modules/projects/services/project-node.service.ts` |
 | the check sheet | MAN-7878 | `sheet/CheckSheet.tsx`, `CheckRows.tsx`, `SelectedCheck.tsx`, `CheckLabelEditor.tsx` |
 | History | MAN-7877 (feed MAN-7888, lookup card MAN-7889, banner MAN-7890) | `history/*.tsx`, `hooks/useActivityFeed.ts`, `UnreachableBanner.tsx` |
 | the Mute and Enroll dialogs | MAN-7884 (Mute MAN-7892, Enroll MAN-7893, install step MAN-7894) | `modals/*.tsx`, `hooks/useEnrollmentStatus.ts`, `utils/enrollAsk.ts` |
-| the slots later plans fill | MAN-7867 | `SLOT:` comments, `VIEWS` in `CerberusPanel.tsx` |
+| the slots later plans fill, and the `FILL:` markers a scaffolded screen leaves for its fill | MAN-7867 | `SLOT:` and `FILL:` comments, `VIEWS` in `CerberusPanel.tsx` |
+| the fixes screen, live: Catalog view, a Needs-you card's fix, Fix output, the sheet's fixes, the run reads | MAN-7906 | `catalog/CatalogView.tsx`, `fleet/NeedFix.tsx`, `sheet/FixOutput.tsx`, `sheet/CheckFixes.tsx`, `hooks/useRunOutput.ts`, `hooks/useRunLastLine.ts`, `hooks/useCatalogRead.ts` |
 | the six `animate-cerberus-*` motions and who draws each | MAN-7869 | `tailwind.config.js` |
 | the words | MAN-7870 (alternatives MAN-7881, variables MAN-7882, open words MAN-7883) | `src/modules/i18n/locales/en/common.json` |
 | the library pieces, their paint, the tone names | MAN-740, MAN-739 (`cloudcli:src/shared/ui/verve`); `Timeline`'s layout MAN-7847 | `src/shared/ui/Sheet.tsx`, `src/shared/ui/Timeline.tsx`, `src/shared/ui/TextArea.tsx`, `src/shared/ui/Steps.tsx`, `src/shared/ui/verve/panels.css`, `tailwind.config.js` |
@@ -27,7 +29,7 @@ The Cerberus tab: the fleet's health on the house row. One provider reads `GET /
 - Other modules reach it only through `src/modules/cerberus/index.ts`: `CerberusProvider`, `useCerberusNeeds`, `CerberusPanel` (`lazy`). Files inside import siblings by path, never through the barrel.
 - Types are `type`, never `interface`. A type two files share lives in `src/shared/types.ts` (`TimelineEvent`, `CerberusView`, `CerberusSheetTarget`, `FleetLayout`, `FleetEntry`, …). `src/shared/cerberus-types.ts` is read, never redefined.
 - Every endpoint is a verb of `api.cerberus` in `src/shared/api.ts`.
-- Layout of the module: `context/` (provider), `hooks/`, `utils/` (pure), `fleet/`, `sheet/`, `history/`, `modals/` (both dialogs).
+- Layout of the module: `context/` (provider), `hooks/`, `utils/` (pure), `fleet/`, `sheet/`, `history/`, `catalog/` (the Catalog view), `modals/` (both dialogs).
 - Colour: no hex, `rgba(` or `var(--` in a className or style under `src/modules/cerberus/` (2026-10-06: none outside one comment). Tone reaches paint only as `data-tone` plus a `tone-*` name (MAN-739 rule 3); the set stays five, so denied is `danger` (MAN-739 rule 4).
 - A status is painted from one table, `STATUS_TABLE` (MAN-7873), and a state that speaks in colour also carries its glyph or word (MAN-578).
 - Words: every sentence is a `cerberus.*` key through `t()`, English only; a label, reason, node name or description is data, never a key (MAN-7870).
@@ -68,7 +70,7 @@ Where the Cerberus tab stands in the workspace and what feeds its count. The tab
 ## Pane and palettes
 | piece | fact |
 |---|---|
-| pane (`WorkspaceMain.tsx`) | `activeTab === 'cerberus'` → `<div className="h-full overflow-hidden"><CerberusPanel /></div>`, after the API pane, inside the file's `Suspense`; the panel is the barrel's `lazy` export, its own chunk, loaded on the first open. The "No gate" comment sits above it |
+| pane (`WorkspaceMain.tsx`) | `activeTab === 'cerberus'` → `<div className="h-full overflow-hidden"><CerberusPanel projectChoices={projectChoices} /></div>`, after the API pane, inside the file's `Suspense`; the panel is the barrel's `lazy` export, its own chunk, loaded on the first open. The "No gate" comment sits above it |
 | `NAV_TABS` (`command-palette/CommandPalette.tsx`) | `{ id: 'cerberus', label: 'Go to Cerberus', keywords: 'cerberus fleet health monitoring checks wardens nodes' }`, after API |
 | `visibleTabs` (`ProjectCommandPalette.tsx`) | the always-on list names `'cerberus'` after `'api'`: a `NAV_TABS` row shows only if this list names it |
 
@@ -76,7 +78,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/command-palette/Comm
 
 ## MAN-7867 — Cerberus — the slots later plans fill: every `SLOT:` comment, the `VIEWS` table and `activityEvents`
 
-Where the fixes, diagnosis, updates and sessions plans plug into the tab. Find every slot: `grep -rn "SLOT:" src/modules/cerberus`. Row map: MAN-7868.
+Where the diagnosis and updates plans plug into the tab (the fixes plan's slots are filled and live: MAN-7906). Find every slot: `grep -rn "SLOT:" src/modules/cerberus`. A plan whose screen is scaffolded and not yet filled marks its places `FILL:` instead (`grep -rn "FILL:" src/modules/cerberus`): each names what its fill mounts there, and the fill replaces it. Row map: MAN-7868.
 
 ## Rules
 - A slot is a comment (or a table row) and draws nothing: no placeholder, no empty container, no flag.
@@ -87,23 +89,19 @@ Where the fixes, diagnosis, updates and sessions plans plug into the tab. Find e
 | slot | file | what goes there | plan |
 |---|---|---|---|
 | header button row | `CerberusHeader.tsx`, `SLOT: Update wardens` | the Update wardens button, before Enroll a node | updates |
-| tabs list | `CerberusPanel.tsx`, `VIEWS` (a table, no `SLOT:`); `CerberusView` in `src/shared/types.ts` | one row `{ id: 'catalog', labelKey, hintKey }` between `fleet` and `history`, hint "Fixes Cerberus can offer, or run on its own"; the view in the body between Fleet's and History's; `'catalog'` in `CerberusView` | fixes |
-| Needs-you run strip | `fleet/NeedsYouCard.tsx`, `SLOT: run` | above the action row: "Running on its own · <name>", "✓ <name> finished HH:MM:SS · waiting for the next check", "✕ The warden refused “<name>”", the run's last line in mono | fixes |
-| Needs-you action row | `fleet/NeedsYouCard.tsx`, `SLOT: actions` | before Mute: Run “<fix>” (tonal); Diagnose / Diagnosing… / See diagnosis (outline) | fixes, diagnosis |
-| Needs-you quiet line | `fleet/NeedsYouCard.tsx`, `SLOT: quiet` | after the count line of "Nothing needs you": " Fixes set to auto-run will run on their own and show up below." | fixes |
-| sheet, check → cells | `sheet/CheckSheet.tsx`, `SLOT: fixes and diagnosis` | under the check and its actions, above "Last 60 minutes": "Fixes in the catalog" and a fix's output; the read-only diagnosis | fixes, diagnosis |
-| sheet action row | `sheet/SelectedCheck.tsx`, `SLOT: actions` | before Mute: Diagnose; the catalog fix | diagnosis, fixes |
+| Needs-you action row | `fleet/NeedsYouCard.tsx`, `SLOT: actions` | after `NeedFix` (the fixes plan's strip and Run “<fix>”), before Mute: Diagnose / Diagnosing… / See diagnosis (outline) | diagnosis |
+| sheet, check → cells | `sheet/CheckSheet.tsx`, `SLOT: diagnosis` | between `FixOutput` and `CheckFixes` ("Fixes in the catalog"), under the check and its actions: the read-only diagnosis | diagnosis |
+| sheet action row | `sheet/SelectedCheck.tsx`, `SLOT: actions` | before Mute: Diagnose | diagnosis |
 | node card, updating | `fleet/NodeCard.tsx`, `SLOT: updating` (both faces) | before the warden line: the "Updating · <step>" pill (info tone, `vv-pulse`) | updates |
-| node, projects | `fleet/NodeCard.tsx` (both faces), `fleet/RingsNodePanel.tsx`, `SLOT: projects` | after a co-located node's services: `NodeProjects` ("Projects that run here", "Run a project here") | sessions |
-| rings key | `fleet/RingMarks.tsx`, `SLOT: fixing` (`KEY`) | second row after Needs you: "Fix running or updating", the info dot, once something feeds `fixing` or `enrolling` | fixes, updates |
+| rings key | `fleet/RingMarks.tsx`, `KEY` | the `fixing` row ("Fix running or updating", `cerberus.fix.fleet.legend`, the info dot) is live; the updates plan's `enrolling` shares it, with its own mark | updates |
 
 ## Other places a plan adds a case
 | place | what a plan adds |
 |---|---|
-| `utils/activityEvents.ts` `toTimelineEvent` | a `case` per new `CerberusActivity` kind (`fix`, `catalog`, `diagnosis`, `warden`), a builder, words under `cerberus.activity`; an unknown kind draws neutral and is never thrown on (MAN-7872) |
-| `utils/cerberusStatus.ts` `nodeMark` | `fixing` and `enrolling` return `null` (no mark) while nothing feeds them; the plan that feeds one gives it a mark |
+| `utils/activityEvents.ts` `toTimelineEvent` | a `case` per new `CerberusActivity` kind (`diagnosis`, `warden`; `fix` and `catalog` are live), a builder, words under `cerberus.activity`; an unknown kind draws neutral and is never thrown on (MAN-7872) |
+| `utils/cerberusStatus.ts` `nodeMark` | `enrolling` returns `null` (no mark) while nothing feeds it; the plan that feeds it gives it a mark. `fixing` is fed and draws `FLEET_FIXING_LOOK` through `markLook` |
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/CerberusHeader.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/CerberusPanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/fleet/NeedsYouCard.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/fleet/NodeCard.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/fleet/RingMarks.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/fleet/RingsNodePanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/sheet/CheckSheet.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/sheet/SelectedCheck.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/utils/activityEvents.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/utils/cerberusStatus.ts
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/CerberusHeader.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/CerberusPanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/fleet/NeedsYouCard.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/fleet/NodeCard.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/fleet/RingMarks.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/fleet/RingsNodePanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/fleet/ServiceRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/sheet/CheckSheet.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/sheet/SelectedCheck.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/utils/activityEvents.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/utils/cerberusStatus.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/utils/fleetWords.ts
 
 ## MAN-7869 — Cerberus — the six `animate-cerberus-*` motions in `tailwind.config.js` and who draws each
 
@@ -126,7 +124,7 @@ Every word the Cerberus screen draws, in the top-level `cerberus` block of `src/
 
 ## Shape
 
-- 261 leaves under `cerberus.*`, `en` only. The other ten locales hold no `cerberus` block and no `tabs.cerberus`: `fallbackLng: 'en'` (`src/modules/i18n/config.ts`) reads the English.
+- 348 leaves under `cerberus.*`, `en` only. The other ten locales hold no `cerberus` block and no `tabs.cerberus`: `fallbackLng: 'en'` (`src/modules/i18n/config.ts`) reads the English.
 - Read by the files under `src/modules/cerberus` (MAN-7871).
 - Nested multi-line objects, the file's own 2-space indentation.
 
@@ -137,12 +135,14 @@ Every word the Cerberus screen draws, in the top-level `cerberus` block of `src/
 | `status` | 8 | one word per status value |
 | `fleet` | 46 | `tabs`, `layouts`, `filters`, `searchPlaceholder`, `expandAll`, `collapseAll`, `bar`, `nodes_*`, `showing`, `showMore`, `noMatch`, `noneInGroup`, `legend`, `rings` |
 | `needs` | 14 | the Needs-you panel and its muted list |
-| `node` | 19 | a node card: warden line, empty and waiting states (a card's title, a list band's lead), squares |
+| `node` | 35 | a node card: warden line, empty and waiting states (a card's title, a list band's lead), squares; `sessions_*` (the count after the warden line); `projects.*` (14: "Projects that run here", its empty line, ✕'s name, the two "Moving…" words, "Run a project here", the line with nothing to offer, the refusal, `notReporting`, and `toast.here` / `toast.hereWaiting` / `toast.back`) |
 | `service` | 11 | a service row's pill and cell tip |
-| `activity` | 17 | the What-happened feed |
+| `activity` | 29 | the What-happened feed; `fix` (7) and `catalog` (3) are the fixes plan's kinds, `source.fix` and `source.catalog` their pills |
 | `sheet` | 24 | the check sheet |
 | `lookup` | 13 | the moment lookup's answers |
 | `history` | 27 | the History tab: the look-up card's fields, prompts and headings, the events card's states (MAN-7877) |
+| `catalog` | 27 | the Catalog tab and its rows: `tab`, `tabHint`, `intro`, `count_*`, `empty`, `new`, `trigger.*`, `raw`, `stats.*`, `origin.*`, `auto.*`, `runNow`, `running`, `blocked` (MAN-7906) |
+| `fix` | 32 | a fix on the screen: `run`, `command`, `strip.*` (a Needs-you card's run strip), `output.*` (Fix output), `sheet.*` (the sheet's fixes), `headline` + `headlineAccent`, `quiet`, `fleet.*` (MAN-7906) |
 | `mute` | 17 | the mute dialog and its toast |
 | `enroll` | 31 | the three-step enroll flow |
 | `time` | 13 | spans and relative times |
@@ -153,14 +153,18 @@ Every word the Cerberus screen draws, in the top-level `cerberus` block of `src/
 - `status.*` is keyed by the status value itself (`ok warn failing denied not_enabled unknown muted paused`): `` t(`cerberus.status.${status}`) `` needs no map. Every legend or cell that names a status reads it; only a different word has its own key.
 - `{{word}}` is the lowercased status word, passed by the caller: `lookup.was`, `lookup.wasNoValue`, `service.oneBad`, `node.bad`, `activity.check.other`.
 - A reason, a check label and a node description are data, never keys. The server stores "No reason given" itself (`NO_REASON_GIVEN`, `server/modules/cerberus/mutes.service.ts`), so the mute dialog has no key for it.
-- Glyphs `✓ ▲ ✕ — ·` stay in code. The two keys with a glyph inside: `enroll.copied` (`✓ Copied`) and `needs.word` (`· {{word}}`). `needs.quiet` carries no `✓`: the badge draws it.
+- Glyphs `✓ ▲ ✕ — · ●` stay in code (`RUN_LOOK`, MAN-7873). The two keys with a glyph inside: `enroll.copied` (`✓ Copied`) and `needs.word` (`· {{word}}`). `needs.quiet` carries no `✓`: the badge draws it.
 - A two-part headline is two keys, the second drawn in the accent by code: `header.headline.quiet` + `quietAccent`, `needs_*` + `needsAccent_*`, `enroll.title` + `titleAccent`, `enroll.helloLead` + `helloAccent`.
+- `node.projects.refusedLead` + `refused` are `PROJECT_NODE_NOT_COLOCATED` said in words, in `NodeProjects`' warn banner; the server's two sentences under that code ("not enrolled", "not on this machine") are not shown. `toast.here` and `toast.back` are the toasts the provider's `setProjectNode` raises when a move lands; `toast.hereWaiting` is `toast.here`'s message while the node's warden is not reporting, the case `notReporting` names under the section's heading. `node.sessions_*` carries no `·`: `sessionsTail` (`utils/fleetWords.ts`) draws it, after the warden line's words and only while the warden reports. Its words are bound by no-break spaces (` `), and the code joins the dot to them with one, so on a phone the phrase wraps whole rather than leaving "here" alone.
 - `enroll.notListening` is `CERBERUS_NOT_LISTENING` said in words, drawn by `EnrollRefusal` (MAN-7884) both after a 409 and up front while the overview says the gateway is not listening.
 - `enroll.desc` is one key, `What it is (optional)`: the prototype draws `optional` in its Field's `meta` slot, which the house `Field` (`src/shared/ui/Field.tsx`) does not have.
 - Apostrophes in keys are straight (`'`); `fleet.noMatch` quotes with `“ ”`.
 - `activity.expired` is the summary line under the `activity.lifted` title; never drawn alone.
 - `activity.muted` (`until {{time}}`) and `activity.mutedTomorrow` (`until {{time}} tomorrow`): `mutedTomorrow` when the lift falls on a later local day than the mute (MAN-7872).
 - `activity.source.check` and `activity.source.mute` have no reader: the pill is the service's label. Only `activity.source.node` is read.
+- `activity.fix.*`, `activity.catalog.*`, `activity.source.fix` and `.source.catalog` are read by `fixEvent` and `catalogEvent` in `utils/activityEvents.ts`. The feed's `fix` line carries a result and the seconds it took but no exit code, so a failure reads `activity.fix.failed` ("Failed"); the exit code is said by `fix.strip.failedExit` and `fix.output.failedExit`, which read the run.
+- A name, label or command in the fixes' words is a `{{name}}` / `{{cmd}}` variable drawn through `t()`, never `Trans`: `Trans` escapes `<` in a label (MAN-7906).
+- `catalog.count_*`, `catalog.stats.allOk_*` / `someOk_*` and `catalog.auto.on_*` are plural pairs on `count`; `catalog.auto.on_hour_*` / `on_day_*` pick by `context` (`hour` or `day`).
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/common.json
 
@@ -174,12 +178,15 @@ The browser's one reader of Cerberus: a provider holds the overview for every re
 | `src/modules/cerberus/index.ts` | barrel: `CerberusProvider`, `useCerberusNeeds`, `CerberusPanel` (lazy) |
 | `src/modules/cerberus/context/CerberusContext.ts` | `CerberusContext` (default `null`), type `CerberusValue`, hooks `useCerberus`, `useCerberusNeeds`; no component |
 | `src/modules/cerberus/context/CerberusProvider.tsx` | `CerberusProvider` only |
+| `src/modules/cerberus/context/ProjectChoicesContext.ts` | `ProjectChoicesContext` (default `null`) and `useProjectChoices()`: the workspace's projects, provided by `CerberusPanel` from its `projectChoices` prop and read by `NodeProjects`; no component |
 | `src/modules/cerberus/hooks/useCheckDetail.ts` | `useCheckDetail` |
+| `src/modules/cerberus/hooks/useCatalogRead.ts` | `useCatalogRead()`: the catalog beside the overview, read by the provider |
+| `src/modules/cerberus/hooks/useRunOutput.ts`, `useRunLastLine.ts` | `useRunOutput(runId)`: one run and its lines, streamed and replayed (`FixOutput`); `useRunLastLine(run)`: a card's strip's newest line, live (`NeedFix`): MAN-7906 |
 | `src/modules/cerberus/utils/cerberusTime.ts` | `hm`, `hms`, `dateOf`, `dayAndTime`, `momentOf`, `stampOf`, `agoParts`, `stretchKey`, `sameLocalDay`, `isWholeTime`, `isWholeDate` |
 | `src/modules/cerberus/fleet/fleetModel.ts`, `utils/activityEvents.ts` | the Fleet's pure model and the activity→Timeline mapping: MAN-7872 |
 | `src/modules/cerberus/fleet/*.tsx`, `utils/fleetWords.ts` | the Fleet view: MAN-7880, MAN-7879 |
 | `src/modules/cerberus/modals/*.tsx`, `hooks/useEnrollmentStatus.ts`, `utils/enrollAsk.ts` | the Mute and Enroll dialogs: MAN-7884 |
-| `src/shared/api.ts` | `api.cerberus` (ten verbs), `refusalSentence` |
+| `src/shared/api.ts` | `api.cerberus` (fifteen verbs, the catalog's and the run's among them); `api.projects.setNode(projectId, node \| null)` (`PUT /api/projects/:projectId/node`, 204; `api.projects.list()` is the sidebar's read); `refusalSentence(response)` (the server's own sentence, or `null`); `refusalCode(response)` (`error.code` of a refusal body, or `null`; reads a clone, so `refusalSentence` can still read the body) |
 | `src/shared/types.ts` | `CerberusMuteInput`, `CerberusLabelInput`, `CerberusEnrollInput` (client-only: the routes read a loose JSON body); the dialogs' `CerberusEnrollRefusal`: MAN-7884 |
 
 ## Mount and barrel
@@ -188,16 +195,24 @@ The browser's one reader of Cerberus: a provider holds the overview for every re
 - `useCerberus()` throws outside the provider (`useCerberus must be used within a CerberusProvider`).
 - `useCerberusNeeds()` = `overview?.counts.needsYou ?? 0`. Read by `useWorkspaceTabGates` for the Cerberus tab's count pill, so the strip and the tab's headline are the same number.
 
-## `CerberusValue`
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/App.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/context/CerberusContext.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/context/CerberusProvider.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/context/ProjectChoicesContext.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/hooks/useCheckDetail.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/utils/cerberusTime.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts
+
+## MAN-7917 — Cerberus — the client: `CerberusProvider`, `useCerberusNeeds`, `useCheckDetail` — `CerberusValue`
+section: Cerberus — the client: `CerberusProvider`, `useCerberusNeeds`, `useCheckDetail`, `api.cerberus`, `cerberusTime`/001 `CerberusValue`
+
 | member | meaning |
 |---|---|
 | `overview: CerberusOverview \| null` | last good read; `null` = no read has answered |
 | `unreachable: boolean` | true only while `overview` is `null` and the last read failed; the next good apply clears it |
 | `stale: boolean` | true once a read fails while the held overview was answered over 90 s before (`STALE_AFTER_MS` = three clock reads); the next good apply clears it. Never true while `overview` is `null` |
-| `refresh(): Promise<void>` | one read; the Try again press; never rejects |
-| `mute(input)`, `liftMute(id)`, `setLabel(input)` | `Promise<boolean>`: `true` = landed and the overview already re-read; `false` = refused or no answer, the warn toast already raised |
+| `catalog: CerberusCatalogEntryView[] \| null` | the catalog, read with the overview (`useCatalogRead`); `null` until a read answers, kept over a failed one |
+| `catalogFailed: boolean` | true only while `catalog` is `null` and its last read failed |
+| `refresh(): Promise<void>` | one read of the overview, and the catalog started beside it and not waited for (a write's verdict never waits out a hung catalog read); resolves when the overview has answered or failed; the Try again press; never rejects |
+| `mute(input)`, `liftMute(id)`, `setLabel(input)`, `runEntry(id)`, `setAuto(id, on)` | `Promise<boolean>`: `true` = landed and the overview and catalog already re-read; `false` = refused or no answer, the warn toast already raised |
+| `starting: readonly string[]` | the entries whose Run press is out: `POST /catalog/:id/run` answers once the warden has accepted (up to 10 s). Every Run now of each reads "Running…" for the wait; an entry leaves when its press settles, after the re-read that holds the run, and a press on another entry meanwhile does not take its label back |
+| `setProjectNode(project, node)` | `Promise<'moved' \| 'refused' \| 'failed'>`: `PUT /api/projects/:projectId/node` through `api.projects.setNode` (`node` the node's id, or `null` for this server). `moved` = landed, the overview already re-read, and the toast `node.projects.toast.here` (its message `hereWaiting` while the node's `link` is not `reporting`) or `toast.back` raised; `refused` = 409 `PROJECT_NODE_NOT_COLOCATED`, no toast (`NodeProjects`' banner says it); `failed` = any other refusal or no answer, the warn toast already raised. One write per project at a time |
 
-- The four verbs keep one identity for the app's life; the translator is read through `tRef` (`useLayoutEffect`), never in a verb's deps.
+- The verbs keep one identity for the app's life; the translator is read through `tRef` (`useLayoutEffect`), never in a verb's deps.
 - A failed read over a held overview keeps it and raises no toast: `unreachable` never rises over one. `stale` rises when that failure finds the overview answered over 90 s before, and the root then draws its "last answer" banner and the header's pill stops saying Live (MAN-7891). It is judged at each failed read, never on a timer, so one dropped poll never flaps it. Every read carries a 30 s deadline of its own (`REQUEST_TIMEOUT_MS` as an `AbortController` timer in `refresh`, passed to `api.cerberus.overview({ signal })`, so a platform without `AbortSignal.timeout` is covered), so a read left hanging fails and is judged rather than keeping the picture fresh.
 
 ## Reads
@@ -209,16 +224,23 @@ The browser's one reader of Cerberus: a provider holds the overview for every re
 | clock | every 30 s (`CLOCK_READ_MS`): cells slide, "ago" ages, a check goes stale with no row written |
 | own landed write | the re-read, before the verb answers |
 
-- A read is good when `response.ok` and the body has a `nodes` array and a `counts` object. Anything else, or a throw, keeps the overview.
+- A read is good when `response.ok` and the body has a `nodes` array and a `counts` object. Anything else, or a throw, keeps the overview. A good body is read as the newer client wants it (`withFixFields`): `running` as none and each need's `fix` and `run` as null where an older server left them out.
 - Each read takes a ticket (`newestReadRef`); a good answer older than the newest applied (`newestAnswerRef`) is dropped. A failed read judges before the mark and never moves it, so an older good read still in flight can land.
 
 ## Writes
-- One in flight per target: `mute:<node>/<key>`, `lift:<id>`, `label:<node>/<key or service>`. A second press returns the first's promise.
-- Verdict is `response.ok` alone; the body is not read. The screen comes from the re-read.
+- One in flight per target: `mute:<node>/<key>`, `lift:<id>`, `label:<node>/<key or service>`, `project-node:<projectId>`, `run:<entry>`, `auto:<entry>`. A second press returns the first's promise.
+- `settleWrite(request, saysOwnRefusal?)` is the one place a write settles; `sendWrite` flattens it to a boolean. Verdict is `response.ok`: the body is not read for it. The screen comes from the re-read. A caller that says one refusal in words of its own passes `saysOwnRefusal`: `setProjectNode` passes `isNotColocatedRefusal` (409 and `refusalCode(response) === 'PROJECT_NODE_NOT_COLOCATED'`), which settles as `refused` with no toast; every other refusal is `failed`.
+- `landed` follows `refresh()`, which never rejects: a write whose re-read failed still answers landed, and the overview lags until the next read (the 30 s clock).
 - Refused or no answer: one `warn` toast, title `cerberus.errors.writeFailed`, message = `refusalSentence(response)` (the server's own sentence), omitted when none. Not raised after unmount.
-- Only the mute speaks on success: `positive` toast, `cerberus.mute.toast.title` (`time` = `hm(until)`), `cerberus.mute.toast.message` (`label` = the check's plain name, else its key). A lift and a label are silent.
+- Speaks on success: the mute and `setProjectNode`. A lift, a label, a run (the card's strip is the proof) and an auto-run switch (the switch and its line are) are silent. A refused run (409 `CERBERUS_RUN_ACTIVE` — the check already has a run going — or `CERBERUS_NODE_SILENT`) and a refused switch (a capped entry) raise the write's warn toast with the server's sentence.
+  - Mute: `positive` toast, `cerberus.mute.toast.title` (`time` = `hm(until)`), `cerberus.mute.toast.message` (`label` = the check's plain name, else its key).
+  - `setProjectNode` to a node: `positive` toast `cerberus.node.projects.toast.here` (`name` = the project's name as `NodeProjects` drew it, `node`); while that node's `link` is not `reporting`, its message is `toast.hereWaiting`. Back to this server: `toast.back` (`name`).
 
-## `useCheckDetail({ node, service, id, lookupAt?, end? })`
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/App.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/context/CerberusContext.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/context/CerberusProvider.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/hooks/useCheckDetail.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/utils/cerberusTime.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts
+
+## MAN-7918 — Cerberus — the client: `CerberusProvider`, `useCerberusNeeds`, `useCheckDetail` — `useCheckDetail({ node, service, id, lookupAt?, end? })`
+section: Cerberus — the client: `CerberusProvider`, `useCerberusNeeds`, `useCheckDetail`, `api.cerberus`, `cerberusTime`/002 `useCheckDetail({ node, service, id, lookupAt?, end? })`
+
 Answers `{ detail, loading, error, refresh }` from `GET /api/cerberus/checks/:node/:service/:id?lookup&end` (MAN-7802).
 
 | field | meaning |
@@ -249,11 +271,20 @@ Answers `{ detail, loading, error, refresh }` from `GET /api/cerberus/checks/:no
 | `setLabel(input)` | `PUT /api/cerberus/labels` |
 | `enroll(input)` | `POST /api/cerberus/enrollments` |
 | `enrollment(name)` | `GET /api/cerberus/enrollments/:name` |
+| `catalog({ signal? })` | `GET /api/cerberus/catalog` |
+| `writeEntry(input)` | `POST /api/cerberus/catalog` (nothing in the tab writes an entry; the seeds go through it) |
+| `setAuto(id, on)` | `PUT /api/cerberus/catalog/:id/auto` |
+| `runEntry(id)` | `POST /api/cerberus/catalog/:id/run` → `{ runId }`, up to 10 s after the press |
+| `run(id)` | `GET /api/cerberus/runs/:id`: the run with every line it holds |
 
 - Reads answer their wire shape bare; a refusal is the app's `{ success: false, error }` envelope. Nobody draws from a write's answer.
-- `refusalSentence(response)`: the server's own sentence from a refusal body (`errorMessage(error) ?? errorMessage(details)`), `null` when none or not JSON. One copy, shared by `NotesProvider` and `CerberusProvider`.
+- `refusalSentence(response)`: the server's own sentence from a refusal body (`errorMessage(error) ?? errorMessage(details)`), `null` when none or not JSON. One copy, shared by `NotesProvider` and `CerberusProvider`. `refusalCode(response)`: the body's `error.code`, `null` when none or not JSON; it reads a clone, so the sentence can still be read after it. `settleWrite` in the provider is the one write path: it answers `landed`, `failed`, or `refused` for a caller that says one refusal in words of its own (`sendWrite` is it flattened to a boolean).
 
-## `cerberusTime.ts`
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/App.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/context/CerberusContext.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/context/CerberusProvider.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/hooks/useCheckDetail.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/utils/cerberusTime.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts
+
+## MAN-7919 — Cerberus — the client: `CerberusProvider`, `useCerberusNeeds`, `useCheckDetail` — `cerberusTime.ts`
+section: Cerberus — the client: `CerberusProvider`, `useCerberusNeeds`, `useCheckDetail`, `api.cerberus`, `cerberusTime`/003 `cerberusTime.ts`
+
 Pure: no `t`, no `Date.now()`. Local time, 24-hour, written by hand so every browser locale reads alike.
 | function | answers |
 |---|---|
@@ -288,6 +319,7 @@ The Cerberus tab's pure half: the overview as sorted fleet items, filter counts,
 | function | answers |
 |---|---|
 | `fleetItems(overview)` | one `FleetItem` per node, worst first: `STATUS_RANK`, then the hub ahead of its peers, then id with numeric collation (`node-2` before `node-10`) |
+| `runOnService(running, node, service)` | the oldest run of `overview.running` on one of the service's checks, or `null`: that service is `fixing` |
 | `groupOf(status)` | the `FleetGroup` bucket |
 | `filterGroups(items)` | all six `FleetFilterGroup`s in order `all needs unknown muted updating empty`, zero counts included; counted over the WHOLE fleet; hiding an empty group is the toolbar's call |
 | `applyFilter(items, group, query)` | items in one filter, narrowed by `query` (trimmed, case aside, substring of `item.search`); blank query narrows nothing; keeps the caller's order, so pass `fleetItems` output |
@@ -299,9 +331,9 @@ The Cerberus tab's pure half: the overview as sorted fleet items, filter counts,
 - A node's status = the worst of its services'; no service = `empty`.
 - A `not_enabled` service counts as `ok` at the node level; its own row still says what it is.
 - `denied` outranks `failing` when a node has both.
-- `fixing` and `enrolling` are in the type and the rank; nothing produces them yet.
+- `fixing` is fed from `overview.running`: a service with a run going on one of its checks (`runOnService`) is `fixing`, whatever its own word is, and a node reads the worst of its services' words. A node whose only trouble is being fixed is `fixing`; one with another service still `failing` stays `failing`, since that one needs you. `enrolling` is in the type and the rank; nothing produces it yet.
 - `groupOf`: `failing denied fixing warn` → `needs`; `paused enrolling` → `updating`; every other status is its own group. `ok` is counted by the status bar; no filter button selects it.
-- `FleetItem` carries `id desc role link status services search` only. Minute cells, warden version and last-heard time stay on `CerberusNodeView`, found by `id`.
+- `FleetItem` carries `id desc role link status fixBy services search` only (`fixBy` is who started the node's run, `auto` or `you`, while its `status` is `fixing`, else `null`). Minute cells, warden version and last-heard time stay on `CerberusNodeView`, found by `id`.
 - `item.search` = lower-cased `id`, `desc`, each service's id and label, joined by single spaces; null and empty words are dropped, so `center cerberus` matches.
 
 ## `ringsLayout`
@@ -329,7 +361,7 @@ Maps one `CerberusActivity` to a kit `TimelineEvent`. Callers: the Fleet's What-
 - `mutedTomorrow` rests on the 24 h mute cap: a different local day is always the next. If the server allows longer mutes, `mutedTitle` must name the date.
 - `meta` = `activity.meta` (`service` = check key, `node`); for a `check` it is followed by ` · <from word> → <to word>`. Status words come from `STATUS_TABLE[status].wordKey`.
 - A label, reason, node name and value go in as variables, never as keys.
-- New `CerberusActivity` kinds (`fix catalog diagnosis warden`) add a case to the switch, a builder, and words under `cerberus.activity`.
+- `fix` and `catalog` are live: `fixEvent` (started: "Ran on its own: “X”" / "You ran “X”", info; ended: "“X” finished · Succeeded in 12 s" / "· Failed" / "· Timed out" in the result's tone, "The warden refused “X”" in the refusal's red; the line carries the result and the seconds, not the exit) and `catalogEvent` ("Added “X”" positive, "Auto-run on · “X”" / "Auto-run off · “X”" neutral; no node or check). New kinds (`diagnosis warden`) add a case to the switch, a builder, and words under `cerberus.activity`.
 
 ## Callers must
 - Guard `overview.lastResultAt` for null before `agoParts` (it takes a number).
@@ -344,8 +376,8 @@ The Cerberus tab's drawing vocabulary and the check sheet's three pieces. Pure o
 ## Files
 | file | holds |
 |---|---|
-| `src/modules/cerberus/utils/cerberusStatus.ts` | `STATUS_TABLE`; `nodeMark(status)`, the status a node's word draws its marks with (`null` for `empty`, `fixing`, `enrolling`), read by the node card and the rings |
-| `src/modules/cerberus/StatusMarks.tsx` | `StatusGlyph`, `StatusCell`, `StatusSquare`, `StatusPill` |
+| `src/modules/cerberus/utils/cerberusStatus.ts` | `STATUS_TABLE`; `RUN_LOOK`, `FLEET_FIXING_LOOK`; `markLook(mark)`, the look a mark paints from (`STATUS_TABLE`'s row, or `FLEET_FIXING_LOOK` for `fixing`); `nodeMark(status)`, the mark a node's word draws with (`null` for `empty`, `enrolling`), read by the node card and the rings |
+| `src/modules/cerberus/StatusMarks.tsx` | `StatusGlyph`, `StatusCell`, `StatusSquare`, `StatusPill` (each takes a `CerberusMark`: a status, or `fixing`) |
 | `src/modules/cerberus/sheet/MinuteCells.tsx` | `MinuteCells` |
 | `src/modules/cerberus/sheet/LookupMoment.tsx` | `LookupMoment`, `LookupSentence`, `SentenceRow` |
 | `src/modules/cerberus/sheet/RecordedResults.tsx` | `RecordedResults` |
@@ -372,6 +404,20 @@ No file outside the module imports the marks or the sheet pieces. Inside it, `sh
 - `unknown` and `paused` draw the same cell: no reading either way; only the word says why.
 - `not_enabled` never needs you.
 
+## `RUN_LOOK` and `FLEET_FIXING_LOOK` — a fix's look
+`RUN_LOOK: Record<'going' | 'ok' | 'failed' | 'timed_out' | 'refused', { tone, glyph }>`: how a fix's run is drawn. A refusal is a run's outcome, never a check's status, so it is no row of `STATUS_TABLE`.
+
+| run | tone | glyph |
+|---|---|---|
+| `going` | info | ● |
+| `ok` | positive | ✓ |
+| `failed`, `timed_out` | warn | ▲ |
+| `refused` | danger | ✕ |
+
+- Read by `fleet/NeedFix.tsx` (the strip; a run that succeeded takes the glyph but a neutral tone) and `sheet/FixOutput.tsx` (the pill): MAN-7906. The glyph stays in code (MAN-7870).
+- `FLEET_FIXING_LOOK: { tone, glyph, cell, wordKey, glyphMotion }` = `RUN_LOOK.going`'s tone, ●, cell `solid`, `cerberus.fix.fleet.running`, `glyphMotion` `vv-pulse` 1.4 s: how the fleet draws a node or service with a fix running (`fixing`), through `markLook`; the glyph, the pill's ● and the ring dot pulse in place of the failing ring. The `solid` cell makes every paint map keyed by shape draw it as the prototype does: the tile edged 1.5 px in the info dot, ring dot and service square filled.
+- `fixing` is fed from `overview.running` (`fleetModel.runOnService`) and drawn by `NodeGlyph`, the tile's edge, the rings' dot, hub and label glyph and panel (`nodeMark` → `markLook`), `nodeLine` ("Fix running on its own" / "Fix running" by `FleetItem.fixBy`), the service row's pill and the collapsed card's squares (`serviceSentence(t, service, run)`), and the rings' key row. The updates plan's `enrolling` shares the rings' key row.
+
 ## `CerberusCellShape` — paint in `StatusMarks.tsx` `CELL_PAINT`
 | shape | paint | reads as |
 |---|---|---|
@@ -393,7 +439,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/index.css, /home/lyphe/.clau
 
 | mark | props | draws |
 |---|---|---|
-| `StatusGlyph` | `status`, `size` `sm`\|`md`\|`lg` (20, 24, 32 px; default `md`), `decorative`, `still` | round glyph in the tone's ink on its wash |
+| `StatusGlyph` | `status` (a `CerberusMark`: a status, or `fixing`, the info ● that pulses), `size` `sm`\|`md`\|`lg` (20, 24, 32 px; default `md`), `decorative`, `still` | round glyph in the tone's ink on its wash |
 | `StatusCell` | `status`, `label`, any span attribute | one minute; the caller gives size, flow and role |
 | `StatusSquare` | `status`, `label` | 10 px square in the cell's shape, with `title` |
 | `StatusPill` | `status`, `text` | `Badge` (`tone`) holding glyph then word or `text`; `text` is cut with an ellipsis |
@@ -490,7 +536,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/history/Eve
 
 ## MAN-7878 — Cerberus — the check sheet: `CheckSheet`, `CheckRows`, `SelectedCheck`, `CheckLabelEditor`
 
-The check sheet on the library's `Sheet`: one service's checks and one of them in full. `CheckSheet.tsx` reads the fleet from `useCerberus()` and the check from `useCheckDetail`, and wires every press: the other three files draw what they are handed and read nothing. Marks and pieces it composes: MAN-7873. Banner: MAN-7877 (`UnreachableBanner`). Time words: MAN-7871. Words: MAN-7870 (`cerberus.sheet.*`, `cerberus.errors.lastAnswer`). Design: `design/cerberus/Cerberus Tab.dc.html` :393-537, less fixes and diagnosis. `CerberusPanel` (MAN-7891) mounts it, opened from a Fleet minute, a service row or a Needs-you card.
+The check sheet on the library's `Sheet`: one service's checks and one of them in full. `CheckSheet.tsx` reads the fleet from `useCerberus()` and the check from `useCheckDetail`, and wires every press: the other three files draw what they are handed and read nothing. Marks and pieces it composes: MAN-7873. Banner: MAN-7877 (`UnreachableBanner`). Time words: MAN-7871. Words: MAN-7870 (`cerberus.sheet.*`, `cerberus.errors.lastAnswer`). Design: `design/cerberus/Cerberus Tab.dc.html` :393-537, less diagnosis; the fixes' pieces: MAN-7906. `CerberusPanel` (MAN-7891) mounts it, opened from a Fleet minute, a service row or a Needs-you card.
 
 ## Files
 | file | holds |
@@ -502,7 +548,7 @@ The check sheet on the library's `Sheet`: one service's checks and one of them i
 
 ## `CheckSheet` — layout and reads
 - Props: `node` (`eis1`, or `center`), `service` (id), `check` (id within the service: the key after the first `/`), `lookupAt?` (epoch ms; omitted = now), `onMute(check)`: the root opens its Mute dialog in front of the sheet.
-- Title: the service's label, else its id. Under it, top to bottom: raw line (`sheet.raw`; `sheet.rawHub` when the node's `wardenVersion` is null), `CheckRows`, `SelectedCheck`, the fixes/diagnosis `SLOT:`, then the check's own sections.
+- Title: the service's label, else its id. Under it, top to bottom: raw line (`sheet.raw`; `sheet.rawHub` when the node's `wardenVersion` is null), `CheckRows`, `SelectedCheck`, Fix output (`FixOutput`), `SLOT: diagnosis`, "Fixes in the catalog" (`CheckFixes`), then the check's own sections. Fix output shows the run the sheet was opened on (a Needs-you card's strip hands its id as `run`) until the check's own read has answered; then the check's newest run within the hour (`detail.run`), which is the same run unless a newer one has begun since — the Run now just pressed — and a sibling check has no opened run. With neither, no Fix output; "Fixes in the catalog" waits for the check's read.
 - `CheckSheetBody` holds every read; `Sheet` mounts it only while open. Keyed `<node>/<service>/<check>@<lookupAt|now>`: each opening, and a sheet sent to another check or minute, starts fresh (row, moment, editor closed).
 - Two reads; the sheet never blanks while one is out:
 
@@ -525,7 +571,11 @@ The check sheet on the library's `Sheet`: one service's checks and one of them i
 - Entrance: raw line rises first (`motion-safe:animate-shape-rise`), rows at `animationDelay: '60ms'`, the check and its sections at `120ms`. The delay is inline: INV-7053.
 - `SLOT:` comments (nothing drawn) in `CheckSheet` and `SelectedCheck`: MAN-7867.
 
-## What `CheckSheet.tsx` reads, holds and writes
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/sheet/CheckLabelEditor.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/sheet/CheckRows.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/sheet/CheckSheet.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/sheet/SelectedCheck.tsx
+
+## MAN-7907 — Cerberus — the check sheet: `CheckSheet`, `CheckRows`, `SelectedCheck` — What `CheckSheet.tsx` reads, holds and writes
+section: Cerberus — the check sheet: `CheckSheet`, `CheckRows`, `SelectedCheck`, `CheckLabelEditor`/001 What `CheckSheet.tsx` reads, holds and writes
+
 | piece | what it is |
 |---|---|
 | `overview` | `useCerberus().overview`, read in `CheckSheet`: names the service and its node before the check is read |
@@ -545,13 +595,18 @@ The check sheet on the library's `Sheet`: one service's checks and one of them i
 
 ## `CheckRows`
 - `ul` with `aria-label` `sheet.checksOf` (`service` = the title); one `button` per check: `StatusGlyph`, label over `check.id` (the id alone, mono, with no label), then `value`.
+- The `ul` is capped at `max-h-[min(260px,32dvh)]` and scrolls itself. why: a service can hold 75 checks, and an uncapped list put the selected check and its 60 minutes 4,300 to 6,400 px down a body 780 to 835 px tall (measured 2026-10-06). On mount and when `selectedKey` changes, `useRowInView` centres the marked row if it is not fully in view; it sets the box's `scrollTop`, never `scrollIntoView`, which would scroll the sheet's body too. A row pressed fully in view stays put; one half in view is centred.
 - The shown row is marked three ways (MAN-578): `bg-background`, a 3 px accent rule on its left edge, `aria-current`.
 - Accessible name reads the status word first (the glyph names it). The glyph rings while failing.
 - `value`: right-aligned, up to 45% of the row from `sm`; under the label on a phone.
 - A row leans 3 px right under the pointer, `motion-safe`; its ground changes at once (MAN-739 rule 5). The focus ring is drawn inside the row (`outline-offset:-2px`): the box clips anything outside.
 - `selectedKey` is `<service>/<id>`; `onSelect` hands the pressed `CerberusCheckView`.
 
-## `SelectedCheck`
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/sheet/CheckLabelEditor.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/sheet/CheckRows.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/sheet/CheckSheet.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/sheet/SelectedCheck.tsx
+
+## MAN-7908 — Cerberus — the check sheet: `CheckSheet`, `CheckRows`, `SelectedCheck` — `SelectedCheck`
+section: Cerberus — the check sheet: `CheckSheet`, `CheckRows`, `SelectedCheck`, `CheckLabelEditor`/002 `SelectedCheck`
+
 - Head, in wrap order: name (`h3`: the label in the serif face, else the key in mono), `StatusPill`, then the naming action. The action wraps first on a phone, never the status.
 - Naming action: ghost `sheet.nameThis` + pencil for a check with no label; a ghost icon button (✎, `sheet.rename`) beside a label. It is hidden while the editor is open.
 - `editor` (an element or `null`) takes the name's place while open; the status pill stays.
@@ -583,7 +638,8 @@ Takes `t` and `now` from the caller, so a sentence is a function of what it is h
 
 | function | case | sentence |
 |---|---|---|
-| `serviceSentence(t, service)` | one check needs you | `service.oneBad` |
+| `serviceSentence(t, service, run?)` | a run going on one of its checks | `fix.fleet.runningAuto` / `fix.fleet.running`, by `run.by` |
+| | one check needs you | `service.oneBad` |
 | | several | `service.needYou_*` |
 | | `unknown`, all checks | `service.noResult_*`; some: `service.someNoResult` |
 | | `paused` | `service.paused` |
@@ -593,7 +649,10 @@ Takes `t` and `now` from the caller, so a sentence is a function of what it is h
 | `nodeLine(t, item, node)` | no services | `node.waiting` (`link === 'never'`), else `node.nothingAssigned` |
 | | `paused` / `muted` / `ok` | `node.restarting` / `node.mutedCheck` / `node.allPassing_*` |
 | | `failing denied warn unknown` | `node.bad`: the first service at that word |
-| | `fixing enrolling empty` | `node.nothingAssigned` |
+| | `fixing` | `fix.fleet.runningAuto` / `fix.fleet.running`, by `item.fixBy` |
+| | `enrolling empty` | `node.nothingAssigned` |
+| `sessionsTail(t, node)` | `link !== 'reporting'` or `sessions` not a positive count (missing included: an older API answering a newer client) | `null`: a silent warden's last list is a count nobody has confirmed since; the hub has none |
+| | otherwise | ` ·\u00a0` + `node.sessions_*` (`count`): the tail of a warden line drawn as words, after `wardenLine`, in its run of text. The no-break spaces keep the dot with the phrase and the phrase whole |
 | `wardenLine(t, node, now)` | hub | `node.hub` |
 | | `link === 'never'` or no `lastHeardAt` | `node.waiting` |
 | | `link === 'silent'` | `node.silent`, `time` = `hm(silentSince ?? lastHeardAt)` |
@@ -623,8 +682,10 @@ Takes `t` and `now` from the caller, so a sentence is a function of what it is h
 - A filter is offered only when its count is above zero, or it is chosen, or it is All; counts are the whole fleet's, so a search never changes a chip.
 - Expand all / Collapse all show only when `folds` (`!narrow && layout !== 'rings'`).
 
-## `SLOT:` comments (nothing drawn)
-Every slot a later plan fills, in this view and elsewhere: MAN-7867.
+## The card's fix, the quiet line and `SLOT:` comments
+- Every slot a later plan fills, in this view and elsewhere: MAN-7867 (a `SLOT:` comment draws nothing).
+- The card's action row is `NeedFix` (the run strip on a line of its own, then Run “<fix>”), then `SLOT: actions` (Diagnose), then Mute. `NeedCard` takes the whole `need`, and `useLeavingNeeds` keeps the whole need of a card that is leaving, so it keeps its strip while it fades.
+- The quiet line ends with `cerberus.fix.quiet` ("Fixes set to auto-run will run on their own and show up below."), after a space, while any catalog entry is set to run on its own (`catalog.some(entry => entry.auto)`). `NeedFix`: MAN-7906.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/fleet/FleetStatusBar.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/fleet/FleetToolbar.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/fleet/NeedsYouCard.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/utils/fleetWords.ts
 
@@ -641,12 +702,16 @@ The Cerberus tab's Fleet view, live: its reads are `useCerberus()` and the pure 
 | `src/modules/cerberus/fleet/FleetRings.tsx` | `FleetRings({ items, nodes, now, onOpenCell })`: the Rings layout; owns its box, its layout and its selection |
 | `src/modules/cerberus/fleet/RingMarks.tsx` | `RingDot`, `RingHub`, `RingsKey`: a node's dot, center's round, the key |
 | `src/modules/cerberus/fleet/RingsNodePanel.tsx` | `RingsNodePanel({ item, node, now, onClose, onOpenCell })`: the selected node beside the rings |
-| `src/modules/cerberus/fleet/NodeCard.tsx` | `NodeCard({ item, node, open, face, index, narrow?, now, onToggle, onOpenCell })`: one node, `face` `grid` or `list`; exports `NodeGlyph({ status, size })` and `Heartbeat({ node, name? })`, which `RingsNodePanel` reuses |
+| `src/modules/cerberus/fleet/NodeCard.tsx` | `NodeCard({ item, node, open, face, index, narrow?, now, onToggle, onOpenCell })`: one node, `face` `grid` or `list`; exports `NodeGlyph({ status, size })` and `Heartbeat({ node, name? })`, which `RingsNodePanel` reuses; on a co-located node it mounts `NodeProjects` after the services, and every warden line it draws as words ends with `sessionsTail` |
+| `src/modules/cerberus/fleet/NodeProjects.tsx` | `NodeProjects({ node, link, projects, face })`: a co-located node's "Projects that run here", after its services, on its card and in the Rings panel — a tile per project (name over path, ✕ back to this server) and "Run a project here", the kit's portalled `ActionMenu` (a `Select`'s list is drawn in place, and the card's `overflow-hidden` cuts it to 11 of its 320 px), disabled while no list has been handed down (a section drawn outside a panel). A tile is named by the sidebar's `displayName` when the workspace lists the project, so the tile, the menu row and the toasts agree; the overview's name (the custom name, else the folder's) stands only for a project the sidebar does not list. While `link` is not `reporting`, a warn banner under the heading says messages in the node's projects are refused until its warden reports. The menu offers the workspace's projects (`useProjectChoices()`) that no node of the overview lists, as `{ projectId, name: displayName, path: fullPath }`; a pick and a ✕ press the provider's `setProjectNode`, and its answer draws the rest. `NodeCard` and `RingsNodePanel` mount it on a co-located node (`node.colocated`), after its services |
 | `src/modules/cerberus/fleet/ServiceRow.tsx` | `ServiceRow({ node, service, face, onOpenCell })`: name, pill, 30 minute cells |
 | `src/modules/cerberus/fleet/WhatHappenedCard.tsx` | `WhatHappenedCard({ activity, now })`: the kit's dense `Timeline` |
 | `src/shared/types.ts` § CERBERUS FLEET MODEL | `FleetLayout`, `FleetEntry` (`{ item, node, open }`), `CerberusSheetTarget` |
+| `src/shared/types.ts` § CERBERUS NODE PROJECTS | `CerberusProjectMove` (`'moved'`, `'refused'`, `'failed'`): what a `NodeProjects` assign or unassign verb resolves to; a rejection reads as `failed`. `refused` is the 409 `PROJECT_NODE_NOT_COLOCATED` (no toast: the section's banner says it); `failed` is any other refusal or no answer (the write's own toast has said it) |
 
-Leaves draw what they are handed and read nothing: they call `onOpenCell`, `onMute`, `onOpen`, `onToggle`. `NeedsYouCard` alone reads the provider, for Unmute (`liftMute(id)`).
+Leaves draw what they are handed and read nothing: they call `onOpenCell`, `onMute`, `onOpen`, `onToggle`. `NeedsYouCard` alone reads the provider, for Unmute (`liftMute(id)`); `NodeProjects` reads the provider's `overview` and `setProjectNode`, and the workspace's projects through `useProjectChoices()`.
+
+- Open: a project assigned to a node that has since stopped being co-located (`node.colocated` false) draws no tile and no ✕, since the section mounts only on a co-located node; the server checks co-location at the assignment only, so the project stays on that node. The way back is `PUT /api/projects/:projectId/node` with `{"node": null}`. Whether the card draws tiles with ✕ and no picker for it is the operator's decision.
 
 ## `FleetView` — contract
 - Props: `overview` (non-null: the root draws loading and unreachable), `narrow` (the root's container query), `onOpenCell(target: CerberusSheetTarget)`, `onMute(check)`. The sheet and the Mute dialog are the root's.
@@ -657,7 +722,7 @@ Leaves draw what they are handed and read nothing: they call `onOpenCell`, `onMu
 - `shown.length === 0`: dashed sentence, `fleet.noneInGroup` for a blank search, else `fleet.noMatch`.
 - Ages use `overview.now`, never a running clock: heartbeats are not re-read between reads, so a clock that ran on would age a node still reporting.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/fleet/FleetGrid.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/fleet/FleetList.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/fleet/FleetRings.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/fleet/FleetView.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/fleet/NodeCard.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/fleet/RingMarks.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/fleet/RingsNodePanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/fleet/ServiceRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/fleet/WhatHappenedCard.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/fleet/FleetGrid.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/fleet/FleetList.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/fleet/FleetRings.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/fleet/FleetView.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/fleet/NodeCard.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/fleet/NodeProjects.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/fleet/RingMarks.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/fleet/RingsNodePanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/fleet/ServiceRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/fleet/WhatHappenedCard.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts
 
 ## MAN-7881 — The Cerberus screen's words — the cerberus block of en/common.json — Alternatives the caller picks
 
@@ -764,9 +829,8 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/comm
 
 | gap | state |
 |---|---|
-| fixes and warden-update words: `Fix running or updating`, `Updating · step`, `Updating to X`, `Show them in the fleet` | no key; the fixes and warden-update plans own them |
-| `enroll.intro` ends at `…reports to Cerberus on center.` | the reference's `, and runs fixes when asked` goes back into it with the cerberus--fixes plan, once a warden runs a catalog fix on center's signed `run.start` |
-| Catalog tab, scenario-player words, preview-node notes | no key |
+| warden-update words: `Updating · step`, `Updating to X`, `Show them in the fleet` (`Fix running or updating` is `fix.fleet.legend`) | no key; the warden-update plan owns them |
+| scenario-player words, preview-node notes | no key |
 | `node.heard`, `node.silent`, `node.wardenRestarting`, `enroll.done`, `activity.enrolledSummary` with a null `wardenVersion` | draw a double space; no code path writes such a row |
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/common.json
@@ -807,7 +871,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/hooks/useEn
 | `WhatHappenedCard.tsx` | `toTimelineEvent(line, t, now)` per line, memoised; one state, `openKey` |
 | `FleetRings.tsx` | `size` (state set by a ResizeObserver on `boxRef`, built from the host window), `layout` (`ringsLayout(items, width, height)` at that size, memoised on the three), `selected` (state, `null` at first; let go when its node leaves `items`), `onSelect` (toggles; ✕ hands `null`) |
 
-- The open What happened row is held by the line's identity (`at`, `kind`, `node`, `check`), never by its position: the kit's `Timeline` takes `openIndex` from its owner, and the card derives it by finding that line. A newer line at the head leaves the open row on its event, and a row pushed past seven stops matching and closes.
+- The open What happened row is held by the line's identity (`at`, `kind`, `node`, `check`, `event`, and the `runId` or `entry`; a part reads empty for a line without one, as a `catalog` line has no node or check), never by its position: the kit's `Timeline` takes `openIndex` from its owner, and the card derives it by finding that line. A newer line at the head leaves the open row on its event, and a row pushed past seven stops matching and closes.
 
 ## `CerberusSheetTarget`
 `{ node: string; service: string; check: string; lookupAt?: number }`.
@@ -839,15 +903,15 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/fleet/Fleet
 - Spokes: dashed `border-tone-dot` under `data-tone="neutral"` for no result (why: `border-input` measured 1.41:1 on the light card, and the line that says no result must read on its own); amber `border-t-2` under `data-tone="warn"` for needs you; plain `border-input` otherwise; a selected plain spoke turns `border-primary`. why 2 px: Chromium floors a border under 2 px to whole device pixels, so the prototype's 1.5 px drew as 1 px on a 1× screen.
 - Beats: `motion-safe:animate-cerberus-travel`, base `opacity-0`, phases `-(index % 7) × 0.45 s`. Every live spoke beats while every node on the rings is `labelled`; past that, only amber spokes beat. why: sixty beats are texture, and a silent node is told by its dashed spoke and hollow dot.
 - Each dot is a button (`aria-pressed`, named "<id> · <line>"); its press area is ≥ 24 px. The keyboard walks the hub, then the nodes worst first.
-- The panel (`RingsNodePanel`, keyed by node) shows only for a node in `items`: name, description, line, the warden line said once, a `ServiceRow` (`grid` face) per service or the one-sentence empty state.
+- The panel (`RingsNodePanel`, keyed by node) shows only for a node in `items`: name, description, line, the warden line said once (ending with `sessionsTail`, MAN-7879), a `ServiceRow` (`grid` face) per service or the one-sentence empty state, then `NodeProjects` (`grid` face) on a co-located node (MAN-7880).
 - Note: `fleet.rings.note` / `fleet.rings.partial`; none while unmeasured (0 × 0) or with no node around the hub.
 
 ## `NodeCard`, `FleetGrid`, `FleetList`
 - `grid` face: collapsed tile (glyph, name, heartbeat, up to 8 service squares then `+N`, one line); open, it spans the grid (`col-span-full`) as a card with the warden line and a `ServiceRow` per service; an empty node draws the kit's `EmptyState`.
 - `list` face: a row (chevron, glyph, name and description, squares, line, warden line) opening a canvas band; an empty node is one sentence at the band's indent. `narrow` moves the warden line from the row's end into the open band.
 - A list row does not repeat the warden line when it equals the node's line ("Waiting for the first heartbeat").
-- The tile's edge is `STATUS_TABLE[mark].cell`: `solid` 1.5 px tone edge, `outline` 1 px, `dashed` 1.5 px dashed, the rest the plain border. A node with no mark (`empty`, `fixing`, `enrolling`) draws a dashed edge and a dashed round glyph.
-- `fixing` and `enrolling` are fed by nothing yet; each draws as a node with no mark.
+- The tile's edge is `markLook(mark).cell`: `solid` 1.5 px tone edge, `outline` 1 px, `dashed` 1.5 px dashed, the rest the plain border. A node with no mark (`empty`, `enrolling`) draws a dashed edge and a dashed round glyph.
+- `fixing` is fed (a fix running on one of its services) and draws the info ● — its tile edged 1.5 px in the info dot, the glyph pulsing; `enrolling` is fed by nothing yet and draws as a node with no mark.
 - `FleetGrid` columns: `repeat(auto-fill,minmax(150px,1fr))`; never packed `dense`. why: dense pulled later tiles above an open card, broke worst-first order and made keyboard order differ from the eye's.
 - Entrance: `motion-safe:animate-shape-rise`, delay inline `min(index, 24) * 18` ms (INV-7053).
 - Heartbeat dot: positive and breathing while `link === 'reporting'` and not restarting, else still neutral; named (`role="img"`) only on a collapsed tile.
@@ -916,10 +980,10 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/history/Eve
 ## MAN-7890 — Cerberus — the History view: `HistoryView`, `LookupCard`, `EventsCard` — `UnreachableBanner`
 
 - `Banner tone="warn"` inside `role="alert"`. An alert is heard when it MOUNTS: a retry that fails again is heard only where the caller mounts the banner afresh. why warn: nothing was refused; the next read may answer.
-- Re-mounting callers: `CerberusPanel` (keyed by Try again's finished reads, MAN-7891); the feed's placeholder and History's index read (put back while the read is out). Silent on a second failure: the check sheet's and the look-up's retry of a check's read keep it mounted.
+- Re-mounting callers: `CerberusPanel` (keyed by Try again's finished reads, MAN-7891); the feed's placeholder, History's index read and the sheet's Fix output (each puts its placeholder back while the read is out). Silent on a second failure: the check sheet's and the look-up's retry of a check's read keep it mounted.
 - Try again: `Button variant="tonal" size="sm"`, `max-md:h-11` (44 px under `md`).
 - First line `errors.unreachable` (`font-medium`); optional `detail` second line sets itself apart by weight alone. No `opacity-*` on it. why: `opacity-80` measured 3.24:1 on the light banner, under AA.
-- Consumers: `CerberusPanel` (its first read of the fleet failed; the fleet it holds is stale, with `detail` `cerberus.errors.lastAnswer`), `LookupCard`, `EventsCard`, `sheet/CheckSheet.tsx`: one spelling of the state for the tab.
+- Consumers: `CerberusPanel` (its first read of the fleet failed; the fleet it holds is stale, with `detail` `cerberus.errors.lastAnswer`), `LookupCard`, `EventsCard`, `sheet/CheckSheet.tsx`, and `sheet/FixOutput.tsx` (its run's own read failed; the sheet's banner speaks only for the check's read): one spelling of the state for the tab.
 
 ## Rules
 - A time printed without a date means today. Both cards judge "today" against the view's one `now`.
@@ -945,13 +1009,13 @@ The Cerberus tab's root and header, live: the root reads the one overview throug
 ## Files
 | file | holds |
 |---|---|
-| `src/modules/cerberus/CerberusPanel.tsx` | `CerberusPanel()`: header, stale banner, strip, the view shown, the sheet and the two dialogs |
+| `src/modules/cerberus/CerberusPanel.tsx` | `CerberusPanel({ projectChoices })`: header, stale banner, strip, the view shown, the sheet and the two dialogs; it provides `projectChoices` (the workspace's projects, which `NodeProjects` offers) to Fleet through `ProjectChoicesContext`, because the workspace owns that list and imports this module |
 | `src/modules/cerberus/CerberusHeader.tsx` | `CerberusHeader({ overview, stale, onEnroll })` and `ClockPill`: eyebrow, headline, summary, clock pill, Enroll a node |
 | `src/modules/cerberus/hooks/useClock.ts` | `useClock(tickMs = 1000)`: the browser's clock as epoch ms, read again each tick on the host window |
 | `src/modules/cerberus/hooks/useCountTo.ts` | `useCountTo(target)`: the passing count as drawn |
 | `src/shared/types.ts` | `CerberusView = 'fleet' | 'history'` |
 
-`index.ts` exports `CerberusPanel` as a `lazy` import (its own chunk, loaded on the tab's first open); `WorkspaceMain` renders it.
+`index.ts` exports `CerberusPanel` as a `lazy` import (its own chunk, loaded on the tab's first open); `WorkspaceMain` renders it with its `projectChoices`, which it only does once the workspace's projects have been read.
 
 ## `CerberusPanel` layout
 | order | block | shows when |
@@ -964,7 +1028,7 @@ The Cerberus tab's root and header, live: the root reads the one overview throug
 | — | "Loading Cerberus…" (`cerberus.loading`, `vv-fade` held back 150 ms) | `overview === null && !unreachable` |
 | — | `UnreachableBanner` (no `detail`), keyed by `attempt` | `overview === null && unreachable` |
 
-- `VIEWS` is one table (`id`, `labelKey`, `hintKey`). The slot a later plan fills in it: MAN-7867.
+- `VIEWS` is one table (`id`, `labelKey`, `hintKey`). its middle row is Catalog (`catalog.tab` / `catalog.tabHint`), between Fleet and History, mounted only while shown like History: it holds no place of its own, so its entrance plays each time. View: MAN-7906.
 - Root: `[container-type:inline-size]`; `data-cerberus-panel="narrow|wide"` carries the flag for a verify script.
 - Gutter `px-[clamp(16px,4cqi,32px)]`, top `pt-[clamp(20px,5cqi,28px)]`: from the panel's own width, not the window's. `HistoryView` and `FleetView` keep the same spelling.
 - `narrow`: below 620 px, wide again only above 660 px; a width of 0 changes nothing.
@@ -1002,7 +1066,7 @@ The tab's place on the house row, its count pill, its pane and both palettes: MA
 - The count in motion is `aria-hidden`; an `sr-only` span carries `counts.passing`.
 - Eyebrow, summary and hint use `text-muted-foreground`. why: `ink-faint` measures ~3.1:1 on the light canvas, under AA.
 - Pill: `live = connected && !stale`. Live: breathing positive dot, `cerberus.header.live`, `hms(now)`. Otherwise: still neutral dot and `cerberus.header.reconnecting`, no time. Only the mode word is `role="status"`; the clock never is.
-- The button row's slot for a later plan: MAN-7867.
+- The button row's slot (MAN-7867). The headline reads "One fix *running*" (`fix.headline` + `headlineAccent`, the accent in the info tone) when `counts.needsYou` is 1 and that need's run is going (`result` null).
 - Buttons `h-8 max-md:h-11`.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/CerberusHeader.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/CerberusPanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/hooks/useClock.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/hooks/useCountTo.ts
@@ -1062,3 +1126,99 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/hooks/useEn
 | house `Field` has no slot for Verve's small "optional" label | `enroll.desc` reads `What it is (optional)` in one key |
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/hooks/useEnrollmentStatus.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/modals/DialogFrame.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/modals/EnrollDialog.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/modals/EnrollInstall.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/modals/MuteDialog.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/utils/enrollAsk.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts
+
+## MAN-7906 — Cerberus — the fixes screen, live: `CatalogView`, `NeedFix`, `FixOutput`, `CheckFixes`, `useRunOutput`
+
+The fixes screen's four pieces, drawn from the provider and the run reads, and mounted on the live tab. Words: MAN-7870 (`cerberus.catalog.*`, `cerberus.fix.*`). Run look: MAN-7873. Wire shapes: MAN-7807. Client reads and the provider's verbs: MAN-7871. Row map: MAN-7868. Design: `design/cerberus/Cerberus Tab.dc.html`.
+
+## Files
+| file | holds | design |
+|---|---|---|
+| `catalog/CatalogView.tsx` | `CatalogView()`: intro, count, entries newest first; `EntryRow`, `ReadingRows` | :301-336 |
+| `fleet/NeedFix.tsx` | `NeedFix({ need, leaving, onOpen })`: a Needs-you card's run strip, then Run “<name>” | :77-84 |
+| `sheet/FixOutput.tsx` | `FixOutput({ runId })`: one run's head, pill and output pane; `ReadingRun`, `UnreadRun` | :429-449 |
+| `sheet/CheckFixes.tsx` | `CheckFixes({ fixes, run })`: "Fixes in the catalog" with Run now | :489-504 |
+| `hooks/useRunOutput.ts` | `useRunOutput(runId)` → `{ run, lines, replaying, failed, refresh }` | — |
+| `hooks/useRunLastLine.ts` | `useRunLastLine(run)`: the strip's newest line, kept live | — |
+| `hooks/useCatalogRead.ts` | `useCatalogRead()` → `{ catalog, catalogFailed, readCatalog }`, called by the provider | — |
+
+## Where they read
+- `CatalogView`: `useCerberus()` for `catalog`, `catalogFailed`, `overview.running`, `starting`, `setAuto`, `runEntry`, `refresh` (Try again); `useClock(60_000)` for the hour an entry is new (`starting.includes(entry.id)` marks a press still out).
+- `NeedFix`: its need; `useCerberus()` for `starting` and `runEntry`; `useRunLastLine(run)`. The strip opens the sheet with `run: run.id`. A press that had focus hands it to the strip when the strip takes the button's place (`aria-disabled`, never `disabled`, kept the focus until then).
+- `FixOutput`: `useRunOutput(runId)`; `useClock` ticks each second while the run goes, hourly otherwise. Each line is an `OutputLine`, memoised on its line, so a line added draws only itself; a run's closing sentence (`note`) waits until `replaying` is over, so it follows the lines.
+- `CheckFixes`: `useCerberus()` for `starting` and `runEntry`.
+- `CerberusPanel` mounts `CatalogView`; `CheckSheet` mounts `FixOutput` (keyed by run) and `CheckFixes`; `NeedsYouCard` mounts `NeedFix` and carries the quiet sentence; `CerberusHeader` says "One fix running".
+
+## `useRunOutput(runId)`
+- Reads `GET /api/cerberus/runs/:id` (`api.cerberus.run`) once subscribed, and again when a `cerberus_changed` hint names the run's check (`<node>/<check key>`, known after the first read) and on `websocket_reconnected`. Only the newest read's answer is applied; `failed` while a read has not answered, cleared by one that has.
+- Lines: the read's and each `cerberus_run_output` frame's for this run, merged by `n` (a line both carry is kept once), in order.
+- A run that has ended when it is first read replays: each line appears at its own `t`, the whole replay capped at 10 s (the pace is squeezed by `10 / last t`). One timer at a time reveals every line whose moment has passed and waits for the next, no sooner than 40 ms, so a 5,000-line run is a few hundred renders and ends at the cap; `replaying` is true until the last line is shown. A run still going shows what it has at once and takes the rest as frames; a later read never replays. The timer ends with the card.
+
+## `useRunLastLine(run)`
+- The newest line of a frame for this run while the run has no result, kept only against the overview's `lastLine` it arrived after: a read of the overview that moved past it wins. An ended run shows the overview's `lastLine`. One case it cannot tell: a read that left before a frame and lands after it is older and looks like one that moved past it (the overview names its line by text, not number), so the older line stands until the next frame or read; a newest line number on `CerberusRunView` would settle it.
+
+## `CatalogView`
+- Order: `createdAt` descending, then name. Count `catalog.count_*` (`count`, `auto`).
+- Row: name, "New · HH:MM" `Badge` and a `bg-tone-soft/70` wash while `now - createdAt < 1 h`; trigger line (check label, else the key in mono, then `catalog.trigger.<when>`); raw key and `when` when a label shows; `$ cmd`; run stats and origin; `Switch` and `auto` line, or the `capped` reason in neutral with no switch; Run now.
+- Row entrance staggers 45 ms a row, capped at 12 rows.
+- States: `ReadingRows` (three skeleton rows, `aria-busy`) before the first read; `UnreachableBanner` with Try again when it failed; `catalog.empty` for no entries.
+- `busy` (this entry runs, or its press is out): "Running…" via `aria-disabled`; `blocked` (another run on the same node and check): real `disabled`, `catalog.blocked` under the auto line, `aria-describedby` on the button. why: center refuses a second run on a check (`CERBERUS_RUN_ACTIVE`).
+
+## `NeedFix`
+- Draws nothing for a need with no `run` and no `fix`.
+- Strip (a `button`, `basis-full`, opens the sheet), from the run: going `strip.running` / `strip.runningAuto` (info, no glyph); `ok` `strip.finished` (neutral, ✓ in positive ink); `failed` `strip.failed` / `strip.failedExit`; `timed_out` `strip.timedOut`; `refused` `strip.refused` (danger).
+- Second line: `run.note` (body face, `line-clamp-2`), else `run.lastLine` (mono, one line, `title` carries it whole), else `$ cmd`.
+- Button `fix.run`, tonal, while `fix !== null` and no run is going. Pending press: "Running…", `aria-disabled`.
+- `leaving` disables both: a card on its way out takes no press.
+
+## `FixOutput`
+- Head: eyebrow `fix.output.title`, the fix's name, `output.meta` (who, node, start time; `output.metaRefused` for a refusal). Right: pill `Badge` (`RUN_LOOK` tone and glyph, `role="status"`) and `output.elapsed` while going / `output.took` once ended; none for a refusal.
+- Pane `role="log"`: `$ cmd`, then `+NNs text` per line (`output.offset`); a line opening `✓` is positive ink; `run.note` after the lines in the result's ink; a blinking caret while going.
+- Pane `max-h-[min(26rem,60vh)]`, scrolls itself. It follows a new line only while the reader is within 8 px of the bottom (`followingRef` + `useLayoutEffect`, no state); scrolled back, it holds still.
+- Pane sits on `bg-background`. why: on the darker grey, muted and green text measured 4.46 and 4.49:1 light; on the page background 4.73 and 4.77.
+- Placeholders keep the frame and eyebrow: `ReadingRun` (skeleton) while the read is out; `UnreadRun` (`UnreachableBanner`, Try again) when it failed. The sheet's own banner speaks only for the check's read.
+- Keyed by run id in the sheet, so a new run starts the pane fresh.
+
+## `CheckFixes`
+- `fixes` = the check's entries, every `when`. Row: name, `$ cmd`, auto line (the `capped` reason, `catalog.auto.on_*`, or `fix.sheet.offered`), Run now (tonal).
+- The entry whose run is going reads "Running…" (`aria-disabled`); every other entry is `disabled` while a run on the check is going. No entries: dashed `fix.sheet.none`.
+
+## Rules
+- A pending or running Run button is `aria-disabled`, never `disabled`. why: `disabled` blurs the button under the keyboard user who pressed it. `disabled` only when another run holds the check.
+- No `Trans` in these pieces: a label, name or command reaches the screen as text through `t()`. why: `Trans` escapes `<` in a check label ("p95 < 300 ms") to protect its own tags.
+- Glyphs live in code (`RUN_LOOK`, MAN-7873), not in the words (MAN-7870).
+- Feed words sit under `cerberus.activity` (`fix`, `catalog`), not under `cerberus.fix`: each kind of event keeps its words there (MAN-7872).
+- Light-mode contrast under 4.5:1 that is the kit's, not this screen's (2026-10-06): green `Badge` 4.48, tonal `Button` 4.48, the sheet's ✕ 4.46. Every colour these pieces choose passes.
+- Phrases with no design source: `catalog.empty`, `catalog.auto.label`, `catalog.blocked`, the failed and timed-out strips, `output.metaRefused`.
+- Not composed: the prototype pulses a card's glyph while its fix runs; the Needs-you card's glyph keeps its failing ring (the fleet's node glyph, squares, pill and dot do pulse: `markLook`).
+- The Catalog writes nothing but the auto switch and a run: no screen writes an entry (`api.cerberus.writeEntry` is the seeds' door).
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/catalog/CatalogView.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/fleet/NeedFix.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/hooks/useCatalogRead.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/hooks/useRunLastLine.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/hooks/useRunOutput.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/sheet/CheckFixes.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/sheet/FixOutput.tsx
+
+## MAN-7920 — Cerberus — a project's node: `projects.node`, `PUT /api/projects/:projectId/node`, the co-location rule, and "Projects that run here"
+
+A project's Claude chats run on this server or on one co-located node's warden. The tab writes the assignment from a node's card and reads it back in the overview. Server side — column declaration, the relay, the hints: MAN-7901 §"A project's node". What a turn does with it: MAN-7905.
+
+## The assignment
+| piece | fact |
+|---|---|
+| column | `projects.node` (`TEXT DEFAULT NULL`): the node's id, NULL = this server |
+| write | `PUT /api/projects/:projectId/node { node: string \| null }` → 204; client `api.projects.setNode(projectId, node)`; the tab's verb `setProjectNode` (MAN-7917) |
+| refusals | 400 `INVALID_PROJECT_NODE` (no `node`, or an empty or non-string one); 404 `PROJECT_NOT_FOUND` (judged first, even for `null`); 409 `PROJECT_NODE_NOT_COLOCATED` |
+| reads | `projectsDb.nodeForPath(path)`, by `dispatchRun` on every turn → `options.node`; `projectsDb.listByNode(node)` → `CerberusNodeView.projects` |
+| effect | the next CLI the project needs is spawned by that node's warden; a CLI already running keeps running where it started and later messages in its chat join it. Only Claude reads `node` |
+
+**Co-location rule.** The 409 answers unless the node is enrolled (`cerberusNodesDb.get`) AND `nodeSessions.isColocated(node)`: the node's last `hello.facts.machineId` equals the first line of this machine's `/etc/machine-id`. why: a session's working folder is a path on this server's disk and the warden reads it from its own. `null` needs no node. The rule is checked at the assignment only: a node that later leaves this machine keeps its projects until they are moved back, and its card (`colocated: false`) draws no section.
+
+## What the tab reads and draws
+| `CerberusNodeView` field | Value | Drawn as |
+|---|---|---|
+| `colocated: boolean` | `nodeSessions.isColocated(id)`; false for the hub | gates `NodeProjects` on the node's open card (Grid, List, the Rings panel) |
+| `projects: { projectId, name, path }[]` | `projectsDb.listByNode(id)`, by path; `name` is the custom name, else the folder's | one tile per project: name over path, ✕ moves it back to this server |
+| `sessions: number` | `nodeSessions.lastListed(id).length`; 0 before a list has answered; the hub 0 | " · N sessions running here" ending the warden line, only while `link` is `reporting` and `sessions > 0` (`sessionsTail`, MAN-7879) |
+
+- "Projects that run here" (`fleet/NodeProjects.tsx`, MAN-7880): the heading, a tile per project, and "Run a project here" — the workspace's projects (`useProjectChoices()`) that no node's list holds, in the kit's `ActionMenu`, not a `Select`: a node card clips what overflows it. A pick and a ✕ both call `setProjectNode`; its answer (`moved`, `refused`, `failed`) draws the rest. A 409 is the section's warn banner; any other failure is the write's toast.
+- While a node's `link` is not `reporting`, a message in its projects is refused with "<node>'s warden is not connected — this project's sessions run on <node>" (MAN-689). The section says so in a warn banner, and a move still lands.
+- A landed write re-reads the overview, and the server hints the node left and the node joined (`cerberus_changed`), so a second window re-reads too (MAN-7871).
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/projects/projects.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/projects/services/project-node.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/fleet/NodeProjects.tsx

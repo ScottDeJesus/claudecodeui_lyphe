@@ -1159,7 +1159,10 @@
       "epicLine_other": "{{word}} · {{shipped}} of {{count}} shipped",
       "epics_one": "{{count}} epic · {{word}}",
       "epics_other": "{{count}} epics · {{word}}",
-      "blocked": "Blocked"
+      "blocked": "Blocked",
+      "zoomIn": "Zoom in",
+      "zoomOut": "Zoom out",
+      "fit": "Fit to screen"
     },
     "panel": {
       "label": "Details",
@@ -1781,7 +1784,27 @@
       "emptyMessage": "Its warden is reporting. Assign a service to {{node}} and its checks show up here.",
       "waitingTitle": "Waiting to hear from it",
       "waitingLead": "Waiting to hear from it.",
-      "waitingMessage": "It shows up here as soon as its warden says hello."
+      "waitingMessage": "It shows up here as soon as its warden says hello.",
+      "sessions_one": "{{count}}\u00a0session\u00a0running\u00a0here",
+      "sessions_other": "{{count}}\u00a0sessions\u00a0running\u00a0here",
+      "projects": {
+        "title": "Projects that run here",
+        "emptyLead": "Nothing runs here yet.",
+        "emptyMessage": "Pick a project below and its Claude chats run on {{node}}.",
+        "moveBack": "Move {{name}} back to this server",
+        "movingHere": "Moving here…",
+        "movingBack": "Moving back…",
+        "pick": "Run a project here",
+        "noChoices": "No other project to run here.",
+        "refusedLead": "{{name}} stays on this server.",
+        "refused": "{{node}} is not on this machine, so a project can't run there.",
+        "notReporting": "Messages in {{node}}'s projects are refused until its warden reports.",
+        "toast": {
+          "here": "{{name}} runs on {{node}} now",
+          "hereWaiting": "Its messages are refused until {{node}}'s warden reports.",
+          "back": "{{name}} runs on this server again"
+        }
+      }
     },
     "service": {
       "oneBad": "{{label}} — {{word}}",
@@ -1799,7 +1822,23 @@
     "activity": {
       "title": "What happened",
       "nothingYet": "Nothing has happened yet.",
+      "fix": {
+        "ranAuto": "Ran on its own: “{{name}}”",
+        "ranYou": "You ran “{{name}}”",
+        "finished": "“{{name}}” finished · {{result}}",
+        "succeeded": "Succeeded in {{count}} s",
+        "failed": "Failed",
+        "timedOut": "Timed out",
+        "refused": "The warden refused “{{name}}”"
+      },
+      "catalog": {
+        "added": "Added “{{name}}”",
+        "autoOn": "Auto-run on · “{{name}}”",
+        "autoOff": "Auto-run off · “{{name}}”"
+      },
       "source": {
+        "fix": "Fix",
+        "catalog": "Catalog",
         "check": "Check",
         "mute": "Mute",
         "node": "Node"
@@ -1889,6 +1928,85 @@
       "readingEarlier": "Reading earlier events…",
       "nothingEarlier": "Nothing earlier on record."
     },
+    "catalog": {
+      "tab": "Catalog",
+      "tabHint": "Fixes Cerberus can offer, or run on its own",
+      "intro": "Each entry pairs a check with a fix. Cerberus offers it when the check fails. Entries set to run on their own do so within their limit, and every run's output is kept. Anything that reaches outside the fleet stays a step you take.",
+      "count_one": "{{count}} entry · {{auto}} run on their own",
+      "count_other": "{{count}} entries · {{auto}} run on their own",
+      "empty": "Nothing in the catalog yet.",
+      "new": "New · {{time}}",
+      "trigger": {
+        "failing": "fails · {{service}} on {{node}}",
+        "warn": "nears its limit · {{service}} on {{node}}"
+      },
+      "raw": "{{key}} · {{when}}",
+      "stats": {
+        "never": "Never run",
+        "allOk_one": "{{count}} run · all succeeded",
+        "allOk_other": "{{count}} runs · all succeeded",
+        "someOk_one": "{{count}} run · {{ok}} succeeded",
+        "someOk_other": "{{count}} runs · {{ok}} succeeded"
+      },
+      "origin": {
+        "written": "Written by you · {{date}}",
+        "diagnosis": "Promoted from a diagnosis · {{date}}",
+        "lastRun": "{{origin}} · last run {{time}}"
+      },
+      "auto": {
+        "label": "Auto-run · “{{name}}”",
+        "on_hour_one": "Runs on its own · at most {{count}} run an hour",
+        "on_hour_other": "Runs on its own · at most {{count}} runs an hour",
+        "on_day_one": "Runs on its own · at most {{count}} run a day",
+        "on_day_other": "Runs on its own · at most {{count}} runs a day",
+        "off": "Off · offered, you press it"
+      },
+      "runNow": "Run now",
+      "running": "Running…",
+      "blocked": "Another fix is running on this check"
+    },
+    "fix": {
+      "run": "Run “{{name}}”",
+      "command": "$ {{cmd}}",
+      "strip": {
+        "runningAuto": "Running on its own · {{name}}",
+        "running": "Running · {{name}}",
+        "finished": "{{name}} finished {{time}} · waiting for the next check",
+        "failed": "{{name}} finished {{time}} · Failed",
+        "failedExit": "{{name}} finished {{time}} · Failed · exit {{exit}}",
+        "timedOut": "{{name}} finished {{time}} · Timed out",
+        "refused": "The warden refused “{{name}}”"
+      },
+      "output": {
+        "title": "Fix output",
+        "ranAuto": "Ran on its own",
+        "ranYou": "You ran it",
+        "meta": "{{who}} · warden on {{node}} · started {{time}}",
+        "metaRefused": "{{who}} · warden on {{node}} · refused {{time}}",
+        "running": "Running",
+        "ok": "Succeeded",
+        "failed": "Failed",
+        "failedExit": "Failed · exit {{exit}}",
+        "timedOut": "Timed out",
+        "refused": "Refused",
+        "took": "took {{count}} s",
+        "elapsed": "{{count}} s",
+        "offset": "+{{seconds}}s"
+      },
+      "sheet": {
+        "title": "Fixes in the catalog",
+        "none": "No catalog fix covers this check yet.",
+        "offered": "Offered · you press it"
+      },
+      "headline": "One fix",
+      "headlineAccent": "running",
+      "quiet": "Fixes set to auto-run will run on their own and show up below.",
+      "fleet": {
+        "runningAuto": "Fix running on its own",
+        "running": "Fix running",
+        "legend": "Fix running or updating"
+      }
+    },
     "mute": {
       "title": "Mute",
       "raw": "{{service}} · {{key}} · now {{value}}",
@@ -1920,7 +2038,7 @@
         "install": "Install",
         "hello": "Say hello"
       },
-      "intro": "A node is any machine with a warden on it. The warden runs checks there and reports to Cerberus on center.",
+      "intro": "A node is any machine with a warden on it. The warden runs checks there, reports to Cerberus on center, and runs fixes when asked.",
       "name": "Name",
       "nameHelper": "Lowercase letters, numbers and dashes. Shown on every check from this node.",
       "nameEmpty": "Give it a name",

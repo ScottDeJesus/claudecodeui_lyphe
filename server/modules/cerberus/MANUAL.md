@@ -2,7 +2,7 @@
 
 ## MAN-7815 — Cerberus — fleet health: what the module does
 
-Cerberus: fleet health. Wardens on other machines and three checks of center's own report results; center stores the ones that say something, works every status out when the screen reads, and serves it at `/api/cerberus`. The warden gateway is a tailnet listener of its own (`CERBERUS_LISTEN`). Which row documents which subject: MAN-7816.
+Cerberus: fleet health. Wardens on other machines and three checks of center's own report results; center stores the ones that say something, works every status out when the screen reads, and serves it at `/api/cerberus`. It holds the catalog of fixes a person has written for a check, asks a warden to run one on a press or by its own auto-run rule, and keeps every run and its output. The warden gateway is a tailnet listener of its own (`CERBERUS_LISTEN`). Which row documents which subject: MAN-7816.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/index.ts
 
@@ -70,7 +70,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/center-k
 
 ## MAN-7801 — Cerberus storage rule — change or keep-alive, `prev_at`, `prev_status`, `since`, and what is pruned
 
-The Cerberus storage rule: only results are stored, and only when they say something. "No result", "not enabled", "muted" and "paused" are worked out when the screen reads (MAN-7808), never written; nothing is overwritten. Appends: `results`, `mutes`. The only `UPDATE`s in the store: definition rows, a node's heartbeat and ack columns, a token's `used_at`, a mute's `lifted_at`. Transaction, refusals and the memory doors around this rule: MAN-7811.
+The Cerberus storage rule: only results are stored, and only when they say something. "No result", "not enabled", "muted" and "paused" are worked out when the screen reads (MAN-7808), never written; nothing is overwritten. Appends: `results`, `mutes`, `catalog_changes`, `run_output`. The only `UPDATE`s in the store: definition rows, a node's heartbeat and ack columns, a token's `used_at`, a mute's `lifted_at`, a catalog entry's `auto` and `retired_at`, a set's `sent_at` and `acked_at`, a run's start and end (MAN-7896). Transaction, refusals and the memory doors around this rule: MAN-7811.
 
 ## The rule — `storeFrame` in `ingest.service.ts`
 Each result is judged against `lastStored[node/key]`: that check's last stored row, held in memory and seeded at start from `cerberusResultsDb.latestPerCheck()`.
@@ -112,14 +112,14 @@ Memory moves only after the frame's transaction commits.
 
 ## Retention — `store-prune.service.ts`
 - Once a day, first run 60 s after the duties arm; started by `soleDuties()`, so only the process holding the takeover prunes.
-- Deletes `keepalive` rows with `at < now − 90 days` (`cerberusResultsDb.pruneKeepalivesBefore`, the only delete on `results`) and enrollment tokens with `issued_at < now − 30 days`, spent or not.
-- `change` rows are never deleted. why: they are the record of every status a past moment can be read from (`rowsInWindow` needs the last row before any window), and "What happened" is built on them. A keep-alive is a copy written to say "still the same". Retention per `design/cerberus/Cerberus Spec.dc.html` Table 4: results "Changes forever · keep-alives 90 days".
+- Deletes `keepalive` rows with `at < now − 90 days` (`cerberusResultsDb.pruneKeepalivesBefore`, the only delete on `results`), enrollment tokens with `issued_at < now − 30 days`, spent or not, and the lines of runs with `requested_at < now − 90 days` (`cerberusRunsDb.pruneOutputBefore`; the `runs` rows are never deleted). The log line reads `pruned <n> keepalive row(s), <n> enrollment token(s) and <n> run output line(s)`.
+- `change` rows are never deleted. why: they are the record of every status a past moment can be read from (`rowsInWindow` needs the last row before any window), and "What happened" is built on them. A keep-alive is a copy written to say "still the same". Retention per `design/cerberus/Cerberus Spec.dc.html` Table 4: results "Changes forever · keep-alives 90 days", runs "forever · output 90 days".
 - Volume, measured 2026-10-06 on eis1 (the first real node: 7 probes, the 74-component shadow-connector document): about 1 100 `change` and 660 `keepalive` rows an hour (1 759 rows, ≈ 760 KB, in the hour to 14:56 PDT), so ≈ 26 000 `change` rows a day (≈ 9.6 million a year at ≈ 430 bytes each, never pruned) and ≈ 16 000 `keepalive` rows a day (pruned at 90 days) — about 18 MB a day for this one node. A value that carries a changing number is a change at every new value, and two sources do it: the warden's own sentences with a timing (`HTTP 200 in 84 ms`, `Answered in 6 ms`, `Read 74 components in 3.2 s` — `cloudcli/http.ok`, `docstore/db.connect`, `shadow-connector/health` change on nearly every read), and — the larger share — components whose `reason` carries a counter or an age (`abatement_mail_sweep`, `edge_origin_census`, `drybook_readings_sweep`, `scope_checklist_engine`, `servpro_kpm_reference`, `system_resources`: 83–112 an hour each, all `change` rows, in the hour to 15:20 PDT). Each node added multiplies it. The rule above stays as written; whether a moved value alone should stay a `change` is an open decision.
 - 2026-10-06, live store: `center` held 56 rows, 17 `change` and 39 `keepalive`.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/boot-vouch.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/ingest.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/store-prune.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/cerberus-results.db.ts
 
-## MAN-7802 — The REST surface at `/api/cerberus` — thirteen routes, their error codes, mutes, enrollment minting, and the `cerberus_changed` hint
+## MAN-7802 — The REST surface at `/api/cerberus` — eighteen routes, their error codes, mutes, the catalog, enrollment minting, and the `cerberus_changed` and `cerberus_run_output` frames
 
 What a browser (or a probe) calls. Mounted in `server/index.ts`: `app.use('/api/cerberus', authenticateToken, cerberus.router)`, directly after the notes mount; the gateway (MAN-7803) is a different listener and carries none of these. Wire shapes: MAN-7807. What the read routes compute: MAN-7808. What the definition and label writes do: MAN-7812, MAN-7813.
 
@@ -128,8 +128,10 @@ What a browser (or a probe) calls. Mounted in `server/index.ts`: `app.use('/api/
 |---|---|
 | `cerberus.routes.ts` | `createCerberusRouter({ readInputs, gatewayState })`: parse, call one verb, answer |
 | `mutes.service.ts` | `createMute(input, by)`, `liftMute(id)` |
+| `catalog.service.ts` | `listCatalog()`, `writeEntry(input, origin)`, `setAuto(id, on, by)` (and the set, ack and retire verbs the link and later plans use) |
+| `runs.service.ts` | `startRun({ entryId, by })`, `getRun(id)` (MAN-7904) |
 | `enrollments.service.ts` | `mintEnrollment({ name, desc? }, gateway)`, `enrollmentStatus(name)` |
-| `cerberus-broadcast.ts` | `hintChanged({ nodes?, checks? })` |
+| `cerberus-broadcast.ts` | `hintChanged({ nodes?, checks? })`, `sendRunOutput(runId, lines)` |
 
 ## Answer and refusal shape
 | rule | value |
@@ -139,7 +141,7 @@ What a browser (or a probe) calls. Mounted in `server/index.ts`: `app.use('/api/
 | refusal | an `AppError` with a `CERBERUS_` code → `{ success: false, error: { code, message, details } }` |
 | routes decide | transport shape only (a field's type, which path parts make the key); range, grammar and existence are the service's refusal; a wrong shape is 400 `CERBERUS_BAD_REQUEST` |
 | read inputs | `readInputs()` once per request: `Date.now()`, `wardenLinks.states()`, the gateway state, `ingest.memory` — one instant for the whole answer |
-| `by` of a mute | `req.user.username`; none → 401 `CERBERUS_USER_REQUIRED` |
+| `by` of a mute, a written entry, an auto switch | `req.user.username`; none → 401 `CERBERUS_USER_REQUIRED` |
 
 ## Routes
 | route | answer | refusals |
@@ -151,6 +153,11 @@ What a browser (or a probe) calls. Mounted in `server/index.ts`: `app.use('/api/
 | `GET /activity?before&limit` | `CerberusActivity[]`; `limit` default 40, capped at 100; `before` default now + 1 | 400 `CERBERUS_BAD_REQUEST` |
 | `POST /mutes {node,key,until,reason?}` | `CerberusMute` | 404 `CERBERUS_UNKNOWN_CHECK`; 400 `CERBERUS_BAD_MUTE` (`until` not whole ms, not in `(now, now + 24 h]`, reason over 500 characters); 400 `CERBERUS_BAD_REQUEST` (shapes) |
 | `POST /mutes/:id/lift` | `CerberusMute` | 404 `CERBERUS_UNKNOWN_MUTE` |
+| `GET /catalog` | `CerberusCatalogEntryView[]`, every live entry of every node, oldest first | |
+| `POST /catalog {node,check,name,when,cmd,timeout,limit:{runs,per},recheck?,capped?}` | the entry (`CerberusCatalogEntryInput` in; `origin` is `{ kind: 'written', by: req.user.username, at: now }`; `auto` starts off) | 400 `CERBERUS_BAD_ENTRY` naming the field in the message and `details.field` (`node` not enrolled, `check` not an active check of it, `name` blank, over 100 or holding half a character (a lone surrogate), `when` not `failing`/`warn`, `cmd` blank, over 8000 or holding half a character, `timeout` not a whole 1–3600, `limit.runs` not a whole 1–10, `limit.per` not 3600 or 86400, `capped` blank, over 300 or holding half a character); 400 `CERBERUS_BAD_REQUEST` (a field of the wrong kind) |
+| `PUT /catalog/:id/auto {on}` | the entry; a switch already in that state writes nothing | 400 `CERBERUS_BAD_REQUEST` (`on` not true/false); 404 `CERBERUS_UNKNOWN_ENTRY` (unknown or retired); 409 `CERBERUS_ENTRY_CAPPED` (`on` for a capped entry; the reason is in the message) |
+| `POST /catalog/:id/run` | `{ runId }` — a run asked for `by: 'you'` (`startRun`, MAN-7904); waits up to 10 s for the warden's ack of a catalog that holds the entry, so the answer can take that long | 404 `CERBERUS_UNKNOWN_ENTRY` (unknown or retired); 409 `CERBERUS_RUN_ACTIVE` (the check has a run that has not ended); 409 `CERBERUS_NODE_SILENT` (the node has no open link) |
+| `GET /runs/:id` | `CerberusRunView` with `lines` | 404 `CERBERUS_UNKNOWN_RUN` |
 | `PUT /labels {node, key? \| service?, label}` | 204; an empty label stores NULL | 400 `CERBERUS_BAD_LABEL`; 404 `CERBERUS_UNKNOWN_NODE` / `CERBERUS_UNKNOWN_CHECK` |
 | `POST /enrollments {name, desc?}` | `CerberusEnrollment` | 400 `CERBERUS_BAD_NAME` / `CERBERUS_BAD_DESC`; 409 `CERBERUS_NAME_TAKEN`; 409 `CERBERUS_NOT_LISTENING` |
 | `GET /enrollments/:name` | `CerberusEnrollmentStatus` | |
@@ -182,10 +189,15 @@ Route params: a check is named by `:service/:check`, key = `<service>/<check>`. 
 - Coalesced: the first hint of a quiet spell opens a 1 s window (`unref`'d); everything named inside is merged; ONE frame goes out when it closes.
 - Fan-out as `broadcastNotesChanged`: one `JSON.stringify`, every open socket in `connectedClients`, a `try/catch` per client.
 - `nodes` are node ids; each `checks` entry is `<node>/<key>`, split at the FIRST `/`.
-- Sent after a commit, on: a stored `change` row or a discovered component (ingest), a link change (`wardenLinks.onChange`, subscribed once by the gateway), a node's first heartbeat, a mute set or lifted, a label, definition or retire write.
+- Sent after a commit, on: a stored `change` row or a discovered component (ingest), a link change (`wardenLinks.onChange`, subscribed once by the gateway), a node's first heartbeat, a mute set or lifted, a label, definition or retire write, a project's node assignment (`setProjectNode`, MAN-7901).
+- Sent too after each run write (`run.accepted`, `run.refused`, `run.output`, `run.end`, a run asked for, a run center ends), naming the run's check.
 - Never sent for a result that was not stored, and never before the write that caused it.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/cerberus-broadcast.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/cerberus.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/enrollments.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/mutes.service.ts
+## The run output frame — `sendRunOutput(runId, lines)`
+- `{ kind: 'cerberus_run_output', runId, lines }` (`CerberusRunOutputEvent`; `GatewayEventKind` carries `'cerberus_run_output'`): a PICTURE, not a hint, so it is NEVER coalesced — one frame per stored `run.output` batch, sent at once through the same fan-out (one `JSON.stringify`, every open socket, a `try/catch` per client). An empty batch sends nothing.
+- Sent after the lines were stored, and only when the batch stored at least one (a batch that is wholly a resend is told to no one). A sheet appends by `n`; whatever it missed, `GET /runs/:id` has.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/catalog-entry-input.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/catalog.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/cerberus-broadcast.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/cerberus.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/enrollments.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/mutes.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/runs.service.ts
 
 ## MAN-7803 — Cerberus warden gateway — its own listener, the credential check before the upgrade, the eight 401 refusals, one warden link
 
@@ -204,7 +216,7 @@ The Cerberus warden gateway: the listener wardens dial in on, the credential che
 - Its own `http.Server`, apart from the API's, bound to `CERBERUS_LISTEN` (live: tailnet `100.103.222.79:3012`); `server.listen({ host, port, reusePort: supervised })`, as `server/index.ts`.
 - It carries `GET /cerberus/ws` (the upgrade) and the two HTTP route tables, and nothing else: no user route, no login. A cookie, an `Authorization` header or a `token` query string opens nothing.
 - `wardenHttpRoutes`: `Map<pathname, (req, res) => void | Promise<void>>`, exact-path GET handlers; `warden-files.ts` registers `/cerberus/enroll.sh` and `/cerberus/warden/latest.json`. `wardenHttpPrefixRoutes`: the same shape keyed by path prefix, tried after the exact table; it holds `/cerberus/warden/`, whose handler judges the rest of the RAW path itself (a release's name carries its version). Outside both tables: plain 404. A handler that throws or rejects answers a logged 500 (awaited as well as caught: an unhandled rejection ends the API process).
-- Upgrade: only `GET /cerberus/ws`, else a plain 404. `authenticateUpgrade` runs BEFORE `wss.handleUpgrade` (`ws`, `noServer: true`, `maxPayload` 8 MiB: a bigger frame closes 1009 with no `error` frame, so a warden keeps a result batch under it); a refusal is `HTTP/1.1 401 Unauthorized` with one plain line as the body and the socket destroyed. A throw while judging answers 500.
+- Upgrade: only `GET /cerberus/ws`, else a plain 404. `authenticateUpgrade` runs BEFORE `wss.handleUpgrade` (`ws`, `noServer: true`, `maxPayload` 8 MiB: a bigger frame closes 1009 with no `error` frame, so a warden keeps a result batch, and a relayed `session.frame` (one CLI line verbatim), under it); a refusal is `HTTP/1.1 401 Unauthorized` with one plain line as the body and the socket destroyed. A throw while judging answers 500.
 - `startWardenGateway` never rejects: `listen` null → `address` and `error` null, nothing starts; not `host:port` → logged, `error` set; a bind error is logged once and answered in `error`. `address` is the bound `host:port`, an IPv6 host with its brackets.
 - `stop()` closes the LISTENER only. Open links end with the process, as `http-drain.ts` leaves the browser's websockets. why: a warden reconnects on its own; closing early only makes it reconnect to the process that is leaving.
 - The first start subscribes once to `wardenLinks.onChange` → `hintChanged({ nodes: [node] })` (attach, detach, silence).
@@ -234,17 +246,18 @@ The eight refusals, the body of the 401, one line each:
 ## Link — `runWardenLink`
 1. `attachWebSocketHeartbeat(ws)` (MAN-316): a `ws` ping every 30 s ends a half-open link. `hello` must come within 10 s else close 4001; a first frame that is not `hello` closes 4003; a malformed `hello` or a refused enrollment sends `error { message }` then closes 4002. Close 4000 is `wardenLinks.attach` replacing an older link of the node.
 2. Enroll `hello`: `enrollNode` (MAN-7800); on success the link attaches, counts as heard, and `welcome` = `{ node, ackedUpto: 0, cert, checks }`.
-3. Connect `hello`: `recordHello`, attach, heard; `welcome` = `{ node, ackedUpto: acked_seq, cert, checks? }`; `checks` only when the hello's `checksVersion` ≠ `nodes.checks_version`; `cert` on EVERY connect `welcome`.
+3. Connect `hello` (read for `startedAt`, `active.runs` and `active.owed` too; any missing is null, never a refusal): `recordHello`, attach, heard; after the `welcome` is sent, `wardenLinks.announceHello(node, hello)` (MAN-7814); `welcome` = `{ node, ackedUpto: acked_seq, cert, checks?, catalog? }`; `checks` only when the hello's `checksVersion` ≠ `nodes.checks_version`; `catalog` only when the node has a published set (`catalogSetFor`) and the hello's `catalogVersion` ≠ its version (MAN catalog service) — then `sent_at` is stamped; `cert` on EVERY connect `welcome`.
 4. After the handshake every frame is `wardenLinks.heard`, then judged an envelope for THIS node (`type`, `id`, `node`, `seq` null or whole, `at` a number, `body` an object); a bad one is logged once per link and ignored.
 
 | frame in | effect |
 |---|---|
 | `heartbeat` | clock offset = median of the last 5 `receivedAt − env.at`; `recordHeartbeat`; the node's first one hints |
 | `checks.ack` | `setChecksAcked(version)` |
+| `catalog.ack` | the handler `catalog.service.ts` registers at `start()`: stamps `acked_at` on `(node, version)`; a version center never published is logged and ignored |
 | `result` | `seq` null or < 1 → logged, ignored. `seq ≤ acked_seq` → `ack { upto: seq }`, nothing stored. Else `ingest.ingestResults` (its own commit) → `setAckedSeq` → `ack`. A crash between the last two costs a resend, which ingest skips by `at` |
-| any other `type` | the handler `wardenLinks.registerHandler` holds for it, else logged once per type and ignored (a newer warden may speak frames this center does not know) |
+| any other `type` | the handler `wardenLinks.registerHandler` holds for it (`catalog.ack`; `run.accepted`, `run.refused`, `run.output`, `run.end`: `run-frames.ts`, MAN-7904; `session.frame`, `session.closed`, `sessions.listed`: `node-sessions.ts`, MAN-7901), else logged once per type and ignored (a newer warden may speak frames this center does not know). A frame the warden NUMBERED (`seq` ≥ 1: its outbox, every `run.*`) shares `result`'s counter: `seq ≤ acked_seq` → `ack`, handler not run; else the handler, and once it has returned `setAckedSeq` → `ack { upto: seq }`. A handler that threw leaves its frame unacked (a later ack covers it, as for a `result`) |
 
-Every frame center sends: `send(type, body)` builds the envelope and wraps it `{ env, sig }` (MAN-7800).
+Every frame center sends: `send(type, body, id?)` builds the envelope (`id` when the caller names it, as `sessions.list` does so `sessions.listed.re` matches; else 6 random bytes in hex) and wraps it `{ env, sig }` (MAN-7800).
 
 ## Probe — `.verify/probe-cerberus-gateway.mjs`
 Run from the repo root; `CERBERUS_DB_PATH`, `CERBERUS_KEY_PATH` and `DATABASE_PATH` must all be under `/tmp` or it exits 2.
@@ -261,7 +274,7 @@ case "$D" in /tmp/cerberus-gateway.*) rm -rf "$D" ;; esac
 - The 30 s ping is the shared helper, not run live in the probe.
 - No shared token-hash helper: `warden-auth.ts` (checks) and `enrollments.service.ts` (mints) each hash with `crypto.createHash('sha256')` inline; both must stay sha256 hex of the token as printed.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/warden-auth.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/warden-gateway.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/warden-link.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-cerberus-gateway.mjs
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/run-frames.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/warden-auth.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/warden-gateway.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/warden-link.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-cerberus-gateway.mjs
 
 ## MAN-7804 — The hub — what every API process runs, what only the takeover holder runs (`soleDuties()`), the three self-checks, configuration
 
@@ -270,7 +283,7 @@ The Cerberus module as a running API process sees it: what `server/index.ts` cal
 ## Files
 | file | owns |
 |---|---|
-| `index.ts` | the barrel: `createCerberusModule`, `wardenLinks`, `ingest`; nothing else leaves the directory |
+| `index.ts` | the barrel: `createCerberusModule`, `wardenLinks`, `nodeSessions`, `hintChanged`; nothing else leaves the directory |
 | `cerberus.module.ts` | `createCerberusModule({ supervised })` → `{ router, start(): Promise<void>, soleDuties(), stop() }` |
 | `self-checks.service.ts` | `startSelfChecks(getGateway)`, `stopSelfChecks()` |
 | `store-prune.service.ts` | `startDailyPrune()`, `stopDailyPrune()` |
@@ -286,7 +299,7 @@ The Cerberus module as a running API process sees it: what `server/index.ts` cal
 ## Who runs what
 | work | every process | only the takeover holder |
 |---|---|---|
-| `start()`: open the store (migrations run), `loadCenterKey()`, `seedHub()`, `wardenLinks.seedFromStore()`, `ingest.seedMemory()` (once per process: the first read through `readInputs()` runs it too, whichever comes first — a handover's new process answers requests a couple of seconds before `start()`), then bind the gateway | yes | |
+| `start()`: open the store (migrations run), `loadCenterKey()`, `seedHub()`, `wardenLinks.seedFromStore()`, `ingest.seedMemory()` (once per process: the first read through `readInputs()` runs it too, whichever comes first — a handover's new process answers requests a couple of seconds before `start()`), `registerCatalogHandlers()` (the `catalog.ack` handler, before any warden can dial in), `registerRunsService()` (the four `run.*` handlers and the hello reconciliation, MAN-7904), `startAutoRun()` (the auto-run rule on `ingest.onChange`; `stop()` unsubscribes it), then bind the gateway | yes | |
 | the `/api/cerberus` router: every read and write route | yes | |
 | ingest of a warden's results | the process that holds the warden's link | |
 | `stop()`: stop the self-checks and the prune, stop the gateway accepting (open links end with the process) | yes | |
@@ -299,7 +312,11 @@ why: a second API process on the same store would write a second set of hub rows
 - The sole duties arm when BOTH `start()` has finished and `soleDuties()` was called, in either order. A boot whose `start()` failed never arms them.
 - The gateway binds in every process (`reusePort: supervised`), AFTER the process has signalled ready. The supervisor retires the old process on that signal and the old process stops its listener, so a handover leaves `CERBERUS_LISTEN` with NO listener for about a second (0.74–1.21 s over six handovers, 2026-10-06): a warden's first redial in it is refused and must back off. `reusePort` lets a successor bind if it ever arrives while the old process still holds the port; it does not make the two overlap. Binding before ready would close the gap and moves the entrypoint's readiness timing, which is a decision of its own.
 
-## Configuration (read at boot; a change takes a restart; documented in `.env.example`)
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.env.example, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/cerberus.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/self-checks.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/store-prune.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/cerberus-whole-live.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/cerberus-whole.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/cerberus-whole.sh
+
+## MAN-7898 — The hub — what every API process runs, what only the takeover holder runs — Configuration (read at boot; a change takes a restart; documented in `.env.example`)
+section: The hub — what every API process runs, what only the takeover holder runs (`soleDuties()`), the three self-checks, configuration/001 Configuration (read at boot; a change takes a restart; documented in `.env.example`)
+
 | name | meaning |
 |---|---|
 | `CERBERUS_LISTEN` | `host:port` of the warden gateway (IPv6 as `[::1]:3012`); blank counts as unset. Live `.env`: `100.103.222.79:3012`, the tailnet address; `HOST` and the API's own listener stay loopback. Unset → no gateway, `address` and `error` null, the hub's `gateway.listening` reads `CERBERUS_LISTEN is not set` |
@@ -325,7 +342,11 @@ Node `center`, service `cerberus` ("Cerberus itself"), kind `self`, every 30 s, 
 ## Prune
 `startDailyPrune()` schedules it, 60 s after the duties arm and then daily. What it deletes and why: MAN-7801.
 
-## Verifying it live
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.env.example, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/cerberus.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/self-checks.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/store-prune.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/cerberus-whole-live.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/cerberus-whole.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/cerberus-whole.sh
+
+## MAN-7899 — The hub — what every API process runs, what only the takeover holder runs — Verifying it live
+section: The hub — what every API process runs, what only the takeover holder runs (`soleDuties()`), the three self-checks, configuration/002 Verifying it live
+
 After `touch server/index.ts`: `journalctl -u cloudcli-server-dev.service --since "<time>" --no-pager | grep -E '\[supervisor\]|warden gateway is listening'` reads `handover complete — serving pid <n>` and, about a second LATER, the new pid's `[Cerberus] the warden gateway is listening on <address>` (read at the `handover complete` line, nothing listens yet); after that line `ss -ltn | grep 3012` shows one listener on `CERBERUS_LISTEN`'s address and none on `0.0.0.0`; `GET /api/cerberus/overview` shows `.nodes[0].services[0].checks` as the three hub checks. The writes (mutes, enrollments, labels, definitions) are driven on the scratch server of `scripts/sunset-probe.sh` (MAN-673), never against `~/.cloudcli/cerberus.db`, where a probe's token or mute would be the operator's own row.
 
 ## The whole, once (`.verify/cerberus-whole*`)
@@ -337,7 +358,7 @@ After `touch server/index.ts`: `journalctl -u cloudcli-server-dev.service --sinc
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/.env.example, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/cerberus.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/self-checks.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/store-prune.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/cerberus-whole-live.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/cerberus-whole.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/cerberus-whole.sh
 
-## MAN-7805 — The store — `cerberus.db`: its path, the connection, the schema steps (`CERBERUS_MIGRATIONS`) and step 0
+## MAN-7805 — The store — `cerberus.db`: its path, the connection, the schema steps (`CERBERUS_MIGRATIONS`) and steps 0 and 1
 
 A second SQLite file beside `auth.db`, with its own singleton and its own stepped schema. Repositories over it: MAN-7806.
 
@@ -346,7 +367,7 @@ A second SQLite file beside `auth.db`, with its own singleton and its own steppe
 |---|---|
 | `server/modules/database/cerberus-connection.ts` | `getCerberusDatabasePath`, `getCerberusConnection`, `closeCerberusConnection`; the step runner |
 | `server/modules/database/cerberus-schema.ts` | `CERBERUS_MIGRATIONS: readonly string[]` — one SQL string per step |
-| `server/modules/database/index.ts` | re-exports the three connection functions, the five `cerberus*Db` objects and their row types |
+| `server/modules/database/index.ts` | re-exports the three connection functions, the seven `cerberus*Db` objects and their row types |
 
 ## Path
 | When | Path |
@@ -383,7 +404,16 @@ A second SQLite file beside `auth.db`, with its own singleton and its own steppe
 | `results` | `(node, check_key, at)` | append-only; `kind IN ('change','keepalive')` CHECK |
 | `mutes` | `id` | append-only but `lifted_at`; index `ix_mutes_check(node, check_key, until_at)` |
 
-All times are epoch milliseconds, except `every`, `timeout`, `cadence`, `stale_after` (seconds).
+## Step 1 tables (`user_version` 1 → 2; the `cerberus--fixes` plan; spec Table 4)
+| Table | Key | Holds |
+|---|---|---|
+| `catalog` | `id` (the name's slug) | a fix written for one check; `run_when IN ('failing','warn')`, `auto` 0 until switched on, `limit_runs` per `limit_per` seconds, `capped` the reason it may never auto-run, `retired_at` hides it; never deleted |
+| `catalog_sets` | `(node, version)` | the catalog as a node was told it; `entries` / `one_offs` JSON, `sent_at`, `acked_at` |
+| `catalog_changes` | `(entry, at, field)` | append-only: every edit of an entry, one row per field |
+| `runs` | `id` | one attempt to run a fix; `by IN ('auto','you')`, `result IN ('ok','failed','refused','timed_out')` NULL while active; index `ix_runs_check(node, check_key, requested_at)`; kept forever |
+| `run_output` | `(run, n)` | one line of a run's output, `t` its offset in seconds, `stream IN ('out','err')`; kept 90 days (the daily prune, MAN-7801) |
+
+All times are epoch milliseconds, except `every`, `timeout`, `cadence`, `stale_after`, `catalog.timeout`, `catalog.limit_per` and `run_output.t` (seconds).
 
 ## Prove it
 Both probes refuse to run unless `CERBERUS_DB_PATH` and `DATABASE_PATH` start with `/tmp/`:
@@ -394,19 +424,19 @@ CERBERUS_DB_PATH=$D/cerberus.db DATABASE_PATH=$D/auth.db TSX_TSCONFIG_PATH=serve
 ```
 | Probe | Proves |
 |---|---|
-| `.verify/probe-cerberus-store.mjs` | `user_version` 1, WAL, `busy_timeout` 5000, `foreign_keys` 1, and each repository verb through the barrel |
-| `.verify/probe-cerberus-open-race.mjs` | 6 processes open a fresh store at one instant, 4 rounds: shipped `BEGIN IMMEDIATE` opened 24 of 24 at `user_version` 1; a deferred-transaction control failed 20 of 24 with `database is locked` (2026-10-06) |
+| `.verify/probe-cerberus-store.mjs` | `user_version` 2, WAL, `busy_timeout` 5000, `foreign_keys` 1, and each step-0 repository verb through the barrel |
+| `.verify/probe-cerberus-open-race.mjs` | 6 processes open a fresh store at one instant, 4 rounds: shipped `BEGIN IMMEDIATE` opened 24 of 24 at `user_version` = `CERBERUS_MIGRATIONS.length` (read from the array, not a literal); a deferred-transaction control failed 20 of 24 with `database is locked` (2026-10-06) |
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/cerberus-connection.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/cerberus-schema.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-cerberus-open-race.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-cerberus-store.mjs
 
-## MAN-7806 — The Cerberus repositories — five `cerberus*Db` objects over `cerberus.db`
+## MAN-7806 — The Cerberus repositories — seven `cerberus*Db` objects over `cerberus.db`
 
-Connection and schema: MAN-7805. Reach every repository through `@/modules/database/index.js`.
+Connection and schema: MAN-7805. Reach every repository through `@/modules/database/index.js`. `cerberusCatalogDb` and `cerberusRunsDb`: MAN-7896.
 
-## Contract (all five)
+## Contract (all seven)
 - A repository takes `getCerberusConnection()` inside every method and opens no transaction; a multi-statement unit (enrollment, ingest, a definitions write) is the caller's own transaction on that connection.
-- Rows go in and come out as the table stores them: snake_case, epoch-millisecond times, `spec` / `facts` / `data` as JSON text. Parsing and camelCase belong to the caller.
-- Row types are `CerberusNodeRow`, `CerberusEnrollTokenRow`, `CerberusProbeRow`, `CerberusCheckRow`, `CerberusStoredResultRow`, `CerberusMuteRow`; the names `CerberusResultRow` and `CerberusMute` are taken by the read model.
+- Rows go in and come out as the table stores them: snake_case, epoch-millisecond times, `spec` / `facts` / `data` / `entries` / `one_offs` as JSON text. Parsing and camelCase belong to the caller.
+- Row types are `CerberusNodeRow`, `CerberusEnrollTokenRow`, `CerberusProbeRow`, `CerberusCheckRow`, `CerberusStoredResultRow`, `CerberusMuteRow`, `CerberusCatalogRow`, `CerberusCatalogSetRow`, `CerberusCatalogChangeRow`, `CerberusRunRow`, `CerberusRunInsert`, `CerberusRunLineRow`, `CerberusRunResult`; the names `CerberusResultRow` and `CerberusMute` are taken by the read model.
 - A column named `desc`, `key` or `by` is quoted in every statement.
 
 ## `cerberusNodesDb` — `repositories/cerberus-nodes.db.ts`
@@ -461,7 +491,7 @@ No verb deletes a node.
 
 - `insert` throws `RangeError` unless `Number.isSafeInteger(row.at)`, and throws on a NULL key or a `kind` outside `change` / `keepalive`. The ingest caller must treat a throw as a failed frame and not ack it.
 - `status` is SQL NULL for "not enabled"; `prev_status` spells it `not_enabled`. A reader treats the two as one. `statusDiffers` compares through `COALESCE(status, 'not_enabled')`.
-- Every `limit` is clamped `Math.max(0, Math.trunc(limit))` (also in `cerberusMutesDb.recent`); `NaN` and `Infinity` throw.
+- Every `limit` is clamped `Math.max(0, Math.trunc(limit))` (also in `cerberusMutesDb.recent`, `cerberusCatalogDb.changes`, `cerberusRunsDb.recent`); `NaN` and `Infinity` throw.
 - `transitions` may return more than `limit` rows: a cut inside a group of rows sharing one `at` returns the whole group.
 - `transitions` scans `results` — step 0 has no index on `at`. 2026-10-06: 28 ms at 466k rows; 135–162 ms at 1.85–2.3M.
 
@@ -488,7 +518,7 @@ One home for every Cerberus shape. Later plans of the arc add frames and read-mo
 |---|---|
 | `server/shared/cerberus-types.ts` | everything: vocabulary, warden wire, read model, definition and enrollment documents, hint event, server-only seams |
 | `src/shared/cerberus-types.ts` | the browser's subset, field for field; imports nothing from `server/` |
-| `server/shared/types.ts` | `GatewayEventKind` carries `'cerberus_changed'` (the hint event's `kind`) |
+| `server/shared/types.ts` | `GatewayEventKind` carries `'cerberus_changed'` (the hint event's `kind`) and `'cerberus_run_output'` (the run-output event's) |
 
 Both files are siblings of the over-ceiling `types.ts`, the `kanban-types.ts` pattern.
 
@@ -497,9 +527,11 @@ Both files are siblings of the over-ceiling `types.ts`, the `kanban-types.ts` pa
 |---|---|---|
 | VOCABULARY | both | `CerberusStoredStatus`, `CerberusStatus`, `CerberusDocStatus`, `CerberusProbeKind` |
 | WARDEN WIRE | server only | `CerberusEnvelope<B>`, `CerberusSignedFrame`, `CerberusHostFacts`, `CerberusHelloBody`, `CerberusNodeCert`, `CerberusWelcomeBody`, `CerberusChecksSet`, `CerberusResultWire`, `CerberusHeartbeatBody`, `CerberusResultBody`, `CerberusAckBody`, `CerberusChecksAckBody`, `CerberusErrorBody`, `CerberusFrameType` |
-| READ MODEL | both | `CerberusMute`, `CerberusCell`, `CerberusCheckView`, `CerberusServiceView`, `CerberusNodeView`, `CerberusNeed`, `CerberusActivity`, `CerberusOverview`, `CerberusResultRow`, `CerberusLookup`, `CerberusCheckDetail`, `CerberusCheckIndexEntry` |
-| DEFINITIONS AND ENROLLMENT | both | `CerberusEnrollment`, `CerberusEnrollmentStatus`, `CerberusProbeDefinition`, `CerberusServiceDefinition`, `CerberusDefinition`; `CerberusProbeSpec` is the one wire-born shape repeated in the browser file (a definition carries probes as their spec); the server file has it under WARDEN WIRE |
-| THE HINT EVENT | both | `CerberusChangedEvent` |
+| NODE SESSIONS | server only | `CerberusHostFrame`, `CerberusNodeHost`, `CerberusSessionOpenBody`, `CerberusSessionFrameBody`, `CerberusSessionDetachBody`, `CerberusSessionClosedBody`, `CerberusSessionsListBody`, `CerberusSessionsListedBody`, `CerberusSessionRetireBody`; none rides the outbox: the host's journal and acked cursor are the replay |
+| FIXES: CATALOG AND RUNS | server only | `CerberusCatalogSet`, `CerberusCatalogAckBody`, `CerberusRunStartBody`, `CerberusRunAcceptedBody`, `CerberusRunRefusedBody`, `CerberusRunOutputBody`, `CerberusRunEndBody`, `CerberusProbeRunBody`; every warden → center run frame rides the outbox (same `seq` counter as `result`, acked by `ack`), center → warden frames never queue |
+| READ MODEL | both | `CerberusMute`, `CerberusCell`, `CerberusCheckView`, `CerberusServiceView`, `CerberusNodeProject` (`{ projectId, name, path }`), `CerberusNodeView`, `CerberusCatalogEntryView`, `CerberusCatalogEntryInput` (the body of `POST /catalog`), `CerberusRunLine`, `CerberusRunView`, `CerberusNeed`, `CerberusActivity`, `CerberusOverview`, `CerberusResultRow`, `CerberusLookup`, `CerberusCheckDetail`, `CerberusCheckIndexEntry` |
+| DEFINITIONS AND ENROLLMENT | both | `CerberusEnrollment`, `CerberusEnrollmentStatus`, `CerberusProbeDefinition`, `CerberusServiceDefinition`, `CerberusDefinition`; `CerberusProbeSpec` is a wire-born shape repeated in the browser file (a definition carries probes as their spec; the server file has it under WARDEN WIRE), as is `CerberusRunLine` (a fix's output reaches the tab as the lines a warden sent) |
+| THE BROWSER EVENTS | both | `CerberusChangedEvent`, `CerberusRunOutputEvent` |
 | SERVER-ONLY SEAMS | server only | `CerberusLinkState`, `CerberusGatewayState`, `CerberusCheckMemory`, `CerberusReadInputs` |
 
 ## Rules an editor must not break
@@ -508,25 +540,51 @@ Both files are siblings of the over-ceiling `types.ts`, the `kanban-types.ts` pa
 - A shared type is edited in both files in the same change. why: a field renamed on one side is a screen that stops reading.
 - The browser file imports nothing from `server/`, and a type that names a server-only type is not shared. why: the client tsconfig does not compile server code.
 - A comment in the browser file must not name a server-only type (`CerberusCheckMemory`, `CerberusLinkState`).
-- `CerberusFrameType` widens as plans land (`run.*`, `diag.*`, `update.*`, `session.*`, `catalog.*`); `CerberusActivity` gains `fix`, `catalog`, `diagnosis`, `warden`. A reader switches on `type` / `kind` and ignores one it does not know.
+- `CerberusFrameType` widens as plans land (`diag.*`, `update.*`); `CerberusActivity` gains `diagnosis`, `warden`. A reader switches on `type` / `kind` and ignores one it does not know.
 - Format with prettier `--single-quote --print-width 100`, as `claude-update-types.ts`.
 
-## Meanings fixed here that later phases inherit
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/shared/cerberus-types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/cerberus-types.ts
+
+## MAN-7902 — Cerberus wire contract — `server/shared/cerberus-types.ts` and its browser — Meanings fixed here that later phases inherit
+section: Cerberus wire contract — `server/shared/cerberus-types.ts` and its browser mirror/001 Meanings fixed here that later phases inherit
+
 | type.field | meaning |
 |---|---|
 | `CerberusNodeView.link` | decided in order: `never` (no first heartbeat on record; wins over `silent`), `reporting` (heard within 90 s), `silent`. The hub is `reporting`; its `lastHeardAt` is its newest self-check, its `wardenVersion`, `silentSince` and `enrolledAt` are null |
 | `CerberusNodeView.lastHeardAt` | last frame of any kind; falls back to the node row's stored last heartbeat when nothing was heard since boot. `silentSince` = that + 90 000 while silent, else null |
+| `CerberusNodeView.colocated` / `projects` / `sessions` | `nodeSessions.isColocated(id)`; `projects: CerberusNodeProject[]` = `projectsDb.listByNode(id)` (every project row whose `node` is this one — archived and scratch-root ones too — as `{ projectId, name, path }` by path; `name` is the custom name, else the folder's name, not the sidebar's `package.json` name); `nodeSessions.lastListed(id).length` (0 until a list has been answered; it moves only when a list is). The hub: `false`, `[]`, `0` |
 | `CerberusLinkState.lastHeardAt` | null until a frame is heard since boot; `silentSince` null with it. The read model fills the node's `lastHeardAt` from `nodes.last_heartbeat_at` |
 | `CerberusLookup.verdict` | `result` (fresh then; no row need exist at that very moment), `stale` (past what the rows vouch for, or on or after a current silence's start), `too_early` (no row at or before it), `future` |
 | freshness rule | between two stored rows: fresh while moment ≤ (next row's `prevAt`, else the earlier row's `at`) + `staleAfter`; past the latest row: fresh while ≤ (center's in-memory last-received time for the check (`CerberusCheckMemory.lastReceivedAt`), else the row's `at`) + `staleAfter`; a boot seeds that memory with its own moment for each check that was reporting just before it (MAN-7801, Boot vouch). A stored row's own age proves nothing. Implemented in MAN-7808 |
 | `CerberusStoredStatus` | only `status` is limited to its four words; a null status is stored null; only `prev_status` spells it `not_enabled` |
 | `CerberusProbeSpec` at rest | `probes` row holds the kind's fields as JSON, `every`, `timeout`, `cadence`; the `checks` row holds `pass`, `warn`, `staleAfter`; a `checks.set` joins the two |
 | `CerberusNodeCert.sig` | ed25519 over the UTF-8 bytes of `cerberus-cert\n<node>\n<fingerprint>\n<issuedAt>` (`issuedAt` decimal ms); `centerKey` is not in the text. `issueCert` (MAN-7800) signs these bytes and the warden's verification must use exactly them; change the comment first if the layout changes. The cert rides the enrollment `welcome` AND every connect `welcome` (same bytes each time); a warden that holds one ignores a repeat |
-| `CerberusChangedEvent` | a hint: `nodes` are ids, each `checks` entry is `<node>/<key>` split at the FIRST `/`; coalesced to one a second; never sent for a result that was not stored |
+| `CerberusChangedEvent` | a hint: `nodes` are ids, each `checks` entry is `<node>/<key>` split at the FIRST `/`; coalesced to one a second; never sent for a result that was not stored; a fix run starting or ending sends one naming its check |
+| `CerberusRunOutputEvent` | a picture, not a hint: the lines center just stored for one run, in order; an open sheet appends them by `n`, every other screen ignores it |
+| outbox frames | `result` and every warden → center run frame (`run.accepted`, `run.refused`, `run.output`, `run.end`) share one `seq` counter and one `ack`; `welcome.ackedUpto` is the highest of either. `catalog.ack` is unsequenced; `catalog.set`, `run.start` and `probe.run` are never queued, so a run asked for while the link is down is never started late |
+| session frames | `session.*` and `sessions.*` never ride the outbox and carry `seq` null: the host's journal and acked cursor are the replay. `CerberusSessionsListedBody.re` is the request envelope's `id`. A `session.frame` carries one CLI line verbatim; a frame past the gateway's 8 MiB closes the whole link (1009, MAN-7803) and every channel on it. `hostId` is a name of letters, digits, `-`, `_` within the warden's own length limit; center does not check it. Relay: MAN-7901 |
+| `CerberusRunStartBody` | the warden checks, in order, the version is the one it acked, the id is in it, and `cmd` is that id's command byte for byte; a miss is `run.refused { reason }` and the run ends `refused`, never a check result |
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/shared/cerberus-types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/cerberus-types.ts
+
+## MAN-7903 — Cerberus wire contract — `server/shared/cerberus-types.ts` and its browser — `CerberusHelloBody.active`
+section: Cerberus wire contract — `server/shared/cerberus-types.ts` and its browser mirror/002 `CerberusHelloBody.active`
+
+| type.field | meaning |
+|---|---|
+| `CerberusHelloBody.active` | `runs` names the runs whose child is still running; `owed` (optional) the runs that are over but whose `run.*` frames still wait on the warden's outbox for center's ack. A run center holds live that neither names is lost — the process is gone (child and outbox together) or its `run.start` never arrived — and center ends it `failed`: "The warden restarted while it ran…" if it had been accepted, "The warden never started it." if not. A run in `owed` is left: the outbox's frames, resent after `welcome`, end it; a frame for an already-ended run changes nothing, the first end wins. A hello with no `owed` (an older warden) cannot say what it still owes, so only a run that belongs to a process that is gone is ended — accepted, or asked for, before `hello.startedAt` (the clock offset applied) |
+| `CerberusRunView` clocks | `requestedAt`, `startedAt` and `endedAt` are ALL center's clock: the frames' warden times are stored shifted by the node's clock offset, never later than the moment they were heard and never earlier than the run was asked for (or accepted). `CerberusNeed.run` applies the offset to `since` (the warden's clock) only |
+| `CerberusCatalogEntryView.recheck` | the probe re-runs only when a run ends `ok`; failed, timed out and refused runs ask for none |
+| `CerberusRunLine` | `n` counts up from 1 within a run and is the line's identity (`(runId, n)` is stored once, a repeat dropped); `t` is seconds since `run.accepted.startedAt`; output lines are kept 90 days, runs for good |
+| `CerberusNeed.fix` | the first unretired entry on the check, oldest first, whose `when` the current status satisfies: failing satisfies `failing` and `warn` entries, warn satisfies `warn` entries, denied is offered what failing is but never auto-run |
+| `CerberusNeed.run` | the check's newest run requested since the check's `since`, while it runs or for 90 s after it ended |
+| `CerberusCheckDetail.run` | the check's newest run requested within the last hour, with its `lines`; not bounded by `since`, so the sheet still shows "Succeeded" beside the reading the fix produced. `fixes` is every unretired entry on the check, any `when`, oldest first |
+| `CerberusActivity` `catalog` | the one member with no `node` and no `check` (`entry`, `name`, `event`, `by`); a reader keys or sorts on `'node' in line` and `'check' in line`, never `line.node` |
+| `CerberusCatalogEntryView.stats` | over the entry's runs that have ended: `runs` all, `ok` those that succeeded, `lastRunAt` when the newest ended |
 
 ## Open
 - `CerberusProbeSpec.cmd`: run through a shell or split into argv — the warden plan decides.
-- `CerberusHelloBody.catalogVersion`: its comment says `checks` is sent in `welcome` when versions differ; only `checksVersion` drives `checks`.
+
 
 ## Cross-references
 - Store: MAN-7805. Repositories (row types `Cerberus*Row`, distinct from the read model's `CerberusResultRow` and `CerberusMute`): MAN-7806. Read model that builds these shapes: MAN-7808.
@@ -542,8 +600,8 @@ Continues in MAN-7809 (overlays, node link, cells, check view, overview, lookup)
 ## Entry points
 | function | file | answers |
 |---|---|---|
-| `buildOverview(inputs)` | `overview.ts` | `CerberusOverview`: hub node first, then every enrolled node |
-| `checkDetail(node, key, { lookupAt, end }, inputs)` | `check-detail.ts` | `CerberusCheckDetail`: check and siblings (always now), 60 cells ending at the minute boundary after `end` and `recent` (the change rows of `[end − 3 h, end]`), lookup (at `lookupAt ?? end`); `end` defaults to now and is clamped to it |
+| `buildOverview(inputs)` | `overview.ts` | `CerberusOverview`: hub node first, then every enrolled node; every `needsYou` entry carries its `fix` (MAN-7809) and `run`, and `running` lists every run not ended (`run-views.ts`, MAN-7904) |
+| `checkDetail(node, key, { lookupAt, end }, inputs)` | `check-detail.ts` | `CerberusCheckDetail`: check and siblings (always now), 60 cells ending at the minute boundary after `end` and `recent` (the change rows of `[end − 3 h, end]`), lookup (at `lookupAt ?? end`), `fixes` (every live entry of the check) and `run` (the newest run of the last hour, with lines; as of now whatever `end` is); `end` defaults to now and is clamped to it |
 | `checkIndex()` | `check-detail.ts` | `CerberusCheckIndexEntry[]`, active checks by node, service, key |
 | `lookupAt(node, key, at, inputs)` | `lookup.ts` | `CerberusLookup`; `lookupOfCheck(check, at, inputs)` when the check row is in hand |
 | `activity({ before, limit }, inputs)` | `activity.ts` | `CerberusActivity[]`, newest first |
@@ -616,13 +674,20 @@ Part of the read model; entry points and the freshness rule: MAN-7808.
 |---|---|
 | nodes | hub `center` first: role `hub`, link `reporting`, `lastHeardAt` = newest self-check (newest row or `liveLastAt`), `wardenVersion` / `silentSince` / `enrolledAt` null; then `cerberusNodesDb.list()` |
 | services | every service with an active check, plus every probe's service with no check yet (draws `unknown`), by name |
+| node sessions | `colocated`, `projects` and `sessions` come from the projects table and the relay's cache, not from `inputs`: they feed no status, so the "now / a minute ago" rule has nothing to answer for |
 | `counts.checks` | active checks minus the not-enabled; a retired check is in no count |
 | fleet `counts` | `checks`, `passing`, `needsYou`, `muted` are the sums of the services' counts; `nodes` = the hub plus every enrolled node |
 | service `counts` | `total` = checks minus not-enabled; `passing`, `needsYou`, `muted`, `notEnabled`, `unknown` each count the checks whose current status is that word |
-| `needsYou` | `needsAttention` checks, oldest `since` first, null `since` last, then key, then node |
+| `needsYou` | `needsAttention` checks, oldest `since` first, null `since` last, then key, then node; each entry is `{ check, fix, run }` — `fix` from `catalog-views.ts` `offeredFixes` (below), `run` from `run-views.ts` `needRuns` (MAN-7904): the check's newest run requested at or after `since + clockOffsetMs` (`since` is the warden's clock, a request is center's), while it runs or until `endedAt` is 90 s old (run times are center's clock; only `since` takes the offset); null when `since` is null |
+| `running` | `run-views.ts` `runningViews`: every run of every node that has not ended, oldest first, no lines |
 | `muted` | checks with a mute covering now, whatever their status |
 | `activity` | newest 7 |
 | `lastResultAt` | newest stored row at or before `now`, across nodes |
+
+## Fixes on screen (`catalog-views.ts`)
+- `catalogEntryViews(rows)`: `CerberusCatalogEntryView`s in the order given. Names from the active checks (one `activeChecks(node)` per distinct node; null when the check is not active), run counts from ONE `cerberusRunsDb.statsFor` (ended runs only: `runs` all, `ok` those `ok`, `lastRunAt` the newest `ended_at`; a refusal counts as a run that did not succeed). An unreadable `origin` column is logged and shown as written by `unknown`.
+- `fixesOfCheck(node, key)` = `CerberusCheckDetail.fixes`: every live entry of the check, whatever its `when`, oldest first.
+- `offeredFixes(checks)` = `CerberusNeed.fix`: the first live entry of the check, oldest first, whose `when` the status satisfies — `failing` and `denied` satisfy `failing` and `warn` entries, `warn` satisfies `warn` entries only. One `cerberusCatalogDb.list()` serves every need.
 
 ## Lookup (`lookup.ts`)
 | verdict | `status` | `value` | `resultAt` |
@@ -634,17 +699,19 @@ Part of the read model; entry points and the freshness rule: MAN-7808.
 - A moment at or after a current `silentSince` answers `stale`.
 - A retired or unknown check throws `AppError` 404, code `CERBERUS_UNKNOWN_CHECK` (`findActiveCheck`): a retired check has no staleness to judge by.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/read-model/cells.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/read-model/check-detail.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/read-model/check-views.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/read-model/lookup.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/read-model/node-links.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/read-model/overlays.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/read-model/overview.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/read-model/series.ts
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/read-model/catalog-views.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/read-model/cells.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/read-model/check-detail.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/read-model/check-views.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/read-model/lookup.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/read-model/node-links.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/read-model/overlays.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/read-model/overview.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/read-model/run-views.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/read-model/series.ts
 
 ## MAN-7810 — The read model — What happened (`activity.ts`), its open edge, and the read-model probe
 
 Part of the read model; entry points and the freshness rule: MAN-7808.
 
 ## Activity — What happened (`activity.ts`)
-- Sources: `cerberusResultsDb.transitions`, `cerberusMutesDb.recent`, `cerberusNodesDb.list()` enrollments. Each source is asked for `limit` of its own newest.
+- Sources: `cerberusResultsDb.transitions`, `cerberusMutesDb.recent`, `cerberusNodesDb.list()` enrollments, `cerberusCatalogDb.changes`, `cerberusRunsDb.recent`. Each source is asked for `limit` of its own newest.
+- Fix events (`run-views.ts` `fixEvents`, MAN-7904): each run `recent` returns gives a `started` line at `requested_at` and, once ended, an `ended` line at `ended_at` carrying `result` (`refused` included) and `durationS` — `started_at` to `ended_at` in whole seconds, never below 0, null for a refusal that never started. Only moments strictly before `before`: an end that has not happened by then belongs to a later page. The line names the run by its entry's name (retired too), falling back to the diagnosis or the run id.
+- Catalog events: a `catalog_changes` row of field `added` is `added`; field `auto` with `to_value` `1` is `auto_on`, else `auto_off`; any other field is skipped. The line names the entry by its own row (retired too), falling back to the id; `by` is the row's.
 - The answer runs to the end of the `at` instant the `limit`-th event sits in; a cursor `before = <last at>` therefore loses none.
 - Mute events: `muted` at `from_at`; `lifted` at `lifted_at`; `expired` at `until_at` once past, only when never lifted. A lifted mute never reads `expired`.
-- Same instant orders by node, check, kind. `check.from` goes through `statusOf`, `to` through `shownRow`.
+- Same instant orders by node, check, kind; a `catalog` line is about no node or check, so both read empty for it (`'node' in item`, `'check' in item`). `check.from` goes through `statusOf`, `to` through `shownRow`.
 - Throws `RangeError` for a non-numeric or NaN `before` / `limit`; `limit <= 0` returns `[]`.
 - `check-detail.ts` `recent` = the newest 100 `change` rows of `[end − 3 h, end]` (`end` is now unless the caller asked for an earlier moment), `status` through `storedStatusOf`.
 
@@ -673,7 +740,7 @@ Seed through the repositories and pass a hand-built `memory` standing in for `in
 ## Cross-references
 Wire shapes and meanings: MAN-7807. Store and repositories: MAN-7805, MAN-7806. `HUB_NODE_ID` (`center`) lives in `server/modules/cerberus/definition-document.ts`.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/read-model/activity.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-cerberus-read-model.mjs
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/read-model/activity.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/read-model/run-views.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-cerberus-read-model.mjs
 
 ## MAN-7811 — Ingest — `ingest.ingestResults`: one transaction per frame, what is refused, what is announced, the memory doors
 
@@ -698,7 +765,7 @@ The vocabulary test runs BEFORE `discoverComponent`, so a refused result leaves 
 A warden whose clock runs more than 5 minutes fast has all its results refused (one log per key) until the clock is fixed.
 A probe's own check must report `source` = its key: center's self-checks send `source = key`; any other source is refused.
 
-Outputs after the commit: `hintChanged` for the stored `change` keys and the discovered keys; `onChange` listeners get one call per frame, `{ node, changed: CerberusStatusChange[] }` (`from` null at first sight), a throwing listener is logged and skipped.
+Outputs after the commit: `hintChanged` for the stored `change` keys and the discovered keys; `onChange` listeners get one call per frame, `{ node, changed: CerberusStatusChange[] }` (`from` null at first sight), a throwing listener is logged and skipped. The one listener today is `auto-run.ts` (MAN-7904).
 `seedMemory()` (once per process: `start()` or the first read, whichever comes first) fills `lastStored` and `since` from `latestPerCheck()` and `lastReceivedAt` for each check that was reporting just before the boot (`boot-vouch.ts`, MAN-7801); `memory(node, key)` → `CerberusCheckMemory`.
 
 ## Open
@@ -780,7 +847,7 @@ The registry every warden's link joins: who is connected, when each node was las
 - Any frame counts as hearing the node; `heard` only moves the stamp forward and tells listeners at once when it ends silence. Entering silence is found by a 5 s `unref`'d timer started by the first `attach`, `heard` or `seedFromStore`.
 - `seedFromStore()` reads each node's `last_heartbeat_at` as `lastHeardAt`; seeding raises no change event. A node unheard since before the boot reads silent at once (its stored stamp is old); a handover's one-second gap never does (the stamp is at most a minute old); a node that never sent a heartbeat has no `lastHeardAt` and is silent until it does.
 - `attach(link)`: an older link of the node is closed `4000`, `replaced by a newer link`; its `close` throwing is logged and the new link is still in place and announced. `detach(link)` does nothing when the node's current link is another. A link's version and clock offset outlive it.
-- `send(node, type, body)` → false for no link or a throwing link (logged). Callers send after their write committed; a socket throw must not turn a committed write into a failure.
+- `send(node, type, body, id?)` → false for no link or a throwing link (logged). Callers send after their write committed; a socket throw must not turn a committed write into a failure. `id` names the envelope for a caller whose request is answered by a frame carrying it back (`sessions.list` → `sessions.listed.re`); without it the link picks one.
 - `registerHandler(type, handler)` THROWS on a second registration of one type. why: two plans claiming a frame fail at boot, never one silently replacing the other. A handler's throw or rejection is the link's to log.
 
 ## API
@@ -789,9 +856,11 @@ Types `CerberusWardenLink` (`node`, `send`, `close`, `version`, `clockOffsetMs`)
 | call | does |
 |---|---|
 | `get(node)` / `isLinked(node)` | the node's open link or `null` / whether a socket is open now (not whether the node was heard lately) |
-| `send(node, type, body)` | one frame down the node's link; `false` when it cannot |
+| `send(node, type, body, id?)` | one frame down the node's link, under the envelope id `id` when given; `false` when it cannot |
 | `onChange(listener)` | `(node, state)` on attach, detach and entering or leaving silence; answers the unsubscribe |
-| `registerHandler(type, fn)` / `handlerFor(type)` | the door later plans add frames through (`run.*`, `diag.*`, `update.*`, `session.*`) |
+| `onHello(listener)` / `announceHello(node, hello)` | `(node, CerberusHelloReport { version, startedAt, activeRuns, owedRuns, catalogVersion })` once per CONNECT hello, after the link attached and its `welcome` went — `startedAt` (the warden process's start, its clock), `activeRuns` and `owedRuns` (runs over whose frames still wait on its outbox) are null when the hello did not say. The runs service reconciles on it (MAN-7904). A throwing listener is logged; the rest still hear. `announceHello` is the link's own call |
+| `registerHandler(type, fn)` / `handlerFor(type)` | the door later plans add frames through (`catalog.ack` is registered by `catalog.service.ts` at `start()`; `run.accepted`, `run.refused`, `run.output`, `run.end` by `run-frames.ts` at `start()`, MAN-7904; `session.frame`, `session.closed`, `sessions.listed` by `node-sessions.ts` on its first call, MAN-7901; `diag.*`, `update.*` follow) |
+| `clockOffsetMs(node)` | center's clock minus the node's, in ms (add it to a warden's time): the open link's median of its last five heartbeats, else what the last link reported, else 0 |
 | `states()` | `Map<node, CerberusLinkState { linked, lastHeardAt, silentSince, clockOffsetMs, version }>` for every node the registry knows |
 | `attach`, `detach`, `heard`, `seedFromStore` | the link's own calls (`warden-link.ts`) and the module's `start()` |
 
@@ -815,9 +884,13 @@ Design: `design/cerberus/Cerberus Spec.dc.html`. Time is epoch milliseconds on e
 | the read model: status words, freshness | MAN-7808 | `read-model/status-rules.ts`, `freshness.ts`, `series.ts` |
 | the read model: overlays, cells, overview (Needs you, counts), lookup | MAN-7809 | `read-model/overlays.ts`, `cells.ts`, `check-views.ts`, `overview.ts`, `lookup.ts`, `node-links.ts`, `check-detail.ts` |
 | the read model: What happened | MAN-7810 | `read-model/activity.ts` |
-| the REST surface, its error codes, the `cerberus_changed` hint | MAN-7802 | `cerberus.routes.ts`, `mutes.service.ts`, `enrollments.service.ts`, `cerberus-broadcast.ts` |
+| the REST surface, its error codes, mutes, the catalog and run routes, enrollment minting, the `cerberus_changed` hint and the `cerberus_run_output` frame | MAN-7802 | `cerberus.routes.ts`, `mutes.service.ts`, `enrollments.service.ts`, `cerberus-broadcast.ts` |
+| the catalog service: entries, versioned signed sets, acks, the auto switch | MAN-7900 | `catalog.service.ts`, `catalog-entry-input.ts`, `read-model/catalog-views.ts`, `.verify/cerberus-catalog.sh` |
+| runs: `startRun`, the `run.*` frames, the recheck, the reconciliation on `hello`, the auto-run rule | MAN-7904 | `runs.service.ts`, `run-frames.ts`, `run-reconcile.ts`, `run-ending.ts`, `catalog-ack.ts`, `auto-run.ts`, `read-model/run-views.ts`, `.verify/cerberus-runs.sh` |
+| the seeded fixes on `eis1`: what each runs, the Verisk verdict pipe, both start with auto off | MAN-7925 | the scripts they run: `docstore/bin/backup`, `/opt/shadow-connector/extractors/xactimate/http_login.py` |
 | the store: path, connection, schema steps | MAN-7805 | `server/modules/database/cerberus-connection.ts`, `cerberus-schema.ts` |
-| the five repositories | MAN-7806 | `server/modules/database/repositories/cerberus-*.db.ts` |
+| the repositories: contract, nodes, enroll, definitions, results, mutes | MAN-7806 | `server/modules/database/repositories/cerberus-{nodes,enroll,definitions,results,mutes}.db.ts` |
+| the fixes repositories: catalog, runs, output | MAN-7896 | `server/modules/database/repositories/cerberus-{catalog,runs}.db.ts` |
 | edits that break the store | INV-7004 | the same files |
 | the wire contract | MAN-7807 | `server/shared/cerberus-types.ts`, `src/shared/cerberus-types.ts` |
 | the whole system, once: enroll, link, ack on a scratch center; the hub through a live handover | MAN-7804 | `.verify/cerberus-whole.sh`, `.verify/cerberus-whole.mjs`, `.verify/cerberus-whole-live.mjs` |
@@ -827,10 +900,277 @@ Design: `design/cerberus/Cerberus Spec.dc.html`. Time is epoch milliseconds on e
 | the node-side agent, package `cloudcli:warden`: its map MAN-7839 (link MAN-7824, outbox MAN-7835, home MAN-7836, unit MAN-7837, the first node MAN-7838) | `cloudcli:warden` | `warden/` |
 
 ## Rules of the module
-- Other modules reach it only through `server/modules/cerberus/index.ts`: `createCerberusModule`, `wardenLinks`, `ingest`.
+- Other modules reach it only through `server/modules/cerberus/index.ts`: `createCerberusModule`, `wardenLinks`, `nodeSessions`, `hintChanged`.
 - The store's connection, schema and repositories live in `server/modules/database/` and leave it through its barrel; no module opens a `Database` of its own.
 - Shared shapes live in `server/shared/cerberus-types.ts`; there is no module-local `types.ts`.
 - Routes parse, call one service verb, answer.
 - No unit tests: each seam is shown on the real API or on the scratch server of `scripts/sunset-probe.sh`; a probe never opens `~/.cloudcli/cerberus.db` or binds `CERBERUS_LISTEN`'s live address.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/index.ts
+
+## MAN-7896 — The fixes repositories — `cerberusCatalogDb` and `cerberusRunsDb`: catalog entries, sets, changes, runs and their output
+
+Contract (statements only, no transaction, rows as stored, clamped `limit`) and row types: MAN-7806. Tables: MAN-7805 §"Step 1 tables". Daily prune of run output: MAN-7801.
+
+## `cerberusCatalogDb` — `repositories/cerberus-catalog.db.ts`
+| Verb | Does |
+|---|---|
+| `insert(entry)` | appends a live entry; throws on a duplicate id; a capped entry is stored with `auto` 0 whatever `auto` says |
+| `get(id)` | one entry, retired included, or `null` |
+| `list(node?)` / `forCheck(node, key)` | live entries only, `created_at` then `id` |
+| `setAuto(id, on)` | ONE `UPDATE` that refuses an unknown or retired entry, an entry already in that state, and `on` for a capped one; answers whether this call moved it — the caller reads the entry first to tell the refusals apart and writes the change row only on `true` |
+| `retire(id, at)` | stamps `retired_at` while live; answers whether this call did |
+| `insertChange(change)` / `changes(before, limit)` | append one field's change, throws on a repeat of `(entry, at, field)` / changes with `at < before`, newest first, in WHOLE `at` instants |
+| `latestSet(node)` / `ackedSet(node)` | the node's newest set / its newest set the warden acked, or `null`; `latestSet` runs ahead of `ackedSet` while a new set is in flight, and a `run.start` is verified against the acked one |
+| `insertSet(node, entries, oneOffs)` | the node's next version (highest + 1, or 1), chosen inside the `INSERT`; answers it; `entries` / `oneOffs` are JSON text |
+| `markSetSent` / `markSetAcked(node, version, at)` | stamp `sent_at` (again on every resend) / `acked_at` (the latest ack wins); answer whether the set exists |
+
+## `cerberusRunsDb` — `repositories/cerberus-runs.db.ts`
+| Verb | Does |
+|---|---|
+| `insert(run)` / `get(id)` | a run asked for and not yet answered; throws on a duplicate id / one run or `null` |
+| `markStarted(id, at)` / `markEnded(id, result, exit, endedAt, note)` | each ONE `UPDATE` that fires only while the run has not ended; the first end wins; answer whether this call moved it |
+| `insertOutput(run, lines)` | `INSERT OR IGNORE` on `(run, n)` in one statement, a batch lands whole; answers lines written, fewer than sent when some were a resend; an empty batch answers 0 |
+| `output(run)` | the run's lines by `n` |
+| `autoRunsSince(entry, since)` | count of `by = 'auto'` runs with `requested_at >= since` (epoch ms), whatever came of them: a refused or failing fix cannot loop past its limit |
+| `statsFor(entries)` | per entry of the ids given: ended runs (`runs`), those `ok`, newest `ended_at` (`last_run_at`); one grouped statement, the ids as one JSON text; an entry with no ended run has no row |
+| `activeForCheck(node, key)` / `activeForNode(node)` | runs with `ended_at IS NULL`: the newest of a check / every one of a node, oldest first |
+| `latestForCheck(node, key, since)` | the check's newest run with `requested_at >= since`, ended or not, or `null` |
+| `recent(before, limit)` | runs with `requested_at < before`, ranked by the newest of end / request that falls before `before`, in WHOLE instants |
+| `pruneOutputBefore(at)` | deletes the lines of runs with `requested_at < at`; the `runs` rows stay; answers the count |
+
+- `insertOutput` THROWS (before any write) on a malformed line, `TypeError` on a `run` that is not a non-empty string, `RangeError` on a `run` that `runs` does not hold. why: `OR IGNORE` would swallow a bad line as a resend, and output under no `runs` row is reachable by no prune. The runs service checks the run belongs to the link's node; a statement-only repository cannot.
+- `recent` rows carry no moment: the caller derives it as `ended_at` when that is `< before`, else `requested_at`. Stamp `ended_at` on the center's clock, not the warden's: a warden clock behind by more than the run lasted drops the run out of the window.
+- `recent` and `changes` may return more than `limit` rows: a cut inside a group sharing one instant returns the whole group (a health document that flips many checks starts several runs in one millisecond).
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/cerberus-catalog.db.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/cerberus-runs.db.ts
+
+## MAN-7900 — The catalog service — entries written through one route, a versioned signed set per node, acks recorded, auto-run switched
+
+The catalog: the fixes a person has written for a check, and the signed set of them each node's warden verifies every `run.start` against. Tables: MAN-7805 §"Step 1 tables"; statements: MAN-7896; wire: MAN-7807; routes: MAN-7802; the frames in the link: MAN-7803; how an entry reads on screen: MAN-7809, MAN-7810.
+
+## Files
+| file | owns |
+|---|---|
+| `catalog.service.ts` | the ONE writer of `catalog`, `catalog_sets`, `catalog_changes`: `writeEntry`, `setAuto`, `retireEntry`, `publishCatalog`, `catalogSetFor`, `ackedCatalogVersion`, `listCatalog`, `catalogForWelcome`, `markCatalogSent`, `registerCatalogHandlers` |
+| `catalog-entry-input.ts` | `validateEntryInput` (the 400s), `freeEntryId` (the slug) |
+| `catalog-ack.ts` | `ackedVersionCovering(node, id)`, `waitForCoveringAck(node, id, ms)`, `notifyCatalogAcked(node)` — the wait a run makes for an ack that holds its entry (MAN-7904); `liveEntry(id)` in `catalog.service.ts` is the 404 both `setAuto` and `startRun` share |
+| `read-model/catalog-views.ts` | entry rows as `CerberusCatalogEntryView`, `fixesOfCheck`, `offeredFixes` (MAN-7809) |
+
+## Writes
+| verb | does | refuses |
+|---|---|---|
+| `writeEntry(input, origin)` | one transaction: the entry (auto 0), its `catalog_changes` row (`added`), the node's next set; after the commit `hintChanged` and the signed `catalog.set` | 400 `CERBERUS_BAD_ENTRY` naming the field (the list is in MAN-7802) |
+| `setAuto(id, on, by)` | one transaction: `cerberusCatalogDb.setAuto` and, only when it moved, a `catalog_changes` row (`auto`, `0`↔`1`); `hintChanged`; NO set — the warden is never told which entries run unprompted, Cerberus decides auto-runs | 404 `CERBERUS_UNKNOWN_ENTRY` (unknown or retired); 409 `CERBERUS_ENTRY_CAPPED` |
+| `retireEntry(id)` | one transaction: `retire` and the node's next set; `hintChanged`, then the `catalog.set`. One already retired changes nothing. No route calls it yet | 404 `CERBERUS_UNKNOWN_ENTRY` |
+| `publishCatalog(node)` | a new set row and the `catalog.set`; for the plans that change a set without an entry changing | |
+
+- The id is the name's slug (accents folded, lower case, other runs a hyphen, 60 characters, `fix` when nothing is left), then `-2`, `-3` while taken — a RETIRED entry still holds its id, because a run's history names its entry by id. Picked and inserted under one write lock.
+- `origin` is `{ kind: 'written', by, at }` for every entry: `POST /catalog` is the one door and the route passes it (MAN-7802). `{ kind: 'diagnosis', diagnosis, at }` is in the contract (`CerberusCatalogEntryView`) for the diagnoses plan's promotion of a one-off into an entry; nothing writes it yet. An unreadable `origin` column reads as written by `unknown` (MAN-7809). The two entries on `eis1`: MAN-7925.
+- A change is keyed `(entry, at, field)`: a second edit of one field in the same millisecond is written a millisecond later, however many there are, never refused.
+- The command is stored byte for byte (never trimmed); the warden compares it byte for byte. `name`, `cmd` and `capped` holding half of a character (a lone surrogate, which SQLite would store as U+FFFD) are refused 400 at their field, so the text kept, signed and run is the text typed.
+
+## Sets
+- An ENTRY (`catalog`) is the definition; a SET (`catalog_sets`) is what a node may run: one row per version, `entries` and `one_offs` never rewritten, only `sent_at` and `acked_at` stamped.
+- A set = `{ version, entries: [{ id, cmd, timeout }] of every live entry of the node, oneOffs }`, oldest entry first. `oneOffs` are the PREVIOUS set's one-offs with `expiresAt > now`; nothing here adds one (the diagnoses plan will), only carries and drops.
+- Versions are per node, from 1, chosen inside the `INSERT` (`cerberusCatalogDb.insertSet`). The set row commits with the change that made it; `sent_at` is stamped only when the link took the `catalog.set` (a node with no link reads it in its next welcome).
+- `catalog.set` and `welcome.catalog` are the whole catalog, never a patch; the warden ignores a `catalog.set` below the version it holds (a `welcome`'s is taken whatever its version).
+
+## Acks
+- `catalog.ack { version }` (the handler is registered at `start()`, before the gateway binds) stamps `acked_at` on `(node, version)`; a version center never published, or a version that is not a whole number, is logged and ignored. `ackedCatalogVersion(node)` = the newest version with an `acked_at`: what `catalogForWelcome` compares. A `run.start` names the node's NEWEST set once that set is acked and holds the entry's id (`ackedVersionCovering`, MAN-7904), not the newest acked one. Every ack stamped (a `catalog.ack` frame, or a `hello` carrying a version above the newest acked) calls `notifyCatalogAcked(node)`, which ends the waits of runs asked for the moment their fix was written.
+- Only the version named is stamped: sets written while the node had no link and superseded before it dialled in are never sent or acked, and their rows stay `sent_at`/`acked_at` NULL for good — "every set acked" is read as "the newest acked", never as no NULL row. A `hello` carrying `catalogVersion` is the same word said again. `catalogForWelcome(node, heldVersion, at)` stamps a published version above the newest acked one — an ack lost with the previous link would otherwise never be repeated, because a welcome carries a set only when the versions DIFFER — and answers the latest set unless `heldVersion` equals it.
+
+## Prove it
+`.verify/cerberus-catalog.sh` (slot 4; `SUNSET_SLOT=4 bash .verify/cerberus-catalog.sh`, about 2 minutes): a scratch warden enrolled as `probe-node` with a `file_age` probe; the nine refusals; an entry, a same-named one taking `-2`; sets sent and acked; auto on writes one change row and no set; a capped entry 409; a warden stopped while an entry is written and its next welcome carrying it; a lost ack repaired by the next hello after a center restart; `retireEntry` and the welcome that follows; `GET /catalog` with run counts, the need's `fix`, the sheet's `fixes`, and the catalog lines of `GET /activity`.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/catalog-ack.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/catalog-entry-input.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/catalog.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/read-model/catalog-views.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/cerberus-catalog.sh
+
+## MAN-7901 — The node-session relay — `nodeSessions`: channels over a warden link, `listHosts`, link-up, co-location
+
+Center's side of running a Claude session on a node's machine: one channel per remote host over the node's warden link, the list of what runs there, and the word that a link came up. Frame shapes: MAN-7807 (NODE SESSIONS). Link registry the relay sits on: MAN-7814. Gateway and the frame ceiling: MAN-7803. The warden's side: `warden/src/sessions.mjs`.
+
+## Files
+| file | owns |
+|---|---|
+| `node-sessions.ts` | `nodeSessions`, exported from the cerberus barrel (`index.ts`); imports nothing from providers |
+| `.verify/probe-cerberus-node-sessions.mjs` | end-to-end probe with a stand-in warden |
+
+## API — `nodeSessions`
+| call | does |
+|---|---|
+| `isLinked(node)` | a warden socket is open now (`wardenLinks.isLinked`) |
+| `isColocated(node)` | `nodes.machine_id` (from the last `hello`'s `facts.machineId`) equals the first line of this machine's `/etc/machine-id`. False when this machine has no such file: two machines without an id are never co-located |
+| `openChannel(node, { op, hostId, cwd, frame }, { frame, closed })` | sends `session.open` under a fresh `chan`; returns `{ send(frame), detach() }`, or `null` when the node has no link or the link took no frame (nothing was opened, no handler will be called) |
+| `listHosts(node)` | `sessions.list` → `Promise<CerberusNodeHost[]>`; keeps the answer for `lastListed`. Rejects at once when the node is not linked, when the frame cannot be put on the link, or when the link is lost before the answer; else rejects at 10 s (`LIST_TIMEOUT_MS`) |
+| `lastListed(node)` | the node's last answer, `[]` before the first; survives the link dropping |
+| `retireHost(node, hostId)` | `session.retire`; `true` when the frame went out. Nothing is answered |
+| `onLinkUp(listener, { replay? })` | `listener(node)` for each link not seen before (first connect, reconnect, replacement); returns the unsubscribe. `replay: true` also tells it once, a microtask later, of every node already linked |
+
+- `openChannel`, `listHosts`, `retireHost`, `onLinkUp` arm the relay on first call; `isLinked`, `isColocated`, `lastListed` do not. Nothing runs on import.
+- Arming registers `session.frame`, `session.closed`, `sessions.listed` through `wardenLinks.registerHandler` and subscribes to `wardenLinks.onChange`. It throws, every call, when another plan already holds one of the three types; no handler is registered then. why: a half-armed relay is worse than none.
+- `lastListed` and every `listHosts` answer are `structuredClone`s: a caller changing a host never changes the cache.
+- A listed host whose `hostId` or `appSessionId` is not a string is dropped (logged); any other wrong-typed field becomes its empty value.
+
+## Channels
+- A channel is `{ node, link, handlers }` keyed by `chan` (12 hex chars). A frame about a `chan` center did not open on THAT node is dropped: a warden speaks only for its own channels.
+- Host frames reach `handlers.frame` verbatim; `send(frame)` → `session.frame` and answers `false` once the channel is over or the link took no frame.
+- A channel ends four ways:
+| end | `closed` called | later `send` |
+|---|---|---|
+| holder `detach()` (idempotent; sends `session.detach`; the host keeps running) | no | `false` |
+| warden `session.closed { reason }` (a refused open arrives this way) | once, with `reason` (`the host closed the channel` when empty) | `false` |
+| host `exit` frame delivered to `handlers.frame` (the warden drops its side after it) | no | `false` |
+| link lost | once, `closed('link lost')` | `false` |
+- Link lost = `wardenLinks.get(node)` is any other link object than the one the channel opened on. A replacement counts: `detach` never reports it.
+- A holder's handler that throws or rejects is logged with the node; it costs the link nothing.
+- Nothing retries or replays: the host's journal and acked cursor are the replay (MAN-7807).
+
+## A project's node — `projects.node`, `PUT /api/projects/:projectId/node`
+- `projects.node` (`TEXT DEFAULT NULL`, in `~/.cloudcli/auth.db`) names the node whose warden hosts the project's Claude sessions; NULL runs them on this server. Declared on all three table paths in `database/schema.ts` and `database/migrations.ts`: the fresh `projects` schema, the add-column branch the live database takes, the rebuild branch's `projects__new` (copies `node` when the old table had it, as it does `isArchived`).
+- `projectsDb.setNode(projectId, node | null)`, `nodeForPath(path)` (normalised like the other path reads; archived rows answer too) and `listByNode(node)`. `nodeForPath` is read by `chat-websocket.service.ts` `dispatchRun` on every turn and handed to the Claude runtime as `options.node`: the next CLI the project needs is spawned by that node's warden (`session-host/node-transport.ts`, MAN-7905). `listByNode`'s `name` is the custom name, else the folder's name — not the sidebar's `package.json` name (a blank-renamed project can differ).
+- `PUT /api/projects/:projectId/node { node: string | null }` → 204. 400 `INVALID_PROJECT_NODE` for a body without `node`, an empty one or a non-string; 404 `PROJECT_NOT_FOUND` for an unknown project (judged first, even for `null`); 409 `PROJECT_NODE_NOT_COLOCATED` unless the node is enrolled (`cerberusNodesDb.get`) and `nodeSessions.isColocated(node)`; `null` moves the project back to this server and needs no node. After the write the node left and the node joined are hinted (`hintChanged`, exported through the barrel), so a second window re-reads. The check runs at the assignment only; `projects/services/project-node.service.ts` (`setProjectNode`) holds it and imports `nodeSessions` and `hintChanged` through this barrel.
+- Client: `api.projects` in `src/shared/api.ts` is `{ list(), setNode(projectId, node) }` (`setNode` → the `PUT` above).
+
+## Order of a link change
+1. `wardenLinks.onChange` → one microtask later `settleLinkChange(node)` reads where the link stands THEN. why: `attach` runs inside `hello` handling, before the `welcome` sent in the same synchronous run; a warden drops any answer it gives before it has seen `welcome`.
+2. Channels and pending lists opened on a link no longer held end (`closed('link lost')`; the list rejects `the link of node <n> was lost before it answered sessions.list`).
+3. Then, when the link is one not seen before, each `onLinkUp` listener runs.
+- After a replacement the node is already linked inside `closed('link lost')`: a holder waiting for `onLinkUp` to re-open subscribes before that handler returns, or checks `isLinked` and re-opens at once.
+- A link up before the subscription is not "coming up": `onLinkUp` does not fire for it without `replay` (on a center restart the wardens redial before the session host subscribes).
+- The handshake must stay synchronous from `attach` to `send('welcome')` in `warden-link.ts` (`onHello`); an `await` there brings back answers thrown away.
+
+## `sessions.list` matching
+- `listHosts` names the request envelope's `id` (`wardenLinks.send(node, type, body, id)`); the answer's `re` is that id. An answer from a node other than the asker's, or with no `hosts` array, settles nothing / rejects (`answered sessions.list without a hosts list`).
+
+## Probe — `.verify/probe-cerberus-node-sessions.mjs`
+Run from the repo root; the three paths must be under `/tmp` or it exits 2.
+```
+D=$(mktemp -d /tmp/cerberus-node-sessions.XXXXXX) || exit 1
+CERBERUS_DB_PATH=$D/cerberus.db CERBERUS_KEY_PATH=$D/center.key DATABASE_PATH=$D/auth.db \
+  TSX_TSCONFIG_PATH=server/tsconfig.json node --import tsx .verify/probe-cerberus-node-sessions.mjs
+case "$D" in /tmp/cerberus-node-sessions.*) rm -rf "$D" ;; esac
+```
+- Binds `127.0.0.1:7920`: run it alone. Ends `ALL PASS` (exit 0) or `<n> FAILED` (exit 1). 12 s measured 2026-10-06: one case waits the 10 s list bound.
+- The stand-in warden is Node's global `WebSocket`: enrolls with no machine id, then connects signed with `facts.machineId` = this machine's. It drops any answer it gives before `welcome` and verifies the signature of every frame center sends. A `slow-*` host closes 60 s late, so its channel is still open when the socket drops.
+- Covers: not-linked answers (`null`, immediate rejection, co-location false), welcome-before-list at link-up, `listHosts` fields, channel frames then `closed`, client frame down verbatim, `retireHost`, `detach` (one frame, holder told nothing), `exit` forgets the channel, socket drop (`link lost`, pending list rejected at once, `lastListed` kept), reconnect, 10 s list bound, `replay`, replacement (`link lost` with the node already linked, then `onLinkUp`), unsubscribe, no bad signature and no unhandled rejection.
+
+## Open
+- `node-sessions.ts` is past the 300-line ceiling (371); a split is its own pure move.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/node-sessions.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/projects.db.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/projects/services/project-node.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-cerberus-node-sessions.mjs
+
+## MAN-7904 — Runs — `startRun`, the run frames, the recheck, the reconciliation on `hello`, and Cerberus's own auto-run rule
+
+Center's half of a run: asking a warden to run a fix, hearing what it did, and Cerberus's own rule for running one unprompted. Tables: MAN-7805; statements: MAN-7896; wire frames: MAN-7807 (`run.start`, `run.accepted`, `run.refused`, `run.output`, `run.end`, `probe.run`); the catalog a run is verified against: MAN-7900; the warden's half (verify version, id, command; the child; batched output): `cloudcli:warden`; how a run reads on screen: MAN-7809, MAN-7810; routes: MAN-7802.
+
+## Files
+| file | owns |
+|---|---|
+| `runs.service.ts` | `startRun({ entryId, by })`, `getRun(id)`, `checkHasRun(node, check)`, `registerRunsService()` |
+| `run-frames.ts` | the four frame handlers, the recheck, `registerRunFrames()` |
+| `run-reconcile.ts` | `reconcileRunsOnHello(node, hello)` — what each `hello` says about live runs |
+| `run-ending.ts` | `endRun(run, result, exit, endedAt, note)` — the one write that ends a run, then the hint; `hintRun(run)` |
+| `catalog-ack.ts` | `ackedVersionCovering`, `waitForCoveringAck`, `notifyCatalogAcked` — the ≤ 10 s wait for an ack |
+| `auto-run.ts` | the auto-run rule on `ingest.onChange` |
+| `read-model/run-views.ts` | runs as `CerberusRunView`: `runningViews`, `needRuns`, `sheetRunOf`, `runViewById`, `fixEvents` |
+
+## `startRun({ entryId?, diagnosisId?, by })` → `runId`
+| step | rule |
+|---|---|
+| one of the two ids | neither or both → 400 `CERBERUS_BAD_RUN`; a `diagnosisId` → 404 `CERBERUS_UNKNOWN_DIAGNOSIS` until the plan that owns diagnoses can resolve one |
+| the entry | `liveEntry(id)`: unknown or retired → 404 `CERBERUS_UNKNOWN_ENTRY` |
+| the check | already has a run that has not ended, OR one `startRun` is in the middle of asking for (`starting`, a `<node>/<check>` set) → 409 `CERBERUS_RUN_ACTIVE`. why: while the ack is awaited no row exists yet |
+| the node | `wardenLinks.isLinked` false → 409 `CERBERUS_NODE_SILENT`. A `run.start` is never queued for a warden that is away |
+| the ack | `waitForCoveringAck(node, id, 10 s)`: the node's NEWEST set must be acked and hold the id (by id only — whether its command is still the entry's is the warden's refusal). Newest, not newest-acked: a set published after the acked one is about to replace it, and a `run.start` naming the older version would arrive behind that `catalog.set` and be refused. Ended by the ack itself (`notifyCatalogAcked`, called by `catalog.service.ts` after each ack it stamps), never by polling. None in time → the run is recorded `failed` with "The warden on <node> did not confirm the catalog holding “<name>” within 10 seconds, so it was not asked to run it." and its id returned |
+| the entry again | read fresh after the wait: retired meanwhile → 404; the run carries the entry's CURRENT `cmd` and `timeout` |
+| the row | `runs` insert (`requested_at` = when `startRun` was called, `catalog_version` = the acked version; on a timed-out wait the newest set's, else 0), `hintChanged` naming the check, then the signed `run.start { runId, catalogVersion, entryId, proposalId: null, cmd, timeout, by }` |
+| the send | a link that closed in the wait or before the socket took the frame → the run ends `failed`, "The link to <node> closed before the run could be sent." |
+
+The warden's three checks (version, id, command, in that order) stay the only judge of whether a command runs: center sends what the `catalog` table holds with the version the warden acked, so a row changed behind center's back is refused by the warden ("The command is not catalog v<n>'s command for '<id>'"), which ends the run `refused` with that reason as its `note`.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/auto-run.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/catalog-ack.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/read-model/run-views.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/run-ending.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/run-frames.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/run-reconcile.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/runs.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/cerberus-runs.sh, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/cerberus-ws-tap.mjs
+
+## MAN-7909 — Runs — `startRun`, the run frames, the recheck, the reconciliation on `hello` — The frames (`run-frames.ts`)
+section: Runs — `startRun`, the run frames, the recheck, the reconciliation on `hello`, and Cerberus's own auto-run rule/001 The frames (`run-frames.ts`)
+
+- Registered at `start()`, before the gateway binds (`wardenLinks.registerHandler` throws on a second registration).
+- TIMES: `run.accepted`'s `startedAt` and `run.end`'s `endedAt` are the warden's clock; they are stored on CENTER'S clock — shifted by `wardenLinks.clockOffsetMs(node)`, never later than now and never earlier than the run's request (an end: its start). So the feed's paging and a need's 90 s linger compare one clock, and a warden five seconds behind or a million years ahead cannot reorder either.
+- A frame is honoured only for a run center holds AND asked THIS node to start; a body that is not an object, a run unknown or another node's, or a field of the wrong kind is logged once per `(node, type, run, reason)` and ignored. The link acks it all the same (MAN-7803: a numbered frame is acked once its handler returns).
+- `run.accepted { runId, startedAt }` → `markStarted` (on center's clock, see TIMES); hint if it moved.
+- `run.refused { runId, reason }` → `endRun(…, 'refused', null, now, reason)`. A blank reason reads "The warden refused the run."
+- `run.output { runId, lines }` → well-formed lines only (a malformed one is dropped and logged, never the batch) → `insertOutput` (`OR IGNORE`: a resent line lands once) → when at least one line was written, `hintChanged` and `sendRunOutput` (MAN-7802: one `cerberus_run_output` frame to every open browser, uncoalesced). A batch that wrote nothing is told to no one.
+- `run.end { runId, result, exit, endedAt }` → `endRun` with the warden's `endedAt` on center's clock (a missing one is center's now); `result` must be `ok`, `failed` or `timed_out` (`refused` is `run.refused`'s). The first end wins: a resend, or an end after a refusal, changes nothing and rechecks nothing.
+- THE RECHECK: only after an END that was the first and `ok`, and only when the entry has `recheck`: `probe.run { probe }` for the probe reporting the run's check (`activeChecks(node)`'s `reporting_probe`: the check's `probe`, else its `source` — a health document's component's document, or the check's own probe). One check, one fix: nothing else is asked to run. A node with no link by then reads the check at its next scheduled run.
+
+## Results and notes — `runs.result`, `runs.note`
+| `result` | decided by | `exit` | `note` |
+|---|---|---|---|
+| NULL | the run has not ended | NULL | NULL |
+| `ok` | `run.end`, exit 0 | 0 | NULL |
+| `failed` | `run.end` with any other exit, or none (a signal, a command that did not start); or center: the ack wait lapsed or the link closed before the send (MAN-7904 `startRun`), the warden restarted or never started it (§"Reconciliation on `hello`") | the command's, else NULL | NULL for the warden's end; center's own sentence for its ends |
+| `timed_out` | `run.end` after the timeout ladder (MAN-7895) | as the shell left it; NULL for a signal | NULL |
+| `refused` | `run.refused` | NULL | the warden's reason (the sentences of MAN-7895 §"Verification"); "The warden refused the run." when blank |
+- The first end wins (`markEnded`): a resent frame, an end after a refusal, a reconciliation of an ended run change nothing.
+- A `note` is the one sentence for a person when the command's own exit does not say why (`run-ending.ts`); the screen draws it after the output in the result's ink (MAN-7906).
+- A refusal never started: no `started_at`, `durationS` null, no recheck.
+
+## Reconciliation on `hello` (`run-reconcile.ts`)
+`wardenLinks.onHello` (MAN-7814), once per connect. Nothing is concluded from a hello that does not say what runs it holds (`active.runs` null: a warden older than the runner). For each run of the node that has not ended:
+- NAMED in `active.runs` (its child still runs) or in `active.owed` (it is over, its `run.*` frames still wait on the warden's outbox): left alone. The outbox's frames are resent after the `welcome` and end it themselves.
+- NAMED IN NEITHER, from a warden that reports `owed`: lost — its process restarted (child and outbox gone together) or its `run.start` never arrived (the link dropped with the frame in flight, the process lived on). Ends `failed`: ACCEPTED (`started_at` set) "The warden restarted while it ran; the output ends where the link did."; NEVER ACCEPTED "The warden never started it." No clock is consulted.
+- NAMED IN NEITHER, from a warden that does not report `owed` (an older build): it cannot say what it still owes, so a run that ended on its own while the link was down would look lost. Only a run of a process that is gone is ended: `started_at` (or, never accepted, `requested_at`), less the node's clock offset, before `hello.startedAt` (the process's start, the warden's clock). Same notes.
+- Ends are stamped on center's clock (center's decision, not the warden's report).
+- The warden builds `owed` in `daemon.mjs` `runsOwed`: every run id in an unacked `run.*` frame of its outbox that is not running.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/auto-run.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/catalog-ack.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/read-model/run-views.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/run-ending.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/run-frames.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/run-reconcile.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/runs.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/cerberus-runs.sh, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/cerberus-ws-tap.mjs
+
+## MAN-7910 — Runs — `startRun`, the run frames, the recheck, the reconciliation on `hello` — Auto-run (`auto-run.ts`)
+section: Runs — `startRun`, the run frames, the recheck, the reconciliation on `hello`, and Cerberus's own auto-run rule/002 Auto-run (`auto-run.ts`)
+
+The rule lives in center and nowhere in the warden. Registered on `ingest.onChange` at `start()`. For each stored change whose status MOVED INTO an entry's state from outside it — `failing` for `when: failing`; `warn` or `failing` for `when: warn` (the previous status null, a check first seen, counts as outside) — the entries of that check, oldest first, are offered: the first that has `auto` on, is not capped (and, by `forCheck`, not retired), has had fewer than `limit_runs` AUTO runs in the last `limit_per` seconds (`autoRunsSince`: manual runs are not counted; every auto run asked for is, whatever came of it), and whose check has no run going (`checkHasRun`) is started, `by: 'auto'`.
+- A move is acted on only while it is news. A warden that was cut off replays its outbox oldest first, so a failure that healed hours ago arrives as a move into failing now. Of one frame's moves only the LAST per check counts (`[ok, failing, ok]` is a check that is ok), and a move whose result is older than the check's staleness window (`stale_after`; the result's `at` is the warden's clock, so now less the node's offset) is history: it runs nothing and spends none of the entry's runs. A check with no `stale_after` (`activeChecks` row whose probe row is gone) has no window to judge by and is not run. A check still failing when a long outage ends is therefore not run on its own until it next moves; it is on Needs you with its button.
+- A `denied` check is never auto-run (its state is in no entry's set). A check that STAYS failing never matches: nothing moved. A MUTED check still runs: mute silences asking, not fixing, and the status ingest hands over has no mute laid on it.
+- The run is asked for, not awaited; a refusal (the link closed, a run began meanwhile) is one log line.
+- Only the run's OWN check is rechecked: an entry never chains to another.
+
+## What the screen reads (`read-model/run-views.ts`)
+- `CerberusRunView`: `name` = the entry's (retired or not), `lastLine` = the newest line (ONE statement for all runs asked for), `lines` only for `GET /runs/:id` and a check's sheet.
+- `CerberusOverview.running` = every run not ended, oldest first, no lines. `CerberusNeed.run` = the check's newest run requested at or after `since + clockOffsetMs` (`since` is the warden's clock, a run's times center's), while it runs or until `endedAt` is 90 s old; null when `since` is. `CerberusCheckDetail.run` = the newest run requested in the last hour, running or ended, with lines.
+- `fix` lines of What happened: `started` at `requested_at`; `ended` at `ended_at` with `result` and `durationS` (null for a refusal, which never started). Runs are kept for ever; output 90 days (MAN-7801).
+- Times: `requested_at`, `started_at` and `ended_at` are ALL center's clock (the frames' warden times are shifted by the node's offset when stored, MAN-7909), so the feed's paging and the 90 s linger need no correction.
+
+## Prove it
+`.verify/cerberus-runs.sh` (slot 5; `SUNSET_SLOT=5 bash .verify/cerberus-runs.sh`, about 3 minutes, measured 2026-10-06: 194 s, exit 0; the times the check moved into failing are counted from the stored change rows, because failing → run → recheck → ok can end between two polls) with `.verify/lib/cerberus-ws-tap.mjs`: a scratch warden enrolled as `probe-node` with a `file_age` probe (`pass: "age < 1m"`, every 10 s); an auto entry that `touch`es the file with limit one run an hour: the check failing after a minute, the run `by: auto`, its end, the recheck passing the check within seconds, the check failing again a minute later and NOT run a second time; `GET /runs/:id`; a `printf 'a\nb\nc\n'` entry run by `POST /catalog/:id/run` with its lines and the `cerberus_run_output` frames a `/ws` client prints; a second press 409; an entry whose `catalog` row was changed behind center's back, signed and sent by the real center, refused by the warden; the ack wait with the warden frozen by SIGSTOP (an entry written, a press waiting; thawed after 3 s the run starts at the thaw, frozen on the press answers after 10 s with a `failed` run that was never sent); the warden stopped (409 `CERBERUS_NODE_SILENT`); the warden SIGKILLed mid-run and started again (the run ends `failed`, restarted) and a never-accepted run written into the store (ends "never started it").
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/auto-run.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/catalog-ack.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/read-model/run-views.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/run-ending.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/run-frames.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/run-reconcile.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/runs.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/cerberus-runs.sh, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/cerberus-ws-tap.mjs
+
+## MAN-7925 — Cerberus catalog fixes — the two seeded entries on eis1: what each run does, why the Verisk login ends in a verdict pipe, auto-run off
+
+The two catalog entries written for `eis1` on 2026-10-07 06:19 UTC through `POST /api/cerberus/catalog` (origin `{ kind: 'written', by: 'verve' }`, MAN-7802): the first real fixes, each a command that already existed. Entries, sets, the auto switch: MAN-7900. A run: MAN-7904. The warden's verification: MAN-7895 (`cloudcli:warden`). Their screens: MAN-7906 (`cloudcli:src/modules/cerberus`).
+
+## The entries
+| id | check | `when` | `timeout` | limit | `recheck` | `auto` |
+|---|---|---|---|---|---|---|
+| `run-the-docstore-backup-now` | `docstore/backup.age` ("Backed up in the last day") | `failing` | 600 s | 1 per 86 400 s | yes | off |
+| `sign-in-to-verisk-again` | `shadow-connector/xactanalysis_session` ("XactAnalysis polls are succeeding") | `failing` | 360 s | 2 per 3 600 s | yes | off |
+
+- Both start `auto` off and no build step switches one on: `PUT /api/cerberus/catalog/<id>/auto { "on": true }` is the person's. Neither is `capped`. Off is every entry's default (Cerberus Spec §4); a run of the Verisk entry signs in to Verisk, outside the fleet, which the Catalog's own intro leaves as a step you take (MAN-7906).
+- Both commands are stored and signed as written, byte for byte (MAN-7900). Editing a script below changes what the entry does with no catalog change and no new set; the warden compares the command, never the script.
+
+## Run the docstore backup now
+- `cmd`: `/home/lyphe/.claude/docstore/bin/backup`, the nightly cron's own script, unchanged. Stdout is one line, `backup: <dir>/docstore-<weekday>.dump <bytes> bytes`, printed after the `mv` that commits the dump; exit 0 only then.
+- One backup at a time: `flock -n` on `state/docstore/backup.lock`, outside the directory `backup.age` reads. A press during the 03:30 cron, or the reverse, exits 1 with `backup: another backup is already running; this one made none`, so the run ends `failed` (MAN-92, `house:docstore`).
+- The recheck is `probe.run` for `docstore/backup.age` (a `file_age` probe, `age < 26h`, MAN-7838).
+- Measured 2026-10-07: two runs `by: 'you'`, `ok`, exit 0, 18 s and 20 s, one `out` line each; the check read "Newest file written 0 s ago (docstore-2.dump)" at 06:19:34, the moment the first run ended.
+
+## Sign in to Verisk again
+- `cmd`: `cd /opt/shadow-connector && venv/bin/python extractors/xactimate/http_login.py | venv/bin/python -c 'import json,sys; s=json.loads(sys.stdin.read().strip().splitlines()[-1]); print(json.dumps(s)); sys.exit(0 if s.get("status")=="ok" else 1)'`.
+- The first stage is shadow-connector's own login script, unchanged; nothing under `/opt/shadow-connector` is edited. A run is a real sign-in to Verisk, writes `/var/lib/shadow-connector/xactimate_token.json` and may rotate the password (`password_rotation`). The script bounds none of its HTTP calls (`timeout=` appears once in the file, as `_wait_for_mfa`'s own parameter), so the entry's `timeout` is the only bound on a run: the warden's SIGTERM, then SIGKILL 5 s later (MAN-7895).
+- `_wait_for_mfa(timeout=300)` is a person's wait, on the email-code path only: the script prints `EMAIL 2FA CODE NEEDED` on stderr and waits 300 s for `/tmp/xactimate_mfa_response`. Unattended it raises `TimeoutError`, stdout stays empty, the verdict pipe exits 1 and the run ends `failed`.
+- WHY THE VERDICT PIPE: `http_login.py` exits 0 on every outcome. `login()` prints `{"status": "error", "step": …}` and returns `None`, and `__main__` never turns that into an exit code, so `/bin/sh -c` alone would end a run `ok` for a login Verisk refused. The second stage reads the last stdout line, prints it, and exits 0 only when its `status` is `ok`, else 1.
+- Every way the first stage ends without an `ok` line fails the run: a pipeline's status is its last stage's (`/bin/sh`, no `pipefail`), and no output or a last line that is not JSON makes the parser raise (exit 1). Measured 2026-10-07 on made-up last lines through the same `python -c`: `{"status": "ok", …}` → 0, `{"status": "error", …}` → 1, empty → 1, `Traceback` → 1.
+- The recheck is `probe.run` for `shadow-connector/health`, the probe that reports the check (the health document). The check is judged by the last successful `xactanalysis_poll` in `poller_events` (`/opt/shadow-connector/cerberus/health.py` `_check_xactanalysis_session`), not by the login's result: after an `ok` run it passes when shadow-connector's own poll has succeeded.
+- The run's stderr is kept as `run_output` for 90 days and pushed to open browsers as `cerberus_run_output` (MAN-7802). `http_login.py` logs the TOTP code it generates (`Generated TOTP: <code>`), on the email path the code it read (`Got code: <code>`), and the first 20 characters of the interaction handle, `stateHandle`, `interaction_code` and auth code. The codes are short-lived; `password_rotation.py` never logs a password.
+- `http_login.py`'s exit behaviour is the pipe's ground: a change to its last-line `status` contract, or to its exit codes, changes what `ok` means for this entry.
+
+governs: /home/lyphe/.claude/docstore/bin/backup, /opt/shadow-connector/extractors/xactimate/http_login.py

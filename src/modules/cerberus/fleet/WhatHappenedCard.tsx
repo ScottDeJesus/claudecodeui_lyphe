@@ -28,8 +28,19 @@ export function WhatHappenedCard({ activity, now }: WhatHappenedCardProps) {
   const { t } = useTranslation();
   // The lines as Timeline rows: worded once, by the same function History's feed uses.
   const events = useMemo(() => activity.map((line) => toTimelineEvent(line, t, now)), [activity, t, now]);
-  // What a line is, apart from where it stands in the list: when, what kind, on which node and check.
-  const lineKey = (line: CerberusActivity): string => `${line.at}:${line.kind}:${line.node}:${'check' in line ? line.check : ''}`;
+  // What a line is, apart from where it stands in the list: when, what kind, on which node and check, which
+  // event of it, and which run or entry. A `catalog` line is about no node or check, so both read empty for
+  // it; the event and the run or entry tell apart two lines of one run in one millisecond (a run that fails
+  // to send is asked for and ended in the same one) and every catalog line of a moment.
+  const lineKey = (line: CerberusActivity): string =>
+    [
+      line.at,
+      line.kind,
+      'node' in line ? line.node : '',
+      'check' in line ? line.check : '',
+      'event' in line ? line.event : '',
+      'runId' in line ? line.runId : 'entry' in line ? line.entry : '',
+    ].join(':');
   // The line whose row is open to its detail, by what the line IS and not by its place: a newer line
   // arriving at the head pushes every row down, and a position would leave the detail under a different
   // event. Null while none is open. A line pushed past the seven stops matching, so its row is closed.
@@ -46,7 +57,7 @@ export function WhatHappenedCard({ activity, now }: WhatHappenedCardProps) {
 
   const newest = activity[0];
   // Keyed by the newest line, the blip is a new element when a newer one arrives, and rings again.
-  const newestKey = newest === undefined ? 'none' : `${newest.at}:${newest.kind}:${newest.node}:${'check' in newest ? newest.check : ''}`;
+  const newestKey = newest === undefined ? 'none' : lineKey(newest);
 
   return (
     <Card className="px-[18px] py-4">

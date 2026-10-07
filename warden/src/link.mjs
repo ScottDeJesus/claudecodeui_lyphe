@@ -11,6 +11,7 @@
 //             asked about (`readRefusal`) so the log says WHY — a websocket client cannot see the 401's body.
 //
 // Later plans add frames with `link.on('checks.set', fn)` and `link.send(type, body)`; none touches the socket.
+// `link.on('link.down', fn)` runs when a LINKED socket is lost (never for `stop()`, nor for an attempt that missed `welcome`).
 import { log } from './log.mjs';
 import { createOutbox } from './outbox.mjs';
 import { version } from './state.mjs';
@@ -180,7 +181,11 @@ export function createLink({ identity, state = noState, outbox = createOutbox(),
   const nextBackoffSeconds = () => BACKOFF_SECONDS[Math.min(attempt, BACKOFF_SECONDS.length - 1)];
 
   function goDown() {
-    if (linked) log(`link lost — retrying in ${nextBackoffSeconds()} s`);
+    if (linked) {
+      log(`link lost — retrying in ${nextBackoffSeconds()} s`);
+      // The one event that is no frame from center: whatever lives only as long as the link (a session channel) is told.
+      if (handlers.has('link.down')) dispatch({ type: 'link.down', body: {} });
+    }
     linked = false;
     clearInterval(heartbeatTimer);
     clearTimeout(deadlineTimer);

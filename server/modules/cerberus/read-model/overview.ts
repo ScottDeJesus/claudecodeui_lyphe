@@ -1,4 +1,4 @@
-import { cerberusDefinitionsDb, cerberusNodesDb } from '@/modules/database/index.js';
+import { cerberusDefinitionsDb, cerberusNodesDb, projectsDb } from '@/modules/database/index.js';
 import type {
   CerberusCheckView,
   CerberusNeed,
@@ -10,11 +10,14 @@ import type {
 } from '@/shared/cerberus-types.js';
 
 import { HUB_NODE_ID } from '../definition-document.js';
+import { nodeSessions } from '../node-sessions.js';
 
 import { activity } from './activity.js';
 import { buildServiceCells, stripStart } from './cells.js';
+import { offeredFixes } from './catalog-views.js';
 import { buildCheckView } from './check-views.js';
 import { resolveNodeLink } from './node-links.js';
+import { needRuns, runningViews } from './run-views.js';
 import { loadSeries, type CheckSeries } from './series.js';
 import { needsAttention, worst } from './status-rules.js';
 
@@ -33,7 +36,8 @@ const OVERVIEW_ACTIVITY = 7;
  * the active index at all); `not_enabled` never needs you, and a muted check keeps recording, so it
  * is in `muted` and never in `needsYou`. `needsYou` lists the active checks whose current status is
  * warn, failing or denied, ordered by how long ago they began (ingest's `since`) then key; a check
- * whose beginning ingest does not know sorts after the ones it does.
+ * whose beginning ingest does not know sorts after the ones it does. Each need carries the fix offered
+ * for it and the run it shows (`run-views.ts`); `running` is every fix run that has not ended.
  */
 
 /** What reading one node yields: its services, and the evidence the overview totals across nodes. */
@@ -162,6 +166,10 @@ export function buildOverview(inputs: CerberusReadInputs): CerberusOverview {
     lastHeardAt: hub.newestHeardAt,
     silentSince: null,
     enrolledAt: null,
+    // center runs no warden, so it hosts no sessions and takes no projects.
+    colocated: false,
+    projects: [],
+    sessions: 0,
     services: hub.services,
   });
 
@@ -179,11 +187,19 @@ export function buildOverview(inputs: CerberusReadInputs): CerberusOverview {
       lastHeardAt: link.lastHeardAt,
       silentSince: link.link === 'silent' ? link.silentSince : null,
       enrolledAt: row.enrolled_at,
+      colocated: nodeSessions.isColocated(row.id),
+      // Read from the projects table and the relay's cache, not from `inputs`: they are where the
+      // fleet stands now, and neither feeds a status, so "a minute ago" never has to answer for them.
+      projects: projectsDb.listByNode(row.id),
+      sessions: nodeSessions.lastListed(row.id).length,
       services: reading.services,
     });
   }
 
   const checks = nodes.flatMap((node) => node.services.flatMap((service) => service.checks));
+  const needing = checks.filter((check) => needsAttention(check.status));
+  const fixes = offeredFixes(needing);
+  const runs = needRuns(needing, inputs);
   const services = nodes.flatMap((node) => node.services);
   const sum = (pick: (service: CerberusServiceView) => number): number =>
     services.reduce((total, service) => total + pick(service), 0);
@@ -191,11 +207,15 @@ export function buildOverview(inputs: CerberusReadInputs): CerberusOverview {
   return {
     now,
     nodes,
-    needsYou: checks
-      .filter((check) => needsAttention(check.status))
-      .map((check) => ({ check }))
+    needsYou: needing
+      .map((check) => ({
+        check,
+        fix: fixes.get(`${check.node}/${check.key}`) ?? null,
+        run: runs.get(`${check.node}/${check.key}`) ?? null,
+      }))
       .sort(sinceThenKey),
     muted: checks.filter((check) => check.mute !== null),
+    running: runningViews(nodes.map((node) => node.id)),
     counts: {
       checks: sum((service) => service.counts.total),
       passing: sum((service) => service.counts.passing),

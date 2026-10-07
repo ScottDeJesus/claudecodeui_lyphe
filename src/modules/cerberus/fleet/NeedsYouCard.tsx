@@ -2,6 +2,7 @@ import type { TFunction } from 'i18next';
 import { useTranslation } from 'react-i18next';
 
 import { useCerberus } from '@/modules/cerberus/context/CerberusContext';
+import { NeedFix } from '@/modules/cerberus/fleet/NeedFix';
 import { useLeavingNeeds } from '@/modules/cerberus/hooks/useLeavingNeeds';
 import { StatusGlyph } from '@/modules/cerberus/StatusMarks';
 import { STATUS_TABLE } from '@/modules/cerberus/utils/cerberusStatus';
@@ -20,7 +21,8 @@ function timeLeft(t: TFunction, until: number, now: number): string {
 }
 
 type NeedCardProps = {
-  check: CerberusCheckView;
+  /** The card's whole need: its check, the fix offered for it and its recent run, which `NeedFix` reads. */
+  need: CerberusNeed;
   /** It stopped needing you: drawn for .55 s more as it leaves, and no longer pressable. */
   leaving: boolean;
   onOpen: (target: CerberusSheetTarget) => void;
@@ -34,8 +36,9 @@ type NeedCardProps = {
  * with no label yet is named by its key, in mono, which then is not written a second time under it.
  * The glyph is decoration: its word is written beside it.
  */
-function NeedCard({ check, leaving, onOpen, onMute }: NeedCardProps) {
+function NeedCard({ need, leaving, onOpen, onMute }: NeedCardProps) {
   const { t } = useTranslation();
+  const { check } = need;
   const look = STATUS_TABLE[check.status];
   const service = check.serviceLabel ?? check.service;
   return (
@@ -74,9 +77,10 @@ function NeedCard({ check, leaving, onOpen, onMute }: NeedCardProps) {
           {check.value}
         </p>
       )}
-      {/* SLOT: run — the fixes plan's run strip ("Running on its own · <name>", "✓ <name> finished HH:MM:SS · waiting for the next check", "✕ The warden refused “<name>”") with the run's last line in mono. */}
       <div className="flex flex-wrap gap-2 pl-[34px]">
-        {/* SLOT: actions — the fixes plan's Run “<fix>” (tonal) and the diagnosis plan's Diagnose / Diagnosing… / See diagnosis (outline), before Mute. */}
+        {/* The run strip on a line of its own above the row's buttons, then Run “<fix>” (tonal). */}
+        <NeedFix need={need} leaving={leaving} onOpen={onOpen} />
+        {/* SLOT: actions — the diagnosis plan's Diagnose / Diagnosing… / See diagnosis (outline), after the fix and before Mute. */}
         <Button
           variant="ghost"
           size="sm"
@@ -109,12 +113,13 @@ type NeedsYouCardProps = {
  * NEEDS YOU: the top of the Fleet, the checks a person should look at now, oldest first.
  *
  * Each card says what is wrong in words before anything else ("Session is valid · Failing"), then
- * where and since when, then what it reported, then what can be done (Mute; the fixes and diagnosis
- * plans add theirs before it). A card that stops needing you does not blink out: it stays where it
- * was for .55 s and leaves on `vv-toast-out`. With motion reduced it is simply gone.
+ * where and since when, then what it reported, then what can be done: first the card's fix (`NeedFix`,
+ * its run's strip on a line of its own, then Run “<fix>”), then Mute (the diagnosis plan adds its buttons
+ * before it). A card that stops needing you does not blink out: it stays where it
+ * was for .55 s, its strip as it was drawn, and leaves on `vv-toast-out`. With motion reduced it is simply gone.
  *
- * With nothing to ask for, the card says so: "✓ Nothing needs you" and "N of M checks passing." The
- * fixes plan adds the sentence about fixes running on their own after it.
+ * With nothing to ask for, the card says so: "✓ Nothing needs you" and "N of M checks passing." Then, while
+ * any catalog entry is set to run on its own, "Fixes set to auto-run will run on their own and show up below."
  *
  * Under them, while any mute is set, "Muted · N": each muted check, "Until 18:40 · 48 min left · <the
  * reason>", and Unmute.
@@ -125,7 +130,8 @@ export function NeedsYouCard({ needs, muted, counts, now, onOpen, onMute }: Need
   const { t } = useTranslation();
   // Each of `needs` in its order, then a card that stopped needing you kept at its place while it leaves.
   const cards = useLeavingNeeds(needs);
-  const { liftMute } = useCerberus();
+  // The catalog says whether any entry runs on its own, which the quiet line's last sentence is about.
+  const { liftMute, catalog } = useCerberus();
   // The mute lifts early; `liftMute` reads the overview again, so the row leaves Muted and, when the
   // check still fails, its card is back in Needs you. A refused lift raises its own toast.
   const onUnmute = (muteId: string) => {
@@ -141,8 +147,9 @@ export function NeedsYouCard({ needs, muted, counts, now, onOpen, onMute }: Need
 
       {cards.length > 0 && (
         <ul className="flex flex-wrap gap-2.5 px-3.5 pb-3.5">
-          {cards.map(({ check, leaving }) => (
-            <NeedCard key={`${check.node}/${check.key}`} check={check} leaving={leaving} onOpen={onOpen} onMute={onMute} />
+          {/* Each card is handed its whole need: `useLeavingNeeds` keeps a leaving card's need, so it leaves with its strip as it was drawn. */}
+          {cards.map(({ need, leaving }) => (
+            <NeedCard key={`${need.check.node}/${need.check.key}`} need={need} leaving={leaving} onOpen={onOpen} onMute={onMute} />
           ))}
         </ul>
       )}
@@ -160,7 +167,7 @@ export function NeedsYouCard({ needs, muted, counts, now, onOpen, onMute }: Need
           </div>
           <p className="text-[13.5px] text-muted-foreground">
             {t('cerberus.needs.quietPassing', { passing: counts.passing, count: counts.checks })}
-            {/* SLOT: quiet — the fixes plan's " Fixes set to auto-run will run on their own and show up below." follows the count. */}
+            {catalog?.some((entry) => entry.auto) && ` ${t('cerberus.fix.quiet')}`}
           </p>
         </div>
       )}

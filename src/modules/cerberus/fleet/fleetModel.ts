@@ -3,7 +3,7 @@
 // of the overview and the box it is handed, so the grid, the list and the rings never disagree about
 // which node is worse. Ported from the prototype's `build` (`design/cerberus/cerberus-fleet.js`)
 // for the real read model: nothing synthetic, no "fleet size" knob.
-import type { CerberusNodeView, CerberusOverview, CerberusServiceView } from '@/shared/cerberus-types';
+import type { CerberusNodeView, CerberusOverview, CerberusRunView, CerberusServiceView } from '@/shared/cerberus-types';
 import type {
   FleetFilter,
   FleetFilterGroup,
@@ -20,9 +20,10 @@ import type {
 
 /**
  * How bad each node status is, the one ranking every sort and "is it loud" test reads: the smaller,
- * the worse. `failing` and `denied` share the worst place. `fixing` and `paused`/`enrolling` hold
- * their places for the fixes and updates plans; nothing feeds them yet. `empty` — no service — is
- * last: nothing is wrong, and nothing is on it.
+ * the worse. `failing` and `denied` share the worst place. `fixing` — a fix running — sits just under
+ * them: a node whose only trouble is being fixed reads fixing, while one with another service still
+ * failing stays failing, since that one still needs you. `paused`/`enrolling` hold their places for the
+ * updates plan. `empty` — no service — is last: nothing is wrong, and nothing is on it.
  */
 const STATUS_RANK: Record<FleetStatus, number> = {
   failing: 0,
@@ -54,15 +55,26 @@ function isWorse(candidate: FleetStatus, current: FleetStatus): boolean {
 }
 
 /**
- * A node's word: the worst of its services', `empty` with none. A service whose every check is
- * switched off on its own side (`not_enabled`) counts as passing here — it is nothing to look at and
- * nothing wrong — while its own row still says what it is.
+ * The run going on one of a service's checks, or null: the oldest of `running` (the overview's runs
+ * that have not ended, oldest first) whose check is one of the service's. A service with a run is
+ * `fixing`, whatever its own word is; its row, its square and its node's word read it from here.
  */
-function nodeStatusOf(services: CerberusServiceView[]): FleetStatus {
-  if (services.length === 0) return 'empty';
+export function runOnService(running: CerberusRunView[], node: string, service: CerberusServiceView): CerberusRunView | null {
+  return running.find((run) => run.node === node && service.checks.some((check) => check.key === run.check)) ?? null;
+}
+
+/**
+ * A node's word: the worst of its services', `empty` with none. A service with a run going is `fixing`.
+ * A service whose every check is switched off on its own side (`not_enabled`) counts as passing here —
+ * it is nothing to look at and nothing wrong — while its own row still says what it is.
+ */
+function nodeStatusOf(node: CerberusNodeView, running: CerberusRunView[]): FleetStatus {
+  if (node.services.length === 0) return 'empty';
   let worst: FleetStatus = 'ok';
-  for (const service of services) {
-    const word: FleetStatus = service.status === 'not_enabled' ? 'ok' : service.status;
+  for (const service of node.services) {
+    const word: FleetStatus = runOnService(running, node.id, service) !== null
+      ? 'fixing'
+      : service.status === 'not_enabled' ? 'ok' : service.status;
     if (isWorse(word, worst)) worst = word;
   }
   return worst;
@@ -79,7 +91,7 @@ function compareFleetItems(a: FleetItem, b: FleetItem): number {
  * One node of the overview as an item: its services cut down to what the fleet lists, and the
  * lower-cased text a search matches — id, description, and each service's id and plain label.
  */
-function toFleetItem(node: CerberusNodeView): FleetItem {
+function toFleetItem(node: CerberusNodeView, running: CerberusRunView[]): FleetItem {
   const services: FleetService[] = node.services.map((service) => ({
     service: service.service,
     label: service.label,
@@ -90,12 +102,15 @@ function toFleetItem(node: CerberusNodeView): FleetItem {
   // text has single spaces, so a query that runs across two words ("center cerberus") still matches.
   const words = [node.id, node.desc, ...services.flatMap((service) => [service.service, service.label])]
     .filter((word): word is string => word !== null && word !== '');
+  const status = nodeStatusOf(node, running);
   return {
     id: node.id,
     desc: node.desc,
     role: node.role,
     link: node.link,
-    status: nodeStatusOf(node.services),
+    status,
+    // Who started the fix the node's line speaks of: its oldest run (`running` is oldest first).
+    fixBy: status === 'fixing' ? running.find((run) => run.node === node.id)?.by ?? null : null,
     services,
     search: words.join(' ').toLowerCase(),
   };
@@ -107,7 +122,7 @@ function toFleetItem(node: CerberusNodeView): FleetItem {
  * PEERS of the same word, so a quiet fleet still opens on the server Cerberus runs on.
  */
 export function fleetItems(overview: CerberusOverview): FleetItem[] {
-  return overview.nodes.map(toFleetItem).sort(compareFleetItems);
+  return overview.nodes.map((node) => toFleetItem(node, overview.running)).sort(compareFleetItems);
 }
 
 // ---------------------------

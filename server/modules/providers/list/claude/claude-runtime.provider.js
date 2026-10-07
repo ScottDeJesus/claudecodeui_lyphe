@@ -1184,7 +1184,9 @@ async function spawnProcess(command, options, initialWs, context) {
         appSessionId: sessionId ?? null,
         userId: ws?.userId ?? null,
         reattach: reattach ?? null,
-        profile: reattach ? null : { ...profile }
+        profile: reattach ? null : { ...profile },
+        // A re-adopted host answers to the node that holds it; a fresh turn to its project's node.
+        node: reattach ? reattach.node : options.node ?? null
       });
 
       // Streaming input, always: the queue keeps stdin open for the life of the process. A

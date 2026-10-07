@@ -85,7 +85,7 @@ function applyMigrationSteps(db: Database.Database): void {
  * The singleton is assigned only after step 5 succeeds, so a failed migration leaves nothing
  * half-open: the handle is closed, the error propagates, and the next call starts over.
  *
- * Consumers: the five `cerberus-*.db.ts` repositories (a call inside every method), and the cerberus
+ * Consumers: the seven `cerberus-*.db.ts` repositories (a call inside every method), and the cerberus
  * module's `start()` (the first call, which creates the file) and its multi-statement transactions
  * (`ingest`, a definitions write), which open on this connection.
  */

@@ -1,5 +1,7 @@
 import { useTranslation } from 'react-i18next';
 
+import { useCerberus } from '@/modules/cerberus/context/CerberusContext';
+import { runOnService } from '@/modules/cerberus/fleet/fleetModel';
 import { StatusCell, StatusPill } from '@/modules/cerberus/StatusMarks';
 import { STATUS_TABLE } from '@/modules/cerberus/utils/cerberusStatus';
 import { hm } from '@/modules/cerberus/utils/cerberusTime';
@@ -41,7 +43,8 @@ function checkIdFor(service: CerberusServiceView, worst: string | null): string 
  *
  * The pill is the service's folded status, so its glyph and its sentence (`serviceSentence`) always
  * agree: "Session is valid — failing", "2 checks need you", "2 of 3 passing · 1 muted", "All 3 checks
- * passing", "Its check is passing".
+ * passing", "Its check is passing". While a fix runs on one of its checks (`overview.running`) the pill is
+ * the info ● and says "Fix running on its own" / "Fix running" by who started it.
  *
  * The minutes are the read model's strip, oldest on the left, each a `StatusCell` named on hover by
  * its time, its word and, when it folds several checks, the check that set it. The newest minute is
@@ -60,6 +63,9 @@ export function ServiceRow({ node, service, face, onOpenCell }: ServiceRowProps)
   const { t } = useTranslation();
   const grid = face === 'grid';
   const newest: CerberusCell | undefined = service.cells[service.cells.length - 1];
+  // The run going on one of this service's checks, which the pill speaks of in place of the service's word.
+  const { overview } = useCerberus();
+  const run = runOnService(overview?.running ?? [], node, service);
 
   /** Opens the sheet on the check a press resolves to, looked up at `lookupAt`; left out, at now. */
   const openAt = (worst: string | null, lookupAt?: number) => {
@@ -101,7 +107,7 @@ export function ServiceRow({ node, service, face, onOpenCell }: ServiceRowProps)
           )}
         </span>
         <span className="flex min-w-0 flex-[1_1_200px]">
-          <StatusPill status={service.status} text={serviceSentence(t, service)} />
+          <StatusPill status={run === null ? service.status : 'fixing'} text={serviceSentence(t, service, run)} />
         </span>
       </button>
       <span role="group" aria-label={t('cerberus.sheet.cells')} className="flex flex-none gap-0.5">

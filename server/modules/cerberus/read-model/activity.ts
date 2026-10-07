@@ -1,4 +1,5 @@
 import {
+  cerberusCatalogDb,
   cerberusDefinitionsDb,
   cerberusMutesDb,
   cerberusNodesDb,
@@ -7,16 +8,20 @@ import {
 } from '@/modules/database/index.js';
 import type { CerberusActivity, CerberusReadInputs } from '@/shared/cerberus-types.js';
 
+import { fixEvents } from './run-views.js';
 import { shownRow, statusOf } from './status-rules.js';
 
 /**
- * "What happened": the fleet's recent moments, merged newest first from three sources — a check's
- * status changing, a mute being set, lifted or running out, and a node enrolling. Later plans of the
- * arc add `fix`, `catalog`, `diagnosis` and `warden` lines; a reader switches on `kind`.
+ * "What happened": the fleet's recent moments, merged newest first from five sources — a check's
+ * status changing, a mute being set, lifted or running out, a node enrolling, the catalog changing and
+ * a fix running (`started` at its request, `ended` at its end). Later plans of the arc add `diagnosis`
+ * and `warden` lines; a reader switches on `kind`.
  *
  * Only what is already in the store is read: a transition is a `change` row that has a `prev_status`
- * and a status that differs from it (`not_enabled` spells a null on either side), and a mute's
- * three events are its own columns. Nothing is written for the feed.
+ * and a status that differs from it (`not_enabled` spells a null on either side), a mute's
+ * three events are its own columns, and a catalog event is a `catalog_changes` row — `added` is an
+ * entry written, `auto` an entry's auto-run moving to `1` (`auto_on`) or `0` (`auto_off`); a field
+ * this feed has no line for is skipped. Nothing is written for the feed.
  */
 
 /** A check's plain names, keyed `<node>/<key>` — a node id has no `/`, so the key cannot be misread. */
@@ -60,11 +65,29 @@ function muteEvents(mute: CerberusMuteRow, before: number, now: number, labels: 
   return events;
 }
 
+/**
+ * The catalog lines among `catalog_changes` rows before `before`. An entry is named by the entry's own
+ * row, retired or not — a change outlives the entry's place in the lists.
+ */
+function catalogEvents(before: number, limit: number): CerberusActivity[] {
+  const names = new Map<string, string>();
+  const events: CerberusActivity[] = [];
+  for (const change of cerberusCatalogDb.changes(before, limit)) {
+    const event =
+      change.field === 'added' ? 'added' : change.field === 'auto' ? (change.to_value === '1' ? 'auto_on' : 'auto_off') : null;
+    if (event === null) continue;
+    if (!names.has(change.entry)) names.set(change.entry, cerberusCatalogDb.get(change.entry)?.name ?? change.entry);
+    events.push({ kind: 'catalog', at: change.at, entry: change.entry, name: names.get(change.entry) ?? change.entry, event, by: change.by });
+  }
+  return events;
+}
+
 /** Newest first; at one instant, by node then check then kind, so a page is the same every time. */
 function newestFirst(a: CerberusActivity, b: CerberusActivity): number {
   if (a.at !== b.at) return b.at - a.at;
+  // A `catalog` line is about no node or check, so both parts read empty for it.
   const keyOf = (item: CerberusActivity): string =>
-    `${item.node}\u0000${'check' in item ? item.check : ''}\u0000${item.kind}`;
+    `${'node' in item ? item.node : ''}\u0000${'check' in item ? item.check : ''}\u0000${item.kind}`;
   return keyOf(a) < keyOf(b) ? -1 : keyOf(a) > keyOf(b) ? 1 : 0;
 }
 
@@ -76,8 +99,8 @@ function newestFirst(a: CerberusActivity, b: CerberusActivity): number {
  * skipped for ever. So the answer runs on to the end of the instant the `limit`-th event sits in.
  *
  * Each source is asked for `limit` of its own newest: an event in the overall top `limit` is in the
- * top `limit` of its source. That holds for transitions (the store returns whole instants) and
- * enrollments, and for mutes except where two mutes' newest events share the cut's instant —
+ * top `limit` of its source. That holds for transitions and catalog changes (the store returns whole
+ * instants) and enrollments, and for mutes except where two mutes' newest events share the cut's instant —
  * `cerberusMutesDb.recent` returns exactly `limit` mutes, so the second of such a tie is on neither
  * this page nor the next. Labels come from the active checks; a retired check's
  * events keep their key and a null label, and a check's label may be null on the screen too — the
@@ -117,6 +140,9 @@ export function activity(
   for (const mute of cerberusMutesDb.recent(before, limit)) {
     merged.push(...muteEvents(mute, before, inputs.now, labels));
   }
+
+  merged.push(...catalogEvents(before, limit));
+  merged.push(...fixEvents(before, limit));
 
   for (const node of cerberusNodesDb.list()) {
     if (node.enrolled_at < before) {

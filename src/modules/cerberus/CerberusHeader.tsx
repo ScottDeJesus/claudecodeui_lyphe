@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 
 import { useClock } from '@/modules/cerberus/hooks/useClock';
 import { useCountTo } from '@/modules/cerberus/hooks/useCountTo';
+import { RUN_LOOK } from '@/modules/cerberus/utils/cerberusStatus';
 import { hms } from '@/modules/cerberus/utils/cerberusTime';
 import { agoPhrase } from '@/modules/cerberus/utils/fleetWords';
 import type { CerberusOverview } from '@/shared/cerberus-types';
@@ -27,7 +28,8 @@ type CerberusHeaderProps = {
  * 2. the headline, the biggest thing on the tab: "All *quiet*", "One check *needs you*" or "3 checks
  *    *need you*". Its accent words are italic, never bold, since the display serif has no bold. They
  *    take the state's tone: the positive ink at quiet, the warn ink while anything needs you, so the call
- *    to act is never painted in the passing green. A headline that changes rises in afresh;
+ *    to act is never painted in the passing green. A headline that changes rises in afresh; and "One fix
+ *    *running*", its accent in the info ink, when the only check needing you has its fix running;
  * 3. the summary, "18 of 21 checks passing · 2 muted · 6 nodes · last result 2 s ago". The passing
  *    count opens on its number, counts to a new one over 1.4 s when it changes, and a screen reader
  *    hears only the number it lands on. The muted part is left out at none, and the age while center has
@@ -54,8 +56,17 @@ export function CerberusHeader({ overview, stale, onEnroll }: CerberusHeaderProp
   const shownPassing = useCountTo(counts.passing);
 
   const needs = counts.needsYou;
-  const lead = needs === 0 ? t('cerberus.header.headline.quiet') : t('cerberus.header.headline.needs', { count: needs });
-  const accent = needs === 0 ? t('cerberus.header.headline.quietAccent') : t('cerberus.header.headline.needsAccent', { count: needs });
+  // "One fix running" when the only check needing you has its fix running: its run is going, with no result yet.
+  const onlyRun = needs === 1 ? overview.needsYou[0]?.run ?? null : null;
+  const fixRunning = onlyRun !== null && onlyRun.result === null;
+  const lead = fixRunning
+    ? t('cerberus.fix.headline')
+    : needs === 0 ? t('cerberus.header.headline.quiet') : t('cerberus.header.headline.needs', { count: needs });
+  const accent = fixRunning
+    ? t('cerberus.fix.headlineAccent')
+    : needs === 0 ? t('cerberus.header.headline.quietAccent') : t('cerberus.header.headline.needsAccent', { count: needs });
+  // The accent's tone: a fix's own while one runs (the info ink), else the state's.
+  const accentTone = fixRunning ? RUN_LOOK.going.tone : needs === 0 ? 'positive' : 'warn';
   // The summary's parts after the passing count, each named so its place holds while its words change.
   const rest = [
     counts.muted > 0 ? { id: 'muted', words: t('cerberus.header.summary.muted', { count: counts.muted }) } : null,
@@ -72,7 +83,7 @@ export function CerberusHeader({ overview, stale, onEnroll }: CerberusHeaderProp
         <h1 className="min-h-[38px] font-serif text-[length:clamp(28px,7.5cqi,34px)] font-normal leading-[1.1] text-foreground">
           {/* Keyed by its words, so a headline that changes rises in afresh, as the prototype's swap does. */}
           <span key={`${lead}|${accent}`} className="inline-block motion-safe:animate-shape-rise">
-            {lead} <em data-tone={needs === 0 ? 'positive' : 'warn'} className="italic text-tone-ink">{accent}</em>
+            {lead} <em data-tone={accentTone} className="italic text-tone-ink">{accent}</em>
           </span>
         </h1>
         <p className="text-[13.5px] tabular-nums text-muted-foreground">

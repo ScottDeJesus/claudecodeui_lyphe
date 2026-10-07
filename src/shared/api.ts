@@ -5,6 +5,7 @@ import {
 } from '@/shared/authToken';
 import type { AuthTraceEvent, CerberusEnrollInput, CerberusLabelInput, CerberusMuteInput, DeepseekRange, DispatcherAsk, DispatcherModelChoice, DispatcherWipChoice, DispatcherWipLimit, FileLinePatch, JevRange, NoteInput, NtfySettingsInput, SimpleListItemRef, SimpleListPosition, SubagentTranscriptResult } from '@/shared/types';
 import type { AgentLaunchDefaultsChange, AgentLaunchRowChange } from '@/shared/agent-launch-types';
+import type { CerberusCatalogEntryInput } from '@/shared/cerberus-types';
 import type { ClaudeUpdateApplyRequest } from '@/shared/claude-update-types';
 import type { RoadmapWriteBody } from '@/shared/roadmap-types';
 import { IS_PLATFORM } from '@/shared/utils';
@@ -200,6 +201,25 @@ export async function refusalSentence(response: Response): Promise<string | null
   }
 }
 
+/**
+ * The machine-readable `error.code` of a refusal body (`PROJECT_NODE_NOT_COLOCATED`), or `null` when
+ * the body carries none or is not JSON. For the writers that treat one particular refusal as an answer
+ * of their own rather than a failure. It reads a CLONE, so `refusalSentence` can still read the body
+ * of the response it was given.
+ */
+export async function refusalCode(response: Response): Promise<string | null> {
+  try {
+    const body: unknown = await response.clone().json();
+    if (body === null || typeof body !== 'object') return null;
+    const error = (body as { error?: unknown }).error;
+    if (error === null || typeof error !== 'object') return null;
+    const code = (error as { code?: unknown }).code;
+    return typeof code === 'string' ? code : null;
+  } catch {
+    return null;
+  }
+}
+
 const get = (url: string, options: ApiRequestOptions = {}) => authenticatedFetch(url, options);
 
 const withBody =
@@ -308,7 +328,14 @@ export const api = {
   // config endpoint removed - no longer needed (frontend uses window.location)
   // After the projectName → projectId migration the path/query identifier is
   // the DB-assigned `projectId`; parameter names reflect that for clarity.
-  projects: () => get('/api/projects'),
+  projects: {
+    list: () => get('/api/projects'),
+    // Assigns a project's sessions to a node's warden, or back to this server with `null`: the next CLI a
+    // chat in the project needs is spawned there. Answers 204; a node that is not on this machine is
+    // refused with 409 `PROJECT_NODE_NOT_COLOCATED`.
+    setNode: (projectId: string, node: string | null) =>
+      put(`/api/projects/${encodeURIComponent(projectId)}/node`, { node }),
+  },
   archivedProjects: () => get('/api/projects/archived'),
   projectSessions: (
     projectId: string,
@@ -833,6 +860,16 @@ export const api = {
     setLabel: (input: CerberusLabelInput) => put('/api/cerberus/labels', input),
     enroll: (input: CerberusEnrollInput) => post('/api/cerberus/enrollments', input),
     enrollment: (name: string) => get(`/api/cerberus/enrollments/${encodeURIComponent(name)}`),
+    // The fixes (server/modules/cerberus/MANUAL.md): the catalog read answers every unretired entry; a write
+    // answers the entry it wrote, which nobody draws from (the screen is the read that follows). `runEntry`
+    // answers `{ runId }` once the warden has accepted, up to 10 s after the press; a 409 says why not
+    // (`CERBERUS_RUN_ACTIVE`: the check has a run going, `CERBERUS_NODE_SILENT`: its warden is not linked).
+    // `run(id)` is one run with every line it holds, which `useRunOutput` reads before its frames append.
+    catalog: (options: ApiRequestOptions = {}) => get('/api/cerberus/catalog', options),
+    writeEntry: (input: CerberusCatalogEntryInput) => post('/api/cerberus/catalog', input),
+    setAuto: (id: string, on: boolean) => put(`/api/cerberus/catalog/${encodeURIComponent(id)}/auto`, { on }),
+    runEntry: (id: string) => post(`/api/cerberus/catalog/${encodeURIComponent(id)}/run`, {}),
+    run: (id: string, options: ApiRequestOptions = {}) => get(`/api/cerberus/runs/${encodeURIComponent(id)}`, options),
   },
 
   // The dispatcher lane (docs/MANUAL.md (dispatcher)): the plans in the dispatcher's own store, and the

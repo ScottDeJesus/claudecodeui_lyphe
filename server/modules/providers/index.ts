@@ -18,10 +18,18 @@ export { closeSessionsWatcher } from './services/sessions-watcher.service.js';
 // the API its registry run back, before the server starts listening (D-11).
 export { readoptKeepaliveSessions, releaseKeepaliveOwnership } from './list/claude/session-host/index.js';
 
+// whenNodeSessionsReadopted: used by server/index.ts beside the boot re-adoption, so the running-sessions
+// read waits for a co-located node's hosts to be handed back (they can only be once its warden links).
+export { whenNodeSessionsReadopted } from './list/claude/session-host/index.js';
+
 // busyReason, listLiveHosts: used by the claude-activity module to ask every live Claude session host
 // the one question the idle sweep asks — is a turn or background work in flight? — and to know which
 // `claude` processes on the box are a host's own CLI.
 export { busyReason, listLiveHosts } from './list/claude/session-host/index.js';
+
+// listColocatedNodeHosts, refreshColocatedNodeHosts: used by the same module for the hosts a co-located
+// node's warden holds — their CLIs are this machine's `claude` processes too.
+export { listColocatedNodeHosts, refreshColocatedNodeHosts } from './list/claude/session-host/index.js';
 export type { LiveHost } from './list/claude/session-host/index.js';
 
 // readClaudeTranscriptBySessionId: used by the dispatch-souls module to read a launched soul's own

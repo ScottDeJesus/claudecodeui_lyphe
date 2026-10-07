@@ -1,3 +1,4 @@
+import { useLayoutEffect, useRef, type RefObject } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { StatusGlyph } from '@/modules/cerberus/StatusMarks';
@@ -16,9 +17,30 @@ type CheckRowsProps = {
 };
 
 /**
+ * Scrolls the box so the marked row is in view, centred, when it is not. It moves the box and nothing
+ * above it (`scrollIntoView` would also scroll the sheet's body), and a row already in view is left
+ * where it is, so pressing a row never makes the list jump under the pointer.
+ */
+function useRowInView(boxRef: RefObject<HTMLUListElement | null>, selectedKey: string) {
+  useLayoutEffect(() => {
+    const box = boxRef.current;
+    const row = box?.querySelector<HTMLElement>('[aria-current]');
+    if (!box || !row) return;
+    const boxRect = box.getBoundingClientRect();
+    const rowRect = row.getBoundingClientRect();
+    if (rowRect.top >= boxRect.top && rowRect.bottom <= boxRect.bottom) return;
+    box.scrollTop += rowRect.top - boxRect.top - (boxRect.height - rowRect.height) / 2;
+  }, [boxRef, selectedKey]);
+}
+
+/**
  * THE SERVICE'S CHECKS, one row each in a bordered box: the status glyph, the label over its raw id
- * (or the id alone, in mono, for a check with no label yet), and the value it reported. The row the
- * sheet shows is marked three ways, so colour is never the only sign (MAN-578): the canvas ground,
+ * (or the id alone, in mono, for a check with no label yet), and the value it reported. The box is
+ * capped at 260 px (a third of the screen's height on a short one) and scrolls inside itself: a service
+ * can hold seventy-five checks, and an uncapped list would push the check the sheet was opened for, its
+ * minutes and its lookup thousands of pixels below the fold. It opens with the marked row in view (see
+ * `useRowInView`), and a row pressed while it is in view stays put. The row the sheet shows is marked
+ * three ways, so colour is never the only sign (MAN-578): the canvas ground,
  * an accent rule on its left edge and `aria-current`.
  *
  * Each row is a button. Its accessible name reads the status word first, because the glyph names it
@@ -34,10 +56,13 @@ type CheckRowsProps = {
  */
 export function CheckRows({ checks, selectedKey, serviceName, onSelect }: CheckRowsProps) {
   const { t } = useTranslation();
+  const boxRef = useRef<HTMLUListElement>(null);
+  useRowInView(boxRef, selectedKey);
   return (
     <ul
+      ref={boxRef}
       aria-label={t('cerberus.sheet.checksOf', { service: serviceName })}
-      className="m-0 list-none divide-y divide-border overflow-hidden rounded-xl border border-border p-0"
+      className="m-0 max-h-[min(260px,32dvh)] list-none divide-y divide-border overflow-y-auto overflow-x-hidden rounded-xl border border-border p-0"
     >
       {checks.map((check) => {
         const selected = check.key === selectedKey;

@@ -1,10 +1,10 @@
 import { createContext, useContext } from 'react';
 
-import type { CerberusOverview } from '@/shared/cerberus-types';
-import type { CerberusLabelInput, CerberusMuteInput } from '@/shared/types';
+import type { CerberusCatalogEntryView, CerberusNodeProject, CerberusOverview } from '@/shared/cerberus-types';
+import type { CerberusLabelInput, CerberusMuteInput, CerberusProjectMove } from '@/shared/types';
 
 /**
- * The fleet as center's read model last answered it, and the three writes the tab presses. No
+ * The fleet as center's read model last answered it, the catalog beside it, and the writes the tab presses. No
  * component lives here: the provider is its own file so this one can be imported by anything that
  * only reads (`react(only-export-components)` would warn about a hook exported beside it).
  *
@@ -27,12 +27,38 @@ export type CerberusValue = {
    * good answer, and judged only when a read fails, never on a timer. `overview` is never null while this is true.
    */
   stale: boolean;
-  /** Reads the overview again. Resolves when the read has been answered or has failed; never rejects. */
+  /**
+   * The catalog's entries, read with the overview and kept as it keeps it. `null` until the first read answers:
+   * the Catalog draws shimmering rows then, and never an empty catalog.
+   */
+  catalog: CerberusCatalogEntryView[] | null;
+  /** True while the catalog has never been read and its last read failed. A failed read after a good one keeps the entries. */
+  catalogFailed: boolean;
+  /** Reads the overview and the catalog again. Resolves when the overview has answered or failed (the catalog follows, and never holds a write's verdict back); never rejects. */
   refresh: () => Promise<void>;
   /** Each write answers `true` when it landed — and by then the overview has been re-read. On `false` it has already raised the toast. */
   mute: (input: CerberusMuteInput) => Promise<boolean>;
   liftMute: (id: string) => Promise<boolean>;
   setLabel: (input: CerberusLabelInput) => Promise<boolean>;
+  /**
+   * Runs a project's Claude chats on a node's warden (`node` the node's id), or back on this server
+   * (`null`). Resolves to what `NodeProjects` draws from: `moved` (the overview has been re-read and a
+   * toast has said so), `refused` (409 `PROJECT_NODE_NOT_COLOCATED`: no toast, the section's banner says it)
+   * or `failed` (the write's own toast has said it). Never rejects.
+   */
+  setProjectNode: (project: CerberusNodeProject, node: string | null) => Promise<CerberusProjectMove>;
+  /**
+   * The catalog entries whose Run press is still out (none: empty). Center answers a run once the warden has
+   * accepted it (up to 10 s), and each press reads "Running…" for all of that wait, in every place it is drawn.
+   */
+  starting: readonly string[];
+  /**
+   * Runs a catalog entry now, by you. Answers `true` when it started, and by then the overview holds the
+   * run; on `false` the toast has said why (a run already going on the check, the node's warden not linked).
+   */
+  runEntry: (id: string) => Promise<boolean>;
+  /** Switches an entry's auto-run on or off. Answers `true` when it landed, with the catalog re-read; a capped entry is refused and the toast says so. */
+  setAuto: (id: string, on: boolean) => Promise<boolean>;
 };
 
 export const CerberusContext = createContext<CerberusValue | null>(null);

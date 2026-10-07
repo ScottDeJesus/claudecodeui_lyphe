@@ -451,6 +451,25 @@ export const ROADMAP_LANDING_PARAM = 'roadmap';
 
 // ---------------------------
 
+//----------------- ZOOM GESTURES ------------
+
+/** What one press of a `+` / `−` zoom button multiplies the zoom by. Used by the kit's Lightbox (`useZoomPan`) and the roadmap module's tree zoom (`useTreeZoom`), so both buttons step alike. */
+export const ZOOM_BUTTON_STEP = 1.5;
+
+/** The zoom a double-click or double-tap lands on when it zooms in from fit. Used by `useZoomPan` and `useTreeZoom`. */
+export const ZOOM_DOUBLE_TAP_SCALE = 2;
+
+/** How far a press may travel, in px, and still be a tap rather than a pan. Used by `useZoomPan` and `useTreeZoom`. */
+export const ZOOM_TAP_SLOP_PX = 6;
+
+/** Two taps this close in time, in ms, and within `ZOOM_DOUBLE_TAP_RADIUS_PX`, are a double-tap. Used by `useZoomPan` and `useTreeZoom`. */
+export const ZOOM_DOUBLE_TAP_WINDOW_MS = 320;
+
+/** The distance, in px, within which a second tap counts as a double-tap of the first. Used by `useZoomPan` and `useTreeZoom`. */
+export const ZOOM_DOUBLE_TAP_RADIUS_PX = 32;
+
+// ---------------------------
+
 //----------------- FOCUS TRAPS ------------
 
 /**

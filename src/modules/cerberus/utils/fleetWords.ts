@@ -8,7 +8,7 @@ import type { TFunction } from 'i18next';
 
 import { STATUS_TABLE } from '@/modules/cerberus/utils/cerberusStatus';
 import { agoParts, hm } from '@/modules/cerberus/utils/cerberusTime';
-import type { CerberusNodeView, CerberusServiceView, CerberusStatus } from '@/shared/cerberus-types';
+import type { CerberusNodeView, CerberusRunView, CerberusServiceView, CerberusStatus } from '@/shared/cerberus-types';
 import type { FleetItem } from '@/shared/types';
 
 /** The words a check needs a person for: the three the read model counts in `needsYou`. */
@@ -30,8 +30,14 @@ export function agoPhrase(t: TFunction, ms: number, now: number): string {
   return t(`cerberus.time.${key}`, { count: parts.n });
 }
 
+/** "Fix running on its own" or "Fix running", by who started the run: a node's line, a service's pill and a square's name. */
+function fixingSentence(t: TFunction, by: 'auto' | 'you' | null): string {
+  return t(by === 'auto' ? 'cerberus.fix.fleet.runningAuto' : 'cerberus.fix.fleet.running');
+}
+
 /**
  * What a service row's pill says, and the name of the service's square in a collapsed card:
+ * - a fix running on one of its checks (`run`, from `runOnService`): "Fix running on its own" / "Fix running";
  * - one check needs you: "<its label> — failing" (its key when it has no label);
  * - more: "2 checks need you";
  * - no result: "Its check has no result", "No result from its 2 checks", or "1 of 3 passing · 2 no result";
@@ -39,10 +45,12 @@ export function agoPhrase(t: TFunction, ms: number, now: number): string {
  * - passing but for a mute: "2 of 3 passing · 1 muted";
  * - every check switched off on the service's own side: the status word, "Not enabled";
  * - passing: "Its check is passing", "All 3 checks passing".
- * The service's folded status picks the case, so the pill's glyph and its words never disagree. A
- * switched-off check is in no count, as the read model has it ("never counted in “of N checks”").
+ * The service's folded status picks the case, so the pill's glyph and its words never disagree; a run
+ * going takes the pill's glyph too (●). A switched-off check is in no count, as the read model has it
+ * ("never counted in “of N checks”").
  */
-export function serviceSentence(t: TFunction, service: CerberusServiceView): string {
+export function serviceSentence(t: TFunction, service: CerberusServiceView, run: CerberusRunView | null = null): string {
+  if (run !== null) return fixingSentence(t, run.by);
   const { counts } = service;
   switch (service.status) {
     case 'warn':
@@ -74,6 +82,7 @@ export function serviceSentence(t: TFunction, service: CerberusServiceView): str
  * The one line under a node's name, in a collapsed card, a list row and the rings:
  * - its warden has not said hello and nothing is assigned: "Waiting for the first heartbeat";
  * - nothing assigned: "Nothing assigned yet";
+ * - a fix running on one of its services: "Fix running on its own" / "Fix running";
  * - its warden restarting for an update: "Warden restarting";
  * - passing but for a mute: "Passing · muted check";
  * - passing: "Its service is passing", "All 3 services passing";
@@ -100,9 +109,11 @@ export function nodeLine(t: TFunction, item: FleetItem, node: CerberusNodeView):
       const worst = node.services.find((service) => service.status === status) ?? node.services[0];
       return t('cerberus.node.bad', { label: worst.label ?? worst.service, word: lowerWord(t, status) });
     }
+    case 'fixing':
+      return fixingSentence(t, item.fixBy);
     default:
-      // `fixing`, `enrolling` and `empty` are the fixes and updates plans' places; nothing feeds them
-      // yet, and a node with services is never `empty`. Each plan writes its own line here.
+      // `enrolling` is the updates plan's place and nothing feeds it yet, and a node with services is
+      // never `empty`. That plan writes its own line here.
       return t('cerberus.node.nothingAssigned');
   }
 }
@@ -134,4 +145,19 @@ export function wardenLine(t: TFunction, node: CerberusNodeView, now: number): s
   }
   if (isRestarting(node)) return t('cerberus.node.wardenRestarting', { version });
   return t('cerberus.node.heard', { version, ago: agoPhrase(t, node.lastHeardAt, now) });
+}
+
+/**
+ * The tail of a warden line that says how many chats the node's warden is hosting: " · 2 sessions
+ * running here", or `null` when there is nothing to say. Said only while the warden reports and has
+ * sessions: a silent warden's last list is a count nobody has confirmed since it went quiet, and the hub
+ * has no warden. It is drawn right after `wardenLine`, in the same run of text. A no-break space binds
+ * the dot to the phrase and the phrase's own words to each other, so on a phone the line breaks before
+ * the dot and the phrase wraps whole, never leaving "here" alone on a line.
+ */
+export function sessionsTail(t: TFunction, node: CerberusNodeView): string | null {
+  // Written as "is not a positive count", so a view with no `sessions` (an older API answering a newer
+  // client) says nothing, where `sessions <= 0` would have called `undefined` a count and drawn a raw key.
+  if (node.link !== 'reporting' || !(node.sessions > 0)) return null;
+  return ` ·\u00a0${t('cerberus.node.sessions', { count: node.sessions })}`;
 }

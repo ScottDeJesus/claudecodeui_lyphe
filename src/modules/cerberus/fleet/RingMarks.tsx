@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next';
 
-import { nodeMark, STATUS_TABLE } from '@/modules/cerberus/utils/cerberusStatus';
+import { FLEET_FIXING_LOOK, markLook, nodeMark, STATUS_TABLE } from '@/modules/cerberus/utils/cerberusStatus';
 import type { CerberusCellShape, FleetItem, FleetStatus } from '@/shared/types';
 import { cn } from '@/shared/utils';
 
@@ -56,7 +56,8 @@ const SELECTED_RING = 'ring-2 ring-foreground ring-offset-2 ring-offset-card';
 /**
  * A node as a round dot: its word's shape (`DOT_PAINT`), its tone through `data-tone`. While the node is
  * failing the dot rings with `cerberus-ring-warn`, the halo its glyph wears in the cards; selected, it
- * wears the ink ring instead, as both are a box-shadow. It swells under a hovered `group`, the button the
+ * wears the ink ring instead, as both are a box-shadow. A fix running is the info dot, filled, and it
+ * pulses in the ring's place. It swells under a hovered `group`, the button the
  * rings wrap it in. `still` is for the key, whose swatch explains a look and must not ask for one. The
  * dot is decoration: the button around it, or the key's words beside it, name it.
  *
@@ -70,7 +71,7 @@ export function RingDot({ status, size, selected = false, still = false }: {
   still?: boolean;
 }) {
   const mark = nodeMark(status);
-  const look = mark === null ? null : STATUS_TABLE[mark];
+  const look = mark === null ? null : markLook(mark);
   return (
     <span
       aria-hidden
@@ -81,6 +82,7 @@ export function RingDot({ status, size, selected = false, still = false }: {
         look === null ? UNMARKED_DOT : DOT_PAINT[look.cell],
         selected && SELECTED_RING,
         mark === 'failing' && !selected && !still && 'motion-safe:animate-cerberus-ring-warn',
+        mark === 'fixing' && !selected && !still && FLEET_FIXING_LOOK.glyphMotion,
       )}
     />
   );
@@ -103,7 +105,7 @@ export function RingHub({ hub, selected, label, onPress }: {
 }) {
   const { t } = useTranslation();
   const mark = nodeMark(hub.status);
-  const look = mark === null ? null : STATUS_TABLE[mark];
+  const look = mark === null ? null : markLook(mark);
   return (
     <button
       type="button"
@@ -130,9 +132,9 @@ export function RingHub({ hub, selected, label, onPress }: {
 const KEY: { status: FleetStatus; wordKey: string }[] = [
   { status: 'ok', wordKey: STATUS_TABLE.ok.wordKey },
   { status: 'failing', wordKey: 'cerberus.fleet.rings.legend.needs' },
-  // SLOT: fixing — the fixes and updates plans add "Fix running or updating" here, second after Needs you as
-  // the prototype's key orders it, with the info dot their words draw, once something feeds `fixing` or
-  // `enrolling`.
+  // Second after Needs you, as the prototype's key orders it (`Cerberus Tab.dc.html` :273); the updates plan's
+  // `enrolling` shares this row and its words.
+  { status: 'fixing', wordKey: 'cerberus.fix.fleet.legend' },
   { status: 'unknown', wordKey: 'cerberus.fleet.rings.legend.unknown' },
   { status: 'muted', wordKey: STATUS_TABLE.muted.wordKey },
 ];

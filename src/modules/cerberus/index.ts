@@ -15,7 +15,8 @@ export { useCerberusNeeds } from '@/modules/cerberus/context/CerberusContext';
 
 // The Cerberus tab's pane, mounted by src/modules/project-workspace (WorkspaceMain): the fleet's
 // health under its header, Fleet and History beneath, with the check sheet and the Mute and Enroll
-// dialogs over them.
+// dialogs over them. It takes the workspace's `projectChoices`, which a co-located node's card offers
+// in "Run a project here": the workspace owns that list and imports this module, so it is handed down.
 // Lazy: the panel is its tab's whole tree and loads on the tab's first open, so importing this
 // barrel for anything else never pulls the panel into the first page load.
 export const CerberusPanel = lazy(() => import('@/modules/cerberus/CerberusPanel').then((m) => ({ default: m.CerberusPanel })));

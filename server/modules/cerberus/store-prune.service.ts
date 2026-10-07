@@ -1,12 +1,14 @@
-import { cerberusEnrollDb, cerberusResultsDb } from '@/modules/database/index.js';
+import { cerberusEnrollDb, cerberusResultsDb, cerberusRunsDb } from '@/modules/database/index.js';
 
 /**
  * The store's one housekeeping job: once a day, forget what nothing reads any more.
  *
- * Only two things are ever deleted, and both are bookkeeping rather than history: KEEPALIVE rows
+ * Only three things are ever deleted, and all are bookkeeping rather than history: KEEPALIVE rows
  * older than 90 days (the copies ingest writes every five minutes to say "still the same" — a
- * `change` row, which is what a past moment is read from, is never touched) and enrollment tokens
- * older than 30 days, spent or not (a token is good for 15 minutes; after a month it only clutters).
+ * `change` row, which is what a past moment is read from, is never touched), enrollment tokens
+ * older than 30 days, spent or not (a token is good for 15 minutes; after a month it only clutters),
+ * and the OUTPUT of runs asked for more than 90 days ago ("Runs forever · output 90 days": the
+ * `runs` row, which says what ran and how it ended, stays; only its lines go).
  * Each is one statement, so the write lock is held for the length of a `DELETE`, not of a sweep.
  *
  * The first run is a minute after start, so a boot never pays for it; the next ones follow a day
@@ -21,6 +23,7 @@ const FIRST_RUN_DELAY_MS = 60_000;
 const RUN_INTERVAL_MS = 24 * 60 * 60 * 1000;
 const KEEPALIVE_RETENTION_MS = 90 * RUN_INTERVAL_MS;
 const TOKEN_RETENTION_MS = 30 * RUN_INTERVAL_MS;
+const RUN_OUTPUT_RETENTION_MS = 90 * RUN_INTERVAL_MS;
 
 let pruneTimer: NodeJS.Timeout | null = null;
 
@@ -29,7 +32,10 @@ function pruneOnce(): void {
   try {
     const keepalives = cerberusResultsDb.pruneKeepalivesBefore(now - KEEPALIVE_RETENTION_MS);
     const tokens = cerberusEnrollDb.pruneOlderThan(now - TOKEN_RETENTION_MS);
-    console.log(`[Cerberus] pruned ${keepalives} keepalive row(s) and ${tokens} enrollment token(s)`);
+    const runOutputLines = cerberusRunsDb.pruneOutputBefore(now - RUN_OUTPUT_RETENTION_MS);
+    console.log(
+      `[Cerberus] pruned ${keepalives} keepalive row(s), ${tokens} enrollment token(s) and ${runOutputLines} run output line(s)`
+    );
   } catch (error) {
     console.error(`[Cerberus] the daily prune failed: ${error instanceof Error ? error.message : String(error)}`);
   }
@@ -50,7 +56,7 @@ export function startDailyPrune(): void {
   scheduleRun(FIRST_RUN_DELAY_MS);
 }
 
-/** Stops the prune; one already running finishes (it is a single synchronous statement pair). */
+/** Stops the prune; one already running finishes (it is three synchronous statements). */
 export function stopDailyPrune(): void {
   if (pruneTimer) clearTimeout(pruneTimer);
   pruneTimer = null;

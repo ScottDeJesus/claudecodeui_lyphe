@@ -15,19 +15,27 @@ const GOAL_MARGIN = 200;
 type PaneView = { left: number; width: number };
 
 /**
- * Scrolls the pane sideways so the mark of the node keyed `key` stands at its centre, when that node is not wholly
- * inside the pane's visible width; does nothing when it is, or when the pane draws no such node. The node's mark (a
- * ring, or a dot's hit circle) is its first child: it is what the reader looks for. `scrollTo` is given a `left`
- * alone, so the pane never moves down.
+ * Scrolls the pane so the mark of the node keyed `key` stands at its centre on each axis along which that node is not
+ * wholly inside the pane's visible box; does nothing when it is inside on both, or when the pane draws no such node.
+ * An axis the node is inside on is left alone, so a node out of view below is brought up without the pane moving
+ * sideways. The node's mark (a ring, or a dot's hit circle) is its first child: it is what the reader looks for.
+ * Down is reachable only while the pane overflows downward (a floored fit, or a zoom); where it does not, the
+ * browser holds `top` at 0.
  */
 function centreNodeIn(pane: HTMLElement, key: string, behavior: ScrollBehavior): void {
   const node = pane.querySelector(`[data-tree-key="${CSS.escape(key)}"]`);
   if (node === null) return;
   const shown = pane.getBoundingClientRect();
   const box = node.getBoundingClientRect();
-  if (box.left >= shown.left && box.right <= shown.right) return;
+  const insideX = box.left >= shown.left && box.right <= shown.right;
+  const insideY = box.top >= shown.top && box.bottom <= shown.bottom;
+  if (insideX && insideY) return;
   const mark = (node.firstElementChild ?? node).getBoundingClientRect();
-  pane.scrollTo({ left: pane.scrollLeft + (mark.left + mark.width / 2) - (shown.left + shown.width / 2), behavior });
+  pane.scrollTo({
+    left: insideX ? pane.scrollLeft : pane.scrollLeft + (mark.left + mark.width / 2) - (shown.left + shown.width / 2),
+    top: insideY ? pane.scrollTop : pane.scrollTop + (mark.top + mark.height / 2) - (shown.top + shown.height / 2),
+    behavior,
+  });
 }
 
 type TreePaneInput = {
@@ -36,6 +44,8 @@ type TreePaneInput = {
   layout: TreeLayout;
   /** The drawing's scale: the svg is drawn `layout.width × scale` wide. */
   scale: number;
+  /** The user's zoom, one factor of `scale`: a scale change that comes with a new zoom is placed by `useTreeZoom`, not here. */
+  zoom: number;
   /** The roadmap on screen: the opening scroll is keyed on its name, never on a new frame of it. */
   roadmapName: string;
   /** The name of the roadmap's current milestone; null when every milestone is reached. */
@@ -60,17 +70,19 @@ type TreePaneInput = {
  *   reader who has moved along it. A pane with no width (the gutter's widget stays mounted under every other
  *   tab, `display: none`) cannot take a scroll, so its opening is owed: the pane's resize observer runs it the
  *   moment the pane gains a width.
- * - THE SELECTION SCROLL. When the selected node is not wholly inside the pane's visible width, the pane scrolls
- *   sideways to centre its mark, smooth, or instant under `prefers-reduced-motion: reduce`. `scrollTo` takes a
- *   `left` alone, so it never scrolls down, and the goal, which is always in view, is left alone. The commit
- *   of an opening has had its say (above), so it runs no selection scroll of its own.
+ * - THE SELECTION SCROLL. When the selected node is not wholly inside the pane's visible box, the pane scrolls to
+ *   centre its mark on each axis the node is out on (down only while the pane overflows downward: a floored fit or
+ *   a zoom), smooth, or instant under `prefers-reduced-motion: reduce`. The goal, which is always in view, is left
+ *   alone. The commit of an opening has had its say (above), so it runs no selection scroll of its own.
  * - THE SCALE. A new scale resizes the drawing under the pane, so the drawing's x at the pane's centre is held
  *   across it (while the pane overflowed), and a view the opening set stays on the milestone it set it on when
- *   the face's measured height arrives a frame after the tree.
+ *   the face's measured height arrives a frame after the tree. That hold is for a scale that moves WITHOUT the
+ *   user's zoom (a resize, the face's height arriving). A zoom is placed about the point it was made at by
+ *   `useTreeZoom`, whose layout effect runs first; this hook then only reads the pane it left.
  *
  * Returns the goal's x in the drawing. Used by the roadmap module's tree, `tree/RoadmapTree`.
  */
-export function useTreePane({ paneRef, layout, scale, roadmapName, current, selected }: TreePaneInput): number {
+export function useTreePane({ paneRef, layout, scale, zoom, roadmapName, current, selected }: TreePaneInput): number {
   // What the pane showed when last read, once per animation frame: the goal's x derives from it. Not derivable
   // at render: only the DOM knows how far the reader has scrolled and how wide the pane is. Null until first read.
   const [view, setView] = useState<PaneView | null>(null);
@@ -99,14 +111,21 @@ export function useTreePane({ paneRef, layout, scale, roadmapName, current, sele
     setView((held) => (held !== null && held.left === next.left && held.width === next.width ? held : next));
   }, [paneRef]);
 
-  // The scale: hold the drawing's centre. Declared before the opening, which wins when both run in one commit.
+  // The zoom as of the last commit: a scale change that arrives with another zoom is the zoom hook's to place.
+  const zoomHeld = useRef(zoom);
+
+  // The scale: hold the drawing's centre across a change that is not a zoom. A zoom has been placed already, by
+  // `useTreeZoom`'s layout effect (it runs first), so it only refreshes the reading. Declared before the opening,
+  // which wins when both run in one commit.
   useLayoutEffect(() => {
     const pane = paneRef.current;
+    const zoomed = zoomHeld.current !== zoom;
+    zoomHeld.current = zoom;
     const anchor = anchorRef.current;
-    if (pane === null || anchor === null) return;
-    pane.scrollTo({ left: anchor * scale - pane.clientWidth / 2, behavior: 'instant' });
-    read();
-  }, [paneRef, scale, read]);
+    if (pane === null) return;
+    if (!zoomed && anchor !== null) pane.scrollTo({ left: anchor * scale - pane.clientWidth / 2, behavior: 'instant' });
+    if (zoomed || anchor !== null) read();
+  }, [paneRef, scale, zoom, read]);
 
   // The opening: set the pane on the current milestone (or the held selection). A pane with no width cannot take it, so it is owed until one arrives.
   const open = useCallback(() => {

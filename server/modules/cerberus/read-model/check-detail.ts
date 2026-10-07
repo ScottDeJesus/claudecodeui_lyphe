@@ -7,9 +7,11 @@ import type {
 } from '@/shared/cerberus-types.js';
 
 import { buildCheckCells, stripStart } from './cells.js';
+import { fixesOfCheck } from './catalog-views.js';
 import { buildCheckView, findActiveCheck } from './check-views.js';
 import { lookupOfCheck } from './lookup.js';
 import { silentSinceOf } from './node-links.js';
+import { sheetRunOf } from './run-views.js';
 import { loadSeries } from './series.js';
 import { storedStatusOf } from './status-rules.js';
 
@@ -84,6 +86,9 @@ export function checkDetail(
     cells: buildCheckCells(stripSeries, silentSince, stripEnd, DETAIL_CELLS),
     recent,
     lookup: lookupOfCheck(check, lookupAt ?? stripEnd, inputs),
+    fixes: fixesOfCheck(node, key),
+    // As of now, whatever `end` the strip stands at: the sheet shows the fix beside the reading it produced.
+    run: sheetRunOf(node, key, now),
   };
 }
 

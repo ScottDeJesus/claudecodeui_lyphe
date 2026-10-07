@@ -10,7 +10,8 @@ import { useHostWindow } from '@/shared/context/HostWindowContext';
  * The tick runs on the window the reader is looking at (`useHostWindow()`): a hidden opener throttles
  * its timers to about one a minute, and a seconds clock would stutter in a floating window.
  *
- * Used by `CerberusHeader`, the one place on the tab whose words move with the second.
+ * Used by `CerberusHeader`, whose words move with the second, by `FixOutput`, which counts a running fix's
+ * seconds, and by `CatalogView`, which only needs to know when an entry's hour as new is up.
  */
 export function useClock(tickMs = 1000): number {
   const hostWindow = useHostWindow();

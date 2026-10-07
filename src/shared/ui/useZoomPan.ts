@@ -1,33 +1,13 @@
 import { type PointerEvent as ReactPointerEvent, useCallback, useEffect, useRef, useState } from 'react';
 
+import { ZOOM_BUTTON_STEP, ZOOM_DOUBLE_TAP_RADIUS_PX, ZOOM_DOUBLE_TAP_SCALE, ZOOM_DOUBLE_TAP_WINDOW_MS, ZOOM_TAP_SLOP_PX } from '@/shared/constants';
 import { useHostWindow } from '@/shared/context/HostWindowContext';
-import { resizeObserverIn } from '@/shared/utils';
+import { resizeObserverIn, wheelZoomRatio } from '@/shared/utils';
 
 /** Fit-to-screen is the floor: a viewer that zooms OUT past fit only shows more backdrop. */
 const MIN_SCALE = 1;
 /** Eight times fit: enough to read the smallest label of a large diagram on a laptop. */
 const MAX_SCALE = 8;
-/** What one press of `+` / `−` multiplies the scale by. */
-const BUTTON_STEP = 1.5;
-/** Where a double-click or double-tap lands when it zooms in. */
-const DOUBLE_TAP_SCALE = 2;
-/** How far a press may travel and still be a tap rather than a pan. */
-const TAP_SLOP_PX = 6;
-/** Two taps this close in time, and within DOUBLE_TAP_RADIUS_PX, are a double-tap. */
-const DOUBLE_TAP_WINDOW_MS = 320;
-const DOUBLE_TAP_RADIUS_PX = 32;
-/** Exponential zoom rate per wheel-delta pixel: a 100px mouse-wheel notch is about 25%. */
-const WHEEL_ZOOM_RATE = 0.0022;
-/** A trackpad pinch arrives as `ctrl`+wheel with small deltas, so it needs a steeper rate. */
-const PINCH_WHEEL_ZOOM_RATE = 0.01;
-/**
- * The most a single `ctrl`+wheel event may zoom by, in delta pixels. A pinch sends many events of a
- * few pixels each, but a mouse-wheel notch with Ctrl held is one event of 100 or more — at the
- * pinch rate that is 2.7× per notch, two notches from the ceiling. Capped, it lands beside a plain notch.
- */
-const PINCH_WHEEL_MAX_DELTA_PX = 25;
-/** Firefox reports wheel deltas in lines; this converts them to the pixels the rates above expect. */
-const LINE_DELTA_PX = 16;
 
 /**
  * Where the content sits: `x`/`y` are the translation from the stage centre in CSS pixels, applied
@@ -122,8 +102,8 @@ export function useZoomPan() {
     commit(next);
   }, [commit]);
 
-  const zoomIn = useCallback(() => transform(BUTTON_STEP, CENTRE, 0, 0, true), [transform]);
-  const zoomOut = useCallback(() => transform(1 / BUTTON_STEP, CENTRE, 0, 0, true), [transform]);
+  const zoomIn = useCallback(() => transform(ZOOM_BUTTON_STEP, CENTRE, 0, 0, true), [transform]);
+  const zoomOut = useCallback(() => transform(1 / ZOOM_BUTTON_STEP, CENTRE, 0, 0, true), [transform]);
   const fit = useCallback(() => commit({ ...FIT, animated: true }), [commit]);
 
   // A resize or a phone turned on its side moves the clamp under a view that was legal a moment
@@ -150,10 +130,7 @@ export function useZoomPan() {
     if (!surface) return undefined;
     const handleWheel = (event: WheelEvent) => {
       event.preventDefault();
-      const deltaPx = event.deltaY * (event.deltaMode === WheelEvent.DOM_DELTA_LINE ? LINE_DELTA_PX : 1);
-      const zoomPx = event.ctrlKey ? clamp(deltaPx, -PINCH_WHEEL_MAX_DELTA_PX, PINCH_WHEEL_MAX_DELTA_PX) : deltaPx;
-      const rate = event.ctrlKey ? PINCH_WHEEL_ZOOM_RATE : WHEEL_ZOOM_RATE;
-      transform(Math.exp(-zoomPx * rate), toStagePoint(event.clientX, event.clientY), 0, 0, false);
+      transform(wheelZoomRatio(event), toStagePoint(event.clientX, event.clientY), 0, 0, false);
     };
     surface.addEventListener('wheel', handleWheel, { passive: false });
     return () => surface.removeEventListener('wheel', handleWheel);
@@ -175,7 +152,7 @@ export function useZoomPan() {
       if (pointers.current.size === 1) {
         // Below the slop the press is still a tap; `previous` stays the press point, so the first pan
         // step after the slop is measured from where the finger came down and nothing lurches.
-        if (!state.moved && Math.hypot(current.x - state.startX, current.y - state.startY) < TAP_SLOP_PX) return;
+        if (!state.moved && Math.hypot(current.x - state.startX, current.y - state.startY) < ZOOM_TAP_SLOP_PX) return;
         state.moved = true;
         pointers.current.set(event.pointerId, current);
         transform(1, CENTRE, current.x - previous.x, current.y - previous.y, false);
@@ -208,8 +185,8 @@ export function useZoomPan() {
 
       // A tap. Two of them close together in time and place are a double-tap, on a mouse as well as
       // a finger: detected here rather than from `dblclick`, which a touch screen does not send.
-      const isDoubleTap = event.timeStamp - state.lastTapAt < DOUBLE_TAP_WINDOW_MS
-        && Math.hypot(event.clientX - state.lastTapX, event.clientY - state.lastTapY) < DOUBLE_TAP_RADIUS_PX;
+      const isDoubleTap = event.timeStamp - state.lastTapAt < ZOOM_DOUBLE_TAP_WINDOW_MS
+        && Math.hypot(event.clientX - state.lastTapX, event.clientY - state.lastTapY) < ZOOM_DOUBLE_TAP_RADIUS_PX;
       if (!isDoubleTap) {
         state.lastTapAt = event.timeStamp;
         state.lastTapX = event.clientX;
@@ -220,7 +197,7 @@ export function useZoomPan() {
       if (viewRef.current.scale > MIN_SCALE) {
         commit({ ...FIT, animated: true });
       } else {
-        transform(DOUBLE_TAP_SCALE / viewRef.current.scale, toStagePoint(event.clientX, event.clientY), 0, 0, true);
+        transform(ZOOM_DOUBLE_TAP_SCALE / viewRef.current.scale, toStagePoint(event.clientX, event.clientY), 0, 0, true);
       }
     };
 
