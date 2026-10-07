@@ -13,12 +13,14 @@
  *   process. Which is which is decided here, in one place, from the SDK's real surface: `setModel`,
  *   `applyFlagSettings` (effort) and `setPermissionMode` are live, and so is GROWING the allowed
  *   tool list (a newly allowed tool merely reaches `canUseTool`, which reads the live options).
- *   cwd, MCP servers, a resume anchor, a conversation restarted from scratch, any change to the
- *   disallowed list (it shapes the model's tool context at launch), a SHRUNK allowed list (the
- *   CLI holds the launch list as allow rules it resolves before ever asking `canUseTool`) and the
- *   installed CLI version (a running process is the build it was started with) are launch
- *   arguments and are not. The version is the one launch argument that is ORDERED rather than
- *   compared: only a process behind the binary is replaced, never one ahead of a reading.
+ *   cwd, MCP servers — and who each is signed in as (mcp-sign-in.ts: a CLI reads its tokens once,
+ *   at launch, so a sign-in made mid-chat is invisible to it) — a resume anchor, a conversation
+ *   restarted from scratch, any change to the disallowed list (it shapes the model's tool context
+ *   at launch), a SHRUNK allowed list (the CLI holds the launch list as allow rules it resolves
+ *   before ever asking `canUseTool`) and the installed CLI version (a running process is the build
+ *   it was started with) are launch arguments and are not. The version is the one launch argument
+ *   that is ORDERED rather than compared: only a process behind the binary is replaced, never one
+ *   ahead of a reading.
  *
  * consumer: claude-runtime.provider.js, session-host/idle-version-sweep.ts (the version rule)
  */
@@ -160,6 +162,12 @@ export type LaunchProfile = {
   resumeSessionAt: string | null;
   /** The MCP map as JSON, '' for none — or null when the config could not be read this time. */
   mcpServers: string | null;
+  /**
+   * Per MCP server, a digest of who it is signed in as (mcp-sign-in.ts) — `{}` for none, null when
+   * the sign-in store could not be read this time, and absent on a profile a session host recorded
+   * before this field existed. Never a token.
+   */
+  mcpSignIn: Record<string, string> | null;
   permissionMode: string;
   launchedInBypass: boolean;
   model: string;
@@ -194,7 +202,8 @@ export function launchProfileOf(
   sdkOptions: SdkOptionsShape,
   mcpUnreadable = false,
   unknown = false,
-  cliVersion: string | null = null
+  cliVersion: string | null = null,
+  mcpSignIn: Record<string, string> | null = null
 ): LaunchProfile {
   const permissionMode = sdkOptions.permissionMode ?? 'default';
   return {
@@ -202,6 +211,7 @@ export function launchProfileOf(
     cwd: sdkOptions.cwd ?? null,
     resumeSessionAt: sdkOptions.resumeSessionAt ?? null,
     mcpServers: mcpUnreadable ? null : sdkOptions.mcpServers ? JSON.stringify(sdkOptions.mcpServers) : '',
+    mcpSignIn,
     permissionMode,
     launchedInBypass: permissionMode === 'bypassPermissions',
     model: sdkOptions.model ?? '',
@@ -224,6 +234,18 @@ export type LivePlan = { respawn: string; changes: null } | { respawn: null; cha
 
 const sameList = (a: string[], b: string[]): boolean =>
   a.length === b.length && a.every((entry, index) => entry === b[index]);
+
+/**
+ * The MCP servers whose sign-in differs between two profiles. Only a server BOTH sides have a
+ * reading for is compared: an unread side is "not heard" (the same rule as an unreadable MCP
+ * config), and a server added or dropped is the MCP-configuration reason, not a sign-in one.
+ */
+function reSignedInServers(live: LaunchProfile, next: LaunchProfile): string[] {
+  const before = live.mcpSignIn;
+  const after = next.mcpSignIn;
+  if (!before || !after) return [];
+  return Object.keys(after).filter((name) => name in before && before[name] !== after[name]);
+}
 
 /**
  * Decides whether the next message can go into the running process, and what to apply to it
@@ -265,6 +287,12 @@ export function planLiveChanges(
   // An unreadable config (a write in progress) is not a changed one; only a read map compares.
   if (next.mcpServers !== null && next.mcpServers !== live.mcpServers) {
     return { respawn: 'the MCP server configuration changed', changes: null };
+  }
+  // A sign-in lives in the credentials file, not the MCP config, and the process read it once at
+  // launch: a server signed in (or out) since then stays "needs authentication" until replaced.
+  const reSignedIn = reSignedInServers(live, next);
+  if (reSignedIn.length > 0) {
+    return { respawn: `the sign-in of MCP server ${reSignedIn.join(', ')} changed`, changes: null };
   }
   if (next.permissionMode === 'bypassPermissions' && !live.launchedInBypass) {
     return { respawn: 'bypassing permissions needs a process launched that way', changes: null };

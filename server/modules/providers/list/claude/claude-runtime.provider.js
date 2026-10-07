@@ -53,6 +53,7 @@ import {
 } from './chat-process.js';
 import { createSignalState, detectRuntimeSignals } from './claude-runtime-signals.js';
 import { installedCliVersionForLaunch } from './installed-cli-version.js';
+import { readMcpSignIn } from './mcp-sign-in.js';
 import { SURFACE_ENV, SURFACE_PROMPT_APPEND } from './surface-signal.js';
 
 const activeSessions = new Map();
@@ -812,7 +813,11 @@ async function resolveSdkOptions(options, context) {
   if (mcpServers && !mcpUnreadable) {
     sdkOptions.mcpServers = mcpServers;
   }
-  return { sdkOptions, mcpUnreadable };
+  // Read from the config dir this process's own env names, for the servers it was given plus the
+  // ones the CLI loads itself (mcp-sign-in.ts). With the MCP map unreadable there is no list of
+  // servers to read for, so there is no reading.
+  const mcpSignIn = mcpUnreadable ? null : await readMcpSignIn(sdkOptions.mcpServers, sdkOptions.cwd, sdkOptions.env);
+  return { sdkOptions, mcpUnreadable, mcpSignIn };
 }
 
 /**
@@ -830,7 +835,7 @@ async function joinProcess(live, command, options, ws, context) {
   const installedCliVersion = typeof live.profile?.cliVersion === 'string'
     ? await installedCliVersionForLaunch()
     : null;
-  const next = launchProfileOf(resolved.sdkOptions, resolved.mcpUnreadable, false, installedCliVersion);
+  const next = launchProfileOf(resolved.sdkOptions, resolved.mcpUnreadable, false, installedCliVersion, resolved.mcpSignIn);
   const plan = planLiveChanges(live.profile, next, { resumeFromScratch: options.resumeFromScratch === true });
   if (plan.respawn) {
     console.log(`[Claude SDK] Replacing the process for session ${sessionId}: ${plan.respawn}`);
@@ -1104,6 +1109,10 @@ async function spawnProcess(command, options, initialWs, context) {
         profile.allowedTools = [...changes.tools.allowed];
         profile.disallowedTools = [...changes.tools.disallowed];
       }
+      // A profile with no sign-in reading — the store was unreadable at launch, or a session host
+      // recorded it before the field existed — takes the first reading as its baseline, so a later
+      // sign-in has something to differ from.
+      if (!profile.mcpSignIn && next.mcpSignIn) profile.mcpSignIn = next.mcpSignIn;
       if (profile.unknown) {
         // The first message after re-adoption IS the profile from here on — every field but
         // its CLI version: `next` carries the INSTALLED binary's version, and a process's own
@@ -1175,8 +1184,8 @@ async function spawnProcess(command, options, initialWs, context) {
       profile = reattach
         ? (reattach.profile
             ? { ...reattach.profile, unknown: false, cliVersion: reportedCliVersion }
-            : launchProfileOf(sdkOptions, resolved.mcpUnreadable, true, reportedCliVersion))
-        : launchProfileOf(sdkOptions, resolved.mcpUnreadable);
+            : launchProfileOf(sdkOptions, resolved.mcpUnreadable, true, reportedCliVersion, resolved.mcpSignIn))
+        : launchProfileOf(sdkOptions, resolved.mcpUnreadable, false, null, resolved.mcpSignIn);
       // Known the moment the run is adopted, so the report (and the banner beside the
       // transcript) never reads a live host as "not heard yet" until its next turn.
       if (reportedCliVersion && typeof ws.setCliVersion === 'function') ws.setCliVersion(reportedCliVersion);
