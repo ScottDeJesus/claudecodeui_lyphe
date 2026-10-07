@@ -49,13 +49,13 @@ function checkIdFor(service: CerberusServiceView, worst: string | null): string 
  * The minutes are the read model's strip, oldest on the left, each a `StatusCell` named on hover by
  * its time, its word and, when it folds several checks, the check that set it. The newest minute is
  * now: it breathes, or rings while it is failing. A click on a minute opens the sheet on the check that
- * set it, looked up at the minute's last second, as the sheet's own strip looks a minute up, and at now
- * for the minute still running. That second is not always the cell's word, which is the worst over the
- * whole minute: it answers a run's first minute, but on a run's last minute it already reads the word
- * that came after. The read model knows the moment each minute's word was reached, and `CerberusCell`
- * does not carry it yet. The cells are a pointer's shortcut and take no tab stop: thirty stops per
- * service would bury the keyboard. The name and pill are one button, which opens the sheet at now, and
- * the sheet's own strip steps through every minute from the keyboard.
+ * set it, looked up at the moment the minute's word was reached (`cell.at`, which the sheet's own strip
+ * looks a minute up at too), and at now for the minute still running. A fixed second would not always
+ * be the cell's word, which is the worst over the whole minute: the last second reads the word that
+ * came after a run's last minute, the first second misses a run's first. The cells are a pointer's
+ * shortcut and take no tab stop: thirty stops per service would bury the keyboard. The name and pill
+ * are one button, which opens the sheet at now, and the sheet's own strip steps through every minute
+ * from the keyboard.
  *
  * Used by Fleet's `NodeCard`, for each service of an open node in Grid and in List.
  */
@@ -120,12 +120,9 @@ export function ServiceRow({ node, service, face, onOpenCell }: ServiceRowProps)
               status={cell.status}
               label={name}
               title={name}
-              // A minute: `openAt` hands onOpenCell the check that set it, looked up at the minute's last
-              // second (`to` − 1 s), as the sheet's strip does, and at now for the minute still running.
-              // No fixed second always reads the cell's word, the worst over its whole minute: the last
-              // second misses a run's last minute, the first second a run's first. The cure is the read
-              // model's — the moment the word was reached — and this row and the sheet's strip take it together.
-              onClick={() => openAt(cell.worst, isNewest ? undefined : cell.to - 1_000)}
+              // A minute: `openAt` hands onOpenCell the check that set it, looked up at the moment its
+              // word was reached (`cell.at`), as the sheet's strip does, and at now for the minute still running.
+              onClick={() => openAt(cell.worst, isNewest ? undefined : cell.at)}
               className={cn(
                 'w-[7px] cursor-pointer transition-transform duration-move ease-spring hover:scale-y-[1.3] motion-reduce:transition-none',
                 grid ? 'h-[22px]' : 'h-5',

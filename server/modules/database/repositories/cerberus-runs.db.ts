@@ -1,4 +1,8 @@
 import { getCerberusConnection } from '@/modules/database/cerberus-connection.js';
+import {
+  historyConditions,
+  type CerberusHistoryFilter,
+} from '@/modules/database/repositories/cerberus-history-filter.js';
 
 /**
  * `runs` and `run_output`, as row-level statements — every attempt to run a fix, and the lines it
@@ -30,7 +34,8 @@ import { getCerberusConnection } from '@/modules/database/cerberus-connection.js
  * output statements, `activeForCheck` for its 409, `activeForNode` to reconcile a hello), the
  * auto-run rule (`autoRunsSince`, `activeForCheck`), the read model (`activeForNode`,
  * `latestForCheck`, `recent` for What happened, `output` for a run's lines, `lastLines` for the line a
- * strip quotes, `statsFor` for an entry's counts) and the daily prune
+ * strip quotes, `statsFor` for an entry's counts, `latestForDiagnoses` for the run of a diagnosis's
+ * one-off), the diagnosis agent (`requestedSince` for its `history_read`) and the daily prune
  * (`pruneOutputBefore`). Reach it through `@/modules/database/index.js`. Every statement runs on
  * the caller's connection and opens no transaction of its own.
  */
@@ -186,21 +191,21 @@ export const cerberusRunsDb = {
   },
 
   /**
-   * The text of the newest line of each of `runs` that has any, keyed by run id. A run with no output
-   * has no entry. One statement however many runs are asked for.
+   * The newest line of each of `runs` that has any — its number and its text — keyed by run id. A run
+   * with no output has no entry. One statement however many runs are asked for.
    */
-  lastLines(runs: string[]): Map<string, string> {
+  lastLines(runs: string[]): Map<string, { n: number; line: string }> {
     if (runs.length === 0) return new Map();
     const rows = getCerberusConnection()
       .prepare(
-        `SELECT o.run AS run, o.line AS line
+        `SELECT o.run AS run, o.n AS n, o.line AS line
            FROM run_output o
            JOIN (SELECT run, MAX(n) AS n FROM run_output
                   WHERE run IN (SELECT value FROM json_each(@runs)) GROUP BY run) newest
              ON newest.run = o.run AND newest.n = o.n`
       )
-      .all({ runs: JSON.stringify(runs) }) as { run: string; line: string }[];
-    return new Map(rows.map((row) => [row.run, row.line]));
+      .all({ runs: JSON.stringify(runs) }) as { run: string; n: number; line: string }[];
+    return new Map(rows.map((row) => [row.run, { n: row.n, line: row.line }]));
   },
 
   /**
@@ -261,6 +266,38 @@ export const cerberusRunsDb = {
       )
       .get(node, key, since) as CerberusRunRow | undefined;
     return row ?? null;
+  },
+
+  /**
+   * The newest run of each of `diagnoses` — the run of its one-off — keyed by diagnosis id; a
+   * diagnosis nobody has run has no entry. One statement however many are asked for.
+   */
+  latestForDiagnoses(diagnoses: string[]): Map<string, CerberusRunRow> {
+    if (diagnoses.length === 0) return new Map();
+    const rows = getCerberusConnection()
+      .prepare(
+        `SELECT ${RUN_COLUMNS} FROM runs r
+          WHERE r.diagnosis IN (SELECT value FROM json_each(@diagnoses))
+            AND r.id = (SELECT id FROM runs WHERE diagnosis = r.diagnosis ORDER BY requested_at DESC, id LIMIT 1)`
+      )
+      .all({ diagnoses: JSON.stringify(diagnoses) }) as CerberusRunRow[];
+    return new Map(rows.flatMap((row) => (row.diagnosis === null ? [] : [[row.diagnosis, row] as const])));
+  },
+
+  /**
+   * Runs asked for at or after `since`, newest first, at most `limit` — across every node, or one
+   * node's (`node`), or one check key's (`check`). A diagnosis's `history_read` is the caller. The
+   * WHERE is assembled from fixed fragments with every value bound.
+   */
+  requestedSince(filter: CerberusHistoryFilter, limit: number): CerberusRunRow[] {
+    const { conditions, params } = historyConditions(filter, 'requested_at', limit);
+    return getCerberusConnection()
+      .prepare(
+        `SELECT ${RUN_COLUMNS} FROM runs
+          WHERE ${conditions.join(' AND ')}
+          ORDER BY requested_at DESC, id LIMIT @limit`
+      )
+      .all(params) as CerberusRunRow[];
   },
 
   /**

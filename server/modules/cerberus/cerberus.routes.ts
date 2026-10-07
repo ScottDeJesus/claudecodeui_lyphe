@@ -2,10 +2,11 @@ import express from 'express';
 import type { Request, Response, Router } from 'express';
 
 import type { CerberusGatewayState, CerberusReadInputs } from '@/shared/cerberus-types.js';
-import { AppError, asyncHandler, readPathParam } from '@/shared/utils.js';
+import { asyncHandler, readPathParam } from '@/shared/utils.js';
 
-import { listCatalog, setAuto, writeEntry } from './catalog.service.js';
+import { listCatalog, retireEntry, setAuto, writeEntry } from './catalog.service.js';
 import { getDefinition, putDefinition, retireCheck, setLabel } from './definitions.service.js';
+import { createDiagnosisRouter } from './diagnosis/diagnosis.routes.js';
 import { enrollmentStatus, mintEnrollment } from './enrollments.service.js';
 import { createMute, liftMute } from './mutes.service.js';
 import { activity } from './read-model/activity.js';
@@ -13,10 +14,22 @@ import { checkDetail, checkIndex } from './read-model/check-detail.js';
 import { lookupAt } from './read-model/lookup.js';
 import { buildOverview } from './read-model/overview.js';
 import { getRun, startRun } from './runs.service.js';
+import {
+  badRequest,
+  optionalBoolean,
+  optionalText,
+  readBody,
+  readUsername,
+  requiredNumber,
+  requiredObject,
+  requiredText,
+} from './route-input.js';
+import { createUpdatesRouter } from './updates.routes.js';
 
 /**
- * Cerberus's eighteen routes, created by `cerberus.module.ts` for the server entrypoint's one mount
- * at `/api/cerberus`.
+ * Cerberus's twenty-six routes, created by `cerberus.module.ts` for the server entrypoint's one mount
+ * at `/api/cerberus` — nineteen here, the three of a warden update in `updates.routes.ts` and the four
+ * of a diagnosis in `diagnosis/diagnosis.routes.ts`, both mounted at the end of this router.
  *
  * WHAT A ROUTE DECIDES HERE. Transport SHAPE only: that a field is the kind of value the verb takes
  * (text, a number of milliseconds), and which path parts make up a check's key. Whether a time is in
@@ -37,8 +50,6 @@ import { getRun, startRun } from './runs.service.js';
  * answer.
  */
 
-type AuthenticatedRequest = Request & { user?: { username?: string } };
-
 /** What the module hands its routes: the read model's inputs and the gateway's state, both read live. */
 type CerberusRouteDependencies = {
   readInputs: () => CerberusReadInputs;
@@ -47,54 +58,6 @@ type CerberusRouteDependencies = {
 
 const DEFAULT_ACTIVITY_LIMIT = 40;
 const MAX_ACTIVITY_LIMIT = 100;
-
-function badRequest(message: string): AppError {
-  return new AppError(message, { code: 'CERBERUS_BAD_REQUEST', statusCode: 400 });
-}
-
-/** The JSON object a write carries. */
-function readBody(request: Request): Record<string, unknown> {
-  const body: unknown = request.body;
-  if (typeof body !== 'object' || body === null || Array.isArray(body)) throw badRequest('The body must be a JSON object.');
-  return body as Record<string, unknown>;
-}
-
-/** A text field that must be there (the empty string counts as there). */
-function requiredText(source: Record<string, unknown>, field: string): string {
-  const value = source[field];
-  if (typeof value !== 'string') throw badRequest(`${field} must be text.`);
-  return value;
-}
-
-/** A text field that may be absent or null; present, it must be text. */
-function optionalText(source: Record<string, unknown>, field: string): string | undefined {
-  const value = source[field];
-  if (value === undefined || value === null) return undefined;
-  if (typeof value !== 'string') throw badRequest(`${field} must be text.`);
-  return value;
-}
-
-/** A number field that must be there; whether it is in range is the service's refusal. */
-function requiredNumber(source: Record<string, unknown>, field: string): number {
-  const value = source[field];
-  if (typeof value !== 'number' || !Number.isFinite(value)) throw badRequest(`${field} must be a number.`);
-  return value;
-}
-
-/** A true/false field that may be absent; present, it must be one. */
-function optionalBoolean(source: Record<string, unknown>, field: string): boolean | undefined {
-  const value = source[field];
-  if (value === undefined) return undefined;
-  if (typeof value !== 'boolean') throw badRequest(`${field} must be true or false.`);
-  return value;
-}
-
-/** A nested JSON object field that must be there. */
-function requiredObject(source: Record<string, unknown>, field: string): Record<string, unknown> {
-  const value = source[field];
-  if (typeof value !== 'object' || value === null || Array.isArray(value)) throw badRequest(`${field} must be an object.`);
-  return value as Record<string, unknown>;
-}
 
 /** A moment or count in a query string: whole digits, or absent. */
 function optionalWholeNumber(request: Request, name: string): number | undefined {
@@ -107,14 +70,6 @@ function optionalWholeNumber(request: Request, name: string): number | undefined
 /** The key of a check named by the three path parts `:service/:check` — `<service>/<id>`. */
 function readCheckKey(request: Request): string {
   return `${readPathParam(request.params.service, 'service')}/${readPathParam(request.params.check, 'check')}`;
-}
-
-function readUsername(request: Request): string {
-  const username = (request as AuthenticatedRequest).user?.username;
-  if (typeof username !== 'string' || username === '') {
-    throw new AppError('Authenticated user is required.', { code: 'CERBERUS_USER_REQUIRED', statusCode: 401 });
-  }
-  return username;
 }
 
 /** Creates the router for `cerberus.module.ts`. Each handler is one verb and its shape. */
@@ -204,6 +159,15 @@ export function createCerberusRouter({ readInputs, gatewayState }: CerberusRoute
       const on = optionalBoolean(readBody(request), 'on');
       if (on === undefined) throw badRequest('on must be true or false.');
       response.json(setAuto(readPathParam(request.params.id, 'id'), on, readUsername(request)));
+    })
+  );
+
+  // An entry withdrawn: it leaves every list and the node's next set (404 for an unknown id; one already retired is a 204 that changes nothing).
+  router.post(
+    '/catalog/:id/retire',
+    asyncHandler(async (request: Request, response: Response) => {
+      retireEntry(readPathParam(request.params.id, 'id'));
+      response.status(204).end();
     })
   );
 
@@ -297,6 +261,9 @@ export function createCerberusRouter({ readInputs, gatewayState }: CerberusRoute
       response.status(204).end();
     })
   );
+
+  router.use(createUpdatesRouter());
+  router.use(createDiagnosisRouter(readInputs));
 
   return router;
 }

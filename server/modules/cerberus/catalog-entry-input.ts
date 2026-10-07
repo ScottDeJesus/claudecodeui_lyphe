@@ -13,7 +13,7 @@ import { HUB_NODE_ID } from './definition-document.js';
  * (`{ field }`), the way a bad definition names its path. The first field that fails is the one
  * reported; a person fixes it and tries again.
  *
- * Consumers: `catalog.service.ts` (`writeEntry`).
+ * Consumers: `catalog.service.ts` (`writeEntry`) and `diagnosis/diagnosis-promotion.ts` (`badEntry`).
  */
 
 const MIN_TIMEOUT_S = 1;
@@ -30,7 +30,8 @@ const MAX_SLUG_LENGTH = 60;
 /** What a name with no letter or digit in it (a name in a script the slug cannot spell) becomes. */
 const FALLBACK_SLUG = 'fix';
 
-function badEntry(field: string, message: string): AppError {
+/** The 400 `CERBERUS_BAD_ENTRY` that names the field (in the message and in `details`); `diagnosis/diagnosis-promotion.ts` refuses its own two fields with it too. */
+export function badEntry(field: string, message: string): AppError {
   return new AppError(`The entry is not valid at ${field}: ${message}.`, {
     code: 'CERBERUS_BAD_ENTRY',
     statusCode: 400,
@@ -56,8 +57,12 @@ export type ValidEntry = {
  * Half of an emoji or another character outside the basic plane: a high surrogate with no low one
  * after it, or a low one with no high one before. JSON can carry one (`"\ud83d"`) and SQLite stores
  * it as U+FFFD, so the text kept — and signed, and run — would not be the text typed.
+ *
+ * Consumers: this file's own `refuseLoneSurrogate`, and `diagnosis/diagnosis-tools.ts`, whose
+ * `submit_diagnosis` and `note` refuse such text at the agent so a proposal it makes can still be
+ * promoted to an entry.
  */
-const LONE_SURROGATE = /[\ud800-\udbff](?![\udc00-\udfff])|(?<![\ud800-\udbff])[\udc00-\udfff]/;
+export const LONE_SURROGATE = /[\ud800-\udbff](?![\udc00-\udfff])|(?<![\ud800-\udbff])[\udc00-\udfff]/;
 
 function refuseLoneSurrogate(field: string, text: string): void {
   if (LONE_SURROGATE.test(text)) throw badEntry(field, 'holds half of a character, which cannot be stored as typed');

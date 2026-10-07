@@ -26,20 +26,23 @@ type CoveringWaiter = {
 const waiters = new Set<CoveringWaiter>();
 
 /**
- * The version of the node's NEWEST set when the warden has acked it and it holds `id`, else null. The
- * newest, not the newest acked: while a set that came after the acked one is in flight the warden is about
- * to hold it, and a `run.start` naming the older version would reach it behind that `catalog.set` and be
- * refused ("not the one this warden acked"). So a set written a moment ago holds every press until its ack.
+ * The version of the node's NEWEST set when the warden has acked it and it holds `id` — as an entry, or
+ * as a diagnosis's one-off: the warden keeps both in one table by id, so a run names either the same way
+ * — else null. The newest, not the newest acked: while a set that came after the acked one is in flight
+ * the warden is about to hold it, and a `run.start` naming the older version would reach it behind that
+ * `catalog.set` and be refused ("not the one this warden acked"). So a set written a moment ago holds
+ * every press until its ack.
  */
 export function ackedVersionCovering(node: string, id: string): number | null {
   const newest = cerberusCatalogDb.latestSet(node);
   if (!newest || newest.acked_at === null) return null;
   try {
     const entries = JSON.parse(newest.entries) as CerberusCatalogSet['entries'];
-    return entries.some((entry) => entry.id === id) ? newest.version : null;
+    const oneOffs = JSON.parse(newest.one_offs) as CerberusCatalogSet['oneOffs'];
+    return entries.some((entry) => entry.id === id) || oneOffs.some((oneOff) => oneOff.id === id) ? newest.version : null;
   } catch (error) {
     // An unreadable set must not wedge a run behind a thrown parse: it covers nothing.
-    console.error(`[Cerberus] version ${newest.version} of node ${node}'s catalog has entries this center cannot read: ${error instanceof Error ? error.message : String(error)}`);
+    console.error(`[Cerberus] version ${newest.version} of node ${node}'s catalog has a list this center cannot read: ${error instanceof Error ? error.message : String(error)}`);
     return null;
   }
 }

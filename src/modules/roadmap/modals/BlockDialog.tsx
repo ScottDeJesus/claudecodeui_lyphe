@@ -88,7 +88,7 @@ export function BlockDialog({ kind, item, onClose }: BlockDialogProps) {
             <Button type="button" variant="ghost" className="max-md:h-11" disabled={busy} onClick={dismiss}>
               {t('roadmap.dialog.cancel')}
             </Button>
-            <Button type="submit" className="max-md:h-11" disabled={!ready || busy} aria-busy={busy || undefined}>
+            <Button type="submit" className="max-md:h-11" disabled={!ready} busy={busy}>
               {t('roadmap.dialog.block.save')}
             </Button>
           </footer>

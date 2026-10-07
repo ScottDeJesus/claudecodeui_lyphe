@@ -185,8 +185,8 @@ export function NodeProjects({ node, link, projects, face }: NodeProjectsProps) 
                     size="sm"
                     aria-label={moving === null ? moveBack : undefined}
                     title={moving === null ? moveBack : undefined}
-                    aria-disabled={moving === 'back' || undefined}
-                    onClick={moving === null ? () => void move(project, 'back') : undefined}
+                    busy={moving === 'back'}
+                    onClick={() => void move(project, 'back')}
                     // Muted ink, not the ghost's accent: moving a project back is a quiet, reversible act, and
                     // the card's green already means "passing".
                     className={cn(

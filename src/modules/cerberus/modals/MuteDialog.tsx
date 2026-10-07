@@ -215,15 +215,9 @@ function MuteForm({ check, onClose }: { check: CerberusCheckView; onClose: () =>
           <Button type="button" variant="outline" className="max-md:h-11" disabled={busy} onClick={dismiss}>
             {t('cerberus.mute.cancel')}
           </Button>
-          {/* aria-disabled, not disabled: a disabled button gives up the focus it holds the moment the write
-              goes out, and a refusal would hand the person back a page with none. The form's own guard
-              ignores a press while busy. */}
-          <Button
-            type="submit"
-            className="aria-disabled:cursor-not-allowed aria-disabled:opacity-60 max-md:h-11"
-            aria-disabled={busy || undefined}
-            aria-busy={busy || undefined}
-          >
+          {/* `busy`, not `disabled`: a disabled button gives up the focus it holds the moment the write
+              goes out, and a refusal would hand the person back a page with none. */}
+          <Button type="submit" className="max-md:h-11" busy={busy}>
             {t('cerberus.mute.confirm', { time: hm(until) })}
           </Button>
         </div>

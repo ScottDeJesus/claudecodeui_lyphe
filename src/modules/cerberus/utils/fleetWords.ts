@@ -84,6 +84,8 @@ export function serviceSentence(t: TFunction, service: CerberusServiceView, run:
  * - nothing assigned: "Nothing assigned yet";
  * - a fix running on one of its services: "Fix running on its own" / "Fix running";
  * - its warden restarting for an update: "Warden restarting";
+ * - an update queued or running on its warden, and nothing worse to say: "Updating its warden" — the
+ *   collapsed tile has no pill, so its line is the one place it can say so;
  * - passing but for a mute: "Passing · muted check";
  * - passing: "Its service is passing", "All 3 services passing";
  * - anything worse: the first service at the node's word, and that word — "docstore — refused",
@@ -92,11 +94,15 @@ export function serviceSentence(t: TFunction, service: CerberusServiceView, run:
  */
 export function nodeLine(t: TFunction, item: FleetItem, node: CerberusNodeView): string {
   if (node.services.length === 0) {
-    return node.link === 'never' ? t('cerberus.node.waiting') : t('cerberus.node.nothingAssigned');
+    if (node.link === 'never') return t('cerberus.node.waiting');
+    if (node.link === 'paused') return t('cerberus.node.restarting');
+    return node.updating === null ? t('cerberus.node.nothingAssigned') : t('cerberus.node.updatingWarden');
   }
   switch (item.status) {
     case 'paused':
       return t('cerberus.node.restarting');
+    case 'updating':
+      return t('cerberus.node.updatingWarden');
     case 'muted':
       return t('cerberus.node.mutedCheck');
     case 'ok':
@@ -112,38 +118,39 @@ export function nodeLine(t: TFunction, item: FleetItem, node: CerberusNodeView):
     case 'fixing':
       return fixingSentence(t, item.fixBy);
     default:
-      // `enrolling` is the updates plan's place and nothing feeds it yet, and a node with services is
-      // never `empty`. That plan writes its own line here.
+      // `enrolling` is a held place nothing feeds yet, and a node with services is never `empty`.
       return t('cerberus.node.nothingAssigned');
   }
 }
 
 /**
- * Whether a node's warden is restarting for an update: the read model pauses every check of the node
- * while it does (`paused`). Its heartbeat is then not a sign of life to breathe for, and its warden line
- * says so. Read by `wardenLine` and by the node card's heartbeat dot.
+ * Whether a node's warden is restarting for an update: its link is `paused`, which the read model lays over a
+ * node from the update's `restarting` step until the update ends (its new hello, the launcher's rollback hello,
+ * or the update's failure) and which outranks silent and never. Its heartbeat is then not a sign of life to
+ * breathe for, and its warden line says so. Read by `wardenLine` and by the node card's heartbeat dot.
  */
 export function isRestarting(node: CerberusNodeView): boolean {
-  return node.services.some((service) => service.checks.some((check) => check.status === 'paused'));
+  return node.link === 'paused';
 }
 
 /**
  * A node's warden line: "Warden 0.4.2 · heard 3 s ago" while it reports, "Warden 0.4.2 · restarting"
- * while its warden restarts for an update, "Warden 0.4.1 · silent since 17:41" once it has gone quiet
- * (silence outranks a restart: a restart that never comes back is the thing to see), "Waiting for the
- * first heartbeat" before its first, and for the hub, which has no warden, "Cerberus · this server".
+ * while its warden restarts for an update (`isRestarting`: it outranks silent and never), "Warden
+ * 0.4.1 · silent since 17:41" once it has gone quiet, "Waiting for the first heartbeat" before its first,
+ * and for the hub, which has no warden, "Cerberus · this server". A restart that never comes back stops
+ * reading "restarting" when the update fails, and the silence it left is then the thing to see.
  * The age is against `now`, the read's own moment: between two reads a node's heartbeats are not
  * re-read, so a clock that ran on would age a node that is still reporting. A heartbeat carries the
  * warden's version, so a node that has reported has one.
  */
 export function wardenLine(t: TFunction, node: CerberusNodeView, now: number): string {
   if (node.role === 'hub') return t('cerberus.node.hub');
+  if (isRestarting(node)) return t('cerberus.node.wardenRestarting', { version: node.wardenVersion ?? '' });
   if (node.link === 'never' || node.lastHeardAt === null) return t('cerberus.node.waiting');
   const version = node.wardenVersion ?? '';
   if (node.link === 'silent') {
     return t('cerberus.node.silent', { version, time: hm(node.silentSince ?? node.lastHeardAt) });
   }
-  if (isRestarting(node)) return t('cerberus.node.wardenRestarting', { version });
   return t('cerberus.node.heard', { version, ago: agoPhrase(t, node.lastHeardAt, now) });
 }
 

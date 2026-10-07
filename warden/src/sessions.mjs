@@ -127,11 +127,11 @@ export function createSessions({ link, home }) {
   /** The socket of a host, started first when the open is a spawn. Throws the sentence for a person. */
   async function reach(op, hostId, cwd) {
     if (op === 'spawn') {
-      if (!registry.isServerUp()) throw new Error(SESSION_SERVER_DOWN);
       try {
         registry.spawnHostSession(hostId, cwd);
       } catch (error) {
-        throw new Error(`The session host could not be started: ${failureDetail(error.message)}`);
+        // The registry refuses a spawn when the keepalive server is down; its sentence here names the unit.
+        throw new Error(error.code === 'HOST_SERVER_DOWN' ? SESSION_SERVER_DOWN : `The session host could not be started: ${failureDetail(error.message)}`);
       }
       return registry.connectToHost(hostId, SPAWN_CONNECT_MS);
     }

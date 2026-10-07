@@ -213,4 +213,78 @@ CREATE TABLE run_output (
     PRIMARY KEY(run, n)
 );
 `,
+
+  // Step 2 (user_version 2 → 3) — the `cerberus--updates` plan: the record of every warden update.
+  // The tables are `design/cerberus/Cerberus Spec.dc.html` Table 4 (the store), "updates … Forever":
+  // an update and its steps are appended and never pruned — the daily prune names neither table.
+  `
+-- One warden update of one node. batch groups the nodes a person picked in one go (they run one at a
+-- time, in the order given). from_version is what the node ran when the row was written (NULL when
+-- it had never said); to_version is the release offered. step is the latest step — 'queued' until
+-- the node's turn, then what its warden last reported. ended_at and result are NULL while the update
+-- is live: 'updated' when the node's next hello names to_version, 'rolled_back' when it names a
+-- failed swap, 'failed' when a step said so or the warden went silent (the reason is in note).
+CREATE TABLE updates (
+    id TEXT PRIMARY KEY,
+    batch TEXT NOT NULL,
+    node TEXT NOT NULL,
+    from_version TEXT,
+    to_version TEXT NOT NULL,
+    started_at INTEGER NOT NULL,
+    step TEXT,
+    ended_at INTEGER,
+    result TEXT CHECK(result IN ('updated','rolled_back','failed')),
+    note TEXT
+);
+
+-- Append-only: every progress frame an update produced, stamped with the center's clock. text is the
+-- line the dialog shows. The primary key makes a frame resent inside one millisecond a no-op. A
+-- node's "paused" window is read from these rows (its 'restarting' step to the update's end) and is
+-- never written anywhere.
+CREATE TABLE update_steps (
+    update_id TEXT NOT NULL,
+    at INTEGER NOT NULL,
+    step TEXT NOT NULL,
+    text TEXT NOT NULL,
+    PRIMARY KEY(update_id, at, step)
+);
+`,
+
+  // Step 3 (user_version 3 → 4) — the `cerberus--diagnosis` plan: what a read-only diagnosis was
+  // asked, what it read and what it concluded. The tables are `design/cerberus/Cerberus Spec.dc.html`
+  // Table 4 (the store), "diagnoses · diag_steps … Forever": nothing here is ever pruned.
+  `
+-- One diagnosis of one check. asked_by is who pressed Diagnose and model the model that read.
+-- status is 'running' until the loop ends it as 'done' or 'failed'; a failed one keeps its reason
+-- in error and proposes nothing. summary is the conclusion in prose, evidence a JSON array of
+-- strings (only what was found), proposal JSON { name, cmd, general } or NULL when no fix was
+-- proposed — cmd is the exact command a one-off run sends, general the same command with absolute
+-- times made relative, the text a promotion saves. Never deleted.
+CREATE TABLE diagnoses (
+    id TEXT PRIMARY KEY,
+    node TEXT NOT NULL,
+    check_key TEXT NOT NULL,
+    asked_by TEXT NOT NULL,
+    model TEXT NOT NULL,
+    started_at INTEGER NOT NULL,
+    ended_at INTEGER,
+    status TEXT NOT NULL CHECK(status IN ('running','done','failed')),
+    summary TEXT,
+    evidence TEXT,
+    proposal TEXT,
+    error TEXT
+);
+
+CREATE INDEX ix_diagnoses_check ON diagnoses(node, check_key, started_at);
+
+-- What a diagnosis did, one row per step. n is the step's number within the diagnosis and t its
+-- offset in seconds from the start; the primary key makes a repeated step a no-op. Never deleted.
+CREATE TABLE diag_steps (
+    diagnosis TEXT NOT NULL,
+    n INTEGER NOT NULL,
+    t REAL NOT NULL,
+    text TEXT NOT NULL,
+    PRIMARY KEY(diagnosis, n)
+);
+`,
 ];

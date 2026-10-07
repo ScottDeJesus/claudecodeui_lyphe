@@ -60,20 +60,22 @@ const GLYPH_SIZE = {
  * motion it is still. It names its word to assistive tech and on hover. Pass `decorative` when the
  * word is already written beside it, so it isn't read twice. Pass `still` for the status at an
  * asked moment rather than now (a lookup), which never rings: the moment may be long past, and
- * the ring means now.
+ * the ring means now. Pass `label` when the mark stands for more than one word: a node updating draws
+ * the fixing ●, and says "Updating its warden", never "Fix running".
  *
  * Used by the sheet's `LookupSentence` today, and by the fleet's cards, the sheet's check rows and
  * History as they are composed.
  */
-export function StatusGlyph({ status, size = 'md', decorative = false, still = false }: {
+export function StatusGlyph({ status, size = 'md', decorative = false, still = false, label }: {
   status: CerberusMark;
   size?: keyof typeof GLYPH_SIZE;
   decorative?: boolean;
   still?: boolean;
+  label?: string;
 }) {
   const { t } = useTranslation();
   const look = markLook(status);
-  const word = t(look.wordKey);
+  const word = label ?? t(look.wordKey);
   return (
     <span
       data-tone={look.tone}

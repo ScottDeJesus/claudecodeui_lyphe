@@ -3,20 +3,23 @@
 //
 //   CHAIN        `chain.mjs` keeps each check's `prevAt` across restarts (what center acked, saved on acks and at a
 //                clean stop), so a restart does not blank the minutes before it for a quiet check.
-//   COMPOSITION  the link asks the scheduler, the catalog and the runner what to put in `hello` and every heartbeat
-//                (`state()`), and they send and receive through the link (`checks.set` and `catalog.set` and
-//                `run.start` in, `result` and `run.*` out; the session host's `session.*` frames both ways, and
-//                none of them through the outbox). Every later plan's
+//   COMPOSITION  the link asks the scheduler, the catalog, the runner and the updater what to put in `hello` and every
+//                heartbeat (`state()`), and they send and receive through the link (`checks.set` and `catalog.set`
+//                and `run.start` and `update.offer` in, `result` and `run.*` and `update.progress` out; the session
+//                host's `session.*` frames both ways, and none of them through the outbox). Every later plan's
 //                frame joins the same way: a `link.on(type, fn)` registered here, before the link starts, and a
 //                field in `state()` when center must be told of it in `hello`.
 //   RUN.JSON     rewritten on the link's own events — after every heartbeat, whenever a socket closes (the link's
 //                `onReport`), and when a `welcome` or a `checks.set` has been applied — so `status` never waits
 //                for a timer: an outage shows its queue growing at each failed reconnect. Written at start and
 //                at stop too. A write that fails is one log line, never the end of the daemon.
+//   UPDATE       an `update.offer` ends this process with 75 through the same clean stop a SIGTERM takes, so the launcher
+//                (`launcher.mjs`) starts the release `update.mjs` swapped in; `main.mjs` exits with the code `run` resolves.
 //   LOG          the link says its own changes (`linked to …`, `link lost — retrying in 1 s`); this file adds
 //                one line at start and one at stop.
 import { createCatalog } from './catalog.mjs';
 import { createChain } from './chain.mjs';
+import { createDiagTools } from './diag-tools.mjs';
 import { takeHomeLock } from './home-lock.mjs';
 import { createLink } from './link.mjs';
 import { log } from './log.mjs';
@@ -24,6 +27,7 @@ import { createOutbox } from './outbox.mjs';
 import { createProbes } from './probes.mjs';
 import { createRunner } from './runner.mjs';
 import { createSessions } from './sessions.mjs';
+import { createUpdater } from './update.mjs';
 import { hasNodeKey, homeDir, homePaths, readIdentity, version, writeRun } from './state.mjs';
 
 const NOT_ENROLLED = 'This node is not enrolled — run enroll.sh with a token from Cerberus';
@@ -76,14 +80,18 @@ export async function runDaemon() {
   if (lock !== 'held') log(`could not take the one-daemon lock on this home (${lock}); going on without it`);
 
   const outbox = createOutbox({ home });
-  // `probes`, `catalog` and `runner` exist once the link does; the link reads this only after `start()`, when all are built.
+  let stopDaemon = () => {}; // replaced below, once the promise that holds the daemon open exists
+  // `probes`, `catalog`, `runner`, `diagTools` and `updater` exist once the link does; the link reads this only after `start()`, when all are built.
+  /** The work that must not be cut off by a restart: the fix runs in flight and the diagnosis open. `hello.active` says it, and the updater waits on it. */
+  const activeWork = () => ({ ...runner.activeWork(), ...diagTools.activeWork() });
   const state = () => {
-    const running = runner.activeWork().runs;
+    const work = activeWork();
     return {
       checksVersion: probes.checksVersion,
       catalogVersion: catalog.version,
-      active: { runs: running, diags: [], owed: runsOwed(outbox, running) },
+      active: { runs: work.runs, diags: work.diags, owed: runsOwed(outbox, work.runs) },
       probesRunning: probes.scheduled, // the wire's word for "how many probes it has scheduled" (cerberus-types.ts)
+      update: updater.helloUpdate(),
     };
   };
   const report = () => {
@@ -109,6 +117,17 @@ export async function runDaemon() {
   const catalog = createCatalog({ link });
   const runner = createRunner({ link, catalog });
   const sessions = createSessions({ link, home });
+  const diagTools = createDiagTools({ link, home });
+  const updater = createUpdater({
+    link,
+    home,
+    activeWork,
+    onWorkChange: (listener) => {
+      const removers = [runner.onWorkChange(listener), diagTools.onWorkChange(listener)];
+      return () => removers.forEach((remove) => remove());
+    },
+    exit: (code) => stopDaemon('the update is swapped in', code),
+  });
   link.on('ack', chain.noteAck);
   // After `createProbes`: handlers of one frame run in registration order, so the scheduler has applied
   // the checks a `welcome` or a `checks.set` carries by the time the record is written.
@@ -121,19 +140,20 @@ export async function runDaemon() {
 
   return new Promise((resolve) => {
     let stopping = false;
-    const stop = (signal) => {
+    stopDaemon = (reason, code = 0) => {
       if (stopping) return;
       stopping = true;
-      log(`${signal} received; stopping`);
+      log(`${reason}; stopping`);
       probes.stop(); // flushes the batch while the link is still up
       runner.stop(); // kills the commands it started: none outlives its warden
+      diagTools.stop(); // kills the reads a diagnosis has going
       sessions.stop(); // detaches every session channel; the hosts, in their own cgroup, keep running
       link.stop();
       chain.save(); // what the outbox still holds is not acked, so the saved chain stops short of it
       report();
-      setTimeout(() => resolve(0), SHUTDOWN_GRACE_MS);
+      setTimeout(() => resolve(code), SHUTDOWN_GRACE_MS);
     };
-    process.on('SIGTERM', () => stop('SIGTERM'));
-    process.on('SIGINT', () => stop('SIGINT'));
+    process.on('SIGTERM', () => stopDaemon('SIGTERM received'));
+    process.on('SIGINT', () => stopDaemon('SIGINT received'));
   });
 }

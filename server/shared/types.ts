@@ -220,6 +220,7 @@ export type GatewayEventKind =
   | 'notes_changed'
   | 'cerberus_changed'
   | 'cerberus_run_output'
+  | 'cerberus_diag_step'
   | 'simple_list_changed'
   | 'universe_activity'
   | 'universe_map'

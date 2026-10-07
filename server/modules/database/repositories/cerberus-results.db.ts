@@ -1,4 +1,8 @@
 import { getCerberusConnection } from '@/modules/database/cerberus-connection.js';
+import {
+  historyConditions,
+  type CerberusHistoryFilter,
+} from '@/modules/database/repositories/cerberus-history-filter.js';
 
 /**
  * `results`, as row-level statements — the append-only history of the Cerberus store.
@@ -25,7 +29,8 @@ import { getCerberusConnection } from '@/modules/database/cerberus-connection.js
  *
  * Consumers: `server/modules/cerberus/` — ingest (`insert`, and `latestPerCheck` to seed its memory at
  * start), the read model (`rowsInWindow` for cells and lookups, `recentChanges` for a check's detail,
- * `transitions` for What happened) and the daily prune (`pruneKeepalivesBefore`). Reach it through
+ * `transitions` for What happened), the diagnosis agent (`recentChanges` for its prompt,
+ * `transitionsSince` for its `history_read`) and the daily prune (`pruneKeepalivesBefore`). Reach it through
  * `@/modules/database/index.js`. Every statement runs on the caller's connection and opens no
  * transaction of its own — ingest's "one transaction per frame" is its own.
  */
@@ -218,6 +223,26 @@ export const cerberusResultsDb = {
           ORDER BY at DESC LIMIT ?`
       )
       .all(node, key, since, until, Math.max(0, Math.trunc(limit))) as CerberusStoredResultRow[];
+  },
+
+  /**
+   * Status moves with `at >= since`, newest first, at most `limit` — across every node, or one node's
+   * (`node`), or one check key's (`check`, on any node unless `node` narrows it). A move is a `change`
+   * row whose status differs from the one stored before it, or a check's first row. A change of the
+   * VALUE alone is not one: a check that says "last sweep failed 17.6h ago" stores a row every
+   * half-minute, and a window of those would never reach the moment the check went red. A diagnosis's
+   * `history_read` is the one caller. The WHERE is assembled from fixed fragments with every value
+   * bound, and a given `node` keeps the primary key's leading column in play.
+   */
+  transitionsSince(filter: CerberusHistoryFilter, limit: number): CerberusStoredResultRow[] {
+    const { conditions, params } = historyConditions(filter, 'at', limit);
+    return getCerberusConnection()
+      .prepare(
+        `SELECT ${resultColumns()} FROM results
+          WHERE kind = 'change' AND (prev_status IS NULL OR ${statusDiffers()}) AND ${conditions.join(' AND ')}
+          ORDER BY at DESC, node, check_key LIMIT @limit`
+      )
+      .all(params) as CerberusStoredResultRow[];
   },
 
   /**

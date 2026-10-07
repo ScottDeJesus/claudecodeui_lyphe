@@ -8,14 +8,17 @@ import {
 } from '@/modules/database/index.js';
 import type { CerberusActivity, CerberusReadInputs } from '@/shared/cerberus-types.js';
 
+import { diagnosisEvents } from './diagnosis-views.js';
 import { fixEvents } from './run-views.js';
 import { shownRow, statusOf } from './status-rules.js';
+import { updateEvents } from './update-views.js';
 
 /**
- * "What happened": the fleet's recent moments, merged newest first from five sources — a check's
- * status changing, a mute being set, lifted or running out, a node enrolling, the catalog changing and
- * a fix running (`started` at its request, `ended` at its end). Later plans of the arc add `diagnosis`
- * and `warden` lines; a reader switches on `kind`.
+ * "What happened": the fleet's recent moments, merged newest first from seven sources — a check's
+ * status changing, a mute being set, lifted or running out, a node enrolling, the catalog changing,
+ * a fix running (`started` at its request, `ended` at its end), a warden update (`update_started` once
+ * per batch, then `updated`, `rolled_back` or `update_failed` per node) and a diagnosis (`asked` at its
+ * request, then `ready` or `failed` at its end). A reader switches on `kind`.
  *
  * Only what is already in the store is read: a transition is a `change` row that has a `prev_status`
  * and a status that differs from it (`not_enabled` spells a null on either side), a mute's
@@ -86,8 +89,9 @@ function catalogEvents(before: number, limit: number): CerberusActivity[] {
 function newestFirst(a: CerberusActivity, b: CerberusActivity): number {
   if (a.at !== b.at) return b.at - a.at;
   // A `catalog` line is about no node or check, so both parts read empty for it.
+  // A `warden` line that starts a batch is about no node either (its `node` is null).
   const keyOf = (item: CerberusActivity): string =>
-    `${'node' in item ? item.node : ''}\u0000${'check' in item ? item.check : ''}\u0000${item.kind}`;
+    `${'node' in item ? (item.node ?? '') : ''}\u0000${'check' in item ? item.check : ''}\u0000${item.kind}`;
   return keyOf(a) < keyOf(b) ? -1 : keyOf(a) > keyOf(b) ? 1 : 0;
 }
 
@@ -143,6 +147,8 @@ export function activity(
 
   merged.push(...catalogEvents(before, limit));
   merged.push(...fixEvents(before, limit));
+  merged.push(...updateEvents(before, limit));
+  merged.push(...diagnosisEvents(before, limit, (node, check) => labels.get(`${node}/${check}`)?.label ?? null));
 
   for (const node of cerberusNodesDb.list()) {
     if (node.enrolled_at < before) {

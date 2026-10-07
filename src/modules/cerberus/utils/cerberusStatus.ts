@@ -57,8 +57,9 @@ export const STATUS_TABLE: Record<CerberusStatus, StatusLook> = {
  * warden would not run because no catalog it acked holds it. A refusal is the run's outcome, never a
  * check's status, so it is not a row of the status table above.
  *
- * Read by the Needs-you card's run strip (`NeedFix`) and the sheet's Fix output (`FixOutput`), so a run
- * reads the same on the card and in the sheet.
+ * Read by the Needs-you card's run strip (`NeedFix`), the sheet's Fix output (`FixOutput`) and the diagnosis
+ * panel (`DiagnosisPanel`: its ▲ Failed pill and its one-off's ran line), so a run reads the same on the card
+ * and in the sheet.
  */
 export const RUN_LOOK: Record<'going' | 'ok' | 'failed' | 'timed_out' | 'refused', { tone: Tone; glyph: '●' | '✓' | '▲' | '✕' }> = {
   going: { tone: 'info', glyph: '●' },
@@ -105,12 +106,15 @@ export function markLook(mark: CerberusMark): MarkLook {
 /**
  * The mark a NODE's word draws with, or `null` for a word with no mark. `empty` has none: nothing is on
  * the node to read. `fixing` is a fix running on the node: the info ●, which pulses where a failing
- * node rings. `enrolling` is the updates plan's place, fed by nothing yet; that plan gives its word a
- * mark when it does.
+ * node rings. `updating` is a warden update queued or running on it, and draws that same info ● — the
+ * rings' key says "Fix running or updating" of the one look — while `paused`, its warden mid-restart,
+ * keeps the dashed neutral of its checks. `enrolling` is a held place, fed by nothing yet; whatever
+ * feeds it gives its word a mark.
  *
  * Read by Fleet's node card (its glyph and its tile's edge) and by the rings (each node's dot, its
  * label's glyph, and the hub), so a node is drawn the same in every layout.
  */
 export function nodeMark(status: FleetStatus): CerberusMark | null {
-  return status === 'empty' || status === 'enrolling' ? null : status;
+  if (status === 'empty' || status === 'enrolling') return null;
+  return status === 'updating' ? 'fixing' : status;
 }

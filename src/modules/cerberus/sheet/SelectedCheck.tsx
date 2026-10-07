@@ -2,9 +2,10 @@ import { useEffect, useRef, type ReactElement } from 'react';
 import { Pencil } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
+import { DiagnoseButton } from '@/modules/cerberus/DiagnoseButton';
 import { StatusPill } from '@/modules/cerberus/StatusMarks';
 import { hm, hms, stretchKey } from '@/modules/cerberus/utils/cerberusTime';
-import type { CerberusCheckView } from '@/shared/cerberus-types';
+import type { CerberusCheckView, CerberusDiagnosisView } from '@/shared/cerberus-types';
 import { Badge, Button } from '@/shared/ui';
 
 type SelectedCheckProps = {
@@ -17,6 +18,12 @@ type SelectedCheckProps = {
   onMute: () => void;
   /** Unmute, beside the note of the mute that covers the check. */
   onUnmute: () => void;
+  /** The check's newest diagnosis, or null when it has none. "Diagnose again" reads once there is one, and no button stands while it runs: center takes one diagnosis at a time on a check. */
+  diagnosis: CerberusDiagnosisView | null;
+  /** Whether the check's own read has answered. Until it has, nobody knows whether the check has a diagnosis, so the button is not drawn rather than drawn with the wrong word. */
+  diagnosisRead: boolean;
+  /** A diagnosis has just started: reads the check again, so the sheet holds it (and Diagnose's busy look ends on it, not before). Resolves when that read has settled. */
+  onDiagnosisStarted: () => Promise<void>;
 };
 
 /**
@@ -29,14 +36,15 @@ type SelectedCheckProps = {
  * - the value it reported; "Checked 17:52:10 · every 30 s · by the warden on eis1" (by Cerberus on
  *   this server for the hub's own checks, "No result yet" before the first); and the raw key, which
  *   a check with no label already shows as its name.
- * - the action row: Mute, or the mute's note ("Muted until 18:40 · <reason>") with Unmute.
+ * - the action row: Diagnose ("Diagnose again" once the check has a diagnosis), then Mute, or the mute's note
+ *   ("Muted until 18:40 · <reason>") with Unmute.
  *
  * When the editor closes it takes focus with it. If focus fell to the page, it comes back to what
  * opened the editor, which after a save is the ✎ that now follows the name.
  *
- * Used by the cerberus module's `CheckSheet`, which wires the four callbacks and the editor.
+ * Used by the cerberus module's `CheckSheet`, which wires the callbacks and the editor.
  */
-export function SelectedCheck({ check, editor, onName, onMute, onUnmute }: SelectedCheckProps) {
+export function SelectedCheck({ check, editor, onName, onMute, onUnmute, diagnosis, diagnosisRead, onDiagnosisStarted }: SelectedCheckProps) {
   const { t } = useTranslation();
   const nameTriggerRef = useRef<HTMLButtonElement>(null);
   const editing = editor !== null;
@@ -106,8 +114,14 @@ export function SelectedCheck({ check, editor, onName, onMute, onUnmute }: Selec
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
-        {/* SLOT: actions — the diagnosis plan's Diagnose goes here, before Mute, as the prototype orders it
-            (:418). Nothing is drawn for it until it lands. */}
+        {diagnosisRead && diagnosis?.status !== 'running' && (
+          <DiagnoseButton
+            node={check.node}
+            checkKey={check.key}
+            label={t(diagnosis === null ? 'cerberus.diagnosis.diagnose' : 'cerberus.diagnosis.again')}
+            onStarted={onDiagnosisStarted}
+          />
+        )}
         {check.mute === null ? (
           <Button variant="ghost" size="sm" onClick={onMute}>
             {t('cerberus.sheet.mute')}

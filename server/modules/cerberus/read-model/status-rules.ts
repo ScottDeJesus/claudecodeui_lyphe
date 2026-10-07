@@ -12,8 +12,9 @@ import type { CerberusStatus, CerberusStoredStatus } from '@/shared/cerberus-typ
  * `paused` because it is one of them quieted, and `unknown` ranks above `ok` so a window with a gap
  * in it is never read as passing.
  *
- * Consumers: `cells.ts` (a cell keeps the first check to reach its worst word) and, through the
- * cerberus barrel, the `fixes` plan's auto-run, so the tab and the auto-run read one set of rules.
+ * Consumers: `cells.ts` (a cell keeps the first check to reach its worst word), `freshness.ts` (a
+ * window's word and the moment it rose) and, through the cerberus barrel, the `fixes` plan's auto-run,
+ * so the tab and the auto-run read one set of rules.
  */
 export const SEV: Record<CerberusStatus, number> = {
   not_enabled: -1,
@@ -27,11 +28,18 @@ export const SEV: Record<CerberusStatus, number> = {
 };
 
 /**
+ * A window's word and the first moment inside the window at which that word held — the moment a
+ * lookup of the same check answers it, when the window holds one (`layerWindow` says when it does
+ * not). Handed by `windowStatus` and the overlay layering over it, and carried to the wire as a cell's `at`.
+ */
+export type WindowWord = { status: CerberusStatus; at: number };
+
+/**
  * The worse of two words by `SEV`. On a tie the FIRST argument wins, which is what lets a fold name
  * the check that set a cell: the first check to reach the worst status keeps it.
  *
- * Consumers: `freshness.ts` (a window), `cells.ts` (a service's cell, and the check that set it) and
- * `overview.ts` (a service's status folded from its checks).
+ * Consumers: `cells.ts` (a service's cell, and the check that set it) and `overview.ts` (a service's
+ * status folded from its checks).
  */
 export function worst(a: CerberusStatus, b: CerberusStatus): CerberusStatus {
   return SEV[b] > SEV[a] ? b : a;

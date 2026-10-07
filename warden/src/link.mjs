@@ -1,17 +1,16 @@
-// The link: the warden's one socket to center, kept up for as long as the warden runs.
-//
-// The protocol's one home is `server/shared/cerberus-types.ts`; center's half of the conversation is
-// `server/modules/cerberus/warden-auth.ts` (who may connect) and `warden-link.ts` (what it says back).
-// This file follows them and restates nothing beyond what it must act on; the behaviour by stage is MAN-7824.
+// The link: the warden's one socket to center, kept up for as long as the warden runs. The protocol's one home is
+// `server/shared/cerberus-types.ts`; center's half is `warden-auth.ts` (who may connect) and `warden-link.ts` (what it says back).
+// This file restates only what it must act on; the behaviour by stage is MAN-7824.
 //
 //   CONNECT   a fresh `at` and signature on EVERY attempt (center remembers the pairs it has seen); `hello` first.
 //   TRUST     every frame from center is checked against the key pinned at enrollment BEFORE its text is parsed.
-//   LINKED    from `welcome` to the socket's close: the outbox trimmed to `ackedUpto`, the rest resent, a heartbeat every 15 s.
+//   LINKED    from `welcome` to the socket's close: the outbox trimmed to `ackedUpto`, the rest resent, a heartbeat every 15 s;
+//             a reliable frame center leaves unanswered for 90 s, with no other word from it, drops the link (`ack-watch.mjs`).
 //   RETRY     after any close, 1, 2, 4, 8, then 15 s (±20 %), restarted by a `welcome`; a connect that never opened is
 //             asked about (`readRefusal`) so the log says WHY — a websocket client cannot see the 401's body.
 //
-// Later plans add frames with `link.on('checks.set', fn)` and `link.send(type, body)`; none touches the socket.
-// `link.on('link.down', fn)` runs when a LINKED socket is lost (never for `stop()`, nor for an attempt that missed `welcome`).
+// `link.on(type, fn)` and `link.send(type, body)` add frames; `link.on('link.down', fn)` runs when a LINKED socket is lost.
+import { createAckWatch } from './ack-watch.mjs';
 import { log } from './log.mjs';
 import { createOutbox } from './outbox.mjs';
 import { version } from './state.mjs';
@@ -23,8 +22,8 @@ export { readRefusal, verifyFrame };
 const BACKOFF_SECONDS = [1, 2, 4, 8, 15];
 const BACKOFF_JITTER = 0.2;
 const HEARTBEAT_MS = 15_000;
-/** Center closes a socket that has not said `hello` in 10 s; the warden gives each stage of an attempt (the upgrade, then the `welcome`) the same. */
-const ATTEMPT_DEADLINE_MS = 10_000;
+const ATTEMPT_DEADLINE_MS = 10_000; // center closes a socket silent for 10 s; each stage of an attempt (the upgrade, then the `welcome`) gets the same
+const ACK_DEADLINE_MS = 90_000; // six heartbeats: a center that acks a batch in milliseconds and a backlog in seconds is silent after this
 const SOCKET_OPEN = 1;
 
 function isRecord(value) {
@@ -57,6 +56,10 @@ export function createLink({ identity, state = noState, outbox = createOutbox(),
   let heartbeatTimer = null;
   let deadlineTimer = null;
   let sentUpto = 0; // the highest seq put on the current socket
+  const ackWatch = createAckWatch(ACK_DEADLINE_MS, () => {
+    log(`center has answered nothing for ${ACK_DEADLINE_MS / 1000} s with ${sentUpto - outbox.ackedUpto} reliable frame(s) outstanding; dropping the link`);
+    abandon(socket); scheduleReconnect();
+  });
 
   function logOnce(key, message) {
     if (loggedOnce.has(key)) return;
@@ -81,6 +84,7 @@ export function createLink({ identity, state = noState, outbox = createOutbox(),
       if (!transmit(frame.type, frame.seq, frame.body)) return;
       sentUpto = frame.seq;
     }
+    if (linked && sentUpto > outbox.ackedUpto) ackWatch.expect();
   }
 
   /** A report that throws is logged and dropped: it must never end the daemon from inside a socket event or a timer. */
@@ -104,6 +108,7 @@ export function createLink({ identity, state = noState, outbox = createOutbox(),
     attempt = 0;
     lastLoggedRefusal = null;
     sentUpto = ackedUpto;
+    ackWatch.stop(); // a welcome re-settles the account: `flushUnsent` below starts the watch again only for what is still unanswered
     linked = true;
     const resend = outbox.pending(ackedUpto);
     log(`linked to ${identity.center} as ${identity.node}${resend.length ? `; resending ${resend.length} unacked frame(s)` : ''}`);
@@ -122,6 +127,7 @@ export function createLink({ identity, state = noState, outbox = createOutbox(),
     welcome: onWelcome,
     ack: (body) => {
       outbox.ack(body.upto);
+      ackWatch.settle(sentUpto > outbox.ackedUpto);
       flushUnsent(); // an ack can drain the outbox below its cap, which queues a frame
     },
     error: onError,
@@ -173,6 +179,7 @@ export function createLink({ identity, state = noState, outbox = createOutbox(),
       logOnce(`other-node:${env.type}`, `dropped a "${env.type}" frame addressed to node ${JSON.stringify(env.node)}, not ${identity.node}`);
       return;
     }
+    ackWatch.heard();
     dispatch(env);
   }
 
@@ -189,6 +196,7 @@ export function createLink({ identity, state = noState, outbox = createOutbox(),
     linked = false;
     clearInterval(heartbeatTimer);
     clearTimeout(deadlineTimer);
+    ackWatch.stop();
   }
 
   function scheduleReconnect() {
@@ -220,11 +228,7 @@ export function createLink({ identity, state = noState, outbox = createOutbox(),
   function abandon(ws) {
     if (socket === ws) socket = null;
     goDown();
-    try {
-      ws.close();
-    } catch {
-      // Already closing; nothing is left to do for it.
-    }
+    try { ws.close(); } catch { /* already closing: nothing is left to do for it */ }
   }
 
   function connect() {
@@ -250,9 +254,7 @@ export function createLink({ identity, state = noState, outbox = createOutbox(),
       transmit('hello', null, buildHello(state()));
       armDeadline('welcome');
     });
-    ws.addEventListener('message', (event) => {
-      if (socket === ws) onMessage(event.data);
-    });
+    ws.addEventListener('message', (event) => { if (socket === ws) onMessage(event.data); });
     // `close` always follows and carries the decision; this only keeps an error from being unhandled.
     ws.addEventListener('error', () => {});
     ws.addEventListener('close', () => {
@@ -267,9 +269,7 @@ export function createLink({ identity, state = noState, outbox = createOutbox(),
 
   return {
     outbox,
-    get linked() {
-      return linked;
-    },
+    get linked() { return linked; },
     start() {
       if (running) return;
       running = true;

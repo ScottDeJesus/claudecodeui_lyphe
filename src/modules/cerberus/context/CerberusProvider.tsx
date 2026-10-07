@@ -3,12 +3,14 @@ import { useTranslation } from 'react-i18next';
 
 import { CerberusContext, type CerberusValue } from '@/modules/cerberus/context/CerberusContext';
 import { useCatalogRead } from '@/modules/cerberus/hooks/useCatalogRead';
+import { useDiagnosisVerbs } from '@/modules/cerberus/hooks/useDiagnosisVerbs';
+import { useWardensRead } from '@/modules/cerberus/hooks/useWardensRead';
 import { hm } from '@/modules/cerberus/utils/cerberusTime';
 import { api, refusalCode, refusalSentence, REQUEST_TIMEOUT_MS } from '@/shared/api';
 import type { CerberusNodeProject, CerberusNodeView, CerberusOverview } from '@/shared/cerberus-types';
 import { useToast } from '@/shared/context/ToastContext';
 import { useWebSocket } from '@/shared/context/WebSocketContext';
-import type { CerberusLabelInput, CerberusMuteInput, CerberusProjectMove } from '@/shared/types';
+import type { CerberusLabelInput, CerberusMuteInput, CerberusProjectMove, CerberusStartedBatch } from '@/shared/types';
 
 /**
  * The least gap between two reads that `cerberus_changed` frames may start. Center already coalesces
@@ -32,6 +34,13 @@ const CLOCK_READ_MS = 30_000;
  * keeping the picture "fresh" forever.
  */
 const STALE_AFTER_MS = 3 * CLOCK_READ_MS;
+
+/**
+ * How long after a landed write's failed re-read the overview is read again, in order: a blip that failed the
+ * read is usually over within the first, and the second is for one that was not. After the last the clock's
+ * own read (`CLOCK_READ_MS`) is the next chance.
+ */
+const REREAD_RETRY_PAUSES_MS = [1_000, 4_000];
 
 /**
  * The label a check goes by on screen — its plain name, or its key when it has none — read off the
@@ -78,15 +87,15 @@ function isOverview(body: unknown): body is CerberusOverview {
 }
 
 /**
- * The overview with the fixes plan's fields filled in where an older server left them out (an older API
- * answering a newer client): `running` as none, each need's `fix` and `run` as null. Every view dereferences
- * them, and one missing field must not stand the error boundary in place of the whole panel.
+ * The overview with the fixes and diagnosis plans' fields filled in where an older server left them out (an older
+ * API answering a newer client): `running` as none, each need's `fix`, `run` and `diagnosis` as null. Every view
+ * dereferences them, and one missing field must not stand the error boundary in place of the whole panel.
  */
 function withFixFields(body: CerberusOverview): CerberusOverview {
   return {
     ...body,
     running: body.running ?? [],
-    needsYou: body.needsYou.map((need) => ({ ...need, fix: need.fix ?? null, run: need.run ?? null })),
+    needsYou: body.needsYou.map((need) => ({ ...need, fix: need.fix ?? null, run: need.run ?? null, diagnosis: need.diagnosis ?? null })),
   };
 }
 
@@ -101,7 +110,8 @@ function withFixFields(body: CerberusOverview): CerberusOverview {
  * draw from the one overview, so a mute pressed in the sheet is already in the strip's number when
  * the sheet closes, and no reader can hold a copy of the fleet the others cannot see. The catalog is read
  * with it, in the same `refresh`, so a run's press and an auto-run switch bring the entry and the run
- * back together.
+ * back together; so are the wardens (`GET /wardens`: the release on offer and the batch running), which the
+ * header's update button and the Update wardens dialog both read.
  *
  * THE READ IS THE PICTURE. A write answers the row it wrote and nothing reads that body: the screen
  * comes from the read that follows the write, so a card is never drawn from an answer center has
@@ -109,7 +119,8 @@ function withFixFields(body: CerberusOverview): CerberusOverview {
  *
  * A FRAME IS A HINT, NOT A PICTURE. `cerberus_changed` says what moved and the answer to it is
  * always "read the overview again" — and reads overlap (a frame's, a write's, the clock's, the
- * mount's), so each takes a ticket and answers are published in TICKET order, never arrival order.
+ * mount's), so each takes a ticket and answers are published in TICKET order, never arrival order. A frame
+ * of a warden update (`updates: true`) is the one kind read at once instead of held to the frame gap.
  */
 export function CerberusProvider({ children }: { children: ReactNode }) {
   const { t } = useTranslation();
@@ -142,6 +153,9 @@ export function CerberusProvider({ children }: { children: ReactNode }) {
 
   // The catalog beside the overview, and the one read that brings it.
   const { catalog, catalogFailed, readCatalog } = useCatalogRead();
+
+  // The fleet's wardens beside the overview, and the one read that brings them.
+  const { wardens, readWardens } = useWardensRead();
 
   // The entries whose Run press is out: center answers once the warden has accepted the run, which can take
   // up to 10 s, and every Run now of those entries reads "Running…" for the wait. A list, since a press on
@@ -192,7 +206,7 @@ export function CerberusProvider({ children }: { children: ReactNode }) {
    * whose body has the overview's shape — replaces it; anything else, or a throw, leaves it as it
    * was and says "could not be read" only while there is none yet.
    */
-  const readOverview = useCallback(async () => {
+  const readOverview = useCallback(async (): Promise<boolean> => {
     const ticket = ++newestReadRef.current;
     let answer: CerberusOverview | null = null;
     // The read's own deadline, over the headers AND the body: a half-open connection never fails by
@@ -222,24 +236,41 @@ export function CerberusProvider({ children }: { children: ReactNode }) {
         if (overviewRef.current === null) setUnreachable(true);
         else if (Date.now() - lastAnswerAtRef.current > STALE_AFTER_MS) setStale(true);
       }
-      return;
+      return false;
     }
     // A good reading, but not the newest one applied: something newer is already on screen, and the
     // fleet must not go backwards.
-    if (ticket < newestAnswerRef.current) return;
-    newestAnswerRef.current = ticket;
-    apply(answer);
+    if (ticket > newestAnswerRef.current) {
+      newestAnswerRef.current = ticket;
+      apply(answer);
+    }
+    return true;
   }, [apply]);
 
   /**
-   * The overview and the catalog, read together; answers when the OVERVIEW has. The catalog is secondary
-   * data and follows on its own: a write's verdict waits for the picture it moved, never for a catalog read
-   * that hangs for its 30 s deadline.
+   * The overview, the catalog and the wardens, read together; answers when the OVERVIEW has, with whether its
+   * read was answered. The catalog and the wardens are secondary data and follow on their own: a write's verdict
+   * waits for the picture it moved, never for a read that hangs for its 30 s deadline.
    */
-  const refresh = useCallback(async () => {
+  const refresh = useCallback(async (): Promise<boolean> => {
     void readCatalog();
-    await readOverview();
-  }, [readOverview, readCatalog]);
+    void readWardens();
+    return readOverview();
+  }, [readOverview, readCatalog, readWardens]);
+
+  /**
+   * The re-read after a landed write failed: read again, on `REREAD_RETRY_PAUSES_MS`, until an answer to a read
+   * taken after the write (`after` is the newest ticket then) has been applied — this one's, or a frame's or the
+   * clock's. The write's verdict does not wait for it: a toast saying the write landed would otherwise sit over a
+   * screen that still shows the old fleet for as long as the next read takes to come on its own.
+   */
+  const rereadAfterWrite = useCallback(async (after: number) => {
+    for (const pause of REREAD_RETRY_PAUSES_MS) {
+      await new Promise((resolve) => window.setTimeout(resolve, pause));
+      if (!mountedRef.current || newestAnswerRef.current > after) return;
+      if (await refresh()) return;
+    }
+  }, [refresh]);
 
   /** ONE WRITE PER TARGET: the promise is on the map before a second press can see it. */
   const writeOnce = useCallback(<Answer,>(target: string, write: () => Promise<Answer>): Promise<Answer> => {
@@ -256,7 +287,8 @@ export function CerberusProvider({ children }: { children: ReactNode }) {
    * One write, and the one place a refused write becomes a sentence. The verdict is `response.ok`
    * alone — the body is not read, because the screen comes from the re-read — and a landed write is
    * followed by that re-read BEFORE this answers, so the card has already left Needs you when the
-   * caller's toast speaks. A refusal's body is read for the SERVER'S OWN WORDS ("until must be
+   * caller's toast speaks. A re-read that failed is tried again in the background (`rereadAfterWrite`), so
+   * the screen catches up in seconds, not at the next clock read. A refusal's body is read for the SERVER'S OWN WORDS ("until must be
    * within the next 24 hours"), which go under the toast when it carried any.
    *
    * A caller whose screen says one particular refusal in words of its own passes `saysOwnRefusal`: that
@@ -270,7 +302,8 @@ export function CerberusProvider({ children }: { children: ReactNode }) {
     try {
       const response = await request();
       if (response.ok) {
-        await refresh();
+        const after = newestReadRef.current;
+        if (!(await refresh())) void rereadAfterWrite(after);
         return 'landed';
       }
       if (saysOwnRefusal && (await saysOwnRefusal(response))) return 'refused';
@@ -289,7 +322,7 @@ export function CerberusProvider({ children }: { children: ReactNode }) {
       });
     }
     return 'failed';
-  }, [refresh, toast]);
+  }, [refresh, rereadAfterWrite, toast]);
 
   /** A write whose only answers are "it landed" and "it did not": `settleWrite`, flattened. */
   const sendWrite = useCallback(
@@ -387,6 +420,30 @@ export function CerberusProvider({ children }: { children: ReactNode }) {
     () => sendWrite(() => api.cerberus.setAuto(id, on)),
   ), [writeOnce, sendWrite]);
 
+  /**
+   * A batch of warden updates started: answers the batch and its updates as they stood, which the dialog follows
+   * (the screen itself comes from the re-read, where `wardens.running` holds them). A refusal (409 `CERBERUS_UPDATE_RUNNING`, a batch already
+   * going, perhaps from another window) raises the write's own toast and reads the wardens again, so the dialog
+   * can follow the batch that is running. A second press answers the first's verdict.
+   */
+  const startUpdate = useCallback((nodes: string[]): Promise<CerberusStartedBatch | null> => writeOnce(
+    'update:start',
+    async () => {
+      let started: CerberusStartedBatch | null = null;
+      const verdict = await settleWrite(async () => {
+        const response = await api.cerberus.startUpdate(nodes);
+        // Read only from a landed start: a refusal's body is `settleWrite`'s to read for its sentence.
+        if (response.ok) started = (await response.json()) as CerberusStartedBatch;
+        return response;
+      });
+      if (verdict !== 'landed') void refresh();
+      return verdict === 'landed' ? started : null;
+    },
+  ), [writeOnce, settleWrite, refresh]);
+
+  // The diagnosis's three writes, riding the same guards and the same toast as the verbs above.
+  const { diagnose, runProposal, promote } = useDiagnosisVerbs({ writeOnce, settleWrite, toast, tRef, mountedRef });
+
   useEffect(() => {
     mountedRef.current = true;
 
@@ -409,12 +466,36 @@ export function CerberusProvider({ children }: { children: ReactNode }) {
       }, wait);
     };
 
+    // A warden update's frames (`updates: true`) are read at once, never held to the gap above: an update is over
+    // in under half a second, so a read held for the gap would find it ended and the screen could never draw
+    // its step, the restart's pill or the paused minute. One read at a time, and a frame that lands while one is
+    // out asks for exactly one more when it answers, so a burst of steps costs two reads, never one per step. Only
+    // the overview and the wardens are read: they are all an update moves.
+    let updateReadOut = false;
+    let updateReadAgain = false;
+    const readForUpdateFrame = () => {
+      if (updateReadOut) {
+        updateReadAgain = true;
+        return;
+      }
+      updateReadOut = true;
+      void Promise.all([readOverview(), readWardens()]).finally(() => {
+        updateReadOut = false;
+        if (updateReadAgain && mountedRef.current) {
+          updateReadAgain = false;
+          readForUpdateFrame();
+        }
+      });
+    };
+
     // Subscribed BEFORE the first read: a `cerberus_changed` frame that lands between the two must
     // start its own read rather than be missed, and the tickets above keep the order honest. A
     // reconnect reads at once and unthrottled — frames were missed while the socket was down.
     const unsubscribe = subscribe((event) => {
-      if (event.kind === 'cerberus_changed') readForFrame();
-      else if (event.kind === 'websocket_reconnected') void refresh();
+      if (event.kind === 'cerberus_changed') {
+        if (event.updates === true) readForUpdateFrame();
+        else readForFrame();
+      } else if (event.kind === 'websocket_reconnected') void refresh();
     });
     void refresh();
     const clock = window.setInterval(() => void refresh(), CLOCK_READ_MS);
@@ -425,10 +506,10 @@ export function CerberusProvider({ children }: { children: ReactNode }) {
       window.clearInterval(clock);
       if (queuedRead !== null) window.clearTimeout(queuedRead);
     };
-  }, [refresh, subscribe]);
+  }, [refresh, readOverview, readWardens, subscribe]);
 
   // Anything that reads the fleet re-draws when a read lands. The verbs keep one identity, so
-  // in practice only `overview`, `unreachable`, `stale`, `catalog` and `starting` ever make a new value here.
+  // in practice only `overview`, `unreachable`, `stale`, `catalog`, `wardens` and `starting` ever make a new value here.
   const value = useMemo<CerberusValue>(() => ({
     overview,
     unreachable,
@@ -443,7 +524,12 @@ export function CerberusProvider({ children }: { children: ReactNode }) {
     starting,
     runEntry,
     setAuto,
-  }), [overview, unreachable, stale, catalog, catalogFailed, refresh, mute, liftMute, setLabel, setProjectNode, starting, runEntry, setAuto]);
+    wardens,
+    startUpdate,
+    diagnose,
+    runProposal,
+    promote,
+  }), [overview, unreachable, stale, catalog, catalogFailed, refresh, mute, liftMute, setLabel, setProjectNode, starting, runEntry, setAuto, wardens, startUpdate, diagnose, runProposal, promote]);
 
   return <CerberusContext.Provider value={value}>{children}</CerberusContext.Provider>;
 }

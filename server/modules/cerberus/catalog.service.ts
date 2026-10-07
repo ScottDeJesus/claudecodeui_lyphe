@@ -1,5 +1,6 @@
 import {
   cerberusCatalogDb,
+  cerberusDiagnosesDb,
   getCerberusConnection,
   type CerberusCatalogChangeRow,
   type CerberusCatalogRow,
@@ -11,6 +12,7 @@ import { AppError } from '@/shared/utils.js';
 import { notifyCatalogAcked } from './catalog-ack.js';
 import { hintChanged } from './cerberus-broadcast.js';
 import { freeEntryId, validateEntryInput } from './catalog-entry-input.js';
+import { oneOffLapsesAt, proposalOf } from './diagnosis/diagnosis-proposal.js';
 import { catalogEntryViews } from './read-model/catalog-views.js';
 import { wardenLinks } from './warden-links.js';
 
@@ -24,10 +26,11 @@ import { wardenLinks } from './warden-links.js';
  * `hintChanged`. Refusals are `AppError`s: 400 `CERBERUS_BAD_ENTRY` (the field named, see
  * `catalog-entry-input.ts`), 404 `CERBERUS_UNKNOWN_ENTRY`, 409 `CERBERUS_ENTRY_CAPPED`.
  *
- * A SET is a node's whole catalog at one version: `{ id, cmd, timeout }` of every live entry, plus the
- * one-offs of the previous set that have not yet expired (a one-off is a diagnosis's proposal; the
- * plan that owns diagnoses is the one that puts one in, this file only carries them across a
- * publish and drops them once past `expiresAt`). Versions count up per node from 1. The set carries
+ * A SET is a node's whole catalog at one version: `{ id, cmd, timeout }` of every live entry, plus
+ * the node's one-offs — each a diagnosis's proposal that ended less than an hour ago (`openOneOffs`:
+ * `{ id: <diagnosis id>, cmd: <the proposal's exact command>, timeout: 600, expiresAt: <ended_at +
+ * 3 600 000> }`). The diagnoses store is where one-offs live, so a set is built from it afresh each
+ * time and a lapsed one simply is not in the next. Versions count up per node from 1. The set carries
  * nothing about WHEN a fix applies, its limit or its auto switch: the warden verifies, center decides.
  *
  * THE ACK. A warden answers `catalog.set` (or a `welcome`'s catalog) with `catalog.ack { version }`
@@ -48,9 +51,17 @@ import { wardenLinks } from './warden-links.js';
  *
  * Consumers: `cerberus.routes.ts` (`listCatalog`, `writeEntry`, `setAuto`), `warden-link.ts`
  * (`catalogForWelcome`, `markCatalogSent`), `cerberus.module.ts` (`registerCatalogHandlers`),
- * `runs.service.ts` (`liveEntry`, `catalogSetFor`) and the plans after this one (`publishCatalog` when
- * a diagnosis's one-off appears, `retireEntry` when an entry is withdrawn).
+ * `runs.service.ts` (`liveEntry`, `catalogSetFor`), the diagnosis service (`publishCatalog` when a
+ * diagnosis's one-off appears, `writeEntry` and `setAuto` when it is promoted) and the plans after
+ * this one (`retireEntry` when an entry is withdrawn).
  */
+
+/**
+ * How long a run of a one-off may last, in seconds: the timeout a set gives the warden for a proposal,
+ * the one `runs.service.ts` sends with its `run.start`, and the one a promotion gives the entry it
+ * writes — one number, so a proposal runs for as long once as it is allowed to as an entry.
+ */
+export const ONE_OFF_TIMEOUT_S = 600;
 
 function unknownEntry(id: string): AppError {
   return new AppError(`No catalog entry "${id}" exists.`, { code: 'CERBERUS_UNKNOWN_ENTRY', statusCode: 404 });
@@ -84,7 +95,7 @@ function appendChange(change: Omit<CerberusCatalogChangeRow, 'at'>, at: number):
   }
 }
 
-/** The one-offs a set's JSON column holds, or none when the column cannot be read — it must not block a publish. */
+/** The one-offs a set's JSON column holds, or none when the column cannot be read — it must not block a warden's welcome. */
 function parseOneOffs(row: CerberusCatalogSetRow, node: string): CerberusCatalogSet['oneOffs'] {
   try {
     return JSON.parse(row.one_offs) as CerberusCatalogSet['oneOffs'];
@@ -117,14 +128,18 @@ export function ackedCatalogVersion(node: string): number | null {
 }
 
 /**
- * Records the node's next set: its live entries, and the previous set's one-offs that have not yet
- * expired. Runs INSIDE the caller's write transaction, so the set and the change that made it commit
- * together; nothing is sent here.
+ * Records the node's next set: its live entries, and the node's open one-offs. Runs INSIDE the
+ * caller's write transaction, so the set and the change that made it commit together; nothing is sent
+ * here.
  */
 function recordNextSet(node: string, now: number): CerberusCatalogSet {
   const entries = cerberusCatalogDb.list(node).map(({ id, cmd, timeout }) => ({ id, cmd, timeout }));
-  const previous = cerberusCatalogDb.latestSet(node);
-  const oneOffs = previous ? parseOneOffs(previous, node).filter((oneOff) => oneOff.expiresAt > now) : [];
+  const oneOffs = cerberusDiagnosesDb.openOneOffs(node, now).flatMap((diagnosis) => {
+    // `openOneOffs` selects rows with a proposal and an end; the guard keeps the types honest. The
+    // command is the proposal's own `cmd`, as stored — never the `general` form a promotion saves.
+    const expiresAt = oneOffLapsesAt(diagnosis);
+    return expiresAt === null ? [] : [{ id: diagnosis.id, cmd: proposalOf(diagnosis).cmd, timeout: ONE_OFF_TIMEOUT_S, expiresAt }];
+  });
   const version = cerberusCatalogDb.insertSet(node, JSON.stringify(entries), JSON.stringify(oneOffs));
   return { version, entries, oneOffs };
 }
@@ -136,8 +151,8 @@ function sendSet(node: string, set: CerberusCatalogSet): void {
 
 /**
  * Publishes the node's catalog as it stands now: a new version row, then the signed `catalog.set`
- * down its link. Answers the set. For the plans that change a set without an entry changing (a
- * diagnosis's one-off appearing or lapsing); the writes below publish in their own transaction.
+ * down its link. Answers the set. For what changes a set without an entry changing — a diagnosis's
+ * one-off appearing; the writes below publish in their own transaction.
  */
 export function publishCatalog(node: string): CerberusCatalogSet {
   const set = getCerberusConnection()

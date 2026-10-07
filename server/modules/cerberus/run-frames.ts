@@ -33,11 +33,12 @@ import { wardenLinks } from './warden-links.js';
  * seconds behind, or reads a million years ahead, cannot reorder the feed or keep a run on a need for
  * ever. A refusal carries no time, so it ends at center's own.
  *
- * THE RECHECK. A run that ends `ok`, on an entry that asks for it (`recheck`), sends `probe.run` for the
- * probe that reports the run's check — so the check moves within seconds of the fix instead of at its
- * next cadence. Only that check's own probe (one check, one fix: an entry never starts another), and only
- * on `ok`: a run that failed, timed out or was refused changed nothing worth measuring. A node that has
- * no link by then simply reads the check at its next scheduled run.
+ * THE RECHECK. A run that ends `ok`, on an entry that asks for it (`recheck`) or as a diagnosis's one-off
+ * (always: it was proposed for this very check, and a person pressing it wants to see the answer), sends
+ * `probe.run` for the probe that reports the run's check — so the check moves within seconds of the fix
+ * instead of at its next cadence. Only that check's own probe (one check, one fix: neither starts
+ * another), and only on `ok`: a run that failed, timed out or was refused changed nothing worth
+ * measuring. A node that has no link by then simply reads the check at its next scheduled run.
  *
  * Consumers: `runs.service.ts` (`registerRunFrames`, at the module's start).
  */
@@ -141,10 +142,10 @@ function reportingProbeOf(run: CerberusRunRow): string | null {
   return check?.reporting_probe ?? null;
 }
 
-/** Asks the warden to run the check's probe now, when the run's entry asked for it. */
+/** Asks the warden to run the check's probe now, when the run's entry asked for it or the run is a diagnosis's one-off. */
 function recheck(run: CerberusRunRow): void {
   const entry = run.entry === null ? null : cerberusCatalogDb.get(run.entry);
-  if (entry?.recheck !== 1) return;
+  if (run.diagnosis === null && entry?.recheck !== 1) return;
   const probe = reportingProbeOf(run);
   if (probe === null) {
     console.warn(`[Cerberus] run ${run.id} ended ok but no probe reports ${run.node}/${run.check_key}, so it is not rechecked`);

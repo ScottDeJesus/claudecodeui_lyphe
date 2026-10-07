@@ -21,7 +21,7 @@ type DialogFrameProps = {
   /** Escape, the backdrop and the ✕. The dialog decides whether that closes it. */
   onDismiss: () => void;
   /** Which dialog this is, as `data-cerberus-dialog` on the panel: what a verify script finds it by. */
-  marker: 'mute' | 'enroll';
+  marker: 'mute' | 'enroll' | 'promote' | 'update';
   children: ReactNode;
 };
 
@@ -36,7 +36,8 @@ type DialogFrameProps = {
  * is drawn first: the first focus then lands on the dialog's first field or chip, not on the way out, and
  * Escape still closes from anywhere.
  *
- * Used by the cerberus module's `MuteDialog` and `EnrollDialog`.
+ * Used by the cerberus module's `MuteDialog` and `EnrollDialog`, by its `PromoteDialog` at the 600 width,
+ * the nearer of the two to the prototype's 580, and by its `UpdateWardensDialog` at 600, the prototype's own.
  */
 export function DialogFrame({ size, title, accent, busy = false, onDismiss, marker, children }: DialogFrameProps) {
   const { t } = useTranslation();

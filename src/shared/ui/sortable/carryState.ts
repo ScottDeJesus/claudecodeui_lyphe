@@ -22,6 +22,13 @@ export type Carry = {
   /** The pane the list scrolls in, and how far it had scrolled when the carry last decided anything. */
   scroller: HTMLElement | null;
   reference: { x: number; y: number; scroll: number };
+  /**
+   * The edge zone the carry began inside — -1 the top one, 1 the bottom one, 0 neither — until the pointer
+   * has been out of it or pulled far past the pane's edge (`edgeHoldAt`). A carry that begins in a zone has not
+   * travelled to that edge, so the pane holds still toward it: held, a drag of one row's height from a row that
+   * opens in the zone is one slot, not a run to the list's end.
+   */
+  edgeHold: number;
   /** The pane's offset as the last frame saw it, so a scroll nobody here caused (the reader's wheel) is noticed. */
   seenScroll: number;
   frame: number;

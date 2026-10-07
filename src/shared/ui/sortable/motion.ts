@@ -30,6 +30,13 @@ const SLIDE_EASING = 'cubic-bezier(.22,1,.36,1)';
 const EDGE_ZONE_PX = 56;
 const EDGE_MAX_STEP_PX = 22;
 
+/**
+ * How deep into an edge zone a pointer must be pulled, in zone depths (1 is the pane's own edge), for the
+ * edge a carry BEGAN in to let go of it: more than two zones' depth past the pane is a pull toward
+ * scrolling, which no reorder among the rows in view needs.
+ */
+const EDGE_HOLD_RELEASE_DEPTH = 3;
+
 const reducedMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 /** Plays `element` from where it was drawn (`from`) to where it now stands, unless the reader asked for no motion. */
@@ -53,15 +60,31 @@ export function scrollerOf(element: Element): HTMLElement | null {
   return null;
 }
 
-/** How far the pane scrolls this frame for a pointer at `pointerY`: 0 away from its edges, up to a step near them, signed (negative is up). */
-export function edgeStep(scroller: HTMLElement, pointerY: number): number {
+/** How deep into an edge zone a pointer at `pointerY` is, in zone depths: 0 away from the edges, 1 at the pane's own edge, more past it; signed (negative is the top edge). */
+function edgeDepth(scroller: HTMLElement, pointerY: number): number {
   const box = scroller.getBoundingClientRect();
   const top = Math.max(box.top, 0) + EDGE_ZONE_PX;
   const bottom = Math.min(box.bottom, window.innerHeight) - EDGE_ZONE_PX;
-  const depth = pointerY < top ? (top - pointerY) / EDGE_ZONE_PX : pointerY > bottom ? (pointerY - bottom) / EDGE_ZONE_PX : 0;
+  if (pointerY < top) return -(top - pointerY) / EDGE_ZONE_PX;
+  return pointerY > bottom ? (pointerY - bottom) / EDGE_ZONE_PX : 0;
+}
+
+/** How far the pane scrolls this frame for a pointer at `pointerY`: 0 away from its edges, up to a step near them, signed (negative is up). */
+export function edgeStep(scroller: HTMLElement, pointerY: number): number {
+  const depth = edgeDepth(scroller, pointerY);
   if (depth === 0) return 0;
-  const step = Math.max(1, Math.round(EDGE_MAX_STEP_PX * Math.min(depth, 1)));
-  return pointerY < top ? -step : step;
+  return Math.sign(depth) * Math.max(1, Math.round(EDGE_MAX_STEP_PX * Math.min(Math.abs(depth), 1)));
+}
+
+/**
+ * The edge a carry still holds, for a pointer at `pointerY`: `held` (-1 the top zone, 1 the bottom, 0 none) while
+ * the pointer is in that zone, and 0 once it is out of it or pulled `EDGE_HOLD_RELEASE_DEPTH` zones into it. A carry
+ * begins holding the edge its first point is in (the sign of `edgeStep` there), so a row merely drawn in a zone does
+ * not run the pane, and a pointer carried far past the pane's edge — or out of the zone and back — does.
+ */
+export function edgeHoldAt(scroller: HTMLElement, pointerY: number, held: number): number {
+  const depth = edgeDepth(scroller, pointerY);
+  return Math.sign(depth) === held && Math.abs(depth) < EDGE_HOLD_RELEASE_DEPTH ? held : 0;
 }
 
 /** Whether a computed colour is wholly transparent: the keyword, `rgba(…, 0)`, or the `color(… / 0)` form `color-mix` computes to. */

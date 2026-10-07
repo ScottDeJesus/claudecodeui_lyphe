@@ -69,7 +69,19 @@ function signalGroup(child, signal) {
 export function createRunner({ link, catalog, home = os.homedir() }) {
   const active = new Map(); // run id → { child, lines, timers, ended }
   const settled = new Set(); // the last SETTLED_KEPT ids that ended, oldest first
+  const changeListeners = new Set();
   let stopped = false;
+
+  /** Tells whoever waits on the set of runs (the updater, before it restarts the warden) that it has changed. A listener that throws is logged and does not stop the run's own bookkeeping. */
+  function announceChange() {
+    for (const listener of changeListeners) {
+      try {
+        listener();
+      } catch (error) {
+        log(`a listener of the run set failed: ${error?.message ?? error}`);
+      }
+    }
+  }
 
   /** A run frame, reliable. A frame the outbox could not number (a full disk) is one log line: the run goes on. */
   function say(type, body) {
@@ -101,6 +113,7 @@ export function createRunner({ link, catalog, home = os.homedir() }) {
     const lines = createRunLines({ emit: (batch) => say('run.output', { runId, lines: batch }) });
     const run = { child: null, lines, timers: [], ended: false };
     active.set(runId, run);
+    announceChange();
 
     const seconds = Number.isInteger(requestedTimeout) && requestedTimeout >= 1 ? Math.min(held.timeout, requestedTimeout) : held.timeout;
     let timedOut = false;
@@ -112,6 +125,7 @@ export function createRunner({ link, catalog, home = os.homedir() }) {
       if (timedOut) signalGroup(run.child, 'SIGKILL');
       lines.finish();
       active.delete(runId);
+      announceChange();
       settled.add(runId);
       if (settled.size > SETTLED_KEPT) settled.delete(settled.values().next().value);
       const result = timedOut ? 'timed_out' : code === 0 ? 'ok' : 'failed';
@@ -184,6 +198,11 @@ export function createRunner({ link, catalog, home = os.homedir() }) {
     /** The ids of the runs in flight: `hello.active.runs`, and what the updates plan waits on before it restarts the warden. */
     activeWork() {
       return { runs: [...active.keys()] };
+    },
+    /** Registers `listener` to run whenever a run starts or ends; answers its remover. */
+    onWorkChange(listener) {
+      changeListeners.add(listener);
+      return () => changeListeners.delete(listener);
     },
     /** The warden is stopping: every child is killed, and nothing more is said about them. */
     stop() {

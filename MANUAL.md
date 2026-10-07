@@ -2168,7 +2168,7 @@ Rules
 - 2026-10-06: `h-[clamp(9rem,26vh,16rem)]`, `text-xl/tight` and `grid-cols-[auto_minmax(0,1fr)]` were in the served stylesheet; `src/index.css` needed no touch.
 
 Traps
-- OPEN DEFECT (INV-7057), in the shared sortable: `edgeStep`'s fixed 56px zone (`shared/ui/sortable/motion.ts`) covers 112 of the band's 234px, and the first visible row opens within 20px of the band's bottom. A carry begun in the zone scrolls the band under the pointer, and a drag of a row's height ends with the row dropped at the list's END, a wrong write of the order (`{kind: 'plan', name, after: <last>}`). It is not a no-op. The cure is in the sortable and needs its own review (the runner tab shares it): hold the edge scroll until the pointer has travelled from where the carry began. Scaling the zone to `min(56, height / 4)` alone does not cure it: 234 / 4 is 58.
+- The band is 234px and `useSortable`'s edge zone is 56px at each edge, so a row can open inside a zone (the first visible one opens within 20px of the bottom). A carry that begins there holds that edge until the pointer has left the zone or been pulled far past the pane (`Carry.edgeHold`, MAN-7577): a drag of a row's height moves it one slot (`{kind: 'plan', name, before: <next>}`) or nothing, and the band does not move. Before the hold it ran the band to the list's END and wrote `after: <last>`. Scaling the zone to `min(56, height / 4)` would not have cured it: 234 / 4 is 58.
 - The ⋯ menu closes on any scroll: a probe brings the panel into view before it presses the trigger.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/panel/PanelRows.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/panel/TreePanel.tsx
@@ -2248,10 +2248,11 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/panel/EpicPa
 - The dot is `data-tone` + `bg-tone-dot`, so it cannot disagree with a status mark.
 
 ## Row layout
-`dot` · one wrapping line (`flex-wrap gap-x-2.5 gap-y-1`) holding the source pill (`max-w-full truncate`) and the words (`flex-[1_1_10rem]`: title, then summary when `full`) · `when` · chevron.
-- Words have less than 10 rem beside the pill: they drop UNDER the pill, in either density; a `dense` title stays one line there.
-- Measured: at 390 px a "Shadow connector" pill left the title ~90 px, and titles wrapped to four lines side by side. The stack is the cure.
-- A pill wider than the row truncates.
+`dot` · the body (`.vv-timeline__body`: the source pill, then the words — title, then summary when `full`) · `when` · chevron.
+- STACKED OR SIDE BY SIDE IS THE LIST'S DECISION, never a row's. `.vv-timeline` is a container (`container: vv-timeline / inline-size`): under 32 rem EVERY row drops its words UNDER its pill, in either density (a `dense` title stays one line there); from 32 rem EVERY row sets them beside it, the pill capped at 45 % of the body so the words keep their 10 rem.
+- why: a wrap decided row by row, on each pill's own width, put the title of a short-pilled row beside it and the title of a long-pilled one under it, so one list's titles started in two places. Measured 2026-10-07 on the real `Timeline` with eight sources of different lengths (`.verify/cerberus-timeline-stacking.mjs`): before, 340 to 460 px split the list (6, 4 and 1 of 8 rows stacked); after, every width from 300 to 900 px is all stacked or all side by side, and the narrowest title is 165 px.
+- Measured: at 390 px a "Shadow connector" pill beside the title left it ~90 px, and titles wrapped to four lines. The stack is the cure.
+- A pill wider than its room truncates (`.vv-timeline__source`: ellipsis).
 
 ## Consumers
 | consumer | density | file |
@@ -2287,3 +2288,63 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Timeline.tsx
 | every option is its own tab stop (`tabIndex={0}`); no arrow keys, no type-to-find | roving focus is its own piece of work |
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Select.tsx
+
+## MAN-7926 — Cerberus fixes, the whole once — .verify/cerberus-fixes-whole-scratch.sh, -live.mjs and cerberus-fixes-refused-shot.mjs: what each proves, how to run it, the verdicts
+
+The fixes screen, the catalog and the auto-run rule shown end to end: a real Run now on the live tab, auto-run and a refusal on a scratch center. The whole before the fixes: MAN-7899 (`.verify/cerberus-whole*`). Runs, the rule, the refusal's source: MAN-7904, MAN-7910, INV-7106, INV-7080. The screen: MAN-7906. The seeded entries: MAN-7925. The scratch server and its slots: MAN-673 (`cloudcli:docs`).
+
+## Files
+| file | proves | runs against |
+|---|---|---|
+| `.verify/cerberus-fixes-whole-live.mjs` | Run now on `docstore/backup.age`, pressed in the sheet as a person presses it | the live app on :5183 (`openConsole`, `openNodeCard`), `~/.cloudcli/cerberus.db` read-only |
+| `.verify/cerberus-fixes-whole-scratch.sh` | auto-run once inside its limit, the recheck, a refused `run.start` | a scratch center (`scripts/sunset-probe.sh`) and a scratch warden |
+| `.verify/cerberus-fixes-refused-shot.mjs` | `FixOutput` reads "✕ Refused" and the refusal's reason over a real run view | the running :5183 client, the scratch center's answer |
+
+## Run it
+| when | do |
+|---|---|
+| the live half | `node .verify/cerberus-fixes-whole-live.mjs --evidence <dir>` |
+| the scratch half | `SUNSET_SLOT=4 bash .verify/cerberus-fixes-whole-scratch.sh <dir>` — about 4 minutes, run it in the background |
+| the shot alone | `SCRATCH_TOKEN=<jwt of the scratch center> node .verify/cerberus-fixes-refused-shot.mjs <run url> <dir> [Refused]` — the scratch script calls it |
+
+## `cerberus-fixes-whole-live.mjs`
+- Opens eis1's card, the Document store row (the sheet opens on `docstore/backup.age`), presses "Run now" under "Fixes in the catalog", polls the page every 200 ms and prints each change of the pill, the pane's lines and the check's value.
+- Starts a REAL `docstore/bin/backup` (one `pg_dump`, ~18 s): `docstore-<weekday>.dump` is overwritten. No model is called.
+- Verdicts, all required: the POST answered 200 with a `runId`; `GET /api/cerberus/runs/<id>` is `by: you`, `result: ok`, `exit: 0`; its lines carry `backup: …/docstore-<weekday>.dump <bytes> bytes` with an offset `t`; the pane shows that line; the pill reads "✓ Succeeded"; the check's value reads "Newest file written <n> s ago (docstore-<weekday>.dump)" with n < 60; the entry has exactly one more run in the store; no console error while signed in.
+- Output: `steps.txt` and the screenshots (1440×900 running, 1440×900 and 390×844 ended, 390×844 pane) in `<dir>`.
+- No guard for the 03:25–03:35 backup `flock` (`state/docstore/backup.lock`): a press then ends `failed` (MAN-7925).
+
+## `cerberus-fixes-whole-scratch.sh`
+1. A held slot (a server answering, a port listening, `server.pid` or `probe.db` on file) exits 1 before anything is written.
+2. Boots the scratch center, enrolls a warden from this checkout with its own `CERBERUS_WARDEN_HOME` as a background job, sets a `file_age` probe `pass: "age < 1m"` every 10 s.
+3. Entry A touches the file (auto on, 1 run per 3 600 s, `recheck`). Entry B is on another check, auto off.
+4. Timeline until the check has moved into failing twice (counted from stored `change` rows) plus 25 s: A must have exactly one run.
+5. B's set is acked, then `update catalog set cmd='echo changed'` in the scratch store; `POST /catalog/<B>/run` makes the real center send the changed command with the acked version; the warden answers `run.refused`.
+6. Mounts `FixOutput` over B's run through `cerberus-fixes-refused-shot.mjs`.
+
+| verdict | passes when |
+|---|---|
+| A ran by auto exactly once | `count(runs where entry = A and by = 'auto')` is 1 |
+| A's auto run ended ok | `runs.result = 'ok'` |
+| the recheck passed the check | a stored `failing → ok` row with `at - prev_at < 5000` and `at` within −1 s to +5 s of A's run `ended_at` |
+| B ended refused | `result = refused`, `started_at` null, `cmd = 'echo changed'` |
+| B's refusal says why | `note` equals `The command is not catalog v<sent version>'s command for '<B id>'` |
+| B named the newest acked version | `catalog_version` is the max acked version of the node |
+
+- The recheck verdict compares `prev_at` (the warden's previous result time, `ingest.service.ts`) with the run's end: a recheck follows the failing result by ~1 s, a cadence tick by ~10 s. why: a bare `failing → ok` count passes on the next tick when `recheck` never fired.
+- The refusal verdict names the command check: a refusal for an unknown id or the wrong version fails it.
+- Cleanup on every exit: the warden (pid checked as an integer above 1 and as `warden/src/main.mjs` in `/proc/<pid>/cmdline` before `kill`), the probe server, then the `mktemp -d` scratch under `/tmp/heph-fixes-whole-*`.
+- Measured 2026-10-07: slot 4, A one auto run, recheck row 1 s after the failing result; B `refused` with no start and no exit.
+
+## `cerberus-fixes-refused-shot.mjs`
+- Reads the run from the scratch center (`<run url>`, token in `SCRATCH_TOKEN`) and hands it to the component through a Playwright route on `**/api/cerberus/runs/<id>`. why: the component reads through the live client's API base, not `$SUNSET_API`.
+- Mounts the running client's own `FixOutput` and `WebSocketContext` with `lib/mountReact.mjs` (specifiers read from served source), a quiet socket, at 1440×900 and 390×844.
+- Writes `fix-output-<expect>-<w>x<h>.png`; `expect` is the pill word, default `Refused`.
+- Six verdicts per size: pill glyph + word; eyebrow "Fix output"; the run's name; the pane's first line `$ <cmd>`; the run's note in the pane; no page error. A refused run whose `note` is null fails the note verdict; any other result accepts a null note.
+- Exit 1 when any verdict failed at either size.
+
+## Rules
+- A "recheck passed" claim is discriminated from the probe's own cadence: compare `prev_at` and the run's end, never a bare `failing → ok` count.
+- The scratch script runs in a slot of its own (`SUNSET_SLOT`, default 4 here) and never opens `~/.cloudcli/cerberus.db` or binds 3012; the live script only reads that store (`sqlite3 -readonly`).
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/cerberus-fixes-refused-shot.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/cerberus-fixes-whole-live.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/cerberus-fixes-whole-scratch.sh

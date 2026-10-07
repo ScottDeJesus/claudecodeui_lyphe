@@ -2,6 +2,7 @@ import type { TFunction } from 'i18next';
 import { useTranslation } from 'react-i18next';
 
 import { useCerberus } from '@/modules/cerberus/context/CerberusContext';
+import { DiagnoseButton } from '@/modules/cerberus/DiagnoseButton';
 import { NeedFix } from '@/modules/cerberus/fleet/NeedFix';
 import { useLeavingNeeds } from '@/modules/cerberus/hooks/useLeavingNeeds';
 import { StatusGlyph } from '@/modules/cerberus/StatusMarks';
@@ -41,6 +42,8 @@ function NeedCard({ need, leaving, onOpen, onMute }: NeedCardProps) {
   const { check } = need;
   const look = STATUS_TABLE[check.status];
   const service = check.serviceLabel ?? check.service;
+  // The sheet on this check, at now: the root's onOpenCell with the check's id inside its service.
+  const target: CerberusSheetTarget = { node: check.node, service: check.service, check: check.id };
   return (
     <li
       aria-hidden={leaving || undefined}
@@ -56,8 +59,7 @@ function NeedCard({ need, leaving, onOpen, onMute }: NeedCardProps) {
         <button
           type="button"
           disabled={leaving}
-          // The sheet on this check, at now: the root's onOpenCell with the check's id inside its service.
-          onClick={() => onOpen({ node: check.node, service: check.service, check: check.id })}
+          onClick={() => onOpen(target)}
           className="min-w-0 flex-1 text-left"
         >
           <span className="block text-[14.5px] font-medium">
@@ -80,7 +82,14 @@ function NeedCard({ need, leaving, onOpen, onMute }: NeedCardProps) {
       <div className="flex flex-wrap gap-2 pl-[34px]">
         {/* The run strip on a line of its own above the row's buttons, then Run “<fix>” (tonal). */}
         <NeedFix need={need} leaving={leaving} onOpen={onOpen} />
-        {/* SLOT: actions — the diagnosis plan's Diagnose / Diagnosing… / See diagnosis (outline), after the fix and before Mute. */}
+        {need.diagnosis === null ? (
+          // No diagnosis since it went bad: asking for one opens the sheet, where its steps arrive.
+          <DiagnoseButton node={check.node} checkKey={check.key} label={t('cerberus.diagnosis.diagnose')} disabled={leaving} onStarted={() => onOpen(target)} />
+        ) : (
+          <Button variant="outline" size="sm" disabled={leaving} onClick={() => onOpen(target)}>
+            {t(need.diagnosis.status === 'running' ? 'cerberus.diagnosis.diagnosing' : 'cerberus.diagnosis.see')}
+          </Button>
+        )}
         <Button
           variant="ghost"
           size="sm"
@@ -114,9 +123,10 @@ type NeedsYouCardProps = {
  *
  * Each card says what is wrong in words before anything else ("Session is valid · Failing"), then
  * where and since when, then what it reported, then what can be done: first the card's fix (`NeedFix`,
- * its run's strip on a line of its own, then Run “<fix>”), then Mute (the diagnosis plan adds its buttons
- * before it). A card that stops needing you does not blink out: it stays where it
- * was for .55 s, its strip as it was drawn, and leaves on `vv-toast-out`. With motion reduced it is simply gone.
+ * its run's strip on a line of its own, then Run “<fix>”), then Diagnose (outline; “Diagnosing…” while the
+ * check's diagnosis since it went bad runs, “See diagnosis” once it ended: both open the sheet), then Mute.
+ * A card that stops needing you does not blink out: it stays where it was for .55 s, its strip as it was
+ * drawn, and leaves on `vv-toast-out`. With motion reduced it is simply gone.
  *
  * With nothing to ask for, the card says so: "✓ Nothing needs you" and "N of M checks passing." Then, while
  * any catalog entry is set to run on its own, "Fixes set to auto-run will run on their own and show up below."

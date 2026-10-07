@@ -4177,40 +4177,6 @@ probe-key: 243c2c19a79b7caa3e2ac6ef9c8de94689797207
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/center-key.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/warden-auth.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/warden-enrollment.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/warden-gateway.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/warden-link.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-cerberus-gateway.mjs
 
-## INV-6991 — probe — A `CERBERUS_LISTEN` equal to the API's address binds beside it and answers half of the browser's requests with 404; the report does not name it
-
-A `CERBERUS_LISTEN` equal to the API's address binds beside it and answers half of the browser's requests with 404; the report does not name it
-
-```probe
-D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
-cat > "$D/p.sh" <<'EOF'
-cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
-export CERBERUS_DB_PATH="$D/cerberus.db" CERBERUS_KEY_PATH="$D/center.key" DATABASE_PATH="$D/auth.db" TSX_TSCONFIG_PATH=server/tsconfig.json
-cat > "$D/p.mjs" <<'MJS'
-import http from 'node:http';
-const { startWardenGateway } = await import('/home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/warden-gateway.ts');
-// stands in for the API, bound the way server/index.ts binds it under the supervisor
-const api = http.createServer((q, r) => r.end('API')).listen({ host: '127.0.0.1', port: 7907, reusePort: true });
-await new Promise((r) => api.once('listening', r));
-const gw = await startWardenGateway({ listen: '127.0.0.1:7907', supervised: true });
-let apiAnswers = 0, gatewayAnswers = 0;
-for (let i = 0; i < 60; i++) { const body = await (await fetch('http://127.0.0.1:7907/', { headers: { connection: 'close' } })).text(); if (body === 'API') apiAnswers++; else gatewayAnswers++; }
-console.log(`gateway on the API's own address: ${gw.error ? 'refused: ' + gw.error : 'bound'} | of 60 requests the API answered ${apiAnswers}, the gateway's 404 answered ${gatewayAnswers}`);
-process.exit(0);
-MJS
-node --import tsx "$D/p.mjs" 2>&1 | grep -E "^gateway on" || echo "probe printed nothing"
-EOF
-export D
-bash "$D/p.sh"
-case "$D" in /tmp/athena-probe.*) rm -rf "$D";; esac
-expect: gateway on the API's own address: bound | of 60 requests the API answered ~30, the gateway's 404 answered ~30 (both non-zero)
-```
-
-measured 2026-10-06 by chain chain-cerberus--center--gateway-20261006-084510-45cb, finding L3, LOW
-probe-key: adcd70083c43e77c0bb3116c085574d95f18fc9d
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/center-key.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/warden-auth.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/warden-enrollment.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/warden-gateway.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/warden-link.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-cerberus-gateway.mjs
-
 ## INV-6998 — probe — MEDIUM — a deploy paints the hub "No result", twice: for ~30 s on the live reading, and for minutes in its history
 
 MEDIUM — a deploy paints the hub "No result", twice: for ~30 s on the live reading, and for minutes in its history
@@ -4396,6 +4362,8 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/cerberus
 ## INV-7006 — probe — LOW — the search the report must show leaves two of the intent's subjects out (the builder disclosed it)
 
 LOW — the search the report must show leaves two of the intent's subjects out (the builder disclosed it)
+
+Cause (2026-10-07): a four-topic query embeds as one blend, and the first stage keeps the nearest rows by best-chunk cosine, `max(6, limit)` of them; MAN-7801 sits 32nd and MAN-7803 67th by cosine, while the cross-encoder puts MAN-7801 4th (logit 4.24) and MAN-7803 16th (−0.55, above the floor −2.295) of the 150 nearest. So the default call (limit 3, a pool of 6, set by the rerank's measured latency, MAN-5422) can never show them, and `--limit 40` shows both once the door runs the `hnsw.ef_search` fix in `rank.candidates` (before it, any `--limit` came back with at most 12 rows from a 40-chunk scan). The default width stands; a multi-topic question is asked as one question per topic, or with `--limit 40`.
 
 ```probe
 D=$(mktemp -d /tmp/athena-probe-p.XXXXXX) || exit 1
@@ -5595,18 +5563,6 @@ measured 2026-10-06 by chain chain-cerberus--warden--whole-20261006-143758-038d,
 probe-key: ed637001d84570db780d10aaa5ca616bd7af9e0e
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/boot-vouch.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/cerberus.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/ingest.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/read-model/freshness.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/read-model/series.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/cerberus-types.ts
-
-## INV-7057 — (HIGH) — a carry begun in the band's edge zone runs the band away and writes the row to the list's END
-
-(HIGH) — a carry begun in the band's edge zone runs the band away and writes the row to the list's END
-
-2026-10-06, chain chain-roadmap-tree-view--panel-fill-20261006-143136-92fe, finding H1: carrying `restorly--kit` from the edge zone of the panel's band moved the band's scroll from 0 to 501 and wrote `{"kind":"plan","name":"restorly--kit","after":"restorly--judgment"}`, the list's end. Cured when the scroll after such a carry is small and the write holds one `before` body naming the next row, or there is no write.
-
-Mechanism and cure direction: MAN-7840 Traps. The cure is in the shared sortable (`edgeStep` in `src/shared/ui/sortable/motion.ts`, and `useSortable`): its own review, since the runner tab shares it.
-
-No reproducer is kept: the browser script that measured it imported `.verify` libs deleted with the old face. To re-measure, drive the panel's band through `.verify/lib/console.mjs` and `.verify/lib/roadmap-page.mjs` (`openRoadmapTab`, `pickRoadmap`) with the roadmap writes answered locally: press a feature's dot, carry a row of the epic panel from within 56px of the band's bottom edge, and read the band's scroll and the write's body.
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/faceContext.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/panel/PanelRows.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/panel/TreePanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/sortable/useSortable.ts
 
 ## INV-7058 — probe — a re-read that lands after more than a page of new events leaves a silent hole in the feed
 
@@ -6921,3 +6877,875 @@ measured 2026-10-07 by chain chain-cerberus--sessions--readopt-20261006-231514-9
 probe-key: a34c0c98ebf1787974d6c11a88986d72b88cddae
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/session-host/colocated-hosts.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/session-host/node-readopt.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/session-host/readopt-host.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/cerberus-node-readopt.mjs
+
+## INV-7127 — probe — step 3's verdict "the recheck passed the check" passes without a recheck
+
+step 3's verdict "the recheck passed the check" passes without a recheck
+
+```probe
+D=$(mktemp -d /tmp/athena-p.XXXXXX) && cat > "$D/p.sh" <<'EOF'
+cd /home/lyphe/.claude/claudecodeui_lyphe
+grep -n 'the recheck passed the check' .verify/cerberus-fixes-whole-scratch.sh | grep -c 'ended_at' || true
+EOF
+bash "$D/p.sh"; case "$D" in /tmp/athena-p.?*) rm -r "$D";; esac
+expect: 0 while the defect stands (the verdict's SQL never mentions the run's end); 1 once it compares to ended_at
+```
+
+measured 2026-10-07 by chain chain-cerberus--fixes--whole-20261007-021025-89aa, finding L1, LOW
+probe-key: dd32c416bdbf275f1b2307b54583728ac5004ce4
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/cerberus-fixes-refused-shot.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/cerberus-fixes-whole-live.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/cerberus-fixes-whole-scratch.sh
+
+## INV-7128 — probe — the narrative line "the rule did not run it again" is printed whatever the data
+
+the narrative line "the rule did not run it again" is printed whatever the data
+
+```probe
+D=$(mktemp -d /tmp/athena-p.XXXXXX) && cat > "$D/p.sh" <<'EOF'
+cd /home/lyphe/.claude/claudecodeui_lyphe
+grep -c '^echo .*the rule did not run it again' .verify/cerberus-fixes-whole-scratch.sh || true
+EOF
+bash "$D/p.sh"; case "$D" in /tmp/athena-p.?*) rm -r "$D";; esac
+expect: 1 while the line is printed unconditionally; 0 once it is behind a test of $COUNT
+```
+
+measured 2026-10-07 by chain chain-cerberus--fixes--whole-20261007-021025-89aa, finding L2, LOW
+probe-key: 8fb0a48bce4c8a566f185970ef2a8fcb9c001d38
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/cerberus-fixes-refused-shot.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/cerberus-fixes-whole-live.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/cerberus-fixes-whole-scratch.sh
+
+## INV-7129 — probe — a refusal's reason is asserted by neither script
+
+a refusal's reason is asserted by neither script
+
+```probe
+D=$(mktemp -d /tmp/athena-p.XXXXXX) && cat > "$D/p.sh" <<'EOF'
+cd /home/lyphe/.claude/claudecodeui_lyphe
+OUT=$(mktemp -d /tmp/athena-p.XXXXXX) || exit 1
+BODY='{"id":"aaaa1111bbbb2222","entry":"e","diagnosis":null,"name":"Print three lines","node":"probe-node","check":"probe/other.age","by":"you","cmd":"echo changed","requestedAt":1791365065817,"startedAt":null,"endedAt":1791365065819,"result":"refused","exit":null,"note":null,"lastLine":null,"lines":[]}'
+URL="data:application/json,$(printf '%s' "$BODY" | jq -sRr @uri)"
+SCRATCH_TOKEN=x timeout 120 node .verify/cerberus-fixes-refused-shot.mjs "$URL" "$OUT" Refused 2>&1 | grep -E "^(PASS|FAIL)  the pane shows the run's note" | sort | uniq -c || echo "no verdict line"
+case "$OUT" in /tmp/athena-p.?*) rm -r "$OUT";; esac
+EOF
+bash "$D/p.sh"; case "$D" in /tmp/athena-p.?*) rm -r "$D";; esac
+expect: `2 PASS  the pane shows the run's note (a refusal's reason)` while the defect stands (the card shows no reason and the line still passes); FAIL once a refusal with no note fails it
+```
+
+measured 2026-10-07 by chain chain-cerberus--fixes--whole-20261007-021025-89aa, finding L3, LOW
+probe-key: ecca7ab54eef56e9e79a40c33757207ddbc0a17d
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/cerberus-fixes-refused-shot.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/cerberus-fixes-whole-live.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/cerberus-fixes-whole-scratch.sh
+
+## INV-7154 — probe — LOW — `inline-flex` makes the hit area depend on the parent: a dead zone right of the words, and a 3px strut, in a block parent
+
+LOW — `inline-flex` makes the hit area depend on the parent: a dead zone right of the words, and a 3px strut, in a block parent
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+#!/bin/bash
+H=$(dirname "$0")
+cat > "$H/p.mjs" <<'JS'
+import { openConsole } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/console.mjs';
+import { installReactHarness } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/mountReact.mjs';
+const session = await openConsole({ dark: false, viewport: { width: 1440, height: 900 } });
+const { page } = session;
+try {
+  await installReactHarness(page);
+  await page.evaluate(async () => {
+    const { h, React, mount, importModule, readSpecifier } = window.__mountReact;
+    const barrel = await readSpecifier('/src/modules/cerberus/CerberusHeader.tsx', /from ["']([^"']*shared\/ui\/index[^"']*)["']/);
+    const { Checkbox } = await importModule(barrel);
+    window.__calls = 0;
+    await mount('athena-host', h('div', { id: 'card', className: 'rounded-xl border p-5', style: { width: 420 } },
+      h('div', { id: 'row' }, h(Checkbox, { checked: false, onChange() { window.__calls += 1; }, label: 'eis1 · warden 0.14.0' }))));
+  });
+  const m = await page.evaluate(() => ({ display: getComputedStyle(document.querySelector('.vv-checkbox')).display, label: Math.round(document.querySelector('.vv-checkbox').getBoundingClientRect().width), row: Math.round(document.getElementById('row').getBoundingClientRect().width), rowH: Math.round(document.getElementById('row').getBoundingClientRect().height * 10) / 10, labelH: Math.round(document.querySelector('.vv-checkbox').getBoundingClientRect().height * 10) / 10 }));
+  const t = await page.locator('.vv-checkbox__label').boundingBox();
+  await page.mouse.click(t.x + t.width + 60, t.y + t.height / 2);
+  const calls = await page.evaluate(() => window.__calls);
+  console.log(`display ${m.display}; label ${m.label}px of a ${m.row}px row; row ${m.rowH}px tall vs label ${m.labelH}px; a press 60px right of the words → onChange calls ${calls} (${calls === 0 ? 'DEAD ZONE' : 'toggles'})`);
+} finally { await session.browser.close(); }
+JS
+node "$H/p.mjs"
+EOF
+bash "$D/p.sh"
+expect: `display inline-flex; label 159px of a 378px row; row 23.3px tall vs label 20.3px; … onChange calls 0 (DEAD ZONE)` while the defect stands; `toggles` (and `display flex`) once cured
+```
+
+measured 2026-10-07 by chain chain-cerberus--updates--checkbox-20261007-025711-5258, finding L1, LOW
+probe-key: 9cc917134e388f9845e06cc460bd656523c966dc
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/index.css, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Checkbox.tsx
+
+## INV-7155 — probe — LOW — no overflow guard: an unbroken label token widens past its container
+
+LOW — no overflow guard: an unbroken label token widens past its container
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+#!/bin/bash
+H=$(dirname "$0")
+cat > "$H/p.mjs" <<'JS'
+import { openConsole } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/console.mjs';
+import { installReactHarness } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/mountReact.mjs';
+const session = await openConsole({ dark: false, viewport: { width: 390, height: 844 } });
+const { page } = session;
+try {
+  await installReactHarness(page);
+  await page.evaluate(async () => {
+    const { h, mount, importModule, readSpecifier } = window.__mountReact;
+    const barrel = await readSpecifier('/src/modules/cerberus/CerberusHeader.tsx', /from ["']([^"']*shared\/ui\/index[^"']*)["']/);
+    const { Checkbox } = await importModule(barrel);
+    await mount('athena-host', h('div', { id: 'card', className: 'rounded-xl border p-5', style: { width: 340 } },
+      h(Checkbox, { checked: false, onChange() {}, label: 'snake_case_service_name_that_never_breaks_and_goes_on_and_on_for_seventy_chars' })));
+  });
+  const m = await page.evaluate(() => ({ label: Math.round(document.querySelector('.vv-checkbox').getBoundingClientRect().width), cardInner: document.getElementById('card').clientWidth, cardScroll: document.getElementById('card').scrollWidth }));
+  console.log(`label ${m.label}px in a card ${m.cardInner}px wide; card scrollWidth ${m.cardScroll}; ${m.cardScroll > m.cardInner ? 'OVERFLOWS' : 'fits'}`);
+} finally { await session.browser.close(); }
+JS
+node "$H/p.mjs"
+EOF
+bash "$D/p.sh"
+expect: `label 579px in a card 338px wide; card scrollWidth 599; OVERFLOWS` while the defect stands; `fits` once the label wraps
+```
+
+measured 2026-10-07 by chain chain-cerberus--updates--checkbox-20261007-025711-5258, finding L2, LOW
+probe-key: c3f435fcb29f93b9951ee753d5ce1ad7183dcb08
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/index.css, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Checkbox.tsx
+
+## INV-7156 — probe — · MEDIUM — `file.read` / `log.read {path}` of a pseudo-file answers `ok:true` with EMPTY text (and a complete `/sys` file as `truncated:true`)
+
+· MEDIUM — `file.read` / `log.read {path}` of a pseudo-file answers `ok:true` with EMPTY text (and a complete `/sys` file as `truncated:true`)
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1; export D
+cat > "$D/p.mjs" <<'EOF'
+const SRC = '/home/lyphe/.claude/claudecodeui_lyphe/warden/src';
+const handlers = new Map(); const sent = [];
+const link = { on: (t, h) => handlers.set(t, h), send: (t, b) => sent.push({ t, b }) };
+const { createDiagTools } = await import(`${SRC}/diag-tools.mjs`);
+createDiagTools({ link });
+await handlers.get('diag.open')({ diagId: 'athena-probe', check: 'x/y' });
+for (const p of ['/proc/loadavg', '/sys/class/net/lo/mtu']) {
+  await handlers.get('diag.call')({ diagId: 'athena-probe', callId: p, tool: 'file.read', args: { path: p } });
+  const r = sent.find((s) => s.b.callId === p).b;
+  console.log(p, `ok=${r.ok}`, `bytes=${Buffer.byteLength(r.text)}`, `truncated=${r.truncated}`);
+}
+process.exit(0);
+EOF
+cat > "$D/p.sh" <<'EOF'
+node "$D/p.mjs" 2>&1 | grep -v '^\[warden\]'
+EOF
+bash "$D/p.sh"
+case "$D" in /tmp/athena-probe.??????) rm -rf "$D";; esac
+expect: cured → `/proc/loadavg ok=true bytes=<the file's length, > 0> truncated=false` and `/sys/class/net/lo/mtu ok=true bytes=6 truncated=false`; with the defect standing it prints `bytes=0 truncated=false` and `bytes=6 truncated=true`
+```
+
+measured 2026-10-07 by chain chain-cerberus--diagnosis--warden-diag-20261007-023834-9d9c, finding M1, MEDIUM
+probe-key: 520cf68764eeb6e8ecd0ece99dcdeb39caf180f4
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/warden-diag-tools.mjs, /home/lyphe/.claude/claudecodeui_lyphe/warden/package.json, /home/lyphe/.claude/claudecodeui_lyphe/warden/src/diag-argv.mjs, /home/lyphe/.claude/claudecodeui_lyphe/warden/src/diag-guard.mjs, /home/lyphe/.claude/claudecodeui_lyphe/warden/src/diag-reads.mjs, /home/lyphe/.claude/claudecodeui_lyphe/warden/src/diag-tools.mjs
+
+## INV-7157 — probe — · MEDIUM — real credential stores on this node pass both the denylist and the mask (a contract gap, measured on the live files)
+
+· MEDIUM — real credential stores on this node pass both the denylist and the mask (a contract gap, measured on the live files)
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1; export D
+mkdir -p "$D/home/.cerberus-warden/sessions" || exit 1
+printf 'https://alice:ghp_FAKEFAKEFAKEFAKEFAKE1234@github.com\n' > "$D/home/.git-credentials"
+printf 'ls\ncurl -s https://api.example/v1 -H "Authorization: Bearer FAKEFAKEFAKEFAKEFAKE0123456789"\n' > "$D/home/.bash_history"
+printf '{"line":"FAKEFAKE-transcript-of-an-operator-session"}\n' > "$D/home/.cerberus-warden/sessions/s1.ndjson"
+cat > "$D/p.mjs" <<'EOF'
+const SRC = '/home/lyphe/.claude/claudecodeui_lyphe/warden/src';
+const home = process.env.HOME;
+const handlers = new Map(); const sent = [];
+const link = { on: (t, h) => handlers.set(t, h), send: (t, b) => sent.push({ t, b }) };
+const { createDiagTools } = await import(`${SRC}/diag-tools.mjs`);
+createDiagTools({ link, home: `${home}/.cerberus-warden` });
+await handlers.get('diag.open')({ diagId: 'athena-probe', check: 'x/y' });
+for (const rel of ['.git-credentials', '.bash_history', '.cerberus-warden/sessions/s1.ndjson']) {
+  await handlers.get('diag.call')({ diagId: 'athena-probe', callId: rel, tool: 'file.read', args: { path: `${home}/${rel}` } });
+  const r = sent.find((s) => s.b.callId === rel).b;
+  console.log(rel.padEnd(36), `ok=${r.ok}`, `fake secret/transcript text returned: ${r.text.includes('FAKEFAKE')}`);
+}
+process.exit(0);
+EOF
+cat > "$D/p.sh" <<'EOF'
+HOME="$D/home" node "$D/p.mjs" 2>&1 | grep -v '^\[warden\]'
+EOF
+bash "$D/p.sh"
+case "$D" in /tmp/athena-probe.??????) rm -rf "$D";; esac
+expect: cured → each of the three lines prints `ok=false … returned: false` (refused) or `ok=true … returned: false` (masked); with the defect standing all three print `ok=true … returned: true`
+```
+
+measured 2026-10-07 by chain chain-cerberus--diagnosis--warden-diag-20261007-023834-9d9c, finding M2, MEDIUM
+probe-key: 42cb72bc3ad013872ac627823986231df31d6511
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/warden-diag-tools.mjs, /home/lyphe/.claude/claudecodeui_lyphe/warden/package.json, /home/lyphe/.claude/claudecodeui_lyphe/warden/src/diag-argv.mjs, /home/lyphe/.claude/claudecodeui_lyphe/warden/src/diag-guard.mjs, /home/lyphe/.claude/claudecodeui_lyphe/warden/src/diag-reads.mjs, /home/lyphe/.claude/claudecodeui_lyphe/warden/src/diag-tools.mjs
+
+## INV-7158 — probe — · LOW — the mask runs after the 64 KB cap, so the text center receives can be twice the cap
+
+· LOW — the mask runs after the 64 KB cap, so the text center receives can be twice the cap
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1; export D
+mkdir -p "$D/bin" || exit 1
+printf '#!/bin/sh\nyes "token=1" | head -c 160000\n' > "$D/bin/uptime"; chmod +x "$D/bin/uptime"
+cat > "$D/p.mjs" <<'EOF'
+const SRC = '/home/lyphe/.claude/claudecodeui_lyphe/warden/src';
+const handlers = new Map(); const sent = [];
+const link = { on: (t, h) => handlers.set(t, h), send: (t, b) => sent.push({ t, b }) };
+const { createDiagTools } = await import(`${SRC}/diag-tools.mjs`);
+createDiagTools({ link });
+await handlers.get('diag.open')({ diagId: 'athena-probe', check: 'x/y' });
+await handlers.get('diag.call')({ diagId: 'athena-probe', callId: 'u', tool: 'status.read', args: { what: 'uptime' } });
+const r = sent.find((s) => s.b.callId === 'u').b;
+console.log(`answer bytes=${Buffer.byteLength(r.text)} (cap is 65536) truncated=${r.truncated}`);
+process.exit(0);
+EOF
+cat > "$D/p.sh" <<'EOF'
+PATH="$D/bin:$PATH" node "$D/p.mjs" 2>&1 | grep -v '^\[warden\]'
+EOF
+bash "$D/p.sh"
+case "$D" in /tmp/athena-probe.??????) rm -rf "$D";; esac
+expect: cured → `answer bytes=` at most 65536 with `truncated=true`; with the defect standing it prints `answer bytes=122880`
+```
+
+measured 2026-10-07 by chain chain-cerberus--diagnosis--warden-diag-20261007-023834-9d9c, finding L1, LOW
+probe-key: 40551c26ab02cbbdce3db30d5ed8afc1c80d6808
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/warden-diag-tools.mjs, /home/lyphe/.claude/claudecodeui_lyphe/warden/package.json, /home/lyphe/.claude/claudecodeui_lyphe/warden/src/diag-argv.mjs, /home/lyphe/.claude/claudecodeui_lyphe/warden/src/diag-guard.mjs, /home/lyphe/.claude/claudecodeui_lyphe/warden/src/diag-reads.mjs, /home/lyphe/.claude/claudecodeui_lyphe/warden/src/diag-tools.mjs
+
+## INV-7159 — probe — · LOW — a log tail cut to 64 KB is cut from the FRONT, mid-line, and leaves the end of a secret unmasked
+
+· LOW — a log tail cut to 64 KB is cut from the FRONT, mid-line, and leaves the end of a secret unmasked
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1; export D
+cat > "$D/p.mjs" <<'EOF'
+import fs from 'node:fs';
+const SRC = '/home/lyphe/.claude/claudecodeui_lyphe/warden/src';
+let text = Array.from({ length: 500 }, () => 'a'.repeat(199)).join('\n');
+const cut = Buffer.byteLength(text) - 65536;
+const secret = 'password=hunter2LEAKVALUE';
+text = text.slice(0, cut - 13) + secret + text.slice(cut - 13 + secret.length);
+fs.writeFileSync(`${process.env.D}/app.log`, `${text}\n`);
+const handlers = new Map(); const sent = [];
+const link = { on: (t, h) => handlers.set(t, h), send: (t, b) => sent.push({ t, b }) };
+const { createDiagTools } = await import(`${SRC}/diag-tools.mjs`);
+createDiagTools({ link });
+await handlers.get('diag.open')({ diagId: 'athena-probe', check: 'x/y' });
+await handlers.get('diag.call')({ diagId: 'athena-probe', callId: 't', tool: 'log.read', args: { path: `${process.env.D}/app.log`, lines: 500 } });
+const out = String(sent.find((s) => s.b.callId === 't').b.text);
+console.log('text begins:', JSON.stringify(out.slice(0, 24)), '| part of the secret value survives:', out.includes('VALUE'));
+process.exit(0);
+EOF
+cat > "$D/p.sh" <<'EOF'
+node "$D/p.mjs" 2>&1 | grep -v '^\[warden\]'
+EOF
+bash "$D/p.sh"
+case "$D" in /tmp/athena-probe.??????) rm -rf "$D";; esac
+expect: cured → `part of the secret value survives: false`; with the defect standing the text begins `er2LEAKVALUEaaaa` and it prints `true`
+```
+
+measured 2026-10-07 by chain chain-cerberus--diagnosis--warden-diag-20261007-023834-9d9c, finding L2, LOW
+probe-key: 8af72d8a65b6ef9cb96acb4bb48f220ab9b61c97
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/warden-diag-tools.mjs, /home/lyphe/.claude/claudecodeui_lyphe/warden/package.json, /home/lyphe/.claude/claudecodeui_lyphe/warden/src/diag-argv.mjs, /home/lyphe/.claude/claudecodeui_lyphe/warden/src/diag-guard.mjs, /home/lyphe/.claude/claudecodeui_lyphe/warden/src/diag-reads.mjs, /home/lyphe/.claude/claudecodeui_lyphe/warden/src/diag-tools.mjs
+
+## INV-7160 — probe — · LOW — a `contains` miss reads as "no such line", not as "none in the last N lines"
+
+· LOW — a `contains` miss reads as "no such line", not as "none in the last N lines"
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1; export D
+cat > "$D/p.mjs" <<'EOF'
+import fs from 'node:fs';
+const SRC = '/home/lyphe/.claude/claudecodeui_lyphe/warden/src';
+fs.writeFileSync(`${process.env.D}/w.log`, `${Array.from({ length: 1000 }, (_, i) => `error ${i + 1}`).join('\n')}\n`);
+const handlers = new Map(); const sent = [];
+const link = { on: (t, h) => handlers.set(t, h), send: (t, b) => sent.push({ t, b }) };
+const { createDiagTools } = await import(`${SRC}/diag-tools.mjs`);
+createDiagTools({ link });
+await handlers.get('diag.open')({ diagId: 'athena-probe', check: 'x/y' });
+await handlers.get('diag.call')({ diagId: 'athena-probe', callId: 'w', tool: 'log.read', args: { path: `${process.env.D}/w.log`, contains: 'error 5', lines: 200 } });
+const r = sent.find((s) => s.b.callId === 'w').b;
+console.log('answer text:', JSON.stringify(r.text), '| names the window scanned:', /\b200\b|last/i.test(r.text));
+process.exit(0);
+EOF
+cat > "$D/p.sh" <<'EOF'
+node "$D/p.mjs" 2>&1 | grep -v '^\[warden\]'
+EOF
+bash "$D/p.sh"
+case "$D" in /tmp/athena-probe.??????) rm -rf "$D";; esac
+expect: cured → `names the window scanned: true` (the miss says it looked at the last 200 lines); with the defect standing it prints `(no line contains \"error 5\")` and `false`
+```
+
+measured 2026-10-07 by chain chain-cerberus--diagnosis--warden-diag-20261007-023834-9d9c, finding L3, LOW
+probe-key: 2a0011a19d0632d40efbea87e7ce8f51cb1436e4
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/warden-diag-tools.mjs, /home/lyphe/.claude/claudecodeui_lyphe/warden/package.json, /home/lyphe/.claude/claudecodeui_lyphe/warden/src/diag-argv.mjs, /home/lyphe/.claude/claudecodeui_lyphe/warden/src/diag-guard.mjs, /home/lyphe/.claude/claudecodeui_lyphe/warden/src/diag-reads.mjs, /home/lyphe/.claude/claudecodeui_lyphe/warden/src/diag-tools.mjs
+
+## INV-7161 — probe — · LOW — the daemon never calls `diagTools.stop()`; the report, the manual and INV-7130 say it does
+
+· LOW — the daemon never calls `diagTools.stop()`; the report, the manual and INV-7130 say it does
+
+```probe
+grep -c 'diagTools\.stop()' /home/lyphe/.claude/claudecodeui_lyphe/warden/src/daemon.mjs || true
+expect: cured → `1` (the stop path calls `diagTools.stop()` beside `runner.stop()`); with the defect standing it prints `0`
+```
+
+measured 2026-10-07 by chain chain-cerberus--diagnosis--warden-diag-20261007-023834-9d9c, finding L4, LOW
+probe-key: 492a63a2f00bf2509173153d2173cefe27c70006
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/warden-diag-tools.mjs, /home/lyphe/.claude/claudecodeui_lyphe/warden/package.json, /home/lyphe/.claude/claudecodeui_lyphe/warden/src/diag-argv.mjs, /home/lyphe/.claude/claudecodeui_lyphe/warden/src/diag-guard.mjs, /home/lyphe/.claude/claudecodeui_lyphe/warden/src/diag-reads.mjs, /home/lyphe/.claude/claudecodeui_lyphe/warden/src/diag-tools.mjs
+
+## INV-7162 — probe — · LOW — a call settles only on the child's `close`: a pipe-holding grandchild (or an unkillable child) leaves it unanswered past the 10 s kill
+
+· LOW — a call settles only on the child's `close`: a pipe-holding grandchild (or an unkillable child) leaves it unanswered past the 10 s kill
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1; export D
+mkdir -p "$D/bin" || exit 1
+printf '#!/bin/sh\nsleep 40 &\nwait\n' > "$D/bin/free"; chmod +x "$D/bin/free"
+cat > "$D/p.mjs" <<'EOF'
+const SRC = '/home/lyphe/.claude/claudecodeui_lyphe/warden/src';
+const handlers = new Map(); const sent = [];
+const link = { on: (t, h) => handlers.set(t, h), send: (t, b) => sent.push({ t, b }) };
+const { createDiagTools } = await import(`${SRC}/diag-tools.mjs`);
+createDiagTools({ link });
+await handlers.get('diag.open')({ diagId: 'athena-probe', check: 'x/y' });
+const t0 = Date.now();
+handlers.get('diag.call')({ diagId: 'athena-probe', callId: 'm', tool: 'status.read', args: { what: 'memory' } });
+await new Promise((r) => setTimeout(r, 14000));
+const r = sent.find((s) => s.b.callId === 'm')?.b;
+console.log(`after ${Date.now() - t0} ms (the kill is at 10 000 ms): ${r ? `answered ok=${r.ok}` : 'NO ANSWER'}`);
+process.exit(0);
+EOF
+cat > "$D/p.sh" <<'EOF'
+PATH="$D/bin:$PATH" node "$D/p.mjs" 2>&1 | grep -v '^\[warden\]'
+EOF
+bash "$D/p.sh"
+case "$D" in /tmp/athena-probe.??????) rm -rf "$D";; esac
+expect: cured → `answered ok=false` at about 14 000 ms; with the defect standing it prints `NO ANSWER` (the stub's `sleep 40` ends by itself 40 s after it started)
+```
+
+measured 2026-10-07 by chain chain-cerberus--diagnosis--warden-diag-20261007-023834-9d9c, finding L5, LOW
+probe-key: 3b4378c962d32ea783918fbe638cd985696c263b
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/warden-diag-tools.mjs, /home/lyphe/.claude/claudecodeui_lyphe/warden/package.json, /home/lyphe/.claude/claudecodeui_lyphe/warden/src/diag-argv.mjs, /home/lyphe/.claude/claudecodeui_lyphe/warden/src/diag-guard.mjs, /home/lyphe/.claude/claudecodeui_lyphe/warden/src/diag-reads.mjs, /home/lyphe/.claude/claudecodeui_lyphe/warden/src/diag-tools.mjs
+
+## INV-7168 — probe — MEDIUM — the prompt door does not mask credentials; the history door does (`diagnosis-prompt.ts` `oneLine`)
+
+MEDIUM — the prompt door does not mask credentials; the history door does (`diagnosis-prompt.ts` `oneLine`)
+
+```probe
+D=~/.claude/state/pipeline-reviews/cerberus--diagnosis--agent/probes
+bash "$D/p1.sh"
+expect: PROMPT-LEAKS: none   (today it prints PROMPT-LEAKS: hunter2,abc123,SEKRET123)
+```
+
+measured 2026-10-07 by chain chain-cerberus--diagnosis--agent-20261007-025958-d301, finding M1, MEDIUM
+probe-key: 11cb9206cdfbde8526573301644a26da5c056570
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/diagnosis/diagnosis-agent.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/diagnosis/diagnosis-prompt.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/diagnosis/diagnosis-tools.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/cerberus-diagnosis-agent.mjs
+
+## INV-7169 — probe — MEDIUM — the evidence rule does not hold on a quiet run, and the proposal invents (`diagnosis-prompt.ts`; the submit gate cannot see it)
+
+MEDIUM — the evidence rule does not hold on a quiet run, and the proposal invents (`diagnosis-prompt.ts`; the submit gate cannot see it)
+
+```probe
+D=~/.claude/state/pipeline-reviews/cerberus--diagnosis--agent/probes
+bash "$D/p2.sh"
+expect: every RUN line reads absence-lines=0 (today 3 of 3 print absence-lines=1 and a restart proposal; three Haiku runs, ~70 s, on a .backup copy)
+```
+
+measured 2026-10-07 by chain chain-cerberus--diagnosis--agent-20261007-025958-d301, finding M2, MEDIUM
+probe-key: 757b5aecb30d5b4522b45cb6808a0d685dd37c64
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/diagnosis/diagnosis-agent.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/diagnosis/diagnosis-prompt.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/diagnosis/diagnosis-tools.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/cerberus-diagnosis-agent.mjs
+
+## INV-7170 — probe — LOW — `submit_diagnosis` has no once-guard; parallel calls reach `deps.submit` twice and the agent answers the LAST (`diagnosis-tools.ts` / `diagnosis-agent.ts` `captureSubmission`)
+
+LOW — `submit_diagnosis` has no once-guard; parallel calls reach `deps.submit` twice and the agent answers the LAST (`diagnosis-tools.ts` / `diagnosis-agent.ts` `captureSubmission`)
+
+```probe
+D=~/.claude/state/pipeline-reviews/cerberus--diagnosis--agent/probes
+bash "$D/p3.sh"
+expect: DOUBLE-SUBMIT: deps.submit called 1 times …   (today: 2 times, ["first","second"])
+```
+
+measured 2026-10-07 by chain chain-cerberus--diagnosis--agent-20261007-025958-d301, finding L1, LOW
+probe-key: 5f1a7700ae319ed6316397598b38b7575c37a565
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/diagnosis/diagnosis-agent.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/diagnosis/diagnosis-prompt.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/diagnosis/diagnosis-tools.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/cerberus-diagnosis-agent.mjs
+
+## INV-7171 — probe — LOW — nothing bounds a `callNode` that never answers (`diagnosis-tools.ts` `readFromNode`)
+
+LOW — nothing bounds a `callNode` that never answers (`diagnosis-tools.ts` `readFromNode`)
+
+```probe
+D=~/.claude/state/pipeline-reviews/cerberus--diagnosis--agent/probes
+bash "$D/p4.sh"
+expect: LOG_READ-ANSWERED-WITHIN-15s (callNode never answers): true   (today: false)
+```
+
+measured 2026-10-07 by chain chain-cerberus--diagnosis--agent-20261007-025958-d301, finding L2, LOW
+probe-key: 46cab8a53d352d6f455aa86ec71ea72f00991db9
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/diagnosis/diagnosis-agent.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/diagnosis/diagnosis-prompt.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/diagnosis/diagnosis-tools.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/cerberus-diagnosis-agent.mjs
+
+## INV-7172 — probe — LOW — an already-aborted signal still spawns the CLI (`diagnosis-agent.ts`)
+
+LOW — an already-aborted signal still spawns the CLI (`diagnosis-agent.ts`)
+
+```probe
+D=~/.claude/state/pipeline-reviews/cerberus--diagnosis--agent/probes
+bash "$D/p5.sh" abort-pre
+expect: PRE-ABORTED: rejected after <200 ms; a claude CLI child was spawned: false   (today: ~1150 ms, true)
+```
+
+measured 2026-10-07 by chain chain-cerberus--diagnosis--agent-20261007-025958-d301, finding L3, LOW
+probe-key: e42c8efa973544dbc9dc7e4323d2c2f5ec0fafa8
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/diagnosis/diagnosis-agent.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/diagnosis/diagnosis-prompt.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/diagnosis/diagnosis-tools.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/cerberus-diagnosis-agent.mjs
+
+## INV-7173 — probe — LOW — the failure sentence ends in a double period and carries CLI jargon (`diagnosis-agent.ts` catch)
+
+LOW — the failure sentence ends in a double period and carries CLI jargon (`diagnosis-agent.ts` catch)
+
+```probe
+D=~/.claude/state/pipeline-reviews/cerberus--diagnosis--agent/probes
+bash "$D/p5.sh" badmodel
+expect: BAD-MODEL: … ends with a double period: false · carries CLI flag jargon ("Run --model"): false   (today: true · true; no model tokens are spent)
+```
+
+measured 2026-10-07 by chain chain-cerberus--diagnosis--agent-20261007-025958-d301, finding L4, LOW
+probe-key: 97267cec8e8b54f739ed0a3752a15d5c4eff6be4
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/diagnosis/diagnosis-agent.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/diagnosis/diagnosis-prompt.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/diagnosis/diagnosis-tools.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/cerberus-diagnosis-agent.mjs
+
+## INV-7174 — probe — LOW — the prompt's "last 20 stored results" can be 20 identical keepalives (`diagnosis-prompt.ts` `resultsSection` + the `lastRowsOfCheck` it reads)
+
+LOW — the prompt's "last 20 stored results" can be 20 identical keepalives (`diagnosis-prompt.ts` `resultsSection` + the `lastRowsOfCheck` it reads)
+
+```probe
+D=~/.claude/state/pipeline-reviews/cerberus--diagnosis--agent/probes
+bash "$D/p8.sh"
+expect: kinds includes change, or distinct(status,kind,value) above 1   (today, while the check stays red: kinds=keepalive distinct(status,kind,value)=1; it reads the repository function the prompt quotes, on a .backup copy, and answers in both states)
+```
+
+measured 2026-10-07 by chain chain-cerberus--diagnosis--agent-20261007-025958-d301, finding L5, LOW
+probe-key: b2558dda65e487437dd1ea68a9d75d1b407feca1
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/diagnosis/diagnosis-agent.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/diagnosis/diagnosis-prompt.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/diagnosis/diagnosis-tools.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/cerberus-diagnosis-agent.mjs
+
+## INV-7175 — probe — LOW — the `note` and `submit_diagnosis` schemas accept what the sheet and the catalog later refuse (`diagnosis-tools.ts`)
+
+LOW — the `note` and `submit_diagnosis` schemas accept what the sheet and the catalog later refuse (`diagnosis-tools.ts`)
+
+```probe
+D=~/.claude/state/pipeline-reviews/cerberus--diagnosis--agent/probes
+bash "$D/p6.sh"
+expect: NOTE-WITH-NEWLINE-FILED: "one two" or a refusal, and SUBMIT-NAME-WITH-NEWLINE / -LONE-SURROGATE lines read refused   (today all three read accepted and the note keeps its newline)
+```
+
+measured 2026-10-07 by chain chain-cerberus--diagnosis--agent-20261007-025958-d301, finding L6, LOW
+probe-key: fca01e3cb05bcd10113c2135c93e2cc25e0d2304
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/diagnosis/diagnosis-agent.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/diagnosis/diagnosis-prompt.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/diagnosis/diagnosis-tools.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/cerberus-diagnosis-agent.mjs
+
+## INV-7176 — probe — MEDIUM — a warden that is legitimately `waiting` for a fix is failed at 3:00, then restarts onto the release anyway: the row says `failed`, no `restarting` step or pause is ever stored, and the batch has already moved on
+
+MEDIUM — a warden that is legitimately `waiting` for a fix is failed at 3:00, then restarts onto the release anyway: the row says `failed`, no `restarting` step or pause is ever stored, and the batch has already moved on
+
+```probe
+D=$(mktemp -d /tmp/athena-probe-f1.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+REPO=/home/lyphe/.claude/claudecodeui_lyphe; cd "$REPO" || exit 1
+export SUNSET_SLOT=3; source scripts/sunset-probe.sh; sunset_paths || exit 1
+case "$D" in /tmp/athena-probe-f1.*) ;; *) exit 1;; esac
+if curl -sf --max-time 2 "$SUNSET_API/api/auth/status" >/dev/null; then echo "slot 3 is held; nothing touched"; exit 1; fi
+mkdir "$D/dist" && export CERBERUS_WARDEN_DIST="$D/dist" || exit 1
+H="$D/home"; LP=""
+cleanup() { case "$LP" in ''|*[!0123456789]*|0*|1) ;; *) kill -TERM "$LP" 2>/dev/null;; esac; sleep 1; stop_probe_server; }
+trap cleanup EXIT
+probe_db && boot_probe_server || exit 1
+API="$SUNSET_API/api/cerberus"; AUTH="Authorization: Bearer $(mint_token)"
+timeout 60 bash -c 'until curl -sf -H "$0" "$1/overview" | jq -e ".gateway.listening" >/dev/null; do sleep 1; done' "$AUTH" "$API" || { echo "gateway never listened"; exit 1; }
+mkrelease() { local S; S=$(mktemp -d /tmp/athena-probe-rel.XXXXXX) || return 1; case "$S" in /tmp/athena-probe-rel.*) ;; *) return 1;; esac
+  mkdir -p "$S/warden" "$S/server/modules/providers/list/claude" && cp -r "$REPO/warden/." "$S/warden/" &&
+  cp -r "$REPO/server/modules/providers/list/claude/session-host" "$S/server/modules/providers/list/claude/" &&
+  jq --arg v "$1" '.version=$v | .cerberus.note="probe release"' "$REPO/warden/package.json" > "$S/warden/p.json" && mv "$S/warden/p.json" "$S/warden/package.json" &&
+  ( cd "$S" && node warden/build.mjs >/dev/null ) && cp "$S"/dist-warden/cerberus-warden-"$1".tar.gz* "$S/dist-warden/latest.json" "$D/dist/"
+  local rc=$?; cd "$REPO"; case "$S" in /tmp/athena-probe-rel.*) rm -rf "$S";; esac; return $rc; }
+mkrelease 9.1.0 || exit 1
+T=$(curl -sf -X POST "$API/enrollments" -H "$AUTH" -H 'Content-Type: application/json' -d '{"name":"probe-node","desc":"x"}' | jq -r .token)
+mkdir -p "$H/releases/9.1.0" && chmod 700 "$H" && tar -xzf "$D/dist/cerberus-warden-9.1.0.tar.gz" -C "$H/releases/9.1.0" && ln -s releases/9.1.0 "$H/current" &&
+CERBERUS_WARDEN_HOME="$H" node "$H/current/warden/src/main.mjs" enroll --center "http://$SUNSET_GATEWAY" --name probe-node --token "$T" >/dev/null && cp "$H/current/warden/src/launcher.mjs" "$H/launcher.mjs" || exit 1
+CERBERUS_WARDEN_HOME="$H" node "$H/launcher.mjs" >> "$D/launcher.log" 2>&1 < /dev/null &
+LP=$!
+curl -sf -X PUT "$API/definitions/probe-node" -H "$AUTH" -H 'Content-Type: application/json' -d '{"services":[{"service":"fx","label":"Fixture","probes":[{"key":"fx/bad","kind":"exec","cmd":"false","every":5,"timeout":5}]}]}' >/dev/null
+timeout 60 bash -c 'until curl -s "$0/overview" -H "$1" | jq -e ".nodes[]|select(.id==\"probe-node\")|.link==\"reporting\" and .wardenVersion==\"9.1.0\"" >/dev/null; do sleep 1; done' "$API" "$AUTH" || { echo "warden never linked"; exit 1; }
+mkrelease 9.2.0 || exit 1
+ID=$(curl -s -X POST "$API/catalog" -H "$AUTH" -H 'Content-Type: application/json' -d '{"node":"probe-node","check":"fx/bad","name":"Hold","when":"failing","cmd":"sleep 200","timeout":400,"limit":{"runs":5,"per":3600}}' | jq -r .id)
+curl -s -X POST "$API/catalog/$ID/run" -H "$AUTH" >/dev/null; sleep 3          # a fix is running on the node, 200 s long
+B=$(curl -s -X POST "$API/updates" -H "$AUTH" -H 'Content-Type: application/json' -d '{"nodes":["probe-node"]}' | jq -r .batch); T0=$(date +%s)
+for i in $(seq 1 60); do
+  sleep 6; NOW=$(( $(date +%s) - T0 )); V=$(curl -s "$API/wardens" -H "$AUTH" | jq -r '.nodes[0].version')
+  R=$(curl -s "$API/updates/$B" -H "$AUTH" | jq -r '.[0]|"\(.result // "live") steps=\([.steps[].step]|join(","))"')
+  [ "$NOW" -ge 186 ] && [ -z "$AT186" ] && AT186="t=${NOW}s row: $R"
+  [ "$V" = 9.2.0 ] && break
+done
+echo "row at 3 min:        $AT186"
+echo "node when it restarted: t=$(( $(date +%s) - T0 ))s warden version $V"
+echo "row at that moment:  $(curl -s "$API/updates/$B" -H "$AUTH" | jq -r '.[0]|"\(.result // "live") steps=\([.steps[].step]|join(","))"')"
+echo "restarting step stored: $(sqlite3 -readonly "${SUNSET_PREFIX}cerberus.db" "select count(*) from update_steps where update_id in (select id from updates where batch='$B') and step='restarting'")"
+EOF
+export D; timeout 560 bash "$D/p.sh"; case "$D" in /tmp/athena-probe-f1.*) rm -rf "$D";; esac
+expect: "row at 3 min: t=186s row: failed steps=waiting,failed" then "node when it restarted: t≈200s warden version 9.2.0" and "restarting step stored: 0" (cured: the row is still `live` at t=186 s and ends `updated` with `restarting` stored, so the last line reads 1; ~4 min run, slot 3, answers "slot 3 is held; nothing touched" when the slot is in use)
+```
+
+measured 2026-10-07 by chain chain-cerberus--updates--center-updates-20261007-032122-138a, finding M1, MEDIUM
+probe-key: 7b3bf3b08ce5b9c73f3cbf395b0410345fd3bc27
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/hello-update.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/update-driver.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/updates.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/warden-release.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/cerberus-updates.sh
+
+## INV-7180 — probe — `maskSecrets` is not idempotent, and `log.read` of a file wipes the rest of a compact JSON log line after a secret field
+
+`maskSecrets` is not idempotent, and `log.read` of a file wipes the rest of a compact JSON log line after a secret field
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1; export D
+cat > "$D/p.sh" <<'EOF'
+node --input-type=module <<'JS'
+import fs from 'node:fs';
+import os from 'node:os';
+const D = process.env.D;
+const { createDiagTools } = await import(`${os.homedir()}/.cerberus-warden/current/warden/src/diag-tools.mjs`);
+const { maskSecrets } = await import(`${os.homedir()}/.cerberus-warden/current/warden/src/diag-guard.mjs`);
+fs.writeFileSync(`${D}/app.log`, '{"level":"error","msg":"login failed","token":"abc123","err":"ECONNREFUSED","code":111}\n');
+const handlers = new Map(); const sent = [];
+createDiagTools({ link: { on: (t, h) => handlers.set(t, h), send: (t, b) => sent.push([t, b]) }, home: D });
+handlers.get('diag.open')({ diagId: 'athena-probe', check: 'x' });
+const read = async (callId, tool) => { await handlers.get('diag.call')({ diagId: 'athena-probe', callId, tool, args: { path: `${D}/app.log` } }); await new Promise((r) => setTimeout(r, 250)); return sent.filter(([, b]) => b.callId === callId).at(-1)[1].text; };
+const once = maskSecrets(fs.readFileSync(`${D}/app.log`, 'utf8'));
+console.log('maskSecrets idempotent:', maskSecrets(once) === once);
+console.log('file.read keeps err field (1 pass):', (await read('a', 'file.read')).includes('ECONNREFUSED'));
+console.log('log.read  keeps err field (2 passes):', (await read('b', 'log.read')).includes('ECONNREFUSED'));
+process.exit(0);
+JS
+EOF
+bash "$D/p.sh" 2>&1 | grep -v '^\[warden\]'
+case "$D" in /tmp/athena-probe.*) rm -r -- "$D";; esac
+```
+
+measured 2026-10-07 by chain chain-cerberus--diagnosis--eis1-20261007-050807-bd69, finding M1, MEDIUM
+probe-key: fa878426fc50f0182cb4a8ff4e5fe4ad0b336adb
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/dist-warden/cerberus-warden-0.8.0.tar.gz, /home/lyphe/.claude/claudecodeui_lyphe/dist-warden/latest.json, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/diagnosis/diagnosis-text.ts, /home/lyphe/.claude/claudecodeui_lyphe/warden/package.json, /home/lyphe/.claude/claudecodeui_lyphe/warden/src/diag-guard.mjs
+
+## INV-7181 — probe — the mask's name rule misses a camelCase `secretKey` and the plurals `API_KEYS`, `secrets`
+
+the mask's name rule misses a camelCase `secretKey` and the plurals `API_KEYS`, `secrets`
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1; export D
+cat > "$D/p.sh" <<'EOF'
+node --input-type=module <<'JS'
+import os from 'node:os';
+const { maskSecrets } = await import(`${os.homedir()}/.cerberus-warden/current/warden/src/diag-guard.mjs`);
+for (const [label, text, value] of [
+  ['"secretKey" (camelCase)', '{"secretKey":"Zx81qLm0pRt5Vw3Y"}', 'Zx81qLm0pRt5Vw3Y'],
+  ['API_KEYS (plural)', 'API_KEYS=Zx81qLm0pRt5Vw3Y,Qw92rMn1sTu6Xv4Z', 'Zx81qLm0pRt5Vw3Y'],
+  ['"secrets" (plural)', 'secrets: Zx81qLm0pRt5Vw3Y', 'Zx81qLm0pRt5Vw3Y'],
+  ['DB_PASS (control)', 'DB_PASS=Zx81qLm0pRt5Vw3Y', 'Zx81qLm0pRt5Vw3Y'],
+]) console.log(label.padEnd(26), 'value-survives-mask=' + maskSecrets(text).includes(value));
+JS
+EOF
+bash "$D/p.sh"
+case "$D" in /tmp/athena-probe.*) rm -r -- "$D";; esac
+```
+
+measured 2026-10-07 by chain chain-cerberus--diagnosis--eis1-20261007-050807-bd69, finding L1, LOW
+probe-key: 391a65ba67bb7395ea4e3e4b3124a1193deef871
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/dist-warden/cerberus-warden-0.8.0.tar.gz, /home/lyphe/.claude/claudecodeui_lyphe/dist-warden/latest.json, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/diagnosis/diagnosis-text.ts, /home/lyphe/.claude/claudecodeui_lyphe/warden/package.json, /home/lyphe/.claude/claudecodeui_lyphe/warden/src/diag-guard.mjs
+
+## INV-7182 — probe — a `log.read { path, lines }` window that starts inside a PEM block returns the key's body lines (pre-existing; `diag-reads.mjs`, not in this diff)
+
+a `log.read { path, lines }` window that starts inside a PEM block returns the key's body lines (pre-existing; `diag-reads.mjs`, not in this diff)
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1; export D
+cat > "$D/p.sh" <<'EOF'
+node --input-type=module <<'JS'
+import fs from 'node:fs';
+import os from 'node:os';
+const D = process.env.D;
+const { createDiagTools } = await import(`${os.homedir()}/.cerberus-warden/current/warden/src/diag-tools.mjs`);
+const body = 'MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQC7VJTUt9Us8cKj';
+fs.writeFileSync(`${D}/server.conf`, ['listen 443;', '-----BEGIN PRIVATE KEY-----', body, 'MzEfYyjiWA4R4/M2bS1GB4t7NXp98C3SC6dVMvDuictGeurT8jNbvJZHtCSuYEvu', '-----END PRIVATE KEY-----', 'workers 4;'].join('\n') + '\n');
+const handlers = new Map(); const sent = [];
+createDiagTools({ link: { on: (t, h) => handlers.set(t, h), send: (t, b) => sent.push([t, b]) }, home: D });
+handlers.get('diag.open')({ diagId: 'athena-probe', check: 'x' });
+for (const lines of [500, 4]) {
+  await handlers.get('diag.call')({ diagId: 'athena-probe', callId: `c${lines}`, tool: 'log.read', args: { path: `${D}/server.conf`, lines } });
+  await new Promise((r) => setTimeout(r, 250));
+  const text = sent.filter(([, b]) => b.callId === `c${lines}`).at(-1)[1].text;
+  console.log(`log.read lines=${lines}`.padEnd(18), 'key-body-line-returned=' + text.includes('MzEfYyjiWA4R4'));
+}
+process.exit(0);
+JS
+EOF
+bash "$D/p.sh" 2>&1 | grep -v '^\[warden\]'
+case "$D" in /tmp/athena-probe.*) rm -r -- "$D";; esac
+```
+
+measured 2026-10-07 by chain chain-cerberus--diagnosis--eis1-20261007-050807-bd69, finding L2, LOW
+probe-key: 0ece8852428a9ab2e44f18907e4f34e3d6bbfd97
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/dist-warden/cerberus-warden-0.8.0.tar.gz, /home/lyphe/.claude/claudecodeui_lyphe/dist-warden/latest.json, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/diagnosis/diagnosis-text.ts, /home/lyphe/.claude/claudecodeui_lyphe/warden/package.json, /home/lyphe/.claude/claudecodeui_lyphe/warden/src/diag-guard.mjs
+
+## INV-7183 — probe — `~/.claude.json` is refused, its copies are not
+
+`~/.claude.json` is refused, its copies are not
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1; export D
+cat > "$D/p.sh" <<'EOF'
+node --input-type=module <<'JS'
+import fs from 'node:fs';
+import os from 'node:os';
+const home = os.homedir();
+const { resolveReadable } = await import(`${home}/.cerberus-warden/current/warden/src/diag-guard.mjs`);
+const copies = [`${home}/.claude.json`, ...fs.readdirSync(home).filter((f) => f.startsWith('.claude.json.')).map((f) => `${home}/${f}`), ...(fs.existsSync(`${home}/.claude/backups`) ? fs.readdirSync(`${home}/.claude/backups`).map((f) => `${home}/.claude/backups/${f}`) : [])];
+for (const p of copies.slice(0, 4)) console.log(p.replace(home, '~').padEnd(52), resolveReadable(p, `${home}/.cerberus-warden`).refusal ? 'REFUSED' : 'ALLOWED');
+JS
+EOF
+bash "$D/p.sh"
+case "$D" in /tmp/athena-probe.*) rm -r -- "$D";; esac
+```
+
+measured 2026-10-07 by chain chain-cerberus--diagnosis--eis1-20261007-050807-bd69, finding L3, LOW
+probe-key: f2504dfed06bd3f745442f7a8f816ae0104286d3
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/dist-warden/cerberus-warden-0.8.0.tar.gz, /home/lyphe/.claude/claudecodeui_lyphe/dist-warden/latest.json, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/diagnosis/diagnosis-text.ts, /home/lyphe/.claude/claudecodeui_lyphe/warden/package.json, /home/lyphe/.claude/claudecodeui_lyphe/warden/src/diag-guard.mjs
+
+## INV-7190 — probe — LOW — the one irreversible press is not gated by its own precondition
+
+LOW — the one irreversible press is not gated by its own precondition
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX)
+cat > "$D/p.sh" <<'EOF'
+cd /home/lyphe/.claude/claudecodeui_lyphe
+awk '/the dialog lists/ {on=1} on && /throw|process\.exit/ {n++} on && /\.click\(\);/ && !done {done=1; print "throws or exits between the dialog check and the press: " n+0}' .verify/cerberus-updates-whole-live.mjs
+EOF
+bash "$D/p.sh"
+expect: throws or exits between the dialog check and the press: 0
+```
+
+measured 2026-10-07 by chain chain-cerberus--updates--whole-20261007-060811-0c47, finding L1, LOW
+probe-key: 41d0d5094826ce0635c39f1bffc55be46725794e
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/cerberus-updates-whole-live.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/browser-frames.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/update-run-kit.mjs
+
+## INV-7191 — probe — LOW — a legitimate `waiting` first step makes the proof FAIL
+
+LOW — a legitimate `waiting` first step makes the proof FAIL
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX)
+cat > "$D/p.sh" <<'EOF'
+cd /home/lyphe/.claude/claudecodeui_lyphe
+grep -n "uploading,verified,swapping,restarting" .verify/cerberus-updates-whole-live.mjs | cut -c1-90
+echo "lines that allow a 'waiting' step: $(grep -c "'waiting'" .verify/cerberus-updates-whole-live.mjs)"
+EOF
+bash "$D/p.sh"
+expect: line 189 compares to the bare four-step string, and "lines that allow a 'waiting' step: 0"
+```
+
+measured 2026-10-07 by chain chain-cerberus--updates--whole-20261007-060811-0c47, finding L2, LOW
+probe-key: 935a9a650f41dedff1907912fd46f6db0eafa635
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/cerberus-updates-whole-live.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/browser-frames.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/update-run-kit.mjs
+
+## INV-7192 — probe — LOW — "ms from the press" is anchored before the click, so the quoted timings are inflated by ~174 ms (and two runs of one batch disagree under one label)
+
+LOW — "ms from the press" is anchored before the click, so the quoted timings are inflated by ~174 ms (and two runs of one batch disagree under one label)
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX)
+cat > "$D/p.sh" <<'EOF'
+cd /home/lyphe/.claude/claudecodeui_lyphe/.verify/artifacts/updates-whole-live
+grep -h '^restart:' steps.txt after/steps.txt | sed 's/.*; steps //' || echo none
+sqlite3 -readonly ~/.cloudcli/cerberus.db "select 'batch started_at ms after the logged press 06:35:57.460: ' || (started_at - 1791380157460) from updates where batch='d6860ca4810a60f6'"
+EOF
+bash "$D/p.sh"
+expect: two different step-offset lines for one batch ("+184, +352, +352, +353 ms from the press" and "+10, +178, +178, +179 ms from the press") and 174
+```
+
+measured 2026-10-07 by chain chain-cerberus--updates--whole-20261007-060811-0c47, finding L3, LOW
+probe-key: aac04051ca82b926c222ee9a87f69a3fce22ee84
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/cerberus-updates-whole-live.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/browser-frames.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/update-run-kit.mjs
+
+## INV-7193 — probe — LOW — the wait for "heard N s ago" has a 7–10 s margin and misses the line's first wording
+
+LOW — the wait for "heard N s ago" has a 7–10 s margin and misses the line's first wording
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX)
+cat > "$D/p.sh" <<'EOF'
+cd /home/lyphe/.claude/claudecodeui_lyphe
+grep -h -E '^  \+ *(1812|21317) ms' .verify/artifacts/updates-whole-live/steps.txt | cut -c1-110 || echo none
+grep -n 'heard \\\\d+ s ago' .verify/cerberus-updates-whole-live.mjs | grep -o 'timeout: [0-9]*' | head -1
+EOF
+bash "$D/p.sh"
+expect: "+1812 ms … heard just now …", "+21317 ms … heard 2 s ago …" (19.5 s apart) and "timeout: 30000"
+```
+
+measured 2026-10-07 by chain chain-cerberus--updates--whole-20261007-060811-0c47, finding L4, LOW
+probe-key: 87a0f49389ee2e5e781d114458bba2d6bf8ba116
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/cerberus-updates-whole-live.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/browser-frames.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/update-run-kit.mjs
+
+## INV-7194 — probe — LOW — two of the live shots do not show their captions, and the fix for them was never tried at the live page's size
+
+LOW — two of the live shots do not show their captions, and the fix for them was never tried at the live page's size
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX)
+cat > "$D/p.sh" <<'EOF'
+python3 -E -P - <<'PY' 2>/dev/null
+from PIL import Image
+base = '/home/lyphe/.claude/claudecodeui_lyphe/.verify/artifacts/updates-whole-live/'
+def dark(name, box):
+    im = Image.open(base + name).convert('L').crop(box)
+    return sum(1 for p in im.getdata() if p < 110)
+for n in ('04-header-updating-1440x900.png', '05-card-updating-restarting-1440x900.png'):
+    print(n, 'dark pixels where the header button sits:', dark(n, (1100, 80, 1290, 116)))
+im = Image.open(base + '07-card-updated-1440x900.png').convert('RGB').crop((620, 690, 850, 750))
+print('07-card-updated: distinct colours in the box over the Shadow connector row:', len(set(im.getdata())))
+PY
+EOF
+bash "$D/p.sh"
+expect: 04 → 0, 05 → 382 (a few hundred), 07 → 1
+```
+
+measured 2026-10-07 by chain chain-cerberus--updates--whole-20261007-060811-0c47, finding L5, LOW
+probe-key: c54903aecfb9f34f6eb2930df672268dde32134f
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/cerberus-updates-whole-live.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/browser-frames.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/update-run-kit.mjs
+
+## INV-7195 — probe — LOW — `recordFrames` is dead code
+
+LOW — `recordFrames` is dead code
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX)
+cat > "$D/p.sh" <<'EOF'
+cd /home/lyphe/.claude/claudecodeui_lyphe
+grep -rn 'recordFrames' .verify --include=*.mjs --include=*.sh | cut -c1-110
+EOF
+bash "$D/p.sh"
+expect: exactly one line, the definition at .verify/lib/update-run-kit.mjs:47, and no caller
+```
+
+measured 2026-10-07 by chain chain-cerberus--updates--whole-20261007-060811-0c47, finding L6, LOW
+probe-key: 57a645ad30914ee338ed5bebbf9339405cfca991
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/cerberus-updates-whole-live.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/browser-frames.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/update-run-kit.mjs
+
+## INV-7196 — probe — LOW — `--after` has a one-hour life that its header does not say
+
+LOW — `--after` has a one-hour life that its header does not say
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX)
+cat > "$D/p.sh" <<'EOF'
+R=/home/lyphe/.claude/claudecodeui_lyphe
+TOKEN=$(node --input-type=module -e "import('$R/.verify/lib/whole-check-kit.mjs').then(k=>process.stdout.write(k.loginToken()??''))")
+curl -s -H "Authorization: Bearer $TOKEN" http://127.0.0.1:3011/api/cerberus/checks/eis1/archpulse/http.ok \
+  | jq -c '{cells:(.cells|length), pausedCellsAtTheRestart:([.cells[]|select(.status=="paused" and .from<=1791380157813 and 1791380157813<.to)]|length)}'
+date +%H:%M
+EOF
+bash "$D/p.sh"
+expect: {"cells":60,"pausedCellsAtTheRestart":1} before 07:36 PDT today, pausedCellsAtTheRestart 0 after
+```
+
+measured 2026-10-07 by chain chain-cerberus--updates--whole-20261007-060811-0c47, finding L7, LOW
+probe-key: 6b47ab4e81bdcd96287ff61a5a581d95218cd255
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/cerberus-updates-whole-live.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/browser-frames.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/update-run-kit.mjs
+
+## INV-7197 — probe — LOW — the frame listener's loss is silent
+
+LOW — the frame listener's loss is silent
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX)
+cat > "$D/server.mjs" <<'EOF'
+import { WebSocketServer } from '/home/lyphe/.claude/claudecodeui_lyphe/node_modules/ws/wrapper.mjs';
+const wss = new WebSocketServer({ port: 7997, host: '127.0.0.1' });
+wss.on('connection', (s) => { s.send(JSON.stringify({ kind: 'cerberus_changed', nodes: ['eis1'] })); setTimeout(() => s.close(), 500); });
+setTimeout(() => process.exit(0), 8000);
+EOF
+cat > "$D/p.sh" <<'EOF'
+D="$1"
+node "$D/server.mjs" & SERVER=$!
+sleep 1
+( cd /home/lyphe/.claude/claudecodeui_lyphe && node .verify/lib/browser-frames.mjs ws://127.0.0.1:7997/ws FAKE-TOKEN > "$D/out.txt" 2> "$D/err.txt" ) & LISTENER=$!
+sleep 4
+if kill -0 "$LISTENER" 2>/dev/null; then echo "listener still running 3.5 s after the server closed the socket"; else echo "listener ended"; fi
+echo "its output: $(tr '\n' '|' < "$D/out.txt" | sed 's/[0-9]\{13\}/<ms>/g")   its stderr: $(head -c 100 "$D/err.txt")"
+kill "$LISTENER" 2>/dev/null; wait "$LISTENER" 2>/dev/null
+kill "$SERVER" 2>/dev/null; wait "$SERVER" 2>/dev/null
+exit 0
+EOF
+bash "$D/p.sh" "$D"
+expect: "listener ended", output "<ms> open|<ms> eis1|", empty stderr — no line saying the socket closed
+```
+
+measured 2026-10-07 by chain chain-cerberus--updates--whole-20261007-060811-0c47, finding L8, LOW
+probe-key: e8431ccc062b18e34f106e85de7b0be09b3a53c8
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/cerberus-updates-whole-live.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/browser-frames.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/update-run-kit.mjs
+
+## INV-7198 — probe — MEDIUM — the figure check is not "digit for digit": a changed count passes in three common ways, and the MANUAL, the script header and the verdict text say it does not
+
+MEDIUM — the figure check is not "digit for digit": a changed count passes in three common ways, and the MANUAL, the script header and the verdict text say it does not
+
+```probe
+D=$(mktemp -d) || exit 1
+cat > "$D/p.sh" <<'EOF'
+printf '%s\n' '2026-10-07T07:12:30 eis1 uvicorn[2071371]: [xa-detail] Notes JSON for 06Q0MK7: 123 notes parsed' '2026-10-07T07:12:31 eis1 uvicorn[2071372]: pid 41250 started, 3 workers, port 8125' > "$1/log.txt"
+cat > "$1/p.mjs" <<'JS'
+import { pairEvidence } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/diagnosis-evidence.mjs';
+const file = process.argv[2];
+const body = '[xa-detail] Notes JSON for 06Q0MK7: ';
+const variants = [
+  ['the real count, 123            ', `${body}123 notes parsed`],
+  ['changed to 125 (inside 8125)   ', `${body}125 notes parsed`],
+  ['changed to 9 (one digit)       ', `${body}9 notes parsed`],
+  ["changed to '777' (in quote marks)", `${body}'777' notes parsed`],
+  ['changed to 777 (unquoted)      ', `${body}777 notes parsed`],
+];
+const pairs = pairEvidence({ steps: [{ n: 1, t: 0, text: `Reading ${file}` }], startedAt: Date.now(), store: process.env.HOME + '/.cloudcli/cerberus.db', evidence: variants.map((v) => v[1]), prompt: [] });
+pairs.forEach((pair, i) => console.log(pair.ok ? 'PAIRED  ' : 'REJECTED', variants[i][0], '::', variants[i][1].slice(-26)));
+JS
+node "$1/p.mjs" "$1/log.txt"
+EOF
+bash "$D/p.sh" "$D"
+case "$D" in /tmp/tmp.*) rm -rf "$D";; esac
+```
+
+measured 2026-10-07 by chain chain-cerberus--diagnosis--whole-20261007-070743-39f2, finding M1, MEDIUM
+probe-key: f93ff060d09f6fd2b7334f1a95024215cdc43a71
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/diagnosis/diagnosis-quotes.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/cerberus-diagnosis-whole-live.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/diagnosis-evidence.mjs

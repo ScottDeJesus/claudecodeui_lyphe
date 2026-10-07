@@ -43,12 +43,12 @@ import '@/shared/ui/verve/feedback.css';
 // The FAB and split-pane paint shares no selector with the files either side of it, so its only
 // constraint is that board.css stays last, below.
 import '@/shared/ui/verve/surfaces.css';
-// panels.css holds the paint of TextArea, Sheet, Timeline and Steps. `.vv-textarea` composes `.vv-input`
-// (controls.css) and wins each tie it has — against `.vv-input`'s colours, against src/index.css's pins
-// on every `textarea` and against `text-sm`'s line height — by specificity, never by order. The Sheet,
-// Timeline and Steps rules share no selector with any sibling. So nothing here depends on its place
-// against controls.css, feedback.css or surfaces.css, and the one constraint is that board.css stays
-// last, below.
+// panels.css holds the paint of TextArea, Sheet, Timeline, Steps and Checkbox. `.vv-textarea` composes
+// `.vv-input` (controls.css) and wins each tie it has — against `.vv-input`'s colours, against
+// src/index.css's pins on every `textarea` and against `text-sm`'s line height — by specificity, never by
+// order. The Sheet, Timeline, Steps and Checkbox rules share no selector with any sibling. So nothing
+// here depends on its place against controls.css, feedback.css or surfaces.css, and the one constraint
+// is that board.css stays last, below.
 import '@/shared/ui/verve/panels.css';
 // The board layer goes LAST on purpose, and the order is load-bearing: a lane card composes
 // `.vv-card`'s ground and then overrides its background, shadow and transition. Imported first,
@@ -67,6 +67,10 @@ export { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/shared/u
 // hidden content. The glyph is shared with the chat's shape cards on purpose — `ShapeFrame` draws it
 // too, so there is one sign and not two look-alikes.
 export { CardFoldBody, CardFoldToggle, FoldChevron } from '@/shared/ui/CardFold';
+// Verve's forms/Checkbox: a real checkbox input with its box and tick painted, the words beside it taking
+// the press too. The cerberus tab's Update wardens dialog is the first: one row a node whose warden is
+// behind, ticked to choose which to update.
+export { Checkbox } from '@/shared/ui/Checkbox';
 export { Chip } from '@/shared/ui/Chip';
 export { ClaudeCodeMark } from '@/shared/ui/ClaudeCodeMark';
 export { Collapsible, CollapsibleTrigger, CollapsibleContent } from '@/shared/ui/Collapsible';

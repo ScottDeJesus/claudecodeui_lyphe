@@ -33,8 +33,8 @@ import { wardenLinks } from './warden-links.js';
  * HAZARD, for the module that calls this: `reusePort` lets the gateway bind an address another
  * listener of the supervised API already holds, WITHOUT an error, and the kernel then splits that
  * address's traffic between the two (measured: of 60 requests, 26 reached the API and 34 got this
- * gateway's 404). The gateway cannot know the API's port; the caller must refuse a
- * `CERBERUS_LISTEN` on it before calling.
+ * gateway's 404). The gateway cannot know the API's port, so the caller refuses a `CERBERUS_LISTEN` on it
+ * before calling: the cerberus module's `start()` does, by port alone (`isApiOwnPort`).
  *
  * `stop()` closes the LISTENER only. Open links are left to the process's exit, as `http-drain.ts`
  * leaves the browser's websockets: a warden reconnects on its own, and closing a link early would

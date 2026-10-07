@@ -6,6 +6,9 @@
 //   <home>/state.json       { seqFloor } — the reserved ceiling of the result sequence (outbox.mjs)
 //   <home>/chain.json       { <check>: at } — the last result per check center has acked, so a restart keeps each `prevAt` chain (chain.mjs)
 //   <home>/run.json         what the daemon last said about itself — `run` rewrites it on every heartbeat (daemon.mjs)
+//   <home>/current          a symlink to releases/<version>, the release the launcher runs
+//   <home>/pending-update.json  { updateId, from, to, swappedAt[, failed, reason] } — an update the launcher is judging, or has just taken back (update.mjs, launcher.mjs)
+//   <home>/hello-ok.json    { version, at } — written by a release after each `welcome`: the proof it started (update.mjs)
 //
 // The home is `CERBERUS_WARDEN_HOME` when set, else `~/.cerberus-warden`, and is forced to 0700:
 // the installer extracts the release into it before the warden first runs, so it may pre-exist
@@ -41,6 +44,10 @@ export function homePaths(home = homeDir()) {
     stateFile: path.join(home, 'state.json'),
     chainFile: path.join(home, 'chain.json'),
     runFile: path.join(home, 'run.json'),
+    releasesDir: path.join(home, 'releases'),
+    currentLink: path.join(home, 'current'),
+    pendingFile: path.join(home, 'pending-update.json'),
+    helloOkFile: path.join(home, 'hello-ok.json'),
   };
 }
 
@@ -87,7 +94,7 @@ export function writeFileDurably(file, text, mode) {
 }
 
 /** The parsed JSON file, or null when it is not there. A file that is there and unreadable throws. */
-function readJsonFile(file) {
+export function readJsonFile(file) {
   let text;
   try {
     text = fs.readFileSync(file, 'utf8');

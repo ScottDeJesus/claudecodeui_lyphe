@@ -20,12 +20,13 @@
 # WHAT EACH RUN DOES.
 #   enroll   (--name, --token)  refused when identity.json already exists (that is a refresh). Fetches
 #            latest.json and the release from center, checks the SHA-256, unpacks into
-#            ~/.cerberus-warden/releases/<version>/, points `current` at it, runs `enroll`, then
-#            writes every unit the release carries, enables them and restarts cerberus-warden so the
+#            ~/.cerberus-warden/releases/<version>/, points `current` at it, runs `enroll`, copies the
+#            release's launcher to ~/.cerberus-warden/launcher.mjs, then writes every unit the release carries, enables them and restarts cerberus-warden so the
 #            daemon reads the identity just made.
 #   refresh  (--refresh)        refused unless identity.json exists. Fetches a release only when it is
-#            NEWER than `current`'s, points `current` at it, writes every unit template the release
-#            carries, enables (and so starts) any unit not yet enabled, restarts cerberus-warden — and only
+#            NEWER than `current`'s, points `current` at it, copies the launcher out of `current` to
+#            ~/.cerberus-warden/launcher.mjs (the unit runs that copy, which lives outside every release),
+#            writes every unit template the release carries, enables (and so starts) any unit not yet enabled, restarts cerberus-warden — and only
 #            that: cerberus-warden-sessions holds the node's running chat sessions and is never restarted by
 #            a refresh. Identity and keys are never touched.
 #
@@ -117,6 +118,15 @@ install_release() {
   # A symlink made beside `current`, then renamed over it: a reader sees the old release or the new, never neither.
   as_account ln -sfn "releases/$VERSION" "$WARDEN_HOME/current.next"
   as_account mv -T "$WARDEN_HOME/current.next" "$WARDEN_HOME/current"
+}
+
+# Copies the release's launcher to ~/.cerberus-warden/launcher.mjs, where the unit runs it. The launcher lives OUTSIDE every
+# release so that a release that cannot start cannot take its own rescue with it; it is written beside its final name and
+# renamed in, so a launcher that is running while this happens (a refresh) keeps the file it was started from.
+install_launcher() {
+  [ -f "$WARDEN_HOME/current/warden/src/launcher.mjs" ] || die "The release carries no warden/src/launcher.mjs — nothing was installed."
+  as_account cp "$WARDEN_HOME/current/warden/src/launcher.mjs" "$WARDEN_HOME/launcher.mjs.next"
+  as_account mv -f "$WARDEN_HOME/launcher.mjs.next" "$WARDEN_HOME/launcher.mjs"
 }
 
 # Writes every unit template of the current release into /etc/systemd/system; RENDERED names them.
@@ -241,6 +251,7 @@ main() {
     else
       say "The warden $installed is already the newest Cerberus has built."
     fi
+    install_launcher
     render_units
     systemctl daemon-reload
     enable_units
@@ -258,6 +269,7 @@ main() {
   install_release
   as_account "$NODE" "$WARDEN_HOME/current/warden/src/main.mjs" enroll --center "$CENTER" --name "$NAME" --token "$TOKEN" < /dev/null ||
     die "Cerberus did not enroll this machine, so no unit was installed."
+  install_launcher
   render_units
   systemctl daemon-reload
   enable_units

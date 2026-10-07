@@ -1,7 +1,7 @@
 import { createContext, useContext } from 'react';
 
-import type { CerberusCatalogEntryView, CerberusNodeProject, CerberusOverview } from '@/shared/cerberus-types';
-import type { CerberusLabelInput, CerberusMuteInput, CerberusProjectMove } from '@/shared/types';
+import type { CerberusCatalogEntryView, CerberusNodeProject, CerberusOverview, CerberusWardens } from '@/shared/cerberus-types';
+import type { CerberusLabelInput, CerberusMuteInput, CerberusProjectMove, CerberusPromoteInput, CerberusStartedBatch } from '@/shared/types';
 
 /**
  * The fleet as center's read model last answered it, the catalog beside it, and the writes the tab presses. No
@@ -34,9 +34,9 @@ export type CerberusValue = {
   catalog: CerberusCatalogEntryView[] | null;
   /** True while the catalog has never been read and its last read failed. A failed read after a good one keeps the entries. */
   catalogFailed: boolean;
-  /** Reads the overview and the catalog again. Resolves when the overview has answered or failed (the catalog follows, and never holds a write's verdict back); never rejects. */
-  refresh: () => Promise<void>;
-  /** Each write answers `true` when it landed — and by then the overview has been re-read. On `false` it has already raised the toast. */
+  /** Reads the overview and the catalog again. Resolves when the overview has answered or failed (the catalog follows, and never holds a write's verdict back), with whether it answered; never rejects. */
+  refresh: () => Promise<boolean>;
+  /** Each write answers `true` when it landed — and by then the overview has been re-read, or, if that read failed, is being read again until it answers. On `false` it has already raised the toast. */
   mute: (input: CerberusMuteInput) => Promise<boolean>;
   liftMute: (id: string) => Promise<boolean>;
   setLabel: (input: CerberusLabelInput) => Promise<boolean>;
@@ -59,6 +59,35 @@ export type CerberusValue = {
   runEntry: (id: string) => Promise<boolean>;
   /** Switches an entry's auto-run on or off. Answers `true` when it landed, with the catalog re-read; a capped entry is refused and the toast says so. */
   setAuto: (id: string, on: boolean) => Promise<boolean>;
+  /**
+   * Where the fleet's wardens stand against the release center holds, read beside the overview and again on
+   * `cerberus_changed`. `null` until a read answers: the header draws no update button and the dialog nothing
+   * until then, so "not read yet" never looks like "nothing to update".
+   */
+  wardens: CerberusWardens | null;
+  /**
+   * Starts a batch that takes `nodes` to the release, one at a time. Answers the batch's id and its updates as they
+   * stood, which the Update wardens dialog follows; `null` when it was refused (a batch already going, nothing
+   * built): the toast has said why, and the wardens are read again so a batch started elsewhere shows.
+   */
+  startUpdate: (nodes: string[]) => Promise<CerberusStartedBatch | null>;
+  /**
+   * Starts a read-only diagnosis of one check (`key` its key, `<service>/<id>`) on `node`, and sends no model:
+   * center picks its own. Answers `true` when it started, and by then the overview holds it (the card says
+   * "Diagnosing…"); on `false` the toast has said why (a diagnosis already going on the check, an unknown check).
+   */
+  diagnose: (node: string, key: string) => Promise<boolean>;
+  /**
+   * Runs a diagnosis's proposal once, by you. Answers `true` when the warden accepted the run and the fleet was
+   * re-read; on `false` the toast has said why (no proposal, its one-off ran out, a run already going on the check,
+   * the node's warden not linked). It never touches the catalog.
+   */
+  runProposal: (id: string) => Promise<boolean>;
+  /**
+   * Adds a diagnosis's proposal to the catalog as the entry `input` describes. Answers `true` when it landed, with
+   * the catalog re-read and the toast "Added to the catalog" raised; on `false` the toast has said why and nothing was written.
+   */
+  promote: (id: string, input: CerberusPromoteInput) => Promise<boolean>;
 };
 
 export const CerberusContext = createContext<CerberusValue | null>(null);

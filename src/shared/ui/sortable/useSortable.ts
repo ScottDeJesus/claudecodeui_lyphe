@@ -5,7 +5,7 @@ import { isFreePress, SORTABLE_ITEM_ATTRIBUTE } from '@/shared/ui/sortable/freeP
 import { reconcile, sameOrder } from '@/shared/ui/sortable/carryState';
 import type { Carry } from '@/shared/ui/sortable/carryState';
 import { useDropHold } from '@/shared/ui/sortable/dropHold';
-import { edgeStep, radiusOf, restoreScrollOffsets, scrollerOf, scrollOffsetsWithin, slideFrom, surfaceBehind } from '@/shared/ui/sortable/motion';
+import { edgeHoldAt, edgeStep, radiusOf, restoreScrollOffsets, scrollerOf, scrollOffsetsWithin, slideFrom, surfaceBehind } from '@/shared/ui/sortable/motion';
 import { layoutRectOf, moveKey, slotAt } from '@/shared/ui/sortable/slotAt';
 import { usePointerDrag } from '@/shared/ui/usePointerDrag';
 import type { PointerDragPoint } from '@/shared/ui/usePointerDrag';
@@ -52,6 +52,10 @@ export type SortableList = {
  *
  * THE CLICK THAT ENDS A CARRY IS SWALLOWED. NEAR THE PANE'S TOP OR BOTTOM EDGE the pane scrolls itself
  * (`edgeStep`), the item stays under the pointer and the slot is re-read as the list moves beneath it.
+ * A CARRY THAT BEGINS INSIDE AN EDGE ZONE DOES NOT SCROLL TOWARD THAT EDGE until the pointer has been out of
+ * it, or pulled well past the pane's edge (`Carry.edgeHold`, `edgeHoldAt`): the pointer has not travelled to that
+ * edge, the row it lifted was merely drawn there. Without it a short pane, whose two zones cover half of it,
+ * runs away under any carry of a row that opens in one.
  * A CANCELLED carry (the browser took the touch) puts the card back. THE POLL DOES NOT RESET A CARRY:
  * the preview order lives here and is `reconcile`d against the keys on each render; a carried item
  * whose key leaves the list is let go. A drop calls `onReorder` once and clears the preview in the same
@@ -144,7 +148,9 @@ export function useSortable({ keys, onReorder }: {
     let scrolled = false;
     if (scroller !== null) {
       const step = edgeStep(scroller, active.pointerY);
-      if (step !== 0) scroller.scrollTop += step;
+      // The edge the carry began in stays held while the pointer is in its zone; out of it, in the other one or pulled far past the pane, it is let go for good.
+      active.edgeHold = edgeHoldAt(scroller, active.pointerY, active.edgeHold);
+      if (step !== 0 && active.edgeHold === 0) scroller.scrollTop += step;
       // A pane that moved — by this edge, or by the reader's own wheel — moved the slots under the pointer.
       scrolled = scroller.scrollTop !== active.seenScroll;
       active.seenScroll = scroller.scrollTop;
@@ -210,6 +216,7 @@ export function useSortable({ keys, onReorder }: {
       order,
       scroller,
       reference: { x, y, scroll: scroller?.scrollTop ?? 0 },
+      edgeHold: scroller === null ? 0 : Math.sign(edgeStep(scroller, y)),
       seenScroll: scroller?.scrollTop ?? 0,
       frame: 0,
       slides: new Map(),

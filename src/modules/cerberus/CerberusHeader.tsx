@@ -6,7 +6,8 @@ import { useCountTo } from '@/modules/cerberus/hooks/useCountTo';
 import { RUN_LOOK } from '@/modules/cerberus/utils/cerberusStatus';
 import { hms } from '@/modules/cerberus/utils/cerberusTime';
 import { agoPhrase } from '@/modules/cerberus/utils/fleetWords';
-import type { CerberusOverview } from '@/shared/cerberus-types';
+import { batchPlace, canTake } from '@/modules/cerberus/utils/wardenUpdates';
+import type { CerberusOverview, CerberusWardens } from '@/shared/cerberus-types';
 import { useWebSocket } from '@/shared/context/WebSocketContext';
 import { Button } from '@/shared/ui';
 import { cn } from '@/shared/utils';
@@ -16,8 +17,12 @@ type CerberusHeaderProps = {
   overview: CerberusOverview;
   /** The fleet is the last answer center gave, not this minute's: no read has answered for 90 s. The pill stops saying Live. */
   stale: boolean;
+  /** Where the fleet's wardens stand against the release on offer, null until a read answers. The update button waits for it, and for a release in it. */
+  wardens: CerberusWardens | null;
   /** Enroll a node, pressed. The root opens its Enroll dialog. */
   onEnroll: () => void;
+  /** The update button, pressed. The root opens its Update wardens dialog. */
+  onUpdateWardens: () => void;
 };
 
 /**
@@ -36,14 +41,18 @@ type CerberusHeaderProps = {
  *    received no result at all.
  *
  * On the right, wrapping under the left on a phone: the clock pill, then the button row. The pill says
- * Live only while the socket is up AND the fleet is this minute's.
+ * Live only while the socket is up AND the fleet is this minute's. The row is "Update wardens to 0.4.3"
+ * while a node's warden is behind the release on offer, "Updating wardens · 2 of 3" while a batch runs
+ * (the first update that has not ended, of the batch), "Wardens up to date" otherwise; it opens the Update
+ * wardens dialog. It is drawn only once the wardens read has answered with a release, since with none
+ * there is nothing to offer. Then Enroll a node.
  *
  * The headline's number is `counts.needsYou`, the same count the workspace strip's pill shows, so the
  * two never disagree. The header enters on Verve's page entrance with the rest of the tab.
  *
  * Used by the cerberus module's root, `CerberusPanel`, above its tabs.
  */
-export function CerberusHeader({ overview, stale, onEnroll }: CerberusHeaderProps) {
+export function CerberusHeader({ overview, stale, wardens, onEnroll, onUpdateWardens }: CerberusHeaderProps) {
   const { t } = useTranslation();
   const { counts } = overview;
 
@@ -67,6 +76,17 @@ export function CerberusHeader({ overview, stale, onEnroll }: CerberusHeaderProp
     : needs === 0 ? t('cerberus.header.headline.quietAccent') : t('cerberus.header.headline.needsAccent', { count: needs });
   // The accent's tone: a fix's own while one runs (the info ink), else the state's.
   const accentTone = fixRunning ? RUN_LOOK.going.tone : needs === 0 ? 'positive' : 'warn';
+  // The update button's words, by where the wardens stand: a batch running first, then a node that can take
+  // the release (the dialog's own test, so the button never offers what the dialog would answer "Update 0
+  // nodes"), else up to date. Null while there is no release to speak of.
+  const place = batchPlace(wardens?.running ?? []);
+  const updateWords = wardens?.latest == null
+    ? null
+    : place !== null
+      ? t('cerberus.updates.button.updating', { index: place.index, total: place.of })
+      : wardens.nodes.some(canTake)
+        ? t('cerberus.updates.button.update', { version: wardens.latest.version })
+        : t('cerberus.updates.button.upToDate');
   // The summary's parts after the passing count, each named so its place holds while its words change.
   const rest = [
     counts.muted > 0 ? { id: 'muted', words: t('cerberus.header.summary.muted', { count: counts.muted }) } : null,
@@ -106,8 +126,11 @@ export function CerberusHeader({ overview, stale, onEnroll }: CerberusHeaderProp
       <div className="flex flex-wrap items-center gap-2.5">
         <ClockPill live={connected && !stale} now={now} />
         <div className="flex flex-wrap gap-2.5">
-          {/* SLOT: Update wardens — the updates plan's button goes here, before Enroll a node, where the
-              prototype draws its Deploy (:48). Nothing is drawn for it until it lands. */}
+          {updateWords !== null && (
+            <Button variant="outline" size="sm" className="h-8 max-md:h-11" onClick={onUpdateWardens}>
+              {updateWords}
+            </Button>
+          )}
           <Button variant="outline" size="sm" className="h-8 max-md:h-11" onClick={onEnroll}>
             {t('cerberus.header.enroll')}
           </Button>

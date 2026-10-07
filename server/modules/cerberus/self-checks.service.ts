@@ -4,6 +4,7 @@ import type { CerberusGatewayState, CerberusResultWire } from '@/shared/cerberus
 import { HUB_NODE_ID } from './definition-document.js';
 import { ingest } from './ingest.service.js';
 import { resolveNodeLink } from './read-model/node-links.js';
+import { pauseWindows } from './updates.service.js';
 import { wardenLinks } from './warden-links.js';
 
 /**
@@ -16,6 +17,8 @@ import { wardenLinks } from './warden-links.js';
  *
  *   `cerberus/wardens.fresh`     "1 of 1 reporting": ok while every node that has spoken is reporting,
  *                                failing while one is silent; no result (status null) with none yet.
+ *                                A node whose warden is restarting for an update is neither: it is
+ *                                named ("1 of 2 reporting · 1 updating") and does not fail the check.
  *   `cerberus/gateway.listening` "Listening on 100.103.222.79:3012"; failing with the bind error;
  *                                null with "CERBERUS_LISTEN is not set".
  *   `cerberus/store.write`       "Took the write lock in 2 ms": the time an empty `BEGIN IMMEDIATE`
@@ -24,7 +27,9 @@ import { wardenLinks } from './warden-links.js';
  * "A node that has spoken": a node whose warden has not yet sent a first heartbeat is mid-install, not
  * silent — the fleet screen calls it `never`, and counting it would turn this check failing for the
  * seconds between an enrollment and its first beat. The link rule is the screen's own
- * (`resolveNodeLink`), so this check and the screen cannot disagree about who is reporting.
+ * (`resolveNodeLink`), so this check and the screen cannot disagree about who is reporting — nor about
+ * who is paused: a restart the warden was told to make is not an outage, and one that outlasts its 90 s
+ * is the silence it then reads as.
  *
  * `prevAt` is the time of the last tick that INGESTED WITHOUT ERROR, null after a boot. Stored or not:
  * an unchanged tick stores nothing (a keepalive's business) and is still a link in the chain. A tick
@@ -88,17 +93,19 @@ function resultOf(
   };
 }
 
-/** How many of the nodes that have spoken are reporting now. */
+/** How many of the nodes that have spoken are reporting now, and how many of the rest are only restarting for an update. */
 function wardensFreshOutcome(now: number): { status: CerberusResultWire['status']; value: string } {
   const states = wardenLinks.states();
   const spoken = cerberusNodesDb
     .list()
-    .map((row) => resolveNodeLink(row, states.get(row.id), now))
+    .map((row) => resolveNodeLink(row, states.get(row.id), now, pauseWindows(row.id, now, now + 1)))
     .filter((link) => link.link !== 'never');
   if (spoken.length === 0) return { status: null, value: 'No warden has enrolled yet' };
 
   const reporting = spoken.filter((link) => link.link === 'reporting').length;
-  return { status: reporting === spoken.length ? 'ok' : 'failing', value: `${reporting} of ${spoken.length} reporting` };
+  const updating = spoken.filter((link) => link.link === 'paused').length;
+  const value = `${reporting} of ${spoken.length} reporting${updating > 0 ? ` · ${updating} updating` : ''}`;
+  return { status: reporting + updating === spoken.length ? 'ok' : 'failing', value };
 }
 
 function gatewayOutcome(gateway: CerberusGatewayState): { status: CerberusResultWire['status']; value: string } {

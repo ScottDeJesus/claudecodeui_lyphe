@@ -22,8 +22,10 @@ import type {
  * How bad each node status is, the one ranking every sort and "is it loud" test reads: the smaller,
  * the worse. `failing` and `denied` share the worst place. `fixing` — a fix running — sits just under
  * them: a node whose only trouble is being fixed reads fixing, while one with another service still
- * failing stays failing, since that one still needs you. `paused`/`enrolling` hold their places for the
- * updates plan. `empty` — no service — is last: nothing is wrong, and nothing is on it.
+ * failing stays failing, since that one still needs you. `updating` (an update queued or running on the
+ * node's warden), `paused` (its warden restarting for one) and `enrolling` share the place under no result
+ * and above muted: something is going on there, and nothing needs you. `empty` — no service — is last:
+ * nothing is wrong, and nothing is on it.
  */
 const STATUS_RANK: Record<FleetStatus, number> = {
   failing: 0,
@@ -32,6 +34,7 @@ const STATUS_RANK: Record<FleetStatus, number> = {
   warn: 2,
   unknown: 3,
   paused: 4,
+  updating: 4,
   enrolling: 4,
   muted: 5,
   ok: 6,
@@ -67,10 +70,16 @@ export function runOnService(running: CerberusRunView[], node: string, service: 
  * A node's word: the worst of its services', `empty` with none. A service with a run going is `fixing`.
  * A service whose every check is switched off on its own side (`not_enabled`) counts as passing here —
  * it is nothing to look at and nothing wrong — while its own row still says what it is.
+ *
+ * A node whose warden is restarting for an update (`link` `paused`) or has one queued or running
+ * (`updating`) starts from that word instead of `ok`, so a node being updated is found under Updating
+ * even with nothing else to say — and even with no service, which would otherwise read `empty`. Anything
+ * worse still wins: a failing check on a node that is updating still needs you.
  */
 function nodeStatusOf(node: CerberusNodeView, running: CerberusRunView[]): FleetStatus {
-  if (node.services.length === 0) return 'empty';
-  let worst: FleetStatus = 'ok';
+  const updateWord: FleetStatus | null = node.link === 'paused' ? 'paused' : node.updating !== null ? 'updating' : null;
+  if (node.services.length === 0) return updateWord ?? 'empty';
+  let worst: FleetStatus = updateWord ?? 'ok';
   for (const service of node.services) {
     const word: FleetStatus = runOnService(running, node.id, service) !== null
       ? 'fixing'
@@ -141,6 +150,7 @@ export function groupOf(status: FleetStatus): FleetGroup {
     case 'warn':
       return 'needs';
     case 'paused':
+    case 'updating':
     case 'enrolling':
       return 'updating';
     default:

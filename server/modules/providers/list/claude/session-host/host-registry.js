@@ -435,8 +435,15 @@ export function createHostRegistry({ tmuxSocketName, keepaliveSession, sessionsD
   /**
    * Starts `host.js` as its own tmux session and returns once tmux has accepted it; the host
    * still has to reach `listen`, which is what `connectToHost`'s retry window is for. Throws
-   * when tmux refuses (a duplicate session name, a server that is down). `-f /dev/null` keeps
-   * the operator's tmux.conf out of a server it was never written for.
+   * when tmux refuses: a duplicate session name, or no server — `error.code` is then
+   * `HOST_SERVER_DOWN`. `-f /dev/null` keeps the operator's tmux.conf out of a server it was
+   * never written for.
+   *
+   * THE SERVER IS ASKED FOR IN THE SAME COMMAND LINE: `has-session -t <keepalive> ; new-session …`
+   * is one tmux invocation, so a server that is not up refuses the spawn instead of `new-session`
+   * starting a server of its own inside the CALLER's process group — a warden's host would then
+   * die with the warden's service, the very thing the keepalive unit exists to prevent. Callers'
+   * own `isServerUp` checks are only for saying so early; nothing depends on them.
    * @param {string} hostId
    * @param {string} cwd
    */
@@ -444,6 +451,10 @@ export function createHostRegistry({ tmuxSocketName, keepaliveSession, sessionsD
     const created = tmuxCommand([
       '-f',
       '/dev/null',
+      'has-session',
+      '-t',
+      keepaliveSession,
+      ';',
       'new-session',
       '-d',
       '-s',
@@ -455,7 +466,12 @@ export function createHostRegistry({ tmuxSocketName, keepaliveSession, sessionsD
       hostId,
       sessionsDir
     ]);
-    if (!created.ok) throw new Error(`tmux new-session failed: ${created.error}`);
+    if (created.ok) return;
+    // Told apart AFTER the refusal and only to word it: the refusal was tmux's own, whichever it was.
+    if (!isServerUp()) {
+      throw Object.assign(new Error(`the keepalive tmux server is not running (${keepaliveSession})`), { code: 'HOST_SERVER_DOWN' });
+    }
+    throw new Error(`tmux new-session failed: ${created.error}`);
   }
 
   /**

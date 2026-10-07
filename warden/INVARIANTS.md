@@ -147,6 +147,7 @@ Behaviour: MAN-7824 (link, wire), MAN-7835 (outbox), MAN-7825 (enroll), MAN-7836
 | `ack(n)` raises the counter above `n`, and frames queued under numbers center already holds are renumbered above it (`renumberAbove`), never trimmed as stored. | a lost `state.json` must not swallow results |
 | A failed `takeSeq` leaves the counter where it was: `renumberAbove` takes every number inside a `try` and restores `nextSeq` before it rethrows. | a raised counter with unrenumbered frames makes the next `welcome` find nothing to renumber and trim them as stored |
 | Anything in `onWelcome` that can throw runs BEFORE `clearTimeout(deadlineTimer)`; `attempt` and `lastLoggedRefusal` reset only after it succeeded. | a throw after the cancel leaves the socket open, never linked and with no deadline; a failing `welcome` must not reset the backoff |
+| A reliable frame sent on a LINKED socket starts `ackWatch` only while `linked`, an `ack` settles it, any verified frame from center starts it over, `goDown` and `welcome` stop it, and only `flushUnsent` starts it. | a `welcome` re-settles the whole account: the watch it leaves running would drop an idle healthy link 90 s later when that `welcome` acked everything. `expect` on a down link arms a timer for a socket that is gone: its expiry would abandon `null` and schedule a second reconnect beside the pending one; a watch that ignored other frames would drop a link to a center that is alive but has not acked a frame it has no handler for |
 | Every stage of an attempt has a deadline (`ATTEMPT_DEADLINE_MS`) that abandons the socket into the normal backoff: the upgrade, then the `welcome`. | a center that takes the connection and goes silent must not hold the link for good |
 | Nothing is sent from the outbox before `welcome`; `flushUnsent` runs only while `linked`, from `sentUpto`. | a `welcome` raises the counter and trims the queue to what center holds: a frame sent before it can carry a number center already has |
 | Every frame from center is verified over the exact bytes of `env` with the pinned `centerKey` BEFORE it is parsed, never over a re-serialisation; a failure, or a frame for another node, is dropped and logged once per kind. | a parse and a stringify can respace the same object; a signature over other text proves nothing. The type of an unverified frame is not read |
@@ -157,7 +158,7 @@ Behaviour: MAN-7824 (link, wire), MAN-7835 (outbox), MAN-7825 (enroll), MAN-7836
 | Words from a peer not yet trusted (a refusal, an `error` frame before the key is pinned) reach a terminal only through `oneLine`: first line, control characters removed, 200 characters. | an escape sequence in a refusal body must not run in a person's terminal |
 | The warden runs on bare `node` ≥ 22: no dependency, no loader, no TypeScript. | `main.mjs`'s posture, the same as `deploy/dev-supervisor/*.mjs` |
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/warden/src/enroll.mjs, /home/lyphe/.claude/claudecodeui_lyphe/warden/src/link.mjs, /home/lyphe/.claude/claudecodeui_lyphe/warden/src/outbox.mjs, /home/lyphe/.claude/claudecodeui_lyphe/warden/src/state.mjs, /home/lyphe/.claude/claudecodeui_lyphe/warden/src/wire.mjs
+governs: /home/lyphe/.claude/claudecodeui_lyphe/warden/src/ack-watch.mjs, /home/lyphe/.claude/claudecodeui_lyphe/warden/src/enroll.mjs, /home/lyphe/.claude/claudecodeui_lyphe/warden/src/link.mjs, /home/lyphe/.claude/claudecodeui_lyphe/warden/src/outbox.mjs, /home/lyphe/.claude/claudecodeui_lyphe/warden/src/state.mjs, /home/lyphe/.claude/claudecodeui_lyphe/warden/src/wire.mjs
 
 ## INV-7040 — probe — LOW — a floor write that fails inside `onWelcome` leaves the socket open, never linked and with no deadline; when it is the L1 renumber, the next welcome trims the queued frames as stored
 
@@ -217,56 +218,6 @@ probe-key: 72ee66ae1949913cf99c28059c667d5ff7538ead
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/warden/src/enroll.mjs, /home/lyphe/.claude/claudecodeui_lyphe/warden/src/link.mjs, /home/lyphe/.claude/claudecodeui_lyphe/warden/src/outbox.mjs, /home/lyphe/.claude/claudecodeui_lyphe/warden/src/wire.mjs
 
-## INV-7041 — probe — LOW — an established link whose peer goes silent is never recycled (open; the builder declared it a follow-up)
-
-LOW — an established link whose peer goes silent is never recycled (open; the builder declared it a follow-up)
-
-```probe
-D=$(mktemp -d /tmp/athena-w.XXXXXX) || exit 1
-cat > "$D/c.mjs" <<'JS'
-import crypto from 'node:crypto'; import fs from 'node:fs'; import http from 'node:http'; import path from 'node:path';
-const R = '/home/lyphe/.claude/claudecodeui_lyphe/';
-const { WebSocketServer } = await import(R + 'node_modules/ws/wrapper.mjs');
-export const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-export const res = (c, v) => ({ check: c, source: c, at: Date.now(), fetchedAt: Date.now(), status: 'ok', docStatus: null, value: v, data: null, tookMs: 1, prevAt: null });
-export async function center(home) {
-  const pair = () => crypto.generateKeyPairSync('ed25519'), node = pair(), key = pair(); let connections = 0;
-  fs.mkdirSync(path.join(home, 'keys'), { recursive: true });
-  fs.writeFileSync(path.join(home, 'keys/node.key'), node.privateKey.export({ type: 'pkcs8', format: 'pem' }), { mode: 0o600 });
-  process.env.CERBERUS_WARDEN_HOME = home;
-  const frame = (type, body) => { const env = JSON.stringify({ type, id: 'x', node: 'probe', seq: null, at: Date.now(), body }); return JSON.stringify({ env, sig: crypto.sign(null, Buffer.from(env), key.privateKey).toString('base64') }); };
-  const wss = new WebSocketServer({ noServer: true }), server = http.createServer();
-  server.on('upgrade', (req, sock, head) => wss.handleUpgrade(req, sock, head, (ws) => {            // welcomes, then never says another word
-    connections += 1; ws.on('error', () => {});
-    ws.on('message', (data) => { if (JSON.parse(data.toString()).type === 'hello') ws.send(frame('welcome', { node: 'probe', ackedUpto: 0 })); }); }));
-  await new Promise((r) => server.listen(0, '127.0.0.1', r));
-  const identity = { node: 'probe', center: `http://127.0.0.1:${server.address().port}`, centerKey: key.publicKey.export({ type: 'spki', format: 'der' }).toString('base64') };
-  const w = await Promise.all(['link', 'outbox'].map((f) => import(R + `warden/src/${f}.mjs`)));
-  return { identity, connections: () => connections, createLink: w[0].createLink, createOutbox: w[1].createOutbox };
-}
-JS
-cat > "$D/p.mjs" <<'JS'
-import { center, res, sleep } from './c.mjs';
-const home = process.argv[2], c = await center(home), outbox = c.createOutbox({ home }), link = c.createLink({ identity: c.identity, outbox });
-link.start(); await sleep(2000);
-for (let i = 0; i < 3; i++) link.send('result', { results: [res('svc/c', String(i))] }, { reliable: true });
-await sleep(36000);
-console.log('after 38 s with no ack and no answer to 2 heartbeats: link.linked =', link.linked, '| connections made =', c.connections(), '| unacked frames =', outbox.size); process.exit(0);
-JS
-cat > "$D/p.sh" <<'SH'
-H=$(mktemp -d /tmp/athena-w.XXXXXX) || exit 1
-timeout 90 node "$D/p.mjs" "$H" 2>&1 | grep -v '^\[warden\]'
-case "$H" in /tmp/athena-w.*) rm -rf "$H";; esac
-SH
-export D; bash "$D/p.sh"; case "$D" in /tmp/athena-w.*) rm -rf "$D";; esac
-expect: "… link.linked = true | connections made = 1 | unacked frames = 3" (cured: more than one connection)
-```
-
-measured 2026-10-06 by chain chain-cerberus--warden--link-20261006-113710-b85d, finding L3, LOW
-probe-key: 564d14a8b59788493026e0b6f3bc31a2bcf7e05d
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/warden/src/enroll.mjs, /home/lyphe/.claude/claudecodeui_lyphe/warden/src/link.mjs, /home/lyphe/.claude/claudecodeui_lyphe/warden/src/outbox.mjs, /home/lyphe/.claude/claudecodeui_lyphe/warden/src/wire.mjs
-
 ## INV-7042 — Warden install path — rules an edit must keep: one marker, a vetted address, remove only your own mktemp, a whole script before it runs, a refused version, a raw-path name check
 
 Subject map: MAN-7826.
@@ -285,6 +236,7 @@ Subject map: MAN-7826.
 | `build.mjs` writes the tarball to `<name>.partial` and renames it over its final name only after `tar` exits 0; `latest.json` is renamed in last. | a half file under the final name is served by the route, is called "already built" by the next run, and on a `--force` rebuild has already overwritten the good tarball every node's `latest.json` still names. |
 | `enroll.sh` in the enroll branch refuses an existing `identity.json` BEFORE `install_release`. | the swap of `current` moves a running daemon's release, and the refusal that followed was worded "no unit was installed" on a machine that has one. |
 | `build.mjs` stages the four session-host files (`host.js`, `host-conn.js`, `host-journal.js`, `host-registry.js`) at their repo paths beside `warden/`, and a release-root `package.json` of `type: module`; `enroll.sh` refuses a machine without `tmux` at `/usr/bin/tmux`. | `sessions.mjs` imports the registry by a relative path that only holds where the files sit as they do in the checkout; the `.js` files take their module type from the nearest package.json, and a release has none of the app's; the sessions unit starts that tmux by absolute path. |
+| `build.mjs` refuses a `warden/package.json` with no one-line `cerberus.note` and copies it into `latest.json`; `enroll.sh` copies `warden/src/launcher.mjs` out of `current` to `~/.cerberus-warden/launcher.mjs` on install and on every `--refresh`, BEFORE it renders the units, and the unit's `ExecStart` is that file. | the note is what the Cerberus tab and `update.offer` show for a release; the launcher lives outside every release (INV-7131), and a unit that named a launcher the install never wrote could not start. |
 | `build.mjs` refuses a version already built unless `--force`; a plan that changes `warden/` bumps the minor version in `warden/package.json` before it builds. | `--refresh` installs only a newer version, so an unbumped change would never reach a node. |
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/warden-files.ts, /home/lyphe/.claude/claudecodeui_lyphe/warden/build.mjs, /home/lyphe/.claude/claudecodeui_lyphe/warden/enroll.sh, /home/lyphe/.claude/claudecodeui_lyphe/warden/systemd/cerberus-warden.service
@@ -302,6 +254,7 @@ Behaviour: MAN-7825 (`run`, `run.json`), MAN-7824 (the link's `onReport`).
 | `state()` sends `probesRunning: probes.scheduled`, never the in-flight count. | the wire contract (`cerberus-types.ts`) says "how many probes it has scheduled"; between turns nothing is in flight, so a consumer built to the type read 0 |
 | `run` takes the home's one-daemon lock (`home-lock.mjs`) before it writes anything; a taken lock is one sentence and exit 1, any other lock error is logged and the daemon goes on. | center closes the older link of a node when a newer one connects: two daemons took it from each other about once a second and both rewrote `state.json`; a platform that cannot bind the lock must still report |
 | `probes.stop()` kills the probe commands still going (`killLiveProcesses`), and `runner.stop()` the commands of runs in flight. | a hand-run `run` has no cgroup to take them with it |
+| The updater's restart is the daemon's own stop with exit code 75, and `hello.update` is composed into `state()` (INV-7131). | the batch is flushed and the chain saved as for a SIGTERM; the launcher reads 75 as "start the release `current` now names, under probation". |
 | The link's `state()` is composed in `daemon.mjs` from the scheduler, the catalog and the runner, and a later plan's field goes there; a frame handler is `link.on(type, fn)` registered before `link.start()`. | a handler registered after the first `welcome` misses it |
 | `run` refuses a home with no identity, an incomplete identity or no key with one sentence and exit 1, before it creates or opens anything. | systemd restarts a crashing unit forever; a stray `run` must not leave a home behind |
 | The status record's `linked: true` older than 45 s is reported as a daemon that is gone; a `linked: false` record is never judged by its age. | while linked a heartbeat is due every 15 s; with the link down nothing is due, and the age says only how long it has been down |
@@ -352,3 +305,253 @@ Subject map: MAN-7897.
 | `.verify/warden-sessions.sh` refuses to run when a server already answers on `-L cerberus-warden`, and its `kill-server` runs only for a server this run started. | that socket is the installed unit's, and the script's last step is `kill-server`; a holder that appears between the check and the start is left standing. |
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/warden-sessions.sh, /home/lyphe/.claude/claudecodeui_lyphe/warden/build.mjs, /home/lyphe/.claude/claudecodeui_lyphe/warden/enroll.sh, /home/lyphe/.claude/claudecodeui_lyphe/warden/src/sessions.mjs, /home/lyphe/.claude/claudecodeui_lyphe/warden/systemd/cerberus-warden-sessions.service
+
+## INV-7130 — Warden diagnosis tools — rules an edit must keep: no tool runs a string, a unit never starts with `-`, the denylist on the path and its realpath, every text masked, 10 s and 64 KB, one diagnosis, it ends with its link
+
+Behaviour: the diagnosis-tools manual row of this package (`diag.*`, the three tools, the denylist, the mask). Link: MAN-7824. Daemon: MAN-7832. Runner (the other thing that runs on center's word): INV-7080.
+
+| rule | why |
+|---|---|
+| There is no tool that runs a string. A read is a row of `STATUS_MENU`, `journalctl` for one validated unit, or this process opening a path that passed `resolveReadable`; every spawn is `spawn(binary, argv)` with no `shell`, never `sh -c`. | the diagnosis agent is a model reading what is on a node; a shell would make every sentence it was shown a command |
+| A unit name matches `^[A-Za-z0-9@._-]+$` and does not start with `-`. | `systemctl status -H <host>` reaches another machine, and `journalctl -u -<option>` is an option; the pattern alone lets both through |
+| A read of a path is refused on the path as asked AND on its `realpath`, before a byte is read: a basename ending `.env` (`.env`, `.eis_backend.env`) or holding `.env.`, `*.pem`, `*.key`, `*.p12`, `id_*`, `.pgpass`, `.netrc`, `credentials*` and `.credentials*`, `.git-credentials`, `auth.json` and `auth-profiles.json`, `.claude.json*` (copies too), a history file (`.bash_history` …), and everything under `~/.ssh`, `~/.cerberus-warden/keys`, this warden's `<home>/keys`, `~/.claude/.credentials.json`, `~/.docker/config.json`, `~/.npmrc`, `/etc/shadow`, `/etc/ssh`, `/root`, and the operator's session transcripts (`~/.cerberus-warden/sessions` and `<home>/sessions`, `~/.claude/projects`, `~/.claude/history.jsonl`, `~/.codex/sessions`, `~/.openclaw/agents/<agent>/sessions`, `~/.cloudcli`). | a symlink named `notes.txt` that points at `.env` is the `.env`; a service's env file is named `<name>.env` as often as `.env`, and an agent's provider keys sit in `auth.json` under a `"key"` field no mask word names; the node key must stay unreadable on a scratch home too, where it is not under `~/.cerberus-warden`; a history file holds the `Authorization: Bearer …` and `postgres://user:pw@` that were typed, and a session journal or a Claude, Codex or OpenClaw transcript is the operator's own conversation — no key word beside either, so the mask cannot be the only guard |
+| Every text a `diag.result` carries passes `maskSecrets` — the refusals too — and `contains` filters the MASKED text. Any text cut to a cap is masked BEFORE the cut (a log tail included: the whole window is masked before its last `lines` lines are taken, so a private-key block cannot be cut away from its `BEGIN` line). `maskSecrets` is idempotent — a text is masked at its source and again as it leaves — and every pattern added to it is too. Every quantifier of `maskSecrets` that can start at many places is bounded. | a diagnosis's reads go to a model and into center's store; a filter on the raw text would let a model confirm a guess at a secret one line at a time; a cut before the mask can halve a secret and leave its value's tail with no key word to find; `a.a.a.a…` under an unbounded scheme pattern is a quadratic scan on the event loop the heartbeat shares |
+| Every spawn is killed at 10 s and its output capped at 64 KB, the child killed at the cap and `truncated: true`; a `file.read` is capped at 64 KB too; the text SENT is cut to 64 KB after masking. The call is answered at the kill, never at the pipes' `close`. | `yes` prints 25 million lines a second; `diag.result` is one frame on the link; masking lengthens text, so a cap judged before it is not a cap; a child the program forked holds the pipes open and an answer that waited for `close` would wait for it |
+| A file is read to its end (up to the cap), never to `stat().size`; an empty read says "(the file is empty)". | `/proc` files stat as 0 and `/sys` ones as a page: a size-bounded read answers `ok: true` with no text for a file that has 1 500 bytes, and "what was found" is the evidence rule |
+| A `contains` miss names how many lines it looked at and that the read covers only the latest ones. | "no line contains X" is the sentence a diagnosis cites as "no such error", and absence is never evidence |
+| A file is opened read-only and non-blocking (`O_RDONLY` with `O_NONBLOCK`), and only after `stat` says it is a regular file or a directory. | a FIFO opened blocking would hold the warden's event loop for good |
+| One diagnosis is open on a node. A second open is answered `diag.opened` and every call under it is `ok: false`, "Another diagnosis is open on this node"; a call under no open diagnosis is refused. | the node's reads are a shared door; center's loop learns on its first read that it does not hold it |
+| The open diagnosis ends on `diag.close`, on `link.down` and on `stop()`, and the reads it had going are killed; a read that ends after that is answered to no one. | none of these frames rides the outbox: a link lost mid-diagnosis fails it at center, which never sends `diag.close`, and a ghost would block every later diagnosis and the updater |
+| `activeWork()` names the open diagnosis, `onWorkChange` tells when it begins or ends, and nothing ticks. | the updater waits on it; an event wakes it, a timer that polled would be a watchdog |
+| The log carries diagnosis ids, check keys, tool names and error codes — never an argument, a path's contents or a result. | the reads are exactly the text that may hold a secret |
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/warden-diag-tools.mjs, /home/lyphe/.claude/claudecodeui_lyphe/warden/src/diag-argv.mjs, /home/lyphe/.claude/claudecodeui_lyphe/warden/src/diag-guard.mjs, /home/lyphe/.claude/claudecodeui_lyphe/warden/src/diag-reads.mjs, /home/lyphe/.claude/claudecodeui_lyphe/warden/src/diag-tools.mjs
+
+## INV-7131 — Warden updater and launcher — rules an edit must keep: the launcher imports nothing from a release, a swap is a symlink rename, a welcome proves a start, no release is deleted, nothing polls
+
+Subject map and behaviour: MAN-7929.
+
+| rule | why |
+|---|---|
+| `launcher.mjs` imports only `node:` built-ins, never a file of a release; the few lines it shares with `update.mjs` (the durable write, the `current` swap) are repeated there. The file names `pending-update.json` and `hello-ok.json` and the shape of the pending record are the contract between the two. | it lives in `~/.cerberus-warden/`, outside every release, so a release that cannot start cannot take its own rescue with it; a copy that imported `current/…/state.mjs` would die with the release it is meant to rescue |
+| `current` is changed only by a temporary symlink (`current.next`) renamed over it — by the updater to swap forward and by the launcher to roll back; the rollback swaps `current` BEFORE it rewrites `pending-update.json`. | a reader sees the old release or the new, never neither; a crash between the two rollback steps leaves `current` on the old release and a record not yet marked, which the next launcher finishes as `failed`, whereas the other order would leave a record that says `failed` over a `current` that is still the bad release. The swap is made only onto a release whose `warden/src/main.mjs` is on disk: a `current` that dangles starts nothing every five seconds for ever. |
+| A pending record is a trial only while `current` names its `to`; an exit 75 with no record on trial is an ordinary exit, not an immediate restart. An `update.offer` for a version older than the running one is `failed`. | a record about a release `current` is not would roll back whatever `current` is (a refresh inside the minute) for an update that never ran; a release that exits 75 with no update behind it would be restarted dozens of times a second where the unit paces every other failing exit at 5 s; an offer is signed but has no freshness, so a replayed old one must not downgrade the node |
+| A release counts as welcomed only by a `hello-ok.json` whose `version` is `pending.to` AND whose `at` is no earlier than `pending.swappedAt`; the release writes it after every `welcome`, before it removes `pending-update.json`. | a leftover from an earlier run of the same version proves nothing; a `welcome` is center letting the release in, so a release that starts and cannot link is rolled back too |
+| A record that says `failed` is never put on trial again; a pending record whose names are not one path segment is ignored. | the old release's `hello` still has to carry the reason; a path is never built from a name read off disk without that check |
+| `update.mjs` writes `pending-update.json` only after `releases/<to>/` is complete and `releases/<from>/` still exists, and removes it if the swap throws. | a record with nothing to roll back to is a promise ("<from> kept for rollback") that is false; a record over a swap that never happened would be judged by a launcher for a release that never ran |
+| No release directory is ever removed by the warden, the launcher or `enroll.sh`. | the previous release is the rollback target; 2026-09-20: an empty variable in `rm -rf` deleted about 622 run directories |
+| The updater waits for the fixes in flight on events (`onWorkChange`, the runner's and the diagnosis tools'), with one 10-minute timer; the launcher ends a probation on an `fs.watch` of the home with one 60-second timer and a final read. No sleep loop polls either. | operator, 2026-10-06: "Always event driven, no lazy watchdog checks ever" |
+| The restart is the daemon's own clean stop with exit code 75 (`exit` passed to `createUpdater`), after at most 2 s for center's ack of the `restarting` frame. | the batch is flushed and `chain.json` saved as for a SIGTERM; `process.exit(75)` is only the default for a caller with no daemon |
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/warden/src/launcher.mjs, /home/lyphe/.claude/claudecodeui_lyphe/warden/src/release-files.mjs, /home/lyphe/.claude/claudecodeui_lyphe/warden/src/update.mjs
+
+## INV-7163 — probe — the launcher "rolls back" onto a release that is not on disk (`launcher.mjs` `revert()`, L164–179)
+
+the launcher "rolls back" onto a release that is not on disk (`launcher.mjs` `revert()`, L164–179)
+
+```probe
+D=$(mktemp -d /tmp/athena-probe-l1.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+# launcher: rollback target gone
+W=/home/lyphe/.claude/claudecodeui_lyphe/warden
+S=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+H=$S/home; mkdir -p "$H/releases/d/warden/src" "$S/bin"; export CERBERUS_WARDEN_HOME=$H
+echo 'setInterval(() => {}, 1000)' > "$H/releases/d/warden/src/main.mjs"
+ln -s releases/d "$H/current"
+printf '{"updateId":"u1","from":"a","to":"d","swappedAt":1}\n' > "$H/pending-update.json"   # releases/a does not exist
+cp "$W/src/launcher.mjs" "$S/bin/launcher.mjs"
+node "$S/bin/launcher.mjs" > "$S/log" 2>&1 & LP=$!
+sleep 3
+case "$LP" in ''|*[!0123456789]*|0*|1) ;; *) kill "$LP" 2>/dev/null;; esac
+echo "current -> $(readlink "$H/current"); main.mjs reachable: $([ -f "$H/current/warden/src/main.mjs" ] && echo yes || echo no)"
+grep -E "rolled back|cannot roll|Cannot find module|no kept" "$S/log" | head -3 | cut -c1-110
+case "$S" in /tmp/athena-probe.*) rm -rf "$S";; esac
+EOF
+bash "$D/p.sh"
+case "$D" in /tmp/athena-probe-l1.*) rm -rf "$D";; esac
+expect: `current -> releases/a; main.mjs reachable: no` with `[launcher] rolled back to a: no hello within 60 s` and a `Cannot find module` stack while the defect stands; once cured the launcher names the missing release and prints `main.mjs reachable: yes`.
+```
+
+measured 2026-10-07 by chain chain-cerberus--updates--warden-update-20261007-023832-67f7, finding L1, LOW
+probe-key: 46f94dace7ad050cd484cfc86c20d5b29288bf47
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/warden/src/launcher.mjs, /home/lyphe/.claude/claudecodeui_lyphe/warden/src/release-files.mjs, /home/lyphe/.claude/claudecodeui_lyphe/warden/src/update.mjs
+
+## INV-7164 — probe — a child that exits 75 with no update on trial is restarted with no pause (`launcher.mjs` L199–206)
+
+a child that exits 75 with no update on trial is restarted with no pause (`launcher.mjs` L199–206)
+
+```probe
+D=$(mktemp -d /tmp/athena-probe-l2.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+# launcher: a release that exits 75 with no pending record is restarted with no pause
+W=/home/lyphe/.claude/claudecodeui_lyphe/warden
+S=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+H=$S/home; mkdir -p "$H/releases/a/warden/src" "$S/bin"; export CERBERUS_WARDEN_HOME=$H
+echo "console.log('up'); process.exit(75);" > "$H/releases/a/warden/src/main.mjs"
+ln -s releases/a "$H/current"
+cp "$W/src/launcher.mjs" "$S/bin/launcher.mjs"
+node "$S/bin/launcher.mjs" > "$S/log" 2>&1 & LP=$!
+sleep 3
+case "$LP" in ''|*[!0123456789]*|0*|1) ;; *) kill "$LP" 2>/dev/null;; esac
+echo "starts in 3 s: $(grep -c '^up' "$S/log")"
+case "$S" in /tmp/athena-probe.*) rm -rf "$S";; esac
+EOF
+bash "$D/p.sh"
+case "$D" in /tmp/athena-probe-l2.*) rm -rf "$D";; esac
+expect: `starts in 3 s: ` a number in the dozens or more (97–134 measured) while the defect stands; 1–2 once the restart is paced.
+```
+
+measured 2026-10-07 by chain chain-cerberus--updates--warden-update-20261007-023832-67f7, finding L2, LOW
+probe-key: b8636a9d4ce9f7adaf6d61478f8efb4f017282c5
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/warden/src/launcher.mjs, /home/lyphe/.claude/claudecodeui_lyphe/warden/src/release-files.mjs, /home/lyphe/.claude/claudecodeui_lyphe/warden/src/update.mjs
+
+## INV-7165 — probe — a trial is not tied to `current` (`launcher.mjs` L238–246 and L199–206)
+
+a trial is not tied to `current` (`launcher.mjs` L238–246 and L199–206)
+
+```probe
+D=$(mktemp -d /tmp/athena-probe-l3.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+# launcher: an unfailed pending record for `b` while `current` is the welcomed release `c` rolls c back to a
+W=/home/lyphe/.claude/claudecodeui_lyphe/warden
+S=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+H=$S/home; mkdir -p "$S/bin" "$H/releases"; export CERBERUS_WARDEN_HOME=$H
+for R in a c; do mkdir -p "$H/releases/$R/warden/src"; cat > "$H/releases/$R/warden/src/main.mjs" <<JS
+import fs from 'node:fs';
+console.log('up $R');
+fs.writeFileSync('$H/hello-ok.json', JSON.stringify({ version: '$R', at: Date.now() }));
+setInterval(() => {}, 1000);
+JS
+done
+ln -s releases/c "$H/current"
+printf '{"updateId":"u1","from":"a","to":"b","swappedAt":%s}\n' "$(( $(date +%s%3N) - 58000 ))" > "$H/pending-update.json"
+cp "$W/src/launcher.mjs" "$S/bin/launcher.mjs"
+node "$S/bin/launcher.mjs" > "$S/log" 2>&1 & LP=$!
+sleep 5
+case "$LP" in ''|*[!0123456789]*|0*|1) ;; *) kill "$LP" 2>/dev/null;; esac
+echo "current -> $(readlink "$H/current")"
+grep -E "^up|rolled back|resuming|probation over" "$S/log" | cut -c1-110
+for P in $(pgrep -f "$H/current/warden/src/main.mjs"); do case "$P" in ''|*[!0123456789]*|0*|1) ;; *) kill "$P" 2>/dev/null;; esac; done
+case "$S" in /tmp/athena-probe.*) rm -rf "$S";; esac
+EOF
+bash "$D/p.sh"
+case "$D" in /tmp/athena-probe-l3.*) rm -rf "$D";; esac
+expect: `current -> releases/a` with `up c` then `rolled back to a: no hello within 60 s` while the defect stands; `current -> releases/c` and no rollback once a record for another release is treated as stale.
+```
+
+measured 2026-10-07 by chain chain-cerberus--updates--warden-update-20261007-023832-67f7, finding L3, LOW
+probe-key: 76a0145bdeee4bc35e69afd93a398b996ae38c2f
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/warden/src/launcher.mjs, /home/lyphe/.claude/claudecodeui_lyphe/warden/src/release-files.mjs, /home/lyphe/.claude/claudecodeui_lyphe/warden/src/update.mjs
+
+## INV-7166 — probe — an offer for an OLDER version is installed (`update.mjs` `runOffer`, L172–200)
+
+an offer for an OLDER version is installed (`update.mjs` `runOffer`, L172–200)
+
+```probe
+D=$(mktemp -d /tmp/athena-probe-l4.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+# updater: an offer for a version OLDER than the running one is taken (a replayed old signed offer downgrades the node)
+W=/home/lyphe/.claude/claudecodeui_lyphe/warden
+S=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+H=$S/home; mkdir -p "$H/releases" "$S/rel/warden/src" "$S/srv"; export CERBERUS_WARDEN_HOME=$H
+RV=$(node -p "require('$W/package.json').version")
+mkdir -p "$H/releases/$RV/warden/src"; echo '' > "$H/releases/$RV/warden/src/main.mjs"; ln -s "releases/$RV" "$H/current"
+printf '{"name":"cerberus-warden","version":"0.0.1","type":"module"}\n' > "$S/rel/warden/package.json"; echo '' > "$S/rel/warden/src/main.mjs"
+tar -czf "$S/srv/old.tar.gz" -C "$S/rel" .
+SHA=$(sha256sum "$S/srv/old.tar.gz" | cut -d' ' -f1); SIZE=$(stat -c %s "$S/srv/old.tar.gz")
+cat > "$S/drive.mjs" <<'JS'
+import http from 'node:http'; import fs from 'node:fs';
+const [S, SHA, SIZE] = process.argv.slice(2);
+const srv = http.createServer((q, r) => { r.writeHead(200, { 'content-length': SIZE }); fs.createReadStream(S + '/srv/old.tar.gz').pipe(r); });
+await new Promise((ok) => srv.listen(0, '127.0.0.1', ok));
+const real = process.exit.bind(process), handlers = new Map(); let seq = 0;
+process.exit = (code) => { console.log('EXIT ' + code); real(0); };
+const link = { on(t, h) { handlers.set(t, [...(handlers.get(t) ?? []), h]); return () => {}; },
+  send(t, b, o = {}) { console.log(t, b.step, '-', b.text); return { seq: o.reliable ? ++seq : null }; } };
+const { createUpdater } = await import('/home/lyphe/.claude/claudecodeui_lyphe/warden/src/update.mjs');
+createUpdater({ link, home: process.env.CERBERUS_WARDEN_HOME, activeWork: () => ({ runs: [] }) });
+const offer = { updateId: 'u-old', version: '0.0.1', url: `http://127.0.0.1:${srv.address().port}/old.tar.gz`, sha256: SHA, size: Number(SIZE), note: 'n' };
+for (const h of handlers.get('update.offer')) await h(offer);
+setTimeout(() => real(0), 3000);
+JS
+node "$S/drive.mjs" "$S" "$SHA" "$SIZE" 2>&1 | grep -v '^\[warden\]'
+echo "running $RV; current -> $(readlink "$H/current")"
+case "$S" in /tmp/athena-probe.*) rm -rf "$S";; esac
+EOF
+bash "$D/p.sh"
+case "$D" in /tmp/athena-probe-l4.*) rm -rf "$D";; esac
+expect: `EXIT 75` and `current -> releases/0.0.1` while downgrades are accepted; a `failed` step and `current -> releases/<running>` once refused.
+```
+
+measured 2026-10-07 by chain chain-cerberus--updates--warden-update-20261007-023832-67f7, finding L4, LOW
+probe-key: 84a467bd8ad9530ff572c678362789e73c6e8b60
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/warden/src/launcher.mjs, /home/lyphe/.claude/claudecodeui_lyphe/warden/src/release-files.mjs, /home/lyphe/.claude/claudecodeui_lyphe/warden/src/update.mjs
+
+## INV-7184 — probe — LOW — `MAN-7826` (and `warden/MANUAL.md`) give one refusal sentence for two refusals
+
+LOW — `MAN-7826` (and `warden/MANUAL.md`) give one refusal sentence for two refusals
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+SRC=/home/lyphe/.claude/claudecodeui_lyphe
+D=$1
+mkdir -p "$D/r/warden" && cp "$SRC/warden/build.mjs" "$D/r/warden/" || exit 1
+printf '{"name":"x","version":"9.9.9","cerberus":{"note":"line one\\nline two"}}\n' > "$D/r/warden/package.json"
+echo "build prints: $(node "$D/r/warden/build.mjs" | head -1)"
+echo "rows naming that sentence: $(~/.claude/scripts/docstore get MAN-7826 --text | grep -c 'must be one line')"
+EOF
+bash "$D/p.sh" "$D"
+case "$D" in /tmp/athena-probe.?*) cd / && rm -rf -- "$D";; esac
+expect: build prints "The note in warden/package.json must be one line." and "rows naming that sentence: 0" while the row names one sentence for both refusals
+```
+
+measured 2026-10-07 by chain chain-cerberus--updates--docs-20261007-053846-b365, finding L1, LOW
+probe-key: 8e2396044cc1ca953673c1b3bf601b33a675843a
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/warden/
+
+## INV-7185 — probe — LOW — `build.mjs` L9–11 still says center serves from `dist-warden/`, which this plan made the default
+
+LOW — `build.mjs` L9–11 still says center serves from `dist-warden/`, which this plan made the default
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+echo "build.mjs lines naming CERBERUS_WARDEN_DIST: $(grep -c 'CERBERUS_WARDEN_DIST' warden/build.mjs)"
+grep -n 'Center serves these three' warden/build.mjs | cut -c1-120
+EOF
+bash "$D/p.sh" "$D"
+case "$D" in /tmp/athena-probe.?*) cd / && rm -rf -- "$D";; esac
+expect: "build.mjs lines naming CERBERUS_WARDEN_DIST: 0" and line 9 "Center serves these three from `dist-warden/`" while the comment is unqualified
+```
+
+measured 2026-10-07 by chain chain-cerberus--updates--docs-20261007-053846-b365, finding L2, LOW
+probe-key: ad18b77a8969b5257631bff8caace86a560014f9
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/warden/build.mjs
+
+## INV-7186 — probe — LOW — the note rule is not reachable from `warden/package.json`, the file a builder edits to satisfy it (S7)
+
+LOW — the note rule is not reachable from `warden/package.json`, the file a builder edits to satisfy it (S7)
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+echo "rows in the first ten of govern warden/package.json that state the note rule: $(~/.claude/scripts/docstore govern warden/package.json --limit 10 --text | awk '{print $1}' | grep -c -x 'MAN-7949\|MAN-7839\|INV-7042\|MAN-7826')"
+EOF
+bash "$D/p.sh" "$D"
+case "$D" in /tmp/athena-probe.?*) cd / && rm -rf -- "$D";; esac
+expect: "rows in the first ten … that state the note rule: 0" while no row stating the rule governs warden/package.json (a cure prints 1 or more)
+```
+
+measured 2026-10-07 by chain chain-cerberus--updates--docs-20261007-053846-b365, finding L3, LOW
+probe-key: 1c98f688aedc8c45c1c2476eb5cd37afe11d6c11
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/warden/package.json

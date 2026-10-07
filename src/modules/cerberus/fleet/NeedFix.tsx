@@ -143,9 +143,9 @@ export function NeedFix({ need, leaving, onOpen }: NeedFixProps) {
           variant="tonal"
           size="sm"
           disabled={leaving}
-          aria-disabled={starting || undefined}
-          onClick={starting ? undefined : (event) => onRun(fix, event.currentTarget)}
-          className={cn('h-auto min-h-9 max-w-full whitespace-normal py-1.5 text-left', starting && 'cursor-not-allowed opacity-70')}
+          busy={starting}
+          onClick={(event) => onRun(fix, event.currentTarget)}
+          className="h-auto min-h-9 max-w-full whitespace-normal py-1.5 text-left"
         >
           {starting ? t('cerberus.catalog.running') : t('cerberus.fix.run', { name: fix.name })}
         </Button>

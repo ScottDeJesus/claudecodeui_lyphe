@@ -20,6 +20,8 @@ The Cerberus tab: the fleet's health on the house row. One provider reads `GET /
 | the Mute and Enroll dialogs | MAN-7884 (Mute MAN-7892, Enroll MAN-7893, install step MAN-7894) | `modals/*.tsx`, `hooks/useEnrollmentStatus.ts`, `utils/enrollAsk.ts` |
 | the slots later plans fill, and the `FILL:` markers a scaffolded screen leaves for its fill | MAN-7867 | `SLOT:` and `FILL:` comments, `VIEWS` in `CerberusPanel.tsx` |
 | the fixes screen, live: Catalog view, a Needs-you card's fix, Fix output, the sheet's fixes, the run reads | MAN-7906 | `catalog/CatalogView.tsx`, `fleet/NeedFix.tsx`, `sheet/FixOutput.tsx`, `sheet/CheckFixes.tsx`, `hooks/useRunOutput.ts`, `hooks/useRunLastLine.ts`, `hooks/useCatalogRead.ts` |
+| the diagnosis screen, live: the read-only diagnosis panel and the Promote dialog; the Diagnose buttons, the diagnosis read and its three writes | MAN-7932; MAN-7945 | `sheet/DiagnosisPanel.tsx`, `modals/PromoteDialog.tsx`; `DiagnoseButton.tsx`, `hooks/useDiagnosis.ts`, `hooks/useDiagnosisVerbs.ts` |
+| the updates screen, live: the header's Update wardens button, the dialog, the Updating pill and paused restart on a node's card, the warden lines of What happened | MAN-7934 | `CerberusHeader.tsx`, `modals/UpdateWardensDialog.tsx`, `hooks/useWardensRead.ts`, `hooks/useUpdateBatch.ts`, `utils/wardenUpdates.ts`, `fleet/UpdatingPill.tsx` |
 | the six `animate-cerberus-*` motions and who draws each | MAN-7869 | `tailwind.config.js` |
 | the words | MAN-7870 (alternatives MAN-7881, variables MAN-7882, open words MAN-7883) | `src/modules/i18n/locales/en/common.json` |
 | the library pieces, their paint, the tone names | MAN-740, MAN-739 (`cloudcli:src/shared/ui/verve`); `Timeline`'s layout MAN-7847 | `src/shared/ui/Sheet.tsx`, `src/shared/ui/Timeline.tsx`, `src/shared/ui/TextArea.tsx`, `src/shared/ui/Steps.tsx`, `src/shared/ui/verve/panels.css`, `tailwind.config.js` |
@@ -29,7 +31,7 @@ The Cerberus tab: the fleet's health on the house row. One provider reads `GET /
 - Other modules reach it only through `src/modules/cerberus/index.ts`: `CerberusProvider`, `useCerberusNeeds`, `CerberusPanel` (`lazy`). Files inside import siblings by path, never through the barrel.
 - Types are `type`, never `interface`. A type two files share lives in `src/shared/types.ts` (`TimelineEvent`, `CerberusView`, `CerberusSheetTarget`, `FleetLayout`, `FleetEntry`, …). `src/shared/cerberus-types.ts` is read, never redefined.
 - Every endpoint is a verb of `api.cerberus` in `src/shared/api.ts`.
-- Layout of the module: `context/` (provider), `hooks/`, `utils/` (pure), `fleet/`, `sheet/`, `history/`, `catalog/` (the Catalog view), `modals/` (both dialogs).
+- Layout of the module: `context/` (provider), `hooks/`, `utils/` (pure), `fleet/`, `sheet/`, `history/`, `catalog/` (the Catalog view), `modals/` (the dialogs).
 - Colour: no hex, `rgba(` or `var(--` in a className or style under `src/modules/cerberus/` (2026-10-06: none outside one comment). Tone reaches paint only as `data-tone` plus a `tone-*` name (MAN-739 rule 3); the set stays five, so denied is `danger` (MAN-739 rule 4).
 - A status is painted from one table, `STATUS_TABLE` (MAN-7873), and a state that speaks in colour also carries its glyph or word (MAN-578).
 - Words: every sentence is a `cerberus.*` key through `t()`, English only; a label, reason, node name or description is data, never a key (MAN-7870).
@@ -76,9 +78,9 @@ Where the Cerberus tab stands in the workspace and what feeds its count. The tab
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/command-palette/CommandPalette.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/hooks/useProjectsState.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/hooks/useWorkspaceTabGates.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/ProjectCommandPalette.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/ProjectSidebarRegion.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/WorkspaceMain.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/WorkspaceTabs.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts
 
-## MAN-7867 — Cerberus — the slots later plans fill: every `SLOT:` comment, the `VIEWS` table and `activityEvents`
+## MAN-7867 — Cerberus — the slots later plans fill: every `SLOT:` and `FILL:` comment, the `VIEWS` table and `activityEvents`
 
-Where the diagnosis and updates plans plug into the tab (the fixes plan's slots are filled and live: MAN-7906). Find every slot: `grep -rn "SLOT:" src/modules/cerberus`. A plan whose screen is scaffolded and not yet filled marks its places `FILL:` instead (`grep -rn "FILL:" src/modules/cerberus`): each names what its fill mounts there, and the fill replaces it. Row map: MAN-7868.
+Where a plan plugs into the tab (the fixes plan's places are filled and live: MAN-7906, and so are the updates plan's: MAN-7934, and the diagnosis plan's: MAN-7932). No `SLOT:` and no `FILL:` comment stands in `src/modules/cerberus`; the one slot left is the table row below. A plan whose screen is scaffolded and not yet filled marks its places `FILL:` (`grep -rn "FILL:" src/modules/cerberus`): each names what its fill mounts there, and the fill replaces it. Row map: MAN-7868.
 
 ## Rules
 - A slot is a comment (or a table row) and draws nothing: no placeholder, no empty container, no flag.
@@ -88,20 +90,15 @@ Where the diagnosis and updates plans plug into the tab (the fixes plan's slots 
 ## Slots
 | slot | file | what goes there | plan |
 |---|---|---|---|
-| header button row | `CerberusHeader.tsx`, `SLOT: Update wardens` | the Update wardens button, before Enroll a node | updates |
-| Needs-you action row | `fleet/NeedsYouCard.tsx`, `SLOT: actions` | after `NeedFix` (the fixes plan's strip and Run “<fix>”), before Mute: Diagnose / Diagnosing… / See diagnosis (outline) | diagnosis |
-| sheet, check → cells | `sheet/CheckSheet.tsx`, `SLOT: diagnosis` | between `FixOutput` and `CheckFixes` ("Fixes in the catalog"), under the check and its actions: the read-only diagnosis | diagnosis |
-| sheet action row | `sheet/SelectedCheck.tsx`, `SLOT: actions` | before Mute: Diagnose | diagnosis |
-| node card, updating | `fleet/NodeCard.tsx`, `SLOT: updating` (both faces) | before the warden line: the "Updating · <step>" pill (info tone, `vv-pulse`) | updates |
-| rings key | `fleet/RingMarks.tsx`, `KEY` | the `fixing` row ("Fix running or updating", `cerberus.fix.fleet.legend`, the info dot) is live; the updates plan's `enrolling` shares it, with its own mark | updates |
+| rings key | `fleet/RingMarks.tsx`, `KEY` | the `fixing` row ("Fix running or updating", `cerberus.fix.fleet.legend`, the info dot) is live, and an `updating` node draws it too; `enrolling` shares it, with no mark of its own yet | enrolling |
 
 ## Other places a plan adds a case
 | place | what a plan adds |
 |---|---|
-| `utils/activityEvents.ts` `toTimelineEvent` | a `case` per new `CerberusActivity` kind (`diagnosis`, `warden`; `fix` and `catalog` are live), a builder, words under `cerberus.activity`; an unknown kind draws neutral and is never thrown on (MAN-7872) |
-| `utils/cerberusStatus.ts` `nodeMark` | `enrolling` returns `null` (no mark) while nothing feeds it; the plan that feeds it gives it a mark. `fixing` is fed and draws `FLEET_FIXING_LOOK` through `markLook` |
+| `utils/activityEvents.ts` `toTimelineEvent` | a `case` per new `CerberusActivity` kind (`fix`, `catalog`, `warden` and `diagnosis` are live), a builder, words under `cerberus.activity`; an unknown kind draws neutral and is never thrown on (MAN-7872) |
+| `utils/cerberusStatus.ts` `nodeMark` | `enrolling` returns `null` (no mark) while nothing feeds it; whatever feeds it gives it a mark. `fixing` is fed and draws `FLEET_FIXING_LOOK` through `markLook`, and so does `updating` (a node with an update queued or running) |
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/CerberusHeader.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/CerberusPanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/fleet/NeedsYouCard.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/fleet/NodeCard.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/fleet/RingMarks.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/fleet/RingsNodePanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/fleet/ServiceRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/sheet/CheckSheet.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/sheet/SelectedCheck.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/utils/activityEvents.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/utils/cerberusStatus.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/utils/fleetWords.ts
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/CerberusHeader.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/CerberusPanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/fleet/NeedsYouCard.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/fleet/NodeCard.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/fleet/RingMarks.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/fleet/RingsNodePanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/fleet/ServiceRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/sheet/CheckFixes.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/sheet/CheckSheet.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/sheet/SelectedCheck.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/utils/activityEvents.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/utils/cerberusStatus.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/utils/fleetWords.ts
 
 ## MAN-7869 — Cerberus — the six `animate-cerberus-*` motions in `tailwind.config.js` and who draws each
 
@@ -110,7 +107,7 @@ The tab's six motions, named in `tailwind.config.js` (`keyframes` + `animation`)
 | name | motion | drawn by |
 |---|---|---|
 | `cerberus-ring-warn` | halo of the warn dot, `box-shadow` 0 → 8px as it fades; 1.8 s ease-out, infinite | a mark that needs you: `StatusGlyph` while `failing` (not `still`), the rings' node dot while `failing` and not selected, the newest cell of a service row while `failing` |
-| `cerberus-breathe` | opacity 1 ↔ .5; 2.6 s ease-in-out, infinite | `Heartbeat` (`NodeCard.tsx`) while the warden is reporting and not restarting; the clock pill's dot while live (`CerberusHeader.tsx`); the newest cell of a service row that is not failing |
+| `cerberus-breathe` | opacity 1 ↔ .5; 2.6 s ease-in-out, infinite | `Heartbeat` (`NodeCard.tsx`) while the warden is reporting (`link === 'reporting'`, so never while `paused`); the clock pill's dot while live (`CerberusHeader.tsx`); the newest cell of a service row that is not failing |
 | `cerberus-travel` | a beat from the node's end of a spoke to the hub (`left: 100%` → `0`), in over the first 12%, out over the last 15%; 3.2 s linear, infinite | `FleetRings.tsx`, on a live spoke (MAN-7886) |
 | `cerberus-check` | a ✓ grows .4 → 1 as it fades in; .6 s `--ease-spring`, both | `NeedsYouCard.tsx`'s quiet ✓ (100 ms delay), a landed step in `EnrollInstall.tsx`, the hello mark in `EnrollDialog.tsx` (as an arbitrary `animate-[…]` beside `vv-ring`) |
 | `cerberus-line` | a rise from 5px below; .35 s `--ease-enter`, both | `history/LookupCard.tsx`: each answer of the look-up as it arrives |
@@ -124,7 +121,7 @@ Every word the Cerberus screen draws, in the top-level `cerberus` block of `src/
 
 ## Shape
 
-- 348 leaves under `cerberus.*`, `en` only. The other ten locales hold no `cerberus` block and no `tabs.cerberus`: `fallbackLng: 'en'` (`src/modules/i18n/config.ts`) reads the English.
+- 440 leaves under `cerberus.*`, `en` only (measured 2026-10-07: the groups below sum to it). The other ten locales hold no `cerberus` block and no `tabs.cerberus`: `fallbackLng: 'en'` (`src/modules/i18n/config.ts`) reads the English.
 - Read by the files under `src/modules/cerberus` (MAN-7871).
 - Nested multi-line objects, the file's own 2-space indentation.
 
@@ -135,16 +132,19 @@ Every word the Cerberus screen draws, in the top-level `cerberus` block of `src/
 | `status` | 8 | one word per status value |
 | `fleet` | 46 | `tabs`, `layouts`, `filters`, `searchPlaceholder`, `expandAll`, `collapseAll`, `bar`, `nodes_*`, `showing`, `showMore`, `noMatch`, `noneInGroup`, `legend`, `rings` |
 | `needs` | 14 | the Needs-you panel and its muted list |
-| `node` | 35 | a node card: warden line, empty and waiting states (a card's title, a list band's lead), squares; `sessions_*` (the count after the warden line); `projects.*` (14: "Projects that run here", its empty line, ✕'s name, the two "Moving…" words, "Run a project here", the line with nothing to offer, the refusal, `notReporting`, and `toast.here` / `toast.hereWaiting` / `toast.back`) |
+| `node` | 37 | a node card: warden line, empty and waiting states (a card's title, a list band's lead), squares; `sessions_*` (the count after the warden line); `projects.*` (14: "Projects that run here", its empty line, ✕'s name, the two "Moving…" words, "Run a project here", the line with nothing to offer, the refusal, `notReporting`, and `toast.here` / `toast.hereWaiting` / `toast.back`); `updating` (`UpdatingPill`) and `updatingWarden` (the collapsed tile's line): MAN-7934 |
 | `service` | 11 | a service row's pill and cell tip |
-| `activity` | 29 | the What-happened feed; `fix` (7) and `catalog` (3) are the fixes plan's kinds, `source.fix` and `source.catalog` their pills |
+| `activity` | 43 | the What-happened feed; `fix` (7) and `catalog` (3) are the fixes plan's kinds, `source.fix` and `source.catalog` their pills; `diagnosis` (4: `asked`, `askedSummary`, `ready`, `failed`) and `source.diagnosis` are the diagnosis plan's, read by `diagnosisEvent` (MAN-7872); `warden` (8) and `source.warden` are the updates plan's, read by `wardenEvent` (MAN-7934) |
 | `sheet` | 24 | the check sheet |
 | `lookup` | 13 | the moment lookup's answers |
 | `history` | 27 | the History tab: the look-up card's fields, prompts and headings, the events card's states (MAN-7877) |
 | `catalog` | 27 | the Catalog tab and its rows: `tab`, `tabHint`, `intro`, `count_*`, `empty`, `new`, `trigger.*`, `raw`, `stats.*`, `origin.*`, `auto.*`, `runNow`, `running`, `blocked` (MAN-7906) |
 | `fix` | 32 | a fix on the screen: `run`, `command`, `strip.*` (a Needs-you card's run strip), `output.*` (Fix output), `sheet.*` (the sheet's fixes), `headline` + `headlineAccent`, `quiet`, `fleet.*` (MAN-7906) |
+| `diagnosis` | 29 | the diagnosis plan's panel and buttons (MAN-7932): `eyebrow`, the pill's `reading` / `ready` / `failed`, `scope`, `steps_*` (the folded steps' one line), `proposal.*` (the Proposed fix box: `title`, `runOnce`, `addToCatalog`, `running`, `ranOnce` with `result.*`, `refused`, `expired`, `unpublished`, `promotedOff` / `promotedOn` / `promotedRetired`, `note`, `noteAdd`, `none`), and the buttons: `diagnose`, `diagnosing`, `see`, `again`, `hint` |
+| `promote` | 24 | the Promote dialog (MAN-7932): `title` + `accent`, `from_*`, `name`, `nameHelper`, `when`, `runs`, `generalized`, `last`, `exact`, `auto`, `autoOff`, `autoOn` (+ `autoOn_warn`), `limit`, `limitHelper`, `perHour_*`, `cancel`, `confirm`, `toast.*` |
 | `mute` | 17 | the mute dialog and its toast |
 | `enroll` | 31 | the three-step enroll flow |
+| `updates` | 23 | the updates plan's dialog and header button (MAN-7934): `button.update` / `.updating` / `.upToDate` (the header's three states), `title` + `titleAccent`, `note`, `kept_*`, `versions`, `node`, `current`, `queued`, `updated`, `rolledBack`, `cancel`, `start_*`, `running`, `close`, `done`, `missed_*`, `finish` |
 | `time` | 13 | spans and relative times |
 | `errors` | 4 | `unreachable`, `retry`, `lastAnswer` (the banner's second line over a kept answer), `writeFailed` (the warn toast's title for a refused mute, lift or label write, and the Enroll dialog's banner title for a refused ask) |
 
@@ -165,6 +165,9 @@ Every word the Cerberus screen draws, in the top-level `cerberus` block of `src/
 - `activity.fix.*`, `activity.catalog.*`, `activity.source.fix` and `.source.catalog` are read by `fixEvent` and `catalogEvent` in `utils/activityEvents.ts`. The feed's `fix` line carries a result and the seconds it took but no exit code, so a failure reads `activity.fix.failed` ("Failed"); the exit code is said by `fix.strip.failedExit` and `fix.output.failedExit`, which read the run.
 - A name, label or command in the fixes' words is a `{{name}}` / `{{cmd}}` variable drawn through `t()`, never `Trans`: `Trans` escapes `<` in a label (MAN-7906).
 - `catalog.count_*`, `catalog.stats.allOk_*` / `someOk_*` and `catalog.auto.on_*` are plural pairs on `count`; `catalog.auto.on_hour_*` / `on_day_*` pick by `context` (`hour` or `day`).
+- `promote.from_*` and `promote.perHour_*` are plural pairs on `count`; `promote.autoOn` picks `autoOn_warn` by `context` (the entry's `when`), and falls back to `autoOn` for `failing`. `diagnosis.steps_*` is a plural pair on `count`, with `{{from}}` and `{{to}}` (the first and last step's `hms()`; `_one` has no range). `diagnosis.ready`, `.proposal.ranOnce`, `.proposal.refused`, `.proposal.expired` and `promote.from_*` take `{{time}}` as `hms()`; `.proposal.unpublished` takes `{{node}}`. `promote.generalized`'s `{{used}}` and `{{saved}}` are spans of the proposal's two commands, `saved` read through `promote.last` + `time.minutes` / `time.hours` when it is a relative window (MAN-7932). A summary, a piece of evidence, an error and a command are data, never keys.
+- `updates.kept_*`, `updates.start_*` and `updates.missed_*` are plural pairs on `count`; `kept_*` counts the versions kept for rollback, its `{{from}}` one version or `updates.versions` joining several. A version, a release note, a node's id and a warden's step sentence are data, never keys; `note` drops the release note's own trailing full stop. The ✓ before `updated` and `done`, the ✕ before `rolledBack`, the ▲ before a failed step's sentence and before `missed_*`, and the running ● stay in code (MAN-7934). `activity.warden.*` (8: `started`, `startedSummary_*`, `updated`, `updatedKept`, `rolledBack`, `rolledBackUnknown`, `failed`) and `activity.source.warden` are the warden update's lines of What happened.
+- `diagnosis.proposal.ranOnce`'s `{{result}}` is `proposal.result.*` (`ok`, `failed`, `timedOut`), so a run that did not succeed never says "succeeded"; a refusal never started, so it is `proposal.refused`, never "Ran once"; the ↳ before a piece of evidence, the ✓ before `promotedOff` / `promotedOn` and the ▲ before `diagnosis.failed` stay in code.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/common.json
 
@@ -181,12 +184,14 @@ The browser's one reader of Cerberus: a provider holds the overview for every re
 | `src/modules/cerberus/context/ProjectChoicesContext.ts` | `ProjectChoicesContext` (default `null`) and `useProjectChoices()`: the workspace's projects, provided by `CerberusPanel` from its `projectChoices` prop and read by `NodeProjects`; no component |
 | `src/modules/cerberus/hooks/useCheckDetail.ts` | `useCheckDetail` |
 | `src/modules/cerberus/hooks/useCatalogRead.ts` | `useCatalogRead()`: the catalog beside the overview, read by the provider |
+| `src/modules/cerberus/hooks/useWardensRead.ts` | `useWardensRead()` → `{ wardens, readWardens }`: `GET /api/cerberus/wardens` beside the overview (the release on offer, each node against it, the running batch), read by the provider on the same triggers; ticketed like the catalog's read, a failed read keeps the last answer: MAN-7934 |
 | `src/modules/cerberus/hooks/useRunOutput.ts`, `useRunLastLine.ts` | `useRunOutput(runId)`: one run and its lines, streamed and replayed (`FixOutput`); `useRunLastLine(run)`: a card's strip's newest line, live (`NeedFix`): MAN-7906 |
+| `src/modules/cerberus/hooks/useDiagnosis.ts`, `useDiagnosisVerbs.ts` | `useDiagnosis(id)`: one diagnosis and its steps, read and kept live (`DiagnosisPanel`); `useDiagnosisVerbs(tools)`: the provider's `diagnose`, `runProposal` and `promote`: MAN-7945 |
 | `src/modules/cerberus/utils/cerberusTime.ts` | `hm`, `hms`, `dateOf`, `dayAndTime`, `momentOf`, `stampOf`, `agoParts`, `stretchKey`, `sameLocalDay`, `isWholeTime`, `isWholeDate` |
 | `src/modules/cerberus/fleet/fleetModel.ts`, `utils/activityEvents.ts` | the Fleet's pure model and the activity→Timeline mapping: MAN-7872 |
 | `src/modules/cerberus/fleet/*.tsx`, `utils/fleetWords.ts` | the Fleet view: MAN-7880, MAN-7879 |
 | `src/modules/cerberus/modals/*.tsx`, `hooks/useEnrollmentStatus.ts`, `utils/enrollAsk.ts` | the Mute and Enroll dialogs: MAN-7884 |
-| `src/shared/api.ts` | `api.cerberus` (fifteen verbs, the catalog's and the run's among them); `api.projects.setNode(projectId, node \| null)` (`PUT /api/projects/:projectId/node`, 204; `api.projects.list()` is the sidebar's read); `refusalSentence(response)` (the server's own sentence, or `null`); `refusalCode(response)` (`error.code` of a refusal body, or `null`; reads a clone, so `refusalSentence` can still read the body) |
+| `src/shared/api.ts` | `api.cerberus` (the overview's, the catalog's, the run's, the warden updates' — `wardens`, `startUpdate`, `updateBatch` — and the diagnosis' verbs); `api.projects.setNode(projectId, node \| null)` (`PUT /api/projects/:projectId/node`, 204; `api.projects.list()` is the sidebar's read); `refusalSentence(response)` (the server's own sentence, or `null`); `refusalCode(response)` (`error.code` of a refusal body, or `null`; reads a clone, so `refusalSentence` can still read the body) |
 | `src/shared/types.ts` | `CerberusMuteInput`, `CerberusLabelInput`, `CerberusEnrollInput` (client-only: the routes read a loose JSON body); the dialogs' `CerberusEnrollRefusal`: MAN-7884 |
 
 ## Mount and barrel
@@ -207,8 +212,11 @@ section: Cerberus — the client: `CerberusProvider`, `useCerberusNeeds`, `useCh
 | `stale: boolean` | true once a read fails while the held overview was answered over 90 s before (`STALE_AFTER_MS` = three clock reads); the next good apply clears it. Never true while `overview` is `null` |
 | `catalog: CerberusCatalogEntryView[] \| null` | the catalog, read with the overview (`useCatalogRead`); `null` until a read answers, kept over a failed one |
 | `catalogFailed: boolean` | true only while `catalog` is `null` and its last read failed |
-| `refresh(): Promise<void>` | one read of the overview, and the catalog started beside it and not waited for (a write's verdict never waits out a hung catalog read); resolves when the overview has answered or failed; the Try again press; never rejects |
-| `mute(input)`, `liftMute(id)`, `setLabel(input)`, `runEntry(id)`, `setAuto(id, on)` | `Promise<boolean>`: `true` = landed and the overview and catalog already re-read; `false` = refused or no answer, the warn toast already raised |
+| `wardens: CerberusWardens \| null` | where the wardens stand against the release on offer (`useWardensRead`), read with the overview and again on every `cerberus_changed`; `null` until a read answers, kept over a failed one. The header's update button and the Update wardens dialog both draw from it |
+| `startUpdate(nodes)` | `Promise<{ batch, updates } \| null>`: `POST /api/cerberus/updates` through `api.cerberus.startUpdate`, one at a time (`writeOnce`). The answer is the batch and its updates as they stood, after the re-read; `null` = refused (409 `CERBERUS_UPDATE_RUNNING`: a batch is already going; 409 `CERBERUS_NO_RELEASE`), the warn toast with the server's sentence already raised and the wardens read again so a batch started elsewhere shows |
+| `diagnose(node, key)`, `runProposal(id)`, `promote(id, input)` | `Promise<boolean>`, built by `useDiagnosisVerbs` (MAN-7945) over the provider's `writeOnce` and `settleWrite`, so a landed write has re-read the fleet before it answers and a refused one has raised the warn toast with the server's sentence: `diagnose` is `POST /api/cerberus/diagnoses { node, check: key }` and sends no model, silent when it lands; `runProposal` is `POST …/:id/run`, silent when it lands; `promote` is `POST …/:id/promote` with a `CerberusPromoteInput` and raises the toast `promote.toast.*` ("Added to the catalog" · "<name> · auto-run off", the name from the entry the server wrote) when it lands |
+| `refresh(): Promise<boolean>` | one read of the overview, and the catalog and the wardens started beside it and not waited for (a write's verdict never waits out a hung read of either); resolves when the overview has answered or failed, with whether it answered; the Try again press; never rejects |
+| `mute(input)`, `liftMute(id)`, `setLabel(input)`, `runEntry(id)`, `setAuto(id, on)` | `Promise<boolean>`: `true` = landed and the overview already re-read (or, when that read failed, being read again — see `settleWrite`); `false` = refused or no answer, the warn toast already raised |
 | `starting: readonly string[]` | the entries whose Run press is out: `POST /catalog/:id/run` answers once the warden has accepted (up to 10 s). Every Run now of each reads "Running…" for the wait; an entry leaves when its press settles, after the re-read that holds the run, and a press on another entry meanwhile does not take its label back |
 | `setProjectNode(project, node)` | `Promise<'moved' \| 'refused' \| 'failed'>`: `PUT /api/projects/:projectId/node` through `api.projects.setNode` (`node` the node's id, or `null` for this server). `moved` = landed, the overview already re-read, and the toast `node.projects.toast.here` (its message `hereWaiting` while the node's `link` is not `reporting`) or `toast.back` raised; `refused` = 409 `PROJECT_NODE_NOT_COLOCATED`, no toast (`NodeProjects`' banner says it); `failed` = any other refusal or no answer, the warn toast already raised. One write per project at a time |
 
@@ -220,6 +228,7 @@ section: Cerberus — the client: `CerberusProvider`, `useCerberusNeeds`, `useCh
 |---|---|
 | mount | one read, after the subscription |
 | `cerberus_changed` | at most one read per 1 s (`FRAME_READ_GAP_MS`); frames inside the gap queue ONE trailing read |
+| `cerberus_changed` with `updates: true` | read at once, never held to the gap (`readForUpdateFrame`): the overview and the wardens only, one read at a time, and frames that land while it is out ask for ONE more when it answers, so a burst of an update's steps costs two reads. why: an update is over in about 0.4 s, so a read held for the gap finds it ended |
 | `websocket_reconnected` | read at once, unthrottled |
 | clock | every 30 s (`CLOCK_READ_MS`): cells slide, "ago" ages, a check goes stale with no row written |
 | own landed write | the re-read, before the verb answers |
@@ -230,7 +239,7 @@ section: Cerberus — the client: `CerberusProvider`, `useCerberusNeeds`, `useCh
 ## Writes
 - One in flight per target: `mute:<node>/<key>`, `lift:<id>`, `label:<node>/<key or service>`, `project-node:<projectId>`, `run:<entry>`, `auto:<entry>`. A second press returns the first's promise.
 - `settleWrite(request, saysOwnRefusal?)` is the one place a write settles; `sendWrite` flattens it to a boolean. Verdict is `response.ok`: the body is not read for it. The screen comes from the re-read. A caller that says one refusal in words of its own passes `saysOwnRefusal`: `setProjectNode` passes `isNotColocatedRefusal` (409 and `refusalCode(response) === 'PROJECT_NODE_NOT_COLOCATED'`), which settles as `refused` with no toast; every other refusal is `failed`.
-- `landed` follows `refresh()`, which never rejects: a write whose re-read failed still answers landed, and the overview lags until the next read (the 30 s clock).
+- `landed` follows `refresh()`, which never rejects. A write whose re-read failed still answers landed, at once (its verdict never waits out a second read), and `rereadAfterWrite` reads the overview again after 1 s and after 4 s until a read taken after the write has been applied — its own, a frame's or the clock's — so the screen catches up in seconds, not at the next 30 s clock read. Measured 2026-10-07 on the real provider with the API answered by routes: the re-read failing once, the new fleet on screen 1.02 s after the press; failing twice, 5.02 s (`.verify/cerberus-write-reread.mjs`).
 - Refused or no answer: one `warn` toast, title `cerberus.errors.writeFailed`, message = `refusalSentence(response)` (the server's own sentence), omitted when none. Not raised after unmount.
 - Speaks on success: the mute and `setProjectNode`. A lift, a label, a run (the card's strip is the proof) and an auto-run switch (the switch and its line are) are silent. A refused run (409 `CERBERUS_RUN_ACTIVE` — the check already has a run going — or `CERBERUS_NODE_SILENT`) and a refused switch (a capped entry) raise the write's warn toast with the server's sentence.
   - Mute: `positive` toast, `cerberus.mute.toast.title` (`time` = `hm(until)`), `cerberus.mute.toast.message` (`label` = the check's plain name, else its key).
@@ -276,6 +285,13 @@ Answers `{ detail, loading, error, refresh }` from `GET /api/cerberus/checks/:no
 | `setAuto(id, on)` | `PUT /api/cerberus/catalog/:id/auto` |
 | `runEntry(id)` | `POST /api/cerberus/catalog/:id/run` → `{ runId }`, up to 10 s after the press |
 | `run(id)` | `GET /api/cerberus/runs/:id`: the run with every line it holds |
+| `wardens({ signal? })` | `GET /api/cerberus/wardens` → `CerberusWardens`; the provider brings its own deadline |
+| `startUpdate(nodes)` | `POST /api/cerberus/updates { nodes }` → `{ batch, updates }`; 409 `CERBERUS_UPDATE_RUNNING` while a batch runs |
+| `updateBatch(batch, { signal? })` | `GET /api/cerberus/updates/:batch` → the batch's `CerberusUpdateView[]`, every step with its time; `useUpdateBatch` reads it 2 s after each answer while the dialog is open |
+| `diagnose({ node, check, model? })` | `POST /api/cerberus/diagnoses` → `{ id }`; 409 `CERBERUS_DIAG_RUNNING` while the check has a diagnosis going. The tab sends no `model` |
+| `diagnosis(id, { signal? })` | `GET /api/cerberus/diagnoses/:id` → `CerberusDiagnosisView` with every step and its run's lines; `useDiagnosis` reads it |
+| `runProposal(id)` | `POST /api/cerberus/diagnoses/:id/run` → `{ runId }`; 409 with no proposal or once its one-off expired; never touches the catalog |
+| `promote(id, input)` | `POST /api/cerberus/diagnoses/:id/promote { name, auto, limit }` → the new `CerberusCatalogEntryView`; the one write that does touch the catalog |
 
 - Reads answer their wire shape bare; a refusal is the app's `{ success: false, error }` envelope. Nobody draws from a write's answer.
 - `refusalSentence(response)`: the server's own sentence from a refusal body (`errorMessage(error) ?? errorMessage(details)`), `null` when none or not JSON. One copy, shared by `NotesProvider` and `CerberusProvider`. `refusalCode(response)`: the body's `error.code`, `null` when none or not JSON; it reads a clone, so the sentence can still be read after it. `settleWrite` in the provider is the one write path: it answers `landed`, `failed`, or `refused` for a caller that says one refusal in words of its own (`sendWrite` is it flattened to a boolean).
@@ -327,13 +343,14 @@ The Cerberus tab's pure half: the overview as sorted fleet items, filter counts,
 | `ringsLayout(items, width, height)` | `RingsLayout` in pixels from the box's top-left |
 
 ## Node status rules
-- `STATUS_RANK` (smaller = worse): `failing`/`denied` 0, `fixing` 1, `warn` 2, `unknown` 3, `paused`/`enrolling` 4, `muted` 5, `ok` 6, `empty` 7.
+- `STATUS_RANK` (smaller = worse): `failing`/`denied` 0, `fixing` 1, `warn` 2, `unknown` 3, `paused`/`updating`/`enrolling` 4, `muted` 5, `ok` 6, `empty` 7.
 - A node's status = the worst of its services'; no service = `empty`.
 - A `not_enabled` service counts as `ok` at the node level; its own row still says what it is.
 - `denied` outranks `failing` when a node has both.
 - `fixing` is fed from `overview.running`: a service with a run going on one of its checks (`runOnService`) is `fixing`, whatever its own word is, and a node reads the worst of its services' words. A node whose only trouble is being fixed is `fixing`; one with another service still `failing` stays `failing`, since that one needs you. `enrolling` is in the type and the rank; nothing produces it yet.
-- `groupOf`: `failing denied fixing warn` → `needs`; `paused enrolling` → `updating`; every other status is its own group. `ok` is counted by the status bar; no filter button selects it.
-- `FleetItem` carries `id desc role link status fixBy services search` only (`fixBy` is who started the node's run, `auto` or `you`, while its `status` is `fixing`, else `null`). Minute cells, warden version and last-heard time stay on `CerberusNodeView`, found by `id`.
+- `updating` and `paused` are fed from the node itself (`nodeStatusOf`): a node with `link === 'paused'` (its warden restarting for an update) starts from `paused`, one with `updating` set (an update queued or running) from `updating`, instead of `ok` — so it is under Updating even when every check is passing, and even with no service, which would read `empty`. A worse word still wins: a failing check on a node that is updating still needs you.
+- `groupOf`: `failing denied fixing warn` → `needs`; `paused updating enrolling` → `updating`; every other status is its own group. `ok` is counted by the status bar; no filter button selects it.
+- `FleetItem` carries `id desc role link status fixBy services search` only; `link` is typed `CerberusNodeView['link']` (`reporting`, `silent`, `never`, `paused`), so it follows that union (`fixBy` is who started the node's run, `auto` or `you`, while its `status` is `fixing`, else `null`). Minute cells, warden version and last-heard time stay on `CerberusNodeView`, found by `id`.
 - `item.search` = lower-cased `id`, `desc`, each service's id and label, joined by single spaces; null and empty words are dropped, so `center cerberus` matches.
 
 ## `ringsLayout`
@@ -361,7 +378,7 @@ Maps one `CerberusActivity` to a kit `TimelineEvent`. Callers: the Fleet's What-
 - `mutedTomorrow` rests on the 24 h mute cap: a different local day is always the next. If the server allows longer mutes, `mutedTitle` must name the date.
 - `meta` = `activity.meta` (`service` = check key, `node`); for a `check` it is followed by ` · <from word> → <to word>`. Status words come from `STATUS_TABLE[status].wordKey`.
 - A label, reason, node name and value go in as variables, never as keys.
-- `fix` and `catalog` are live: `fixEvent` (started: "Ran on its own: “X”" / "You ran “X”", info; ended: "“X” finished · Succeeded in 12 s" / "· Failed" / "· Timed out" in the result's tone, "The warden refused “X”" in the refusal's red; the line carries the result and the seconds, not the exit) and `catalogEvent` ("Added “X”" positive, "Auto-run on · “X”" / "Auto-run off · “X”" neutral; no node or check). New kinds (`diagnosis warden`) add a case to the switch, a builder, and words under `cerberus.activity`.
+- `fix` and `catalog` are live: `fixEvent` (started: "Ran on its own: “X”" / "You ran “X”", info; ended: "“X” finished · Succeeded in 12 s" / "· Failed" / "· Timed out" in the result's tone, "The warden refused “X”" in the refusal's red; the line carries the result and the seconds, not the exit) and `catalogEvent` ("Added “X”" positive, "Auto-run on · “X”" / "Auto-run off · “X”" neutral; no node or check). `diagnosisEvent` is live too: asked ("You asked for a diagnosis" · "<label> · read-only", info), ready ("Diagnosis ready" · its summary, neutral: a document, not a health signal), failed ("Diagnosis failed" · the sentence that says why, the warn of a failed run). `wardenEvent` is live too (source `activity.source.warden`, words `activity.warden.*`; MAN-7933 says when center writes each): `update_started` ("You started a warden update to <to>", info, no node; summary "<n> nodes · one at a time" when `nodes` is present), `updated` ("Warden on <node> updated to <to> · <from> kept for rollback", positive; no tail when `from` is null or equals `to`, since nothing was swapped), `rolled_back` ("Warden on <node> rolled back to <from>", warn; "rolled back" alone when `from` is null), `update_failed` ("Warden on <node> could not update to <to>", warn). A new kind adds a case to the switch, a builder, and words under `cerberus.activity`.
 
 ## Callers must
 - Guard `overview.lastResultAt` for null before `agoParts` (it takes a number).
@@ -376,7 +393,7 @@ The Cerberus tab's drawing vocabulary and the check sheet's three pieces. Pure o
 ## Files
 | file | holds |
 |---|---|
-| `src/modules/cerberus/utils/cerberusStatus.ts` | `STATUS_TABLE`; `RUN_LOOK`, `FLEET_FIXING_LOOK`; `markLook(mark)`, the look a mark paints from (`STATUS_TABLE`'s row, or `FLEET_FIXING_LOOK` for `fixing`); `nodeMark(status)`, the mark a node's word draws with (`null` for `empty`, `enrolling`), read by the node card and the rings |
+| `src/modules/cerberus/utils/cerberusStatus.ts` | `STATUS_TABLE`; `RUN_LOOK`, `FLEET_FIXING_LOOK`; `markLook(mark)`, the look a mark paints from (`STATUS_TABLE`'s row, or `FLEET_FIXING_LOOK` for `fixing`); `nodeMark(status)`, the mark a node's word draws with (`null` for `empty`, `enrolling`; `fixing` for `updating`), read by the node card and the rings |
 | `src/modules/cerberus/StatusMarks.tsx` | `StatusGlyph`, `StatusCell`, `StatusSquare`, `StatusPill` (each takes a `CerberusMark`: a status, or `fixing`) |
 | `src/modules/cerberus/sheet/MinuteCells.tsx` | `MinuteCells` |
 | `src/modules/cerberus/sheet/LookupMoment.tsx` | `LookupMoment`, `LookupSentence`, `SentenceRow` |
@@ -414,9 +431,9 @@ No file outside the module imports the marks or the sheet pieces. Inside it, `sh
 | `failed`, `timed_out` | warn | ▲ |
 | `refused` | danger | ✕ |
 
-- Read by `fleet/NeedFix.tsx` (the strip; a run that succeeded takes the glyph but a neutral tone) and `sheet/FixOutput.tsx` (the pill): MAN-7906. The glyph stays in code (MAN-7870).
+- Read by `fleet/NeedFix.tsx` (the strip; a run that succeeded takes the glyph but a neutral tone) and `sheet/FixOutput.tsx` (the pill): MAN-7906; and by `sheet/DiagnosisPanel.tsx` (its ▲ Failed pill, and its one-off's ran line in the result's ink): MAN-7932. The glyph stays in code (MAN-7870).
 - `FLEET_FIXING_LOOK: { tone, glyph, cell, wordKey, glyphMotion }` = `RUN_LOOK.going`'s tone, ●, cell `solid`, `cerberus.fix.fleet.running`, `glyphMotion` `vv-pulse` 1.4 s: how the fleet draws a node or service with a fix running (`fixing`), through `markLook`; the glyph, the pill's ● and the ring dot pulse in place of the failing ring. The `solid` cell makes every paint map keyed by shape draw it as the prototype does: the tile edged 1.5 px in the info dot, ring dot and service square filled.
-- `fixing` is fed from `overview.running` (`fleetModel.runOnService`) and drawn by `NodeGlyph`, the tile's edge, the rings' dot, hub and label glyph and panel (`nodeMark` → `markLook`), `nodeLine` ("Fix running on its own" / "Fix running" by `FleetItem.fixBy`), the service row's pill and the collapsed card's squares (`serviceSentence(t, service, run)`), and the rings' key row. The updates plan's `enrolling` shares the rings' key row.
+- `fixing` is fed from `overview.running` (`fleetModel.runOnService`) and drawn by `NodeGlyph`, the tile's edge, the rings' dot, hub and label glyph and panel (`nodeMark` → `markLook`), `nodeLine` ("Fix running on its own" / "Fix running" by `FleetItem.fixBy`), the service row's pill and the collapsed card's squares (`serviceSentence(t, service, run)`), and the rings' key row. An `updating` node draws the same ● and shares the rings' key row ("Fix running or updating"); `enrolling` shares it too.
 
 ## `CerberusCellShape` — paint in `StatusMarks.tsx` `CELL_PAINT`
 | shape | paint | reads as |
@@ -536,7 +553,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/history/Eve
 
 ## MAN-7878 — Cerberus — the check sheet: `CheckSheet`, `CheckRows`, `SelectedCheck`, `CheckLabelEditor`
 
-The check sheet on the library's `Sheet`: one service's checks and one of them in full. `CheckSheet.tsx` reads the fleet from `useCerberus()` and the check from `useCheckDetail`, and wires every press: the other three files draw what they are handed and read nothing. Marks and pieces it composes: MAN-7873. Banner: MAN-7877 (`UnreachableBanner`). Time words: MAN-7871. Words: MAN-7870 (`cerberus.sheet.*`, `cerberus.errors.lastAnswer`). Design: `design/cerberus/Cerberus Tab.dc.html` :393-537, less diagnosis; the fixes' pieces: MAN-7906. `CerberusPanel` (MAN-7891) mounts it, opened from a Fleet minute, a service row or a Needs-you card.
+The check sheet on the library's `Sheet`: one service's checks and one of them in full. `CheckSheet.tsx` reads the fleet from `useCerberus()` and the check from `useCheckDetail`, and wires every press: the other three files draw what they are handed and read nothing. Marks and pieces it composes: MAN-7873. Banner: MAN-7877 (`UnreachableBanner`). Time words: MAN-7871. Words: MAN-7870 (`cerberus.sheet.*`, `cerberus.errors.lastAnswer`). Design: `design/cerberus/Cerberus Tab.dc.html` :393-537; the fixes' pieces: MAN-7906; the diagnosis's: MAN-7932. `CerberusPanel` (MAN-7891) mounts it, opened from a Fleet minute, a service row or a Needs-you card.
 
 ## Files
 | file | holds |
@@ -548,7 +565,7 @@ The check sheet on the library's `Sheet`: one service's checks and one of them i
 
 ## `CheckSheet` — layout and reads
 - Props: `node` (`eis1`, or `center`), `service` (id), `check` (id within the service: the key after the first `/`), `lookupAt?` (epoch ms; omitted = now), `onMute(check)`: the root opens its Mute dialog in front of the sheet.
-- Title: the service's label, else its id. Under it, top to bottom: raw line (`sheet.raw`; `sheet.rawHub` when the node's `wardenVersion` is null), `CheckRows`, `SelectedCheck`, Fix output (`FixOutput`), `SLOT: diagnosis`, "Fixes in the catalog" (`CheckFixes`), then the check's own sections. Fix output shows the run the sheet was opened on (a Needs-you card's strip hands its id as `run`) until the check's own read has answered; then the check's newest run within the hour (`detail.run`), which is the same run unless a newer one has begun since — the Run now just pressed — and a sibling check has no opened run. With neither, no Fix output; "Fixes in the catalog" waits for the check's read.
+- Title: the service's label, else its id. Under it, top to bottom: raw line (`sheet.raw`; `sheet.rawHub` when the node's `wardenVersion` is null), `CheckRows`, `SelectedCheck`, Fix output (`FixOutput`), `DiagnosisPanel` (while the check has a diagnosis, keyed by its id: MAN-7932), "Fixes in the catalog" (`CheckFixes`), then the check's own sections. Fix output shows the run the sheet was opened on (a Needs-you card's strip hands its id as `run`) until the check's own read has answered; then the check's newest run within the hour (`detail.run`), which is the same run unless a newer one has begun since — the Run now just pressed — and a sibling check has no opened run. A run of the shown diagnosis's proposal is left out of Fix output: the panel draws it under its proposal, so it is never drawn twice. With neither, no Fix output; "Fixes in the catalog" waits for the check's read.
 - `CheckSheetBody` holds every read; `Sheet` mounts it only while open. Keyed `<node>/<service>/<check>@<lookupAt|now>`: each opening, and a sheet sent to another check or minute, starts fresh (row, moment, editor closed).
 - Two reads; the sheet never blanks while one is out:
 
@@ -569,7 +586,6 @@ The check sheet on the library's `Sheet`: one service's checks and one of them i
 
 - Live region: one `<p role="status" class="sr-only">`, mounted with the body. Says `sheet.loading` while the read is out with no answer, `sheet.gone` when gone, else nothing. The placeholder and the visible gone line carry no role; the banner is its own alert. why: a region inserted with its text often is not announced.
 - Entrance: raw line rises first (`motion-safe:animate-shape-rise`), rows at `animationDelay: '60ms'`, the check and its sections at `120ms`. The delay is inline: INV-7053.
-- `SLOT:` comments (nothing drawn) in `CheckSheet` and `SelectedCheck`: MAN-7867.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/sheet/CheckLabelEditor.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/sheet/CheckRows.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/sheet/CheckSheet.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/sheet/SelectedCheck.tsx
 
@@ -590,7 +606,12 @@ section: Cerberus — the check sheet: `CheckSheet`, `CheckRows`, `SelectedCheck
 | `onSave` | `setLabel({ node, key: shown.key, label })`; `''` clears the name. The editor closes when the write lands, if it is still on that check, and stays open, Save ready again, when it does not (the provider's toast says why) |
 | `onMute` | the root's `onMute(shown)` |
 | `onUnmute` | `liftMute(shown.mute.id)`; the note leaves when the fleet reads the lift |
-| `onPick` | the lookup to the pressed minute's last second (`cell.to - 1000`), or back to live for the newest cell, which is the minute still running (the read sends no `end`). Judged by place on the strip, never by the browser's clock; `typedTime` clears and the input follows the read |
+| `diagnosis` | `detail?.diagnosis ?? null`, the check's newest diagnosis (`?? null`: an older server's answer has none): `SelectedCheck`'s Diagnose / Diagnose again, and `DiagnosisPanel` keyed by its id |
+| `heldByOther` | the check's going run (`detail.run`) is not this diagnosis's own one-off: `DiagnosisPanel`'s `held`, which disables Run it once as `CheckFixes` holds its entries |
+| `outputRunId` | the run Fix output shows, except the one that is `diagnosis.run`: the panel draws that under its proposal |
+| `onDiagnosisStarted` | `useCheckDetail`'s `refresh`, handed to `SelectedCheck`: Diagnose reads the check again when a diagnosis lands, and stays busy until that read has settled |
+| `onPromote` | the root's `onPromote(diagnosis, shown)`: Add to catalog opens the Promote dialog in front of the sheet, as `onMute` does Mute |
+| `onPick` | the lookup to the moment the pressed minute's word was reached (`cell.at`), or back to live for the newest cell, which is the minute still running (the read sends no `end`). Judged by place on the strip, never by the browser's clock; `typedTime` clears and the input follows the read |
 | `onTimeChange` | holds the text; a whole time (`isWholeTime`) moves the lookup to that second today, local (`todayAt`) |
 
 ## `CheckRows`
@@ -611,7 +632,7 @@ section: Cerberus — the check sheet: `CheckSheet`, `CheckRows`, `SelectedCheck
 - Naming action: ghost `sheet.nameThis` + pencil for a check with no label; a ghost icon button (✎, `sheet.rename`) beside a label. It is hidden while the editor is open.
 - `editor` (an element or `null`) takes the name's place while open; the status pill stays.
 - Then `check.value`; "Checked `hms(at)` · every `stretchKey(every)` · by …" (`sheet.checked`; `sheet.checkedHub` when `origin === 'self'`; `sheet.notChecked` / `notCheckedHub` while `at` is null); then the raw key, when the check has a label or the editor is open.
-- Action row: `SLOT:`, then `sheet.mute` (ghost) while `check.mute` is null, else a neutral `Badge` holding `sheet.muteNote` (`hm(mute.until)`, `reason`) in full, wrapping, and `sheet.unmute`.
+- Action row: `DiagnoseButton` (outline, `diagnosis.diagnose`; `diagnosis.again` once the check has a diagnosis; not drawn while one runs, nor until the check's own read has answered, since until then nobody knows which word is true), then `sheet.mute` (ghost) while `check.mute` is null, else a neutral `Badge` holding `sheet.muteNote` (`hm(mute.until)`, `reason`) in full, wrapping, and `sheet.unmute`.
 - Focus: when the editor closes and focus fell to the page, it returns to the naming button.
 
 ## `CheckLabelEditor`
@@ -646,21 +667,21 @@ Takes `t` and `now` from the caller, so a sentence is a function of what it is h
 | | `muted` | `service.someMuted` |
 | | `not_enabled` | the status word |
 | | `ok` | `service.allPassing_*` |
-| `nodeLine(t, item, node)` | no services | `node.waiting` (`link === 'never'`), else `node.nothingAssigned` |
-| | `paused` / `muted` / `ok` | `node.restarting` / `node.mutedCheck` / `node.allPassing_*` |
+| `nodeLine(t, item, node)` | no services | `node.waiting` (`link === 'never'`), `node.restarting` (`link === 'paused'`), `node.updatingWarden` (`updating` set), else `node.nothingAssigned` |
+| | `paused` / `updating` / `muted` / `ok` | `node.restarting` / `node.updatingWarden` / `node.mutedCheck` / `node.allPassing_*` |
 | | `failing denied warn unknown` | `node.bad`: the first service at that word |
 | | `fixing` | `fix.fleet.runningAuto` / `fix.fleet.running`, by `item.fixBy` |
 | | `enrolling empty` | `node.nothingAssigned` |
+| `isRestarting(node)` | `link === 'paused'` | true; the heartbeat dot also reads it |
 | `sessionsTail(t, node)` | `link !== 'reporting'` or `sessions` not a positive count (missing included: an older API answering a newer client) | `null`: a silent warden's last list is a count nobody has confirmed since; the hub has none |
 | | otherwise | ` ·\u00a0` + `node.sessions_*` (`count`): the tail of a warden line drawn as words, after `wardenLine`, in its run of text. The no-break spaces keep the dot with the phrase and the phrase whole |
 | `wardenLine(t, node, now)` | hub | `node.hub` |
+| | `isRestarting(node)` (`link === 'paused'`) | `node.wardenRestarting` (the read model lays `paused` over `silent` and `never`) |
 | | `link === 'never'` or no `lastHeardAt` | `node.waiting` |
 | | `link === 'silent'` | `node.silent`, `time` = `hm(silentSince ?? lastHeardAt)` |
-| | any `paused` check | `node.wardenRestarting` |
 | | else | `node.heard`, `ago` against `now` |
-| `isRestarting(node)` | any check `paused` | true; the heartbeat dot also reads it |
 
-- Silence outranks a restart: a restart that never comes back is the thing to see.
+- A restart is `link === 'paused'`, which outranks silence for as long as the update runs; when the update fails the node reads silent, and that is the thing to see.
 - A switched-off service counts as passing for the node.
 - `serviceSentence` also names a service's square in a collapsed card (`node.squareTip`).
 - The service's folded status picks the case, so the pill's glyph and words never disagree.
@@ -682,16 +703,15 @@ Takes `t` and `now` from the caller, so a sentence is a function of what it is h
 - A filter is offered only when its count is above zero, or it is chosen, or it is All; counts are the whole fleet's, so a search never changes a chip.
 - Expand all / Collapse all show only when `folds` (`!narrow && layout !== 'rings'`).
 
-## The card's fix, the quiet line and `SLOT:` comments
-- Every slot a later plan fills, in this view and elsewhere: MAN-7867 (a `SLOT:` comment draws nothing).
-- The card's action row is `NeedFix` (the run strip on a line of its own, then Run “<fix>”), then `SLOT: actions` (Diagnose), then Mute. `NeedCard` takes the whole `need`, and `useLeavingNeeds` keeps the whole need of a card that is leaving, so it keeps its strip while it fades.
+## The card's fix, its diagnosis and the quiet line
+- The card's action row is `NeedFix` (the run strip on a line of its own, then Run “<fix>”), then Diagnose (outline): `DiagnoseButton` while `need.diagnosis` is null, whose press opens the sheet on the check, where the steps arrive; "Diagnosing…" while the need's diagnosis runs and "See diagnosis" once it ended, both opening the sheet; then Mute. `NeedCard` takes the whole `need`, and `useLeavingNeeds` keeps the whole need of a card that is leaving, so it keeps its strip while it fades.
 - The quiet line ends with `cerberus.fix.quiet` ("Fixes set to auto-run will run on their own and show up below."), after a space, while any catalog entry is set to run on its own (`catalog.some(entry => entry.auto)`). `NeedFix`: MAN-7906.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/fleet/FleetStatusBar.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/fleet/FleetToolbar.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/fleet/NeedsYouCard.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/utils/fleetWords.ts
 
 ## MAN-7880 — Cerberus — the Fleet view: `FleetView`, `NodeCard`, `ServiceRow`, `FleetGrid`, `FleetList`, `WhatHappenedCard`
 
-The Cerberus tab's Fleet view, live: its reads are `useCerberus()` and the pure fleet model, its choices component state, its two presses the props `onOpenCell` and `onMute`. Sentences, Needs-you card, status bar, legend, toolbar, `SLOT:` comments: MAN-7879. Pure model: MAN-7872. Marks and strips: MAN-7873. Check sheet it opens: MAN-7878. Words: MAN-7870. Client reader: MAN-7871. `CerberusPanel` mounts it (MAN-7891), the workspace's Cerberus tab.
+The Cerberus tab's Fleet view, live: its reads are `useCerberus()` and the pure fleet model, its choices component state, its two presses the props `onOpenCell` and `onMute`. Sentences, Needs-you card, status bar, legend, toolbar: MAN-7879. Pure model: MAN-7872. Marks and strips: MAN-7873. Check sheet it opens: MAN-7878. Words: MAN-7870. Client reader: MAN-7871. `CerberusPanel` mounts it (MAN-7891), the workspace's Cerberus tab.
 
 ## Files
 | file | holds |
@@ -702,7 +722,7 @@ The Cerberus tab's Fleet view, live: its reads are `useCerberus()` and the pure 
 | `src/modules/cerberus/fleet/FleetRings.tsx` | `FleetRings({ items, nodes, now, onOpenCell })`: the Rings layout; owns its box, its layout and its selection |
 | `src/modules/cerberus/fleet/RingMarks.tsx` | `RingDot`, `RingHub`, `RingsKey`: a node's dot, center's round, the key |
 | `src/modules/cerberus/fleet/RingsNodePanel.tsx` | `RingsNodePanel({ item, node, now, onClose, onOpenCell })`: the selected node beside the rings |
-| `src/modules/cerberus/fleet/NodeCard.tsx` | `NodeCard({ item, node, open, face, index, narrow?, now, onToggle, onOpenCell })`: one node, `face` `grid` or `list`; exports `NodeGlyph({ status, size })` and `Heartbeat({ node, name? })`, which `RingsNodePanel` reuses; on a co-located node it mounts `NodeProjects` after the services, and every warden line it draws as words ends with `sessionsTail` |
+| `src/modules/cerberus/fleet/NodeCard.tsx` | `NodeCard({ item, node, open, face, index, narrow?, now, onToggle, onOpenCell })`: one node, `face` `grid` or `list`; exports `NodeGlyph({ status, size })` and `Heartbeat({ node, name? })`, which `RingsNodePanel` reuses; on a co-located node it mounts `NodeProjects` after the services, and every warden line it draws as words ends with `sessionsTail`; a node with an update queued or running wears `UpdatingPill` ("Updating · Restarting the warden", `fleet/UpdatingPill.tsx`) before its warden line, on a list row and on an open grid card, and reads "Updating its warden" as its collapsed tile's line; while its warden restarts (`link === 'paused'`) its heartbeat dot stands neutral and its warden line says "Warden 0.4.2 · restarting": MAN-7934 |
 | `src/modules/cerberus/fleet/NodeProjects.tsx` | `NodeProjects({ node, link, projects, face })`: a co-located node's "Projects that run here", after its services, on its card and in the Rings panel — a tile per project (name over path, ✕ back to this server) and "Run a project here", the kit's portalled `ActionMenu` (a `Select`'s list is drawn in place, and the card's `overflow-hidden` cuts it to 11 of its 320 px), disabled while no list has been handed down (a section drawn outside a panel). A tile is named by the sidebar's `displayName` when the workspace lists the project, so the tile, the menu row and the toasts agree; the overview's name (the custom name, else the folder's) stands only for a project the sidebar does not list. While `link` is not `reporting`, a warn banner under the heading says messages in the node's projects are refused until its warden reports. The menu offers the workspace's projects (`useProjectChoices()`) that no node of the overview lists, as `{ projectId, name: displayName, path: fullPath }`; a pick and a ✕ press the provider's `setProjectNode`, and its answer draws the rest. `NodeCard` and `RingsNodePanel` mount it on a co-located node (`node.colocated`), after its services |
 | `src/modules/cerberus/fleet/ServiceRow.tsx` | `ServiceRow({ node, service, face, onOpenCell })`: name, pill, 30 minute cells |
 | `src/modules/cerberus/fleet/WhatHappenedCard.tsx` | `WhatHappenedCard({ activity, now })`: the kit's dense `Timeline` |
@@ -733,7 +753,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/fleet/Fleet
 | result `value` is null | `lookup.wasNoValue`, `mute.rawNoValue` | `lookup.was`, `mute.raw` |
 
 - `fleet.bar.needs_one` (`{{count}} needs you`) and `node.allPassing_one` (`Its service is passing`) are the singular forms; the other counts use `_other`.
-- The warden line is one whole key in each state: `node.heard`, `node.wardenRestarting` and `node.silent` each carry their own `Warden {{version}} · `; `node.waiting` and `node.hub` have no version. A restart is told from the checks: any `paused` check.
+- The warden line is one whole key in each state: `node.heard`, `node.wardenRestarting` and `node.silent` each carry their own `Warden {{version}} · `; `node.waiting` and `node.hub` have no version. A restart is told from the link: `link === 'paused'`.
 - An empty node is `node.emptyTitle`/`node.waitingTitle` over its message in Grid's `EmptyState`, and `node.emptyLead`/`node.waitingLead` (the same words with their full stop) leading the message in List's one sentence.
 
 ## Composition
@@ -855,7 +875,7 @@ The two dialogs are filled and live in their own right: both read the one overvi
 - `MuteDialog` draws nothing when `check` is `null`; its form is keyed `node/key`, so a dialog sent straight to another check starts over.
 - A dialog closes on Escape, the backdrop, the ✕, Cancel (Enroll: Done too). While Mute's write is out (`busy`) none of them closes it. Enroll never holds its way out: it closes at any moment, even with an ask out — a token the server already minted still works until it expires, it is just never shown.
 - `useReturnFocus()` returns focus to the opener.
-- `DialogFrame`: `size` `md` = 520 px (Mute), `lg` = 600 px (Enroll), never wider than the screen less 2 rem; the panel scrolls as a whole. `marker` sets `data-cerberus-dialog="mute" | "enroll"` on the panel: what a verify script finds it by.
+- `DialogFrame`: `size` `md` = 520 px (Mute), `lg` = 600 px (Enroll; the diagnosis plan's `PromoteDialog`, MAN-7932, the nearer of the two to the prototype's 580; and the updates plan's `UpdateWardensDialog`, MAN-7934), never wider than the screen less 2 rem; the panel scrolls as a whole. `marker` sets `data-cerberus-dialog="mute" | "enroll" | "promote" | "update"` on the panel: what a verify script finds it by.
 - `DialogFrame` draws the ✕ LAST in panel order, so first focus lands on the dialog's first field or chip, and Escape still closes from anywhere. It is `disabled` while `busy`.
 - `DialogFrame` `accent`: `{ words }` in the accent italic; `{ key }` in mono, upright, for a check with no label.
 
@@ -867,7 +887,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/hooks/useEn
 |---|---|
 | `FleetView.tsx` | `fleetItems`, `groups` (`filterGroups`), `shown` (`applyFilter`) memoised on the overview; state `layout`, `filter`, `query`, `toggled` (nodes opened or closed by hand, read for its own entries only: a node named `constructor` is a legal name), `limit`; a filter or a search sets `limit` to null; Expand all and Collapse all write an entry for every node of the page |
 | `NeedsYouCard.tsx` | `useCerberus().liftMute(id)` for Unmute; `hooks/useLeavingNeeds.ts` keeps a card that stopped needing you drawn 0.55 s at the place it held (`leaving: true`, `vv-toast-out`), keyed `<node>/<key>`, and drops it when the check needs you again; a place counts in the list as drawn, cards still leaving included; when a leaver expires, the leavers after it move up one slot; a new need that lands ahead of a leaver within the 0.55 s leaves it one slot off until it goes (an anchor-key design would remove that) |
-| `ServiceRow.tsx` | `onOpenCell` for the row (at now) and for a minute (`lookupAt: cell.to - 1_000`; the newest minute, now) |
+| `ServiceRow.tsx` | `onOpenCell` for the row (at now) and for a minute (`lookupAt: cell.at`; the newest minute, now) |
 | `WhatHappenedCard.tsx` | `toTimelineEvent(line, t, now)` per line, memoised; one state, `openKey` |
 | `FleetRings.tsx` | `size` (state set by a ResizeObserver on `boxRef`, built from the host window), `layout` (`ringsLayout(items, width, height)` at that size, memoised on the three), `selected` (state, `null` at first; let go when its node leaves `items`), `onSelect` (toggles; ✕ hands `null`) |
 
@@ -882,12 +902,12 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/hooks/useEn
 |---|---|
 | a Needs-you card's name | `{ node, service, check: check.id }`, now |
 | a service row's name and pill (one button) | the check that set the newest minute, else the check at the service's own word, else its first; now |
-| a minute cell, not the newest | that minute's `worst` check resolved the same way; `lookupAt: cell.to - 1_000` |
+| a minute cell, not the newest | that minute's `worst` check resolved the same way; `lookupAt: cell.at`, the moment its word was reached |
 | the newest minute | as above, now |
 
 - A service with no check opens nothing.
 - The 30 cells are a pointer's shortcut and take no tab stop (30 stops per service would bury the keyboard). The keyboard opens the sheet from the name and picks minutes in the sheet's own strip.
-- Trap: `cell.to - 1_000` is not always the cell's word. A minute's word is the worst over the whole minute: the last second answers a run's first minute; on a run's last minute it already reads the word that came after. Cure, not built: the read model hands each minute the moment its word was reached (`CerberusCell.at`, set in `windowStatus` and `buildServiceCells`), then `ServiceRow` and `CheckSheet` both pass `lookupAt: cell.at` in one change.
+- Why `cell.at` and not a fixed second: a minute's word is the worst over the whole minute, so its last second reads the word that came after a run's last minute and its first second misses a run's first. The read model hands each minute the moment its word was reached (`CerberusCell.at`, MAN-7809); `ServiceRow` and the sheet's strip both pass it as `lookupAt`.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/fleet/FleetGrid.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/fleet/FleetList.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/fleet/FleetRings.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/fleet/FleetView.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/fleet/NodeCard.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/fleet/ServiceRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/fleet/WhatHappenedCard.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/hooks/useLeavingNeeds.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts
 
@@ -898,7 +918,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/fleet/Fleet
 - The ring's card (`flex-[3_1_300px]`, at most 720 px) and the side column (`flex-[2_1_300px]`) stand side by side from a 616 px row, which the fleet column always is beside What happened (its floor is 620 px); under that they stack. why: the prototype's 440 + 280 needed 736 px, and on the app's 1004–1159 px panes (1037 on a 1366 screen, 1111 on a 1440) the panel fell some 700 px below the ring, out of view. 300 px is what a service row's 30 minutes need, padding included.
 - ✕ hands focus back to the selected node's dot (the hub when that node is not drawn) before letting it go. why: the dot stays mounted and only its `aria-pressed` flips, so focus never falls to `<body>` with the panel's button.
 - Positions are the layout's pixels drawn as shares of the box it was laid out in (`center` × 2). A fixed fake fills any width, and a resize being measured stays in place. Dots and spokes keep their px.
-- Marks (`RingMarks.tsx`) read `nodeMark` and `STATUS_TABLE`. `RingDot` paints by the word's cell shape; `soft` (passing) takes the tone's edge too. why: a lone dot needs one to be seen; a strip's minute does not. `RingHub` is center: glyph, name, "Cerberus", a fifth of the box (66–92 px). `surface` (muted) takes the neutral dot's solid edge on the raised grey. why: the strip's `border-input` edge measured 1.41:1 on the light card, and a lone dot needs 3:1 to be found. A node with no mark (nothing assigned, as every newly enrolled node starts), and an unmarked hub, is a hollow round in the neutral dot's solid edge under `data-tone="neutral"`: kept dashed it would read as no result. `RingsKey`'s swatches are `RingDot`s; its "Fix running or updating" row is a `SLOT:` in `KEY`, second after Needs you, as the prototype orders it.
+- Marks (`RingMarks.tsx`) read `nodeMark` and `STATUS_TABLE`. `RingDot` paints by the word's cell shape; `soft` (passing) takes the tone's edge too. why: a lone dot needs one to be seen; a strip's minute does not. `RingHub` is center: glyph, name, "Cerberus", a fifth of the box (66–92 px). `surface` (muted) takes the neutral dot's solid edge on the raised grey. why: the strip's `border-input` edge measured 1.41:1 on the light card, and a lone dot needs 3:1 to be found. A node with no mark (nothing assigned, as every newly enrolled node starts), and an unmarked hub, is a hollow round in the neutral dot's solid edge under `data-tone="neutral"`: kept dashed it would read as no result. `RingsKey`'s swatches are `RingDot`s; its "Fix running or updating" row is the `fixing` row of `KEY`, second after Needs you, as the prototype orders it.
 - A label (glyph + name) stands on the side away from the hub: above a node on a ring's upper half, below one on its lower half. It is capped at `max-w-[30cqi]` (the box is an inline-size container) and cut with an ellipsis, and in the box's outer left or right fifth it runs inward from its dot. why: names have no length cap, and at a phone's 320 px box long ones ran past the card; the dot's title, its name and the panel carry a name whole.
 - Spokes: dashed `border-tone-dot` under `data-tone="neutral"` for no result (why: `border-input` measured 1.41:1 on the light card, and the line that says no result must read on its own); amber `border-t-2` under `data-tone="warn"` for needs you; plain `border-input` otherwise; a selected plain spoke turns `border-primary`. why 2 px: Chromium floors a border under 2 px to whole device pixels, so the prototype's 1.5 px drew as 1 px on a 1× screen.
 - Beats: `motion-safe:animate-cerberus-travel`, base `opacity-0`, phases `-(index % 7) × 0.45 s`. Every live spoke beats while every node on the rings is `labelled`; past that, only amber spokes beat. why: sixty beats are texture, and a silent node is told by its dashed spoke and hollow dot.
@@ -911,7 +931,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/fleet/Fleet
 - `list` face: a row (chevron, glyph, name and description, squares, line, warden line) opening a canvas band; an empty node is one sentence at the band's indent. `narrow` moves the warden line from the row's end into the open band.
 - A list row does not repeat the warden line when it equals the node's line ("Waiting for the first heartbeat").
 - The tile's edge is `markLook(mark).cell`: `solid` 1.5 px tone edge, `outline` 1 px, `dashed` 1.5 px dashed, the rest the plain border. A node with no mark (`empty`, `enrolling`) draws a dashed edge and a dashed round glyph.
-- `fixing` is fed (a fix running on one of its services) and draws the info ● — its tile edged 1.5 px in the info dot, the glyph pulsing; `enrolling` is fed by nothing yet and draws as a node with no mark.
+- `fixing` is fed (a fix running on one of its services) and draws the info ● — its tile edged 1.5 px in the info dot, the glyph pulsing. `updating` (an update queued or running) draws the same look through `nodeMark` and names itself "Updating its warden" (`StatusGlyph`'s `label`); `paused` keeps the dashed neutral of its checks. `enrolling` is fed by nothing yet and draws as a node with no mark.
 - `FleetGrid` columns: `repeat(auto-fill,minmax(150px,1fr))`; never packed `dense`. why: dense pulled later tiles above an open card, broke worst-first order and made keyboard order differ from the eye's.
 - Entrance: `motion-safe:animate-shape-rise`, delay inline `min(index, 24) * 18` ms (INV-7053).
 - Heartbeat dot: positive and breathing while `link === 'reporting'` and not restarting, else still neutral; named (`role="img"`) only on a collapsed tile.
@@ -983,7 +1003,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/history/Eve
 - Re-mounting callers: `CerberusPanel` (keyed by Try again's finished reads, MAN-7891); the feed's placeholder, History's index read and the sheet's Fix output (each puts its placeholder back while the read is out). Silent on a second failure: the check sheet's and the look-up's retry of a check's read keep it mounted.
 - Try again: `Button variant="tonal" size="sm"`, `max-md:h-11` (44 px under `md`).
 - First line `errors.unreachable` (`font-medium`); optional `detail` second line sets itself apart by weight alone. No `opacity-*` on it. why: `opacity-80` measured 3.24:1 on the light banner, under AA.
-- Consumers: `CerberusPanel` (its first read of the fleet failed; the fleet it holds is stale, with `detail` `cerberus.errors.lastAnswer`), `LookupCard`, `EventsCard`, `sheet/CheckSheet.tsx`, and `sheet/FixOutput.tsx` (its run's own read failed; the sheet's banner speaks only for the check's read): one spelling of the state for the tab.
+- Consumers: `CerberusPanel` (its first read of the fleet failed; the fleet it holds is stale, with `detail` `cerberus.errors.lastAnswer`), `LookupCard`, `EventsCard`, `sheet/CheckSheet.tsx`, `sheet/FixOutput.tsx` (its run's own read failed; the sheet's banner speaks only for the check's read), and `sheet/DiagnosisPanel.tsx` (its diagnosis's own read failed, MAN-7932): one spelling of the state for the tab.
 
 ## Rules
 - A time printed without a date means today. Both cards judge "today" against the view's one `now`.
@@ -1004,7 +1024,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/history/Eve
 
 ## MAN-7891 — Cerberus — the tab root and header: `CerberusPanel`, `CerberusHeader`
 
-The Cerberus tab's root and header, live: the root reads the one overview through `useCerberus()`, holds the tab's own state, and hosts the sheet and the two dialogs; the workspace mounts it as the Cerberus tab. Fleet view: MAN-7880. History view: MAN-7877. Sheet: MAN-7878. Dialogs: MAN-7884. Client reader: MAN-7871. Words: MAN-7870. Banner: MAN-7890. Design: `design/cerberus/Cerberus Tab.dc.html`.
+The Cerberus tab's root and header, live: the root reads the one overview through `useCerberus()`, holds the tab's own state, and hosts the sheet and its four dialogs (Mute, Promote, Enroll, Update wardens); the workspace mounts it as the Cerberus tab. Fleet view: MAN-7880. History view: MAN-7877. Sheet: MAN-7878. Dialogs: MAN-7884. Client reader: MAN-7871. Words: MAN-7870. Banner: MAN-7890. Design: `design/cerberus/Cerberus Tab.dc.html`.
 
 ## Files
 | file | holds |
@@ -1045,7 +1065,10 @@ The Cerberus tab's root and header, live: the root reads the one overview throug
 | `view` | state, `'fleet'`: the view the strip shows |
 | `sheet` | state, `CerberusSheetTarget \| null`: set by Fleet's `onOpenCell`, handed to `CheckSheet` field by field |
 | `muting` | state, `CerberusCheckView \| null`: set by `onMute` from a Needs-you card or the sheet; the sheet stays open under the dialog |
+| `promoting` | state, `{ diagnosis, check } \| null`: set by the sheet's `onPromote` (Add to catalog on a diagnosis) for `PromoteDialog`; the sheet stays open under the dialog. A promotion that lands (`onPromoted`) clears it, closes the sheet and sets `view` to `'catalog'`, where the new entry stands first with its "New" badge and wash |
 | `enrolling` | state, `false`: the header's Enroll a node opens the dialog |
+| `updatingWardens` | state, `false`: the header's update button opens the Update wardens dialog; closing it leaves a running batch running |
+| `wardens` | `useCerberus()`: handed to the header, which draws its update button from it |
 | `connected` (header) | `useWebSocket().isConnected` |
 | `now` (header) | `useClock()`: every second |
 | passing count as drawn (header) | `useCountTo(counts.passing)`: the number itself on mount; on a change it counts from the number last drawn over 1.4 s, ease-out `1 − (1 − k)³`, rounded, one step a frame on the host window; with motion reduced it is the target at once |
@@ -1066,7 +1089,7 @@ The tab's place on the house row, its count pill, its pane and both palettes: MA
 - The count in motion is `aria-hidden`; an `sr-only` span carries `counts.passing`.
 - Eyebrow, summary and hint use `text-muted-foreground`. why: `ink-faint` measures ~3.1:1 on the light canvas, under AA.
 - Pill: `live = connected && !stale`. Live: breathing positive dot, `cerberus.header.live`, `hms(now)`. Otherwise: still neutral dot and `cerberus.header.reconnecting`, no time. Only the mode word is `role="status"`; the clock never is.
-- The button row's slot (MAN-7867). The headline reads "One fix *running*" (`fix.headline` + `headlineAccent`, the accent in the info tone) when `counts.needsYou` is 1 and that need's run is going (`result` null).
+- The button row, before Enroll a node (MAN-7934): Enroll's own Button (outline, `sm`), opening the Update wardens dialog. Its words: `updates.button.updating` ("Updating wardens · 2 of 3": `batchPlace(wardens.running)`, the first update not ended, counting from 1, of the batch's size) while a batch runs, else `updates.button.update` with `latest.version` while a node can take it (`canTake`: `behind` and a version — one that never said hello is on no link to offer the release on, so the header never offers what the dialog would answer "Update 0 nodes"), else `updates.button.upToDate`. Drawn only once `GET /wardens` has answered with a release: with none there is nothing to offer. The headline reads "One fix *running*" (`fix.headline` + `headlineAccent`, the accent in the info tone) when `counts.needsYou` is 1 and that need's run is going (`result` null).
 - Buttons `h-8 max-md:h-11`.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/CerberusHeader.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/CerberusPanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/hooks/useClock.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/hooks/useCountTo.ts
@@ -1147,7 +1170,7 @@ The fixes screen's four pieces, drawn from the provider and the run reads, and m
 - `NeedFix`: its need; `useCerberus()` for `starting` and `runEntry`; `useRunLastLine(run)`. The strip opens the sheet with `run: run.id`. A press that had focus hands it to the strip when the strip takes the button's place (`aria-disabled`, never `disabled`, kept the focus until then).
 - `FixOutput`: `useRunOutput(runId)`; `useClock` ticks each second while the run goes, hourly otherwise. Each line is an `OutputLine`, memoised on its line, so a line added draws only itself; a run's closing sentence (`note`) waits until `replaying` is over, so it follows the lines.
 - `CheckFixes`: `useCerberus()` for `starting` and `runEntry`.
-- `CerberusPanel` mounts `CatalogView`; `CheckSheet` mounts `FixOutput` (keyed by run) and `CheckFixes`; `NeedsYouCard` mounts `NeedFix` and carries the quiet sentence; `CerberusHeader` says "One fix running".
+- `CerberusPanel` mounts `CatalogView`; `CheckSheet` mounts `FixOutput` (keyed by run) and `CheckFixes`, and the diagnosis plan's `DiagnosisPanel` mounts a second `FixOutput` for its proposal's one-off run, under the proposal (MAN-7932); `NeedsYouCard` mounts `NeedFix` and carries the quiet sentence; `CerberusHeader` says "One fix running".
 
 ## `useRunOutput(runId)`
 - Reads `GET /api/cerberus/runs/:id` (`api.cerberus.run`) once subscribed, and again when a `cerberus_changed` hint names the run's check (`<node>/<check key>`, known after the first read) and on `websocket_reconnected`. Only the newest read's answer is applied; `failed` while a read has not answered, cleared by one that has.
@@ -1155,7 +1178,7 @@ The fixes screen's four pieces, drawn from the provider and the run reads, and m
 - A run that has ended when it is first read replays: each line appears at its own `t`, the whole replay capped at 10 s (the pace is squeezed by `10 / last t`). One timer at a time reveals every line whose moment has passed and waits for the next, no sooner than 40 ms, so a 5,000-line run is a few hundred renders and ends at the cap; `replaying` is true until the last line is shown. A run still going shows what it has at once and takes the rest as frames; a later read never replays. The timer ends with the card.
 
 ## `useRunLastLine(run)`
-- The newest line of a frame for this run while the run has no result, kept only against the overview's `lastLine` it arrived after: a read of the overview that moved past it wins. An ended run shows the overview's `lastLine`. One case it cannot tell: a read that left before a frame and lands after it is older and looks like one that moved past it (the overview names its line by text, not number), so the older line stands until the next frame or read; a newest line number on `CerberusRunView` would settle it.
+- The newest line of a frame for this run while the run has no result and its number is past `run.lastN` (the overview's own newest line number); from the moment a read has caught up with it, the overview's `lastLine`. Lines are compared by number, never text, so a read that left before a frame and lands after it cannot put its older line back. An ended run shows the overview's `lastLine`. An overview with no `lastN` (an older API) reads as no line yet, so the newest frame's line stands until the run ends. why: `lastN` is `CerberusRunView`'s newest line number, from the same statement as `lastLine`.
 
 ## `CatalogView`
 - Order: `createdAt` descending, then name. Count `catalog.count_*` (`count`, `auto`).
@@ -1184,7 +1207,7 @@ The fixes screen's four pieces, drawn from the provider and the run reads, and m
 - The entry whose run is going reads "Running…" (`aria-disabled`); every other entry is `disabled` while a run on the check is going. No entries: dashed `fix.sheet.none`.
 
 ## Rules
-- A pending or running Run button is `aria-disabled`, never `disabled`. why: `disabled` blurs the button under the keyboard user who pressed it. `disabled` only when another run holds the check.
+- A pending or running Run button is the kit `Button`'s `busy` (`aria-disabled`, never `disabled`; the kit refuses the press itself — `Button.tsx`). why: `disabled` blurs the button under the keyboard user who pressed it. `disabled` only when another run holds the check.
 - No `Trans` in these pieces: a label, name or command reaches the screen as text through `t()`. why: `Trans` escapes `<` in a check label ("p95 < 300 ms") to protect its own tags.
 - Glyphs live in code (`RUN_LOOK`, MAN-7873), not in the words (MAN-7870).
 - Feed words sit under `cerberus.activity` (`fix`, `catalog`), not under `cerberus.fix`: each kind of event keeps its words there (MAN-7872).
@@ -1222,3 +1245,84 @@ A project's Claude chats run on this server or on one co-located node's warden. 
 - A landed write re-reads the overview, and the server hints the node left and the node joined (`cerberus_changed`), so a second window re-reads too (MAN-7871).
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/projects/projects.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/projects/services/project-node.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/fleet/NodeProjects.tsx
+
+## MAN-7932 — Cerberus — the diagnosis screen, live: `DiagnosisPanel`, `PromoteDialog`
+
+The diagnosis plan's screen, live on the tab: `DiagnosisPanel` in the check sheet, `PromoteDialog` over it, the Diagnose buttons of the Needs-you card and the sheet, and the reads and writes behind them. Words: MAN-7870 (`cerberus.diagnosis.*`, `cerberus.promote.*`, `cerberus.activity.diagnosis.*`). Wire shapes: `CerberusDiagnosisView`, `CerberusDiagnosisStep`, `CerberusDiagStepEvent` in `src/shared/cerberus-types.ts`; `CerberusPromoteInput` in `src/shared/types.ts`. The buttons, `useDiagnosis` and the provider's three writes: MAN-7945. Routes: MAN-7918. Row map: MAN-7868. Design: `design/cerberus/Cerberus Tab.dc.html` :447-487 (the panel), :560-594 (Promote), :85 (the card's buttons).
+
+## `sheet/DiagnosisPanel.tsx` — `DiagnosisPanel({ diagnosisId, held, onPromote })`
+- Frame and eyebrows are Fix output's (`FRAME`, `EYEBROW`), `vv-pop` on arrival. Head: `diagnosis.eyebrow`, then the pill in a `role="status"`, keyed by `status`: `running` → `diagnosis.reading`, info `Badge`, `vv-pulse` 1.6 s; `done` → `diagnosis.ready` with `hms(endedAt)`, neutral, `cerberus-check` once; `failed` → `RUN_LOOK.failed` (▲, warn) and `diagnosis.failed`. why neutral for Ready: a diagnosis is a document, not a health signal; a green pill would say the check is fine while it is still red.
+- Body: `diagnosis.scope` with `node`; its "logs, status and Cerberus history" is false for a history-only diagnosis (the node's warden not connected) and `CerberusDiagnosisView` has no field to branch on, so the sentence is drawn as it stands until the contract carries one; the steps in a `role="log"` labelled by the eyebrow, each a memoised `StepRow` rising in on `cerberus-line`: ● in the info ink breathing (`vv-pulse` 1.2 s) on the last step while `running`, ✓ (muted) otherwise, the text, `hms(startedAt + t × 1000)`.
+- The steps fold once the diagnosis is over: a `Collapsible`, open while `running`, then on the person's press of its one line, `diagnosis.steps_*` ("7 steps · 17:53:14–17:53:45", a `CollapsibleTrigger` with the kit's `FoldChevron`, 44 px under `md`); the list sits in `CardFoldBody`, so a folded trail leaves the tab order and the accessibility tree. why: a finished diagnosis's answer is the signal and its steps the detail; unfolded, 14 steps put the summary below a phone's fold.
+- `done`: under a rule (`shape-rise`), the summary in the serif display face (20 px, `text-wrap: pretty`), then each piece of evidence after an `aria-hidden` ↳ with a hanging indent. `failed`: `error` in the warn ink under a rule; no summary, no proposal, no "No fix proposed.".
+- The Proposed fix box (`done` with a `proposal`; canvas ground, `vv-pop` 180 ms after the summary): eyebrow, name, `$ cmd` (`fix.command`); Run it once (primary) while `run` is null and the one-off is live, `disabled` while `held` (another run holds the check: center takes one at a time, and `CheckFixes` holds its other entries the same way); Add to catalog (tonal) while `promotedTo` is null; the ran line (`RanLine`): `proposal.running` while the run goes, `proposal.ranOnce` with `hms(startedAt ?? requestedAt)` and `proposal.result.*` once it started and ended, in its result's ink unless it succeeded, and `proposal.refused` with `hms(endedAt ?? requestedAt)` for a refusal, which never started; never run with its one-off gone, `proposal.expired` (`hms(oneOffExpiresAt)`) or, for one never published (`oneOffExpiresAt` null), `proposal.unpublished`, muted, both pointing at Diagnose again; ✓ and `proposal.promotedOff` / `promotedOn` in the positive ink, or `proposal.promotedRetired` with the id, muted and with no ✓, once the entry is retired; then the note for the buttons on screen: `proposal.note` with both, `proposal.noteAdd` with Add to catalog alone, none with Run it once alone. `done` with no proposal: `proposal.none`.
+- The one-off's run draws as `FixOutput`, keyed by its id, straight under the box. why: the hand that pressed Run it once is at the box, and `proposal.running` says "output below". The sheet's own Fix output leaves that run out (`CheckSheet`'s `outputRunId`, MAN-7907), so it is never drawn twice.
+- The one-off is live while `useStillAhead(oneOffExpiresAt)`: one `hostWindow.setTimeout` at the moment it expires, seeded at mount so a long-expired one-off never flashes its button. Nothing polls.
+- Read out: `ReadingDiagnosis` (eyebrow written, shape shimmering, `aria-busy`). Read failed: `UnreadDiagnosis` (eyebrow, `UnreachableBanner` with Try again).
+- Reads and writes: `useDiagnosis(diagnosisId)` (below) gives the diagnosis with its steps, `failed` and `refresh` (Try again). `promoted` is `promotedTo` resolved against the provider's catalog: `{ retired: false, name, auto }` with the entry's current name and auto, or `{ retired: true, name }` with the id itself once the catalog no longer holds it; `null` while `promotedTo` is null and while the catalog has not been read, so "not read yet" never says retired. Run it once is `runProposal(diagnosis.id)`; `starting` holds the button `aria-disabled`, reading `catalog.running`, through the press AND the panel's own re-read after it (`await refresh()`), so the button never comes back before the run shows under the box and takes a second press that center would refuse. A refusal is the provider's toast. Add to catalog hands the diagnosis to the `onPromote` prop.
+
+## `modals/PromoteDialog.tsx` — `PromoteDialog({ open, diagnosis, check, onClose, onPromoted })`
+- `DialogFrame` `size="lg"` (600, the nearer of the frame's two widths to the prototype's 580), `marker="promote"`, title `promote.title` with the accent `promote.accent`. Draws nothing unless open with a diagnosis that has a proposal and a check; keyed by the diagnosis.
+- Top to bottom: `promote.from` (`hms(startedAt)`, counted by the evidence); Name (`Input`, starting as `proposal.name`, `maxLength` 100 = the server's `MAX_NAME_LENGTH`, amber `invalid` while blank, when the confirm is `aria-disabled`); When (a read-only `Field`: the check's label, or its key in mono, with `catalog.trigger.<when>` over `catalog.raw`, as the Catalog writes the entry), `when` being `warn` for a warn check and `failing` otherwise; Runs (`$ general` in mono on `bg-secondary`; helper `promote.generalized` when `general !== cmd`, else `promote.exact`); the `Switch` with `promote.auto` and `promote.autoOff` / `promote.autoOn` (context `warn` says "nears its limit"); Limit chips 1, 2 and 4 runs an hour (`promote.perHour`, 2 chosen at first, as the prototype), helper `promote.limitHelper`; Cancel (outline) and `promote.confirm` (submit).
+- `promote.generalized`'s `used` and `saved` are `changedSpans(cmd, general)`: the words between the two commands' common start and common end (`--since 17:50` against `--since 15m` is `17:50` and `15m`; a side left with no span stands as its whole command). `saved` reads as `promote.last` with `time.minutes` or `time.hours` when it is a relative window (`15m`, `"15 min ago"`, `2h`), as written otherwise.
+- Nothing is optimistic, as in Mute: `busy` holds every control and every way out. Confirm is `promote(diagnosis.id, { name: name.trim(), auto, limit: { runs, per: 3600 } })`, which raises the toast `promote.toast.*` when it lands; then `onPromoted()` and the root closes the dialog and the sheet and shows the Catalog, where the new entry stands first with its "New" badge and wash (`onClose` is only for the ways out that write nothing). A refusal raises the provider's toast and leaves the dialog open, controls free, with what was typed.
+
+## Where it mounts
+- `CheckSheet` (MAN-7878): `DiagnosisPanel` between Fix output and `CheckFixes`, from `detail.diagnosis`, keyed by its id; `held` is a going run that is not this diagnosis's own one-off; its `onPromote` goes up to the root as `onMute` does. `CerberusPanel` (MAN-7891) hosts the one `PromoteDialog`, between Mute and Enroll, in front of the sheet.
+- `utils/activityEvents.ts` (MAN-7872): the `diagnosis` kind of What happened.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/modals/PromoteDialog.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/sheet/DiagnosisPanel.tsx
+
+## MAN-7934 — Cerberus — the updates screen, live: the header's button, `UpdateWardensDialog`, a node's pill and restart, the warden lines of What happened
+
+The updates screen, live on the tab: the header's Update wardens button (MAN-7891), the dialog it opens, the Updating pill and the restarting warden line on a node's card (`UpdatingPill`, `nodeLine`, `wardenLine`: MAN-7880), the `updating` and `paused` nodes under Updating (`fleetModel`: MAN-7872), and the `warden` kind of What happened (`activityEvents` `wardenEvent`: MAN-7872). Words: MAN-7870 (`cerberus.updates.*`; `cerberus.node.updating`, `cerberus.node.updatingWarden`; `cerberus.activity.warden.*`). Wire shapes: `CerberusWardens`, `CerberusUpdateView`, `CerberusUpdateStep` in `src/shared/cerberus-types.ts`; `CerberusStartedBatch` in `src/shared/types.ts`. Row map: MAN-7868. Design: `design/cerberus/Cerberus Tab.dc.html` :644-690 (the dialog), :48 (its header button).
+
+## Where the screen reads
+- `wardens` is the provider's (`useWardensRead`, MAN-7871): `GET /wardens` beside every overview read — the 30 s clock, a `cerberus_changed` frame, a write's re-read. A release built while the tab is open reaches the button within the clock's 30 s; a batch's every step does at once: an update's frames carry `updates: true` and are read without the gap, so the steps of an update that is over in 0.4 s are each on screen as they land.
+- `useUpdateBatch(batch, seed)` reads `GET /updates/:batch` 2 s after each answer for as long as the dialog stands and some update of it has not ended: one read at a time, a failed one keeps the last answer. `seed` is what the dialog knew when it began following (the press's answer, or `wardens.running`), so it never flashes back to choosing before the first read. The hook answers whichever of its poll and its `seed` knows more, per update (`freshestBatch`: an ended update outweighs any steps, otherwise the steps it has — an update only moves forward), and the dialog keeps `seed` current with what `wardens.running` pushes on every update frame, so a step shows as it lands and not at the next 2 s read.
+- `startUpdate(nodes)` is the provider's write (MAN-7871): `{ batch, updates }` on a landed start, `null` on a refusal after its toast.
+
+## `modals/UpdateWardensDialog.tsx` — `UpdateWardensDialog({ open, onClose })`
+- `DialogFrame` `size="lg"` (600, the prototype's own), `marker="update"`, title `updates.title` with the accent `updates.titleAccent`. Draws nothing unless open, and nothing while `latest` is null.
+- The note: `updates.note` (`latest.version`, and `latest.note` with its own trailing full stop dropped, since the sentence brings one), then `updates.kept` counted by the versions kept for rollback: the ticked nodes' while choosing, the batch's `from`s once it runs, distinct and oldest first (numeric collation), joined by `updates.versions` when there are several; left out when there are none. A node the offer found already on the release (`from === to`) swapped nothing and keeps nothing: its version is left out, here and in What happened's "updated to <v>" line.
+- A row per `wardens.nodes` entry, in the read's order. While choosing, a node that can take the update (`canTake`) is a `Checkbox` (`src/shared/ui/Checkbox.tsx`, painted by `.vv-checkbox*` in `verve/panels.css`: MAN-740) labelled `updates.node`; its `className="py-3"` makes the whole 44 px row the press target, and it is disabled while Update N nodes is out. Every other row is the same words plain (the bare id when it has no version) with `rowState` on its right, 12.5 px medium. In the batch: `updates.queued` (muted) until its first step, then that step's text behind the info ● breathing (`vv-pulse` 1.2 s), then ✓ `updates.updated` (positive — the handshake, the new warden's hello that ends the update, is not a step of the wire, and this mark is how the dialog shows it), ✕ `updates.rolledBack` with `from` (warn), or ▲ before the last step's text for `failed` (warn). Outside it: `updates.current` with the node's own version when it is not behind, `node.waiting` with no version, nothing when it is behind. A state is keyed by its words and fades in (`vv-fade` .25 s).
+- Under a row in the batch, its steps: a `role="log"` labelled by the row's words, mono 11.5 px on the canvas ground, `hms(at)` in the muted ink then the text, the `failed` step in the warn ink, each rising in on `cerberus-line`, keyed by `at` and `step`. why the canvas: the times' muted ink measured 4.46:1 on the prototype's surface2 in light, under AA; 4.73:1 on the canvas, 8.07:1 in dark.
+- The footer: a `role="status"` region mounted from the first frame, then the buttons. Choosing: the region empty, Cancel (outline) and `updates.start` counted by the ticked nodes that can take it, `aria-disabled` at none and while out, `aria-busy` while out, the press guarded. Running (any update's `result` null): `updates.running` (muted) and Close (outline). Ended: ✓ `updates.done` (positive) when every update ended `updated`, else ▲ `updates.missed` counted by those that did not (warn), both naming the release the batch took its nodes to (the batch's own `to`, never `latest`, which a newer build may have moved), and `updates.finish` (primary). why the second ending: an ending is never said greener than it was. Every button is 44 px below md. The footer row is pinned (`sticky bottom-0`, `z-10`) on the panel's own ground (`bg-card`) under a hairline (`border-t border-border`), `pt-3 pb-4` with `-mb-4` laying its bottom padding over the frame's. why: the panel scrolls as a whole, and the first focus — Close or Done while a batch runs or has ended — sat below the fold on a phone, so a tall batch opened scrolled to its foot with the title, the ✕ and the note out of view; pinned, it opens at its top. The list gives its inputs `scroll-mb-28`, so a Checkbox the keyboard reaches is scrolled in clear of the pinned footer.
+- Nothing is optimistic: `starting` holds the Checkboxes, Cancel and the ✕, and a row moves only when the batch's read does. Closing never stops a batch.
+- State: `followed` (`CerberusStartedBatch | null`: the batch the dialog follows with its updates as they stood; set by a landed start, or adopted from `wardens.running` the moment it holds one — as the dialog opens, or after a refused start (409 `CERBERUS_UPDATE_RUNNING`) when the re-read brings the batch that is going; replaced by `freshestBatch(followed.updates, wardens.running)` whenever the pushed batch knows more; kept after the wardens read drops an ended batch, so the ending stays up until Done), `selected` (the ticked nodes, starting as every node that can take the update; a Checkbox's press adds or takes away), `starting` (Update N nodes out). The batch the rows draw is `useUpdateBatch(followed?.batch ?? null, followed?.updates ?? [])`; null while choosing.
+- A reopened dialog over a running batch is not choosing: it adopts the batch and follows it. An ended batch is gone from `wardens.running`, so a dialog opened after it ended is choosing again.
+
+## `fleet/UpdatingPill.tsx` — `UpdatingPill({ updating })`
+- `<Badge as="span" tone="info">` with `max-w-full whitespace-nowrap` and `vv-pulse` 1.6 s (motion-safe), "Updating · " + `updating.text` (`node.updating`) in a `truncate` span: the warden's own sentence for its latest step, or center's while the update has no step yet ("Offering warden 0.8.0", "Waiting its turn"). On a list row and an open grid card, before the warden line.
+
+## `utils/wardenUpdates.ts`
+- `canTake(node)`: `behind && version !== null`; read by the header and the dialog so neither offers what the other would refuse.
+- `freshestBatch(held, incoming)`: two reads of one batch laid together, per update (in `held`'s order) whichever knows more — an ended update outweighs any steps, otherwise the steps it has; read by `useUpdateBatch` (its poll against its seed) and the dialog (its `followed` against `wardens.running`).
+- `batchPlace(running)`: `{ index, of }` for the header's "i of n": the first update with no `result`, counting from 1, of the batch's length; the last place when all ended but the read still holds the batch; `null` with no batch.
+
+## Prove it
+- `node .verify/cerberus-updates-whole-live.mjs --evidence <dir>` runs the whole update on the live tab (:5183): two real tabs, one holding the dialog and one the node's open card, the press, the steps, the pill, the paused cell in the sheet's strip and What happened, with 1440×900 shots and every change of what a reader saw stamped from the batch's start at center (its `startedAt`: one clock for every figure). Before the press it throws unless the dialog offers exactly one Checkbox, `<node> · warden <from>`, and "Update 1 node" (the dialog ticks every node that can take the update, so another node behind would be sent too). It reports the independent `/ws` client's socket as "opened +N ms … closed at +N ms" or "never opened". `--after <batch>` runs only what follows the update (the REST reads, the sheet, What happened), read-only, for a batch that already ran; the sheet's strip holds the last 60 minutes, so about an hour after the update the restart's minute has left it and that leg says so instead of checking it.
+- A restart is on screen for about 0.35 s, so each page's reads are held (`.verify/lib/update-run-kit.mjs` `holdAfter`) once it has drawn the restart, the shots are taken, and the reads are let go: nothing is altered, only fetched late.
+- `SUNSET_SLOT=8 bash .verify/cerberus-updates-whole-scratch.sh <dir>` is its rehearsal: the same script against a scratch center, a scratch warden named `eis1` under its launcher and a scratch Vite (its own dependency cache, `.verify/lib/vite-scratch.config.mjs`; held open by a pipe on stdin, since Vite ends itself when its stdin does).
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/fleet/UpdatingPill.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/hooks/useUpdateBatch.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/hooks/useWardensRead.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/modals/UpdateWardensDialog.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/utils/wardenUpdates.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/cerberus-updates-whole-live.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/cerberus-updates-whole-scratch.sh, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/update-run-kit.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/vite-scratch.config.mjs
+
+## MAN-7945 — Cerberus — the diagnosis screen, live: `DiagnoseButton`, `useDiagnosis`, `useDiagnosisVerbs`
+
+The diagnosis screen's buttons and reads, live: `DiagnoseButton` (the Needs-you card's and the sheet's Diagnose), `useDiagnosis` (one diagnosis and its steps, kept live) and `useDiagnosisVerbs` (the provider's three writes). The panel and the dialog they feed: MAN-7932. Words: MAN-7870. Routes: MAN-7918. The provider's verbs: MAN-7917. Row map: MAN-7868.
+
+## `DiagnoseButton.tsx` — `DiagnoseButton({ node, checkKey, label, disabled?, onStarted? })`
+- An outline `sm` `Button` that asks for a diagnosis through the provider's `diagnose(node, key)`, which sends no model. `pressing` (state) holds it `busy` and reading `diagnosis.diagnosing` for the press, `aria-disabled` and never `disabled`, so the hand that pressed it keeps its focus. The `disabled` prop is the card's alone: set while the card is leaving (its check no longer needs you), the button drawn as it was and taking no press. A landed press calls `onStarted` and stays busy until what it returns settles; a refusal (409 `CERBERUS_DIAG_RUNNING`) is the provider's toast. why: center's hint for the check is coalesced to the trailing edge of its one-second window, so for up to a second after the start the sheet's own read held no diagnosis, and a button that came back at center's answer was an enabled "Diagnose" over a diagnosis already running: a second press was a refused POST and a warn toast.
+- On the Needs-you card (`NeedsYouCard`): drawn while `need.diagnosis` is null, "Diagnose" (`diagnosis.diagnose`), and `onStarted` opens the sheet on the check, where the steps arrive. Once the need has a diagnosis (`need.diagnosis`: the check's newest since it went bad) the button is a plain outline `Button` that opens the same sheet: "Diagnosing…" (`diagnosis.diagnosing`) while it runs, "See diagnosis" (`diagnosis.see`) once it ended, whatever its outcome.
+- In the sheet's action row (`SelectedCheck`, before Mute): "Diagnose" while the check has no diagnosis, "Diagnose again" (`diagnosis.again`) once it has one. Not drawn while the diagnosis runs (center takes one at a time on a check), and not until the check's own read has answered (`diagnosisRead`), since until then nobody knows which word is true. Its `onStarted` is the sheet's own check read (`useCheckDetail`'s `refresh`, through `SelectedCheck`'s `onDiagnosisStarted`), so the new diagnosis stands before the button lets go: the button then goes (the diagnosis runs) and its panel, keyed by its id, replaces the old.
+- `CheckFixes`' empty note gains `diagnosis.hint` after its own sentence, in the one dashed box.
+
+## `hooks/useDiagnosis.ts` — `useDiagnosis(diagnosisId)` → `{ diagnosis, failed, refresh }`
+- The diagnosis as `GET /api/cerberus/diagnoses/:id` answers it, its steps merged by `n` from two roads: the read brings every step the diagnosis holds, and each `cerberus_diag_step` frame for this id (a picture, not a hint: no re-read) brings the one just stored; a step both carry is kept once, and a frame for another diagnosis is ignored. Frames that land before the first read answers are kept and merged into it.
+- Everything else (status, summary, evidence, proposal, `run`, `promotedTo`) is only ever what a read said. A read is made again when a `cerberus_changed` hint names the diagnosis's check (`<node>/<check key>`: the diagnosis ended, its one-off ran, it was promoted) and on `websocket_reconnected`. Only the newest read's answer is applied; a read that did not answer sets `failed` until a read does, and keeps the last good answer; the panel draws `failed` only while there is no answer. An answer is a diagnosis when `id`, `node`, `status` and `steps` are there; `evidence`, `proposal` and `run` are then defaulted (none, null, null) as the overview's `withFixFields` does, since the panel dereferences them and a server that drifted from the client must not stand the error boundary in place of the tab.
+- `refresh()` reads once more and resolves when that read has settled (Try again; the panel awaits it after Run it once). State carries its diagnosis's id, so a panel handed another id never draws the first's answer.
+
+## `hooks/useDiagnosisVerbs.ts` — `useDiagnosisVerbs({ writeOnce, settleWrite, toast, tRef, mountedRef })`
+- The provider's three writes, split out of `CerberusProvider.tsx` (already past 500 lines) and built over its guards: one write per target (`diagnose:<node>/<key>`, `run-proposal:<id>`, `promote:<id>`, so a double press is one write), `settleWrite` (the fleet is re-read before the verb answers; a refusal is the warn toast with the server's sentence). `diagnose` and `runProposal` are silent when they land: the card's "Diagnosing…" and the panel's "Running now" are the proof. `promote` speaks, since its result is on another tab: "Added to the catalog" · "<name> · auto-run off" (`messageOn` when auto was set), the name from the entry the server wrote, or the typed name when the answer's body is unreadable: a landed write stays landed (`response.ok` is its verdict), never a refusal.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/DiagnoseButton.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/hooks/useDiagnosis.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/hooks/useDiagnosisVerbs.ts

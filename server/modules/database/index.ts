@@ -1,7 +1,7 @@
 export { initializeDatabase } from '@/modules/database/init-db.js';
 export { closeConnection, getConnection, getDatabasePath } from '@/modules/database/connection.js';
 // The Cerberus store — a second SQLite file beside auth.db, with its own singleton and its own stepped
-// schema — and its seven repositories: used by the cerberus module, whose services read and write the
+// schema — and its `cerberus-*.db.ts` repositories: used by the cerberus module, whose services read and write the
 // store through them, and whose ingest and definition-write transactions open on its connection. It
 // is not auth.db and no other module reads it.
 export {
@@ -22,6 +22,17 @@ export type {
   CerberusCheckUpsert,
   CerberusProbeRow,
 } from '@/modules/database/repositories/cerberus-definitions.db.js';
+export {
+  CERBERUS_ONE_OFF_TTL_MS,
+  cerberusDiagnosesDb,
+} from '@/modules/database/repositories/cerberus-diagnoses.db.js';
+export type {
+  CerberusDiagnosisEndFields,
+  CerberusDiagnosisInsert,
+  CerberusDiagnosisRow,
+  CerberusDiagnosisStatus,
+  CerberusDiagnosisStepRow,
+} from '@/modules/database/repositories/cerberus-diagnoses.db.js';
 export { cerberusEnrollDb } from '@/modules/database/repositories/cerberus-enroll.db.js';
 export type { CerberusEnrollTokenRow } from '@/modules/database/repositories/cerberus-enroll.db.js';
 export { cerberusMutesDb } from '@/modules/database/repositories/cerberus-mutes.db.js';
@@ -45,6 +56,14 @@ export type {
   CerberusRunRow,
   CerberusRunStatsRow,
 } from '@/modules/database/repositories/cerberus-runs.db.js';
+export { cerberusUpdatesDb } from '@/modules/database/repositories/cerberus-updates.db.js';
+export type {
+  CerberusPauseWindowRow,
+  CerberusUpdateInsert,
+  CerberusUpdateResult,
+  CerberusUpdateRow,
+  CerberusUpdateStepRow,
+} from '@/modules/database/repositories/cerberus-updates.db.js';
 export { apiKeysDb } from '@/modules/database/repositories/api-keys.js';
 export { appConfigDb } from '@/modules/database/repositories/app-config.js';
 export { credentialsDb } from '@/modules/database/repositories/credentials.js';

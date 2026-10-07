@@ -3,7 +3,7 @@ import {
   getStoredAuthToken,
   storeAuthToken,
 } from '@/shared/authToken';
-import type { AuthTraceEvent, CerberusEnrollInput, CerberusLabelInput, CerberusMuteInput, DeepseekRange, DispatcherAsk, DispatcherModelChoice, DispatcherWipChoice, DispatcherWipLimit, FileLinePatch, JevRange, NoteInput, NtfySettingsInput, SimpleListItemRef, SimpleListPosition, SubagentTranscriptResult } from '@/shared/types';
+import type { AuthTraceEvent, CerberusEnrollInput, CerberusLabelInput, CerberusMuteInput, CerberusPromoteInput, DeepseekRange, DispatcherAsk, DispatcherModelChoice, DispatcherWipChoice, DispatcherWipLimit, FileLinePatch, JevRange, NoteInput, NtfySettingsInput, SimpleListItemRef, SimpleListPosition, SubagentTranscriptResult } from '@/shared/types';
 import type { AgentLaunchDefaultsChange, AgentLaunchRowChange } from '@/shared/agent-launch-types';
 import type { CerberusCatalogEntryInput } from '@/shared/cerberus-types';
 import type { ClaudeUpdateApplyRequest } from '@/shared/claude-update-types';
@@ -870,6 +870,23 @@ export const api = {
     setAuto: (id: string, on: boolean) => put(`/api/cerberus/catalog/${encodeURIComponent(id)}/auto`, { on }),
     runEntry: (id: string) => post(`/api/cerberus/catalog/${encodeURIComponent(id)}/run`, {}),
     run: (id: string, options: ApiRequestOptions = {}) => get(`/api/cerberus/runs/${encodeURIComponent(id)}`, options),
+    // The warden updates (server/modules/cerberus/MANUAL.md): `wardens` answers the release on offer, each node's
+    // version against it and the batch running; `startUpdate` answers `{ batch, updates }` and the screen follows
+    // the batch by `updateBatch` (every update of it, with its steps). A 409 says why not (`CERBERUS_UPDATE_RUNNING`:
+    // a batch is already going, `CERBERUS_NO_RELEASE`: nothing is built).
+    wardens: (options: ApiRequestOptions = {}) => get('/api/cerberus/wardens', options),
+    startUpdate: (nodes: string[]) => post('/api/cerberus/updates', { nodes }),
+    updateBatch: (batch: string, options: ApiRequestOptions = {}) => get(`/api/cerberus/updates/${encodeURIComponent(batch)}`, options),
+    // The diagnosis (server/modules/cerberus/MANUAL.md): `diagnose` answers `{ id }` at once and the diagnosis runs on
+    // in the background (no `model`: center picks its own; a probe passes one); `diagnosis(id)` is the whole
+    // `CerberusDiagnosisView` with every step, which `useDiagnosis` reads before its `cerberus_diag_step` frames append.
+    // `runProposal` answers `{ runId }` and never touches the catalog; `promote` answers the new entry and is the only
+    // route that does. A 409 says why not (`CERBERUS_DIAG_RUNNING`: the check has a diagnosis going, and for a run:
+    // no proposal, or its one-off has expired).
+    diagnose: (input: { node: string; check: string; model?: string }) => post('/api/cerberus/diagnoses', input),
+    diagnosis: (id: string, options: ApiRequestOptions = {}) => get(`/api/cerberus/diagnoses/${encodeURIComponent(id)}`, options),
+    runProposal: (id: string) => post(`/api/cerberus/diagnoses/${encodeURIComponent(id)}/run`, {}),
+    promote: (id: string, input: CerberusPromoteInput) => post(`/api/cerberus/diagnoses/${encodeURIComponent(id)}/promote`, input),
   },
 
   // The dispatcher lane (docs/MANUAL.md (dispatcher)): the plans in the dispatcher's own store, and the

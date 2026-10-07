@@ -8,7 +8,7 @@
 //   treats a seq at or below what it has acked as a resend and answers without storing, so a repeat
 //   would silently lose a batch. The number is therefore RESERVED on disk before it is used:
 //   `state.json` holds `seqFloor`, a ceiling every number handed out stays below; to hand out a
-//   number at or past it, `seqFloor + 1000` is written (and fsynced) first. After a restart the
+//   number at or past it, the number about to be handed out `+ 1000` is written (and fsynced) first. After a restart the
 //   counter starts at the persisted floor, so it skips what the last run might have used. Center's
 //   `ackedUpto` raises it further (`ack`): were `state.json` lost, the counter, and any frame
 //   already queued under a number center holds, end above everything center holds.

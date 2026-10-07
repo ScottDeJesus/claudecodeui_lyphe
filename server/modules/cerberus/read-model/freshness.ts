@@ -1,7 +1,7 @@
 import type { CerberusStoredResultRow } from '@/modules/database/index.js';
 import type { CerberusLookup, CerberusStatus } from '@/shared/cerberus-types.js';
 
-import { shownRow, worst } from './status-rules.js';
+import { SEV, shownRow, type WindowWord } from './status-rules.js';
 
 /**
  * THE HONEST RULE — when a stored row still speaks for a moment — written once, over rows alone.
@@ -116,29 +116,32 @@ export function statusAt(
 }
 
 /**
- * Whether some lapse overlaps the moments `a..last`. A lapse is the stretch of moments after a row's
- * vouching ends and before the next row: `(freshUntil, next.at)`, and after the last row,
- * `(freshUntil, now)` — which a window ending at or before `now` reaches the end of by construction,
- * so the open end is simply unbounded here.
+ * The first moment of the moments `a..last` that falls in a lapse, or null when none does. A lapse is
+ * the stretch of moments after a row's vouching ends and before the next row: `(freshUntil, next.at)`,
+ * and after the last row, `(freshUntil, now)` — which a window ending at or before `now` reaches the
+ * end of by construction, so the open end is simply unbounded here. A lookup of the returned moment
+ * answers `stale`.
  */
-function lapseOverlaps(
+function firstLapseMoment(
   rows: CerberusStoredResultRow[],
   a: number,
   last: number,
   staleAfterMs: number,
   liveLastAt: number | null
-): boolean {
+): number | null {
   for (let index = 0; index < rows.length; index += 1) {
     const lapseFirst = freshUntil(rows, index, staleAfterMs, liveLastAt) + 1;
     const next = rows[index + 1];
     const lapseLast = next ? next.at - 1 : Number.POSITIVE_INFINITY;
-    if (Math.max(a, lapseFirst) <= Math.min(last, lapseLast)) return true;
+    const first = Math.max(a, lapseFirst);
+    if (first <= Math.min(last, lapseLast)) return first;
   }
-  return false;
+  return null;
 }
 
 /**
- * The worst word a check showed over the window `[a, b)`: the worst of
+ * The worst word a check showed over the window `[a, b)`, and the first moment it showed it. The
+ * word is the worst of
  *   1. its status at `a` (`unknown` when `a` is not fresh, or before the first row),
  *   2. every stored row strictly inside `(a, b)`,
  *   3. `unknown`, when any lapse overlaps the window, and
@@ -147,6 +150,11 @@ function lapseOverlaps(
  * window that opens before the check's first row is `unknown`, and `not_enabled` never outranks a
  * real status (it is `SEV` -1). Mute and silence are NOT laid here; `overlays.ts` does that, since
  * they belong to the window's end and to the node and not to the rows.
+ *
+ * `at` is where the word was raised, as that part of the list names it: `a` for 1 and 4, a row's own
+ * `at` for 2, the first moment of the first lapse for 3. When several parts say the same word the
+ * earliest moment keeps it, so `at` is the first moment the word held and never the last second of a
+ * window whose word came and went. Each such moment is one a lookup answers with that word.
  *
  * The window must end at or before `now` — a caller clips its last cell at `now`, as the engine's
  * `cells` does. A window of no width (`b <= a`, which the clipped last cell is when `now` is exactly
@@ -160,13 +168,19 @@ export function windowStatus(
   b: number,
   staleAfterMs: number,
   liveLastAt: number | null
-): CerberusStatus {
+): WindowWord {
   const last = Math.max(b - 1, a);
 
-  let status = wordAt(rows, a, staleAfterMs, liveLastAt);
+  let word: WindowWord = { status: wordAt(rows, a, staleAfterMs, liveLastAt), at: a };
+  const reach = (status: WindowWord['status'], at: number) => {
+    const rise = SEV[status] - SEV[word.status];
+    if (rise > 0 || (rise === 0 && at < word.at)) word = { status, at };
+  };
   for (const row of rows) {
-    if (row.at > a && row.at < b) status = worst(status, shownRow(row));
+    if (row.at > a && row.at < b) reach(shownRow(row), row.at);
   }
-  if (lapseOverlaps(rows, a, last, staleAfterMs, liveLastAt)) status = worst(status, 'unknown');
-  return worst(status, wordAt(rows, last, staleAfterMs, liveLastAt));
+  const lapse = firstLapseMoment(rows, a, last, staleAfterMs, liveLastAt);
+  if (lapse !== null) reach('unknown', lapse);
+  reach(wordAt(rows, last, staleAfterMs, liveLastAt), last);
+  return word;
 }

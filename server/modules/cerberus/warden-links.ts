@@ -1,5 +1,5 @@
 import { cerberusNodesDb } from '@/modules/database/index.js';
-import type { CerberusEnvelope, CerberusLinkState } from '@/shared/cerberus-types.js';
+import type { CerberusEnvelope, CerberusHelloBody, CerberusLinkState } from '@/shared/cerberus-types.js';
 
 /**
  * The registry every warden's link joins: who is connected, when each node was last heard, and the
@@ -76,15 +76,19 @@ type LinkChangeListener = (node: string, state: CerberusLinkState) => void;
  * runner), and a listener must then conclude nothing from them. `owedRuns` is the ids of runs that are
  * over but whose frames still wait on the warden's outbox; null when the warden does not report them
  * (a build older than that list), which a listener must read as "this hello does not account for what
- * is still owed". `catalogVersion` is the set it acked.
- * Consumers: `warden-link.ts` builds it; `run-reconcile.ts` reads it.
+ * is still owed". `activeDiags` is the ids of the diagnoses the warden holds open, null when it does not
+ * say (a build older than diagnoses). `catalogVersion` is the set it acked. `update` is how the warden
+ * says an update ended (`CerberusHelloBody.update`), null when the hello names none.
+ * Consumers: `warden-link.ts` builds it; `run-reconcile.ts`, `update-driver.ts` and the diagnosis service read it.
  */
 export type CerberusHelloReport = {
   version: string;
   startedAt: number | null;
   activeRuns: string[] | null;
   owedRuns: string[] | null;
+  activeDiags: string[] | null;
   catalogVersion: number | null;
+  update: NonNullable<CerberusHelloBody['update']> | null;
 };
 
 /** Called with the node and what its hello said, after the link carrying it is attached. */

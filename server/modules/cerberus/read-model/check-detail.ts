@@ -9,8 +9,9 @@ import type {
 import { buildCheckCells, stripStart } from './cells.js';
 import { fixesOfCheck } from './catalog-views.js';
 import { buildCheckView, findActiveCheck } from './check-views.js';
+import { sheetDiagnosisOf } from './diagnosis-views.js';
 import { lookupOfCheck } from './lookup.js';
-import { silentSinceOf } from './node-links.js';
+import { nodeOverlayOf } from './node-links.js';
 import { sheetRunOf } from './run-views.js';
 import { loadSeries } from './series.js';
 import { storedStatusOf } from './status-rules.js';
@@ -69,7 +70,8 @@ export function checkDetail(
     now,
     inputs
   );
-  const silentSince = silentSinceOf(node, inputs);
+  // The pauses are read from the strip's first cell on: the strip may stand at an earlier `end`, the current readings stand at now.
+  const overlay = nodeOverlayOf(node, inputs, stripStart(stripEnd, DETAIL_CELLS));
 
   // A strip that ends now reads the rows already in hand; one that ends earlier needs its own
   // window's rows.
@@ -80,15 +82,19 @@ export function checkDetail(
     .recentChanges(node, key, stripEnd - RECENT_WINDOW_MS, RECENT_LIMIT, stripEnd)
     .map((row) => ({ at: row.at, status: storedStatusOf(row), value: row.value }));
 
+  const checkView = buildCheckView(ownSeries, overlay, inputs);
+
   return {
-    check: buildCheckView(ownSeries, silentSince, inputs),
-    siblings: siblingSeries.map((series) => buildCheckView(series, silentSince, inputs)),
-    cells: buildCheckCells(stripSeries, silentSince, stripEnd, DETAIL_CELLS),
+    check: checkView,
+    siblings: siblingSeries.map((series) => buildCheckView(series, overlay, inputs)),
+    cells: buildCheckCells(stripSeries, overlay, stripEnd, DETAIL_CELLS),
     recent,
     lookup: lookupOfCheck(check, lookupAt ?? stripEnd, inputs),
     fixes: fixesOfCheck(node, key),
     // As of now, whatever `end` the strip stands at: the sheet shows the fix beside the reading it produced.
     run: sheetRunOf(node, key, now),
+    // As of now too, reaching back the further of 24 hours and the check's `since` (`diagnosis-views.ts`).
+    diagnosis: sheetDiagnosisOf(checkView, inputs),
   };
 }
 

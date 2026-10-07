@@ -9,9 +9,11 @@ import { FleetView } from '@/modules/cerberus/fleet/FleetView';
 import { HistoryView } from '@/modules/cerberus/history/HistoryView';
 import { EnrollDialog } from '@/modules/cerberus/modals/EnrollDialog';
 import { MuteDialog } from '@/modules/cerberus/modals/MuteDialog';
+import { PromoteDialog } from '@/modules/cerberus/modals/PromoteDialog';
+import { UpdateWardensDialog } from '@/modules/cerberus/modals/UpdateWardensDialog';
 import { CheckSheet } from '@/modules/cerberus/sheet/CheckSheet';
 import { UnreachableBanner } from '@/modules/cerberus/UnreachableBanner';
-import type { CerberusCheckView } from '@/shared/cerberus-types';
+import type { CerberusCheckView, CerberusDiagnosisView } from '@/shared/cerberus-types';
 import { useHostWindow } from '@/shared/context/HostWindowContext';
 import type { CerberusSheetTarget, CerberusView, ProjectChoice } from '@/shared/types';
 import { ScrollArea, Tabs } from '@/shared/ui';
@@ -50,7 +52,7 @@ const GUTTER = 'px-[clamp(16px,4cqi,32px)]';
  * (`design/cerberus/Cerberus Tab.dc.html` :32-57).
  *
  * Read top to bottom:
- * 1. `CerberusHeader`: the headline, the summary, the clock pill and Enroll a node.
+ * 1. `CerberusHeader`: the headline, the summary, the clock pill, the update button and Enroll a node.
  * 2. Only while the fleet on screen is stale: "Cerberus can't be reached · Showing the last answer it
  *    gave." with Try again.
  * 3. The strip, Fleet · Catalog · History, with a hint beside it saying how the view shown is read.
@@ -83,7 +85,8 @@ const GUTTER = 'px-[clamp(16px,4cqi,32px)]';
  *
  * THE HOSTS. One check sheet, opened from a Fleet minute, a service row or a Needs-you card. One Mute
  * dialog, opened from a Needs-you card or the sheet; it opens in front of the sheet, which waits beneath
- * it. One Enroll dialog, opened from the header. Each is mounted only while it is open.
+ * it. One Promote dialog, opened from the sheet's diagnosis (Add to catalog), in front of the sheet as Mute's is;
+ * a promotion that lands closes both and shows the Catalog. One Enroll dialog and one Update wardens dialog, opened from the header; closing the second never stops the batch it started. Each is mounted only while it is open.
  *
  * For src/modules/project-workspace's `WorkspaceMain`, which draws it as the Cerberus tab, through this
  * module's barrel.
@@ -96,7 +99,7 @@ export function CerberusPanel({ projectChoices }: CerberusPanelProps) {
 
   // The fleet the provider keeps, null until a read answers; whether that first read failed; and whether
   // what is held is the last answer rather than this minute's (the provider judges it at each failed read).
-  const { overview, unreachable, stale, refresh } = useCerberus();
+  const { overview, unreachable, stale, refresh, wardens } = useCerberus();
 
   // How many of Try again's reads have finished. Essential, not derivable: both banners are keyed by it, so
   // a retry that fails again mounts the banner afresh and its alert is heard again, while the provider's
@@ -113,8 +116,14 @@ export function CerberusPanel({ projectChoices }: CerberusPanelProps) {
   // The check the Mute dialog is open on; null while it is closed. Held beside the sheet, never in it,
   // since a Needs-you card mutes with no sheet open and the sheet stays open under the dialog.
   const [muting, setMuting] = useState<CerberusCheckView | null>(null);
+  // The diagnosis the Promote dialog is open on, with the check it diagnosed; null while it is closed. Held beside the
+  // sheet, as Mute's is, since the dialog opens in front of the sheet and the sheet stays open under it.
+  const [promoting, setPromoting] = useState<{ diagnosis: CerberusDiagnosisView; check: CerberusCheckView } | null>(null);
   // Whether the Enroll dialog is open: the one dialog with no subject, so a flag is all it needs.
   const [enrolling, setEnrolling] = useState(false);
+  // Whether the Update wardens dialog is open. A flag, as Enroll's: the batch it follows is its own, and a
+  // dialog closed over a running batch leaves the batch going, so nothing here has to outlive the dialog.
+  const [updatingWardens, setUpdatingWardens] = useState(false);
 
   // The narrow flag follows the panel's own width, never the window's. A width of 0 (the tab hidden)
   // changes nothing, so the layout a person left comes back as it was.
@@ -141,8 +150,18 @@ export function CerberusPanel({ projectChoices }: CerberusPanelProps) {
   // The sheet stays open under the Mute dialog: the dialog opens in front of it.
   const onMute = (check: CerberusCheckView) => setMuting(check);
   const onCloseMute = () => setMuting(null);
+  const onPromote = (diagnosis: CerberusDiagnosisView, check: CerberusCheckView) => setPromoting({ diagnosis, check });
+  const onClosePromote = () => setPromoting(null);
+  // A promotion landed: the dialog and the sheet behind it go, and the Catalog shows the new entry, newest first with its "New" wash.
+  const onPromoted = () => {
+    setPromoting(null);
+    setSheet(null);
+    setView('catalog');
+  };
   const onEnroll = () => setEnrolling(true);
   const onCloseEnroll = () => setEnrolling(false);
+  const onUpdateWardens = () => setUpdatingWardens(true);
+  const onCloseUpdateWardens = () => setUpdatingWardens(false);
 
   const shown = VIEWS.find((entry) => entry.id === view) ?? VIEWS[0];
 
@@ -165,7 +184,7 @@ export function CerberusPanel({ projectChoices }: CerberusPanelProps) {
           )
         ) : (
           <>
-            <CerberusHeader overview={overview} stale={stale} onEnroll={onEnroll} />
+            <CerberusHeader overview={overview} stale={stale} wardens={wardens} onEnroll={onEnroll} onUpdateWardens={onUpdateWardens} />
             {stale && (
               // The fleet below is the last answer center gave, not this minute's. Full width, as every block
               // under the header is.
@@ -218,10 +237,19 @@ export function CerberusPanel({ projectChoices }: CerberusPanelProps) {
           lookupAt={sheet.lookupAt}
           run={sheet.run}
           onMute={onMute}
+          onPromote={onPromote}
         />
       )}
       <MuteDialog open={muting !== null} check={muting} onClose={onCloseMute} />
+      <PromoteDialog
+        open={promoting !== null}
+        diagnosis={promoting?.diagnosis ?? null}
+        check={promoting?.check ?? null}
+        onClose={onClosePromote}
+        onPromoted={onPromoted}
+      />
       <EnrollDialog open={enrolling} onClose={onCloseEnroll} />
+      <UpdateWardensDialog open={updatingWardens} onClose={onCloseUpdateWardens} />
     </div>
   );
 }

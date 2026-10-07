@@ -8,10 +8,12 @@ import { registerCatalogHandlers } from './catalog.service.js';
 import { createCerberusRouter } from './cerberus.routes.js';
 import { loadCenterKey } from './center-key.js';
 import { seedHub } from './definitions.service.js';
+import { registerDiagnosisService, stopDiagnoses } from './diagnosis/diagnosis.service.js';
 import { ingest } from './ingest.service.js';
 import { registerRunsService } from './runs.service.js';
 import { startSelfChecks, stopSelfChecks } from './self-checks.service.js';
 import { startDailyPrune, stopDailyPrune } from './store-prune.service.js';
+import { registerUpdatesService } from './updates.service.js';
 import { registerWardenFileRoutes } from './warden-files.js';
 import { parseListen, startWardenGateway, type WardenGateway } from './warden-gateway.js';
 import { wardenLinks } from './warden-links.js';
@@ -25,7 +27,9 @@ import { wardenLinks } from './warden-links.js';
  * (its migrations run on the first open), loads the center key (a key that cannot be read or written
  * fails HERE, loudly, not on the first warden's enrollment), seeds the hub's own definitions, makes
  * every enrolled node known to the link registry (silent until heard), fills ingest's memory from
- * the store, registers the frames the services take from a warden and arms Cerberus's own auto-run
+ * the store, registers the frames the services take from a warden (the catalog's, the runs', the
+ * diagnoses' — which also ends the diagnoses a restart left running — and the updates', which also
+ * picks up a batch a restart left half done) and arms Cerberus's own auto-run
  * rule on ingest's status changes — and only then binds the gateway, so the first warden to dial in
  * finds a center that knows its nodes (ingest's memory is also filled by the first read, whichever comes first — a
  * handover's new process is asked before `start()` runs); the warden's file routes (the enroll script and the release) are registered just
@@ -111,12 +115,15 @@ export function createCerberusModule(dependencies: { supervised: boolean }): {
       // say which runs it holds in its hello, and resend the `run.*` frames of a run that ended while it was away.
       registerCatalogHandlers();
       registerRunsService();
+      registerDiagnosisService();
       stopAutoRun = startAutoRun();
 
       const listen = readConfiguredListen();
       const refusal = listen !== null && isApiOwnPort(listen) ? `CERBERUS_LISTEN ${listen} is on the API's own port` : null;
       if (refusal) console.error(`[Cerberus] the warden gateway did not start: ${refusal}`);
       if (listen !== null && refusal === null) registerWardenFileRoutes(listen);
+      // `update.progress` and the hello that ends an update, and the batch a restart left half done; offers are built from the gateway's address.
+      registerUpdatesService(refusal === null ? listen : null);
       gateway = refusal === null ? await startWardenGateway({ listen, supervised }) : null;
       gatewayState = { listen, address: gateway?.address ?? null, error: refusal ?? gateway?.error ?? null };
 
@@ -139,6 +146,7 @@ export function createCerberusModule(dependencies: { supervised: boolean }): {
     stop: () => {
       stopped = true;
       stopAutoRun();
+      stopDiagnoses();
       stopSelfChecks();
       stopDailyPrune();
       gateway?.stop();

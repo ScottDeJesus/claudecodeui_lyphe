@@ -213,15 +213,9 @@ function EnrollFlow({ onClose }: { onClose: () => void }) {
                 {t('cerberus.enroll.cancel')}
               </Button>
               {/* A name that cannot be sent or a gateway that is down disables the button outright; while the ask is
-                  out it is aria-disabled instead, because a disabled button gives up the focus it holds and a
-                  refusal would hand the person back a page with none. The form's own guard ignores the press. */}
-              <Button
-                type="submit"
-                className="aria-disabled:cursor-not-allowed aria-disabled:opacity-60 max-md:h-11"
-                disabled={nameError !== null || gatewayDown}
-                aria-disabled={issuing || undefined}
-                aria-busy={issuing || undefined}
-              >
+                  out it is `busy` instead, because a disabled button gives up the focus it holds and a
+                  refusal would hand the person back a page with none. */}
+              <Button type="submit" className="max-md:h-11" disabled={nameError !== null || gatewayDown} busy={issuing}>
                 {t('cerberus.enroll.getCommand')}
               </Button>
             </div>

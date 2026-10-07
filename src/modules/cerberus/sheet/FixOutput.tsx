@@ -128,7 +128,8 @@ function UnreadRun({ eyebrowId, onRetry }: { eyebrowId: string; onRetry: () => v
  * Until its read answers, the card's shape shimmers. A read that did not answer keeps the frame and says
  * so, with Try again (`UnreadRun`).
  *
- * For the check sheet (`CheckSheet`), keyed by the run: the run it was opened on, else the check's latest.
+ * For the check sheet (`CheckSheet`), keyed by the run: the run it was opened on, else the check's latest; and
+ * for the diagnosis panel (`DiagnosisPanel`), which draws its proposal's one-off run straight under the proposal.
  */
 export function FixOutput({ runId }: { runId: string }) {
   const { t } = useTranslation();

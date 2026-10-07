@@ -10,14 +10,17 @@
 # writes only under ~/.cerberus-warden, mode 0700, and its key there is that account's, never
 # root's. A root warden would turn every command center can schedule into a root command.
 #
-# Type=simple: `node ... run` is the daemon itself and stays in the foreground. Restart=always
-# brings it back after ANY exit — a crash, a kill, a clean exit — five seconds later, and the link
-# redials by itself. Results not yet acknowledged live in memory only, so a restart drops them and the
-# probes simply run again. The log is journald's: every line the warden prints is `[warden] …`
-# (`journalctl -u cerberus-warden`).
+# Type=simple: the launcher stays in the foreground and runs the daemon (`node ... main.mjs run`) as
+# its child. Restart=always brings the launcher back after ANY exit — a crash, a kill, a clean exit —
+# five seconds later, and the link redials by itself. Results not yet acknowledged live in memory
+# only, so a restart drops them and the probes simply run again. The log is journald's: every line the
+# warden prints is `[warden] …` and the launcher's own are `[launcher] …` (`journalctl -u cerberus-warden`).
 #
-# ExecStart goes through the `current` symlink, which `enroll.sh` swaps atomically when it installs a
-# release, so `systemctl restart cerberus-warden` is all it takes to run the new one.
+# ExecStart is the LAUNCHER, a copy `enroll.sh` makes from each release into ~/.cerberus-warden/launcher.mjs:
+# it lives outside every release, so a release that cannot start cannot take its own rescue with it. The
+# launcher runs whatever the `current` symlink names (swapped atomically by `enroll.sh`, and by the warden
+# itself when Cerberus offers it a newer release) and, after such an update, takes a release that does not
+# say hello within 60 s back to the one it replaced. `systemctl restart cerberus-warden` runs `current`.
 #
 # The three double-underscore words below (the user, the home directory and the node binary) are
 # filled in by `enroll.sh`, never by hand: the operator's account, its home, and the absolute path
@@ -38,7 +41,7 @@ User=__USER__
 WorkingDirectory=__HOME__
 Environment=HOME=__HOME__
 Environment=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
-ExecStart=__NODE__ __HOME__/.cerberus-warden/current/warden/src/main.mjs run
+ExecStart=__NODE__ __HOME__/.cerberus-warden/launcher.mjs
 Restart=always
 RestartSec=5
 

@@ -134,24 +134,6 @@ probe-key: abccf0a1e0bbcfdf4dd0e307c828c8ad013cc048
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/hooks/useCatalogRead.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/hooks/useRunLastLine.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/hooks/useRunOutput.ts
 
-## INV-7120 — probe — `useRunLastLine.ts`: an overview read that left before a frame and lands after it puts the older line back
-
-`useRunLastLine.ts`: an overview read that left before a frame and lands after it puts the older line back
-
-```probe
-D=$(mktemp -d)
-cat > "$D/p.sh" <<'EOF'
-cd /home/lyphe/.claude/state/pipeline-reviews/cerberus--fixes--fixes-fill/probes && timeout 120 node stale-overview-lastline.mjs
-EOF
-bash "$D/p.sh"
-expect: `stale-overview-lastline: before-landing=L6 after-landing=<line>`, with after-landing=L6 once cured; today L5
-```
-
-measured 2026-10-07 by chain chain-cerberus--fixes--fixes-fill-20261006-234909-a012, finding L2, LOW
-probe-key: 8c4563f3f688ccd24f4a678e34b762af7ab1bc42
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/hooks/useCatalogRead.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/hooks/useRunLastLine.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/hooks/useRunOutput.ts
-
 ## INV-7121 — probe — `useRunOutput.ts` / `FixOutput.tsx`: while a failed run replays, its closing sentence is on screen first
 
 `useRunOutput.ts` / `FixOutput.tsx`: while a failed run replays, its closing sentence is on screen first
@@ -262,3 +244,122 @@ measured 2026-10-07 by chain chain-cerberus--fixes--fixes-fill-20261006-234909-a
 probe-key: 06fb7c7c254e8a60e07e876ccb6e413e5097f54e
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/hooks/useCatalogRead.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/hooks/useRunLastLine.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/hooks/useRunOutput.ts
+
+## INV-7178 — probe — LOW — an update that ended "Already on <v>" says "<v> kept for rollback"
+
+LOW — an update that ended "Already on <v>" says "<v> kept for rollback"
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+#!/bin/bash
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+W=$(dirname "$0")
+cat > "$W/p.mts" <<'TS'
+import { readFileSync } from 'node:fs';
+import { toTimelineEvent } from '@/modules/cerberus/utils/activityEvents';
+const common = JSON.parse(readFileSync('src/modules/i18n/locales/en/common.json', 'utf8'));
+const t = (key: string, args: Record<string, unknown> = {}) => {
+  let v: any = common;
+  for (const p of key.split('.')) v = v?.[p];
+  return typeof v === 'string' ? v.replace(/\{\{(\w+)\}\}/g, (_, k) => String(args[k])) : `MISSING(${key})`;
+};
+const now = Date.now();
+const line = (from: string | null) => (toTimelineEvent({ kind: 'warden', at: now - 1000, node: 'eis1', event: 'updated', from, to: '0.8.0' } as any, t as any, now) as any).title;
+console.log('from 0.7.0 :', line('0.7.0'));
+console.log('from===to  :', line('0.8.0'));
+TS
+npx tsx --tsconfig tsconfig.json "$W/p.mts" 2>&1 | tail -3
+EOF
+bash "$D/p.sh"
+expect: the `from===to` line reads "Warden on eis1 updated to 0.8.0 · 0.8.0 kept for rollback" while the defect stands; cured, it reads "Warden on eis1 updated to 0.8.0" with no clause
+```
+
+measured 2026-10-07 by chain chain-cerberus--updates--dialog-fill-20261007-043110-22d1, finding L1, LOW
+probe-key: da847b2ce411ed700701a8329254875f37b2fe71
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/fleet/UpdatingPill.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/hooks/useUpdateBatch.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/hooks/useWardensRead.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/utils/wardenUpdates.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts
+
+## INV-7179 — probe — LOW — the dialog's ending names the newest release on disk, not the one the batch took the nodes to
+
+LOW — the dialog's ending names the newest release on disk, not the one the batch took the nodes to
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+#!/bin/bash
+W=$(dirname "$0")
+cat > "$W/p.mjs" <<'JS'
+import { openConsole } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/console.mjs';
+import { openCerberusTab } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/node-card.mjs';
+const s = await openConsole();
+const { page } = s;
+const REL = { version: '0.8.0', note: 'Newer.', builtAt: Date.now() };
+const upd = { id: 'u1', batch: 'b1', node: 'eis1', from: '0.5.0', to: '0.7.0', startedAt: Date.now() - 60000, step: 'verified', endedAt: Date.now() - 1000, result: 'updated', steps: [{ at: Date.now() - 2000, step: 'verified', text: 'Signature checks out' }] };
+await page.route(/\/api\/cerberus\/wardens(\?|$)/, (r) => r.fulfill({ json: { latest: REL, nodes: [{ node: 'eis1', version: '0.7.0', behind: true }], running: [upd] } }));
+await page.route(/\/api\/cerberus\/updates(\/|\?|$)/, (r) => r.request().method() === 'GET' ? r.fulfill({ json: [upd] }) : r.abort());
+let out = 'none';
+try {
+  await page.reload({ waitUntil: 'networkidle' });
+  const row = await page.waitForSelector('div.md\\:w-\\[20\\.5rem\\] .pb-safe-area-inset-bottom > div > div.group > button', { timeout: 20000 });
+  await row.click(); await page.waitForTimeout(600);
+  await openCerberusTab(page);
+  await page.getByRole('button', { name: /^(Update wardens to |Updating wardens · |Wardens up to date)/ }).first().click();
+  const dlg = page.getByRole('dialog'); await dlg.waitFor({ timeout: 10000 }); await page.waitForTimeout(2500);
+  out = (await dlg.innerText()).split('\n').filter((l) => /selected warden/.test(l)).join(' / ') || 'no ending line';
+} catch (error) { out = `none (${String(error.message).split('\n')[0]})`; }
+console.log('batch took eis1 to 0.7.0; latest on disk 0.8.0; footer:', out);
+await s.browser.close();
+JS
+node "$W/p.mjs" 2>&1 | tail -2
+EOF
+bash "$D/p.sh"
+expect: footer reads "✓ Every selected warden is on 0.8.0." while the defect stands (the batch took the node to 0.7.0); cured, it reads "… is on 0.7.0."
+```
+
+measured 2026-10-07 by chain chain-cerberus--updates--dialog-fill-20261007-043110-22d1, finding L2, LOW
+probe-key: 6f65973514ce8f6d3a0bd82b428b6b67db14852f
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/fleet/UpdatingPill.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/hooks/useUpdateBatch.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/hooks/useWardensRead.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/utils/wardenUpdates.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts
+
+## INV-7187 — probe — The sheet's Diagnose button comes back as an enabled "Diagnose" for the ~0.8 s before the sheet hears the diagnosis exists; a second press there is a refused POST and a warn toast, and the button then disappears under the pressing hand
+
+The sheet's Diagnose button comes back as an enabled "Diagnose" for the ~0.8 s before the sheet hears the diagnosis exists; a second press there is a refused POST and a warn toast, and the button then disappears under the pressing hand
+
+```probe
+bash /home/lyphe/.claude/state/pipeline-reviews/cerberus--diagnosis--panel-fill/athena-probes/f1.sh
+expect: the sheet's button reads "Diagnose" with aria-disabled=null after "Diagnosing…" and before panel=true, a `SECOND PRESS` line, `POSTs sent: 2` and the toast `Cerberus didn't take that · A diagnosis is already running on this check.`; cured when the button never returns to an enabled "Diagnose" before the panel stands, and `POSTs sent: 1` (`none: …` prints when no Needs-you check without a fix or diagnosis is live)
+```
+
+measured 2026-10-07 by chain chain-cerberus--diagnosis--panel-fill-20261007-050807-2929, finding M1, MEDIUM
+probe-key: 492e0dcebbe36cd7aec914101e53bf4f2ffcbe9b
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/DiagnoseButton.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/hooks/useDiagnosis.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/hooks/useDiagnosisVerbs.ts
+
+## INV-7188 — probe — `isDiagnosis` is a four-field check that does not guard what the panel reads: an answer with `id`, `node`, `status`, `steps` but without `evidence`, `proposal` or `run` stands the tab's error boundary in place of the whole Cerberus tab
+
+`isDiagnosis` is a four-field check that does not guard what the panel reads: an answer with `id`, `node`, `status`, `steps` but without `evidence`, `proposal` or `run` stands the tab's error boundary in place of the whole Cerberus tab
+
+```probe
+bash /home/lyphe/.claude/state/pipeline-reviews/cerberus--diagnosis--panel-fill/athena-probes/f2.sh
+expect: `body without `evidence`: tab error boundary shown = true | page errors = 2 Cannot read properties of undefined (reading 'length')`; cured when it prints `= false` (the read is refused as not-a-diagnosis or the field is defaulted)
+```
+
+measured 2026-10-07 by chain chain-cerberus--diagnosis--panel-fill-20261007-050807-2929, finding L1, LOW
+probe-key: bde56cdb72cc0994dafc9677995cf971b24b6004
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/DiagnoseButton.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/hooks/useDiagnosis.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/hooks/useDiagnosisVerbs.ts
+
+## INV-7189 — probe — `promote` reads the answer's body inside the write's closure: a promote the server accepted (200) whose body is not JSON is reported as a refusal, and the dialog stays open on a landed write
+
+`promote` reads the answer's body inside the write's closure: a promote the server accepted (200) whose body is not JSON is reported as a refusal, and the dialog stays open on a landed write
+
+```probe
+bash /home/lyphe/.claude/state/pipeline-reviews/cerberus--diagnosis--panel-fill/athena-probes/f3.sh
+expect: `server answered 200 (promotes sent: 1) | toast: Cerberus didn't take that | promote dialog still open: true | selected tabs: ,Fleet,Grid`; cured when the toast is absent, the dialog is closed and the selected tab is Catalog
+```
+
+measured 2026-10-07 by chain chain-cerberus--diagnosis--panel-fill-20261007-050807-2929, finding L2, LOW
+probe-key: 1e65e1e775c5e8e75f011fd995fb8b0512d2f4cd
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/DiagnoseButton.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/hooks/useDiagnosis.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/hooks/useDiagnosisVerbs.ts

@@ -144,11 +144,11 @@ function EntryRow({ entry, index, isNew, busy, blocked, now, onAuto, onRun }: En
         variant="outline"
         size="sm"
         disabled={held}
-        aria-disabled={busy || undefined}
+        busy={busy}
         aria-describedby={held ? reasonId : undefined}
         // One width for both words, so the columns stand in line down the catalog whichever a row reads.
-        className={cn('min-w-24', busy && 'cursor-not-allowed opacity-70')}
-        onClick={busy ? undefined : () => onRun(entry)}
+        className="min-w-24"
+        onClick={() => onRun(entry)}
       >
         {busy ? t('cerberus.catalog.running') : t('cerberus.catalog.runNow')}
       </Button>

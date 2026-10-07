@@ -4,7 +4,7 @@ import type { ComponentType, ReactNode } from 'react';
 import type { NavigateFunction } from 'react-router-dom';
 
 import type { AppEntry } from '@/shared/app-types';
-import type { CerberusNodeView, CerberusServiceView, CerberusStatus } from '@/shared/cerberus-types';
+import type { CerberusNodeView, CerberusServiceView, CerberusStatus, CerberusUpdateView } from '@/shared/cerberus-types';
 
 //----------------- LLM PROVIDER MODEL CATALOG ------------
 
@@ -2298,7 +2298,7 @@ export type CerberusCellShape = 'soft' | 'outline' | 'solid' | 'flat' | 'dashed'
 // ---------------------------
 
 //----------------- CERBERUS WRITE INPUTS ------------
-// What the Cerberus tab hands the three writes it presses. They are the client's own: the server's
+// What the Cerberus tab hands the writes it presses. They are the client's own: the server's
 // routes read a loose JSON body and validate it, so there is no wire type to mirror. The read model's
 // shapes are in `src/shared/cerberus-types.ts`.
 
@@ -2308,8 +2308,14 @@ export type CerberusMuteInput = { node: string; key: string; until: number; reas
 /** What a label write takes: the node, and EITHER a check's `key` OR a `service` (never both), and the plain name to show for it. An empty `label` clears the name, and the raw id stands in again. */
 export type CerberusLabelInput = { node: string; key?: string; service?: string; label: string };
 
+/** What promoting a diagnosis's proposal takes (`POST /api/cerberus/diagnoses/:id/promote`): the name the fix button will carry, whether the entry runs on its own (the Promote dialog starts it off) and its limit — `runs` runs per `per` seconds, which the dialog always sends as an hour (3600). */
+export type CerberusPromoteInput = { name: string; auto: boolean; limit: { runs: number; per: number } };
+
 /** What minting an enrollment token takes: the node's name (lowercase letters, numbers and dashes) and, optionally, a line saying what the machine is — shown under the name in Fleet. */
 export type CerberusEnrollInput = { name: string; desc?: string };
+
+/** What `POST /api/cerberus/updates` answers when a warden update batch starts: the batch's id and its updates as they stood, one per node named, all queued. The Cerberus provider's `startUpdate` hands it to the Update wardens dialog, which follows the batch from it. */
+export type CerberusStartedBatch = { batch: string; updates: CerberusUpdateView[] };
 
 // ---------------------------
 
@@ -2335,11 +2341,13 @@ export type CerberusProjectMove = 'moved' | 'refused' | 'failed';
 
 /**
  * The word a whole NODE stands at: the worst of its services' words, `empty` for a node with no
- * service, and two states no service carries. `not_enabled` never appears (a switched-off service
+ * service, and three states no service carries. `not_enabled` never appears (a switched-off service
  * counts as passing at the node level). `fixing` is a node with a fix running on one of its services
- * (fed from `overview.running`); `enrolling` is the updates plan's held place, which no node reads yet.
+ * (fed from `overview.running`); `updating` is a node whose warden has an update queued or running
+ * (`CerberusNodeView.updating`), whose checks are not paused yet — once the warden restarts they are,
+ * and the word is `paused`; `enrolling` is a held place which no node reads yet.
  */
-export type FleetStatus = Exclude<CerberusStatus, 'not_enabled'> | 'fixing' | 'enrolling' | 'empty';
+export type FleetStatus = Exclude<CerberusStatus, 'not_enabled'> | 'fixing' | 'updating' | 'enrolling' | 'empty';
 
 /**
  * What a node's or a service's mark can be drawn as: any check status, or `fixing`, a fix running (info
@@ -2350,7 +2358,7 @@ export type CerberusMark = CerberusStatus | 'fixing';
 
 /**
  * The bucket a node's status falls in for counting and filtering: `needs` is failing, denied,
- * fixing and warn; `updating` is paused and enrolling; every other status is its own bucket. `ok`
+ * fixing and warn; `updating` is updating, paused and enrolling; every other status is its own bucket. `ok`
  * is a bucket the status bar counts but no filter button selects.
  */
 export type FleetGroup = 'needs' | 'unknown' | 'muted' | 'updating' | 'empty' | 'ok';
@@ -2379,7 +2387,7 @@ export type FleetItem = {
   id: string;
   desc: string | null;
   role: 'hub' | 'node';
-  link: 'reporting' | 'silent' | 'never';
+  link: CerberusNodeView['link'];
   status: FleetStatus;
   /** Who started the fix running on the node, while its `status` is `fixing`: "Fix running on its own" or "Fix running". Null otherwise. */
   fixBy: 'auto' | 'you' | null;
@@ -2444,12 +2452,9 @@ export type FleetEntry = { item: FleetItem; node: CerberusNodeView; open: boolea
  * by its ID within the service (`session.valid`, its key after the first `/`), and the moment to look
  * up, epoch ms, left out for now. The caller resolves the check where it holds the data, so it is
  * never empty. A Fleet minute cell hands the check that set the minute — the service's worst check,
- * else its first, for a minute no check set — looked up at the minute's last second, the moment the
- * sheet's own strip uses, and now for the minute still running. That second is not always the cell's
- * word, the worst over the whole minute: it answers a run's first minute, but on a run's last minute it
- * reads the word that came after. The moment each minute's word was reached is the read model's to hand
- * over, and `CerberusCell` does not carry it yet. A Needs-you card, or a service row pressed as a whole,
- * hands its check and now. The tab's root holds one and hands its fields to `CheckSheet` as they are.
+ * else its first, for a minute no check set — looked up at the moment the minute's word was reached
+ * (`CerberusCell.at`, the moment the sheet's own strip uses), and now for the minute still running. A
+ * Needs-you card, or a service row pressed as a whole, hands its check and now. The tab's root holds one and hands its fields to `CheckSheet` as they are.
  * A Needs-you card's run strip also hands `run`, the id of the run it shows, which the sheet's Fix output
  * opens on.
  */

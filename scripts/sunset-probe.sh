@@ -156,8 +156,10 @@ stop_probe_server() {
   # and `kill 0` this shell's own group (2026-10-05: a pid file holding -1 took down every service on
   # the box). The digits are spelled out, not a range, so no locale widens what counts as one.
   case "$pid" in ''|*[!0123456789]*|0*|1) pid="" ;; esac
-  # And only a probe server: a pid file a killed run left behind can name a recycled pid.
-  if [ -n "$pid" ]; then command_line="$(tr '\0' ' ' < "/proc/$pid/cmdline" 2>/dev/null)" || command_line=""; fi
+  # And only a probe server: a pid file a killed run left behind can name a recycled pid. The `2>/dev/null`
+  # stands BEFORE the `<`: bash opens the file first, and its own "No such file or directory" for a server that
+  # already exited is written to the stderr in force at that moment (a redirect after the `<` came too late).
+  if [ -n "$pid" ]; then command_line="$(tr '\0' ' ' 2>/dev/null < "/proc/$pid/cmdline")" || command_line=""; fi
   case "$command_line" in *server/index.ts*) ;; *) pid="" ;; esac
   if [ -n "$pid" ]; then
     kill "$pid" 2>/dev/null || true

@@ -5,14 +5,14 @@ import { AppError } from '@/shared/utils.js';
 import { HUB_NODE_ID } from '../definition-document.js';
 
 import { statusAt } from './freshness.js';
-import { layerOverlays, muteActiveAt, toMuteView } from './overlays.js';
+import { layerCurrent, muteActiveAt, pausedSince, toMuteView, type NodeOverlay } from './overlays.js';
 import { staleAfterSecondsOf, type CheckSeries } from './series.js';
 import { shownRow, storedStatusOf } from './status-rules.js';
 
 /**
  * One check as the screen reads it, now: the stored row's word while it is fresh, `unknown` when it
- * is not, with the mute and the silence laid over — the one place a check's CURRENT status is
- * decided, so the tab, "Needs you" and the `fixes` plan's auto-run cannot disagree.
+ * is not, with the mute, the silence and the pause laid over — the one place a check's CURRENT status
+ * is decided, so the tab, "Needs you" and the `fixes` plan's auto-run cannot disagree.
  */
 
 const PROBE_KINDS: ReadonlySet<string> = new Set<CerberusProbeKind>([
@@ -90,8 +90,8 @@ function unknownSince(
  * `status` is the latest row's word when it is still fresh (`statusAt`), `unknown` when it is not or
  * when no row exists, then the overlays. `stored`, `value` and `at` stay the latest row's own even
  * when the status over them is `unknown` or `muted` — the screen can say what was last heard.
- * `since` is when `status` began: ingest's memory for a stored status, and the moment it went stale
- * or silent for `unknown`. `mute` is the unexpired mute covering the check, whatever its status.
+ * `since` is when `status` began: ingest's memory for a stored status, the moment it went stale
+ * or silent for `unknown`, and the restart's first step for `paused`. `mute` is the unexpired mute covering the check, whatever its status.
  * `every` and `staleAfter` are seconds.
  *
  * Consumers: `overview.ts` (every check of the fleet) and `check-detail.ts` (the check and its
@@ -99,14 +99,14 @@ function unknownSince(
  */
 export function buildCheckView(
   series: CheckSeries,
-  silentSince: number | null,
+  overlay: NodeOverlay,
   inputs: CerberusReadInputs
 ): CerberusCheckView {
   const { check } = series;
   const { now } = inputs;
   const { verdict, row } = statusAt(series.rows, now, series.staleAfterMs, series.liveLastAt, now);
   const raw = verdict === 'result' && row ? shownRow(row) : 'unknown';
-  const status = layerOverlays(raw, now, series.mutes, silentSince);
+  const status = layerCurrent(raw, now, series.mutes, overlay);
   const mute = muteActiveAt(series.mutes, now);
 
   return {
@@ -122,8 +122,10 @@ export function buildCheckView(
     at: row?.at ?? null,
     since:
       status === 'unknown'
-        ? unknownSince(series, row?.at ?? null, silentSince, now)
-        : inputs.memory(check.node, check.key).since,
+        ? unknownSince(series, row?.at ?? null, overlay.silentSince, now)
+        : status === 'paused'
+          ? pausedSince(overlay.pauses, now)
+          : inputs.memory(check.node, check.key).since,
     every: check.probe_every ?? 0,
     staleAfter: staleAfterSecondsOf(check),
     origin: originOf(check),

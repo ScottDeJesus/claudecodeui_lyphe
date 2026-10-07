@@ -6,17 +6,19 @@ import { pipeline } from 'node:stream/promises';
 import { findApplicationRoot, getModuleDirectory } from '@/shared/utils.js';
 
 import { wardenHttpPrefixRoutes, wardenHttpRoutes } from './warden-gateway.js';
+import { wardenDistDirectory } from './warden-release.js';
 
 /**
  * The warden's install files, served on the gateway: the three GETs that turn `warden/` into a
  * running unit on a node (`warden/enroll.sh` is the client of all three).
  *
  *   GET /cerberus/enroll.sh               `warden/enroll.sh` with its address marker replaced by `http://<CERBERUS_LISTEN>`
- *   GET /cerberus/warden/latest.json      `dist-warden/latest.json`: the release a node should fetch
- *   GET /cerberus/warden/<file>           `dist-warden/<file>`, for `cerberus-warden-<x.y.z>.tar.gz` only, streamed
+ *   GET /cerberus/warden/latest.json      `latest.json` of the build directory: the release a node should fetch
+ *   GET /cerberus/warden/<file>           `<file>` of the build directory, for `cerberus-warden-<x.y.z>.tar.gz` only, streamed
  *
- * `npm run build:warden` writes `dist-warden/`. A build is live the moment it lands: every request
- * reads the disk, nothing is cached, so a new version needs no restart. Nothing served is a secret —
+ * The build directory is `CERBERUS_WARDEN_DIST`, else `<repo>/dist-warden` where `npm run build:warden` writes
+ * (`warden-release.ts` names it, and the updates driver offers the release from the same place). A build is
+ * live the moment it lands: every request reads the disk, nothing is cached, so a new version needs no restart. Nothing served is a secret —
  * the script and the release are public source, and the gateway answers no login.
  *
  * WHY THE ADDRESS IS WRITTEN INTO THE SCRIPT. The script is piped into `sudo sh` as root, so the
@@ -44,7 +46,7 @@ const SAFE_LISTEN = /^[A-Za-z0-9.:[\]-]+$/;
 
 const NOT_BUILT_LINE = 'No warden has been built — run npm run build:warden';
 
-/** Where `warden/` and `dist-warden/` are: the application root, the same before and after compilation. */
+/** Where `warden/` is: the application root, the same before and after compilation. */
 function applicationRoot(): string {
   return findApplicationRoot(getModuleDirectory(import.meta.url));
 }
@@ -74,7 +76,7 @@ function enrollScriptHandler(centerUrl: string): (req: http.IncomingMessage, res
 async function latestJsonHandler(_req: http.IncomingMessage, res: http.ServerResponse): Promise<void> {
   let latest: Buffer;
   try {
-    latest = await fsp.readFile(path.join(applicationRoot(), 'dist-warden', 'latest.json'));
+    latest = await fsp.readFile(path.join(wardenDistDirectory(), 'latest.json'));
   } catch (error) {
     if (!isMissingFile(error)) throw error;
     answerText(res, 404, NOT_BUILT_LINE);
@@ -95,7 +97,7 @@ async function releaseFileHandler(req: http.IncomingMessage, res: http.ServerRes
   // belongs to the stream from `createReadStream` on and closes when the stream does.
   let handle: fsp.FileHandle;
   try {
-    handle = await fsp.open(path.join(applicationRoot(), 'dist-warden', fileName), 'r');
+    handle = await fsp.open(path.join(wardenDistDirectory(), fileName), 'r');
   } catch (error) {
     if (!isMissingFile(error)) throw error;
     answerText(res, 404, NOT_BUILT_LINE);
@@ -125,4 +127,16 @@ export function registerWardenFileRoutes(listen: string): void {
   wardenHttpRoutes.set('/cerberus/enroll.sh', enrollScriptHandler(`http://${listen}`));
   wardenHttpRoutes.set(`${WARDEN_FILE_PREFIX}latest.json`, latestJsonHandler);
   wardenHttpPrefixRoutes.set(WARDEN_FILE_PREFIX, releaseFileHandler);
+}
+
+/**
+ * The absolute address a warden fetches a release tarball from: `http://<listen><prefix><file>`, built
+ * from the configured `CERBERUS_LISTEN` the way the enroll script's address is — never from a request's
+ * `Host`, which a node may not reach. `null` when `listen` holds characters outside a host and port or
+ * `file` is not a name the file route serves, so an offer never carries an address the route would 404.
+ * Consumers: `update-driver.ts`, for the `url` of an `update.offer`.
+ */
+export function wardenReleaseUrl(listen: string, file: string): string | null {
+  if (!SAFE_LISTEN.test(listen) || !RELEASE_FILE_NAME.test(file)) return null;
+  return `http://${listen}${WARDEN_FILE_PREFIX}${file}`;
 }

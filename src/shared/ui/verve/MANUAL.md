@@ -104,19 +104,20 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/main.tsx, /home/lyphe/.claud
 ## MAN-740 — The library those tokens paint
 section: README/002 The library those tokens paint
 
-30 components carry Verve paint (2026-10-06: a file in `src/shared/ui/` that puts a `.vv-*` class in its markup; a comment naming one does not count, and `Toast` with `ToastStack`, `Tabs` with `TabsMore` count once). The sheet that paints each (rule 6):
+31 components carry Verve paint (2026-10-07: a file in `src/shared/ui/` that puts a `.vv-*` class in its markup; a comment naming one does not count, and `Toast` with `ToastStack`, `Tabs` with `TabsMore` count once). The sheet that paints each (rule 6):
 
 | sheet | components |
 |---|---|
 | `controls.css` | Button, Badge, Input, Card, Shimmer, Chip, Switch, Avatar, Meter, Spinner, Field, Select, Stepper |
 | `feedback.css` | Banner, Toast, Tabs, EmptyState, Menu, Dialog, Tooltip, ActionMenu |
 | `surfaces.css` | DockableFab, SplitPane, ResizeGrip |
-| `panels.css` | TextArea, Sheet, Timeline, Steps |
+| `panels.css` | TextArea, Sheet, Timeline, Steps, Checkbox |
 | `board.css` | KanbanLane, KanbanCard |
 
 - `Sheet` (a panel on the right edge over a scrim), `Timeline` (an event feed, dense or full; props and open-row rules: MAN-7847) and `Steps` (Verve's navigation stepper) joined for the Cerberus tab: `CheckSheet`, Fleet's "What happened" and History's feed, the Enroll dialog. `TextArea` joined for the roadmap's goal field; the Mute dialog's reason takes it too.
 - `Steps`, not `Stepper`: `Stepper` is the house's numeric minus/plus control and has its own consumers, and Verve's bundle gives its navigation component the same name. `Steps` shows where a flow stands: numbered rounds, a ✓ once done, an accent rail between; a step is not pressable.
 - `TextArea` wears `Input`'s `.vv-input` paint (`controls.css`) and adds only its geometry in `panels.css`.
+- `Checkbox` is Verve's `forms/Checkbox`, in the library because Verve draws it; its first consumer is the Cerberus Update wardens dialog. A real `<input type="checkbox">` hidden with `sr-only`, its box and ✓ painted from the input's own `:checked`, `:disabled` and `:focus-visible` by sibling selectors, so the state has one home. The focus ring is `Input`'s (2px `--accent`, 2px offset) moved onto the box; the rule that silences the hidden input's own ring has three class-level parts because `src/index.css` pins `input[type="checkbox"]:focus` at (0,2,1). Its `className` is size and flow on the `<label>`, the press target, never paint: the dialog's rows pass `py-3`, so a whole row is one 44 px target.
 - `DockableFab`, `SplitPane` and `ResizeGrip` were admitted on the barrel's *mechanism* test, not its two-module rule (`index.ts`'s own header). `ResizeGrip`'s one consumer is `ChatHostPanel`.
 - `ConfirmDialog` was admitted on the two-module rule and paints nothing of its own: it is `Dialog` and `Button`, both already painted. It is not in the table.
 
@@ -143,14 +144,14 @@ What they share is the contract every later one joins:
    (`~/.claude/plans/cloudcli-verve-integration.md`), or a real call. A prop nobody passes is a
    prop nobody proves: `Card`'s `interactive` has no consumer today.
 6. **A stylesheet at its ceiling opens a new file; it never wins lines back by squeezing what is
-   there.** The barrel imports five sheets, in this order (lines measured 2026-10-06):
+   there.** The barrel imports five sheets, in this order (lines measured 2026-10-07):
 
    | import | sheet | opened | lines | also holds |
    |---|---|---|---|---|
-   | 1 | `controls.css` | 1st | 493 | past its stated ceiling (the headers of `surfaces.css` and `panels.css` say so) |
+   | 1 | `controls.css` | 1st | 496 | past its stated ceiling (the headers of `surfaces.css` and `panels.css` say so) |
    | 2 | `feedback.css` | 2nd | 438 | — |
    | 3 | [`surfaces.css`](surfaces.css) | 4th | 367 | the `body.vv-dragging` / `vv-drag-fab` / `vv-drag-split` / `vv-drag-resize` classes a drag of any piece sets for its length (why a new file: that sheet's own header) |
-   | 4 | [`panels.css`](panels.css) | 5th | 220 | `.vv-input`'s colours and ground said back over `src/index.css`'s `!important` pins on every bare `textarea` (the piece's own header says why) |
+   | 4 | [`panels.css`](panels.css) | 5th | 284 | `.vv-input`'s colours and ground said back over `src/index.css`'s `!important` pins on every bare `textarea` (the piece's own header says why) |
    | 5 | `board.css` | 3rd | 227 | the `.vv-lane`, `.vv-lane__head` and `.vv-lane-card` rules and their variants |
 
    `panels.css` is the fifth sheet opened and the fourth imported. The order is load-bearing at one end:
@@ -166,7 +167,7 @@ What they share is the contract every later one joins:
 Which components exist at all, and when a screen composes instead of asking for a new one, is
 doctrine §1–§3. Read it there, not here.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Sheet.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Steps.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/TextArea.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Timeline.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/verve/panels.css
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Checkbox.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Sheet.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Steps.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/TextArea.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Timeline.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/verve/panels.css
 
 ## MAN-741 — The overlay half
 section: README/003 The overlay half
@@ -211,17 +212,22 @@ Tabs, EmptyState and Menu new, Dialog, Tooltip and ActionMenu restyled.
   outright, which would overwrite the `-translate-*` that centres the panel. The retuned
   `animate-dialog-content-show` is that motion carried onto a centred box.
 
-## MAN-742 — Two open design-language questions
-section: README/004 Two open design-language questions
+## MAN-742 — Three open design-language questions
+section: README/004 Three open design-language questions
 
-Both are measured facts about Verve's own palette, recorded rather than fixed. Changing either
-means picking a colour Verve did not, which is the operator's call:
+All three are measured facts about Verve's own palette, recorded rather than fixed. Changing any of
+them means picking a colour Verve did not, which is the operator's call:
 
 - The accent on the canvas measures **2.81:1** in light, under the 3:1 floor for graphics.
   Verve spends the accent on actions and focus, never on body text.
 - `text-destructive` on the canvas measures **3.17:1** in dark, below AA. Verve's `.dark` block
   lightens nearly everything but never redeclares `--danger`, though it does ship
   `--danger-ink` for exactly this ink-on-canvas role.
+- An unticked `Checkbox`'s edge, `--border-strong` on `--surface`, measures **1.41:1** in light and
+  **1.57:1** in dark, under the 3:1 a control's outline needs (WCAG 1.4.11). It is Verve's own
+  `forms/Checkbox` draw, a 1.5px `--border-strong` edge (`_ds_bundle.js` :1570). Its first screen,
+  the Cerberus Update wardens dialog, opens with every box it offers ticked, so an empty box there
+  is one the operator emptied.
 
 ## MAN-743 — What a composed screen looks like
 section: README/005 What a composed screen looks like

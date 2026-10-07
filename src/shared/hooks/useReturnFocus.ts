@@ -12,7 +12,7 @@ import { useEffect } from 'react';
  *
  * Used by the dispatcher module (`DeletePlanDialog`), the roadmap module's dialogs (`ItemDialog`,
  * `FeatureDialog`, `MoveDialog`, `BlockDialog`, `DeleteDialog`, `PromoteDialog`) and the cerberus
- * module's (`MuteDialog`, `EnrollDialog`).
+ * module's (`MuteDialog`, `EnrollDialog`, `PromoteDialog`, `UpdateWardensDialog`).
  */
 export function useReturnFocus(): void {
   useEffect(() => {

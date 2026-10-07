@@ -43,10 +43,11 @@ export function makeEnvelope(node, type, seq, body) {
 
 /**
  * The `hello` body (`CerberusHelloBody`). `known` is what the warden holds that center versions:
- * `{ checksVersion, catalogVersion, active }`, each defaulting to "nothing yet".
+ * `{ checksVersion, catalogVersion, active }`, each defaulting to "nothing yet". `update` is the update
+ * this process was started after (`update.mjs`), left out of the body when there is none.
  */
-export function buildHello({ checksVersion = null, catalogVersion = null, active = { runs: [], diags: [] } } = {}) {
-  return { version, startedAt, facts: hostFacts(), checksVersion, catalogVersion, active };
+export function buildHello({ checksVersion = null, catalogVersion = null, active = { runs: [], diags: [] }, update } = {}) {
+  return { version, startedAt, facts: hostFacts(), checksVersion, catalogVersion, active, ...(update ? { update } : {}) };
 }
 
 // --- the upgrade headers --------------------------------------------------------------------------

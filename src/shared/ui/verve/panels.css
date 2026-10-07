@@ -1,5 +1,6 @@
-/* Verve panel paint — the rules for the pieces that do not fit the first two sheets: TextArea, and
- * the three the Cerberus tab draws its detail with — Sheet, Timeline and Steps.
+/* Verve panel paint — the rules for the pieces that do not fit the first two sheets: TextArea, the
+ * three the Cerberus tab draws its detail with — Sheet, Timeline and Steps — and the Checkbox its
+ * Update wardens dialog ticks nodes with.
  *
  * The fifth paint file, opened rather than squeezed in: controls.css is past its stated ceiling,
  * feedback.css is at it, surfaces.css belongs to the three kit pieces that are mechanism, and
@@ -23,8 +24,8 @@
  * Imported once, for side effect, from src/shared/ui/index.ts — after surfaces.css and before
  * board.css, which keeps the last word. Nothing here depends on its place against controls.css or
  * against src/index.css, which lands after this sheet: whatever has to beat `.vv-input`, a utility
- * in the class string or one of index.css's pins does so on specificity. The Sheet, Timeline and
- * Steps rules share no selector with any sibling, so for them the order decides nothing.
+ * in the class string or one of index.css's pins does so on specificity. The Sheet, Timeline, Steps
+ * and Checkbox rules share no selector with any sibling, so for them the order decides nothing.
  */
 
 /* ---------------------------------------------------------------- TextArea */
@@ -150,6 +151,18 @@
  * source pill's text is --ink-mid on --surface2 (--ink-muted there is 4.46:1, a hair under AA at
  * 11px). The row is a button, so its own chrome is reset here rather than left to a base layer. */
 .vv-timeline__item + .vv-timeline__item { border-top: 1px solid var(--surface2); }
+/* STACKED OR SIDE BY SIDE IS THE LIST'S DECISION. The list is a container: under 32rem every row drops its words
+ * under its source pill; from 32rem every row sets them beside it, the pill capped at 45% of the row so the words
+ * keep their 10rem. A wrap decided row by row put the title of a short-pilled row beside it and the title of a
+ * long-pilled one under it, so one list's titles started in two places. */
+.vv-timeline { container: vv-timeline / inline-size; }
+.vv-timeline__body { display: flex; flex: 1 1 0%; flex-direction: column; align-items: flex-start; gap: 4px; min-width: 0; }
+.vv-timeline__words { align-self: stretch; min-width: 0; }
+@container vv-timeline (min-width: 32rem) {
+  .vv-timeline__body { flex-direction: row; column-gap: 10px; }
+  .vv-timeline__source { max-width: 45%; }
+  .vv-timeline__words { flex: 1 1 10rem; align-self: auto; }
+}
 .vv-timeline__row {
   padding: 11px 2px;
   border: 0;
@@ -162,6 +175,10 @@
 .vv-timeline__dot { width: 8px; height: 8px; margin-top: 7px; border-radius: 50%; flex: none; }
 .vv-timeline__source {
   flex: none;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   padding: 2px 8px;
   border-radius: var(--radius-pill);
   background: var(--surface2);
@@ -218,3 +235,50 @@
 /* The bottom margin lifts the rail to the rounds' centre line: the label hangs below them. */
 .vv-steps__rail { width: 52px; height: 2px; margin: 0 8px 20px; border-radius: 2px; background: var(--border); transition: background-color 0.3s; }
 .vv-steps__rail[data-filled] { background: var(--accent); }
+
+/* ---------------------------------------------------------------- Checkbox */
+/* Verve's forms/Checkbox (`_ds_bundle.js`): a 20px box, 6px corners, a 1.5px --border-strong edge on the
+ * --surface ground; ticked it takes the --accent edge and fill and the ✓ in --on-accent (Verve says
+ * #fff, which dark mode would need to flip — --on-accent is the pair already measured against
+ * --accent, as `.vv-steps__round` spends it). The real input is `sr-only` in the component and this
+ * sheet paints its sibling box from the input's own `:checked`, `:disabled` and `:focus-visible`, so
+ * the pixels cannot disagree with the form control a screen reader reads. The ✓ is always in the DOM
+ * and pops in on --ease-spring ("pops, knobs, checkmarks", tokens.css); the box fill is a quick
+ * colour move. */
+.vv-checkbox { color: var(--ink); cursor: pointer; }
+.vv-checkbox:has(.vv-checkbox__input:disabled) { cursor: not-allowed; }
+.vv-checkbox__box {
+  box-sizing: border-box;
+  border: 1.5px solid var(--border-strong);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--on-accent);
+  transition: background-color var(--dur-quick), border-color var(--dur-quick);
+}
+.vv-checkbox__tick {
+  line-height: 1;
+  opacity: 0;
+  transform: scale(0.4);
+  transition: opacity var(--dur-quick), transform 0.25s var(--ease-spring);
+}
+.vv-checkbox__input:checked + .vv-checkbox__box { border-color: var(--accent); background: var(--accent); }
+.vv-checkbox__input:checked + .vv-checkbox__box .vv-checkbox__tick { opacity: 1; transform: none; }
+/* `overflow-wrap: anywhere` because a label can be one unbroken token (a node id, a path): as a flex item
+ * its min-content would otherwise be the whole token and the row would widen past its card, as
+ * `.vv-timeline__title` records. Spaces still break first; only a token with none is cut. */
+.vv-checkbox__label { font-size: 14.5px; line-height: 1.4; color: var(--ink); overflow-wrap: anywhere; }
+
+/* The focus ring `Input` wears — tokens.css's `input:focus-visible` outline, 2px --accent at a 2px
+ * offset — moved from the hidden input onto the box the keyboard is really standing on. Three class
+ * parts on the quieted rule, because src/index.css pins `input[type="checkbox"]:focus` to that same
+ * outline at (0,2,1), which a two-part rule would lose to on specificity: a mouse press would otherwise
+ * ring the invisible input. The box rings on `:focus-visible` only, so a pointer press draws none. */
+.vv-checkbox .vv-checkbox__input:focus { outline: none; }
+.vv-checkbox__input:focus-visible + .vv-checkbox__box { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* Disabled is `.vv-input:disabled`'s look (controls.css): the --surface2 ground, the quiet --border edge
+ * and --ink-faint words. A ticked-and-disabled box has no accent left to press, so it greys to
+ * --ink-faint and keeps its ✓: the state still reads from the mark and the pointer, not from colour. */
+.vv-checkbox__input:disabled + .vv-checkbox__box { border-color: var(--border); background: var(--surface2); }
+.vv-checkbox__input:disabled:checked + .vv-checkbox__box { border-color: var(--ink-faint); background: var(--ink-faint); }
+.vv-checkbox__input:disabled ~ .vv-checkbox__label { color: var(--ink-faint); }

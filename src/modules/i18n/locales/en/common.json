@@ -1773,6 +1773,8 @@
       "waiting": "Waiting for the first heartbeat",
       "nothingAssigned": "Nothing assigned yet",
       "restarting": "Warden restarting",
+      "updating": "Updating · {{step}}",
+      "updatingWarden": "Updating its warden",
       "bad": "{{label}} — {{word}}",
       "mutedCheck": "Passing · muted check",
       "allPassing_one": "Its service is passing",
@@ -1836,12 +1838,30 @@
         "autoOn": "Auto-run on · “{{name}}”",
         "autoOff": "Auto-run off · “{{name}}”"
       },
+      "diagnosis": {
+        "asked": "You asked for a diagnosis",
+        "askedSummary": "{{label}} · read-only",
+        "ready": "Diagnosis ready",
+        "failed": "Diagnosis failed"
+      },
+      "warden": {
+        "started": "You started a warden update to {{to}}",
+        "startedSummary_one": "{{count}} node · one at a time",
+        "startedSummary_other": "{{count}} nodes · one at a time",
+        "updated": "Warden on {{node}} updated to {{to}}",
+        "updatedKept": "Warden on {{node}} updated to {{to}} · {{from}} kept for rollback",
+        "rolledBack": "Warden on {{node}} rolled back to {{from}}",
+        "rolledBackUnknown": "Warden on {{node}} rolled back",
+        "failed": "Warden on {{node}} could not update to {{to}}"
+      },
       "source": {
         "fix": "Fix",
         "catalog": "Catalog",
         "check": "Check",
         "mute": "Mute",
-        "node": "Node"
+        "node": "Node",
+        "diagnosis": "Diagnosis",
+        "warden": "Warden"
       },
       "check": {
         "ok": "{{label}} passes again",
@@ -2007,6 +2027,69 @@
         "legend": "Fix running or updating"
       }
     },
+    "diagnosis": {
+      "eyebrow": "Diagnosis · read-only",
+      "reading": "Reading…",
+      "ready": "Ready {{time}}",
+      "failed": "Failed",
+      "scope": "Read-only on {{node}}. It reads logs, status and Cerberus history. It can't run fixes or change files.",
+      "steps_one": "{{count}} step · {{from}}",
+      "steps_other": "{{count}} steps · {{from}}–{{to}}",
+      "proposal": {
+        "title": "Proposed fix",
+        "runOnce": "Run it once",
+        "addToCatalog": "Add to catalog",
+        "running": "Running now — output below",
+        "ranOnce": "Ran once at {{time}} · {{result}} · the catalog is unchanged",
+        "result": {
+          "ok": "succeeded",
+          "failed": "failed",
+          "timedOut": "timed out"
+        },
+        "refused": "The warden refused it at {{time}} · the catalog is unchanged",
+        "expired": "Its one-off ran out at {{time}} · Diagnose again to run it once.",
+        "unpublished": "Its one-off never reached {{node}}'s warden · Diagnose again to run it once.",
+        "promotedOff": "In the catalog as “{{name}}” · auto-run off",
+        "promotedOn": "In the catalog as “{{name}}” · auto-run on",
+        "promotedRetired": "Added to the catalog as “{{name}}” · since retired",
+        "note": "Running it once leaves the catalog alone. Adding it lets Cerberus offer it next time.",
+        "noteAdd": "Adding it lets Cerberus offer it next time.",
+        "none": "No fix proposed."
+      },
+      "diagnose": "Diagnose",
+      "diagnosing": "Diagnosing…",
+      "see": "See diagnosis",
+      "again": "Diagnose again",
+      "hint": "Diagnose it — a good diagnosis can become one."
+    },
+    "promote": {
+      "title": "Add to the",
+      "accent": "catalog",
+      "from_one": "From the diagnosis at {{time}} · read-only · {{count}} piece of evidence",
+      "from_other": "From the diagnosis at {{time}} · read-only · {{count}} pieces of evidence",
+      "name": "Name",
+      "nameHelper": "What you'll see on the fix button.",
+      "when": "When",
+      "runs": "Runs",
+      "generalized": "The diagnosis used {{used}}. It's saved as “{{saved}}” so it works next time.",
+      "last": "the last {{window}}",
+      "exact": "Saved exactly as the diagnosis proposed it.",
+      "auto": "Run it on its own",
+      "autoOff": "Off — Cerberus offers it and you press it. You can turn it on later.",
+      "autoOn": "Runs on its own when the check fails, at most {{limit}}.",
+      "autoOn_warn": "Runs on its own when the check nears its limit, at most {{limit}}.",
+      "limit": "Limit",
+      "limitHelper": "It never runs more often than this, even if the check keeps failing.",
+      "perHour_one": "{{count}} run an hour",
+      "perHour_other": "{{count}} runs an hour",
+      "cancel": "Cancel",
+      "confirm": "Add to catalog",
+      "toast": {
+        "title": "Added to the catalog",
+        "messageOff": "{{name}} · auto-run off",
+        "messageOn": "{{name}} · auto-run on"
+      }
+    },
     "mute": {
       "title": "Mute",
       "raw": "{{service}} · {{key}} · now {{value}}",
@@ -2065,6 +2148,33 @@
       "helloAccent": "hello",
       "done": "{{name}} is enrolled · warden {{version}} · first heartbeat {{time}}",
       "inFleet": "It's in Fleet now, with nothing on it yet. Checks appear as soon as a service is assigned to it.",
+      "finish": "Done"
+    },
+    "updates": {
+      "button": {
+        "update": "Update wardens to {{version}}",
+        "updating": "Updating wardens · {{index}} of {{total}}",
+        "upToDate": "Wardens up to date"
+      },
+      "title": "Update",
+      "titleAccent": "wardens",
+      "note": "Warden {{version}} · {{note}}. One node at a time; its checks pause for about 3 s while the warden restarts.",
+      "kept_one": "{{from}} is kept for rollback.",
+      "kept_other": "{{from}} are kept for rollback.",
+      "versions": "{{rest}} and {{last}}",
+      "node": "{{node}} · warden {{version}}",
+      "current": "Already on {{version}}",
+      "queued": "Waiting its turn",
+      "updated": "Updated",
+      "rolledBack": "Rolled back to {{from}}",
+      "cancel": "Cancel",
+      "start_one": "Update {{count}} node",
+      "start_other": "Update {{count}} nodes",
+      "running": "Closing this doesn't stop it.",
+      "close": "Close",
+      "done": "Every selected warden is on {{version}}.",
+      "missed_one": "{{count}} selected warden isn't on {{version}}.",
+      "missed_other": "{{count}} selected wardens aren't on {{version}}.",
       "finish": "Done"
     },
     "time": {

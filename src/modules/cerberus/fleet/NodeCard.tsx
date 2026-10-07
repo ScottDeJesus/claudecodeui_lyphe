@@ -4,6 +4,7 @@ import { useCerberus } from '@/modules/cerberus/context/CerberusContext';
 import { groupOf, runOnService } from '@/modules/cerberus/fleet/fleetModel';
 import { NodeProjects } from '@/modules/cerberus/fleet/NodeProjects';
 import { ServiceRow } from '@/modules/cerberus/fleet/ServiceRow';
+import { UpdatingPill } from '@/modules/cerberus/fleet/UpdatingPill';
 import { StatusGlyph, StatusSquare } from '@/modules/cerberus/StatusMarks';
 import { markLook, nodeMark } from '@/modules/cerberus/utils/cerberusStatus';
 import { isRestarting, nodeLine, serviceSentence, sessionsTail, wardenLine } from '@/modules/cerberus/utils/fleetWords';
@@ -31,24 +32,26 @@ const TILE_EDGE: Record<CerberusCellShape, string> = {
 const UNMARKED_EDGE = 'border-[1.5px] border-dashed border-input';
 
 /**
- * The node's round glyph from the table, or an empty dashed round when its word has no mark.
+ * The node's round glyph from the table, or an empty dashed round when its word has no mark. An updating
+ * node wears the fixing ●, and names itself "Updating its warden".
  *
  * Used by this card and by the rings' `RingsNodePanel`, which heads a selected node with the glyph its
  * card wears.
  */
 export function NodeGlyph({ status, size }: { status: FleetStatus; size: 'sm' | 'md' }) {
+  const { t } = useTranslation();
   const mark = nodeMark(status);
   if (mark === null) {
     return <span aria-hidden className={cn('flex-none rounded-full border border-dashed border-input', size === 'sm' ? 'size-5' : 'size-6')} />;
   }
-  return <StatusGlyph status={mark} size={size} />;
+  return <StatusGlyph status={mark} size={size} label={status === 'updating' ? t('cerberus.node.updatingWarden') : undefined} />;
 }
 
 /**
  * The warden's heartbeat: the positive dot breathing while the node reports, the neutral dot still
- * while it is silent, restarting for an update, or not yet heard. Given a `name` (its warden line) it
- * is an image a reader can hover and hear, where no line beside it says the same; without one it is
- * decoration.
+ * while it is silent, restarting for an update (`link` `paused`), or not yet heard. Given a `name` (its
+ * warden line) it is an image a reader can hover and hear, where no line beside it says the same; without
+ * one it is decoration.
  *
  * Used by this card and by the rings' `RingsNodePanel`, beside a selected node's warden line.
  */
@@ -129,8 +132,12 @@ const STAGGER_PLACES = 24;
  * band under its row, where an empty node is one sentence at the band's indent, as the list's rows are.
  *
  * Every mark is the one table's: the glyph, the squares, and the tile's edge by its cell shape. A node
- * with a fix running is `fixing`: the info ●, its tile edged in the info dot. `enrolling` is the updates
- * plan's word; until it is fed, no node reads it, and it draws as a node with no mark.
+ * with a fix running is `fixing`: the info ●, its tile edged in the info dot. A node with an update
+ * queued or running is `updating`, which draws that same ● and says so: a pill on a list row and on an
+ * open card ("Updating · Restarting the warden", `UpdatingPill`), and "Updating its warden" as the
+ * collapsed tile's line, which has no room for a pill. While its warden restarts its heartbeat dot stands
+ * neutral and its warden line reads "Warden 0.4.2 · restarting". `enrolling` is a held place; until
+ * something feeds it, no node reads it, and it draws as a node with no mark.
  *
  * Used by Fleet's `FleetGrid` and `FleetList`, once per node of the page.
  */
@@ -192,7 +199,7 @@ export function NodeCard({ item, node, open, face, index, narrow = false, now, o
           <span data-tone={loud ? tone : undefined} className={cn('min-w-0 flex-[1_1_200px] truncate text-[13px]', loud ? 'text-tone-ink' : 'text-muted-foreground')}>
             {line}
           </span>
-          {/* SLOT: updating — the updates plan's "Updating · <step>" pill (info, `vv-pulse`) stands here, before the warden line. */}
+          {node.updating !== null && <UpdatingPill updating={node.updating} />}
           {!narrow && ownWardenLine && (
             <span className="inline-flex flex-none items-center gap-[7px] text-xs text-muted-foreground">
               <Heartbeat node={node} />
@@ -235,7 +242,7 @@ export function NodeCard({ item, node, open, face, index, narrow = false, now, o
             <span className="text-base font-bold tracking-[-0.01em]">{item.id}</span>
             {item.desc !== null && <span className="text-[13px] text-muted-foreground">{item.desc}</span>}
             <span className="ml-auto flex flex-wrap items-center gap-2 text-[12.5px] text-muted-foreground">
-              {/* SLOT: updating — the updates plan's "Updating · <step>" pill (info, `vv-pulse`) stands here, before the warden line. */}
+              {node.updating !== null && <UpdatingPill updating={node.updating} />}
               <span className="inline-flex items-center gap-[7px]">
                 <Heartbeat node={node} />
                 {warden}

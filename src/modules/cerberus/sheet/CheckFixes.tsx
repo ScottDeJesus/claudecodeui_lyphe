@@ -5,7 +5,6 @@ import { useTranslation } from 'react-i18next';
 import { useCerberus } from '@/modules/cerberus/context/CerberusContext';
 import type { CerberusCatalogEntryView, CerberusRunView } from '@/shared/cerberus-types';
 import { Button } from '@/shared/ui';
-import { cn } from '@/shared/utils';
 
 /** What an entry does on its own, as the sheet says it: its capped reason, "Runs on its own · at most 2 runs an hour", or "Offered · you press it". */
 function autoLine(t: TFunction, { capped, auto, limit }: CerberusCatalogEntryView): string {
@@ -23,14 +22,14 @@ type CheckFixesProps = {
 
 /**
  * FIXES IN THE CATALOG: the entries that fix this check, each with Run now (`design/cerberus/Cerberus
- * Tab.dc.html` :489-504). In the check sheet, under Fix output.
+ * Tab.dc.html` :489-504). In the check sheet, under Fix output and the diagnosis.
  *
  * Each entry is a row: its name, its command after a `$`, and what it does on its own — the capped reason,
  * "Runs on its own · at most 2 runs an hour", or "Offered · you press it" — then Run now (tonal). The
  * entry whose run is going reads "Running…" and keeps its place in the tab order (`aria-disabled`, never
  * `disabled`, which blurs the button under the person who pressed it); every other entry waits, disabled,
- * since center takes one run on a check at a time. With no entry on the check, a dashed line says so:
- * "No catalog fix covers this check yet."
+ * since center takes one run on a check at a time. With no entry on the check, a dashed line says so, and where
+ * the way to one is: "No catalog fix covers this check yet. Diagnose it — a good diagnosis can become one."
  *
  * For the check sheet (`CheckSheet`), with the check's read.
  */
@@ -49,7 +48,9 @@ export function CheckFixes({ fixes, run }: CheckFixesProps) {
     <section aria-labelledby={headingId} className="flex flex-col gap-2">
       <h4 id={headingId} className="m-0 text-xs font-normal uppercase tracking-[0.14em] text-muted-foreground">{t('cerberus.fix.sheet.title')}</h4>
       {fixes.length === 0 ? (
-        <p className="rounded-xl border border-dashed border-input px-4 py-3.5 text-[13px] text-muted-foreground">{t('cerberus.fix.sheet.none')}</p>
+        <p className="rounded-xl border border-dashed border-input px-4 py-3.5 text-[13px] text-muted-foreground">
+          {t('cerberus.fix.sheet.none')} {t('cerberus.diagnosis.hint')}
+        </p>
       ) : (
         <ul className="flex flex-col gap-2">
           {fixes.map((entry) => {
@@ -65,10 +66,10 @@ export function CheckFixes({ fixes, run }: CheckFixesProps) {
                   variant="tonal"
                   size="sm"
                   disabled={going !== null && !busy}
-                  aria-disabled={busy || undefined}
+                  busy={busy}
                   // One width for both words, so the row does not reflow when a run starts or ends.
-                  className={cn('min-w-24', busy && 'cursor-not-allowed opacity-70')}
-                  onClick={busy ? undefined : () => onRun(entry)}
+                  className="min-w-24"
+                  onClick={() => onRun(entry)}
                 >
                   {busy ? t('cerberus.catalog.running') : t('cerberus.catalog.runNow')}
                 </Button>

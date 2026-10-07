@@ -105,13 +105,9 @@ export function EnrollInstall({ issued, status, copied, issuing, refusal, onCopy
               variant="tonal"
               size="sm"
               autoFocus
-              className="mt-2.5 h-8 px-3 aria-disabled:cursor-not-allowed aria-disabled:opacity-60 max-md:h-11"
-              aria-disabled={issuing || undefined}
-              aria-busy={issuing || undefined}
-              onClick={() => {
-                // aria-disabled keeps the focus the button holds while the ask is out; the press is ignored here.
-                if (!issuing) onReissue();
-              }}
+              className="mt-2.5 h-8 px-3 max-md:h-11"
+              busy={issuing}
+              onClick={onReissue}
             >
               {t('cerberus.enroll.getNewCommand')}
             </Button>

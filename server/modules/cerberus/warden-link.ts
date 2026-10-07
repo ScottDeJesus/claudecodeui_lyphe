@@ -15,6 +15,7 @@ import { catalogForWelcome, markCatalogSent } from './catalog.service.js';
 import { hintChanged } from './cerberus-broadcast.js';
 import { signText } from './center-key.js';
 import { checksSetFor } from './definitions.service.js';
+import { readHelloUpdate } from './hello-update.js';
 import { ingest } from './ingest.service.js';
 import type { WardenAuthResult } from './warden-auth.js';
 import { enrollNode, issueCert } from './warden-enrollment.js';
@@ -80,6 +81,10 @@ type ReadHello = {
   activeRuns: string[] | null;
   /** The runs that are over but whose frames still wait on the warden's outbox; null when it does not report them. */
   owedRuns: string[] | null;
+  /** The diagnoses the warden holds open; null when it does not say (a build older than diagnoses). */
+  activeDiags: string[] | null;
+  /** How an update ended, when this hello is the first of the process the update restarted; null otherwise. */
+  update: ReturnType<typeof readHelloUpdate>;
 };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -102,6 +107,7 @@ function readHello(body: unknown): ReadHello | null {
   const machineId = body.facts.machineId;
   const runs = isRecord(body.active) ? body.active.runs : undefined;
   const owed = isRecord(body.active) ? body.active.owed : undefined;
+  const diags = isRecord(body.active) ? body.active.diags : undefined;
   const textList = (value: unknown): string[] | null =>
     Array.isArray(value) && value.every((item) => typeof item === 'string') ? (value as string[]) : null;
   return {
@@ -115,6 +121,8 @@ function readHello(body: unknown): ReadHello | null {
     startedAt: typeof body.startedAt === 'number' && Number.isFinite(body.startedAt) ? body.startedAt : null,
     activeRuns: textList(runs),
     owedRuns: textList(owed),
+    activeDiags: textList(diags),
+    update: readHelloUpdate(body.update),
   };
 }
 

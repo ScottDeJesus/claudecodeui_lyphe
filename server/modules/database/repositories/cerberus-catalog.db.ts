@@ -24,7 +24,9 @@ import { getCerberusConnection } from '@/modules/database/cerberus-connection.js
  *
  * Consumers: `server/modules/cerberus/` — the catalog service (`insert`, `get`, `setAuto`, `retire`,
  * the change and set statements), the auto-run rule (`forCheck`), the read model (`list`, `forCheck`,
- * `changes` for What happened). Reach it through `@/modules/database/index.js`. Every statement runs
+ * `changes` for What happened, `promotedFrom` for a diagnosis's `promotedTo`) and the diagnosis
+ * promotion (`promotedFrom`, so a diagnosis is written into the catalog once). Reach it through
+ * `@/modules/database/index.js`. Every statement runs
  * on the caller's connection and opens no transaction of its own — the catalog service's "a toggle
  * and its change row land together" is its own.
  */
@@ -138,6 +140,26 @@ export const cerberusCatalogDb = {
           ORDER BY created_at, id`
       )
       .all(node, key) as CerberusCatalogRow[];
+  },
+
+  /**
+   * The entry each of `diagnoses` was promoted into, keyed by diagnosis id — retired entries included,
+   * since a diagnosis stays promoted after its entry is withdrawn. A diagnosis never promoted has no
+   * entry here. `origin` is JSON text, so the match reads it with `json_extract`; the ids travel as one
+   * JSON text, so the statement never grows with them. The oldest wins should two ever share one.
+   */
+  promotedFrom(diagnoses: string[]): Map<string, string> {
+    if (diagnoses.length === 0) return new Map();
+    const rows = getCerberusConnection()
+      .prepare(
+        `SELECT id, json_extract(origin, '$.diagnosis') AS diagnosis FROM catalog
+          WHERE json_extract(origin, '$.kind') = 'diagnosis'
+            AND json_extract(origin, '$.diagnosis') IN (SELECT value FROM json_each(@diagnoses))
+          ORDER BY created_at DESC, id DESC`
+      )
+      .all({ diagnoses: JSON.stringify(diagnoses) }) as { id: string; diagnosis: string }[];
+    // Newest first, so the oldest entry is the one written last into the map.
+    return new Map(rows.map((row) => [row.diagnosis, row.id] as const));
   },
 
   /**

@@ -6,9 +6,11 @@ import type { TimelineEvent } from '@/shared/types';
 type TimelineProps = {
   events: TimelineEvent[];
   /**
-   * `dense` is one line per row — no summary, the title cut with an ellipsis — for a card's margin. On
-   * a row too narrow for the source and a readable title side by side, the title drops under the
-   * source in either density, still one line when dense.
+   * `dense` is one line per row — no summary, the title cut with an ellipsis — for a card's margin. In a
+   * list too narrow for the source and a readable title side by side, EVERY title drops under its
+   * source, in either density, still one line when dense. The list decides once, by its own width
+   * (`.vv-timeline` is a container): a row that wrapped on its own pill's width made the titles of one
+   * list start in two places.
    */
   density?: 'full' | 'dense';
   /**
@@ -66,12 +68,11 @@ export function Timeline({ events, density = 'full', openIndex, onToggle }: Time
               onClick={() => toggle(index)}
             >
               <span data-tone={event.tone} className="vv-timeline__dot bg-tone-dot" aria-hidden />
-              {/* The source and the words share one line that wraps: a row with less than 10rem left
-                  for the words beside the pill drops them under it at the row's width. Side by side,
-                  a phone's row gave "Shadow connector" its pill and the title ~90px. */}
-              <span className="flex min-w-0 flex-1 flex-wrap items-start gap-x-2.5 gap-y-1">
-                <span className="vv-timeline__source max-w-full truncate">{event.source}</span>
-                <span className="min-w-0 flex-[1_1_10rem]">
+              {/* The source and the words: stacked, or side by side once the list is wide enough for every
+                  row to give the words 10rem beside its pill (the `@container` rule in panels.css). */}
+              <span className="vv-timeline__body">
+                <span className="vv-timeline__source">{event.source}</span>
+                <span className="vv-timeline__words">
                   <span className="vv-timeline__title block">{event.title}</span>
                   {!dense && event.summary ? <span className="vv-timeline__summary block">{event.summary}</span> : null}
                 </span>

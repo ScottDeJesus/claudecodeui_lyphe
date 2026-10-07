@@ -3,8 +3,8 @@ import type { CerberusLookup, CerberusReadInputs, CerberusStatus } from '@/share
 
 import { findActiveCheck } from './check-views.js';
 import { statusAt } from './freshness.js';
-import { silentSinceOf } from './node-links.js';
-import { layerOverlays, toMuteView } from './overlays.js';
+import { nodeOverlayOf } from './node-links.js';
+import { layerCurrent, pausedAt, toMuteView } from './overlays.js';
 import { staleAfterSecondsOf } from './series.js';
 import { shownRow } from './status-rules.js';
 
@@ -55,14 +55,15 @@ export function lookupOfCheck(check: CerberusActiveCheckRow, at: number, inputs:
   const muteRow = cerberusMutesDb.activeAt(node, key, at);
   const mute = muteRow ? toMuteView(muteRow) : null;
 
-  const silentSince = silentSinceOf(node, inputs);
-  const silent = silentSince !== null && at >= silentSince;
+  const overlay = nodeOverlayOf(node, inputs, at);
+  const silent = overlay.silentSince !== null && at >= overlay.silentSince;
 
   if (verdict === 'too_early') return answer({ verdict, status: null, mute });
   if (verdict === 'stale' || silent || row === null) {
-    return answer({ verdict: 'stale', status: 'unknown', resultAt: row?.at ?? null, mute });
+    const word: CerberusStatus = pausedAt(overlay.pauses, at) ? 'paused' : 'unknown';
+    return answer({ verdict: 'stale', status: word, resultAt: row?.at ?? null, mute });
   }
-  const status: CerberusStatus = layerOverlays(shownRow(row), at, muteRow ? [muteRow] : [], null);
+  const status: CerberusStatus = layerCurrent(shownRow(row), at, muteRow ? [muteRow] : [], overlay);
   return answer({ verdict, status, value: row.value, resultAt: row.at, mute });
 }
 

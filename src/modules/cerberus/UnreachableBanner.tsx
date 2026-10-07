@@ -18,8 +18,8 @@ import { Banner, Button } from '@/shared/ui';
  *
  * Used by the tab's root (`CerberusPanel`) while its first read of the fleet has failed and while the
  * fleet it holds is stale, by History's two cards, `LookupCard` and `EventsCard`, by the check sheet
- * (`CheckSheet`), and by the sheet's Fix output (`FixOutput`) when its run's own read failed: one spelling
- * of the state for the whole tab.
+ * (`CheckSheet`), by the sheet's Fix output (`FixOutput`) when its run's own read failed, and by the diagnosis
+ * panel (`DiagnosisPanel`) when its diagnosis's own read failed: one spelling of the state for the whole tab.
  */
 export function UnreachableBanner({ onRetry, detail }: { onRetry: () => void; detail?: string }) {
   const { t } = useTranslation();

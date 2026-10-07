@@ -14,6 +14,8 @@ type MuteActivity = Extract<CerberusActivity, { kind: 'mute' }>;
 type NodeActivity = Extract<CerberusActivity, { kind: 'node' }>;
 type FixActivity = Extract<CerberusActivity, { kind: 'fix' }>;
 type CatalogActivity = Extract<CerberusActivity, { kind: 'catalog' }>;
+type WardenActivity = Extract<CerberusActivity, { kind: 'warden' }>;
+type DiagnosisActivity = Extract<CerberusActivity, { kind: 'diagnosis' }>;
 
 /** A status as the word the tab shows for it ("Close to the limit"), from the one status table. */
 function statusWord(t: TFunction, status: CerberusStatus): string {
@@ -135,6 +137,78 @@ function catalogEvent(activity: CatalogActivity, t: TFunction, when: string): Ti
 }
 
 /**
+ * A warden update, at its moments. As a batch starts (no node: it is about all it names): "You started a
+ * warden update to 0.4.3" in the info tone, with "2 nodes · one at a time" under it. As one node's update ends:
+ * "Warden on eis1 updated to 0.4.3 · 0.4.2 kept for rollback" (positive; the tail is left out when the node had
+ * reported no version or was already on the release), "Warden on eis1 rolled back to 0.4.2" (warn: the launcher took the new release back,
+ * so `from` is the version it is on again) or "Warden on eis1 could not update to 0.4.3" (warn: the warden gave
+ * up, or went quiet for three minutes).
+ */
+function wardenEvent(activity: WardenActivity, t: TFunction, when: string): TimelineEvent {
+  const { node, from, to } = activity;
+  const base = { source: t('cerberus.activity.source.warden'), when };
+  const named = node ?? '';
+  switch (activity.event) {
+    case 'update_started':
+      return {
+        ...base,
+        tone: 'info',
+        title: t('cerberus.activity.warden.started', { to }),
+        ...(activity.nodes === undefined ? {} : { summary: t('cerberus.activity.warden.startedSummary', { count: activity.nodes }) }),
+      };
+    case 'updated':
+      return {
+        ...base,
+        tone: 'positive',
+        // Nothing was kept for rollback when the node reported no version, or was already on the release (the
+        // offer ended "Already on <v>", no swap): `from === to`.
+        title: from === null || from === to
+          ? t('cerberus.activity.warden.updated', { node: named, to })
+          : t('cerberus.activity.warden.updatedKept', { node: named, to, from }),
+      };
+    case 'rolled_back':
+      return {
+        ...base,
+        tone: 'warn',
+        title: from === null
+          ? t('cerberus.activity.warden.rolledBackUnknown', { node: named })
+          : t('cerberus.activity.warden.rolledBack', { node: named, from }),
+      };
+    case 'update_failed':
+      return { ...base, tone: 'warn', title: t('cerberus.activity.warden.failed', { node: named, to }) };
+  }
+}
+
+/**
+ * A diagnosis, at its moments. As it is asked: "You asked for a diagnosis" in a going run's info tone, with
+ * "<label> · read-only" under it. As it ends: "Diagnosis ready" with its summary under it (neutral: a diagnosis is
+ * a document, not a health signal, as its pill in the sheet is), or "Diagnosis failed" with the sentence that
+ * says why under it (the warn of a failed run). A check with no label is named by its key.
+ */
+function diagnosisEvent(activity: DiagnosisActivity, t: TFunction, when: string): TimelineEvent {
+  const base = {
+    source: t('cerberus.activity.source.diagnosis'),
+    when,
+    meta: t('cerberus.activity.meta', { service: activity.check, node: activity.node }),
+  };
+  if (activity.event === 'asked') {
+    return {
+      ...base,
+      tone: RUN_LOOK.going.tone,
+      title: t('cerberus.activity.diagnosis.asked'),
+      summary: t('cerberus.activity.diagnosis.askedSummary', { label: activity.label ?? activity.check }),
+    };
+  }
+  const failed = activity.event === 'failed';
+  return {
+    ...base,
+    tone: failed ? RUN_LOOK.failed.tone : 'neutral',
+    title: t(failed ? 'cerberus.activity.diagnosis.failed' : 'cerberus.activity.diagnosis.ready'),
+    ...(activity.summary ? { summary: activity.summary } : {}),
+  };
+}
+
+/**
  * One "What happened" line as a Timeline row. Used by the Fleet's What happened card (the overview's
  * newest seven) and by History's feed (pages of `GET /api/cerberus/activity`).
  *
@@ -143,11 +217,9 @@ function catalogEvent(activity: CatalogActivity, t: TFunction, when: string): Ti
  * is not. `now` is the caller's, not the clock's, so a row never changes between two renders of the
  * same overview.
  *
- * LATER PLANS ADD THEIR KINDS HERE. The union `CerberusActivity` gains `diagnosis` and `warden` as those
- * plans land; each adds its case to this switch, its builder above, and its words under
- * `cerberus.activity`. Until a plan does, a kind this bundle does not know — a newer server's line in an
- * older tab — is shown as a neutral row naming the kind, never thrown on: a screen must not go blank
- * over one line it has no words for.
+ * A PLAN THAT ADDS A KIND ADDS ITS CASE HERE, its builder above, and its words under `cerberus.activity`. Until it
+ * does, a kind this bundle does not know — a newer server's line in an older tab — is shown as a neutral row
+ * naming the kind, never thrown on: a screen must not go blank over one line it has no words for.
  */
 export function toTimelineEvent(activity: CerberusActivity, t: TFunction, now: number): TimelineEvent {
   const when = sameLocalDay(activity.at, now) ? hms(activity.at) : dayAndTime(activity.at);
@@ -162,6 +234,10 @@ export function toTimelineEvent(activity: CerberusActivity, t: TFunction, now: n
       return fixEvent(activity, t, when);
     case 'catalog':
       return catalogEvent(activity, t, when);
+    case 'warden':
+      return wardenEvent(activity, t, when);
+    case 'diagnosis':
+      return diagnosisEvent(activity, t, when);
     default: {
       const unlearned: { kind: string } = activity;
       return { tone: 'neutral', source: unlearned.kind, title: unlearned.kind, when };

@@ -1,7 +1,8 @@
 //----------------- CERBERUS CONTRACTS ------------
 // The client's view of Cerberus, the monitoring tab: every shape the tab reads off a wire or hands
 // back to it — the status vocabulary, the read model, the definition and enrollment documents, the
-// hint frame that says "read again" and the frame that carries a fix's output lines as they arrive.
+// hint frame that says "read again" and the two frames that carry a fix's output lines and a
+// diagnosis's steps as they arrive.
 //
 // It mirrors `server/shared/cerberus-types.ts` field for field, and that file is the home: look
 // there when a shape here seems wrong, and add a frame or a read-model field there first. The two
@@ -13,8 +14,9 @@
 //
 // The browser never sees the warden wire. Its frames, envelopes, signatures and the four server-only
 // seam types stay in the server file; the wire-born shapes repeated here are `CerberusProbeSpec`,
-// because the definition document carries probes as their spec, and `CerberusRunLine`, because a
-// fix's output reaches the tab as the lines a warden sent.
+// because the definition document carries probes as their spec, `CerberusRunLine`, because a
+// fix's output reaches the tab as the lines a warden sent, and `CerberusUpdateStep`, because an
+// update's steps reach the tab as the words a warden sent.
 //
 // Every time is epoch MILLISECONDS and every duration (`every`, `timeout`, `cadence`, `staleAfter`)
 // is SECONDS. JSON is camelCase, as it is on every Cerberus wire.
@@ -56,6 +58,21 @@ export type CerberusDocStatus = 'green' | 'yellow' | 'red' | 'muted';
  */
 export type CerberusProbeKind = 'health_doc' | 'http' | 'tcp' | 'exec' | 'file_age' | 'sql';
 
+/**
+ * The six words a warden reports an update's progress in, in the order a healthy update says them:
+ * `waiting` (a fix or diagnosis is running and the restart will not interrupt it — said before the
+ * upload, said again after `verified` when work started in the seconds between, and not said at all
+ * when nothing is running), `uploading` (fetching the release), `verified` (its SHA-256 equals the
+ * offer's, or the warden is already on the offered version), `swapping` (the new release is extracted
+ * and `current` points at it), `restarting` (the warden is about to exit for its launcher to start
+ * the new release) and `failed` (the warden gave up on the offer; `text` says why). Center files its
+ * own last step under `failed` too, when an update ends other than by the warden's word (a rollback,
+ * a silence), so how an update ended is read from `CerberusUpdateView.result`, never
+ * from a `failed` step. Carried by every step of a `CerberusUpdateView`.
+ */
+export type CerberusUpdateStep =
+  'waiting' | 'uploading' | 'verified' | 'swapping' | 'restarting' | 'failed';
+
 // ---------------------------
 
 //----------------- READ MODEL ------------
@@ -82,12 +99,24 @@ export type CerberusMute = {
  * One cell of a strip: the status over `[from, to)`, the worst status inside that window with the
  * mute and silence laid over it. `worst` is the check key that set the cell's status when the strip
  * folds several checks (a service's strip), null when it is one check's own or nothing set it.
+ * `paused` takes part as a rank, not as a silence: it ranks with `muted`, above `ok` and
+ * `not_enabled`, so it replaces every word below `warn` — `ok`, `not_enabled` and `unknown`, a
+ * restart being the reason a check went unheard — in every cell its window touches, and a restart
+ * never hides a reading that already needs attention (`warn`, `failing`, `denied`).
+ * `at` is the first moment inside the cell's window (clipped at now) at which its word held, so a
+ * lookup of the check `worst` names, at `at`, answers the cell's word: the moment a stored row
+ * raised it, a lapse began, a silence began, a restart began or a mute took it, else the window's
+ * first moment — moved past a mute that ran out, or a restart that ended, inside the window. A
+ * minute's last second is not that moment — it can already read what came after. A minute whose
+ * word came and went under a mute or a restart (the reading recovered before the mute began, or
+ * before the cover ended) has no such moment, and `at` is then the nearest one inside the window.
  */
 export type CerberusCell = {
   from: number;
   to: number;
   status: CerberusStatus;
   worst: string | null;
+  at: number;
 };
 
 /**
@@ -164,6 +193,17 @@ export type CerberusNodeProject = {
  * last frame of any kind, and when nothing has been heard since this boot it is the node row's
  * stored last heartbeat; `silentSince` is that plus 90 000 while silent, null otherwise.
  *
+ * `paused` is the fourth link word, and it is never a silence: it is a node whose warden is
+ * restarting under an update, from the update's `restarting` step until the update ends (its new
+ * hello, the launcher's rollback hello, or the update's failure). The link is down by design for
+ * those seconds, so it wins over `silent` and over `never`, `silentSince` is null while it holds, and
+ * it is the same window the node's checks show as `paused`. It is laid over by the read model from
+ * the update's steps and is not a state the warden's link ever reports. The hub is never paused.
+ * `updating` is the node's update while one is queued or running — null otherwise, and always null
+ * for the hub: `step` is the update's latest word (`queued` while it waits its turn in the batch),
+ * `text` its sentence, `index` the node's place in its batch counting from 1 and `of` the batch's
+ * size.
+ *
  * The three fields of the node's sessions: `colocated` is whether the node runs on THIS machine
  * (the only kind that can take a project), `projects` lists the projects assigned to it, by folder,
  * and `sessions` counts the hosts its warden last listed. The hub is none of these: `colocated`
@@ -174,7 +214,7 @@ export type CerberusNodeView = {
   id: string;
   desc: string | null;
   role: 'hub' | 'node';
-  link: 'reporting' | 'silent' | 'never';
+  link: 'reporting' | 'silent' | 'never' | 'paused';
   wardenVersion: string | null;
   lastHeardAt: number | null;
   silentSince: number | null;
@@ -182,7 +222,64 @@ export type CerberusNodeView = {
   colocated: boolean;
   projects: CerberusNodeProject[];
   sessions: number;
+  updating: { step: CerberusUpdateStep | 'queued'; text: string; index: number; of: number } | null;
   services: CerberusServiceView[];
+};
+
+/**
+ * One warden release, as `dist-warden/latest.json` names it: `version` is `major.minor.patch`,
+ * `note` the one line of `warden/package.json`'s `cerberus.note` it was built with — what changed,
+ * in words for a person, and a build refuses to ship a release without one — and `builtAt` when it
+ * was built, epoch milliseconds (the file itself writes ISO text; center reads it into this unit).
+ * Carried by `CerberusWardens.latest`.
+ */
+export type CerberusWardenRelease = { version: string; note: string; builtAt: number };
+
+/**
+ * One warden update — one node taken from one release to another — as the tab reads it. `batch` is
+ * the id of the `POST /updates` that began it, shared by every node that call named; `node` the node
+ * and `to` the release offered; `from` the version the node reported when the update began (null
+ * when it had reported none). `startedAt` is when the update was queued and `endedAt` when it ended
+ * (null while it runs); every time here, those two and each step's `at`, is center's clock — the
+ * moment center stored it — so it compares directly with a result's cells and with now. `step` is
+ * the update's latest word: `queued` until the warden's first `update.progress` (the update waits its
+ * turn, one node at a time), then the `CerberusUpdateStep` of the newest one. `result` is null until
+ * it ends, then `updated` (the node's next hello named `to`, or, for a node already on the release,
+ * which never restarts, its `verified` step), `rolled_back` (its hello named the release it was
+ * taken back from — the launcher swapped the old release back in) or
+ * `failed` (the warden gave up, or said nothing for three minutes — ten after a `waiting` step, the
+ * warden's own limit for a fix it waits on). `steps` is every word of the
+ * update in order, each with its time and sentence. When an update ends other than by the warden's
+ * word (a rollback, a silence), center adds the sentence as the last step, filed under
+ * `failed`: `result`, never a `failed` step, says how the update ended. Updates and their steps are
+ * kept forever.
+ */
+export type CerberusUpdateView = {
+  id: string;
+  batch: string;
+  node: string;
+  from: string | null;
+  to: string;
+  startedAt: number;
+  step: CerberusUpdateStep | 'queued';
+  endedAt: number | null;
+  result: 'updated' | 'rolled_back' | 'failed' | null;
+  steps: { at: number; step: CerberusUpdateStep; text: string }[];
+};
+
+/**
+ * What `GET /api/cerberus/wardens` answers: where the fleet's wardens stand against the release
+ * center holds. `latest` is the newest release built (null when none has been); `nodes` lists every
+ * enrolled node with the warden version it last reported (null before it has) and `behind` — true
+ * when `latest` is set and the node's version is older than it, a null version counting as older;
+ * `running` is every update of the batch that is running now, the ended ones included until the whole
+ * batch ends so a header can say "2 of 3", and empty when no batch is running. The tab reads it
+ * again on `cerberus_changed`.
+ */
+export type CerberusWardens = {
+  latest: CerberusWardenRelease | null;
+  nodes: { node: string; version: string | null; behind: boolean }[];
+  running: CerberusUpdateView[];
 };
 
 /**
@@ -199,7 +296,10 @@ export type CerberusNodeView = {
  * not a fault). `recheck` asks for the check's probe to run again as soon as a run ends `ok`; a run that failed,
  * timed out or was refused asks for none. `origin`
  * says where the entry came from — written by a person (`by`, `at`) or promoted from a diagnosis
- * (its id, `at`). `stats` counts the entry's runs that have ended: `runs` all of them, `ok` those
+ * (`diagnosis` its id, `at` when it was promoted). The `diagnosis` member is promotion's alone:
+ * `POST /api/cerberus/diagnoses/:id/promote` writes it, and `POST /api/cerberus/catalog` only ever
+ * writes `written`; the entry then points back at the diagnosis whose `CerberusDiagnosisView.promotedTo`
+ * points at it. `stats` counts the entry's runs that have ended: `runs` all of them, `ok` those
  * that succeeded, `lastRunAt` when the newest ended (null when none has). Answered by
  * `GET /api/cerberus/catalog`, `POST /api/cerberus/catalog` and `PUT /api/cerberus/catalog/:id/auto`.
  */
@@ -271,7 +371,9 @@ export type CerberusRunLine = { n: number; t: number; stream: 'out' | 'err'; lin
  * or `timed_out`; `exit` is the exit code, null when there is none. `note` is one sentence for a
  * person, set when the run ended other than by its command's own exit — the warden's refusal
  * reason, "The warden restarted while it ran; the output ends where the link did." — and null
- * otherwise. `lastLine` is the text of the newest output line (null before any). `lines` is every
+ * otherwise. `lastLine` is the text of the newest output line and `lastN` its number — the `n` its
+ * `CerberusRunLine` carries, so a reader holding a line from a `cerberus_run_output` frame can tell whether the
+ * overview has read past it (both null before any line). `lines` is every
  * line, present only where one run is asked for by itself (`GET /api/cerberus/runs/:id` and a
  * check's sheet); the overview and a need leave it off. Runs are kept for good; their output lines
  * for 90 days.
@@ -292,6 +394,7 @@ export type CerberusRunView = {
   exit: number | null;
   note: string | null;
   lastLine: string | null;
+  lastN: number | null;
   lines?: CerberusRunLine[];
 };
 
@@ -305,12 +408,83 @@ export type CerberusRunView = {
  * `since` is. `since` is on the warden's clock (`since` of a health document's check, on its
  * service's) and a run's times and now on center's, so the one comparison across them applies the
  * node's clock offset to `since`. The card draws its strip from `run` and offers `fix` only
- * while no run is going.
+ * while no run is going. `diagnosis` is the check's newest diagnosis requested since the same
+ * `since` — running or ended, whatever its outcome, with the same clock rule as `run` — null when
+ * there is none, or when `since` is: the card says "Diagnose" while it is null and "Diagnosing…" or
+ * "See diagnosis" once it is not. It carries its `steps`, and its own `run` without `lines`.
  */
 export type CerberusNeed = {
   check: CerberusCheckView;
   fix: CerberusCatalogEntryView | null;
   run: CerberusRunView | null;
+  diagnosis: CerberusDiagnosisView | null;
+};
+
+/**
+ * One thing a diagnosis said as it worked: `n` is its place in the diagnosis, counting up from 1,
+ * and its identity — a diagnosis never holds the same `n` twice; `t` is the seconds since the
+ * diagnosis started (center's clock); `text` is one line for a person. CENTER writes what the session
+ * DID, in fixed words: an opening step ("Opened a read-only session on eis1"), one step per tool
+ * call generated from the call's arguments ("Reading the journal of docstore.service · last 15
+ * min", "Reading Cerberus history: <label> since 17:40") and a closing step ("Closed the session ·
+ * nothing was changed"), and the one that says a node is out of reach ("<node>'s warden is not
+ * connected: this diagnosis reads Cerberus history only"). The AGENT writes only what it FOUND,
+ * through its `note` tool, one sentence each ("All 4 failed on one call — 401 from shadow
+ * connector"). Kept for good, as the diagnosis is. Carried by `CerberusDiagnosisView.steps` and by
+ * every `CerberusDiagStepEvent`.
+ */
+export type CerberusDiagnosisStep = { n: number; t: number; text: string };
+
+/**
+ * One diagnosis of one check, as the tab reads it: a read-only agent's look at a failing check, from
+ * the question to what it found and what it proposes. `id` names it; `node` and `check` the check it
+ * was for (`check` is the check key); `askedBy` who asked, `model` the model that ran it. Every time
+ * is center's clock. `startedAt` is when it was asked, `endedAt` when it ended (null while it runs).
+ * `status` is `running`, `done` (the agent submitted a diagnosis) or `failed` (the link was lost,
+ * the agent ended without submitting, the ceiling of three minutes passed, or center could not
+ * start it — `error` says which, in one sentence for a person, and is null otherwise).
+ *
+ * What a `done` diagnosis found: `summary` is one or two sentences saying what is wrong (null until
+ * it is done, and on a failed one); `evidence` is each thing it FOUND that says so, one line each,
+ * quoting what the journal, the file, the status or Cerberus's history actually said — the absence
+ * of an error is never evidence and is never listed; `proposal` is the one fix it suggests, or null
+ * when it suggests none. A proposal's `name` is what the fix button will say, `cmd` is the exact
+ * command the diagnosis would run now (it may name an absolute time, `--since 17:50`), and `general`
+ * is the same command with each absolute time made a relative window (`--since "15 min ago"`),
+ * which is what promotion saves as a catalog entry's command — equal to `cmd` when nothing needed
+ * generalising.
+ *
+ * `steps` are everything it said as it worked, in order. `oneOffExpiresAt` is when the one-off the
+ * warden holds for `proposal` expires — the proposal is published to the node's catalog as a
+ * one-off — null when there is no proposal or none is published; past it, running the proposal is
+ * refused. `run` is the run of that one-off, null until someone presses "Run it once" (a run of a
+ * diagnosis's proposal never touches the catalog); it carries `lines` where the diagnosis is asked
+ * for by itself (`GET /api/cerberus/diagnoses/:id` and a check's sheet) and leaves them off inside a
+ * need. `promotedTo` is the id (the slug) of the catalog entry the diagnosis was promoted into, null
+ * until it is (that entry's `origin` points back here); the tab resolves the id against the catalog
+ * entries it holds to show the entry's current name — the person may have renamed it in the dialog,
+ * so `proposal.name` is not it — and shows the id itself when that entry has since been retired and
+ * is no longer there. Diagnoses are kept for good; so are their steps.
+ * Answered by `GET /api/cerberus/diagnoses/:id` and carried by `CerberusNeed.diagnosis` and
+ * `CerberusCheckDetail.diagnosis`; `POST /api/cerberus/diagnoses` answers only its `id`.
+ */
+export type CerberusDiagnosisView = {
+  id: string;
+  node: string;
+  check: string;
+  askedBy: string;
+  model: string;
+  startedAt: number;
+  endedAt: number | null;
+  status: 'running' | 'done' | 'failed';
+  summary: string | null;
+  evidence: string[];
+  proposal: { name: string; cmd: string; general: string } | null;
+  error: string | null;
+  steps: CerberusDiagnosisStep[];
+  oneOffExpiresAt: number | null;
+  run: CerberusRunView | null;
+  promotedTo: string | null;
 };
 
 /**
@@ -319,9 +493,15 @@ export type CerberusNeed = {
  * expiring; `node` is a node enrolling; `fix` is a run starting (`started`, `result` and
  * `durationS` null) or ending (`ended`, with its `result` — `refused` included — and `durationS`,
  * the seconds from start to end, null for a refusal that never started); `catalog` is an entry
- * being `added` or its auto-run switched `auto_on` or `auto_off`, `by` whoever did it. Later plans
- * add two more kinds — `diagnosis` and `warden` — so a reader switches on `kind` and ignores a kind
- * it does not know.
+ * being `added` or its auto-run switched `auto_on` or `auto_off`, `by` whoever did it; `warden` is
+ * a warden update: `update_started` is a whole batch beginning (`node` null, `from` null, `nodes`
+ * the number of nodes it took, `to` the release), and `updated`, `rolled_back` and `update_failed`
+ * are one node's update ending (`node` named, `from` the version it left, `to` the release it was
+ * offered, no `nodes`); `diagnosis` is a diagnosis being `asked` (its `at` the moment it was asked,
+ * `summary` null), `ready` (its `at` the moment it ended `done`, `summary` the diagnosis's own) or
+ * `failed` (`summary` the sentence that says why — the diagnosis's `error`); `diagId` names it and
+ * `label` is the check's label as it reads now, null when it has none or the check is retired. A
+ * reader switches on `kind` and ignores a kind it does not know.
  */
 export type CerberusActivity =
   | {
@@ -373,6 +553,25 @@ export type CerberusActivity =
       name: string;
       event: 'added' | 'auto_on' | 'auto_off';
       by: string;
+    }
+  | {
+      kind: 'warden';
+      at: number;
+      node: string | null;
+      event: 'update_started' | 'updated' | 'rolled_back' | 'update_failed';
+      from: string | null;
+      to: string;
+      nodes?: number;
+    }
+  | {
+      kind: 'diagnosis';
+      at: number;
+      node: string;
+      check: string;
+      label: string | null;
+      diagId: string;
+      event: 'asked' | 'ready' | 'failed';
+      summary: string | null;
     };
 
 /**
@@ -433,7 +632,16 @@ export type CerberusLookup = {
  * `fixes` is every unretired catalog entry on the check, whatever its `when`, oldest first; `run` is
  * the check's newest run requested within the last hour, running or ended, with its `lines` (null
  * when there is none). Both are as of now: the sheet shows a fix's output beside the reading the
- * fix produced, so `run` is not bounded by the check's `since` as a need's is.
+ * fix produced, so `run` is not bounded by the check's `since` as a need's is. `diagnosis` is the
+ * check's newest diagnosis, running or ended, with its `steps` and its own `run` with `lines` — null
+ * when there is none. It is as of now too, and reaches back the further of two bounds: 24 hours, or
+ * the check's current `since` (the bound a need's diagnosis has), so a sheet opened from a need
+ * always shows what its card said "See diagnosis" for, and a fix that worked still shows the
+ * diagnosis that proposed it — with its "Add to catalog" — after the check turned green. It can
+ * therefore be older than the incident its card is about: a check red for 2 hours whose newest
+ * diagnosis is 10 hours old (an earlier incident) reads "Diagnose" on its card, and its sheet shows
+ * that older diagnosis with the time it was asked (`startedAt`), "Diagnose again" and "Add to
+ * catalog" — and "Run it once" only while its `oneOffExpiresAt` is still ahead.
  */
 export type CerberusCheckDetail = {
   check: CerberusCheckView;
@@ -443,6 +651,7 @@ export type CerberusCheckDetail = {
   lookup: CerberusLookup;
   fixes: CerberusCatalogEntryView[];
   run: CerberusRunView | null;
+  diagnosis: CerberusDiagnosisView | null;
 };
 
 /**
@@ -561,15 +770,21 @@ export type CerberusDefinition = {
  * 'cerberus_changed'`. A HINT, not a picture: it says what moved and the screen reads again. `nodes`
  * are node ids; each entry of `checks` is `<node>/<key>` (`eis1/docstore/backup.age`), split at the
  * FIRST `/` because a key itself holds one. Coalesced to at most one a second; sent on a stored
- * change, a link change, a mute, a label, a definition change or a fix run starting or ending (it
- * names the run's check) — never on a result that was not stored. The other browser frame is
- * `CerberusRunOutputEvent`.
+ * change, a link change, a mute, a label, a definition change, a fix run starting or ending (it
+ * names the run's check) or a diagnosis starting or ending (it names the diagnosis's check) — never
+ * on a result that was not stored. The one exception to the second is a warden update's moments (a
+ * batch's start, each step stored, each end): those go out at once, `updates: true`, because an update
+ * is over in under half a second and a held frame would arrive after it; the screen reads on such a
+ * frame without waiting out its own gap. The other browser frames are `CerberusRunOutputEvent` and
+ * `CerberusDiagStepEvent`.
  */
 export type CerberusChangedEvent = {
   kind: 'cerberus_changed';
   at: number;
   nodes: string[];
   checks: string[];
+  /** Present (`true`) on the frame of a warden update's moment, sent at once rather than coalesced. */
+  updates?: true;
 };
 
 /**
@@ -584,4 +799,19 @@ export type CerberusRunOutputEvent = {
   kind: 'cerberus_run_output';
   runId: string;
   lines: CerberusRunLine[];
+};
+
+/**
+ * The frame center puts on the browser's gateway socket the moment a running diagnosis says
+ * something, `kind: 'cerberus_diag_step'`. Like `cerberus_run_output` it is a PICTURE, not a hint: a
+ * step must appear as it is said and a re-read cannot give it, so the frame holds the step itself —
+ * the one center has just stored for `diagId`, never coalesced with another diagnosis's. A sheet
+ * that is open on the diagnosis appends it (by `step.n`, dropping one it already has); every other
+ * screen ignores the frame. Whatever it missed, `GET /api/cerberus/diagnoses/:id` answers with every
+ * step. A diagnosis's start and end are announced by `cerberus_changed`, not by this frame.
+ */
+export type CerberusDiagStepEvent = {
+  kind: 'cerberus_diag_step';
+  diagId: string;
+  step: CerberusDiagnosisStep;
 };

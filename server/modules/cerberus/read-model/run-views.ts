@@ -1,4 +1,4 @@
-import { cerberusCatalogDb, cerberusRunsDb, type CerberusRunRow } from '@/modules/database/index.js';
+import { cerberusCatalogDb, cerberusDiagnosesDb, cerberusRunsDb, type CerberusRunRow } from '@/modules/database/index.js';
 import type { CerberusActivity, CerberusCheckView, CerberusReadInputs, CerberusRunView } from '@/shared/cerberus-types.js';
 
 /**
@@ -18,12 +18,14 @@ import type { CerberusActivity, CerberusCheckView, CerberusReadInputs, CerberusR
  *   - A SHEET'S RUN is the check's newest run requested within the last hour, running or ended, with its
  *     lines: the sheet shows a fix's output beside the reading it produced, so `since` does not bound it.
  *
- * The `name` of a run is its entry's, retired or not; `lastLine` is the text of its newest output line.
+ * The `name` of a run is its entry's, retired or not — or, for the run of a diagnosis's one-off, the proposal's;
+ * `lastLine` is the text of its newest output line and `lastN` its number.
  * Both are read for every run asked for in ONE statement each. `lines` is attached only when one run is
  * asked for by itself.
  *
  * Consumers: `overview.ts` (`runningViews`, `needRuns`), `check-detail.ts` (`sheetRunOf`), `activity.ts`
- * (`fixEvents`) and `runs.service.ts` (`runViewById`, for `GET /runs/:id`).
+ * (`fixEvents`), `diagnosis-views.ts` (`diagnosisRunViews`, `clockOffsetOf`) and `runs.service.ts`
+ * (`runViewById`, for `GET /runs/:id`).
  */
 
 /** How long a need keeps showing a run after it ended: long enough to read "finished", short enough not to linger. */
@@ -32,18 +34,38 @@ const NEED_RUN_LINGER_MS = 90_000;
 /** How far back a check's sheet looks for the run it shows. */
 const SHEET_RUN_WINDOW_MS = 60 * 60 * 1000;
 
-/** The names of the entries the rows ran, by entry id; an entry that cannot be read keeps its id for a name. */
+/** A diagnosis's proposal name, or `null` when it cannot be read — the name of a run of its one-off. */
+function proposalName(diagnosisId: string): string | null {
+  const proposal = cerberusDiagnosesDb.get(diagnosisId)?.proposal;
+  if (proposal == null) return null;
+  try {
+    const name = (JSON.parse(proposal) as { name?: unknown }).name;
+    return typeof name === 'string' ? name : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * What the rows ran are called, by the key `nameOf` reads: an entry's name under its id (an entry that
+ * cannot be read keeps its id for a name), and a one-off's — its diagnosis's proposal name — under
+ * `diagnosis:<id>`.
+ */
 function entryNames(rows: CerberusRunRow[]): Map<string, string> {
   const names = new Map<string, string>();
   for (const row of rows) {
     if (row.entry !== null && !names.has(row.entry)) names.set(row.entry, cerberusCatalogDb.get(row.entry)?.name ?? row.entry);
+    if (row.entry === null && row.diagnosis !== null && !names.has(`diagnosis:${row.diagnosis}`)) {
+      names.set(`diagnosis:${row.diagnosis}`, proposalName(row.diagnosis) ?? row.diagnosis);
+    }
   }
   return names;
 }
 
-/** What a run is called: its entry's name, else what is left to name it — a diagnosis's proposal has no entry. */
+/** What a run is called: its entry's name, else its diagnosis's proposal name, else what is left to name it. */
 function nameOf(row: CerberusRunRow, names: Map<string, string>): string {
-  return (row.entry !== null ? names.get(row.entry) : undefined) ?? row.diagnosis ?? row.id;
+  const named = row.entry !== null ? names.get(row.entry) : row.diagnosis !== null ? names.get(`diagnosis:${row.diagnosis}`) : undefined;
+  return named ?? row.diagnosis ?? row.id;
 }
 
 /** The rows as views, in the order given. `withLines` attaches every line of each — for one run read alone. */
@@ -66,9 +88,20 @@ function runViews(rows: CerberusRunRow[], withLines = false): CerberusRunView[] 
     result: row.result,
     exit: row.exit,
     note: row.note,
-    lastLine: lastLines.get(row.id) ?? null,
+    lastLine: lastLines.get(row.id)?.line ?? null,
+    lastN: lastLines.get(row.id)?.n ?? null,
     ...(withLines ? { lines: cerberusRunsDb.output(row.id) } : {}),
   }));
+}
+
+/**
+ * The newest run of each diagnosis that has been run, as views keyed by diagnosis id — the run of its
+ * one-off. `withLines` attaches every line, for a diagnosis read alone. Consumers: `diagnosis-views.ts`.
+ */
+export function diagnosisRunViews(diagnoses: string[], withLines: boolean): Map<string, CerberusRunView> {
+  const rows = [...cerberusRunsDb.latestForDiagnoses(diagnoses).values()];
+  const views = runViews(rows, withLines);
+  return new Map(rows.flatMap((row, index) => (row.diagnosis === null ? [] : [[row.diagnosis, views[index]] as const])));
 }
 
 /** One run with its lines, or `null` when none carries the id. */
@@ -84,8 +117,12 @@ export function runningViews(nodes: string[]): CerberusRunView[] {
   return runViews(rows);
 }
 
-/** The offset that brings a warden's time onto center's clock: 0 for a node never heard and for the hub. */
-function offsetOf(node: string, inputs: CerberusReadInputs): number {
+/**
+ * The offset that brings a warden's time onto center's clock: 0 for a node never heard and for the hub.
+ * Consumers: this file's `needRuns`, and `diagnosis-views.ts`, which bounds a need's diagnosis by the
+ * check's `since` the same way.
+ */
+export function clockOffsetOf(node: string, inputs: CerberusReadInputs): number {
   return inputs.links.get(node)?.clockOffsetMs ?? 0;
 }
 
@@ -97,7 +134,7 @@ export function needRuns(checks: CerberusCheckView[], inputs: CerberusReadInputs
   const chosen: { mark: string; row: CerberusRunRow }[] = [];
   for (const check of checks) {
     if (check.since === null) continue;
-    const offsetMs = offsetOf(check.node, inputs);
+    const offsetMs = clockOffsetOf(check.node, inputs);
     const row = cerberusRunsDb.latestForCheck(check.node, check.key, check.since + offsetMs);
     if (!row) continue;
     if (row.ended_at !== null && row.ended_at < inputs.now - NEED_RUN_LINGER_MS) continue;
