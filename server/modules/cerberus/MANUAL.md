@@ -670,7 +670,7 @@ Both files are siblings of the over-ceiling `types.ts`, the `kanban-types.ts` pa
 - The browser file imports nothing from `server/`, and a type that names a server-only type is not shared. why: the client tsconfig does not compile server code.
 - A comment in the browser file must not name a server-only type (`CerberusCheckMemory`, `CerberusLinkState`).
 - `CerberusFrameType` carries `diag.*` and `update.*`; `CerberusActivity` has `diagnosis` and `warden` members; both widen as plans land. A reader switches on `type` / `kind` and ignores one it does not know.
-- Format with prettier `--single-quote --print-width 100`, as `claude-update-types.ts`.
+- Format with prettier `--single-quote --print-width 100`, as `claude-update-types.ts`: `npx prettier --single-quote --print-width 100 --check <file>`. why: prettier is not a devDependency, so `node_modules/.bin/prettier` does not exist; `npx` runs it from its cache.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/shared/cerberus-types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/cerberus-types.ts
 

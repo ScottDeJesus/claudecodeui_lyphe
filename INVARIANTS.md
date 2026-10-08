@@ -7170,21 +7170,6 @@ probe-key: 3b4378c962d32ea783918fbe638cd985696c263b
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/warden-diag-tools.mjs, /home/lyphe/.claude/claudecodeui_lyphe/warden/package.json, /home/lyphe/.claude/claudecodeui_lyphe/warden/src/diag-argv.mjs, /home/lyphe/.claude/claudecodeui_lyphe/warden/src/diag-guard.mjs, /home/lyphe/.claude/claudecodeui_lyphe/warden/src/diag-reads.mjs, /home/lyphe/.claude/claudecodeui_lyphe/warden/src/diag-tools.mjs
 
-## INV-7168 — probe — MEDIUM — the prompt door does not mask credentials; the history door does (`diagnosis-prompt.ts` `oneLine`)
-
-MEDIUM — the prompt door does not mask credentials; the history door does (`diagnosis-prompt.ts` `oneLine`)
-
-```probe
-D=~/.claude/state/pipeline-reviews/cerberus--diagnosis--agent/probes
-bash "$D/p1.sh"
-expect: PROMPT-LEAKS: none   (today it prints PROMPT-LEAKS: hunter2,abc123,SEKRET123)
-```
-
-measured 2026-10-07 by chain chain-cerberus--diagnosis--agent-20261007-025958-d301, finding M1, MEDIUM
-probe-key: 11cb9206cdfbde8526573301644a26da5c056570
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/diagnosis/diagnosis-agent.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/diagnosis/diagnosis-prompt.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/diagnosis/diagnosis-tools.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/cerberus-diagnosis-agent.mjs
-
 ## INV-7169 — probe — MEDIUM — the evidence rule does not hold on a quiet run, and the proposal invents (`diagnosis-prompt.ts`; the submit gate cannot see it)
 
 MEDIUM — the evidence rule does not hold on a quiet run, and the proposal invents (`diagnosis-prompt.ts`; the submit gate cannot see it)
@@ -7197,21 +7182,6 @@ expect: every RUN line reads absence-lines=0 (today 3 of 3 print absence-lines=1
 
 measured 2026-10-07 by chain chain-cerberus--diagnosis--agent-20261007-025958-d301, finding M2, MEDIUM
 probe-key: 757b5aecb30d5b4522b45cb6808a0d685dd37c64
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/diagnosis/diagnosis-agent.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/diagnosis/diagnosis-prompt.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/diagnosis/diagnosis-tools.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/cerberus-diagnosis-agent.mjs
-
-## INV-7170 — probe — LOW — `submit_diagnosis` has no once-guard; parallel calls reach `deps.submit` twice and the agent answers the LAST (`diagnosis-tools.ts` / `diagnosis-agent.ts` `captureSubmission`)
-
-LOW — `submit_diagnosis` has no once-guard; parallel calls reach `deps.submit` twice and the agent answers the LAST (`diagnosis-tools.ts` / `diagnosis-agent.ts` `captureSubmission`)
-
-```probe
-D=~/.claude/state/pipeline-reviews/cerberus--diagnosis--agent/probes
-bash "$D/p3.sh"
-expect: DOUBLE-SUBMIT: deps.submit called 1 times …   (today: 2 times, ["first","second"])
-```
-
-measured 2026-10-07 by chain chain-cerberus--diagnosis--agent-20261007-025958-d301, finding L1, LOW
-probe-key: 5f1a7700ae319ed6316397598b38b7575c37a565
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/diagnosis/diagnosis-agent.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/diagnosis/diagnosis-prompt.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/diagnosis/diagnosis-tools.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/cerberus-diagnosis-agent.mjs
 
@@ -7257,36 +7227,6 @@ expect: BAD-MODEL: … ends with a double period: false · carries CLI flag jarg
 
 measured 2026-10-07 by chain chain-cerberus--diagnosis--agent-20261007-025958-d301, finding L4, LOW
 probe-key: 97267cec8e8b54f739ed0a3752a15d5c4eff6be4
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/diagnosis/diagnosis-agent.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/diagnosis/diagnosis-prompt.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/diagnosis/diagnosis-tools.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/cerberus-diagnosis-agent.mjs
-
-## INV-7174 — probe — LOW — the prompt's "last 20 stored results" can be 20 identical keepalives (`diagnosis-prompt.ts` `resultsSection` + the `lastRowsOfCheck` it reads)
-
-LOW — the prompt's "last 20 stored results" can be 20 identical keepalives (`diagnosis-prompt.ts` `resultsSection` + the `lastRowsOfCheck` it reads)
-
-```probe
-D=~/.claude/state/pipeline-reviews/cerberus--diagnosis--agent/probes
-bash "$D/p8.sh"
-expect: kinds includes change, or distinct(status,kind,value) above 1   (today, while the check stays red: kinds=keepalive distinct(status,kind,value)=1; it reads the repository function the prompt quotes, on a .backup copy, and answers in both states)
-```
-
-measured 2026-10-07 by chain chain-cerberus--diagnosis--agent-20261007-025958-d301, finding L5, LOW
-probe-key: b2558dda65e487437dd1ea68a9d75d1b407feca1
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/diagnosis/diagnosis-agent.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/diagnosis/diagnosis-prompt.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/diagnosis/diagnosis-tools.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/cerberus-diagnosis-agent.mjs
-
-## INV-7175 — probe — LOW — the `note` and `submit_diagnosis` schemas accept what the sheet and the catalog later refuse (`diagnosis-tools.ts`)
-
-LOW — the `note` and `submit_diagnosis` schemas accept what the sheet and the catalog later refuse (`diagnosis-tools.ts`)
-
-```probe
-D=~/.claude/state/pipeline-reviews/cerberus--diagnosis--agent/probes
-bash "$D/p6.sh"
-expect: NOTE-WITH-NEWLINE-FILED: "one two" or a refusal, and SUBMIT-NAME-WITH-NEWLINE / -LONE-SURROGATE lines read refused   (today all three read accepted and the note keeps its newline)
-```
-
-measured 2026-10-07 by chain chain-cerberus--diagnosis--agent-20261007-025958-d301, finding L6, LOW
-probe-key: fca01e3cb05bcd10113c2135c93e2cc25e0d2304
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/diagnosis/diagnosis-agent.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/diagnosis/diagnosis-prompt.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/diagnosis/diagnosis-tools.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/cerberus-diagnosis-agent.mjs
 
