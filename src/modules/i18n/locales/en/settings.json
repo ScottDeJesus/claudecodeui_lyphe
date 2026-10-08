@@ -421,6 +421,14 @@
       "description": "An Accept during DeepSeek’s peak window (01:00–04:00 and 06:00–10:00 UTC, weekdays) queues the feature and starts it when the window lifts. Off: Accept walks now.",
       "unreadable": "The switch could not be read from the server, so its position is unknown — this is not the same as off. It is retried whenever this page regains focus."
     },
+    "runnerDactyls": {
+      "label": "Dactyls",
+      "description": "On: a builder on Claude reads, decides and verifies; every code edit is made by a dactyl — a <model>{{model}}</model> child at {{effort}} effort that sees only its brief and the one file. A builder on DeepSeek Flash is untouched. Takes effect on the next builder.",
+      "descriptionBare": "On: a builder on Claude reads, decides and verifies; every code edit is made by a dactyl — a child that sees only its brief and the one file. A builder on DeepSeek Flash is untouched. Takes effect on the next builder.",
+      "waiting": "Waiting: <why>{{why}}</why>. Builders work as before until it can.",
+      "readinessUnread": "Whether this Claude Code can serve a dactyl could not be read.",
+      "unreadable": "The switch could not be read from the server, so its position is unknown — this is not the same as off. It is retried whenever this page regains focus."
+    },
     "plannerLanes": {
       "label": "Planner lanes",
       "description": "How many planners (designs, cuts, judgments) run at once — {{count}} at a time. Lowering it stops no planner already out; the lane takes no new one until it has room. Takes effect at once.",

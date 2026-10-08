@@ -98,6 +98,7 @@ export default function RunnerModelContent() {
           />
         )}
       </SettingRow>
+      {/* FILL: dactyls-row — <RunnerDactylsRow />, directly under the DeepSeek row */}
 
       {/* THE WIP DEFAULTS — what every epic starts from: two steppers, features in progress and tasks
           per feature, on the one shared ladder. Its own file and its own hook, like the rows around it. */}

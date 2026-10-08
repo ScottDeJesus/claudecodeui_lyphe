@@ -105,6 +105,13 @@ export function AgentLaunchDefaults({ census, held, refused, onSave }: AgentLaun
             />
             <p className="text-xs text-muted-foreground">{t('agentLaunch.defaults.deepseekHint')}</p>
           </div>
+          {/* FILL: dactyl-field — <AgentLaunchDactylField models={choices.dactyl_models} efforts={choices.efforts}
+              model={defaults.dactyl_model} effort={defaults.dactyl_effort} held={held} onSave={save} /> as the fourth
+              field. Two more hunks are this marker's: the grid above trades `[@container(min-width:48rem)]:grid-cols-3`
+              for `[@container(min-width:48rem)]:grid-cols-2` (two by two from 48rem, stacked below it as now; a row of
+              four cuts the effort lists' "None · the CLI's own (xhigh)" at a 1152px panel), and the docstring's
+              "Three fields on a wide panel, stacked on a phone." becomes "Four fields, two by two on a wide panel,
+              stacked on a phone." */}
         </div>
       </div>
     </Card>
