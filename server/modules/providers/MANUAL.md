@@ -4,6 +4,8 @@
 
 The provider contract: every wrapper exposes the same seven facets — runtime, models, auth, mcp, skills, sessions, sessionSynchronizer — over the shared interfaces, so a new provider is added without guessing which file moves.
 
+Custom compaction (Claude chats): the stitched history, indexer and search are MAN-8054; the runtime seams are MAN-8055; MAN-8068 says which row holds which seam.
+
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/
 
 ## MAN-696 — Providers Module Guide
@@ -602,3 +604,22 @@ The Claude runtime reaches a custom compaction (`server/modules/compaction/`) on
 - **A run that resumes nothing** (`resumeFromScratch`: an edited first prompt, a compaction's seed turn) seeds the session-id capture with null, so the session it starts is captured, handed to `ws.setSessionId` and announced with `session_created`; seeded with the chat's old provider id, as it was, the capture never fired and the chat stayed on the old session. When the run registry then moves a Claude chat's row from one provider session to another it marks the session it leaves superseded first, so the abandoned original is kept on disk, goes with the chat and is never indexed as a second sidebar chat.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/chat-process.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-compaction-seams.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-runtime.provider.js, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/services/provider-runtime.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/websocket/services/chat-run-registry.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/interfaces.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts
+
+## MAN-8068 — Custom compaction — the providers' seams at a glance: history, indexer, search, runtime hooks, which row holds each
+
+Claude only. The module that compacts is `server/modules/compaction/` (MAN-8067); the providers reach it through their context and its record through `sessionCompactionsDb` (MAN-8046), and import neither module. With the switch off, a chat with no record reads exactly as before and the launch is byte-identical.
+
+| Seam | Fact | Row |
+|---|---|---|
+| history | `fetchHistory` stitches: per compaction record, oldest first, that transcript's rows (read under its own provider id, so its subagents are found), one `kind: 'compaction'` row (`id` `compaction-<old provider id>`), then the live transcript's rows. `stitchCompactedHistory` in `list/claude/claude-compacted-history.ts` | MAN-8054 |
+| old rows | rows of a superseded transcript carry no `transcriptAnchorId`: no edit, no fork from them | MAN-8054 |
+| seed as summary | the first user-prompt row of every transcript after the first is rewritten to `isCompactSummary: true`, `id` `compaction-summary-<previous old provider id>`, first text block only; the existing branch draws it under `showCompactSummary`; the second block is not drawn | MAN-8054 |
+| counter | `tokenUsage` (the composer's context counter) is read from the live transcript's rows only | MAN-8054 |
+| indexer | `ClaudeSessionSynchronizer.processSessionFile` skips a transcript whose provider id is superseded (the Codex rule): a compacted transcript is never a second sidebar chat | MAN-8054 |
+| search | `listCompactedTranscriptRows` adds one search entry per record, the chat's own row with the old provider id and path: a hit in a compacted transcript names its chat | MAN-8054 |
+| launches | `sessions.service.ts` `fetchHistory` collects stamped soul launches for the live provider id AND each record's old id | MAN-8054 |
+| runtime hooks | `ProviderRuntimeContext.compaction: ChatCompactionHooks` (`takesOver`, `turnEnded`, `activityChanged`); `providerRuntimeService.useChatCompaction(hooks)`; default: `takesOver` false, the others nothing | MAN-8055 |
+| `activity` | optional `IProviderRuntime.activity(appSessionId)` → `{ live, busy, why }`; `providerRuntimeService.activity(provider, id)` answers not-live when a runtime has none | MAN-8055 |
+| seed turn | `options.promptBlocks` (strings) become the message's text blocks in place of the command; `options.compactionSeed` files no run-stopped push | MAN-8055 |
+| `resumeFromScratch` | the run seeds the session-id capture with null, so the session it starts is announced (`session_created`) and the registry moves the chat's row; the transcript the chat leaves is marked superseded first. An edited first prompt and a compaction's seed turn both ride it | MAN-8055 |
+| CLI settings | `CLI_COMPACTION_SETTINGS` = `{ idleCompaction: false }`, merged only for a taken-over chat; `autoCompactEnabled` is never touched | MAN-8055, MAN-8067 |

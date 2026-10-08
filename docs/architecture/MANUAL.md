@@ -1514,8 +1514,10 @@ section: 03-conversation-handoff/002 The pieces
 | `server/modules/providers/provider.routes.ts` | `POST /sessions` mints the app id; `GET /sessions/:id/messages`, `/sessions/:id/provider-id` (409 until the first turn reports an id), `GET /sessions/:id` (details, `providerSessionId` null inside a 200 until then — what `useCliSessionId` reads), `/sessions/running`, `POST /sessions/:id/fork` |
 | `server/modules/providers/services/sessions.service.ts` | `createAppSession`, `resolveProviderSessionId`, `resolveEditAnchor`, `providerRewindsForEdit`, `rewindSessionForEdit`, `forkSessionById`, `fetchHistory`, `listRunningSessions` |
 | `server/modules/database/repositories/sessions.db.ts` | The one row that holds both ids, and every mutation of the mapping |
+| `server/modules/compaction/` (`compaction-runtime.ts`, `compaction-procedure.ts`, `auto-trigger.ts`, `compaction-seed.ts`) | A decorator over the runtime gateway (`withChatCompaction`, wired in `server/index.ts`): while Custom compaction is on, a Claude chat's `/compact` and its turn-end and idle triggers run the summarizer verb and move the chat to a seeded new session (MAN-8067, MAN-8065, MAN-8066) |
+| `server/modules/database/repositories/session-compactions.db.ts` | `sessionCompactionsDb`: the compaction record and the one mover of a chat between provider sessions for a compaction — `swapToCompactedSession`, `unswapCompactedSession` (MAN-8046) |
 | `server/modules/websocket/services/chat-session-writer.service.ts` | `ChatSessionWriter`: swallows `session_created`, captures the native id, fans out to every attached socket |
-| `server/modules/websocket/services/chat-run-registry.service.ts` | `startRun`, `attachConnection`, `replayEvents`, `completeRun`, `completeRunIfCurrent`; internally `decorateAndRecordEvent` and `recordProviderSessionId` |
+| `server/modules/websocket/services/chat-run-registry.service.ts` | `startRun`, `attachConnection`, `replayEvents`, `completeRun`, `completeRunIfCurrent`; internally `decorateAndRecordEvent` and `recordProviderSessionId` (it marks the provider session a chat leaves superseded before the mapping moves) |
 | `server/modules/websocket/services/chat-websocket.service.ts` | `handleChatSend`, `handleChatEditSend`, `handleChatSubscribe`, `handleChatAbort`, `dispatchRun`, `runDetachedChatTurn` |
 | `server/modules/websocket/services/session-upsert-broadcast.service.ts` | `buildSessionUpsertedEvent` — the single builder of the sidebar delta |
 | `server/modules/providers/services/sessions-watcher.service.ts` | Watches provider directories, debounces, broadcasts upserts in batches |
@@ -3564,7 +3566,7 @@ section: 06-tool-view/002 The pieces
 | `src/modules/chat/tools/InteractiveRenderers/QuestionTextField.tsx` | The panel's typed half of an answer: the "Other" option's words |
 | `src/modules/chat/transcript/MessageComponent.tsx` | Draws one transcript row. Decides container versus tool versus error versus compaction divider |
 | `src/modules/chat/transcript/ToolGroupContainer.tsx` | The collapsed `Read x4` row and its expanded children |
-| `src/modules/chat/transcript/CompactionMarker.tsx` | The divider a compaction leaves between the summarized conversation and its summary (MAN-8060) |
+| `src/modules/chat/transcript/CompactionMarker.tsx` | The divider a compaction leaves between the summarized conversation and its summary — heading "Conversation compacted", always shown, "Show work" never hides it (MAN-8060) |
 | `src/modules/chat/transcript/ThinkingRow.tsx` | A thinking block as a tool row: brain, `Thinking /`, the first line truncated, copy on hover (always shown on touch); the row toggles the full text |
 | `src/modules/chat/utils/workVisibility.ts` | `isHiddenWork`: which messages "Show work" off hides, and which it never hides |
 | `src/modules/chat/transcript/TypingIndicator.tsx` | The three-dot "still working" mark drawn while the work is hidden |

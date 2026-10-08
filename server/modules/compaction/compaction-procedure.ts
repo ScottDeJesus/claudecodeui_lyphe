@@ -185,8 +185,12 @@ async function runSteps(run: Run): Promise<Ending> {
 function refusedByReadiness(run: Run, sentence: string): Ending {
   noteVerbNotReady(sentence);
   refuseAutomatic(run.sessionId);
-  if (run.trigger !== 'manual') {
-    logDecision(run.sessionId, run.trigger, lastTurnContext(run.sessionId), run.inner.activity('claude', run.sessionId), `left alone: the summarizer is not ready (${sentence})`);
+  const manual = run.trigger === 'manual';
+  logDecision(
+    run.sessionId, run.trigger, lastTurnContext(run.sessionId), run.inner.activity('claude', run.sessionId),
+    `${manual ? 'handed to the CLI' : 'left alone'}: the summarizer is not ready (${sentence})`,
+  );
+  if (!manual) {
     run.emit(completeFrame(run.sessionId, 0));
     return ENDED;
   }

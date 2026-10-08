@@ -4,7 +4,7 @@ import type { AnyRecord, ChatCompactionHooks, ChatProcessActivity, CompactionFac
 import { createAutoTrigger } from './auto-trigger.js';
 import { completeFrame } from './compaction-frames.js';
 import { logDecision } from './compaction-log.js';
-import { takesOver } from './compaction-mode.js';
+import { compactionMode, takesOver } from './compaction-mode.js';
 import { compact } from './compaction-procedure.js';
 import { flightOf, lastTurnContext, stopFlightsBeforeSeed } from './compaction-registry.js';
 
@@ -72,7 +72,10 @@ export function withChatCompaction<Inner extends CompactionInnerRuntime>(inner: 
       if (request === null) return inner.run(provider, command, options, writer);
 
       const node = typeof options.node === 'string' && options.node ? options.node : null;
-      if (await takesOver({ appSessionId: request.sessionId, node })) {
+      // ONE mode read both decides (it is `takesOver`'s own test) and explains: a switch that is on while the
+      // summarizer cannot be served says why below. A node's chat keeps the CLI's compaction and asks nothing.
+      const mode = node === null ? await compactionMode() : null;
+      if (mode?.on) {
         return compact(inner, { ...request, options, writer });
       }
       if (request.trigger !== 'manual') {
@@ -87,6 +90,11 @@ export function withChatCompaction<Inner extends CompactionInnerRuntime>(inner: 
         );
         writer.send(completeFrame(request.sessionId, 0));
         return undefined;
+      }
+      // The operator pressed Compact with the switch on and the CLI left to do it: one line says why. With the
+      // switch off `why` is null and nothing is said, so an off switch changes nothing.
+      if (mode?.why) {
+        logDecision(request.sessionId, request.trigger, lastTurnContext(request.sessionId), inner.activity('claude', request.sessionId), `handed to the CLI: ${mode.why}`);
       }
       return inner.run(provider, command, options, writer);
     },
