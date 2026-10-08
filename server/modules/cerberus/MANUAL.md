@@ -1330,20 +1330,21 @@ The rule lives in center and nowhere in the warden. Registered on `ingest.onChan
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/auto-run.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/catalog-ack.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/read-model/run-views.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/run-ending.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/run-frames.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/run-reconcile.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/runs.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/cerberus-run-output-quiet.sh, /home/lyphe/.claude/claudecodeui_lyphe/.verify/cerberus-runs.sh, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/cerberus-ws-tap.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/signed-results.mjs
 
-## MAN-7925 — Cerberus catalog fixes — the two seeded entries on eis1: what each run does, why the Verisk login ends in a verdict pipe, auto-run off
+## MAN-7925 — Cerberus catalog fixes — the entries on eis1: what each run does, why the Verisk login ends in a verdict pipe, why Back up now does not wait, auto-run off
 
-The two catalog entries written for `eis1` on 2026-10-06 at 23:19 -07:00 through `POST /api/cerberus/catalog` (origin `{ kind: 'written', by: 'verve' }`, MAN-7802): the first real fixes, each a command that already existed. Entries, sets, the auto switch: MAN-7900. A run: MAN-7904. The warden's verification: MAN-7895 (`cloudcli:warden`). Their screens: MAN-7906 (`cloudcli:src/modules/cerberus`).
+The two catalog entries written for `eis1` on 2026-10-06 at 23:19 -07:00 through `POST /api/cerberus/catalog` (origin `{ kind: 'written', by: 'verve' }`, MAN-7802): the first real fixes, each a command that already existed. A third, `back-up-now`, was written the same way on 2026-10-07 at 22:02 -07:00 (below). Entries, sets, the auto switch: MAN-7900. A run: MAN-7904. The warden's verification: MAN-7895 (`cloudcli:warden`). Their screens: MAN-7906 (`cloudcli:src/modules/cerberus`).
 
 ## The entries
 | id | check | `when` | `timeout` | limit | `recheck` | `auto` |
 |---|---|---|---|---|---|---|
 | `run-the-docstore-backup-now` | `docstore/backup.age` ("Backed up in the last day") | `failing` | 600 s | 1 per 86 400 s | yes | off |
 | `sign-in-to-verisk-again-2` | `shadow-connector/xactanalysis_session` ("XactAnalysis polls are succeeding") | `failing` | 360 s | 2 per 3 600 s | yes | off |
+| `back-up-now` | `estate-backup/copy.age` ("Copied to Google Drive in the last day") | `failing` | 60 s | 3 per 86 400 s | yes | off |
 
 The Verisk entry was replaced on 2026-10-07 at 04:29 -07:00, before its first press: `sign-in-to-verisk-again` (retired through `POST /catalog/:id/retire`, no run ever made) became `sign-in-to-verisk-again-2`, whose command drops the login's stderr. The live command is `-2`'s, below. The warden acked the set that carries it (version 4 of `eis1`).
 
-- Both start `auto` off and no build step switches one on: `PUT /api/cerberus/catalog/<id>/auto { "on": true }` is the person's. Neither is `capped`. Off is every entry's default (Cerberus Spec §4); a run of the Verisk entry signs in to Verisk, outside the fleet, which the Catalog's own intro leaves as a step you take (MAN-7906).
-- Both commands are stored and signed as written, byte for byte (MAN-7900). Editing a script below changes what the entry does with no catalog change and no new set; the warden compares the command, never the script.
+- Every entry starts `auto` off and no build step switches one on: `PUT /api/cerberus/catalog/<id>/auto { "on": true }` is the person's. None is `capped`. Off is every entry's default (Cerberus Spec §4); a run of the Verisk entry signs in to Verisk, outside the fleet, which the Catalog's own intro leaves as a step you take (MAN-7906).
+- Every command is stored and signed as written, byte for byte (MAN-7900). Editing a script below changes what the entry does with no catalog change and no new set; the warden compares the command, never the script.
 
 ## Run the docstore backup now
 - `cmd`: `/home/lyphe/.claude/docstore/bin/backup`, the nightly cron's own script, unchanged. Stdout is one line, `backup: <dir>/docstore-<weekday>.dump <bytes> bytes`, printed after the `mv` that commits the dump; exit 0 only then.
@@ -1360,6 +1361,12 @@ The Verisk entry was replaced on 2026-10-07 at 04:29 -07:00, before its first pr
 - The recheck is `probe.run` for `shadow-connector/health`, the probe that reports the check (the health document). The check is judged by the last successful `xactanalysis_poll` in `poller_events` (`/opt/shadow-connector/cerberus/health.py` `_check_xactanalysis_session`), not by the login's result: after an `ok` run it passes when shadow-connector's own poll has succeeded.
 - THE LOGIN'S STDERR IS DISCARDED (`2>/dev/null` on its stage). A run's output is kept as `run_output` for 90 days and pushed to open browsers as `cerberus_run_output` (MAN-7802), and `http_login.py` logs on stderr, on every login, the TOTP code it generates (`Generated TOTP: <code>`), on the email path the code it read (`Got code: <code>`), the first 30 characters of each `identity.verisk.com` cookie value and of the XSRF token, and the first 20 characters of the interaction handle, `stateHandle`, `interaction_code` and auth code. Its stdout is only the verdict JSON (`status`, `step`, a response's first 500 characters in `detail`), which the second stage prints. The verdict pipe, not the login's log, is what a run shows. Any entry whose command runs a script that logs a secret on stderr drops it the same way: a run keeps both streams verbatim.
 - `http_login.py`'s exit behaviour is the pipe's ground: a change to its last-line `status` contract, or to its exit codes, changes what `ok` means for this entry.
+
+## Back up now
+- `cmd`: `sudo -n systemctl start --no-block estate-backup.service`, for `estate-backup/copy.age` (MAN-7838). The warden runs it as `lyphe` through `/bin/sh -c` from `$HOME`, with no terminal; `sudo -n` is passwordless for `lyphe` (measured), so it never waits on a prompt.
+- WHY `--no-block`: the unit is `Type=oneshot` and a run lasts minutes to hours (the first upload of 88 GB at the 3 500 KiB/s limit is about seven hours). `systemctl start` without the flag waits for a oneshot's whole run, so the 60 s `timeout` would end the entry `failed` while the unit carried on. With it the command returns once the job is queued, the press ends `ok` at once, and the check itself reports the progress ("the first upload is running: <a> of <b> GB sent, about <eta> left", MAN-7985).
+- The recheck is `probe.run` for `estate-backup/copy.age`: straight after a press it still reads the progress or the failure, and turns `ok` only when a snapshot has landed ("<h> h since the newest copy …", under 26 h).
+- Written through `POST /api/cerberus/catalog` with `auto` off; the live entry carries `capped: null`.
 
 governs: /home/lyphe/.claude/docstore/bin/backup, /opt/shadow-connector/extractors/xactimate/http_login.py
 
