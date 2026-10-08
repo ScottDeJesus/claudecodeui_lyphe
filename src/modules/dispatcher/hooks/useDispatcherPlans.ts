@@ -4,7 +4,7 @@ import { askIdentity } from '@/modules/dispatcher/askState';
 import { epochOf } from '@/modules/dispatcher/dispatcherState';
 import { noteLaneClock, usePutAwayEntries } from '@/modules/dispatcher/hiddenPlans';
 import { DISPATCHER_ALL_TOPIC, useLiveTopic } from '@/modules/live-bus';
-import type { DispatcherArc, DispatcherAsk, DispatcherDaemon, DispatcherLanePicture, DispatcherPlan, DispatcherPlanner, DispatcherRoute } from '@/shared/types';
+import type { DispatcherArc, DispatcherAsk, DispatcherDaemon, DispatcherLanePicture, DispatcherPlan, DispatcherPlanner, DispatcherRoute, Tone } from '@/shared/types';
 
 /**
  * The lane's read side: every plan the dispatcher's store holds, every planner outing of it and
@@ -55,6 +55,16 @@ export function useDispatcherPlans(): {
    * alone, like `count`, because a plan the operator has put away draws no card his word could reach.
    */
   waiting: number;
+  /**
+   * The lane's mark, decided once for both homes that wear it — the Roadmap tab's dot and the chat
+   * gutter's Runs badge: `warn` while a prompt waits on the operator, `info` while an agent is at work
+   * (a drawn plan reading `live`, or a planner outing out), `positive` only once every drawn plan is
+   * `complete`, and `neutral` for work nobody is doing (stalled, paused, scheduled, parked). RUNNING
+   * OUTRANKS FINISHED: a lane still at work never wears the green that says it is done — the accent
+   * the dot wore before this is that same green, and an epic in flight read as finished
+   * (operator, 2026-10-08). `null` while nothing is drawn.
+   */
+  tone: Tone | null;
   route: DispatcherRoute | null;
   daemon: DispatcherDaemon | null;
   /**
@@ -114,6 +124,13 @@ export function useDispatcherPlans(): {
     // lock names every plan of its arc), and only the drawn ones count: a plan the operator has put
     // away shows no card his word could reach.
     const waiting = new Set(plans.map(planAsking).filter((ask): ask is DispatcherAsk => ask !== null).map(askIdentity)).size;
+    // Any outing out counts, drawn or loose: a loose one is drawn as a badge above the decks.
+    const running = plans.some((plan) => plan.status === 'live') || planners.some((outing) => outing.state === 'out');
+    const tone: Tone | null = plans.length === 0 ? null
+      : waiting > 0 ? 'warn'
+        : running ? 'info'
+          : plans.every((plan) => plan.status === 'complete') ? 'positive'
+            : 'neutral';
 
     return {
       plans,
@@ -126,6 +143,7 @@ export function useDispatcherPlans(): {
       hidden,
       count: plans.length,
       waiting,
+      tone,
       route: picture?.route ?? null,
       daemon: picture?.daemon ?? null,
       offpeakAt: epochOf(picture?.offpeak_at ?? null),

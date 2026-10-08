@@ -282,38 +282,29 @@ export function useSettingsController({ isOpen, initialTab }: UseSettingsControl
   }, []);
 
   /**
-   * The only way the modal closes. Resetting the flow here, and not on the next open, is what keeps the
-   * modal from being remounted on the account command while the design one is still selected — the
-   * command is read off the flow at render time.
+   * The only way the modal closes, and the one moment this screen re-reads who is signed in. Resetting
+   * the flow here, and not on the next open, is what keeps the modal from being remounted on the account
+   * command while the design one is still selected — the command is read off the flow at render time.
+   *
+   * WHY CLOSE AND NOT THE COMMAND'S EXIT. `claude /login` signs in and then stays at the CLI's prompt, so
+   * its exit code never arrives and the window is closed with ✕; anything waiting on the exit would keep
+   * showing the old account until Settings was reopened. The server reads the live login fresh on every
+   * call, so asking it as the window closes names whoever signed in. A window closed without signing in
+   * re-reads the same answer, which is harmless. A read that FAILS at this moment leaves the last answer
+   * on screen: the login is intact, and replacing a good line with "Not connected" would only be the
+   * display lying.
+   *
+   * A design authorization authenticates nothing this screen reports on: it is a second, separate
+   * claude.ai grant for design-system projects, and the account's own credential is exactly where it
+   * was. Re-reading would re-answer a question that did not change and flash the line to "Checking…"
+   * over a healthy account — so that flow closes without a re-read.
    */
   const closeLoginModal = useCallback(() => {
     setShowLoginModal(false);
     setLoginFlow('account');
-  }, []);
-
-  const handleLoginComplete = useCallback((exitCode: number) => {
-    if (!loginProvider) {
-      return;
+    if (loginProvider && loginFlow === 'account') {
+      void checkProviderAuthStatus(loginProvider, { keepLastAnswerOnFailure: true });
     }
-
-    // A design authorization authenticates nothing this screen reports on: it is a second, separate
-    // claude.ai grant for design-system projects, and the account's own credential is exactly where it
-    // was. Re-reading the auth status would re-answer a question that did not change, and the one save
-    // banner below would announce a sign-in that never happened — so this flow ends silently, which is
-    // also why it is decided here rather than by leaving the callback off the modal.
-    if (loginFlow === 'design') {
-      return;
-    }
-
-    void (async () => {
-      const authStatus = await checkProviderAuthStatus(loginProvider);
-
-      if (exitCode !== 0) {
-        console.warn(`Login process exited with code ${exitCode}; refreshing auth status before setting save status.`);
-      }
-
-      setSaveStatus(authStatus.authenticated ? 'success' : 'error');
-    })();
   }, [checkProviderAuthStatus, loginFlow, loginProvider]);
 
   const saveSettings = useCallback(async () => {
@@ -526,6 +517,5 @@ export function useSettingsController({ isOpen, initialTab }: UseSettingsControl
     showLoginModal,
     loginProvider,
     loginFlow,
-    handleLoginComplete,
   };
 }

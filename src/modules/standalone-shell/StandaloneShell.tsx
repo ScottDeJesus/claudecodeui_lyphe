@@ -12,7 +12,6 @@ type StandaloneShellProps = {
   isPlainShell?: boolean | null;
   isActive?: boolean;
   autoConnect?: boolean;
-  onComplete?: ((exitCode: number) => void) | null;
   onClose?: (() => void) | null;
   title?: string | null;
   className?: string;
@@ -29,7 +28,6 @@ export default function StandaloneShell({
   isPlainShell = null,
   isActive = true,
   autoConnect = true,
-  onComplete = null,
   onClose = null,
   title = null,
   className = '',
@@ -44,13 +42,11 @@ export default function StandaloneShell({
 
   const shouldUsePlainShell = isPlainShell !== null ? isPlainShell : command !== null;
 
-  const handleProcessComplete = useCallback(
-    (exitCode: number) => {
-      setIsCompleted(true);
-      onComplete?.(exitCode);
-    },
-    [onComplete],
-  );
+  // The header's "completed" mark is the only thing the command's exit changes here. It is deliberately not
+  // handed to the caller: `claude /login` never exits, so a caller that waited on it would wait forever.
+  const handleProcessComplete = useCallback(() => {
+    setIsCompleted(true);
+  }, []);
 
   if (!project) {
     return <StandaloneShellEmptyState className={className} />;

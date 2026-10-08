@@ -199,7 +199,8 @@ export type MessageKind =
   | 'permission_cancelled'
   | 'session_created'
   | 'history_truncated'
-  | 'task_notification';
+  | 'task_notification'
+  | 'compaction';
 
 /**
  * Event kinds added by the chat gateway layer on top of provider message kinds.
@@ -336,9 +337,9 @@ export type DispatcherPlanStatus = 'idle' | 'parked' | 'queued' | 'scheduled' | 
 export type DispatcherAsk = { plan: string; plans: string[]; asked: { id: number; at: string } } & ({ kind: 'accept'; header: string; question: string; token: string; options: Array<{ label: string; description: string }>; rework: string[] } | { kind: 'questions'; questions: Array<{ text: string; options: string[] }>; target: string });
 /** One plan whole: its row, its waits, its armed hour, its books, its phases in position order and its log oldest first. `state` is the STORE's own state word — `designing`, `designed`, `questions`, `loaded`, `parked` — a string rather than a union, because the store's vocabulary belongs to the store. `goal` is null on a plan that has been opened and not yet designed. `session` is the session that opened it, `author` the soul that wrote its design. `schedule` is the armed hour read back out of systemd at this instant (`schedule.armed`), `{ start_at, unit }` with `start_at` the timer's own ISO stamp — so a timer stopped or fired by hand reads null here at once. `cost_usd`, `rounds` and `tokens*` sum this plan's phases — and `cost_usd` is PAID dollars, so a plan that rode the operator's Claude subscription reads `0` there while its tokens count everything it spent. `launched` is whether a walk has ever gone out for it — see the field. */
 export type DispatcherPlan = { name: string; state: string; status: DispatcherPlanStatus; repo: string; goal: string | null; delivers: string | null; session: string | null; /** The ONE field the server ADDS, which is why this type is not a pure mirror: the plan's `session` resolved through `sessionsDb.resolveAppSessionId` (the rule `dispatcher-state.service.ts` follows), `null` when the plan names no session or the id resolves to none. The document's own `session` travels untouched beside it. */ session_app_id: string | null; author: string | null; /** The name of the ARC this plan belongs to (`plans.arc_id` read through the arc row), or `null` for a plan of no arc — the join a card makes against the same document's `arcs` list. The bare name, with no `.arc` adornment. */ arc: string | null; /** The ONE planner outing this plan reports (`report_planners.of_plan`): its own newest live row, else its arc's when it has none of its own, then the newest ending of either whose work is still SHORT of a plan. So a plan of an arc being designed whole reports the arc's design, and a plan whose own cut died reports that cut. `null` on a plan no planner is on. Read tolerantly (`plannerSince`), so a dispatcher build older than the field draws no badge rather than blanking every card. */ planner: DispatcherPlanner | null; /** The plan's EFFECTIVE model word (`dispatcher/model.py:model.of`): its own, else its arc's, else the store's default — so the control that draws it and presses it back is showing what this plan's next chain will really be launched with, never a bare column. `null` only against a dispatcher build older than the field, which reads the store's default (`effectiveModelWord`). */ model: DispatcherModelChoice | null; /** THIS plan's width in one phrase (`width.word` of its effective model word and its task-WIP word, `width.task_word`) — the route it walks and how many of its tasks run at once, as the gate acts on it: `claude route · WIP: 2 tasks at a time`. The card's caption reads it in place of the box's `DispatcherRoute.word`, so a plan is never captioned with a number that is not the one in force for it. `null` against a build older than the field, where the box's phrase is the only one there is. */ posture: string | null; /** Why this feature is waiting for an epic slot (`report.plan_dict.wip_hold`): the FEATURE-WIP clause the gate (`width.feature_hold`) returns for the plan's first ready phase — `WIP: at most N features of this epic in progress` — while the plan is eligible, and `null` otherwise (unapproved, paused, finished, waiting on a plan, a feature already in progress, a feature of no epic, an epic with room). The card draws it as one line beside `waits on …`, in the dispatcher's own words. `null` against a dispatcher build older than the field, where no line is drawn. */ wip_hold: string | null; created_at: string; updated_at: string; completed_at: string | null; prompted_at: string | null; paused: boolean; /** Whether a walk has EVER gone out for this plan (`report.launched`, read off the plan's own event rows and never stored — INV-172). It is the ONE fact the status word cannot state on its own: `paused` and `scheduled` both describe a plan that is not moving, and neither says whether it was stopped mid-walk or is still waiting at the gate. So it is also the word on the card's primary button — Resume for the first, Start for the second. An arc's header draws nothing off it: the arc's Start reaches either state, and its Pause and its Schedule start reach the whole set of them (`report_arcs.stopped`). `false` against a dispatcher build older than the field. */ launched: boolean; /** Why the plan's ONLY running work has ended with nothing to record it (`report_stall`), or `null`: the cause beside the `stalled` status word, derived once by the dispatcher so no card works it out. */ stalled: DispatcherStall | null; approved: { at: string; by: string } | null; /** The prompt CloudCLI has put up for this plan and is waiting on (`DispatcherAsk`), or `null`. Read tolerantly (`askingSince`): a dispatcher build older than the key asks nothing. */ asking: DispatcherAsk | null; waits_on: string[]; schedule: { start_at: string; unit: string } | null; cost_usd: number; tokens: number; tokens_in: number; tokens_out: number; tokens_cache_read: number | null; /** How long at least one agent was out on this plan, in whole seconds (`report_runtime`): the union of its planner outings' and its stage tries' intervals — overlaps counted once, pauses and waits not at all — derived at read time, never stored. An interval still open ends at the document's own reading time, so the figure moves while an agent is out and stands still otherwise; a card ticks it between frames only while `agentsOut` says one is (`workingTime.ts`). The frame's lane compares pictures WITHOUT this key (`dispatcher-watcher.service.ts`), because it moves on every read of a live plan. `0` against a build older than the field. */ runtime_s: number; rounds: number; phases: DispatcherPhase[]; events: DispatcherEvent[] };
-/** An arc's derived word, in ONE precedence (`store_arcs.arc_word`): `empty`, `complete`, `judging`, `stalled`, `live`, then its plans' OWN waiting word — `scheduled`, `paused`, `queued` — else `designing`. `empty` comes FIRST because an arc whose every plan was dropped has no plan row for anything below it to read; `complete` next, when every plan of it carries its completion stamp, its judgment's included; `judging` while the arc's own judgment plan exists and has not finished (no stamp, and not every phase of it done), because that plan IS a plan of its arc and would otherwise read as work still being designed, queued or live; then `live` while any phase of any of its plans is walking (`phase_chain.busy`, never the status column — INV-186) or while a plan of it is approved, unpaused and unfinished and so the rule's to take up (the same set `DispatcherArc.walking` draws Pause for); then the STRONGEST waiting word its plans carry (`report.status_word`), for an arc none of whose plans is still being designed: `scheduled` with an hour armed, `paused` stopped mid-walk, else `queued` at the gate. Never a column: INV-172. */
+/** An arc's derived word, in ONE precedence (`store_arcs.arc_word`): `empty`, `complete`, `judging`, `stalled`, `live`, then its plans' OWN waiting word — `scheduled`, `paused`, `queued` — else `designing`. `empty` comes FIRST because an arc whose every plan was dropped has no plan row for anything below it to read; `complete` next, when every plan of it carries its completion stamp, its judgment's included (an epic created with one feature opens none, and never reads `judging`); `judging` while the arc's own judgment plan exists and has not finished (no stamp, and not every phase of it done), because that plan IS a plan of its arc and would otherwise read as work still being designed, queued or live; then `live` while any phase of any of its plans is walking (`phase_chain.busy`, never the status column — INV-186) or while a plan of it is approved, unpaused and unfinished and so the rule's to take up (the same set `DispatcherArc.walking` draws Pause for); then the STRONGEST waiting word its plans carry (`report.status_word`), for an arc none of whose plans is still being designed: `scheduled` with an hour armed, `paused` stopped mid-walk, else `queued` at the gate. Never a column: INV-172. */
 export type DispatcherArcStatus = 'empty' | 'complete' | 'judging' | 'stalled' | 'live' | 'scheduled' | 'paused' | 'queued' | 'designing';
-/** One arc of the store (`report_arcs.arc_dict`): its words, its own model word, its derived status and the NAMES of its plans, in `store.arc_plans` order — the arc file's order, except for a member that pre-dated its arc — which is what a reader joins against `plans[].arc` in the same document. `model` is the ARC's own word, never one plan's effective one: it is what the arc's control draws and what `dispatcher model <arc> <word>` hands to every plan of the arc. `cost_usd` and the four token keys are the sums of the plan cards under it in the same document (`report.plan_dict`'s own figures, a phase mid-walk counted as its card counts it), so an arc and its plans never disagree about what the arc has cost (INV-4299). `walking`, `stopped` and `schedule` are its own verbs' readings, taken off the same document's plan rows — so the header and `dispatcher stop|resume|schedule <arc>` can never disagree about what a press reaches. */
+/** One arc of the store (`report_arcs.arc_dict`): its words, its own model word, its derived status and the NAMES of its plans, in `store.arc_plans` order — the arc file's order, except for a member that pre-dated its arc — which is what a reader joins against `plans[].arc` in the same document. `model` is the ARC's own word, never one plan's effective one: it is what the arc's control draws and what `dispatcher model <arc> <word>` hands to every plan of the arc. `cost_usd`, the four token keys and `runtime_s` are the epic's books: the plan cards' figures in the same document (`report.plan_dict`'s own, a phase mid-walk counted as its card counts it) cut at the moment each feature JOINED the epic — a stage counts when it launched at or after it, a feature born in the epic counts whole — so an epic that took a finished feature in after it ran does not carry that feature's past, while the feature's own card keeps it (`report_arcs._books`, INV-4299). `walking`, `stopped` and `schedule` are its own verbs' readings, taken off the same document's plan rows — so the header and `dispatcher stop|resume|schedule <arc>` can never disagree about what a press reaches. */
 export type DispatcherArc = { name: string; goal: string | null; architecture: string | null; delivers: string | null; model: DispatcherModelChoice | null; status: DispatcherArcStatus; /** Whether any of the arc's plans is LIVE (`report_arcs.walking` — the `live` ones): a walk is out on it, or it is approved and unpaused and so the rule's to take up when its waits are complete. This is what `dispatcher stop <arc>` acts on and the set the header draws Pause for — so Pause reaches the plans waiting their turn as well as the one in flight, and the next one cannot start the moment the walker of the one before it ends. */ walking: boolean; /** Whether any of the arc's plans is STOPPED — approved, paused and unfinished (`report_arcs.stopped`): `queued` at the gate, `paused` mid-walk, `scheduled` with an hour armed. This is what `dispatcher resume <arc>` and `dispatcher schedule <arc>` both act on, and the set the header draws Start and Schedule start for. NOT OFF `launched`: a plan of an arc is born paused — an arc whose plans the operator accepted with Queue is a row of plans waiting at the gate, and reading only the ones stopped MID-WALK left such an arc with no Start at all. The set is the plan's own card's: `PlanControls` draws its Start or its Resume for exactly these three words. */ stopped: boolean; /** Whether any of the arc's plans is STALLED (`report_arcs.stalled`): released, with its only running work ended and nothing to record it (`report_stall`). It is what the header draws Resume for when nothing of the arc is stopped — `dispatcher resume <arc>` takes these plans along with the stopped ones, waking the daemon — and it never replaces Pause: a stalled plan is released, so Pause still reaches it (`walking`). */ stalled: boolean; /** The ONE hour the arc's STOPPED plans are armed for, as the timer's own ISO stamp, or null (`report_arcs.hour`). Over the same set the arc's Cancel reaches — which is the set its Start reaches — whoever armed it. One stamp because one press wrote them all; null when none of them is armed, and when they were armed apart — the header then offers the press again rather than naming a time half its plans are not waiting for. */ schedule: string | null; plans: string[]; /** The epic's two WIP limits (`report_arcs.arc_dict.wip`, from `wip.report`): for each of `features` and `tasks`, the epic's OWN word (`null` while it carries none and follows Settings' default) and the word in force. It is what the epic's WIP control draws and presses back (`dispatcher wip <arc> <limit> <word>`). `null` against a dispatcher build older than the field, where the control is simply not drawn. */ wip: DispatcherArcWip | null; /** The one planner outing of the ARC — its design, its cut, its judgment (`report_planners.of_arc`: the newest live row whose `target` IS the arc, else its newest ending still short of a plan). A row naming one of the arc's plans is that PLAN's, and rides `plan.planner` instead, so the deck's header and a card inside it can never state one outing twice. `null` on an arc no planner is on, and against a dispatcher build older than the field. */ planner: DispatcherPlanner | null; created_at: string; completed_at: string | null; cost_usd: number; tokens: number; tokens_in: number; tokens_out: number; tokens_cache_read: number | null; /** How long at least one agent was out on the epic, in whole seconds (`report_arcs.arc_dict`): the UNION of its plans' intervals and the outings whose subject is the epic itself — its design, its cut, its judge — never its plans' `runtime_s` added, because features of one epic walk at the same time. Read like `DispatcherPlan.runtime_s`: derived, ticked between frames only while an agent is out, `0` against a build older than the field. */ runtime_s: number };
 /** This box's posture, as `report.snapshot` reads it on every call: the provider the walks take (`width.route` — the DeepSeek switch, read live, never cached). `word` is the BOX's whole posture in one phrase (`width.word()`): its route and the Settings task default — never a `held` line's ending, which names the clause that refused (`width.reason`); one plan's own phrase is `DispatcherPlan.posture`. `park_at_peak` is the operator's third switch file; `peak_until` is when the CURRENT DeepSeek peak window ends, as an ISO stamp, or null outside one — on the Claude route the peak has no price, so it is null whatever the toggle says. `planners` is the planner lane's dial and its census (`planner_lanes.census`): `lanes` the width the operator set in `planners.flag` (default 2, floor 1), `out` how many planner outings are out against it — `out` may stand above `lanes` after the dial is lowered, since an outing already out is never stopped. Absent against a dispatcher build older than the field, where the readout is not drawn. `wip` is Settings' two WIP defaults as words (`wip.defaults`) — the numbers every epic with no word of its own walks under, which its WIP control compares a press against; absent against a build older than the field, where the control is not drawn. */
 export type DispatcherRoute = { provider: 'claude' | 'deepseek'; word: string; park_at_peak: boolean; peak_until: string | null; wip?: DispatcherWipDefaults; planners?: { lanes: number; out: number } };
@@ -729,6 +730,12 @@ export type NormalizedMessage = {
   subagent?: SubagentInfo;
   /** Stored memory the reply drew on, when the provider reports it. */
   memoryCitations?: MemoryCitation[];
+  /**
+   * What a custom compaction did, on the one `compaction` row it leaves in a chat's history and
+   * live stream. Present only when `kind` is `compaction`. Mirrored on the client's own
+   * NormalizedMessage in src/shared/types.ts.
+   */
+  compaction?: ChatCompactionMarker;
   toolUseResult?: unknown;
   sequence?: number;
   rowid?: number;
@@ -907,6 +914,74 @@ export type ProviderRuntimePermissionGateway = {
   listPendingSessions?(): string[];
 };
 
+// ---------------------------
+//----------------- CUSTOM COMPACTION: the runtime's seams to a compaction it never imports ------------
+// The Claude runtime learns everything about custom compaction through its context
+// (`ProviderRuntimeContext.compaction`), the same seam it already uses for every other lookup the
+// app answers for it. It imports nothing from the compaction module; that module registers the
+// hooks (`providerRuntimeService.useChatCompaction`) and reads a process's activity back
+// (`providerRuntimeService.activity`).
+
+/**
+ * What one chat's CLI process is doing right now, as the runtime sees it. `live` is whether a
+ * process for the chat exists at all; `busy` is whether it must not be replaced yet — a turn
+ * pending or in flight, or background work (tasks, watchers, deferred calls) still outstanding —
+ * and `why` names which, in a sentence a status line can quote after "waits until"
+ * ("a turn is in flight", "a turn is about to start" — a finished background task's follow-up,
+ * "2 background tasks are running", "1 background call has not reported"). `why` is null whenever
+ * `busy` is false. A chat with no process is
+ * `{ live: false, busy: false, why: null }`: nothing to wait for.
+ * Produced by the Claude runtime (`claude-compaction-seams.ts`) and the runtime service's
+ * not-live default; consumed by the compaction module's guard and its triggers.
+ */
+export type ChatProcessActivity = { live: boolean; busy: boolean; why: string | null };
+
+/**
+ * What the runtime reports to the compaction when a process's `result` lands, after the turn's own
+ * `complete` has gone out (so a hook can never delay or break the reply). `contextTokens` is the
+ * context of the turn's last MAIN-THREAD request — input plus both caches plus output — and `null`
+ * when the turn made none; `contextWindow` is the window of the model that request ran on, read off
+ * the result's `modelUsage`, `null` when no entry names that model. `sendOptions` are the turn's own
+ * send options without anything one turn carries (`attachments`, `images`, `files`, `promptBlocks`,
+ * `resumeFromScratch`, `resumeAnchorId`, `compactionSeed`, `compactionTrigger`, and `keepalive`, a
+ * re-adopted run's descriptor), so a compaction started from a report sends its seed turn at the
+ * chat's own model, effort, permission mode and tools. A re-adopted run carries none of those until a
+ * message joins it, so they are read from the launch profile the host recorded; a host with no record
+ * leaves the options bare. `answered` is whether a client turn was waiting on this result (false for a background
+ * follow-up turn); `aborted` whether the turn was a Stop's; `seed` whether it was a compaction's
+ * own seed turn. `activity` is the process's activity at that moment.
+ * Produced by the Claude runtime's loop; consumed by the compaction module's triggers.
+ */
+export type ChatTurnReport = {
+  appSessionId: string;
+  userId: string | number | null;
+  contextTokens: number | null;
+  contextWindow: number | null;
+  sendOptions: AnyRecord;
+  answered: boolean;
+  aborted: boolean;
+  seed: boolean;
+  activity: ChatProcessActivity;
+};
+
+/**
+ * The three questions a runtime asks of a custom compaction, answered by whoever registered them
+ * (`providerRuntimeService.useChatCompaction`; the default answers `takesOver` false and does
+ * nothing for the other two). `takesOver` is asked each time a message resolves launch options — twice for a message that replaces the process, once to plan the respawn and once to launch:
+ * `appSessionId` is null for a run with no chat behind it (the git and agent one-shots) and `node`
+ * names the Cerberus node the chat is placed on, null for local. `turnEnded` and `activityChanged`
+ * are fire-and-forget notifications; the runtime wraps every call, so a hook that throws is logged
+ * and the turn goes on.
+ * Consumed by the Claude runtime through `ProviderRuntimeContext.compaction`.
+ */
+export type ChatCompactionHooks = {
+  takesOver(input: { appSessionId: string | null; node: string | null }): Promise<boolean>;
+  turnEnded(report: ChatTurnReport): void;
+  activityChanged(appSessionId: string, activity: ChatProcessActivity): void;
+};
+
+// ---------------------------
+//----------------- PROVIDER RUNTIME CONTEXT ------------
 /**
  * Provider-scoped application capabilities supplied to a runtime for one run.
  *
@@ -922,6 +997,8 @@ export type ProviderRuntimeContext = {
   getProviderModels(): Promise<ProviderModelsDefinition>;
   normalizeMessage(raw: unknown, sessionId: string | null): NormalizedMessage[];
   isProviderInstalled(): Promise<boolean>;
+  /** Custom compaction's three hooks; always present, and inert until something registers them. */
+  compaction: ChatCompactionHooks;
 };
 
 export type ProviderRunFunction = (
@@ -2156,13 +2233,20 @@ export type AgentLaunchRowChange = { model?: string | null; effort?: string | nu
 /**
  * An edit of the table's defaults, as `PUT /api/agent-launch/defaults` carries it and `launch-table defaults`
  * takes it. `model` is the default model; `effort` maps a model to its default effort word, or to `null` for
- * "no `--effort` flag on that model"; `deepseek_effort` is the one house-wide DeepSeek effort. A field left out is
- * left alone. Read by the relay's routes (the body's shape) and its service (the argv).
+ * "no `--effort` flag on that model"; `deepseek_effort` is the one house-wide DeepSeek effort; `dactyl_model` and
+ * `dactyl_effort` are the two words every dactyl launches at (the table's `[dactyl]`), and `summarizer_model` and
+ * `summarizer_effort` are the two that write a chat's compaction while Custom compaction is on (the table's
+ * `[summarizer]`); none of the four can be cleared.
+ * A field left out is left alone. Read by the relay's routes (the body's shape) and its service (the argv).
  */
 export type AgentLaunchDefaultsChange = {
   model?: string;
   effort?: Record<string, string | null>;
   deepseek_effort?: string;
+  dactyl_model?: string;
+  dactyl_effort?: string;
+  summarizer_model?: string;
+  summarizer_effort?: string;
 };
 
 // ---------------------------
@@ -2239,4 +2323,67 @@ export type CronRegistrySnapshot = {
   readAt: string;
   jobs: CronJob[];
   lastSync: CronSyncReport | null;
+};
+
+// ---------------------------
+//----------------- CUSTOM COMPACTION RECORD: the facts of a compacted transcript ------------
+// A compaction leaves the chat's old transcript behind as a `superseded_provider_sessions` row with
+// `reason = 'compaction'`, so the two delete paths, `resolveAppSessionId` and the indexer's refusal
+// cover it with no new reader. These two types are that row's contents: `sessionCompactionsDb`
+// (`repositories/session-compactions.db.ts`) writes the facts and answers the record.
+
+/** What a custom compaction knew about itself at the moment the chat swapped onto its new session; `sessionCompactionsDb.swapToCompactedSession` writes it and every field lands in its own column. `trigger` is what started it: the operator pressing Compact (`manual`), a turn's end past the window fraction (`auto`), or the chat sitting idle (`idle`). `summarizerModel` is the word the summarizer was launched with and `summarizerServed` the model that actually answered (`null` when no reply named one) — the two are kept apart because a launch word can be an alias. `summarizerEffort` is the effort it ran at. `preTokens` is the chat's context before the compaction, `null` when no turn had reported it. `summarizerTokensIn` and `summarizerTokensOut` are summed over every summarizer call, failed ones included, and `chunks` is the number of calls the transcript was parted into (1 when it fit one). Tokens only, never dollars — the house is on a subscription. */
+export type CompactionFacts = {
+  trigger: 'manual' | 'auto' | 'idle';
+  summarizerModel: string;
+  summarizerServed: string | null;
+  summarizerEffort: string;
+  preTokens: number | null;
+  summarizerTokensIn: number;
+  summarizerTokensOut: number;
+  chunks: number;
+};
+
+/** One compaction as `sessionCompactionsDb.listCompactions` and `listAllCompactions` answer it: the facts, plus where the chat came from. `oldProviderSessionId` and `oldJsonlPath` name the transcript the chat left (still on disk, still searchable); `sessionId` is the app session that left it; `createdAt` is the swap's time as ISO-8601 UTC. `postTokens` is the chat's context after the new session's first turn, and `null` until that turn has reported it (`setCompactionPostTokens` fills it in) — a record read between the swap and that report is not malformed, it is early. */
+export type CompactionRecord = CompactionFacts & {
+  oldProviderSessionId: string;
+  oldJsonlPath: string;
+  sessionId: string;
+  createdAt: string;
+  postTokens: number | null;
+};
+
+/** The `compaction` row a chat's history and live stream draw where a custom compaction swapped the chat onto a new session. `NormalizedMessage.compaction` carries it on a row of `kind: 'compaction'` (`id: 'compaction-<old provider session id>'`), built from a `CompactionRecord` by the Claude history reader and, live, by the compaction run itself. `trigger` is what started the compaction (`manual`: the operator pressed Compact; `auto`: a turn ended past the window fraction; `idle`: the chat sat idle). `summarizerModel` is the word the summarizer launched with and `summarizerServed` the model that answered, `null` when no reply named one. `preTokens` is the chat's context before and `postTokens` its context after the new session's first turn — `null` until known, so a marker read early is not malformed. `summarizerTokensIn`, `summarizerTokensOut` and `chunks` say what the summarizer read, wrote and in how many calls (tokens only, never dollars — the house is on a subscription). `at` is the swap's time as an ISO-8601 string. The client mirrors this type in `src/shared/types.ts`; keep the two identical. */
+export type ChatCompactionMarker = {
+  trigger: 'manual' | 'auto' | 'idle';
+  summarizerModel: string;
+  summarizerServed: string | null;
+  summarizerEffort: string;
+  preTokens: number | null;
+  postTokens: number | null;
+  summarizerTokensIn: number;
+  summarizerTokensOut: number;
+  chunks: number;
+  at: string;
+};
+
+// ---------------------------
+//----------------- CUSTOM COMPACTION SWITCH: the summarizer's status ------------
+
+/**
+ * What `~/.claude/scripts/summarize --status` prints as its one JSON line: the summarizer's words
+ * (`launch.toml`'s `[summarizer]`, which CloudCLI never parses) and whether the installed Claude Code
+ * can serve them now. `ready: false` carries its sentence in `why`; `ready: true` carries `''`.
+ * `cli` names the binary that answer was derived from, so a holder can ask again exactly when the
+ * binary changes: `settings`' `summarizerStatus()` produces it and `modules/compaction` caches a READY
+ * one by `cli.path`, `size` and `mtime_ns` (a not-ready one is asked again at the next launch, because
+ * the operator's words change without the binary). `mtime_ns` is past 2^53, so a comparison against a `stat` goes
+ * through `Number(stat.mtimeNs)` on a bigint stat — both sides then round the same way.
+ */
+export type SummarizerStatus = {
+  model: string;
+  effort: string;
+  ready: boolean;
+  why: string;
+  cli: { path: string; size: number; mtime_ns: number; version: string };
 };

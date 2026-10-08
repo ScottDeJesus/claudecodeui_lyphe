@@ -89,9 +89,10 @@ export function ChatGutterLayout({
   // The Runs widget lists the arcs as decks and the plans no arc holds as cards, so its badge
   // counts the plans alone: an arc's own plans are already counted, and the arc's deck is a
   // heading over cards the count has counted — the In flight face's own rule (`useDispatcherPlans.count`).
-  // `waiting` is the badge's TONE, not its number: the count stays what it always was, and turns
-  // amber while any of those plans owes the operator a word — the same amber the tab's dot wears.
-  const { count: runnerCount, waiting: runnerWaiting } = useDispatcherPlans();
+  // `tone` is the badge's colour, not its number: the count stays what it always was, and wears what
+  // the lane is DOING — amber while a plan owes the operator a word, blue while anything runs, green
+  // only once all of it is finished — the same colour the Roadmap tab's dot wears (`useDispatcherPlans.tone`).
+  const { count: runnerCount, tone: runnerTone } = useDispatcherPlans();
   // The Roadmap widget's badge counts what is being worked on — features still being designed and features in
   // flight, on the ONE roadmap on screen — and turns amber while any of them owes the operator a word: the
   // same register as the Runs badge above. These reads sit OUTSIDE every widget's boundary, so a picture whose
@@ -290,9 +291,9 @@ export function ChatGutterLayout({
     runner: {
       title: t('gutters.runner.title'),
       count: runnerCount,
-      // Amber while a prompt on the lane is waiting on the operator — the badge is the widget's
-      // only mark that says so, and the tab it mirrors wears the same tone at the same moment.
-      countTone: runnerWaiting > 0 ? 'warn' : undefined,
+      // The lane's own mark: the badge is the widget's only one, and the tab it mirrors wears the
+      // same colour at the same moment.
+      countTone: runnerTone ?? undefined,
       icon: ActivityIcon,
       Body: RunnerWidgetBody,
     },

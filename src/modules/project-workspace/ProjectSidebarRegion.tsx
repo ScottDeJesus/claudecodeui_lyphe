@@ -26,6 +26,7 @@ function ProjectSidebarRegion({
     memoryPendingCount,
     runnerCount,
     runnerWaiting,
+    runnerTone,
     shouldShowHealTab,
     healCount,
     cerberusNeeds,
@@ -52,6 +53,7 @@ function ProjectSidebarRegion({
       memoryPendingCount={memoryPendingCount}
       runnerCount={runnerCount}
       runnerWaiting={runnerWaiting}
+      runnerTone={runnerTone}
       shouldShowHealTab={shouldShowHealTab}
       healCount={healCount}
       cerberusNeeds={cerberusNeeds}

@@ -5,6 +5,7 @@ import { useDeepSeekFlashSwitch } from '@/shared/hooks/useDeepSeekFlashSwitch';
 import { useHealMasterSwitch } from '@/shared/hooks/useHealMasterSwitch';
 import { Button, LLMProviderLogo, SettingRow } from '@/shared/ui';
 import SettingsToggle from '@/modules/settings/SettingsToggle';
+import RunnerCompactionRow from '@/modules/settings/tabs/agents-settings/sections/content/RunnerCompactionRow';
 import RunnerHealModelRow from '@/modules/settings/tabs/agents-settings/sections/content/RunnerHealModelRow';
 import RunnerParkAtPeakRow from '@/modules/settings/tabs/agents-settings/sections/content/RunnerParkAtPeakRow';
 import RunnerPlannerLanesRow from '@/modules/settings/tabs/agents-settings/sections/content/RunnerPlannerLanesRow';
@@ -24,10 +25,11 @@ import RunnerWipDefaultsRow from '@/modules/settings/tabs/agents-settings/sectio
  * The read, the write and the re-read live in `useDeepSeekFlashSwitch` and `useHealMasterSwitch` —
  * one hook per switch rather than one generalised switch, because switches sharing a module move
  * together the first time one of them is edited, and these must never. The WIP defaults, the planner
- * lanes and the park-at-peak switch each have a row of their own file below (`RunnerWipDefaultsRow`,
- * `RunnerPlannerLanesRow`, `RunnerParkAtPeakRow`) with a hook of its own, and the fourth heal switch,
- * `useHealModelSwitch`, is drawn by `RunnerHealModelRow` — its own file, because the row that asks
- * WHICH MODEL a heal runs on needs this card's heal poller and grew past what this file should hold.
+ * lanes, the park-at-peak switch and the Custom compaction switch each have a row of their own file
+ * (`RunnerWipDefaultsRow`, `RunnerPlannerLanesRow`, `RunnerParkAtPeakRow` and `RunnerCompactionRow` — drawn directly
+ * under the DeepSeek row, because it asks that row's question of a chat's compaction: which small model does a big
+ * model's chore) with a hook of its own, and the fourth heal switch, `useHealModelSwitch`, is drawn by `RunnerHealModelRow` — its own file, because
+ * the row that asks WHICH MODEL a heal runs on needs this card's heal poller and grew past what this file should hold.
  *
  * The heal row wears the heal panel's own `HeartPulseIcon`, so one shape means one thing wherever it
  * appears.
@@ -98,7 +100,7 @@ export default function RunnerModelContent() {
           />
         )}
       </SettingRow>
-      {/* FILL: dactyls-row — <RunnerDactylsRow />, directly under the DeepSeek row */}
+      <RunnerCompactionRow />
 
       {/* THE WIP DEFAULTS — what every epic starts from: two steppers, features in progress and tasks
           per feature, on the one shared ladder. Its own file and its own hook, like the rows around it. */}

@@ -112,7 +112,7 @@ section: README/004 What Each Facet Does
 
 | Facet | Responsibility | Base / Service |
 | --- | --- | --- |
-| `runtime` | Run and abort live SDK/CLI sessions | `IProviderRuntime` -> `providerRuntimeService` |
+| `runtime` | Run and abort live SDK/CLI sessions; optionally (`activity?`) report what a chat's process is doing, MAN-8055 | `IProviderRuntime` -> `providerRuntimeService` |
 | `models` | Resolve supported and active models | `IProviderModels` -> `providerModelsService` |
 | `auth` | Report install/auth state for the provider runtime | `IProviderAuth` -> `providerAuthService` |
 | `mcp` | Read, list, write, and remove provider-native MCP config | `McpProvider` -> `providerMcpService` |
@@ -538,3 +538,67 @@ Success: `createApiSuccessResponse(data)`.
 - 2026-09-30, live: create, move into a folder, delete = 3 writes, exactly 1 frame each.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/provider.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/services/simple-list.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/simple-list.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts
+
+## MAN-8054 — Compacted history — the stitch, the divider, search and the indexer
+
+**RULE: a chat with compaction records reads as ONE conversation — each compacted transcript, a divider, then the live transcript; a chat with none reads exactly the live transcript.**
+
+Records come from `sessionCompactionsDb.listCompactions` (MAN-8046). Claude only.
+
+## History — `stitchCompactedHistory`
+
+`stitchCompactedHistory({ sessionId, liveTranscriptPath, liveProviderSessionId, readTranscriptRows })` in `claude-compacted-history.ts` returns `{ rows, liveRows, supersededRows }`. The file is a leaf: `claude-sessions.provider.ts` hands its one-transcript reader in as `readTranscriptRows`; nothing imports back.
+
+| Part | Rule |
+| --- | --- |
+| Order | per record, oldest first: that transcript's rows, then one divider row; then the live rows |
+| Read of a compacted transcript | `readTranscriptRows(record.oldJsonlPath, record.oldProviderSessionId)`: its own id, so its subagents are found under its own folder |
+| Reader | `getSessionMessages(sessionId, transcriptPath, providerSessionId, limit, offset)` reads ONE transcript; a missing file is no rows, never an error; `readTranscriptRows` keeps only rows carrying `providerSessionId` |
+| Divider | raw row `type: 'cloudcli-compaction'`, `uuid: compaction-<old provider id>`, `timestamp` = `createdAt`, or the millisecond before the following seed's stamp when the seed is stamped no later (the record keeps the swap to the second, the seed to the millisecond, and the store's timestamp sort would otherwise put the summary above its divider; the marker's own `at` stays `createdAt`); `normalizeMessage` → `isCompactionRow` / `normalizeCompactionRow` → one `kind: 'compaction'` message whose `compaction` is a `ChatCompactionMarker` (`server/shared/types.ts`; the client mirrors it in `src/shared/types.ts`, keep identical) |
+| Seed | the first user prompt row (`isUserPromptRow`) of every transcript after the first becomes `isCompactSummary: true`, `uuid: compaction-summary-<previous record's old provider id>`, first text block only; drawn under `showCompactSummary`. The id equals the live frames' id, so the refresh after a compaction replaces the live row |
+| Anchors | `withoutAnchors` strips `transcriptAnchorId` from every row of a compacted transcript (`supersededRows`): no edit, no fork there |
+| `tokenUsage` | `summarizeClaudeTokenUsage(liveRows)`: the context the chat holds now |
+
+## Cache and launches
+
+| What | Rule |
+| --- | --- |
+| `readHistoryCompanionStamp(sessionId, transcriptPath, providerSessionId)` (`session-agents.service.ts`) | subagent stamp + `readCompactionStamp(sessionId)` (`compactions:<old id>@<postTokens>,…`); `sessions.service.ts` and `session-subagent-runs.service.ts` BOTH pass it, since two stamps for one entry evict each other |
+| Why the record rides the stamp | the swap writes its record before the new transcript exists, and `postTokens` is filled after the seed's last row; path, mtime and size alone cache a marker without its "after" |
+| `collectStampedSoulLaunches(providerSessionIds)` | takes an array: the live id and every record's `oldProviderSessionId`; one pass over the launch directory |
+| `subagentTranscriptService.readByToolUse` | looks up the live transcript, then each record's `oldJsonlPath` newest first, each under its own provider id |
+
+## Indexer and search
+
+| What | Rule |
+| --- | --- |
+| `ClaudeSessionSynchronizer.processSessionFile` | returns null when `sessionsDb.isProviderSessionSuperseded(id, provider)`: a compacted or abandoned-seed transcript is not a sidebar chat (the Codex rule) |
+| `listCompactedTranscriptRows(chatRows)` (`session-conversations-compacted.ts`) | one extra search entry per record whose chat is in `chatRows`: the chat's row with `provider_session_id` = old id and `jsonl_path` = old path; appended after the live rows; same hidden-root and archived-project filters as every row. An archived chat adds none |
+| `getSessionKey` | `provider:session_id:provider_session_id`; without the third part a hit in the old transcript makes the live row scan its live file |
+| `addSessionResult(sessionResults, result)` | ONE result per chat and provider (the sidebar keys results by chat id); appends hits whose `messageUuid`, `timestamp` and `snippet` together are not already held |
+
+## Traps
+
+| Trap | Why / do |
+| --- | --- |
+| `stitchCompactedHistory` reads no live rows when `liveProviderSessionId` is a record's `oldProviderSessionId` | a caller that took the id before the swap landed pairs it with the fresh path, still the old file in the gap; every compacted row would draw twice. Keep the rule if the stitch is restructured |
+| `provider-token-usage.service.ts` answers the old transcript's last turn between a swap and the seed's first row | it reads `session.jsonl_path` with no provider-id filter; only `fetchHistory`'s `tokenUsage` is cured |
+| The history cache charges its byte budget by the live file's size | a stitched entry's compacted rows go uncharged |
+| `listCompactions` runs on every stamp read | no `session_id` index (MAN-8046) |
+| A whitespace-only seed block is not guarded | the summarizer's block 0 always opens with its preamble; only a hand-edited transcript reaches it |
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-compacted-history.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-sessions.provider.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-session-synchronizer.provider.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/services/session-conversations-compacted.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/services/session-conversations-search.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/services/session-soul-launches.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/services/subagent-transcript.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts
+
+## MAN-8055 — The Claude runtime's seams to custom compaction
+
+The Claude runtime reaches a custom compaction (`server/modules/compaction/`) only through its context, `ProviderRuntimeContext.compaction` (`ChatCompactionHooks`: `takesOver`, `turnEnded`, `activityChanged`), and imports nothing from that module. `providerRuntimeService.useChatCompaction(hooks)` stores the hooks every context then carries — one delegating object that reads the registered hooks at CALL time, because a process keeps the context of the message that spawned it. The default answers `takesOver` false and does nothing for the other two, so with nothing registered the runtime behaves as it did before the seams. `providerRuntimeService.activity(provider, appSessionId)` asks the provider's runtime (`IProviderRuntime.activity?`) and answers `{ live: false, busy: false, why: null }` when it has none.
+
+`claude-runtime.provider.js` takes call-in lines only; every body is `list/claude/claude-compaction-seams.ts`:
+
+- **Taken over at launch.** `resolveSdkOptions` asks `takesOver({ appSessionId, node })` (a run with no app session id never asks) and `applyCompactionSettings` merges `CLI_COMPACTION_SETTINGS` (`{ idleCompaction: false }`, the one constant) into `sdkOptions.settings` beside ultracode's. `autoCompactEnabled` is never touched: the CLI's threshold compaction, its compaction at overflow and its precompute stay as the net. With the answer false nothing is merged and the launch is byte-identical.
+- **A flip is live.** `LaunchProfile.compactionTakenOver` is read off the launch settings (a profile recorded before the field reads as off); `planLiveChanges` makes a change of it a live `compaction` change, never a respawn, applied once for a re-adopted profile; `applyChanges` hands `applyFlagSettings` the constant, or — to give the chat back — `null` for a process that was only flipped on live (it removes the live value, so the operator's own setting shows again) and the CLI's DEFAULT (`idleCompaction: true`) for a process LAUNCHED taken over. Not `null` for that one: measured on 2.1.293 with no model call, the launch holds the key in the flag layer's base and a live `null` only removes what a live apply added, so `effective.idleCompaction` keeps reading `false` under it. The default also overrides an `idleCompaction` the operator set in a settings file; a launch argument cannot be taken back live, and the only other way is a respawn. Whether a process was launched on is fixed at launch (`launchedTakenOver`), and a re-adopted host with no profile on record counts as launched on.
+- **The turn's end is reported.** At the end of every `result` branch — after the turn's own `complete` — `turnEnded(report)` gets the turn's last MAIN-THREAD assistant request (`contextTokens`), the window of the model that request ran on (`contextWindow`, from the result's `modelUsage`), the turn's send options without anything one turn carries, whether a client turn was waiting (`answered`), `aborted`, `seed` and the process's `activity`. `activityChanged` follows every `result`, `task_started`, `task_notification` and `background_tasks_changed`, and once when the process ends with `live: false` (not when a newer process already holds the session key, nor while a replacement is spawning for the chat). `get activity` on the process handle is `busy` for a turn pending or in flight, a follow-up turn about to start, or background work, with `why` naming which. A non-ambient `task_notification` outside a running turn holds the process busy ("a turn is about to start") until the follow-up's `init` or any `result`, or for 2 s — the CLI starts that turn ~100 ms later, and an idle report in the gap would let a compaction swap the process under it. A re-adopted run's report has no model options of its own, so its `sendOptions` are filled from the host's recorded launch profile (bare only for a host with none). Every hook call is wrapped: a hook that throws is logged and the turn goes on, and `takesOver`, which a send awaits, answers "not taken over" after 10 s.
+- **A seed turn** (`options.compactionSeed`) sends `options.promptBlocks` — strings, each a text block — in place of the command text, and files no run-stopped push.
+- **A run that resumes nothing** (`resumeFromScratch`: an edited first prompt, a compaction's seed turn) seeds the session-id capture with null, so the session it starts is captured, handed to `ws.setSessionId` and announced with `session_created`; seeded with the chat's old provider id, as it was, the capture never fired and the chat stayed on the old session. When the run registry then moves a Claude chat's row from one provider session to another it marks the session it leaves superseded first, so the abandoned original is kept on disk, goes with the chat and is never indexed as a second sidebar chat.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/chat-process.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-compaction-seams.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-runtime.provider.js, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/services/provider-runtime.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/websocket/services/chat-run-registry.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/interfaces.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts

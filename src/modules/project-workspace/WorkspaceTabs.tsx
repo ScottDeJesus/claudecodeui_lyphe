@@ -19,7 +19,7 @@ import type { ComponentType, Dispatch, SetStateAction } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { Tabs } from '@/shared/ui';
-import type { AppTab } from '@/shared/types';
+import type { AppTab, Tone } from '@/shared/types';
 import { usePlugins } from '@/modules/plugins';
 
 type WorkspaceTabsProps = {
@@ -35,6 +35,8 @@ type WorkspaceTabsProps = {
   runnerCount: number;
   /** How many prompts the lane is waiting on, for the tab's attention mark. Zero leaves the tab unmarked. */
   runnerWaiting: number;
+  /** What the lane is doing, for the tab dot's colour (`useDispatcherPlans.tone`): blue while work runs, green only once all of it is finished. */
+  runnerTone: Tone | null;
   shouldShowHealTab: boolean;
   /** How much live friction the ledger holds, for the tab's count pill. Zero draws no pill at all. */
   healCount: number;
@@ -143,6 +145,7 @@ export default function WorkspaceTabs({
   memoryPendingCount,
   runnerCount,
   runnerWaiting,
+  runnerTone,
   shouldShowHealTab,
   healCount,
   cerberusNeeds,
@@ -195,6 +198,9 @@ export default function WorkspaceTabs({
     icon: tab.icon,
     count: countFor(tab.id),
     attention: attentionFor(tab.id),
+    // The Roadmap tab's dot says what its lane is DOING: blue while anything runs, which outranks
+    // green, so an epic in flight never reads as finished (operator, 2026-10-08).
+    tone: tab.id === 'runner' ? runnerTone ?? undefined : undefined,
   });
 
   // Plugin tabs keep their place at the end of the house row, after every built-in one, so a newly

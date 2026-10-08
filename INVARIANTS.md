@@ -8623,3 +8623,279 @@ measured 2026-10-07 by chain chain-cerberus--judgment--whole-20261007-132555-096
 probe-key: db4aa1dda93573693e2d4b5ca8cb6ba35197bffa
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/diagnosis/diagnosis-absence.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/diagnosis/diagnosis-deps.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/diagnosis/diagnosis-prompt.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/diagnosis/diagnosis-quotes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/diagnosis/diagnosis-tools.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/cerberus-types.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/cerberus-judgment-diagnosis.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/cerberus-judgment-handover.sh, /home/lyphe/.claude/claudecodeui_lyphe/.verify/cerberus-judgment-tab.mjs
+
+## INV-7351 — probe — LOW — a census missing `choices.dactyl_models` blanks the whole Agent Chains window
+
+LOW — a census missing `choices.dactyl_models` blanks the whole Agent Chains window
+
+```probe
+node /home/lyphe/.claude/state/pipeline-reviews/dactyls--defaults-fill/athena-probes/old-census.mjs
+expect: `panel ready: false | pageerrors: 2 Cannot read properties of undefined (reading 'map')` while the defect stands; `panel ready: true | pageerrors: 0` (or the "did not answer with a census" card with a retry) once cured
+```
+
+measured 2026-10-08 by chain chain-dactyls--defaults-fill-20261008-073023-1ba3, finding L1, LOW
+probe-key: f6ef3619f2163f2d70736d9c1d3bef81ae19e2e0
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/agent-launch/AgentLaunchDefaults.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/agent-launch-types.ts
+
+## INV-7356 — probe — `swapToCompactedSession` checks that the chat exists and is Claude, not that it stands on `oldProviderSessionId`
+
+`swapToCompactedSession` checks that the chat exists and is Claude, not that it stands on `oldProviderSessionId`
+
+```probe
+D=$(mktemp -d /tmp/athena-probe-rec.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+D=$1
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+sqlite3 ~/.cloudcli/auth.db ".backup '$D/auth.db'" || exit 1
+cat > "$D/p.mjs" <<'JS'
+import crypto from 'node:crypto';
+const m = await import('@/modules/database/index.js'); await m.initializeDatabase();
+const db = m.getConnection(), C = m.sessionCompactionsDb;
+const c = db.prepare(`SELECT * FROM sessions WHERE provider='claude' AND session_id<>provider_session_id AND jsonl_path IS NOT NULL LIMIT 1`).get();
+const facts = { trigger: 'manual', summarizerModel: 'm', summarizerServed: null, summarizerEffort: 'high', preTokens: null, summarizerTokensIn: 1, summarizerTokensOut: 1, chunks: 1 };
+const stale = crypto.randomUUID();
+let r; try { C.swapToCompactedSession({ sessionId: c.session_id, oldProviderSessionId: stale, oldJsonlPath: c.jsonl_path, newProviderSessionId: crypto.randomUUID(), facts }); r = 'accepted'; } catch (e) { r = 'refused'; }
+const now = db.prepare('SELECT provider_session_id p FROM sessions WHERE session_id=?').get(c.session_id).p;
+console.log(`swap naming an old id the chat is not on: ${r} | chat left its real session=${now !== c.provider_session_id} | real session recorded as left behind=${m.sessionsDb.isProviderSessionSuperseded(c.provider_session_id, 'claude')}`);
+JS
+DATABASE_PATH=$D/auth.db node_modules/.bin/tsx --tsconfig server/tsconfig.json "$D/p.mjs" 2>&1 | tail -1
+EOF
+bash "$D/p.sh" "$D"
+cd /tmp && case "$D" in /tmp/athena-probe-rec.*) rm -rf "$D";; esac
+```
+
+measured 2026-10-08 by chain chain-custom-compaction--record-20261008-082326-5119, finding L1, LOW
+probe-key: 6e2895b5cb2dfc01787479d93829e9400ff15131
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/migrations.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/session-compactions.db.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/schema.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts
+
+## INV-7366 — probe — LOW — three places still state "an epic's books are the sum of its plan cards, to the digit"; the diff made that false and edited the row that says it without touching the sentence
+
+LOW — three places still state "an epic's books are the sum of its plan cards, to the digit"; the diff made that false and edited the row that says it without touching the sentence
+
+```probe
+cd /home/lyphe/.claude && echo "arc=sum-of-cards claims — manual: $(grep -c 'row is therefore the sum of the plan cards under it, to the digit' hooks/dispatcher/MANUAL.md) | types.ts copies: $(cat claudecodeui_lyphe/server/shared/types.ts claudecodeui_lyphe/src/shared/types.ts | grep -c 'so an arc and its plans never disagree about what the arc has cost')"
+echo "[probe exit $?]"
+expect: manual: 0 | types.ts copies: 0 (the sentences say the epic is cut at each feature's join); the defect reads manual: 1 | types.ts copies: 2
+```
+
+measured 2026-10-08 by chain chain-epic-books-since-joined-20261008-085600-800f, finding L1, LOW
+probe-key: a1965ef1bd5249d4a281e0d068098ca9b59270d3
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher-arc.reader.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/hooks/dispatcher/store_joined.py, /home/lyphe/.claude/hooks/dispatcher/store.py
+
+## INV-7367 — probe — LOW — a read queued before a flip is issued after the write began, and its answer redraws the old side while the write is out
+
+LOW — a read queued before a flip is issued after the write began, and its answer redraws the old side while the write is out
+
+```probe
+cd /tmp && node /home/lyphe/.claude/state/pipeline-reviews/dactyls--row-fill/athena-probes/s16b-requeued-read.mjs 2>&1 | tail -3
+expect: a line `S16b trace (ms, side): [[1,"on"],[<~700>,"off"],[<~1500>,"on"]] flicker-to-off-while-write-out=true` while the defect stands; cured when it prints `flicker-to-off-while-write-out=false` (a trace that never reads "off")
+```
+
+measured 2026-10-08 by chain chain-dactyls--row-fill-20261008-082830-10e9, finding L1, LOW
+probe-key: 5062ae8aa28b65d79d0e9a44cb0e2feb63f59b58
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/settings/dactyls-switch.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/settings/settings.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/useDactylsSwitch.ts
+
+## INV-7371 — probe — MEDIUM — three manual rows still say the capture is gated on the login command's exit code
+
+MEDIUM — three manual rows still say the capture is gated on the login command's exit code
+
+```probe
+bash /home/lyphe/.claude/state/pipeline-reviews/relogin-window-and-switch/athena-probes/docs_stale.sh
+echo "[probe exit $?]"
+expect: `MAN-466 lines saying the capture is gated on the login command's exit code: 1` and `MAN-467 bullets about the exit-code gate / the exit-line scrape: 2` while the defect stands; both 0 when cured
+```
+
+measured 2026-10-08 by chain chain-relogin-window-and-switch-20261008-094412-9e3d, finding M1, MEDIUM
+probe-key: 3f7362edf0b8d2902058104a3633dd9ce86827ce
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/AccountFooterRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/AccountPopover.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/hooks/useClaudeAccounts.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/hooks/useReloginCapture.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/provider-auth/ProviderLoginModal.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/Settings.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/relogin-window.mjs
+
+## INV-7372 — probe — LOW — the re-login's pre-save and close-time captures bypass the single-writer guard the old capture had
+
+LOW — the re-login's pre-save and close-time captures bypass the single-writer guard the old capture had
+
+```probe
+node /home/lyphe/.claude/state/pipeline-reviews/relogin-window-and-switch/athena-probes/relogin_edges.mjs
+echo "[probe exit $?]"
+expect: first line `PRE-SAVE in flight — Re-login disabled: false | disabled buttons in the panel: 0`; second `captures sent: 2 | switches sent while it ran: 1` while the defect stands (cured: disabled true, captures 1, switches 0 or refused)
+```
+
+measured 2026-10-08 by chain chain-relogin-window-and-switch-20261008-094412-9e3d, finding L1, LOW
+probe-key: 40301d48ed82d95de810e2e6dc69169eac4f5ba6
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/AccountFooterRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/AccountPopover.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/hooks/useClaudeAccounts.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/hooks/useReloginCapture.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/provider-auth/ProviderLoginModal.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/Settings.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/relogin-window.mjs
+
+## INV-7373 — probe — LOW — an unreadable store at open or close means the sign-in is never filed, and nothing says so
+
+LOW — an unreadable store at open or close means the sign-in is never filed, and nothing says so
+
+```probe
+node /home/lyphe/.claude/state/pipeline-reviews/relogin-window-and-switch/athena-probes/relogin_edges.mjs
+echo "[probe exit $?]"
+expect: last line `CLOSE with the picture unreadable — captures sent: 0 | toast naming the new account or a failure: 0 | row reads: old.account@example.test` while the defect stands
+```
+
+measured 2026-10-08 by chain chain-relogin-window-and-switch-20261008-094412-9e3d, finding L2, LOW
+probe-key: 717c64bf84e24f5c8efab6cfc16e8c30beee44e7
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/AccountFooterRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/AccountPopover.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/hooks/useClaudeAccounts.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/hooks/useReloginCapture.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/provider-auth/ProviderLoginModal.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/Settings.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/relogin-window.mjs
+
+## INV-7380 — probe — LOW — doc comments in `server/shared/types.ts` that the code contradicts
+
+LOW — doc comments in `server/shared/types.ts` that the code contradicts
+
+```probe
+bash /home/lyphe/.claude/state/pipeline-reviews/custom-compaction--seams/probes/stale-docs.sh
+expect: types.ts quotes "1 background calls have not and names keepalive 0 times while the seams file writes 'background call has' and strips keepalive (1); after the fix the quote reads (not the plural form) and keepalive count is 1
+```
+
+measured 2026-10-08 by chain chain-custom-compaction--seams-20261008-095144-d30e, finding L2, LOW
+probe-key: a63d4f381d3df722c616b1847a936414c325e493
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts
+
+## INV-7385 — probe — LOW — a comment still points at the button that is gone
+
+LOW — a comment still points at the button that is gone
+
+```probe
+cd /home/lyphe/.claude/claudecodeui_lyphe && grep -n -i "second button\|to add one" src/modules/accounts/AccountPopover.tsx src/modules/accounts/AccountFooterRow.tsx src/modules/accounts/hooks/useReloginCapture.ts || echo none
+echo "[probe exit $?]"
+expect: `src/modules/accounts/AccountPopover.tsx:221:` prints while the defect stands; `none` once the comment stops referring to a second button
+```
+
+measured 2026-10-08 by chain chain-remove-add-account-button-20261008-103333-20a8, finding L1, LOW
+probe-key: a5b8e01c128691f28b87f61510fb05747010377d
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/AccountFooterRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/AccountPopover.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/hooks/useReloginCapture.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/relogin-window.mjs
+
+## INV-7386 — probe — LOW — MAN-467 still says no run measures the panel at a phone width, or records its reach by `[NOTE]`
+
+LOW — MAN-467 still says no run measures the panel at a phone width, or records its reach by `[NOTE]`
+
+```probe
+cd /home/lyphe/.claude/claudecodeui_lyphe && printf 'MAN-467 lines claiming no run measures the mobile width: '; docstore get MAN-467 --text | grep -c "No run measures a shorter viewport"; printf 'MAN-8057 lines naming the phone viewport: '; docstore get MAN-8057 --text | grep -c "phone 390"
+echo "[probe exit $?]"
+expect: `MAN-467 lines claiming … : 1` and `MAN-8057 lines naming the phone viewport: 1` while the defect stands; the first reads 0 once the bullet says what the gate now measures
+```
+
+measured 2026-10-08 by chain chain-remove-add-account-button-20261008-103333-20a8, finding L2, LOW
+probe-key: 131931f1fe7308113e8e7c527616d80ab5b57f80
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/AccountFooterRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/AccountPopover.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/hooks/useReloginCapture.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/relogin-window.mjs
+
+## INV-7396 — probe — a swap that throws leaves the seed's CLI process registered under the chat; the next message goes into it and the chat is corrupted
+
+a swap that throws leaves the seed's CLI process registered under the chat; the next message goes into it and the chat is corrupted
+
+```probe
+bash /home/lyphe/.claude/state/pipeline-reviews/custom-compaction--compaction/athena-probes/run.sh drive-B swapthrows | grep -E "inner.abort calls|error\("
+expect: now `inner.abort calls: 0` after an `error(Compaction failed: Cannot swap session …)` frame; cured when it prints `inner.abort calls: 1` (or more) — the seed's process is retired before the chat is handed back
+```
+
+measured 2026-10-08 by chain chain-custom-compaction--compaction-20261008-120915-b235, finding M1, MEDIUM
+probe-key: 9b33c9ee7868b2a2fa519d870a70d07722b3b9a4
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/compaction/auto-trigger.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/compaction/compaction-children.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/compaction/compaction-facts.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/compaction/compaction-frames.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/compaction/compaction-guard.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/compaction/compaction-mode.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/compaction/compaction-procedure.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/compaction/compaction-registry.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/compaction/compaction-runtime.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/compaction/compaction-seed.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/compaction/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notifications/services/notification-copy.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/custom-compaction-chat.mjs
+
+## INV-7397 — probe — the readiness cache never re-asks after a words change; the Settings row says ready, the chats keep the CLI's compaction
+
+the readiness cache never re-asks after a words change; the Settings row says ready, the chats keep the CLI's compaction
+
+```probe
+bash /home/lyphe/.claude/state/pipeline-reviews/custom-compaction--compaction/athena-probes/run.sh drive-A | grep -E "^(2|3) "
+expect: now `2 … ready= true` then `3 takesOver after words change: false`; cured when line 3 prints `true`
+```
+
+measured 2026-10-08 by chain chain-custom-compaction--compaction-20261008-120915-b235, finding M2, MEDIUM
+probe-key: 6c5490a2988639b7e02f7041b63f283ad1136914
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/compaction/auto-trigger.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/compaction/compaction-children.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/compaction/compaction-facts.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/compaction/compaction-frames.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/compaction/compaction-guard.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/compaction/compaction-mode.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/compaction/compaction-procedure.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/compaction/compaction-registry.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/compaction/compaction-runtime.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/compaction/compaction-seed.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/compaction/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notifications/services/notification-copy.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/custom-compaction-chat.mjs
+
+## INV-7398 — probe — an idle or automatic compaction stamps the chat unread (the builder flagged it; measured)
+
+an idle or automatic compaction stamps the chat unread (the builder flagged it; measured)
+
+```probe
+bash /home/lyphe/.claude/state/pipeline-reviews/custom-compaction--compaction/athena-probes/run.sh drive-D idle-restamp | grep -E "before the idle|after  the idle"
+expect: now `after` shows `"c"` later than `"r"` (r unchanged) — the chat reads unread; cured when `"r"` is not before `"c"` after the idle compaction (or `"c"` is unchanged)
+```
+
+measured 2026-10-08 by chain chain-custom-compaction--compaction-20261008-120915-b235, finding M3, MEDIUM
+probe-key: da5534325a676815e7aa701d45a28b284228784e
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/compaction/auto-trigger.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/compaction/compaction-children.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/compaction/compaction-facts.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/compaction/compaction-frames.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/compaction/compaction-guard.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/compaction/compaction-mode.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/compaction/compaction-procedure.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/compaction/compaction-registry.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/compaction/compaction-runtime.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/compaction/compaction-seed.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/compaction/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notifications/services/notification-copy.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/custom-compaction-chat.mjs
+
+## INV-7399 — probe — pressing Stop on an automatic compaction pushes "Compaction failed" to the operator who pressed it
+
+pressing Stop on an automatic compaction pushes "Compaction failed" to the operator who pressed it
+
+```probe
+bash /home/lyphe/.claude/state/pipeline-reviews/custom-compaction--compaction/athena-probes/run.sh drive-D stop-auto-seed | grep "pushes to the operator"
+expect: now one `compaction.failed` payload after the operator's own Stop; cured when it prints `[]`
+```
+
+measured 2026-10-08 by chain chain-custom-compaction--compaction-20261008-120915-b235, finding L1, LOW
+probe-key: 97cd3b1254e0aa3e3ca4acb06f6fdf6be019052d
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/compaction/auto-trigger.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/compaction/compaction-children.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/compaction/compaction-facts.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/compaction/compaction-frames.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/compaction/compaction-guard.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/compaction/compaction-mode.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/compaction/compaction-procedure.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/compaction/compaction-registry.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/compaction/compaction-runtime.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/compaction/compaction-seed.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/compaction/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notifications/services/notification-copy.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/custom-compaction-chat.mjs
+
+## INV-7400 — probe — a stopped compaction's flight stays registered until its verb exits and swallows the Stop of the next turn
+
+a stopped compaction's flight stays registered until its verb exits and swallows the Stop of the next turn
+
+```probe
+bash /home/lyphe/.claude/state/pipeline-reviews/custom-compaction--compaction/athena-probes/run.sh drive-C ignore-term | grep "Stop of the ordinary turn"
+expect: now `inner.abort reached: 0`; cured when it prints `inner.abort reached: 1`
+```
+
+measured 2026-10-08 by chain chain-custom-compaction--compaction-20261008-120915-b235, finding L2, LOW
+probe-key: 3ee595cb2a35efb996be34dc16974cf824787e6d
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/compaction/auto-trigger.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/compaction/compaction-children.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/compaction/compaction-facts.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/compaction/compaction-frames.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/compaction/compaction-guard.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/compaction/compaction-mode.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/compaction/compaction-procedure.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/compaction/compaction-registry.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/compaction/compaction-runtime.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/compaction/compaction-seed.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/compaction/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notifications/services/notification-copy.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/custom-compaction-chat.mjs
+
+## INV-7401 — probe — `CUSTOM_COMPACTION_IDLE_AFTER_MS` above 2^31-1 fires the idle compaction at once
+
+`CUSTOM_COMPACTION_IDLE_AFTER_MS` above 2^31-1 fires the idle compaction at once
+
+```probe
+bash /home/lyphe/.claude/state/pipeline-reviews/custom-compaction--compaction/athena-probes/run.sh drive-E overflow | grep "IDLE_AFTER_MS"
+expect: now `"99999999999"` and `"2147483648"` print `started within 2.5 s of the turn end: true`, `"2147483647"` prints `false`; cured when all three print `false`
+```
+
+measured 2026-10-08 by chain chain-custom-compaction--compaction-20261008-120915-b235, finding L3, LOW
+probe-key: 1aed9d98d2b2ca8e6b3b76b4358040cc6c068c45
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/compaction/auto-trigger.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/compaction/compaction-children.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/compaction/compaction-facts.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/compaction/compaction-frames.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/compaction/compaction-guard.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/compaction/compaction-mode.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/compaction/compaction-procedure.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/compaction/compaction-registry.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/compaction/compaction-runtime.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/compaction/compaction-seed.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/compaction/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notifications/services/notification-copy.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/custom-compaction-chat.mjs
+
+## INV-7402 — probe — the module is not stopped on shutdown
+
+the module is not stopped on shutdown
+
+```probe
+cd /home/lyphe/.claude/claudecodeui_lyphe && sed -n '/const shutdownRuntimeServices/,/await drained/p' server/index.ts | grep -ci compaction
+expect: now `0`; cured when it prints 1 or more (a stop for the module's deadlines and pending wakes)
+```
+
+measured 2026-10-08 by chain chain-custom-compaction--compaction-20261008-120915-b235, finding L4, LOW
+probe-key: 2dcaf9208a7ac498a27064e29d5d77c8a51338fb
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/compaction/auto-trigger.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/compaction/compaction-children.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/compaction/compaction-facts.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/compaction/compaction-frames.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/compaction/compaction-guard.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/compaction/compaction-mode.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/compaction/compaction-procedure.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/compaction/compaction-registry.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/compaction/compaction-runtime.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/compaction/compaction-seed.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/compaction/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notifications/services/notification-copy.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/custom-compaction-chat.mjs
+
+## INV-7403 — probe — a decision with no log line
+
+a decision with no log line
+
+```probe
+bash /home/lyphe/.claude/state/pipeline-reviews/custom-compaction--compaction/athena-probes/run.sh drive-G idleconds | grep -c "session=chatG-gone trigger=idle"
+expect: now `0`; cured when it prints `1` (a "session gone" decision line for the deleted chat's deadline)
+```
+
+measured 2026-10-08 by chain chain-custom-compaction--compaction-20261008-120915-b235, finding L5, LOW
+probe-key: 7e6e6ae4a6f8ae43b09c5edbf3d1a9dac1ce5770
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/compaction/auto-trigger.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/compaction/compaction-children.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/compaction/compaction-facts.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/compaction/compaction-frames.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/compaction/compaction-guard.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/compaction/compaction-mode.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/compaction/compaction-procedure.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/compaction/compaction-registry.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/compaction/compaction-runtime.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/compaction/compaction-seed.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/compaction/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notifications/services/notification-copy.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/custom-compaction-chat.mjs

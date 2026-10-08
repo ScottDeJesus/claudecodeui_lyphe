@@ -421,12 +421,16 @@
       "description": "An Accept during DeepSeek’s peak window (01:00–04:00 and 06:00–10:00 UTC, weekdays) queues the feature and starts it when the window lifts. Off: Accept walks now.",
       "unreadable": "The switch could not be read from the server, so its position is unknown — this is not the same as off. It is retried whenever this page regains focus."
     },
-    "runnerDactyls": {
-      "label": "Dactyls",
-      "description": "On: a builder on Claude reads, decides and verifies; every code edit is made by a dactyl — a <model>{{model}}</model> child at {{effort}} effort that sees only its brief and the one file. A builder on DeepSeek Flash is untouched. Takes effect on the next builder.",
-      "descriptionBare": "On: a builder on Claude reads, decides and verifies; every code edit is made by a dactyl — a child that sees only its brief and the one file. A builder on DeepSeek Flash is untouched. Takes effect on the next builder.",
-      "waiting": "Waiting: <why>{{why}}</why>. Builders work as before until it can.",
-      "readinessUnread": "Whether this Claude Code can serve a dactyl could not be read.",
+    "runnerCompaction": {
+      "label": "Custom compaction",
+      "description": "On: a chat’s compaction is written by <model>{{model}}</model> at {{effort}} effort instead of by the chat’s own model, in three cases:",
+      "descriptionBare": "On: a chat’s compaction is written by the summarizer instead of by the chat’s own model, in three cases:",
+      "whenPressed": "when you press Compact or type /compact;",
+      "atTurnEnd": "at the end of a turn that leaves the chat past half its context window — never in the middle of work;",
+      "whenIdle": "when the chat has sat idle for 54 minutes holding 200K tokens or more, in place of the CLI’s own idle compaction.",
+      "after": "The chat moves to a new session seeded with the summary and its latest messages, and keeps its own model and effort. The CLI’s auto-compact stays on as the net. Chats placed on a node keep the CLI’s own compaction. A flip reaches each chat at its next message.",
+      "waiting": "Waiting: <why>{{why}}</why>. Chats compact as before until it can.",
+      "readinessUnread": "Whether this Claude Code can serve the summarizer could not be read.",
       "unreadable": "The switch could not be read from the server, so its position is unknown — this is not the same as off. It is retried whenever this page regains focus."
     },
     "plannerLanes": {

@@ -137,9 +137,14 @@ const CHAIN_WINDOW_SLACK_MS = 60_000;
  * dispatcher's records for a launch that predates it), asked BEFORE the cap on how many
  * are returned, so an epic's launches cannot push the chat's own out of it. A soul the chat launched by hand carries neither
  * and stays.
+ *
+ * Takes every provider session id the chat has had: a custom compaction moves a chat onto a new
+ * session, and a soul launched before it was stamped with the id the chat had then. One pass over
+ * the launch directory answers all of them.
  */
-export async function collectStampedSoulLaunches(providerSessionId: string | null | undefined): Promise<string[]> {
-  if (!providerSessionId) {
+export async function collectStampedSoulLaunches(providerSessionIds: readonly string[]): Promise<string[]> {
+  const callerIds = new Set(providerSessionIds.filter(Boolean));
+  if (callerIds.size === 0) {
     return [];
   }
   const root = dispatchSoulsStateDir();
@@ -156,7 +161,7 @@ export async function collectStampedSoulLaunches(providerSessionId: string | nul
   await Promise.all(names.slice(-MAX_SPECS_READ).map(async (name) => {
     try {
       const spec = JSON.parse(await readFile(path.join(root, name, 'spec.json'), 'utf8'));
-      if (spec?.launched_by === providerSessionId && typeof spec.id === 'string') {
+      if (callerIds.has(spec?.launched_by) && typeof spec.id === 'string') {
         stamped.push({ id: spec.id, spec });
       }
     } catch {

@@ -66,15 +66,24 @@ function parseRowChange(body: unknown): Parsed<AgentLaunchRowChange> {
   return { change };
 }
 
-/** The defaults' body — `{ model?: string, effort?: { [model]: string | null }, deepseek_effort?: string }` — with at least one field. */
+/**
+ * The defaults' body — `{ model?: string, effort?: { [model]: string | null }, deepseek_effort?: string,
+ * dactyl_model?: string, dactyl_effort?: string, summarizer_model?: string, summarizer_effort?: string }` — with at
+ * least one field. The dactyl's two and the summarizer's two are words and cannot be cleared, so there is no `null`
+ * for them here; the CLI says which words it accepts.
+ */
 function parseDefaultsChange(body: unknown): Parsed<AgentLaunchDefaultsChange> {
   if (!isRecord(body)) return { error: 'the body must be a JSON object' };
-  const stray = unknownKey(body, ['model', 'effort', 'deepseek_effort']);
+  const stray = unknownKey(body, [
+    'model', 'effort', 'deepseek_effort', 'dactyl_model', 'dactyl_effort', 'summarizer_model', 'summarizer_effort',
+  ]);
   if (stray !== null) {
-    return { error: `\`${stray.slice(0, 64)}\` is not a field of the defaults; they take model, effort and deepseek_effort` };
+    return {
+      error: `\`${stray.slice(0, 64)}\` is not a field of the defaults; they take model, effort, deepseek_effort, dactyl_model, dactyl_effort, summarizer_model and summarizer_effort`,
+    };
   }
   const change: AgentLaunchDefaultsChange = {};
-  for (const field of ['model', 'deepseek_effort'] as const) {
+  for (const field of ['model', 'deepseek_effort', 'dactyl_model', 'dactyl_effort', 'summarizer_model', 'summarizer_effort'] as const) {
     const value = body[field];
     if (value === undefined) continue;
     if (typeof value !== 'string' || !WORD.test(value)) return { error: `\`${field}\` must be a word` };
@@ -96,7 +105,9 @@ function parseDefaultsChange(body: unknown): Parsed<AgentLaunchDefaultsChange> {
     // An empty map changes nothing, so it is no field of the body.
     if (Object.keys(efforts).length > 0) change.effort = efforts;
   }
-  if (Object.keys(change).length === 0) return { error: 'name at least one of model, effort and deepseek_effort' };
+  if (Object.keys(change).length === 0) {
+    return { error: 'name at least one of model, effort, deepseek_effort, dactyl_model, dactyl_effort, summarizer_model and summarizer_effort' };
+  }
   return { change };
 }
 
@@ -157,7 +168,7 @@ export function createAgentLaunchRouter(
     void relay(() => dependencies.setRow(name, parsed.change))(request, response, next);
   });
 
-  /** Change the table's defaults: the default model, each model's default effort, the DeepSeek effort. */
+  /** Change the table's defaults: the default model, each model's default effort, the DeepSeek effort, the dactyl's and the summarizer's model and effort. */
   router.put('/defaults', (request, response, next) => {
     const parsed = parseDefaultsChange(request.body);
     if ('error' in parsed) {

@@ -7,7 +7,7 @@ import {
   RUNNING_BELIEVED_FOR_MS,
   hasFreshSubagentSidechains,
   hasRunningSubagent,
-  readSubagentStamp,
+  readHistoryCompanionStamp,
 } from '@/modules/providers/services/session-agents.service.js';
 import type { LLMProvider } from '@/shared/types.js';
 
@@ -134,7 +134,7 @@ async function sessionHasRunningSubagent(candidate: Candidate, now: number): Pro
       projectPath: candidate.projectPath ?? '',
       providerSessionId,
     }),
-    readCompanionStamp: () => readSubagentStamp(candidate.transcriptPath, providerSessionId),
+    readCompanionStamp: () => readHistoryCompanionStamp(candidate.sessionId, candidate.transcriptPath, providerSessionId),
   });
 
   return fullHistory ? hasRunningSubagent(fullHistory.messages, now) : false;

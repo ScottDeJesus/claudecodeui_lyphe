@@ -1,4 +1,5 @@
 import { Suspense } from 'react';
+import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 
 import { StandaloneShell } from '@/modules/standalone-shell';
@@ -25,7 +26,6 @@ type ProviderLoginModalProps = {
   isOpen: boolean;
   onClose: () => void;
   provider?: LLMProvider;
-  onComplete?: (exitCode: number) => void;
   customCommand?: string;
   isAuthenticated?: boolean;
   /** Overrides the title derived from the provider, for a caller running something other than that provider's own login. Absent everywhere else, which is what keeps those titles byte-for-byte what they were. */
@@ -74,12 +74,17 @@ const getProviderTitle = (provider: LLMProvider) => {
   return 'Claude CLI Login';
 };
 
-/** Used by the onboarding, accounts and settings modules to run a command in an embedded shell — a provider's CLI login, and, through `customCommand` and `title`, the settings dialog's Claude Design authorization. */
+/**
+ * Used by the onboarding, accounts and settings modules to run a command in an embedded shell — a provider's CLI login, and, through `customCommand` and `title`, the settings dialog's Claude Design authorization.
+ *
+ * It reports one thing, `onClose`. The login command's exit is deliberately not reported: `claude /login` signs in and then
+ * stays at the CLI's prompt, so its exit code never arrives and anything waiting on it waits forever. Every caller reads the
+ * login itself when the window closes.
+ */
 export default function ProviderLoginModal({
   isOpen,
   onClose,
   provider = 'claude',
-  onComplete,
   customCommand,
   isAuthenticated = false,
   title: titleOverride,
@@ -91,13 +96,24 @@ export default function ProviderLoginModal({
   const command = getProviderCommand({ provider, customCommand, isAuthenticated });
   const title = titleOverride ?? getProviderTitle(provider);
 
-  const handleComplete = (exitCode: number) => {
-    onComplete?.(exitCode);
-    // Keep the modal open so users can read terminal output before closing.
-  };
-
-  return (
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black bg-opacity-50 max-md:items-stretch max-md:justify-stretch">
+  // Drawn on `document.body`, not where the caller mounts it. `fixed` is laid out against the
+  // nearest ancestor with a `backdrop-filter` (or `transform`, `filter`, `contain`…), and the sidebar's
+  // root carries `backdrop-blur-sm` — so mounted in place inside the account row, this window filled
+  // the side panel instead of the screen. Settings and onboarding mounted it the same way and were
+  // only spared by having no such ancestor. The portal is the same cure `SidebarModals` gives the
+  // app's other dialogs; React events still bubble to the caller through it, so nothing that listened
+  // for them stops hearing.
+  //
+  // Not the kit's `Dialog`: that one closes on Escape and on a click of its backdrop, and takes the
+  // Escape away from whatever is focused. This window's content is a terminal — Escape is a key the CLI
+  // uses, and a stray click must not kill a login halfway through. Only the ✕ closes it.
+  return createPortal(
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label={title}
+      className="fixed inset-0 z-[9999] flex items-center justify-center bg-black bg-opacity-50 max-md:items-stretch max-md:justify-stretch"
+    >
       {/* On mobile this panel is the whole screen, so it takes the PWA safe-area inset as padding
           (`pwa-notch-safe`, src/index.css) — its title and close button are the chrome that must
           clear the status bar, and the panel's own background has to reach the screen edge. */}
@@ -115,10 +131,12 @@ export default function ProviderLoginModal({
 
         <div className="flex-1 overflow-hidden">
           <Suspense fallback={null}>
-            <StandaloneShell project={DEFAULT_PROJECT_FOR_EMPTY_SHELL} command={command} onComplete={handleComplete} minimal={true} />
+            {/* The modal stays open when the command ends, so the operator can read the terminal's last output before closing. */}
+            <StandaloneShell project={DEFAULT_PROJECT_FOR_EMPTY_SHELL} command={command} minimal={true} />
           </Suspense>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

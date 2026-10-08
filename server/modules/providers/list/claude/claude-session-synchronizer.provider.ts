@@ -213,6 +213,14 @@ export class ClaudeSessionSynchronizer implements IProviderSessionSynchronizer {
       return null;
     }
 
+    // A transcript a chat has left behind — compacted away, or a compaction's seed that did not
+    // take — is kept on disk on purpose and is nobody's conversation any more. Indexing it would
+    // add a second sidebar chat for the part of a conversation the chat already carries in its
+    // stitched history (the Codex synchronizer's rule, for the same reason).
+    if (sessionsDb.isProviderSessionSuperseded(parsed.sessionId, this.provider)) {
+      return null;
+    }
+
     // App-created sessions are keyed by an app id, so disk-discovered provider
     // ids must be resolved through the provider-id mapping first.
     const existingSession = sessionsDb.getSessionByProviderSessionId(parsed.sessionId)

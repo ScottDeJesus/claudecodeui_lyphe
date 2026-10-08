@@ -2,6 +2,7 @@ import { readFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 
+import { liveAccountEmail } from '@/modules/accounts/index.js';
 import { commandRuns } from '@/modules/providers/shared/auth/command-runs.js';
 import { resolveClaudeCodeExecutablePath } from '@/shared/claude-cli-path.js';
 import type { IProviderAuth } from '@/shared/interfaces.js';
@@ -21,6 +22,13 @@ const hasErrorCode = (error: unknown, code: string): boolean => (
 
 /** Where Claude Code keeps its settings and login: `CLAUDE_CONFIG_DIR` when set, else `~/.claude`. */
 const claudeConfigDir = (): string => process.env.CLAUDE_CONFIG_DIR?.trim() || path.join(os.homedir(), '.claude');
+
+/**
+ * The account switcher names the identity in `~/.claude.json` and assumes the default config dir. With
+ * `CLAUDE_CONFIG_DIR` pointing elsewhere the tokens read here belong to another login than that file's,
+ * so the switcher's email would be a confident wrong name — the status falls back to "Authenticated".
+ */
+const configDirIsDefault = (): boolean => path.resolve(claudeConfigDir()) === path.join(os.homedir(), '.claude');
 
 /**
  * The cloud backends Claude Code signs in to through the cloud's own credentials rather than a
@@ -141,7 +149,13 @@ export class ClaudeProviderAuth implements IProviderAuth {
 
       if (accessToken) {
         const expiresAt = typeof oauth?.expiresAt === 'number' ? oauth.expiresAt : undefined;
-        const email = readOptionalString(creds.email) ?? readOptionalString(creds.user) ?? null;
+        // The credentials file holds the tokens and no identity: the CLI keeps who is signed in under
+        // `oauthAccount` in `~/.claude.json`, which is the email the account switcher already names. Without
+        // it a signed-in account answered `email: null` — Settings printed "Authenticated" for every login,
+        // so a re-login could never show the account it had just signed in as.
+        const email = readOptionalString(creds.email)
+          ?? readOptionalString(creds.user)
+          ?? (configDirIsDefault() ? liveAccountEmail() : null);
         if (!expiresAt || Date.now() < expiresAt) {
           return {
             authenticated: true,

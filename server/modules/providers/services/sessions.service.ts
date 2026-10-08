@@ -2,11 +2,11 @@ import { randomUUID } from 'node:crypto';
 import fsp from 'node:fs/promises';
 import path from 'node:path';
 
-import { projectsDb, sessionsDb } from '@/modules/database/index.js';
+import { projectsDb, sessionCompactionsDb, sessionsDb } from '@/modules/database/index.js';
 import { broadcastSessionUpserted, chatRunRegistry } from '@/modules/websocket/index.js';
 import { providerRegistry } from '@/modules/providers/provider.registry.js';
 import { sessionHistoryCache } from '@/modules/providers/services/session-history-cache.service.js';
-import { collectSessionAgents, readSubagentStamp } from '@/modules/providers/services/session-agents.service.js';
+import { collectSessionAgents, readHistoryCompanionStamp } from '@/modules/providers/services/session-agents.service.js';
 import { collectSessionSoulLaunches, collectStampedSoulLaunches } from '@/modules/providers/services/session-soul-launches.service.js';
 import type {
   FetchHistoryOptions,
@@ -573,7 +573,7 @@ export const sessionsService = {
       // parent file does not. Without this the cached entry would hold a running agent's timeline,
       // tokens and status frozen until the main thread wrote again.
       readCompanionStamp: transcriptPath
-        ? () => readSubagentStamp(transcriptPath, providerSessionId)
+        ? () => readHistoryCompanionStamp(sessionId, transcriptPath, providerSessionId)
         : undefined,
     });
 
@@ -613,8 +613,13 @@ export const sessionsService = {
     const soulLaunches = requestedOffset === 0 && fullHistory
       ? [...new Set([
         ...collectSessionSoulLaunches(fullHistory.messages),
-        // and the ones the launcher itself stamped with this session, however it was called
-        ...await collectStampedSoulLaunches(providerSessionId ?? sessionId),
+        // and the ones the launcher itself stamped with this session, however it was called:
+        // under the live provider session id AND under each compacted transcript's, since a
+        // soul launched before a compaction carries the id the chat had then
+        ...await collectStampedSoulLaunches([
+          providerSessionId ?? sessionId,
+          ...sessionCompactionsDb.listCompactions(sessionId).map((record) => record.oldProviderSessionId),
+        ]),
       ])]
       : undefined;
 

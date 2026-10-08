@@ -403,5 +403,22 @@
     "showLess": "Show less",
     "showDetails": "Show the full question and every option",
     "hideDetails": "Hide the full question"
+  },
+  "compaction": {
+    "heading": "Conversation compacted",
+    "trigger": {
+      "manual": "You asked to compact",
+      "auto": "A turn ended past half the context window",
+      "idle": "The chat sat idle"
+    },
+    "context": "{{before}} <to>→</to> {{after}} tokens",
+    "contextPending": "{{before}} <to>→</to> … tokens",
+    "contextAfterOnly": "{{after}} tokens after",
+    "afterPending": "(the context after is known once the new session answers its first turn)",
+    "summarizedBy": "Summarized by <model>{{model}}</model> at {{effort}} effort",
+    "read": "read {{tokens}}",
+    "wrote": "wrote {{tokens}}",
+    "parts_one": "in {{count}} part",
+    "parts_other": "in {{count}} parts"
   }
 }

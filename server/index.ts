@@ -21,6 +21,7 @@ import {
     whenNodeSessionsReadopted,
 } from '@/modules/providers/index.js';
 import { createWebSocketServer, startRunStallWatchdog } from '@/modules/websocket/index.js';
+import { stopChatCompaction, withChatCompaction } from '@/modules/compaction/index.js';
 
 import { getConnectableHost } from '../shared/networkHosts.js';
 
@@ -108,6 +109,9 @@ console.log('SERVER_PORT from env:', process.env.SERVER_PORT);
 
 const app = express();
 const server = http.createServer(app);
+// The one-shot runners below stay on the bare service: they have no chat to compact. Everything that
+// carries chat traffic gets this wrapper, which also registers custom compaction's hooks with the service.
+const chatRuntime = withChatCompaction(providerRuntimeService);
 const queryClaude = providerRuntimeService.getRunner('claude');
 const queryCursor = providerRuntimeService.getRunner('cursor');
 const queryCodex = providerRuntimeService.getRunner('codex');
@@ -130,7 +134,7 @@ createWebSocketServer(server, {
         authenticateWebSocket,
     },
     chat: {
-        runtime: providerRuntimeService,
+        runtime: chatRuntime,
     },
     shell: {
         resolveProviderSessionId: (sessionId, provider) => {
@@ -340,7 +344,7 @@ const universe = createUniverseModule();
 app.use('/api/universe', authenticateToken, universe.router);
 
 app.use('/api/notifications', authenticateToken, notificationRoutes);
-app.use('/api/ntfy/act', createNtfyActionRoutes({ runtime: providerRuntimeService })); // Public: ntfy buttons authenticate by signed token, not JWT.
+app.use('/api/ntfy/act', createNtfyActionRoutes({ runtime: chatRuntime })); // Public: ntfy buttons authenticate by signed token, not JWT.
 
 // User API Routes (protected)
 app.use('/api/user', authenticateToken, userRoutes);
@@ -586,14 +590,14 @@ async function soleServerDuties() {
     if (soleServerDutiesRan) return;
     soleServerDutiesRan = true;
     try { // D-11: a browser that subscribes before this ran reads a live keepalive session as idle
-        const keepalive = await readoptKeepaliveSessions({ runtime: providerRuntimeService, supervised });
+        const keepalive = await readoptKeepaliveSessions({ runtime: chatRuntime, supervised });
         // "swept" here is DEAD HOST FILES, not the version sweep: an idle host retired by the boot's
         // version test logs its own `retiring idle host …` line and is not counted in this one.
         console.log(`[keepalive] re-adopted ${keepalive.readopted} host(s), swept ${keepalive.swept} dead host file(s)`);
     } catch (error) { console.error('[keepalive] re-adopt failed (continuing):', getErrorMessage(error)); }
     markRunsReadopted();
     // Sends anything that came due while the server was not running, then keeps polling.
-    initializeScheduledMessageDispatcher(providerRuntimeService);
+    initializeScheduledMessageDispatcher(chatRuntime);
     // Start server-side plugin processes for enabled plugins
     startEnabledPluginServers().catch(err => {
         console.error('[Plugins] Error during startup:', err.message);
@@ -704,6 +708,9 @@ async function startServer() {
                 console.error('[Sessions] Error closing session watchers during shutdown:', getErrorMessage(err));
             });
             closeScheduledMessageDispatcher();
+            // Custom compaction's idle deadlines and pending wakes start a summarizer verb and a seed turn: a
+            // process that is leaving must not begin one, nor leave a verb it started behind.
+            stopChatCompaction();
             dispatcher.stop();
             roadmap.stop();
             claudeUpdates.stop();

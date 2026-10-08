@@ -30,7 +30,7 @@ const SWITCH_REASSURANCE =
  *
  * Kept to ONE line's worth of words on purpose. It sits above the rows (which is where it has
  * to be — every row below carries the phrase it disarms), so every line it costs pushes the
- * switcher and "+ Add another account" further down a panel that already scrolls.
+ * switcher and Re-login further down a panel that already scrolls.
  */
 const DATE_MEANING = 'A date in the past is normal — it is the expiry on the saved copy.';
 
@@ -105,7 +105,8 @@ type AccountPopoverProps = {
   busy: boolean;
   error: string | null;
   onSwitch: (slug: string) => void;
-  onAddAccount: () => void;
+  /** Opens the provider's login window — the panel's one sign-in door, for the same account or another. */
+  onRelogin: () => void;
   onSaveLiveLogin: () => void;
 };
 
@@ -126,7 +127,7 @@ export function AccountPopover({
   busy,
   error,
   onSwitch,
-  onAddAccount,
+  onRelogin,
   onSaveLiveLogin,
 }: AccountPopoverProps) {
   // Advances once a minute so the reset countdowns stay true while the panel is open. The
@@ -213,25 +214,16 @@ export function AccountPopover({
           );
         })}
 
+        {/* The panel's sign-in door: the sign-in Settings → Agents → Claude → Re-login runs,
+            reached from where the account in use is read. It saves the live login first, so
+            signing in as someone else here loses nothing — and files the login it ends on when
+            the window closes, under that login's own email, so this panel then shows it as the
+            account in use. */}
         {picture && (
           <button
             type="button"
             disabled={busy}
-            onClick={onAddAccount}
-            className="rounded-lg px-2.5 py-2 text-left text-[13px] text-accent-ink transition-colors hover:bg-primary/10 disabled:opacity-60"
-          >
-            + Add another account
-          </button>
-        )}
-
-        {/* The sign-in Settings → Agents → Claude → Re-login runs, reached from where the account
-            in use is read. It rides the add-account path on purpose: that path saves the live
-            login first, so signing in as someone else here loses nothing. */}
-        {picture && (
-          <button
-            type="button"
-            disabled={busy}
-            onClick={onAddAccount}
+            onClick={onRelogin}
             className="rounded-lg px-2.5 py-2 text-left text-[13px] text-accent-ink transition-colors hover:bg-primary/10 disabled:opacity-60"
           >
             ↻ Re-login

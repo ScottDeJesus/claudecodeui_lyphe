@@ -97,9 +97,10 @@ export function arcOf(raw: unknown): DispatcherArc {
     planner: plannerSince(field(arc, 'planner'), `arc.planner of ${name}`),
     created_at: need(field(arc, 'created_at'), isText, 'arc.created_at'),
     completed_at: need(field(arc, 'completed_at'), isTextOrNull, 'arc.completed_at'),
-    // The arc's books are its plans' sums, read by `report_arcs.arc_line` through the plan line's own
-    // renderer (INV-4299) — dollars OR tokens, by who was used. They are carried here so the header
-    // never has to add up the cards itself, which is how two readers of one figure start to disagree.
+    // The arc's books are its plans' sums cut at the moment each feature joined the epic
+    // (`report_arcs._books`), read by `report_arcs.arc_line` through the plan line's own renderer
+    // (INV-4299) — dollars OR tokens, by who was used. They are carried here so the header never has
+    // to add up the cards itself, which would count the past of a feature the epic took in late.
     cost_usd: need(field(arc, 'cost_usd'), isCount, 'arc.cost_usd'),
     tokens: countSince(field(arc, 'tokens'), 'arc.tokens'),
     tokens_in: countSince(field(arc, 'tokens_in'), 'arc.tokens_in'),

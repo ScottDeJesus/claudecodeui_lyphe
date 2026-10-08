@@ -15,6 +15,14 @@ import type {
 } from '@/shared/types.js';
 import { parseFilesInputTag } from '@/shared/image-attachments.js';
 import { liftToolResultImages, readImageBlockDataUrl, storeToolResultImages } from '@/modules/providers/list/claude/claude-image-blocks.js';
+import {
+  isCompactionRow,
+  isUserPromptRow,
+  normalizeCompactionRow,
+  stitchCompactedHistory,
+  withoutAnchors,
+  type StitchedClaudeHistory,
+} from '@/modules/providers/list/claude/claude-compacted-history.js';
 import { localCommandDisplayText, type LocalCommandPayload } from '@/shared/local-commands.js';
 import { prepareTranscriptMessages } from '@/shared/message-unification.js';
 import {
@@ -48,14 +56,6 @@ type ClaudeToolResult = {
   /** When the result landed. For a backgrounded agent, its notification's time — the launch receipt's own stamp is the launch. */
   timestamp?: string;
 };
-
-type ClaudeHistoryResult =
-  | AnyRecord[]
-  | {
-    messages?: AnyRecord[];
-    total?: number;
-    hasMore?: boolean;
-  };
 
 type ClaudeHistoryMessagesResult =
   | AnyRecord[]
@@ -476,6 +476,14 @@ function replaceAgentToolResultContent(message: AnyRecord, replacement: string):
  */
 async function readTranscriptRows(jsonlPath: string, providerSessionId: string): Promise<AnyRecord[]> {
   const rows: AnyRecord[] = [];
+  // A resume replays the whole conversation back into the same file, so one
+  // row's `uuid` can be written many times over (measured: up to 5x on a session
+  // woken repeatedly as background work finished). Those copies are byte-identical
+  // replays, NOT edits — a real edit gets a fresh uuid — so collapse same-uuid
+  // rows to one, keeping the latest copy in the slot the uuid first appeared.
+  // Without this the duplicate prompt rows read as superseded edit-branches in
+  // `dropSupersededPromptBranches` and whole turns vanish from the view.
+  const slotByUuid = new Map<string, number>();
   const fileStream = fs.createReadStream(jsonlPath);
   const rl = readline.createInterface({ input: fileStream, crlfDelay: Infinity });
 
@@ -485,7 +493,16 @@ async function readTranscriptRows(jsonlPath: string, providerSessionId: string):
     }
     try {
       const entry = JSON.parse(line) as AnyRecord;
-      if (entry.sessionId === providerSessionId) {
+      if (entry.sessionId !== providerSessionId) {
+        continue;
+      }
+      const uuid = typeof entry.uuid === 'string' ? entry.uuid : null;
+      if (uuid !== null && slotByUuid.has(uuid)) {
+        rows[slotByUuid.get(uuid)!] = entry;
+      } else {
+        if (uuid !== null) {
+          slotByUuid.set(uuid, rows.length);
+        }
         rows.push(entry);
       }
     } catch {
@@ -494,20 +511,6 @@ async function readTranscriptRows(jsonlPath: string, providerSessionId: string):
   }
 
   return rows;
-}
-
-/** True for a row the user typed, as opposed to a tool result or an injected note. */
-function isUserPromptRow(row: AnyRecord): boolean {
-  if (row.type !== 'user' || row.isMeta === true || row.isCompactSummary === true) {
-    return false;
-  }
-
-  const content = row.message?.content;
-  if (Array.isArray(content)) {
-    return content.some((part: AnyRecord) => part?.type === 'text' || part?.type === 'image');
-  }
-
-  return typeof content === 'string' && content.length > 0;
 }
 
 /**
@@ -567,25 +570,43 @@ function dropSupersededPromptBranches(rows: AnyRecord[]): AnyRecord[] {
   return rows.filter((row) => typeof row.uuid !== 'string' || !abandoned.has(row.uuid));
 }
 
+/** False when the file is not there (yet); any other failure to stat it is a real error and is thrown. */
+async function transcriptFileExists(transcriptPath: string): Promise<boolean> {
+  try {
+    return (await fsp.stat(transcriptPath)).isFile();
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+      return false;
+    }
+    throw error;
+  }
+}
+
+/**
+ * Reads ONE transcript, given its path and the provider session id its rows carry. The caller
+ * chooses which transcript: the live one from the session row, or a compacted one from its record
+ * (`stitchCompactedHistory`); a compacted transcript's subagents are looked up under ITS folder,
+ * which is why the provider id travels with the path.
+ *
+ * A transcript that is not on disk — the live one in the moment between a compaction's swap and
+ * the seed's first row — reads as no rows, never as an error.
+ */
 async function getSessionMessages(
   sessionId: string,
+  transcriptPath: string | null | undefined,
   providerSessionId: string,
   limit: number | null,
   offset: number,
 ): Promise<ClaudeHistoryMessagesResult> {
   try {
-    // The DB row is keyed by the app-facing session id, while the JSONL rows
-    // on disk carry the provider-native id — both ids are needed here.
-    const jsonLPath = sessionsDb.getSessionById(sessionId)?.jsonl_path;
-
-    if (!jsonLPath) {
+    if (!transcriptPath || !(await transcriptFileExists(transcriptPath))) {
       return { messages: [], total: 0, hasMore: false };
     }
 
-    const projectDir = path.dirname(jsonLPath);
+    const projectDir = path.dirname(transcriptPath);
 
     const messages = dropSupersededPromptBranches(
-      await readTranscriptRows(jsonLPath, providerSessionId),
+      await readTranscriptRows(transcriptPath, providerSessionId),
     );
 
     const agentIds = new Set<string>();
@@ -893,6 +914,10 @@ export class ClaudeSessionsProvider implements IProviderSessions {
     const raw = readObjectRecord(rawMessage);
     if (!raw) {
       return [];
+    }
+
+    if (isCompactionRow(raw)) {
+      return normalizeCompactionRow(raw, sessionId);
     }
 
     if (raw.type === 'content_block_delta' && raw.delta?.text) {
@@ -1278,18 +1303,28 @@ export class ClaudeSessionsProvider implements IProviderSessions {
     const { limit = null, offset = 0 } = options;
     const providerSessionId = options.providerSessionId ?? sessionId;
 
-    let result: ClaudeHistoryResult;
+    let stitched: StitchedClaudeHistory;
     try {
       // Load full history first so `total` reflects frontend-normalized messages,
-      // not raw JSONL records.
-      result = await getSessionMessages(sessionId, providerSessionId, null, 0);
+      // not raw JSONL records. A chat a custom compaction moved onto a new session
+      // reads as one conversation: its compacted transcripts, a divider, then the
+      // live transcript (the live one's path comes from the session row, as ever).
+      stitched = await stitchCompactedHistory({
+        sessionId,
+        liveTranscriptPath: sessionsDb.getSessionById(sessionId)?.jsonl_path,
+        liveProviderSessionId: providerSessionId,
+        readTranscriptRows: async (transcriptPath, transcriptProviderSessionId) => {
+          const result = await getSessionMessages(sessionId, transcriptPath, transcriptProviderSessionId, null, 0);
+          return Array.isArray(result) ? result : (result.messages || []);
+        },
+      });
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       console.warn(`[ClaudeProvider] Failed to load session ${sessionId}:`, message);
       return { messages: [], total: 0, hasMore: false, offset: 0, limit: null };
     }
 
-    const rawMessages = Array.isArray(result) ? result : (result.messages || []);
+    const rawMessages = stitched.rows;
 
     const toolResultMap = new Map<string, ClaudeToolResult>();
     for (const raw of rawMessages) {
@@ -1319,7 +1354,9 @@ export class ClaudeSessionsProvider implements IProviderSessions {
 
     const normalized: NormalizedMessage[] = [];
     for (const raw of rawMessages) {
-      normalized.push(...this.normalizeMessage(raw, sessionId));
+      const messages = this.normalizeMessage(raw, sessionId);
+      // A compacted transcript's rows offer no edit and no fork: no anchor.
+      normalized.push(...(stitched.supersededRows.has(raw) ? withoutAnchors(messages) : messages));
     }
 
     for (const msg of normalized) {
@@ -1363,7 +1400,8 @@ export class ClaudeSessionsProvider implements IProviderSessions {
       // Carried on every page, like the Codex and OpenCode readers do, so the
       // composer's counter tracks the conversation instead of being frozen at
       // whatever it was when the session was opened.
-      tokenUsage: summarizeClaudeTokenUsage(rawMessages),
+      // The live transcript's rows alone: that is the context the chat now holds.
+      tokenUsage: summarizeClaudeTokenUsage(stitched.liveRows),
     };
   }
 }

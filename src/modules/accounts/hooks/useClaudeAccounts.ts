@@ -35,6 +35,46 @@ async function readBody(response: Response): Promise<unknown> {
   }
 }
 
+/** The event a write made OUTSIDE this hook's own instance fires, so the one instance that polls re-reads the picture at once instead of at its next tick. */
+const ACCOUNTS_CHANGED_EVENT = 'cloudcli:accounts-changed';
+
+/**
+ * Tells the account row the store moved under it. Used by `useReloginCapture`, whose capture runs from
+ * the Settings dialog as well as from the row: the row owns the single poller, and without this it would
+ * go on showing the account that was in use until its next tick, up to a minute after the sign-in.
+ */
+export function announceAccountsChanged(): void {
+  window.dispatchEvent(new Event(ACCOUNTS_CHANGED_EVENT));
+}
+
+/**
+ * One capture, from the request to the toast that says what it did. Answers the store's refusal in
+ * words, or `null` when the login was filed. Used by this hook's `capture` and by `useReloginCapture`,
+ * so the two cannot word the same write differently. The caller decides where a refusal is shown: the
+ * drift banner's "Save it" has the panel's banner, a re-login has no panel to show one in.
+ *
+ * `labelFor` names the slot the store filed the login under — the panel's picture knows its slots'
+ * labels; a caller without a picture passes the email it just read off the live login.
+ */
+export async function sendCapture(
+  push: ReturnType<typeof useToast>,
+  labelFor: (slug: string) => string,
+): Promise<string | null> {
+  const response = await api.accounts.capture();
+  const body = await readBody(response);
+  if (!response.ok) return writeRefusalInWords(body);
+  const captured = (body as { captured?: unknown } | null)?.captured;
+  // A capture is not a snapshot only: the route also re-points the ACTIVE account to the
+  // slug it just saved (`accounts.routes.ts`, the capture route). Under drift that MOVES
+  // which account is in use, so the toast says so rather than reporting a filing.
+  push({
+    tone: 'positive',
+    title: typeof captured === 'string' ? `Saved ${labelFor(captured)}` : 'Saved the login that is live now',
+    message: 'It is now the account in use.',
+  });
+  return null;
+}
+
 /**
  * The signed-in Claude accounts, and the two writes that change them.
  *
@@ -97,6 +137,13 @@ export function useClaudeAccounts() {
     };
   }, [refresh]);
 
+  // A capture made elsewhere (`useReloginCapture`, from the Settings dialog) moved the store: read it now.
+  useEffect(() => {
+    const readAgain = () => { void refresh(); };
+    window.addEventListener(ACCOUNTS_CHANGED_EVENT, readAgain);
+    return () => window.removeEventListener(ACCOUNTS_CHANGED_EVENT, readAgain);
+  }, [refresh]);
+
   /** The label the store gave a slug, or the slug itself when the picture has not caught up (a capture can name a slot this app has never seen). */
   const labelFor = useCallback((slug: string) => {
     const picture = pictureRef.current;
@@ -139,21 +186,11 @@ export function useClaudeAccounts() {
     setBusy(true);
     setError(null);
     try {
-      const response = await api.accounts.capture();
-      const body = await readBody(response);
-      if (!response.ok) {
-        setError(writeRefusalInWords(body));
+      const refusal = await sendCapture(push, labelFor);
+      if (refusal !== null) {
+        setError(refusal);
         return;
       }
-      const captured = (body as { captured?: unknown } | null)?.captured;
-      // A capture is not a snapshot only: the route also re-points the ACTIVE account to the
-      // slug it just saved (`accounts.routes.ts`, the capture route). Under drift that MOVES
-      // which account is in use, so the toast says so rather than reporting a filing.
-      push({
-        tone: 'positive',
-        title: typeof captured === 'string' ? `Saved ${labelFor(captured)}` : 'Saved the login that is live now',
-        message: 'It is now the account in use.',
-      });
       await refresh();
     } catch {
       setError('The server is not reachable.');

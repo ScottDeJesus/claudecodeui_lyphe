@@ -1,5 +1,7 @@
 import { AppError } from '@/shared/utils.js';
 
+import { getCustomCompactionState, setCustomCompactionState } from './custom-compaction-switch.js';
+import { getDactylsState, setDactylsState } from './dactyls-switch.js';
 import { kickDispatcher } from './dispatcher-kick.js';
 import { JEV_SCOPES } from './jev-switches.js';
 import type { JevScopeKey, JevSwitches } from './jev-switches.js';
@@ -257,6 +259,26 @@ export function createSettingsService(dependencies: SettingsDependencies) {
       // no kick rides on a press that never moved the file.
       void kickDispatcher();
       return state;
+    },
+    /**
+     * The plan runner's Dactyls switch. Bodies in `dactyls-switch.ts`, delegated verbatim as the pair
+     * above; no dispatcher kick, because nothing queues on this switch.
+     */
+    async getDactyls() {
+      return getDactylsState();
+    },
+    async setDactyls(enabledInput: unknown) {
+      return setDactylsState(enabledInput);
+    },
+    /**
+     * The Custom compaction switch. Bodies in `custom-compaction-switch.ts`, delegated verbatim as the
+     * pair above; no dispatcher kick, because nothing queues on this switch.
+     */
+    async getCustomCompaction() {
+      return getCustomCompactionState();
+    },
+    async setCustomCompaction(enabledInput: unknown) {
+      return setCustomCompactionState(enabledInput);
     },
     /**
      * The dispatcher's planner-lane dial: how many planners (designs, cuts, judgments) may be out at

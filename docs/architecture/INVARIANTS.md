@@ -55,3 +55,31 @@ measured 2026-10-01 by chain chain-chat-follow-glide-20261001-140108-5a55, findi
 probe-key: 2df769e2680557cd5f84472532ad91284ce352fd
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/ChatInterface.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useChatSessionState.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useFollowGlide.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useReplyAnchor.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/utils/landAtMessageTop.ts
+
+## INV-7394 — probe — LOW — in the merged view the summary can sit above its divider
+
+LOW — in the merged view the summary can sit above its divider
+
+```probe
+cd /tmp && timeout 100 node /home/lyphe/.claude/state/pipeline-reviews/custom-compaction--marker-fill/athena-probes/s16_marker_summary_order.mjs 2>&1 | tail -3 || echo "dev client :5183 not up"
+expect: the second line (seed stamped in the second before the floored swap) reads `old-reply > live-compact-cmd > SUMMARY > DIVIDER > seed-reply` while the defect stands, and `… > DIVIDER > SUMMARY > …` once cured; the first line always reads DIVIDER before SUMMARY
+```
+
+measured 2026-10-08 by chain chain-custom-compaction--marker-fill-20261008-120631-e494, finding L1, LOW
+probe-key: 3088e4cd962cdae7aa0d594e1d6bca49f5d7e472
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/export/buildTranscriptMarkdown.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useChatMessages.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/transcript/CompactionMarker.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/transcript/MessageComponent.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts
+
+## INV-7395 — probe — LOW — MAN-306 still lists `MessageKind` without `compaction`
+
+LOW — MAN-306 still lists `MessageKind` without `compaction`
+
+```probe
+docstore get MAN-306 --text 2>&1 | grep -c "compaction" || true
+expect: `0` while the row is stale; `1` or more once `compaction` is in the kind list and the consumption table
+```
+
+measured 2026-10-08 by chain chain-custom-compaction--marker-fill-20261008-120631-e494, finding L2, LOW
+probe-key: e2a22792159c4d9eb5175382cb742307f42d992b
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/export/buildTranscriptMarkdown.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useChatMessages.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/transcript/CompactionMarker.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/transcript/MessageComponent.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts

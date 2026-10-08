@@ -119,6 +119,13 @@ export function buildTranscriptMarkdown(input: BuildTranscriptMarkdownInput): st
       continue;
     }
 
+    // A custom compaction's divider has no words of its own; without this it would export as an empty
+    // "Claude" section. One line marks where the conversation was compacted.
+    if (message.isCompactionMarker) {
+      sections.push('_— Conversation compacted —_');
+      continue;
+    }
+
     if (message.type === 'user') {
       sections.push(`### You`);
       sections.push('', readString(message.content));

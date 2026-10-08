@@ -2,6 +2,7 @@ import { useCallback, useLayoutEffect, useRef, useState } from 'react';
 import type { ComponentType, KeyboardEvent } from 'react';
 
 import { useHostWindow } from '@/shared/context/HostWindowContext';
+import type { Tone } from '@/shared/types';
 import { MoreFace, TabsMore } from '@/shared/ui/TabsMore';
 import { useTabsOverflow } from '@/shared/ui/useTabsOverflow';
 import { cn, resizeObserverIn } from '@/shared/utils';
@@ -21,6 +22,11 @@ import { cn, resizeObserverIn } from '@/shared/utils';
  * amber on an icon tab, the count pill amber on a word tab) and the title reads
  * `<label> (<count>) · <attention>`, so a mark that is only a colour is never the whole signal
  * (doctrine §6). A tab without one is drawn exactly as it was.
+ *
+ * `tone` is the mark's register when nothing waits on the operator — the state of what is counted:
+ * the Roadmap tab's dot is blue while an agent is at work, green only once everything on the lane
+ * is finished, grey for work nobody is doing (`useDispatcherPlans.tone`). Attention outranks it. A
+ * tab without one wears the accent.
  */
 export type TabItem = {
   id: string;
@@ -28,6 +34,8 @@ export type TabItem = {
   count?: number;
   /** What waits on this tab, said in words — drawn on hover, and the reason its mark turns amber. */
   attention?: string;
+  /** The mark's register while nothing waits on the operator; `attention` outranks it. */
+  tone?: Tone;
   icon?: ComponentType<{ className?: string; strokeWidth?: string | number }>;
 };
 
@@ -80,6 +88,23 @@ function moveSelectionByKey(event: KeyboardEvent<HTMLElement>, current: HTMLElem
   if (next?.getAttribute('role') === 'tab') next.click();
 }
 
+/** The register a tab's mark wears: amber while it carries attention, else its own `tone`, else the accent. */
+function markTone(tab: TabItem): Tone | undefined {
+  return tab.attention !== undefined ? 'warn' : tab.tone;
+}
+
+/** Most urgent first: the order in which a set of marks gives the trigger its one register. */
+const MARK_URGENCY: readonly Tone[] = ['danger', 'warn', 'info', 'positive', 'neutral'];
+
+/**
+ * The register the More trigger's dot wears for the tabs collapsed behind it: the most urgent mark
+ * among those that draw one, so a Roadmap tab pushed behind More keeps its amber or its blue.
+ */
+function collapsedTone(tabs: TabItem[]): Tone | undefined {
+  const tones = tabs.filter((tab) => (tab.count ?? 0) > 0).map(markTone);
+  return MARK_URGENCY.find((tone) => tones.includes(tone));
+}
+
 /** A tab's face — the glyph or the word, and its count — drawn by the live tab and by the ghost. */
 function TabFace({ tab }: { tab: TabItem }) {
   const hasCount = typeof tab.count === 'number' && tab.count > 0;
@@ -87,7 +112,7 @@ function TabFace({ tab }: { tab: TabItem }) {
   // OPERATOR, not merely counted. It tones the marks that are drawn and never decides whether one is
   // — a tab with nothing to count draws no mark either way — so the count stays the one rule for
   // what a mark exists, and attention is only ever the colour it wears.
-  const tone = tab.attention !== undefined ? 'warn' : undefined;
+  const tone = markTone(tab);
 
   return (
     <>
@@ -297,15 +322,15 @@ export function Tabs({ tabs, active, onChange, ariaLabel, variant = 'segmented',
       }}
     >
       {strip}
-      {/* The trigger carries what the collapsed tabs carry: a dot for a count behind it, and the
-          warn tone when one of them is waiting on the operator — so the Roadmap tab hidden behind More
-          keeps its amber instead of losing the one mark that says it wants him. */}
+      {/* The trigger carries what the collapsed tabs carry: a dot for a count behind it, in the most
+          urgent register among them — so the Roadmap tab hidden behind More keeps its amber (or its
+          blue) instead of losing the one mark that says what its lane is doing. */}
       {collapsed.length > 0 && (
         <TabsMore
           label={overflowLabel}
           tabs={collapsed}
           onSelect={onChange}
-          warn={collapsed.some((tab) => tab.attention !== undefined)}
+          tone={collapsedTone(collapsed)}
         />
       )}
       {/* Every tab once, at its natural width, plus the trigger — what the plan is measured

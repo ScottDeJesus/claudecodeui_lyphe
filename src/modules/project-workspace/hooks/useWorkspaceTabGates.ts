@@ -5,7 +5,7 @@ import { useHeal } from '@/modules/heal';
 import { useMemoryIntake } from '@/modules/memory-intake';
 import { useTasksSettings } from '@/modules/task-master';
 import { useUiPreferences } from '@/shared/context/UiPreferencesContext';
-import type { AppTab } from '@/shared/types';
+import type { AppTab, Tone } from '@/shared/types';
 
 export type WorkspaceTabGates = {
   shouldShowTasksTab: boolean;
@@ -29,6 +29,8 @@ export type WorkspaceTabGates = {
    * this is above zero. Zero leaves the tab exactly as it was.
    */
   runnerWaiting: number;
+  /** What the drawn plans are doing (`useDispatcherPlans.tone`), the colour of the tab's dot: blue while anything runs, green only once all of it is finished. */
+  runnerTone: Tone | null;
   /** True while the Heal tab belongs on the bar — the same sticky, data-gated rule the Memory tab takes. */
   shouldShowHealTab: boolean;
   /** How much live friction the ledger holds, for the tab's count pill. */
@@ -84,7 +86,7 @@ export function useWorkspaceTabGates(activeTab: AppTab): WorkspaceTabGates {
   // hold. The pill counts the cards drawn, and `waiting` rides alongside as the tab's ATTENTION: the
   // asks those cards owe the operator, which the pill (a count of plans) cannot say. Neither gates
   // the tab: it is on the bar with an empty lane too.
-  const { count: runnerCount, waiting: runnerWaiting } = useDispatcherPlans();
+  const { count: runnerCount, waiting: runnerWaiting, tone: runnerTone } = useDispatcherPlans();
   // The live count off the Heal tab's own context — the one poll of the ledger, read here in the
   // sidebar, the main region and the palette as well as in the panel. Zero until a read has landed
   // AND while one is failing, so the pill and the gate can never disagree; an unreadable ledger is
@@ -105,6 +107,7 @@ export function useWorkspaceTabGates(activeTab: AppTab): WorkspaceTabGates {
     shouldShowRunnerTab: true,
     runnerCount,
     runnerWaiting,
+    runnerTone,
     shouldShowHealTab: healCount > 0 || activeTab === 'heal',
     healCount,
     cerberusNeeds,

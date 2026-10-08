@@ -135,6 +135,9 @@ export { Stepper } from '@/shared/ui/Stepper';
 export { Steps } from '@/shared/ui/Steps';
 export { Switch } from '@/shared/ui/Switch';
 export { Tabs } from '@/shared/ui/Tabs';
+// A status sentence with each hyphenated word (a model id, a version) held whole: the Custom compaction
+// row and the Dactyls field in Edit Agent Chains draw their Waiting line's reason through it.
+export { WholeWords } from '@/shared/ui/WholeWords';
 // The multi-line field `Input` has no sibling for: Verve's own TextArea on Input's field paint.
 // The roadmap's dialogs take it for a goal: ItemDialog adds and edits every kind of item with one. The
 // cerberus tab's Mute dialog takes it for the reason a mute is raised.

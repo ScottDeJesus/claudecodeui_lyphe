@@ -1,6 +1,7 @@
 import fsp from 'node:fs/promises';
 import path from 'node:path';
 
+import { readCompactionStamp } from '@/modules/providers/list/claude/claude-compacted-history.js';
 import type { AnyRecord, NormalizedMessage, SubagentActivity } from '@/shared/types.js';
 
 /**
@@ -274,4 +275,22 @@ export async function readSubagentStamp(transcriptPath: string, providerSessionI
   }
 
   return count === 0 ? '' : `${count}:${newestMs}`;
+}
+
+/**
+ * The companion stamp the full-history cache validates a conversation's entry by, beyond the
+ * transcript's own path, mtime and size: its subagent sidechains (`readSubagentStamp`) and the
+ * compaction records its stitched history is built from (`readCompactionStamp`).
+ *
+ * Every reader that shares a conversation's cache entry must pass THIS value — the chat's own
+ * history read (`sessions.service.ts`) and the sidebar's running-agent poll
+ * (`session-subagent-runs.service.ts`) — because two readers passing different stamps for one
+ * entry would evict each other's parse on every alternation.
+ */
+export async function readHistoryCompanionStamp(
+  sessionId: string,
+  transcriptPath: string,
+  providerSessionId: string,
+): Promise<string> {
+  return `${await readSubagentStamp(transcriptPath, providerSessionId)}${readCompactionStamp(sessionId)}`;
 }

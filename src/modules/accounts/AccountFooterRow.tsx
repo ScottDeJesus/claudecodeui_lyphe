@@ -6,6 +6,7 @@ import { useClaudeAccounts } from '@/modules/accounts/hooks/useClaudeAccounts';
 import { useClaudeUsage } from '@/modules/accounts/hooks/useClaudeUsage';
 import { useDeepseekBalance } from '@/modules/accounts/hooks/useDeepseekBalance';
 import { useJevBalance } from '@/modules/accounts/hooks/useJevBalance';
+import { useReloginCapture } from '@/modules/accounts/hooks/useReloginCapture';
 import { JevBalanceReadout } from '@/modules/accounts/JevBalanceReadout';
 import { accountInitials } from '@/modules/accounts/utils/accountInitials';
 import { formatWindowCountdown, windowPercent, windowTone } from '@/modules/accounts/utils/usageWindows';
@@ -48,6 +49,8 @@ export function AccountFooterRow({ collapsed = false, onExpand }: AccountFooterR
   const { data: balance, refresh: refreshBalance } = useDeepseekBalance();
   // The third account on this row: a seeded credit metered locally, read from a local route.
   const { data: jevBalance, refresh: refreshJevBalance } = useJevBalance();
+  // What the login window does to the switcher: saves the login before it opens, files the new one when it closes.
+  const { begin: beginRelogin, finish: finishRelogin, busy: reloginBusy } = useReloginCapture();
 
   // Whether the account panel is showing. Not derivable from the picture: the picture says
   // which account is live, and the panel is open precisely while that is being reconsidered.
@@ -63,11 +66,6 @@ export function AccountFooterRow({ collapsed = false, onExpand }: AccountFooterR
 
   const rootRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
-  // Whether the login command exited cleanly while the modal was open. A ref rather than state
-  // because nothing renders from it — it only decides whether closing the modal has a new login
-  // worth saving. A non-zero exit (the operator cancelled, or the auth failed) leaves it false.
-  // See `handleLoginClose`.
-  const loginCompletedRef = useRef(false);
 
   const closePanel = useCallback(() => {
     setOpen(false);
@@ -92,8 +90,10 @@ export function AccountFooterRow({ collapsed = false, onExpand }: AccountFooterR
   // the reader was looking at, closing this panel behind it instead. Marking the event says
   // "already handled" to anything that asks; it does not deny the key to anything that does not.
   //
-  // While the login modal is up neither dismissal fires — the modal covers the panel, and
-  // closing it underneath would take the write's banner with it before anyone had read it.
+  // While the login window is up neither dismissal fires. The window is drawn on `document.body`,
+  // outside `rootRef`, so every pointer inside it would read as "outside" and close the panel behind it,
+  // and an Escape meant for the terminal would close the panel too. The panel stays as it was, and is
+  // still open, and still working, when the window closes.
   useEffect(() => {
     if (!open || loginOpen) return undefined;
 
@@ -155,26 +155,20 @@ export function AccountFooterRow({ collapsed = false, onExpand }: AccountFooterR
     void refreshJevBalance();
   };
 
-  // "Add another account": save the login that is live NOW before the CLI can replace it, then
-  // run the provider's own login. The capture also re-points the ACTIVE account at whatever it
-  // just saved (`accounts.routes.ts`), which is why the toast says so.
-  const handleAddAccount = useCallback(async () => {
-    loginCompletedRef.current = false;
-    await capture();
-    setLoginOpen(true);
-  }, [capture]);
+  // Re-login, the panel's one sign-in door (for the same account or another): save the login that is live
+  // NOW before the CLI can replace it, then run the provider's own login. The window is opened only after
+  // the save has landed.
+  const handleRelogin = useCallback(async () => {
+    if (await beginRelogin()) setLoginOpen(true);
+  }, [beginRelogin]);
 
-  // Closing the modal saves again ONLY when the login command exited CLEANLY. A capture is
-  // never a no-op at the far end — it rewrites both slot files and moves the active mark — so
-  // neither a modal opened and closed without signing in NOR a login the operator cancelled
-  // (which exits non-zero, and still fires `onComplete`) churns the store for a login that did
-  // not change.
+  // Closing the window files the live login when it changed while the window was open, and the
+  // switcher lands on that account — see `useReloginCapture` for why the login, and not the command's
+  // exit code, is the signal. A window closed without signing in writes nothing.
   const handleLoginClose = useCallback(async () => {
     setLoginOpen(false);
-    if (!loginCompletedRef.current) return;
-    loginCompletedRef.current = false;
-    await capture();
-  }, [capture]);
+    await finishRelogin();
+  }, [finishRelogin]);
 
   if (collapsed) {
     return (
@@ -252,10 +246,10 @@ export function AccountFooterRow({ collapsed = false, onExpand }: AccountFooterR
           usage={usage}
           balance={balance}
           jevBalance={jevBalance}
-          busy={busy}
+          busy={busy || reloginBusy}
           error={error}
           onSwitch={(slug) => { void switchTo(slug); }}
-          onAddAccount={() => { void handleAddAccount(); }}
+          onRelogin={() => { void handleRelogin(); }}
           onSaveLiveLogin={() => { void capture(); }}
         />
       )}
@@ -263,7 +257,6 @@ export function AccountFooterRow({ collapsed = false, onExpand }: AccountFooterR
       <ProviderLoginModal
         isOpen={loginOpen}
         onClose={() => { void handleLoginClose(); }}
-        onComplete={(exitCode) => { loginCompletedRef.current = exitCode === 0; }}
         provider="claude"
       />
     </div>

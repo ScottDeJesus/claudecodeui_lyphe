@@ -18,19 +18,29 @@
 export type AgentLaunchChoices = {
   models: string[];
   efforts: string[];
+  dactyl_models: string[];
+  summarizer_models: string[];
 };
 
 /**
- * The table's `[default]` and `[deepseek]` blocks — what a launch runs at when its row pins nothing.
+ * The table's `[default]`, `[deepseek]`, `[dactyl]` and `[summarizer]` blocks — what a launch runs at when its row pins nothing.
  *
  * `effort` is keyed by every model in `choices.models`; a `null` value means no `--effort` flag is
  * passed for that model, so the CLI's own `effortLevel` (`census.cli_effort`) applies.
  * `deepseek_effort` is ONE house-wide word: on the DeepSeek side it wins over a soul's own effort.
+ * `dactyl_model` (one of `choices.dactyl_models`) and `dactyl_effort` (one of `choices.efforts`) are the
+ * two words every dactyl launches at; both are always set, because neither can be cleared.
+ * `summarizer_model` (one of `choices.summarizer_models`) and `summarizer_effort` (one of `choices.efforts`) are the
+ * two words that write a chat's compaction while Custom compaction is on; both are always set, for the same reason.
  */
 export type AgentLaunchDefaults = {
   model: string;
   effort: Record<string, string | null>;
   deepseek_effort: string;
+  dactyl_model: string;
+  dactyl_effort: string;
+  summarizer_model: string;
+  summarizer_effort: string;
 };
 
 /**
@@ -132,10 +142,16 @@ export type AgentLaunchRowChange = { model?: string | null; effort?: string | nu
 
 /**
  * A change to the table's defaults. `effort` names one or more models: a word sets that model's
- * default effort, `null` removes it (no `--effort` flag, so the CLI's own applies).
+ * default effort, `null` removes it (no `--effort` flag, so the CLI's own applies). `dactyl_model` and
+ * `dactyl_effort` set the dactyl's two words, and `summarizer_model` and `summarizer_effort` the summarizer's;
+ * none of the four can be cleared.
  */
 export type AgentLaunchDefaultsChange = {
   model?: string;
   effort?: Record<string, string | null>;
   deepseek_effort?: string;
+  dactyl_model?: string;
+  dactyl_effort?: string;
+  summarizer_model?: string;
+  summarizer_effort?: string;
 };

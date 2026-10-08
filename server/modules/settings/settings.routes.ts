@@ -55,6 +55,16 @@ export function createSettingsRouter(
   // the file holds one line — `off`, or `on`.
   router.get('/park-at-peak', respond(() => service.getParkAtPeak()));
   router.put('/park-at-peak', respond((req) => service.setParkAtPeak(req.body?.enabled)));
+  // The plan runner's Dactyls switch, host-wide like the ones above: it steers the runner on this host,
+  // so no `userId` is read. One word on the PUT body, because the file holds one line. The GET also
+  // carries the verb's readiness, which is not the file's to hold.
+  router.get('/dactyls', respond(() => service.getDactyls()));
+  router.put('/dactyls', respond((req) => service.setDactyls(req.body?.enabled)));
+  // The Custom compaction switch, host-wide like the ones above: it steers how chats on this host
+  // compact, so no `userId` is read. One word on the PUT body, because the file holds one line. The GET
+  // also carries the summarizer's words and readiness, which are not the file's to hold.
+  router.get('/custom-compaction', respond(() => service.getCustomCompaction()));
+  router.put('/custom-compaction', respond((req) => service.setCustomCompaction(req.body?.enabled)));
   // The dispatcher's planner-lane dial, host-wide like the switches above and read the same way: it
   // steers the dispatcher on this host, so no `userId` is read. One integer on the PUT body, because
   // the file holds one line — a bare count of at least 1.

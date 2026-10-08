@@ -673,6 +673,22 @@ export const api = {
     saveParkAtPeakSwitch: (state: { enabled: boolean }) =>
       put('/api/settings/park-at-peak', state),
 
+    // The plan runner's Dactyls switch — the fifth flag file in this shape: whether Hephaestus on
+    // Claude hands his code edits to one-file children. The GET answers the position read off the file
+    // beside the verb's readiness (`model`, `effort`, `ready`, `why`, each null when that call failed);
+    // the PUT answers the same, with the position read back off the file, never what was sent.
+    dactylsSwitch: () => get('/api/settings/dactyls'),
+    saveDactylsSwitch: (state: { enabled: boolean }) => put('/api/settings/dactyls', state),
+
+    // The Custom compaction switch — the sixth flag file in this shape: whether a CloudCLI chat's
+    // compaction is written by the launch table's `[summarizer]` words instead of by the CLI. The GET
+    // answers the position read off the file beside `summarize --status`'s details (`model`, `effort`,
+    // `ready`, `why`, each null when that call failed); the PUT answers the same, with the position
+    // read back off the file, never what was sent.
+    customCompactionSwitch: () => get('/api/settings/custom-compaction'),
+    saveCustomCompactionSwitch: (state: { enabled: boolean }) =>
+      put('/api/settings/custom-compaction', state),
+
     // The heal reflex's MASTER switch — the reflex's whole launching, on one word. `off` stops it
     // launching from the next ending onwards while an ending still indexes, and the typed `/heal`
     // door is never gated by it; `on` is what the flag file being absent has always meant. Same

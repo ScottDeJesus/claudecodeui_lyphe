@@ -1,5 +1,7 @@
 import { useTranslation } from 'react-i18next';
 
+import { AgentLaunchDactylField } from '@/modules/agent-launch/AgentLaunchDactylField';
+import { AgentLaunchSummarizerField } from '@/modules/agent-launch/AgentLaunchSummarizerField';
 import type { AgentLaunchCensus, AgentLaunchDefaultsChange } from '@/shared/agent-launch-types';
 import { Badge, Card, Chip, Select, Spinner } from '@/shared/ui';
 import { cn } from '@/shared/utils';
@@ -20,11 +22,15 @@ type AgentLaunchDefaultsProps = {
  * Used by `AgentLaunchPanel`, above the rows: the table's spine — what every soul that pins nothing
  * launches at, and the one DeepSeek effort the whole house shares.
  *
- * Three fields on a wide panel, stacked on a phone. The default model is a chip group and not a list,
- * because it is the single most consequential word in the table and three choices should be seen, not
- * opened. The default effort is one list per model, and its `none` choice is a launch that passes no
- * `--effort` at all — so it is labelled with the CLI's own level (`cli_effort`), the word that actually
- * applies then. The DeepSeek effort says its one surprise beside it: xhigh buys nothing there.
+ * Five fields on two columns from 48rem (three across cuts a model id and the `none` label at the 48rem
+ * panel; four across cuts `none` at a 1152px one): the Default effort spans the chips and the DeepSeek
+ * effort, and the Dactyls field (the runner's Dactyls switch at its head, the dactyl's two words under it) and
+ * the Summarizer sit abreast under them; stacked on a phone. The default model
+ * is a chip group and not a list, because it is the single most consequential word in the table and three
+ * choices should be seen, not opened. The default effort is one list per model, and its `none` choice is a
+ * launch that passes no `--effort` at all — so it is labelled with the CLI's own level (`cli_effort`), the
+ * word that actually applies then. The DeepSeek effort says its one surprise beside it: xhigh buys nothing
+ * there.
  *
  * A HELD BLOCK IS NOT DISABLED, for the reason a held row is not (`AgentLaunchRowItem`): a disabled control
  * drops keyboard focus to the page and never returns it. The chips take the kit's `busy` — `aria-disabled`,
@@ -62,7 +68,7 @@ export function AgentLaunchDefaults({ census, held, refused, onSave }: AgentLaun
           <p className="text-xs text-muted-foreground">{t('agentLaunch.defaults.hint')}</p>
         </div>
 
-        <div className={cn('grid min-w-0 gap-5 px-4 pb-4 pt-3 [@container(min-width:48rem)]:grid-cols-3 [@container(min-width:48rem)]:gap-x-8', held && 'pointer-events-none')}>
+        <div className={cn('grid min-w-0 gap-5 px-4 pb-4 pt-3 [@container(min-width:48rem)]:grid-cols-2 [@container(min-width:48rem)]:gap-x-8', held && 'pointer-events-none')}>
           <div className="flex min-w-0 flex-col gap-2">
             <span id="agent-default-model" className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
               {t('agentLaunch.defaults.model')}
@@ -76,7 +82,7 @@ export function AgentLaunchDefaults({ census, held, refused, onSave }: AgentLaun
             </div>
           </div>
 
-          <div className="flex min-w-0 flex-col gap-2">
+          <div className="flex min-w-0 flex-col gap-2 [@container(min-width:48rem)]:row-span-2">
             <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{t('agentLaunch.defaults.effort')}</span>
             <div className="flex flex-col gap-2">
               {choices.models.map((model) => (
@@ -105,13 +111,22 @@ export function AgentLaunchDefaults({ census, held, refused, onSave }: AgentLaun
             />
             <p className="text-xs text-muted-foreground">{t('agentLaunch.defaults.deepseekHint')}</p>
           </div>
-          {/* FILL: dactyl-field — <AgentLaunchDactylField models={choices.dactyl_models} efforts={choices.efforts}
-              model={defaults.dactyl_model} effort={defaults.dactyl_effort} held={held} onSave={save} /> as the fourth
-              field. Two more hunks are this marker's: the grid above trades `[@container(min-width:48rem)]:grid-cols-3`
-              for `[@container(min-width:48rem)]:grid-cols-2` (two by two from 48rem, stacked below it as now; a row of
-              four cuts the effort lists' "None · the CLI's own (xhigh)" at a 1152px panel), and the docstring's
-              "Three fields on a wide panel, stacked on a phone." becomes "Four fields, two by two on a wide panel,
-              stacked on a phone." */}
+          <AgentLaunchDactylField
+            models={choices.dactyl_models}
+            efforts={choices.efforts}
+            model={defaults.dactyl_model}
+            effort={defaults.dactyl_effort}
+            held={held}
+            onSave={save}
+          />
+          <AgentLaunchSummarizerField
+            models={choices.summarizer_models}
+            efforts={choices.efforts}
+            model={defaults.summarizer_model}
+            effort={defaults.summarizer_effort}
+            held={held}
+            onSave={save}
+          />
         </div>
       </div>
     </Card>

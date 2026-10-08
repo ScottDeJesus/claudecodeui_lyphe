@@ -176,11 +176,13 @@
   background: var(--accent);
   box-shadow: 0 0 0 2px var(--canvas);
 }
-/* The dot's amber register: a tab whose count is waiting on the OPERATOR, not merely standing. It
- * takes the palette's own warn dot — the tone the widget's badge and the card's pulse wear — so one
- * colour means one thing wherever the lane is drawn. The ring above is untouched: what changes is
- * the dot, not the disc it reads against. */
-.vv-tabs__dot[data-tone="warn"] { background: var(--warn-dot); }
+/* The dot's registers: a tab that says what its count is DOING wears the palette's own tone dot
+ * (tokens.css `[data-tone]`) — amber while it waits on the operator, blue while work runs, green only
+ * once all of it is finished, grey for work nobody is doing — the tones the cards and the widget's
+ * badge wear, so one colour means one thing wherever the lane is drawn. The bare accent above is
+ * that same green, which is why a tab with a state never falls back to it. The ring is untouched:
+ * what changes is the dot, not the disc it reads against. */
+.vv-tabs__dot[data-tone] { background: var(--tone-dot); }
 
 /* Underline register — for chrome that is already a surface (the sidebar), where a second
  * filled tray reads as a card on a card. There is no rail under the row: the indicator below

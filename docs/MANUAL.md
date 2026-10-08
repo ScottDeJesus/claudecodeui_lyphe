@@ -126,9 +126,9 @@ both.
 
 | The server answered | The panel draws |
 |---|---|
-| a picture with slots | the meters, `Switch account · N`, the date line, one row per slot, `+ Add another account` |
+| a picture with slots | the meters, `Switch account · N`, the date line, one row per slot, `↻ Re-login` |
 | `unreadable: true` | the count reads `0` and no rows follow, under *The saved accounts could not be read — none can be listed.* — said in words, because an empty switcher otherwise reads as "you have no accounts" |
-| `reachable: false` | *The server could not read accounts or usage — both are unknown.* in place of the meters, the count as an em-dash, no rows and no add button |
+| `reachable: false` | *The server could not read accounts or usage — both are unknown.* in place of the meters, the count as an em-dash, no rows and no `↻ Re-login` |
 | nothing yet | the meters draw an em-dash and the count reads `—`; the first reading normally lands before anyone opens the panel |
 
 The balance block renders in EVERY one of those rows, including `reachable: false` — it is drawn
@@ -211,12 +211,23 @@ the panel shows a warn `Banner` carrying **the store's own words** whenever it s
 `{reachable:false, reason}` is translated here (*The server did not answer in time.*, *The server
 answered with something this app could not read.*, *The server is not reachable.*).
 
-**Capturing.** `+ Add another account` saves the login that is live now *before* the CLI can replace
-it, then opens `ProviderLoginModal`, which runs the provider's own `/login` in an embedded terminal.
-Closing the modal captures a second time — and only when the login command exited cleanly. Either
-capture raises `Saved <label>` (or *Saved the login that is live now* when the reply named no slug)
+**Capturing.** `↻ Re-login` is the panel's one sign-in door, and it is how another account is added: sign
+in with that account's email and it is saved as its own account and made active. It runs one flow,
+`useReloginCapture`, which reads the live login, saves it *before* the CLI can replace it, and opens `ProviderLoginModal` — drawn on
+`document.body`, so it covers the whole app on a desk (centred) and is the whole screen on a phone,
+never the side panel (the sidebar's root carries a `backdrop-filter`, which is what `position: fixed`
+would otherwise be laid out against). `claude /login` signs in and then stays in its prompt, so the
+window is closed with ✕ and the command's exit code never arrives; the flow reads the live login again,
+once, as the window closes, and captures it when it **changed** while the window was open — a different
+email, or a new token for the same one. The capture files the login under its own email's slot and marks
+that slot in use, so the switcher shows the account just signed in at once. A window closed without
+signing in captures nothing. A store that could not be read as the window opened or closed cannot prove a change, so nothing is
+captured and a warn toast says the sign-in was not compared. While the flow works, the panel's rows and buttons wait (its `busy`). Settings → Agents → Claude → Re-login runs the same flow, and tells the row to re-read.
+Each capture raises `Saved <label>` (or *Saved the login that is live now* when the reply named no slug)
 with the message *It is now the account in use.*: the capture is not a snapshot only, it also
-re-points the active account at whatever it just saved (`accounts.routes.ts`).
+re-points the active account at whatever it just saved (`accounts.routes.ts`). A refusal from the
+re-login's captures is a warn toast with the store's own words (`Could not save <email>`), since the
+re-login has no panel to put a banner in; `Save it` below keeps the panel's banner.
 
 **Drift.** When the picture reports the live login differs from its saved copy, a warn `Banner` names
 both — the one in use and the one *Save it* would adopt — and `Save it` is the same capture.
@@ -255,12 +266,18 @@ section: accounts/006 The rules that bite
    row — *in use now · none proven running*, the only count the server can state — rather than a
    modal. What is refused is a write while
    one is in flight, read from a ref rather than from `busy`, since a render value lands too late to
-   stop a second press in the same tick.
+   stop a second press in the same tick. The re-login flow (`useReloginCapture`) holds a ref of its
+   own over its reads and captures and lends its `busy` to the panel, so Re-login, the rows and Save it
+   all wait while it works.
 
 6. **A capture is never free at the far end.** It rewrites both slot files and moves the active
-   mark, so the second capture is gated on the login command's exit code
-   rather than on the bare fact that it exited. A modal opened and closed without signing in, and a
-   login the operator cancelled, both leave the store untouched.
+   mark, so the capture at the close of the login window is gated on the live login having CHANGED
+   while the window was open — a different email, or a new token for the same one — read once at
+   each end by `useReloginCapture`. `claude /login` stays at its prompt and never exits, so the
+   operator closes the window and the live login is the only evidence of a sign-in. A
+   window opened and closed without signing in leaves the store untouched. A store that cannot be
+   read at either end cannot prove a change, so nothing is captured and a warn toast says the
+   sign-in was not compared.
 
 7. **A refusal describes one attempt.** The inline banner clears when the next write starts and when
    the panel closes; one left standing would greet the next person who opens it.
@@ -293,24 +310,18 @@ section: accounts/007 What is left standing
 - **One Escape dismisses the frontmost overlay AND this panel behind it.** Marking rather than
   stopping is what lets the overlay have its key; the panel's own handler still fires on the same
   event. Measured, and the lesser of the two costs.
-- **The exit-code gate is pinned as source text.** Driving it needs a real failed login against the
-  operator's own account, which no run may spend, so `phase-13.mjs` asserts the shape of the
-  `onComplete` handler instead of its behaviour.
-- **Capture-on-success rides the terminal's exit-line scrape.** `useShellConnection` matches
-  `Process exited with code (\d+)` in the shell's own output; a login whose exit line never prints
-  captures nothing. It self-heals rather than losing anything — the picture then reports `drift`, and
-  the banner's *Save it* adopts the live login.
 - **The avatar hue is positional.** The footer always draws hue 0 and the panel indexes by row, so
   the same account can carry one colour in the footer and another in the list.
-- **The panel scrolls to its actions.** Usage renders above the switcher by the plan's own step
-  order, and the panel grows upward into the space above the row, so at the harness's 1440 × 900 the
-  rows are all on screen and `+ Add another account` is reached by scrolling — recorded as a
-  `[NOTE]` rather than gated, since it is an ordering question this phase neither created nor
-  settles. No run measures a shorter viewport, and none measures the mobile drawer width.
+- **The panel scrolls to its action.** Usage renders above the switcher by the plan's own step
+  order, and the panel grows upward into the space above the row, so `↻ Re-login` sits at the foot of
+  a panel that scrolls. `relogin-window.mjs` (MAN-8057) opens it at 1440 × 900 and at 390 × 844, in
+  both themes, and photographs it scrolled to that foot; it asserts the button is there, not that it
+  is on screen without scrolling.
 - **Two live addresses draw the same `SD`.** A property of the addresses, not of the rule; the
   mitigations are the per-row hue and the full address in a `title` on every label.
-- **Nothing marks the panel inert while the login modal covers it.** Both dismissals stand down so
-  the write's banner survives, but the panel keeps its own focus order behind the overlay.
+- **Nothing marks the panel inert while the login window covers it.** Both dismissals stand down so
+  the panel is not closed behind the window, but the panel keeps its own focus order behind the
+  overlay, and the window traps neither focus nor body scroll.
 - **Two library gaps, left in the library.** `Banner` carries no `role` or `aria-live`, so a refusal
   is not announced; `Meter` emits `role="meter"` with no `aria-valuenow` on a null percent, which is
   correct-by-omission but reads as an incomplete widget to a strict validator.
@@ -323,32 +334,59 @@ section: accounts/007 What is left standing
 ## MAN-468 — Proving it
 section: accounts/008 Proving it
 
-`node .verify/phase-13.mjs`, headless Chromium against the running dev server. **It no longer runs
-green:** it was written against the proxy this lane has since replaced, and its live reads, its two
-`page.route` replays and its capture counter all still name that proxy's retired URL prefix — the
-strings live in the probe's own source, and they must be re-pointed at `/api/accounts`, `/api/usage`
-and `/api/accounts/capture` before any gate means anything. What it measures once they are: the dark
-pass reads the screen against the live picture
-and stops there; the light one carries the rest. It never presses the Switch of another slot and
-never presses *Save it* — either would swap the operator's whole live login mid-run — and it never
-logs in: the login modal is opened by its own title and closed without typing. Everything the
-accounts lane can answer is read live through the server; everything it is not doing today —
-`percent: 0`, a null, a rolled window, a flagged one, a degraded reading, four shapes of expiry,
-drift, and a lane that cannot answer — is replayed into the two READS in the browser, touching no
-server and no account. Shots are
-`13-footer`, `13-popover`, `13-popover-unreachable` and `13-rail`. See
-MAN-670.
+`node .verify/relogin-window.mjs` is the one browser script this lane has. It measures the sign-in
+window and what closing it does — the scenarios, the stubs and the last run are MAN-8057. It answers
+every `/api/accounts*` request itself and the window's `/shell` socket locally, so the operator's
+live login is never touched.
 
-**The balance line is on those shots and in none of those gates.** `phase-13.mjs` predates it and
-asserts nothing about it, so the standing gate would stay green if the figure vanished from both
-registers. Its own procedure — the route with a real token, the unknown exercised by BOOTING from a
-keyless `.env`, and the vendor-body table against a local fake — is
-MAN-522, and it is written out there rather than
-pinned as a script. Note also that opening this panel is now an outbound vendor call from the
-server: a probe that needs the figure to be a known value answers `/api/deepseek/balance` with
-`page.route`, never api.deepseek.com, which no browser-context stub can reach.
+**No standing gate reads the rest of the screen.** The panel's rows and tick, the meters' figures
+(`percent: 0`, a null, a rolled window, a flagged one, a degraded reading), the four shapes of expiry,
+the drift banner, the collapsed rail's avatar, and Escape leaving a running turn alone (the abort
+gate, rule 4 of MAN-466) are each proved only by driving the dev client with `/api/accounts` and
+`/api/usage` answered by `page.route`. A gate for them never presses the Switch of another slot or
+*Save it* against the live store — either swaps the operator's whole live login mid-run — and stubs
+every accounts write the way `relogin-window.mjs` does.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-13.mjs
+**The balance line has no gate either.** Its own procedure — the route with a real token, the unknown
+exercised by BOOTING from a keyless `.env`, and the vendor-body table against a local fake — is
+MAN-522, and it is written out there rather than pinned as a script. Note also that opening this
+panel is an outbound vendor call from the server: a probe that needs the figure to be a known value
+answers `/api/deepseek/balance` with `page.route`, never api.deepseek.com, which no browser-context
+stub can reach. See MAN-670.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/relogin-window.mjs
+
+## MAN-8057 — Proving the re-login window
+section: accounts/009 Proving the re-login window
+
+`node .verify/relogin-window.mjs [before|after]` — headless Chromium against the dev client, signed in as the dev account `verve`.
+The label names the shots: `.verify/shots/relogin-<label>-<desktop|phone>-<panel|window|signed>-<dark|light>.png`
+(plus `relogin-<label>-desktop-settings-window-light.png`).
+
+| Fact | Value |
+| --- | --- |
+| Live login | untouched: every `/api/accounts*` request is answered by the script from state it holds; writes are recorded, never sent. Settings' read of Claude's auth status (`GET /api/providers/claude/auth/status`) is answered from the same held login, so the one live login has the two readers it has on the box |
+| Terminal | `/shell` socket answered locally; no `claude /login` process starts |
+| Viewports | desktop 1440×900, phone 390×844, each dark and light |
+| Last run | 2026-10-08: 82 checks pass, 0 console errors in all four scenarios, 0 stray or switch requests |
+| Not proven | a real `claude /login` changing the live email or token expiry; the onboarding window (first run only) |
+
+| Scenario | Gate |
+| --- | --- |
+| PANEL | the panel's only button besides the account rows is `↻ Re-login`, and its text says nothing about adding an account; shot scrolled to the panel's foot |
+| WINDOW | press Re-login: backdrop equals the viewport box; panel centred on desk, whole screen on phone |
+| CLOSED | ✕ without signing in: 0 captures sent, switcher stays on the old email |
+| SIGNED | different email signed in, then ✕: exactly 1 capture, row and panel show the new email in use |
+| SAME (desktop, light) | new token for the same account: 1 capture, switcher unchanged |
+| SETTINGS (desktop, light) | Settings → Agents → Claude → Re-login ends the same way. Its "Logged in as" line names the old email at open and after a window closed without signing in; with the window still open after a sign-in it has not moved; on ✕ it names the new email with Settings never reopened, from exactly one auth-status read. The design authorization writes nothing and re-reads nothing |
+| SERVER (desktop, light) | read-only, against the REAL server: its Claude auth status email equals the accounts picture's live label (the address is not printed); skipped when the live login is not a signed-in credentials file with a known identity |
+| Refusal | a refused capture raises the `Could not save <email>` warn toast |
+| Unreadable store at open | nothing captured at close |
+| Keys | a click inside the window and Escape leave the window open; the panel still works after it closes |
+
+The `before` run, taken ahead of the change, measured the window at 0,0 328×900 (desk) and 331×844 (phone): the sidebar's size.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/relogin-window.mjs
 
 ## MAN-469 — The API tab
 section: api-tab/000
@@ -2609,11 +2647,30 @@ section: design-login/001 The two rows
 | Command | `claude --dangerously-skip-permissions /login` | `claude --dangerously-skip-permissions /design-login` |
 | `loginFlow` | `'account'` | `'design'` |
 | Grants | the CLI's own credential | `user:design:read` + `user:design:write` on claude.ai/design projects |
-| After the terminal exits | `handleLoginComplete` re-reads auth status, raises the save banner | nothing |
+| When the terminal's command exits | nothing reads it — `claude /login` stays at its prompt and never exits, so the window is closed with ✕ and an exit code never arrives | nothing |
+| When ✕ closes the window | `closeProviderLogin` runs two reads of the live login: `closeLoginModal` re-reads the provider's auth status (the account line below), and `useReloginCapture.finish` files the live login in the switcher if it changed (MAN-465) | nothing: no re-read, no capture |
 
 `/design-login` is the slash command DesignSync tells the user to run in the interactive TUI.
 `claude design-login --json` is the VS Code extension's machine interface and answers in JSON lines;
 it is not used here.
+
+**When the account line refreshes.** The line under *Connection Status* in `AccountContent` — "Logged
+in as `<email>`" — shows `GET /api/providers/<provider>/auth/status`, and that read is repeated at
+exactly two moments: when Settings opens, and when an *account* login window closes
+(`closeLoginModal`, one read for the provider whose window it was). Never from the login command's
+exit, and never on a timer: with the window still open after a sign-in the line still names the old
+account, and ✕ is what moves it, with Settings staying open. A window closed without signing in
+re-reads the same answer. The design authorization window re-reads nothing — it changes no credential
+this line reports. For Claude the email is `oauthAccount.emailAddress` in `~/.claude.json`, the
+account the switcher names, supplied by the accounts module's `liveAccountEmail`:
+`~/.claude/.credentials.json` holds tokens only, so before that the server answered `email: null` and
+the line read "Authenticated" for every login. That source is used only when the credentials come from
+the default config dir (`~/.claude`); with `CLAUDE_CONFIG_DIR` pointing elsewhere the tokens belong to another login
+than `~/.claude.json`, so the line says "Authenticated" rather than a wrong name. A read that fails at
+the close (a 5xx, a dropped request) leaves the last answer on screen. While the pre-save of a Claude
+Re-login runs, a press on any other Login or Authenticate does nothing. Onboarding's provider step
+re-reads on its window closing, and a failed read there is shown as the failure. There is no save
+banner on a login: the line is the result.
 
 ## MAN-1363 — Where each part lives
 section: design-login/002 Where each part lives
@@ -2623,15 +2680,17 @@ section: design-login/002 Where each part lives
 | `src/modules/settings/tabs/agents-settings/sections/content/AccountContent.tsx` | The row: drawn only when `agent === 'claude' && onDesignLogin`. No other gate — an `api_key` account sees it |
 | `src/modules/settings/tabs/agents-settings/AgentsSettingsTab.tsx` | `onDesignLogin` set on `agentContextById.claude` only |
 | `src/shared/types.ts` | `AgentContext.onDesignLogin?` |
-| `src/modules/settings/hooks/useSettingsController.ts` | `loginFlow`, `openDesignLogin`, `openLoginForProvider` (sets `'account'`), `closeLoginModal`, the early return in `handleLoginComplete` |
-| `src/modules/settings/Settings.tsx` | The modal's `customCommand` and `title`, read off `loginFlow`; `key={`${loginProvider \|\| 'claude'}:${loginFlow}`}` |
-| `src/modules/provider-auth/ProviderLoginModal.tsx` | Optional `title`: `titleOverride ?? getProviderTitle(provider)` |
+| `src/modules/settings/hooks/useSettingsController.ts` | `loginFlow`, `openDesignLogin`, `openLoginForProvider` (sets `'account'`), `closeLoginModal` (resets the flow, and for an `'account'` flow re-reads that provider's auth status with `checkProviderAuthStatus(provider, { keepLastAnswerOnFailure: true })` — the account line's refresh) |
+| `src/modules/settings/Settings.tsx` | The modal's `customCommand` and `title`, read off `loginFlow`; `key={`${loginProvider \|\| 'claude'}:${loginFlow}`}`; `useReloginCapture` armed by a Claude account login only (`openProviderLogin`) and run when the window closes (`closeProviderLogin`) — the design flow never arms it, so closing it writes nothing. `openProviderLogin` and `openDesignLoginWhenIdle` return without opening anything while the hook's `busy` is true (the pre-save or close-time capture running) |
+| `src/modules/provider-auth/ProviderLoginModal.tsx` | Optional `title`: `titleOverride ?? getProviderTitle(provider)`; the window itself, portalled to `document.body` for every caller. It reports `onClose` and nothing about the command's exit |
+| `server/modules/providers/list/claude/claude-auth.provider.ts` | The Claude half of the auth status: the email comes from `liveAccountEmail()` (the accounts module's barrel) when `.credentials.json` carries none and `configDirIsDefault()` holds (`CLAUDE_CONFIG_DIR` unset or resolving to `~/.claude`); otherwise `email` stays null |
+| `src/modules/provider-auth/hooks/useProviderAuthStatus.ts` | `checkProviderAuthStatus(provider, { keepLastAnswerOnFailure? })`: default shows "Checking…", then the answer, a failed read included; with the option it skips "Checking…" and keeps the last answer when the read did not answer. Only `closeLoginModal` passes it; `refreshProviderAuthStatuses` (Settings open, Onboarding close) does not |
 | `src/modules/i18n/locales/en/settings.json` | `agents.designLogin.{title,description,button}` — `en` only, the other locales fall back |
 
 `AccountFooterRow` and `Onboarding` mount the modal without `title` or `customCommand`; their
 titles and commands are unchanged.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/settings.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/provider-auth/ProviderLoginModal.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/hooks/useSettingsController.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/Settings.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/agents-settings/AgentsSettingsTab.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/agents-settings/sections/content/AccountContent.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-auth.provider.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/settings.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/onboarding/Onboarding.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/provider-auth/hooks/useProviderAuthStatus.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/provider-auth/ProviderLoginModal.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/hooks/useSettingsController.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/Settings.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/agents-settings/AgentsSettingsTab.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/agents-settings/sections/content/AccountContent.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/standalone-shell/StandaloneShell.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts
 
 ## MAN-1364 — Rules
 section: design-login/003 Rules
@@ -2639,8 +2698,10 @@ section: design-login/003 Rules
 1. `loginFlow` is held state, never derived from `loginProvider`: both flows run on `claude`. A
    third flow adds a value to `LoginFlow`, not a provider id.
 2. `closeLoginModal` is the only path that closes the modal and the only place the flow resets.
-3. `handleLoginComplete` ends the design flow silently. A design grant changes no credential this
-   pane reports; a re-check would relabel a healthy account.
+3. `closeLoginModal` ends the design flow without a re-read. A design grant changes no credential this
+   pane reports; a re-check would relabel a healthy account. An account flow re-reads on close, never
+   on the login command's exit: no reader of this pane waits on the exit code, which `claude /login`
+   never produces.
 4. The modal's `key` carries the flow, so a change of flow remounts the terminal instead of handing a
    new command to a pty already running the old one.
 5. The description says read AND write: the CLI's own panel and the minted URL both carry both scopes.
@@ -2775,11 +2836,11 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/service
 section: dispatch-souls/001 What a pin is, and why it takes two halves/003 The stamp: ownership recorded at the door, for a launch the receipt scan cannot see
 
 A launch is now ALSO pinned when its `spec.json`'s `launched_by` equals the chat's own provider
-session id, stamped by the launcher itself (`hooks/plan_runner/solo/launch.py`, from
+session id (or one a compaction moved it off), stamped by the launcher itself (`hooks/plan_runner/solo/launch.py`, from
 `CLAUDE_CODE_SESSION_ID`) at the moment it mints the launch — never read back from the transcript.
 `collectStampedSoulLaunches` (`server/modules/providers/services/session-soul-launches.service.ts`)
 walks the newest `dispatch-*` dirs under the launch root, reads each `spec.json`, and keeps the ids
-whose `launched_by` matches the session asking — except the dispatcher's own work (`isDispatcherWork`,
+whose `launched_by` matches the session asking (the chat's live provider session id or any id a custom compaction moved it off, MAN-8054) — except the dispatcher's own work (`isDispatcherWork`,
 `dispatch-souls/dispatcher-work.service.ts`: the stamp of an epic's soul is the chat the epic was
 started from, so it cannot say whose the soul is; the filter runs before the 40-launch cap, so an epic
 cannot push the chat's own out); `sessions.service.ts` merges its result into
@@ -3234,7 +3295,7 @@ section: dispatcher/000/007 The endings. `dispatcher-endings.service.ts` watches
 `complete`, `paused`, `relaunched` — and pushes `dispatcher.finished` (kind `stop`, severity `info`),
 `dispatcher.epic_finished` (`stop`/`info`), `dispatcher.paused` (`stop`/`info`; its body carries the pause's cause when the daemon held the plan — an API error line, the storm guard's), `dispatcher.limit_paused` (`stop`/`info`) and `dispatcher.relaunched` (`error`/`warning`). A plan in no epic pushes each as it happens; a feature of an epic is told less, and once (below). A `paused` event whose detail ends ` (until <UTC stamp>)` — or ` (retry at <stamp>)`, the dispatcher's own guess for a limit that named no time (`backoff.tail`) — is a USAGE-LIMIT pause and earns the fourth code, with `meta.resetsAt` (epoch seconds) and `meta.limitGuess` set: ONE push per wall. A NAMED lift speaks once per lift time (only the lowest event id of each epoch); a guessed one speaks once and stays silent while its pauses keep landing within an hour of one another (`speakingLimitPauses`), because the guess is per soul and would otherwise give every plan its own time. Read off the log itself, so it holds across the dev server's restarts and however many plans and minutes apart. Its title names the account, not a plan, and a lift that is not today names its DATE — `Claude usage limit` / `Features paused until 6:51 PM · Resume from the Roadmap tab`, `… until Oct 3, 8:12 PM …`, or `Features paused — no reset time named, retrying at 7:26 PM · …` for a guess.
 
-**A feature of an epic (`plan.arc` set) is told less, and once.** Its `complete` pushes nothing — the EPIC's finish does: `dispatcher.epic_finished` (ntfy priority 3 and tag `white_check_mark`, like `dispatcher.finished`), titled `Epic finished · <epic>`, body `<n> features · <m> tasks · <spend>` (the spend is the arc's own sum — dollars only when paid, tokens otherwise; the tasks clause is left out when a feature has aged off the lane, `ENDED_KEEP_S`, because its tasks can no longer be counted). The epic is finished when its arc's `status` reads `complete` — every feature stamped, a designed-whole arc's judgment included, no roadmap idea left to design (which the plans alone cannot show) — and the ending is keyed `epic:<epic>:<id>` on the NEWEST `complete` event of the epic's features: two features completing in one picture give one push, and an epic that reopens and finishes again has a newer completion and earns a new one. THE LIMIT: a status that turns `complete` with no new completion (the roadmap's `remove` of the last idea an epic held writes no event) leaves nothing to key on, and the watermark has usually passed the epic's newest completion by then, so that finish is never announced; curing it needs the dispatcher to log an event when an arc becomes complete. Its `relaunched` and its `paused` push once per WAVE (`waveStarters`, `WAVE_S` = an hour): an event pushes only when no event of its kind on ANY feature of the same epic landed in the hour before it. Retries and stops wave apart, so one never hides the other; the window slides from the wave's last event and not from its last push, so a run of retries is one push and trouble back after a quiet hour pushes again; a usage-limit pause is the wall rule's and neither opens nor joins a wave. The pushed copy names the epic (`meta.epic`) and says further ones stay on the card until it has been quiet for an hour. All of it is computed from the events the picture carries (`observe(plans, arcs)`), so it holds across the dev server's restarts.
+**A feature of an epic (`plan.arc` set) is told less, and once.** Its `complete` pushes nothing — the EPIC's finish does: `dispatcher.epic_finished` (ntfy priority 3 and tag `white_check_mark`, like `dispatcher.finished`), titled `Epic finished · <epic>`, body `<n> features · <m> tasks · <spend>` (the spend is the arc's own sum — dollars only when paid, tokens otherwise; the tasks clause is left out when a feature has aged off the lane, `ENDED_KEEP_S`, because its tasks can no longer be counted). The epic is finished when its arc's `status` reads `complete` — every feature stamped, a designed-whole arc's judgment included where it has one (an epic created with one feature is never judged and finishes the moment its last feature lands), no roadmap idea left to design (which the plans alone cannot show) — and the ending is keyed `epic:<epic>:<id>` on the NEWEST `complete` event of the epic's features: two features completing in one picture give one push, and an epic that reopens and finishes again has a newer completion and earns a new one. THE LIMIT: a status that turns `complete` with no new completion (the roadmap's `remove` of the last idea an epic held writes no event) leaves nothing to key on, and the watermark has usually passed the epic's newest completion by then, so that finish is never announced; curing it needs the dispatcher to log an event when an arc becomes complete. Its `relaunched` and its `paused` push once per WAVE (`waveStarters`, `WAVE_S` = an hour): an event pushes only when no event of its kind on ANY feature of the same epic landed in the hour before it. Retries and stops wave apart, so one never hides the other; the window slides from the wave's last event and not from its last push, so a run of retries is one push and trouble back after a quiet hour pushes again; a usage-limit pause is the wall rule's and neither opens nor joins a wave. The pushed copy names the epic (`meta.epic`) and says further ones stay on the card until it has been quiet for an hour. All of it is computed from the events the picture carries (`observe(plans, arcs)`), so it holds across the dev server's restarts.
 
 The watermark is
 the EVENT ID, held in the `app_config` row `dispatcher_announced_through`: the store's ids come from
@@ -3508,7 +3569,7 @@ The deck's HEADER is the arc's own top: the Epic tag and the arc's bare name (`K
 wearing the PLAN's own tone through `planStatusTone`, the very function the status badge on the card under them is toned by, so a header cannot argue with its own cards; the nine words are
 `store.arc_word`'s and `dispatcher-arc.reader.ts` refuses any other BY
 NAME, so no default is invented here; standing proof MAN-5419), the arc's own spend where it has one (`data-arc-spend` holding `SpendPills` counting under
-`darc:<arc name>`; the plan card's own rule — dollars OR tokens by who was used, nothing at all for a lane that has not spent — and, as the LAST pill of that row, the epic's working time, `WorkingPill subject="epic"`: the union of every agent interval on its plans and its own design, cut and judge (`arc.runtime_s`, MAN-7770), ticking while an agent is out on it (`arcAgentOut`, MAN-6789), and drawn for an epic that has only been planned and has no spend yet), the
+`darc:<arc name>`; the plan card's own rule — dollars OR tokens by who was used, nothing at all for a lane that has not spent — and, as the LAST pill of that row, the epic's working time, `WorkingPill subject="epic"`: the union of every agent interval on its plans (each clipped at the moment the feature joined the epic, INV-7357) and its own design, cut and judge (`arc.runtime_s`, MAN-7770), ticking while an agent is out on it (`arcAgentOut`, MAN-6789), and drawn for an epic that has only been planned and has no spend yet), the
 ARC's own planner badge where the store gives it one (`arc.planner`, `report_planners.of_arc`; drawn by
 the same `PlannerBadge` on the head's lead row, under the description — the full-width line under the title row, because of
 WIDTH and not because that row cannot wrap: the row WRAPS and its title is floored at its own longest
@@ -6887,6 +6948,7 @@ also exported from the module's `index.ts` for any caller that has to show an ev
   unknown code reads "CloudCLI" / "You have a new notification".
 - The dispatcher's endings are worded off the `meta` its lane fills (MAN-1498), with progress counted over ALL of a plan's phases (`done`/`phases`) so the push agrees with the plan's card: `dispatcher.finished` reads `Feature finished`, body `<done>/<phases> tasks · <spend>` (`task` when `phases` is 1); `dispatcher.epic_finished` reads `Epic finished · <epic>`, body `<n> features · <m> tasks · <spend>` (`feature`/`task` when 1, no tasks clause when `meta.tasks` is null); `dispatcher.paused` reads `Feature paused`, body `<done>/<phases> tasks · <detail> · Resume from the Roadmap tab`; `dispatcher.relaunched` reads `Task relaunched`, body `Task <key> was taken up again · <detail>` (`A task was taken up again` with no key). A paused or relaunched push from a feature of an epic ends with `Epic <epic>: further stops|retries stay on its card until it has been quiet for an hour` (MAN-5639).
 - `<spend>` is `spendText(meta)`, the SAME rule the In flight face draws, and A SPEND FIGURE IS DOLLARS **OR** TOKENS, BY WHO WAS USED: `$0.28 DeepSeek` for a plan a paying API billed, with NO tokens (a vendor's tokens are its own business), and `1.2M in · 48k out` — the total alone, `1.2M tokens`, on a record written before the split — for one on the operator's Claude subscription, with no `$` at all, never `$0.00` (operator rule, 2026-09-24). A plan that used both hands states both, `$0.32 DeepSeek · 12.4M in · 80k out`, its token half counting its CLAUDE records ONLY. the lane fills `costUsd`/`tokensIn`/`tokensOut` in its ending `meta` (`dispatcher-endings.service.ts`) and a meta that recorded none drops the phrase entirely rather than printing a zero.
+- `compaction.failed` (an automatic custom compaction that did not take, MAN-8065) reads `Compaction failed`, body `The idle|end-of-turn compaction did not take: <meta.reason>. The chat stays on its current session.` (`meta.trigger` `idle` picks the first word; the `: <reason>` part drops when `meta.reason` is empty).
 - The body is cut at 1,000 characters: web push refuses a payload over about 4 KB, and the
   orchestrator settles that refusal silently.
 - A tool approval's body is the thing being approved: the Bash command, the path for a file tool,
@@ -6965,9 +7027,10 @@ calls the generalised writer with a board's own path, `~/.claude/state/kanban-de
 at every Metis spawn — and the precedence a plan-runner launched from there then reads by is stated
 in §"The DeepSeek switch" below.
 
-Further callers of the same pair: `jev-switches.ts` (the Jev master and scope flags) and
+Further callers of the same pair: `jev-switches.ts` (the Jev master and scope flags),
 `park-at-peak-switch.ts` (MAN-1497: `~/.claude/state/park_at_peak.flag`, the file the dispatcher reads
-at both Accept doors). One mechanism, so the measured reasons above hold for every flag file it writes.
+at both Accept doors) and `dactyls-switch.ts` (MAN-8059: `~/.claude/state/dactyls.flag`, the file the
+runner reads at every builder launch). One mechanism, so the measured reasons above hold for every flag file it writes.
 
 Every write of this switch ends with `void kickDispatcher()` (`server/modules/settings/dispatcher-kick.ts`),
 as do the WIP defaults and park-at-peak writes — MAN-1497 §"THE KICK".
@@ -7309,7 +7372,7 @@ Accept walks now." With no position the row says so in words — Loading while t
 `unreadable` sentence the DeepSeek row carries once it failed — and the control slot holds Try again in
 place of the toggle.
 
-**THE KICK. Every switch write on this server ends with `dispatcher kick`.** `setDeepseekFlash`,
+**THE KICK. Every switch write a daemon can be holding work for ends with `dispatcher kick`; the Dactyls switch (MAN-8059) is the one that does not — nothing queues on it.** `setDeepseekFlash`,
 `setWipDefaults`, `setParkAtPeak` and `setPlannerLanes` each hand the flip to the dispatcher once the file has settled
 (`server/modules/settings/dispatcher-kick.ts`: `dispatcher kick` spawned with a ten-second bound and
 never awaited). The flip IS the event — a daemon holding a phase for want of a lane, or an hour to arm,
@@ -8241,27 +8304,6 @@ file instead. Nothing under `runTsx` here reaches the memory mapper, so no asser
 would catch that — deleting the env leaves all 40 green — which is the reason the line is commented
 where it sits rather than left to look like decoration. Its contract is at
 [docs/MANUAL.md (accounts)](MANUAL.md).
-
-Phase 13 is back in the browser, and it splits its evidence in two rather than choosing between
-them. It no longer runs green either: `phase-13.mjs` reads and replays that same retired prefix's
-accounts and usage paths and counts captures at its capture path, none of them called since the proxy
-went, so its live reads miss the lane and its replays never catch a request —
-the three URLs must follow the routes to `/api/accounts`, `/api/usage` and `/api/accounts/capture`
-before any gate means anything. Everything the accounts lane can answer for the live login — the
-label on the footer row, the figure beside it, which row carries the tick, how many slots there are,
-and which of them sit past their stamp — it reads live through the app's own server with the page's
-own token and holds the screen against it. Everything the lane is not doing today it replays into
-the two READS with `page.route`,
-so a `percent: 0`, a null, a rolled window, a vendor `severity`, a degraded reading, a drifted login
-and four shapes of expiry are all measured without a server, an environment or an account being
-touched. It presses no Switch and no "Save it", and it does not log in: the provider's login modal
-is opened by its own title and closed again, the one capture that crossed the wire counted at the
-network layer rather than inferred, and the account picture read back afterwards to prove it is what
-it was. Two of its gates measure a door rather than the room behind it — a probe pair registered
-exactly as `ChatInterface`'s abort listener is, asked what it sees while the panel is open and
-again while it is closed; and the unit trap driven both ways round, since a seconds-shaped expiry
-must land in 1970 and a millisecond one must not land in the year 58,000. 88 gates over a dark pass
-and a light one, and it spends no Claude turn. Its contract is at [docs/MANUAL.md (accounts)](MANUAL.md).
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/deploy/dev-supervisor/README.md, /home/lyphe/.claude/claudecodeui_lyphe/node_modules/playwright/index.js, /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/supervised-boot.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/tsconfig.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/transcript/shapes/detect.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/transcript/shapes/InlineMarks.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/transcript/shapes/remarkShapeGroups.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/constants.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/all.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/artifacts/21-surface.json, /home/lyphe/.claude/claudecodeui_lyphe/.verify/artifacts/phase-11-press.json, /home/lyphe/.claude/claudecodeui_lyphe/.verify/artifacts/shapes-elements-baseline.html, /home/lyphe/.claude/claudecodeui_lyphe/.verify/artifacts/shapes-gallery-last-run.log, /home/lyphe/.claude/claudecodeui_lyphe/.verify/artifacts/verve-life-before/shapes-elements-baseline.html, /home/lyphe/.claude/claudecodeui_lyphe/.verify/artifacts/verve-life-retone.sed, /home/lyphe/.claude/claudecodeui_lyphe/.verify/handover/seam-probe.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/keepalive-cases-p3.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/keepalive-cases-p4.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/keepalive-host-case.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/keepalive-lib.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/keepalive-turn.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/color.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/console.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/runner-fixture.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/shapes-fixture.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/verve-life.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-32.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-33.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-34.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-files-api.py, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-files-editor.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-files-previews.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-markdown-cards.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-baseline.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-detect.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-fences.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-groups.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-inline.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-lists.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-prose.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-tables.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-sidebar-state-api.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-simple-icons-unread.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-simple-reorder.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/shots/cfep-editor-390-light.png, /home/lyphe/.claude/claudecodeui_lyphe/.verify/shots/cfep-preview-pdf-390-light.png, /home/lyphe/.claude/claudecodeui_lyphe/.verify/shots/phase-34-light.png, /home/lyphe/.claude/claudecodeui_lyphe/.verify/verve-life-compare.sh
 
@@ -10207,7 +10249,7 @@ section: verification/009 What bites people/005 A gallery over the app must carr
 | **The surface probe reads a process that only lives for one turn** | `phase-21.mjs` polls `/proc/<pid>/environ` of the SDK child spawned for its one Claude turn, and that child exists only while the turn is in flight — it is gone by the time a reply is on screen. The poll has to start before the prompt is sent and keep running through it; a reading taken after the reply arrives finds no such pid and proves nothing. |
 | **Three sidebar readings are only as good as this host's data** | "↳ Show N older conversations" is *asserted*, and needs a project whose first page of sessions is not its whole history — a host without one reports a failure where there is an absence. The other two can only be noted: `messageCount` is `0` on every session server-side, so the "N messages" segment never renders, and no plugin is installed here — the registry reads `~/.claude-code-ui/plugins`, not this repo's `plugins/`, and it is empty — so the plugin tabs draw nothing to read. |
 | **Every signed-in page spends a real DeepSeek call, and no `page.route` can reach it** | `AccountFooterRow` mounts in the sidebar on every probe that signs in, and `useDeepseekBalance` reads on mount, every 180 s, and on each panel open — so each run makes the SERVER call `api.deepseek.com` with the host's own key. It is a read that moves nothing and costs no tokens, but it is a third-party origin that the browser-context stubs above do not and cannot cover: the page only ever sees the same-origin `/api/deepseek/balance`. A probe that needs the figure to be a known value — or needs the vendor left alone — fulfils **that path**, never the vendor's. Its contract is at [docs/MANUAL.md (deepseek-balance)](MANUAL.md). |
-| **Nothing in `all.mjs` measures the DeepSeek balance** | It is the one surface here with no `phase-<n>.mjs`: `phase-13.mjs` predates it and asserts nothing about it, so the figure could vanish from the row and the panel with the standing gate still green — and the shots `13-footer` and `13-popover` would carry the change without a gate reading it. The procedure that does prove it, and the vendor-body table that seeds the missing script, are [docs/MANUAL.md (deepseek-balance)](MANUAL.md) §"Proving it". |
+| **Nothing in `all.mjs` measures the DeepSeek balance** | It is the one surface here with no `.verify` script: no gate reads the account row or panel where the figure sits, so the figure could vanish from both with every standing gate still green. The procedure that does prove it, and the vendor-body table that seeds the missing script, are [docs/MANUAL.md (deepseek-balance)](MANUAL.md) §"Proving it". |
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/shared/claude-cli-path.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/main.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Collapsible.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/uiPreferences.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/console.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/shapes-fixture.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/ntfy/settings-probe.mjs
 
@@ -10331,7 +10373,7 @@ section: The dispatcher types — the store's document, mirrored in two files/00
   `store_arcs.arc_word`: `empty`, `complete`, `judging`, `live`, then its plans' own waiting word —
   `scheduled`, `paused`, `queued` — else `designing`), `plans` (NAMES, in the
   arc file's order) and the arc's own `created_at`, `completed_at`, `cost_usd`, `tokens`, `tokens_in`,
-  `tokens_out`, `tokens_cache_read`, `runtime_s` (below), PLUS the three readings an arc's own controls are drawn by (`report_arcs.walking` /
+  `tokens_out`, `tokens_cache_read`, `runtime_s` (below) — the epic's books: each feature's figures cut at the moment it joined the epic, a feature born in it counted whole (INV-7357) — PLUS the three readings an arc's own controls are drawn by (`report_arcs.walking` /
   `.stopped` / `.hour`, MAN-5220): `walking: boolean` (does the arc have a `live` plan — walking, or
   approved and unpaused and waiting its turn — what its Pause is drawn for), `stopped: boolean` (a plan
   reading `paused`, `queued` or `scheduled`: approved, paused and unfinished — what its Start and its
@@ -10341,7 +10383,7 @@ section: The dispatcher types — the store's document, mirrored in two files/00
   verb reach the same plans. An arc still has no phases and no events; a plan carries no `plans`.
   `walking` and `stopped` are read through `flagSince` and `schedule` through `textSince`, so an older
   frame reads false / null and the header simply offers no arc verbs rather than failing to load.
-- `runtime_s: number` rides `DispatcherPlan` and `DispatcherArc`: how long at least one agent was out on the plan, or on the epic (the union over its plans' intervals and its own outings, never their figures added), in whole seconds, derived at the dispatcher's reading time (`report_runtime`, MAN-7770). Both readers read it through `countSince` (an older build's frame reads `0`). It moves on every read of a thing with an agent out, so `dispatcher-watcher.service.ts`'s `changeOf` leaves it out of its comparison (MAN-5633) and the card ticks it between frames while an agent is out on it (`WorkingPill`, MAN-6789).
+- `runtime_s: number` rides `DispatcherPlan` and `DispatcherArc`: how long at least one agent was out on the plan, or on the epic (the union over its plans' intervals, each clipped at the feature's join moment, and its own outings, never their figures added), in whole seconds, derived at the dispatcher's reading time (`report_runtime`, MAN-7770). Both readers read it through `countSince` (an older build's frame reads `0`). It moves on every read of a thing with an agent out, so `dispatcher-watcher.service.ts`'s `changeOf` leaves it out of its comparison (MAN-5633) and the card ticks it between frames while an agent is out on it (`WorkingPill`, MAN-6789).
 - `tokens_cache_read: number | null` rides `DispatcherStage`, `DispatcherPhase`, `DispatcherPlan` and
   `DispatcherArc` beside `tokens_in`: the part of it SERVED from the prompt cache (`costs.claude_cache_read`,
   summed by `report.usage_sum`), the numerator of the `in` pill's `(97% cache)` (MAN-1557, INV-4299). NULL
@@ -10470,6 +10512,8 @@ Every choice list is `census.choices`; the panel spells no model or effort word.
 | Defaults · model | one chip per `choices.models`; `defaults.model` selected | `{model}` |
 | Defaults · effort | one list per model: `none` + `choices.efforts`; `none` = no `--effort` flag, labelled "None · the CLI’s own (<`cli_effort`>)", bare when `cli_effort` is null | `{effort: {<model>: word\|null}}` |
 | Defaults · DeepSeek effort | one list over `choices.efforts`; hint "DeepSeek maps xhigh to high; only max raises it" (INV-4899) | `{deepseek_effort}` |
+| Defaults · Dactyls | `AgentLaunchDactylField`: the runner's Dactyls switch at its head (`~/.claude/state/dactyls.flag`, Hephaestus alone — MAN-8059; its own hook `useDactylsSwitch`, never the census's save; Try again in the switch's slot while the position is unknown; a warn Waiting line when the installed Claude Code cannot serve the model chosen, re-asked when a save of the words lands), then two lists: the model over `choices.dactyl_models` (no Default, no `none`: neither word can be cleared) and the effort over `choices.efforts`; hint "A model id runs only once the installed Claude Code knows it; haiku is the CLI’s own alias and always runs" | the switch: `PUT /api/settings/dactyls`; the words: `{dactyl_model}` / `{dactyl_effort}`, one word at a time; the word already in force writes nothing |
+| Defaults · Summarizer | the Dactyls field's twin, `AgentLaunchSummarizerField`: the model over `choices.summarizer_models` (no Default, no `none`) and the effort over `choices.efforts`; hint "The model that writes a chat’s compaction while Custom compaction is on; a model id runs only once the installed Claude Code knows it, and the Custom compaction row in Settings → Agents says whether this one does" | `{summarizer_model}` / `{summarizer_effort}`, one word at a time; the word already in force writes nothing |
 | Souls | one row per `kind: "soul"`, census order (by name); count badge and "N pinned" | — |
 | Metis | the `kind: "metis"` row, last, in its own section | — |
 
@@ -10511,9 +10555,9 @@ Every choice list is `census.choices`; the panel spells no model or effort word.
 | 48rem – 64rem | 2: name and stacked controls beside the lanes |
 | < 48rem | 1 |
 
-The query is the panel's own width (`container-type` on the root). Defaults: 3 fields from 48rem, stacked below. Below 30rem each Select list anchors to its trigger's right edge (MAN-7427 §"rules").
+The query is the panel's own width (`container-type` on the root). Defaults: 5 fields on two columns from 48rem (three across cuts a model id and the `none` label at the 48rem panel; four across cuts `none` at a 1152px one): the Default effort takes the right column across the rows of the chips and the DeepSeek effort (`row-span-2`), and the Dactyls field and the Summarizer sit abreast under them; stacked below. Below 30rem each Select list anchors to its trigger's right edge (MAN-7427 §"rules").
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/agent-launch/AgentLaunchChoice.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/agent-launch/AgentLaunchDefaults.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/agent-launch/AgentLaunchLanes.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/agent-launch/AgentLaunchNotices.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/agent-launch/AgentLaunchPanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/agent-launch/AgentLaunchRowItem.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/agent-launch/hooks/useAgentLaunch.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/agent-launch/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/command-palette/CommandPalette.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/hooks/useProjectsState.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/ProjectCommandPalette.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/WorkspaceMain.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/WorkspaceTabs.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/agent-launch-types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/agent-launch/AgentLaunchChoice.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/agent-launch/AgentLaunchDactylField.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/agent-launch/AgentLaunchDefaults.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/agent-launch/AgentLaunchLanes.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/agent-launch/AgentLaunchNotices.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/agent-launch/AgentLaunchPanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/agent-launch/AgentLaunchRowItem.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/agent-launch/AgentLaunchSummarizerField.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/agent-launch/hooks/useAgentLaunch.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/agent-launch/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/command-palette/CommandPalette.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/hooks/useProjectsState.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/ProjectCommandPalette.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/WorkspaceMain.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/WorkspaceTabs.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/agent-launch-types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts
 
 ## MAN-7418 — /api/agent-launch — the three routes and their bodies, refused 400 · unreachable 503 · unreadable 502, LAUNCH_TABLE_BIN, Metis's resolve
 
@@ -10525,7 +10569,7 @@ Mount: `app.use('/api/agent-launch', authenticateToken, createAgentLaunchModule(
 |---|---|---|
 | `GET /api/agent-launch` | — | `launch-table show` |
 | `PUT /api/agent-launch/rows/:name` | `{model?: string\|null, effort?: string\|null}`; at least one field | `set <name> [--model M] [--effort E]`; `null` → `default` |
-| `PUT /api/agent-launch/defaults` | `{model?: string, effort?: {<model>: string\|null}, deepseek_effort?: string}`; at least one field | `defaults [--model M] [--effort <model>=<E\|none>]... [--deepseek-effort E]`; `null` → `none` |
+| `PUT /api/agent-launch/defaults` | `{model?: string, effort?: {<model>: string\|null}, deepseek_effort?: string, dactyl_model?: string, dactyl_effort?: string, summarizer_model?: string, summarizer_effort?: string}`; at least one field | `defaults [--model M] [--effort <model>=<E\|none>]... [--deepseek-effort E] [--dactyl-model W] [--dactyl-effort E] [--summarizer-model W] [--summarizer-effort E]`; `null` → `none`; the dactyl's two and the summarizer's two cannot be cleared, and the CLI says so in a sentence |
 
 - A 200 body is the census the CLI printed, whole. A PUT answers the census read back AFTER the write, never the input (MAN-628).
 - `:name` matches `^[a-z][a-z0-9_]{0,63}$`. The routes check transport shape only; the vocabulary is Python's, so `PUT /rows/hermes` with `{"effort":"loud"}` answers 400 carrying the CLI's sentence.
@@ -10568,7 +10612,7 @@ The Agent Chains panel's data path, its hook and the rules a change to either mu
 |---|---|
 | panel | `src/modules/agent-launch/AgentLaunchPanel.tsx`, re-exported lazily by `index.ts`, rendered only by `AgentChainsContent` (MAN-7427) |
 | panel props | `onClose?: () => void` (draws the header's close button) · `titleId?: string` (the id the `<h2>` carries, so the window is named by it) |
-| parts | `AgentLaunchNotices` (warnings, reach notice) · `AgentLaunchDefaults` · `AgentLaunchRowItem` · `AgentLaunchLanes` · `AgentLaunchChoice` |
+| parts | `AgentLaunchNotices` (warnings, reach notice) · `AgentLaunchDefaults` (mounts `AgentLaunchDactylField` and `AgentLaunchSummarizerField`, twins: a model list and an effort list each) · `AgentLaunchRowItem` · `AgentLaunchLanes` · `AgentLaunchChoice` |
 | hook | `useAgentLaunch()` → `{ census, error, saving, refresh, saveRow, saveDefaults }` |
 | types | `src/shared/agent-launch-types.ts`: the census key for key in the CLI's snake_case, plus `AgentLaunchRowChange` and `AgentLaunchDefaultsChange`; a rename there is a field the panel stops reading |
 
@@ -10579,7 +10623,7 @@ The Agent Chains panel's data path, its hook and the rules a change to either mu
 - The hook keeps every in-flight write by name, oldest first; each write releases only its own entry. The same name pressed twice holds twice. The panel holds one row at a time: with two saves open the older row is live again.
 - A read that a newer call overtook is dropped (`epoch`): a reload begun before a save cannot land after it and restore the old picture. Writes are never dropped.
 - `readCensus(response)` wraps `readApiJson`: the server's `{ error }` passes through; a body that is not JSON, or is JSON that fails `isCensus`, throws "The launch table's API did not answer with a census (HTTP <status>)." Read and both writes use it.
-- `isCensus` is shallow on purpose: it checks `state`, `problems`, `rows`, `choices.models`, `choices.efforts`, `defaults.effort` only. A field the panel starts to dereference belongs in it only if a body missing it could blank the window.
+- `isCensus` is shallow on purpose: it checks `state`, `problems`, `rows`, `choices.models`, `choices.efforts`, `choices.dactyl_models`, `choices.summarizer_models`, `defaults.effort` only; the two model lists are there because the Dactyl and Summarizer fields map them, so a census from a CLI older than the client gets the retry card and not a blank window. A field the panel starts to dereference belongs in it only if a body missing it could blank the window.
 
 ## rules
 - **A held row is not disabled.** A row or the Defaults block being saved is dimmed, pointer switched off, `aria-busy`, and its handlers return early. `disabled` or `fieldset disabled` drops keyboard focus off the trigger; a held row must not use either.
@@ -11858,11 +11902,13 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/LockAnswe
 |---|---|---|
 | `DispatcherAskBell` | `src/modules/dispatcher/DispatcherAskBell.tsx` | mounted by `DispatcherFeed` beside `{children}`; returns `null`; calls `playNotificationSound()` (tones 740 Hz then 988 Hz) |
 | `useDispatcherPlans().waiting` | `src/modules/dispatcher/hooks/useDispatcherPlans.ts` | distinct open asks, by `askIdentity`, across the DRAWN plans |
+| `useDispatcherPlans().tone` | `src/modules/dispatcher/hooks/useDispatcherPlans.ts` | the lane's one mark for the tab dot and the Runs badge: `warn` while `waiting > 0`, else `info` while a drawn plan is `live` or a planner outing is `out`, else `positive` when every drawn plan is `complete`, else `neutral`; `null` with nothing drawn. Running outranks finished (operator, 2026-10-08: the accent dot is the done-green, and an epic in flight read as finished) |
 | `TabItem.attention` | `src/shared/ui/Tabs.tsx` | a sentence; while set, the tab's mark takes `data-tone="warn"` and the title carries it |
-| `TabsMore` / `MoreFace` `warn` | `src/shared/ui/TabsMore.tsx` | the trigger's dot takes `data-tone="warn"`; `Tabs` passes `collapsed.some(attention)` |
-| `.vv-tabs__dot[data-tone="warn"]` | `src/shared/ui/verve/feedback.css` | `background: var(--warn-dot)`; the ring is untouched |
+| `TabItem.tone` | `src/shared/ui/Tabs.tsx` | the mark's register while nothing waits on the operator; `markTone` = `attention ? 'warn' : tone`; absent wears the accent. `WorkspaceTabs` sets it for `runner` from `runnerTone` |
+| `TabsMore` / `MoreFace` `tone` | `src/shared/ui/TabsMore.tsx` | the trigger's dot takes the most urgent mark among the collapsed tabs that draw one; `Tabs` passes `collapsedTone(collapsed)` (danger › warn › info › positive › neutral) |
+| `.vv-tabs__dot[data-tone]` | `src/shared/ui/verve/feedback.css` | `background: var(--tone-dot)` (tokens.css `[data-tone]`); the ring is untouched |
 | `runnerWaiting` | `useWorkspaceTabGates` → `ProjectSidebarRegion` → `WorkspaceTabs` | `attentionFor('runner')` = `t('runner.waiting', { count })` while `runnerWaiting > 0` |
-| `GutterWidgetFrame.countTone` | `src/modules/chat-gutters/GutterWidgetFrame.tsx` | the header badge's tone, default `info`; `ChatGutterLayout` passes `warn` for `runner` while `waiting > 0` |
+| `GutterWidgetFrame.countTone` | `src/modules/chat-gutters/GutterWidgetFrame.tsx` | the header badge's tone, default `info`; `ChatGutterLayout` passes `useDispatcherPlans().tone` for `runner` |
 
 Rules:
 1. One ring per picture carrying at least one identity the mount has not heard, however many are new. The chime never says how many.
@@ -13404,3 +13450,144 @@ The workspace's second landing, beside `?runner=<plan>` (MAN-7531). The hook's s
 - Counts console errors only from each page's own life: a chat fetch aborted by `goto` leaving the previous page is not a finding.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/hooks/useRunnerLanding.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/RoadmapTab.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/constants.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-roadmap-landing.mjs
+
+## MAN-8059 — The Dactyls switch — the runner flag, the readiness beside it, and the field in Edit Agent Chains
+
+`~/.claude/state/dactyls.flag` is the operator's switch for handing Hephaestus's code edits to dactyls (MAN-8044) — his alone: Iris is a builder too and builds by hand (the operator's word, 2026-10-08), and the runner's gate names him by shim (`switch.AGENT`, MAN-8063). CloudCLI writes it; no soul does. The runner re-reads it at every Hephaestus launch, so a flip reaches his next launch with nothing restarted.
+
+## The file
+| fact | value |
+|---|---|
+| writer / reader | `server/modules/settings/dactyls-switch.ts` through `readFlagFile` / `writeFlagFile` (`deepseek-flash-switch.ts`, MAN-628): one mechanism, another path |
+| predicate | the family's: present, ≤256 bytes, trimmed content exactly `on`; absent, `ON`, empty, oversize = OFF |
+| path seam | `PLAN_RUNNER_DACTYLS_FLAG_PATH`, read at every call (a function, not a constant), made absolute with `path.resolve(expandHome(..))` — as `switch.flag_path` does on the Python side |
+| default path | `~/.claude/state/dactyls.flag` |
+
+## The route
+- `GET /api/settings/dactyls` and `PUT /api/settings/dactyls` (`settings.routes.ts`); body `{"enabled": boolean}`.
+- Both answer `{enabled, model, effort, ready, why}`. `enabled` is READ BACK off the file, never the input.
+- Non-boolean `enabled` (absent, `"yes"`) = 400 `INVALID_DACTYLS_STATE`, `enabled must be a boolean`; the file is untouched. Unauthenticated = 401 (the `/api/settings` mount).
+- Host-wide: no `userId` is read.
+- `settings.service.ts` `getDactyls` / `setDactyls` delegate verbatim to `getDactylsState` / `setDactylsState` (the service file is over its ceiling and takes call-in lines only).
+- No `dispatcher kick` on a flip (cf. MAN-1497 §"THE KICK"): nothing queues on this switch.
+
+## Position and readiness are two facts
+| fact | owner | source |
+|---|---|---|
+| `enabled` | the operator | the flag file |
+| `model`, `effort`, `ready`, `why` | the installed Claude Code | `~/.claude/scripts/dactyl --status`, asked on every GET and every PUT |
+
+- Readiness is never re-derived here: the verb scans the installed binary at every ask.
+- `dactylsStatus()`: `execFile` of the absolute verb path, `cwd` = home, 15 s bound (`STATUS_TIMEOUT_MS`), env = `userFacingEnv()` whole (carries `LAUNCH_TABLE_PATH`, `PLAN_RUNNER_CLAUDE_BIN` and the flag seam, so a probe server on scratch copies gets a status from those copies).
+- Reads the last stdout line as JSON `{switch, model, effort, ready, why, cli}`; takes `model`/`effort`/`why` as strings and `ready` as boolean.
+- Any failure (no verb, timeout, non-zero exit, non-JSON, any field mistyped) = all four `null`, logged on the server as `dactyl --status failed: <cause>`. A partly-typed answer is not trusted field by field.
+- `null` = "could not ask": never off, never `ready: false`.
+- On while `ready` is false = armed, not broken: Hephaestus works as before until the CLI can serve the `[dactyl]` model.
+
+## The client
+- `api.settings.dactylsSwitch()` / `saveDactylsSwitch({ enabled })` (`src/shared/api.ts`).
+- `src/shared/hooks/useDactylsSwitch.ts` is the one reader and writer in `src/`: `{enabled, unreadable, model, effort, ready, why, saving, setEnabled, refresh}`.
+- `enabled: null` = no read has succeeded; `unreadable` = a read came back with nothing. Neither is OFF.
+- A detail the body leaves out or mistypes is `null` by itself; a body whose `enabled` is not a boolean (an error answer is `{success:false,…}`, which parses) is no reading at all. The field says a `null` in words rather than drawing it as off or as not ready.
+- Module-level state, one flag = one order of answers: `epoch`, `inFlight`/`waiting` (one read at a time, a second ask folds into the run under way), `writing` (a second flip is dropped).
+- A read that fails is retried once after 1200 ms (`READ_RETRY_MS`).
+- A reading is delivered only if `epoch` did not move since it was asked, no newer ask is queued, AND no write is out (`writing`). why: a tab return fires `focus` and `visibilitychange`; the queued second read, stamped after a press bumped `epoch`, drew the old side for the whole PUT.
+- `setEnabled`: optimistic, then corrected by the body the PUT answered. A failed write is re-read, never inverted to `!next`; a failed re-read drops the position (`forgetPosition`: all `null`, `unreadable`).
+- Re-ask on mount, `focus` and `visibilitychange` (skipped while `writing`). No timer, no poll. why: the update to Claude Code lands on a shell while Settings is closed.
+
+## The field
+- The switch is drawn in Edit Agent Chains (Settings → Agents → Agent chains → Edit Agent Chains → Defaults), at the head of the Dactyls field, `src/modules/agent-launch/AgentLaunchDactylField.tsx` (MAN-7417) — beside the `[dactyl]` words its children run on, because it is one soul's switch and not the host's (operator, 2026-10-08: "it's specifically only for Hephaestus; it should be inside of Edit Chains"). The field's position comes from `useDactylsSwitch`, its own route; the two words' save is the census's (`PUT /api/agent-launch/defaults`). Handle `data-runner-dactyls="unknown|on|off"` on the field root (`data-agent-default-dactyl`).
+- The readiness is asked again (`refresh`) when a save of the words lands — the block's `held` falling — because it is about the model just chosen.
+- Strings under `agentLaunch.defaults` in `common.json`: `dactyl` (the heading), `dactylSwitch` (the switch's accessible name), `dactylOn`, `dactylWaiting`, `dactylReadinessUnread`, `dactylUnreadable`, `dactylLoading`, and the lists' `dactylModel`, `dactylEffort`, `dactylModelLabel`, `dactylEffortLabel`, `dactylHint`.
+
+Words it shows (`common.json`, `agentLaunch.defaults`):
+| key | text |
+|---|---|
+| `dactyl` | Dactyls |
+| `dactylSwitch` | Dactyls for Hephaestus |
+| `dactylOn` | On: Hephaestus on Claude reads, decides and verifies, and every code edit is one dactyl’s — a child on the words below that sees only its brief and the one file. Iris and every other soul build by hand; Hephaestus on DeepSeek Flash is untouched. Takes effect on his next launch. |
+| `dactylWaiting` | Waiting: `<why>`. Hephaestus works as before until it can. |
+| `dactylReadinessUnread` | Whether this Claude Code can serve a dactyl could not be read. |
+| `dactylUnreadable` | The switch could not be read from the server, so its position is unknown — this is not the same as off. It is retried whenever this window regains focus. |
+| `dactylHint` | A model id runs only once the installed Claude Code knows it; haiku is the CLI’s own alias and always runs |
+
+| state | drawn |
+|---|---|
+| `enabled === null`, not `unreadable` | `Loading…`, Try again in the switch's slot |
+| `enabled === null`, `unreadable` | the `dactylUnreadable` sentence, Try again in the switch's slot (`refresh`) |
+| `enabled` known | the kit `Switch` (never `disabled` mid-write) and the `dactylOn` sentence |
+| known, `ready === false` and `why` non-empty | plus a warn-tone `data-dactyls-waiting` line: `Waiting: <why>. Hephaestus works as before until it can.` — in either position; `<why>` through `WholeWords` (`src/shared/ui`), each hyphenated word held whole |
+| known, `ready !== true` and no waiting line (`null`, or not ready with no `why`) | plus a `data-dactyls-unread` line, plain words; never drawn as waiting |
+| `ready === true` | nothing added |
+
+## Probe seams
+| seam | use |
+|---|---|
+| `PLAN_RUNNER_DACTYLS_FLAG_PATH` | a scratch flag; the verb reads the same variable |
+| `LAUNCH_TABLE_PATH` | a table copy whose `[dactyl]` words differ |
+| `PLAN_RUNNER_CLAUDE_BIN` | a scratch Claude Code tree, to draw the Waiting line on a box whose CLI is ready |
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/settings/dactyls-switch.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/settings/settings.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/settings/settings.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/agent-launch/AgentLaunchDactylField.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/useDactylsSwitch.ts, /home/lyphe/.claude/state/dactyls.flag
+
+## MAN-8061 — The Custom compaction switch — the flag, the summarizer's readiness beside it, the client and the row
+
+`~/.claude/state/custom_compaction.flag` is the operator's switch for having a CloudCLI chat's compaction written by the launch table's `[summarizer]` words instead of the CLI's. CloudCLI writes it; no soul does. `modules/compaction` reads it at every message through the settings barrel (`readCustomCompactionSwitch`), so a flip reaches each chat at its next message with nothing restarted. Built in the Dactyls switch's shape (MAN-8059): same mechanism, another path.
+
+## The file
+| fact | value |
+|---|---|
+| writer / reader | `server/modules/settings/custom-compaction-switch.ts` through `readFlagFile` / `writeFlagFile` (`deepseek-flash-switch.ts`, MAN-628) |
+| predicate | the family's: present, ≤256 bytes, trimmed content exactly `on`; anything else = OFF |
+| path seam | `CUSTOM_COMPACTION_FLAG_PATH`, read at every call, made absolute with `path.resolve(expandHome(..))` |
+| default path | `~/.claude/state/custom_compaction.flag` |
+
+## The route
+- `GET /api/settings/custom-compaction` and `PUT /api/settings/custom-compaction` (`settings.routes.ts`); body `{"enabled": boolean}`.
+- Both answer `{enabled, model, effort, ready, why}`. `enabled` is READ BACK off the file, never the input.
+- Non-boolean `enabled` = 400 `INVALID_CUSTOM_COMPACTION_STATE`, `enabled must be a boolean`; the file is untouched.
+- `settings.service.ts` `getCustomCompaction` / `setCustomCompaction` delegate verbatim to `getCustomCompactionState` / `setCustomCompactionState`.
+- No `dispatcher kick` on a flip: nothing queues on this switch.
+
+## Position and readiness are two facts
+| fact | owner | source |
+|---|---|---|
+| `enabled` | the operator | the flag file |
+| `model`, `effort`, `ready`, `why` | the installed Claude Code | `~/.claude/scripts/summarize --status`, asked on every GET and every PUT |
+
+- Readiness is never re-derived here (INV-5703: CloudCLI parses no launch table).
+- `summarizerStatus()` (also exported through the settings barrel for `modules/compaction`): `execFile` of the absolute verb path, `cwd` = home, 15 s bound, env = `userFacingEnv()` whole.
+- Takes the last stdout line as JSON; `model`, `effort`, `why` strings, `ready` boolean, `cli` object `{path, size, mtime_ns, version}` — any field missing or mistyped = `null` whole, logged `summarize --status failed: <cause>`.
+- `null` = "could not ask": never off, never `ready: false`.
+- On while `ready` is false = armed, not broken: chats compact as before until the CLI can serve the summarizer's model.
+
+## The client
+- `api.settings.customCompactionSwitch()` / `saveCustomCompactionSwitch({ enabled })` (`src/shared/api.ts`), after the Dactyls pair.
+- `src/shared/hooks/useCustomCompactionSwitch.ts` is the one reader and writer in `src/`: `{enabled, unreadable, model, effort, ready, why, saving, setEnabled, refresh}`. Same contract as `useDactylsSwitch` (MAN-8059 §"The client"): module-level `epoch`, one read at a time (`inFlight`/`waiting`), `writing` drops a second flip, a failed read retried once after 1200 ms, a failed write re-read and never inverted, a failed re-read = `forgetPosition`.
+- `enabled: null` = no read has succeeded; `unreadable` = a read came back with nothing. Neither is OFF.
+- A detail the body leaves out or mistypes is `null` by itself; a body whose `enabled` is not a boolean is no reading at all.
+- A reading is delivered only if `epoch` did not move, no newer ask is queued, AND no write is out (`!writing`; INV-7367's cure).
+- Re-ask on mount, `focus` and `visibilitychange` (skipped while `writing`). No timer, no poll. why: a Claude Code update lands on a shell while Settings is closed.
+
+## The row
+- `RunnerCompactionRow.tsx` (Settings → Agents → Claude → Account), drawn by `RunnerModelContent.tsx` directly under `RunnerDactylsRow`. Wears lucide `Shrink` (the composer's Compact button glyph). Handle `data-runner-compaction="unknown|on|off"`; the three cases list carries `data-compaction-cases`.
+- Strings under `agents.runnerCompaction` in `src/modules/i18n/locales/en/settings.json`: `label` (Custom compaction), `description` (model and effort interpolated), `descriptionBare` (when `model` or `effort` is `null`), `whenPressed`, `atTurnEnd`, `whenIdle`, `after`, `waiting`, `readinessUnread`, `unreadable`.
+- The three cases: Compact / `/compact` pressed; a turn's end past half the context window; 54 idle minutes holding 200K tokens or more.
+- `WholeWords.tsx` keeps the `why` sentence and a model id unbroken.
+
+| state | drawn |
+|---|---|
+| `enabled === null`, not `unreadable` | `Loading...`, Try again in the control slot |
+| `enabled === null`, `unreadable` | the `unreadable` sentence, Try again in the control slot (`refresh`) |
+| `enabled` known | the toggle (`SettingsToggle`, never `disabled` mid-write), the lead sentence, the three cases, the `after` paragraph |
+| `ready === false` and `why` non-empty | plus a warn-tone `data-compaction-waiting` line: `Waiting: <why>. Chats compact as before until it can.` — in either position |
+| `ready !== true` and no waiting line | plus a `data-compaction-unread` line, plain words; never drawn as waiting |
+| `ready === true` | nothing added |
+
+## Probe seams
+| seam | use |
+|---|---|
+| `CUSTOM_COMPACTION_FLAG_PATH` | a scratch flag; a probe never presses the live row |
+| `LAUNCH_TABLE_PATH` | a table copy whose `[summarizer]` words differ |
+| `PLAN_RUNNER_CLAUDE_BIN` | a scratch Claude Code tree, to draw the Waiting line on a box whose CLI is ready |
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/settings/custom-compaction-switch.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/agents-settings/sections/content/RunnerCompactionRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/useCustomCompactionSwitch.ts, /home/lyphe/.claude/state/custom_compaction.flag

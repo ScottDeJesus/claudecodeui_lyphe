@@ -336,10 +336,10 @@ Module internals of the `/api/agent-launch` relay. Its contract (routes, bodies,
 | check | value |
 |---|---|
 | row name | `^[a-z][a-z0-9_]{0,63}$`; a shape, not a soul whitelist |
-| word (model, effort, model key) | `^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$`; a token fence, not the vocabulary — `-` first would read as a CLI flag |
+| word (`model`, `effort`, an `effort` map key, `deepseek_effort`, `dactyl_model`, `dactyl_effort`, `summarizer_model`, `summarizer_effort`) | `^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$`; a token fence, not the vocabulary — `-` first would read as a CLI flag; the dactyl's two and the summarizer's two have no `null` |
 | unknown body key | 400 |
 | `effort` map | at most 16 models (`EFFORT_MAP_MAX_ENTRIES`); more would overrun the OS argv limit; `{}` counts as no field |
-| no field named | 400 "name at least one of …" |
+| no field named | 400 "name at least one of …" (the defaults route's sentence lists all seven fields) |
 
 Which words the table accepts is the CLI's to say; its sentence reaches the caller.
 
@@ -361,7 +361,9 @@ An error thrown outside these branches goes to the app's error handler.
 ## shared types — `server/shared/types.ts`
 `AgentLaunchResult<T>` · `AgentLaunchResolved` · `AgentLaunchRowChange` · `AgentLaunchDefaultsChange`.
 
-The client mirror is `src/shared/agent-launch-types.ts`: the census key for key in the CLI's snake_case, plus `AgentLaunchRowChange` and `AgentLaunchDefaultsChange`.
+`AgentLaunchDefaultsChange` = `{model?, effort?, deepseek_effort?, dactyl_model?, dactyl_effort?, summarizer_model?, summarizer_effort?}`; the argv flags are `--dactyl-model` / `--dactyl-effort` and `--summarizer-model` / `--summarizer-effort`.
+
+The client mirror is `src/shared/agent-launch-types.ts`: the census key for key in the CLI's snake_case (`choices.dactyl_models`, `choices.summarizer_models`, `defaults.dactyl_model`, `defaults.dactyl_effort`, `defaults.summarizer_model`, `defaults.summarizer_effort` included), plus `AgentLaunchRowChange` and `AgentLaunchDefaultsChange`.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/agent-launch/agent-launch.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/agent-launch/agent-launch.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/agent-launch/agent-launch.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/agent-launch/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/agent-launch-types.ts
 
@@ -2420,3 +2422,165 @@ Photographs the two words a diagnosis tells the sheet — `when` (what promotion
 Photographs, into the evidence dir: `promote-when-warn-<w>x<h>.png`, `diagnosis-scope-history-<w>x<h>.png`; `sheet-did-not-open.png` when the sheet never opens.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/cerberus-diagnosis-words-shot.mjs
+
+## MAN-8065 — modules/compaction procedure — one run, the steps, Stop by phase, automatic refusals and the failure push
+
+`compact()` (`compaction-procedure.ts`) is one compaction run. The decorator hands it the run's own writer: every frame goes to that writer, so the gateway sequences it, replays it to every tab and shows it on the processing line. The old transcript is never written; the chat's row moves only inside `swapToCompactedSession` (MAN-8046).
+
+## The steps
+1. Session row. No `provider_session_id` / `jsonl_path` → error frame `This chat has no transcript to compact yet.`, `complete` exit 1.
+2. Guard `waitUntilQuiet`. Manual waits, subscribed to `activityChanged` BEFORE its first read (no timer, no poll), re-saying `Compaction waits until <why> — Stop cancels it` as the reason moves. Automatic never waits: busy → logged `left alone: the chat is busy (<why>)`, `complete` exit 0.
+3. Fresh `summarizerStatus()` → `noteSummarizerStatus`. Not ready → `refusedByReadiness`. Else status frame `Compacting with <model> · <effort>…`.
+4. `fireCompactHealTrigger`: `python3 ~/.claude/hooks/heal_trigger.py --reason compact`, the CLI's PreCompact payload with the OLD session id and transcript, 10 s bound, a failure is one log line. It fires before the verb: a refused or failed attempt fires it too.
+5. `runSummarizeVerb`: `~/.claude/scripts/summarize --transcript <path> --session <id> [--instructions -]`; 60-minute ceiling; SIGTERM, SIGKILL after 15 s; stdout cap 64 MiB. Only `signalOwnChild` signals, and only a plain pid above 1 of a child not yet exited.
+6. Verb answer:
+
+| answer | do |
+|---|---|
+| exit 0, JSON `{seed: [string, string], model, served[], effort, chunks, tokens_in, tokens_out}` | success |
+| exit 3 | `refusedByReadiness` |
+| exit 2 | `refuseAutomatic`; error frame; no push |
+| any other exit, or exit 0 whose JSON does not read | error frame `Compaction failed: <sentence>. The chat stays on its current session.`, `complete` exit 1, push |
+
+7. Live rows before the seed turn: the `compaction` row, then the summary row (`isCompactSummary`). Ids `compaction-<oldProviderSessionId>` and `compaction-summary-<oldProviderSessionId>` equal the history's, so the post-run refresh replaces them.
+8. Seed turn: `inner.run('claude', '', …)` with the triggering send's options minus `attachments`, `images`, `files`, `compactionTrigger`, plus `resumeFromScratch: true`, `promptBlocks: seed`, `compactionSeed: true`. `createSeedWriter` calls `swapToCompactedSession` at the first announced id other than the old one, before forwarding it, and holds the turn's `complete`.
+9. Success = swapped AND held `complete` exit 0 AND not aborted: `setCompactionPostTokens` with the last `token_budget.used`, then forward the held `complete`. Anything else:
+   - `inner.abort('claude', sessionId)` retires the seed's process (skipped after a Stop, which already did). why: it is registered under the chat's key; left alive, the next message joins it on the seed session while the row says the old one.
+   - `unswapCompactedSession` (records the seed `compaction-abandoned`) when the swap was written; a swap that failed parks the unclaimed seed as superseded.
+   - error frame, `complete` exit 1, push.
+
+`refusedByReadiness`: `noteVerbNotReady`, `refuseAutomatic`. Manual → status `Custom compaction is not ready (<why>); the CLI compacts this chat instead.` then `inner.run('/compact', …)` on the same run and writer. Automatic → logged `left alone: the summarizer is not ready`, `complete` exit 0.
+
+`compact()` never rejects: a thrown step is an error frame, `complete` exit 1 and a push.
+
+## Stop and the flight
+A flight is `{trigger, phase: waiting|summarizing|seeding, stopped, stop}`; `flight.stop` is replaced per phase. After a Stop the run writes nothing more (`emit` gates on `flight.stopped`) and pushes nothing.
+
+| phase | Stop does | result |
+|---|---|---|
+| waiting | ends the guard | no compaction |
+| summarizing | SIGTERM to the verb's child (the verb passes it on) | no verb or summarizer child left |
+| seeding | `inner.abort`; the procedure takes a written swap back | chat stays on its old session; abandoned seed = `compaction-abandoned` |
+
+- `flightOf(sessionId)` = in flight AND not stopped. A stopped flight stays registered until its verb exits; the next turn's Stop must reach `inner.abort`. Code needing "still registered" must not use `flightOf`.
+- `stopFlightsBeforeSeed()` stops every flight not yet seeding (shutdown).
+
+## Automatic refusals
+`refuseAutomatic(sessionId)` stamps the chat with `switchFlipCount()`. The triggers leave the chat alone until the count differs from the stamp (a switch flip) or a manual Compact runs (`liftAutomaticRefusal`). Set by exit 2 and by not-ready. A chat holding only a seed plus one exchange gets exit 2 (nothing to compact yet).
+
+## The failure push
+Code `compaction.failed`, `kind: 'error'`, `severity: 'error'`, `meta {trigger, reason}`, `dedupeKey claude:compaction:failed:<sessionId>`. Wording lives in `notification-copy.service.ts` (MAN-622). Sent for an automatic trigger with an unstopped flight. Not sent for: manual, a Stop, exit 2, not-ready.
+
+## Probing
+`node .verify/custom-compaction-chat.mjs --app <scratch client url> --api <probe api url> --leg manual|background|turn|wait|delete [--chat <id>] [--turns N] [--runs M] [--seconds S] [--evidence <dir>] [--server-log <file>]`; Haiku chats in the scratch project under `/tmp`.
+- Boot the probe server with `CUSTOM_COMPACTION_FLAG_PATH` on a scratch flag, never the live `~/.claude/state/custom_compaction.flag`. `CUSTOM_COMPACTION_AUTO_FRACTION` / `CUSTOM_COMPACTION_IDLE_AFTER_MS` make the `turn` / `wait` legs reach a run.
+- The driver presses Compact in the composer's usage panel: typed `/compact` + Enter picks a built-in from the command palette.
+- Exposure (stated, not observed): a probe server booted with the switch on re-adopts the live keepalive hosts of real chats; a real chat past its fraction would be compacted at its turn end.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/compaction/compaction-children.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/compaction/compaction-facts.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/compaction/compaction-frames.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/compaction/compaction-guard.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/compaction/compaction-procedure.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/compaction/compaction-registry.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/compaction/compaction-seed.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notifications/services/notification-copy.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/custom-compaction-chat.mjs
+
+## MAN-8066 — modules/compaction triggers — turn end, idle, the pending wake, startRun, shutdown and the decision line
+
+`auto-trigger.ts` (`createAutoTrigger`) holds the runtime's `turnEnded` and `activityChanged` hooks and the idle deadline. Operator ruling 2026-10-08: compaction at 50% context on turn end only, never in the middle of work; idle compaction replaced by ours, the CLI's autocompact kept as the net. Nothing here compacts mid-turn, nothing polls, and with the switch off nothing here acts. The run it starts is MAN-8065.
+
+## The two triggers
+| trigger | fires when | default | env seam (read at the call) |
+|---|---|---|---|
+| turn end | `contextTokens ≥ fraction × contextWindow` | fraction 0.5 | `CUSTOM_COMPACTION_AUTO_FRACTION` |
+| idle | one unref'd timeout per chat, re-armed at every turn end, fires once; `contextTokens ≥ min` | 3,240,000 ms (54 min); min 200,000 | `CUSTOM_COMPACTION_IDLE_AFTER_MS`, `CUSTOM_COMPACTION_IDLE_MIN_TOKENS` |
+
+An override that is not a positive finite number falls back to the default. `IDLE_AFTER_MS` above 2,147,483,647 also falls back: Node clamps a larger `setTimeout` delay to 1 ms, which would fire at once.
+
+## Turn end
+`turnEnded(report)`: remember the context (`rememberTurnContext`), drop the chat's pending report, clear its idle deadline, then decide off `takeoverSnapshot()` (MAN-8067).
+
+| when | do |
+|---|---|
+| shutdown (`stopped`) | nothing |
+| snapshot `null` (nothing has asked since boot, e.g. a re-adopted chat's first turn end) | `compactionMode()` then decide again; slower, a queued message may take the session first, the next turn end retries |
+| snapshot `false` | nothing, no log |
+| `report.seed` | log `a seed turn arms nothing` |
+| otherwise | arm the idle deadline, then test the report below |
+
+Not due, tested in this order: turn aborted; context or window unknown; under the fraction (`not due: 3.3% of the window, due at 50.0%`); chat placed on a node; a flight in progress; chat under an automatic refusal. Due and `activity.busy` → kept as the chat's one pending report (`due, kept pending until the process goes quiet`). Due and quiet → `startRun(report, 'auto')` synchronously inside `turnEnded`: the turn's `complete` has gone out and the queued-message pass waits on a `setImmediate`, so the reservation lands first and a queued message lands in the new session.
+
+## The pending wake
+`activityChanged(sessionId, activity)` first hands the change to the guard's listeners (`publishActivity`), then, with a pending report and `activity.busy` false: take the report; snapshot `false` → stop; a run in progress, a flight or an automatic refusal → logged `pending compaction dropped: <why>`; else `startRun(report, 'auto')`.
+
+## The idle deadline
+Fires `fireIdleDeadline`: chat row gone → `forgetSession` and log; `contextTokens` null or under `min` → log; `takesOver` false → log; then, synchronously up to the start: a run in progress, process busy, a flight, a refusal → `left alone: <why>`; else `idle, starting the compaction` and `startRun(report, 'idle')`. A server restart drops every deadline; the chat's next turn end arms it again.
+
+## `startRun`
+`runDetachedChatTurn({ sessionId, userId, content: '/compact', options: {...report.sendOptions, compactionTrigger}, beforeRun })` with the DECORATOR as runtime, so its `/compact` test sees the run.
+- `beforeRun` sets `run.completionAlreadyRecorded = true`: the run does not stamp `last_completed_at`, so no unread dot lights on a chat the operator read. Listeners still hear the run end.
+- That skips the registry's sidebar broadcast too, so when the outcome is `started` the trigger calls `broadcastSessionUpserted(sessionId)`: an open tab refetches and sees the marker's "after" figure.
+- Outcome not started → logged `did not start: <error>`.
+- A detached run has no socket: an open tab shows the processing state, then the refreshed history, never live frames. Watching them needs a tab that subscribes while the run is live (`watchRuns` in the probe driver).
+- If the registry gains a neutral-completion door, `startRun` should use it instead of `completionAlreadyRecorded`.
+
+## Shutdown
+`stop()`: `stopped = true`, clears every idle timer and pending report; `startRun` and `armIdleDeadline` return at once. why: a process that is leaving must not begin a verb its successor cannot see. Reached by `stopChatCompaction()` (MAN-8067).
+
+## The decision line (`compaction-log.ts`, `logDecision`)
+`[compaction] session=<id> trigger=<turn-end|activity|idle|auto|manual> contextTokens=<n|unknown> contextWindow=<n|unknown> activity=<idle|busy (<why>)|not live> decision=<sentence>`
+
+One line per decision, from the triggers, the decorator and the procedure alike; `grep '\[compaction\]'` on the server log says why a chat was or was not compacted. Where no report is at hand the measure is `lastTurnContext(sessionId)`. A run that ends also logs `compacted onto <id> (<pre> → <post> tokens)`.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/compaction/auto-trigger.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/compaction/compaction-log.ts
+
+## MAN-8067 — modules/compaction wiring — the decorator, what takes a chat over, the files and shutdown
+
+`server/modules/compaction/` replaces the CLI's compaction of a Claude chat with the launch table's `[summarizer]` compaction (`~/.claude/scripts/summarize`) while the switch (MAN-8061) reads on and the summarizer is ready. Off or not ready: nothing here acts and the CLI compacts as before. Barrel exports: `withChatCompaction`, `stopChatCompaction`. Only `server/index.ts` imports the module; the module reaches settings, providers, websocket, database and notifications through their barrels only. The Claude runtime knows the module only through `ChatCompactionHooks` (MAN-8055). The record and swap are `sessionCompactionsDb` (MAN-8046); history and the marker are MAN-8054 and MAN-8060. Triggers: MAN-8066. One run: MAN-8065.
+
+## Wiring in `server/index.ts`
+| fact | value |
+|---|---|
+| wrap | `const chatRuntime = withChatCompaction(providerRuntimeService)`, once; it also registers the hooks with the service (`useChatCompaction`) |
+| receives `chatRuntime` | `createWebSocketServer` `chat.runtime`, `createNtfyActionRoutes`, `readoptKeepaliveSessions`, `initializeScheduledMessageDispatcher` |
+| stays on the bare service | the `getRunner` one-shots (no chat to compact) |
+| shutdown | `stopChatCompaction()` in `shutdownRuntimeServices`, right after `closeScheduledMessageDispatcher()` |
+| type | `withChatCompaction<Inner extends CompactionInnerRuntime>(inner): Inner` spreads the service; members the gateway type does not name (`recallApproval`) ride through |
+
+## Files
+| file | owns |
+|---|---|
+| `compaction-runtime.ts` | the decorator: `run` intercepts a taken-over `/compact`, `abort` routes to the flight; `stopChatCompaction` |
+| `auto-trigger.ts` | the `turnEnded` / `activityChanged` hooks, idle deadlines, `startRun` |
+| `compaction-procedure.ts` | `compact()`, one run |
+| `compaction-mode.ts` | switch + summarizer status → `compactionMode`, `takesOver`, `takeoverSnapshot`, `switchFlipCount`, `noteSummarizerStatus`, `noteVerbNotReady` |
+| `compaction-registry.ts` | flights, activity listeners, automatic refusals, last turn contexts, `forgetSession` |
+| `compaction-guard.ts` | `waitUntilQuiet` |
+| `compaction-children.ts` | the only spawns: `runSummarizeVerb`, `fireCompactHealTrigger` |
+| `compaction-seed.ts` | `createSeedWriter`: the swap at the new session's announcement, the held `complete` |
+| `compaction-facts.ts` | `readVerbSuccess`, `verbFailureSentence`, `factsOf` |
+| `compaction-frames.ts` | the frames a run writes |
+| `compaction-log.ts` | `logDecision` |
+
+## What takes a chat over
+`takesOver({ appSessionId, node })` = `appSessionId !== null` AND `node === null` (a node's transcript is on the node) AND `compactionMode().on`. `on` = switch on AND summarizer `ready`; the switch is read at every call.
+
+| when | do |
+|---|---|
+| status cached, `ready`, binary (`cli.path` size + mtime) unchanged | serve the cache |
+| status cached but not ready, or binary changed, or none | ask `summarizerStatus()` (`summarize --status`, ~0.25 s), single-flighted: one verb process per burst, one ask per message launch while not ready |
+| switch seen to move | drop the cached status and add 1 to `switchFlipCount()`: a flip is also a retry |
+| verb exits 3 | `noteVerbNotReady(sentence)`: the cache reads not-ready until the next launch asks again |
+| status unreadable | `ready: null`, not on |
+
+why a not-ready status is never served from the cache: the operator edits the summarizer's words in Edit Agent Chains, which moves neither binary nor switch; a cached not-ready would hold chats on the CLI while Settings (which asks afresh) reads ready.
+
+`takeoverSnapshot()` = the last `compactionMode()` answer, read synchronously (`null` before any ask). The turn-end trigger needs it: its run must start in the tick of the turn's `complete`, before the queued-message pass (`setImmediate`) takes the session's reservation, and an awaited switch read lost that race. A stale snapshot is safe: the decorator re-asks `takesOver` and ends an automatic run no longer taken over with a `complete` exit 0, nothing done.
+
+## The decorator's `/compact` test
+- Claude only; the command matches `/^\/compact(?:\s+([\s\S]*))?$/`; the words after it are the summarizer's instructions.
+- `options.sessionId` is a non-empty string; no `resumeAnchorId`, no `resumeFromScratch: true`. An edit that replaces a message with `/compact` stays an edit and reaches the CLI.
+- Trigger = `options.compactionTrigger` when `auto` or `idle`, else `manual`.
+- Taken over → `compact()`. Not taken over: manual → `inner.run` (the CLI compacts); automatic → logged `no longer taken over, the run ends with nothing done`, `complete` exit 0.
+- `abort`: a flight not yet stopped → `flight.stop()`; else `inner.abort`.
+
+## Shutdown
+`stopChatCompaction()` = the trigger's `stop()` (MAN-8066) + `stopFlightsBeforeSeed()` (MAN-8065): no idle deadline fires, no pending compaction starts, a waiting or summarizing flight is stopped (its verb gets SIGTERM) rather than orphaned. A seed turn already running is a run like any other and finishes with the drain. Not measured: how a service stop treated an in-flight summarizer child before this call existed.
+
+`pre_tokens` of a record = the last report this server kept for the chat (`lastContextTokens`), for manual and automatic alike; null after a restart until the chat's next turn end.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/compaction/compaction-mode.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/compaction/compaction-runtime.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/compaction/index.ts

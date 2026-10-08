@@ -424,12 +424,6 @@ const addProviderSessionIdMapping = (db: Database): void => {
 };
 
 /**
- * Adds the `forked_from_session_id` column recording where a branched session
- * came from.
- *
- * Nothing is backfilled: a session that predates forking was not forked.
- */
-/**
  * Adds the transcript path to the superseded-session record.
  *
  * Only rows written before this column existed lack it, and there is nothing
@@ -441,6 +435,40 @@ const addSupersededTranscriptPathColumn = (db: Database): void => {
   addColumnToTableIfNotExists(db, 'superseded_provider_sessions', columnNames, 'jsonl_path', 'TEXT');
 };
 
+/**
+ * Adds `reason` and the nine compaction facts to the superseded-session record.
+ *
+ * Nothing is backfilled: every row written before them is an edit's rewind, and a
+ * NULL `reason` is exactly how a rewind reads. The list is the one in
+ * `SUPERSEDED_PROVIDER_SESSIONS_TABLE_SCHEMA_SQL`, so a new database and a migrated
+ * one end with the same table.
+ */
+const SUPERSEDED_COMPACTION_COLUMNS: ReadonlyArray<readonly [name: string, type: string]> = [
+  ['reason', 'TEXT'],
+  ['compaction_trigger', 'TEXT'],
+  ['summarizer_model', 'TEXT'],
+  ['summarizer_served', 'TEXT'],
+  ['summarizer_effort', 'TEXT'],
+  ['pre_tokens', 'INTEGER'],
+  ['post_tokens', 'INTEGER'],
+  ['summarizer_tokens_in', 'INTEGER'],
+  ['summarizer_tokens_out', 'INTEGER'],
+  ['summarizer_chunks', 'INTEGER'],
+];
+
+const addSupersededCompactionColumns = (db: Database): void => {
+  const columnNames = getTableInfo(db, 'superseded_provider_sessions').map((column) => column.name);
+  for (const [name, type] of SUPERSEDED_COMPACTION_COLUMNS) {
+    addColumnToTableIfNotExists(db, 'superseded_provider_sessions', columnNames, name, type);
+  }
+};
+
+/**
+ * Adds the `forked_from_session_id` column recording where a branched session
+ * came from.
+ *
+ * Nothing is backfilled: a session that predates forking was not forked.
+ */
 const addForkedFromSessionIdColumn = (db: Database): void => {
   const columnNames = getTableInfo(db, 'sessions').map((column) => column.name);
   addColumnToTableIfNotExists(db, 'sessions', columnNames, 'forked_from_session_id', 'TEXT');
@@ -630,6 +658,7 @@ export const runMigrations = (db: Database) => {
     addLastClaimedQueueIdColumn(db);
     db.exec(SUPERSEDED_PROVIDER_SESSIONS_TABLE_SCHEMA_SQL);
     addSupersededTranscriptPathColumn(db);
+    addSupersededCompactionColumns(db);
 
     db.exec(PROJECTS_TABLE_SCHEMA_SQL);
     rebuildProjectsTableWithPrimaryKeySchema(db);
