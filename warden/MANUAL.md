@@ -581,7 +581,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/warden/systemd/cerberus-warden.s
 
 ## MAN-7838 — eis1 — the first node: its nine probes and why each exists, shadow-connector's 74 labels, and the measured install
 
-eis1 is the host Cerberus runs on, enrolled as a remote node: the first warden and the proof of the install path. Its definition is one document in Cerberus's store (`GET` / `PUT /api/cerberus/definitions/eis1`, MAN-7812); `.verify/probe-warden-probes.mjs` carries the first seven probe specs (every one but the estate-backup pair) as its verification copy. The pair, `estate-backup/copy.age` and `estate-backup/drill.age`, went in on 2026-10-07 by one `PUT` of the whole document with the service `estate-backup` ("Cloud backup") appended, together with the fix "Back up now" (MAN-7925); what they judge: `estate-backup status copy` and `status drill` (MAN-7985). Probe kinds: MAN-7818, MAN-7820. Unit: MAN-7837. Home: MAN-7836. Install: MAN-7826.
+eis1 is the host Cerberus runs on, enrolled as a remote node: the first warden and the proof of the install path. Its definition is one document in Cerberus's store (`GET` / `PUT /api/cerberus/definitions/eis1`, MAN-7812); `.verify/probe-warden-probes.mjs` carries the first seven probe specs (every one but the estate-backup pair) as its verification copy. The pair, `estate-backup/copy.age` and `estate-backup/drill.age`, went in on 2026-10-07 by one `PUT` of the whole document with the service `estate-backup` ("Cloud backup") appended, together with the fix "Back up now" (MAN-7925); what they judge: `estate-backup status copy` and `status drill` (MAN-8018). Probe kinds: MAN-7818, MAN-7820. Unit: MAN-7837. Home: MAN-7836. Install: MAN-7826.
 
 ## Facts
 | item | value |

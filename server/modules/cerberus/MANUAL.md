@@ -1364,11 +1364,11 @@ The Verisk entry was replaced on 2026-10-07 at 04:29 -07:00, before its first pr
 
 ## Back up now
 - `cmd`: `sudo -n systemctl start --no-block estate-backup.service`, for `estate-backup/copy.age` (MAN-7838). The warden runs it as `lyphe` through `/bin/sh -c` from `$HOME`, with no terminal; `sudo -n` is passwordless for `lyphe` (measured), so it never waits on a prompt.
-- WHY `--no-block`: the unit is `Type=oneshot` and a run lasts minutes to hours (the first upload of 88 GB at the 3 500 KiB/s limit is about seven hours). `systemctl start` without the flag waits for a oneshot's whole run, so the 60 s `timeout` would end the entry `failed` while the unit carried on. With it the command returns once the job is queued, the press ends `ok` at once, and the check itself reports the progress ("the first upload is running: <a> of <b> GB sent, about <eta> left", MAN-7985).
+- WHY `--no-block`: the unit is `Type=oneshot` and a run lasts minutes to hours (the first upload of 88 GB at the 3 500 KiB/s limit is about seven hours). `systemctl start` without the flag waits for a oneshot's whole run, so the 60 s `timeout` would end the entry `failed` while the unit carried on. With it the command returns once the job is queued, the press ends `ok` at once, and the check itself reports the progress ("the first upload is running: <a> of <b> GB sent, about <eta> left", MAN-8018).
 - The recheck is `probe.run` for `estate-backup/copy.age`: straight after a press it still reads the progress or the failure, and turns `ok` only when a snapshot has landed ("<h> h since the newest copy …", under 26 h).
 - Written through `POST /api/cerberus/catalog` with `auto` off; the live entry carries `capped: null`.
 
-governs: /home/lyphe/.claude/docstore/bin/backup, /opt/shadow-connector/extractors/xactimate/http_login.py
+governs: /home/lyphe/.claude/docstore/bin/backup, /home/lyphe/.claude/estate-backup/systemd/estate-backup.service, /opt/shadow-connector/extractors/xactimate/http_login.py
 
 ## MAN-7927 — The diagnoses repository — `cerberusDiagnosesDb`: diagnoses, their steps and the one-off window
 
