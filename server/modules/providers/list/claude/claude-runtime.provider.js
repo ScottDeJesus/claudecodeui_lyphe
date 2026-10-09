@@ -44,6 +44,7 @@ import { capToolResult } from '@/shared/message-unification.js';
 import { userFacingEnv } from '@/shared/child-env.js';
 
 import { armKeepaliveSpawn, keepaliveReadopt } from './session-host/index.js';
+import { noteTerminalCommands } from './claude-command-catalog.js';
 import {
   createIdleCloser,
   createPromptQueue,
@@ -1459,6 +1460,11 @@ async function spawnProcess(command, options, initialWs, context) {
         if (message.type === 'system' && message.subtype === 'init') {
           turnInFlight = true;
           followUp.release();
+          // The engine's list of terminal-bound commands rides this frame and no other (an idle read
+          // never gets one); the command catalog keeps it under the CLI version that sent it. Not awaited.
+          if (Array.isArray(message.terminal_slash_commands)) {
+            void noteTerminalCommands(message.claude_code_version, message.terminal_slash_commands);
+          }
         } else if (message.type === 'assistant') {
           turnInFlight = true;
         }

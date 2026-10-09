@@ -8719,3 +8719,330 @@ measured 2026-10-08 by chain chain-remove-add-account-button-20261008-103333-20a
 probe-key: 131931f1fe7308113e8e7c527616d80ab5b57f80
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/AccountFooterRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/AccountPopover.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/hooks/useReloginCapture.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/relogin-window.mjs
+
+## INV-7416 — probe — a stray that ran and a stray the fence refused print the same report; nothing notices a fence that never ran
+
+a stray that ran and a stray the fence refused print the same report; nothing notices a fence that never ran
+
+```probe
+bash /home/lyphe/.claude/state/pipeline-reviews/dactyls-fence-opus/athena-probes/fence-canary.sh
+echo "[probe exit $?]"
+expect: the two `✓ … strays: ./other.txt` reports are identical but for the stub's own words (`… identical …: yes`) while one sibling reads `keep` and the other `hacked`; cured: the unfenced run is not `✓`
+```
+
+measured 2026-10-08 by chain chain-dactyls-fence-opus-20261008-165918-f181, finding L1, LOW
+probe-key: d6478009936123d53f81aec57039cca46bb23fc1
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/agent-launch/AgentLaunchDactylField.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/agent-launch/AgentLaunchDefaults.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/common.json, /home/lyphe/.claude/hooks/plan_runner/dactyls/child.py, /home/lyphe/.claude/hooks/plan_runner/dactyls/fence.py, /home/lyphe/.claude/hooks/plan_runner/dactyls/refuse.py, /home/lyphe/.claude/hooks/plan_runner/dactyls/switch.py, /home/lyphe/.claude/hooks/plan_runner/dactyls/verb.py, /home/lyphe/.claude/hooks/plan_runner/solo/launch.py
+
+## INV-7417 — probe — a RESUME keeps the dactyl mode, but its spawn model follows the table: a fix-pass resumed after Hephaestus is re-pinned to Sonnet runs dactyls on Sonnet
+
+a RESUME keeps the dactyl mode, but its spawn model follows the table: a fix-pass resumed after Hephaestus is re-pinned to Sonnet runs dactyls on Sonnet
+
+```probe
+bash /home/lyphe/.claude/state/pipeline-reviews/dactyls-fence-opus/athena-probes/resume-repin.sh
+echo "[probe exit $?]"
+expect: `resumed fix-pass: dactyls = True … spawns on = sonnet` while the defect stands; cured: `dactyls = False` there (or the model recorded)
+```
+
+measured 2026-10-08 by chain chain-dactyls-fence-opus-20261008-165918-f181, finding L2, LOW
+probe-key: c6250f4570d626d8b2732a10b745d8e07972a5aa
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/agent-launch/AgentLaunchDactylField.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/agent-launch/AgentLaunchDefaults.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/common.json, /home/lyphe/.claude/hooks/plan_runner/dactyls/child.py, /home/lyphe/.claude/hooks/plan_runner/dactyls/fence.py, /home/lyphe/.claude/hooks/plan_runner/dactyls/refuse.py, /home/lyphe/.claude/hooks/plan_runner/dactyls/switch.py, /home/lyphe/.claude/hooks/plan_runner/dactyls/verb.py, /home/lyphe/.claude/hooks/plan_runner/solo/launch.py
+
+## INV-7418 — probe — `dactyl --status` says `ready: true` for a Hephaestus whose launches go to Flash; its docstring says it answers "would the next Hephaestus launch carry dactyls?"
+
+`dactyl --status` says `ready: true` for a Hephaestus whose launches go to Flash; its docstring says it answers "would the next Hephaestus launch carry dactyls?"
+
+```probe
+bash /home/lyphe/.claude/state/pipeline-reviews/dactyls-fence-opus/athena-probes/status-deepseek.sh
+echo "[probe exit $?]"
+expect: `provider … 'deepseek'` beside `ready = True | why = ''` while the defect stands; cured: ready False with a sentence naming DeepSeek
+```
+
+measured 2026-10-08 by chain chain-dactyls-fence-opus-20261008-165918-f181, finding L3, LOW
+probe-key: 06b193858221d0b32897bf6ef28d81bbc2da3239
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/agent-launch/AgentLaunchDactylField.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/agent-launch/AgentLaunchDefaults.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/common.json, /home/lyphe/.claude/hooks/plan_runner/dactyls/child.py, /home/lyphe/.claude/hooks/plan_runner/dactyls/fence.py, /home/lyphe/.claude/hooks/plan_runner/dactyls/refuse.py, /home/lyphe/.claude/hooks/plan_runner/dactyls/switch.py, /home/lyphe/.claude/hooks/plan_runner/dactyls/verb.py, /home/lyphe/.claude/hooks/plan_runner/solo/launch.py
+
+## INV-7419 — probe — a name the CLI itself cannot read (`\` in it) is no longer refused before a token is spent
+
+a name the CLI itself cannot read (`\` in it) is no longer refused before a token is spent
+
+```probe
+bash /home/lyphe/.claude/state/pipeline-reviews/dactyls-fence-opus/athena-probes/backslash-name.sh
+echo "[probe exit $?]"
+expect: `✗ dactyl D/v\w.py — I couldn't make the change: …symlink resolution…`, three turns, `file now: alpha` while the defect stands (spends one Haiku call); cured: a refusal sentence before any turn
+```
+
+measured 2026-10-08 by chain chain-dactyls-fence-opus-20261008-165918-f181, finding L4, LOW
+probe-key: d073893646d95c20c3a8f1991f14e7ed313838d9
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/agent-launch/AgentLaunchDactylField.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/agent-launch/AgentLaunchDefaults.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/common.json, /home/lyphe/.claude/hooks/plan_runner/dactyls/child.py, /home/lyphe/.claude/hooks/plan_runner/dactyls/fence.py, /home/lyphe/.claude/hooks/plan_runner/dactyls/refuse.py, /home/lyphe/.claude/hooks/plan_runner/dactyls/switch.py, /home/lyphe/.claude/hooks/plan_runner/dactyls/verb.py, /home/lyphe/.claude/hooks/plan_runner/solo/launch.py
+
+## INV-7420 — probe — the builder's hand-off names two stub probes whose premise is gone and omits the third; all three now pass for the wrong reason
+
+the builder's hand-off names two stub probes whose premise is gone and omits the third; all three now pass for the wrong reason
+
+```probe
+grep -c 'Edit(/' /home/lyphe/.claude/hooks/plan_runner/INVARIANTS.md
+echo "[probe exit $?]"
+expect: 3 (INV-7343, INV-7344, INV-7349 — the report names two) while the defect stands; cured: 0
+```
+
+measured 2026-10-08 by chain chain-dactyls-fence-opus-20261008-165918-f181, finding L5, LOW
+probe-key: a25352d4012010955240283c19e88292fd099494
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/agent-launch/AgentLaunchDactylField.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/agent-launch/AgentLaunchDefaults.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/common.json, /home/lyphe/.claude/hooks/plan_runner/dactyls/child.py, /home/lyphe/.claude/hooks/plan_runner/dactyls/fence.py, /home/lyphe/.claude/hooks/plan_runner/dactyls/refuse.py, /home/lyphe/.claude/hooks/plan_runner/dactyls/switch.py, /home/lyphe/.claude/hooks/plan_runner/dactyls/verb.py, /home/lyphe/.claude/hooks/plan_runner/solo/launch.py
+
+## INV-7421 — probe — two comments say what the old design did
+
+two comments say what the old design did
+
+```probe
+grep -n 'The CLI refuses those calls' /home/lyphe/.claude/hooks/plan_runner/dactyls/child.py; grep -n '`child.argv` backs the same rule' /home/lyphe/.claude/hooks/plan_runner/dactyls/fence.py
+echo "[probe exit $?]"
+expect: one hit in each file while the defect stands; cured: no output
+```
+
+measured 2026-10-08 by chain chain-dactyls-fence-opus-20261008-165918-f181, finding L6, LOW
+probe-key: a0a68ca40038309f50117130b0b2a908f145f46c
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/agent-launch/AgentLaunchDactylField.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/agent-launch/AgentLaunchDefaults.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/common.json, /home/lyphe/.claude/hooks/plan_runner/dactyls/child.py, /home/lyphe/.claude/hooks/plan_runner/dactyls/fence.py, /home/lyphe/.claude/hooks/plan_runner/dactyls/refuse.py, /home/lyphe/.claude/hooks/plan_runner/dactyls/switch.py, /home/lyphe/.claude/hooks/plan_runner/dactyls/verb.py, /home/lyphe/.claude/hooks/plan_runner/solo/launch.py
+
+## INV-7422 — probe — the "On" line names Sonnet and Flash as by-hand cases and leaves out Fable, which the table can pin and `rides` refuses
+
+the "On" line names Sonnet and Flash as by-hand cases and leaves out Fable, which the table can pin and `rides` refuses
+
+```probe
+cd /home/lyphe/.claude && python3 -c "
+import json,sys; sys.path.insert(0,'hooks')
+from plan_runner.dactyls import switch
+c=json.load(open('claudecodeui_lyphe/src/modules/i18n/locales/en/common.json'))['agentLaunch']['defaults']['dactylOn']
+print('rides(fable):', switch.rides('fable'), '| copy names Fable:', 'Fable' in c, '| copy names Sonnet:', 'Sonnet' in c)"
+echo "[probe exit $?]"
+expect: `rides(fable): False | copy names Fable: False | copy names Sonnet: True` while the defect stands; cured: the copy names Fable or says "any other model"
+```
+
+measured 2026-10-08 by chain chain-dactyls-fence-opus-20261008-165918-f181, finding L7, LOW
+probe-key: e199fb55a5375a4d20bbc42ca3bb16ba5c1a3c24
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/agent-launch/AgentLaunchDactylField.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/agent-launch/AgentLaunchDefaults.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/common.json, /home/lyphe/.claude/hooks/plan_runner/dactyls/child.py, /home/lyphe/.claude/hooks/plan_runner/dactyls/fence.py, /home/lyphe/.claude/hooks/plan_runner/dactyls/refuse.py, /home/lyphe/.claude/hooks/plan_runner/dactyls/switch.py, /home/lyphe/.claude/hooks/plan_runner/dactyls/verb.py, /home/lyphe/.claude/hooks/plan_runner/solo/launch.py
+
+## INV-7423 — probe — MEDIUM — the "Claude Code" group is offered in every provider's composer; in Codex/Cursor/OpenCode, picking one sends an engine command to the wrong engine
+
+MEDIUM — the "Claude Code" group is offered in every provider's composer; in Codex/Cursor/OpenCode, picking one sends an engine command to the wrong engine
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/codex-groups.mjs" <<'EOF'
+import { openConsole, PROJECT_ROW } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/console.mjs';
+const session = await openConsole({ dark: false, viewport: { width: 1440, height: 900 } });
+const { page } = session;
+await page.reload({ waitUntil: 'networkidle' });
+await page.waitForSelector(PROJECT_ROW, { timeout: 20000 });
+await page.locator(PROJECT_ROW).first().click();
+await page.waitForSelector('textarea', { timeout: 20000 });
+await page.locator('text=Click to change model').first().click();
+await page.waitForTimeout(600);
+await page.getByText('gpt-5.5', { exact: true }).first().click();
+await page.waitForTimeout(800);
+const card = await page.locator('text=Click to change model').first().evaluate((e) => e.parentElement.textContent);
+const ta = page.locator('textarea').first();
+await ta.click(); await ta.fill(''); await page.waitForTimeout(250); await ta.fill('/');
+await page.waitForSelector('.command-menu .command-group', { timeout: 15000 }); await page.waitForTimeout(700);
+const groups = await page.evaluate(() => [...document.querySelectorAll('.command-menu .command-group')].map((g) => g.firstElementChild?.querySelector('span')?.textContent));
+console.log('composer provider card:', JSON.stringify(card.slice(0, 60)));
+console.log('palette groups:', JSON.stringify(groups));
+await ta.fill(''); await page.waitForTimeout(1300);
+await session.browser.close();
+EOF
+(cd /home/lyphe/.claude/claudecodeui_lyphe && timeout 120 node "$D/codex-groups.mjs" 2>&1 | tail -4)
+case "$D" in /tmp/athena-probe.*) rm -rf "$D";; esac
+echo "[probe exit $?]"
+expect: `composer provider card: "Codex·GPT-5.5…"` and a `palette groups:` list with no "Claude Code" entry (today: ["CloudCLI Commands","Claude Code","Skills","User Commands"])
+```
+
+measured 2026-10-08 by chain chain-cloudcli-palette-engine-commands-20261008-171107-6488, finding M1, MEDIUM
+probe-key: cf43d7a9db20f49150c81af60af1dedc4e968c2b
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-command-catalog.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-engine-catalog.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-model-catalog.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useSlashCommands.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/palette-claude-code-group.mjs
+
+## INV-7424 — probe — LOW — the proof script's "terminal badge after the turn" leg cannot fail on a hand-off fault
+
+LOW — the proof script's "terminal badge after the turn" leg cannot fail on a hand-off fault
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+TOK=$(curl -s -X POST http://127.0.0.1:3011/api/auth/login -H 'content-type: application/json' -d '{"username":"verve","password":"verve-dev-2026"}' | python3 -c "import sys,json; print(json.load(sys.stdin).get('token',''))")
+curl -s -X POST http://127.0.0.1:3011/api/commands/list -H "authorization: Bearer $TOK" -H 'content-type: application/json' -d '{}' | python3 -c "
+import sys,json
+b={e['name']:e['metadata']['type'] for e in json.load(sys.stdin)['engine']}
+print('doctor badge, no turn sent by this probe:', b.get('/doctor'))"
+python3 -c "
+import json,os
+d=json.load(open(os.path.expanduser('~/.cloudcli/claude-command-catalog.json')))
+print('disk terminalCommands for', d['cliVersion'], '=', d.get('terminalCommands'))"
+EOF
+bash "$D/p.sh"
+case "$D" in /tmp/athena-probe.*) rm -rf "$D";; esac
+echo "[probe exit $?]"
+expect: `doctor badge, no turn sent by this probe: terminal` — the script's last leg passes with no turn; the defect stands while the set is already on disk, cured when the leg proves the frame itself (or says it cannot)
+```
+
+measured 2026-10-08 by chain chain-cloudcli-palette-engine-commands-20261008-171107-6488, finding L1, LOW
+probe-key: 3b9b808cdeed4b0dbf229c057fd7a0b5b2909656
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-command-catalog.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-engine-catalog.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-model-catalog.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useSlashCommands.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/palette-claude-code-group.mjs
+
+## INV-7425 — probe — LOW — the proof script hard-codes today's engine strings, so the next CLI update fails it on a healthy system
+
+LOW — the proof script hard-codes today's engine strings, so the next CLI update fails it on a healthy system
+
+```probe
+grep -n "prompt-audit" /home/lyphe/.claude/claudecodeui_lyphe/.verify/palette-claude-code-group.mjs | cut -c1-120 || echo none
+echo "[probe exit $?]"
+expect: no `prompt-audit` literal (today: lines 130 and 157)
+```
+
+measured 2026-10-08 by chain chain-cloudcli-palette-engine-commands-20261008-171107-6488, finding L2, LOW
+probe-key: d53b46dda68f9723445247c3357ce2ceeb1fd7e7
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-command-catalog.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-engine-catalog.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-model-catalog.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useSlashCommands.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/palette-claude-code-group.mjs
+
+## INV-7426 — probe — LOW — `grep -rn reload-plugins server/ src/` is not empty
+
+LOW — `grep -rn reload-plugins server/ src/` is not empty
+
+```probe
+cd /home/lyphe/.claude/claudecodeui_lyphe && grep -rn reload-plugins server/ src/ | cut -c1-100 || echo none
+echo "[probe exit $?]"
+expect: `none` (today: server/modules/providers/MANUAL.md:632)
+```
+
+measured 2026-10-08 by chain chain-cloudcli-palette-engine-commands-20261008-171107-6488, finding L3, LOW
+probe-key: 5e035b9db7b75d00a3916c504b051b45967a8416
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-command-catalog.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-engine-catalog.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-model-catalog.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useSlashCommands.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/palette-claude-code-group.mjs
+
+## INV-7427 — probe — LOW — `EngineCatalogSpec` is exported and nothing imports it
+
+LOW — `EngineCatalogSpec` is exported and nothing imports it
+
+```probe
+cd /home/lyphe/.claude/claudecodeui_lyphe && grep -rln "EngineCatalogSpec" server src --include=*.ts --include=*.js --include=*.tsx
+echo "[probe exit $?]"
+expect: no file other than claude-engine-catalog.ts listed once the export is dropped (today: only that file, which is the same file that exports it)
+```
+
+measured 2026-10-08 by chain chain-cloudcli-palette-engine-commands-20261008-171107-6488, finding L4, LOW
+probe-key: c0ff9bddf6f1b9eea323c0b6aa8e3bcb2d41a2c2
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-command-catalog.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-engine-catalog.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-model-catalog.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useSlashCommands.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/palette-claude-code-group.mjs
+
+## INV-7428 — The composer's provider is a stored preference a probe must pin
+
+`selectedProvider` is stored per user in `auth.db`; opening any conversation rewrites it to that conversation's provider. The dev account `verve` carries whatever the last run or chat left.
+
+- Follows it: the slash palette's `Claude Code` group (a Claude composer only, MAN-8069) and the model picker's list.
+- 2026-10-08: `node .verify/palette-claude-code-group.mjs` on an account stored on `codex`: 25 FAIL, the app correct (no group, GPT models).
+
+| when | do |
+|---|---|
+| a probe needs the composer on Claude and must not write the account | `pinPreferences(context, { ...HARNESS_PREFERENCES, selectedProvider: 'claude' }, { writes: 'drop' })` from `lib/prefs-pin.mjs`, registered AFTER `openConsole` returns (earlier, it swallows `ensureTheme`'s theme write); pass the same overlay as `openConsole({ preferences })` |
+| a probe needs a given provider | `putComposerOnProvider(page, id)` from `lib/composer-provider.mjs`: picks through the new-chat card's picker (Claude on Haiku, others their first model) and awaits that provider's `/skills` reply |
+| a probe needs to know the provider | `readComposerProvider(page)` → `claude` `codex` `cursor` `opencode` or `null` |
+
+- `putComposerOnProvider` answers `true` once on the provider, `false` when the picker offers none or offers it with no enabled model (caller tries the next of `NON_CLAUDE_PROVIDERS`), and throws when the new-chat card is absent (an open conversation has none) or the pick did not land.
+- A pick writes `selectedProvider` like any pick; only the drop pin keeps it off the shared account.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/composer-provider.mjs
+
+## INV-7429 — probe — `putComposerOnProvider` writes the shared dev account, and a failure between its two writes strands it on Codex
+
+`putComposerOnProvider` writes the shared dev account, and a failure between its two writes strands it on Codex
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/stored.mjs" <<'EOF'
+import { openConsole, PROJECT_ROW } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/console.mjs';
+import { putComposerOnProvider } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/composer-provider.mjs';
+const session = await openConsole({ viewport: { width: 1440, height: 900 } });
+const { page } = session;
+await page.reload({ waitUntil: 'networkidle' });
+await page.waitForSelector(PROJECT_ROW, { timeout: 20000 });
+await page.locator(PROJECT_ROW).first().click();
+await page.waitForSelector('textarea', { timeout: 20000 });
+const stored = async () => (await session.api('/api/user/preferences')).body?.preferences?.selectedProvider ?? null;
+const before = await stored();
+const switched = await putComposerOnProvider(page, 'codex');
+await page.waitForTimeout(800);
+const afterSwitch = await stored();
+await putComposerOnProvider(page, 'claude');
+await page.waitForTimeout(800);
+const restored = await stored();
+console.log(JSON.stringify({ before, switchedToCodex: switched, storedWhileOnCodex: afterSwitch, storedAfterSwitchBack: restored }));
+await session.browser.close();
+EOF
+(cd /home/lyphe/.claude/claudecodeui_lyphe && timeout 150 node "$D/stored.mjs" 2>&1 | tail -4)
+case "$D" in /tmp/athena-probe.*) rm -rf "$D";; esac
+echo "[probe exit $?]"
+expect: {"before":"claude","switchedToCodex":true,"storedWhileOnCodex":"codex","storedAfterSwitchBack":"claude"} — the defect stands while storedWhileOnCodex is "codex" (the helper wrote the shared account); cured when it stays "claude" (the switch is pinned per session, writes dropped)
+```
+
+measured 2026-10-08 by chain chain-cloudcli-palette-engine-commands-proof-20261008-175347-965e, finding L1, LOW
+probe-key: 77c09ecd74dcbf23984eee9a6fd22a7903c624ed
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/composer-provider.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/palette-claude-code-group.mjs
+
+## INV-7430 — probe — a provider that is offered but has no models crashes the whole run, raw, instead of skipping to the next candidate
+
+a provider that is offered but has no models crashes the whole run, raw, instead of skipping to the next candidate
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/empty-catalog.mjs" <<'EOF'
+import { openConsole, PROJECT_ROW } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/console.mjs';
+import { putComposerOnProvider } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/composer-provider.mjs';
+process.on('unhandledRejection', (error) => console.log('UNHANDLED REJECTION:', String(error?.message ?? error).split('\n')[0]));
+const session = await openConsole({ viewport: { width: 1440, height: 900 } });
+const { page } = session;
+await page.route('**/api/providers/codex/models*', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ success: true, data: { provider: 'codex', models: { OPTIONS: [] } } }) }));
+await page.reload({ waitUntil: 'networkidle' });
+await page.waitForSelector(PROJECT_ROW, { timeout: 20000 });
+await page.locator(PROJECT_ROW).first().click();
+await page.waitForSelector('textarea', { timeout: 20000 });
+const t0 = Date.now();
+try {
+  console.log('codex offered with no models: putComposerOnProvider ->', await putComposerOnProvider(page, 'codex'));
+} catch (error) {
+  console.log(`codex offered with no models: threw after ${Date.now() - t0} ms:`, String(error.message).split('\n')[0]);
+}
+await session.browser.close().catch(() => {});
+EOF
+(cd /home/lyphe/.claude/claudecodeui_lyphe && timeout 150 node "$D/empty-catalog.mjs" 2>&1 | tail -4)
+case "$D" in /tmp/athena-probe.*) rm -rf "$D";; esac
+echo "[probe exit $?]"
+expect: `UNHANDLED REJECTION: page.waitForResponse: Timeout 15000ms exceeded…` then `threw after ~30000 ms: locator.click: Timeout 30000ms exceeded.` — the defect stands while the UNHANDLED line prints; cured when it is absent and the answer is `-> false` (or a clear throw naming the empty group)
+```
+
+measured 2026-10-08 by chain chain-cloudcli-palette-engine-commands-proof-20261008-175347-965e, finding L2, LOW
+probe-key: bc779b4bbb12580f350f0bb5025c91cbab0b88f2
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/composer-provider.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/palette-claude-code-group.mjs
+
+## INV-7431 — probe — the manual's Proof line for this script omits the leg this build added and the account write
+
+the manual's Proof line for this script omits the leg this build added and the account write
+
+```probe
+cd /home/lyphe/.claude/claudecodeui_lyphe && grep '^- \*\*Proof\.\*\*.*palette-claude-code-group' server/modules/providers/MANUAL.md | grep -c -i -E 'provider gate|another provider|codex|non-claude|forces? the composer|onto claude'
+echo "[probe exit $?]"
+expect: prints 0 (and `[probe exit 1]`, grep -c's own status for a zero count) — the defect stands while the count is 0; cured when it is 1 or more
+```
+
+measured 2026-10-08 by chain chain-cloudcli-palette-engine-commands-proof-20261008-175347-965e, finding L3, LOW
+probe-key: 719996f3f8bf59915cd820f36484ed81614ce343
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/composer-provider.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/palette-claude-code-group.mjs

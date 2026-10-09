@@ -17,6 +17,8 @@ type AgentLaunchDactylFieldProps = {
   model: string;
   /** The table's `[dactyl] effort`, the word in force. */
   effort: string;
+  /** The word Hephaestus's own row launches him at (the pin, else the default), or `null` when the census holds no such row. */
+  hephaestusModel: string | null;
   /** True while a change to the defaults is in flight: the field's lists are held, never disabled. */
   held: boolean;
   /** The Defaults block's own save, handed one word at a time. */
@@ -34,13 +36,20 @@ type AgentLaunchDactylFieldProps = {
  * names Hephaestus by shim). A switch about one soul's hands belongs with the table that says what every
  * soul launches at, beside the words its children run on, not among the host-wide rows under the account.
  *
+ * THE SWITCH IS ONE SOUL'S AND ONE FAMILY'S. Dactyls rides Hephaestus on Opus alone (the operator's ruling,
+ * 2026-10-08, off a bake-off that measured it saving the Opus builder about a seventh of his spend and costing the
+ * Sonnet one about an eighth more). So the readiness beside the switch answers "would his next launch carry the
+ * mode?", not only "can the CLI serve a dactyl?": a Hephaestus on Sonnet reads Waiting, with the status call's own
+ * sentence, until he is pinned to Opus in the rows below.
+ *
  * THE POSITION AND THE READINESS ARE TWO FACTS. The position is the operator's word, read and written by
  * `useDactylsSwitch` through its own route — never the census's save, which is the words'. The readiness is
  * the installed Claude Code's: whether it can serve the model chosen below, derived from its binary at every
  * ask. A switch that is on while the CLI cannot serve a dactyl is armed, not broken: Hephaestus works as before
  * until it can. So "Waiting" is said in the warn tone in either position, with the status call's own sentence,
  * and a readiness that could not be read is said in plain words, never drawn as waiting. The readiness is asked
- * again each time a save of the words lands, because the model just chosen is what it is about.
+ * again each time a save of the words lands, because the model just chosen is what it is about, and again when
+ * the word Hephaestus's own row launches him at changes, because a save of his row can end the wait.
  *
  * A SWITCH WITH NO POSITION CANNOT BE MOVED. While the read is out, or after it failed, the slot holds the one
  * act that can be honoured — ask again — and the sentence says which it is. The switch is never drawn off for
@@ -63,7 +72,7 @@ type AgentLaunchDactylFieldProps = {
 export function AgentLaunchDactylField(props: AgentLaunchDactylFieldProps) {
   const { t } = useTranslation();
   // `onSave` stays on `props`: the save below is its one reader.
-  const { models, efforts, model, effort, held } = props;
+  const { models, efforts, model, effort, hephaestusModel, held } = props;
 
   // ── The wires: the census's save of the two words, and the switch's own read and two acts. ──
   const save = (change: DactylFieldChange): void => {
@@ -83,6 +92,15 @@ export function AgentLaunchDactylField(props: AgentLaunchDactylFieldProps) {
     if (wasHeld.current && !held) void refresh();
     wasHeld.current = held;
   }, [held, refresh]);
+
+  // His own row is saved by the panel, not by this field, and the census it answers with replaces the one this
+  // block is drawn from: his word changing between two renders IS that save landing (or the table moving under
+  // a reload). A ref again, so that the first render asks nothing.
+  const seenHephaestus = useRef(hephaestusModel);
+  useEffect(() => {
+    if (seenHephaestus.current !== hephaestusModel) void refresh();
+    seenHephaestus.current = hephaestusModel;
+  }, [hephaestusModel, refresh]);
 
   const switchLabel = t('agentLaunch.defaults.dactylSwitch');
   // No position is not OFF, and the lie cuts both ways (above).

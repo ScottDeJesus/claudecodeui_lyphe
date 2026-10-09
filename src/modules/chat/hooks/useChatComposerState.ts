@@ -35,6 +35,7 @@ import { useInputHistory } from '@/modules/chat/hooks/useInputHistory';
 import { useSlashCommands } from '@/modules/chat/hooks/useSlashCommands';
 import { useRestartOnInstalledCli } from '@/modules/chat/hooks/useRestartOnInstalledCli';
 import { useScopedAttachments } from '@/modules/chat/hooks/useScopedAttachments';
+import { isEngineHandledCommand } from '@/shared/utils';
 
 type UseChatComposerStateArgs = {
   selectedProject: Project | null;
@@ -773,7 +774,8 @@ export function useChatComposerState({
                 metadata: { type: 'builtin' },
               } as SlashCommand)
             : undefined);
-        if (matchedCommand && matchedCommand.type !== 'skill') {
+        // A skill or an engine command (/compact, /usage...) is the engine's own: it goes to the wire as typed.
+        if (matchedCommand && !isEngineHandledCommand(matchedCommand)) {
           executeCommand(matchedCommand, isHelpAlias ? '/help' : commandInput);
           recordSentMessage(currentInput);
           setInput('');

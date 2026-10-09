@@ -3,7 +3,7 @@ import { extendTailwindMerge, validators } from 'tailwind-merge';
 
 import { WIP_LADDER_TOP, WIP_LIMIT_MIN } from '@/shared/constants';
 import type { RoadmapFeatureWord, RoadmapPicture } from '@/shared/roadmap-types';
-import type { DispatcherModelChoice, Project, ProjectSession } from '@/shared/types';
+import type { DispatcherModelChoice, Project, ProjectSession, SlashCommand } from '@/shared/types';
 
 //----------------- DEPLOYMENT MODE ------------
 
@@ -639,4 +639,18 @@ export function wheelZoomRatio(event: WheelEvent): number {
   const deltaPx = event.deltaY * (event.deltaMode === WheelEvent.DOM_DELTA_LINE ? LINE_DELTA_PX : 1);
   const zoomPx = event.ctrlKey ? Math.min(PINCH_WHEEL_MAX_DELTA_PX, Math.max(-PINCH_WHEEL_MAX_DELTA_PX, deltaPx)) : deltaPx;
   return Math.exp(-zoomPx * (event.ctrlKey ? PINCH_WHEEL_ZOOM_RATE : WHEEL_ZOOM_RATE));
+}
+
+// ---------------------------
+//----------------- SLASH COMMANDS ------------
+
+/**
+ * Whether the Claude engine itself runs a slash command: a skill, or an entry of the engine's own
+ * command list. Such an entry is inserted into the composer when picked and goes to the wire as typed
+ * text — it is never sent to `/api/commands/execute`, which only knows CloudCLI-native and custom
+ * commands. Used by the chat module's `useSlashCommands` (menu pick) and `useChatComposerState`
+ * (submit guard), so a command is picked and submitted by the same rule.
+ */
+export function isEngineHandledCommand(command: SlashCommand): boolean {
+  return command.type === 'skill' || command.type === 'engine' || command.metadata?.type === 'skill';
 }

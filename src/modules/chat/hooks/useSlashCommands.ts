@@ -5,6 +5,7 @@ import { api } from '@/shared/api';
 import { useHostWindow } from '@/shared/context/HostWindowContext';
 import { safeLocalStorage } from '@/modules/chat/utils/chatStorage';
 import type { LLMProvider, Project, SlashCommand } from '@/shared/types';
+import { isEngineHandledCommand } from '@/shared/utils';
 
 const COMMAND_QUERY_DEBOUNCE_MS = 150;
 
@@ -57,9 +58,6 @@ const saveCommandHistory = (projectName: string, history: Record<string, number>
 
 const isPromiseLike = (value: unknown): value is Promise<unknown> =>
   Boolean(value) && typeof (value as Promise<unknown>).then === 'function';
-
-const isSkillCommand = (command: SlashCommand) =>
-  command.type === 'skill' || command.metadata?.type === 'skill';
 
 const dedupeProviderSkills = (skills: ProviderSkill[]): ProviderSkill[] => {
   const seenCommands = new Set<string>();
@@ -191,6 +189,11 @@ export function useSlashCommands({
           : null;
         const skillCommands = dedupeProviderSkills(skillsData?.data?.skills || [])
           .map(mapSkillToSlashCommand);
+        // Engine entries come last: when a typed name is both a user's own command and one of the
+        // engine's, the submit guard's first match is the user's. They are the Claude engine's alone —
+        // the list reply names no provider — so a Codex, Cursor or OpenCode composer never gets them,
+        // as its skills already follow the provider.
+        const engineCommands = provider === 'claude' ? ((data.engine || []) as SlashCommand[]) : [];
         const allCommands: SlashCommand[] = [
           ...((data.builtIn || []) as SlashCommand[]).map((command) => ({
             ...command,
@@ -200,6 +203,10 @@ export function useSlashCommands({
           ...((data.custom || []) as SlashCommand[]).map((command) => ({
             ...command,
             type: 'custom',
+          })),
+          ...engineCommands.map((command) => ({
+            ...command,
+            type: 'engine',
           })),
         ];
 
@@ -294,7 +301,7 @@ export function useSlashCommands({
     [hostWindow, input, resetCommandMenuState, setInput, slashPosition, textareaRef],
   );
 
-  const executeNonSkillCommand = useCallback(
+  const executeCloudCliCommand = useCallback(
     (command: SlashCommand) => {
       const executionResult = onExecuteCommand(command);
       if (isPromiseLike(executionResult)) {
@@ -316,14 +323,14 @@ export function useSlashCommands({
 
   const selectCommandFromKeyboard = useCallback(
     (command: SlashCommand) => {
-      if (isSkillCommand(command)) {
+      if (isEngineHandledCommand(command)) {
         insertCommandIntoInput(command);
         return;
       }
 
-      executeNonSkillCommand(command);
+      executeCloudCliCommand(command);
     },
-    [executeNonSkillCommand, insertCommandIntoInput],
+    [executeCloudCliCommand, insertCommandIntoInput],
   );
 
   const handleCommandSelect = useCallback(
@@ -338,14 +345,14 @@ export function useSlashCommands({
       }
 
       trackCommandUsage(command);
-      if (isSkillCommand(command)) {
+      if (isEngineHandledCommand(command)) {
         insertCommandIntoInput(command);
         return;
       }
 
-      executeNonSkillCommand(command);
+      executeCloudCliCommand(command);
     },
-    [selectedProject, trackCommandUsage, insertCommandIntoInput, executeNonSkillCommand],
+    [selectedProject, trackCommandUsage, insertCommandIntoInput, executeCloudCliCommand],
   );
 
   const handleToggleCommandMenu = useCallback(() => {

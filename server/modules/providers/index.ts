@@ -7,6 +7,10 @@ export { providerRuntimeService } from './services/provider-runtime.service.js';
 export { providerModelsService } from './services/provider-models.service.js';
 export { providerTokenUsageService } from './services/provider-token-usage.service.js';
 
+// readClaudeCommandCatalog: used by Commands to list the command set the installed Claude CLI
+// advertises to every SDK client, for the chat palette's Claude Code group.
+export { readClaudeCommandCatalog } from './list/claude/claude-command-catalog.js';
+
 // sessionsService: used by the websocket module's chat gateway to resolve an
 // edited message's resume point, which only the providers module can read.
 export { sessionsService } from './services/sessions.service.js';

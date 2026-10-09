@@ -2387,3 +2387,30 @@ export type SummarizerStatus = {
   why: string;
   cli: { path: string; size: number; mtime_ns: number; version: string };
 };
+
+// ---------------------------
+//----------------- CLAUDE COMMAND CATALOG: the command list the engine advertises ------------
+
+/**
+ * One command of the Claude Code engine's own list, as `supportedCommands()` reports it and the
+ * command catalog keeps it. `name` has no leading slash; `description` and `argumentHint` are `''`
+ * when the engine gives none (never undefined), and `aliases` is `[]` when it names none. Only
+ * `claude-command-catalog.ts` builds one, from a record read off the CLI or off its own cache file.
+ */
+export type ClaudeEngineCommand = {
+  name: string;
+  description: string;
+  argumentHint: string;
+  aliases: string[];
+};
+
+/**
+ * The installed Claude CLI's command list plus the engine's own word on which of them are bound to a
+ * local terminal. `terminalCommands` holds command names (no slash) taken from the `init` frame's
+ * `terminal_slash_commands` of a chat that ran on this CLI version: it is EMPTY until such a chat has
+ * run, and a command is never badged on a guess. Served by `readClaudeCommandCatalog`.
+ */
+export type ClaudeCommandCatalog = {
+  commands: ClaudeEngineCommand[];
+  terminalCommands: ReadonlySet<string>;
+};

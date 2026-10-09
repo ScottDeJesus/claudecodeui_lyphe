@@ -830,13 +830,21 @@ export type ComposerMenuAnchor = {
   maxWidth: number;
 };
 
-/** One selectable slash command — built-in, user-defined or skill-backed — as listed in the chat composer's command menu and executed when the user picks it. */
+/**
+ * One selectable slash command as listed in the chat composer's command menu: a CloudCLI-native one
+ * ('built-in'), a user-defined one ('custom'), a skill ('skill'), or one the Claude Code engine itself
+ * advertises ('engine'). `type` is stamped by `useSlashCommands` from the list the entry came from;
+ * skills and engine entries are handled by the engine (`isEngineHandledCommand`), never executed here.
+ * `argumentHint` and `aliases` are the engine's own words and are present on 'engine' entries only.
+ */
 export type SlashCommand = {
   name: string;
   description?: string;
+  argumentHint?: string;
+  aliases?: string[];
   namespace?: string;
   path?: string;
-  type?: 'built-in' | 'custom' | 'skill' | string;
+  type?: 'built-in' | 'custom' | 'skill' | 'engine' | string;
   metadata?: Record<string, unknown>;
   [key: string]: unknown;
 };

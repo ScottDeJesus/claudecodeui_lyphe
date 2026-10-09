@@ -9,6 +9,9 @@ import { cn } from '@/shared/utils';
 /** The word the "no flag" choice carries in an effort list; it is not an effort, so it never leaves this file. */
 const NO_FLAG = 'none';
 
+/** The shim whose seats Dactyls takes (`switch.AGENT` on the runner's side): the Dactyls field watches his row. */
+const HEPHAESTUS = 'hephaestus';
+
 type AgentLaunchDefaultsProps = {
   census: AgentLaunchCensus;
   /** True while a change to the defaults is in flight: every control in the block is held. */
@@ -44,6 +47,7 @@ export function AgentLaunchDefaults({ census, held, refused, onSave }: AgentLaun
     if (held) return;
     void onSave(change);
   };
+  const hephaestusModel = census.rows.find((row) => row.kind === 'soul' && row.name === HEPHAESTUS)?.model ?? null;
   const noneLabel = cliEffort ? t('agentLaunch.defaults.none', { effort: cliEffort }) : t('agentLaunch.defaults.noneBare');
 
   return (
@@ -116,6 +120,7 @@ export function AgentLaunchDefaults({ census, held, refused, onSave }: AgentLaun
             efforts={choices.efforts}
             model={defaults.dactyl_model}
             effort={defaults.dactyl_effort}
+            hephaestusModel={hephaestusModel}
             held={held}
             onSave={save}
           />
