@@ -89,6 +89,8 @@ type LiveDiagnosis = {
   /** Fires on the ceiling, a lost link and a shutdown; the agent's signal follows it. */
   controller: AbortController;
   ceiling: NodeJS.Timeout;
+  /** When the ceiling fires (epoch ms). */
+  endsAt: number;
   session: SessionState;
   ended: boolean;
 };
@@ -252,6 +254,8 @@ async function runDiagnosis(diag: LiveDiagnosis, check: CerberusCheckView, model
         canRunFixes: diag.node !== HUB_NODE_ID,
         steps: diag.steps,
         isOver: () => diag.ended,
+        endsAt: diag.endsAt,
+        signal: diag.controller.signal,
         told,
       })
     );
@@ -299,6 +303,7 @@ export function startDiagnosis(input: { node: string; check: string; model?: str
     steps: createDiagnosisStepLog(id, startedAt),
     controller: new AbortController(),
     ceiling: setTimeout(() => conclude(diag, { status: 'failed', error: CEILING_SENTENCE }), CEILING_MS),
+    endsAt: startedAt + CEILING_MS,
     session: 'none',
     ended: false,
   };

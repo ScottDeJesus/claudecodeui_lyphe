@@ -38,6 +38,23 @@ export const ABSENCE_PHRASES: readonly string[] = [
   'no errors',
 ];
 
+/** The headings of the sections that are FACTS the agent is handed (not rules, not tools): the check, what it measures, its recent results. */
+const GIVEN_HEADINGS: readonly string[] = ['THE CHECK\n', 'WHAT THE CHECK MEASURES\n', 'ITS LAST '];
+
+/**
+ * The sections of a built prompt that the agent was TOLD rather than read — the check's own value, what it measures and its last
+ * changes — as the summary audit's given facts: a figure there is shown, a figure in neither these nor an evidence line is invented.
+ * The sections are the ones `buildDiagnosisSystemPrompt` joins with a blank line, found by their headings above.
+ *
+ * Consumers: `diagnosis-deps.ts`, for the summary audit (`diagnosis-audit.ts`).
+ */
+export function givenFactsOf(prompt: string): string {
+  return prompt
+    .split('\n\n')
+    .filter((section) => GIVEN_HEADINGS.some((heading) => section.startsWith(heading)))
+    .join('\n\n');
+}
+
 /** Free text from the store (a check's value, a command) is cut to this before it enters the prompt. */
 const PROMPT_TEXT_LIMIT = 240;
 

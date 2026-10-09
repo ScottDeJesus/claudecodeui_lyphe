@@ -6,6 +6,7 @@ import { unsupportedClauses, unsupportedSentence } from './diagnosis-audit.js';
 import { historyReadStep, nodeReadStep } from './diagnosis-step-words.js';
 import type { DiagnosisStepLog } from './diagnosis-steps.js';
 import { readDiagnosisHistory } from './diagnosis-history.js';
+import { givenFactsOf } from './diagnosis-prompt.js';
 import { unreadQuotations, unreadQuotationsSentence } from './diagnosis-quotes.js';
 import { carriesCredential, oneMaskedLine } from './diagnosis-text.js';
 import { callNode } from './diagnosis-wire.js';
@@ -44,7 +45,9 @@ import { callNode } from './diagnosis-wire.js';
  *
  * THE SUMMARY IS HELD LAST, BY A SECOND READER. The gates above hold what was quoted; a summary's claims are prose, so after them
  * `submit` has `diagnosis-audit.ts` name every clause that states as found what no evidence line shows, and refuses on its word —
- * at most twice per diagnosis, and never when the auditor could not answer.
+ * at most twice per diagnosis, never when the auditor could not answer, and never once the diagnosis is over or has under a minute
+ * left. It is handed the check's value, what it measures and its recent results (`givenFactsOf`), so a figure it was told is not an
+ * invented one.
  *
  * `canRunFixes` is false for the hub: `center` runs no warden, so a proposal made for it could never be
  * run or promoted. `submit` refuses one with a sentence the agent reads and answers by resubmitting
@@ -55,6 +58,12 @@ import { callNode } from './diagnosis-wire.js';
 
 /** How many times the summary audit may refuse one diagnosis; the next submission goes through whatever it would say. */
 const AUDIT_REFUSALS_ALLOWED = 2;
+
+/**
+ * The time the diagnosis must still have for an audit to start: the auditor's own 30 s and as long again for the agent to answer a
+ * refusal. With less left the submission goes through unaudited, so the audit cannot be what runs a diagnosis into its ceiling.
+ */
+const AUDIT_ROOM_MS = 60_000;
 
 /** A note is one sentence of at most 300 characters (`diagnosis-tools.ts`); the room above is for what masking adds, so a note is not cut for being masked. */
 const NOTE_LIMIT = 400;
@@ -78,9 +87,12 @@ export function buildDiagnosisToolDeps(input: {
   canRunFixes: boolean;
   steps: DiagnosisStepLog;
   isOver: () => boolean;
+  /** When the diagnosis hits its ceiling (epoch ms), and the signal that ends it: the summary audit starts only with `AUDIT_ROOM_MS` left and stops with the signal. */
+  endsAt: number;
+  signal: AbortSignal;
   told: { prompt: string };
 }): CerberusDiagnosisToolDeps {
-  const { diagId, node, linked, canRunFixes, steps, isOver, told } = input;
+  const { diagId, node, linked, canRunFixes, steps, isOver, endsAt, signal, told } = input;
   // What the reads of this diagnosis returned, as the agent was handed it — and, apart, what the reads that SUCCEEDED returned:
   // a refusal or a failure is something the agent may quote in a note, but is no source for an evidence line.
   const answers: string[] = [];
@@ -127,9 +139,10 @@ export function buildDiagnosisToolDeps(input: {
       if (unquoted.length > 0) throw new Error(unquotedSentence(unquoted));
       refuseUnreadQuotations([submission.summary, ...submission.evidence]);
       // The summary's prose is held last, by a second reader, and only twice: a third submission goes through (the audit is no reason for a diagnosis to fail).
-      if (auditRefusals >= AUDIT_REFUSALS_ALLOWED) return;
+      if (isOver()) throw new Error('the diagnosis has ended');
+      if (auditRefusals >= AUDIT_REFUSALS_ALLOWED || endsAt - Date.now() < AUDIT_ROOM_MS) return;
       steps.say('Checking the summary against the evidence');
-      const unsupported = await unsupportedClauses(submission);
+      const unsupported = await unsupportedClauses(submission, givenFactsOf(told.prompt), signal);
       if (unsupported === null || unsupported.length === 0) return;
       auditRefusals += 1;
       throw new Error(unsupportedSentence(unsupported));
