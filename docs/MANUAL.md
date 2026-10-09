@@ -3197,14 +3197,14 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.cl
 section: dispatcher/000/002 The read. `readDispatcherState({ bin, timeoutMs, env })` runs `dispatcher status --json` by argv
 
 **The read.** `readDispatcherState({ bin, timeoutMs, env })` runs `dispatcher status --json` by argv,
-`cwd` the home directory, `maxBuffer` 4 MiB (`STATUS_MAX_BUFFER` in `dispatcher-state.transport.ts` — the document carries
-every plan's `goal` whole, so a verb's 1 MiB is not headroom enough). The subprocess is `readDispatcherJson` in `server/shared/dispatcher-command.ts`, the one run every lane reading a dispatcher document goes through (the roadmap module's `roadmap show --json` read too); `maxBuffer` is its caller's argument, and a failure is a throw naming `dispatcher <argv joined by spaces>`. A document past the ceiling reaches the journal as `printed more than <maxBuffer> bytes — past the buffer this read allows`, the ceiling named (`2026-10-03`: 4 MiB against a 2.97 MB document, about 71%). The body is validated
+`cwd` the home directory, `maxBuffer` 16 MiB (`STATUS_MAX_BUFFER` in `dispatcher-state.transport.ts` — the document carries
+every plan's `goal` and events whole, so a verb's 1 MiB is not headroom enough). The subprocess is `readDispatcherJson` in `server/shared/dispatcher-command.ts`, the one run every lane reading a dispatcher document goes through (the roadmap module's `roadmap show --json` read too); `maxBuffer` is its caller's argument, and a failure is a throw naming `dispatcher <argv joined by spaces>`. A document past the ceiling reaches the journal as `printed more than <maxBuffer> bytes — past the buffer this read allows`, the ceiling named (`2026-10-09`: 4.22 MB over 74 plans, one finished plan alone carrying 520 KB of events — past the former 4 MiB ceiling, so the lane answered `the dispatcher has not been read yet` and drew nothing; the ceiling is 16 MiB). The body is validated
 FIELD BY FIELD into the F1 types — `dispatcher-plan.reader.ts` reads one plan with its phases, stages
 and events, and `launched`, the one fact its own card words its button off (Resume at 3:00 AM for a
-plan that has walked, Start at 3:00 AM for one that has not); `dispatcher-arc.reader.ts` reads one arc
+plan that has walked, Start at 3:00 AM for one that has not), plus `accept_armed` (the Accept-when-cut press, `{at, by, design}` or null) and `design_loaded_at`, both read tolerantly (`acceptArmedOf`, `textSince`); `dispatcher-arc.reader.ts` reads one arc
 (its own words and status, its model word, the NAMES of its plans — never resolved into plan rows, the
 store's report already made that join and a second one would be a second answer — and the four
-readings the arc's header is drawn by: `walking`, `stopped`, `stalled`, `schedule`); `dispatcher-planner.reader.ts`
+readings the arc's header is drawn by: `walking`, `stopped`, `stalled`, `schedule` — and the two counts the deck's Accept when cut is drawn by, `armable` and `armed`, read tolerantly with `countSince`); `dispatcher-planner.reader.ts`
 reads one planner OUTING — the row the card's and the deck header's badge is drawn from, `plannerOf`, and
 the two TOLERANT reads `plannerSince` / `plannersOf` for `planner` and `planners`, because those are keys
 a dispatcher build older than them never wrote (`route.planners`, the planner lane's dial and census, is tolerant the same way in `dispatcher-state.service.ts`: absent is no readout, a malformed one is refused by name); the transport file holds the
@@ -3260,9 +3260,9 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.cl
 ## MAN-5638 — The dispatcher lane — FIVE ROUTES NAME AN ARC
 section: dispatcher/000/006 FOUR ROUTES NAME AN ARC
 
-**FIVE ROUTES NAME AN ARC**: `POST /arcs/:name/model { model }`, and `stop`, `resume`, `schedule { when }`
-and `wip { limit, word }` beside it. One handler factory (`arcRelay`) makes them, because they differ in
-nothing but the verb they relay and how its argument is read — the two argument-free verbs take no
+**SEVEN ROUTES NAME AN ARC**: `POST /arcs/:name/model { model }`, and `stop`, `resume`, `schedule { when }`,
+`wip { limit, word }`, `arm-accept` and `disarm-accept` beside it. `arm-accept` relays `--by app:card` and nothing from the body (the dispatcher arms each designed plan on its own current stamp); the plan route `POST /plans/:name/arm-accept` carries the one stamp the card drew, `{ design }`, checked against `DESIGN_STAMP` before any process starts, with `--by app:card --design <stamp>` as the argv. `POST /plans/:name/disarm-accept` takes no body (MAN-8075). One handler factory (`arcRelay`) makes them, because they differ in
+nothing but the verb they relay and how its argument is read — the argument-free verbs take no
 body at all, `schedule`'s `when` goes through the same `readDispatcherScheduleWhen` grammar the plan's own route does, and `wip` is an epic's verb alone (no plan route; MAN-7682) whose `limit` and `word` `wipArgs` checks (`readDispatcherWipWord`), each refused before any process starts. They have their own fence for a reason:
 `ARC_NAME` is the plan name class with the arc's adornment allowed (`store_arcs.ARC_SUFFIX` — `.arc`), so an arc route takes `<name>` or `<name>.arc`, while `PLAN_NAME` takes the bare name alone and refuses the adornment — the dispatcher's own door rule, which this lane never normalizes: the arc's name travels on exactly as the URL spelled it. THE CLI IS WHAT APPLIES AN ARC'S VERB TO ITS PLANS, in one
 transaction: this lane relays `<verb> <arc>` and never loops over the arc's plans itself — the arc's
@@ -3270,7 +3270,7 @@ name is the whole argument, the dispatcher resolves it plan-first-then-arc (`arc
 terminal and the card therefore say the same thing because they say it with the same verb. An unknown
 arc is refused by the VERB's own line, which names both doors (`no plan or arc <name>`), never
 re-worded by these routes. `model` hands its word to EVERY plan of the arc (`store.set_arc_model`); `stop`, `resume` and `schedule` reach the sets the header's
-own controls are drawn for (`report_arcs.walking` / `.stopped` / `.stalled`), and the next frame redraws the header
+own controls are drawn for (`report_arcs.walking` / `.stopped` / `.stalled`), `arm-accept` and `disarm-accept` the sets the deck's Accept when cut is (`.armable` / `.armed`), and the next frame redraws the header
 and its plans together: nothing optimistic, and nothing copied by this server.
 
 Reads: `GET /plans` and `GET /plans/:name` both start by awaiting `current()` (`dependencies.current`,
@@ -3507,8 +3507,10 @@ section: dispatcher/010 The plan card/014 The controls by status.
 **The controls by status.** `live` → Stop; `stalled` → Resume AND Stop (the plan is released and its running work has ended with nothing to record it: Resume — the same `resume` verb, which wakes the dispatcher or starts one — is the press that starts things again, and Stop stays for an operator who would rather hold the plan; a stalled card never offers Stop alone); `paused` → Resume AND `Resume at …`; `queued` → Start (it
 IS `resume`) AND `Start at …`; `scheduled` → the same pair, reading the armed hour (`startAt =
 epochOf(schedule.start_at)`); the hour itself is the card's own clock (`PlanClock`, `data-dispatcher-clock`)
-and is not said a second time beside the buttons; `parked` → Unpark; `idle` in state `designed` or
-`questions` → Park (the way out of the designed Stop hold); `complete` and any other `idle` → no verb.
+and is not said a second time beside the buttons; `parked` → Unpark; `idle` in state `designed` → `Accept when cut` AND Park (the way out of the designed Stop hold);
+`idle` in state `questions` → Park alone; `idle` in state `loaded` with a press still standing (`plan.accept_armed`: the cut has landed, the daemon has not yet approved it) → the armed word and Cancel, and no Park; `complete` and any other `idle` → no verb.
+
+**ACCEPT WHEN CUT** (`AcceptWhenCut.tsx`, scope `plan`, MAN-8075): the operator's Accept given on a design he has read, ahead of its cut — the daemon approves the first cut of that exact design and walks it, and a Rework disarms it. Drawn before Park, where the dispatcher would take the press and never greyed out where it would refuse: `pressable` = state `designed`, no `accept_armed`, a `design_loaded_at`. Once pressed it reads `Accepted · starts when cut` (`dispatcher.acceptWhenCutArmed`) as a non-button span, its tooltip the door and hour (`acceptWhenCutArmedTitle`), with `Cancel` (`dispatcher.acceptWhenCutCancel`) beside it. The press posts `design_loaded_at` — the stamp of the design THIS card drew — so a press on a design that has since moved is refused by the dispatcher, never landed on the new one; `--by app:card` is the server's own word. Exit 3 (`already armed`: a double press, or the phone beside the card) is toasted as information, not a fault (`alreadyArmed` in `hooks/useArmAcceptVerbs.ts`, read by `useDispatcherVerbs`); a refusal is headed `dispatcher.acceptWhenCutRefused`. Handles: `data-dispatcher-arm-accept` (press), `data-dispatcher-arm-accepted` (armed word), `data-dispatcher-disarm-accept` (Cancel). A model cannot press it: the verb refuses inside a Claude session and the server strips that variable.
 A `complete` plan's bar draws nothing at all (no verb and no switch); putting its card away is Dismiss
 on a complete plan and Hide on any other (`putAwayVerb`, MAN-6803), in the head's corner on every card.
 
@@ -3529,7 +3531,7 @@ either way.
 Every verb goes through `useDispatcherVerbs(name, 'plan', resumeWord)` under one `busy`; a refusal
 toasts the dispatcher's own first line, and a SUCCESS toasts the dispatcher's own sentence (the empty-
 body fallback is `runner.toast.model` for a model press, never its refusal word). Handles:
-`data-dispatcher-stop|resume|start|park|unpark|planner-resume`, `data-dispatcher-schedule` (`-set`, `-cancel`,
+`data-dispatcher-stop|resume|start|park|unpark|planner-resume|arm-accept|arm-accepted|disarm-accept`, `data-dispatcher-schedule` (`-set`, `-cancel`,
 and the armed hour as the group's own attribute VALUE — `''` while unarmed).
 The button words Stop, Resume, Start are `runner.*`; Park and Unpark are
 `dispatcher.park` / `dispatcher.unpark`, and a Delete's toast is headed `dispatcher.delete.word`.
@@ -3628,7 +3630,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/, /home/l
 ## MAN-6801 — The plan card — Its four controls are the plan card's own, applied to the whole arc.
 section: dispatcher/010 The plan card/021 Its four controls are the plan card's own, applied to the whole arc.
 
-**Its four controls are the plan card's own, applied to the whole arc.** Pause, Start and
+**Its controls are the plan card's own, applied to the whole arc.** `Accept when cut` (`AcceptWhenCut.tsx`, scope `dispatch-arc`, MAN-8075): the press is drawn while `arc.armable > 0` and presses every DESIGNED member on that member's own current design (`dispatcher arm-accept <arc>`; a member not yet designed is not armed — he has not read its design); once none is left to press, the armed word and Cancel while `arc.armed > 0` (Cancel is `disarm-accept <arc>`). Handles `data-dispatch-arc-arm-accept`, `data-dispatch-arc-arm-accepted`, `data-dispatch-arc-disarm-accept`; the row also draws where `armable` or `armed` is above zero and nothing else holds. The press carries no stamp. Then Pause, Start and
 `Schedule start` — the last two drawn where `arc.stopped`, Pause where `arc.walking` (the arc's released plans: `live`, and the `stalled` ones), and none of the three
 where neither holds, so the deck never offers a press the dispatcher would refuse; and RESUME where `arc.stalled` with nothing stopped (the same `dispatcher resume <arc>` the Start is, which takes the stalled plans — their running work ended with nothing to record it, `report_stall` — along with the stopped ones; with plans stopped as well the one button is Start and reaches both) — plus
 `RunModelControl` scope `dispatch-arc` drawing the ARC'S OWN word (`arc.model`, never a plan's
@@ -3652,7 +3654,7 @@ unpauses every plan of it and the first one walks while the rest wait their turn
 unless it has dependencies", exactly as asked. THE CONTROLS NEVER LOOP OVER THE ARC'S PLANS THEMSELVES: they post the
 arc's name and nothing else, and the arc's own hour reads back over the plans — `arc.schedule` is a stamp
 only when every STOPPED plan of the arc carries the same one, which one press of this control always
-makes true — so an hour the header names is an hour the Cancel beside it clears. All four go through `useDispatcherVerbs(arc.name, 'arc', t('runner.start'))` — ONE hook for both hands, the scope
+makes true — so an hour the header names is an hour the Cancel beside it clears. All of them go through `useDispatcherVerbs(arc.name, 'arc', t('runner.start'))` — ONE hook for both hands, the scope
 deciding which door a press is relayed through; the third argument is the word a refused press of Start is headed
 with (the drawn one, as `PlanControls` passes its own), while a refused Pause and a refused Schedule start are
 headed with the hook's own `word()`: `runner.stop` (`Stop`) and `runner.schedule.refused` (`Schedule`). Handles: `data-dispatch-arc-stop`, `data-dispatch-arc-resume`,
@@ -3740,14 +3742,14 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/, /home/l
 section: dispatcher/010 The plan card/025 The verbs' door.
 
 **The verbs' door.** `api.dispatcher` (`src/shared/api.ts`): `plans()`, `plan(name)`, `offpeak()`,
-`stop|resume|park|unpark|drop|plannerResume(name)`, `schedule(name, when)`, `model(name, choice)` over
+`stop|resume|park|unpark|drop|plannerResume|disarmAccept(name)`, `schedule(name, when)`, `model(name, choice)` and `armAccept(name, design)` (the stamp the card drew, MAN-8075) over
 `/api/dispatcher/plans…`, and `arcModel(name, choice)`, `arcStop(name)`, `arcResume(name)`,
-`arcSchedule(name, when)` and `arcWip(name, limit, word)` over `/api/dispatcher/arcs/:name/…` — five routes,
+`arcSchedule(name, when)`, `arcWip(name, limit, word)`, `arcArmAccept(name)` and `arcDisarmAccept(name)` over `/api/dispatcher/arcs/:name/…` — seven routes,
 one per verb an arc's own name reaches (MAN-1498); `wip` is an epic's verb alone and has no plan route (MAN-7682). `answer(ask, answers, notes?)` is no verb: it is `POST /api/dispatcher/answer`, the
 prompts' own door (MAN-7400), carrying the ask exactly as the card drew it, the chosen label (or typed words)
 by question, and a Rework's notes by question. `useDispatcherVerbs.answer` is the ONE press that reports
 back: it resolves `true` on a 2xx, `false` on a refusal or a request that never completed, and the card draws its
-answered state from that `true`; the nine verbs resolve `void`. `busy` is `'answer'` while it is out, and a
+answered state from that `true`; the eleven verbs resolve `void` (`armAccept` and `disarmAccept` live in `hooks/useArmAcceptVerbs.ts`, relayed through the hook's own `send`). `busy` is `'answer'` while it is out, and a
 control disables itself on it. `'answer'` lives in the hook's own `DispatcherPress` and never joins
 `DispatcherVerb`, the set the server spawns. The verbs return the
 raw `Response`: a refusal is a RESULT on a 409 with the dispatcher's line on `stdout`, which
@@ -10348,14 +10350,15 @@ key for key. The emitted document is the source of the shape.
   `running`, `done`.
 - `offpeak_at` is a `string`, never null: `plan_runner.when.stamp` answers the literal `none` when
   the clock cannot.
-- `DispatcherVerb` is nine of the CLI's own verbs: `stop`, `resume`, `schedule`, `park`, `unpark`,
-  `planner-resume`, `wip` (an epic's feature or task limit, `hooks/dispatcher/cmd/wip.py`),
+- `DispatcherVerb` is eleven of the CLI's own verbs: `stop`, `resume`, `schedule`, `park`, `unpark`,
+  `planner-resume`, `arm-accept` and `disarm-accept` (the operator's Accept when cut and its Cancel,
+  `hooks/dispatcher/cmd/arm_accept.py`, MAN-8075), `wip` (an epic's feature or task limit, `hooks/dispatcher/cmd/wip.py`),
   `model` (the plan's own DeepSeek / Claude word — one verb serving a plan and an arc, resolved
   plan-first-then-arc, `hooks/dispatcher/cmd/model.py`) and `drop` (the plan out of the store for
-  good, `hooks/dispatcher/cmd/drop.py`). FOUR OF THEM — `stop`, `resume`, `schedule`,
-  `model` — take an ARC's name as readily as a plan's (`arc_verbs.py`, MAN-1465), which is why the
-  client's `api.dispatcher` posts all four to `/api/dispatcher/arcs/:name/…` beside the plan routes
-  (`arcStop`, `arcResume`, `arcSchedule` and `arcModel`) and why `DispatcherVerbResult`'s refusal is
+  good, `hooks/dispatcher/cmd/drop.py`). SIX OF THEM — `stop`, `resume`, `schedule`,
+  `model`, `arm-accept`, `disarm-accept` — take an ARC's name as readily as a plan's (`arc_verbs.py`, MAN-1465), which is why the
+  client's `api.dispatcher` posts all six to `/api/dispatcher/arcs/:name/…` beside the plan routes
+  (`arcStop`, `arcResume`, `arcSchedule`, `arcModel`, `arcArmAccept` and `arcDisarmAccept`) and why `DispatcherVerbResult`'s refusal is
   worded for both. `wip` is the arc's alone (`arcWip`); `park`, `unpark`, `drop` and
   `planner-resume` name a plan only.
 - `DispatcherPlan.model` is the plan's EFFECTIVE model word — its own, else its arc's, else the runner's
@@ -10386,6 +10389,14 @@ section: The dispatcher types — the store's document, mirrored in two files/00
   verb reach the same plans. An arc still has no phases and no events; a plan carries no `plans`.
   `walking` and `stopped` are read through `flagSince` and `schedule` through `textSince`, so an older
   frame reads false / null and the header simply offers no arc verbs rather than failing to load.
+  Two counts ride beside them: `armable: number` (the arc's `designed`, unarmed plans — what the deck's
+  `Accept when cut` is drawn for) and `armed: number` (its plans carrying a press — what the deck's Cancel
+  reaches), `report_arcs.armable` / `.armed` (MAN-8075), read through `countSince`.
+- `DispatcherPlan.accept_armed` is `{ at: string; by: string; design: string } | null`: the operator's
+  Accept-when-cut press (the door, the stamp, the design stamp he read), and `DispatcherPlan.design_loaded_at`
+  is `string | null`: the stamp of the design the plan carries now, which the card sends back with its
+  press. Both mirror the document's keys (`report.plan_dict`); an older frame reads `null` for each, and the
+  card draws no press (`dispatcher-plan.reader.ts`: `acceptArmedOf`, `textSince`).
 - `runtime_s: number` rides `DispatcherPlan` and `DispatcherArc`: how long at least one agent was out on the plan, or on the epic (the union over its plans' intervals, each clipped at the feature's join moment, and its own outings, never their figures added), in whole seconds, derived at the dispatcher's reading time (`report_runtime`, MAN-7770). Both readers read it through `countSince` (an older build's frame reads `0`). It moves on every read of a thing with an agent out, so `dispatcher-watcher.service.ts`'s `changeOf` leaves it out of its comparison (MAN-5633) and the card ticks it between frames while an agent is out on it (`WorkingPill`, MAN-6789).
 - `tokens_cache_read: number | null` rides `DispatcherStage`, `DispatcherPhase`, `DispatcherPlan` and
   `DispatcherArc` beside `tokens_in`: the part of it SERVED from the prompt cache (`costs.claude_cache_read`,
@@ -11888,10 +11899,22 @@ Rules:
 5. A lock's census is drawn whole through `QuestionText` in one `max-h-[50dvh]` focusable `region` (`aria-label` = `ask.header`): no clamp, no excerpt. `why:` the last line is `lock:<digest>`, and the press approves what is drawn (MAN-7400). A round has no region: its questions are paged (rule 8), and its strip is labelled `dispatcher.ask.questionsStrip` (`ask.plan`).
 6. Lock buttons are `lockOptions(ask)` labels verbatim, each description as its `title`; the label IS the answer sent. Accept primary, Queue secondary, Rework outline, all `h-8`.
 7. Rework swaps the three buttons for the `vv-input` textarea, `Send notes` (disabled until words) and Cancel; Cancel keeps the notes.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/LockAnswer.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/PlanAsk.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/RoundAnswer.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/SnapStrip.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/ask-lane.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/deck-strip.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/round-strip.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-card-ask.mjs
+
+## MAN-8076 — The plan card — the ask band (`PlanAsk`, `LockAnswer`, `RoundAnswer`) — A round is PAGED, one question a view, on `SnapStrip` — the arc deck's own strip shape (MAN-5709
+section: The plan card — the ask band (`PlanAsk`, `LockAnswer`, `RoundAnswer`)/001 A round is PAGED, one question a view, on `SnapStrip` — the arc deck's own strip shape (MAN-5709
+
 8. A round is PAGED, one question a view, on `SnapStrip` — the arc deck's own strip shape (MAN-5709, operator 2026-10-01: "Less scrolling the better"): the arrows with `Question N of M` (`dispatcher.pager.question`), a swipe or a horizontal wheel, Left/Right made inside the strip and not in a text control, and the strip as tall as the question in view (no `max-h`, no inner scrollbar). Above it a `StatusFlow` of the questions, drawn when there is more than one: the node in view selected, an answered question `✓` and `positive`, an unanswered one its number and `neutral`; a node press is `goTo`. A page: `QuestionText`, the options (`QuestionOptionRow` with `choice="radio"` and no `keyHint`, inside `role="radiogroup"`), the dashed `Other…` row OUTSIDE the group opening an `Input` (the only `autoFocus`; it follows the press, never a restore). Picking a label closes Other and pages to the NEXT UNANSWERED question (forward from this one, wrapping to the earlier ones; none left → the reader stays) and moves focus to the strip, so the next Tab enters the question now in view; an option press within 500ms of a paging pick is dropped (`PAGING_SETTLE_MS`: the next question is sliding under the pointer, and a repeat tap would answer it unread); only the question in view is live — the other pages are `inert`, so Tab and the browser's focus-scroll cannot enter an off-view page and slide the strip back to it; opening Other and typing never page; opening Other clears the pick; typed words are kept on both. `Send answers` sits under the strip, outside every page, enabled only once EVERY question has an answer. A fold (`display:none`) keeps the question the reader was on (`useSnapStrip` reads nothing from a strip with no width, MAN-5715). `why:` the strip is the arc deck's own, so no snap, key or height rule exists twice.
 9. Answer keys: a lock's by `ask.question` — Accept and Queue send their label; `Send notes` sends the Rework label plus `notes: { [ask.question]: notes.trim() }`; a round's by each answered question's own text.
 10. `busy` (one `const` per form) is read by the lock's Accept, Queue, Rework and `Send notes`, and the round's `Send answers`. The compose-only controls — the lock's notes field and Cancel, the round's rows, `Other…` row and field — stay live on purpose: none sends. Gating the round's rows needs a `disabled` prop on `QuestionOptionRow` (shared component, own review).
 11. Nothing calls `focus()` on mount and no key is bound outside the controls.
+12. An `accept` ask is never drawn for a plan carrying an Accept-when-cut press on its current design (`accept_armed`): the dispatcher raises none (`owed.debt` skips `armed_accept.carried`, MAN-7399), so `asking` is null and the card draws the armed word instead (MAN-6794). A cut that ended short hands the ask back. `.verify/lib/ask-lane.mjs` row builders carry `accept_armed: null`, `design_loaded_at: null` (plans) and `armable: 0`, `armed: 0` (arcs).
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/LockAnswer.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/PlanAsk.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/RoundAnswer.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/SnapStrip.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/ask-lane.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/deck-strip.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/round-strip.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-card-ask.mjs
+
+## MAN-8077 — The plan card — the ask band (`PlanAsk`, `LockAnswer`, `RoundAnswer`) — Proof: `node .verify/probe-card-ask.mjs` — the In flight face of the live client (`:5183`), its lane
+section: The plan card — the ask band (`PlanAsk`, `LockAnswer`, `RoundAnswer`)/002 Proof: `node .verify/probe-card-ask.mjs` — the In flight face of the live client (`:5183`), its lane
 
 Proof: `node .verify/probe-card-ask.mjs` — the In flight face of the live client (`:5183`), its lane rewritten in both of the page's ways in (`.verify/lib/ask-lane.mjs`: the REST seed and every `dispatcher_state` frame), around the real census (`dispatcher question coi-backend-conformance`, a pure read), in four combos (1440×900 and 390×844 at root font 1.072×, light and dark). Reads the design's seven seam-3 groups off the DOM: the loose card's census whole in its bounded region; the deck's round above the strip (three questions, `lib/ask-lane.mjs`), no plan card drawing an ask, and the round PAGED (`lib/round-strip.mjs`: exactly one question in view; `Question 1 of 3`; the arrow, a Right key inside the strip and a horizontal wheel each page one; a pick pages to the next unanswered and marks its node done, wrapping past an answered one; opening or typing in Other never pages and Left/Right in its field are the caret's; Send disabled until the last question is answered; the strip's height equals the page in view, with no bounded box and no inner scrollbar; the Send's `Q:`/`A:` pairs in question order, read in the page and never carried; a fold keeps the question the reader was on) and the arc's own strip beneath it read again (`lib/deck-strip.mjs`) with the lock beside the round unchanged; the folded bar (form `display:none`, the bar reopening the card); Rework's Send disabled until the notes hold real words, Cancel giving the three answers back; Queue on the wire — the ask byte-identical to the fixture's, the label as its answer — refused by the live door (409 `not-open`) with the prompt still standing; every other non-GET answered in the page and listed; 0 console errors. Shots `.verify/shots/card-ask-<combo>-<theme>.png` (4). Exits 1 with the failed checks. 2026-10-01: 584 `[OK]`, 0 `[FAIL]`, ALL READINGS HELD — before rule 8's `inert` pages, `PAGING_SETTLE_MS` and focus-to-strip landed; not re-run since, and none of the three has a reading of its own. Its `--surfacing` mode (seam 4, 1920×1080, dark and light, the Chat tab pressed so the gutter is drawn) ADDS four fixtures to the same lane — an asking loose plan that is the lane's OLDEST and `idle`, a QUIET arc carried ahead of the asking one, an arc owing a word on its SECOND plan placed LAST of the frame's `arcs`, and that second plan put away an hour BEFORE the ask it carries — and reads that an asking card KEEPS ITS PLACE (MAN-7577) and draws its band: the asking plan is the LAST loose card of the tab's wall, the asking arc stands AFTER the quiet one among the decks, the widget lists the quiet arc, the asking arc, the lane's own cards, the asking plan last, and the put-away plan is DRAWN in both homes, on no `Hidden` list (`newestMoment` counts the ask). Seam 3's two fixtures stay out of this mode, so "the asking plan" is ONE plan. Nothing is pressed in it (no ask answered, no card hidden, no fold stored), and every other non-GET the page makes is answered in the page. No ask is raised, so nothing is pushed to the operator's phone; every press that reaches the live door carries an `asked.id` above 900000, which no store has held — it can only refuse, and writes nothing. `installAskLane` registers AFTER any catch-all `context.route` (Playwright tries the newest route first). Phone readings select the project at desktop width, then resize: below 768px the project row matches nothing (`lib/console.mjs`). Its `--retired` mode (seam 6a) reads the lane's bell and the amber tab and widget marks off pictures pushed into the page's socket (`pushPicture`): MAN-7540. A new mode adds its fixtures to `ask-lane.mjs`, never a real press.
 
