@@ -2,6 +2,7 @@ import { cerberusDefinitionsDb } from '@/modules/database/index.js';
 import type { CerberusDiagnosisToolDeps } from '@/shared/cerberus-types.js';
 
 import { unquotedLines, unquotedSentence } from './diagnosis-absence.js';
+import { unsupportedClauses, unsupportedSentence } from './diagnosis-audit.js';
 import { historyReadStep, nodeReadStep } from './diagnosis-step-words.js';
 import type { DiagnosisStepLog } from './diagnosis-steps.js';
 import { readDiagnosisHistory } from './diagnosis-history.js';
@@ -41,12 +42,19 @@ import { callNode } from './diagnosis-wire.js';
  * spliced or decorated line is not a line of a read, so "zero sweep entries found", a paraphrase of a file and a journal line with
  * its time moved all fall to the one rule, which a share of the line or a list of words could not hold (INV-7169, measured four times).
  *
+ * THE SUMMARY IS HELD LAST, BY A SECOND READER. The gates above hold what was quoted; a summary's claims are prose, so after them
+ * `submit` has `diagnosis-audit.ts` name every clause that states as found what no evidence line shows, and refuses on its word —
+ * at most twice per diagnosis, and never when the auditor could not answer.
+ *
  * `canRunFixes` is false for the hub: `center` runs no warden, so a proposal made for it could never be
  * run or promoted. `submit` refuses one with a sentence the agent reads and answers by resubmitting
  * with `proposal: null`, which is a better ending than a fix button that cannot work.
  *
  * Consumers: `diagnosis.service.ts`, which hands the result to `buildDiagnosisTools`.
  */
+
+/** How many times the summary audit may refuse one diagnosis; the next submission goes through whatever it would say. */
+const AUDIT_REFUSALS_ALLOWED = 2;
 
 /** A note is one sentence of at most 300 characters (`diagnosis-tools.ts`); the room above is for what masking adds, so a note is not cut for being masked. */
 const NOTE_LIMIT = 400;
@@ -77,6 +85,8 @@ export function buildDiagnosisToolDeps(input: {
   // a refusal or a failure is something the agent may quote in a note, but is no source for an evidence line.
   const answers: string[] = [];
   const found: string[] = [];
+  /** How many submissions the summary audit has refused in this diagnosis. */
+  let auditRefusals = 0;
   /** Throws, with the sentence the agent reads, when any of `texts` quotes words no read returned and the prompt does not hold. */
   const refuseUnreadQuotations = (texts: string[]): void => {
     const unread = unreadQuotations(texts, [...answers, told.prompt]);
@@ -106,7 +116,7 @@ export function buildDiagnosisToolDeps(input: {
       refuseUnreadQuotations([text]);
       steps.say(oneMaskedLine(text, NOTE_LIMIT));
     },
-    submit: (submission) => {
+    submit: async (submission) => {
       if (!canRunFixes && submission.proposal !== null) {
         throw new Error(`${node} runs no warden, so no fix can be run there. Submit proposal: null`);
       }
@@ -116,6 +126,13 @@ export function buildDiagnosisToolDeps(input: {
       const unquoted = unquotedLines(submission.evidence, found);
       if (unquoted.length > 0) throw new Error(unquotedSentence(unquoted));
       refuseUnreadQuotations([submission.summary, ...submission.evidence]);
+      // The summary's prose is held last, by a second reader, and only twice: a third submission goes through (the audit is no reason for a diagnosis to fail).
+      if (auditRefusals >= AUDIT_REFUSALS_ALLOWED) return;
+      steps.say('Checking the summary against the evidence');
+      const unsupported = await unsupportedClauses(submission);
+      if (unsupported === null || unsupported.length === 0) return;
+      auditRefusals += 1;
+      throw new Error(unsupportedSentence(unsupported));
     },
   };
 }

@@ -340,6 +340,7 @@ export type CerberusFrameType =
   | 'sessions.list'
   | 'sessions.listed'
   | 'session.retire'
+  | 'sessions.changed'
   | 'diag.open'
   | 'diag.opened'
   | 'diag.call'
@@ -461,10 +462,21 @@ export type CerberusSessionsListedBody = { re: string; hosts: CerberusNodeHost[]
 
 /**
  * `session.retire` — center → warden: end a host that is no longer wanted (an older host of the
- * same session, one running a stale CLI while idle). Nothing is answered; the next `sessions.list`
- * no longer holds it. A `hostId` outside `[A-Za-z0-9_-]` is refused by the warden, as in `session.open`.
+ * same session, one running a stale CLI while idle). Nothing is answered at once; when the retire is
+ * over the warden says `sessions.changed`, and the next `sessions.list` no longer holds the host. A
+ * `hostId` outside `[A-Za-z0-9_-]` is refused by the warden, as in `session.open`.
  */
 export type CerberusSessionRetireBody = { hostId: string };
+
+/**
+ * `sessions.changed` — warden → center: the retire it was asked for (`session.retire`) is over — the
+ * host said `exit` and its files are gone, the host was already gone, or the warden gave up waiting
+ * for it — so the list center last read of this node may be stale. Center lists the node again; the
+ * frame carries no host list of its own. It is how a host that takes long to leave stops being
+ * counted: a CLI in the middle of a tool call can outlast any settle center waits after the retire.
+ * A warden older than the frame never sends it, and center never waits for it.
+ */
+export type CerberusSessionsChangedBody = { hostId: string };
 
 // ---------------------------
 
@@ -1625,7 +1637,8 @@ export type CerberusDiagnosisHistoryQuery = {
  *     carries a credential — masking would break the command, so it is refused to the agent, never
  *     altered — an evidence line that is not one stretch of one line of a read's answer, verbatim (an
  *     absence, the check's own value, a paraphrase, a spliced or edited line), and a quotation no read
- *     returned. The summary and evidence it takes are stored masked.
+ *     returned. Last it has a second reader (`diagnosis-audit.ts`) name any clause of the summary that states as found what no
+ *     evidence line shows — it answers late, and refuses a diagnosis at most twice. The summary and evidence it takes are stored masked.
  * Each call may throw; the tool turns that into an error the agent reads, never a crash of the loop.
  */
 export type CerberusDiagnosisToolDeps = {
@@ -1637,7 +1650,7 @@ export type CerberusDiagnosisToolDeps = {
   ) => Promise<Pick<CerberusDiagResultBody, 'ok' | 'text' | 'truncated'>>;
   historyRead: (query: CerberusDiagnosisHistoryQuery) => string | Promise<string>;
   note: (text: string) => void;
-  submit: (submission: CerberusDiagnosisSubmission) => void;
+  submit: (submission: CerberusDiagnosisSubmission) => void | Promise<void>;
 };
 
 // ---------------------------

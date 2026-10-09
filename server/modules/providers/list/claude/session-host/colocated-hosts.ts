@@ -49,7 +49,8 @@ const settling = new Map<string, NodeJS.Timeout>();
  *
  * consumer: node-transport.ts, when a fresh host answers, when a host's `exit` is delivered and when a
  * refused fresh placement retires its host; node-readopt.ts and readopt-host.ts, when a re-adoption
- * retires a host
+ * retires a host, and node-readopt.ts again when a warden says a host it was asked to retire has
+ * ended (`nodeSessions.onHostsChanged`) — the host that takes longer to leave than this settles
  */
 export function noteNodeHostsChanged(node: string): void {
   if (settling.has(node)) return;

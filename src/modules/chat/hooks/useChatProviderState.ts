@@ -12,6 +12,7 @@ import type { PendingPermissionRequest, PermissionMode,
 import { DEFAULT_EFFORT_VALUE } from '@/shared/constants';
 import { readSelectedProvider, writeSelectedProvider } from '@/shared/selectedProvider';
 import { useProviderPermissionMode } from '@/modules/chat/hooks/useProviderPermissionMode';
+import { useReloadModelsOnCliChange } from '@/modules/chat/hooks/useReloadModelsOnCliChange';
 
 const FALLBACK_PROVIDER_EFFORT_VALUES: Partial<Record<LLMProvider, readonly string[]>> = {
   // Superset used only before the model catalog loads; `ultracode` belongs to the
@@ -220,7 +221,9 @@ export function useChatProviderState({ selectedSession, selectedProject: _select
         nextCatalog[p] = entry;
       });
 
-      setProviderModelCatalog(nextCatalog);
+      // Laid over the previous catalog, not replacing it: a provider whose answer was unusable (a JSON
+      // error body) keeps its last good list instead of vanishing from a working picker on a reload.
+      setProviderModelCatalog((previous) => ({ ...previous, ...nextCatalog }));
     } catch (error) {
       console.error('Error loading provider models:', error);
     } finally {
@@ -233,6 +236,7 @@ export function useChatProviderState({ selectedSession, selectedProject: _select
   useEffect(() => {
     void loadProviderModels();
   }, [loadProviderModels]);
+  useReloadModelsOnCliChange(loadProviderModels);
 
   useEffect(() => {
     let cancelled = false;

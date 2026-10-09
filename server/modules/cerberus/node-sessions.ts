@@ -70,6 +70,9 @@ type NodeChannel = {
 /** A link-up subscriber; it may be async, and a throw or rejection is logged here, never raised. */
 type LinkUpListener = (node: string) => void | Promise<void>;
 
+/** A subscriber to a warden's `sessions.changed`, run as a link-up listener is. */
+type HostsChangedListener = (node: string) => void | Promise<void>;
+
 type OpenChannel = { node: string; link: CerberusWardenLink; handlers: ChannelHandlers };
 
 type PendingList = {
@@ -84,6 +87,7 @@ const channels = new Map<string, OpenChannel>();
 const pendingLists = new Map<string, PendingList>();
 const lastListedByNode = new Map<string, CerberusNodeHost[]>();
 const linkUpListeners = new Set<LinkUpListener>();
+const hostsChangedListeners = new Set<HostsChangedListener>();
 /** The link object each node last had, so that an attach is told from a node merely entering or leaving silence. */
 const linkSeenByNode = new Map<string, CerberusWardenLink>();
 let armed = false;
@@ -221,10 +225,17 @@ function settleLinkChange(node: string): void {
   }
 }
 
+/** A warden's word that the retire it was asked for is over: whoever keeps the node's list true lists it again. */
+function onSessionsChanged(node: string, body: unknown): void {
+  if (!isRecord(body)) return;
+  for (const listener of [...hostsChangedListeners]) runHolderHandler(node, 'hosts-changed', () => listener(node));
+}
+
 const FRAME_HANDLERS = {
   'session.frame': onSessionFrame,
   'session.closed': onSessionClosed,
   'sessions.listed': onSessionsListed,
+  'sessions.changed': onSessionsChanged,
 };
 
 function armOnce(): void {
@@ -341,12 +352,23 @@ export const nodeSessions = {
     return structuredClone(lastListedByNode.get(node) ?? []);
   },
 
-  /** Asks the node's warden to end a host. Answers whether the request went out; nothing is answered back. */
+  /** Asks the node's warden to end a host. Answers whether the request went out; the warden answers later with `sessions.changed` (`onHostsChanged`). */
   retireHost(node: string, hostId: string): boolean {
     armOnce();
     const sent = wardenLinks.send(node, 'session.retire', { hostId });
     if (!sent) console.warn(`[Cerberus] could not ask node ${node} to retire host ${hostId}: its link is not usable`);
     return sent;
+  },
+
+  /**
+   * Subscribes to a node's warden saying that a retire it was asked for is over (`sessions.changed`): the
+   * list last read of that node may be stale, so the listener lists it again. Answers the unsubscribe.
+   * A warden older than the frame never says it. consumer: the session host's node re-adoption (`node-readopt.ts`)
+   */
+  onHostsChanged(listener: HostsChangedListener): () => void {
+    armOnce();
+    hostsChangedListeners.add(listener);
+    return () => hostsChangedListeners.delete(listener);
   },
 
   /**

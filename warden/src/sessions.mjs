@@ -284,7 +284,8 @@ export function createSessions({ link, home }) {
       log('ignoring a session.retire without a usable host id');
       return;
     }
-    registry.retireHost(hostId);
+    // The retire is over when the host has said `exit` (or was gone, or the registry gave up): center lists the node again.
+    registry.retireHost(hostId, () => say('sessions.changed', { hostId }));
   }
 
   link.on('session.open', open);

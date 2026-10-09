@@ -343,11 +343,15 @@ export function createHostRegistry({ tmuxSocketName, keepaliveSession, sessionsD
    * Winds one host down over its own socket: EOF first, then SIGTERM if the CLI is still there.
    * Fire-and-forget by design — a boot must not wait on a CLI it has already decided to drop.
    * @param {string} hostId
+   * @param {() => void} [onEnded] Called once, from the socket's `close`, when the retire is over: the
+   *   host said `exit` and its journal and meta are removed, it was already gone, or the give-up
+   *   timer ended the wait. It must not throw. The warden tells center with it (`sessions.changed`).
    */
-  function retireHost(hostId) {
+  function retireHost(hostId, onEnded) {
     const socket = net.connect(hostSocketPath(hostId));
     // A host already gone needs no winding down, and its files are the sweep's business.
     socket.on('error', () => {});
+    if (onEnded) socket.once('close', () => onEnded());
     socket.once('connect', () => {
       /** @param {Record<string, unknown>} frame */
       const send = (frame) => {

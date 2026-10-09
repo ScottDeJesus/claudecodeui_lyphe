@@ -24,7 +24,7 @@ import { flatten } from './diagnosis-quotes.js';
  *
  * WHAT THE LINE MEANS is the operator's to judge on the sheet; this holds that it IS a line of a read. The quotation gate
  * (`diagnosis-quotes.ts`) still runs on the same submission and holds every quoted piece to the reads or the prompt, and the
- * summary is outside both (a semantic pass would hold it; no lexical gate does).
+ * summary's prose is outside both: no lexical gate holds a claim, so `diagnosis-audit.ts` has a second model read it last.
  *
  * Consumers: `diagnosis-deps.ts`, whose `submit` refuses a submission with such a line, so the agent hears which and
  * submits again with each line copied from a read or left out.

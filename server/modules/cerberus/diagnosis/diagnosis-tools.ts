@@ -245,16 +245,17 @@ export function buildDiagnosisTools(deps: CerberusDiagnosisToolDeps): Array<SdkM
     }
   );
 
-  // Set only once `deps.submit` has accepted a call. `deps.submit` is synchronous, so of two calls that
-  // arrive together the second runs after the first has set it.
+  // `submitted` is set only once `deps.submit` has accepted a call. `deps.submit` awaits the summary audit, so of two calls that
+  // arrive together the second finds `submitting` set and is told to wait: one conclusion is checked at a time, and only the first accepted counts.
   let submitted = false;
+  let submitting = false;
 
   const submitDiagnosis = tool(
     DIAGNOSIS_SUBMIT_TOOL_NAME,
     'End the diagnosis. summary: one or two sentences saying what is wrong. evidence: each thing you FOUND that says so, one line each, quoting what the journal, file, status or history said — ' +
       'a line that is not ONE line of ONE answer copied character for character, with nothing of your own on it, is refused (the check\'s value and the prompt are not reads); never what you assumed, and never the absence of an error ("no entries" is not evidence); an empty list when you found nothing. proposal: the one command the operator could run on the node ' +
       '(name = the button\'s words, cmd = the exact command now, general = the same command with absolute times made relative), or null when no fix is warranted — ' +
-      'a proposal needs evidence behind it, and is refused with none.',
+      'a proposal needs evidence behind it, and is refused with none. A second reader then checks the summary against the evidence: state as found only what an evidence line shows, and say "suggests" or "may" for a cause you infer.',
     {
       summary: plainText(600),
       evidence: z.array(plainText(400)).max(10),
@@ -268,19 +269,23 @@ export function buildDiagnosisTools(deps: CerberusDiagnosisToolDeps): Array<SdkM
     },
     async ({ summary, evidence, proposal }) => {
       if (submitted) return textResult('A diagnosis was already submitted — you are done. Do not call any tool again.', true);
+      if (submitting) return textResult('A submission is being checked — wait for its answer, then submit again only if it was refused.', true);
       if (proposal !== null && evidence.length === 0) {
         return textResult(
           'A proposal needs the evidence that points to it, and you listed none. If you found nothing that explains the check, submit proposal: null; otherwise list what you found and submit again.',
           true
         );
       }
+      submitting = true;
       try {
-        deps.submit({ summary, evidence, proposal });
+        await deps.submit({ summary, evidence, proposal });
         submitted = true;
         return textResult('Diagnosis submitted. You are done — do not call any tool again.');
       } catch (error) {
         console.error('[Cerberus] a diagnosis submission was refused', { node: deps.node, error: describe(error) });
         return textResult(`The diagnosis was not accepted: ${describe(error)}. Correct it and submit again.`, true);
+      } finally {
+        submitting = false;
       }
     }
   );

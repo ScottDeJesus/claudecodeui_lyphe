@@ -238,6 +238,8 @@ export function watchNodeLinks(deps: ReadoptDeps): void {
   releaseIfComplete();
   try {
     nodeSessions.onLinkUp((node) => onNodeLinkUp(node, deps), { replay: true });
+    // A retired host that takes long to leave is counted until its warden says it is gone (`sessions.changed`).
+    nodeSessions.onHostsChanged(noteNodeHostsChanged);
     gateFreshNodeHosts(freshHostRefusal);
   } catch (error) {
     // A relay that cannot arm (a frame type another plan holds) costs the node hosts their re-adoption and nothing

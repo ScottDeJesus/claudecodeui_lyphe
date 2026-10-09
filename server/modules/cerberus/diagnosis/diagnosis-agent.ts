@@ -96,8 +96,12 @@ export function resolveDiagnosisModel(requested?: string | null): string {
   return requested || process.env.CERBERUS_DIAG_MODEL || DEFAULT_DIAGNOSIS_MODEL;
 }
 
-/** `~/.claude/state/cerberus-diag`, made if absent: a hidden root the agent is launched in and reads nothing from. */
-function diagnosisWorkingDirectory(): string {
+/**
+ * `~/.claude/state/cerberus-diag`, made if absent: a hidden root the agent is launched in and reads nothing from.
+ *
+ * Consumers: `runDiagnosisAgent` here, and `diagnosis-audit.ts`, whose summary audit is one more session that must never become a chat.
+ */
+export function diagnosisWorkingDirectory(): string {
   const directory = path.join(os.homedir(), '.claude', 'state', 'cerberus-diag');
   fs.mkdirSync(directory, { recursive: true });
   return directory;
