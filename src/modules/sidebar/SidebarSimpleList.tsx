@@ -4,6 +4,7 @@ import type { TFunction } from 'i18next';
 import { api } from '@/shared/api';
 import { Button, ConfirmDialog, EmptyState } from '@/shared/ui';
 import { useAwaitingInputSessionIdSet, useBusySessionIdSet, useSubagentRunningSessionIdSet } from '@/shared/context/SessionProtectionContext';
+import { useSessionHostLiveSet } from '@/shared/context/SessionHostLivenessContext';
 import type { Project, ProjectSession, RecentConversationListItem, SessionWithProvider } from '@/shared/types';
 import { useSimpleChatList } from '@/modules/sidebar/hooks/useSimpleChatList';
 import { useSimpleChatProject } from '@/modules/sidebar/hooks/useSimpleChatProject';
@@ -61,6 +62,7 @@ export default function SidebarSimpleList({
   const busySessionIds = useBusySessionIdSet();
   const awaitingInputSessionIds = useAwaitingInputSessionIdSet();
   const subagentRunningSessionIds = useSubagentRunningSessionIdSet();
+  const liveHostSessionIds = useSessionHostLiveSet();
 
   const { items, hasMore, isLoading, hasError, reload, loadMore, patchLocal, patchFolderLocal, removeLocal, moveLocal } =
     useSimpleChatList(selectedSession?.id ?? null);
@@ -210,6 +212,7 @@ export default function SidebarSimpleList({
             busySessionIds={busySessionIds}
             awaitingInputSessionIds={awaitingInputSessionIds}
             subagentRunningSessionIds={subagentRunningSessionIds}
+            liveHostSessionIds={liveHostSessionIds}
             failedSessionId={failedSessionId}
             freshFolderId={freshFolderId}
             onFreshShown={onFreshShown}

@@ -78,7 +78,7 @@ section: 01-websocket-transport/003 The pieces
 | `server/modules/websocket/services/websocket-auth.service.ts` | `verifyWebSocketClient` — the upgrade-time gate for every path |
 | `server/modules/auth/auth.middleware.ts` | `authenticateWebSocket` — first DB user in platform mode, JWT verification in OSS mode |
 | `server/modules/websocket/services/websocket-state.service.ts` | `connectedClients`, the set of open `/ws` sockets, and `WS_OPEN_STATE` |
-| `server/modules/websocket/services/chat-websocket.service.ts` | The `/ws` protocol: the seven inbound handlers, `protocol_error`, the attachment trust boundary, `runDetachedChatTurn` |
+| `server/modules/websocket/services/chat-websocket.service.ts` | The `/ws` protocol: the seven inbound handlers, `protocol_error`, the attachment trust boundary, `runDetachedChatTurn`, and the one `session_host_liveness` snapshot a connecting socket is sent (MAN-8122) |
 | `server/modules/websocket/services/chat-run-registry.service.ts` | `chatRunRegistry` — one run per session, `seq` stamping, the replay buffer, the exactly-one-`complete` contract |
 | `server/modules/websocket/services/chat-session-writer.service.ts` | `ChatSessionWriter` — the object runtimes write into; swallows `session_created`, fans out to every attached socket |
 | `server/modules/websocket/services/session-upsert-broadcast.service.ts` | The only builder of `session_upserted`, and the batched broadcast helper |
@@ -199,6 +199,7 @@ immediately hand `subscribe` to the hook that does the real work:
 
 The call sites the table does not row — `SessionProtectionContext.tsx`, `useSessionPresence.ts`,
 `useRestartOnInstalledCli.ts`, `useGitDelegation.ts`, `useUniverseStream.ts`, `useSimpleChatList.ts`,
+`SessionHostLivenessContext.tsx` (mounted by `App` directly under `WebSocketProvider`, MAN-8122),
 `useSimpleChatRemove.ts` and the kanban panel's three (`useKanbanMetis.ts`, `useKanbanLanes.ts`,
 `KanbanCardDrawer.tsx`) — take `subscribe` or `sendMessage` straight into their own hooks rather than
 owning a slice of the frame vocabulary; re-grep before quoting the number, because it grows with
@@ -638,6 +639,7 @@ flowchart TD
     SET --> E14["roadmap_state"]
     SET --> E12["notes_changed"]
     SET --> E13["simple_list_changed"]
+    SET --> E15["session_host_liveness"]
   end
   subgraph PerRun["Per-run, this run's audience only"]
     W["ChatSessionWriter connections set"]
@@ -645,7 +647,7 @@ flowchart TD
   end
 ```
 
-There are eleven broadcasters over that set: `loading_progress`, `session_upserted`, the Task Master frames, the board's `kanban_event`, the notes lane's `notes_changed` (MAN-7517), the simple-list lane's `simple_list_changed` (MAN-7519), and FIVE STATE LANES — the launcher-souls lane (`server/modules/dispatch-souls/`) over `~/.claude/state/dispatch-souls/`, a board's own Metis sessions (`server/modules/kanban-metis/`) over `~/.claude/state/kanban-metis/`, the dispatcher's plans (`server/modules/dispatcher/`) over its `status --json` document, the roadmap (`server/modules/roadmap/`, the `roadmap_state` frame, MAN-7631) over its `roadmap show --json` document, and the universe lane
+There are twelve broadcasters over that set: `loading_progress`, `session_upserted`, the Task Master frames, the board's `kanban_event`, the notes lane's `notes_changed` (MAN-7517), the simple-list lane's `simple_list_changed` (MAN-7519), the session host's `session_host_liveness` (`host-liveness.ts`, session-host MAN-695: pushed the moment a chat gains its first or loses its last host, and sent once to each socket, held until the hosts are re-adopted), and FIVE STATE LANES — the launcher-souls lane (`server/modules/dispatch-souls/`) over `~/.claude/state/dispatch-souls/`, a board's own Metis sessions (`server/modules/kanban-metis/`) over `~/.claude/state/kanban-metis/`, the dispatcher's plans (`server/modules/dispatcher/`) over its `status --json` document, the roadmap (`server/modules/roadmap/`, the `roadmap_state` frame, MAN-7631) over its `roadmap show --json` document, and the universe lane
 (`server/modules/universe/`), which watches the registered repos' `.git` HEADs and reads two live
 feeds of the estate, the systemd journal and the Claude transcripts. The four polled lanes — the launcher-souls lane, a board's own Metis sessions, the dispatcher's plans and the roadmap — tick every two seconds and put a frame on the wire only when the picture actually changed, and the universe lane is the exception, below. `notes_changed` and `simple_list_changed` go out once per write that landed and name no row and no account: a client that hears one reads its own list again. The dedup records a picture as
 sent only AFTER the send returns, so a broadcast that throws part-way is re-sent on the next tick
@@ -4090,12 +4092,13 @@ passes over a flagged launch; `collectStampedSoulLaunches` asks the same `isDisp
 caps the list. A soul the chat launched itself — a `plan-runner soul`, an `/inline` chain — carries no
 mark and stays. A launch written before the mark existed is recognised from the dispatcher's own
 records instead: a stage of a chain whose record says `until_pass: true` (the mode the dispatcher walks
-a phase's chain in — `cases cure` walks its fixes in it too, so a cure walk's unmarked stages are
-hidden from the chat that started it while this reading lasts), or a `planner`-role launch. **Those agents are shown on the epic and feature
+a phase's chain in — `cases cure` walks its fixes in it too, so a cure walk's unmarked stages, and a hand-run
+`--until-pass` chain's, are hidden from the chat that started it while this reading lasts), or a `planner`-role launch. **Those agents are shown on the epic and feature
 cards** (the Roadmap tab's In flight face — `PlanFace` and `PlanPhaseRow` draw each task's stages and
 the soul that ran each) and not in the chat's Subagents widget or strip; Clear completed acts on the
-rows the list still holds. The sidebar's purple dot is not part of this: it still lights for the chat
-while its epic has a soul or chain out, because it reads the stamp as written (MAN-6228). Proof:
+rows the list still holds. The sidebar's purple dot skips that work too: it asks the same
+`isDispatcherWork`, so a chat that only started an epic lights nothing while the epic has a soul or
+chain out (MAN-6228, INV-7062). Proof:
 `.verify/probe-subagent-epic-work.mjs` reads both lists in-process for the chat an epic was started
 from and for one that launched souls by hand.
 
@@ -4209,20 +4212,30 @@ dispatch door (`plan-runner chain`, `plan-runner soul`) is a separate process: i
 sidechain into the chat that launched it, so the reading above never sees it. The launcher records
 it instead — `spec.json` carries `launched_by`, the Claude CLI session id whose turn launched it —
 and `listRunningLaunchers` (dispatch-souls module, `running-launchers.service.ts`) reads that
-record. A chat counts when a soul it launched reads `running` by `classifyLaunch`'s own reading
-(the lane the pinned strip draws), or when a chain with a stage it launched still reads
+record. A chat counts when a soul it launched by hand reads `running` by `classifyLaunch`'s own reading
+(the lane the pinned strip draws), or when a chain with a stage it launched by hand still reads
 `status: running` with its walker alive — which keeps the dot steady between a chain's stages
 (the walker's relaunch gap, the hand-off from builder to review to doc sweep), where no soul is
-running but the work is not over. A chain is owned by every session stamped on any of its stages,
-the rule `session_rails_chains.py` keeps for the rails. The stamp is the CLI's id and the dot is the
+running but the work is not over. A chain is owned by every session stamped on any of its stages
+that is not the dispatcher's, the rule `session_rails_chains.py` keeps for the rails less the
+dispatcher's own work (below). The stamp is the CLI's id and the dot is the
 app's, so `session-subagent-runs.service.ts` maps each one through the sessions table
 (`resolveAppSessionId`), skips an id the app does not know, and unions the result with the
 sidechain answer inside the same two-second cached pass. Records older than six hours are never
 opened — above the launcher's own caps (one hour a soul, four a planner) — and a missing, torn or
-half-written record is skipped, never thrown. A planner outing or a phase chain the dispatcher
+half-written record is skipped, never thrown.
+
+**The dispatcher's own work lights nothing.** A planner outing or a phase chain the dispatcher
 launches is stamped with the session of the PLAN that asked for it, never the daemon's own
-(`launch_env`, `planners._start`), so it lights that plan's chat like any other launch while it is
-out; one launched with no session to name carries no stamp and lights nothing.
+(`launch_env`, `planners._start`) — the chat the plan was STARTED from, which launched none of it.
+Both readings therefore skip a launch `isDispatcherWork` (`dispatcher-work.service.ts`) calls the
+dispatcher's: the mark on `spec.json` (`dispatcher: {plan, phase}`), the `planner` role, or a stage of
+an `until_pass` chain. It is the test the chat's Subagents list applies (INV-7062), and one pass over
+the dispatcher's chains serves the whole call. A soul or chain a chat launched BY HAND (an `/inline`
+chain, gaps between its stages included) still lights it; so does an `Agent`-tool subagent, the
+sidechain half, which this leaves alone. While the `until_pass` bridge reading lasts, a `cases cure`
+walk or a hand-run `plan-runner chain --until-pass` (same mode, no mark) is skipped too; a chain
+launched with no session to name carries no stamp and lights nothing either way.
 
 The records and the checks behind the dispatched half are `running-launchers.service.ts` (the two readings and the 6-hour window) and `chain-record.transport.ts` (`chain.json`, `walker.pid`); the launcher rules they restate are INV-6335.
 
@@ -6631,6 +6644,7 @@ section: README/003 The protocol, in two tables/004 Server → client: the `kind
 | `loading_progress` | gateway | Project scan progress. |
 | `soul_launch_state` | gateway | The launcher souls a session started by hand, pushed on change. Feeds the soul pins in the strip above the composer when the desktop chat gutters are not showing, and in the gutter's Subagents widget while they are ([docs/MANUAL.md (dispatch-souls)](../MANUAL.md)). |
 | `simple_list_changed` | gateway | The simple chat list's shape changed: a folder was made, renamed, folded or deleted, or a chat changed place or folder. `{ kind, at }` only; names nothing, so a client that hears it re-reads the feed. Never a transcript row (MAN-7519). |
+| `session_host_liveness` | gateway | Which chats have a live session host (the CLI's tmux session). One shape, `{ kind, change: 'snapshot' \| 'live' \| 'asleep', sessionIds, at }`: a `snapshot` is sent once per connection, held until the keepalive hosts are re-adopted, then a `live` or `asleep` names the chats that gained their first or lost their last host. The ids ride an array, never a `sessionId` key, so the workspace's attention rule cannot mark the chat; no `seq`, so never a transcript row. Read by `SessionHostLivenessContext`, which grays the simple list's asleep rows (session-host, MAN-695). |
 | `universe_map` | gateway | The estate map was rebuilt because a tracked repo's HEAD moved; carries the `mapId` a client refetches `GET /api/universe/map` for. Excused from the chat reducer beside `soul_launch_state`. |
 | `universe_activity` | gateway | Coalesced estate activity — journal lines and Claude transcript edits resolved onto map stars. At most ten frames a second, and none at all while the estate is quiet; carries the held `mapId`, a `rows` array and a `dropped` count. Excused from the chat reducer. See [docs/architecture/MANUAL.md (01-websocket-transport)](MANUAL.md) §"Fan-out: who receives what". |
 | `protocol_error` | gateway | The request was rejected or never started. No `complete` follows. |

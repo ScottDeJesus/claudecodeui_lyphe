@@ -184,6 +184,7 @@
     "unread": "Terminé, pas encore lu",
     "dragHandle": "Glisser pour réordonner",
     "subagentsRunning": "Sous-agents en cours",
+    "asleep": "En veille. Votre prochain message la réveille.",
     "newFolder": "Nouveau dossier",
     "folderNamePlaceholder": "Nom du dossier",
     "folderOptions": "Options du dossier {{name}}",

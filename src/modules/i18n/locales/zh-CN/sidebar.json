@@ -178,6 +178,7 @@
     "unread": "已完成，尚未阅读",
     "dragHandle": "拖动以重新排序",
     "subagentsRunning": "子代理运行中",
+    "asleep": "休眠中。你的下一条消息会唤醒它。",
     "newFolder": "新建文件夹",
     "folderNamePlaceholder": "文件夹名称",
     "folderOptions": "文件夹 {{name}} 的选项",

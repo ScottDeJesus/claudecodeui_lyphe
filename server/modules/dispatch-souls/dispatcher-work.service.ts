@@ -36,8 +36,10 @@ import { listLaunchDirs } from './soul-launch.transport.js';
  *    started on the marking build and a fortnight has passed, no unmarked dispatcher launch is left
  *    on disk and the bridge answers `false` for everything it is asked.
  *
- * Nothing here changes what any other reader of the stamp sees: the sidebar's dot
- * (`running-launchers.service.ts`) and the file-ownership rail still read `launched_by` as written.
+ * Three readers of the stamp ask this one question: the chat's Subagents list, the lane's
+ * `dispatcher_work` flag, and the sidebar's purple dot (`running-launchers.service.ts`), so a chat that
+ * only started an epic carries none of the epic's souls in any of them. The file-ownership rail
+ * (`session_rails_chains.py`) is the reader that still takes `launched_by` as written.
  */
 
 /** The one role that is the dispatcher's alone (`souls.PLANNER_ROLE`); a hand cannot launch it. */
@@ -62,9 +64,9 @@ function carriesMark(spec: unknown): boolean {
  * back to the chain that minted it. A torn or missing record is a chain that names nothing this
  * pass; the next pass reads it again.
  *
- * Consumed by `soul-launch.service.ts`'s lane snapshot and by the providers module's chat-list
- * reader (`session-soul-launches.service.ts`), each of which reads it once per pass and hands it to
- * {@link isDispatcherWork} for every launch it classifies.
+ * Consumed by `soul-launch.service.ts`'s lane snapshot, by `running-launchers.service.ts` (the purple
+ * dot) and by the providers module's chat-list reader (`session-soul-launches.service.ts`), each of
+ * which reads it once per pass and hands it to {@link isDispatcherWork} for every launch it classifies.
  */
 export function readDispatcherChainLaunchIds(soulsRoot: string, notOlderThanMs: number): Set<string> {
   const chainsRoot = chainsRootBeside(soulsRoot);
@@ -82,12 +84,13 @@ export function readDispatcherChainLaunchIds(soulsRoot: string, notOlderThanMs: 
  * name it (a planner, or a stage of a chain in `dispatcherChainLaunchIds`).
  *
  * `spec` is the launch's parsed `spec.json`, `launchId` its directory's name. A caller with no chain
- * index (`classifyLaunch` for the dot, which reads only a launch's state) leaves the set out and gets
+ * index (`classifyLaunch` when its caller reads only a launch's state) leaves the set out and gets
  * the mark and the planner role — the answer that needs nothing but the spec.
  *
  * Consumed by `soul-launch.service.ts` (the lane's `dispatcher_work` flag, which the chat's live
- * anchoring skips) and by the providers module's `session-soul-launches.service.ts` (the chat's
- * server-side list), so the two ways a chat can pin a launch by its stamp agree on which launches
+ * anchoring skips), by `running-launchers.service.ts` (the purple dot, which a dispatcher launch must
+ * not light) and by the providers module's `session-soul-launches.service.ts` (the chat's
+ * server-side list), so the ways a chat can claim a launch by its stamp agree on which launches
  * are not the chat's own.
  */
 export function isDispatcherWork(

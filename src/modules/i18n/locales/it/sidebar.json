@@ -184,6 +184,7 @@
     "unread": "Terminata, non ancora letta",
     "dragHandle": "Trascina per riordinare",
     "subagentsRunning": "Subagenti in esecuzione",
+    "asleep": "In pausa. Il tuo prossimo messaggio la risveglia.",
     "newFolder": "Nuova cartella",
     "folderNamePlaceholder": "Nome cartella",
     "folderOptions": "Opzioni per la cartella {{name}}",

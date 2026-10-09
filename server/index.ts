@@ -135,6 +135,7 @@ createWebSocketServer(server, {
     },
     chat: {
         runtime: chatRuntime,
+        whenHostsReadopted: whenHostsHeld,
     },
     shell: {
         resolveProviderSessionId: (sessionId, provider) => {
@@ -394,6 +395,20 @@ app.use('/api/providers/sessions/running', (_req, _res, next) => {
     }, RUNS_READOPTED_WAIT_MS);
     void Promise.all([whenRunsReadopted, whenNodeSessionsReadopted()]).then(release);
 });
+// What the `/ws` snapshot of which chats have a live session host waits behind: the same two events and the
+// same bound as the hold above, so a handover boot never tells a page that no chat has a host while its
+// predecessor drains — every live row would blink gray until the takeover's re-adoption. A function
+// declaration so the gateway built near the top can name it; it reads the consts above only when called.
+function whenHostsHeld(): Promise<void> {
+    if (hostsReadopted) return Promise.resolve();
+    return new Promise<void>((resolve) => {
+        const bound = setTimeout(resolve, RUNS_READOPTED_WAIT_MS);
+        void Promise.all([whenRunsReadopted, whenNodeSessionsReadopted()]).then(() => {
+            clearTimeout(bound);
+            resolve();
+        });
+    });
+}
 app.use('/api/providers', authenticateToken, providerRoutes);
 app.use('/api/scheduled-messages', authenticateToken, scheduledMessagesRoutes);
 

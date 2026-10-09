@@ -57,7 +57,7 @@ section: README/003 Service Map
 |---|---|
 | `services/websocket-server.service.ts` | Creates `WebSocketServer`, binds `verifyClient`, routes connection by pathname |
 | `services/websocket-auth.service.ts` | Authenticates upgrade requests and attaches `request.user` |
-| `services/chat-websocket.service.ts` | Handles the `/ws` chat protocol (`chat.send` / `chat.edit-send` / `chat.abort` / `chat.subscribe` / `chat.permission-response` / `chat.presence` / `chat.ping`). A visible `chat.presence` also marks that session read when it was unread, and broadcasts `session_upserted` only when a row changed |
+| `services/chat-websocket.service.ts` | Handles the `/ws` chat protocol (`chat.send` / `chat.edit-send` / `chat.abort` / `chat.subscribe` / `chat.permission-response` / `chat.presence` / `chat.ping`). A visible `chat.presence` also marks that session read when it was unread, and broadcasts `session_upserted` only when a row changed. A socket that connects is sent one `session_host_liveness` snapshot (`sessionHostLivenessSnapshot()`, built when sent) after `whenHostsReadopted` resolves; `handleChatConnection` takes that wait as `ChatConnectionDependencies`, a run's `ChatWebSocketDependencies` plus it (session-host MAN-8122) |
 | `services/chat-run-registry.service.ts` | Tracks live provider runs per app session id: seq numbering, event replay buffer, provider-id mapping, completion state, and `lastEventAt` — the silence clock every recorded event resets. On the terminal `complete` it stamps `last_completed_at` once per run end (and `last_read_at` with it when the chat is on screen), then broadcasts `session_upserted` — except for a re-adopted run whose last turn end its host journal shows was already recorded (`completeRunIfCurrent(..., { alreadyRecorded: true })`, decided in `session-host/readopt-host.ts`), which closes without stamping |
 | `services/chat-session-writer.service.ts` | Gateway writer handed to provider runtimes: remaps provider session ids to app ids, swallows `session_created`, assigns `seq` |
 | `services/run-stall-watchdog.service.ts` | Polls the registry's running runs and announces one that has gone quiet past the threshold. A poller rather than a timer per run, so a run that ended cannot leak one |
@@ -300,6 +300,8 @@ and `last_read_at` through the one unread expression
 Broadcasts `kind: notes_changed` after a note is created, replaced or deleted, reaching this set through `modules/websocket/index.js`. The frame names no note and no account (MAN-7517).
 9. `modules/providers/services/simple-list.service.ts`
 Broadcasts `kind: simple_list_changed` after a simple-list folder is made, renamed, folded or deleted, or a chat or folder is moved, reaching this set through `modules/websocket/index.js`. The frame names no folder and no chat (MAN-7519).
+10. `modules/providers/list/claude/session-host/host-liveness.ts`
+Broadcasts `kind: session_host_liveness` when a chat gains its first or loses its last session host, reaching this set through `modules/websocket/index.js`; `handleChatConnection` also sends the same kind, as a snapshot, to each socket that joins the set, once the keepalive hosts are re-adopted (`whenHostsReadopted`). The ids ride a `sessionIds` array, never a `sessionId` key (session-host, MAN-695).
 
 This design centralizes cross-module realtime fanout without requiring route-local references to WebSocket internals.
 

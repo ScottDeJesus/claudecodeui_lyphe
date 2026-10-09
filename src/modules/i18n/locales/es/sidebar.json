@@ -184,6 +184,7 @@
     "unread": "Finalizado, sin leer",
     "dragHandle": "Arrastra para reordenar",
     "subagentsRunning": "Subagentes en ejecución",
+    "asleep": "En reposo. Tu próximo mensaje la despierta.",
     "newFolder": "Carpeta nueva",
     "folderNamePlaceholder": "Nombre de la carpeta",
     "folderOptions": "Opciones de la carpeta {{name}}",

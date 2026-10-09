@@ -189,6 +189,7 @@
     "unread": "Finished, not read yet",
     "dragHandle": "Drag to reorder",
     "subagentsRunning": "Subagents running",
+    "asleep": "Asleep. Your next message wakes it.",
     "newFolder": "New folder",
     "folderNamePlaceholder": "Folder name",
     "folderOptions": "Options for folder {{name}}",

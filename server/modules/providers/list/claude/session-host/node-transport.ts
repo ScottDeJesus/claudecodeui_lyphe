@@ -50,6 +50,7 @@ import { isApiExiting } from './facade.js';
 import type { Facade } from './facade.js';
 import { noteNodeHostsChanged } from './colocated-hosts.js';
 import { deliverHostFrame, hostTransport, plainEnv } from './host-frames.js';
+import { trackHostLiveness } from './host-liveness.js';
 import { retireRefusedHost } from './refused-hosts.js';
 
 /** A warden that has not said one word about a session this long after the open is not going to. */
@@ -212,6 +213,9 @@ export function placeInNodeHost(facade: Facade, options: SpawnOptions, ctx: Node
       if (firstFrameTimer !== null) clearTimeout(firstFrameTimer);
       firstFrameTimer = null;
       resolvePlaced();
+      // The warden has spoken for the host: the chat has a live host until this facade settles. A link
+      // blink (the grace above) leaves the facade unsettled, so the chat stays live through one.
+      trackHostLiveness(facade, ctx.appSessionId, hostId);
       // A fresh host is one more the node holds; a re-adopted one was already listed.
       if (!ctx.reattach) noteNodeHostsChanged(node);
     }

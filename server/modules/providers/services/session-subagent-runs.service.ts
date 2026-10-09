@@ -16,13 +16,15 @@ import type { LLMProvider } from '@/shared/types.js';
  * A conversation counts when EITHER of two things is true:
  *
  * 1. Its own transcript shows a backgrounded `Agent` call still out (the sidechain reading below).
- * 2. A soul or chain it LAUNCHED through the dispatch door (`plan-runner chain`, `plan-runner soul`)
- *    is still out. That process is a child of nothing the chat can see — it streams no sidechain
- *    into the transcript — so the only record of it is the launcher's, stamped with the CLI session
- *    id that launched it (`listRunningLaunchers`, in the dispatch-souls module). The stamp is the
- *    CLI's id and the dot is the app's, so each one is mapped through the sessions table, and an id
- *    the app does not know is skipped. A chain keeps the dot lit between its stages, where no soul
- *    is running but the walker still is.
+ * 2. A soul or chain it LAUNCHED BY HAND through the dispatch door (`plan-runner chain`,
+ *    `plan-runner soul`) is still out. That process is a child of nothing the chat can see — it
+ *    streams no sidechain into the transcript — so the only record of it is the launcher's, stamped
+ *    with the CLI session id that launched it (`listRunningLaunchers`, in the dispatch-souls module).
+ *    The stamp is the CLI's id and the dot is the app's, so each one is mapped through the sessions
+ *    table, and an id the app does not know is skipped. A chain keeps the dot lit between its stages,
+ *    where no soul is running but the walker still is. The dispatcher's own work for a plan the chat
+ *    started carries the chat's stamp too, but it is not the chat's launch and lights nothing
+ *    (`listRunningLaunchers` skips it, as the chat's Subagents list does).
  *
  * The sidebar's run marks could not say either before: they come from `listRunningSessions`, which
  * reads `chatRunRegistry`, and a run leaves that registry the moment its turn ends. A BACKGROUNDED

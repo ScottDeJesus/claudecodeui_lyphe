@@ -6,7 +6,7 @@ import { projectsDb, sessionUserStateDb, sessionsDb } from '@/modules/database/i
 // Presence is recorded here and read by the notification channels, so a push is
 // never sent about the session the user is looking at right now.
 import { clearPresence, markPresence } from '@/modules/notifications/index.js';
-import { providerModelsService, sessionsService } from '@/modules/providers/index.js';
+import { providerModelsService, sessionHostLivenessSnapshot, sessionsService } from '@/modules/providers/index.js';
 import { chatRunRegistry } from '@/modules/websocket/services/chat-run-registry.service.js';
 import { broadcastSessionUpserted } from '@/modules/websocket/services/session-upsert-broadcast.service.js';
 import { connectedClients, WS_OPEN_STATE } from '@/modules/websocket/services/websocket-state.service.js';
@@ -84,6 +84,16 @@ export type ProviderRuntimeGateway = {
 type ChatWebSocketDependencies = {
   /** Central dispatcher for every provider SDK/CLI runtime. */
   runtime: ProviderRuntimeGateway;
+};
+
+/**
+ * What a LIVE socket needs beyond what a run needs (a detached turn is handed `ChatWebSocketDependencies`
+ * alone): `whenHostsReadopted` settles once this process holds the keepalive session hosts, or a bound has
+ * passed — the same hold the running-sessions read waits behind. The host-liveness snapshot waits for it: a
+ * handover boot serves before its takeover, and a snapshot taken then would name no host while tmux holds them all.
+ */
+type ChatConnectionDependencies = ChatWebSocketDependencies & {
+  whenHostsReadopted: () => Promise<void>;
 };
 
 /**
@@ -663,10 +673,15 @@ export async function runDetachedChatTurn(
 export function handleChatConnection(
   ws: WebSocket,
   request: AuthenticatedWebSocketRequest,
-  dependencies: ChatWebSocketDependencies
+  dependencies: ChatConnectionDependencies
 ): void {
   console.log('[INFO] Chat WebSocket connected');
   connectedClients.add(ws);
+  // The one read of which chats have a live session host. It is HELD until the hosts are re-adopted (a
+  // handover boot serves before its takeover) and is built at the moment it is sent, so whatever landed
+  // while it waited is in it; the page ignores the pushes that reach it first, and a page that already
+  // holds a set keeps it until this replaces it. A socket that closed while it waited is not written to.
+  void dependencies.whenHostsReadopted().then(() => sendJson(ws, sessionHostLivenessSnapshot()));
 
   const userId = readRequestUserId(request);
 

@@ -36,6 +36,11 @@ export { busyReason, listLiveHosts } from './list/claude/session-host/index.js';
 export { listColocatedNodeHosts, refreshColocatedNodeHosts } from './list/claude/session-host/index.js';
 export type { LiveHost } from './list/claude/session-host/index.js';
 
+// sessionHostLivenessSnapshot: used by the websocket module's chat gateway, which sends it to every socket as it
+// connects — the chats that have a live session host — so a page starts from the truth and the pushed changes
+// (host-liveness.ts) keep it there.
+export { sessionHostLivenessSnapshot } from './list/claude/session-host/index.js';
+
 // readClaudeTranscriptBySessionId: used by the dispatch-souls module to read a launched soul's own
 // Claude transcript from the session id its launch recorded. A soul has no app session row, so its
 // provider session id is the only handle on the file, and this module is the one that knows where

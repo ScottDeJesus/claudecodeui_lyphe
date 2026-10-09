@@ -16,6 +16,7 @@ import { DispatcherFeed } from '@/modules/dispatcher';
 import { SoulLaunchFeed } from '@/modules/dispatch-souls';
 import { RoadmapFeed } from '@/modules/roadmap';
 import { UniverseFeed } from '@/modules/universe';
+import { SessionHostLivenessProvider } from '@/shared/context/SessionHostLivenessContext';
 import { WebSocketProvider } from '@/shared/context/WebSocketContext';
 import { PluginsProvider } from '@/modules/plugins';
 import { ProjectWorkspaceRoute } from '@/modules/project-workspace';
@@ -130,6 +131,10 @@ export default function App() {
         <UiPreferencesProvider>
         <AuthProvider>
           <WebSocketProvider>
+            {/* Directly under the socket and above the auth gate: the server sends which chats have a live
+                session host ONCE, as the socket connects, so the provider that keeps it must have
+                subscribed before the connection exists. */}
+            <SessionHostLivenessProvider>
             <PluginsProvider>
               <TasksSettingsProvider>
                 <TaskMasterProvider>
@@ -187,6 +192,7 @@ export default function App() {
                 </TaskMasterProvider>
               </TasksSettingsProvider>
             </PluginsProvider>
+            </SessionHostLivenessProvider>
           </WebSocketProvider>
         </AuthProvider>
         </UiPreferencesProvider>

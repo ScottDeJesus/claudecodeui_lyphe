@@ -193,6 +193,7 @@
     "unread": "Завершено, не прочитано",
     "dragHandle": "Перетащите для сортировки",
     "subagentsRunning": "Субагенты выполняются",
+    "asleep": "Спит. Следующее сообщение разбудит её.",
     "newFolder": "Новая папка",
     "folderNamePlaceholder": "Название папки",
     "folderOptions": "Опции папки {{name}}",

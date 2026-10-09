@@ -3,8 +3,9 @@
 // which is what puts a pin among the chat's pinned rows for every hand a session launched by hand.
 export { createDispatchSoulsModule } from './dispatch-souls.module.js';
 // listRunningLaunchers: used by the providers module's running-sessions answer, which lights the
-// sidebar's purple dot for a conversation whose launched soul or chain is still out — a process
-// that never appears in the conversation's own transcript.
+// sidebar's purple dot for a conversation whose soul or chain it launched BY HAND is still out — a
+// process that never appears in the conversation's own transcript. The dispatcher's own work for a
+// plan the chat started lights nothing.
 export { listRunningLaunchers } from './running-launchers.service.js';
 export type { RunningLauncher } from './running-launchers.service.js';
 // isDispatcherWork, readDispatcherChainLaunchIds: used by the providers module's chat-list reader

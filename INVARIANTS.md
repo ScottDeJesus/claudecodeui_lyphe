@@ -2552,8 +2552,8 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/round-strip.mjs
 | `chainsRootBeside(soulsRoot)` = sibling `dispatch-chains` | `chains_dir()` in `solo/chain_state.py` | A probe's `DISPATCH_SOULS_STATE_DIR` stops moving the chains with the souls. |
 
 - The souls root comes only from `dispatchSoulsStateDir()` (`server/shared/utils.ts`); never re-read `DISPATCH_SOULS_STATE_DIR` or hardcode the default.
-- Ownership is the `launched_by` stamp on `spec.json`, nothing else; a chain is owned by every session stamped on any of its stages.
-- A planner outing or phase chain is stamped with the plan's session, so it lights that plan's chat up to the 4 h planner cap; there is no role filter.
+- Ownership is the `launched_by` stamp on `spec.json`, minus the dispatcher's own launches; a chain is owned by every session stamped on any of its stages that is not the dispatcher's.
+- A planner outing or phase chain is stamped with the plan's session — the chat the plan was started from, which launched none of it — and lights nothing: both readings skip what `isDispatcherWork` calls the dispatcher's (the mark, the `planner` role, a stage of an `until_pass` chain), over one `readDispatcherChainLaunchIds` pass per call (INV-7062).
 - A chain started with no session to name carries no stamp and lights nothing (follow-up: stamp `launched_by` in `chain_state.blank()`, a `chain.json` schema change).
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatch-souls/chain-record.transport.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatch-souls/running-launchers.service.ts
@@ -2583,20 +2583,6 @@ expect: `id length 127: launcher walker_alive=True | dot reader counts it=false`
 
 measured 2026-10-02 by chain chain-purple-dot-souls-20261002-043723-dbad, finding L2, LOW
 probe-key: 9686bb9886de60f111e500376e0adfb69f7376ff
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatch-souls/chain-record.transport.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatch-souls/running-launchers.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/utils.ts
-
-## INV-6338 — probe — the MANUAL says planner outings are stamped with no chat and not counted; 75 of 75 are stamped, and the reader has no role filter
-
-the MANUAL says planner outings are stamped with no chat and not counted; 75 of 75 are stamped, and the reader has no role filter
-
-```probe
-python3 /home/lyphe/.claude/state/pipeline-reviews/purple-dot-souls/athena-probes/planner-stamp.py
-expect: `75 planner specs; 75 stamped with a chat id` (the doc says planner outings are stamped with no chat)
-```
-
-measured 2026-10-02 by chain chain-purple-dot-souls-20261002-043723-dbad, finding L3, LOW
-probe-key: ffc32abe2911d78e293fa4b8a6bb821583317862
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatch-souls/chain-record.transport.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatch-souls/running-launchers.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/utils.ts
 
@@ -5656,16 +5642,16 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/history/Eve
 
 ## INV-7062 — A chat's soul list leaves out the dispatcher's own work — the mark decides, two restated launcher rules bridge the launches written before it
 
-The stamp `launched_by` is the chat an epic was STARTED from, and the dispatcher runs every soul of the epic under it, so a chat's own list cannot tell an epic's soul from one the chat launched. `isDispatcherWork` (`dispatch-souls/dispatcher-work.service.ts`) is the one answer, asked by BOTH ways a chat pins a launch by its stamp: `collectStampedSoulLaunches` (latest page, before its 40-launch cap) and the lane's `dispatcher_work` flag that `readStampedLaunchIds` skips. The sidebar's dot and the file-ownership rail keep reading `launched_by` as written.
+The stamp `launched_by` is the chat an epic was STARTED from, and the dispatcher runs every soul of the epic under it, so a chat's own list cannot tell an epic's soul from one the chat launched. `isDispatcherWork` (`dispatch-souls/dispatcher-work.service.ts`) is the one answer, asked by BOTH ways a chat pins a launch by its stamp: `collectStampedSoulLaunches` (latest page, before its 40-launch cap) and the lane's `dispatcher_work` flag that `readStampedLaunchIds` skips. A third reader asks it too: the sidebar's purple dot (`running-launchers.service.ts`, both its soul and its chain reading), so a chat that only started an epic lights nothing for the epic's souls; the file-ownership rail is the one reader that still takes `launched_by` as written.
 
 | Reading | Where it is decided | Source it restates | Breaks if it drifts |
 |---|---|---|---|
 | THE MARK: `spec.json` `dispatcher` is a record with a non-empty string `plan` | `carriesMark` | `hooks/plan_runner/solo/dispatch_mark.py` (`mark`; the two env names are `souls.DISPATCHER_WORK_ENV`, also in `SCRUB_ENV`) | A reader that also demands a non-null `phase` hides no planner (a planner's phase is null); a launcher that writes the mark under another key leaves every new epic soul in the chat's list. |
-| A chain whose `chain.json` says `until_pass: true` is the dispatcher's, and so is each of its stages | `readDispatcherChainLaunchIds` | `plan-runner chain --until-pass` (INV-169): the mode the dispatcher walks a phase's chain in | Measured 2026-10-06: 447 chains carry it, 447 chains are named by `phases.chain_id`, the same ones. NOT EXACT: `cases cure` (`hooks/cases/cure.py:argv_for`, slug `cure-<case>-<stamp>`) walks in the same mode with no mark and no `phases` row, so while the bridge lasts a cure walk's stages are hidden from the chat that started it (none existed on disk on 2026-10-06). Exact would be `phases.chain_id`, which needs the server to read the dispatcher's SQLite. |
+| A chain whose `chain.json` says `until_pass: true` is the dispatcher's, and so is each of its stages | `readDispatcherChainLaunchIds` | `plan-runner chain --until-pass` (INV-169): the mode the dispatcher walks a phase's chain in | Measured 2026-10-06: 447 chains carry it, 447 chains are named by `phases.chain_id`, the same ones. NOT EXACT: `cases cure` (`hooks/cases/cure.py:argv_for`, slug `cure-<case>-<stamp>`) walks in the same mode with no mark and no `phases` row, so while the bridge lasts a cure walk's stages, and a hand-run `--until-pass` chain's, are hidden from the chat that started it and light no dot (no cure walk existed on disk on 2026-10-06). Exact would be `phases.chain_id`, which needs the server to read the dispatcher's SQLite. |
 | A launch with `role: planner` is the dispatcher's | `isDispatcherWork` | `solo/launch.py:prepare` admits `planner` in the daemon's process only; `cmd/soul.py` keeps it off the public verb | Measured the same day: the 50 launches `planners.launch_id` names on disk are exactly the launches wearing the role. A public door that admits it would hide a hand's planner launch. |
 
 - WHO WRITES THE MARK: `phase_chain.launch_env` overlays the plan and phase on the environment of every chain it starts or resumes, and each stage's `prepare` reads them back (the walker is forked from that environment); `planners._start` passes the mark to `prepare` directly. A dispatcher daemon or a walker started before the marking build writes unmarked specs, which the two bridge readings above still recognise.
-- THE TWO BRIDGE READINGS ARE DELETED WITH THEIR LAST LAUNCH: a launch directory is kept 14 days (`solo/record.py:KEEP_DAYS`), so once the daemon and every walker run the marking build and a fortnight has passed, only the mark clause is needed — remove `readDispatcherChainLaunchIds`, the `role` clause, `chain-record.transport.ts`'s `untilPass` and the chain-index argument of `classifyLaunch` and `isDispatcherWork`.
+- THE TWO BRIDGE READINGS ARE DELETED WITH THEIR LAST LAUNCH: a launch directory is kept 14 days (`solo/record.py:KEEP_DAYS`), so once the daemon and every walker run the marking build and a fortnight has passed, only the mark clause is needed — remove `readDispatcherChainLaunchIds` (and its one call in `listRunningLaunchers`, with the index argument of the dot's two readings), the `role` clause, `chain-record.transport.ts`'s `untilPass` and the chain-index argument of `classifyLaunch` and `isDispatcherWork`.
 - The filter runs BEFORE the 40-launch cap on a latest page, so an epic's launches cannot push the chat's own out of it.
 - The reader opens only the newest 200 launch directories (`MAX_SPECS_READ`), so a chat's hand launches older than that window were never in its list.
 - Proof: `cd /home/lyphe/.claude/claudecodeui_lyphe && TSX_TSCONFIG_PATH=server/tsconfig.json node --import tsx .verify/probe-subagent-epic-work.mjs` — the HEAD reader and the current one for the chat an epic was started from and for one that launched souls by hand, against the dispatcher's own database as ground truth.
@@ -8537,3 +8523,76 @@ measured 2026-10-08 by chain chain-cloudcli-palette-engine-commands-proof-202610
 probe-key: 719996f3f8bf59915cd820f36484ed81614ce343
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/composer-provider.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/palette-claude-code-group.mjs
+
+## INV-7516 — probe — (MEDIUM): `MAN-6224` still tells the reader the purple dot lights for a plan's chat, the exact opposite of the new rule
+
+(MEDIUM): `MAN-6224` still tells the reader the purple dot lights for a plan's chat, the exact opposite of the new rule
+
+```probe
+~/.claude/scripts/docstore get MAN-6224 --text | grep -c 'still lights for the chat' || true
+echo "[probe exit $?]"
+expect: prints `1` while the defect stands (the sentence at docs/architecture/MANUAL.md:4097); `0` once MAN-6224 says the dot skips the dispatcher's own work
+```
+
+measured 2026-10-09 by chain chain-subagent-dot-skips-dispatcher-work-20261009-090852-7001, finding M1, MEDIUM
+probe-key: 73b80fb5dd85f00bf1868f3a7e0c5ccf373adabe
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatch-souls/dispatcher-work.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatch-souls/running-launchers.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/services/session-subagent-runs.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/subagent-dot-dispatcher.mjs
+
+## INV-7532 — probe — MEDIUM — after every supervised handover the first snapshot is empty, so every live row blinks gray
+
+MEDIUM — after every supervised handover the first snapshot is empty, so every live row blinks gray
+
+```probe
+node /home/lyphe/.claude/state/pipeline-reviews/simple-list-gray-when-no-live-session/athena-probes/handover-flash.mjs
+echo "[probe exit $?]"
+expect: `first snapshot after the handover: 3 hosts` (tmux's own count) and `peak 0 of 3` (today: `0 hosts` and `peak 3 of 3, for ~0.5 s`). The probe touches (mtime only) server/shared/cerberus-types.ts, so it starts one real dev handover; it prints in both states.
+```
+
+measured 2026-10-09 by chain chain-simple-list-gray-when-no-live-session-20261009-095512-677b, finding M1, MEDIUM
+probe-key: 31f78478ed1e1e4add41ee04939d0b58bfe3cc85
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/session-host/host-liveness.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/websocket/services/chat-websocket.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/App.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/context/SessionHostLivenessContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/live-gray-kit.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/simple-list-live-gray-event.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/simple-list-live-gray-gate.mjs
+
+## INV-7533 — probe — LOW — the open chat's row, when asleep, falls under AA in the light theme, and the row's comment says it does not
+
+LOW — the open chat's row, when asleep, falls under AA in the light theme, and the row's comment says it does not
+
+```probe
+node /home/lyphe/.claude/state/pipeline-reviews/simple-list-gray-when-no-live-session/athena-probes/asleep-contrast.mjs
+echo "[probe exit $?]"
+expect: every title ratio >= 4.50 and every glyph ratio >= 3.00 in the six lines (today: `light selected title 4.30 … glyph 2.83`)
+```
+
+measured 2026-10-09 by chain chain-simple-list-gray-when-no-live-session-20261009-095512-677b, finding L1, LOW
+probe-key: c704fa0f7cedb15aa574b7c5150266901c1d47f0
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/session-host/host-liveness.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/websocket/services/chat-websocket.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/App.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/context/SessionHostLivenessContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/live-gray-kit.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/simple-list-live-gray-event.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/simple-list-live-gray-gate.mjs
+
+## INV-7544 — probe — turning follow-sun OFF over a stale stored theme jumps the page to that theme (pre-existing; builder disclosed; operator's call)
+
+turning follow-sun OFF over a stale stored theme jumps the page to that theme (pre-existing; builder disclosed; operator's call)
+
+```probe
+node /home/lyphe/.claude/state/pipeline-reviews/follow-sun-dark-on-button-press/athena-probes/probe-followsun-off.mjs
+expect: prints `before=light after-OFF=DARK (stored theme dark, follows false)` while the defect stands; cured when it prints `after-OFF=light`
+```
+
+measured 2026-10-09 by chain chain-follow-sun-dark-on-button-press-20261009-104453-19b1, finding L1, LOW
+probe-key: ccfe98489193346d940f4f312af41e912efb69e2
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/context/ThemeContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/follow-sun-press.mjs
+
+## INV-7545 — probe — `toggleDarkMode` writes a preference inside a `setState` updater: React warns on the non-eager path (pre-existing; builder disclosed)
+
+`toggleDarkMode` writes a preference inside a `setState` updater: React warns on the non-eager path (pre-existing; builder disclosed)
+
+```probe
+node /home/lyphe/.claude/state/pipeline-reviews/follow-sun-dark-on-button-press/athena-probes/updater-warning.mjs
+expect: the last line prints `total "Cannot update a component" warnings: 1` while the defect stands (the four press lines above it show the page alternating dark/light correctly); cured when it prints `: 0`
+```
+
+measured 2026-10-09 by chain chain-follow-sun-dark-on-button-press-20261009-104453-19b1, finding L2, LOW
+probe-key: ffac819c6bf0eccb1da41af7b7ec44d0e0e036f4
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/context/ThemeContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/follow-sun-press.mjs

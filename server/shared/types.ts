@@ -223,6 +223,7 @@ export type GatewayEventKind =
   | 'cerberus_run_output'
   | 'cerberus_diag_step'
   | 'simple_list_changed'
+  | 'session_host_liveness'
   | 'universe_activity'
   | 'universe_map'
   | 'pong'
@@ -307,6 +308,33 @@ export type KanbanBoardEvent = {
  * Built only by `modules/providers/services/simple-list.service.ts`.
  */
 export type SimpleListChangedEvent = { kind: 'simple_list_changed'; at: number };
+
+/**
+ * Which chats have a live session host (a tmux session on the keepalive server, or on a node's
+ * warden), built only by `modules/providers/list/claude/session-host/host-liveness.ts`.
+ *
+ * A chat with no host is ASLEEP: no CLI runs for it, and its next message starts one. One shape, three
+ * `change`s, each naming its chats in `sessionIds`:
+ * - `snapshot` — every chat with a host right now. Sent once to a socket as it connects, so a page
+ *   that applies it and then each change below holds the same set the server does.
+ * - `live` — these chats gained their first host (a message spawned one, or a restart re-adopted one).
+ * - `asleep` — these chats lost their last host (an idle close, a crash, the tmux server going down).
+ *
+ * The ids ride an ARRAY and not a `sessionId` key on purpose: the workspace flags a chat for attention
+ * (the unread mark) when any frame carries a `sessionId` that is not the one on screen
+ * (`useProjectsState`), and a host ending is no news in the chat. Like `notes_changed`, the frame
+ * carries no `seq` and no `sessionId`, so it can never become a transcript row or a mark.
+ *
+ * Only Claude chats ever have a host, so a chat of another provider is in no snapshot and a reader
+ * must not read its absence as asleep. `at` is epoch MILLISECONDS. Mirrored by the client's
+ * `SessionHostLivenessContext`, which reads these fields off the loose `ServerEvent`.
+ */
+export type SessionHostLivenessEvent = {
+  kind: 'session_host_liveness';
+  change: 'snapshot' | 'live' | 'asleep';
+  sessionIds: string[];
+  at: number;
+};
 
 /** Sent to every open socket after a note is created, replaced or deleted. It names no note and no account: a client that hears it reads its own list again. It carries no `seq` and no `sessionId`, so it can never become a transcript row. */
 export type NotesChangedEvent = { kind: 'notes_changed'; at: number };

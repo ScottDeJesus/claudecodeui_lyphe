@@ -3,6 +3,7 @@ import path from 'node:path';
 import { dispatchSoulsStateDir } from '@/shared/utils.js';
 
 import { chainsRootBeside, readChainRecord } from './chain-record.transport.js';
+import { isDispatcherWork, readDispatcherChainLaunchIds } from './dispatcher-work.service.js';
 import { classifyLaunch } from './soul-launch.service.js';
 import { hasLaunchReceipt, listLaunchDirs, readLaunchFiles, readLaunchSpec } from './soul-launch.transport.js';
 
@@ -18,13 +19,23 @@ import { hasLaunchReceipt, listLaunchDirs, readLaunchFiles, readLaunchSpec } fro
  * `session_rails_chains.py` keeps for the rails: a chain belongs to a session iff ONE of its stages
  * was launched from it.
  *
+ * THE DISPATCHER'S OWN WORK LIGHTS NOTHING. The stamp names the chat an epic or feature was STARTED
+ * from, and the dispatcher stamps every planner outing and every `until_pass` phase-chain stage it
+ * launches for the plan with it, so the stamp alone cannot tell the chat's own launch from the
+ * dispatcher's: a chat that merely started a feature would show a dot over souls it never launched.
+ * Both readings below skip a launch `isDispatcherWork` calls the dispatcher's — the mark on
+ * `spec.json`, the `planner` role, or a stage of an `until_pass` chain — the same test the chat's
+ * Subagents list applies, so only what a chat launched BY HAND lights it: a soul, or a chain such as
+ * an `/inline` one, with the gaps between its stages. The plan's own card shows the dispatcher's work.
+ *
  * Two readings, because one alone blinks. A soul is out while the launcher's own classification
  * says `running`. A chain is out while its walker is, and that holds BETWEEN its stages too — the
  * relaunch gap, and the hand-off from builder to review to doc sweep, when no soul is running at
  * all but the work is plainly not over. A chain is owned by every session stamped on ANY of its
- * stages: the stages the walker launches inherit the stamp of the session that started the chain
- * (measured 2026-10-02, 60 of 60 recent chains carry one stamp throughout), and a stage resumed
- * from another chat can carry that chat's — a chain started with no session to name carries none, and owns nothing.
+ * stages that is not the dispatcher's: the stages the walker launches inherit the stamp of the session
+ * that started the chain (measured 2026-10-02, 60 of 60 recent chains carry one stamp throughout), and
+ * a stage resumed from another chat can carry that chat's — a chain started with no session to name
+ * carries none, and owns nothing.
  *
  * The answer is CLI ids, not app ids: the translation to the conversation the sidebar draws is the
  * app database's, and belongs to the caller. Everything is read off disk with sync calls, like the
@@ -65,15 +76,23 @@ function launchedBy(spec: unknown): string | null {
  * Measured 2026-10-02: 372 launch directories inside the window, and the full read of each (two
  * pids, a brief) cost 29 ms of a 40 ms pass. Only a launch that names a chat AND has no receipt yet
  * can be a dot, so those two cheap questions go first and the full read is spent on the few that
- * pass — the verdict is still `classifyLaunch`'s, the prefilter only decides who is asked.
+ * pass — the verdict is still `classifyLaunch`'s, the prefilter only decides who is asked. The
+ * dispatcher's own launches are dropped before that read for the same reason: it is an in-memory
+ * question, and the launch is not a dot whatever its state.
  */
-function listRunningSouls(soulsRoot: string, nowS: number): RunningLauncher[] {
+function listRunningSouls(
+  soulsRoot: string,
+  nowS: number,
+  dispatcherChainLaunchIds: ReadonlySet<string>,
+): RunningLauncher[] {
   const running: RunningLauncher[] = [];
   for (const launchId of listLaunchDirs(soulsRoot, (nowS - RUNNING_WINDOW_S) * 1000)) {
     try {
       const launchDir = path.join(soulsRoot, launchId);
-      const cliSessionId = launchedBy(readLaunchSpec(launchDir));
+      const spec = readLaunchSpec(launchDir);
+      const cliSessionId = launchedBy(spec);
       if (cliSessionId === null || hasLaunchReceipt(launchDir)) continue;
+      if (isDispatcherWork(launchId, spec, dispatcherChainLaunchIds)) continue;
       if (classifyLaunch(readLaunchFiles(launchDir, launchId), nowS, RUNNING_WINDOW_S)?.state === 'running') {
         running.push({ cliSessionId, reason: 'soul', sourceId: launchId });
       }
@@ -85,14 +104,22 @@ function listRunningSouls(soulsRoot: string, nowS: number): RunningLauncher[] {
 }
 
 /**
- * Every session that launched a stage of a chain whose walker is still walking.
+ * Every session that launched a stage of a chain whose walker is still walking, by hand.
  *
  * `running` alone is not trusted: a walker killed outright leaves its record at `running` until a
  * reaper settles it, and a dot that stays lit over a corpse is worse than one that blinks. The pid
  * check is the launcher's own (`chain_state.walker_alive`), so a chain counts exactly when the
  * house would call it live.
+ *
+ * The dispatcher's stages are skipped one by one rather than the chain as a whole, so a chain the
+ * dispatcher walks (every stage skipped) owns nobody, while a chain a hand started that has picked
+ * up a marked stage still lights the hand's own.
  */
-function listRunningChains(soulsRoot: string, nowS: number): RunningLauncher[] {
+function listRunningChains(
+  soulsRoot: string,
+  nowS: number,
+  dispatcherChainLaunchIds: ReadonlySet<string>,
+): RunningLauncher[] {
   const chainsRoot = chainsRootBeside(soulsRoot);
   const running: RunningLauncher[] = [];
   for (const chainId of listLaunchDirs(chainsRoot, (nowS - RUNNING_WINDOW_S) * 1000)) {
@@ -102,7 +129,9 @@ function listRunningChains(soulsRoot: string, nowS: number): RunningLauncher[] {
 
       const owners = new Set<string>();
       for (const launchId of chain.launchIds) {
-        const owner = launchedBy(readLaunchSpec(path.join(soulsRoot, launchId)));
+        const spec = readLaunchSpec(path.join(soulsRoot, launchId));
+        if (isDispatcherWork(launchId, spec, dispatcherChainLaunchIds)) continue;
+        const owner = launchedBy(spec);
         if (owner !== null) owners.add(owner);
       }
       for (const cliSessionId of owners) {
@@ -123,10 +152,18 @@ function listRunningChains(soulsRoot: string, nowS: number): RunningLauncher[] {
  * the conversation it belongs to and unions the result with what the chat's own sidechains show.
  * `nowS` is epoch SECONDS, the launcher's clock; `soulsRoot` defaults to the lane's own root and is
  * a parameter so a hermetic tree can be read in its place.
+ *
+ * The dispatcher's chains are indexed ONCE per call and the index serves both readings, over the same
+ * window the two listings use: a chain's directory is rewritten at every stage, so a window that
+ * reaches a launch reaches the chain that holds it.
  */
 export function listRunningLaunchers(
   nowS: number = Date.now() / 1000,
   soulsRoot: string = dispatchSoulsStateDir(),
 ): RunningLauncher[] {
-  return [...listRunningSouls(soulsRoot, nowS), ...listRunningChains(soulsRoot, nowS)];
+  const dispatcherChainLaunchIds = readDispatcherChainLaunchIds(soulsRoot, (nowS - RUNNING_WINDOW_S) * 1000);
+  return [
+    ...listRunningSouls(soulsRoot, nowS, dispatcherChainLaunchIds),
+    ...listRunningChains(soulsRoot, nowS, dispatcherChainLaunchIds),
+  ];
 }

@@ -1532,6 +1532,7 @@ Draws the tree as a fragment inside `SidebarSimpleList`'s `simple-chat-list-rows
 | `items` | `SimpleListItem[]`, server order |
 | `selectedSessionId`, `failedSessionId`, `freshFolderId` | `string \| null` each |
 | `busySessionIds`, `awaitingInputSessionIds`, `subagentRunningSessionIds` | `ReadonlySet<string>` |
+| `liveHostSessionIds` | `ReadonlySet<string> \| null` — the chats whose CLI has a live session host, from `useSessionHostLiveSet` (pushed on change, never polled); `null` until the server's first snapshot |
 | `dragging` | `SimpleListItemRef \| null` |
 | `dropTarget` | `SimpleListDropTarget \| null` |
 | `dragProps(ref)` | the carry's pointer props for one row; chat rows and folder headers both spread it; `useSimpleChatDrag` returns it (MAN-7525) |
@@ -1544,12 +1545,17 @@ Draws the tree as a fragment inside `SidebarSimpleList`'s `simple-chat-list-rows
 - One `data-testid="simple-chat-block"` per top-level item, `relative flex flex-col gap-1`, carrying `data-item-kind` (`chat` \| `folder`) and `data-item-id`. The block, not the row, carries them: a carried folder lands beside a block.
 - A folder's block = header + its chats' rows (`isNested` true), the rows only while `!folder.collapsed`; a folded folder mounts no chat row.
 - The folder's dot = `folderDot(folder.chats.map(chatMarks))` (MAN-7522).
+- A chat row's `isAsleep` = `liveHostSessionIds !== null && chat.provider === 'claude' && !liveHostSessionIds.has(chat.sessionId)`: only a Claude chat has a host to lack, and nothing is grayed while the set is unknown. `SidebarSimpleListRow` draws it as `data-asleep="true"`, the title in `text-muted-foreground` (`text-secondary-foreground` while selected, where muted reads under AA on the selected wash), the glyph in `text-ink-faint` (muted while selected) and the hover title `simpleList.asleep` on the row's link. A state, not a mark: the row opens and takes a message as before, and the next message starts a host. Which chats are asleep and why: session-host MAN-695, "Which chats have a live host".
 - `holdsSelected` = folder folded and one of its chats is the open chat.
 - Rhythm is uniform on purpose: a folder's chats sit `gap-1` from the header, the same air as between blocks; the indent carries the grouping. The block's `gap-1` is the one knob.
 - Fade: a carried chat fades as its own row; a carried folder fades as its whole block (`opacity-50`).
 - `simple-chat-drop-end` (`h-0.5` accent line) is drawn whenever `dropTarget.at === 'end'`.
 
-### Drop marks
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/SidebarSimpleFolderPicker.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/SidebarSimpleFolderRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/SidebarSimpleListItems.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/SidebarSimpleListRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/SidebarSimpleList.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-simple-folders.mjs
+
+## MAN-8123 — The simple list's folder scaffold — `SidebarSimpleListItems` — Drop marks
+section: The simple list's folder scaffold — `SidebarSimpleListItems`, `SidebarSimpleFolderRow`, `SidebarSimpleFolderPicker`/001 Drop marks
+
 | Carried | `dropTarget` | Mark, on |
 | --- | --- | --- |
 | chat | `row`, a chat | `dropEdge` = that edge, on that chat's row |
@@ -1603,7 +1609,11 @@ Props: `open`, `folders: SimpleListFolder[]`, `currentFolderId: string \| null`,
 
 - `ml-8` = 32px = the row's icon box (`w-6`) + `gap-2`: a nested glyph starts in the folder header's chevron column and the title starts past the folder's name. Anything that moves the chevron moves this indent.
 
-## Gate — `.verify/probe-simple-folders.mjs`
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/SidebarSimpleFolderPicker.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/SidebarSimpleFolderRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/SidebarSimpleListItems.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/SidebarSimpleListRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/SidebarSimpleList.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-simple-folders.mjs
+
+## MAN-8124 — The simple list's folder scaffold — `SidebarSimpleListItems` — Gate — `.verify/probe-simple-folders.mjs`
+section: The simple list's folder scaffold — `SidebarSimpleListItems`, `SidebarSimpleFolderRow`, `SidebarSimpleFolderPicker`/002 Gate — `.verify/probe-simple-folders.mjs`
+
 - `node .verify/probe-simple-folders.mjs` (dev server on `127.0.0.1:5183`, signed in through `openConsole`); `ONLY=1440-light|1440-dark|390-light|390-dark` runs one combination. Gitignored; not a `phase-*.mjs`, so `all.mjs` does not run it.
 - Mounts fixture props over the signed-in page through `lib/mountReact.mjs`: 17 states × 4 combinations (1440×900 and 390×844, light and dark). States: header with each of the four dots and none, folded and open, holding the open chat, renaming, as a drop target; picker with and without a current folder; tree with a loose chat, an open and a folded folder, a carried folder's block, the end line.
 - Fixture host: `position:fixed`, `z-index:60` (under `ActionMenu`'s `z-[70]`, over the app), background `var(--canvas)` (`--background` is not defined); the picker's host is `display:contents` so its body-portalled Dialog shows. Frame width = the app's own sidebar width at that viewport.

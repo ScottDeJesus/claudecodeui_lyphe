@@ -35,6 +35,7 @@ section: README/001 Public surface
 | `listLiveHosts()`, `LiveHost`, `busyReason(host)` | the claude-activity module, through the providers barrel | This machine's live hosts and the one test of whether a host is mid-work, asked of every host so an update never installs under a conversation the idle sweep would leave alone |
 | `listColocatedNodeHosts()`, `refreshColocatedNodeHosts()` | the claude-activity module, through the providers barrel | The hosts a co-located node's warden holds, read beside `listLiveHosts()`; the refresh asks each linked warden when the reading is taken |
 | `retireStaleIdleHosts(hosts, installed, retire = retireHost)`, `watchInstalledCliVersionChanges()` | none outside the directory today | The version sweep and its subscription (§"The idle host an install leaves behind"), called by `readopt.ts` and `node-readopt.ts`. Exported for a `.verify` probe, which cannot get the subscription any other way — it never holds the keepalive claim |
+| `sessionHostLivenessSnapshot()` | the websocket module's chat gateway, through the providers barrel | The `session_host_liveness` snapshot frame — every chat with a live host — that a socket is sent once the keepalive hosts are re-adopted (§"Which chats have a live host"). The push that keeps a page current after it is `host-liveness.ts`'s own and not exported |
 | `KeepaliveHandle`, `KeepaliveReattach` | `claude-runtime.provider.js` | The two types those calls traffic in. `KeepaliveReattach` = `{ hostId, turnCompleteSent, heldForBackgroundWork, profile, cliVersion, deferredTools, node }`; `node` is the warden that holds the host, `null` for a host on this machine's own keepalive |
 
 ## Past `index.ts`
@@ -45,6 +46,7 @@ section: README/001 Public surface
 | `host-frames.ts` | `deliverHostFrame(facade, frame, hostId)` → `true` on the host's `exit`; `hostTransport(send)` → the facade's `write` / `endInput` / `kill` / `note`; `plainEnv(env)` | `spawner.ts` (`bindSocket`), `node-transport.ts` |
 | `node-transport.ts` | `placeInNodeHost(facade, options, ctx)` → `Promise<void>`, settled at the host's first frame and rejected with the refusal sentence; `waitingHostIds()`; `gateFreshNodeHosts(gate)` | `spawner.ts` (`armNodeSpawn`), `node-readopt.ts` |
 | `node-readopt.ts` | `watchNodeLinks(deps)`, `releaseNodeReadoptionWait()`, `whenNodeSessionsReadopted()` | `readopt.ts`, `index.ts` |
+| `host-liveness.ts` | `trackHostLiveness(facade, appSessionId, hostId)`; `sessionHostLivenessSnapshot()` | `spawner.ts` (`bindSocket`), `node-transport.ts` (`onHostFrame`); `index.ts` (the snapshot) |
 
 The two registry instances:
 
@@ -464,6 +466,36 @@ Needs what `cerberus-node-chat.mjs` needs (the scratch project `~/.claude/state/
 `.verify/cerberus-node-readopt-boot.mjs --evidence <dir>` is the same chat through the unit's PLAIN restart (`sudo -n systemctl restart cloudcli-server-dev`, not a handover), the path where the hold matters: the warden links after `listen`. Mid-turn it restarts the unit and polls `GET /api/providers/sessions/running` every 200 ms (`polls.txt`). `first_answer` is the first 200 — how long after the restart, how long the request was held, and whether it lists the chat as running (it must: a tab that subscribed there would otherwise read a live session as idle); `restart_readopted` is `[keepalive] node eis1: re-adopted 1 host(s)` in the journal; `turn_complete`, `turn_repeats` and `same_cli_pid` as above; `again_answered` and `same_cli_pid_again` say a second message, "Reply with the word again.", is answered by the same CLI.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/cerberus-node-readopt-boot.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/cerberus-node-readopt.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/node-probe.mjs
+
+## MAN-8122 — Which chats have a live host
+section: README/0107 Which chats have a live host
+
+A chat with no live host is ASLEEP: no CLI runs for it, and its next message starts a fresh one. The simple chat list grays such a row; the server tells every open page the moment a chat gains or loses its last host, and a page that connects is sent the whole set once. Nothing polls.
+
+`host-liveness.ts` holds the set: `Map<appSessionId, Set<hostId>>`, in memory, this process's own. A chat is live while its set is non-empty, so a supersede overlap (two hosts on one chat for seconds) never reads as the chat falling asleep.
+
+| Moment | Where | Effect |
+|---|---|---|
+| A host is bound | `bindSocket` (`spawner.ts`) for this machine's keepalive — a fresh spawn and a re-adoption alike; `onHostFrame`'s first frame in `node-transport.ts` for a node's host | `trackHostLiveness(facade, appSessionId, hostId)` adds it. The chat's FIRST host pushes `live` |
+| The host ends, however | the facade's `exit` event, which every end reaches through `settleExit` | The host leaves the set. The chat's LAST host pushes `asleep` |
+| A socket connects to `/ws` | `handleChatConnection` (websocket module): the socket joins `connectedClients` at once, and the snapshot waits for `whenHostsReadopted` (below) | `sessionHostLivenessSnapshot()` is built at the moment it is sent and goes to that socket alone |
+
+Why the facade's `exit` and not a second listener per cause: the CLI's `exit` frame (an idle close, a `kill-session`, a `kill-server` — tmux SIGHUPs the host, which winds its CLI down and reports it), a socket closed with no `exit`, a node channel closed for good, and a retirement over a second socket each settle the facade, so one listener covers all of them and the boot's re-adoption defines the set after a restart by binding what survived. A node's link blink leaves the facade unsettled for its 60 s grace, so a node chat stays live through one.
+
+The frame, `SessionHostLivenessEvent` in `server/shared/types.ts`: `{ kind: 'session_host_liveness', change: 'snapshot' | 'live' | 'asleep', sessionIds: string[], at }`. The ids ride an array and not a `sessionId` key on purpose: `useProjectsState` marks a chat for attention when any frame carries a `sessionId` that is not the one on screen, and a host ending is no news in the chat. No `seq` and no `sessionId`, so it never becomes a transcript row or a mark. The fan-out copies `broadcastKanbanEvent`.
+
+Silence while the API exits: a facade that settles under `isApiExiting()` was detached (D-10), not ended, so `asleep` is not pushed; the successor's snapshot, held until it has re-adopted, tells the pages.
+
+Boundaries:
+- A page whose socket reconnects (a token refresh does it) is sent a fresh snapshot by the new connection, so it never stands on a set the old socket left behind.
+- The snapshot is HELD until the hosts are re-adopted: `whenHostsReadopted` is `server/index.ts`'s `whenHostsHeld`, the two events the running-sessions read waits behind (`whenRunsReadopted`, `whenNodeSessionsReadopted()`) with the same 11 s bound, one deadline per held socket and no polling. Without it a handover boot, which serves before its takeover while the predecessor drains, sent the empty set while tmux held every host, and every live row blinked gray for about half a second until re-adoption's `live` frames landed. A `live` that reaches a page before its snapshot is ignored (the set is unknown, so nothing is gray) and the snapshot, built after it, holds it. Past the bound the snapshot goes as it stands and late hosts arrive as `live` frames.
+- A turn that falls back to an in-process CLI (the keepalive unit down) has no tmux session, so its chat reads asleep while it runs. The rule is "no live tmux session".
+- Only Claude chats have hosts. The client grays a Claude row only; another provider's chat is never grayed.
+- The client's set is `SessionHostLivenessContext` (mounted by App directly under `WebSocketProvider`, above the auth gate, so it has subscribed before the one snapshot a connection brings); `SidebarSimpleListRow` draws `data-asleep="true"` with the hover title `simpleList.asleep`.
+
+Proof: `.verify/simple-list-live-gray-event.mjs` (a probe chat's own tmux session ended: the `asleep` frame on the page's socket, the row grayed, no page request in between, the next turn un-grays it) and `.verify/simple-list-live-gray-gate.mjs` (the real list, desktop and mobile, light and dark, held against `tmux ls`). A chat in a scratch folder under `/tmp` is kept out of every feed by `hidden-project-paths.ts`, so the event probe splices its own row into the page's feed response; the frames, the host and the set are real.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/session-host/host-liveness.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/session-host/spawner.ts
 
 ## MAN-693 — Failure modes, and how each ends
 section: README/011 Failure modes, and how each ends

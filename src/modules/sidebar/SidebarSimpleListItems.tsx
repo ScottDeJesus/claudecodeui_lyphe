@@ -26,6 +26,11 @@ type SidebarSimpleListItemsProps = {
   awaitingInputSessionIds: ReadonlySet<string>;
   /** The chats with a subagent still running, often after their own turn has ended. */
   subagentRunningSessionIds: ReadonlySet<string>;
+  /**
+   * The chats whose CLI has a live session host, pushed by the server on change; null until the server
+   * has said. A Claude chat NOT in it is asleep and its row is grayed — nothing is grayed while null.
+   */
+  liveHostSessionIds: ReadonlySet<string> | null;
   /** The chat whose removal failed, which its row says out loud; null when none has. */
   failedSessionId: string | null;
   /** The folder that has just been made: its header opens its name for typing and scrolls itself in. */
@@ -144,6 +149,7 @@ export default function SidebarSimpleListItems({
   busySessionIds,
   awaitingInputSessionIds,
   subagentRunningSessionIds,
+  liveHostSessionIds,
   failedSessionId,
   freshFolderId,
   onFreshShown,
@@ -171,6 +177,9 @@ export default function SidebarSimpleListItems({
       isRunning={busySessionIds.has(chat.sessionId)}
       isAwaitingInput={awaitingInputSessionIds.has(chat.sessionId)}
       isSubagentRunning={subagentRunningSessionIds.has(chat.sessionId)}
+      // Only a Claude chat can have a session host, so only one can be asleep: another provider's
+      // chat is never grayed, and nothing is until the server's first snapshot has arrived.
+      isAsleep={liveHostSessionIds !== null && chat.provider === 'claude' && !liveHostSessionIds.has(chat.sessionId)}
       isRemoveFailed={failedSessionId === chat.sessionId}
       // FILL: onSelectChat
       onSelect={() => onSelectChat(chat)}

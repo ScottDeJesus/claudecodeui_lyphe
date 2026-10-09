@@ -59,3 +59,10 @@ export type { LiveHost } from './hosts.js';
  * consumer: the claude-activity module, through the providers barrel
  */
 export { listColocatedNodeHosts, refreshColocatedNodeHosts } from './colocated-hosts.js';
+
+/**
+ * The chats with a live host, as the frame a socket is sent when it connects. The push that keeps a
+ * page current after it is the same file's (`host-liveness.ts`); only this one read is public.
+ * consumer: the websocket module's chat gateway, through the providers barrel
+ */
+export { sessionHostLivenessSnapshot } from './host-liveness.js';

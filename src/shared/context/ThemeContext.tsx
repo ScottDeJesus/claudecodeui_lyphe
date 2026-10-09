@@ -27,6 +27,20 @@ const ThemeContext = createContext<ThemeContextValue | null>(null);
  */
 const MAX_SUN_CHECK_MS = 30 * 60_000;
 
+/**
+ * The colour the sun calls for right now, or `null` when it has no say: the reader is not following
+ * it, or it measured nothing (a polar day or night has no crossing to compute from).
+ *
+ * The ONE place the solar answer is read for the stored preferences — the first paint, the preference
+ * subscriber and the system-scheme listener below all ask it before any stored or system colour, so
+ * no path can apply a colour over the sun's while the sun is in charge.
+ */
+function readSunDarkMode(): boolean | null {
+  if (!readUserPreference<boolean>('themeFollowsSun', false)) return null;
+  const phase = readSunPhase();
+  return phase.nextChangeAt ? !phase.isDaylight : null;
+}
+
 export const useTheme = () => {
   const context = useContext(ThemeContext);
   if (!context) {
@@ -46,11 +60,9 @@ export const ThemeProvider = ({ children }: { children: ReactNode }) => {
 
   const [isDarkMode, setIsDarkMode] = useState(() => {
     // Ahead of the stored theme: when the reader has asked for the sun, the sun is the choice,
-    // and the stored value is only the last colour it happened to leave behind.
-    if (readUserPreference<boolean>('themeFollowsSun', false)) {
-      const phase = readSunPhase();
-      if (phase.nextChangeAt) return !phase.isDaylight;
-    }
+    // and the stored value is only a colour left over from before they asked.
+    const sunDarkMode = readSunDarkMode();
+    if (sunDarkMode !== null) return sunDarkMode;
 
     const savedTheme = readUserPreference<string | null>('theme', null);
     if (savedTheme) {
@@ -67,8 +79,19 @@ export const ThemeProvider = ({ children }: { children: ReactNode }) => {
 
   // The theme now lives in auth.db, so a change made on another device (or in
   // another tab) arrives through the preference store rather than a re-render.
+  //
+  // ⚠ This listener runs on EVERY preference write of ANY key — a font-size step, a Settings switch,
+  // the sign-in hydrate — not just on a change to the theme. While the sun is followed it therefore
+  // applies the sun's answer, never the stored `theme`: that value is whatever the reader last chose by
+  // hand, days ago, and re-applying it here turned the page dark at midday on the next button press,
+  // with nothing to correct it until the sun-follower's next wake (up to 30 minutes later).
   useEffect(() => subscribeToUserPreferences(() => {
     setFollowsSunState(readUserPreference<boolean>('themeFollowsSun', false));
+    const sunDarkMode = readSunDarkMode();
+    if (sunDarkMode !== null) {
+      setIsDarkMode(sunDarkMode);
+      return;
+    }
     const savedTheme = readUserPreference<string | null>('theme', null);
     if (savedTheme) {
       setIsDarkMode(savedTheme === 'dark');
@@ -174,9 +197,9 @@ export const ThemeProvider = ({ children }: { children: ReactNode }) => {
 
     const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
     const handleChange = (e: MediaQueryListEvent) => {
-      // Only update if user hasn't manually set a preference
+      // Only update if user hasn't manually set a preference, and the sun is not in charge of the colour
       const savedTheme = readUserPreference<string | null>('theme', null);
-      if (!savedTheme) {
+      if (!savedTheme && readSunDarkMode() === null) {
         setIsDarkMode(e.matches);
       }
     };
@@ -194,8 +217,9 @@ export const ThemeProvider = ({ children }: { children: ReactNode }) => {
     if (animationTimer.current !== null) window.clearTimeout(animationTimer.current);
   }, []);
 
-  // The only writer: a theme is stored because the user picked it, never
-  // because this device happened to start on one.
+  // A theme is stored because the user picked it (this switch), or because they let the sun go and
+  // the colour on screen became their choice (`setFollowsSun`) — never because this device
+  // happened to start on one.
   const toggleDarkMode = useCallback(() => {
     // The theme swap is the one moment colour is allowed to animate. `vv-anim` sets a
     // transition with !important on EVERY element, so it goes on for the half second around
@@ -208,11 +232,15 @@ export const ThemeProvider = ({ children }: { children: ReactNode }) => {
       document.body.classList.remove('vv-anim');
     }, 500);
 
-    setIsDarkMode((previous) => {
-      const next = !previous;
-      writeUserPreference('theme', next ? 'dark' : 'light');
-      return next;
-    });
+    // The colour is taken from the render's `isDarkMode`, not from a state updater: an updater that
+    // writes a preference runs inside React's render when an update is already pending, and the write
+    // then notifies other providers mid-render.
+    const next = !isDarkMode;
+
+    // Stored before the sun is released: releasing notifies the preference listener above, which from
+    // then on applies the stored `theme`, so it has to be the colour just chosen and not the old one.
+    writeUserPreference('theme', next ? 'dark' : 'light');
+    setIsDarkMode(next);
 
     // Reaching for the switch IS the decision. Leaving the sun in charge would let it undo the
     // choice at the next crossing, which reads as the control being broken.
@@ -220,12 +248,18 @@ export const ThemeProvider = ({ children }: { children: ReactNode }) => {
       writeUserPreference('themeFollowsSun', false);
       setFollowsSunState(false);
     }
-  }, []);
+  }, [isDarkMode]);
 
+  // Letting the sun go from its own switch keeps the colour on screen: it becomes the stored choice.
+  // The listener applies the stored `theme` once the sun is let go, so without this the page jumped
+  // to whatever was stored days ago (the sun never writes `theme`).
   const setFollowsSun = useCallback((next: boolean) => {
+    if (!next && readUserPreference<boolean>('themeFollowsSun', false)) {
+      writeUserPreference('theme', isDarkMode ? 'dark' : 'light');
+    }
     writeUserPreference('themeFollowsSun', next);
     setFollowsSunState(next);
-  }, []);
+  }, [isDarkMode]);
 
   // A fresh object here would re-render every consumer in the app on any
   // render of this provider, theme change or not.

@@ -27,6 +27,7 @@ import type { CerberusHostFrame } from '@/shared/cerberus-types.js';
 import { attachLocalSpawn, createFacade, isApiExiting } from './facade.js';
 import type { Facade, TurnBits } from './facade.js';
 import { deliverHostFrame, hostTransport, plainEnv } from './host-frames.js';
+import { trackHostLiveness } from './host-liveness.js';
 import { isKeepaliveServerUp, isTmuxSessionAlive, registry, removeHostJournal } from './hosts.js';
 import { placeInNodeHost } from './node-transport.js';
 
@@ -111,9 +112,12 @@ function bindSocket(
   facade: Facade,
   socket: net.Socket,
   hostId: string,
+  appSessionId: string,
   firstFrame: CerberusHostFrame
 ): void {
   socket.setNoDelay(true);
+  // The chat has a live host from here until this facade settles (host-liveness.ts).
+  trackHostLiveness(facade, appSessionId, hostId);
 
   const send = (frame: CerberusHostFrame): void => {
     if (socket.writable) socket.write(`${JSON.stringify(frame)}\n`);
@@ -176,7 +180,7 @@ async function placeInHost(facade: Facade, options: SpawnOptions, ctx: SpawnCont
     const socket = await registry.connectToHost(hostId, REATTACH_CONNECT_TIMEOUT_MS);
     // D-3: "acked" is the host's own cursor — it replays any `result` this API never
     // confirmed handling, and nothing it already did.
-    bindSocket(facade, socket, hostId, { t: 'hello', fromSeq: 'acked' });
+    bindSocket(facade, socket, hostId, ctx.appSessionId, { t: 'hello', fromSeq: 'acked' });
     return;
   }
 
@@ -186,7 +190,7 @@ async function placeInHost(facade: Facade, options: SpawnOptions, ctx: SpawnCont
   registry.spawnHostSession(hostId, cwd);
 
   const socket = await registry.connectToHost(hostId, FRESH_CONNECT_TIMEOUT_MS);
-  bindSocket(facade, socket, hostId, {
+  bindSocket(facade, socket, hostId, ctx.appSessionId, {
     t: 'spawn',
     command: options.command,
     args: options.args,
