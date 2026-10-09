@@ -2690,8 +2690,6 @@ CloudCLI's text names arcs, plans and phases as epics, features and tasks. Ident
 - `roadmap_mirror_blocks` — the DocSpace copy of each roadmap: the blocks' own words (titles, tile labels, the closing note) say milestone, epic, feature and task, and the Features database carries each row's `where` phrase from `report_roadmap_words` (`_STEP_PHRASES`, `step_phrase`, `milestone_where`; MAN-7621), the phrases' one home on the dispatcher's side.
 - Untouched in the prompt: `LOCK_HEADER`, `OPTIONS` and their labels, `TOKEN_RE`, `names_of`, and every input of `lock.token`. why: the vet reads the first line and the last token; an outstanding token must stand.
 
-**The slash doors**: `/feature` is `/plan`, `/epic` is `/arc` (`skills/feature/SKILL.md`, `skills/epic/SKILL.md`). Each loads its skill and runs that sequence; nothing of the sequence lives in the door.
-
 **Authored text is drawn as written**: a plan's name, goal, `delivers`, phase titles, the events feed, the stage lines, a roadmap's, milestone's, epic's and feature's title and goal.
 
 **Keeps arc, plan, phase**
@@ -2719,7 +2717,7 @@ Proof — prints exactly the eight other-sense keys above:
 
 Translator contract: MAN-7596. Push wording: MAN-622. The prompt's census and facts line: MAN-6047, MAN-1475.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notifications/services/notification-copy.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/operatorWords.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/, /home/lyphe/.claude/hooks/dispatcher/lock_glance.py, /home/lyphe/.claude/hooks/dispatcher/lock.py, /home/lyphe/.claude/hooks/dispatcher/report_roadmap_words.py, /home/lyphe/.claude/hooks/dispatcher/roadmap_mirror_blocks.py, /home/lyphe/.claude/hooks/intent_lock.py, /home/lyphe/.claude/skills/epic/, /home/lyphe/.claude/skills/feature/
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notifications/services/notification-copy.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/operatorWords.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/, /home/lyphe/.claude/hooks/dispatcher/lock_glance.py, /home/lyphe/.claude/hooks/dispatcher/lock.py, /home/lyphe/.claude/hooks/dispatcher/report_roadmap_words.py, /home/lyphe/.claude/hooks/dispatcher/roadmap_mirror_blocks.py, /home/lyphe/.claude/hooks/intent_lock.py
 
 ## INV-6398 — probe — `.verify/probe-dismiss-done.mjs` cannot run, and its edited labels were never run (LOW)
 

@@ -7448,7 +7448,10 @@ section: schedules/003 The two tables, and where they really live
 `server/modules/database/schema.ts` and applied by `server/modules/database/migrations.ts` exactly
 the way `SCHEDULED_MESSAGES_TABLE_SCHEMA_SQL` is. They live in **the database CloudCLI already
 owns** — the path `getDatabasePath()` resolves from `DATABASE_PATH`, today
-`/home/lyphe/.cloudcli/auth.db`, alongside `scheduled_messages`. The repository is
+`/home/lyphe/.cloudcli/auth.db`, alongside `scheduled_messages`. The door
+(`schedules-cli.ts`) imports `server/load-env.ts` before anything opens the connection, so it resolves
+`DATABASE_PATH` as the server does — the `.env` value, else `~/.cloudcli/auth.db`, never the repo's
+legacy `database/auth.db`, even under an empty environment. The repository is
 `repositories/cron-jobs.db.ts` (`cronJobsDb`), taking `getConnection()` inside each method like its
 neighbours.
 
@@ -7599,7 +7602,7 @@ and this is it.
 
 ```
 cron-registry-sync add --name <n> [--purpose <p>] [--tags <a,b>] --schedule <expr> --command <cmd> [--log <path>] [--tabfile <f>]
-cron-registry-sync remove --command <cmd> [--tabfile <f>]
+cron-registry-sync remove (--command <cmd> | --name <n>) [--tabfile <f>]
 cron-registry-sync list
 cron-registry-sync sync
 ```
@@ -7617,7 +7620,7 @@ this page deliberately carries no copy of it.
   <path>` is composed into the line as `… >> <path> 2>&1`, cron's own idiom, because cron
   otherwise mails stdout; a command that already redirects is written as given, and pairing one
   with `--log` is refused rather than resolved.
-- `remove` takes the line and the row away, and is the one act allowed to delete a row.
+- `remove` takes the line and the row away, and is the one act allowed to delete a row. `--name <n>` stands for the command of the ONE registry row so named; no match or several is refused (exit 2), never guessed.
 - **`add` and `remove` are the ONLY things that clear a drift flag.** Curating a job at the door
   is what says the line is meant.
 
@@ -7641,7 +7644,7 @@ The wrapper is the whole of it:
 
 ```sh
 #!/bin/sh
-cd /home/lyphe/.claudecodeui_lyphe || exit 1
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
 exec ./node_modules/.bin/tsx --tsconfig server/tsconfig.json server/modules/schedules/schedules-cli.ts "$@"
 ```
 
