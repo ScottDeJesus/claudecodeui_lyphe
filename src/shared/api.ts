@@ -929,6 +929,14 @@ export const api = {
     // dispatcher reads which door from its own store — `cut`, `judge`, or a `tell` of `continue` — and
     // answers with that door's own sentence (`QUEUED cut <plan> — …`), or `REFUSED planner-resume …` as a 409.
     plannerResume: (name: string) => post(`/api/dispatcher/plans/${encodeURIComponent(name)}/planner-resume`, {}),
+    // "Accept when cut" on a DESIGNED plan (`dispatcher arm-accept <plan> --by app:card --design <stamp>`): the
+    // stamp is the plan's `design_loaded_at` as the card drew it, so a press on a design that has since moved is
+    // refused by the dispatcher. `disarmAccept` is its Cancel. The arc pair presses/cancels every designed (armed)
+    // plan of the arc on each plan's own current design — no stamp travels.
+    armAccept: (name: string, design: string) => post(`/api/dispatcher/plans/${encodeURIComponent(name)}/arm-accept`, { design }),
+    disarmAccept: (name: string) => post(`/api/dispatcher/plans/${encodeURIComponent(name)}/disarm-accept`, {}),
+    arcArmAccept: (name: string) => post(`/api/dispatcher/arcs/${encodeURIComponent(name)}/arm-accept`, {}),
+    arcDisarmAccept: (name: string) => post(`/api/dispatcher/arcs/${encodeURIComponent(name)}/disarm-accept`, {}),
     // The operator's answer to a plan's prompt, from its card: the ask exactly as the card drew
     // it, the chosen label (or typed words) by question, and a Rework's notes by question. A
     // refusal is a RESULT (409), as for every verb.

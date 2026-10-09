@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { alreadyArmed, useArmAcceptVerbs, type ArmAcceptArcVerbs, type ArmAcceptPlanVerbs } from '@/modules/dispatcher/hooks/useArmAcceptVerbs';
 import { operatorWords } from '@/modules/dispatcher/operatorWords';
 import { api } from '@/shared/api';
 import { useToast } from '@/shared/context/ToastContext';
@@ -8,7 +9,7 @@ import type { DispatcherAsk, DispatcherModelChoice, DispatcherVerb, DispatcherWi
 import { firstLine } from '@/shared/utils';
 
 /** The dispatcher's answer, as much of it as this hook reads. Both fields are free text it wrote. */
-type VerbBody = { stdout?: unknown; stderr?: unknown };
+type VerbBody = { stdout?: unknown; stderr?: unknown; exit?: unknown };
 
 /** The two doors a press can be relayed through: one plan's, or one dispatch arc's. */
 export type DispatcherVerbScope = 'plan' | 'arc';
@@ -31,7 +32,7 @@ async function readBody(response: Response): Promise<VerbBody | null> {
 type DispatcherPress = DispatcherVerb | 'answer';
 
 /** What a plan card may press. */
-export type DispatcherPlanVerbs = {
+export type DispatcherPlanVerbs = ArmAcceptPlanVerbs & {
   stop(): Promise<void>;
   resume(): Promise<void>;
   schedule(when: string): Promise<void>;
@@ -55,7 +56,7 @@ export type DispatcherPlanVerbs = {
  * epic's own `wip`. `park`, `unpark` and `drop` are the plan card's own and no arc header draws them,
  * so no arc callback exists for them rather than one that would have no route to reach.
  */
-export type DispatcherArcVerbs = {
+export type DispatcherArcVerbs = ArmAcceptArcVerbs & {
   stop(): Promise<void>;
   resume(): Promise<void>;
   schedule(when: string): Promise<void>;
@@ -159,6 +160,7 @@ export function useDispatcherVerbs(
       if (verb === 'model') return t('runner.model.refused');
       if (verb === 'wip') return t('dispatcher.wip.refused');
       if (verb === 'answer') return t('dispatcher.ask.word');
+      if (verb === 'arm-accept' || verb === 'disarm-accept') return t('dispatcher.acceptWhenCutRefused');
       return resumeWord ?? t('runner.resume');
     },
     [resumeWord, t],
@@ -211,6 +213,10 @@ export function useDispatcherVerbs(
           return true;
         }
 
+        if (alreadyArmed(verb, body)) {      // an answer that arrived second is the state asked for: no warning
+          toast({ tone: 'info', title: word(verb), message: said });
+          return true;
+        }
         toast({ tone: 'warn', title: word(verb), message: said || t('messages.operationFailed') });
         return false;
       } catch (error) {
@@ -284,6 +290,9 @@ export function useDispatcherVerbs(
     [send],
   );
 
-  if (scope === 'arc') return { stop, resume, schedule, setModel, setWip, busy };
-  return { stop, resume, schedule, park, unpark, drop, plannerResume, setModel, answer, busy };
+  // "Accept when cut" and its Cancel: this hook's `send` carries them (`useArmAcceptVerbs`), both doors.
+  const armVerbs = useArmAcceptVerbs(name, scope, send);
+
+  if (scope === 'arc') return { stop, resume, schedule, setModel, setWip, ...armVerbs, busy };
+  return { stop, resume, schedule, park, unpark, drop, plannerResume, setModel, answer, ...armVerbs, busy };
 }

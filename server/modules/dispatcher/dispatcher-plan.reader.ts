@@ -42,6 +42,21 @@ function approvedOf(value: unknown): DispatcherPlan['approved'] {
   };
 }
 
+/**
+ * `plan.accept_armed`: the operator's "Accept when cut" press (`store_armed`) — the door, the hour and the
+ * design stamp it was pressed against — or `null`. Read tolerantly like `asking`: a dispatcher build older
+ * than the key writes none, and that reads as nothing armed.
+ */
+function acceptArmedOf(value: unknown): DispatcherPlan['accept_armed'] {
+  if (value === undefined || value === null) return null;
+  const press = need(value, isRecord, 'plan.accept_armed');
+  return {
+    at: need(field(press, 'at'), isText, 'plan.accept_armed.at'),
+    by: need(field(press, 'by'), isText, 'plan.accept_armed.by'),
+    design: need(field(press, 'design'), isText, 'plan.accept_armed.design'),
+  };
+}
+
 /** `plan.schedule`: the armed hour read back out of systemd at the instant of the read (`schedule.armed`), or `null` when none is armed. */
 function scheduleOf(value: unknown): DispatcherPlan['schedule'] {
   if (value === null) return null;
@@ -174,6 +189,11 @@ export function planOf(raw: unknown): DocumentPlan {
     // the `stalled` status word: the line the card says it by. Tolerant for a build older than it.
     stalled: stallSince(field(plan, 'stalled'), `plan.stalled of ${name}`),
     approved: approvedOf(field(plan, 'approved')),
+    // The operator's "Accept when cut" press on this plan, and the stamp of the design it would bind to
+    // (`design_loaded_at`) — the stamp the card sends back with its press. Both tolerant of a build older
+    // than the keys, which draws no press.
+    accept_armed: acceptArmedOf(field(plan, 'accept_armed')),
+    design_loaded_at: textSince(field(plan, 'design_loaded_at'), 'plan.design_loaded_at'),
     // The prompt CloudCLI has put up for this plan and is waiting on — the one key the plan's card is
     // drawn from and the book is raised off (`dispatcher-asks.service.ts`). Tolerant for a build
     // older than it, which asks nothing.

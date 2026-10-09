@@ -2,16 +2,19 @@ import { runDispatcherCommand, type DispatcherCommandDependencies } from '@/shar
 import type { DispatcherVerb, DispatcherVerbResult } from '@/shared/types.js';
 
 /**
- * Relaying the dispatcher's own nine verbs: `stop`, `resume`, `schedule` (a plan's Start — or its
+ * Relaying the dispatcher's own eleven verbs: `stop`, `resume`, `schedule` (a plan's Start — or its
  * Resume, for one already stopped — at a time), `park` (a designed plan set aside), `unpark` (handed
  * back to be cut), `model` (a plan's or an arc's own DeepSeek / Claude word), `wip` (an epic's own
  * feature or task WIP limit), `drop` (a plan removed, with everything the store holds of it — refused while a phase
  * of it walks or while a planner outing for the plan or its arc is live, the two gates of
  * `hooks/dispatcher/cmd/drop.py`) and `planner-resume` (a plan's stalled planner outing put back to
  * work — which door it goes back through is the dispatcher's own reading of its store, so it takes
- * the press's `--by` and nothing else).
+ * the press's `--by` and nothing else), and `arm-accept` / `disarm-accept` (the operator's "Accept when
+ * cut" on a designed plan — the card's press carries `--by app:card` and the design stamp it read — and its
+ * Cancel).
  *
- * FOUR OF THE NINE NAME AN ARC AS READILY AS A PLAN — `stop`, `resume`, `schedule` and `model`, each
+ * SIX OF THE ELEVEN NAME AN ARC AS READILY AS A PLAN — `stop`, `resume`, `schedule`, `model`, and the
+ * `arm-accept` / `disarm-accept` pair (every designed, or every armed, plan of it), each
  * resolved by the dispatcher's own door and by nothing on this side. An arc has no walk of its own:
  * `stop <arc>` is this same verb over the arc's LIVE plans — what is walking and what is approved,
  * unpaused and waiting its turn — and `resume <arc>` over its STOPPED ones, which is every plan of it

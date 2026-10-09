@@ -90,6 +90,11 @@ export function arcOf(raw: unknown): DispatcherArc {
     // armed stamp, null when there is none or when its plans were armed apart). It is the stamp the
     // header's Cancel is drawn over and the note beside it states — never computed here.
     schedule: textSince(field(arc, 'schedule'), `arc.schedule of ${name}`),
+    // How many of the arc's plans the "Accept when cut" press reaches now, and how many carry one
+    // (`report_arcs.armable`, `armed`): the deck draws the press and its Cancel by them. Counts, so a
+    // build older than the keys reads zero and draws neither.
+    armable: countSince(field(arc, 'armable'), `arc.armable of ${name}`),
+    armed: countSince(field(arc, 'armed'), `arc.armed of ${name}`),
     plans: names(field(arc, 'plans'), 'arc.plans'),
     // The one outing whose `target` IS this arc — its design, its cut, its judgment
     // (`report_planners.of_arc`). A row naming one of the arc's plans is that PLAN's and rides

@@ -1,5 +1,6 @@
 import { useTranslation } from 'react-i18next';
 
+import { AcceptWhenCut } from '@/modules/dispatcher/AcceptWhenCut';
 import { ActionBar } from '@/modules/dispatcher/ActionBar';
 import { epochOf } from '@/modules/dispatcher/dispatcherState';
 import { EpicWipControl } from '@/modules/dispatcher/EpicWipControl';
@@ -56,6 +57,9 @@ import { effectiveModelWord } from '@/shared/utils';
  * draws nothing from a frame that carries no `arc.wip` or no defaults, and the bar stands without it.
  * It is never refused for the epic's state: the limit is read at the rule's next take-up.
  *
+ * `Accept when cut` (`AcceptWhenCut`, `arc.armable` / `arc.armed`) heads the row while any designed member can
+ * still be Accepted ahead of its cut, or stands armed with its Cancel.
+ *
  * Handles: `data-dispatch-arc-model` / `data-dispatch-arc-model-choice`, `data-dispatch-arc-stop`,
  * `data-dispatch-arc-resume`, `data-dispatcher-arc-schedule` (`-set`, `-cancel`, the armed hour as
  * the group's value), and the WIP control's own (`EpicWipControl`'s `data-epic-wip…`). A probe scopes them under the deck's own `[data-dispatch-arc][data-arc-name]`
@@ -70,7 +74,7 @@ export function DispatchArcControls({ arc }: { arc: DispatcherArc }) {
   // the same reason `PlanControls` passes the word its button carries: a refused press must answer in
   // the word the operator actually read. The hook defaults this to "Resume", which is the plan card's
   // word for a stopped plan and never this row's.
-  const { stop, resume, schedule, setModel, setWip, busy } = useDispatcherVerbs(arc.name, 'arc',
+  const { stop, resume, schedule, setModel, setWip, armAccept, disarmAccept, busy } = useDispatcherVerbs(arc.name, 'arc',
     arc.stopped ? t('runner.start') : t('runner.resume'));
   const { route } = useDispatcherPlans();
   const armed = epochOf(arc.schedule);
@@ -80,8 +84,13 @@ export function DispatchArcControls({ arc }: { arc: DispatcherArc }) {
     <ActionBar
       // Only where a verb would be taken: an arc with nothing live and nothing stopped draws no verb,
       // so a deck never offers a press the dispatcher would refuse.
-      verbs={arc.walking || arc.stopped || arc.stalled ? (
+      verbs={arc.walking || arc.stopped || arc.stalled || arc.armable > 0 || arc.armed > 0 ? (
         <>
+          {/* `Accept when cut` over the deck: every DESIGNED member is Accepted ahead of its cut, each on its
+              own current design (`arc.armable`); once none is left to press, the armed word and Cancel
+              (`arc.armed`). A member not yet designed is not reached — the operator has not read its design. */}
+          <AcceptWhenCut scope="dispatch-arc" busy={held} pressable={arc.armable > 0} armed={arc.armed > 0}
+            onArm={() => void armAccept()} onCancel={() => void disarmAccept()} />
           {arc.walking && (
             <Button variant="secondary" size="sm" className="h-8" disabled={held} onClick={() => void stop()}
               data-dispatch-arc-stop>{t('dispatcher.arcPause')}</Button>

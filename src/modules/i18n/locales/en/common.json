@@ -1287,6 +1287,12 @@
     "park": "Park",
     "unpark": "Unpark",
     "plannerResume": "Resume planner",
+    "acceptWhenCut": "Accept when cut",
+    "acceptWhenCutArmed": "Accepted · starts when cut",
+    "acceptWhenCutCancel": "Cancel",
+    "acceptWhenCutTitle": "Approve this design now; it starts by itself when its cut lands",
+    "acceptWhenCutRefused": "Accept when cut",
+    "acceptWhenCutArmedTitle": "Your press ({{by}}, {{at}}) — the first cut of the design you read is approved when it lands; a Rework disarms it",
     "delete": {
       "word": "Delete",
       "menu": "Delete feature…",

@@ -28,8 +28,12 @@ export { each, field, isCount, isCountOrNull, isFlag, isRecord, isText, isTextOr
  * than left to the default, so the ceiling is a number written down here. A document past it reaches
  * the journal as `did not answer:` and the document's own opening, not as a word about the buffer
  * (`readDispatcherJson` says why) — a line that quotes the document is this number too low.
+ *
+ * Measured 2026-10-09: the live document weighs 4.22 MB over 74 plans (one finished plan alone carries
+ * 520 KB of events), so the ceiling is 16 MiB. A read past the ceiling fails whole: the lane then answers
+ * `the dispatcher has not been read yet` and draws nothing.
  */
-const STATUS_MAX_BUFFER = 4 * 1024 * 1024;
+const STATUS_MAX_BUFFER = 16 * 1024 * 1024;
 
 // --------------------------- reading a field a build older than it did not write ---------------------------
 

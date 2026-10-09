@@ -61,6 +61,26 @@ function wipArgs(body: unknown): string[] | null {
   return checkedLimit === undefined || checkedWord === null ? null : [checkedLimit, checkedWord];
 }
 
+/** A design's stamp (`designs.loaded_at`, `store.now()`'s shape): the lock an "Accept when cut" press carries. */
+const DESIGN_STAMP = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/;
+
+/** The 400 sentence the arm route answers with when the body carries no design stamp. */
+const DESIGN_STAMP_ERROR = 'design must be the design stamp the card read (YYYY-MM-DDTHH:MM:SSZ)';
+
+/**
+ * The argv words of a card's "Accept when cut" press — `['--by', 'app:card', '--design', <stamp>]` — or
+ * `null` for a body that carries no stamp of the design's shape, checked BEFORE ANY PROCESS STARTS.
+ *
+ * THE STAMP IS THE LOCK: the press binds to the exact design the operator read, and the dispatcher
+ * refuses one whose design has since moved. `--by` is this server's own word — the press is the
+ * operator's, from the card or the phone (the same card), and a request can neither pick the door nor
+ * leave the stamp out to press on whatever the design is by then.
+ */
+function armAcceptArgs(body: unknown): string[] | null {
+  const { design } = (body ?? {}) as { design?: unknown };
+  return typeof design === 'string' && DESIGN_STAMP.test(design) ? ['--by', 'app:card', '--design', design] : null;
+}
+
 export type DispatcherRouterDependencies = {
   /**
    * The reading to answer a request with: the watcher's last, and — in the gap before this boot's
@@ -109,13 +129,13 @@ function statusForVerb(result: DispatcherVerbResult): number {
 }
 
 /**
- * The dispatcher lane's sixteen routes: three reads of the plan list, eight presses on a plan, five on
+ * The dispatcher lane's twenty routes: three reads of the plan list, ten presses on a plan, seven on
  * an arc. Auth is the mount's `authenticateToken`, in `server/index.ts`.
  *
  * These handlers validate and translate, and do nothing else: nothing is read here, no process is
  * started here, and no route names a path from the request — the binary and the store are the
  * module's, fixed at composition, and a request can only ever choose a plan or an arc by name, a
- * word from the closed set of nine verbs, and — where the verb takes one — a word from the three
+ * word from the closed set of eleven verbs, and — where the verb takes one — a word from the three
  * model words or the WIP grammar.
  *
  * A READ THAT FINDS NO PICTURE IS TOLD SO (`NOT_READ_YET` above), and the read waits a bound for one
@@ -231,6 +251,15 @@ export function createDispatcherRouter(dependencies: DispatcherRouterDependencie
   // stalled is the dispatcher's own refusal (`REFUSED planner-resume …`, a 409). `--by app:card` is the
   // press's actor, written to the plan's log the way an Accept's is; the word is ours, never the request's.
   router.post('/plans/:name/planner-resume', relay('planner-resume', () => ['--by', 'app:card']));
+  // A DESIGNED plan Accepted ahead of its cut (`dispatcher arm-accept <name> --by app:card --design <stamp>`) —
+  // the card's `Accept when cut`: the daemon approves the first cut of that exact design and walks it. The
+  // stamp the card drew travels in the body and is checked before any spawn (`armAcceptArgs`); the dispatcher
+  // refuses a press on a design that has since moved (a 409 carrying its own sentence) and answers a second
+  // press with exit 3 (`already armed`), which the card reads as answered. A model never arms: the verb refuses
+  // inside a Claude session, and this server strips that variable from the command's environment.
+  router.post('/plans/:name/arm-accept', relay('arm-accept', armAcceptArgs, DESIGN_STAMP_ERROR));
+  // Its Cancel (`dispatcher disarm-accept <name>`): no body, no argument.
+  router.post('/plans/:name/disarm-accept', relay('disarm-accept'));
   // A plan's own DeepSeek / Claude word (`dispatcher model <name> <word>`). RESTARTS NOTHING AND
   // WAKES NOBODY: the word is read when a chain is launched (`phase_chain.launch_env`), so it takes
   // the plan's NEXT phase and never disturbs a walk already out — which is why no plan's state is a
@@ -306,6 +335,10 @@ export function createDispatcherRouter(dependencies: DispatcherRouterDependencie
     const when = readDispatcherScheduleWhen((body as { when?: unknown } | undefined)?.when);
     return when === null ? null : [when];
   }));
+  // The deck's `Accept when cut` and its Cancel: the dispatcher arms every DESIGNED plan of the arc on that plan's
+  // own current design, so no stamp travels — the card never read the members' designs one by one.
+  router.post('/arcs/:name/arm-accept', arcRelay('arm-accept', () => ['--by', 'app:card']));
+  router.post('/arcs/:name/disarm-accept', arcRelay('disarm-accept'));
   // One of the epic's two WIP limits (`dispatcher wip <arc> <limit> <word>`): the epic card's WIP control.
   router.post('/arcs/:name/wip', arcRelay('wip', wipArgs, WIP_BODY_ERROR));
 
