@@ -47,7 +47,8 @@ Four variables in `supervisor.mjs` hold everything:
 - **on READY with a predecessor** — the old child gets SIGTERM. In **its exit handler**, and only
   there, the new child is sent `takeover`. Not one moment earlier: until the old process is gone
   its keepalive hosts are live, and the successor's re-adoption would end those sessions with
-  SIGHUP (`session-host/host.js:198-204`, `spawner.ts:200-208`).
+  SIGHUP (`attach` in `session-host/host.js` ends the older socket; the socket `close` handler in
+  `session-host/spawner.ts` settles that turn with `SIGHUP`).
 - **on READY with no predecessor left** — what the child was TOLD at spawn decides this, never the
   supervisor's state at READY. A first boot was told nothing and ran its duties before it listened,
   so nothing is sent. A child spawned *beside* a predecessor that then died on its own mid-boot is

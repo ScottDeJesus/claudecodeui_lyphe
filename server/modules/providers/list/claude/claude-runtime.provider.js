@@ -23,6 +23,7 @@ import { query } from '@anthropic-ai/claude-agent-sdk';
 import {
   appendFilesInputTag,
   buildClaudeUserContent,
+  normalizeAttachmentDescriptors,
   normalizeImageDescriptors
 } from '@/shared/image-attachments.js';
 import {
@@ -55,17 +56,20 @@ import {
 import {
   applyCompactionSettings,
   askCompactionTakesOver,
+  askContextTokens,
   compactionFlagSettings,
+  createAppendLedger,
   createFollowUpLatch,
   describeProcessActivity,
-  isSeedTurn,
+  isSeedAppend,
   liveActivityOf,
   mainThreadBudgetOf,
   movesBackgroundActivity,
-  promptTextBlocks,
   reportActivityChanged,
-  reportTurnEnded
+  reportTurnEnded,
+  transcriptAppendMessage
 } from './claude-compaction-seams.js';
+import { assertProjectFolderExists, ProjectFolderMissingError } from './claude-project-folder.js';
 import { createSignalState, detectRuntimeSignals } from './claude-runtime-signals.js';
 import { installedCliVersionForLaunch } from './installed-cli-version.js';
 import { SURFACE_ENV, SURFACE_PROMPT_APPEND } from './surface-signal.js';
@@ -679,17 +683,22 @@ function backgroundWorkIds(sdkMessage) {
  * @param {Array} images - Image descriptors ({ path, name?, mimeType? })
  * @param {Array} files - Non-image attachment descriptors
  * @param {string} cwd - Project working directory attachment paths resolve against
- * @param {string[]} [promptBlocks] - A compaction's seed: each string becomes a text block, in place of the command
- * @returns {Promise<Array<Object>>} SDKUserMessage records for the turn
+ * @param {string[]} [transcriptAppend] - A compaction's seed: text blocks the CLI appends to the conversation without a turn of their own, ahead of the send's own message
+ * @returns {Promise<Array<Object>>} SDKUserMessage records for the turn: the append when there is one, then the send's own message
  */
-async function buildPromptMessages(command, images, files, cwd, promptBlocks) {
+async function buildPromptMessages(command, images, files, cwd, transcriptAppend) {
+  const append = transcriptAppendMessage(transcriptAppend);
+  const hasImages = normalizeImageDescriptors(images).length > 0;
+  // An append-only send (a compaction's seed): the append is the whole push, and no empty prompt follows it.
+  if (append && (!command || command.trim() === '') && !hasImages && normalizeAttachmentDescriptors(files).length === 0) {
+    return [append];
+  }
   const promptWithFiles = appendFilesInputTag(command, files);
-  const content = promptTextBlocks(promptBlocks)
-    ?? (normalizeImageDescriptors(images).length === 0
-      ? promptWithFiles
-      : await buildClaudeUserContent(promptWithFiles, images, cwd));
+  const content = hasImages
+    ? await buildClaudeUserContent(promptWithFiles, images, cwd)
+    : promptWithFiles;
 
-  return [{
+  const own = {
     type: 'user',
     message: {
       role: 'user',
@@ -700,7 +709,8 @@ async function buildPromptMessages(command, images, files, cwd, promptBlocks) {
     // how the process loop tells the turn's own result from a background follow-up's.
     uuid: crypto.randomUUID(),
     timestamp: new Date().toISOString()
-  }];
+  };
+  return append ? [append, own] : [own];
 }
 
 /**
@@ -862,7 +872,7 @@ async function joinProcess(live, command, options, ws, context) {
     await live.retire();
     return null;
   }
-  const messages = await buildPromptMessages(command, options.images, options.files, options.cwd, options.promptBlocks);
+  const messages = await buildPromptMessages(command, options.images, options.files, options.cwd, options.transcriptAppend);
   const turnEnded = live.pushTurn(messages, ws, options);
   return turnEnded ? { turnEnded } : null;
 }
@@ -908,7 +918,7 @@ async function spawnProcess(command, options, initialWs, context) {
   const reattach = keepaliveReadopt(options.keepalive, sessionId);
   // Callers pass the stable app session id; the SDK only understands the
   // provider-native id recorded on the session row. A run that resumes nothing
-  // (`resumeFromScratch`: an edited first prompt, a compaction's seed turn) carries none: seeded with
+  // (`resumeFromScratch`: an edited first prompt, a compaction's seed append) carries none: seeded with
   // the chat's old id, the capture below never fired and the session it starts was never announced.
   const providerSessionId = options.resumeFromScratch === true ? null : context.resolveProviderSessionId(sessionId);
   // Provider-native id as the SDK reports it (starts as the resume id, or is
@@ -936,6 +946,9 @@ async function spawnProcess(command, options, initialWs, context) {
   // to tell that result from one a background follow-up turn produces in the same stream. A
   // re-adopted turn has no uuid on record and takes the next result, as it always did.
   let pendingTurn = null;
+  // Whether this run ever opened a turn. A run that fails before it has, and is not a re-adoption of
+  // a process that already answered, failed the very message it was started for (see the catch).
+  let firstTurnOpened = false;
   // The send options of the turn now pending (the spawn's, then every `pushTurn`'s), and the last
   // MAIN-THREAD assistant budget the turn has shown: what the end-of-turn report to the compaction
   // is built from (claude-compaction-seams.ts).
@@ -951,6 +964,7 @@ async function spawnProcess(command, options, initialWs, context) {
     let settle;
     const settled = new Promise((resolve) => { settle = resolve; });
     pendingTurn = { uuid, settle };
+    firstTurnOpened = true;
     return settled;
   };
   const settleTurn = () => {
@@ -958,6 +972,17 @@ async function spawnProcess(command, options, initialWs, context) {
     pendingTurn = null;
     turn?.settle();
   };
+  // The appends this process pushed (a compaction's seed): their `result` is no turn's end unless the
+  // append was alone in its push (see the loop).
+  const appends = createAppendLedger();
+  // Whether a `result` is the one the pending turn waits for. A merged turn (a message pushed while the
+  // CLI was mid-turn) answers with one result naming every uuid it absorbed, so inclusion is the test,
+  // not equality.
+  const answersPendingTurn = (result) => pendingTurn !== null && (
+    pendingTurn.uuid === null
+    || !Array.isArray(result.user_message_uuids)
+    || result.user_message_uuids.includes(pendingTurn.uuid)
+  );
   // What this call returns: the first turn's end. Resolved at once for a re-adopted process
   // whose turn had already completed before the API restarted, and by the loop's `finally`
   // when the process fails before that turn is even opened.
@@ -1170,7 +1195,8 @@ async function spawnProcess(command, options, initialWs, context) {
         ws.setSessionId(capturedSessionId);
       }
       assistantBudgetSent = false;
-      const settled = openTurn(messages[0]?.uuid ?? null);
+      const settled = openTurn(messages.at(-1)?.uuid ?? null);
+      appends.note(messages);
       for (const message of messages) {
         queue.push(message);
       }
@@ -1210,6 +1236,11 @@ async function spawnProcess(command, options, initialWs, context) {
     try {
       const resolved = await resolveSdkOptions(options, context);
       sdkOptions = resolved.sdkOptions;
+      // The one door every CLI start on THIS machine goes through (a send, an edited send, a
+      // compaction's restart, a respawn after a retirement), so the one place a vanished project
+      // folder is caught. Skipped for a re-adoption (its CLI is already running) and for a node's
+      // project (its folder lives on the node, not here).
+      if (!reattach && !options.node) await assertProjectFolderExists(sdkOptions.cwd);
       // Ours, so Stop can end a process that will not answer an interrupt: aborting it has the SDK
       // close the transport and kill the CLI (SIGTERM, then SIGKILL) — through the host when there is one.
       sdkOptions.abortController = processAbort;
@@ -1238,11 +1269,12 @@ async function spawnProcess(command, options, initialWs, context) {
 
       // Streaming input, always: the queue keeps stdin open for the life of the process. A
       // re-adopted process is joined with no prompt at all — its turn is already in the CLI.
-      const promptMessages = reattach ? [] : await buildPromptMessages(command, options.images, options.files, options.cwd, options.promptBlocks);
+      const promptMessages = reattach ? [] : await buildPromptMessages(command, options.images, options.files, options.cwd, options.transcriptAppend);
+      appends.note(promptMessages);
       if (reattach?.turnCompleteSent) {
         settleFirstTurn();
       } else {
-        openTurn(reattach ? null : (promptMessages[0]?.uuid ?? null)).then(settleFirstTurn);
+        openTurn(reattach ? null : (promptMessages.at(-1)?.uuid ?? null)).then(settleFirstTurn);
       }
 
       // Asking a human, in one place: the `permission_request` frame, the push that carries it to
@@ -1524,6 +1556,13 @@ async function spawnProcess(command, options, initialWs, context) {
           }));
         }
 
+        // An append's own `result` (zero turns, all-zero usage, naming only the append). It is neither
+        // the reconciliation's phantom nor a turn's end, so the guard below never reads it; it answers
+        // the pending turn only when the append was alone in its push, and is otherwise skipped before
+        // anything client-facing: no `complete`, notification, deferred-work release or turn report.
+        const appendResult = message.type === 'result' && appends.namesOnlyAppends(message);
+        if (appendResult && !answersPendingTurn(message)) continue;
+
         if (message.type === 'system' && !firstResultHandled) {
           if (message.subtype === 'task_notification') {
             reconciliationPending = true;
@@ -1536,7 +1575,7 @@ async function spawnProcess(command, options, initialWs, context) {
             reconciliationSkipped = false;
           }
         }
-        if (message.type === 'result' && !firstResultHandled) {
+        if (message.type === 'result' && !firstResultHandled && !appendResult) {
           const zeroTurn = message.subtype === 'success' && message.is_error !== true
             && message.num_turns === 0 && (message.result ?? '') === '';
           const windowOpen = reconciliationPending
@@ -1586,9 +1625,10 @@ async function spawnProcess(command, options, initialWs, context) {
 
         // Extract and send token budget updates from assistant usage payloads,
         // falling back to the turn's cumulative bill only for SDK builds that
-        // report no per-assistant usage at all.
+        // report no per-assistant usage at all. An append's result bills nothing: its all-zero
+        // usage would publish a budget of 0 (the answering branch asks the CLI for the real count).
         const tokenBudgetData = extractTokenBudget(message)
-          || (assistantBudgetSent ? null : extractCumulativeTokenBudget(message));
+          || (assistantBudgetSent || appendResult ? null : extractCumulativeTokenBudget(message));
         if (tokenBudgetData) {
           if (message.type === 'assistant') {
             assistantBudgetSent = true;
@@ -1604,22 +1644,31 @@ async function spawnProcess(command, options, initialWs, context) {
           turnInFlight = false;
           followUp.release();
           const turn = pendingTurn;
-          // A merged turn (a message pushed while the CLI was mid-turn) answers with one result
-          // naming every uuid it absorbed, so inclusion is the test, not equality.
-          const answersTurn = turn !== null && (
-            turn.uuid === null
-            || !Array.isArray(message.user_message_uuids)
-            || message.user_message_uuids.includes(turn.uuid)
-          );
+          const answersTurn = answersPendingTurn(message);
           const abortPending = abortedInstances.has(queryInstance);
           // A failed result already went out as its own signal; neither "finished" nor
           // "background agent finished" beside it would be true.
           const failedResult = message.is_error === true;
           if (answersTurn) {
             if (!abortPending) {
+              // An append-only turn ran no request, so no assistant message carried a budget: the CLI's own
+              // count of the context the session now holds is the turn's one `token_budget` (the seed
+              // writer keeps it as the compaction's "after"). `full`, not `summary`: a session that has made
+              // no request yet is estimated ~5-8K tokens high by `summary`; `full` is nearer but still reads
+              // about 1.8-2.1K above the next request's own prompt (measured 2.1.295: 1,758 on the edit legs,
+              // 2,075 and 2,141 on the whole legs; ~0.5 s, inside the grace). A failed or late ask sends none.
+              if (appendResult) {
+                const contextTokens = await askContextTokens(
+                  () => withinGrace(queryInstance.getContextUsage({ detail: 'full' }), 'getContextUsage'),
+                  sessionKey() || 'NEW'
+                );
+                if (contextTokens !== null) {
+                  ws.send(createNormalizedMessage({ kind: 'status', text: 'token_budget', tokenBudget: buildTokenBudget({ input_tokens: contextTokens, output_tokens: 0 }), sessionId: capturedSessionId || sessionId || null, provider: 'claude' }));
+                }
+              }
               // (An aborted turn's terminal `complete` was sent by the abort handler.)
               ws.send(createCompleteMessage({ provider: 'claude', sessionId: capturedSessionId || sessionId || null, exitCode: 0 }));
-              if (!failedResult && !isSeedTurn(turnOptions)) notifyRunStopped({
+              if (!failedResult && !isSeedAppend(turnOptions)) notifyRunStopped({
                 userId: ws?.userId || null,
                 provider: 'claude',
                 sessionId: sessionId || capturedSessionId || null,
@@ -1628,7 +1677,9 @@ async function spawnProcess(command, options, initialWs, context) {
                 durationMs: typeof message.duration_ms === 'number' ? message.duration_ms : null
               });
             }
-            settleTurn();
+            // The turn read above, still: the context ask is the one await between them, and a message
+            // that joined during it has opened its own turn, which this result does not end.
+            if (pendingTurn === turn) settleTurn();
           } else if (!abortPending) {
             // A result no client is waiting on: work started in an earlier turn has finished
             // and pushed a follow-up turn of its own.
@@ -1692,7 +1743,7 @@ async function spawnProcess(command, options, initialWs, context) {
         if (!wasAborted) {
           ws.send(createCompleteMessage({ provider: 'claude', sessionId: capturedSessionId || sessionId || null, exitCode: 0 }));
         }
-        if (!isSeedTurn(turnOptions)) notifyRunStopped({
+        if (!isSeedAppend(turnOptions)) notifyRunStopped({
           userId: ws?.userId || null,
           provider: 'claude',
           sessionId: sessionId || capturedSessionId || null,
@@ -1703,7 +1754,10 @@ async function spawnProcess(command, options, initialWs, context) {
       }
 
     } catch (error) {
-      if (!supersededInstances.has(queryInstance) && !abortedInstances.has(queryInstance)) {
+      if (error instanceof ProjectFolderMissingError) {
+        // An expected refusal, not a crash: one line, no stack.
+        console.warn(`[Claude SDK] Not starting a process for session ${sessionKey() || 'NEW'}: ${error.message}`);
+      } else if (!supersededInstances.has(queryInstance) && !abortedInstances.has(queryInstance)) {
         console.error('SDK query error:', error);
       }
 
@@ -1721,14 +1775,17 @@ async function spawnProcess(command, options, initialWs, context) {
 
       // A process that failed BETWEEN turns failed nobody's request: the last run finished
       // long ago, and the next message spawns a fresh process. Log it and say nothing on
-      // the wire — an error frame there would paint a finished reply as failed.
-      if (!pendingTurn) {
+      // the wire — an error frame there would paint a finished reply as failed. "Between turns"
+      // means a turn once opened (or a re-adopted process); a run that never got as far as
+      // opening its first turn failed the message it was started for, and says so below.
+      if (!pendingTurn && (reattach || firstTurnOpened)) {
         console.error(`[Claude SDK] The idle process for session ${sessionKey() || 'NEW'} ended with an error; the next message starts a new one`);
         return;
       }
 
-      // Check if Claude CLI is installed for a clearer error message
-      const installed = await context.isProviderInstalled();
+      // Check if Claude CLI is installed for a clearer error message. A missing project folder
+      // names its own cause and has nothing to do with the install.
+      const installed = error instanceof ProjectFolderMissingError || await context.isProviderInstalled();
       const errorContent = !installed
         ? 'Claude Code is not installed. Please install it first: https://docs.anthropic.com/en/docs/claude-code'
         : error.message;

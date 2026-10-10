@@ -33,7 +33,7 @@ import { createSeedWriter } from './compaction-seed.js';
  * gateway sequences it, replays it to every tab and shows it on the processing line like any other run.
  *
  *   1 the session row   2 the guard   3 the status line   4 the heal ending   5 the verb
- *   6 the live rows     7 the seed turn   8 success or take-back   9 the push for an automatic failure
+ *   6 the live rows     7 the seed append   8 success or take-back   9 the push for an automatic failure
  *
  * The old transcript is never written; the chat's row moves only inside `swapToCompactedSession`.
  */
@@ -54,7 +54,7 @@ export type CompactionInput = {
   instructions: string | null;
 };
 
-// What the seed turn must not inherit from the send that started the compaction: that message's own
+// What the seed append must not inherit from the send that started the compaction: that message's own
 // attachments, and `compactionTrigger`, which made the run a compaction.
 const NOT_FOR_THE_SEED = ['attachments', 'images', 'files', 'compactionTrigger'] as const;
 
@@ -198,7 +198,7 @@ function refusedByReadiness(run: Run, sentence: string): Ending {
   return { handOffToCli: true, sentence };
 }
 
-// 6 + 7 + 8. THE LIVE ROWS, THE SEED TURN, AND ITS SUCCESS OR TAKE-BACK.
+// 6 + 7 + 8. THE LIVE ROWS, THE SEED APPEND, AND ITS SUCCESS OR TAKE-BACK.
 async function seedTheNewSession(
   run: Run,
   old: { oldProviderSessionId: string; oldTranscriptPath: string; success: VerbSuccess },
@@ -207,20 +207,22 @@ async function seedTheNewSession(
   const { oldProviderSessionId, oldTranscriptPath, success } = old;
   const facts = factsOf(success, trigger, lastContextTokens(sessionId));
 
-  // 6. Live rows, written before the seed turn so the operator watches the summary arrive.
+  // 6. Live rows, written before the seed append so the operator watches the summary arrive.
   run.emit(compactionRowFrame(sessionId, oldProviderSessionId, markerOf(facts, null, new Date().toISOString())));
   run.emit(summaryFrame(sessionId, oldProviderSessionId, success.seed[0]));
 
-  // 7. The seed turn, on the chat's own model, effort, permission mode and tools: the triggering send's
+  // 7. THE SEED APPEND, on the chat's own model, effort, permission mode and tools: the triggering send's
   // options, minus what belonged to that send. `resumeFromScratch` is what retires the old process and
-  // starts the new session with no resume.
+  // starts the new session with no resume; `transcriptAppend` puts the seed in that session's transcript
+  // with no turn of its own, so no model is called and nothing is written back — the CLI merges the seed
+  // into the operator's next message.
   flight.phase = 'seeding';
   flight.stop = async () => {
     flight.stopped = true;
     return inner.abort('claude', sessionId);
   };
   if (flight.stopped) return ENDED;
-  const seedWriter = createSeedWriter({ target: writer, sessionId, oldProviderSessionId, oldTranscriptPath, facts });
+  const seedWriter = createSeedWriter({ target: writer, sessionId, oldProviderSessionId, oldTranscriptPath, facts, seed: success.seed });
   const seedOptions: AnyRecord = { ...options };
   for (const key of NOT_FOR_THE_SEED) delete seedOptions[key];
   Object.assign(seedOptions, {
@@ -228,13 +230,10 @@ async function seedTheNewSession(
     cwd: options.cwd,
     projectPath: options.projectPath,
     node: options.node,
-    resumeFromScratch: true,
-    promptBlocks: success.seed,
-    compactionSeed: true,
   });
   let runFailure: string | null = null;
   try {
-    await inner.run('claude', '', seedOptions, seedWriter);
+    await inner.run('claude', '', { ...seedOptions, resumeFromScratch: true, transcriptAppend: success.seed, compactionSeed: true }, seedWriter);
   } catch (error) {
     runFailure = error instanceof Error ? error.message : String(error);
   }
@@ -258,8 +257,8 @@ async function seedTheNewSession(
 
   const reason = runFailure
     ?? seedWriter.swapFailure
-    ?? (seedWriter.announcedProviderSessionId === null ? 'the new session never started' : 'the new session did not finish its first turn');
-  // The seed's process is registered under the chat's key: left running, the next message joins it, on the
+    ?? (seedWriter.announcedProviderSessionId === null ? 'the new session never started' : 'the new session did not finish taking the seed');
+  // The seed append's process is registered under the chat's key: left running, the next message joins it, on the
   // seed session, while the row says the old one. A Stop already retired it.
   if (!flight.stopped) {
     try {

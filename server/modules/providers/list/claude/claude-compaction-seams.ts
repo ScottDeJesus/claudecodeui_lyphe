@@ -9,7 +9,8 @@
  * - the one constant of what the CLI is told while a chat's compaction is taken over, and the three
  *   functions that put it on a launch, read it back into a launch profile and apply it live;
  * - the question "is this chat taken over?" asked of the hooks, which fails closed;
- * - the prompt a seed turn sends as text blocks;
+ * - the transcript append a seed travels as (a message the CLI keeps without a turn of its own), the
+ *   ledger that tells an append's `result` from a turn's, and the context count the CLI gives for it;
  * - the end-of-turn report: the turn's last main-thread budget, the window of the model that ran it,
  *   the send options without what one turn carries, and the process's activity;
  * - the process's activity, as the handle and `claudeRuntime.activity` answer it.
@@ -19,6 +20,8 @@
  *
  * consumer: claude-runtime.provider.js, chat-process.ts (the profile's reading of the constant)
  */
+
+import { randomUUID } from 'node:crypto';
 
 import type {
   AnyRecord,
@@ -144,16 +147,78 @@ export async function askCompactionTakesOver(context: CompactionContext, options
 }
 
 /**
- * The content of a message whose prompt arrives as `options.promptBlocks`: an array of strings, each
- * becoming one text block, in place of the command text. Null — the ordinary send — when there are
- * none (empty strings are dropped; the API refuses an empty text block).
+ * The SDK user message a send's `options.transcriptAppend` becomes: an array of strings, each one text
+ * block, appended to the conversation WITHOUT a turn of its own (`shouldQuery: false` — the SDK keeps
+ * it in the transcript and merges it into the next user message that does query). Empty strings are
+ * dropped (the API refuses an empty text block); null when `blocks` is not an array or none is left.
+ * The `uuid` is what the CLI keeps on the transcript row and echoes on the append's own `result`
+ * (`user_message_uuids`), which is how `createAppendLedger` knows that result.
  */
-export function promptTextBlocks(promptBlocks: unknown): Array<{ type: 'text'; text: string }> | null {
-  if (!Array.isArray(promptBlocks)) return null;
-  const blocks = promptBlocks
+export function transcriptAppendMessage(blocks: unknown): {
+  type: 'user';
+  message: { role: 'user'; content: Array<{ type: 'text'; text: string }> };
+  parent_tool_use_id: null;
+  shouldQuery: false;
+  uuid: string;
+  timestamp: string;
+} | null {
+  if (!Array.isArray(blocks)) return null;
+  const content = blocks
     .filter((block): block is string => typeof block === 'string' && block.length > 0)
     .map((text) => ({ type: 'text' as const, text }));
-  return blocks.length > 0 ? blocks : null;
+  if (content.length === 0) return null;
+  return {
+    type: 'user',
+    message: { role: 'user', content },
+    parent_tool_use_id: null,
+    shouldQuery: false,
+    uuid: randomUUID(),
+    timestamp: new Date().toISOString()
+  };
+}
+
+/**
+ * The appends one process has pushed, kept by uuid. The CLI answers an append with a `result` of its
+ * own (zero turns, all-zero usage) whose `user_message_uuids` hold only the append's uuid: that result
+ * is no turn's end, and `namesOnlyAppends` is how the loop tells it from one.
+ */
+export function createAppendLedger(): {
+  note(messages: ReadonlyArray<{ shouldQuery?: boolean; uuid?: string }>): void;
+  namesOnlyAppends(result: { user_message_uuids?: unknown }): boolean;
+} {
+  const appended = new Set<string>();
+  return {
+    /** Remembers every message of a push that is an append (`shouldQuery === false`). */
+    note(messages) {
+      for (const message of messages) {
+        if (message.shouldQuery === false && typeof message.uuid === 'string') appended.add(message.uuid);
+      }
+    },
+    /** True when the result's `user_message_uuids` is a non-empty array naming nothing but noted appends. */
+    namesOnlyAppends(result) {
+      const named = result.user_message_uuids;
+      return Array.isArray(named) && named.length > 0 && named.every((uuid) => typeof uuid === 'string' && appended.has(uuid));
+    }
+  };
+}
+
+/**
+ * The context, in tokens, the CLI itself counts for a session (`totalTokens` of `getContextUsage` — a
+ * count by the token-count API, no model call). `ask` is the whole request, already bounded by the caller's grace race, and is started
+ * here so that a throw on the way out is caught with a failed answer. Null — with one warning — when
+ * the ask failed, was late or answered no count (an empty session never counts 0): a missing number costs the composer one reading,
+ * never the turn it follows.
+ */
+export async function askContextTokens(ask: () => Promise<unknown>, sessionKey: string): Promise<number | null> {
+  try {
+    const answer = await ask();
+    const total = answer && typeof answer === 'object' ? (answer as { totalTokens?: unknown }).totalTokens : undefined;
+    if (typeof total === 'number' && Number.isFinite(total) && total > 0) return total;
+    console.warn(`[Claude SDK] getContextUsage for session ${sessionKey} answered no token count; no token_budget was sent`);
+  } catch (error) {
+    console.warn(`[Claude SDK] getContextUsage for session ${sessionKey} failed (${error instanceof Error ? error.message : error}); no token_budget was sent`);
+  }
+  return null;
 }
 
 // What one turn carries and no later turn may inherit. `keepalive` joins the spec's list for a reason
@@ -163,7 +228,7 @@ const PER_TURN_SEND_OPTIONS = [
   'attachments',
   'images',
   'files',
-  'promptBlocks',
+  'transcriptAppend',
   'resumeFromScratch',
   'resumeAnchorId',
   'compactionSeed',
@@ -205,8 +270,8 @@ function sendOptionsOfTurn(options: AnyRecord, profile: ProfileForSend | null): 
   return kept;
 }
 
-/** Whether a turn is a compaction's own seed turn (its options carry `compactionSeed: true`). */
-export function isSeedTurn(options: AnyRecord | null | undefined): boolean {
+/** Whether a turn is a compaction's own seed append (its options carry `compactionSeed: true`). */
+export function isSeedAppend(options: AnyRecord | null | undefined): boolean {
   return options?.compactionSeed === true;
 }
 
@@ -282,7 +347,7 @@ export function reportTurnEnded(
       sendOptions: sendOptionsOfTurn(turn.sendOptions, turn.profile),
       answered: turn.answered,
       aborted: turn.aborted,
-      seed: isSeedTurn(turn.sendOptions),
+      seed: isSeedAppend(turn.sendOptions),
       activity: turn.activity
     };
     return context.compaction.turnEnded(report);

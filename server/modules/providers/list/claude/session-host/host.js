@@ -87,7 +87,7 @@ function finishExit() {
   if (leaving) return;
   leaving = true;
   clearTimeout(drainTimer);
-  const frame = journal.appendExit(childExit.code, childExit.signal);
+  const frame = journal.appendExit(childExit.code, childExit.signal, childExit.error);
   const conn = attachedConn;
   const leave = () => {
     releaseOwnFiles();
@@ -124,6 +124,26 @@ function readCliStdout() {
   });
 }
 
+/**
+ * Node words a spawn failure caused by the working folder as `spawn <binary> ENOENT` (or EACCES,
+ * ENOTDIR), which blames a binary that is fine. This host runs on the machine the CLI runs on, as
+ * the user it runs as, so it is the one place that can tell: when the folder is not one this
+ * process can enter, the message names the folder and keeps Node's own words after it.
+ */
+function explainSpawnError(err, cwd) {
+  if (typeof cwd !== 'string' || cwd === '') return err.message;
+  if (err.code !== 'ENOENT' && err.code !== 'EACCES' && err.code !== 'ENOTDIR') return err.message;
+  try {
+    if (fs.statSync(cwd).isDirectory()) {
+      fs.accessSync(cwd, fs.constants.X_OK);
+      return err.message;
+    }
+  } catch {
+    // A folder that cannot be statted or entered is the finding below, not a second failure.
+  }
+  return `the working folder ${cwd} does not exist or cannot be entered (${err.message})`;
+}
+
 function spawnCli(frame) {
   if (child) return 'already spawned';
   if (typeof frame.command !== 'string' || !Array.isArray(frame.args)) {
@@ -152,7 +172,10 @@ function spawnCli(frame) {
   child.stdin.on('error', (err) => log(`stdin write failed: ${err.message}`));
   child.on('error', (err) => {
     log(`child error: ${err.message}`);
-    childExit = childExit ?? { code: 127, signal: null };
+    // The CLI never ran, so there is no exit code to report: the exit frame carries Node's own
+    // message instead (a missing binary, a missing cwd, EACCES). The log line above is not enough:
+    // it lives in the tmux pane, which dies with the session.
+    childExit = childExit ?? { code: null, signal: null, error: explainSpawnError(err, frame.cwd) };
     stdoutClosed = true;
     maybeFinish();
   });

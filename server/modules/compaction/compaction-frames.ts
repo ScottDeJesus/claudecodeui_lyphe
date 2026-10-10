@@ -38,7 +38,7 @@ export function completeFrame(sessionId: string, exitCode: number): NormalizedMe
 
 /**
  * The marker a compaction draws, from the facts the verb and the trigger gave. `postTokens` is null
- * until the new session's first turn has reported; `at` is when the swap happens (the frame is written
+ * until the seed append's context count has reported; `at` is when the swap happens (the frame is written
  * moments before it).
  */
 export function markerOf(facts: CompactionFacts, postTokens: number | null, at: string): ChatCompactionMarker {

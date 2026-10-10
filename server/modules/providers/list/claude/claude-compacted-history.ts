@@ -1,4 +1,5 @@
 import { sessionCompactionsDb } from '@/modules/database/index.js';
+import { summarizeClaudeTokenUsage } from '@/modules/providers/services/provider-token-usage.service.js';
 import type {
   AnyRecord,
   ChatCompactionMarker,
@@ -65,6 +66,13 @@ export type StitchedClaudeHistory = {
    * "no longer in the transcript".
    */
   supersededRows: WeakSet<AnyRecord>;
+  /**
+   * What the CLI counted the live session at when the latest compaction ended (the record's
+   * `post_tokens`), while the live transcript holds no assistant usage yet; null once it does, in a
+   * chat with no compaction, and when the record has no count yet. The seed append has no reply, so
+   * until the next one the transcript has nothing for the composer's counter to read.
+   */
+  openingContextTokens: number | null;
 };
 
 /** The first text block of a user row's content, as a string; null when it has none. */
@@ -79,13 +87,48 @@ function readFirstTextBlock(content: unknown): string | null {
   return block ? block.text : null;
 }
 
+/** The only text of the stand-in reply the CLI writes when it resumes a session whose last row is a user row. */
+const RESUME_PLACEHOLDER_TEXT = 'No response requested.';
+
+/** True for the CLI's `<synthetic>` assistant row whose only text is "No response requested." */
+function isResumePlaceholderRow(row: AnyRecord): boolean {
+  if (row.type !== 'assistant' || row.message?.model !== '<synthetic>') {
+    return false;
+  }
+  const content = row.message?.content;
+  if (typeof content === 'string') {
+    return content.trim() === RESUME_PLACEHOLDER_TEXT;
+  }
+  return Array.isArray(content)
+    && content.length > 0
+    && content.every((part: AnyRecord) => part?.type === 'text' && typeof part.text === 'string' && part.text.trim() === RESUME_PLACEHOLDER_TEXT);
+}
+
+/**
+ * Drops the resume placeholder that lies between the seed row (at `seedIndex`) and the next user
+ * prompt. A seed append has no reply of its own, so when the session resumes from disk the CLI
+ * answers the append's dangling user row with this stand-in before the operator's message — and
+ * drawn, it would read as the model speaking after the summary. The row stays in the transcript
+ * (it is the resume point an edit's anchor rule uses); only the reading leaves it out. A placeholder
+ * anywhere else in the conversation is the CLI's own business and is drawn as before.
+ */
+function dropResumePlaceholder(rows: AnyRecord[], seedIndex: number): AnyRecord[] {
+  let nextPromptIndex = rows.findIndex((row, index) => index > seedIndex && isUserPromptRow(row));
+  if (nextPromptIndex === -1) {
+    nextPromptIndex = rows.length;
+  }
+  const kept = rows.filter((row, index) => index <= seedIndex || index >= nextPromptIndex || !isResumePlaceholderRow(row));
+  return kept.length === rows.length ? rows : kept;
+}
+
 /**
  * Rewrites the seed — the first prompt of a transcript a compaction began — into the shape the
  * CLI's own summary row has, so the existing `isCompactSummary` branch draws it as assistant-side
  * summary text under the `showCompactSummary` preference.
  *
- * The seed is two blocks: the summary, then the verbatim tail of the old conversation. Only the
- * first is kept: the second repeats rows the reader has already drawn above the divider. Its id is
+ * The seed is the summary, then — when it has them — the operator's own messages, the verbatim tail
+ * of the old conversation and the handover line. Only the first is kept: the others are for the model,
+ * and the messages and the tail repeat rows the reader has already drawn above the divider. Its id is
  * the one the live frames use (`compaction-summary-<old provider id>`), so the refresh after a
  * compaction replaces the live row with this one and never draws both.
  */
@@ -98,12 +141,14 @@ function rewriteSeedAsSummary(rows: AnyRecord[], beganBy: CompactionRecord | nul
     return rows;
   }
   const seed = rows[seedIndex];
+  // Rows leave only AFTER the seed, so `seedIndex` still names it in what is kept.
+  const kept = dropResumePlaceholder(rows, seedIndex);
   const summaryText = readFirstTextBlock(seed.message?.content);
   if (summaryText === null) {
-    return rows;
+    return kept;
   }
 
-  const rewritten = rows.slice();
+  const rewritten = kept.slice();
   rewritten[seedIndex] = {
     ...seed,
     isCompactSummary: true,
@@ -147,6 +192,21 @@ function buildCompactionRow(record: CompactionRecord, followingRows: AnyRecord[]
 }
 
 /**
+ * The latest compaction's `post_tokens` while the live transcript has no assistant usage to count,
+ * else null. "No usage" is `summarizeClaudeTokenUsage`'s own reading (a sidechain row, and a
+ * `<synthetic>` row such as the resume placeholder, carry none), so the two can never disagree about
+ * which of them answers the composer's counter.
+ */
+function readOpeningContextTokens(compactions: CompactionRecord[], liveRows: AnyRecord[]): number | null {
+  const postTokens = compactions[compactions.length - 1]?.postTokens ?? null;
+  if (postTokens === null) {
+    return null;
+  }
+  const liveUsage = summarizeClaudeTokenUsage(liveRows, undefined, { transcriptIsComplete: false });
+  return liveUsage.used === 0 ? postTokens : null;
+}
+
+/**
  * Reads a chat's history across its compactions, oldest first: for each compaction record, that
  * transcript's rows (read with ITS OWN provider session id, so its subagents are found under its
  * own folder) and one compaction row; then the live transcript's rows.
@@ -179,7 +239,7 @@ export async function stitchCompactedHistory(input: {
     ...compactions.map((record) => input.readTranscriptRows(record.oldJsonlPath, record.oldProviderSessionId)),
   ]);
   if (compactions.length === 0) {
-    return { rows: liveRows, liveRows, supersededRows };
+    return { rows: liveRows, liveRows, supersededRows, openingContextTokens: null };
   }
 
   const rows: AnyRecord[] = [];
@@ -197,7 +257,7 @@ export async function stitchCompactedHistory(input: {
     rows.push(row);
   }
 
-  return { rows, liveRows, supersededRows };
+  return { rows, liveRows, supersededRows, openingContextTokens: readOpeningContextTokens(compactions, liveRows) };
 }
 
 /** True for the raw row `stitchCompactedHistory` synthesizes; the Claude `normalizeMessage` branches on it. */

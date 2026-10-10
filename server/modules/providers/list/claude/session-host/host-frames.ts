@@ -31,6 +31,10 @@ export function deliverHostFrame(facade: Facade, frame: CerberusHostFrame, hostI
       if (typeof frame.line === 'string') facade.pushLine(frame.line);
       return false;
     case 'exit':
+      // A CLI that could not be started has no exit code worth reporting; the host sends Node's own
+      // message instead. Told to the SDK first, as `attachLocalSpawn` does, so the turn fails with
+      // the cause rather than with a bare "exited". A host from before this field sends none.
+      if (typeof frame.error === 'string' && frame.error !== '') facade.emitError(new Error(frame.error));
       facade.settleExit(
         typeof frame.code === 'number' ? frame.code : null,
         typeof frame.signal === 'string' ? (frame.signal as NodeJS.Signals) : null

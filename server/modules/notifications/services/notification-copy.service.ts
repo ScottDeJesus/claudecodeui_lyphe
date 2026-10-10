@@ -279,7 +279,7 @@ const COPY_BY_CODE = new Map<string, CodeCopy>([
   })],
   // An automatic custom compaction (a turn's end past half the window, or the chat sitting idle) that
   // did not take: nobody pressed Compact, so nobody is watching it fail. `meta.reason` is the verb's or
-  // the seed turn's own sentence.
+  // the seed append's own sentence.
   ['compaction.failed', ({ meta }) => {
     const reason = readText(meta.reason);
     return {

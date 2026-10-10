@@ -1,4 +1,4 @@
-import { sessionsDb } from '@/modules/database/index.js';
+import { sessionCompactionsDb, sessionsDb } from '@/modules/database/index.js';
 import { broadcastSessionUpserted, chatRunRegistry, runDetachedChatTurn } from '@/modules/websocket/index.js';
 import type { ProviderRuntimeGateway } from '@/modules/websocket/index.js';
 import type { ChatCompactionHooks, ChatProcessActivity, ChatTurnReport, LLMProvider } from '@/shared/types.js';
@@ -20,9 +20,10 @@ import {
  * case." Nothing here compacts mid-turn, nothing polls, and with the switch off nothing here does
  * anything at all.
  *
- * - TURN END: a turn that leaves the chat at or past `AUTO_COMPACT_FRACTION` of its window starts a
- *   detached `/compact` run at once, or — when background work is live — is kept as the chat's pending
- *   compaction and started by the `activityChanged` that says the process went quiet.
+ * - TURN END: a turn that leaves the chat at or past `AUTO_COMPACT_FRACTION` of its window — and, for a
+ *   chat compacted before, `MIN_GROWTH_FRACTION` of the window past where its latest compaction left it —
+ *   starts a detached `/compact` run at once, or — when background work is live — is kept as the chat's
+ *   pending compaction and started by the `activityChanged` that says the process went quiet.
  * - IDLE: every turn end (re)arms ONE unref'd timeout per chat; it fires once, `IDLE_COMPACT_AFTER_MS`
  *   later (the CLI's own moment: 0.9 of the one-hour prompt cache), and is replaced by the next turn's end.
  *
@@ -30,18 +31,33 @@ import {
  */
 
 const AUTO_COMPACT_FRACTION = 0.5;
+// How much the context must grow past the latest compaction's own result before a turn end is due again.
+// The operator block only grows, so a seed at or past half the window would leave the first turn after
+// every compaction due once more — a loop of compactions each minutes long. Normal seeds never meet the
+// bound (a 60K seed on a 1M window compacts at 500K); the idle trigger needs none.
+const MIN_GROWTH_FRACTION = 0.2;
 const IDLE_COMPACT_AFTER_MS = 3_240_000;
 const IDLE_COMPACT_MIN_TOKENS = 200_000;
 
-/** A positive finite number from the environment, read at the call (the probes' seam), or null. */
-function numberFromEnv(name: string): number | null {
+/** A finite number from the environment, read at the call (the probes' seam), or null. */
+function finiteNumberFromEnv(name: string): number | null {
   const raw = process.env[name];
   if (raw === undefined || raw.trim() === '') return null;
   const value = Number(raw);
-  return Number.isFinite(value) && value > 0 ? value : null;
+  return Number.isFinite(value) ? value : null;
+}
+
+/** A positive finite number from the environment, read at the call (the probes' seam), or null. */
+function numberFromEnv(name: string): number | null {
+  const value = finiteNumberFromEnv(name);
+  return value !== null && value > 0 ? value : null;
 }
 
 const autoFraction = (): number => numberFromEnv('CUSTOM_COMPACTION_AUTO_FRACTION') ?? AUTO_COMPACT_FRACTION;
+// Any finite number, a negative one included. The context's growth since a compaction is a turn end's count minus the
+// compaction's post-append count, two instruments that disagree by a stable ~1.7-2.1K, so a chat that has just been compacted
+// and answered once reads NEGATIVE growth: only a bound below zero lets such a turn through, and a probe needs that.
+const minGrowthFraction = (): number => finiteNumberFromEnv('CUSTOM_COMPACTION_MIN_GROWTH') ?? MIN_GROWTH_FRACTION;
 // The longest delay `setTimeout` takes: past it Node clamps the delay to 1 ms, so an override this large
 // would fire the idle compaction at once instead of never.
 const MAX_TIMER_DELAY_MS = 2_147_483_647;
@@ -113,7 +129,7 @@ export function createAutoTrigger(
     );
   };
 
-  /** Why a report is not due, or null when it is. Order follows the rules: window, takeover, flight, refusal. */
+  /** Why a report is not due, or null when it is. Order follows the rules: window, growth, takeover, flight, refusal. */
   const notDueBecause = (report: ChatTurnReport): string | null => {
     if (report.aborted) return 'not due: the turn was stopped';
     const { contextTokens, contextWindow } = report;
@@ -121,6 +137,15 @@ export function createAutoTrigger(
     const fraction = autoFraction();
     if (contextTokens < fraction * contextWindow) {
       return `not due: ${((contextTokens / contextWindow) * 100).toFixed(1)}% of the window, due at ${(fraction * 100).toFixed(1)}%`;
+    }
+    // A chat with no record, or one whose record has no `post_tokens` yet, is not held by the guard.
+    const postTokens = sessionCompactionsDb.latestCompaction(report.appSessionId)?.postTokens ?? null;
+    if (postTokens !== null) {
+      const grew = contextTokens - postTokens;
+      const needed = minGrowthFraction() * contextWindow;
+      if (grew < needed) {
+        return `not due: the context grew ${Math.round(grew)} since the last compaction, under ${Math.round(needed)}`;
+      }
     }
     if (nodeOf(report) !== null) return 'not taken over: the chat is placed on a node';
     if (flightOf(report.appSessionId)) return 'not due: a compaction is already in flight';
@@ -140,8 +165,10 @@ export function createAutoTrigger(
       // Nothing has asked since this server started (a re-adopted chat's first turn end): ask now, then
       // decide. Slower than the synchronous path — a queued message may take the session first, and the
       // next turn end tries again.
-      compactionMode().then(() => turnEnded(report), (error: unknown) => {
-        console.error(`[compaction] session=${sessionId} could not read the mode:`, error instanceof Error ? error.message : error);
+      // The `.catch` covers the decision itself too: it now reads the record, and a throw out of this
+      // `.then` would otherwise surface as an unhandled rejection, which ends the process.
+      compactionMode().then(() => turnEnded(report)).catch((error: unknown) => {
+        console.error(`[compaction] session=${sessionId} could not read the mode or decide on the turn end:`, error instanceof Error ? error.message : error);
       });
       return;
     }
@@ -149,7 +176,7 @@ export function createAutoTrigger(
     if (!taken) return;
 
     if (report.seed) {
-      logDecision(sessionId, 'turn-end', report, report.activity, 'a seed turn arms nothing');
+      logDecision(sessionId, 'turn-end', report, report.activity, 'a seed append arms nothing');
       return;
     }
     armIdleDeadline(report);

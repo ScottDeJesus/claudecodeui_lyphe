@@ -7,7 +7,7 @@ import { switchFlipCount } from './compaction-mode.js';
  * object and moves `phase`; the decorator's `abort` and the triggers only read it.
  *
  * `stop` is replaced at each phase with what stopping means THERE: waking the guard, signalling the
- * verb's child, or aborting the seed turn. `stopped` is set by every `stop`, and the procedure checks it
+ * verb's child, or aborting the seed append. `stopped` is set by every `stop`, and the procedure checks it
  * at each boundary, so a Stop that lands between two phases is not lost.
  */
 export type CompactionFlight = {
@@ -51,8 +51,8 @@ export function flightOf(sessionId: string): CompactionFlight | undefined {
 }
 
 /**
- * Stops every compaction that has not yet started its seed turn: a waiting guard ends, a running verb's
- * child gets its SIGTERM. A seed turn is a real run, so it is left to finish with the drain. Called once, at
+ * Stops every compaction that has not yet started its seed append: a waiting guard ends, a running verb's
+ * child gets its SIGTERM. A seed append is a real run, so it is left to finish with the drain. Called once, at
  * shutdown, so a verb is not orphaned on a process that is leaving.
  */
 export function stopFlightsBeforeSeed(): void {

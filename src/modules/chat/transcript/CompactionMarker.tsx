@@ -71,8 +71,9 @@ function FactLine({ facts, className }: { facts: ReactNode[]; className: string 
  * - then who wrote the summary, the served model by its catalog name at its effort, and what that model
  *   read and wrote, with the number of parts when one call could not hold the transcript.
  *
- * Tokens only, never dollars: the operator's Claude use is a subscription. The context after is the new
- * session's first turn, so the live row holds its place with "…" until the history row brings it. The
+ * Tokens only, never dollars: the operator's Claude use is a subscription. The context after is the CLI's
+ * own count of the new session at the compaction's end, known once the seed append has been counted, so
+ * the live row holds its place with "…" until the history row brings it. The
  * label carries no clock: the reply above it is captioned with its time and the summary under it ends
  * with its own, so the moment of the swap is only on hover.
  *

@@ -10,7 +10,7 @@ import type { VerbAnswer } from './compaction-children.js';
 
 /** The verb's exit-0 answer, narrowed to what the compaction uses. */
 export type VerbSuccess = {
-  seed: [string, string];
+  seed: string[];
   model: string;
   served: string[];
   effort: string;
@@ -31,14 +31,14 @@ export function readVerbSuccess(json: Record<string, unknown> | null): VerbSucce
   const tokensIn = asCount(json.tokens_in);
   const tokensOut = asCount(json.tokens_out);
   if (
-    !Array.isArray(seed) || seed.length !== 2 || !isNonEmptyString(seed[0]) || typeof seed[1] !== 'string'
+    !Array.isArray(seed) || seed.length === 0 || !seed.every(isNonEmptyString)
     || !isNonEmptyString(model) || !isNonEmptyString(effort)
     || !Array.isArray(served) || !served.every((word) => typeof word === 'string')
     || chunks === null || tokensIn === null || tokensOut === null
   ) {
     return null;
   }
-  return { seed: [seed[0], seed[1]], model, served: served as string[], effort, chunks, tokensIn, tokensOut };
+  return { seed: [...seed], model, served: served as string[], effort, chunks, tokensIn, tokensOut };
 }
 
 /**

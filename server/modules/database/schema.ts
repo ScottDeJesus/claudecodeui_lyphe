@@ -272,8 +272,8 @@ CREATE TABLE IF NOT EXISTS session_drafts (
  *
  * Custom compaction leaves transcripts behind the same way, so it writes the same
  * row and every reader of the table (the two delete paths, `resolveAppSessionId`,
- * the indexer's refusal) covers it with no new code. The ten nullable columns after
- * `created_at` are its facts, and `reason` says which kind of row this is. They are
+ * the indexer's refusal) covers it with no new code. The eleven nullable columns after
+ * `created_at` are its facts and its seed, and `reason` says which kind of row this is. They are
  * the same list `migrations.ts` adds to a database that predates them.
  */
 export const SUPERSEDED_PROVIDER_SESSIONS_TABLE_SCHEMA_SQL = `
@@ -301,6 +301,10 @@ CREATE TABLE IF NOT EXISTS superseded_provider_sessions (
     summarizer_tokens_in INTEGER,
     summarizer_tokens_out INTEGER,
     summarizer_chunks INTEGER,
+    -- The seed's blocks as a JSON array of strings, as the summarizer returned
+    -- them and as they were appended to the new session. NULL for an edit's
+    -- rewind and for a compaction recorded before this column existed.
+    seed TEXT,
     PRIMARY KEY (provider_session_id, provider)
 );
 `;

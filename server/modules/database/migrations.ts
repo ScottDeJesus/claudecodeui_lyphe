@@ -436,10 +436,11 @@ const addSupersededTranscriptPathColumn = (db: Database): void => {
 };
 
 /**
- * Adds `reason` and the nine compaction facts to the superseded-session record.
+ * Adds `reason`, the nine compaction facts and the seed to the superseded-session record.
  *
  * Nothing is backfilled: every row written before them is an edit's rewind, and a
- * NULL `reason` is exactly how a rewind reads. The list is the one in
+ * NULL `reason` is exactly how a rewind reads. A compaction recorded before `seed`
+ * keeps a NULL seed. The list is the one in
  * `SUPERSEDED_PROVIDER_SESSIONS_TABLE_SCHEMA_SQL`, so a new database and a migrated
  * one end with the same table.
  */
@@ -454,6 +455,7 @@ const SUPERSEDED_COMPACTION_COLUMNS: ReadonlyArray<readonly [name: string, type:
   ['summarizer_tokens_in', 'INTEGER'],
   ['summarizer_tokens_out', 'INTEGER'],
   ['summarizer_chunks', 'INTEGER'],
+  ['seed', 'TEXT'],
 ];
 
 const addSupersededCompactionColumns = (db: Database): void => {

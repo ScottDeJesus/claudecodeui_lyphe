@@ -6,5 +6,5 @@
  * (The one-shot runners from `getRunner` stay on the bare service: they have no chat to compact.)
  */
 // stopChatCompaction: used by the same entrypoint's shutdown, so no idle deadline or pending compaction
-// starts a verb on a process that is leaving, and a verb not yet at its seed turn is not orphaned.
+// starts a verb on a process that is leaving, and a verb not yet at its seed append is not orphaned.
 export { withChatCompaction, stopChatCompaction } from './compaction-runtime.js';

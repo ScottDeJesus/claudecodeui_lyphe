@@ -723,7 +723,7 @@ async function startServer() {
                 console.error('[Sessions] Error closing session watchers during shutdown:', getErrorMessage(err));
             });
             closeScheduledMessageDispatcher();
-            // Custom compaction's idle deadlines and pending wakes start a summarizer verb and a seed turn: a
+            // Custom compaction's idle deadlines and pending wakes start a summarizer verb and a seed append: a
             // process that is leaving must not begin one, nor leave a verb it started behind.
             stopChatCompaction();
             dispatcher.stop();

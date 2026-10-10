@@ -1,3 +1,4 @@
+import { sessionCompactionsDb } from '@/modules/database/index.js';
 import type { ProviderRuntimeGateway } from '@/modules/websocket/index.js';
 import type { AnyRecord, ChatCompactionHooks, ChatProcessActivity, CompactionFacts, LLMProvider } from '@/shared/types.js';
 
@@ -25,6 +26,9 @@ const COMPACT_COMMAND = /^\/compact(?:\s+([\s\S]*))?$/;
  * The compaction this run asks for, or null when it is anyone else's run. A Claude `/compact` that is
  * not an edit: an edit replaces a message and resumes partway (`resumeAnchorId`) or starts over
  * (`resumeFromScratch`), and an edit that replaces a message with `/compact` is still an edit.
+ *
+ * An edit that starts over is a run of its own to this module (`optionsOfRun`): in a chat whose
+ * compaction stored a seed, it carries that seed again.
  */
 function compactionRequestOf(
   provider: LLMProvider,
@@ -41,13 +45,47 @@ function compactionRequestOf(
   return { sessionId: options.sessionId, instructions: words === '' ? null : words, trigger };
 }
 
+/**
+ * The send options only this module puts on a run. The chat gateway spreads a client's send options into
+ * the runtime's, so a client could name them: a `transcriptAppend` would ride into a transcript, and a
+ * `compactionSeed` would silence a turn's push and its report. They are removed from every Claude run
+ * this decorator handles, before anything else reads the options — the way `node` is the gateway's own.
+ */
+const MODULE_OWNED_OPTIONS = ['transcriptAppend', 'compactionSeed'] as const;
+
+/**
+ * The options a Claude run goes on with: the caller's, without what only this module may set, and — for
+ * a start-over in a chat whose latest compaction stored a seed — with that seed as `transcriptAppend`.
+ *
+ * Why a start-over carries the seed again: when the operator's first message after a compaction joined
+ * the seed append's live process, no assistant row precedes it — only the append and its attachments —
+ * so `resolveEditAnchor` answers "start over", and the new session would start empty, knowing nothing
+ * the compaction kept. Started over with the seed appended again, the session holds exactly the seed
+ * and the edited message, and the session it replaces is filed as an edit's rewind like any start-over.
+ * (`resolveEditAnchor` stays as it is: an attachment's uuid is refused as a resume point, so no anchor
+ * could make the edited message a sibling under one parent.) When the CLI resumed from disk instead, its
+ * placeholder row precedes the message and the anchor rule resumes through it — not a start-over. A
+ * record with no stored seed (a NULL column) gives none: nothing is appended.
+ *
+ * The procedure's step 7 calls the inner service directly, so its own append never passes through here.
+ */
+function optionsOfRun(provider: LLMProvider, command: string, options: AnyRecord): AnyRecord {
+  if (provider !== 'claude') return options;
+  const cleaned: AnyRecord = { ...options };
+  for (const key of MODULE_OWNED_OPTIONS) delete cleaned[key];
+  if (cleaned.resumeFromScratch !== true || COMPACT_COMMAND.test(command.trim())) return cleaned;
+  if (typeof cleaned.sessionId !== 'string' || cleaned.sessionId === '') return cleaned;
+  const seed = sessionCompactionsDb.latestCompaction(cleaned.sessionId)?.seed ?? null;
+  return seed === null ? cleaned : { ...cleaned, transcriptAppend: seed };
+}
+
 // The triggers `withChatCompaction` built, for `stopChatCompaction`.
 let activeTriggers: { stop(): void } | null = null;
 
 /**
  * Stops the module for a process that is leaving: no deadline fires, no pending compaction starts, and a
  * compaction still waiting or summarizing is stopped (its verb gets SIGTERM) rather than orphaned. A seed
- * turn already running is a run like any other and finishes with the drain.
+ * append already running is a run like any other and finishes with the drain.
  *
  * Consumer: index.ts, for server/index.ts's shutdown.
  */
@@ -59,7 +97,10 @@ export function stopChatCompaction(): void {
 /**
  * Wraps the provider runtime service so a taken-over chat's `/compact` becomes the summarizer's
  * compaction, and registers the module's hooks with it. Every other member — and every run that is not
- * such a `/compact` — is the inner service's own, unchanged.
+ * such a `/compact` — is the inner service's own, unchanged, with two exceptions the module owns on a
+ * Claude run: `transcriptAppend` and `compactionSeed` are removed from the options the caller sent (only
+ * this module puts them on a run), and a start-over in a compacted chat — an edit of the first message
+ * after the compaction — runs with the chat's stored seed as `transcriptAppend` (`optionsOfRun`).
  *
  * Consumer: index.ts, for server/index.ts.
  */
@@ -67,7 +108,8 @@ export function withChatCompaction<Inner extends CompactionInnerRuntime>(inner: 
   const decorated: Inner = {
     ...inner,
 
-    async run(provider: LLMProvider, command: string, options: AnyRecord, writer): Promise<unknown> {
+    async run(provider: LLMProvider, command: string, sentOptions: AnyRecord, writer): Promise<unknown> {
+      const options = optionsOfRun(provider, command, sentOptions);
       const request = compactionRequestOf(provider, command, options);
       if (request === null) return inner.run(provider, command, options, writer);
 
@@ -101,7 +143,7 @@ export function withChatCompaction<Inner extends CompactionInnerRuntime>(inner: 
 
     async abort(provider: LLMProvider, sessionId: string): Promise<boolean> {
       // A compaction in flight is stopped by the procedure's own rule for the phase it is in: the guard's
-      // wait ends, the verb's child gets SIGTERM, or the seed turn is aborted like any turn.
+      // wait ends, the verb's child gets SIGTERM, or the seed append's run is aborted like any run.
       const flight = provider === 'claude' ? flightOf(sessionId) : undefined;
       return flight ? flight.stop() : inner.abort(provider, sessionId);
     },

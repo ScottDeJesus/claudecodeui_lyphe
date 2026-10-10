@@ -1171,10 +1171,22 @@ builds an HS256 JWT for the first user from the live database's own `jwt_secret`
 one the running `authenticateToken` accepts; `boot_probe_server` boots a SECOND server on
 `$PROBE_PORT` (`7893` by default) and reuses one only when this script started it, because a phase
 that changed server code must not be verified against a process another phase left running;
-`stop_probe_server` kills that server. The probe writes its marker to a scratch path
+`stop_probe_server` kills that server and deletes its pid file, log, marker, sessions directory and Cerberus store (a caller that wants the log copies it BEFORE the stop). The probe writes its marker to a scratch path
 (`CLOUDCLI_LOCAL_SERVER_MARKER`) and keeps its chat hosts in a scratch sessions directory
 (`CLOUDCLI_SESSIONS_DIR`), so neither the operator's marker nor the operator's running chats are
-ever touched. It still runs against the live auth database; neither redirect isolates that. Cerberus's three roots are scratch values too (`CERBERUS_DB_PATH` and `CERBERUS_KEY_PATH` under `/tmp/apps-cerberus.*`, `CERBERUS_LISTEN` on any free loopback port): `.env` carries the live `CERBERUS_LISTEN`, and without them this server would open the live Cerberus store and try the live tailnet address.
+ever touched. It still runs against the live auth database; neither redirect isolates that. Cerberus's three roots are scratch values too (`CERBERUS_DB_PATH` and `CERBERUS_KEY_PATH` under `/tmp/apps-cerberus*`, `CERBERUS_LISTEN` on any free loopback port): `.env` carries the live `CERBERUS_LISTEN`, and without them this server would open the live Cerberus store and try the live tailnet address.
+
+**`PROBE_PORT` and the paths.** The six per-server paths (`APPS_PID_FILE`, `APPS_LOG`, `APPS_MARKER`, `APPS_SESSIONS_DIR`, `APPS_CERBERUS_DB`, `APPS_CERBERUS_KEY`) follow `PROBE_PORT`, so a second server on another port runs beside the first and neither `stop_probe_server` reaches the other's files:
+
+| `PROBE_PORT` | paths |
+| --- | --- |
+| unset or `7893` | bare: `/tmp/apps-server.pid`, `/tmp/apps-server.log`, `/tmp/apps-marker.json`, `/tmp/apps-sessions`, `/tmp/apps-cerberus.db`, `/tmp/apps-cerberus.key` |
+| any other port, e.g. `7894` | `-<port>` before the extension: `/tmp/apps-server-7894.pid`, `/tmp/apps-sessions-7894`, … |
+
+- Refused at source time (message on stderr, nothing derived, no function defined, the source returns 1): a value that is not ASCII digits, a leading zero, `3011` (the operator's own API: a server that cannot bind it dies unseen while the API answers the status check). The caller's next `boot_probe_server` then fails as "command not found".
+- Each removal in `stop_probe_server` sits in a `case` on that path's two literal shapes (bare, `-<digits>`) and turns away a second slash or a `..`; a path that drifted from them is left alone.
+- `probe_pid_is_signalable <pid>` gates every `kill` / `kill -0`: a plain decimal above 1, no sign, no leading zero, at most 9 digits. why: `kill -1` reaches every process the user owns; `kill 0` the caller's group.
+- A caller's exit trap tests `[ -f "${APPS_LOG:-}" ]`, not `"$APPS_LOG"`: after a refusal the variables are unset and `set -u` would end the trap before the stop.
 
 **`scripts/apps-ui-probe.mjs`** walks the switcher in a real browser over the DevTools protocol —
 no playwright runner, no test framework — because everything it checks (a FAB paints, a drawer opens

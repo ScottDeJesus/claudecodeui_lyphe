@@ -414,7 +414,7 @@
     "context": "{{before}} <to>→</to> {{after}} tokens",
     "contextPending": "{{before}} <to>→</to> … tokens",
     "contextAfterOnly": "{{after}} tokens after",
-    "afterPending": "(the context after is known once the new session answers its first turn)",
+    "afterPending": "(the context after is known once the new session has counted the summary)",
     "summarizedBy": "Summarized by <model>{{model}}</model> at {{effort}} effort",
     "read": "read {{tokens}}",
     "wrote": "wrote {{tokens}}",

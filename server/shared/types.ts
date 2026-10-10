@@ -970,14 +970,14 @@ export type ChatProcessActivity = { live: boolean; busy: boolean; why: string | 
  * context of the turn's last MAIN-THREAD request — input plus both caches plus output — and `null`
  * when the turn made none; `contextWindow` is the window of the model that request ran on, read off
  * the result's `modelUsage`, `null` when no entry names that model. `sendOptions` are the turn's own
- * send options without anything one turn carries (`attachments`, `images`, `files`, `promptBlocks`,
+ * send options without anything one turn carries (`attachments`, `images`, `files`, `transcriptAppend`,
  * `resumeFromScratch`, `resumeAnchorId`, `compactionSeed`, `compactionTrigger`, and `keepalive`, a
- * re-adopted run's descriptor), so a compaction started from a report sends its seed turn at the
+ * re-adopted run's descriptor), so a compaction started from a report sends its seed append at the
  * chat's own model, effort, permission mode and tools. A re-adopted run carries none of those until a
  * message joins it, so they are read from the launch profile the host recorded; a host with no record
  * leaves the options bare. `answered` is whether a client turn was waiting on this result (false for a background
  * follow-up turn); `aborted` whether the turn was a Stop's; `seed` whether it was a compaction's
- * own seed turn. `activity` is the process's activity at that moment.
+ * own seed append. `activity` is the process's activity at that moment.
  * Produced by the Claude runtime's loop; consumed by the compaction module's triggers.
  */
 export type ChatTurnReport = {
@@ -2372,7 +2372,7 @@ export type CompactionFacts = {
   chunks: number;
 };
 
-/** One compaction as `sessionCompactionsDb.listCompactions` and `listAllCompactions` answer it: the facts, plus where the chat came from. `oldProviderSessionId` and `oldJsonlPath` name the transcript the chat left (still on disk, still searchable); `sessionId` is the app session that left it; `createdAt` is the swap's time as ISO-8601 UTC. `postTokens` is the chat's context after the new session's first turn, and `null` until that turn has reported it (`setCompactionPostTokens` fills it in) — a record read between the swap and that report is not malformed, it is early. */
+/** One compaction as `sessionCompactionsDb.listCompactions` and `listAllCompactions` answer it: the facts, plus where the chat came from. `oldProviderSessionId` and `oldJsonlPath` name the transcript the chat left (still on disk, still searchable); `sessionId` is the app session that left it; `createdAt` is the swap's time as ISO-8601 UTC. `postTokens` is the chat's context after the seed append, and `null` until the append's context count has reported (`setCompactionPostTokens` fills it in) — a record read between the swap and that report is not malformed, it is early. */
 export type CompactionRecord = CompactionFacts & {
   oldProviderSessionId: string;
   oldJsonlPath: string;
@@ -2381,7 +2381,14 @@ export type CompactionRecord = CompactionFacts & {
   postTokens: number | null;
 };
 
-/** The `compaction` row a chat's history and live stream draw where a custom compaction swapped the chat onto a new session. `NormalizedMessage.compaction` carries it on a row of `kind: 'compaction'` (`id: 'compaction-<old provider session id>'`), built from a `CompactionRecord` by the Claude history reader and, live, by the compaction run itself. `trigger` is what started the compaction (`manual`: the operator pressed Compact; `auto`: a turn ended past the window fraction; `idle`: the chat sat idle). `summarizerModel` is the word the summarizer launched with and `summarizerServed` the model that answered, `null` when no reply named one. `preTokens` is the chat's context before and `postTokens` its context after the new session's first turn — `null` until known, so a marker read early is not malformed. `summarizerTokensIn`, `summarizerTokensOut` and `chunks` say what the summarizer read, wrote and in how many calls (tokens only, never dollars — the house is on a subscription). `at` is the swap's time as an ISO-8601 string. The client mirrors this type in `src/shared/types.ts`; keep the two identical. */
+/** What `sessionCompactionsDb.latestCompaction` answers for a chat: the three things the compaction module needs from the chat's NEWEST `compaction` row, and nothing else (`CompactionRecord` is the full row). `oldProviderSessionId` names the transcript that compaction left behind. `postTokens` is the chat's context after its seed append, `null` until the append's count has reported — the growth guard holds nothing against a chat with no `postTokens`. `seed` is the seed's blocks as the summarizer returned them, parsed back from the JSON array the swap stored; it is `null` for a compaction recorded before the column existed, and when the stored text is not a non-empty array of non-empty strings — a start-over then carries no seed and the chat reads as it did before the record. Consumers: the compaction module's auto-trigger (`postTokens`) and its decorator (`seed`). */
+export type LatestCompaction = {
+  oldProviderSessionId: string;
+  postTokens: number | null;
+  seed: string[] | null;
+};
+
+/** The `compaction` row a chat's history and live stream draw where a custom compaction swapped the chat onto a new session. `NormalizedMessage.compaction` carries it on a row of `kind: 'compaction'` (`id: 'compaction-<old provider session id>'`), built from a `CompactionRecord` by the Claude history reader and, live, by the compaction run itself. `trigger` is what started the compaction (`manual`: the operator pressed Compact; `auto`: a turn ended past the window fraction; `idle`: the chat sat idle). `summarizerModel` is the word the summarizer launched with and `summarizerServed` the model that answered, `null` when no reply named one. `preTokens` is the chat's context before and `postTokens` its context after the seed append — `null` until known, so a marker read early is not malformed. `summarizerTokensIn`, `summarizerTokensOut` and `chunks` say what the summarizer read, wrote and in how many calls (tokens only, never dollars — the house is on a subscription). `at` is the swap's time as an ISO-8601 string. The client mirrors this type in `src/shared/types.ts`; keep the two identical. */
 export type ChatCompactionMarker = {
   trigger: 'manual' | 'auto' | 'idle';
   summarizerModel: string;

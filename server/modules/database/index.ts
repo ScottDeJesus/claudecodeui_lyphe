@@ -123,8 +123,10 @@ export type {
   SessionDraftRecord,
 } from '@/modules/database/repositories/session-drafts.db.js';
 export { sessionsDb } from '@/modules/database/repositories/sessions.db.js';
-// sessionCompactionsDb: used by the compaction module to swap a chat onto its compacted session and back, and by
-// Providers to stitch a compacted chat's history and index its old transcripts for search.
+// sessionCompactionsDb: used by the compaction module to swap a chat onto its compacted session and back, to hold a
+// turn-end compaction until the context has grown past the latest one and to give a start-over its seed again
+// (`latestCompaction`), and by Providers to stitch a compacted chat's history and index its old transcripts for
+// search.
 export { sessionCompactionsDb } from '@/modules/database/repositories/session-compactions.db.js';
 // sessionUserStateDb: used by the chat run registry and the chat websocket to stamp completion and read, and by Providers to set an icon.
 export { sessionUserStateDb } from '@/modules/database/repositories/session-user-state.db.js';

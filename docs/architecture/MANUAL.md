@@ -1516,7 +1516,7 @@ section: 03-conversation-handoff/002 The pieces
 | `server/modules/providers/provider.routes.ts` | `POST /sessions` mints the app id; `GET /sessions/:id/messages`, `/sessions/:id/provider-id` (409 until the first turn reports an id), `GET /sessions/:id` (details, `providerSessionId` null inside a 200 until then — what `useCliSessionId` reads), `/sessions/running`, `POST /sessions/:id/fork` |
 | `server/modules/providers/services/sessions.service.ts` | `createAppSession`, `resolveProviderSessionId`, `resolveEditAnchor`, `providerRewindsForEdit`, `rewindSessionForEdit`, `forkSessionById`, `fetchHistory`, `listRunningSessions` |
 | `server/modules/database/repositories/sessions.db.ts` | The one row that holds both ids, and every mutation of the mapping |
-| `server/modules/compaction/` (`compaction-runtime.ts`, `compaction-procedure.ts`, `auto-trigger.ts`, `compaction-seed.ts`) | A decorator over the runtime gateway (`withChatCompaction`, wired in `server/index.ts`): while Custom compaction is on, a Claude chat's `/compact` and its turn-end and idle triggers run the summarizer verb and move the chat to a seeded new session (MAN-8067, MAN-8065, MAN-8066) |
+| `server/modules/compaction/` (`compaction-runtime.ts`, `compaction-procedure.ts`, `auto-trigger.ts`, `compaction-seed.ts`) | A decorator over the runtime gateway (`withChatCompaction`, wired in `server/index.ts`): while Custom compaction is on, a Claude chat's `/compact` and its turn-end and idle triggers run the summarizer verb and move the chat to a seeded new session; on any Claude run it also removes the options only it may set, and a start-over (an edit of the first message after a compaction) in a chat with a stored seed appends that seed again (MAN-8067, MAN-8065, MAN-8066) |
 | `server/modules/database/repositories/session-compactions.db.ts` | `sessionCompactionsDb`: the compaction record and the one mover of a chat between provider sessions for a compaction — `swapToCompactedSession`, `unswapCompactedSession` (MAN-8046) |
 | `server/modules/websocket/services/chat-session-writer.service.ts` | `ChatSessionWriter`: swallows `session_created`, captures the native id, fans out to every attached socket |
 | `server/modules/websocket/services/chat-run-registry.service.ts` | `startRun`, `attachConnection`, `replayEvents`, `completeRun`, `completeRunIfCurrent`; internally `decorateAndRecordEvent` and `recordProviderSessionId` (it marks the provider session a chat leaves superseded before the mapping moves) |
@@ -6782,11 +6782,11 @@ Defaults live in `DEFAULT_PLACEMENTS` (`src/modules/chat-gutters/hooks/useGutter
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat-gutters/ChatGutterLayout.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat-gutters/hooks/useGutterPlacements.ts
 
-## MAN-8046 — sessionCompactionsDb — a compacted transcript's record and the swap
+## MAN-8046 — sessionCompactionsDb — a compacted transcript's record, the seed it stores, and the swap
 
 **RULE: a compaction's old transcript is a `superseded_provider_sessions` row, and `sessionCompactionsDb` is the one writer of that row's compaction kinds and the one mover of the chat between sessions.**
 
-`server/modules/database/repositories/session-compactions.db.ts`, exported through the database barrel as `sessionCompactionsDb`. Types: `CompactionFacts`, `CompactionRecord`, `ChatCompactionMarker` in `server/shared/types.ts`. Readers of the record: MAN-8054.
+`server/modules/database/repositories/session-compactions.db.ts`, exported through the database barrel as `sessionCompactionsDb`. Types: `CompactionFacts`, `CompactionRecord`, `LatestCompaction`, `ChatCompactionMarker` in `server/shared/types.ts`. Readers of the record: MAN-8054.
 
 ## Columns added to `superseded_provider_sessions`
 
@@ -6800,8 +6800,9 @@ Declared in `SUPERSEDED_PROVIDER_SESSIONS_TABLE_SCHEMA_SQL`; added to a database
 | `summarizer_served` | the one model that answered, or NULL |
 | `summarizer_effort` | effort word it ran at |
 | `pre_tokens` | context before; NULL when no turn had reported it |
-| `post_tokens` | context after the new session's first turn; NULL until `setCompactionPostTokens` |
+| `post_tokens` | context after the seed append (the CLI's `getContextUsage` `full` count); NULL until `setCompactionPostTokens` |
 | `summarizer_tokens_in`, `summarizer_tokens_out`, `summarizer_chunks` | summed over every summarizer call, failed ones included; chunks = calls |
+| `seed` | the seed's blocks as a JSON array of strings, as the verb returned them and as appended to the new session. NULL on a rewind row and on a compaction recorded before the column. Written by the swap's upsert, so a redo overwrites it |
 
 `CompactionFacts.chunks` is `summarizer_chunks`; `CompactionFacts.trigger` is `compaction_trigger`. `CompactionRecord` = `CompactionFacts` + `oldProviderSessionId`, `oldJsonlPath`, `sessionId`, `createdAt`, `postTokens`. `createdAt` is ISO UTC at one-second resolution; `rowid` breaks ties.
 
@@ -6809,9 +6810,10 @@ Declared in `SUPERSEDED_PROVIDER_SESSIONS_TABLE_SCHEMA_SQL`; added to a database
 
 | Function | Does |
 | --- | --- |
-| `swapToCompactedSession({ sessionId, oldProviderSessionId, oldJsonlPath, newProviderSessionId, facts })` | One transaction: upserts the old transcript's `compaction` row (`post_tokens` NULL again on a redo), repoints the chat via `sessionsDb.repointSessionToProviderSession` (`provider_session_id` AND `jsonl_path` together), deletes any watcher row already made for the new id |
+| `swapToCompactedSession({ sessionId, oldProviderSessionId, oldJsonlPath, newProviderSessionId, facts, seed })` | One transaction: upserts the old transcript's `compaction` row with `seed` as JSON (`post_tokens` NULL again on a redo), repoints the chat via `sessionsDb.repointSessionToProviderSession` (`provider_session_id` AND `jsonl_path` together), deletes any watcher row already made for the new id |
 | `unswapCompactedSession({ sessionId, oldProviderSessionId, oldJsonlPath, newProviderSessionId })` | One transaction: deletes only the `reason = 'compaction'` row of the old id, records the seed as `compaction-abandoned`, repoints the chat back. A no-op unless the chat stands on `newProviderSessionId`, and when the chat's row is gone |
 | `setCompactionPostTokens(oldProviderSessionId, postTokens)` | Writes `post_tokens` of a `compaction` row only; nothing when the row is gone |
+| `latestCompaction(sessionId)` | The chat's newest `compaction` row (`created_at` DESC, `rowid` DESC) as `LatestCompaction` `{ oldProviderSessionId, postTokens, seed }`; null when the chat has none. `seed` is null for a NULL column, an empty array, non-JSON or any element that is not a non-empty string; the last three log a `[compaction-record] session=<id> …` line. Read by the auto-trigger's growth guard (`postTokens`, MAN-8066), the decorator's start-over (`seed`, MAN-8067) and the composer's token-usage route (`postTokens`, MAN-8054) |
 | `listCompactions(sessionId)` | One chat's `compaction` rows, oldest first. Excludes rewind and abandoned rows |
 | `listAllCompactions()` | Every chat's `compaction` rows, oldest first |
 
@@ -6821,6 +6823,7 @@ Writes nothing, throws:
 
 - an id that is not a bare file-name stem (`/^[A-Za-z0-9_-][A-Za-z0-9._-]*$/`), the new id equal to the old, a relative or empty `oldJsonlPath`
 - facts the columns would store wrong: `trigger` outside the three; counts not non-negative integers (`preTokens` may be null); `summarizerModel` / `summarizerEffort` empty; `summarizerServed` empty (null is fine)
+- a `seed` that is not an array of one or more non-empty strings (a sparse array's holes count as not strings)
 - a chat whose row is gone — a record for a deleted chat would keep the indexer refusing the old transcript, which nothing could then delete through the app
 - a chat that is not `claude`
 - a chat standing on neither `oldProviderSessionId` nor `newProviderSessionId`. Standing on the new id is a duplicate announcement and repeats the swap
@@ -6839,8 +6842,8 @@ A swap that throws leaves the seed's transcript unrecorded: the unswap is a no-o
 | `unswapCompactedSession` records the abandoned seed at the chat's current `jsonl_path` when the indexer already repointed it there (differs from the old path), else beside the old transcript | A transcript can sit outside `encode(project_path)`; the sibling path is only the CLI's default guess |
 | `summarizerModel` is the launch word, `summarizerServed` the single model that answered | The summarizer verb's `served` is an array; the caller picks the string when it builds the facts |
 | `reason` NULL means rewind | A reader that needs "an edit's rewind" tests `reason IS NULL`, never `reason != 'compaction'` |
-| Every other reader of the table (`resolveAppSessionId`, `isProviderSessionSuperseded`, `getSupersededTranscriptPaths`, the chat-delete clear) reads rows of every `reason` | A compaction row is covered by them with no new code; only the two list functions here filter to `compaction` |
-| `superseded_provider_sessions` has no `session_id` index | Empty today; add one before `listCompactions` runs over a large table |
+| Every other reader of the table (`resolveAppSessionId`, `isProviderSessionSuperseded`, `getSupersededTranscriptPaths`, the chat-delete clear) reads rows of every `reason` | A compaction row is covered by them with no new code; only the two list functions and `latestCompaction` here filter to `compaction` |
+| `superseded_provider_sessions` has no `session_id` index | 5 rows on 2026-10-09 (all `compaction`); add one before `listCompactions` runs over a large table |
 | A force delete between the seed's file landing and the indexer repointing leaves that file on disk | It is then indexed as a new chat; a repository cannot close it |
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/migrations.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/session-compactions.db.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/schema.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts
@@ -6861,7 +6864,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/index.ts
 | Part | Rule |
 | --- | --- |
 | Heading | hairline, `Shrink` icon (the usage panel's Compact glyph), `compaction.heading`, hairline; label span is `text-center` so a heading too wide for one line wraps centred. `title` = the swap time (`marker.at`); no visible clock |
-| Line 1 | trigger (`compaction.trigger.manual` / `auto` / `idle`), then context `before → after tokens`. `after` null: `compaction.contextPending` holds its place with `…` plus an `sr-only` `compaction.afterPending`; `before` null: `compaction.contextAfterOnly` |
+| Line 1 | trigger (`compaction.trigger.manual` / `auto` / `idle`), then context `before → after tokens`: `before` = `preTokens`, the chat's last turn-end context; `after` = `postTokens`, the CLI's own count of the new session's context at the compaction's end (the runtime's one `getContextUsage` `full` count after the seed append, MAN-8055; every block of the seed is in it, no reply is). `after` null: `compaction.contextPending` holds its place with `…` plus an `sr-only` `compaction.afterPending`; `before` null: `compaction.contextAfterOnly` |
 | Line 2 | `compaction.summarizedBy` (model by catalog label, effort), `compaction.read`, `compaction.wrote`, `compaction.parts` only when `chunks > 1` |
 | Arrow | `ArrowRight` icon; the locale's `→` stays for screen readers (`<to>` slot) |
 | Numbers | tokens through `formatTokenCount` (`chat/utils/chatFormatting`); never dollars |

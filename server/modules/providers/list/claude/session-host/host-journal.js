@@ -134,9 +134,17 @@ export function createJournal({ hostId, sessionsDir }) {
       return append({ t: 'out', seq: nextSeq++, at: Date.now(), line });
     },
 
-    appendExit(code, signal) {
+    /** `error` is set only when the CLI could not be started; a normal exit leaves the field off. */
+    appendExit(code, signal, error) {
       const at = Date.now();
-      const frame = append({ t: 'exit', seq: nextSeq++, at, code, signal });
+      const frame = append({
+        t: 'exit',
+        seq: nextSeq++,
+        at,
+        code,
+        signal,
+        ...(typeof error === 'string' ? { error } : {})
+      });
       writeMeta({ exited: { code, signal, at } });
       return frame;
     },

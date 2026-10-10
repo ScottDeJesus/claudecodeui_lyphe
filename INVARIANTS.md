@@ -8596,3 +8596,478 @@ measured 2026-10-09 by chain chain-follow-sun-dark-on-button-press-20261009-1044
 probe-key: ffac819c6bf0eccb1da41af7b7ec44d0e0e036f4
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/context/ThemeContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/follow-sun-press.mjs
+
+## INV-7554 — probe — the seed append's context count (`detail: 'summary'`) overstates "after" by a constant ~5.4K tokens in the app, 8.3K in a bare session
+
+the seed append's context count (`detail: 'summary'`) overstates "after" by a constant ~5.4K tokens in the app, 8.3K in a bare session
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) && cat > "$D/p.sh" <<'EOF'
+#!/bin/bash
+H=$(dirname "$0")
+mkdir -p /tmp/cloudcli-probe-chat
+cat > "$H/ctx.mjs" <<'EOT'
+import crypto from 'node:crypto';
+const { query } = await import('/home/lyphe/.claude/claudecodeui_lyphe/node_modules/@anthropic-ai/claude-agent-sdk/sdk.mjs');
+const msg = (text, append) => ({ type: 'user', message: { role: 'user', content: append ? [{ type: 'text', text }] : text }, parent_tool_use_id: null, ...(append ? { shouldQuery: false } : {}), uuid: crypto.randomUUID(), timestamp: new Date().toISOString() });
+const inbox = []; let wake; const next = () => new Promise((r) => { wake = r; });
+async function* input() { for (;;) { while (inbox.length) yield inbox.shift(); await next(); } }
+const q = query({ prompt: input(), options: { model: 'claude-haiku-4-5-20251001', cwd: '/tmp/cloudcli-probe-chat', permissionMode: 'default', maxTurns: 1 } });
+const push = (m) => { inbox.push(m); wake?.(); };
+push(msg('The secret word is HELIOTROPE.', true));
+let step = 0; let summary = null; let full = null; let real = null; const ms = {};
+for await (const m of q) {
+  if (m.type === 'result' && step === 0) {
+    step = 1;
+    let t0 = Date.now(); summary = (await q.getContextUsage({ detail: 'summary' })).totalTokens; ms.summary = Date.now() - t0;
+    t0 = Date.now(); full = (await q.getContextUsage({ detail: 'full' })).totalTokens; ms.full = Date.now() - t0;
+    push(msg('What is the secret word? One word.', false));
+  } else if (m.type === 'assistant' && real === null) {
+    const u = m.message.usage; real = (u.input_tokens ?? 0) + (u.cache_read_input_tokens ?? 0) + (u.cache_creation_input_tokens ?? 0);
+  } else if (m.type === 'result' && step === 1) break;
+}
+console.log(JSON.stringify({ summary, full, realFirstRequest: real, summaryOver: summary - real, fullOver: full - real, ms }));
+process.exit(0);
+EOT
+cd /tmp/cloudcli-probe-chat && timeout 120 node "$H/ctx.mjs"
+EOF
+timeout 150 bash "$D/p.sh" 2>&1 | tail -3
+expect: `summaryOver` in the thousands (8351 measured; 5.4K in the app) and `fullOver` under 400 (335 measured) — once the runtime asks for `full` or the summary is corrected, the app's marker "after" matches the next request's first count within a few hundred tokens
+```
+
+measured 2026-10-09 by chain chain-compaction-handover--append-20261009-133059-4418, finding M1, MEDIUM
+probe-key: c345b05142750c555b1aa3d179b5ce5e7bac344b
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts
+
+## INV-7555 — probe — `askContextTokens` accepts `totalTokens: 0` and publishes a `token_budget` of `used: 0`
+
+`askContextTokens` accepts `totalTokens: 0` and publishes a `token_budget` of `used: 0`
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) && cat > "$D/p.sh" <<'EOF'
+#!/bin/bash
+H=$(dirname "$0")
+cat > "$H/z.mts" <<'EOT'
+const { askContextTokens } = await import('/home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-compaction-seams.ts') as any;
+console.warn = () => {};
+console.log('answer {totalTokens:0} -> ' + JSON.stringify(await askContextTokens(async () => ({ totalTokens: 0 }), 'k')));
+EOT
+cd /home/lyphe/.claude/claudecodeui_lyphe && node_modules/.bin/tsx --tsconfig tsconfig.json "$H/z.mts"
+EOF
+bash "$D/p.sh" 2>&1 | tail -2
+expect: `answer {totalTokens:0} -> 0` today; `null` once an empty count is refused
+```
+
+measured 2026-10-09 by chain chain-compaction-handover--append-20261009-133059-4418, finding L1, LOW
+probe-key: 66fda36f06e3b6d74fa8a640749ceed216af1c6a
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts
+
+## INV-7556 — probe — one stale sentence about "the new session's first turn"
+
+one stale sentence about "the new session's first turn"
+
+```probe
+cd /home/lyphe/.claude/claudecodeui_lyphe && grep -n "first turn has reported" server/modules/compaction/compaction-frames.ts || echo none
+expect: one line (41) today; `none` once the sentence names the seed append's count
+```
+
+measured 2026-10-09 by chain chain-compaction-handover--append-20261009-133059-4418, finding L2, LOW
+probe-key: 3d1206d19b52d3edbaaf6e5387204f1cda045657
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts
+
+## INV-7558 — probe — A project folder that is gone still reaches the client as `spawn <claude> ENOENT` wherever the pre-flight does not run (a Cerberus node's project; a folder removed after the stat), and MAN-693 says it never does
+
+A project folder that is gone still reaches the client as `spawn <claude> ENOENT` wherever the pre-flight does not run (a Cerberus node's project; a folder removed after the stat), and MAN-693 says it never does
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+D=$1
+H=/home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/session-host/host.js
+cat > "$D/c.mjs" <<'JS'
+import net from 'node:net';
+import { spawn } from 'node:child_process';
+import fs from 'node:fs';
+const [,, D, H] = process.argv;
+const hostId = 'athena-probe-cwd';
+const host = spawn('node', [H, hostId, D], { stdio: 'ignore' });
+const sock = `${D}/${hostId}.sock`;
+for (let i = 0; i < 50 && !fs.existsSync(sock); i++) await new Promise((r) => setTimeout(r, 100));
+const c = net.connect(sock);
+let buf = '';
+c.on('data', (d) => { buf += d; });
+c.on('connect', () => c.write(JSON.stringify({ t: 'spawn', command: '/bin/true', args: [], cwd: `${D}/gone`, env: { PATH: '/usr/bin:/bin' }, appSessionId: 'athena-probe', userId: 1, profile: null }) + '\n'));
+await new Promise((r) => host.on('exit', r));
+const exit = buf.trim().split('\n').map((l) => JSON.parse(l)).find((f) => f.t === 'exit');
+console.log('exit frame error:', exit?.error ?? 'none', '| names the missing folder:', String(exit?.error).includes('/gone'));
+process.exit(0);
+JS
+node "$D/c.mjs" "$D" "$H"
+EOF
+bash "$D/p.sh" "$D"
+cd /tmp && case "$D" in /tmp/athena-probe.*) rm -r "$D";; esac
+echo "[probe exit $?]"
+expect: `exit frame error: spawn /bin/true ENOENT | names the missing folder: false` while the defect stands (the binary exists; the folder does not); `… names the missing folder: true` once the host says which folder
+```
+
+measured 2026-10-09 by chain chain-cloudcli-missing-project-folder-20261009-143553-aa0c, finding M1, MEDIUM
+probe-key: d0a4ea7092246c408b6aa5f19c28da2a485ad19e
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-project-folder.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-runtime.provider.js, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/session-host/host-frames.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/session-host/host-journal.js, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/session-host/host.js
+
+## INV-7559 — probe — The new paragraph sits in a row that governs neither file it describes, so the house's file-to-row lookup never shows it
+
+The new paragraph sits in a row that governs neither file it describes, so the house's file-to-row lookup never shows it
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+for f in claude-project-folder.ts claude-runtime.provider.js; do
+  docstore govern server/modules/providers/list/claude/$f | python3 -I -c "
+import sys, json
+rows = json.load(sys.stdin)['rows']
+hit = sorted(r['token'] for r in rows if 'A chat whose project folder is gone' in r['body'])
+print('$f', 'surfaces the folder paragraph in', hit or 'NO row')"
+done
+docstore get MAN-699 | python3 -I -c "
+import sys, json
+r = json.load(sys.stdin)['row']
+print('MAN-699 governs the two files:', any(g.endswith('claude-project-folder.ts') for g in r['governs']), any(g.endswith('claude-runtime.provider.js') for g in r['governs']))"
+EOF
+bash "$D/p.sh"
+cd /tmp && case "$D" in /tmp/athena-probe.*) rm -r "$D";; esac
+echo "[probe exit $?]"
+expect: both files print `NO row` and `governs the two files: False False` while the defect stands; each file names MAN-699 (or the row it moved to) once cured
+```
+
+measured 2026-10-09 by chain chain-cloudcli-missing-project-folder-20261009-143553-aa0c, finding L1, LOW
+probe-key: 199ac784e11a840797805a4886e7b1c0ae697fac
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-project-folder.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-runtime.provider.js, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/session-host/host-frames.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/session-host/host-journal.js, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/session-host/host.js
+
+## INV-7560 — probe — the composer has two token readers; the history answers `post_tokens`, the route answers 0 on the same transcript, and the docs say nothing of it
+
+the composer has two token readers; the history answers `post_tokens`, the route answers 0 on the same transcript, and the docs say nothing of it
+
+```probe
+D=$(mktemp -d /tmp/athp-m1.XXXXXX) || exit 1
+cat > "$D/m1.mts" <<'EOF'
+import fs from 'node:fs';
+import { sessionCompactionsDb } from '@/modules/database/index.js';
+import { stitchCompactedHistory, withOpeningContext } from '/home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-compacted-history.ts';
+import { createProviderTokenUsageService, summarizeClaudeTokenUsage } from '@/modules/providers/services/provider-token-usage.service.js';
+const file = process.argv[2] + '/P.jsonl';
+const rows = [
+  { type: 'queue-operation', sessionId: 'P' },
+  { type: 'attachment', uuid: 'a1', parentUuid: null, sessionId: 'P' },
+  { type: 'user', uuid: 'seed', parentUuid: 'a1', sessionId: 'P', queueTranscriptOnly: true, message: { role: 'user', content: [{ type: 'text', text: 'SUMMARY' }, { type: 'text', text: 'HANDOVER' }] } },
+];
+fs.writeFileSync(file, rows.map((r) => JSON.stringify(r)).join('\n') + '\n');
+(sessionCompactionsDb as any).listCompactions = () => [{ oldProviderSessionId: 'OLD', oldJsonlPath: '/nowhere.jsonl', sessionId: 'CHAT', createdAt: '2026-10-09T10:00:00.000Z', postTokens: 36057 }];
+const read = async (p: string, sid: string) => fs.readFileSync(p, 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l)).filter((r) => r.sessionId === sid);
+const stitched = await stitchCompactedHistory({ sessionId: 'CHAT', liveTranscriptPath: file, liveProviderSessionId: 'P', readTranscriptRows: async (p, sid) => (p === file ? read(p, sid) : []) });
+const history = withOpeningContext(summarizeClaudeTokenUsage(stitched.liveRows), stitched.openingContextTokens);
+const route = await createProviderTokenUsageService({ getSessionById: () => ({ session_id: 'CHAT', provider: 'claude', provider_session_id: 'P', jsonl_path: file }) as any, isProviderSessionSuperseded: () => false }).getSessionTokenUsage('CHAT');
+console.log(`history used=${history.used} route used=${route.used} ${history.used === route.used ? 'AGREE' : 'DISAGREE'}`);
+process.exit(0);
+EOF
+cat > "$D/p.sh" <<'EOF'
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+TSX_TSCONFIG_PATH=server/tsconfig.json timeout 120 node --import tsx "$1/m1.mts" "$1" 2>&1 | tail -3
+EOF
+bash "$D/p.sh" "$D"
+```
+
+measured 2026-10-09 by chain chain-compaction-handover--history-20261009-141900-ed06, finding M1, MEDIUM
+probe-key: 7c1e71a9cf4f1f29129a048ccbaeba155e2a6177
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/compaction-opening-history.sh
+
+## INV-7561 — probe — the runtime bullet says `full` is "within ~300" of the next request; in the app's append it is 1,758 high, on every chat I measured
+
+the runtime bullet says `full` is "within ~300" of the next request; in the app's append it is 1,758 high, on every chat I measured
+
+```probe
+D=$(mktemp -d /tmp/athp-l1.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+bash .verify/compaction-opening-history.sh > "$1/out" 2>&1
+post=$(sed -n "s/^the record's post_tokens: //p" "$1/out" | head -1)
+next=$(grep -o "turn-end contextTokens=[0-9]*" "$1/out" | tail -1 | cut -d= -f2)
+echo "post_tokens=${post:-none} first_request_after=${next:-none} gap=$(( ${post:-0} - ${next:-0} ))"
+EOF
+bash "$D/p.sh" "$D"
+```
+
+measured 2026-10-09 by chain chain-compaction-handover--history-20261009-141900-ed06, finding L1, LOW
+probe-key: c526eabd62fb908ea9267a5175f93aa466a7a38f
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/compaction-opening-history.sh
+
+## INV-7562 — probe — MAN-8068 still says "the second block is not drawn"; the seed the app writes now has four
+
+MAN-8068 still says "the second block is not drawn"; the seed the app writes now has four
+
+```probe
+grep -n "the second block is not drawn" /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/MANUAL.md || echo gone
+```
+
+measured 2026-10-09 by chain chain-compaction-handover--history-20261009-141900-ed06, finding L2, LOW
+probe-key: 643fa2ca0dbc52ff21916e516b7e2b3a7fa5c18b
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/compaction-opening-history.sh
+
+## INV-7563 — probe — the script can pass while the placeholder is drawn, and its one check treats two empty strings as equal
+
+the script can pass while the placeholder is drawn, and its one check treats two empty strings as equal
+
+```probe
+sed -n '/^banner "3\./,$p' /home/lyphe/.claude/claudecodeui_lyphe/.verify/compaction-opening-history.sh | grep -c 'fail "'
+```
+
+measured 2026-10-09 by chain chain-compaction-handover--history-20261009-141900-ed06, finding L3, LOW
+probe-key: 9c228e38bd2843920904bb1618ef41ac6cd396f9
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/compaction-opening-history.sh
+
+## INV-7566 — probe — MEDIUM — the "no acknowledgement" check cannot see the seed's own words, and was never shown able to fail
+
+MEDIUM — the "no acknowledgement" check cannot see the seed's own words, and was never shown able to fail
+
+```probe
+D=$(mktemp -d /tmp/athena-p.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+D2=$(dirname "$0")
+{
+  grep -m1 '^const ACKNOWLEDGES' .verify/lib/handover-whole.mjs
+  cat <<'JS'
+const cases = [
+  ['control: got compacted', 'Okay I got compacted. The code word is zorblax-1.'],
+  ['preamble echo: ran out of context', 'Continuing from a conversation that ran out of context, the code word is zorblax-1.'],
+  ['preamble echo: previous conversation', 'From our previous conversation, the code word is zorblax-1.'],
+  ['continuing from where we left off', 'Continuing from where we left off, the code word is zorblax-1.'],
+];
+for (const [label, text] of cases) console.log(String(ACKNOWLEDGES.test(text)).padEnd(6), label);
+JS
+} > "$D2/t.mjs"
+node "$D2/t.mjs"
+EOF
+bash "$D/p.sh"
+expect: the control prints true and the three phrases of the seed's own preamble print false (cured when they print true)
+```
+
+measured 2026-10-09 by chain chain-compaction-handover--whole-20261009-154527-c396, finding M1, MEDIUM
+probe-key: 87cb891f3dfdf0af75d0d73ddce35ac42eea7764
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/compaction-handover-whole.sh, /home/lyphe/.claude/claudecodeui_lyphe/.verify/custom-compaction-chat.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/custom-compaction-whole.sh, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/handover-whole.mjs
+
+## INV-7567 — probe — MEDIUM — the planted skill has one fixed name, and any `--leg delete` removes it: a concurrent edit run kills a live whole run
+
+MEDIUM — the planted skill has one fixed name, and any `--leg delete` removes it: a concurrent edit run kills a live whole run
+
+```probe
+D=$(mktemp -d /tmp/athena-p.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+echo "skill name : $(grep -m1 '^const COMMAND_NAME' .verify/lib/handover-whole.mjs)"
+echo "delete leg : $(grep -n 'removeCommand()' .verify/compaction-handover-chat.mjs | head -2 | tr '\n' ' ')"
+echo "edit script: $(grep -c -- '--leg delete' .verify/compaction-handover.sh) delete-leg call(s), $(grep -m1 -o 'PROBE_PORT:-[0-9]*' .verify/compaction-handover.sh)"
+EOF
+bash "$D/p.sh"
+expect: COMMAND_NAME is the literal 'handover-recall', deleteLeg calls removeCommand() with no owner check, and compaction-handover.sh (default port 7895, beside this script's 7893) runs --leg delete twice (cured: a per-run name, or delete removes only what its own run planted)
+```
+
+measured 2026-10-09 by chain chain-compaction-handover--whole-20261009-154527-c396, finding M2, MEDIUM
+probe-key: 9989ab9aebd8cd69f9cde6f88bc49fd1920c540c
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/compaction-handover-whole.sh, /home/lyphe/.claude/claudecodeui_lyphe/.verify/custom-compaction-chat.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/custom-compaction-whole.sh, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/handover-whole.mjs
+
+## INV-7568 — probe — LOW — the time check cannot tell "each under its own time" from "all under one time", and its bound admits a minute-early stamp
+
+LOW — the time check cannot tell "each under its own time" from "all under one time", and its bound admits a minute-early stamp
+
+```probe
+D=$(mktemp -d /tmp/athena-p.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+echo "time bound : $(grep -m1 -o 'delta > -20 && delta < 80' .verify/lib/handover-whole.mjs || echo none)"
+node -e 'const delta = 10 + 60; console.log("a stamp one minute before a send made 10 s into its minute: delta =", delta, "accepted =", delta > -20 && delta < 80)'
+EOF
+bash "$D/p.sh"
+expect: the bound line prints and a minute-early stamp is accepted (accepted = true); cured when the upper bound is 60 or less
+```
+
+measured 2026-10-09 by chain chain-compaction-handover--whole-20261009-154527-c396, finding L1, LOW
+probe-key: 3c251b3b02cfa48bc3c04dc94b12fcfb4800b894
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/compaction-handover-whole.sh, /home/lyphe/.claude/claudecodeui_lyphe/.verify/custom-compaction-chat.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/custom-compaction-whole.sh, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/handover-whole.mjs
+
+## INV-7569 — probe — LOW — MAN-8134 says the whole takes "about six minutes"; it takes about two
+
+LOW — MAN-8134 says the whole takes "about six minutes"; it takes about two
+
+```probe
+D=$(mktemp -d /tmp/athena-p.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+docstore get MAN-8134 | grep -o 'about [a-z]* minutes' | head -1 || echo none
+EOF
+bash "$D/p.sh"
+expect: prints "about six minutes" while the doc is wrong; measured runs are 109 s and 116 s (cured when it names about two minutes)
+```
+
+measured 2026-10-09 by chain chain-compaction-handover--whole-20261009-154527-c396, finding L2, LOW
+probe-key: 46ca1f0fa5f867ffa0557fe71633e6c998b59da2
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/compaction-handover-whole.sh, /home/lyphe/.claude/claudecodeui_lyphe/.verify/custom-compaction-chat.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/custom-compaction-whole.sh, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/handover-whole.mjs
+
+## INV-7570 — probe — LOW — `custom-compaction-whole.sh` has no port guard, though MAN-8134 now says the two scripts "never run together"
+
+LOW — `custom-compaction-whole.sh` has no port guard, though MAN-8134 now says the two scripts "never run together"
+
+```probe
+D=$(mktemp -d /tmp/athena-p.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+echo "port guard (ss -ltnH): custom-compaction-whole.sh $(grep -c 'ss -ltnH' .verify/custom-compaction-whole.sh), compaction-handover-whole.sh $(grep -c 'ss -ltnH' .verify/compaction-handover-whole.sh)"
+EOF
+bash "$D/p.sh"
+expect: custom-compaction-whole.sh 0, compaction-handover-whole.sh 1 (cured when the first is 1 or more)
+```
+
+measured 2026-10-09 by chain chain-compaction-handover--whole-20261009-154527-c396, finding L3, LOW
+probe-key: d0c74069b7795613603099d1b2cf9fea0cf1b92b
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/compaction-handover-whole.sh, /home/lyphe/.claude/claudecodeui_lyphe/.verify/custom-compaction-chat.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/custom-compaction-whole.sh, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/handover-whole.mjs
+
+## INV-7571 — probe — LOW — the whole leg prints the appended row's blocks but never compares them with the stored seed
+
+LOW — the whole leg prints the appended row's blocks but never compares them with the stored seed
+
+```probe
+D=$(mktemp -d /tmp/athena-p.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+echo "append==seed comparison: whole leg $(grep -c 'textsOf(append)' .verify/lib/handover-whole.mjs), edit leg $(grep -c 'textsOf(append)' .verify/compaction-handover-chat.mjs)"
+EOF
+bash "$D/p.sh"
+expect: whole leg 0, edit leg 1 (cured when the whole leg is 1 or more)
+```
+
+measured 2026-10-09 by chain chain-compaction-handover--whole-20261009-154527-c396, finding L4, LOW
+probe-key: 7047ebc9addb3fe0369620cf8abf71daffd3700d
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/compaction-handover-whole.sh, /home/lyphe/.claude/claudecodeui_lyphe/.verify/custom-compaction-chat.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/custom-compaction-whole.sh, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/handover-whole.mjs
+
+## INV-7572 — probe — MAN-8046 says the table is "Empty today"; it holds five rows
+
+MAN-8046 says the table is "Empty today"; it holds five rows
+
+```probe
+D=$(mktemp -d /tmp/athena-p.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+echo "rows in superseded_provider_sessions: $(sqlite3 ~/.cloudcli/auth.db 'select count(*) from superseded_provider_sessions')"
+echo "MAN-8046 lines saying 'Empty today': $(~/.claude/scripts/docstore get MAN-8046 --text | grep -c 'Empty today')"
+EOF
+bash "$D/p.sh"
+cd /tmp; case "$D" in /tmp/athena-p.??????) rm -r "$D";; esac
+expect: `rows … : 5` and `lines saying 'Empty today': 1` while the row is wrong; cured when that count is 0 (or the row states the count it holds)
+```
+
+measured 2026-10-09 by chain chain-compaction-handover--docs-20261009-165748-35f0, finding L1, LOW
+probe-key: 3b2ca4e099ad72cf02279383bb42ce324930dd53
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/
+
+## INV-7573 — probe — a comment in the runtime says `full` counts "to within ~300"; the row it sits under, and 9 of 9 measurements, say otherwise
+
+a comment in the runtime says `full` counts "to within ~300"; the row it sits under, and 9 of 9 measurements, say otherwise
+
+```probe
+D=$(mktemp -d /tmp/athena-p.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+echo "comment says 'counts it to within ~300': $(grep -c 'counts it to within ~300' server/modules/providers/list/claude/claude-runtime.provider.js)"
+E=/tmp/compaction-handover-whole.RmHm0M
+[ -f "$E/whole/whole.txt" ] || { echo "evidence directory gone"; exit 0; }
+python3 -I - "$E" <<'PY'
+import json, re, sys
+base = sys.argv[1] + "/whole/"
+posts = [int(x) for x in re.findall(r"post_tokens=(\d+)", open(base + "whole.txt").read())[:2]]
+def first_request(path):
+    for line in open(path):
+        try: r = json.loads(line)
+        except ValueError: continue
+        u = (r.get("message") or {}).get("usage") if r.get("type") == "assistant" else None
+        if u and r["message"].get("model") != "<synthetic>":
+            return u.get("input_tokens", 0) + u.get("cache_creation_input_tokens", 0) + u.get("cache_read_input_tokens", 0)
+for name, post in zip(["stretch-2.jsonl", "stretch-3.jsonl"], posts):
+    first = first_request(base + name)
+    print(name, "post_tokens", post, "first request", first, "gap", post - first)
+PY
+EOF
+bash "$D/p.sh"
+cd /tmp; case "$D" in /tmp/athena-p.??????) rm -r "$D";; esac
+expect: `comment says … : 1` and gaps 2075 and 2141 while the comment says ~300; cured when the comment names the measured offset (count 0) — `evidence directory gone` means /tmp was swept, re-measure on a fresh whole run
+```
+
+measured 2026-10-09 by chain chain-compaction-handover--docs-20261009-165748-35f0, finding L2, LOW
+probe-key: 76f8639a8315ad3934e306bfa88f8208f5594039
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/
+
+## INV-7574 — probe — `compaction-runtime.ts:69` still points at the retired "reply to the seed"; the row that governs it dropped the same sentence
+
+`compaction-runtime.ts:69` still points at the retired "reply to the seed"; the row that governs it dropped the same sentence
+
+```probe
+D=$(mktemp -d /tmp/athena-p.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+grep -n "reply to the seed" server/modules/compaction/compaction-runtime.ts || echo none
+EOF
+bash "$D/p.sh"
+cd /tmp; case "$D" in /tmp/athena-p.??????) rm -r "$D";; esac
+expect: `69: * reply to the seed, so it never starts over.` while it stands; `none` once the comment and MAN-8067 say the same thing about a record with no stored seed
+```
+
+measured 2026-10-09 by chain chain-compaction-handover--docs-20261009-165748-35f0, finding L3, LOW
+probe-key: 933db6d0dd228f1703edca566df2af9f9a029a6d
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/
+
+## INV-7575 — probe — the report says none of the three earlier-shape messages appears verbatim anywhere in the new `84a97950` seed; one appears whole, in block 0
+
+the report says none of the three earlier-shape messages appears verbatim anywhere in the new `84a97950` seed; one appears whole, in block 0
+
+```probe
+D=$(mktemp -d /tmp/athena-p.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+python3 -I - <<'PY'
+import sys, json, os, re
+sys.path.insert(0, "/home/lyphe/.claude/hooks")
+from plan_runner.summarize import render, rows
+P = os.path.expanduser("~/.claude/projects/-home-lyphe--claude/")
+sid = "84a97950-c636-4d29-a72d-a054226a9f15"
+seed = json.load(open("/home/lyphe/.claude/state/summarize/summarize-1791579024310-3393540/result.json"))["seed"]
+old = next(render.row_seed(r) for r in rows.live_rows(P + sid + ".jsonl", sid) if render.row_seed(r) is not None)
+for piece in re.split(r"\n\n(?=### )", old.earlier):
+    lines = piece.splitlines()
+    if lines[0] == "### User" and not lines[1].startswith("<task-notification>"):
+        body = "\n".join(lines[1:]).strip()
+        print(len(body), "chars; whole text in the new seed's blocks:", [i for i, b in enumerate(seed) if body in b] or "none")
+PY
+EOF
+bash "$D/p.sh"
+cd /tmp; case "$D" in /tmp/athena-p.??????) rm -r "$D";; esac
+expect: `198 … none`, `1217 … none`, `151 … [0]`
+```
+
+measured 2026-10-09 by chain chain-compaction-handover--docs-20261009-165748-35f0, finding L4, LOW
+probe-key: e6852f37a3718584776643cb3876c453c74c9664
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/

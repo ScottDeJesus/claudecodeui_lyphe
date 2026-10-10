@@ -4,8 +4,8 @@ import { sessionCompactionsDb, sessionsDb } from '@/modules/database/index.js';
 import type { CompactionFacts, ProviderRuntimeWriter } from '@/shared/types.js';
 
 /**
- * THE SEED TURN's writer: the run's own writer, wrapped so that the swap of the chat onto its new
- * session happens at exactly the moment the new session announces itself, and so that the turn's
+ * THE SEED APPEND's writer: the run's own writer, wrapped so that the swap of the chat onto its new
+ * session happens at exactly the moment the new session announces itself, and so that the run's
  * `complete` is held until the compaction knows whether it took.
  *
  * - At the FIRST `setSessionId(id)` or `session_created` naming an id other than the old one, it calls
@@ -28,7 +28,7 @@ type SeedTarget = ProviderRuntimeWriter & {
   getSessionId?(): string | null;
 };
 
-/** What the procedure reads off the wrapper once the seed turn's run has settled. */
+/** What the procedure reads off the wrapper once the seed append's run has settled. */
 export type SeedWriter = ProviderRuntimeWriter & {
   setCliVersion(version: string): void;
   getSessionId(): string | null;
@@ -75,6 +75,8 @@ export function createSeedWriter(input: {
   oldProviderSessionId: string;
   oldTranscriptPath: string;
   facts: CompactionFacts;
+  /** The seed's blocks as the verb returned them: the swap stores them, so a start-over can append them again. */
+  seed: string[];
 }): SeedWriter {
   const { target } = input;
   let announced: string | null = null;
@@ -98,6 +100,7 @@ export function createSeedWriter(input: {
         oldJsonlPath: input.oldTranscriptPath,
         newProviderSessionId: id,
         facts: input.facts,
+        seed: input.seed,
       });
       swapped = true;
       return true;

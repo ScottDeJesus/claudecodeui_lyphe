@@ -578,7 +578,7 @@ type QuestionOption = {
  * reader and, live, by the compaction run itself; the chat turns it into a `ChatMessage` marked
  * `isCompactionMarker` that `CompactionMarker` draws. Tokens only, never dollars: the house is on a
  * subscription. A field that is `null` is not malformed, it is early: `postTokens` stays `null` until the
- * new session's first turn has reported. Mirrors the server's `ChatCompactionMarker` in
+ * seed append's context count has reported. Mirrors the server's `ChatCompactionMarker` in
  * server/shared/types.ts field for field; keep the two identical.
  */
 export type ChatCompactionMarker = {
