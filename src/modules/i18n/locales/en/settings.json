@@ -445,14 +445,14 @@
       "hand": {
         "line": "Last {{days}}: {{dactyls}} by hand — {{reads}}, {{edits}} · <spend>{{spend}}</spend>",
         "lineWithoutSpend": "Last {{days}}: {{dactyls}} by hand — {{reads}}, {{edits}}",
-        "days_one": "{{count}} day",
-        "days_other": "{{count}} days",
-        "dactyls_one": "{{count}} dactyl",
-        "dactyls_other": "{{count}} dactyls",
-        "reads_one": "{{count}} read",
-        "reads_other": "{{count}} reads",
-        "edits_one": "{{count}} edit",
-        "edits_other": "{{count}} edits"
+        "days_one": "{{count, number}} day",
+        "days_other": "{{count, number}} days",
+        "dactyls_one": "{{count, number}} dactyl",
+        "dactyls_other": "{{count, number}} dactyls",
+        "reads_one": "{{count, number}} read",
+        "reads_other": "{{count, number}} reads",
+        "edits_one": "{{count, number}} edit",
+        "edits_other": "{{count, number}} edits"
       }
     },
     "plannerLanes": {

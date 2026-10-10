@@ -71,19 +71,20 @@ export default function RunnerMainSessionDactylsRow() {
   const waiting = ready === false && why ? why : null;
   const readinessUnread = ready !== true && waiting === null;
 
-  // The week's hand ledger, said once there is something to count. Every count carries its own plural key and
-  // keeps its noun on its line; the spend is the verb's own rendering, so it is data and never a key, and a week
-  // with no token counted ends the line at the edits rather than drawing an empty figure.
+  // The week's hand ledger, said once there is something to count. Every count carries its own plural key, is
+  // digit-grouped for the reader's locale (a busy week runs to four digits) and keeps its noun on its line; the
+  // spend is the verb's own rendering, so it is data and never a key, and a week with no token counted ends the
+  // line at the edits rather than drawing an empty figure.
   const handLine = hand !== null && hand.count > 0
     ? (
       <Trans
         t={t}
         i18nKey={hand.spend ? 'agents.runnerMainSessionDactyls.hand.line' : 'agents.runnerMainSessionDactyls.hand.lineWithoutSpend'}
         values={{
-          days: t('agents.runnerMainSessionDactyls.hand.days', { count: hand.days, defaultValue_one: '{{count}}\u00a0day', defaultValue_other: '{{count}}\u00a0days' }),
-          dactyls: t('agents.runnerMainSessionDactyls.hand.dactyls', { count: hand.count, defaultValue_one: '{{count}}\u00a0dactyl', defaultValue_other: '{{count}}\u00a0dactyls' }),
-          reads: t('agents.runnerMainSessionDactyls.hand.reads', { count: hand.reads, defaultValue_one: '{{count}}\u00a0read', defaultValue_other: '{{count}}\u00a0reads' }),
-          edits: t('agents.runnerMainSessionDactyls.hand.edits', { count: hand.edits, defaultValue_one: '{{count}}\u00a0edit', defaultValue_other: '{{count}}\u00a0edits' }),
+          days: t('agents.runnerMainSessionDactyls.hand.days', { count: hand.days, defaultValue_one: '{{count, number}}\u00a0day', defaultValue_other: '{{count, number}}\u00a0days' }),
+          dactyls: t('agents.runnerMainSessionDactyls.hand.dactyls', { count: hand.count, defaultValue_one: '{{count, number}}\u00a0dactyl', defaultValue_other: '{{count, number}}\u00a0dactyls' }),
+          reads: t('agents.runnerMainSessionDactyls.hand.reads', { count: hand.reads, defaultValue_one: '{{count, number}}\u00a0read', defaultValue_other: '{{count, number}}\u00a0reads' }),
+          edits: t('agents.runnerMainSessionDactyls.hand.edits', { count: hand.edits, defaultValue_one: '{{count, number}}\u00a0edit', defaultValue_other: '{{count, number}}\u00a0edits' }),
           spend: hand.spend,
         }}
         // The spend is one figure: broken at a space, `212.4k` and `in` read as two.

@@ -13619,7 +13619,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/settings/dactyls-
 - Re-ask on mount, `focus` and `visibilitychange` (skipped while `writing`). No timer, no poll. why: a Claude Code update lands on a shell while Settings is closed.
 
 ## The row
-- `RunnerCompactionRow.tsx` (Settings → Agents → Claude → Account), drawn by `RunnerModelContent.tsx` directly under `RunnerDactylsRow`. Wears lucide `Shrink` (the composer's Compact button glyph). Handle `data-runner-compaction="unknown|on|off"`; the three cases list carries `data-compaction-cases`.
+- `RunnerCompactionRow.tsx` (Settings → Agents → Claude → Account), drawn by `RunnerModelContent.tsx` directly under the DeepSeek Flash row, the card's first. Wears lucide `Shrink` (the composer's Compact button glyph). Handle `data-runner-compaction="unknown|on|off"`; the three cases list carries `data-compaction-cases`.
 - Strings under `agents.runnerCompaction` in `src/modules/i18n/locales/en/settings.json`: `label` (Custom compaction), `description` (model and effort interpolated), `descriptionBare` (when `model` or `effort` is `null`), `whenPressed`, `atTurnEnd`, `whenIdle`, `after`, `waiting`, `readinessUnread`, `unreadable`.
 - The three cases: Compact / `/compact` pressed; a turn's end past half the context window; 54 idle minutes holding 200K tokens or more.
 - `WholeWords.tsx` keeps the `why` sentence and a model id unbroken.
@@ -13665,3 +13665,50 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/settings/custom-c
 **To read the cure next time.** A Playwright timeout whose message ends in `PAGE WHEN THE WAIT GAVE UP:` came from a script that loaded `console.mjs`; a script that launched its own browser (an Athena `lib.mjs`, `/opt/eis-app`'s `newAuthedContext`) has no block and may call `explainTimeouts(page, () => errors)` itself. A phone leg that waits for the Settings gear and still times out is a page that drew neither the gear nor the hamburger — the block says what it drew.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/console.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/layout-nav.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/mountReact.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/settings-rows-walk.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/timeout-state.mjs
+
+## MAN-8149 — Dactyls for the main session — the Settings row: composition, handles, strings, the spend line, the scaffold
+
+`RunnerMainSessionDactylsRow.tsx` (Settings → Agents → Claude → Account) is the operator's view of the MAIN-session Dactyls switch, `~/.claude/state/main_session_dactyls.flag` (the flag and the gate: MAN-8148). Host-wide: every main session on the box, a chat here or a terminal. Not the Dactyls switch (MAN-8059): that one takes a builder's hands, is Hephaestus's alone, and is drawn in Edit Agent Chains.
+
+## Status
+- 2026-10-10: composed over a fake and NOT mounted. `RunnerModelContent.tsx` holds `{/* FILL: main-session-dactyls-row — … */}` directly under `<RunnerCompactionRow />`; the live card draws no new row.
+- Three trailing `// FILL:` markers in the row replace its wires: `state` (the read, `useMainSessionDactylsFake()`), `onToggle`, `onRetry`.
+- `main-session-dactyls-fake.ts` stands in for the real hook until phase `row-fill`, then is deleted. Exports `MAIN_SESSION_DACTYLS_FAKE_STATES` (nine named states), `MainSessionDactylsFakeContext`, `useMainSessionDactylsFake`.
+- The row never names its state's type: the hook keeps its own.
+
+## Composition
+`RunnerCompactionRow`'s grammar (MAN-8061 §"The row"); wears lucide `Pointer` (a dactyl is a finger); handle `data-runner-main-session-dactyls="unknown|on|off"`.
+
+| state | drawn |
+|---|---|
+| `enabled === null`, not `unreadable` | `Loading...`, Try again in the control slot |
+| `enabled === null`, `unreadable` | the `unreadable` sentence, Try again in the control slot |
+| `enabled` known | `SettingsToggle` (never `disabled` mid-write), then three paragraphs: lead (`description`, or `descriptionBare` when `model` or `effort` is `null`), `hands`, `after` |
+| `ready === false` and `why` non-empty | plus warn-tone `data-main-session-dactyls-waiting`: `Waiting: <why>. Sessions keep their own hands until it can.` — in either position; `<why>` through `WholeWords` |
+| `ready !== true` and no waiting line | plus plain `data-main-session-dactyls-unread` line, no tone |
+| `hand !== null` and `hand.count > 0` | plus `data-main-session-dactyls-hand` line in body ink, either position: a hand dactyl needs no switch |
+
+- Handle names are `data-main-session-dactyls-*`: `data-dactyls-*` is the Edit Agent Chains field's (MAN-8059).
+- A model id never breaks at a hyphen (`whitespace-nowrap` span in the lead); the waiting reason's ids through `WholeWords`.
+- `WholeWords` (`src/shared/ui/WholeWords.tsx`, kit export) has three consumers, each for its Waiting line's `<why>`: `RunnerCompactionRow`, `RunnerMainSessionDactylsRow`, `AgentLaunchDactylField`.
+
+## Strings
+`agents.runnerMainSessionDactyls` in `src/modules/i18n/locales/en/settings.json`, directly after `runnerCompaction`: `label`, `description`, `descriptionBare`, `hands`, `after`, `waiting`, `readinessUnread`, `unreadable`, `hand` (`line`, `lineWithoutSpend`, and `days` / `dactyls` / `reads` / `edits`, each `_one` + `_other`).
+
+## The spend line
+- `hand` = `place.hand_fold(7)`'s `{days, count, reads, edits, spend}`: dactyls launched by hand (under no plan's launch) over `days`; `spend` is the verb's own token rendering (`212.4k in · 9.8k out`), `""` when no token was counted. Tokens, never dollars.
+- `hand.spend` non-empty → key `hand.line` (`… by hand — {{reads}}, {{edits}} · <spend>{{spend}}</spend>`); empty → `hand.lineWithoutSpend` (ends at the edits).
+- Every count is its own plural key and is formatted `{{count, number}}` (digit-grouped: `1,234 dactyls`) with a no-break space (` `) before its noun. Keep `, number` in both the locale string and the row's `defaultValue_*` fallbacks.
+- `spend` is data, never a key; kept on one line (`<spend>` is `whitespace-nowrap`).
+
+## Rules
+- A `null` detail is "could not ask": never off, never `ready: false`. A switch on while not ready is armed, not broken.
+- The `buttons.retry` fallback text in the row is `'Try again'` (the card's other rows' fallback); the key shows `Retry`. A sweep of the card's call sites waits until `RunnerModelContent.tsx` may change beyond its FILL line.
+
+## Fake states (`MAIN_SESSION_DACTYLS_FAKE_STATES`)
+`asking`, `unreadable`, `offReady`, `onReady`, `offWaiting`, `onWaiting`, `statusUnread` (on, details all `null`), `onReadySpend`, `offReadyNoTokens` (off, `hand` with `spend: ""`, 3 dactyls: 1 read, 2 edits). Model `claude-haiku-5-5`, effort `xhigh`.
+
+## Measured
+- 2026-10-10: 440 checks, 0 failures over the nine states at 1440×900 and 390×844, light and dark, on the live client (:5183), with the row mounted under the real Custom compaction row; 0 preference writes. Contrast ≥ 5.06:1 (light description), 17.72:1 spend line.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/agents-settings/sections/content/main-session-dactyls-fake.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/agents-settings/sections/content/RunnerMainSessionDactylsRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/agents-settings/sections/content/RunnerModelContent.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/WholeWords.tsx
