@@ -433,6 +433,28 @@
       "readinessUnread": "Whether this Claude Code can serve the summarizer could not be read.",
       "unreadable": "The switch could not be read from the server, so its position is unknown — this is not the same as off. It is retried whenever this page regains focus."
     },
+    "runnerMainSessionDactyls": {
+      "label": "Dactyls for the main session",
+      "description": "On: the main session — a chat here or a terminal session — changes a repository file only through a dactyl, a <model>{{model}}</model> child at {{effort}} that sees only its brief and the files it is given.",
+      "descriptionBare": "On: the main session — a chat here or a terminal session — changes a repository file only through a dactyl, a child that sees only its brief and the files it is given.",
+      "hands": "Its own Edit and Write into repository files are refused, and so are its shell writes there; /tmp, git-ignored files and /remember are untouched. It may also hand a file to a dactyl to read and answer about, so the file’s body never enters its context. A /tweak lands through a dactyl, and rail 2 logs it on the chain the file belongs to.",
+      "after": "A session that cannot reach a dactyl keeps its own hands. A flip reaches each session at its next message. The dactyl’s words are edited in Edit Agent Chains.",
+      "waiting": "Waiting: <why>{{why}}</why>. Sessions keep their own hands until it can.",
+      "readinessUnread": "Whether this Claude Code can serve a dactyl could not be read.",
+      "unreadable": "The switch could not be read from the server, so its position is unknown — this is not the same as off. It is retried whenever this page regains focus.",
+      "hand": {
+        "line": "Last {{days}}: {{dactyls}} by hand — {{reads}}, {{edits}} · <spend>{{spend}}</spend>",
+        "lineWithoutSpend": "Last {{days}}: {{dactyls}} by hand — {{reads}}, {{edits}}",
+        "days_one": "{{count}} day",
+        "days_other": "{{count}} days",
+        "dactyls_one": "{{count}} dactyl",
+        "dactyls_other": "{{count}} dactyls",
+        "reads_one": "{{count}} read",
+        "reads_other": "{{count}} reads",
+        "edits_one": "{{count}} edit",
+        "edits_other": "{{count}} edits"
+      }
+    },
     "plannerLanes": {
       "label": "Planner lanes",
       "description": "How many planners (designs, cuts, judgments) run at once — {{count}} at a time. Lowering it stops no planner already out; the lane takes no new one until it has room. Takes effect at once.",

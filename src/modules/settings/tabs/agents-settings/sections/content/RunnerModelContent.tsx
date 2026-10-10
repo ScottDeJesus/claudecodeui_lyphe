@@ -101,6 +101,7 @@ export default function RunnerModelContent() {
         )}
       </SettingRow>
       <RunnerCompactionRow />
+      {/* FILL: main-session-dactyls-row — <RunnerMainSessionDactylsRow />, directly under Custom compaction */}
 
       {/* THE WIP DEFAULTS — what every epic starts from: two steppers, features in progress and tasks
           per feature, on the one shared ladder. Its own file and its own hook, like the rows around it. */}
