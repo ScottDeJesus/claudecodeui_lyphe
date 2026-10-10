@@ -182,7 +182,6 @@
     "iconDefault": "Predefinita",
     "iconOption": "Icona {{name}}",
     "unread": "Terminata, non ancora letta",
-    "dragHandle": "Trascina per riordinare",
     "subagentsRunning": "Subagenti in esecuzione",
     "asleep": "In pausa. Il tuo prossimo messaggio la risveglia.",
     "newFolder": "Nuova cartella",

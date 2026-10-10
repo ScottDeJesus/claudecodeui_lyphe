@@ -51,9 +51,9 @@ const DOT_INK: Record<SimpleChatMark, string> = {
  * height rule, its icon box, its 8px discs and their inks, its menu and its drop line.
  *
  * THE NAME IS THE FOLD, AND IT IS NOT A `<button>`. The carry behind this list turns every press
- * inside a `button` away, so a mouse has to be able to pick the folder up by its name exactly as it
- * picks a chat up by its title: the toggle is a `role="button"` span with `tabIndex`, answering a
- * press, Enter and Space, and on a touch the carry waits for the glyph's `data-drag-handle`.
+ * inside a `button` away, so the folder has to be picked up by its name exactly as a chat is picked
+ * up by its title — a mouse by a drag, a finger by a hold: the toggle is a `role="button"` span with
+ * `tabIndex`, answering a press, Enter and Space.
  *
  * ONE DOT, NEVER A SPINNER AND NEVER TWO: the folder's most pressing chat, in the same disc the
  * chat row would wear for it — a question in the warning ink and the row's pulse, a reply not read
@@ -140,11 +140,7 @@ export default function SidebarSimpleFolderRow({
         // `data-dragging` below.
       )}
     >
-      <span
-        data-drag-handle
-        title={t('simpleList.dragHandle')}
-        className="flex h-7 w-6 flex-shrink-0 cursor-grab touch-none items-center justify-center text-muted-foreground"
-      >
+      <span className="flex h-7 w-6 flex-shrink-0 items-center justify-center text-muted-foreground">
         <Folder className="h-4 w-4" aria-hidden="true" />
       </span>
 

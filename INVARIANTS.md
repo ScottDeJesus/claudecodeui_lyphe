@@ -9149,3 +9149,66 @@ measured 2026-10-09 by chain chain-project-name-hints-20261009-205007-0d30, find
 probe-key: ad28409cfb495d8ccfcadaa15a1b52ee41166f85
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/projectNameHints.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/project-name-hints.mjs
+
+## INV-7586 — probe — MEDIUM — a lifted row cannot reach any row beyond the pane: the pane is frozen and nothing scrolls it
+
+MEDIUM — a lifted row cannot reach any row beyond the pane: the pane is frozen and nothing scrolls it
+
+```probe
+bash /home/lyphe/.claude/state/pipeline-reviews/simple-list-hold-to-drag/athena-probes/run.sh edge.mjs
+echo "[probe exit $?]"
+expect: the second line reads `scrollTop = 0` while the defect stands (the pane never moves under a parked, lifted finger); `scrollTop` above 0 once a carry scrolls the pane at its edge
+```
+
+measured 2026-10-10 by chain chain-simple-list-hold-to-drag-20261009-233125-3a36, finding M1, MEDIUM
+probe-key: ab3f220eaa510899af539351207eb41ffafa5884
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/hooks/useCarryEdgeScroll.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/hooks/useSimpleChatDrag.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/SidebarSimpleListRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/sortable/touchLift.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/touch-input.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/simple-list-hold-to-drag.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/simple-list-hold-to-drag-scratch.sh, /home/lyphe/.claude/claudecodeui_lyphe/.verify/sortable-hold-equivalence.mjs
+
+## INV-7587 — probe — MEDIUM — a hold on a status icon inside a `Tooltip` opens the tooltip AND lifts the row
+
+MEDIUM — a hold on a status icon inside a `Tooltip` opens the tooltip AND lifts the row
+
+```probe
+bash /home/lyphe/.claude/state/pipeline-reviews/simple-list-hold-to-drag/athena-probes/run.sh tooltip.mjs
+echo "[probe exit $?]"
+expect: `at 700 ms lifted=["run"] tooltip=true` while the defect stands; `lifted=[]` once a press on a status icon is turned away (the tooltip may still open)
+```
+
+measured 2026-10-10 by chain chain-simple-list-hold-to-drag-20261009-233125-3a36, finding M2, MEDIUM
+probe-key: adb6fcab46efd5858d0eac70b40475b0e12c99eb
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/hooks/useCarryEdgeScroll.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/hooks/useSimpleChatDrag.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/SidebarSimpleListRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/sortable/touchLift.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/touch-input.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/simple-list-hold-to-drag.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/simple-list-hold-to-drag-scratch.sh, /home/lyphe/.claude/claudecodeui_lyphe/.verify/sortable-hold-equivalence.mjs
+
+## INV-7588 — probe — LOW — a press on the blank part of the row's open action menu lifts the row behind it
+
+LOW — a press on the blank part of the row's open action menu lifts the row behind it
+
+```probe
+bash /home/lyphe/.claude/state/pipeline-reviews/simple-list-hold-to-drag/athena-probes/run.sh menu.mjs
+echo "[probe exit $?]"
+expect: `lifted=["<session id>"] body="vv-dragging vv-drag-sort"` while the defect stands; `lifted=[]` once a press from a portal is refused
+```
+
+measured 2026-10-10 by chain chain-simple-list-hold-to-drag-20261009-233125-3a36, finding L1, LOW
+probe-key: a3dcd5ff76dbd62c5cefe14a38e6b802bff396fb
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/hooks/useCarryEdgeScroll.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/hooks/useSimpleChatDrag.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/SidebarSimpleListRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/sortable/touchLift.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/touch-input.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/simple-list-hold-to-drag.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/simple-list-hold-to-drag-scratch.sh, /home/lyphe/.claude/claudecodeui_lyphe/.verify/sortable-hold-equivalence.mjs
+
+## INV-7589 — probe — LOW — four statements in the docstore rows the walk rewrote or left are wrong against the code
+
+LOW — four statements in the docstore rows the walk rewrote or left are wrong against the code
+
+```probe
+~/.claude/scripts/docstore get MAN-8139 --text | grep -c 'captured on the row\|press\.item'
+~/.claude/scripts/docstore get MAN-7523 --text | grep -c 'dragProps(ref)'
+~/.claude/scripts/docstore get MAN-8136 --text | grep -c 'touchLift'
+grep -c 'captureOnStart: (handle) => listRef.current' /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/hooks/useSimpleChatDrag.ts
+echo "[probe exit $?]"
+expect: `2`, `1`, `0`, `1` while the defect stands (the code captures on the list; two rows say otherwise or name the old call form; the file table has no `touchLift.ts`); `0`, `0`, a positive number, `1` once healed
+```
+
+measured 2026-10-10 by chain chain-simple-list-hold-to-drag-20261009-233125-3a36, finding L2, LOW
+probe-key: 9e9f542e4ab98659d516ee0b161f35421d17a97a
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/hooks/useCarryEdgeScroll.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/hooks/useSimpleChatDrag.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/SidebarSimpleListRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/sortable/touchLift.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/touch-input.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/simple-list-hold-to-drag.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/simple-list-hold-to-drag-scratch.sh, /home/lyphe/.claude/claudecodeui_lyphe/.verify/sortable-hold-equivalence.mjs

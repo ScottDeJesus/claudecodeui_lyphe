@@ -44,7 +44,7 @@ type SidebarSimpleListItemsProps = {
   /** Where the pointer says the carried row would land, or null. */
   dropTarget: SimpleListDropTarget | null;
   /** The carry's pointer handlers for one row: every chat row and every folder header spreads these. */
-  dragProps: (item: SimpleListItemRef) => Pick<HTMLAttributes<HTMLElement>, 'onPointerDown' | 'onClickCapture' | 'onDragStart'>;
+  dragProps: Pick<HTMLAttributes<HTMLElement>, 'onPointerDown' | 'onClickCapture' | 'onDragStart'>;
   /** A chat row was pressed: open that chat. */
   onSelectChat: (chat: RecentConversationListItem) => void;
   /** A chat row's Archive: put the chat away, keeping its transcript. */
@@ -198,7 +198,7 @@ export default function SidebarSimpleListItems({
       // FILL: onMoveToFolder
       onMoveToFolder={onMoveToFolder === null ? null : () => onMoveToFolder(chat)}
       // FILL: dragProps
-      dragProps={dragProps({ kind: 'chat', id: chat.sessionId })}
+      dragProps={dragProps}
       isDragging={dragging !== null && dragging.kind === 'chat' && dragging.id === chat.sessionId}
       dropEdge={chatDropEdge(chat.sessionId, dragging, dropTarget)}
       t={t}
@@ -264,7 +264,7 @@ export default function SidebarSimpleListItems({
                 // FILL: onDeleteFolder
                 onDelete={() => onDeleteFolder(folder)}
                 // FILL: dragProps
-                dragProps={dragProps({ kind: 'folder', id })}
+                dragProps={dragProps}
                 isDragging={isCarried}
                 dropEdge={folderDropEdge(id, dragging, dropTarget)}
                 isDropInto={folderDropInto(id, dragging, dropTarget)}

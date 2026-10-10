@@ -478,3 +478,14 @@ export const ZOOM_DOUBLE_TAP_RADIUS_PX = 32;
  * when they open.
  */
 export const FOCUSABLE_SELECTOR = 'a[href], button:not([disabled]), input:not([disabled]), textarea:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
+// ---------------------------
+
+//----------------- TOUCH LIFT ------------
+
+/**
+ * How long a finger holds still on a free spot, in ms, before it lifts what is under it. Used by the kit's
+ * `useSortable` (the runner, roadmap and dispatcher lists) and by the sidebar's `useSimpleChatDrag` (the chat
+ * list), so a card and a chat row lift on the same hold.
+ */
+export const TOUCH_HOLD_MS = 400;

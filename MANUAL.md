@@ -1535,7 +1535,7 @@ Draws the tree as a fragment inside `SidebarSimpleList`'s `simple-chat-list-rows
 | `liveHostSessionIds` | `ReadonlySet<string> \| null` — the chats whose CLI has a live session host, from `useSessionHostLiveSet` (pushed on change, never polled); `null` until the server's first snapshot |
 | `dragging` | `SimpleListItemRef \| null` |
 | `dropTarget` | `SimpleListDropTarget \| null` |
-| `dragProps(ref)` | the carry's pointer props for one row; chat rows and folder headers both spread it; `useSimpleChatDrag` returns it (MAN-7525) |
+| `dragProps` | one object of the carry's pointer props, the same for every row; chat rows and folder headers both spread it; `useSimpleChatDrag` returns it and `SidebarSimpleListItems` takes it as given (MAN-7525) |
 | `onSelectChat`, `onArchiveChat`, `onDeleteChat`, `onChooseIcon` | `(chat) => void` |
 | `onRenameChat(sessionId, title)` | |
 | `onMoveToFolder` | `((chat) => void) \| null`; `null` = no "Move to folder…" entry on any row |
@@ -1572,7 +1572,7 @@ The header. Props: `folder`, `dot`, `holdsSelected`, `isFresh`, `onFreshShown`, 
 | --- | --- |
 | root | `data-testid="simple-chat-folder"`, `data-folder-id`, `data-collapsed` (`'true' \| 'false'`), `data-dragging`; spreads `dragProps` |
 | height | compact sidebar: `min-h-11`; otherwise `py-2` (the chat row's rule) |
-| glyph | `Folder` icon in a `data-drag-handle` span: the touch carry waits for it |
+| glyph | the `Folder` icon in a bare span; the header is carried by a hold anywhere that is not a control, like a chat row |
 | toggle | ONE element, `role="button"` span, `tabIndex={0}`, `data-testid="simple-chat-folder-toggle"`, `aria-expanded`; press, Enter and Space call `onToggle`; `title` = `runner.collapse` / `runner.expand`, ns `common`; `FoldChevron` + name |
 | rename | input `simple-chat-folder-rename-input`: Enter saves, Escape cancels; blank or unchanged name calls nothing |
 | dot | drawn only when `dot !== null`: `simple-chat-folder-dot`, `data-mark`, `role="img"`, label and title = the mark's word; `awaitingInput` adds `vv-pulse` |
@@ -1582,7 +1582,7 @@ The header. Props: `folder`, `dot`, `holdsSelected`, `isFresh`, `onFreshShown`, 
 | line | `dropEdge='before'`: `h-0.5` accent line on the top edge |
 | fade | none of its own; `data-dragging` only says it is the carried header |
 
-- The name is not a `<button>`: the carry turns away any press inside a `button`, so a mouse picks the folder up by its name.
+- The name is not a `<button>`: the carry turns away any press inside a `button`, so the name carries the folder like a chat's title does (a mouse by a drag, a finger by a hold).
 - Fresh effect (`isFresh`): opens the name for typing, selects it whole on first focus, `scrollIntoView({ block: 'nearest' })`, calls `onFreshShown()`; the list clears its fresh id there, so it runs once per fresh turn.
 
 | Mark | Word key (`simpleList.`) | Disc ink |
@@ -1702,7 +1702,8 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/hooks/useSim
 ## Wiring
 - 2026-09-30: live. `SidebarSimpleList.tsx` calls `useSimpleChatDrag({ items, onMove: move })`, `move` being `useSimpleChatFolders`' (MAN-7528); `.verify/probe-simple-folder-composer.mjs` drives the carry on the mounted tree, `.verify/probe-simple-drag.mjs` at the hook level.
 - Why pointer events, not the browser's drag-and-drop: DnD never fires from a touch screen and this list is used on a phone.
-- Size: 300 LOC against the 300 default. The next addition wants an extraction, not an append.
+- Size: 310 LOC against the 300 default (`wc -l`, 2026-10-10). The next addition wants an extraction, not an append: `chatTargetAt` / `folderTargetAt` (about 110 lines) are the cohesive piece to move.
+- 2026-10-09: the press-to-carry runs on the kit's `usePointerDrag` (kind `sort`), the mechanism the sortable lists lift on. A finger carries after holding still for `TOUCH_HOLD_MS` (400 ms, `src/shared/constants.ts`, shared with `useSortable`) anywhere on a row or header that is not a control; one that moves first is scrolling the list and lifts nothing. A mouse carries after 5 px, as before. Operator: "Can we fix drag and drop on mobile to be hold then drag on the chat please".
 
 ## Signature
 `useSimpleChatDrag({ items, onMove })`
@@ -1714,25 +1715,32 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/hooks/useSim
 
 | Out | Is |
 | --- | --- |
-| `dragging` | `SimpleListItemRef \| null`: the carried row, set once the press passes the threshold |
+| `dragging` | `SimpleListItemRef \| null`: the carried row, set once the carry lifts (a mouse past the threshold, a finger after the hold) |
 | `dropTarget` | `SimpleListDropTarget \| null`: where the pointer says it would land; re-rendered only when the target changes |
-| `dragProps(ref)` | `Pick<HTMLAttributes<HTMLElement>, 'onPointerDown' \| 'onClickCapture' \| 'onDragStart'>`; spread on every chat row and folder header (assigns to `SidebarSimpleListItems`' `dragProps`) |
+| `dragProps` | one `Pick<HTMLAttributes<HTMLElement>, 'onPointerDown' \| 'onClickCapture' \| 'onDragStart'>` object, the same for every row; spread on every chat row and folder header (assigns to `SidebarSimpleListItems`' `dragProps`). The row a press lands on is read off the row's own `data-session-id` / `data-folder-id` |
+| `attachList` | ref callback for the list's root (`SidebarSimpleList` puts it on `simple-chat-list`): the kit's `useHoldPane`, which cancels a `touchmove` while a row is lifted so the pane does not scroll under the finger. It is set for the root's whole life: `touch-action` cannot change under a touch already running |
 
-## Gesture
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/hooks/useSimpleChatDrag.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/sortable/touchLift.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-simple-drag.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/simple-list-hold-to-drag-live.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/simple-list-hold-to-drag.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/simple-list-hold-to-drag-scratch.sh
+
+## MAN-8139 — The simple list's carry — `useSimpleChatDrag` and the pointer's reading of the — Gesture
+section: The simple list's carry — `useSimpleChatDrag` and the pointer's reading of the drawn list/001 Gesture
+
 | Rule | Is |
 | --- | --- |
-| threshold | `DRAG_THRESHOLD_PX = 5`: less travel is a click |
-| press guards | primary button only; a press inside `button, input, [data-no-drag]` stays that control's; a touch starts only inside `[data-drag-handle]` |
-| one press | a press while another is armed is ignored |
-| carry start | the text selection is cleared (`removeAllRanges`) |
-| listeners | four on `window` per press (`pointermove`, `pointerup`, `pointercancel`, `keydown`), removed at press end and on unmount |
-| release | `pointerup` of the armed pointer id ends the press and commits |
-| abandon | `Escape` or `pointercancel` ends the press and commits nothing |
+| threshold | mouse and pen: `DRAG_THRESHOLD_PX = 5`, less travel is a click |
+| hold | touch: `TOUCH_HOLD_MS` (400 ms) held still lifts the row; a finger that drifts past the kit's slop first is scrolling, and the gesture lets go silently (no click is owed). The kit's `vibrate(8)` ticks the lift, and the browser's long-press reactions (text selection, context menu) are cancelled while a hold is pending or lifted |
+| press guards | primary button only (the kit); in `accept`: a press that landed outside the row's own DOM is refused (React bubbles a press from a portal — the row's open action menu — through the tree to the row), and so is a press inside `button, input, [data-no-drag]`, which stays that control's. The three status marks in the chat row (`simple-chat-awaiting-input`, `-running`, `-subagents-running`) carry `data-no-drag`: each sits in a `Tooltip` that opens on a 350 ms touch hold, and the 400 ms carry must not lift the row under it |
+| one press | a press while another gesture runs is ignored by the kit, so a second finger never changes which row is lifted |
+| carry start | the text selection is cleared (`removeAllRanges`); `body` wears `vv-dragging vv-drag-sort` for the carry, which also keeps iframes from swallowing it |
+| capture | the pointer is captured on the LIST's root at the lift (`captureOnStart`; the root arrives through `attachList`), never at the press, so a tap still reaches the row's link and fold toggle, and never on the row, because `:hover` follows the capture and a captured row would keep its hover wash for the whole carry |
+| edge scroll | `useCarryEdgeScroll` (`hooks/useCarryEdgeScroll.ts`): from the lift, every animation frame while the pointer rests in the pane's top or bottom 56 px zone, the pane (`scrollerOf` the list root) scrolls a step toward that edge and the target is read again under the still pointer. Step and zone are the kit's own `edgeStep`, `edgeHoldAt` (`shared/ui/sortable/motion.ts`), the ones `useSortable` runs on; a carry that began in a zone does not run toward it until the pointer has left it. A page that scrolls as a whole has no pane to run. Ended at release, at Escape and on unmount |
+| release | `pointerup` ends the gesture and commits |
+| abandon | `Escape` (a keydown listener present while a row is carried) clears the marks and commits nothing; `pointercancel` after a lift commits nothing |
 | click | a carry's release is followed by a swallowed click (`onClickCapture`: `preventDefault` + `stopPropagation`); a keyboard click (`detail === 0`) passes; the next `pointerdown` disarms the swallow before its guards run |
 | native drag | `onDragStart` is `preventDefault`ed |
 
 ## Commit
-- On release after a carry: `positionForDrop(itemsRef.current, press.item, target)` (MAN-7520); `onMove` fires only for a non-null answer. A drop that changes nothing prints nothing.
+- On release after a carry: `positionForDrop(itemsRef.current, carried, target)` (MAN-7520); `onMove` fires only for a non-null answer. A drop that changes nothing prints nothing.
 - No target is never a move.
 
 ## DOM contract (selectors the hook reads)
@@ -1745,7 +1753,11 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/hooks/useSim
 
 - The target comes from the boxes the list draws, never from the tree: drawn order is what the reader sees.
 
-## Target — carrying a chat (`chatTargetAt`)
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/hooks/useCarryEdgeScroll.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/hooks/useSimpleChatDrag.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-simple-drag.mjs
+
+## MAN-8140 — The simple list's carry — `useSimpleChatDrag` and the pointer's reading of the — Target — carrying a chat (`chatTargetAt`)
+section: The simple list's carry — `useSimpleChatDrag` and the pointer's reading of the drawn list/002 Target — carrying a chat (`chatTargetAt`)
+
 Scan: every row and header under the root, in document order, carried row included. `over` = the last whose top edge is at or above the pointer (the gap between two rows belongs to the row above). `drawnBelow` = some row begins below the pointer.
 
 | Pointer | `dropTarget` |
@@ -1766,8 +1778,12 @@ Scan: every row and header under the root, in document order, carried row includ
 - `{ at: 'row', item: <block's ref>, edge }`: `before` above the block's middle, else `after`.
 - Never `end`, never `into`: a folder lives at the top level, and past the last block the last block with `after` maps to the same place as `end`.
 
-## Gate — `.verify/probe-simple-drag.mjs`
-- `node .verify/probe-simple-drag.mjs` (dev server `127.0.0.1:5183`, signed in through `openConsole`, 1440×900). Gitignored; not a `phase-*.mjs`, so `all.mjs` does not run it. Zero model turns; creates nothing on the server.
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/hooks/useSimpleChatDrag.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-simple-drag.mjs
+
+## MAN-8141 — The simple list's carry — `useSimpleChatDrag` and the pointer's reading of the — Gate — `.verify/probe-simple-drag.mjs`
+section: The simple list's carry — `useSimpleChatDrag` and the pointer's reading of the drawn list/003 Gate — `.verify/probe-simple-drag.mjs`
+
+- `node .verify/probe-simple-drag.mjs` (dev server `127.0.0.1:5183`, signed in through `openConsole`, 1440×900). Gitignored; not a `phase-*.mjs`, so `all.mjs` does not run it. Zero model turns; creates nothing on the server. `CARRY_PROBE_APP_URL=<scratch client>` points it, `athena-carry-endzone.mjs`, `athena-carry-ownplace.mjs` and `probe-simple-folders.mjs` at a scratch client instead (`mountReact.mjs` reads React's URLs off the page's own entry module), and then no preference of the live account is read, parked or restored.
 - Fixture: `lib/mountReact.mjs` mounts a component that calls the hook over a literal tree (loose `a1`, `a2`; open `f1[c1, c2]`; open `f2[e1]`), drawn as plain elements with the test ids and data attributes above, `dragProps` spread on every row and header. Drags are real (`page.mouse.down` / `move` / `up`). The hook's own `dragging` / `dropTarget` are rendered into the host and read while the button is still down.
 - Account: reads `simpleChatList` through the API BEFORE `openConsole` (its park PATCHes `false`), restores it AFTER `browser.close()`.
 - Artifact: `.verify/artifacts/simple-drag.json`.
@@ -1786,9 +1802,21 @@ Scan: every row and header under the root, in document order, carried row includ
 
 - Each drag also checks `dragging` and `dropTarget` are `null` after release.
 - Ends `SIMPLE-DRAG PASS`, else `SIMPLE-DRAG FAIL` (exit 1); a signed-in console error also fails.
-- 2026-09-30: 9 of 9 PASS, exit 0.
+- 2026-09-30: 9 of 9 PASS, exit 0. 2026-10-09, on the `usePointerDrag` engine and a scratch client: 9 of 9 PASS.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/hooks/useSimpleChatDrag.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-simple-drag.mjs
+
+## MAN-8142 — The simple list's carry — `useSimpleChatDrag` and the pointer's reading of the — Gate — the hold on a phone, `.verify/simple-list-hold-to-drag.mjs`
+section: The simple list's carry — `useSimpleChatDrag` and the pointer's reading of the drawn list/004 Gate — the hold on a phone, `.verify/simple-list-hold-to-drag.mjs`
+
+- `SUNSET_SLOT=7 bash .verify/simple-list-hold-to-drag-scratch.sh` stands up a SCRATCH API on a copy of the database, seeds 14 top-level rows (12 loose chats, 2 folders holding 3 chats), serves the client as git HEAD has it (`before`) and as it is (`after`), runs the proof against each and tears everything down. The proof refuses the live app (:5183, :5184, :3011) and a list that is not the seeded one, and puts the list back after every leg. Artifacts: `.verify/artifacts/simple-list-hold-to-drag/` (`before.json`, `after.json`, a rest shot and a mid-carry shot per desktop/mobile × dark/light).
+- Phone (390×844, real touch): T1 hold a chat's title past 400 ms, slide it below another chat, let go — the chat lands there and the SERVER's order says so; T2 the same from a folder's header; T3 a quick vertical swipe from a row's title scrolls the list and lifts nothing; T4 the same from a row's icon (before the change this lifted the row and refused to scroll); T5 hold a row still and let go — nothing moves and the chat stays shut (before: it opened); T6 tap opens the chat. Desktop (a real mouse): M1 a chat carried, M2 a folder carried, M3 a click opens the chat — the same server orders before and after.
+- `.verify/lib/touch-input.mjs`: `openFinger(page)` → `{ down(point), slide(point, { stepPx, stepDelayMs }), up(), tap(point), close() }`, one finger over CDP `Input.dispatchTouchEvent`; the context needs `hasTouch: true`. why: `page.touchscreen` only taps, and a `TouchEvent` dispatched inside the page skips the browser's gesture recogniser, so neither shows a scroll begin or be refused.
+- A `before` run only records (28 of 73 checks fail, by design); an `after` run exits 1 on any failure. 2026-10-09: after 75 of 75 PASS. The one console line it allows is the 404 the seeded chats' own `token-usage` returns when opened (they have no transcript).
+- Not proven: iOS Safari. The link-preview callout on a long-press of the chat `<a>` is not covered by the `contextmenu` cancel; `-webkit-touch-callout` is not set. A real phone that shows the callout is the follow-up.
+- `.verify/simple-list-hold-to-drag-live.mjs` is the read-only look at the live list (no press, no touch, nothing written): it reads that the drawn list carries no `data-drag-handle` and no `.touch-none`, that rows exist, and that the page logs no error.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/hooks/useSimpleChatDrag.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/touch-input.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/simple-list-hold-to-drag-live.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/simple-list-hold-to-drag.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/simple-list-hold-to-drag-scratch.sh
 
 ## MAN-7528 — The simple list's folder verbs — `useSimpleChatFolders`, the composer `SidebarSimpleList` and its walk
 

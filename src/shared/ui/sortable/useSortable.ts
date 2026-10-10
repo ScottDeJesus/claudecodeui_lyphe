@@ -1,17 +1,16 @@
 import { type PointerEvent as ReactPointerEvent, useCallback, useEffect, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
 
+import { TOUCH_HOLD_MS } from '@/shared/constants';
 import { isFreePress, SORTABLE_ITEM_ATTRIBUTE } from '@/shared/ui/sortable/freePress';
 import { reconcile, sameOrder } from '@/shared/ui/sortable/carryState';
 import type { Carry } from '@/shared/ui/sortable/carryState';
 import { useDropHold } from '@/shared/ui/sortable/dropHold';
 import { edgeHoldAt, edgeStep, radiusOf, restoreScrollOffsets, scrollerOf, scrollOffsetsWithin, slideFrom, surfaceBehind } from '@/shared/ui/sortable/motion';
 import { layoutRectOf, moveKey, slotAt } from '@/shared/ui/sortable/slotAt';
+import { tickLift, useHoldPane } from '@/shared/ui/sortable/touchLift';
 import { usePointerDrag } from '@/shared/ui/usePointerDrag';
 import type { PointerDragPoint } from '@/shared/ui/usePointerDrag';
-
-/** How long a finger holds still on a free spot before it lifts the card. */
-const TOUCH_HOLD_MS = 400;
 
 /** How far the pointer, or the pane under it, must travel after one reorder before the next may happen. */
 const REORDER_TRAVEL_PX = 8;
@@ -46,9 +45,8 @@ export type SortableList = {
  * WHERE A CARRY BEGINS (`isFreePress`): a free press — never on a control, a field, or a track swiped
  * sideways. A mouse carries once it moves past the threshold (the text selection it could have begun is
  * cleared). A finger carries after holding still for `TOUCH_HOLD_MS`; one that moves first is
- * scrolling. Once lifted, the pane must not scroll under the finger: the list carries a `touchmove`
- * listener that cancels it, set for the list's whole life — `touch-action` cannot be changed under a
- * touch already running, and a listener met only after the touch began is not reliably allowed to cancel.
+ * scrolling. Once lifted, the pane must not scroll under the finger: the list carries the kit's
+ * `touchmove` canceller (`useHoldPane`, `touchLift.ts`), set for the list's whole life.
  *
  * THE CLICK THAT ENDS A CARRY IS SWALLOWED. NEAR THE PANE'S TOP OR BOTTOM EDGE the pane scrolls itself
  * (`edgeStep`), the item stays under the pointer and the slot is re-read as the list moves beneath it.
@@ -236,8 +234,7 @@ export function useSortable({ keys, onReorder }: {
       event.preventDefault();
     };
     window.addEventListener('click', swallowClick.current, true);
-    // A finger has no other sign the card has come up: where the device can, it says so in the hand.
-    navigator.vibrate?.(8);
+    tickLift();
     setPreview(order);
     place(active);
     active.frame = requestAnimationFrame(frame);
@@ -299,15 +296,12 @@ export function useSortable({ keys, onReorder }: {
     if (swallowClick.current !== null) window.removeEventListener('click', swallowClick.current, true);
   }, []);
 
-  /** Cancels a `touchmove` while an item is in the hand, so the pane does not scroll under the finger. */
-  const holdPane = useCallback((event: TouchEvent) => {
-    if (carry.current !== null) event.preventDefault();
-  }, []);
+  // The pane held still while an item is in the hand (`touchLift.ts`).
+  const holdPane = useHoldPane(() => carry.current !== null);
 
   const attachList = useCallback((element: HTMLElement | null) => {
-    listElement.current?.removeEventListener('touchmove', holdPane);
     listElement.current = element;
-    element?.addEventListener('touchmove', holdPane, { passive: false }); // a cancelling listener is ignored unless it says it may cancel
+    holdPane(element);
   }, [holdPane]);
 
   const itemProps = useCallback((key: string): SortableItemProps => ({

@@ -129,11 +129,9 @@ export default function SidebarSimpleListRow({
     >
       <span
         data-testid="simple-chat-icon"
-        data-drag-handle
         data-icon={row.icon ?? 'default'}
-        title={t('simpleList.dragHandle')}
         className={cn(
-          'flex h-7 w-6 flex-shrink-0 cursor-grab touch-none items-center justify-center',
+          'flex h-7 w-6 flex-shrink-0 items-center justify-center',
           // Faint only off the selected wash: on `bg-primary/10` faint ink reads 2.83:1 (graphic needs 3).
           isAsleep && !isSelected ? 'text-ink-faint' : 'text-muted-foreground',
         )}
@@ -191,10 +189,13 @@ export default function SidebarSimpleListRow({
         </a>
       )}
 
+      {/* The three marks below sit inside a Tooltip, which opens on a 350 ms touch hold: `data-no-drag` keeps
+          the carry's 400 ms hold from lifting the row under a tooltip that has just opened. */}
       {marks.awaitingInput && !isEditing && (
         <Tooltip content={t('simpleList.awaitingInput')} position="top">
           <span
             data-testid="simple-chat-awaiting-input"
+            data-no-drag
             role="status"
             aria-label={t('simpleList.awaitingInput')}
             className="vv-pulse flex h-5 w-5 flex-shrink-0 items-center justify-center"
@@ -209,6 +210,7 @@ export default function SidebarSimpleListRow({
         <Tooltip content={t('simpleList.running')} position="top">
           <span
             data-testid="simple-chat-running"
+            data-no-drag
             className="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-md text-muted-foreground"
           >
             <Loader2 className="h-3 w-3 animate-spin" />
@@ -220,6 +222,7 @@ export default function SidebarSimpleListRow({
         <Tooltip content={t('simpleList.subagentsRunning')} position="top">
           <span
             data-testid="simple-chat-subagents-running"
+            data-no-drag
             role="status"
             aria-label={t('simpleList.subagentsRunning')}
             className="flex h-5 w-5 flex-shrink-0 items-center justify-center"

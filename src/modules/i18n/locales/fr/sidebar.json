@@ -182,7 +182,6 @@
     "iconDefault": "Par défaut",
     "iconOption": "Icône {{name}}",
     "unread": "Terminé, pas encore lu",
-    "dragHandle": "Glisser pour réordonner",
     "subagentsRunning": "Sous-agents en cours",
     "asleep": "En veille. Votre prochain message la réveille.",
     "newFolder": "Nouveau dossier",

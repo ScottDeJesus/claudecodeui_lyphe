@@ -7782,8 +7782,7 @@ section: simple-chat-list/004 Order
 
 A tagged chat's place is `sessions.simple_list_rank`, never its creation time: the column is
 written when the chat is created, so a new chat always lands on top, and only a drag moves it
-afterwards. A **mouse** press may start anywhere on the row; a **touch** press starts a drag only
-from the leading icon (`data-drag-handle`), so a touch on the title still scrolls the list. What travels is `{ item, folderId, after }` — the item moved, the container it lands in (`null` = top level) and the item it sits *after* (`null` = first in that container) — the browser
+afterwards. A **mouse** press may start anywhere on the row that is not a control and carries after 5 px; a **touch** press carries after holding still for 400 ms anywhere on the row that is not a control (a quick swipe that starts on a row scrolls the list and lifts nothing). What travels is `{ item, folderId, after }` — the item moved, the container it lands in (`null` = top level) and the item it sits *after* (`null` = first in that container) — the browser
 decides only which row and which side of it. The server does the arithmetic, in `server/modules/database/repositories/simple-list-ladder.db.ts`:
 it takes the midpoint between the neighbours' ranks, and when no room is left between them it
 renumbers the whole ladder instead, so two items never share a rank. The ladder is every tagged
@@ -12024,7 +12023,10 @@ The order of the lane's top-level cards (arc decks and plans of no arc) is the o
 
 - Decks reorder among decks, plans among plans, on the tab; a deck and a plan swap places only in the widget.
 
-## The sortable capability — `src/shared/ui/sortable/`
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/cardOrderEntries.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/cardOrder.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/sortable/, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/usePointerDrag.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/order-lane.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-card-order.mjs
+
+## MAN-8136 — The card order and the sortable lists — The sortable capability — `src/shared/ui/sortable/`
+section: The card order and the sortable lists/001 The sortable capability — `src/shared/ui/sortable/`
 
 `useSortable({ keys, onReorder })` returns `{ order, attachList, itemProps(key) }`. It knows no item kind: `onReorder(carried, order)` is called once per drop that moved something, with the whole order. It returns nothing, or a `Promise<boolean>` answering whether the store took the write (the drop hold below).
 
@@ -12039,9 +12041,14 @@ Users: the In flight face and widget (above); the roadmap tree panel's `Mileston
 | `slotAt.ts` | `slotAt` (the slot a pointer names), `moveKey`, `layoutRectOf` (box with translates taken off) |
 | `motion.ts` | `slideFrom`, `scrollerOf`, `edgeStep`, `edgeHoldAt`, `surfaceBehind`, `radiusOf`, `scrollOffsetsWithin` + `restoreScrollOffsets` |
 | `carryState.ts` | `Carry`, `sameOrder`, `reconcile` |
+| `touchLift.ts` | `useHoldPane(isLifted)` → ref callback for the list: cancels a `touchmove` under it while an item is lifted, set for the element's whole life; `tickLift()`, the haptic tick at the lift. Shared with the sidebar chat list's carry (MAN-7525); the hold time `TOUCH_HOLD_MS` is in `src/shared/constants.ts` |
 | `dropHold.ts` | `useDropHold(keys)` → `{ heldOrder, hold(order, answer) }`: the order a drop made, drawn until the store catches up |
 
-## A drop whose write answers later — `dropHold.ts`
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/cardOrderEntries.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/cardOrder.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/sortable/, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/usePointerDrag.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/order-lane.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-card-order.mjs
+
+## MAN-8137 — The card order and the sortable lists — A drop whose write answers later — `dropHold.ts`
+section: The card order and the sortable lists/002 A drop whose write answers later — `dropHold.ts`
+
 - `onReorder` returning a promise (a write whose next reading is what redraws the keys): `useSortable` calls `hold(dropped, promise)`. why: without it the list drew the old order for about 450 ms after the drop, then jumped forward when the frame landed. A synchronous `onReorder` (the In flight face's) never holds.
 - The hold ends at the first of:
   1. the keys stand in the drop's order, compared only over the items both lists know. why: another writer adding or removing an item in the list neither ends the hold nor stands in for the drop;
@@ -12057,7 +12064,7 @@ Carry behaviour:
 - Marks of a carry: a translate on the item, `position: relative`, `z-index: 30`, a backing of the surface it stands on and the card's corner radius (a translucent deck would show through), `body.vv-drag-sort` (`cursor: grabbing`, `src/shared/ui/verve/surfaces.css`), `navigator.vibrate(8)` on lift. No drop line, no ghost, no handle.
 - The list reorders DURING the carry (`flushSync`); neighbours slide to their new slots (nothing slides under `prefers-reduced-motion`). A reorder is earned: the pointer or pane must travel 8 px before the next.
 - `reorder` restores every scroller's offset inside the re-inserted items (a deck's strip, an ask band's census); focus inside a re-inserted card is not restored.
-- Within the pane's edge band the pane scrolls itself (`edgeStep`, a 56px zone at each edge); the list's `touchmove` listener, set for its whole life, cancels the pane's scroll under a lifted finger.
+- Within the pane's edge band the pane scrolls itself (`edgeStep`, a 56px zone at each edge); the list's `touchmove` listener, set for its whole life, cancels the pane's scroll under a lifted finger. That listener and the lift's haptic tick live in `src/shared/ui/sortable/touchLift.ts` (`useHoldPane`, `tickLift`), and the hold time is `TOUCH_HOLD_MS` in `src/shared/constants.ts`; all three are shared with the sidebar chat list's carry (MAN-7525).
 - A carry that begins INSIDE an edge zone holds that edge (`Carry.edgeHold`, set in `begin`, read by `frame`): the pane does not scroll toward it until the pointer has been out of that zone (or in the other one), or pulled `EDGE_HOLD_RELEASE_DEPTH` (3) zone-depths into it (the pane's own edge is depth 1, so 112px past it for a 56px zone: a pull toward scrolling, which no reorder among the rows in view needs), then the edge works for the rest of the carry. why: a row drawn in a zone has not been carried there; without the hold, a 234px tree panel (zones cover 112px of it) ran the band to the list's end under any carry of a row that opens in one, writing the row at the END. `.verify/sortable-edge-hold.mjs` (a fixture of that geometry on the real hook) and `.verify/sortable-edge-hold-roadmap.mjs` (the real epic panel, writes answered locally) read it.
 - Mouse text selection is cleared on lift; the click that ends a carry is swallowed.
 - A poll never resets a carry: the preview is `reconcile`d against the keys on every render (an arrival goes first; a carried key that leaves the list is let go, nothing written).
@@ -12065,7 +12072,10 @@ Carry behaviour:
 - A press on the ask band's question text carries the card; the text is not an exclusion.
 - No keyboard reorder.
 
-## `usePointerDrag` options added for it
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/cardOrderEntries.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/cardOrder.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/sortable/, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/usePointerDrag.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/order-lane.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-card-order.mjs
+
+## MAN-8138 — The card order and the sortable lists — `usePointerDrag` options added for it
+section: The card order and the sortable lists/003 `usePointerDrag` options added for it
 
 `PointerDragKind` gained `'sort'` (body class `vv-drag-sort`, with `vv-dragging`). Absent options leave the FAB, split and resize consumers unchanged.
 
