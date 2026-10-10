@@ -3,20 +3,21 @@ import { flushSync } from 'react-dom';
 
 import { TOUCH_HOLD_MS } from '@/shared/constants';
 import { isFreePress, SORTABLE_ITEM_ATTRIBUTE } from '@/shared/ui/sortable/freePress';
+import { dropNow, placeUnder, putDown, takeUp } from '@/shared/ui/sortable/carried';
 import { reconcile, sameOrder } from '@/shared/ui/sortable/carryState';
 import type { Carry } from '@/shared/ui/sortable/carryState';
 import { useDropHold } from '@/shared/ui/sortable/dropHold';
-import { edgeHoldAt, edgeStep, radiusOf, restoreScrollOffsets, scrollerOf, scrollOffsetsWithin, slideFrom, surfaceBehind } from '@/shared/ui/sortable/motion';
+import { edgeHoldAt, edgeStep, restoreScrollOffsets, scrollerOf, scrollOffsetsWithin, slideFrom } from '@/shared/ui/sortable/motion';
 import { layoutRectOf, moveKey, slotAt } from '@/shared/ui/sortable/slotAt';
 import { tickLift, useHoldPane } from '@/shared/ui/sortable/touchLift';
 import { usePointerDrag } from '@/shared/ui/usePointerDrag';
-import type { PointerDragPoint } from '@/shared/ui/usePointerDrag';
+import type { HoldLiftProps, PointerDragPoint } from '@/shared/ui/usePointerDrag';
 
 /** How far the pointer, or the pane under it, must travel after one reorder before the next may happen. */
 const REORDER_TRAVEL_PX = 8;
 
-/** What a list's owner spreads on one item's root element. The attribute marks the item for `isFreePress`, so a list nested inside an item never arms the list around it. */
-type SortableItemProps = {
+/** What a list's owner spreads on one item's root element. The attribute marks the item for `isFreePress`, so a list nested inside an item never arms the list around it; the hold marker keeps a phone's own long-press off the item (`usePointerDrag`). */
+type SortableItemProps = HoldLiftProps & {
   ref: (element: HTMLElement | null) => void;
   onPointerDown: (event: ReactPointerEvent<HTMLElement>) => void;
   'data-sortable-item': '';
@@ -36,7 +37,7 @@ export type SortableList = {
  * stands in; what that order MEANS, and where it is kept, is the caller's.
  *
  * WHAT THE READER SEES, AND NOTHING MORE. The carried item follows the pointer (a translate on the item
- * itself). The list is reordered DURING the carry — React re-renders the keys in their preview order —
+ * itself) and wears Verve's lifted state (`carried.ts`, the one copy the sidebar's chat list runs too). The list is reordered DURING the carry — React re-renders the keys in their preview order —
  * so a column or a wrapping grid lays itself out around the gap, and each neighbour slides to its new
  * place (`slideFrom`; nothing slides under `prefers-reduced-motion`). No drop line, no ghost, no
  * handle, no highlight: the only marks of a carry are on the carried item, on the neighbours as they
@@ -96,10 +97,7 @@ export function useSortable({ keys, onReorder }: {
   };
 
   /** The carried item drawn under the pointer, whatever its slot in the layout has become. */
-  const place = (active: Carry) => {
-    const slot = layoutRectOf(active.element);
-    active.element.style.transform = `translate(${active.pointerX - active.grabX - slot.left}px, ${active.pointerY - active.grabY - slot.top}px)`;
-  };
+  const place = (active: Carry) => placeUnder(active, active.pointerX, active.pointerY);
 
   /** Puts the list in `next` order NOW (the layout is current when this returns) and slides every other item from where it was drawn. */
   const reorder = (active: Carry, next: readonly string[]) => {
@@ -159,29 +157,11 @@ export function useSortable({ keys, onReorder }: {
     active.frame = requestAnimationFrame(frame);
   };
 
-  /** Lets go of the carried item's inline marks once it has settled into its slot. */
-  const clearMarks = (element: HTMLElement) => {
-    element.style.position = '';
-    element.style.zIndex = '';
-    element.style.willChange = '';
-    element.style.backgroundColor = '';
-    element.style.borderRadius = '';
-  };
-
-  /** `clearMarks` for a settled item — unless it has been taken up again, whose marks they now are. */
-  const letGo = (element: HTMLElement) => {
-    if (carry.current?.element !== element) clearMarks(element);
-  };
-
   /** Ends the carry: the item settles into its slot, the click that follows is swallowed, and `dropped` is the order a drop commits — `null` when nothing is to be committed. */
   const settle = (active: Carry, dropped: readonly string[] | null) => {
     cancelAnimationFrame(active.frame);
     carry.current = null;
-    const drawn = active.element.getBoundingClientRect();
-    active.element.style.transform = '';
-    const slide = slideFrom(active.element, drawn);
-    if (slide === null) clearMarks(active.element);
-    else void slide.finished.then(() => letGo(active.element), () => letGo(active.element));
+    putDown(active.element);
     window.getSelection()?.removeAllRanges();
     // One tick, so this gesture's own click still finds the listener.
     setTimeout(() => {
@@ -199,15 +179,13 @@ export function useSortable({ keys, onReorder }: {
     const key = pressedKey.current;
     const element = key === null ? undefined : elements.current.get(key);
     if (key === null || element === undefined) return;
-    const slot = layoutRectOf(element);
     // A carry begins from what the operator sees, which a drop still being written has already moved.
     const order = latest.current.drawn;
     const scroller = scrollerOf(listElement.current ?? element);
     const active: Carry = {
       key,
       element,
-      grabX: x - slot.left,
-      grabY: y - slot.top,
+      ...takeUp(element, x, y),
       pointerX: x,
       pointerY: y,
       startOrder: order,
@@ -220,14 +198,6 @@ export function useSortable({ keys, onReorder }: {
       slides: new Map(),
     };
     carry.current = active;
-    // A slide still running (the item grabbed again mid-settle) would out-rank the carry's transform.
-    element.getAnimations().forEach((running) => running.cancel());
-    // Above its neighbours, on its own layer, backed with its ground in its card's corners (a translucent card hides what it passes over).
-    element.style.position = 'relative';
-    element.style.zIndex = '30';
-    element.style.willChange = 'transform';
-    element.style.backgroundColor = surfaceBehind(element);
-    element.style.borderRadius = radiusOf(element);
     window.getSelection()?.removeAllRanges();
     swallowClick.current = (event: Event) => {
       event.stopPropagation();
@@ -262,7 +232,7 @@ export function useSortable({ keys, onReorder }: {
     settle(active, moved && !sameOrder(active.order, active.startOrder) ? orderNow() : null);
   };
 
-  const { onPointerDown } = usePointerDrag({
+  const { onPointerDown, handleProps } = usePointerDrag({
     kind: 'sort',
     holdMs: TOUCH_HOLD_MS,
     // `accept` hears only a press that may START the gesture (a second finger never reaches it), so the key is the one the hold lifts.
@@ -289,8 +259,7 @@ export function useSortable({ keys, onReorder }: {
     const active = carry.current;
     if (active !== null) {
       cancelAnimationFrame(active.frame);
-      clearMarks(active.element);
-      active.element.style.transform = '';
+      dropNow(active.element);
     }
     carry.current = null;
     if (swallowClick.current !== null) window.removeEventListener('click', swallowClick.current, true);
@@ -310,8 +279,9 @@ export function useSortable({ keys, onReorder }: {
       else elements.current.set(key, element);
     },
     onPointerDown,
+    ...handleProps,
     [SORTABLE_ITEM_ATTRIBUTE]: '',
-  }), [onPointerDown]);
+  }), [onPointerDown, handleProps]);
 
   return { order: drawn, attachList, itemProps };
 }

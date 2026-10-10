@@ -205,11 +205,7 @@ export default function SidebarSimpleList({
           {newFolderButton}
         </div>
       ) : (
-        <div
-          data-testid="simple-chat-list-rows"
-          // No text selection while a row is carried; the titles stay selectable at rest.
-          className={dragging !== null ? 'flex select-none flex-col gap-1' : 'flex flex-col gap-1'}
-        >
+        <div data-testid="simple-chat-list-rows" className="flex flex-col gap-1">
           <SidebarSimpleListItems
             items={items}
             selectedSessionId={selectedSessionId}

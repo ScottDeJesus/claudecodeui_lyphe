@@ -12030,7 +12030,7 @@ section: The card order and the sortable lists/001 The sortable capability — `
 
 `useSortable({ keys, onReorder })` returns `{ order, attachList, itemProps(key) }`. It knows no item kind: `onReorder(carried, order)` is called once per drop that moved something, with the whole order. It returns nothing, or a `Promise<boolean>` answering whether the store took the write (the drop hold below).
 
-`itemProps(key)` is `{ ref, onPointerDown, 'data-sortable-item': '' }` (`SORTABLE_ITEM_ATTRIBUTE`, `freePress.ts`): spread on the item's root element.
+`itemProps(key)` is `{ ref, onPointerDown, 'data-hold-lift': '', 'data-sortable-item': '' }` (`SORTABLE_ITEM_ATTRIBUTE`, `freePress.ts`): spread on the item's root element. `data-hold-lift` is the marker `usePointerDrag` hands every handle that lifts on a touch hold: `surfaces.css` keeps the platform's long-press (callout, selection, native link drag) off it from the first touch.
 
 Users: the In flight face and widget (above); the roadmap tree panel's `MilestonePanel` (its epic rows) and `EpicPanel` (its feature rows), each handing its list to `PanelRows`' `RowList` and each `onReorder` returning `writes.move(...)` (MAN-7840, MAN-7841).
 
@@ -12039,9 +12039,10 @@ Users: the In flight face and widget (above); the roadmap tree panel's `Mileston
 | `useSortable.ts` | the carry: preview order, frame loop, drop, cancel |
 | `freePress.ts` | `isFreePress(target, item)`: a press may carry unless it lands on a control, an ARIA-role widget, inside an ancestor scrolling sideways right now, or inside a list nested in the item (its nearest `[data-sortable-item]` ancestor is not this item: that press is the inner list's own) |
 | `slotAt.ts` | `slotAt` (the slot a pointer names), `moveKey`, `layoutRectOf` (box with translates taken off) |
-| `motion.ts` | `slideFrom`, `scrollerOf`, `edgeStep`, `edgeHoldAt`, `surfaceBehind`, `radiusOf`, `scrollOffsetsWithin` + `restoreScrollOffsets` |
+| `carried.ts` | the item in the hand, one copy for `useSortable` and the sidebar chat list's carry: `takeUp(element, x, y)` (marks: above its neighbours, own layer, an opaque ground, its corners, `data-carried`), `placeUnder(grip, x \| null, y)` (the translate that keeps it under the pointer; null x = on the list's rail), `putDown(element, from?)` (slides to its slot, then lets go; an item taken up again mid-slide keeps its marks), `dropNow` (no slide, for a list unmounting). Verve draws `[data-carried]` (`surfaces.css`) |
+| `motion.ts` | `slideFrom`, `scrollerOf`, `edgeStep`, `edgeHoldAt`, `surfaceBehind` (the ground an item stands on as ONE OPAQUE colour: translucent grounds, the sidebar's `bg-background/80` among them, are painted over one another up to the first opaque one), `radiusOf`, `scrollOffsetsWithin` + `restoreScrollOffsets` |
 | `carryState.ts` | `Carry`, `sameOrder`, `reconcile` |
-| `touchLift.ts` | `useHoldPane(isLifted)` → ref callback for the list: cancels a `touchmove` under it while an item is lifted, set for the element's whole life; `tickLift()`, the haptic tick at the lift. Shared with the sidebar chat list's carry (MAN-7525); the hold time `TOUCH_HOLD_MS` is in `src/shared/constants.ts` |
+| `touchLift.ts` | `useHoldPane(isLifted)` → ref callback for the list: cancels a `touchmove` under it while an item is lifted, set for the element's whole life; `tickLift()`, the 20 ms haptic pulse at the lift. Shared with the sidebar chat list's carry (MAN-7525); the hold time `TOUCH_HOLD_MS` is in `src/shared/constants.ts` |
 | `dropHold.ts` | `useDropHold(keys)` → `{ heldOrder, hold(order, answer) }`: the order a drop made, drawn until the store catches up |
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/cardOrderEntries.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/cardOrder.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/sortable/, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/usePointerDrag.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/order-lane.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-card-order.mjs
@@ -12083,7 +12084,7 @@ section: The card order and the sortable lists/003 `usePointerDrag` options adde
 |---|---|
 | `accept(event)` | a press it refuses arms nothing: no listener, capture or body class |
 | `captureOnStart(handle)` | capture moves from the press to the drag's start, onto the element returned |
-| `holdMs` | touch only: `onStart` after holding still this long; moving past 8 px first lets the gesture go silently; `contextmenu` and `selectstart` are cancelled while a hold is pending or lifted |
+| `holdMs` | touch only: `onStart` after holding still this long; moving past 8 px first lets the gesture go silently; `contextmenu` and `selectstart` are cancelled while a hold is pending or lifted. A hook with `holdMs` also returns `handleProps` (`data-hold-lift`), which its owner spreads on the handle: the platform decides on its callout and selection when a touch begins (an iPhone sends no `contextmenu`), so `surfaces.css` binds the suppression to the marker, on touch screens only |
 | `onStart(point)` | the drag began (threshold crossed, or the hold lifted) |
 | `onEnd` payload `cancelled` | `true` when the browser took the gesture away; the FAB, split and resize ignore it |
 
@@ -13666,15 +13667,15 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/settings/custom-c
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/console.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/layout-nav.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/mountReact.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/settings-rows-walk.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/timeout-state.mjs
 
-## MAN-8149 — Dactyls for the main session — the Settings row: composition, handles, strings, the spend line, the scaffold
+## MAN-8149 — Dactyls for the main session — the Settings row: composition, handles, strings, the spend line, the wires
 
 `RunnerMainSessionDactylsRow.tsx` (Settings → Agents → Claude → Account) is the operator's view of the MAIN-session Dactyls switch, `~/.claude/state/main_session_dactyls.flag` (the flag and the gate: MAN-8148). Host-wide: every main session on the box, a chat here or a terminal. Not the Dactyls switch (MAN-8059): that one takes a builder's hands, is Hephaestus's alone, and is drawn in Edit Agent Chains.
 
 ## Status
-- 2026-10-10: composed over a fake and NOT mounted. `RunnerModelContent.tsx` holds `{/* FILL: main-session-dactyls-row — … */}` directly under `<RunnerCompactionRow />`; the live card draws no new row.
-- Three trailing `// FILL:` markers in the row replace its wires: `state` (the read, `useMainSessionDactylsFake()`), `onToggle`, `onRetry`.
-- `main-session-dactyls-fake.ts` stands in for the real hook until phase `row-fill`, then is deleted. Exports `MAIN_SESSION_DACTYLS_FAKE_STATES` (nine named states), `MainSessionDactylsFakeContext`, `useMainSessionDactylsFake`.
-- The row never names its state's type: the hook keeps its own.
+- 2026-10-10: LIVE. `RunnerModelContent.tsx` draws `<RunnerMainSessionDactylsRow />` directly under `<RunnerCompactionRow />`.
+- The wires are `useMainSessionDactylsSwitch` (`src/shared/hooks/`, `useCustomCompactionSwitch`'s shape: one module epoch, one read at a time, a re-read after a failed write, a re-ask on `focus` and `visibilitychange`, nothing polls), `api.settings.mainSessionDactylsSwitch` / `saveMainSessionDactylsSwitch`, and `GET` / `PUT /api/settings/main-session-dactyls`.
+- The server half is `server/modules/settings/main-session-dactyls-switch.ts`: the flag through `readFlagFile` / `writeFlagFile` at `MAIN_SESSION_DACTYLS_FLAG_PATH` (made absolute, read at the call) else `~/.claude/state/main_session_dactyls.flag`; the words, readiness and ledger from `~/.claude/scripts/dactyl --session-status` (`userFacingEnv()` whole, cwd home, 15 s), parsed whole or not at all, `hand` included. `enabled` is read back off the file. A non-boolean PUT is a 400, `INVALID_MAIN_SESSION_DACTYLS_STATE`, and kicks nothing.
+- The row never names its state's type: the hook keeps its own. A missing or mistyped field is `null`, "could not ask".
 
 ## Composition
 `RunnerCompactionRow`'s grammar (MAN-8061 §"The row"); wears lucide `Pointer` (a dactyl is a finger); handle `data-runner-main-session-dactyls="unknown|on|off"`.
@@ -13703,12 +13704,11 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/console.mjs, /home/l
 
 ## Rules
 - A `null` detail is "could not ask": never off, never `ready: false`. A switch on while not ready is armed, not broken.
-- The `buttons.retry` fallback text in the row is `'Try again'` (the card's other rows' fallback); the key shows `Retry`. A sweep of the card's call sites waits until `RunnerModelContent.tsx` may change beyond its FILL line.
-
-## Fake states (`MAIN_SESSION_DACTYLS_FAKE_STATES`)
-`asking`, `unreadable`, `offReady`, `onReady`, `offWaiting`, `onWaiting`, `statusUnread` (on, details all `null`), `onReadySpend`, `offReadyNoTokens` (off, `hand` with `spend: ""`, 3 dactyls: 1 read, 2 edits). Model `claude-haiku-5-5`, effort `xhigh`.
+- The `buttons.retry` fallback text in the row is `'Try again'` (the card's other rows' fallback); the key shows `Retry`. A sweep of the card's call sites is a change of its own.
 
 ## Measured
-- 2026-10-10: 440 checks, 0 failures over the nine states at 1440×900 and 390×844, light and dark, on the live client (:5183), with the row mounted under the real Custom compaction row; 0 preference writes. Contrast ≥ 5.06:1 (light description), 17.72:1 spend line.
+- 2026-10-10: on a probe server over a scratch flag, the row photographed off, pressed (the file read `on`), photographed on, pressed back (the file read `off`) — light and dark at 1440×900, 0 console errors; the live client (:5183) photographed off, light and dark, nothing pressed. `.verify/main-session-dactyls-row-shots.mjs` runs it (`--mode probe` or `--mode live`); probe mode refuses an `--app` that is the operator's client or server and a `--flag` that is the operator's file, and proves the client's server reads `--flag` (each word written, the row must draw it) before its first press.
+- 2026-10-10, the row's composition (nine drawn states): 440 checks, 0 failures at 1440×900 and 390×844, light and dark, with the row mounted under the real Custom compaction row; 0 preference writes. Contrast ≥ 5.06:1 (light description), 17.72:1 spend line.
+- 2026-10-10, on the filled row (Athena's review): no horizontal overflow of the row or the card at 1440 (670 px), 390 (364 px) and 336 (310 px), light and dark; the spend figure on one line; the warn tone legible in both themes (light `rgb(138,102,32)`, dark `rgb(227,185,107)`).
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/agents-settings/sections/content/main-session-dactyls-fake.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/agents-settings/sections/content/RunnerMainSessionDactylsRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/agents-settings/sections/content/RunnerModelContent.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/WholeWords.tsx
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/settings/main-session-dactyls-switch.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/agents-settings/sections/content/RunnerMainSessionDactylsRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/agents-settings/sections/content/RunnerModelContent.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/useMainSessionDactylsSwitch.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/WholeWords.tsx

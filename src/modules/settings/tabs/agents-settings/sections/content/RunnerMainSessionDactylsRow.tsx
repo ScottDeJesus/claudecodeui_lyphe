@@ -2,7 +2,7 @@ import { Pointer } from 'lucide-react';
 import { Trans, useTranslation } from 'react-i18next';
 
 import SettingsToggle from '@/modules/settings/SettingsToggle';
-import { useMainSessionDactylsFake } from '@/modules/settings/tabs/agents-settings/sections/content/main-session-dactyls-fake';
+import { useMainSessionDactylsSwitch } from '@/shared/hooks/useMainSessionDactylsSwitch';
 import { Button, SettingRow, WholeWords } from '@/shared/ui';
 
 /**
@@ -39,9 +39,9 @@ export default function RunnerMainSessionDactylsRow() {
   const { t } = useTranslation('settings');
 
   // ── The wires: the read and its two acts. Everything below them is composition. ──
-  const { enabled, unreadable, model, effort, ready, why, hand } = useMainSessionDactylsFake(); // FILL: state
-  const onToggle = (_next: boolean): void => {}; // FILL: onToggle
-  const onRetry = (): void => {}; // FILL: onRetry
+  const { enabled, unreadable, model, effort, ready, why, hand, setEnabled, refresh } = useMainSessionDactylsSwitch();
+  const onToggle = (next: boolean): void => void setEnabled(next);
+  const onRetry = (): void => void refresh();
 
   const label = t('agents.runnerMainSessionDactyls.label', { defaultValue: 'Dactyls for the main session' });
   // No position is not OFF, and the lie cuts both ways: drawn off while on, it promises sessions their own
@@ -114,7 +114,7 @@ export default function RunnerMainSessionDactylsRow() {
             <p>{lead}</p>
             <p className="mt-1">
               {t('agents.runnerMainSessionDactyls.hands', {
-                defaultValue: 'Its own Edit and Write into repository files are refused, and so are its shell writes there; /tmp, git-ignored files and /remember are untouched. It may also hand a file to a dactyl to read and answer about, so the file’s body never enters its context. A /tweak lands through a dactyl, and rail 2 logs it on the chain the file belongs to.',
+                defaultValue: 'Its own Edit and Write into repository files are refused, and so are its shell writes there; files outside any repository (scratch in /tmp), git-ignored files and /remember are untouched. It may also hand a file to a dactyl to read and answer about, so the file’s body never enters its context. A /tweak lands through a dactyl, and rail 2 logs it on the chain the file belongs to.',
               })}
             </p>
             <p className="mt-1">

@@ -151,7 +151,7 @@ What they share is the contract every later one joins:
    |---|---|---|---|---|
    | 1 | `controls.css` | 1st | 496 | past its stated ceiling (the headers of `surfaces.css` and `panels.css` say so) |
    | 2 | `feedback.css` | 2nd | 438 | — |
-   | 3 | [`surfaces.css`](surfaces.css) | 4th | 367 | the `body.vv-dragging` / `vv-drag-fab` / `vv-drag-split` / `vv-drag-resize` classes a drag of any piece sets for its length (why a new file: that sheet's own header) |
+   | 3 | [`surfaces.css`](surfaces.css) | 4th | 391 | the `body.vv-dragging` / `vv-drag-fab` / `vv-drag-split` / `vv-drag-resize` classes a drag of any piece sets for its length (why a new file: that sheet's own header); `[data-hold-lift]` (a hold-lift handle's callout, selection and native drag, off on touch screens from the first touch) and `[data-carried]` (an item in a hand: `--shadow-lift` and a `--border-strong` hairline) |
    | 4 | [`panels.css`](panels.css) | 5th | 341 | `.vv-input`'s colours and ground said back over `src/index.css`'s `!important` pins on every bare `textarea` (the piece's own header says why) |
    | 5 | `board.css` | 3rd | 227 | the `.vv-lane`, `.vv-lane__head` and `.vv-lane-card` rules and their variants |
 

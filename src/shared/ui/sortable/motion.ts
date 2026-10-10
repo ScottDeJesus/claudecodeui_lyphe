@@ -11,7 +11,10 @@
  * THE CARRIED ITEM IS BACKED WITH THE SURFACE IT STANDS ON (`surfaceBehind`). A card drawn on a
  * translucent ground (a deck is `bg-muted/40`) would show whatever it is carried over through itself,
  * two heads read at once; the item takes the colour of the ground it was lifted from, so it hides what
- * is beneath it and, over its own ground, looks exactly as it did.
+ * is beneath it and, over its own ground, looks exactly as it did. THE GROUND IS ONE OPAQUE COLOUR: a
+ * ground that is itself translucent (the sidebar is `bg-background/80`) is painted over the one under
+ * it, and so on up to the first that is not, so the backing is what the reader sees there and hides
+ * what it passes over completely.
  *
  * NOTHING SLIDES UNDER `prefers-reduced-motion`. The carried item still follows the pointer (that is
  * the carry, not a flourish), but every neighbour and the settling drop land where they land.
@@ -90,13 +93,42 @@ export function edgeHoldAt(scroller: HTMLElement, pointerY: number, held: number
 /** Whether a computed colour is wholly transparent: the keyword, `rgba(…, 0)`, or the `color(… / 0)` form `color-mix` computes to. */
 const isClear = (colour: string) => colour === 'transparent' || /^rgba\(.*,\s*0\)$/.test(colour) || /\/\s*0(?:\.0+)?\)$/.test(colour);
 
-/** The colour `element` stands on: the first ancestor background that is not clear, else the page's own. */
+/** A 1x1 canvas the computed colours are painted on, so the browser — not a colour parser written here — decides what a `color(srgb …)` or a `rgba(…)` is. */
+let swatch: CanvasRenderingContext2D | null = null;
+
+/** `layers` (CSS colours, outermost first) painted over one another on a clear swatch: the resulting 0-255 red, green, blue and alpha. */
+function composite(layers: readonly string[]): [number, number, number, number] {
+  if (swatch === null) {
+    const canvas = document.createElement('canvas');
+    canvas.width = 1;
+    canvas.height = 1;
+    swatch = canvas.getContext('2d', { willReadFrequently: true });
+  }
+  if (swatch === null) return [0, 0, 0, 0];
+  swatch.clearRect(0, 0, 1, 1);
+  for (const colour of layers) {
+    swatch.fillStyle = colour;
+    swatch.fillRect(0, 0, 1, 1);
+  }
+  const [red, green, blue, alpha] = swatch.getImageData(0, 0, 1, 1).data;
+  return [red, green, blue, alpha];
+}
+
+/**
+ * The colour `element` stands on, opaque: the grounds above it from the nearest outward, each painted over the one beyond
+ * it, up to the first that is wholly opaque; a ground that never gets there stands on the page's own.
+ */
 export function surfaceBehind(element: Element): string {
+  const layers: string[] = [];
   for (let node = element.parentElement; node !== null; node = node.parentElement) {
     const colour = getComputedStyle(node).backgroundColor;
-    if (!isClear(colour)) return colour;
+    if (isClear(colour)) continue;
+    layers.unshift(colour);
+    if (composite(layers)[3] === 255) break;
   }
-  return getComputedStyle(document.body).backgroundColor;
+  if (composite(layers)[3] !== 255) layers.unshift(getComputedStyle(document.body).backgroundColor);
+  const [red, green, blue] = composite(layers);
+  return `rgb(${red}, ${green}, ${blue})`;
 }
 
 /**

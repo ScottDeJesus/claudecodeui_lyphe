@@ -2,6 +2,7 @@ import { AppError } from '@/shared/utils.js';
 
 import { getCustomCompactionState, setCustomCompactionState } from './custom-compaction-switch.js';
 import { getDactylsState, setDactylsState } from './dactyls-switch.js';
+import { getMainSessionDactylsState, setMainSessionDactylsState } from './main-session-dactyls-switch.js';
 import { kickDispatcher } from './dispatcher-kick.js';
 import { JEV_SCOPES } from './jev-switches.js';
 import type { JevScopeKey, JevSwitches } from './jev-switches.js';
@@ -279,6 +280,16 @@ export function createSettingsService(dependencies: SettingsDependencies) {
     },
     async setCustomCompaction(enabledInput: unknown) {
       return setCustomCompactionState(enabledInput);
+    },
+    /**
+     * The Dactyls-for-the-main-session switch. Bodies in `main-session-dactyls-switch.ts`, delegated
+     * verbatim as the pairs above; no dispatcher kick, because nothing queues on this switch.
+     */
+    async getMainSessionDactyls() {
+      return getMainSessionDactylsState();
+    },
+    async setMainSessionDactyls(enabledInput: unknown) {
+      return setMainSessionDactylsState(enabledInput);
     },
     /**
      * The dispatcher's planner-lane dial: how many planners (designs, cuts, judgments) may be out at

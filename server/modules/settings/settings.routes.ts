@@ -65,6 +65,11 @@ export function createSettingsRouter(
   // also carries the summarizer's words and readiness, which are not the file's to hold.
   router.get('/custom-compaction', respond(() => service.getCustomCompaction()));
   router.put('/custom-compaction', respond((req) => service.setCustomCompaction(req.body?.enabled)));
+  // The Dactyls-for-the-main-session switch, host-wide like the ones above: it steers every main session on
+  // this host, so no `userId` is read. One word on the PUT body, because the file holds one line. The GET
+  // also carries the dactyl's words, its readiness and the week's hand ledger, which are not the file's.
+  router.get('/main-session-dactyls', respond(() => service.getMainSessionDactyls()));
+  router.put('/main-session-dactyls', respond((req) => service.setMainSessionDactyls(req.body?.enabled)));
   // The dispatcher's planner-lane dial, host-wide like the switches above and read the same way: it
   // steers the dispatcher on this host, so no `userId` is read. One integer on the PUT body, because
   // the file holds one line — a bare count of at least 1.

@@ -12,6 +12,12 @@ const DRAG_THRESHOLD_PX = 4;
 /** How far a finger may drift during a hold and still be holding. Past it the touch is a scroll, and the hold is let go. */
 const HOLD_SLOP_PX = 8;
 
+/** What a handle that lifts on a touch hold wears from the first touch: `surfaces.css` keeps the platform's own long-press (a link menu, a text selection) off whatever carries it. */
+export type HoldLiftProps = { 'data-hold-lift'?: '' };
+
+const HOLD_LIFT_PROPS: HoldLiftProps = { 'data-hold-lift': '' };
+const NO_HOLD_LIFT_PROPS: HoldLiftProps = {};
+
 /** One gesture, from the press that began it to the release that ends it. */
 type Gesture = {
   pointerId: number;
@@ -64,6 +70,14 @@ type Gesture = {
  *   a finger that travels more than `HOLD_SLOP_PX` first is scrolling, and the gesture lets go
  *   silently. A mouse or a pen ignores it and begins at `threshold` as ever. While a hold is pending
  *   or lifted the browser's own long-press reactions (a text selection, a context menu) are cancelled.
+ *
+ * A HOLD'S HANDLE IS MARKED, because those cancels are events and not every platform sends the event.
+ * An iPhone answers its own long-press (the link menu, the selection loupe) at about half a second
+ * without a `contextmenu`, and takes the touch away, a moment after the hold here lifts: the carry
+ * survived only for a finger that moved inside that gap. The platform decides on the menu and the
+ * selection when a touch BEGINS, so a style applied at the lift is too late; the handle carries
+ * `data-hold-lift` from the start (`handleProps`, spread on the handle by whoever owns it), and
+ * `surfaces.css` turns the callout and the selection off under it on a touch screen.
  */
 export function usePointerDrag(options: {
   kind: PointerDragKind;
@@ -74,7 +88,7 @@ export function usePointerDrag(options: {
   onStart?: (point: PointerDragPoint) => void;          // the drag has begun: threshold crossed, or touch lifted
   onMove: (point: PointerDragPoint) => void;
   onEnd: (point: PointerDragPoint & { moved: boolean; cancelled: boolean }) => void;  // `cancelled`: the browser took the gesture away
-}): { onPointerDown: (event: ReactPointerEvent<HTMLElement>) => void } {
+}): { onPointerDown: (event: ReactPointerEvent<HTMLElement>) => void; handleProps: HoldLiftProps } {
   const { kind, threshold = DRAG_THRESHOLD_PX } = options;
 
   // The live gesture, and how to take its listeners back off. Refs, not state: a drag that
@@ -245,5 +259,5 @@ export function usePointerDrag(options: {
     };
   }, [kind, release, threshold]);
 
-  return { onPointerDown };
+  return { onPointerDown, handleProps: options.holdMs === undefined ? NO_HOLD_LIFT_PROPS : HOLD_LIFT_PROPS };
 }

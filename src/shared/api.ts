@@ -689,6 +689,15 @@ export const api = {
     saveCustomCompactionSwitch: (state: { enabled: boolean }) =>
       put('/api/settings/custom-compaction', state),
 
+    // The Dactyls-for-the-main-session switch — the seventh flag file in this shape: whether a main session
+    // changes a repository file only through a dactyl. The GET answers the position read off the file beside
+    // `dactyl --session-status`'s details (`model`, `effort`, `ready`, `why` and the week's `hand` ledger,
+    // each null when that call failed); the PUT answers the same, with the position read back off the file,
+    // never what was sent.
+    mainSessionDactylsSwitch: () => get('/api/settings/main-session-dactyls'),
+    saveMainSessionDactylsSwitch: (state: { enabled: boolean }) =>
+      put('/api/settings/main-session-dactyls', state),
+
     // The heal reflex's MASTER switch — the reflex's whole launching, on one word. `off` stops it
     // launching from the next ending onwards while an ending still indexes, and the typed `/heal`
     // door is never gated by it; `on` is what the flag file being absent has always meant. Same

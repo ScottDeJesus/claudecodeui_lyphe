@@ -9212,3 +9212,31 @@ measured 2026-10-10 by chain chain-simple-list-hold-to-drag-20261009-233125-3a36
 probe-key: 9e9f542e4ab98659d516ee0b161f35421d17a97a
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/hooks/useCarryEdgeScroll.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/hooks/useSimpleChatDrag.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/SidebarSimpleListRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/sortable/touchLift.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/touch-input.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/simple-list-hold-to-drag.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/simple-list-hold-to-drag-scratch.sh, /home/lyphe/.claude/claudecodeui_lyphe/.verify/sortable-hold-equivalence.mjs
+
+## INV-7612 — probe — the row-shots script's probe mode presses the switch at whatever `--app` names, and refuses nothing (LOW)
+
+the row-shots script's probe mode presses the switch at whatever `--app` names, and refuses nothing (LOW)
+
+```probe
+bash /home/lyphe/.claude/state/pipeline-reviews/main-session-dactyls--row-fill/athena-probes/p-verify-guard.sh
+expect: "lines that refuse it: 0" beside "toggle presses in probe mode: 2" while the defect stands; a refusal line makes it 1 or more
+```
+
+measured 2026-10-10 by chain chain-main-session-dactyls--row-fill-20261010-134101-4b74, finding L1, LOW
+probe-key: 84d4a67602f5a0e0aabd0487b785d42a214bfe88
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/settings/main-session-dactyls-switch.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/useMainSessionDactylsSwitch.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/main-session-dactyls-row-shots.mjs
+
+## INV-7613 — probe — MAN-8149's rewrite dropped a still-true measurement and left phone width unmeasured (LOW)
+
+MAN-8149's rewrite dropped a still-true measurement and left phone width unmeasured (LOW)
+
+```probe
+bash /home/lyphe/.claude/state/pipeline-reviews/main-session-dactyls--row-fill/athena-probes/p-man8149-phone.sh
+expect: "phone width mentions: 0" and "contrast ratios: 0" while the defect stands; the cure makes each 1 or more
+```
+
+measured 2026-10-10 by chain chain-main-session-dactyls--row-fill-20261010-134101-4b74, finding L2, LOW
+probe-key: b464da2d865a62084a454f906d9b5133297b5e1e
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/settings/main-session-dactyls-switch.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/useMainSessionDactylsSwitch.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/main-session-dactyls-row-shots.mjs

@@ -1,11 +1,10 @@
 import { useState } from 'react';
-import type { HTMLAttributes } from 'react';
 import { Edit2, EyeOff, FolderInput, Loader2, MoreHorizontal, Smile, Trash2 } from 'lucide-react';
 import type { TFunction } from 'i18next';
 
 import { ActionMenu, Tooltip } from '@/shared/ui';
 import { cn } from '@/shared/utils';
-import type { RecentConversationListItem } from '@/shared/types';
+import type { RecentConversationListItem, SimpleListDragProps } from '@/shared/types';
 import { useCompactSidebar } from '@/modules/sidebar/hooks/useCompactSidebar';
 import { SimpleChatIconGlyph } from '@/modules/sidebar/SidebarSessionIcon';
 import { chatMarks } from '@/modules/sidebar/utils/simpleChatMarks';
@@ -41,8 +40,8 @@ type SidebarSimpleListRowProps = {
   // The "Move to folder…" entry, or null while the list holds no folder to move this chat into.
   onMoveToFolder: (() => void) | null;
   // The pointer handlers that pick this row up; null when the list offers no reorder.
-  dragProps: Pick<HTMLAttributes<HTMLElement>, 'onPointerDown' | 'onClickCapture' | 'onDragStart'> | null;
-  // True while this very row is the one being carried: it fades so the drop line reads.
+  dragProps: SimpleListDragProps | null;
+  // True while this very row is the one being carried. The kit's carry moves it (`sortable/carried.ts`); the row itself only says so.
   isDragging: boolean;
   // Which edge of this row the carried row would land on, or null when it is not the target.
   dropEdge: 'before' | 'after' | null;
@@ -124,7 +123,6 @@ export default function SidebarSimpleListRow({
         // Desktop is unaffected — it never carries the compact height floor at all.
         isCompact ? 'min-h-11' : 'py-2',
         isSelected ? 'bg-primary/10 text-foreground' : 'text-foreground hover:bg-accent/60',
-        isDragging && 'opacity-50',
       )}
     >
       <span
@@ -299,12 +297,13 @@ export default function SidebarSimpleListRow({
       )}
 
       {/* Where the carried row lands. It ignores the pointer, so the row under it stays the
-          target it marks. */}
+          target it marks, and it stands one step above the carried row (`z-40` over the kit's 30),
+          which is drawn under the pointer, over this very row. */}
       {dropEdge && (
         <span
           aria-hidden
           className={cn(
-            'pointer-events-none absolute inset-x-1 h-0.5 rounded-full bg-primary',
+            'pointer-events-none absolute inset-x-1 z-40 h-0.5 rounded-full bg-primary',
             dropEdge === 'before' ? 'top-0' : 'bottom-0',
           )}
         />

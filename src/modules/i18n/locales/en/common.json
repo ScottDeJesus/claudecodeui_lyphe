@@ -376,7 +376,7 @@
       "dactylEffort": "Effort",
       "dactylModelLabel": "Dactyl model",
       "dactylEffortLabel": "Dactyl effort",
-      "dactylHint": "A model id runs only once the installed Claude Code knows it; haiku is the CLI’s own alias and always runs",
+      "dactylHint": "A model id runs only once the installed Claude Code knows it; haiku is the CLI’s own alias and always runs. The same words serve Dactyls for the main session, on the Settings → Agents card",
       "summarizer": "Summarizer",
       "summarizerModel": "Model",
       "summarizerEffort": "Effort",

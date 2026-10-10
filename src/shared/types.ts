@@ -1,6 +1,6 @@
 import type { EditorState } from '@codemirror/state';
 import type { TFunction } from 'i18next';
-import type { ComponentType, ReactNode } from 'react';
+import type { ComponentType, HTMLAttributes, ReactNode } from 'react';
 import type { NavigateFunction } from 'react-router-dom';
 
 import type { AppEntry } from '@/shared/app-types';
@@ -1922,6 +1922,9 @@ export type SimpleListDropTarget =
   | { at: 'row'; item: SimpleListItemRef; edge: 'before' | 'after' }
   | { at: 'into'; folderId: string }
   | { at: 'end' };
+
+/** The handlers and hold marker the simple list's carry (`useSimpleChatDrag`) hands every chat row and folder header: spread whole on the row's root element. */
+export type SimpleListDragProps = Pick<HTMLAttributes<HTMLElement>, 'onPointerDown' | 'onClickCapture' | 'onDragStart'> & { 'data-hold-lift'?: '' };
 
 /**
  * The rename the sidebar currently has open, if any.
