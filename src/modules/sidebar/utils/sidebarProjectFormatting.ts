@@ -167,5 +167,6 @@ export const normalizeProjectForSettings = (project: Project): SettingsProject =
       typeof project.path === 'string' && project.path.length > 0
         ? project.path
         : fallbackPath,
+    isFolderMissing: project.isFolderMissing === true,
   };
 };

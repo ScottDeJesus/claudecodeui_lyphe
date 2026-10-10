@@ -2,7 +2,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 
 import { projectsDb, sessionsDb } from '@/modules/database/index.js';
-import { sessionSynchronizerService } from '@/modules/providers/index.js';
+import { diagnoseProjectFolder, sessionSynchronizerService } from '@/modules/providers/index.js';
 import { WS_OPEN_STATE, connectedClients } from '@/modules/websocket/index.js';
 import type { RealtimeClientConnection } from '@/shared/types.js';
 import { AppError } from '@/shared/utils.js';
@@ -24,7 +24,7 @@ type SessionRepositoryRow = {
   created_at?: string | null;
 };
 
-export type ProjectListItem = {
+type ProjectListItemBase = {
   projectId: string;
   path: string;
   displayName: string;
@@ -37,7 +37,15 @@ export type ProjectListItem = {
   };
 };
 
-export type ArchivedProjectListItem = ProjectListItem & {
+export type ProjectListItem = ProjectListItemBase & {
+  /**
+   * The project's folder is gone from this machine (missing, or not a folder), so a chat cannot start
+   * there. Never true for a project assigned to a node: its folder lives on the node.
+   */
+  isFolderMissing: boolean;
+};
+
+export type ArchivedProjectListItem = ProjectListItemBase & {
   isArchived: true;
 };
 
@@ -176,6 +184,16 @@ function broadcastProgress(progress: ProgressUpdate) {
 }
 
 /**
+ * Whether the project's folder is gone from this machine, by the one folder test the Claude run's
+ * pre-flight uses. A node's project is never gone: the run is not checked here either, because its
+ * folder lives on the node.
+ */
+async function isProjectFolderMissing(projectPath: string): Promise<boolean> {
+  if (projectsDb.nodeForPath(projectPath) !== null) return false;
+  return (await diagnoseProjectFolder(projectPath)) !== null;
+}
+
+/**
  * Reads all projects from DB and returns normalized session summaries.
  */
 export async function getProjectsWithSessions(
@@ -224,6 +242,7 @@ export async function getProjectsWithSessions(
       displayName,
       fullPath: projectPath,
       isStarred: Boolean(row.isStarred),
+      isFolderMissing: await isProjectFolderMissing(projectPath),
       sessions: sessionsPage.sessions,
       sessionMeta: {
         hasMore: sessionsPage.hasMore,

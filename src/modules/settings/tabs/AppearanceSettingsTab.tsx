@@ -8,6 +8,7 @@ import { useSetUiPreference, useUiPreferences } from '@/shared/context/UiPrefere
 import { useTheme } from '@/shared/context/ThemeContext';
 import { useChatFontSize } from '@/shared/hooks/useChatFontSize';
 import { useSimpleChatListPreferences } from '@/shared/hooks/useSimpleChatListPreferences';
+import { projectNameHints } from '@/shared/projectNameHints';
 import SettingsCard from '@/modules/settings/SettingsCard';
 import SettingsSection from '@/modules/settings/SettingsSection';
 import SettingsToggle from '@/modules/settings/SettingsToggle';
@@ -56,8 +57,16 @@ export default function AppearanceSettingsTab({
 
   // Sorted by display name so the picker reads alphabetically regardless of the order
   // `projects` arrived in; the value stays `project.name` — the id the sidebar resolves by.
-  const simpleChatProjectOptions = [...projects]
-    .map((project) => ({ value: project.name, label: project.displayName ?? project.name }))
+  // The hints are worked out over every project, then the ones whose folder is gone are left out: a chat
+  // cannot start there. A same-named project reads with the hint that sets it apart, as in the new-chat picker.
+  const nameHints = projectNameHints(projects.map((project) => ({
+    projectId: project.name,
+    displayName: project.displayName ?? project.name,
+    fullPath: project.fullPath ?? project.path ?? '',
+  })));
+  const simpleChatProjectOptions = projects
+    .filter((project) => !project.isFolderMissing)
+    .map((project) => ({ value: project.name, label: project.displayName ?? project.name, hint: nameHints.get(project.name) }))
     .sort((a, b) => a.label.localeCompare(b.label));
 
   return (

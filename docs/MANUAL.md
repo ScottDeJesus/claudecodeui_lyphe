@@ -7716,7 +7716,7 @@ section: simple-chat-list/000
 An alternative sidebar for someone who does not think in projects: no project tree, no search chips, and a
 feed of the chats they started from this view — loose chats and folders that hold chats; a new chat lands at the top and a row stays where it is dragged, into a folder or out of one — ending in a New chat row (a
 `+` pill shaped like a chat, `SidebarNewChatButton.tsx`) and a New folder button. The project a new chat starts in is picked
-on the new-chat screen, beside the model, and saved as the list's project for new chats;
+on the new-chat screen, beside the model, and saved as the list's project for new chats (a project whose folder is gone is neither offered nor kept as the saved choice, and same-named projects carry a hint: MAN-8135);
 `openProjectChat` (project-workspace) saves it the same way before any new chat it opens.
 `src/modules/sidebar/SidebarSimpleList.tsx` composes it from five module-private
 hooks (`hooks/useSimpleChatList.ts`, `hooks/useSimpleChatProject.ts`, `hooks/useSimpleChatRemove.ts`,

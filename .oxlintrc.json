@@ -124,7 +124,8 @@
           "src/shared/claude-update-types.ts",
           "src/shared/roadmap-types.ts",
           "src/shared/cerberus-types.ts",
-          "src/shared/sessionRecency.ts"
+          "src/shared/sessionRecency.ts",
+          "src/shared/projectNameHints.ts"
         ],
         "mode": "file"
       },

@@ -31,6 +31,8 @@ type SidebarSimpleListItemsProps = {
    * has said. A Claude chat NOT in it is asleep and its row is grayed — nothing is grayed while null.
    */
   liveHostSessionIds: ReadonlySet<string> | null;
+  /** What sets a project apart from another of the same name, by project id (`projectNameHints`); a chat whose project has no entry draws none. */
+  projectNameHints: ReadonlyMap<string, string>;
   /** The chat whose removal failed, which its row says out loud; null when none has. */
   failedSessionId: string | null;
   /** The folder that has just been made: its header opens its name for typing and scrolls itself in. */
@@ -150,6 +152,7 @@ export default function SidebarSimpleListItems({
   awaitingInputSessionIds,
   subagentRunningSessionIds,
   liveHostSessionIds,
+  projectNameHints,
   failedSessionId,
   freshFolderId,
   onFreshShown,
@@ -180,6 +183,7 @@ export default function SidebarSimpleListItems({
       // Only a Claude chat can have a session host, so only one can be asleep: another provider's
       // chat is never grayed, and nothing is until the server's first snapshot has arrived.
       isAsleep={liveHostSessionIds !== null && chat.provider === 'claude' && !liveHostSessionIds.has(chat.sessionId)}
+      projectNameHint={(chat.projectId && projectNameHints.get(chat.projectId)) || null}
       isRemoveFailed={failedSessionId === chat.sessionId}
       // FILL: onSelectChat
       onSelect={() => onSelectChat(chat)}

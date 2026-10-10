@@ -5,7 +5,8 @@ import type { NavigateFunction } from 'react-router-dom';
 import { useOpenProjectChat } from '@/modules/project-workspace/hooks/useOpenProjectChat';
 import { useProjectsState } from '@/modules/project-workspace/hooks/useProjectsState';
 import { GIT_REPO_PATHS } from '@/shared/constants';
-import type { GitRepository, IsSessionProcessing, ProjectChoice, ServerEvent } from '@/shared/types';
+import { projectNameHints } from '@/shared/projectNameHints';
+import type { GitRepository, IsSessionProcessing, Project, ProjectChoice, ServerEvent } from '@/shared/types';
 
 type ProjectsState = ReturnType<typeof useProjectsState>;
 
@@ -31,7 +32,7 @@ type ProjectMainState = Pick<
 > & {
   /** The git tab's repositories in strip order, memoised on the fields the tab reads. */
   gitRepositories: GitRepository[];
-  /** Every project a new chat can start in, by name, memoised on its id, name and path. */
+  /** Every project, by name, memoised on its id, name, path, name hint and folder mark; a new chat's picker lists those whose folder exists. */
   projectChoices: ProjectChoice[];
   /** Points the workspace at a project by id; an id no longer in the list does nothing. */
   selectProjectById: (projectId: string) => void;
@@ -52,7 +53,7 @@ type ProjectActiveSessionState = {
 };
 
 type ProjectChatState = {
-  /** Every project a chat can be pointed at, by name, memoised on its id, name and path. */
+  /** Every project a chat can be pointed at, by name, memoised on its id, name, path, name hint and folder mark. */
   projectChoices: ProjectChoice[];
   /** The one door into a project's conversation, with one identity for the provider's life. */
   openProjectChat: ReturnType<typeof useOpenProjectChat>;
@@ -66,6 +67,20 @@ type ProjectsStateProviderProps = {
   isMobile: boolean;
   isSessionProcessing: IsSessionProcessing;
 };
+
+/** One row per project, by name: `[id, name, path, name hint, folder missing]`, the fields a `ProjectChoice` is made of. */
+function projectChoiceRows(projects: Project[]): [string, string, string, string | null, boolean][] {
+  const hints = projectNameHints(projects);
+  return [...projects]
+    .sort((a, b) => a.displayName.localeCompare(b.displayName))
+    .map((project) => [
+      project.projectId,
+      project.displayName,
+      project.fullPath,
+      hints.get(project.projectId) ?? null,
+      project.isFolderMissing === true,
+    ]);
+}
 
 const ProjectSidebarContext = createContext<ProjectSidebarState | null>(null);
 const ProjectMainContext = createContext<ProjectMainState | null>(null);
@@ -131,16 +146,20 @@ export function ProjectsStateProvider({
     [gitRepositoriesKey],
   );
 
-  // The same discipline for the new-chat project picker: a list keyed on the id, name and path
-  // alone, so a session upsert that rebuilds `state.projects` does not wake the chat pane.
-  const projectChoicesKey = JSON.stringify(
-    [...state.projects]
-      .sort((a, b) => a.displayName.localeCompare(b.displayName))
-      .map((project) => [project.projectId, project.displayName, project.fullPath]),
-  );
+  // The same discipline for the new-chat project picker: a list keyed on the id, name, path, name
+  // hint and folder mark alone, so a session upsert that rebuilds `state.projects` does not wake the
+  // chat pane. The hints are worked out over the WHOLE list here, so a project reads the same in the
+  // picker as in the chat list; the picker itself leaves a gone-folder project out.
+  const projectChoicesKey = JSON.stringify(projectChoiceRows(state.projects));
   const projectChoices = useMemo<ProjectChoice[]>(
-    () => (JSON.parse(projectChoicesKey) as [string, string, string][])
-      .map(([projectId, displayName, fullPath]) => ({ projectId, displayName, fullPath })),
+    () => (JSON.parse(projectChoicesKey) as [string, string, string, string | null, boolean][])
+      .map(([projectId, displayName, fullPath, nameHint, isFolderMissing]) => ({
+        projectId,
+        displayName,
+        fullPath,
+        nameHint,
+        isFolderMissing,
+      })),
     [projectChoicesKey],
   );
   // The full project is looked up at pick time, from the newest list, through a ref, so the

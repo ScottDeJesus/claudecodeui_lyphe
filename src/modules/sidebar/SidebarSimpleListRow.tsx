@@ -29,6 +29,8 @@ type SidebarSimpleListRowProps = {
   /** The chat has no live session host: the row is grayed and says so on hover. It stays fully usable — the next message starts a host. */
   isAsleep: boolean;
   isRemoveFailed: boolean;
+  // What sets the chat's project apart from another of the same name; null when its name is its own.
+  projectNameHint: string | null;
   // One step in, under the folder this chat sits in: indented, and marked `data-nested`.
   isNested: boolean;
   onSelect: () => void;
@@ -56,6 +58,7 @@ export default function SidebarSimpleListRow({
   isSubagentRunning,
   isAsleep,
   isRemoveFailed,
+  projectNameHint,
   isNested,
   onSelect,
   onArchive,
@@ -171,8 +174,14 @@ export default function SidebarSimpleListRow({
         >
           {/* Asleep: muted ink; one step up (ink-mid) on the selected wash, where muted reads 4.30:1 (AA is 4.5). */}
           <span className={cn('block truncate text-[13px] font-normal leading-4', isAsleep && (isSelected ? 'text-secondary-foreground' : 'text-muted-foreground'))}>{row.sessionTitle}</span>
-          <span className="mt-0.5 block truncate text-[10px] leading-3 text-muted-foreground">
-            {row.projectDisplayName}
+          <span className="mt-0.5 flex min-w-0 items-center gap-1 text-[10px] leading-3 text-muted-foreground">
+            <span className="truncate">{row.projectDisplayName}</span>
+            {/* Beside the name, never in it: the name stays what the rename box and the server read. The
+                name gives way first on a narrow row, because the hint is the part that tells this project
+                from the other of its name. */}
+            {projectNameHint && (
+              <span data-testid="simple-chat-project-hint" className="max-w-[60%] flex-shrink-0 truncate">{`· ${projectNameHint}`}</span>
+            )}
           </span>
           {isRemoveFailed && (
             <span className="mt-0.5 block truncate text-[10px] leading-3 text-destructive">

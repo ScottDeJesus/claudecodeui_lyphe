@@ -9071,3 +9071,81 @@ measured 2026-10-09 by chain chain-compaction-handover--docs-20261009-165748-35f
 probe-key: e6852f37a3718584776643cb3876c453c74c9664
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/
+
+## INV-7576 — probe — two same-named projects in the same parent folder get the SAME hint
+
+two same-named projects in the same parent folder get the SAME hint
+
+```probe
+D=$(mktemp -d /tmp/athena-p.XXXXXX) || exit 1
+cat > "$D/h.mts" <<'EOF'
+import { projectNameHints } from '/home/lyphe/.claude/claudecodeui_lyphe/src/shared/projectNameHints.ts';
+const list = [
+  { projectId: 'a', displayName: 'repo', fullPath: '/home/me/foo' },
+  { projectId: 'b', displayName: 'repo', fullPath: '/home/me/repo' },
+];
+const hints = projectNameHints(list);
+console.log('hints:', JSON.stringify([...hints.values()]), 'distinct:', new Set(hints.values()).size === list.length);
+EOF
+cat > "$D/p.sh" <<'EOF'
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+node_modules/.bin/tsx "$1/h.mts"
+EOF
+bash "$D/p.sh" "$D"
+cd /tmp; case "$D" in /tmp/athena-p.??????) rm -r "$D";; esac
+echo "[probe exit $?]"
+expect: `hints: ["home/me","home/me"] distinct: false` while the defect stands; cured when it prints `distinct: true`
+```
+
+measured 2026-10-09 by chain chain-project-name-hints-20261009-205007-0d30, finding H1, HIGH
+probe-key: a9cf1905094868acdff61654c16d04316014adb0
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/projectNameHints.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/project-name-hints.mjs
+
+## INV-7577 — probe — a folder that vanishes while the page is open is never marked or withdrawn until a full reload
+
+a folder that vanishes while the page is open is never marked or withdrawn until a full reload
+
+```probe
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+echo "isFolderMissing mentions in useProjectsState.ts (the file whose projectsHaveChanges decides whether a refreshed list replaces the held one): $(grep -c 'isFolderMissing' src/modules/project-workspace/hooks/useProjectsState.ts)"
+echo "[probe exit $?]"
+expect: `…: 0` while the defect stands (measured in the browser, see athena-1-evidence/stale.mjs and stale2.mjs); cured when it is at least 1 and the refresh click in stale.mjs shows the note on `vanishing`
+```
+
+measured 2026-10-09 by chain chain-project-name-hints-20261009-205007-0d30, finding H2, HIGH
+probe-key: 551665cde7e4a960fe6532a7caf8b061505c4bc5
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/projectNameHints.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/project-name-hints.mjs
+
+## INV-7578 — probe — a long hint wraps and hard-clips in the dropdown row, with no ellipsis
+
+a long hint wraps and hard-clips in the dropdown row, with no ellipsis
+
+```probe
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+echo "overflow/ellipsis rules on .vv-select__hint or .vv-select__option in controls.css: $(grep -E 'vv-select__(hint|option)\b' src/shared/ui/verve/controls.css | grep -c -E 'ellipsis|overflow|word-break|overflow-wrap')"
+echo "[probe exit $?]"
+expect: `…: 0` while the defect stands (measured: option scrollWidth 543 > clientWidth 242 at 320 px); cured when the hint or the row has an overflow rule and the long-hint dropdown shows an ellipsis
+```
+
+measured 2026-10-09 by chain chain-project-name-hints-20261009-205007-0d30, finding L1, LOW
+probe-key: ba083d2d48a6c36e8edd91bf04f16d9ec16df41b
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/projectNameHints.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/project-name-hints.mjs
+
+## INV-7579 — probe — Settings' "default project for new chats" picker still names projects by bare name and lists gone folders
+
+Settings' "default project for new chats" picker still names projects by bare name and lists gone folders
+
+```probe
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+echo "hint/mark uses in AppearanceSettingsTab.tsx: $(grep -c -E 'nameHint|projectNameHints|isFolderMissing' src/modules/settings/tabs/AppearanceSettingsTab.tsx)"
+echo "[probe exit $?]"
+expect: `…: 0` while the picker names projects bare; cured when it is at least 1
+```
+
+measured 2026-10-09 by chain chain-project-name-hints-20261009-205007-0d30, finding L2, LOW
+probe-key: ad28409cfb495d8ccfcadaa15a1b52ee41166f85
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/projectNameHints.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/project-name-hints.mjs

@@ -121,6 +121,8 @@ export type Project = {
   fullPath: string;
   path?: string;
   isStarred?: boolean;
+  /** The server found the project's folder gone from this machine (missing, or not a folder): a chat cannot start there. Never set for a project assigned to a node. */
+  isFolderMissing?: boolean;
   sessions?: ProjectSession[];
   sessionMeta?: ProjectSessionMeta;
   taskmaster?: ProjectTaskmasterInfo;
@@ -137,9 +139,13 @@ export type GitRepository = Pick<Project, 'projectId' | 'fullPath' | 'displayNam
 /**
  * A project a chat can be pointed at, as the new-chat screen's project picker lists it: its id, its
  * name, and its `fullPath` — the absolute path of the repository, which is how an application
- * registered against a project (`AppEntry.project`) is matched to it.
+ * registered against a project (`AppEntry.project`) is matched to it. `nameHint` is what sets it
+ * apart from a project of the same name (`projectNameHints`), null when its name is its own;
+ * `isFolderMissing` marks one a chat cannot start in, which the new-chat picker leaves out.
  */
-export type ProjectChoice = Pick<Project, 'projectId' | 'displayName' | 'fullPath'>;
+export type ProjectChoice = Pick<Project, 'projectId' | 'displayName' | 'fullPath' | 'isFolderMissing'> & {
+  nameHint: string | null;
+};
 
 /** Progress payload streamed while the backend enumerates projects, used to drive the sidebar loading bar. */
 export type LoadingProgress = {
@@ -1682,6 +1688,8 @@ export type AgentSettingsProject = {
   displayName?: string;
   fullPath?: string;
   path?: string;
+  /** The project's folder is gone from this machine; Settings' default-project picker leaves it out. */
+  isFolderMissing?: boolean;
 };
 
 /** Claude's persisted permission settings: the allowed and disallowed tool patterns and whether permission prompts are skipped; read and written as one unit by the settings controller. */
@@ -1953,6 +1961,7 @@ export type SettingsProject = {
   displayName: string;
   fullPath: string;
   path?: string;
+  isFolderMissing?: boolean;
 };
 
 /** How the session picker's list stands: `ready` draws its rows, `loading` draws placeholders while the simple list's first page is in flight, `error` says the list could not be read. The project tree is always `ready`. */
@@ -1972,6 +1981,8 @@ export type SessionPickerRow = {
   projectId: string | null;
   /** The project's name, drawn under the title where the row stands alone (the simple list); null under a project heading, which already says it. */
   projectName: string | null;
+  /** What sets the project apart from another of the same name, drawn beside `projectName` in muted text (`projectNameHints`); null when the name is its own or the row has no `projectName`. */
+  projectNameHint: string | null;
   /** The simple list's chosen icon name; null draws the default glyph. */
   icon: string | null;
   isRunning: boolean;

@@ -2,7 +2,7 @@ import { memo, useEffect, useRef } from 'react';
 import { Check, ChevronDown, ChevronRight, Edit3, Star, Trash2, X } from 'lucide-react';
 import type { TFunction } from 'i18next';
 
-import { Button } from '@/shared/ui';
+import { Badge, Button } from '@/shared/ui';
 import { cn } from '@/shared/utils';
 import type { LLMProvider, MCPServerStatus, Project, ProjectSession, SessionWithProvider } from '@/shared/types';
 import { getTaskIndicatorStatus } from '@/modules/sidebar/utils/sidebarProjectFormatting';
@@ -110,6 +110,13 @@ function SidebarProjectItem({
   const projectMetaLine = getProjectMetaLine(project, totalSessionCount, t);
   const taskStatus = getTaskIndicatorStatus(project, mcpServerStatus);
   const mobileRenameInputRef = useRef<HTMLInputElement>(null);
+  // The server found this project's folder gone from the machine: a chat cannot start in it. Only a
+  // note, with the path on hover; the row's own actions, archiving included, stay the reader's to use.
+  const folderMissingNote = project.isFolderMissing ? (
+    <Badge tone="warn" className="mt-1 text-[11px]" title={project.fullPath} data-testid="project-folder-missing">
+      {t('projects.folderMissing', { defaultValue: 'Folder missing' })}
+    </Badge>
+  ) : null;
 
   useEffect(() => {
     if (!isEditing || !mobileRenameInputRef.current) {
@@ -226,6 +233,7 @@ function SidebarProjectItem({
                       <p className="truncate text-xs text-muted-foreground" title={project.fullPath}>
                         {projectMetaLine}
                       </p>
+                      {folderMissingNote}
                     </>
                   )}
                 </div>
@@ -362,6 +370,7 @@ function SidebarProjectItem({
                   <div className="mt-0.5 truncate text-xs text-muted-foreground" title={project.fullPath}>
                     {projectMetaLine}
                   </div>
+                  {folderMissingNote}
                 </div>
               )}
             </div>

@@ -520,13 +520,13 @@ Returns `{ projectChoices, openProjectChat }` from `ProjectChatContext`, the inn
 
 | field | type | holds |
 |---|---|---|
-| `projectChoices` | `ProjectChoice[]` | every project a chat can be pointed at |
+| `projectChoices` | `ProjectChoice[]` | every project by name, gone-folder ones included (`isFolderMissing`); the new-chat picker leaves those out (MAN-8135) |
 | `openProjectChat` | `(projectPath: string \| null, mode: 'latest' \| 'new') => boolean` | the one door into a project's conversation |
 
-- `ProjectChoice` = `Pick<Project, 'projectId' \| 'displayName' \| 'fullPath'>` (`src/shared/types.ts`); memoised on a JSON key of `[projectId, displayName, fullPath]`, so a session upsert does not rebuild it.
+- `ProjectChoice` = `Pick<Project, 'projectId' \| 'displayName' \| 'fullPath' \| 'isFolderMissing'> & { nameHint: string \| null }` (`src/shared/types.ts`); memoised on a JSON key of `[projectId, displayName, fullPath, nameHint, isFolderMissing]` (`projectChoiceRows`), so a session upsert does not rebuild it. `nameHint` = `projectNameHints(state.projects)` over the whole list (MAN-8135).
 - Separate from `ProjectMainContext` so a reader of only these two is not woken by a selection change or a `projects` rebuild.
 - The value is memoised on the two fields and moves only when the choices do.
-- `ProjectsStateContext.tsx` is 297 lines: the next reader hook added there needs an extraction first.
+- `ProjectsStateContext.tsx` is 316 lines: the next reader hook added there needs an extraction first.
 - Readers: `ProjectWorkspaceShell` (`projectChoices`, handed to `AppSwitcherProvider`), `useChatDoor` (`openProjectChat(app.project, 'latest')`, once per visit of an application) and `FloatingChatHeader` (`openProjectChat(app.project ?? null, 'new')`).
 
 ## `openProjectChat(projectPath, mode)` — `src/modules/project-workspace/hooks/useOpenProjectChat.ts`
@@ -1010,7 +1010,7 @@ The floating chat's header switcher: a two-line trigger and a panel listing the 
 | `SidebarSessionPickerMenu.tsx` | default export, the view: `name`, `projectName`, `groups`, `status`, `currentSessionId`, `hasMore`, `onPick(row)`, `onNewChat`, `onLoadMore`. Draws trigger content, pinned New chat, states, groups, Show more |
 | `SidebarSessionPickerPopover.tsx` | default export, the mechanics: `trigger`, `triggerTitle`, `label`, `pinned`, `children` |
 | `SidebarSessionPickerRow.tsx` | default export, one conversation: `row`, `standalone`, `isCurrent`, `onPick` |
-| `utils/sessionPickerGroups.ts` | `groupsFromProjects(projects, marks, nameOf)`, `groupsFromSimpleList(rows, marks)` |
+| `utils/sessionPickerGroups.ts` | `groupsFromProjects(projects, marks, nameOf)`, `groupsFromSimpleList(rows, marks, projectNameHints)` |
 | `utils/projectStarOverrides.ts` | the reader's toggled stars, shared with the sidebar controller: `useProjectStarOverrides()`, `withResolvedStarState(projects, overrides)` (MAN-7507) |
 | `utils/sidebarProjectFormatting.ts` | exports `getSessionName(session: ProjectSession, t)`: summary, else name, else `projects.newSession`; `sortProjects(projects, order)` |
 
@@ -1020,18 +1020,18 @@ Types in `src/shared/types.ts`, group `SIDEBAR`: `SessionPickerStatus` (`'ready'
 
 | shape | blocks | row |
 | --- | --- | --- |
-| simple list (`groupsFromSimpleList`) | one, key `simple-list`, `heading: null`, feed order kept | `standalone`: icon (`SimpleChatIconGlyph`), 13px title, 10px project line; `unread` from the feed |
-| project tree (`groupsFromProjects`) | one per project in the order handed in, `key` = `projectId`, `heading` = `displayName \|\| projectId` | one line; `projectName`, `icon` null, `unread` false; sessions from `getAllSessions(project)`, newest first |
+| simple list (`groupsFromSimpleList`) | one, key `simple-list`, `heading: null`, feed order kept | `standalone`: icon (`SimpleChatIconGlyph`), 13px title, 10px project line, then `· <projectNameHint>` when the project's name is shared (MAN-8135); `unread` from the feed |
+| project tree (`groupsFromProjects`) | one per project in the order handed in, `key` = `projectId`, `heading` = `displayName \|\| projectId` | one line; `projectName` and `projectNameHint` null, `icon` null, `unread` false; sessions from `getAllSessions(project)`, newest first |
 
 - A project with no sessions stays a block: `projects.noConversations` under its heading. why: a missing project reads as not there.
 - Headings are `sticky top-0 bg-card`; New chat is pinned outside the scrolling list.
-- `nameOf` is passed in; the file holds no copy of the naming rule.
+- `nameOf` and `projectNameHints` are passed in; the file holds no copy of either rule.
 
 ## Data — `useSessionPicker`
 
 | when | do |
 | --- | --- |
-| `useSimpleChatListPreferences().enabled` | groups = `groupsFromSimpleList(list.rows, marks)`; `list` = `useSimpleChatList(selectedSessionId, enabled)`, whose `rows` is `flattenChats(items)` — every chat of the feed's tree, a folder's chats in its place (MAN-7524) |
+| `useSimpleChatListPreferences().enabled` | groups = `groupsFromSimpleList(list.rows, marks, projectHints)`; `projectHints` = `projectNameHints(projects)` over the whole `projects` list; `list` = `useSimpleChatList(selectedSessionId, enabled)`, whose `rows` is `flattenChats(items)` — every chat of the feed's tree, a folder's chats in its place (MAN-7524) |
 | preference off | groups = `groupsFromProjects(sortProjects(withResolvedStarState(projects, starOverrides), sortOrder), marks, nameOf)`; `starOverrides` = `useProjectStarOverrides()`; `sortOrder` = `useSyncExternalStore(subscribeToUserPreferences, readProjectSortOrder)`, so it follows the preference live |
 | marks | `useBusySessionIdSet`, `useAwaitingInputSessionIdSet`, `useSubagentRunningSessionIdSet` |
 | `status` | simple list with no rows: `list.hasError` → `'error'`, else `list.isLoading` → `'loading'`; otherwise `'ready'`, always `'ready'` in the tree. why: `reload` sets `isLoading` on every `session_upserted` and `simple_list_changed`; mapping it straight would blank the drawn list for a skeleton each time |
@@ -1330,7 +1330,7 @@ Rules of the picker's view: the panel's mechanics and the trigger and row it dra
 6. The open conversation: `aria-current="true"`, `bg-primary/10`, `font-medium` and a `Check` tick, so it survives greyscale.
 7. States, each with New chat still pinned: loading (three `vv-skeleton` rows in `role="status"`, `chatHost.pickerLoading`); error (`Banner tone="warn"`, `chatHost.pickerError`); no groups, or the simple list's one empty block (paragraph `chatHost.pickerEmpty`).
 8. Show more (`simpleList.loadMore`, "Show more") draws only when `status === 'ready'`, the list is not empty and `hasMore`; it calls `onLoadMore` and keeps the panel open.
-9. Selectors: `[data-picker-item]`, `role="group"`; `[role="menu"]` and `[role="menuitem"]` select nothing. Test ids: `session-picker-trigger`, `-panel`, `-new`, `-row` (with `data-session-id`), `-flat`, `-project`, `-project-empty`, `-empty`, `-load-more`.
+9. Selectors: `[data-picker-item]`, `role="group"`; `[role="menu"]` and `[role="menuitem"]` select nothing. Test ids: `session-picker-trigger`, `-panel`, `-new`, `-row` (with `data-session-id`), `-flat`, `-project`, `-project-hint`, `-project-empty`, `-empty`, `-load-more`.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/SidebarSessionPickerMenu.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/SidebarSessionPickerPopover.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/SidebarSessionPickerRow.tsx
 
@@ -2290,6 +2290,12 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Timeline.tsx
 - No chosen row (`value` matches no option): the list opens at its top.
 - why: History's check picker holds every active check (84 on the live index); opened at its top it hid the choice being reconsidered (MAN-7877).
 
+## Option `hint`
+- `SelectOption` = `{ value, label, hint? }`. `hint` is secondary text after the label in `.vv-select__hint` (muted ink, 0.86em), for a choice whose label alone does not name it (two projects called `app`; MAN-8135). It is never part of `label`.
+- The trigger and every option draw it through `OptionText`, with a real space (`{' '}`) before the span. why: a CSS margin is not text, so the accessible name and a copied label ran the words together.
+- An option that has a hint truncates (`min-w-0 truncate`) like the trigger; options without one are unchanged.
+- On the chosen row's wash the hint steps up one ink (`--ink-mid`). why: `--ink-muted` read 4.44:1 there, under AA.
+
 ## Rules
 - `.vv-select__panel` (`position: absolute`, `controls.css`) must stay the positioned ancestor of `.vv-select__list` and its rows. why: the offset arithmetic above reads both offsets from it; a `position: relative` on the list or a row breaks the centring.
 - `.vv-select__list` is the scroller (`overflow-y: auto`); the `action` row sits outside it.
@@ -2681,3 +2687,72 @@ Proves, on real Haiku chats driven through the composer: the decorator's start-o
 - `custom-compaction-whole.sh`'s search step needs a word only the first transcript holds. Every seed's operator block carries each typed message verbatim, so nothing the first prompts say stays out of the later transcripts; the manual leg's first turn asks the assistant for a lorem ipsum filler paragraph "only for the record", which a summary drops (measured with the verb at `SUMMARIZE_TAIL_TOKENS=50`: 27 of 32 words absent from the seed). A list of thirty obscure words with definitions is carried whole (0 of 79 absent). The search reads `text` blocks only and skips `isMeta` rows, so a word in a tool result or a skill body is never found by it.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/compaction-handover-chat.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/compaction-handover.sh, /home/lyphe/.claude/claudecodeui_lyphe/.verify/compaction-handover-whole.sh, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/handover-whole.mjs
+
+## MAN-8135 — Same-named projects and gone folders — `projectNameHints`, `isFolderMissing`, where each shows
+
+Two lists of rules: a project NAME is not unique (a worktree, a copy), and a project's FOLDER can be gone. Both are decided once and drawn by every list that names a project.
+
+## `projectNameHints(projects)` — `src/shared/projectNameHints.ts`
+
+| item | value |
+|---|---|
+| signature | `projectNameHints(projects: readonly Pick<Project, 'projectId' \| 'displayName' \| 'fullPath'>[]): Map<string, string>` |
+| returns | `projectId` → hint, ONLY for projects that share a `displayName` with another; a unique name has no entry (`hints.get(id) ?? null`) |
+| input | the WHOLE visible list, never a filtered one: a filtered list can drop the other project of the name |
+| pure | no I/O; no copy of the rule lives anywhere else |
+
+Hint rule, per group of one name:
+
+| when | hint |
+|---|---|
+| parents differ | the fewest trailing parent-folder names that differ from every other project of the name; one more parent where the last ones collide (`a/x`, `b/x`, `y`) |
+| two projects share the SAME parent (`/home/me/foo` named `repo` beside `/home/me/repo`) | their own folder names (`foo`, `repo`), lengthened with the parents above only when another hint already reads the same |
+| project at the filesystem root | `/` |
+
+- Each project gets its own depth, not the group's.
+- The hint is secondary text drawn BESIDE the name in a muted ink; never fold it into `displayName`, which the rename box and the server read.
+- The helper is a shared file registered in `.oxlintrc.json`'s shared-file list; a new shared helper is added there or lint flags every import.
+
+## Callers — one list, one hint
+
+| surface | where | draws |
+|---|---|---|
+| new-chat project dropdown | `ProjectsStateProvider` computes `nameHint` into every `ProjectChoice` (MAN-7444); `ProviderSelectionEmptyState` maps it to the `Select` option `hint` | trigger and options |
+| chat list row | `SidebarSimpleList` → `SidebarSimpleListItems` → `SidebarSimpleListRow` `projectNameHint` | `· <hint>` after the 10px project line, `data-testid="simple-chat-project-hint"` |
+| session picker row | `useSessionPicker` → `groupsFromSimpleList(rows, marks, projectHints)` → `SessionPickerRow.projectNameHint` | `· <hint>` after the project line, `data-testid="session-picker-project-hint"` (MAN-7473) |
+| Settings default-project picker | `AppearanceSettingsTab` `simpleChatProjectOptions` | `Select` option `hint` |
+
+- A row's project line truncates the NAME before the hint; the hint is the part that tells the project apart (`max-w-[60%] flex-shrink-0 truncate`).
+- Not covered (a bare name): the tree-mode Recent conversations list, sidebar search results. A new surface that names a project calls `projectNameHints` over the whole list.
+
+## `isFolderMissing`
+
+| item | value |
+|---|---|
+| set by | `getProjectsWithSessions` (`projects-with-sessions-fetch.service.ts`) per project through `diagnoseProjectFolder` (`list/claude/claude-project-folder.ts`, exported by the `providers` barrel) — the SAME test the run pre-flight uses (MAN-699) |
+| never true | for a project assigned to a node (`projectsDb.nodeForPath(path) !== null`): its folder lives on the node; for an archived item |
+| type | `ProjectListItem.isFolderMissing: boolean` (server); `Project.isFolderMissing?: boolean` (client); `SettingsProject` and `AgentSettingsProject` carry it optionally, set in `normalizeProjectForSettings` |
+
+| surface | effect |
+|---|---|
+| new-chat dropdown (`ProviderSelectionEmptyState`) | project left out |
+| `useSimpleChatProject` | skipped, saved choice and first-project fallback alike; a saved gone project falls back as if absent |
+| Settings default-project picker | project left out |
+| project tree row (`SidebarProjectItem`) | `Badge tone="warn"` "Folder missing" (`projects.folderMissing`, en only, `defaultValue`), path as hover `title`, `data-testid="project-folder-missing"`, compact and desktop layouts |
+
+- The tree's own actions on a marked project are unchanged; archiving it stays the reader's click.
+- A folder that vanishes while the page is open reaches the client only if `projectsHaveChanges` (`useProjectsState.ts`) compares the field. A new field the server adds to the project list is added there too, or an idle refresh drops it.
+
+## `HIDDEN_PROJECT_ROOTS` — `server/shared/hidden-project-paths.ts`
+
+- Roots: `TEST_PROJECTS_ROOT`, `~/.claude/state`, `/tmp`, `/var/tmp`, `os.tmpdir()`. A project under one is out of every project list, feed and search.
+- Mirror: `~/.claude/scripts/heal_friction_who.py` `HIDDEN_ROOTS`. A root added to the TS list is added there, or a probe chat in it reads as operator-typed.
+
+## Proof — `.verify/project-name-hints.mjs`
+
+- Run through `.verify/project-name-hints-scratch.sh`: a scratch API on a copy of the database, fixtures under `/dev/shm`, the client served twice (`after` = now; `before` = the touched files from git HEAD via `.verify/lib/vite-scratch-before.config.mjs`). Nothing touches the operator's list.
+- Command: `node .verify/project-name-hints.mjs --label before|after --app <url> --fixture-root <dir> [--out <dir>]`. `after` exits 1 on any failed check; `before` records only.
+- Reads, per desktop and mobile × dark and light: the new-chat dropdown, the chat list, the session picker, the tree's "Folder missing" badge. Artifacts: `.verify/artifacts/project-name-hints/`.
+- 2026-10-09: after 58 checks per label, all pass, no console or page errors; before 38 fail. Hint ink contrast 5.06 or better; the chosen option row steps up one ink (`.vv-select__option[aria-selected='true'] .vv-select__hint`).
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/projects/services/projects-with-sessions-fetch.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/hidden-project-paths.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/hooks/useProjectsState.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/projectNameHints.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/project-name-hints.mjs

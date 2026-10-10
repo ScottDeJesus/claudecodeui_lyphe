@@ -108,12 +108,12 @@ why three of its files are plain ESM JavaScript, are in
 [`server/modules/providers/list/claude/session-host/MANUAL.md (README)`](list/claude/session-host/MANUAL.md) §"Re-adoption, on boot".
 
 **A chat whose project folder is gone.** The run loop in `claude-runtime.provider.js` checks the run's
-settled `cwd` (`assertProjectFolderExists`, `list/claude/claude-project-folder.ts`) before
+settled `cwd` (`assertProjectFolderExists` over `diagnoseProjectFolder`, `list/claude/claude-project-folder.ts`; the projects list asks the same test to mark a gone project, MAN-8135) before
 `armKeepaliveSpawn`, so before any host or process starts, and for every door that starts a CLI on this
 machine: a send, an edited send, a compaction's restart from scratch, a respawn after a retirement. A
 re-adoption (its CLI already runs) and a node's project (its folder lives on the node) are not checked.
 The client gets ONE `error` frame naming the folder ("This project's folder no longer exists on this
-machine: <path>. Restore the folder, or open the chat in another project."), then the terminal
+machine: <path>. Restore the folder to continue this chat, or start a new chat in another project."), then the terminal
 `complete`; the journal gets one `[Claude SDK] Not starting a process for session …` line and no stack.
 why before the spawn: `tmux new-session -c <missing dir>` silently falls back to the home directory, so
 the host starts, and its `spawn` then fails with an ENOENT whose message names the BINARY. Any other

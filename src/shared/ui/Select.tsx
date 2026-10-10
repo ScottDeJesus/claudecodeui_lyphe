@@ -4,7 +4,12 @@ import { useHostWindow } from '@/shared/context/HostWindowContext';
 import { OWNS_ESCAPE } from '@/shared/ui/overlayEscape';
 import { cn } from '@/shared/utils';
 
-type SelectOption = { value: string; label: string };
+/**
+ * `hint` is secondary text drawn beside the label in a muted ink, for a choice whose label alone
+ * does not name it (two projects both called `app`). It is never part of `label`, so what a caller
+ * reads back as the label stays the name.
+ */
+type SelectOption = { value: string; label: string; hint?: string };
 
 /**
  * The one row in the panel that is not a choice — it MAKES something to choose, and closes the
@@ -25,6 +30,17 @@ type SelectProps = {
   /** Optional. Drawn under the list, behind a hairline, outside the listbox. */
   action?: SelectAction;
 };
+
+/** An option's label, then its muted hint when it has one; the trigger and every row draw it the same way. */
+function OptionText({ option }: { option: SelectOption }) {
+  return (
+    <>
+      {option.label}
+      {/* A real space before the hint: the gap CSS draws is not text, so the accessible name and a copied label would run the two words together. */}
+      {option.hint && <>{' '}<span className="vv-select__hint">{option.hint}</span></>}
+    </>
+  );
+}
 
 /**
  * A single-choice picker with a chevron trigger and an overlay list.
@@ -105,7 +121,7 @@ export function Select({ options, value, onChange, placeholder = 'Choose…', ar
         onClick={() => setOpen((wasOpen) => !wasOpen)}
       >
         <span className={cn('truncate', !selected && 'vv-select__placeholder')}>
-          {selected ? selected.label : placeholder}
+          {selected ? <OptionText option={selected} /> : placeholder}
         </span>
         <span className="vv-select__chevron inline-block shrink-0" aria-hidden="true">
           ▼
@@ -137,7 +153,10 @@ export function Select({ options, value, onChange, placeholder = 'Choose…', ar
                   setOpen(false);
                 }}
               >
-                {option.label}
+                {/* A hinted option truncates like the trigger does: a hint of three long folder names would wrap and clip mid-word. */}
+                <span className={cn('min-w-0', option.hint && 'truncate')}>
+                  <OptionText option={option} />
+                </span>
               </li>
             ))}
           </ul>

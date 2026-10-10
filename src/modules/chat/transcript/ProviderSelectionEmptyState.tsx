@@ -138,8 +138,16 @@ export default function ProviderSelectionEmptyState({
   // saved as that list's project for new chats too, so its New chat row and this picker agree; in
   // the project tree nothing reads that setting, so nothing is written to it.
   const { enabled: simpleListEnabled, setProjectId } = useSimpleChatListPreferences();
+  // A project whose folder is gone is left out: a chat cannot start there. The hint is what sets a
+  // project apart from another of the same name, drawn beside the name and never in it.
   const projectOptions = useMemo(
-    () => projectChoices.map((project) => ({ value: project.projectId, label: project.displayName })),
+    () => projectChoices
+      .filter((project) => !project.isFolderMissing)
+      .map((project) => ({
+        value: project.projectId,
+        label: project.displayName,
+        hint: project.nameHint ?? undefined,
+      })),
     [projectChoices],
   );
   const handleProjectChange = useCallback((projectId: string) => {

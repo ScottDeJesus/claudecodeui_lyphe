@@ -29,6 +29,7 @@ export function groupsFromProjects(
       provider: session.__provider,
       projectId: project.projectId,
       projectName: null,
+      projectNameHint: null,
       icon: null,
       isRunning: marks.running.has(session.id),
       isAwaitingInput: marks.awaitingInput.has(session.id),
@@ -41,11 +42,14 @@ export function groupsFromProjects(
 /**
  * Used by useSessionPicker for the simple list's shape (`useSimpleChatList` is the feed that hands it the
  * rows): ONE block with no heading, the rows in the order the feed gave them (the reader's
- * own order, which the server keeps). Each row names its own project, because nothing above it does.
+ * own order, which the server keeps). Each row names its own project, because nothing above it does,
+ * and adds the hint that sets that project apart from another of the same name (`projectNameHints`,
+ * worked out over the whole project list and handed in, so this file holds no copy of the rule).
  */
 export function groupsFromSimpleList(
   rows: RecentConversationListItem[],
   marks: SessionPickerMarks,
+  projectNameHints: ReadonlyMap<string, string>,
 ): SessionPickerGroup[] {
   return [{
     key: 'simple-list',
@@ -56,6 +60,7 @@ export function groupsFromSimpleList(
       provider: row.provider,
       projectId: row.projectId,
       projectName: row.projectDisplayName,
+      projectNameHint: (row.projectId && projectNameHints.get(row.projectId)) || null,
       icon: row.icon,
       isRunning: marks.running.has(row.sessionId),
       isAwaitingInput: marks.awaitingInput.has(row.sessionId),

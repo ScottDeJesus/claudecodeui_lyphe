@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { TFunction } from 'i18next';
 
 import { api } from '@/shared/api';
+import { projectNameHints } from '@/shared/projectNameHints';
 import { Button, ConfirmDialog, EmptyState } from '@/shared/ui';
 import { useAwaitingInputSessionIdSet, useBusySessionIdSet, useSubagentRunningSessionIdSet } from '@/shared/context/SessionProtectionContext';
 import { useSessionHostLiveSet } from '@/shared/context/SessionHostLivenessContext';
@@ -84,6 +85,9 @@ export default function SidebarSimpleList({
   } = useSimpleChatRemove({ onArchived: handleArchived });
 
   const effectiveProject = useSimpleChatProject(projects);
+  // Worked out over the whole project list, not per row, so a project reads the same here as in the
+  // new-chat picker and the session picker.
+  const projectHints = useMemo(() => projectNameHints(projects), [projects]);
 
   // Deliberately the ids, not the objects: a new selectedSession/selectedProject/effectiveProject
   // reference with the SAME id must not re-arm the effect below, or a parent re-render (not a
@@ -213,6 +217,7 @@ export default function SidebarSimpleList({
             awaitingInputSessionIds={awaitingInputSessionIds}
             subagentRunningSessionIds={subagentRunningSessionIds}
             liveHostSessionIds={liveHostSessionIds}
+            projectNameHints={projectHints}
             failedSessionId={failedSessionId}
             freshFolderId={freshFolderId}
             onFreshShown={onFreshShown}

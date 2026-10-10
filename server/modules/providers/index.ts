@@ -11,6 +11,10 @@ export { providerTokenUsageService } from './services/provider-token-usage.servi
 // advertises to every SDK client, for the chat palette's Claude Code group.
 export { readClaudeCommandCatalog } from './list/claude/claude-command-catalog.js';
 
+// diagnoseProjectFolder: used by the projects module's list to mark a project whose folder is gone,
+// with the same test the Claude run's pre-flight refuses a start by — one folder test, not two.
+export { diagnoseProjectFolder } from './list/claude/claude-project-folder.js';
+
 // sessionsService: used by the websocket module's chat gateway to resolve an
 // edited message's resume point, which only the providers module can read.
 export { sessionsService } from './services/sessions.service.js';
