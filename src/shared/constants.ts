@@ -274,32 +274,6 @@ export const MARKDOWN_CARDS_CLASS = 'chat-md-cards';
 
 // ---------------------------
 
-//----------------- SWARM CEILING LADDER ------------
-
-/**
- * The floor of a swarm ceiling, mirrored from the runner's own grammar: a switch that is on runs at
- * least one phase, and `on 0` is not on at all. Nothing is narrowed above it — the count the operator
- * sets is the count the file holds.
- *
- * Used by `useSwarmSwitch` (the writer clamps to it), `swarmLadderSteps` (the ladder stops there), the
- * dispatcher module's `SwarmControl` (one lane is the word `off`) and the settings module's
- * `RunnerModelContent` (one lane has its own singular).
- */
-export const LANES_MIN = 1;
-
-/**
- * The count the swarm ladder climbs to before `All`: `1, 2, … 6, All`. Six is the widest count the
- * operator has ever chosen. It is only the FLOOR of the ladder's top rung — a wider count in play
- * raises it (`swarmLadderTop`). On the plan card the box's count is always in play, so it stays a rung
- * however the plan's own count moves; on the Settings row the row's own count is the only one.
- *
- * Used by `swarmLadderTop` in `utils.ts`, which both steppers of the swarm — the plan card's
- * `SwarmControl` and the settings module's `RunnerModelContent` — climb through.
- */
-export const SWARM_LADDER_TOP = 6;
-
-// ---------------------------
-
 //----------------- DISPATCHER LANE WALL ------------
 
 /**

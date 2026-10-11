@@ -3,7 +3,7 @@ import {
   getStoredAuthToken,
   storeAuthToken,
 } from '@/shared/authToken';
-import type { AuthTraceEvent, DeepseekRange, DispatcherAsk, DispatcherModelChoice, DispatcherSwarmChoice, FileLinePatch, JevRange, NoteInput, NtfySettingsInput, SimpleListItemRef, SimpleListPosition, SubagentTranscriptResult } from '@/shared/types';
+import type { AuthTraceEvent, DeepseekRange, DispatcherAsk, DispatcherModelChoice, FileLinePatch, JevRange, NoteInput, NtfySettingsInput, SimpleListItemRef, SimpleListPosition, SubagentTranscriptResult } from '@/shared/types';
 import type { AgentLaunchDefaultsChange, AgentLaunchRowChange } from '@/shared/agent-launch-types';
 import type { ClaudeUpdateApplyRequest } from '@/shared/claude-update-types';
 import type { RoadmapWriteBody } from '@/shared/roadmap-types';
@@ -612,22 +612,14 @@ export const api = {
     deepseekFlash: () => get('/api/settings/deepseek-flash'),
     saveDeepseekFlash: (enabled: boolean) => put('/api/settings/deepseek-flash', { enabled }),
 
-    // The plan runner's swarm switch — whether it runs several phases of a plan at once, and the
-    // optional ceiling it runs under. Same host-wide shape as the switch above, for the same
-    // reason, and the same answer read back off disk: `lanes` is a count the operator chose, or
-    // `null` for no ceiling at all, which is what a bare `on` in the flag means.
-    swarmSwitch: () => get('/api/settings/swarm'),
-    saveSwarmSwitch: (state: { enabled: boolean; lanes: number | null }) =>
-      put('/api/settings/swarm', state),
-
     // The dispatcher's planner-lane dial — how many planners (designs, cuts, judgments) may be out at
-    // once. A fifth flag file on this host, in the same host-wide shape and with the same read-back
+    // once. A second flag file on this host, in the same host-wide shape and with the same read-back
     // answer: `lanes` is the whole number the file holds, at least 1, with no "all" above it.
     plannerLanes: () => get('/api/settings/planner-lanes'),
     savePlannerLanes: (state: { lanes: number }) => put('/api/settings/planner-lanes', state),
 
-    // The dispatcher's park-at-peak switch — the fourth flag file on this host, and the same shape
-    // as the three above for the same reason: a file the dispatcher's own process re-reads, not a
+    // The dispatcher's park-at-peak switch — the third flag file on this host, and the same shape
+    // as the two above for the same reason: a file the dispatcher's own process re-reads, not a
     // preference the browser owns. On, an Accept during DeepSeek's peak window queues the plan and
     // arms the hour it lifts; off, Accept walks now. Both calls answer with the state read back off
     // disk, never with what was sent.
@@ -643,7 +635,7 @@ export const api = {
     healMaster: () => get('/api/settings/heal-master'),
     saveHealMaster: (enabled: boolean) => put('/api/settings/heal-master', { enabled }),
 
-    // The reflex's two knob files, beside the master switch and in the swarm switch's shape: the
+    // The reflex's two knob files, beside the master switch and in the same host-wide shape: the
     // nightly cycle's schedule (on/off and its UTC hour) and the day's spend ceiling. Both answer
     // the state read back off disk, never what was typed. `usd: null` is NO CEILING.
     healCycle: () => get('/api/settings/heal-cycle'),
@@ -831,10 +823,6 @@ export const api = {
     // control relays it; nothing is optimistic, and the next `dispatcher_state` frame reads the
     // word back. Restarts nothing — the word is read when a chain is LAUNCHED.
     model: (name: string, model: DispatcherModelChoice) => post(`/api/dispatcher/plans/${encodeURIComponent(name)}/model`, { model }),
-    // A plan's own swarm word (`dispatcher swarm <plan> <word>`) — `off`, `on`, `on <N>`, or `auto` to
-    // follow the box's switch again. The plan card's swarm control relays it; nothing is optimistic,
-    // and the next `dispatcher_state` frame reads the word back. A plan's verb alone: no arc route.
-    swarm: (name: string, swarm: DispatcherSwarmChoice) => post(`/api/dispatcher/plans/${encodeURIComponent(name)}/swarm`, { swarm }),
     // The DISPATCH ARC header's four presses (`dispatcher model|stop|resume|schedule <arc> …`), each
     // relayed to the arc's own door. Separate routes from the plan's because an arc is addressed by
     // its own door (`.arc`), never through a plan's.

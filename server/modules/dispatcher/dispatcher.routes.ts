@@ -1,12 +1,11 @@
 import express from 'express';
 
-import type { DispatcherOffpeak, DispatcherSwarmChoice, DispatcherVerb, DispatcherVerbResult } from '@/shared/types.js';
+import type { DispatcherOffpeak, DispatcherVerb, DispatcherVerbResult } from '@/shared/types.js';
 import {
   dispatcherModelChoiceError,
   dispatcherScheduleWhenError,
   readDispatcherModelChoice,
   readDispatcherScheduleWhen,
-  readDispatcherSwarmWord,
 } from '@/shared/utils.js';
 
 import type { DispatcherPicture } from './dispatcher-state.service.js';
@@ -33,9 +32,6 @@ const PLAN_NAME = /^[a-z0-9][a-z0-9-]{0,99}$/;
  * `<name>` or `<name>.arc`, that one the bare name alone and refuses the `.arc` ending.
  */
 const ARC_NAME = /^[a-z0-9][a-z0-9-]{0,99}(\.arc)?$/;
-
-/** The 400 sentence the swarm route answers with when the body names no word the dispatcher takes. */
-const SWARM_CHOICE_ERROR = 'swarm must be off, on, on <N> (N a whole number from 1 to 9007199254740991), or auto';
 
 export type DispatcherRouterDependencies = {
   /**
@@ -85,19 +81,19 @@ function statusForVerb(result: DispatcherVerbResult): number {
 }
 
 /**
- * The dispatcher lane's sixteen routes: three reads of the plan list, nine presses on a plan, four on
+ * The dispatcher lane's fifteen routes: three reads of the plan list, eight presses on a plan, four on
  * an arc. Auth is the mount's `authenticateToken`, in `server/index.ts`.
  *
  * These handlers validate and translate, and do nothing else: nothing is read here, no process is
  * started here, and no route names a path from the request — the binary and the store are the
  * module's, fixed at composition, and a request can only ever choose a plan or an arc by name, a
- * word from the closed set of nine verbs, and — where the verb takes one — a word from the three
- * model words or the swarm grammar.
+ * word from the closed set of eight verbs, and — where the verb takes one — a word from the three
+ * model words or the schedule grammar.
  *
  * A READ THAT FINDS NO PICTURE IS TOLD SO (`NOT_READ_YET` above), and the read waits a bound for one
  * first: the two together are what keep a handover from being drawn as an empty plan list.
  *
- * FOUR OF THE NINE ARE RELAYED TWICE, once under `/plans/:name` and once under `/arcs/:name`, because
+ * FOUR OF THE EIGHT ARE RELAYED TWICE, once under `/plans/:name` and once under `/arcs/:name`, because
  * the dispatcher's own doors open on both: `model`, `stop`, `resume` and `schedule` take an arc's
  * name as readily as a plan's. The two spellings are two routes rather than one param because the
  * NAME CLASSES differ (`PLAN_NAME` against `ARC_NAME` below) — a fence that would be lost the moment
@@ -189,17 +185,6 @@ export function createDispatcherRouter(dependencies: DispatcherRouterDependencie
     return choice === null ? null : [choice];
   };
 
-  /**
-   * A plan's swarm word — `readDispatcherSwarmWord`'s canonical `off`, `on`, `on <N>`, or the door's
-   * own `auto` — or `null`. The same shape as `modelArgs`: the word becomes an argv word only once it
-   * is one this server spelled.
-   */
-  const swarmArgs = (body: unknown): string[] | null => {
-    const typed = (body as { swarm?: unknown } | undefined)?.swarm;
-    const choice: DispatcherSwarmChoice | null = typed === 'auto' ? 'auto' : readDispatcherSwarmWord(typed);
-    return choice === null ? null : [choice];
-  };
-
   router.post('/plans/:name/stop', relay('stop'));
   router.post('/plans/:name/resume', relay('resume'));
   router.post('/plans/:name/park', relay('park'));
@@ -222,11 +207,6 @@ export function createDispatcherRouter(dependencies: DispatcherRouterDependencie
   // the plan's NEXT phase and never disturbs a walk already out — which is why no plan's state is a
   // reason to refuse this verb, and why the dispatcher's own answer is the whole verdict.
   router.post('/plans/:name/model', relay('model', modelArgs, dispatcherModelChoiceError()));
-  // A plan's own swarm word (`dispatcher swarm <name> <word>`), or `auto` to hand it back to the box's
-  // switch. A PLAN'S VERB ALONE — an arc carries no swarm word — and never refused for a plan's state:
-  // the word is read at the rule's next take-up (`width.reason`), and the dispatcher kicks its own
-  // daemon when the word changed, so a wider word frees a held phase without a press here.
-  router.post('/plans/:name/swarm', relay('swarm', swarmArgs, SWARM_CHOICE_ERROR));
   // A QUEUED plan's Start at a time, and the only verb here with an argument:
   // `dispatcher schedule <name> offpeak|<iso>|none`. The dispatcher refuses a plan that is live or
   // has never waited, and a time already past; that sentence is the 409's body, untouched.

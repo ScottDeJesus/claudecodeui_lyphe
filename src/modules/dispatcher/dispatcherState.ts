@@ -44,11 +44,14 @@ export function epochOf(iso: string | null): number | null {
 
 /**
  * How a plan's word reaches the eye. `live` and `complete` are `positive`: one is walking, the other
- * finished — neither asks for anything. Everything else is `neutral`: `paused`, `queued`,
- * `scheduled`, `parked` and `idle` are all states the operator chose or is waiting on, and amber
- * over a plan they parked themselves would be the card arguing with them.
+ * finished — neither asks for anything. `stalled` is `warn`: a released plan whose work has ended with
+ * nothing to record it is the one state nobody asked for, and its Resume is waiting on the operator.
+ * Everything else is `neutral`: `paused`, `queued`, `scheduled`, `parked` and `idle` are all states
+ * the operator chose or is waiting on, and amber over a plan they parked themselves would be the card
+ * arguing with them.
  */
 export function planStatusTone(status: DispatcherPlanStatus): Tone {
+  if (status === 'stalled') return 'warn';
   return status === 'live' || status === 'complete' ? 'positive' : 'neutral';
 }
 
@@ -100,7 +103,7 @@ export function phaseProgress(plan: DispatcherPlan): { done: number; total: numb
  * `groups` and `rest` are its decks and its plans of no arc, each keeping that order among its own
  * kind (the tab's decks above, its wall below).
  *
- * NOTHING BUT THE OPERATOR'S ARRANGEMENT MOVES A CARD. Status, `updated_at`, an owed word, a swarm
+ * NOTHING BUT THE OPERATOR'S ARRANGEMENT MOVES A CARD. Status, `updated_at`, an owed word, a model
  * press and the open chat all change a plan every few seconds; a card that stood by any of them would
  * jump under the reader's hand. A plan that asks keeps its place and its band.
  *
@@ -156,12 +159,12 @@ export type DispatchDeckLayer = 'done' | 'top' | 'beneath';
 
 /**
  * Which layer of the arc's strip a plan is on — `done` for one that has finished, `top` for the one
- * being walked, `beneath` for everything else. Read by the card for the dimming a finished card wears
+ * being walked or released and stalled, `beneath` for everything else. Read by the card for the dimming a finished card wears
  * and written on the row as the harness's handle, so the strip can be read without measuring pixels.
  */
 export function planLayer(plan: DispatcherPlan): DispatchDeckLayer {
   if (plan.status === 'complete') return 'done';
-  return plan.status === 'live' ? 'top' : 'beneath';
+  return plan.status === 'live' || plan.status === 'stalled' ? 'top' : 'beneath';
 }
 
 /**
@@ -209,11 +212,12 @@ export function waitsOnSiblings(plan: DispatcherPlan, members: DispatcherPlan[])
  * the second gate. `report_planners.of_plan` gives a plan's OWN row first, an ending included, so a
  * plan whose own cut ended short hides its arc's queued cut, and `drop` refuses it. `live` is refused
  * as well, for the window the document cannot see: `phase_chain.launch` forks the walker before the
- * phase carries a `chain_id`, and a plan the rule can launch is exactly a `live` one. Where this is
- * false the card draws no Delete at all.
+ * phase carries a `chain_id`, and a plan the rule can launch is exactly a released one — `live`, or
+ * `stalled`, which the daemon takes up again as soon as it is woken. Where this is false the card
+ * draws no Delete at all.
  */
 export function planDroppable(plan: DispatcherPlan, planners: readonly DispatcherPlanner[]): boolean {
-  if (plan.status === 'live') return false;
+  if (plan.status === 'live' || plan.status === 'stalled') return false;
   if ((plan.phases ?? []).some((phase) => phase.busy)) return false;
   const subjects = plan.arc === null ? [plan.name] : [plan.name, plan.arc];
   return !planners.some((row) => row.state !== 'ended'

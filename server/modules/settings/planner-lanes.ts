@@ -37,10 +37,9 @@ const PLANNER_LANES_MIN = 1;
 const FLAG_MAX_BYTES = 64;
 
 /**
- * The trim `String.trim()` does not do, added so this reader and Python's `str.strip()` agree — the
- * same class `swarm-switch.ts` uses, for the same reason: the C0 separators `\x1c`–`\x1f` and NEL are
- * whitespace to Python and not to JavaScript, and `\s` already covers the BOM the dispatcher reads
- * through `utf-8-sig`.
+ * The trim `String.trim()` does not do, added so this reader and Python's `str.strip()` agree: the
+ * C0 separators `\x1c`–`\x1f` and NEL are whitespace to Python and not to JavaScript, and `\s`
+ * already covers the BOM the dispatcher reads through `utf-8-sig`.
  */
 const FLAG_TRIM = /^[\s\x1c-\x1f\u0085]+|[\s\x1c-\x1f\u0085]+$/g;
 

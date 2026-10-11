@@ -3,25 +3,12 @@ import { useTranslation } from 'react-i18next';
 
 import { ActionBar } from '@/modules/dispatcher/ActionBar';
 import { epochOf } from '@/modules/dispatcher/dispatcherState';
-import { useDispatcherPlans } from '@/modules/dispatcher/hooks/useDispatcherPlans';
 import { useDispatcherVerbs } from '@/modules/dispatcher/hooks/useDispatcherVerbs';
 import { RunModelControl } from '@/modules/dispatcher/RunModelControl';
 import { ScheduleControl } from '@/modules/dispatcher/ScheduleControl';
-import { SwarmControl } from '@/modules/dispatcher/SwarmControl';
 import { Button } from '@/shared/ui';
-import type { DispatcherPlan, DispatcherRoute, DispatcherSwarmWord } from '@/shared/types';
+import type { DispatcherPlan } from '@/shared/types';
 import { effectiveModelWord } from '@/shared/utils';
-
-/**
- * The box's swarm switch (Settings → Agents) as one word of the grammar — `off`, `on`, `on <N>` — the
- * word a plan with none of its own walks under, whose number its swarm control draws as the default.
- * `null` before the first frame has a route.
- */
-function boxSwarmWord(route: DispatcherRoute | null): DispatcherSwarmWord | null {
-  if (route === null) return null;
-  if (!route.swarm.enabled) return 'off';
-  return route.swarm.lanes === null ? 'on' : `on ${route.swarm.lanes}`;
-}
 
 /**
  * The plan card's `ActionBar`: the verbs that apply to a plan, chosen by its status, then its model
@@ -29,6 +16,10 @@ function boxSwarmWord(route: DispatcherRoute | null): DispatcherSwarmWord | null
  * refuse.
  *
  * - `live` → Stop. A pause; Resume is its undo, so no dialog guards it.
+ * - `stalled` → Resume and Stop. The plan is released and its running work has ended with nothing to
+ *   record it, so Resume — the same `resume` verb — is the press that wakes the daemon, and Stop is
+ *   still drawn because a released plan can be held rather than woken. No hour is offered: the
+ *   dispatcher refuses to schedule a plan that is not paused.
  * - `paused` → Resume and `Resume at …`: a plan STOPPED mid-walk is the one an hour makes sense in
  *   front of, because the timer's press is the very Resume the button beside it sends.
  * - `queued` → Start (it IS `resume`: the plan is approved and paused and has never walked) and
@@ -58,12 +49,6 @@ function boxSwarmWord(route: DispatcherRoute | null): DispatcherSwarmWord | null
  * control here: the arc's action bar carries the ARC's word and hands it down, and this is where one plan
  * speaks for itself again.
  *
- * THE PLAN'S OWN SWARM WORD RIDES BESIDE IT (`SwarmControl`), on the same plans and for the same
- * reason: `dispatcher swarm` is never refused for a plan's state either (the word is read at the
- * rule's next take-up). It is one stepper of how many of the feature's tasks walk at once, defaulting to
- * the number Settings holds: a plan with no word of its own draws that number marked `default`, and
- * stepping back to it hands the plan back to Settings.
- *
  * A STALLED PLANNER IS DRAWN BESIDE ALL OF THEM, whatever the plan's status (`plan.planner.stalled`):
  * Resume planner, the press that puts the outing that ended short back to work. Which door it goes
  * back through — `cut`, `judge`, a `tell` of `continue` — is the dispatcher's own reading of its store
@@ -82,9 +67,8 @@ export function PlanControls({ plan }: { plan: DispatcherPlan }) {
   // reads `queued`).
   const stops = plan.status === 'paused' || (plan.status === 'scheduled' && plan.launched);
   const starts = plan.status === 'queued' || (plan.status === 'scheduled' && !plan.launched);
-  const { stop, resume, schedule, park, unpark, plannerResume, setModel, setSwarm, busy } = useDispatcherVerbs(plan.name, 'plan',
+  const { stop, resume, schedule, park, unpark, plannerResume, setModel, busy } = useDispatcherVerbs(plan.name, 'plan',
     starts ? t('runner.start') : t('runner.resume'));
-  const { route } = useDispatcherPlans();
   const held = busy !== null;
   const armed = epochOf(plan.schedule?.start_at ?? null);
   const word = starts ? t('runner.start') : t('runner.resume');
@@ -95,6 +79,15 @@ export function PlanControls({ plan }: { plan: DispatcherPlan }) {
       <Button variant="secondary" size="sm" className="h-8" disabled={held} onClick={() => void stop()} data-dispatcher-stop>
         {t('runner.stop')}
       </Button>
+    );
+  } else if (plan.status === 'stalled') {
+    verbs = (
+      <>
+        <Button size="sm" className="h-8" disabled={held} onClick={() => void resume()} data-dispatcher-resume>{word}</Button>
+        <Button variant="secondary" size="sm" className="h-8" disabled={held} onClick={() => void stop()} data-dispatcher-stop>
+          {t('runner.stop')}
+        </Button>
+      </>
     );
   } else if (stops || starts) {
     // ONE PAIR, TWO STATES: the plan is at the gate (`starts` — Start, and `Start at …`) or the plan
@@ -145,12 +138,8 @@ export function PlanControls({ plan }: { plan: DispatcherPlan }) {
     <ActionBar
       verbs={verbs}
       model={movable ? (
-        <>
-          <SwarmControl value={plan.swarm ?? null} settingsWord={boxSwarmWord(route)} busy={held}
-            onChoose={(choice) => void setSwarm(choice)} />
-          <RunModelControl scope="plan" value={modelWord} busy={held}
-            onChoose={(choice) => void setModel(choice)} />
-        </>
+        <RunModelControl scope="plan" value={modelWord} busy={held}
+          onChoose={(choice) => void setModel(choice)} />
       ) : null}
     />
   );

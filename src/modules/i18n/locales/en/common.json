@@ -537,13 +537,10 @@
     "switches": {
       "chat": "DeepSeek chat switch",
       "heal": "Heal model switch",
-      "swarm": "Swarm switch",
       "on": "on",
       "off": "off",
       "unreadable": "unreadable",
-      "lanes": "up to {{n}} lanes",
-      "noCeiling": "no lane ceiling",
-      "caption": "Mirrors only. Settings changes the chat and swarm switches; Heal changes the heal model."
+      "caption": "Mirrors only. Settings changes the chat switch; Heal changes the heal model."
     },
     "recon": {
       "ledger": "ledger priced",
@@ -1199,6 +1196,7 @@
     "status": {
       "live": "LIVE",
       "paused": "PAUSED",
+      "stalled": "STALLED",
       "queued": "QUEUED",
       "scheduled": "SCHEDULED",
       "parked": "PARKED",
@@ -1277,6 +1275,7 @@
       "confirm": "Delete"
     },
     "waitsOn": "waits on {{names}}",
+    "wipHold": "Waiting for a WIP slot · {{reason}}",
     "dismissDone": "Dismiss done · {{count}}",
     "plannersOut": "planners {{out}} of {{lanes}} out",
     "dismiss": "Dismiss feature",
@@ -1301,6 +1300,7 @@
       "live": "LIVE",
       "complete": "COMPLETE",
       "empty": "EMPTY",
+      "stalled": "STALLED",
       "queued": "QUEUED",
       "paused": "PAUSED",
       "scheduled": "SCHEDULED"
@@ -1320,17 +1320,6 @@
     "model": {
       "planLabel": "Model for this feature’s builders",
       "arcLabel": "Model for every feature of this epic"
-    },
-    "swarm": {
-      "hint": "How many of this feature's tasks walk at once. Step back to Settings → Agents' number to follow Settings again.",
-      "hintDefault": "How many of this feature's tasks walk at once. This number comes from Settings → Agents; step to another to give this feature its own, and back to follow Settings again.",
-      "default": "default",
-      "all": "All",
-      "lanesLabel": "Most of this feature's tasks at once",
-      "lanesDown": "One task fewer at once",
-      "lanesUp": "One task more at once",
-      "refused": "Swarm not set",
-      "done": "Swarm set — the next take-up reads it"
     }
   },
   "navigation": {

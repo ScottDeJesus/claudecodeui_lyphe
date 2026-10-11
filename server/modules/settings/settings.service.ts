@@ -9,7 +9,6 @@ import { readHealCycle, writeHealCycle } from './heal-cycle-switch.js';
 import { readHealCap, readHealMaster, writeHealCap, writeHealMaster } from './heal-switch.js';
 import { getParkAtPeakState, setParkAtPeakState } from './park-at-peak-switch.js';
 import { getPlannerLanesState, setPlannerLanesState } from './planner-lanes.js';
-import { readSwarmSwitch, writeSwarmSwitch } from './swarm-switch.js';
 
 /**
  * Every field a `PUT /jev` body may name — the master plus each scope in the table — for the two
@@ -223,57 +222,6 @@ export function createSettingsService(dependencies: SettingsDependencies) {
       return state;
     },
     /**
-     * The swarm switch: whether the plan runner runs several phases of one plan at once, and the
-     * optional ceiling it runs under.
-     *
-     * Unlike the DeepSeek switch above it — the one switch here injected as a dependency, because a
-     * Kanban board carries its own copy of that flag and needs a second writer — this one is not a
-     * dependency of this service: it reads and writes `swarm-switch.ts` directly, the way the metis
-     * spawner reads its own flag writer and the way the heal switches below read theirs. There is one
-     * swarm flag and no second path to it, so an injected pair would carry nothing the module does not.
-     */
-    async getSwarm() {
-      return readSwarmSwitch();
-    },
-    async setSwarm(enabledInput: unknown, lanesInput: unknown) {
-      if (typeof enabledInput !== 'boolean') {
-        throw new AppError('enabled must be a boolean', {
-          code: 'INVALID_SWARM_STATE',
-          statusCode: 400,
-        });
-      }
-      // The ceiling is OPTIONAL, and both ways of saying "none" mean the same thing: absent, or
-      // an explicit null. `null` is the uncapped default the operator asked for, so it is a
-      // position and never an error — a caller turning the switch on with no ceiling chosen gets
-      // `on`, every phase the independence rule frees at once.
-      const lanes = lanesInput === undefined || lanesInput === null ? null : lanesInput;
-      // A COUNT, and one both languages can hold. `Number.isSafeInteger` is exactly the line where
-      // this server's double and the runner's arbitrary-precision int stop agreeing — the reader in
-      // `swarm-switch.ts` says so at the same line, and answers one lane past it rather than the
-      // number — so a ceiling above it is a value the row would draw as `1 lane` while the runner
-      // honoured nine quadrillion, and `1e21` is worse still: `Math.trunc(1e21).toString()` is
-      // `1e+21`, a token NEITHER grammar accepts, so an ON press would leave a flag both readers
-      // call OFF. Refused at the door, where the count enters, rather than narrowed on the way out.
-      // A float is refused with it: a ceiling is a number of lanes, and silently truncating one is
-      // how the row and the file first disagree.
-      if (lanes !== null && (typeof lanes !== 'number' || !Number.isSafeInteger(lanes))) {
-        throw new AppError('lanes must be a whole number of lanes, or null for no ceiling', {
-          code: 'INVALID_SWARM_STATE',
-          statusCode: 400,
-        });
-      }
-      await writeSwarmSwitch(enabledInput, lanes);
-      // Read back rather than echo the input, for the reason above — and here the file is the one
-      // that holds the truth about the ceiling: `null` reads back as `null`, and a count reads back
-      // exactly as it was written, because nothing on either side narrows it.
-      const state = await readSwarmSwitch();
-      // The flip is the event, as on the DeepSeek switch above: a swarm that was just turned on has
-      // phases the rule was holding for want of a lane, and they are taken up on the kick rather
-      // than at the next session event.
-      void kickDispatcher();
-      return state;
-    },
-    /**
      * The dispatcher's park-at-peak switch: whether an Accept during DeepSeek's peak window queues
      * the plan and arms the hour it lifts, or walks now.
      *
@@ -338,7 +286,7 @@ export function createSettingsService(dependencies: SettingsDependencies) {
      * The heal reflex's CYCLE SCHEDULE: when the maintenance cycle opens, and the UTC hour it opens at.
      * A flag file of the family above, machine-wide for the same reason.
      *
-     * `hour` rides on the PUT body beside `enabled` as `lanes` does on the swarm one: the file is ONE
+     * `hour` rides on the PUT body beside `enabled`: the file is ONE
      * line — `off`, or `on <hour>` — so the hour is REQUIRED and held to a whole hour of the day, and
      * no press can be drawn as a time it never asked for. Unlike the master this is not the launch
      * gate but a CLOCK: `off` stops the scheduled cycle and nothing else, because a pressed cycle is

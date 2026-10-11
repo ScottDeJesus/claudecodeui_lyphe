@@ -107,6 +107,30 @@ export function modelSince(value: unknown, where: string): DispatcherModelChoice
   return value === undefined || value === null ? null : oneOf(value, MODEL_CHOICES, where);
 }
 
+// --------------------------- WIP words ---------------------------
+
+/** A WIP word's two spellings: `all` (no limit), or a whole number with no sign, no padding and no leading zero. */
+const WIP_WORD = /^(?:all|[1-9][0-9]*)$/;
+
+/**
+ * A WIP word as `hooks/dispatcher/wip.py:spell` writes one: `all`, or a count from 1 to 2**53 − 1.
+ *
+ * The count's ceiling is the one the MANUAL (MAN-7682) states for this reader: past a safe integer
+ * this server's double and the dispatcher's int disagree about the number, and one refused word
+ * freezes the whole board (INV-5693), so the line is drawn where the two still agree. A 5000-digit
+ * token reaches `Number` as `Infinity` and is refused there. Used by `dispatcher-state.service.ts`
+ * (`route.wip`) and `dispatcher-arc.reader.ts` (`arc.wip`), which read the same grammar.
+ */
+export function isWipWord(value: unknown): value is string {
+  if (!isText(value) || !WIP_WORD.test(value)) return false;
+  return value === 'all' || Number.isSafeInteger(Number(value));
+}
+
+/** A WIP word, or `null` where the epic has none of its own (`arc.wip.<limit>.own`). Used by `dispatcher-arc.reader.ts`. */
+export function isWipWordOrNull(value: unknown): value is string | null {
+  return value === null || isWipWord(value);
+}
+
 /**
  * One `dispatcher status --json`, as the parsed body — `readDispatcherJson` with this lane's argv and
  * ceiling. `env` comes from the caller — `dispatcher.module.ts` is the one place that reads the

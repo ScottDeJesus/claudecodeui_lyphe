@@ -1,6 +1,6 @@
-import type { DispatcherArc, DispatcherArcStatus } from '@/shared/types.js';
+import type { DispatcherArc, DispatcherArcStatus, DispatcherArcWip, DispatcherArcWipLimit } from '@/shared/types.js';
 
-import { countOrNullSince, countSince, each, field, flagSince, isCount, isRecord, isText, isTextOrNull, modelSince, names, need, oneOf, textSince } from './dispatcher-state.transport.js';
+import { countOrNullSince, countSince, each, field, flagSince, isCount, isFlag, isRecord, isText, isTextOrNull, isWipWord, isWipWordOrNull, modelSince, names, need, oneOf, textSince } from './dispatcher-state.transport.js';
 import { plannerSince } from './dispatcher-planner.reader.js';
 
 /**
@@ -19,8 +19,34 @@ import { plannerSince } from './dispatcher-planner.reader.js';
  * one would be a second answer.
  */
 
-/** The eight words an arc's derived status may be (`store_arcs.arc_word`'s one precedence). Anything else is a build this lane cannot draw. */
-export const ARC_STATUSES: readonly DispatcherArcStatus[] = ['empty', 'complete', 'judging', 'live', 'scheduled', 'paused', 'queued', 'designing'];
+/** The nine words an arc's derived status may be (`store_arcs.arc_word`'s one precedence). Anything else is a build this lane cannot draw. */
+export const ARC_STATUSES: readonly DispatcherArcStatus[] = ['empty', 'complete', 'judging', 'stalled', 'live', 'scheduled', 'paused', 'queued', 'designing'];
+
+/** One of an epic's two limits as `wip.report` prints it: its own word or `null`, the word in force and the default under it. */
+function wipLimitOf(raw: unknown, where: string): DispatcherArcWipLimit {
+  const limit = need(raw, isRecord, where);
+  return {
+    own: need(field(limit, 'own'), isWipWordOrNull, `${where}.own`),
+    effective: need(field(limit, 'effective'), isWipWord, `${where}.effective`),
+    default: need(field(limit, 'default'), isWipWord, `${where}.default`),
+  };
+}
+
+/**
+ * The epic's WIP block (`arc.wip`, `wip.report`): the two limits as the document prints them, passed
+ * through and never summed, defaulted or compared here — the dispatcher states the `default` beside
+ * each limit so that no reader has to work out which route the epic walks. A build older than the
+ * block sends none (MANUAL, MAN-7682), which reads as `null`; a block that IS there and does not read
+ * is refused by name.
+ */
+function wipOf(value: unknown, name: string): DispatcherArcWip | null {
+  if (value === undefined) return null;
+  const wip = need(value, isRecord, `arc.wip of ${name}`);
+  return {
+    features: wipLimitOf(field(wip, 'features'), `arc.wip.features of ${name}`),
+    tasks: wipLimitOf(field(wip, 'tasks'), `arc.wip.tasks of ${name}`),
+  };
+}
 
 /** One arc whole. Its `name` is read first, so every later refusal can name the arc it came from. */
 export function arcOf(raw: unknown): DispatcherArc {
@@ -35,6 +61,9 @@ export function arcOf(raw: unknown): DispatcherArc {
     // draws and presses, and pressing it hands the word to every plan of the arc
     // (`store.set_arc_model`). A build older than the field reads `null` — the store's default.
     model: modelSince(field(arc, 'model'), 'arc.model'),
+    // The epic's two WIP limits — the only concurrency switches for the work under it, and the one
+    // place the document says how wide an epic walks. Carried as printed (`wipOf`).
+    wip: wipOf(field(arc, 'wip'), name),
     status: oneOf(field(arc, 'status'), ARC_STATUSES, `status of ${name}`),
     // THE ARC'S OWN VERBS, read off its plans' status words by `report_arcs` and drawn by the header
     // here: `walking` is what Pause is drawn for and `stopped` what Start and Schedule start are —
@@ -56,6 +85,14 @@ export function arcOf(raw: unknown): DispatcherArc {
     // (`report_planners.of_arc`). A row naming one of the arc's plans is that PLAN's and rides
     // `plan.planner` instead, so the header and the cards under it never state one outing twice.
     planner: plannerSince(field(arc, 'planner'), `arc.planner of ${name}`),
+    // The arc's four remaining own readings, each derived by `report_arcs` off the plan rows the
+    // document already holds: how many plans the "Accept when cut" press reaches and how many carry
+    // one, whether any plan has stalled, and the epic's working time in whole seconds (the UNION of
+    // its plans' intervals, never their sum). Required: today's document always prints them.
+    armable: need(field(arc, 'armable'), isCount, `arc.armable of ${name}`),
+    armed: need(field(arc, 'armed'), isCount, `arc.armed of ${name}`),
+    stalled: need(field(arc, 'stalled'), isFlag, `arc.stalled of ${name}`),
+    runtime_s: need(field(arc, 'runtime_s'), isCount, `arc.runtime_s of ${name}`),
     created_at: need(field(arc, 'created_at'), isText, 'arc.created_at'),
     completed_at: need(field(arc, 'completed_at'), isTextOrNull, 'arc.completed_at'),
     // The arc's books are its plans' sums, read by `report_arcs.arc_line` through the plan line's own

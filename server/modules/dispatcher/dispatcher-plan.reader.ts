@@ -1,5 +1,4 @@
-import type { DispatcherEvent, DispatcherPhase, DispatcherPlan, DispatcherStage, DispatcherSwarmWord } from '@/shared/types.js';
-import { readDispatcherSwarmWord } from '@/shared/utils.js';
+import type { DispatcherEvent, DispatcherPhase, DispatcherPlan, DispatcherStage } from '@/shared/types.js';
 
 import { each, countOrNullSince, countSince, field, flagSince, isCount, isCountOrNull, isFlag, isRecord, isText, isTextOrNull, modelSince, names, need, oneOf, textSince } from './dispatcher-state.transport.js';
 import { askingSince } from './dispatcher-ask.reader.js';
@@ -27,22 +26,8 @@ import { plannerSince } from './dispatcher-planner.reader.js';
  */
 export type DocumentPlan = Omit<DispatcherPlan, 'session_app_id'>;
 
-/**
- * A plan's own swarm word a build OLDER than the field did not write, read as `null`, and refused by
- * name when the key is there and is neither `null` nor a canonical word (`readDispatcherSwarmWord`).
- *
- * `null` is also what a plan with no word of its own carries, and the two mean the same thing: the
- * plan follows the box's switch, as every plan did before the field existed.
- */
-function swarmSince(value: unknown, where: string): DispatcherSwarmWord | null {
-  if (value === undefined || value === null) return null;
-  const word = readDispatcherSwarmWord(value);
-  if (word === null) throw new Error(`dispatcher status --json answered the ${where} ${String(value)}`);
-  return word;
-}
-
-/** The seven words a plan's status may be (`report.status_word`'s one precedence). Anything else is a build this lane cannot draw. */
-export const PLAN_STATUSES: readonly DispatcherPlan['status'][] = ['idle', 'parked', 'queued', 'scheduled', 'paused', 'live', 'complete'];
+/** The eight words a plan's status may be (`report.status_word`'s one precedence). Anything else is a build this lane cannot draw. */
+export const PLAN_STATUSES: readonly DispatcherPlan['status'][] = ['idle', 'parked', 'queued', 'scheduled', 'paused', 'stalled', 'live', 'complete'];
 
 /** The three words a phase's status may be (`phase_chain`'s own column). */
 export const PHASE_STATUSES: readonly DispatcherPhase['status'][] = ['not started', 'running', 'done'];
@@ -163,11 +148,14 @@ export function planOf(raw: unknown): DocumentPlan {
     // derived here: this is the document's own answer, and a second derivation would be a second
     // answer (`dispatcher/model.py:model.of` is the only one).
     model: modelSince(field(plan, 'model'), 'plan.model'),
-    // The plan's OWN swarm word, or `null` when it follows the box's switch — the document's answer
-    // (`swarm_word.own`), carried as written. `posture` is the plan's width phrase (`width.word` of
-    // its two words), read tolerantly like `arc`: a build older than either field writes neither.
-    swarm: swarmSince(field(plan, 'swarm'), 'plan.swarm'),
+    // The plan's width phrase (`width.word` of its route and the task WIP in force for it), read
+    // tolerantly like `arc`: a build older than the field writes none. It names task WIP alone — an
+    // epic's own two words are the arc's `wip`.
     posture: textSince(field(plan, 'posture'), 'plan.posture'),
+    // The sentence of the FEATURE-WIP clause holding this plan's first ready phase, or `null`
+    // (`report.wip_hold`) — the gate's own words, passed through untouched and never re-derived here.
+    // Absent from a build older than the field (MANUAL, MAN-7682), which reads as `null`: not held.
+    wip_hold: textSince(field(plan, 'wip_hold'), 'plan.wip_hold'),
     created_at: need(field(plan, 'created_at'), isText, 'plan.created_at'),
     updated_at: need(field(plan, 'updated_at'), isText, 'plan.updated_at'),
     completed_at: need(field(plan, 'completed_at'), isTextOrNull, 'plan.completed_at'),

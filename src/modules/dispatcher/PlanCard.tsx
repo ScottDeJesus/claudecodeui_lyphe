@@ -57,12 +57,11 @@ import { cn } from '@/shared/utils';
  * the store prunes against.
  *
  * DELETE IS THE MENU'S, AND ONLY WHERE THE DISPATCHER WOULD TAKE IT. `⋯` carries `Delete feature…`
- * exactly when `planDroppable(plan, planners)` holds. It is never drawn disabled on a `live` plan, a
+ * exactly when `planDroppable(plan, planners)` holds. It is never drawn disabled on a `live` or `stalled` plan, a
  * walking phase or a planner out on the plan or its arc. Delete is the menu's only item, so those cards
  * draw no `⋯` at all. The planner half of that gate needs the lane's `planners` list, so the card reads
- * the lane (`useDispatcherPlans`) for it, as its controls (`PlanControls`) do for the box's swarm word:
- * `plan.planner` gives a plan's own ended row ahead of its arc's live one, so it cannot answer what
- * `drop` asks. The press opens `DeletePlanDialog`, the
+ * the lane (`useDispatcherPlans`) for it: `plan.planner` gives a plan's own ended row ahead of its
+ * arc's live one, so it cannot answer what `drop` asks. The press opens `DeletePlanDialog`, the
  * module's one modal, because `dispatcher drop` is the one verb no press undoes. The card does not
  * leave on the press: it leaves when a frame no longer carries the plan.
  *
@@ -145,13 +144,20 @@ export function PlanCard({
                 {description && <CardDescription text={description} />}
                 {/* WHO IS OUT ON THIS PLAN and what it waits on, under its description: the word says
                     what the PLAN is (`designing`), the badge who is doing something about it; the wait is
-                    a fact about THIS plan ("before this, that"). Neither draws anything when absent. */}
-                {(plan.planner || waitsOn.length > 0) && (
+                    a fact about THIS plan ("before this, that"). None draws anything when absent. */}
+                {(plan.planner || waitsOn.length > 0 || plan.wip_hold !== null) && (
                   <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
                     {plan.planner && <PlannerBadge planner={plan.planner} />}
                     {waitsOn.length > 0 && (
                       <span data-plan-waits-on className="min-w-0 break-words font-mono text-xs text-muted-foreground">
                         {t('dispatcher.waitsOn', { names: waitsOn.join(', ') })}
+                      </span>
+                    )}
+                    {/* The epic's feature WIP is holding this plan from starting: the gate's own
+                        sentence (`plan.wip_hold`), said as the dispatcher words it and never re-derived. */}
+                    {plan.wip_hold !== null && (
+                      <span data-plan-wip-hold className="min-w-0 break-words font-mono text-xs text-muted-foreground">
+                        {t('dispatcher.wipHold', { reason: plan.wip_hold })}
                       </span>
                     )}
                   </div>

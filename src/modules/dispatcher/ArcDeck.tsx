@@ -39,6 +39,8 @@ import { cn } from '@/shared/utils';
  * judgment is still being designed, cut or walked. `complete` is positive, and it is the word once the
  * judgment has finished too — stamped, or every phase of it done. `empty` is warn because an arc whose every plan was dropped is the one
  * state an operator did not ask for, and it is the state nothing else on the screen would show.
+ * `stalled` is warn for the same reason: the arc's only running work has ended with nothing to record
+ * it, and its header's Resume is what wakes the daemon.
  *
  * THE THREE WAITING WORDS WEAR THE PLAN'S OWN TONE, through `planStatusTone` and not a colour of
  * their own: `queued`, `paused` and `scheduled` are the plans' words too (`DispatcherPlanStatus`),
@@ -52,20 +54,21 @@ const ARC_STATUS: Record<DispatcherArcStatus, { key: string; tone: Tone }> = {
   live: { key: 'dispatcher.arcStatus.live', tone: 'info' },
   complete: { key: 'dispatcher.arcStatus.complete', tone: 'positive' },
   empty: { key: 'dispatcher.arcStatus.empty', tone: 'warn' },
+  stalled: { key: 'dispatcher.arcStatus.stalled', tone: 'warn' },
   queued: { key: 'dispatcher.arcStatus.queued', tone: planStatusTone('queued') },
   paused: { key: 'dispatcher.arcStatus.paused', tone: planStatusTone('paused') },
   scheduled: { key: 'dispatcher.arcStatus.scheduled', tone: planStatusTone('scheduled') },
 };
 
 /**
- * A plan's mark on the arc's flow, by its status: done, held and armed each have a glyph of their
- * own, and every other plan (queued, parked, idle) is its place in the arc — so the node reads
+ * A plan's mark on the arc's flow, by its status: done, held, armed and stalled each have a glyph of
+ * their own, and every other plan (queued, parked, idle) is its place in the arc — so the node reads
  * without its colour, and the plans still ahead count off in the order they will walk. WALKING is not
  * a status: `live` is also a plan approved and waiting on its turn (operator, 2026-10-03: "when a
  * feature isnt in progress, it should not have an animated play icon on it"), so `▶︎` is drawn from
  * the plan's tasks instead — one of them walking now (`phaseWord`, the task track's own rule).
  */
-const FLOW_MARK: Partial<Record<DispatcherPlanStatus, string>> = { complete: '✓', paused: '⏸︎', scheduled: '◷' };
+const FLOW_MARK: Partial<Record<DispatcherPlanStatus, string>> = { complete: '✓', paused: '⏸︎', scheduled: '◷', stalled: '▲' };
 
 /**
  * ONE dispatch arc, drawn as the deck every arc on this screen is drawn as, in the lane card's ONE

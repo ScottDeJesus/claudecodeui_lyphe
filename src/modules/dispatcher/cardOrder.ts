@@ -3,11 +3,11 @@
  * and no store in it: what a card's rank is, what the cards sort by, and which ranks a drop writes.
  *
  * THE OPERATOR'S ARRANGEMENT IS THE ONLY THING THAT ORDERS A CARD. Not its status, not when it was
- * last touched, not whether it owes a word, not which chat is open: a swarm press bumps `updated_at`,
- * the daemon's take-ups and finishes bump it again, status changes with every phase, and an order
- * keyed to any of those moves cards under the reader's eyes (operator, 2026-10-01: "the ordering of
- * plan cards changes if I turn on swarm or off swarm … make it so that the plan cards stay in their
- * allotted locations"). So a card has a RANK, higher first, and it is one of two numbers: the one the
+ * last touched, not whether it owes a word, not which chat is open: a press on a plan's switch bumps
+ * `updated_at`, the daemon's take-ups and finishes bump it again, status changes with every phase, and
+ * an order keyed to any of those moves cards under the reader's eyes (operator, 2026-10-01: the
+ * ordering of plan cards changed when he pressed a plan's switch — "make it so that the plan cards stay
+ * in their allotted locations"). So a card has a RANK, higher first, and it is one of two numbers: the one the
  * operator saved by dropping the card somewhere (`cardOrderEntries.ts`), else the card's creation in
  * epoch milliseconds. Cards the operator has never moved therefore stand newest-first, a new card
  * lands at the top, and nothing else changes where any card stands. Ties break by name.

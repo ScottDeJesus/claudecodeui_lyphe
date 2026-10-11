@@ -35,7 +35,6 @@ function scheduleOf(body: unknown): HealCycleSwitch | null {
  *
  * THE SCHEDULE ROW is `state/heal_cycle.flag`, read off its own door when the dialog opens and
  * written back through it; what it draws is always the file's answer, never the press. Its shape is
- * the swarm row's (`RunnerModelContent.tsx`):
  * the hour stepper beside the toggle, both live whether the schedule is on or off, so an hour chosen
  * while off is carried by the next ON press. A stepper and not a number field, because the reader is
  * choosing a slot on a 24-step scale, which is a press and not a figure to type. The daily cap IS a
@@ -43,7 +42,7 @@ function scheduleOf(body: unknown): HealCycleSwitch | null {
  */
 export function HealControls({ switches, ignore }: { switches: HealSwitches; ignore: IgnoreRow[] }) {
   const { t } = useTranslation();
-  // ONE WRITE AT A TIME, the swarm row's own rule: the flag file holds one line, and a second press
+  // ONE WRITE AT A TIME: the flag file holds one line, and a second press
   // issued before the first has read back would compute its value off props that have not moved yet.
   // A press while one is crossing is DROPPED, not queued. Every write ends in `refresh()`, so what
   // these rows draw is the summary the server read back — a refused write leaves the old value
