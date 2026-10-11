@@ -114,7 +114,7 @@ export default function RunnerMainSessionDactylsRow() {
             <p>{lead}</p>
             <p className="mt-1">
               {t('agents.runnerMainSessionDactyls.hands', {
-                defaultValue: 'Its own Edit and Write into repository files are refused, and so are its shell writes there; files outside any repository (scratch in /tmp), git-ignored files and /remember are untouched. It may also hand a file to a dactyl to read and answer about, so the file’s body never enters its context. A /tweak lands through a dactyl, and rail 2 logs it on the chain the file belongs to.',
+                defaultValue: 'Its own Edit and Write into repository files are refused, and so are its shell writes there; files outside any repository (scratch in /tmp), git-ignored files and /remember are untouched. Shell dumps of a repository file’s body (cat, head, tail, sed) are refused too: what a file says comes through dactyl --read, so its body never enters its context, and the Read tool keeps exact lines. A /tweak lands through a dactyl, and rail 2 logs it on the chain the file belongs to.',
               })}
             </p>
             <p className="mt-1">
