@@ -1,5 +1,8 @@
 import { type PointerEvent as ReactPointerEvent, useCallback, useEffect, useRef } from 'react';
 
+import { beginPan, paneToPan } from '@/shared/ui/sortable/touchPan';
+import type { Pan } from '@/shared/ui/sortable/touchPan';
+
 /** The four gestures this hook serves, and the two body classes a drag of any one sets. */
 export type PointerDragKind = 'fab' | 'split' | 'resize' | 'sort';
 
@@ -12,10 +15,11 @@ const DRAG_THRESHOLD_PX = 4;
 /** How far a finger may drift during a hold and still be holding. Past it the touch is a scroll, and the hold is let go. */
 const HOLD_SLOP_PX = 8;
 
-/** What a handle that lifts on a touch hold wears from the first touch: `surfaces.css` keeps the platform's own long-press (a link menu, a text selection) off whatever carries it. */
-export type HoldLiftProps = { 'data-hold-lift'?: '' };
+/** What a handle wears from the first touch: `data-hold-lift` (a lifting handle; `surfaces.css` keeps the platform's own long-press off it) and `data-touch-pan` (`scrollsPane`; `surfaces.css` tells the browser not to scroll under that finger). */
+export type HoldLiftProps = { 'data-hold-lift'?: ''; 'data-touch-pan'?: '' };
 
 const HOLD_LIFT_PROPS: HoldLiftProps = { 'data-hold-lift': '' };
+const HOLD_LIFT_AND_PAN_PROPS: HoldLiftProps = { 'data-hold-lift': '', 'data-touch-pan': '' };
 const NO_HOLD_LIFT_PROPS: HoldLiftProps = {};
 
 /** One gesture, from the press that began it to the release that ends it. */
@@ -31,6 +35,11 @@ type Gesture = {
   captured: Element | null;
   /** The pending lift of a touch hold, until it fires or the gesture ends. */
   holdTimer: ReturnType<typeof setTimeout> | null;
+  /** False for a press `accept` refused that only pans: it never lifts, and the owner never hears it end. */
+  accepted: boolean;
+  /** The pane a swipe scrolls by hand (`scrollsPane`), or null when the browser scrolls it; and the pan once the slop is crossed. */
+  pane: HTMLElement | null;
+  pan: Pan | null;
 };
 
 /**
@@ -55,8 +64,8 @@ type Gesture = {
  * so the frames regain their hit-testing before any of the application's own handlers run against an
  * app with most of it unclickable.
  *
- * THREE OPTIONS SERVE A HANDLE THAT IS A WHOLE CARD, not a grip, and each is absent for the other
- * three consumers, which behave exactly as before:
+ * FOUR OPTIONS SERVE A HANDLE THAT IS A WHOLE CARD, not a grip, and each is absent for the other
+ * consumers, which behave exactly as before:
  *
  * - `accept` looks at a press BEFORE anything is armed and may refuse it: a card is full of buttons,
  *   inputs and scrolling tracks, and a press that began on one of those must stay the page's own —
@@ -70,6 +79,11 @@ type Gesture = {
  *   a finger that travels more than `HOLD_SLOP_PX` first is scrolling, and the gesture lets go
  *   silently. A mouse or a pen ignores it and begins at `threshold` as ever. While a hold is pending
  *   or lifted the browser's own long-press reactions (a text selection, a context menu) are cancelled.
+ * - `scrollsPane` is the other outcome of the same touch: a finger that travels past the slop before the
+ *   hold fires PANS the handle's scroll pane by hand, with a glide after the release (`sortable/touchPan.ts`),
+ *   instead of being let go to the browser's own pan. The handles are `touch-action: none` at rest
+ *   (`handleProps`), because a phone may dispatch every touch as uncancelable, and the browser's pan can
+ *   then be refused only before the touch begins. A press `accept` refuses still pans, and never lifts.
  *
  * A HOLD'S HANDLE IS MARKED, because those cancels are events and not every platform sends the event.
  * An iPhone answers its own long-press (the link menu, the selection loupe) at about half a second
@@ -83,6 +97,7 @@ export function usePointerDrag(options: {
   kind: PointerDragKind;
   threshold?: number;                                   // default 4 (px)
   holdMs?: number;                                      // touch only: lift after this long without moving
+  scrollsPane?: boolean;                                // touch only, with holdMs: a swipe before the lift scrolls the pane by hand
   accept?: (event: ReactPointerEvent<HTMLElement>) => boolean;
   captureOnStart?: (handle: Element) => Element;
   onStart?: (point: PointerDragPoint) => void;          // the drag has begun: threshold crossed, or touch lifted
@@ -129,6 +144,8 @@ export function usePointerDrag(options: {
     off?.();
     if (!active) return;
     if (active.holdTimer !== null) clearTimeout(active.holdTimer);
+    // A swipe that was scrolling glides on from a lift, and from nothing else: no event is an unmount, a cancel is the browser's.
+    active.pan?.release(event?.timeStamp ?? 0, event?.type !== 'pointerup');
 
     // The capture goes back before anything else reads the pointer: it is what routed every move
     // here, and a handle that keeps it keeps the pointer with it.
@@ -139,7 +156,7 @@ export function usePointerDrag(options: {
     // Both classes, always. They are added as a pair and this is the only place either comes off.
     document.body.classList.remove('vv-dragging', `vv-drag-${kind}`);
 
-    if (!event) return;
+    if (!event || !active.accepted) return;
     // A gesture the browser took away is not a press. A cancelled tap that never moved must reach no
     // consumer, or a touch long-press that raises a context menu opens what the FAB opens.
     if (!active.moved && event.type === 'pointercancel') return;
@@ -168,11 +185,15 @@ export function usePointerDrag(options: {
   const onPointerDown = useCallback((event: ReactPointerEvent<HTMLElement>) => {
     // The primary button only; every other one belongs to the browser's own menu.
     if (event.button !== 0 || gesture.current) return;
-    if (latest.current.accept?.(event) === false) return;
+    const accepted = latest.current.accept?.(event) !== false;
 
     const handle = event.currentTarget;
     const pointerId = event.pointerId;
-    const holdMs = event.pointerType === 'touch' ? latest.current.holdMs : undefined;
+    const isTouch = event.pointerType === 'touch';
+    const pane = isTouch && latest.current.holdMs !== undefined && latest.current.scrollsPane === true ? paneToPan(handle, event.target) : null;
+    // A refused press is the page's own, except where the finger's swipe is the pane's by hand: there it pans.
+    if (!accepted && pane === null) return;
+    const holdMs = isTouch && accepted ? latest.current.holdMs : undefined;
 
     const active: Gesture = {
       pointerId,
@@ -184,6 +205,9 @@ export function usePointerDrag(options: {
       moved: false,
       captured: null,
       holdTimer: null,
+      accepted,
+      pane,
+      pan: null,
     };
 
     // The capture is what keeps a fast drag alive. Without it the moves stop arriving at the handle
@@ -216,10 +240,22 @@ export function usePointerDrag(options: {
       const dy = moveEvent.clientY - active.startY;
 
       if (!active.moved) {
-        // A finger that travels while the hold is still pending is SCROLLING the pane: the gesture is
-        // let go, and the browser's own pan carries on untouched.
-        if (active.holdTimer !== null) {
-          if (Math.hypot(dx, dy) > HOLD_SLOP_PX) release();
+        if (active.pan !== null) {
+          active.pan.move(moveEvent.clientY, moveEvent.timeStamp);
+          return;
+        }
+        // A finger that travels while the hold is still pending is SCROLLING the pane. On a list that
+        // scrolls it by hand that is the pan, from this move on; on any other the gesture is let go,
+        // and the browser's own pan carries on untouched.
+        if (active.holdTimer !== null || !active.accepted) {
+          if (Math.hypot(dx, dy) <= HOLD_SLOP_PX) return;
+          if (active.pane === null) {
+            release();
+            return;
+          }
+          if (active.holdTimer !== null) clearTimeout(active.holdTimer);
+          active.holdTimer = null;
+          active.pan = beginPan(active.pane, moveEvent.clientY, moveEvent.timeStamp);
           return;
         }
         // A press that has not travelled is still a press. It is a click, and the thing it opens is
@@ -259,5 +295,6 @@ export function usePointerDrag(options: {
     };
   }, [kind, release, threshold]);
 
-  return { onPointerDown, handleProps: options.holdMs === undefined ? NO_HOLD_LIFT_PROPS : HOLD_LIFT_PROPS };
+  const handleProps = options.holdMs === undefined ? NO_HOLD_LIFT_PROPS : (options.scrollsPane ? HOLD_LIFT_AND_PAN_PROPS : HOLD_LIFT_PROPS);
+  return { onPointerDown, handleProps };
 }

@@ -1923,8 +1923,8 @@ export type SimpleListDropTarget =
   | { at: 'into'; folderId: string }
   | { at: 'end' };
 
-/** The handlers and hold marker the simple list's carry (`useSimpleChatDrag`) hands every chat row and folder header: spread whole on the row's root element. */
-export type SimpleListDragProps = Pick<HTMLAttributes<HTMLElement>, 'onPointerDown' | 'onClickCapture' | 'onDragStart'> & { 'data-hold-lift'?: '' };
+/** The handlers and the two touch markers (hold-lift, touch-pan) the simple list's carry (`useSimpleChatDrag`) hands every chat row and folder header: spread whole on the row's root element. */
+export type SimpleListDragProps = Pick<HTMLAttributes<HTMLElement>, 'onPointerDown' | 'onClickCapture' | 'onDragStart'> & { 'data-hold-lift'?: ''; 'data-touch-pan'?: '' };
 
 /**
  * The rename the sidebar currently has open, if any.

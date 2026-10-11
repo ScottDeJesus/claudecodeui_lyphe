@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { type RefObject, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
 
 import { TOUCH_HOLD_MS } from '@/shared/constants';
@@ -8,7 +8,7 @@ import { carriedElementOf, chatTargetAt, folderTargetAt, refOfRow, targetsEqual 
 import { positionForDrop } from '@/modules/sidebar/utils/simpleChatTree';
 import { dropNow, placeUnder, putDown, takeUp } from '@/shared/ui/sortable/carried';
 import type { Grip } from '@/shared/ui/sortable/carried';
-import { tickLift, useHoldPane } from '@/shared/ui/sortable/touchLift';
+import { tickLift } from '@/shared/ui/sortable/touchLift';
 import { usePointerDrag } from '@/shared/ui/usePointerDrag';
 
 /**
@@ -18,7 +18,10 @@ import { usePointerDrag } from '@/shared/ui/usePointerDrag';
  * run by the kit's one pointer-drag mechanism (`usePointerDrag`, kind `sort`), the same one the
  * sortable lists lift on. A mouse carries once it has moved past the threshold. A finger carries once
  * it has held still on a row for `TOUCH_HOLD_MS`, anywhere on the row that is not a control; one that
- * moves first is scrolling the list, and the row lifts nothing. A lifted row held at the pane's top or
+ * moves first is scrolling the list, and the row lifts nothing: THE PAGE SCROLLS THE PANE FOR IT, because
+ * a row is `touch-action: none` from the first touch (`scrollsPane`, below) and the browser has no pan to
+ * take. A swipe that starts on a control inside a row scrolls the pane too, and a hold on one lifts
+ * nothing. A lifted row held at the pane's top or
  * bottom edge scrolls the pane toward it (`useCarryEdgeScroll`), so it can reach rows off screen.
  *
  * THE LIFTED ROW LEAVES ITS SLOT AND FOLLOWS THE POINTER, up and down, wearing Verve's lifted state: the
@@ -42,8 +45,8 @@ const CONTROL_SELECTOR = 'button, input, [data-no-drag]';
 /**
  * The carry behind SidebarSimpleList's tree, its one consumer: what is carried, where the pointer
  * says it would land, the handlers every chat row and folder header spreads, and the ref callback of
- * the list's root (`attachList`), which holds the pane still under a lifted finger. `onMove` fires
- * once, on release, and only when `positionForDrop` answers a position the drop really asks for.
+ * the list's root (`listRef`, where the pointer's capture goes at the lift). `onMove` fires once, on
+ * release, and only when `positionForDrop` answers a position the drop really asks for.
  */
 export function useSimpleChatDrag({ items, onMove }: {
   items: SimpleListItem[];
@@ -52,7 +55,7 @@ export function useSimpleChatDrag({ items, onMove }: {
   dragging: SimpleListItemRef | null;
   dropTarget: SimpleListDropTarget | null;
   dragProps: SimpleListDragProps;
-  attachList: (element: HTMLElement | null) => void;
+  listRef: RefObject<HTMLDivElement>;
 } {
   // The carried row and where it would land: both are drawn onto the rows, so both are state.
   const [dragging, setDragging] = useState<SimpleListItemRef | null>(null);
@@ -77,8 +80,8 @@ export function useSimpleChatDrag({ items, onMove }: {
   // The row (or folder header) a press landed on, and the element lifted from it: the kit's `Grip`, held for as long as the carry has it.
   const pressedElementRef = useRef<HTMLElement | null>(null);
   const gripRef = useRef<Grip | null>(null);
-  // The list's root, as `attachList` was handed it: where the pointer's capture goes at the lift.
-  const listRef = useRef<HTMLElement | null>(null);
+  // The list's root, put on it by the caller: where the pointer's capture goes at the lift.
+  const listRef = useRef<HTMLDivElement>(null);
 
   const setTarget = useCallback((next: SimpleListDropTarget | null) => {
     if (targetsEqual(targetRef.current, next)) return;
@@ -93,18 +96,38 @@ export function useSimpleChatDrag({ items, onMove }: {
     setTarget(carried.kind === 'chat' ? chatTargetAt(pointerY, carried.id) : folderTargetAt(pointerY, carried));
   }, [setTarget]);
 
-  /** Keeps the lifted row under the pointer and reads what it is over: on a move, and when the pane scrolled under a still pointer. */
+  /**
+   * Draws the lifted row under the pointer at `pointerY`, kept inside the list's own box. The row never leaves its
+   * slot (the gap it leaves is the point), so a row painted below the list's end would add to its pane's scrollable
+   * overflow with every pixel the pane scrolled, and the edge loop would find no end: the pane would run on into
+   * empty space and snap back at the release. `null` for x keeps the row on the list's rail, so a drifting finger
+   * never makes the pane scroll sideways.
+   */
+  const placeLifted = useCallback((pointerY: number) => {
+    const grip = gripRef.current;
+    if (grip === null) return;
+    let top = pointerY - grip.grabY;
+    if (listRef.current !== null) {
+      const list = listRef.current.getBoundingClientRect();
+      top = Math.min(Math.max(top, list.top), list.bottom - grip.element.getBoundingClientRect().height);
+    }
+    placeUnder(grip, null, top + grip.grabY);
+  }, []);
+
+  /** Places the lifted row and reads what the pointer is over: on a move, and when the pane scrolled under a still pointer. */
   const followPointer = useCallback((pointerY: number) => {
-    // `null`: the row stays on the list's rail, so a drifting finger never makes the pane scroll sideways.
-    if (gripRef.current !== null) placeUnder(gripRef.current, null, pointerY);
+    placeLifted(pointerY);
     retarget(pointerY);
-  }, [retarget]);
-  const { begin: beginEdgeScroll, follow: followEdgeScroll, end: endEdgeScroll } = useCarryEdgeScroll(followPointer);
+  }, [placeLifted, retarget]);
+  const { begin: beginEdgeScroll, follow: followEdgeScroll, end: endEdgeScroll } = useCarryEdgeScroll(followPointer, placeLifted);
 
   const { onPointerDown, handleProps } = usePointerDrag({
     kind: 'sort',
     threshold: DRAG_THRESHOLD_PX,
     holdMs: TOUCH_HOLD_MS,
+    // A swipe before the hold fires scrolls the pane by hand, controls included (`accept` refuses
+    // them the lift, not the pan): the rows are `touch-action: none` at rest (`handleProps`).
+    scrollsPane: true,
     // Hears only a press that may START the gesture (a second finger never reaches it), so the row
     // it names is the one the hold lifts.
     accept: (event) => {
@@ -132,7 +155,7 @@ export function useSimpleChatDrag({ items, onMove }: {
         : carriedElementOf(pressedElementRef.current, carriedRef.current);
       if (element !== null) {
         gripRef.current = { element, ...takeUp(element, x, y) };
-        placeUnder(gripRef.current, null, y);
+        placeLifted(y);
       }
       tickLift();
       setDragging(carriedRef.current);
@@ -172,13 +195,6 @@ export function useSimpleChatDrag({ items, onMove }: {
       if (grip !== null && from !== null) putDown(grip.element, from);
     },
   });
-
-  // The pane held still while a row is in the hand (`touchLift.ts`).
-  const holdPane = useHoldPane(() => carriedRef.current !== null);
-  const attachList = useCallback((element: HTMLElement | null) => {
-    listRef.current = element;
-    holdPane(element);
-  }, [holdPane]);
 
   // Escape abandons the carry: the marks come off at once and the release that follows commits nothing.
   useEffect(() => {
@@ -224,5 +240,5 @@ export function useSimpleChatDrag({ items, onMove }: {
     onDragStart: (event) => event.preventDefault(),
   }), [onPointerDown, handleProps]);
 
-  return { dragging, dropTarget, dragProps, attachList };
+  return { dragging, dropTarget, dragProps, listRef };
 }

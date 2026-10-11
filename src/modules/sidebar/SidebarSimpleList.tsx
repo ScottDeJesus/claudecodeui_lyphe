@@ -169,7 +169,7 @@ export default function SidebarSimpleList({
   } = useSimpleChatFolders({ items, reload, patchFolderLocal, moveLocal, t });
 
   // The carry, feeding the folder hook's own `move`: a drop and a "Move to folder…" are one write.
-  const { dragging, dropTarget, dragProps, attachList } = useSimpleChatDrag({ items, onMove: move });
+  const { dragging, dropTarget, dragProps, listRef } = useSimpleChatDrag({ items, onMove: move });
   // The tree's folders in drawn order: what the folder picker lists.
   const folders = items.flatMap((item) => (item.kind === 'folder' ? [item.folder] : []));
 
@@ -188,7 +188,7 @@ export default function SidebarSimpleList({
   );
 
   return (
-    <div ref={attachList} data-testid="simple-chat-list" className="flex flex-col gap-2 px-2 py-2">
+    <div ref={listRef} data-testid="simple-chat-list" className="flex flex-col gap-2 px-2 py-2">
       {hasError && items.length === 0 ? (
         <div className="px-2 py-6 text-center text-sm text-muted-foreground">
           {t('recent.loadFailed', 'Could not load recent conversations')}

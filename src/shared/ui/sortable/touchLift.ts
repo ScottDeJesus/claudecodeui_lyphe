@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef } from 'react';
 
-/** How long the lift's pulse lasts: Android's own long-press buzz, which a hand can feel (many vibration motors cannot render 8 ms). A phone on silent, and an iPhone, get none; the item leaving its slot (`carried.ts`) is the cue that does not depend on it. */
+/** How long the lift's pulse lasts: Android's own long-press buzz, which a hand can feel (many vibration motors cannot render a shorter one). A phone on silent, and an iPhone, get none; the item leaving its slot (`carried.ts`) is the cue that does not depend on it. */
 const LIFT_PULSE_MS = 20;
 
 /** The sign a finger gets that something has come up: where the device can, it says so in the hand. Used by `useSortable` and `useSimpleChatDrag` at the moment of the lift. */
@@ -19,8 +19,10 @@ export function tickLift(): void {
  * cancel. It must say `passive: false` for the same reason — a cancelling listener is ignored unless
  * it declares that it may cancel.
  *
- * Used by `useSortable` (the runner, roadmap and dispatcher lists) and by `useSimpleChatDrag` (the
- * sidebar's chat list), so a lifted card and a lifted chat row are held by the one canceller.
+ * Used by `useSortable` (the runner, roadmap and dispatcher lists), which keep their native scrolling. It
+ * holds nothing on a phone that dispatches every touch uncancelable (the browser's pan cannot be cancelled
+ * there at all), which is why the sidebar's chat list does not use it: its rows are `touch-action: none`
+ * from the first touch and its swipes are scrolled by `touchPan.ts`.
  */
 export function useHoldPane(isLifted: () => boolean): (element: HTMLElement | null) => void {
   // The latest answer, read when a touch moves rather than when the list attached: written in an
