@@ -13700,6 +13700,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/console.mjs, /home/l
 
 ## Strings
 `agents.runnerMainSessionDactyls` in `src/modules/i18n/locales/en/settings.json`, directly after `runnerCompaction`: `label`, `description`, `descriptionBare`, `hands`, `after`, `waiting`, `readinessUnread`, `unreadable`, `hand` (`line`, `lineWithoutSpend`, and `days` / `dactyls` / `reads` / `edits`, each `_one` + `_other`).
+- `hands` states what a session loses (its own Edit and Write into repository files, its shell writes there, its shell dumps of a body: cat, head, tail, sed) and the route (`dactyl --read`; the Read tool keeps exact lines). It is the operator's view of the charter's YOUR HANDS paragraph (`words.SESSION_CHARTER`, MAN-8148); a change to either is checked against the other.
 
 ## The spend line
 - `hand` = `place.hand_fold(7)`'s `{days, count, reads, edits, spend}`: dactyls launched by hand (under no plan's launch) over `days`; `spend` is the verb's own token rendering (`212.4k in · 9.8k out`), `""` when no token was counted. Tokens, never dollars.
