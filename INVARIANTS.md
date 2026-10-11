@@ -417,7 +417,7 @@ expect: the "S9 round trip" line reads `[HOLD] … returns the deck with 4 of it
 measured 2026-09-28 by chain chain-done-cards-leave-20260928-160626-ad80, finding M1, MEDIUM
 probe-key: 8734efe63225eeacfb3de1416303af86f7100857
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/ArcDeck.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/DeletePlanDialog.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/hiddenPlans.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/hooks/useDispatcherPlans.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/putAwayFocus.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/common.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/hooks/useWorkspaceTabGates.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/useCardFold.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-arc-nest.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-arc-strip-return.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-dismiss-done.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-runner-widget-list.mjs, /home/lyphe/.claude/state/dispatch-souls/dispatch-hephaestus-20260928-161608-f892/result.md
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/ArcDeck.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/DeletePlanDialog.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/hiddenPlans.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/hooks/useDispatcherPlans.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/putAwayFocus.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/common.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/hooks/useWorkspaceTabGates.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/useCardFold.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-arc-nest.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-arc-strip-return.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-dismiss-done.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-runner-widget-list.mjs
 
 ## INV-5672 — probe — The builder's report is a placeholder
 
@@ -431,7 +431,7 @@ expect: a report naming the files changed, the put-away design decision, the pro
 measured 2026-09-28 by chain chain-done-cards-leave-20260928-160626-ad80, finding M3, MEDIUM
 probe-key: a09ec39296b03d4ae59750cdcec2df89c135ef8c
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/ArcDeck.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/DeletePlanDialog.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/hiddenPlans.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/hooks/useDispatcherPlans.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/putAwayFocus.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/common.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/hooks/useWorkspaceTabGates.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/useCardFold.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-arc-nest.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-arc-strip-return.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-dismiss-done.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-runner-widget-list.mjs, /home/lyphe/.claude/state/dispatch-souls/dispatch-hephaestus-20260928-161608-f892/result.md
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/ArcDeck.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/DeletePlanDialog.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/hiddenPlans.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/hooks/useDispatcherPlans.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/putAwayFocus.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/common.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/hooks/useWorkspaceTabGates.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/useCardFold.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-arc-nest.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-arc-strip-return.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-dismiss-done.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-runner-widget-list.mjs
 
 ## INV-5673 — probe — Dismiss is dead on a slow browser clock (S13)
 
@@ -445,7 +445,7 @@ expect: `[HOLD] S13: after Dismiss with a 6 h slow clock the judgment card is go
 measured 2026-09-28 by chain chain-done-cards-leave-20260928-160626-ad80, finding L1, LOW
 probe-key: 33eb8d9e775793acfaafad16da9708e35571eed4
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/ArcDeck.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/DeletePlanDialog.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/hiddenPlans.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/hooks/useDispatcherPlans.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/putAwayFocus.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/common.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/hooks/useWorkspaceTabGates.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/useCardFold.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-arc-nest.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-arc-strip-return.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-dismiss-done.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-runner-widget-list.mjs, /home/lyphe/.claude/state/dispatch-souls/dispatch-hephaestus-20260928-161608-f892/result.md
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/ArcDeck.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/DeletePlanDialog.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/hiddenPlans.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/hooks/useDispatcherPlans.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/putAwayFocus.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/common.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/hooks/useWorkspaceTabGates.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/useCardFold.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-arc-nest.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-arc-strip-return.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-dismiss-done.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-runner-widget-list.mjs
 
 ## INV-5674 — probe — `probe-arc-nest.mjs` still carries the old ending rule while claiming the hook's
 
@@ -459,7 +459,7 @@ expect: no hit — `hidden()` dates a complete plan by its newest phase `done_at
 measured 2026-09-28 by chain chain-done-cards-leave-20260928-160626-ad80, finding L2, LOW
 probe-key: c885cbc840485be044b43329affbd18c92aef23e
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/ArcDeck.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/DeletePlanDialog.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/hiddenPlans.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/hooks/useDispatcherPlans.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/putAwayFocus.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/common.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/hooks/useWorkspaceTabGates.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/useCardFold.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-arc-nest.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-arc-strip-return.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-dismiss-done.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-runner-widget-list.mjs, /home/lyphe/.claude/state/dispatch-souls/dispatch-hephaestus-20260928-161608-f892/result.md
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/ArcDeck.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/DeletePlanDialog.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/hiddenPlans.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/hooks/useDispatcherPlans.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/putAwayFocus.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/common.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/hooks/useWorkspaceTabGates.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/useCardFold.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-arc-nest.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-arc-strip-return.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-dismiss-done.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-runner-widget-list.mjs
 
 ## INV-5675 — probe — `DeletePlanDialog`'s head states a mechanism that is not there
 
@@ -473,7 +473,7 @@ expect: no hit — the head says hidden plans count and a dismissed plan, being 
 measured 2026-09-28 by chain chain-done-cards-leave-20260928-160626-ad80, finding L3, LOW
 probe-key: f3ff63caf2e96c5fa159780d73802de96d9fccdd
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/ArcDeck.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/DeletePlanDialog.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/hiddenPlans.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/hooks/useDispatcherPlans.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/putAwayFocus.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/common.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/hooks/useWorkspaceTabGates.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/useCardFold.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-arc-nest.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-arc-strip-return.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-dismiss-done.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-runner-widget-list.mjs, /home/lyphe/.claude/state/dispatch-souls/dispatch-hephaestus-20260928-161608-f892/result.md
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/ArcDeck.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/DeletePlanDialog.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/hiddenPlans.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/hooks/useDispatcherPlans.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/putAwayFocus.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/common.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/hooks/useWorkspaceTabGates.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/useCardFold.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-arc-nest.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-arc-strip-return.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-dismiss-done.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-runner-widget-list.mjs
 
 ## INV-5680 — probe — The standing proof passes a lead that paints nothing
 
@@ -7751,21 +7751,6 @@ probe-key: 32bd1d35e7eeab0b6b3b52da6f312b1ddb5d5ce5
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/diagnosis/diagnosis-tools.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/cerberus-diagnosis-words-shot.mjs
 
-## INV-7219 — probe — the script's optional `[node/service/check]` argument only works for Shadow connector
-
-the script's optional `[node/service/check]` argument only works for Shadow connector
-
-```probe
-D=~/.claude/state/pipeline-reviews/cerberus--judgment--diag-words/probes
-bash "$D/p2.sh"
-expect: "PASS lines: 0  TimeoutError lines: 1" (cured: PASS lines above 0 and TimeoutError lines: 0)
-```
-
-measured 2026-10-07 by chain chain-cerberus--judgment--diag-words-20261007-105655-477a, finding L2, LOW
-probe-key: bc422976ea4ee401e338de026d463a72190f06b8
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/[node/service/check]
-
 ## INV-7225 — probe — MEDIUM — Run now in the sheet, then a press on a sibling row: the sibling blanks to "Reading this check…" for ~27 s
 
 MEDIUM — Run now in the sheet, then a press on a sibling row: the sibling blanks to "Reading this check…" for ~27 s
@@ -9163,7 +9148,7 @@ expect: the second line reads `scrollTop = 0` while the defect stands (the pane 
 measured 2026-10-10 by chain chain-simple-list-hold-to-drag-20261009-233125-3a36, finding M1, MEDIUM
 probe-key: ab3f220eaa510899af539351207eb41ffafa5884
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/hooks/useCarryEdgeScroll.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/hooks/useSimpleChatDrag.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/SidebarSimpleListRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/sortable/touchLift.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/touch-input.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/simple-list-hold-to-drag.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/simple-list-hold-to-drag-scratch.sh, /home/lyphe/.claude/claudecodeui_lyphe/.verify/sortable-hold-equivalence.mjs
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/hooks/useCarryEdgeScroll.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/hooks/useSimpleChatDrag.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/SidebarSimpleListRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/sortable/touchLift.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/touch-input.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/simple-list-hold-to-drag.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/simple-list-hold-to-drag-scratch.sh
 
 ## INV-7587 — probe — MEDIUM — a hold on a status icon inside a `Tooltip` opens the tooltip AND lifts the row
 
@@ -9178,7 +9163,7 @@ expect: `at 700 ms lifted=["run"] tooltip=true` while the defect stands; `lifted
 measured 2026-10-10 by chain chain-simple-list-hold-to-drag-20261009-233125-3a36, finding M2, MEDIUM
 probe-key: adb6fcab46efd5858d0eac70b40475b0e12c99eb
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/hooks/useCarryEdgeScroll.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/hooks/useSimpleChatDrag.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/SidebarSimpleListRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/sortable/touchLift.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/touch-input.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/simple-list-hold-to-drag.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/simple-list-hold-to-drag-scratch.sh, /home/lyphe/.claude/claudecodeui_lyphe/.verify/sortable-hold-equivalence.mjs
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/hooks/useCarryEdgeScroll.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/hooks/useSimpleChatDrag.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/SidebarSimpleListRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/sortable/touchLift.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/touch-input.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/simple-list-hold-to-drag.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/simple-list-hold-to-drag-scratch.sh
 
 ## INV-7588 — probe — LOW — a press on the blank part of the row's open action menu lifts the row behind it
 
@@ -9193,4 +9178,4 @@ expect: `lifted=["<session id>"] body="vv-dragging vv-drag-sort"` while the defe
 measured 2026-10-10 by chain chain-simple-list-hold-to-drag-20261009-233125-3a36, finding L1, LOW
 probe-key: a3dcd5ff76dbd62c5cefe14a38e6b802bff396fb
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/hooks/useCarryEdgeScroll.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/hooks/useSimpleChatDrag.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/SidebarSimpleListRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/sortable/touchLift.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/touch-input.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/simple-list-hold-to-drag.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/simple-list-hold-to-drag-scratch.sh, /home/lyphe/.claude/claudecodeui_lyphe/.verify/sortable-hold-equivalence.mjs
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/hooks/useCarryEdgeScroll.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/hooks/useSimpleChatDrag.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/SidebarSimpleListRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/sortable/touchLift.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/touch-input.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/simple-list-hold-to-drag.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/simple-list-hold-to-drag-scratch.sh
