@@ -9179,3 +9179,90 @@ measured 2026-10-10 by chain chain-simple-list-hold-to-drag-20261009-233125-3a36
 probe-key: a3dcd5ff76dbd62c5cefe14a38e6b802bff396fb
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/hooks/useCarryEdgeScroll.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/hooks/useSimpleChatDrag.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/SidebarSimpleListRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/sortable/touchLift.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/touch-input.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/simple-list-hold-to-drag.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/simple-list-hold-to-drag-scratch.sh
+
+## INV-7979 — probe — a follow-up turn's result releases the OLDEST hold even when a notification already released the call that woke it
+
+a follow-up turn's result releases the OLDEST hold even when a notification already released the call that woke it
+
+```probe
+D=$(mktemp -d /tmp/athena-p.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+F=server/modules/providers/list/claude/claude-runtime.provider.js
+sed -n '/A result no client is waiting on/,/for (const id of launchedThisTurn)/p' "$F" | grep -n "oldest\|abortPending\|notified\|released" || echo "block not found"
+EOF
+bash "$D/p.sh"
+cd /tmp; case "$D" in /tmp/athena-p.??????) rm -r "$D";; esac
+echo "[probe exit $?]"
+expect: lines 11-13 show `release it: its own follow-up turn does, oldest first.`, `const oldest = deferredTools.values().next();` and `if (!oldest.done) deferredTools.delete(oldest.value);` with no test of whether a task_notification already released the call that woke this turn; cured when a guard of that kind appears. Dynamic shape (scratch stack, 2026-10-12): two background Bash calls (`sleep 110`, `sleep 5`) in one turn → after the short one's follow-up turn the idle closer logs `tasks=1, deferred=0` while the long one runs.
+```
+
+measured 2026-10-12 by chain chain-chat-busy-ledger-20261012-105339-80e5, finding M1, MEDIUM
+probe-key: 7ca27a952a6523848a29ee5fcb33608395a31d37
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/chat-busy-ledger.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/chat-busy-ledger.sh
+
+## INV-7980 — probe — the one other chat with stuck marks (Adjuster comms, `9abcf102`) is the SAME bug and stays stuck: the node-side release is not live
+
+the one other chat with stuck marks (Adjuster comms, `9abcf102`) is the SAME bug and stays stuck: the node-side release is not live
+
+```probe
+D=$(mktemp -d /tmp/athena-p.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+cd ~/.cerberus-warden/sessions 2>/dev/null || { echo "no warden sessions dir"; exit 0; }
+python3 -I - <<'PY'
+import glob, json
+metas = glob.glob("9abcf102-*.json")
+if not metas: print("no host for 9abcf102 (the chat ended or the warden moved)")
+for mp in metas:
+    ids = set(json.load(open(mp)).get("deferredTools") or [])
+    seen = set()
+    for line in open(mp[:-5] + ".ndjson"):
+        if "task_notification" not in line: continue
+        try: o = json.loads(json.loads(line)["line"])
+        except Exception: continue
+        if o.get("subtype") == "task_notification" and o.get("tool_use_id") in ids: seen.add(o["tool_use_id"])
+    print("held calls:", len(ids), "- of them the journal shows reported:", len(seen))
+PY
+echo "warden registry copies carrying reportedCalls: $(grep -rl reportedCalls ~/.cerberus-warden/releases 2>/dev/null | wc -l)"
+EOF
+bash "$D/p.sh"
+cd /tmp; case "$D" in /tmp/athena-p.??????) rm -r "$D";; esac
+echo "[probe exit $?]"
+expect: `held calls: 8 - of them the journal shows reported: 8` and `copies carrying reportedCalls: 0` while the defect stands; cured when the held count is 0 (a warden release carrying the new host-registry.js, or the chat ended — then `no host for 9abcf102`).
+```
+
+measured 2026-10-12 by chain chain-chat-busy-ledger-20261012-105339-80e5, finding L1, LOW
+probe-key: 4ba42137c694451d5bb924620bd5ac09bca5f2b0
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/chat-busy-ledger.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/chat-busy-ledger.sh
+
+## INV-7981 — probe — MAN-8066 says the retry runs "once" in one place and repeatedly in another
+
+MAN-8066 says the retry runs "once" in one place and repeatedly in another
+
+```probe
+~/.claude/scripts/docstore get MAN-8066 --text | grep -c "decided again once"
+echo "[probe exit $?]"
+expect: `1` while the table row says "decided again once"; cured when it says the decision is made again at each quiet (the start still at most once).
+```
+
+measured 2026-10-12 by chain chain-chat-busy-ledger-20261012-105339-80e5, finding L2, LOW
+probe-key: 71755261c477faa21fbb80d19f2755c501d8be96
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/chat-busy-ledger.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/chat-busy-ledger.sh
+
+## INV-7982 — probe — MAN-687 carries a history pointer
+
+MAN-687 carries a history pointer
+
+```probe
+~/.claude/scripts/docstore get MAN-687 --text | grep -c "used to move into the list anyway"
+echo "[probe exit $?]"
+expect: `1` while the pointer stands; cured at 0.
+```
+
+measured 2026-10-12 by chain chain-chat-busy-ledger-20261012-105339-80e5, finding L3, LOW
+probe-key: a84fe822dd68800e6363c527052331b18aef6aa7
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/chat-busy-ledger.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/chat-busy-ledger.sh

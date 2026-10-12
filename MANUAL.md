@@ -2560,7 +2560,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/compaction/compac
 | trigger | fires when | default | env seam (read at the call) |
 |---|---|---|---|
 | turn end | `contextTokens ≥ fraction × contextWindow`, and for a chat compacted before, `contextTokens − post_tokens ≥ growth × contextWindow` (growth guard) | fraction 0.5 (`AUTO_COMPACT_FRACTION`); growth 0.2 (`MIN_GROWTH_FRACTION`) | `CUSTOM_COMPACTION_AUTO_FRACTION`, `CUSTOM_COMPACTION_MIN_GROWTH` |
-| idle | one unref'd timeout per chat, re-armed at every turn end, fires once; `contextTokens ≥ min` | 3,240,000 ms (54 min); min 200,000 | `CUSTOM_COMPACTION_IDLE_AFTER_MS`, `CUSTOM_COMPACTION_IDLE_MIN_TOKENS` |
+| idle | one unref'd timeout per chat, re-armed at every turn end, fires once, and is decided again at each quiet of the process while it finds the process busy or a run in progress (the compaction starts at most once: "The idle deadline"); `contextTokens ≥ min` | 3,240,000 ms (54 min); min 200,000 | `CUSTOM_COMPACTION_IDLE_AFTER_MS`, `CUSTOM_COMPACTION_IDLE_MIN_TOKENS` |
 
 An override that is not a positive finite number falls back to the default; `CUSTOM_COMPACTION_MIN_GROWTH` takes any finite number, a negative one included. `IDLE_AFTER_MS` above 2,147,483,647 also falls back: Node clamps a larger `setTimeout` delay to 1 ms, which would fire at once.
 
@@ -2593,6 +2593,10 @@ Only verb exit 2 and not-ready put a chat under an automatic refusal (MAN-8065).
 
 ## The idle deadline
 Fires `fireIdleDeadline`: chat row gone → `forgetSession` and log; `contextTokens` null or under `min` → log; `takesOver` false → log; then, synchronously up to the start: a run in progress, process busy, a flight, a refusal → `left alone: <why>`; else `idle, starting the compaction` and `startRun(report, 'idle')`. A server restart drops every deadline; the chat's next turn end arms it again.
+
+A run in progress or a busy process ends on its own, so those two `left alone` answers keep the report in `idleRetries` (one per chat). The `activityChanged` that says the process went quiet takes it out and runs `fireIdleDeadline` again, whole: every condition above is read afresh (a second `left alone` keeps it again, the next quiet tries once more). A flight or an automatic refusal is not kept: a flight's own end is a turn end, which re-arms the deadline. A turn end (`clearIdle`) and `stop()` drop the kept report with the deadline. Nothing here polls: the wake is the activity edge. The decision lines are the same sentences; a retried chat reads `left alone: the process is busy` and, later, `idle, starting the compaction` under `trigger=idle`.
+
+What goes quiet without a turn end: a task whose notification wakes no follow-up turn (the follow-up latch's grace expires), and the process ending (`live: false`). A task that wakes a follow-up turn ends in a turn end, which supersedes the kept report with a fresh deadline.
 
 ## `startRun`
 `runDetachedChatTurn({ sessionId, userId, content: '/compact', options: {...report.sendOptions, compactionTrigger}, beforeRun })` with the DECORATOR as runtime, so its `/compact` test sees the run.

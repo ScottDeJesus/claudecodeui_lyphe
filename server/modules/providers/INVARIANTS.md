@@ -69,3 +69,28 @@ measured 2026-10-08 by chain chain-custom-compaction--seams-20261008-095144-d30e
 probe-key: feb0f6745244c4761f805d3fba0d271a8e5eb41f
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-compaction-seams.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/interfaces.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts
+
+## INV-7978 — Claude runtime — the background-call ledger: what holds the CLI open and what releases a hold
+
+`spawnProcess` in `claude-runtime.provider.js` holds two sets of tool-call ids. A call is a hold while its work may still run past the turn that launched it. While `deferredTools` is non-empty the process reads busy (`busy (N background calls have not reported)`), the idle closer and the version sweep keep their hands off it, and a Stop leaves it alive.
+
+| set | contents | filled | emptied |
+|---|---|---|---|
+| `launchedThisTurn` | ids launched this turn that may outlive it (`backgroundWorkIds`: Bash with `run_in_background`, the `DEFERRED_WORK_TOOLS` names) | every message that carries them | at each `result`; by a `task_notification` naming the id |
+| `deferredTools` | ids whose work was still outstanding when a turn ended; persisted in the host meta (`deferredTools`, `heldForBackgroundWork`) | at a `result`: every id still in `launchedThisTurn` | the releases below |
+
+Releases (the only ones; a hold with none of these stays):
+
+| when | release |
+|---|---|
+| `system/task_notification` with a `tool_use_id`, before or after the launching turn's `result` | that id leaves BOTH sets, by id; a call whose notification came mid-turn never becomes a hold |
+| a follow-up turn no task notification woke (a scheduled wake-up, a cron: work the task system never lists) | the OLDEST hold, at that turn's `result` |
+| a follow-up turn a notification woke (`init` seen while the follow-up latch `followUp.expected` was armed sets `followUpAnswersNotification`, read and cleared at the `result`) | none: the notification already released its call by id; the other holds may still be running |
+| re-adoption (`reattach.deferredTools`) | the ids `listLiveHosts` left after reading the host's journal (MAN-687); a meta with only the bit restores one entry `'re-adopted'` |
+
+- why: a notification that arrived before its turn's `result` once still moved its call into `deferredTools` at that result, with nothing left to name it again; the chat read busy for good (2026-10-12: two calls that finished within 12 s held a chat).
+- why: a follow-up that releases "the oldest" after a notification released its own call frees a second call that may still be running.
+- Not released: a launch that never started (a hook-blocked or denied background Bash) has no notification and no follow-up; it stays held until a follow-up no notification woke arrives.
+- Never: replace the ids with a count, release a hold on a timer, or clear the set to unstick a chat. The proof of a finished call is the host journal's own `task_notification` frame, never its absence.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-runtime.provider.js

@@ -86,6 +86,26 @@ function readInitVersion(raw) {
 }
 
 /**
+ * The `tool_use_id` one journal entry's `task_notification` names when it is CLI output carrying one — the CLI's own word that the
+ * work that call launched has ended — else null.
+ * @param {string} raw
+ * @returns {string | null}
+ */
+function readNotifiedToolUseId(raw) {
+  if (!raw.includes('task_notification')) return null;
+  try {
+    const entry = JSON.parse(raw);
+    if (entry.t !== 'out' || typeof entry.line !== 'string') return null;
+    const output = JSON.parse(entry.line);
+    return output.type === 'system' && output.subtype === 'task_notification' && typeof output.tool_use_id === 'string'
+      ? output.tool_use_id
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * The `at` of one journal entry when it is CLI output carrying a `result`, else null.
  * @param {string} raw
  * @returns {number | null}
@@ -117,6 +137,14 @@ export function createHostRegistry({ tmuxSocketName, keepaliveSession, sessionsD
   const hostJournalPath = (hostId) => path.join(sessionsDir, `${hostId}.ndjson`);
   /** @type {(hostId: string) => string} */
   const hostMetaPath = (hostId) => path.join(sessionsDir, `${hostId}.json`);
+  /**
+   * `reportedCalls`'s answers by host, each with what it was read from (the journal's size and the ids asked about): a journal only
+   * grows, so the same size is the same answer, and a poll of a quiet host costs one `stat`.
+   * @type {Map<string, { key: string, reported: Set<string> }>}
+   */
+  const reportedCallsMemo = new Map();
+  /** `host/id` of every release already logged, so a poll that reads the same meta again does not say it again. */
+  const releasesLogged = new Set();
 
   /**
    * Every tmux call in this registry. The timeout is the point: `execFileSync` with no timeout
@@ -218,6 +246,11 @@ export function createHostRegistry({ tmuxSocketName, keepaliveSession, sessionsD
       const meta = readHostMeta(hostId);
       if (!meta || meta.exited !== null || typeof meta.appSessionId !== 'string') continue;
       if (!alive.has(hostId)) continue;
+      // The calls the meta still holds as outstanding, less those the CLI has reported finished since. A meta written by an API whose
+      // ledger missed a notification names a call that will never report again; the journal still has the frame.
+      const heldIds = Array.isArray(meta.deferredTools) ? meta.deferredTools.filter((id) => typeof id === 'string') : [];
+      const reported = heldIds.length > 0 ? reportedCalls(hostId, heldIds) : new Set();
+      const stillHeld = heldIds.filter((id) => !reported.has(id));
       live.push({
         hostId,
         appSessionId: meta.appSessionId,
@@ -225,10 +258,10 @@ export function createHostRegistry({ tmuxSocketName, keepaliveSession, sessionsD
         cwd: meta.cwd ?? null,
         startedAt: typeof meta.startedAt === 'number' ? meta.startedAt : 0,
         turnCompleteSent: meta.turnCompleteSent === true,
-        heldForBackgroundWork: meta.heldForBackgroundWork === true,
-        deferredTools: Array.isArray(meta.deferredTools)
-          ? meta.deferredTools.filter((id) => typeof id === 'string')
-          : [],
+        // A meta that names its calls holds the host only while one of them is unreported; a meta with just the bit (a host from
+        // before the list) has no ids to test and keeps it.
+        heldForBackgroundWork: meta.heldForBackgroundWork === true && !(heldIds.length > 0 && stillHeld.length === 0),
+        deferredTools: stillHeld,
         profile: meta.profile && typeof meta.profile === 'object' ? meta.profile : null,
         // Out of the journal, not the meta: what the CLI said about itself, at the one moment it said
         // it. A host spawned before this field existed answers just the same.
@@ -324,10 +357,47 @@ export function createHostRegistry({ tmuxSocketName, keepaliveSession, sessionsD
   }
 
   /**
+   * Which of `ids` — tool calls a meta holds as background work still outstanding — the host's CLI has reported finished: those its
+   * journal holds a `task_notification` frame for. The live loop releases a call on that very frame; this reads it back for a call the
+   * loop's ledger missed (a notification that arrived before the turn's `result` moved the call in), so a host stuck "busy" for a call
+   * that ended is cleared by evidence, never by a blanket reset. A call with no frame stays held.
+   * @param {string} hostId
+   * @param {string[]} ids
+   * @returns {Set<string>}
+   */
+  function reportedCalls(hostId, ids) {
+    let size;
+    try {
+      size = fs.statSync(hostJournalPath(hostId)).size;
+    } catch {
+      return new Set();
+    }
+    const key = `${size}:${ids.join(',')}`;
+    const memo = reportedCallsMemo.get(hostId);
+    if (memo && memo.key === key) return memo.reported;
+    const wanted = new Set(ids);
+    /** @type {Set<string>} */
+    const reported = new Set();
+    journalLineNewestFirst(hostId, (raw) => {
+      const id = readNotifiedToolUseId(raw);
+      if (id !== null && wanted.has(id)) reported.add(id);
+      return reported.size === wanted.size;
+    });
+    reportedCallsMemo.set(hostId, { key, reported });
+    const fresh = [...reported].filter((id) => !releasesLogged.has(`${hostId}/${id}`));
+    for (const id of fresh) releasesLogged.add(`${hostId}/${id}`);
+    if (fresh.length > 0) {
+      console.log(`[keepalive] host ${hostId}: ${fresh.length} held background call(s) already reported finished in its journal — released (${fresh.join(', ')})`);
+    }
+    return reported;
+  }
+
+  /**
    * Removes the two files the attached adapter owns; the host unlinks its own socket.
    * @param {string} hostId
    */
   function removeHostJournal(hostId) {
+    reportedCallsMemo.delete(hostId);
     for (const target of [hostJournalPath(hostId), hostMetaPath(hostId)]) {
       try {
         fs.rmSync(target, { force: true });

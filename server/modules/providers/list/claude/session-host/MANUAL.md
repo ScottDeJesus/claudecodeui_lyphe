@@ -217,6 +217,20 @@ decides whether the CLI is held after it) — persisted rather than re-derived, 
 them from the journal's content would be a second copy of the loop's result/phantom/background
 decisions. A re-adopted run initializes both from here.
 
+One read is made against the journal, not the meta: `listLiveHosts` drops from `deferredTools` every
+id the host's journal holds a `system/task_notification` frame for — the CLI's own word that the
+work that call launched ended, and the frame the live loop releases a call on — and, when that
+empties a list the meta carried, reads `heldForBackgroundWork` false. A meta written by a loop
+whose ledger missed a notification (one that arrived before its turn's `result`, so the list the
+meta persisted still named a call that had ended) is cleared by that evidence and by nothing else: a call with no
+frame stays held, and so does a meta that carries only the bit. Memoized per host on the journal's
+size and the ids asked about, so a poll of a quiet host costs one `stat`. The meta on disk is not
+rewritten (the host owns it); the next `note` persists the shorter list. Logged once per call per
+process: `[keepalive] host <id>: N held background call(s) already reported finished in its journal
+— released (<ids>)`. Every consumer of `LiveHost` — the boot re-adoption, the idle version sweep,
+the claude-activity reading — sees the released list, and a node's warden does the same the day
+it carries this `host-registry.js`.
+
 `profile` is what the API launched the CLI with, and its `cliVersion` is **null when the meta is
 written** — the meta is written at spawn, before the CLI has said anything. What the CLI later said
 is in the journal (`system/init`'s `claude_code_version`), and THAT is what a re-adoption reads

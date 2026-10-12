@@ -989,14 +989,16 @@ async function spawnProcess(command, options, initialWs, context) {
   let settleFirstTurn;
   const firstTurnSettled = new Promise((resolve) => { settleFirstTurn = resolve; });
 
-  // Tool calls seen during the current turn that leave work running past its `result`; moved
-  // into `deferredTools` at that result.
+  // Tool calls launched during the current turn that may leave work running past its `result`.
+  // A call whose `task_notification` arrives before that result has nothing left to wait for and
+  // leaves this set; the rest move into `deferredTools` at the result.
   const launchedThisTurn = new Set();
-  // The tool-call ids whose work is still outstanding and will report back — released by the
-  // `task_notification` that names the call, or, for work the task system never lists (a
-  // scheduled wake-up, a cron), by the follow-up turn it pushes. Identity, not a count: two
-  // completions folded into one follow-up turn release both. Persisted in the host meta and
-  // restored on re-adoption; an older host's meta carries only the bit, restored as one entry.
+  // The tool-call ids whose work was still outstanding when a turn ended and will report back —
+  // released by the `task_notification` that names the call, or, for work the task system never
+  // lists (a scheduled wake-up, a cron), by the follow-up turn it pushes. Identity, not a count:
+  // two completions folded into one follow-up turn release both. Persisted in the host meta and
+  // restored on re-adoption, less the calls the host's journal shows already reported (the host
+  // registry's `listLiveHosts`); an older host's meta carries only the bit, restored as one entry.
   const deferredTools = new Set(reattach?.deferredTools ?? []);
   if (reattach?.heldForBackgroundWork === true && deferredTools.size === 0) deferredTools.add('re-adopted');
   const heldForBackgroundWork = () => deferredTools.size > 0;
@@ -1008,6 +1010,9 @@ async function spawnProcess(command, options, initialWs, context) {
   // The CLI is between an `init` and its `result`: a user turn, or a follow-up turn a task
   // completion pushed on its own. Either way the process must not be closed under it.
   let turnInFlight = false;
+  // Set at an `init` the follow-up latch was waiting for — the turn the CLI pushed to answer a task's
+  // notification — and read at that turn's `result`, which then has no other hold to release.
+  let followUpAnswersNotification = false;
   // The CLI's own level signal for live background tasks — watchers included — replaced on
   // every `background_tasks_changed` (its documented REPLACE semantics) and edged by the
   // task bookends in between. Empty until the first change after (re)start.
@@ -1491,6 +1496,7 @@ async function spawnProcess(command, options, initialWs, context) {
 
         if (message.type === 'system' && message.subtype === 'init') {
           turnInFlight = true;
+          if (followUp.expected) followUpAnswersNotification = true;
           followUp.release();
           // The engine's list of terminal-bound commands rides this frame and no other (an idle read
           // never gets one); the command catalog keeps it under the CLI version that sent it. Not awaited.
@@ -1510,9 +1516,14 @@ async function spawnProcess(command, options, initialWs, context) {
             backgroundTasks.add(message.task_id);
           } else if (message.subtype === 'task_notification' && typeof message.task_id === 'string') {
             backgroundTasks.delete(message.task_id);
-            // The notification names the call whose work ended: that hold is released here,
-            // whether the follow-up turn it triggers is merged with another's or not.
-            if (typeof message.tool_use_id === 'string') deferredTools.delete(message.tool_use_id);
+            // The notification names the call whose work ended: released here, whether it already
+            // moved to `deferredTools` or ended inside its own turn and is still in
+            // `launchedThisTurn` (it never becomes a hold), and whether the follow-up turn it
+            // triggers is merged with another's or not.
+            if (typeof message.tool_use_id === 'string') {
+              deferredTools.delete(message.tool_use_id);
+              launchedThisTurn.delete(message.tool_use_id);
+            }
             // The CLI answers a finished task with a turn of its own, ~100 ms later; an ambient task
             // wakes nothing, and one that ends mid-turn is absorbed by that turn.
             if (message.ambient !== true && !turnInFlight) followUp.expect();
@@ -1643,6 +1654,8 @@ async function spawnProcess(command, options, initialWs, context) {
           firstResultHandled = true;
           turnInFlight = false;
           followUp.release();
+          const wokenByNotification = followUpAnswersNotification;
+          followUpAnswersNotification = false;
           const turn = pendingTurn;
           const answersTurn = answersPendingTurn(message);
           const abortPending = abortedInstances.has(queryInstance);
@@ -1691,12 +1704,15 @@ async function spawnProcess(command, options, initialWs, context) {
               sessionName: sessionSummary
             });
             // Work the task system never lists (a wake-up, a cron) has no notification to
-            // release it: its own follow-up turn does, oldest first.
+            // release it: its own follow-up turn does, oldest first. A follow-up that answers a
+            // task's notification is that task's alone — the notification released its call by id
+            // — and says nothing about the other holds, which may still be running.
             const oldest = deferredTools.values().next();
-            if (!oldest.done) deferredTools.delete(oldest.value);
+            if (!wokenByNotification && !oldest.done) deferredTools.delete(oldest.value);
           }
-          // Work started during this turn reports back as a turn of its own; the idle closer
-          // keeps its hands off the process until it has.
+          // Work still running as this turn ends (a launch whose notification has not come)
+          // reports back as a turn of its own; the idle closer keeps its hands off the process
+          // until it has.
           for (const id of launchedThisTurn) deferredTools.add(id);
           launchedThisTurn.clear();
           // The turn a Stop ended has now reported. The process a Stop kept alive for its

@@ -26,6 +26,8 @@ import {
  *   pending compaction and started by the `activityChanged` that says the process went quiet.
  * - IDLE: every turn end (re)arms ONE unref'd timeout per chat; it fires once, `IDLE_COMPACT_AFTER_MS`
  *   later (the CLI's own moment: 0.9 of the one-hour prompt cache), and is replaced by the next turn's end.
+ *   A deadline that finds the process busy or a run in progress is kept and decided again, whole, by the
+ *   `activityChanged` that says the process went quiet; the next turn's end drops it with the deadline.
  *
  * Consumer: compaction-runtime.ts, which registers `turnEnded` and `activityChanged` with the runtime.
  */
@@ -84,11 +86,14 @@ export function createAutoTrigger(
   let stopped = false;
   const pending = new Map<string, ChatTurnReport>();
   const idleDeadlines = new Map<string, { timer: NodeJS.Timeout; report: ChatTurnReport }>();
+  // A deadline that was left alone for a busy process or a run: the report it fired for, until the process goes quiet.
+  const idleRetries = new Map<string, ChatTurnReport>();
 
   const clearIdle = (sessionId: string): void => {
     const held = idleDeadlines.get(sessionId);
     if (held) clearTimeout(held.timer);
     idleDeadlines.delete(sessionId);
+    idleRetries.delete(sessionId);
   };
 
   /**
@@ -195,6 +200,7 @@ export function createAutoTrigger(
 
   const activityChanged = (sessionId: string, activity: ChatProcessActivity): void => {
     publishActivity(sessionId, activity);
+    if (!stopped && !activity.busy) retryIdle(sessionId);
     const report = pending.get(sessionId);
     if (stopped || !report || activity.busy) return;
     pending.delete(sessionId);
@@ -214,15 +220,28 @@ export function createAutoTrigger(
     startRun(report, 'auto');
   };
 
+  /** Runs the idle decision for a report; a throw is logged, never left to surface as an unhandled rejection. */
+  const decideIdle = (report: ChatTurnReport): void => {
+    fireIdleDeadline(report).catch((error: unknown) => {
+      console.error(`[compaction] session=${report.appSessionId} the idle deadline failed:`, error instanceof Error ? error.message : error);
+    });
+  };
+
+  /** The idle deadline's second chance: the process just went quiet, so a deadline kept for it is decided again. Once per kept deadline. */
+  const retryIdle = (sessionId: string): void => {
+    const report = idleRetries.get(sessionId);
+    if (!report) return;
+    idleRetries.delete(sessionId);
+    decideIdle(report);
+  };
+
   /** (Re)arms the chat's one idle deadline. A server restart drops it; the chat's next turn end arms it again. */
   function armIdleDeadline(report: ChatTurnReport): void {
     const sessionId = report.appSessionId;
     if (stopped) return;
     const timer = setTimeout(() => {
       idleDeadlines.delete(sessionId);
-      fireIdleDeadline(report).catch((error: unknown) => {
-        console.error(`[compaction] session=${sessionId} the idle deadline failed:`, error instanceof Error ? error.message : error);
-      });
+      decideIdle(report);
     }, idleAfterMs());
     timer.unref();
     idleDeadlines.set(sessionId, { timer, report });
@@ -248,15 +267,15 @@ export function createAutoTrigger(
     // Everything below is synchronous up to the start, so nothing can slip in between check and run.
     if (stopped) return;
     const activity = activityNow();
-    const reason = chatRunRegistry.isProcessing(sessionId)
-      ? 'a run is in progress'
-      : activity.busy
-        ? 'the process is busy'
-        : flightOf(sessionId)
-          ? 'a compaction is already in flight'
-          : isRefusedAutomatic(sessionId) ? 'the chat is under an automatic refusal' : null;
+    // A run or a busy process ends on its own, so those two are kept for the activity hook's next "quiet"; a flight or a
+    // refusal is not waited out (a flight's own end is a turn end, which re-arms the deadline).
+    const busyReason = chatRunRegistry.isProcessing(sessionId) ? 'a run is in progress' : activity.busy ? 'the process is busy' : null;
+    const reason = busyReason ?? (flightOf(sessionId)
+      ? 'a compaction is already in flight'
+      : isRefusedAutomatic(sessionId) ? 'the chat is under an automatic refusal' : null);
     if (reason !== null) {
       logDecision(sessionId, 'idle', report, activity, `left alone: ${reason}`);
+      if (busyReason !== null) idleRetries.set(sessionId, report);
       return;
     }
     logDecision(sessionId, 'idle', report, activity, 'idle, starting the compaction');
@@ -268,6 +287,7 @@ export function createAutoTrigger(
     stopped = true;
     for (const { timer } of idleDeadlines.values()) clearTimeout(timer);
     idleDeadlines.clear();
+    idleRetries.clear();
     pending.clear();
   };
 
