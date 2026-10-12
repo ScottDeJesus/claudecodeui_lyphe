@@ -1,8 +1,7 @@
 import { useContext, useEffect, useState } from 'react';
 import type { WorkSheet } from 'xlsx';
 
-import { EmptyState, Tabs } from '@/shared/ui';
-import { Spinner } from '@/shared/ui/Spinner';
+import { EmptyState, Spinner, Tabs } from '@/shared/ui';
 import type { DocumentViewProps } from '@/shared/types';
 import { DocumentFrameContext } from '@/modules/document-preview/DocumentPreview';
 

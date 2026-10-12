@@ -2,7 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, typ
 import { useTranslation } from 'react-i18next';
 
 import { NoteDraftsContext, NotesContext, type NoteDraftsValue, type NotesValue } from '@/modules/notes/context/NotesContext';
-import { api, errorMessage } from '@/shared/api';
+import { api, refusalSentence } from '@/shared/api';
 import { useToast } from '@/shared/context/ToastContext';
 import { useWebSocket } from '@/shared/context/WebSocketContext';
 import type { Note, NoteInput } from '@/shared/types';
@@ -12,22 +12,6 @@ const COMPOSER_TARGET = 'composer';
 
 /** Nothing typed: the blank card's draft on mount, and again once an add has landed and been re-read. */
 const BLANK_DRAFT: NoteInput = { title: '', description: '' };
-
-/**
- * The server's own sentence out of a refusal body, or `null` when the body carried none — or was
- * not JSON at all. Two shapes arrive on this wire and `errorMessage` reads both: a route's plain
- * `error` string, and the error middleware's `{ error: { code, message } }`.
- */
-async function refusalSentence(response: Response): Promise<string | null> {
-  try {
-    const body: unknown = await response.json();
-    if (body === null || typeof body !== 'object') return null;
-    const envelope = body as { error?: unknown; details?: unknown };
-    return errorMessage(envelope.error) ?? errorMessage(envelope.details);
-  } catch {
-    return null;
-  }
-}
 
 /**
  * One record without one key — and the SAME object when the key was not there, so clearing a mark

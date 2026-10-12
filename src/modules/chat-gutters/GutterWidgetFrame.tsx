@@ -57,7 +57,10 @@ import { cn } from '@/shared/utils';
  * `fixed inset-0` where it stands, the fold is forced open (a fullscreen card showing only its own
  * header is a screen of nothing), and the root claims Escape so a dialog behind it stands down. The
  * KEY itself belongs to the layout, which owns which widget is fullscreen; this card cannot turn its
- * own fullscreen off.
+ * own fullscreen off. A widget may swap its body for a fullscreen one (the layout's `FullscreenBody`), and the
+ * body that held the keyboard's focus is then unmounted under the leave, which drops focus to `<body>`; so on
+ * leaving, a focus that fell out of the document goes back to this card's fullscreen switch (the control
+ * that was pressed to enter), and a focus that is anywhere real is left where it is.
  *
  * THE BODY ANIMATES BOTH WAYS, in the house's collapse motion — a grid whose single row goes between
  * `0fr` and `1fr` over 200ms with the content clipped while it moves. It is spelt here rather than
@@ -143,6 +146,23 @@ export function GutterWidgetFrame({
     if (openTimer.current !== null) clearTimeout(openTimer.current);
     if (rowFrame.current !== null) cancelAnimationFrame(rowFrame.current);
   }, []);
+
+  // The fullscreen switch, so the hand-off below names it without a DOM query.
+  const switchRef = useRef<HTMLButtonElement | null>(null);
+  // Whether the last commit had this card full screen: leaving is the commit where it was and no longer is.
+  const wasFullscreen = useRef(false);
+  // On leaving, put back a focus the leave dropped. A fullscreen body that is swapped out (Escape is the layout's
+  // key, and the focus was inside the body) takes the focused node with it and focus falls to `<body>`, which
+  // throws a keyboard reader back to the top of the document (`dispatcher/putAwayFocus.ts` names the same hazard).
+  // Only a lost focus is handed back: one that is on a real element is where the reader put it.
+  useEffect(() => {
+    const leaving = wasFullscreen.current && !fullscreen;
+    wasFullscreen.current = fullscreen;
+    const button = switchRef.current;
+    if (!leaving || button === null) return;
+    const focused = button.ownerDocument.activeElement;
+    if (focused === null || focused === button.ownerDocument.body) button.focus();
+  }, [fullscreen]);
 
   const toggle = () => {
     if (!open) {
@@ -270,6 +290,7 @@ export function GutterWidgetFrame({
         {headerAction}
         {onToggleFullscreen ? (
           <button
+            ref={switchRef}
             type="button"
             data-testid="gutter-widget-fullscreen"
             onClick={onToggleFullscreen}

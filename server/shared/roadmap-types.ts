@@ -29,7 +29,7 @@ export type RoadmapFeatureWord = 'idea' | 'proposed' | 'designing' | 'in flight'
 
 /**
  * The finer step under a feature's word. `designing` carries the steps `designing`, `questions`,
- * `cutting`, `parked` and `accept`; `in flight` carries `building`, `paused`, `queued`, `waiting`
+ * `cutting`, `parked` and `accept`; `in flight` carries `building`, `paused`, `queued`, `stalled`, `waiting`
  * and `starting`; every other word is its own step. Consumers: the roadmap lane's reader and the screen.
  */
 export type RoadmapFeatureStep =
@@ -44,6 +44,7 @@ export type RoadmapFeatureStep =
   | 'waiting'
   | 'queued'
   | 'paused'
+  | 'stalled'
   | 'starting'
   | 'shipped';
 
@@ -118,7 +119,10 @@ export type RoadmapTask = {
  * operator's own reason, a mark the picture shows and nothing reads, or null; `waits_on` names the
  * plans it waits on. `repo` and `project` are always strings: `project` is always a label, the feature's
  * own or the one the dispatcher derives (MAN-7621). `cases` counts the feature's own active cases by
- * word. Consumers: the roadmap lane's reader and the screen.
+ * word. `runtime_s` is how long agents were out on it — the union of its planner outings' and its stage
+ * tries' intervals, whole seconds, counting what has ENDED (`report_roadmap`: a figure that moved every
+ * second would put this picture's frame on every socket every two seconds) — which a shipped feature's
+ * row says after its date. Consumers: the roadmap lane's reader and the screen.
  */
 export type RoadmapFeature = {
   name: string;
@@ -137,13 +141,17 @@ export type RoadmapFeature = {
   promoted_at: string | null;
   approved_at: string | null;
   shipped_at: string | null;
+  runtime_s: number;
   cases: RoadmapCases;
 };
 
 /**
  * One epic (an arc on the wire's other face): a body of features under a milestone.
  * `designed_whole` is true when the epic's features were cut together as one design. `standing.cases`
- * is the dispatcher's sum of its features' `cases`. Consumers: the roadmap lane's reader and the screen.
+ * is the dispatcher's sum of its features' `cases`. `runtime_s` is how long agents were out on the epic:
+ * the union over its features' intervals and its own outings (never its features' figures added), whole
+ * seconds, counting what has ENDED like `RoadmapFeature.runtime_s`. Consumers: the roadmap lane's reader
+ * and the screen.
  */
 export type RoadmapEpic = {
   name: string;
@@ -155,6 +163,7 @@ export type RoadmapEpic = {
   designed_whole: boolean;
   word: RoadmapEpicWord;
   completed_at: string | null;
+  runtime_s: number;
   standing: {
     features: number;
     shipped: number;

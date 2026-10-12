@@ -19,6 +19,7 @@
     "tryDifferentSearch": "Try adjusting your search term",
     "runClaudeCli": "Run Claude CLI in a project directory to get started",
     "noConversations": "no conversations yet",
+    "folderMissing": "Folder missing",
     "conversationCount_one": "{{count}} conversation",
     "conversationCount_other": "{{count}} conversations"
   },
@@ -187,8 +188,8 @@
     "iconDefault": "Default",
     "iconOption": "{{name}} icon",
     "unread": "Finished, not read yet",
-    "dragHandle": "Drag to reorder",
     "subagentsRunning": "Subagents running",
+    "asleep": "Asleep. Your next message wakes it.",
     "newFolder": "New folder",
     "folderNamePlaceholder": "Folder name",
     "folderOptions": "Options for folder {{name}}",

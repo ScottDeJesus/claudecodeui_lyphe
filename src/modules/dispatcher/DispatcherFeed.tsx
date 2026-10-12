@@ -60,7 +60,12 @@ export function DispatcherFeed({ children }: { children: ReactNode }) {
         const held = bus.get(DISPATCHER_ALL_TOPIC);
         if (held && held.at >= at) return false;
       }
-      bus.publish(DISPATCHER_ALL_TOPIC, picture, at);
+      // STAMPED WITH THIS BROWSER'S CLOCK AT THE MOMENT IT ARRIVES (`received_at`), beside the server's `at`
+      // the bus keeps for ordering: a running working-time pill counts its seconds from the former, and a
+      // subtraction of the server's stamp from this browser's would carry any skew between the two clocks
+      // into the figure. The server's `at` is untouched, so the seed's "never overwrite a newer reading"
+      // guard still compares one clock with itself.
+      bus.publish(DISPATCHER_ALL_TOPIC, { ...picture, received_at: Date.now() }, at);
       return true;
     };
 

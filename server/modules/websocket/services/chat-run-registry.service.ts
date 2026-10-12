@@ -148,6 +148,42 @@ function decorateAndRecordEvent(run: ChatRun, message: NormalizedMessage): Norma
 }
 
 /**
+ * A Claude chat whose row moves from one provider session to another has left the first behind for
+ * good — an edited first prompt starts the conversation over (`resumeFromScratch`) — so the old
+ * session is marked superseded BEFORE the mapping moves: kept on disk, deleted with the chat, and
+ * refused by the indexer, which would otherwise list the abandoned original as a second sidebar
+ * chat. Claude only: Codex records its own supersession when it rewinds. A move to the id the row
+ * already holds (a compaction's swap writes its own record first) leaves nothing behind.
+ */
+function supersedeClaudeSessionLeftBehind(run: ChatRun, announcedProviderSessionId: string): void {
+  if (run.provider !== 'claude') {
+    return;
+  }
+
+  try {
+    const row = sessionsDb.getSessionById(run.appSessionId);
+    const left = row?.provider_session_id;
+    if (!row || !left || left === announcedProviderSessionId) {
+      return;
+    }
+    sessionsDb.markProviderSessionSuperseded({
+      providerSessionId: left,
+      provider: 'claude',
+      sessionId: run.appSessionId,
+      jsonlPath: row.jsonl_path,
+    });
+  } catch (error) {
+    // Never a reason to keep the chat on the session it left: the mapping below still moves.
+    const message = error instanceof Error ? error.message : String(error);
+    console.error('[ChatRunRegistry] Failed to supersede the provider session a chat left', {
+      appSessionId: run.appSessionId,
+      providerSessionId: announcedProviderSessionId,
+      error: message,
+    });
+  }
+}
+
+/**
  * Records the provider-native session id for a run and persists the
  * app-id-to-provider-id mapping so history fetches and future resumes can
  * address the provider transcript.
@@ -163,6 +199,7 @@ function recordProviderSessionId(run: ChatRun, providerSessionId: string): void 
 
   run.providerSessionId = providerSessionId;
 
+  supersedeClaudeSessionLeftBehind(run, providerSessionId);
   try {
     sessionsDb.assignProviderSessionId(run.appSessionId, providerSessionId);
     void broadcastSessionUpserted(run.appSessionId).catch((error) => {

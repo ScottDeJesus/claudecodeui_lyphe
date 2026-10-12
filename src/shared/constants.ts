@@ -13,8 +13,8 @@ import {
 } from 'lucide-react';
 import type { ComponentType } from 'react';
 
-import type { RoadmapFeatureWord, RoadmapMilestoneWord } from '@/shared/roadmap-types';
-import type { FileStatusCode, LLMProvider, McpProvider, McpScope, McpTransport, SettingsMainTab } from '@/shared/types';
+import type { RoadmapEpicWord, RoadmapFeatureWord, RoadmapMilestoneWord } from '@/shared/roadmap-types';
+import type { FileStatusCode, LLMProvider, McpProvider, McpScope, McpTransport, RoadmapDotState, SettingsMainTab } from '@/shared/types';
 import type { UserPreferenceKey } from '@/shared/userSettings';
 
 /** The four buckets the git changes view sorts working-tree files into. */
@@ -274,6 +274,30 @@ export const MARKDOWN_CARDS_CLASS = 'chat-md-cards';
 
 // ---------------------------
 
+//----------------- WIP LADDER ------------
+
+/**
+ * The floor of every WIP limit, mirrored from the dispatcher's own grammar (`wip.spell`): a limit is a
+ * whole number from one, or `all`. Nothing is narrowed above it — the count the operator sets is the
+ * count the file holds.
+ *
+ * Used by `wipLadderSteps`, where the ladder stops there.
+ */
+export const WIP_LIMIT_MIN = 1;
+
+/**
+ * The count the WIP ladder climbs to before `All`: `1, 2, … 6, All`. Six is the widest count the
+ * operator has ever chosen. It is only the FLOOR of the ladder's top rung — a wider count in play
+ * raises it (`wipLadderTop`). On an epic's card Settings' default is always in play, so it stays a rung
+ * however the epic's own count moves; on a Settings stepper the stepper's own count is the only one.
+ *
+ * Used by `wipLadderTop` in `utils.ts`, which both steppers of the ladder — the epic card's
+ * `EpicWipControl` and the settings module's `RunnerWipDefaultsRow` — climb through.
+ */
+export const WIP_LADDER_TOP = 6;
+
+// ---------------------------
+
 //----------------- DISPATCHER LANE WALL ------------
 
 /**
@@ -338,8 +362,10 @@ export const FAB_CATCH_PX = 44;
 
 /**
  * Each feature word's key in the locale, which spells `in flight` as `inFlight`: the one way a feature's
- * word is put into words. Used by the roadmap module's `StateLine` (its five stations and its label) and
- * `FeatureFacts` (the word of each feature a feature waits on).
+ * word is put into words. Used by the roadmap module's `StateLine` (its five stations and its label),
+ * `FeatureFacts` (the word of each feature a feature waits on), the tree's `tree/treeWords` (a feature
+ * dot's tip and label), and the tree's panel: `panel/EpicPanel` (a feature row's meta) and
+ * `panel/FeaturePanel` (the State fact).
  */
 export const ROADMAP_FEATURE_WORD_KEYS: Record<RoadmapFeatureWord, string> = {
   idea: 'roadmap.word.idea',
@@ -355,14 +381,53 @@ export const ROADMAP_FEATURE_WORD_KEYS: Record<RoadmapFeatureWord, string> = {
 
 /**
  * Each milestone word's key in the locale, which spells `not started` and `in progress` as `notStarted` and
- * `inProgress`: the one way a milestone's word is put into words. Used by the roadmap module's
- * `MilestonePath` (each station's line and label) and `MilestoneFocus` (the stage's eyebrow).
+ * `inProgress`: the one way a milestone's word is put into words. Used by the roadmap module's tree:
+ * `tree/TreeMilestoneNode` (the line under a milestone's ring) and `tree/treeWords` (a milestone's tip
+ * and label), and its panel: `panel/RoadmapPanel` (a milestone row's meta) and `panel/MilestonePanel`
+ * (the sub line).
  */
 export const ROADMAP_MILESTONE_WORD_KEYS: Record<RoadmapMilestoneWord, string> = {
   empty: 'roadmap.milestoneWord.empty',
   'not started': 'roadmap.milestoneWord.notStarted',
   'in progress': 'roadmap.milestoneWord.inProgress',
   reached: 'roadmap.milestoneWord.reached',
+};
+
+// ---------------------------
+
+//----------------- THE ROADMAP'S EPIC WORDS ------------
+
+/**
+ * Each epic word's key in the locale, which spells `not started` and `in progress` as `notStarted` and
+ * `inProgress`: the one way an epic's word is put into words. Used by the roadmap module's tree:
+ * `tree/TreeEpicNode` (the line under an epic's title) and `tree/treeWords` (an epic's tip and label), and
+ * its panel: `panel/MilestonePanel` (an epic row's meta) and `panel/EpicPanel` (the sub line).
+ */
+export const ROADMAP_EPIC_WORD_KEYS: Record<RoadmapEpicWord, string> = {
+  empty: 'roadmap.epicWord.empty',
+  'not started': 'roadmap.epicWord.notStarted',
+  'in progress': 'roadmap.epicWord.inProgress',
+  complete: 'roadmap.epicWord.complete',
+};
+
+// ---------------------------
+
+//----------------- THE ROADMAP TREE'S PAINT ------------
+
+/**
+ * How each feature dot is painted, by its state: a Verve token for the fill and one for the stroke, put on
+ * through `style`. Green shipped, amber in flight, the garnish designing (orange in light, gold in dark),
+ * teal proposed, red blocked, and an idea hollow (the surface inside a faint ring). Used by the roadmap
+ * module's tree, `tree/TreeEpicNode`, for each feature's dot under its epic's title, and by its panel,
+ * `panel/PanelRows`'s `PanelDot`, for each row's dot and the feature's State fact.
+ */
+export const ROADMAP_DOT_PAINT: Record<RoadmapDotState, { fill: string; stroke: string }> = {
+  shipped: { fill: 'var(--accent)', stroke: 'var(--accent)' },
+  inFlight: { fill: 'var(--warn-dot)', stroke: 'var(--warn-dot)' },
+  designing: { fill: 'var(--garnish)', stroke: 'var(--garnish)' },
+  proposed: { fill: 'var(--info-dot)', stroke: 'var(--info-dot)' },
+  idea: { fill: 'var(--surface)', stroke: 'var(--ink-faint)' },
+  blocked: { fill: 'var(--danger-dot)', stroke: 'var(--danger-dot)' },
 };
 
 // ---------------------------
@@ -383,3 +448,44 @@ export const RUNNER_LANDING_PARAM = 'runner';
  * widget (`RoadmapWidgetBody`), which writes it from a surface that has no Roadmap tab above it.
  */
 export const ROADMAP_LANDING_PARAM = 'roadmap';
+
+// ---------------------------
+
+//----------------- ZOOM GESTURES ------------
+
+/** What one press of a `+` / `−` zoom button multiplies the zoom by. Used by the kit's Lightbox (`useZoomPan`) and the roadmap module's tree zoom (`useTreeZoom`), so both buttons step alike. */
+export const ZOOM_BUTTON_STEP = 1.5;
+
+/** The zoom a double-click or double-tap lands on when it zooms in from fit. Used by `useZoomPan` and `useTreeZoom`. */
+export const ZOOM_DOUBLE_TAP_SCALE = 2;
+
+/** How far a press may travel, in px, and still be a tap rather than a pan. Used by `useZoomPan` and `useTreeZoom`. */
+export const ZOOM_TAP_SLOP_PX = 6;
+
+/** Two taps this close in time, in ms, and within `ZOOM_DOUBLE_TAP_RADIUS_PX`, are a double-tap. Used by `useZoomPan` and `useTreeZoom`. */
+export const ZOOM_DOUBLE_TAP_WINDOW_MS = 320;
+
+/** The distance, in px, within which a second tap counts as a double-tap of the first. Used by `useZoomPan` and `useTreeZoom`. */
+export const ZOOM_DOUBLE_TAP_RADIUS_PX = 32;
+
+// ---------------------------
+
+//----------------- FOCUS TRAPS ------------
+
+/**
+ * What a Tab can land on: the selector a focus trap queries for its first and last stop. Used by the
+ * kit's `Dialog` and `Sheet`, which trap Tab inside their panel the same way and focus the first stop
+ * when they open.
+ */
+export const FOCUSABLE_SELECTOR = 'a[href], button:not([disabled]), input:not([disabled]), textarea:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
+// ---------------------------
+
+//----------------- TOUCH LIFT ------------
+
+/**
+ * How long a finger holds still on a free spot, in ms, before it lifts what is under it. Used by the kit's
+ * `useSortable` (the runner, roadmap and dispatcher lists) and by the sidebar's `useSimpleChatDrag` (the chat
+ * list), so a card and a chat row lift on the same hold.
+ */
+export const TOUCH_HOLD_MS = 400;

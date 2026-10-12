@@ -4,6 +4,8 @@ import { sessionsService } from '@/modules/providers/services/sessions.service.j
 import type { IProvider } from '@/shared/interfaces.js';
 import type {
   AnyRecord,
+  ChatCompactionHooks,
+  ChatProcessActivity,
   LLMProvider,
   ProviderPermissionDecision,
   ProviderRuntimePermissionGateway,
@@ -34,6 +36,15 @@ const defaultDependencies: ProviderRuntimeServiceDependencies = {
   getProviderModels: (provider) => providerModelsService.getProviderModels(provider),
 };
 
+// What a chat is answered when custom compaction has registered nothing, or its runtime keeps no
+// process to ask about: the CLI compacts as it always has, and nobody is waiting on anything.
+const NOT_TAKEN_OVER_HOOKS: ChatCompactionHooks = {
+  takesOver: async () => false,
+  turnEnded: () => {},
+  activityChanged: () => {},
+};
+const NOT_LIVE_ACTIVITY: ChatProcessActivity = { live: false, busy: false, why: null };
+
 /**
  * Creates the application-facing provider runtime dispatcher.
  *
@@ -45,6 +56,16 @@ export function createProviderRuntimeService(
   dependencyOverrides: Partial<ProviderRuntimeServiceDependencies> = {},
 ) {
   const dependencies = { ...defaultDependencies, ...dependencyOverrides };
+
+  let compactionHooks: ChatCompactionHooks = NOT_TAKEN_OVER_HOOKS;
+  // ONE object every context carries, reading the registered hooks at CALL time: a Claude process
+  // keeps the context of the message that spawned it for its whole life, and a registration made
+  // after that message (or replaced later) must still reach it.
+  const compaction: ChatCompactionHooks = {
+    takesOver: (input) => compactionHooks.takesOver(input),
+    turnEnded: (report) => compactionHooks.turnEnded(report),
+    activityChanged: (appSessionId, activity) => compactionHooks.activityChanged(appSessionId, activity),
+  };
 
   const createRuntimeContext = (
     provider: IProvider,
@@ -62,6 +83,7 @@ export function createProviderRuntimeService(
         return true;
       }
     },
+    compaction,
   });
 
   const run = (
@@ -76,6 +98,24 @@ export function createProviderRuntimeService(
 
   return {
     run,
+
+    // Registered once, by the custom-compaction module when the app boots; every context built
+    // before or after carries it (see `compaction` above).
+    useChatCompaction(hooks: ChatCompactionHooks): void {
+      compactionHooks = hooks;
+    },
+
+    // What the chat's process is doing, asked of the provider's runtime; a provider whose runtime
+    // keeps no such process (or throws when asked) answers not-live, which waits on nothing.
+    activity(providerName: LLMProvider, appSessionId: string): ChatProcessActivity {
+      try {
+        const runtime = dependencies.resolveProvider(providerName).runtime;
+        return runtime.activity?.(appSessionId) ?? { ...NOT_LIVE_ACTIVITY };
+      } catch (error) {
+        console.warn(`[provider-runtime] could not read the activity of ${providerName} session ${appSessionId}:`, error);
+        return { ...NOT_LIVE_ACTIVITY };
+      }
+    },
 
     hasRuntime(providerName: string): boolean {
       try {

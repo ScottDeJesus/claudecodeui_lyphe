@@ -14,12 +14,19 @@ import { PlanControls } from '@/modules/dispatcher/PlanControls';
 import { PlanClock, PlanFace, PlanStatusBadge } from '@/modules/dispatcher/PlanFace';
 import { PlannerBadge } from '@/modules/dispatcher/PlannerBadge';
 import { SpendPills } from '@/modules/dispatcher/SpendPills';
+import { WorkingPill } from '@/modules/dispatcher/WorkingPill';
+import { planAgentOut } from '@/modules/dispatcher/workingTime';
 import { planFoldKey, useCardFold } from '@/shared/hooks/useCardFold';
 import { spendParts } from '@/shared/spend';
 import { Card, CardContent, CardFoldBody, CardHeader, Collapsible } from '@/shared/ui';
 import type { ActionMenuItem } from '@/shared/ui';
 import type { DispatcherPlan } from '@/shared/types';
 import { cn } from '@/shared/utils';
+
+/** The clause of a `wip_hold` sentence without its `WIP:` lead — the card says "Waiting for a WIP slot" itself, so the lead would read twice. */
+function wipClause(hold: string): string {
+  return hold.replace(/^WIP:\s*/, '');
+}
 
 /**
  * One plan the dispatcher is carrying, in the lane card's ONE anatomy — the arc deck's too: a head
@@ -29,9 +36,10 @@ import { cn } from '@/shared/utils';
  *   sits in an epic's deck) leading the mono name, the word (`PlanStatusBadge`), the clock (`PlanClock`)
  *   and `done/total` phases on row one; the plan's description (`cardDescription`: its design's
  *   `delivers` line, else its goal's where that yields nothing) folded to one line until pressed, when
- *   it opens whole (`CardDescription`) — then who is out on the plan (`PlannerBadge`) and what of its
- *   arc it waits on, on row two; the plan's total as pills
- *   (`SpendPills`, counting at first sight) on row three; Dismiss or Hide, and the fold, in the corner.
+ *   it opens whole (`CardDescription`) — then who is out on the plan (`PlannerBadge`), what of its
+ *   arc it waits on and, while its epic's feature limit holds it, the WIP slot it waits for, on row two; the plan's total as pills
+ *   (`SpendPills`, counting at first sight), the last of them how long agents have worked on it
+ *   (`WorkingPill`), on row three; Dismiss or Hide, and the fold, in the corner.
  * - THE BAR (`PlanControls` → `ActionBar`): the verbs the plan's status allows and its model switch.
  * - THE FACE (`PlanFace`): the phases' track, what is moving now, and the closed lists. Its own rules —
  *   which disclosures start closed and why no home can open them — are stated there, not here.
@@ -57,11 +65,11 @@ import { cn } from '@/shared/utils';
  * the store prunes against.
  *
  * DELETE IS THE MENU'S, AND ONLY WHERE THE DISPATCHER WOULD TAKE IT. `⋯` carries `Delete feature…`
- * exactly when `planDroppable(plan, planners)` holds. It is never drawn disabled on a `live` or `stalled` plan, a
- * walking phase or a planner out on the plan or its arc. Delete is the menu's only item, so those cards
+ * exactly when `planDroppable(plan, planners)` holds. It is never drawn disabled on a `live` or `stalled` plan,
+ * a walking phase or a planner out on the plan or its arc. Delete is the menu's only item, so those cards
  * draw no `⋯` at all. The planner half of that gate needs the lane's `planners` list, so the card reads
- * the lane (`useDispatcherPlans`) for it: `plan.planner` gives a plan's own ended row ahead of its
- * arc's live one, so it cannot answer what `drop` asks. The press opens `DeletePlanDialog`, the
+ * the lane (`useDispatcherPlans`) for it: `plan.planner` gives a plan's own ended row ahead of its arc's live one, so it cannot answer what
+ * `drop` asks. The press opens `DeletePlanDialog`, the
  * module's one modal, because `dispatcher drop` is the one verb no press undoes. The card does not
  * leave on the press: it leaves when a frame no longer carries the plan.
  *
@@ -77,10 +85,19 @@ import { cn } from '@/shared/utils';
  * (`waitsOnSiblings`), empty for a plan of no arc. It is passed IN rather than read here: the card
  * cannot know which plans are its arc's without the group it was handed.
  *
+ * `WAITING FOR A WIP SLOT` IS THE DISPATCHER'S OWN SENTENCE, NEVER THE CARD'S (`plan.wip_hold`): the
+ * FEATURE-WIP clause the gate returned for this plan's first ready phase, so a feature that is eligible
+ * and standing still because its epic already has its limit in progress says why, in the gate's own
+ * words, beside `waits on …`. A frame without the key (an older dispatcher) draws no line.
+ *
+ * A STALLED PLAN SAYS WHY (`plan.stalled`, the dispatcher's own cause word — `report_stall`): the head's
+ * second row carries one line, `data-plan-stalled`, naming whether the dispatcher is down or the run
+ * ended unrecorded, and that Resume starts things again. The card words the cause and decides none of it.
+ *
  * `data-dispatcher-card`, `data-plan-name`, `data-plan-status` and `data-collapsed` are the browser
  * harness's handles, on the ROOT so a probe scopes every reading and every press to ONE plan — the
  * live plan walking beside a probe must never be pressed. `data-card-description` marks the lead's
- * description line, the arc deck's too.
+ * description line, the arc deck's too, and `data-plan-wip-hold` the line above.
  *
  * Used by `RunnerPanel` and `RunnerWidgetBody` (runner-tab), for the plans no arc holds, and by
  * `DispatchArcDeck`, for each plan of an arc.
@@ -120,6 +137,8 @@ export function PlanCard({
     ? [{ key: 'delete', label: t('dispatcher.delete.menu'), icon: Trash2, isDanger: true, onSelect: () => setDeleting(true) }]
     : [];
   const verb = putAwayVerb([plan]);
+  // Whether an agent is out on the plan now: what lets its working time tick, and draws the pill for a first agent.
+  const agentOut = planAgentOut(plan, planners);
 
   return (
     <Card
@@ -144,8 +163,8 @@ export function PlanCard({
                 {description && <CardDescription text={description} />}
                 {/* WHO IS OUT ON THIS PLAN and what it waits on, under its description: the word says
                     what the PLAN is (`designing`), the badge who is doing something about it; the wait is
-                    a fact about THIS plan ("before this, that"). None draws anything when absent. */}
-                {(plan.planner || waitsOn.length > 0 || plan.wip_hold !== null) && (
+                    a fact about THIS plan ("before this, that"). Neither draws anything when absent. */}
+                {(plan.planner || waitsOn.length > 0 || plan.wip_hold || plan.stalled) && (
                   <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
                     {plan.planner && <PlannerBadge planner={plan.planner} />}
                     {waitsOn.length > 0 && (
@@ -153,11 +172,14 @@ export function PlanCard({
                         {t('dispatcher.waitsOn', { names: waitsOn.join(', ') })}
                       </span>
                     )}
-                    {/* The epic's feature WIP is holding this plan from starting: the gate's own
-                        sentence (`plan.wip_hold`), said as the dispatcher words it and never re-derived. */}
-                    {plan.wip_hold !== null && (
-                      <span data-plan-wip-hold className="min-w-0 break-words font-mono text-xs text-muted-foreground">
-                        {t('dispatcher.wipHold', { reason: plan.wip_hold })}
+                    {plan.wip_hold && (
+                      <span data-plan-wip-hold className="min-w-0 break-words text-xs text-muted-foreground">
+                        {t('dispatcher.wipHold', { clause: wipClause(plan.wip_hold) })}
+                      </span>
+                    )}
+                    {plan.stalled && (
+                      <span data-plan-stalled={plan.stalled} className="min-w-0 break-words text-xs text-foreground">
+                        {t(`dispatcher.stalled.${plan.stalled}`)}
                       </span>
                     )}
                   </div>
@@ -168,7 +190,12 @@ export function PlanCard({
               <SpendPills
                 parts={spendParts(plan.cost_usd, plan.tokens_in, plan.tokens_out, plan.tokens, plan.tokens_cache_read)}
                 countKey={`plan:${plan.name}`}
-              />
+              >
+                {/* HOW LONG AGENTS HAVE WORKED ON IT, one more pill of the books' row — ticking only while
+                    one is out on the plan (`planAgentOut`), still otherwise; nothing before any has worked
+                    or is out (a first agent's figure reads 0, so the gate is the figure OR an agent out). */}
+                {(plan.runtime_s > 0 || agentOut) && <WorkingPill seconds={plan.runtime_s} running={agentOut} subject="feature" />}
+              </SpendPills>
             )}
             corner={{ menuLabel: t('dispatcher.menu'), menuItems, putAway: { verb, label: t(`dispatcher.${verb}`), onPress: onPutAway } }}
             headingLevel={headingLevel}

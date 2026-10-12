@@ -10,11 +10,13 @@ import { TaskMasterProvider,TasksSettingsProvider } from '@/modules/task-master'
 import { MemoryIntakeProvider } from '@/modules/memory-intake';
 import { NotesProvider } from '@/modules/notes';
 import { HealProvider } from '@/modules/heal';
+import { CerberusProvider } from '@/modules/cerberus';
 import { LiveBusProvider } from '@/modules/live-bus';
 import { DispatcherFeed } from '@/modules/dispatcher';
 import { SoulLaunchFeed } from '@/modules/dispatch-souls';
 import { RoadmapFeed } from '@/modules/roadmap';
 import { UniverseFeed } from '@/modules/universe';
+import { SessionHostLivenessProvider } from '@/shared/context/SessionHostLivenessContext';
 import { WebSocketProvider } from '@/shared/context/WebSocketContext';
 import { PluginsProvider } from '@/modules/plugins';
 import { ProjectWorkspaceRoute } from '@/modules/project-workspace';
@@ -129,6 +131,10 @@ export default function App() {
         <UiPreferencesProvider>
         <AuthProvider>
           <WebSocketProvider>
+            {/* Directly under the socket and above the auth gate: the server sends which chats have a live
+                session host ONCE, as the socket connects, so the provider that keeps it must have
+                subscribed before the connection exists. */}
+            <SessionHostLivenessProvider>
             <PluginsProvider>
               <TasksSettingsProvider>
                 <TaskMasterProvider>
@@ -161,12 +167,19 @@ export default function App() {
                           reflex's summary — the workspace's own tab-gate hook included, which weighs
                           the ledger's live count for the Heal tab's badge. */}
                       <HealProvider>
+                      {/* The fleet's health: ONE read of Cerberus's overview for every reader — the
+                          tab's views and the strip's count pill — above the Router so the pill is
+                          honest on every tab. Inside the auth gate like its neighbours, so the read
+                          never fires against the login screen, and below WebSocketProvider, whose one
+                          socket carries the `cerberus_changed` hint that re-reads it. */}
+                      <CerberusProvider>
                       <Router basename={routerBasename}>
                         <Routes>
                           <Route path="/" element={<ProjectWorkspaceRoute />} />
                           <Route path="/session/:sessionId" element={<ProjectWorkspaceRoute />} />
                         </Routes>
                       </Router>
+                      </CerberusProvider>
                       </HealProvider>
                       </NotesProvider>
                     </MemoryIntakeProvider>
@@ -179,6 +192,7 @@ export default function App() {
                 </TaskMasterProvider>
               </TasksSettingsProvider>
             </PluginsProvider>
+            </SessionHostLivenessProvider>
           </WebSocketProvider>
         </AuthProvider>
         </UiPreferencesProvider>

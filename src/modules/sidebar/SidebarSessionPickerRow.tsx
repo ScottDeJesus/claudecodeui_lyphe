@@ -83,7 +83,13 @@ export default function SidebarSessionPickerRow({ row, standalone, isCurrent, on
           {row.title}
         </span>
         {standalone && row.projectName && (
-          <span className="mt-0.5 block truncate text-[10px] leading-3 text-muted-foreground">{row.projectName}</span>
+          <span className="mt-0.5 flex min-w-0 items-center gap-1 text-[10px] leading-3 text-muted-foreground">
+            <span className="truncate">{row.projectName}</span>
+            {/* The same line as the sidebar's row: the name gives way before the hint that tells it apart. */}
+            {row.projectNameHint && (
+              <span data-testid="session-picker-project-hint" className="max-w-[60%] flex-shrink-0 truncate">{`· ${row.projectNameHint}`}</span>
+            )}
+          </span>
         )}
       </span>
 

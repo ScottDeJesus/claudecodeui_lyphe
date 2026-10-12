@@ -31,6 +31,10 @@ function isCensus(body: unknown): body is AgentLaunchCensus {
     isRecord(choices) &&
     Array.isArray(choices.models) &&
     Array.isArray(choices.efforts) &&
+    // The Dactyl and Summarizer fields map these lists, so a census from a CLI older than the client must be
+    // refused here, with the retry card, and not reach the panel and blank the window.
+    Array.isArray(choices.dactyl_models) &&
+    Array.isArray(choices.summarizer_models) &&
     isRecord(defaults) &&
     isRecord(defaults.effort)
   );

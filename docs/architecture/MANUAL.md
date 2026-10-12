@@ -78,7 +78,7 @@ section: 01-websocket-transport/003 The pieces
 | `server/modules/websocket/services/websocket-auth.service.ts` | `verifyWebSocketClient` — the upgrade-time gate for every path |
 | `server/modules/auth/auth.middleware.ts` | `authenticateWebSocket` — first DB user in platform mode, JWT verification in OSS mode |
 | `server/modules/websocket/services/websocket-state.service.ts` | `connectedClients`, the set of open `/ws` sockets, and `WS_OPEN_STATE` |
-| `server/modules/websocket/services/chat-websocket.service.ts` | The `/ws` protocol: the seven inbound handlers, `protocol_error`, the attachment trust boundary, `runDetachedChatTurn` |
+| `server/modules/websocket/services/chat-websocket.service.ts` | The `/ws` protocol: the seven inbound handlers, `protocol_error`, the attachment trust boundary, `runDetachedChatTurn`, and the one `session_host_liveness` snapshot a connecting socket is sent (MAN-8122) |
 | `server/modules/websocket/services/chat-run-registry.service.ts` | `chatRunRegistry` — one run per session, `seq` stamping, the replay buffer, the exactly-one-`complete` contract |
 | `server/modules/websocket/services/chat-session-writer.service.ts` | `ChatSessionWriter` — the object runtimes write into; swallows `session_created`, fans out to every attached socket |
 | `server/modules/websocket/services/session-upsert-broadcast.service.ts` | The only builder of `session_upserted`, and the batched broadcast helper |
@@ -199,6 +199,7 @@ immediately hand `subscribe` to the hook that does the real work:
 
 The call sites the table does not row — `SessionProtectionContext.tsx`, `useSessionPresence.ts`,
 `useRestartOnInstalledCli.ts`, `useGitDelegation.ts`, `useUniverseStream.ts`, `useSimpleChatList.ts`,
+`SessionHostLivenessContext.tsx` (mounted by `App` directly under `WebSocketProvider`, MAN-8122),
 `useSimpleChatRemove.ts` and the kanban panel's three (`useKanbanMetis.ts`, `useKanbanLanes.ts`,
 `KanbanCardDrawer.tsx`) — take `subscribe` or `sendMessage` straight into their own hooks rather than
 owning a slice of the frame vocabulary; re-grep before quoting the number, because it grows with
@@ -305,10 +306,10 @@ section: 01-websocket-transport/010 The chat protocol coming down
 **RULE: every frame the chat gateway sends carries a `kind`, drawn from one of two unions
 in `server/shared/types.ts`.**
 
-**`MessageKind` (`:178-193`) — produced by provider runtimes:** `text`, `tool_use`,
+**`MessageKind` — produced by provider runtimes:** `text`, `tool_use`,
 `tool_result`, `thinking`, `stream_delta`, `stream_end`, `error`, `complete`, `status`,
 `permission_request`, `permission_resolved`, `permission_cancelled`, `session_created`,
-`history_truncated`, `task_notification`.
+`history_truncated`, `task_notification`, `compaction`.
 
 **`GatewayEventKind` (`server/shared/types.ts`) — produced by the gateway, no provider involved:**
 `chat_subscribed`, `session_upserted`, `loading_progress`, `soul_launch_state`, `kanban_metis_state`, `kanban_event`, `universe_activity`, `universe_map`, `protocol_error`.
@@ -336,6 +337,7 @@ Two kinds in those unions never appear where you would look for them:
 | Kind | Origin | Consumed by |
 | --- | --- | --- |
 | `text`, `thinking`, `tool_use`, `tool_result`, `task_notification` | Provider runtime | `useChatRealtimeHandlers` → session store (`:224-233`) |
+| `compaction` | The compaction run's own frame, live (`id: compaction-<old provider id>`); the Claude history reader, on a load (the same id) | A frame carrying a run's `seq` joins the store through `useChatRealtimeHandlers`'s generic persist path, no case of its own; `normalizedToChatMessages` makes it one content-less `isCompactionMarker` row and `CompactionMarker` draws it (MAN-8060). The history row replaces the live one by id |
 | `stream_delta`, `stream_end` | Provider runtime | `useChatRealtimeHandlers`, flushed on a 100 ms timer (`:189-221`) |
 | `status` | Provider runtime | Activity indicator; `text === 'token_budget'` updates the context counter, and only for the viewed session (`:329-343`) |
 | `error` | Provider runtime | A message row. **Not** terminal |
@@ -637,6 +639,7 @@ flowchart TD
     SET --> E14["roadmap_state"]
     SET --> E12["notes_changed"]
     SET --> E13["simple_list_changed"]
+    SET --> E15["session_host_liveness"]
   end
   subgraph PerRun["Per-run, this run's audience only"]
     W["ChatSessionWriter connections set"]
@@ -644,7 +647,7 @@ flowchart TD
   end
 ```
 
-There are eleven broadcasters over that set: `loading_progress`, `session_upserted`, the Task Master frames, the board's `kanban_event`, the notes lane's `notes_changed` (MAN-7517), the simple-list lane's `simple_list_changed` (MAN-7519), and FIVE STATE LANES — the launcher-souls lane (`server/modules/dispatch-souls/`) over `~/.claude/state/dispatch-souls/`, a board's own Metis sessions (`server/modules/kanban-metis/`) over `~/.claude/state/kanban-metis/`, the dispatcher's plans (`server/modules/dispatcher/`) over its `status --json` document, the roadmap (`server/modules/roadmap/`, the `roadmap_state` frame, MAN-7631) over its `roadmap show --json` document, and the universe lane
+There are twelve broadcasters over that set: `loading_progress`, `session_upserted`, the Task Master frames, the board's `kanban_event`, the notes lane's `notes_changed` (MAN-7517), the simple-list lane's `simple_list_changed` (MAN-7519), the session host's `session_host_liveness` (`host-liveness.ts`, session-host MAN-695: pushed the moment a chat gains its first or loses its last host, and sent once to each socket, held until the hosts are re-adopted), and FIVE STATE LANES — the launcher-souls lane (`server/modules/dispatch-souls/`) over `~/.claude/state/dispatch-souls/`, a board's own Metis sessions (`server/modules/kanban-metis/`) over `~/.claude/state/kanban-metis/`, the dispatcher's plans (`server/modules/dispatcher/`) over its `status --json` document, the roadmap (`server/modules/roadmap/`, the `roadmap_state` frame, MAN-7631) over its `roadmap show --json` document, and the universe lane
 (`server/modules/universe/`), which watches the registered repos' `.git` HEADs and reads two live
 feeds of the estate, the systemd journal and the Claude transcripts. The four polled lanes — the launcher-souls lane, a board's own Metis sessions, the dispatcher's plans and the roadmap — tick every two seconds and put a frame on the wire only when the picture actually changed, and the universe lane is the exception, below. `notes_changed` and `simple_list_changed` go out once per write that landed and name no row and no account: a client that hears one reads its own list again. The dedup records a picture as
 sent only AFTER the send returns, so a broadcast that throws part-way is re-sent on the next tick
@@ -913,7 +916,7 @@ section: 02-realtime-stream/003 The pieces
 | `src/modules/chat/hooks/useChatRealtimeHandlers.ts` | The whole client-side protocol. One switch on `kind`; the streaming buffer; the `seq` bookkeeping. |
 | `src/modules/chat/ChatInterface.tsx` | Owns the four refs the handler mutates — `accumulatedStreamRef`, `streamTimerRef`, `lastSeqRef`, `statusCheckSentAtRef` — and clears the first two on unmount. |
 | `src/modules/chat/hooks/useSessionStore.ts` | Per-session slots. `appendRealtime`, `updateStreaming`, `finalizeStreaming`, `truncateAt`, and the merge of live and persisted rows. |
-| `src/modules/chat/hooks/useChatMessages.ts` | `normalizedToChatMessages` — the projection from store records to UI objects. Pairs `tool_use` with `tool_result`, folds subagent rows into their container, and memoises through a `WeakMap`. |
+| `src/modules/chat/hooks/useChatMessages.ts` | `normalizedToChatMessages` — the projection from store records to UI objects. Pairs `tool_use` with `tool_result`, folds subagent rows into their container, turns a `compaction` message into its content-less marker row (MAN-8060), and memoises through a `WeakMap`. |
 | `src/modules/chat/hooks/useChatSessionState.ts` | Sends `chat.subscribe` on session open and on reconnect, owns `requestLatestMessages` and `resetStreamingState`, and memoises `chatMessages`. |
 | `src/modules/chat/hooks/useChatComposerState.ts` | The outbound side: `chat.send`, `chat.edit-send`, `chat.abort`, `chat.permission-response`, plus the optimistic user echo. |
 | `src/modules/chat/hooks/useSessionPresence.ts` | Sends `chat.presence`: which session this tab is showing, restated on reconnect, on `visibilitychange` and every 30 s, and cleared on the way out — so the notification channels skip a session you are watching. `useIsLookingAtSession(isActive)` exposes the same "watching" test as a boolean for the scroll follow and the reply anchor (MAN-7575). |
@@ -925,7 +928,7 @@ section: 02-realtime-stream/003 The pieces
 | `server/modules/websocket/services/chat-run-registry.service.ts` | One entry per app session. `decorateAndRecordEvent` at `:94` is the choke point: session-id rewrite, `seq` assignment, replay buffering, terminal-`complete` de-duplication, and the `lastEventAt` stamp that makes a run's silence measurable from outside (`:107`). |
 | `server/modules/websocket/services/chat-session-writer.service.ts` | The object provider runtimes think is their socket. Swallows `session_created`; `forward` at `:160` fans out to every watching connection and collects dead ones. |
 | `server/shared/utils.ts` | `createNormalizedMessage` at `:348` and `createCompleteMessage` — the envelope every provider event is built with. **Not** `message-unification.ts`; that file exports only `prepareTranscriptMessages`, which runs on REST history reads and never on the live path. |
-| `server/shared/types.ts` | `MessageKind` at `:178` — the fifteen kinds a provider can emit. `GatewayEventKind` at `:204` — the four the gateway adds. |
+| `server/shared/types.ts` | `MessageKind` — the sixteen kinds a provider can emit, `compaction` among them. `GatewayEventKind` — the app-level frames the gateway adds (listed in MAN-306). |
 | `server/modules/providers/list/*/` | Per provider, a `*-runtime.provider.js` that drives the CLI or SDK and a `*-sessions.provider.ts` whose `normalizeMessage` converts one raw event into `NormalizedMessage[]`. |
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/websocket/services/chat-run-registry.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/websocket/services/chat-session-writer.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/websocket/services/chat-websocket.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/utils.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/ChatInterface.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useChatComposerState.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useChatMessages.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useChatRealtimeHandlers.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useChatSessionState.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useSessionPresence.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useSessionStore.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/transcript/StreamingMarkdown.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/utils/streamingMarkdown.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/context/WebSocketContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/useSessionProtection.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts
@@ -1498,7 +1501,8 @@ section: 03-conversation-handoff/001 Mental model
 7. **Nothing is ever deleted from a provider transcript.** An edit either resumes the
    transcript partway (Claude) or branches it on disk (Codex). An abandoned Codex thread
    stays on disk and is recorded in `superseded_provider_sessions` so the indexer will not
-   offer it back.
+   offer it back. A custom compaction's old Claude transcript is recorded in the same table
+   (MAN-8046).
 8. **`history_truncated` only cuts, and only where the anchor is already loaded.**
    `sessionStore.truncateAt` returns without doing anything when no cached server row
    carries that `transcriptAnchorId`, so a client that has not paged back far enough is
@@ -1512,13 +1516,15 @@ section: 03-conversation-handoff/002 The pieces
 | `server/modules/providers/provider.routes.ts` | `POST /sessions` mints the app id; `GET /sessions/:id/messages`, `/sessions/:id/provider-id` (409 until the first turn reports an id), `GET /sessions/:id` (details, `providerSessionId` null inside a 200 until then — what `useCliSessionId` reads), `/sessions/running`, `POST /sessions/:id/fork` |
 | `server/modules/providers/services/sessions.service.ts` | `createAppSession`, `resolveProviderSessionId`, `resolveEditAnchor`, `providerRewindsForEdit`, `rewindSessionForEdit`, `forkSessionById`, `fetchHistory`, `listRunningSessions` |
 | `server/modules/database/repositories/sessions.db.ts` | The one row that holds both ids, and every mutation of the mapping |
+| `server/modules/compaction/` (`compaction-runtime.ts`, `compaction-procedure.ts`, `auto-trigger.ts`, `compaction-seed.ts`) | A decorator over the runtime gateway (`withChatCompaction`, wired in `server/index.ts`): while Custom compaction is on, a Claude chat's `/compact` and its turn-end and idle triggers run the summarizer verb and move the chat to a seeded new session; on any Claude run it also removes the options only it may set, and a start-over (an edit of the first message after a compaction) in a chat with a stored seed appends that seed again (MAN-8067, MAN-8065, MAN-8066) |
+| `server/modules/database/repositories/session-compactions.db.ts` | `sessionCompactionsDb`: the compaction record and the one mover of a chat between provider sessions for a compaction — `swapToCompactedSession`, `unswapCompactedSession` (MAN-8046) |
 | `server/modules/websocket/services/chat-session-writer.service.ts` | `ChatSessionWriter`: swallows `session_created`, captures the native id, fans out to every attached socket |
-| `server/modules/websocket/services/chat-run-registry.service.ts` | `startRun`, `attachConnection`, `replayEvents`, `completeRun`, `completeRunIfCurrent`; internally `decorateAndRecordEvent` and `recordProviderSessionId` |
+| `server/modules/websocket/services/chat-run-registry.service.ts` | `startRun`, `attachConnection`, `replayEvents`, `completeRun`, `completeRunIfCurrent`; internally `decorateAndRecordEvent` and `recordProviderSessionId` (it marks the provider session a chat leaves superseded before the mapping moves) |
 | `server/modules/websocket/services/chat-websocket.service.ts` | `handleChatSend`, `handleChatEditSend`, `handleChatSubscribe`, `handleChatAbort`, `dispatchRun`, `runDetachedChatTurn` |
 | `server/modules/websocket/services/session-upsert-broadcast.service.ts` | `buildSessionUpsertedEvent` — the single builder of the sidebar delta |
 | `server/modules/providers/services/sessions-watcher.service.ts` | Watches provider directories, debounces, broadcasts upserts in batches |
 | `server/modules/providers/services/session-synchronizer.service.ts` | Shared full scan, per-file indexing, `pruneOrphanedSessions` |
-| `server/modules/providers/list/claude/claude-sessions.provider.ts` | `resolveEditAnchor` — walks `parentUuid` back to the previous assistant row |
+| `server/modules/providers/list/claude/claude-sessions.provider.ts` | `resolveEditAnchor` — walks `parentUuid` back to the previous assistant row; `fetchHistory` reads a compacted chat as one conversation through `stitchCompactedHistory` (MAN-8054) |
 | `server/modules/providers/list/codex/codex-sessions.provider.ts` | `resolveEditAnchor` and `rewindSession` — forks the thread and repoints the session row |
 | `server/modules/providers/list/claude/claude-fork.provider.ts`, `.../codex/codex-fork.provider.ts` | Branch a conversation into an independent one |
 | `src/modules/chat/hooks/useChatComposerState.ts` | Allocates the session on the first send; builds `chat.send` and `chat.edit-send` |
@@ -1570,7 +1576,7 @@ emits `session_created`, but only when there was nothing to resume. Both land in
 **Capture is not "first one wins".** Repeating the id already held is a no-op in both
 functions. A *different* id replaces the mapping, and that is deliberate: a Claude edit of
 the very first prompt runs with `resumeFromScratch`, the SDK announces a brand-new native
-id, and the row has to follow it.
+id, and the row has to follow it (leaving the old session superseded: kept on disk, never indexed).
 
 Reading in the other direction, runtimes receive the **app** id and translate it themselves.
 `provider-runtime.service.ts` injects `context.resolveProviderSessionId`, which is
@@ -1583,7 +1589,7 @@ Reading in the other direction, runtimes receive the **app** id and translate it
 
 Going the other way — a provider or disk-discovered id in, the app id out — is
 `sessionsDb.resolveAppSessionId`, which checks the current provider mapping, then
-`superseded_provider_sessions` (so an id an edit moved on from still resolves), then a plain app id,
+`superseded_provider_sessions` (so an id an edit or a compaction moved on from still resolves), then a plain app id,
 and returns the input unchanged rather than `null` when no row carries it at all. It exists for
 callers outside the sessions service that hold a provider-spelled id and must show it beside an app
 session without ever letting a provider id itself reach the browser: the dispatcher lane's plan `session` (MAN-1498) and the memory lane's `sessionId`
@@ -1623,7 +1629,9 @@ very first turn the transcript on screen is entirely realtime rows.
 Only a provider that rewinds by branching reaches `Pending` again:
 `CodexSessionsProvider.rewindSession` calls `markProviderSessionSuperseded` and then
 `detachProviderSession` when nothing survives the cut. Claude never detaches — it re-runs
-with `resumeFromScratch` and the row is remapped when the SDK announces its new id.
+with `resumeFromScratch` and the row is remapped when the SDK announces its new id; the session
+the row leaves is marked superseded first (`recordProviderSessionId`), so the abandoned original
+stays on disk, goes with the chat and is never indexed as a second sidebar chat.
 
 ## MAN-342 — Starting a new conversation
 section: 03-conversation-handoff/006 Starting a new conversation
@@ -2006,7 +2014,7 @@ section: 03-conversation-handoff/014 Gotchas and why the code looks like this
 | `truncateAt` keeps only the *newest* tagged replacement | A refused send leaves its echo behind; a retried edit would otherwise show both attempts |
 | The rewind runs inside `dispatchRun`'s `beforeRun` | It used to run before the run was admitted, so an edit refused with `RUN_IN_PROGRESS` had already moved the conversation onto a branch without telling the client |
 | `repointSessionToProviderSession` exists next to `assignProviderSessionId` | `assign` keeps the existing `jsonl_path` on purpose; reusing it for a rewind left the session claiming the new thread while still reading the old transcript |
-| `superseded_provider_sessions` | The pre-edit Codex rollout stays on disk but is nobody's conversation. Without the record a rescan hands it back — and for a disk-discovered session, whose app id *is* its thread id, that reinstates the version the user edited away. It also lets "delete permanently" reach transcripts the row no longer points at |
+| `superseded_provider_sessions` | The pre-edit Codex rollout stays on disk but is nobody's conversation. Without the record a rescan hands it back — and for a disk-discovered session, whose app id *is* its thread id, that reinstates the version the user edited away. It also lets "delete permanently" reach transcripts the row no longer points at. Custom compaction writes the same row for the transcript a chat leaves when it moves onto a compacted session (`reason = 'compaction'`, with the compaction's facts in the ten columns after `created_at`) and for a seed whose swap was taken back (`reason = 'compaction-abandoned'`); `reason` NULL is an edit's rewind. `sessionCompactionsDb` is the one writer of those two |
 | `completeRunIfCurrent` vs `completeRun` | A queued message can start the session's next run before the previous runtime promise settles; the session-keyed helper would then kill the *new* run. `dispatchRun`'s `finally` uses the run-scoped one |
 | `updateWebSocket` adds instead of replacing | It used to replace, so opening a session in a second tab froze the first mid-answer (`48c8f647`) |
 | Dead sockets are collected in `forward()`, not on close | A refreshed tab leaves its old connection behind; sweeping on send is enough and costs nothing extra |
@@ -3558,13 +3566,14 @@ section: 06-tool-view/002 The pieces
 | `src/modules/chat/tools/ContentRenderers/` | The bodies a collapsible can contain |
 | `src/modules/chat/tools/InteractiveRenderers/AskUserQuestionPanel.tsx` | Keyboard-driven answer picker for an `AskUserQuestion` prompt — a run's own ask, drawn inline in the transcript |
 | `src/modules/chat/tools/InteractiveRenderers/QuestionTextField.tsx` | The panel's typed half of an answer: the "Other" option's words |
-| `src/modules/chat/transcript/MessageComponent.tsx` | Draws one transcript row. Decides container versus tool versus error |
+| `src/modules/chat/transcript/MessageComponent.tsx` | Draws one transcript row. Decides container versus tool versus error versus compaction divider |
 | `src/modules/chat/transcript/ToolGroupContainer.tsx` | The collapsed `Read x4` row and its expanded children |
+| `src/modules/chat/transcript/CompactionMarker.tsx` | The divider a compaction leaves between the summarized conversation and its summary — heading "Conversation compacted", always shown, "Show work" never hides it (MAN-8060) |
 | `src/modules/chat/transcript/ThinkingRow.tsx` | A thinking block as a tool row: brain, `Thinking /`, the first line truncated, copy on hover (always shown on touch); the row toggles the full text |
 | `src/modules/chat/utils/workVisibility.ts` | `isHiddenWork`: which messages "Show work" off hides, and which it never hides |
 | `src/modules/chat/transcript/TypingIndicator.tsx` | The three-dot "still working" mark drawn while the work is hidden |
 | `src/modules/chat/utils/toolGrouping.ts` | `groupConsecutiveTools`, `isToolGroupItem`, `buildGroupPreview` |
-| `src/modules/chat/hooks/useChatMessages.ts` | `normalizedToChatMessages`: result pairing, live subagent folding, the projection cache |
+| `src/modules/chat/hooks/useChatMessages.ts` | `normalizedToChatMessages`: result pairing, live subagent folding, the compaction marker row (MAN-8060), the projection cache |
 | `src/modules/chat/context/TranscriptRenderContext.ts` | The "we are rendering a document" flag |
 | `src/modules/chat/context/PermissionContext.tsx` | Carries the pending prompts and the callback that answers them |
 
@@ -4073,6 +4082,26 @@ equals the chat's CLI session id (`readStampedLaunchIds`, `useCliSessionId`; doc
 a new stage pins the moment the lane pushes it. **Liveness comes from the dispatch-souls lane**, polled server-side and
 pushed as `soul_launch_state` — an id the lane does not answer for draws nothing at all.
 
+**Epic work is left out of a chat's list.** The stamp names the chat an epic was STARTED from, and the
+dispatcher runs every designer, planner, builder and reviewer of that epic under it — so by the stamp
+alone the chat that starts an epic would list every agent the epic runs, for the epic's whole life, next
+to the souls that chat launched itself. A launch the dispatcher makes is therefore marked on its own
+`spec.json` (`dispatcher: {plan, phase}`, written by `plan_runner/solo/dispatch_mark.py`) and both stamp
+anchors skip it: the lane flags it (`SoulLaunchSnapshot.dispatcher_work`) and `readStampedLaunchIds`
+passes over a flagged launch; `collectStampedSoulLaunches` asks the same `isDispatcherWork` before it
+caps the list. A soul the chat launched itself — a `plan-runner soul`, an `/inline` chain — carries no
+mark and stays. A launch written before the mark existed is recognised from the dispatcher's own
+records instead: a stage of a chain whose record says `until_pass: true` (the mode the dispatcher walks
+a phase's chain in — `cases cure` walks its fixes in it too, so a cure walk's unmarked stages, and a hand-run
+`--until-pass` chain's, are hidden from the chat that started it while this reading lasts), or a `planner`-role launch. **Those agents are shown on the epic and feature
+cards** (the Roadmap tab's In flight face — `PlanFace` and `PlanPhaseRow` draw each task's stages and
+the soul that ran each) and not in the chat's Subagents widget or strip; Clear completed acts on the
+rows the list still holds. The sidebar's purple dot skips that work too: it asks the same
+`isDispatcherWork`, so a chat that only started an epic lights nothing while the epic has a soul or
+chain out (MAN-6228, INV-7062). Proof:
+`.verify/probe-subagent-epic-work.mjs` reads both lists in-process for the chat an epic was started
+from and for one that launched souls by hand.
+
 The soul row's own contract — what a launch directory holds, how a soul's state and provider are
 decided, the six-hour lane window, and why a soul needs none of the four-hour "still believed
 running" discount an agent does — is [docs/MANUAL.md (dispatch-souls)](../MANUAL.md). Dismissals are shared:
@@ -4183,20 +4212,30 @@ dispatch door (`plan-runner chain`, `plan-runner soul`) is a separate process: i
 sidechain into the chat that launched it, so the reading above never sees it. The launcher records
 it instead — `spec.json` carries `launched_by`, the Claude CLI session id whose turn launched it —
 and `listRunningLaunchers` (dispatch-souls module, `running-launchers.service.ts`) reads that
-record. A chat counts when a soul it launched reads `running` by `classifyLaunch`'s own reading
-(the lane the pinned strip draws), or when a chain with a stage it launched still reads
+record. A chat counts when a soul it launched by hand reads `running` by `classifyLaunch`'s own reading
+(the lane the pinned strip draws), or when a chain with a stage it launched by hand still reads
 `status: running` with its walker alive — which keeps the dot steady between a chain's stages
 (the walker's relaunch gap, the hand-off from builder to review to doc sweep), where no soul is
-running but the work is not over. A chain is owned by every session stamped on any of its stages,
-the rule `session_rails_chains.py` keeps for the rails. The stamp is the CLI's id and the dot is the
+running but the work is not over. A chain is owned by every session stamped on any of its stages
+that is not the dispatcher's, the rule `session_rails_chains.py` keeps for the rails less the
+dispatcher's own work (below). The stamp is the CLI's id and the dot is the
 app's, so `session-subagent-runs.service.ts` maps each one through the sessions table
 (`resolveAppSessionId`), skips an id the app does not know, and unions the result with the
 sidechain answer inside the same two-second cached pass. Records older than six hours are never
 opened — above the launcher's own caps (one hour a soul, four a planner) — and a missing, torn or
-half-written record is skipped, never thrown. A planner outing or a phase chain the dispatcher
+half-written record is skipped, never thrown.
+
+**The dispatcher's own work lights nothing.** A planner outing or a phase chain the dispatcher
 launches is stamped with the session of the PLAN that asked for it, never the daemon's own
-(`launch_env`, `planners._start`), so it lights that plan's chat like any other launch while it is
-out; one launched with no session to name carries no stamp and lights nothing.
+(`launch_env`, `planners._start`) — the chat the plan was STARTED from, which launched none of it.
+Both readings therefore skip a launch `isDispatcherWork` (`dispatcher-work.service.ts`) calls the
+dispatcher's: the mark on `spec.json` (`dispatcher: {plan, phase}`), the `planner` role, or a stage of
+an `until_pass` chain. It is the test the chat's Subagents list applies (INV-7062), and one pass over
+the dispatcher's chains serves the whole call. A soul or chain a chat launched BY HAND (an `/inline`
+chain, gaps between its stages included) still lights it; so does an `Agent`-tool subagent, the
+sidechain half, which this leaves alone. While the `until_pass` bridge reading lasts, a `cases cure`
+walk or a hand-run `plan-runner chain --until-pass` (same mode, no mark) is skipped too; a chain
+launched with no session to name carries no stamp and lights nothing either way.
 
 The records and the checks behind the dispatched half are `running-launchers.service.ts` (the two readings and the 6-hour window) and `chain-record.transport.ts` (`chain.json`, `walker.pid`); the launcher rules they restate are INV-6335.
 
@@ -4204,9 +4243,10 @@ Those sidechain files are also why the full-history cache takes a second freshne
 keyed on the parent transcript's stat, and an agent writes its own file continuously while the
 parent is quiet — so the cached parse would hold a running agent's timeline, tokens and status
 still, and a backgrounded agent that ended during a quiet stretch would read `running` until the
-main thread wrote again. `readSubagentStamp` (the newest write across the session's sidechains,
-with their count) rides into the cache key as `readCompanionStamp`; a sidechain write costs one
-re-parse, measured at 189 ms against 7 ms for a hit.
+main thread wrote again. `readHistoryCompanionStamp` (the newest write across the session's sidechains,
+with their count, from `readSubagentStamp`, plus the chat's compaction records, MAN-8054) rides into
+the cache key as `readCompanionStamp`; a sidechain write costs one re-parse, measured at 189 ms
+against 7 ms for a hit.
 
 Every folded row is skipped by the second pass, so it never renders top-level. When a
 history load later attaches the server-indexed `subagentTools`, **the longer of the two
@@ -4611,7 +4651,7 @@ section: 07-live-widgets/002 The pieces
 | `src/modules/chat/embeds/collectEmbedTargets.ts` | `collectEmbedTargets` — every embed a chat has declared, read out of its own messages through the one classifier |
 | `src/modules/chat/embeds/embedSource.ts` | `publishEmbedSource`, `useChatEmbedTargets`, `useEmbedWidgetState` — the chat's list, published for the widget that draws it, and whether it has arrived at all |
 | `src/modules/chat/embeds/EmbedWidgetBody.tsx` | `EmbedWidgetBody` — the gutter widget: the follow latch, the one-row dropdown (house presets, the chat's addresses, `Type an address…`), the way out, and `EmbedUrlFrame` filling the card |
-| `src/modules/chat-gutters/GutterWidgetFrame.tsx` | The gutter card, and its `fullscreen` / `onToggleFullscreen` / `flush` / `headerAction` / `countTone` props |
+| `src/modules/chat-gutters/GutterWidgetFrame.tsx` | The gutter card, its `fullscreen` / `onToggleFullscreen` / `flush` / `headerAction` / `countTone` props, and the focus hand-off to its fullscreen switch when the card leaves full screen (MAN-422) |
 | `src/modules/widgets/embedUrl.ts` | `isLoopbackHost` and `resolveEmbedUrl` — a loopback address moved onto the host that reached this page, because an `src` is resolved by the reader's browser |
 | `src/modules/widgets/docspaceOrigin.ts` | `DOCSPACE_EMBED_DEFAULT_PORT`, `resolveDocSpaceOrigin`, `docspaceEmbedUrl`, `docspaceStudioUrl`, and `isForeignOrigin` — the gate on `allow-same-origin` |
 | `src/modules/widgets/DocSpaceFrame.tsx` | `DOCSPACE_SANDBOX`, `DOCSPACE_READY_TIMEOUT_MS` and `DocSpaceFrame` — the second frame: a `src` on ArchPulse's origin, the latched theme, the ready timer, and the `framed` prop that drops its own border where a card already draws one |
@@ -4630,9 +4670,10 @@ section: 07-live-widgets/002 The pieces
 | `.verify/phase-22.mjs` | The fence probe: the sandbox, the opaque origin, the CSP refusal, height, theme, streaming, export, and the revoke rule from both sides |
 | `.verify/phase-24.mjs` | The bus probe: a stage written to disk read back inside a sandboxed widget, both refusals, the cap, the unmount sweep, the REST seed and the retirement |
 | `.verify/phase-28.mjs` | The kind probe: the exact sandbox, the foreign origin, the error card, the raw path left alone, the streaming gate, the exports, and that a theme flip never rewrites `src` |
+| `.verify/probe-widget-scrollbars.mjs` | The scrollbar probe: a widget's scroll panel and document paint the host's thin scrollbar (computed paint and gutter held against a host `.scrollbar-thin`, shots in `.verify/shots/widget-scrollbars/`), and `--before` serves the pre-change `buildWidgetDocument.ts` for the other half of the pair |
 | `.verify/phase-29.mjs` | The end-to-end probe, and the only one in this repo that needs ArchPulse up: a real block embedded, edited from inside the frame, that edit read back in ArchPulse's own studio, plus the theme flip on a LIVING frame, the height, and the not-found card |
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/embeds/collectEmbedTargets.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/embeds/embedSource.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/embeds/EmbedWidgetBody.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat-gutters/GutterWidgetFrame.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/transcript/Markdown.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/transcript/shapes/code/EmbedFrame.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/transcript/shapes/code/index.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/transcript/shapes/markdownStreaming.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/transcript/shapes/ShapeFrame.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/transcript/StreamingMarkdown.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/live-bus/context/LiveBusContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/live-bus/hooks/useLiveTopic.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/live-bus/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/live-bus/topics.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/widgets/buildWidgetDocument.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/widgets/classifyWidgetBody.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/widgets/DocSpaceFrame.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/widgets/docspaceOrigin.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/widgets/EmbedUrlFrame.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/widgets/embedUrl.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/widgets/hooks/useWidgetBridge.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/widgets/hooks/useWidgetHost.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/widgets/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/widgets/readVerveTokens.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/widgets/widgetBridgeScript.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/widgets/WidgetErrorCard.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/widgets/WidgetFrame.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-22.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-24.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-28.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-29.mjs
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/embeds/collectEmbedTargets.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/embeds/embedSource.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/embeds/EmbedWidgetBody.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat-gutters/GutterWidgetFrame.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/transcript/Markdown.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/transcript/shapes/code/EmbedFrame.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/transcript/shapes/code/index.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/transcript/shapes/markdownStreaming.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/transcript/shapes/ShapeFrame.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/transcript/StreamingMarkdown.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/live-bus/context/LiveBusContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/live-bus/hooks/useLiveTopic.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/live-bus/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/live-bus/topics.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/widgets/buildWidgetDocument.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/widgets/classifyWidgetBody.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/widgets/DocSpaceFrame.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/widgets/docspaceOrigin.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/widgets/EmbedUrlFrame.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/widgets/embedUrl.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/widgets/hooks/useWidgetBridge.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/widgets/hooks/useWidgetHost.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/widgets/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/widgets/readVerveTokens.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/widgets/widgetBridgeScript.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/widgets/WidgetErrorCard.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/widgets/WidgetFrame.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-22.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-24.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-28.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-29.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-widget-scrollbars.mjs
 
 ## MAN-414 — The fence
 section: 07-live-widgets/003 The fence
@@ -5165,6 +5206,8 @@ switch, and one node the widget itself supplies through `headerAction` (the Suba
 "Clear completed" is the only one; [docs/architecture/MANUAL.md (06-tool-view)](MANUAL.md) §Subagents). Each is a sibling
 of the toggle, so a press meant for one of them folds nothing and drags nothing.
 
+A gutter widget may draw a different body while its card is full screen: the layout's `FullscreenBody` replaces `Body` for exactly that time (the Roadmap widget draws the Roadmap tab, MAN-7668), so the card is still a class change and only the body inside it is swapped. A swapped-out body takes the focused node with it and focus would fall to `<body>`; on leaving, `GutterWidgetFrame` hands a focus that fell out of the document back to the card's fullscreen switch (the control that was pressed to enter) and leaves a focus that is on a real element where it is.
+
 A retraction is the one thing that ends fullscreen without the reader: a fence that flashes back to
 the streaming half unmounts `WidgetFrame` entirely, and the card comes back as a card. That is the
 same restart the widget itself suffers there, and curing it is `StreamingMarkdown`'s shape to change.
@@ -5258,6 +5301,7 @@ section: 07-live-widgets/014 If you change this, check that
 | The `sandbox` attribute | Nothing but `allow-scripts` is on it. `.verify/phase-22.mjs` reads the attribute as a string and asserts the frame's origin is opaque and `localStorage` throws |
 | `WIDGET_CSP` | `connect-src 'none'` survives, `img-src`/`font-src` stay at `data:`, and the meta is still emitted before the style, the script and the body. If you added a directive meaning to close frame self-navigation, re-measure the twelve vectors before believing it — the last three candidates all looked right and changed nothing |
 | `buildWidgetDocument` | The fence body still reaches only the `<body>` element, and token values still come from `getComputedStyle` |
+| `DOCUMENT_RESET`'s scrollbar rules | They still repeat `.scrollbar-thin` from `src/index.css` declaration for declaration (`scrollbar-width: thin`, `scrollbar-color: var(--ink-muted) transparent`, the 6px WebKit rules, the `color-mix` hover) on `*` — no host stylesheet crosses the sandbox, so a change to one is a change to both. `node .verify/probe-widget-scrollbars.mjs` reads the frame's computed paint, gutter and WebKit pseudo-elements (bar, track, thumb, and the hover rule's specified colour) against a host `.scrollbar-thin` element; Chromium ignores an author's own `::-webkit-scrollbar` rule on any element the reset's standard properties reach; `--before` serves the pre-change module and is expected to fail |
 | `WIDGET_TOKEN_NAMES` | Every name is still declared in `src/shared/ui/verve/tokens.css`, and the `theme` message carries the same list |
 | The theme path | A flip still posts `theme` and does NOT rebuild `srcDoc`; the memo in `WidgetFrameLive` is keyed on `code` and `hostDocument` alone (a theme flip changes neither). Gate 10 of the probe leaves a sentinel on the frame's `window` and requires it to survive a flip, so adding anything theme-shaped to that memo key reddens it |
 | The height clamp | A widget still SHRINKS, not just grows — gate 4 drives one widget each way, because a `min-height` (or a monotonic `setHeight`) passes every growth assertion alone |
@@ -5282,7 +5326,7 @@ section: 07-live-widgets/014 If you change this, check that
 | `WidgetFrame`'s fullscreen state | It is still a class change and never a move: the live element must keep its position in the React tree across the toggle, or the iframe reloads and a part-typed DocSpace edit is gone. Toggle it and assert the SAME DOM node before and after |
 | The `key` on `WidgetFrameLive` OR on `DocSpaceFrame` | BOTH forks carry the key `<windowKey>:<code>` (host window and body) and both rest on the same premise — the revoke rule, not a reconciliation nicety. Without the body half a changed fence body is applied to the SAME element: `srcDoc` reassigned in place for an HTML widget, a new `src` for a DocSpace block. Either fires a second `load`, which the host cannot tell from the frame navigating itself away, and it silently revokes a healthy frame forever. Gate 9c rebuilds a body and requires `live.theme` to be set inside the new document — the sentinel half of that gate passes either way, because an in-place swap is also a new document, so `live.theme` is the read that matters. Without the window half a widget carried into the floating window reloads under the same element and is revoked: 1 `theme` message before the move, 0 after (`.verify/chat-surfaces-window.mjs` moves one across and back and requires it still sized and still hearing the host) |
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/widgets/WidgetFrame.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/verve/tokens.css, /home/lyphe/.claude/claudecodeui_lyphe/.verify/chat-surfaces-window.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-22.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-24.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-28.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-docspace-canvas.mjs
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/widgets/buildWidgetDocument.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/widgets/WidgetFrame.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/verve/tokens.css, /home/lyphe/.claude/claudecodeui_lyphe/.verify/chat-surfaces-window.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-22.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-24.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-28.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-docspace-canvas.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-widget-scrollbars.mjs
 
 ## MAN-426 — In one paragraph
 section: 08-rendered-shapes/000 In one paragraph
@@ -6600,6 +6644,7 @@ section: README/003 The protocol, in two tables/004 Server → client: the `kind
 | `loading_progress` | gateway | Project scan progress. |
 | `soul_launch_state` | gateway | The launcher souls a session started by hand, pushed on change. Feeds the soul pins in the strip above the composer when the desktop chat gutters are not showing, and in the gutter's Subagents widget while they are ([docs/MANUAL.md (dispatch-souls)](../MANUAL.md)). |
 | `simple_list_changed` | gateway | The simple chat list's shape changed: a folder was made, renamed, folded or deleted, or a chat changed place or folder. `{ kind, at }` only; names nothing, so a client that hears it re-reads the feed. Never a transcript row (MAN-7519). |
+| `session_host_liveness` | gateway | Which chats have a live session host (the CLI's tmux session). One shape, `{ kind, change: 'snapshot' \| 'live' \| 'asleep', sessionIds, at }`: a `snapshot` is sent once per connection, held until the keepalive hosts are re-adopted, then a `live` or `asleep` names the chats that gained their first or lost their last host. The ids ride an array, never a `sessionId` key, so the workspace's attention rule cannot mark the chat; no `seq`, so never a transcript row. Read by `SessionHostLivenessContext`, which grays the simple list's asleep rows (session-host, MAN-695). |
 | `universe_map` | gateway | The estate map was rebuilt because a tracked repo's HEAD moved; carries the `mapId` a client refetches `GET /api/universe/map` for. Excused from the chat reducer beside `soul_launch_state`. |
 | `universe_activity` | gateway | Coalesced estate activity — journal lines and Claude transcript edits resolved onto map stars. At most ten frames a second, and none at all while the estate is quiet; carries the held `mapId`, a `rows` array and a `dropped` count. Excused from the chat reducer. See [docs/architecture/MANUAL.md (01-websocket-transport)](MANUAL.md) §"Fan-out: who receives what". |
 | `protocol_error` | gateway | The request was rejected or never started. No `complete` follows. |
@@ -6712,7 +6757,7 @@ how the pieces fit together.
 | id | default side | order | open | table entry in `ChatGutterLayout` |
 |---|---|---|---|---|
 | `runner` | left | 0 | no | badge `useDispatcherPlans().count`, `countTone: 'warn'` while `waiting > 0` (MAN-7540) |
-| `roadmap` | left | 1 | yes | badge `designing + in_flight` of `useRoadmap().selected.standing`, each read `?? 0`; `countTone: 'warn'` while `waiting_on_you > 0`; `Body: RoadmapWidgetBody` (MAN-7668); `flush: true`; title `gutters.roadmap.title` |
+| `roadmap` | left | 1 | yes | badge `designing + in_flight` of `useRoadmap().selected.standing`, each read `?? 0`; `countTone: 'warn'` while `waiting_on_you > 0`; `Body: RoadmapWidgetBody` (MAN-7668); `FullscreenBody: RoadmapWidgetFullscreenBody` (the tab itself, drawn in place of `Body` while the card is full screen, MAN-7668); `flush: true`; title `gutters.roadmap.title` |
 | `subagents` | left | 2 | yes | `HeaderAction: SubagentWidgetClearCompleted` |
 | `memory` | right | 0 | no | |
 | `embed` | right | 1 | no | `flush: true` |
@@ -6728,7 +6773,7 @@ Defaults live in `DEFAULT_PLACEMENTS` (`src/modules/chat-gutters/hooks/useGutter
 
 1. Add the id to `GutterWidgetId`.
 2. Give it a place in `DEFAULT_PLACEMENTS` (`Record<GutterWidgetId, …>`; a missing key fails typecheck). `GUTTER_WIDGET_ORDER` is read off that record's keys.
-3. Add its entry to the `widgets` table in `ChatGutterLayout` (`Record<GutterWidgetId, …>`; also compiler-checked): `title`, `count`, `icon`, `Body`, optional `countTone` (a `Tone`, default `info`), `flush`, `HeaderAction`.
+3. Add its entry to the `widgets` table in `ChatGutterLayout` (`Record<GutterWidgetId, …>`; also compiler-checked): `title`, `count`, `icon`, `Body`, optional `countTone` (a `Tone`, default `info`), `flush`, `HeaderAction`, `FullscreenBody` (a body drawn in place of `Body` and only while the card has the whole viewport; absent, `Body` is drawn at both sizes and is never remounted by the switch; present, `<Boundary>` is keyed `fullscreen` / `column`, so a crash in one body never leaves the boundary tripped over the other).
 4. Add `gutters.<id>.title` to every locale's `common.json`.
 
 - No stored placement is migrated. `parsePlacements` is seeded from `DEFAULT_PLACEMENTS`, so a stored arrangement without the new id gains it at its default; stored values are never rewritten.
@@ -6736,3 +6781,110 @@ Defaults live in `DEFAULT_PLACEMENTS` (`src/modules/chat-gutters/hooks/useGutter
 - `count` is the badge and `countTone` its colour; a widget counting something other than a list length changes its own table line.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat-gutters/ChatGutterLayout.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat-gutters/hooks/useGutterPlacements.ts
+
+## MAN-8046 — sessionCompactionsDb — a compacted transcript's record, the seed it stores, and the swap
+
+**RULE: a compaction's old transcript is a `superseded_provider_sessions` row, and `sessionCompactionsDb` is the one writer of that row's compaction kinds and the one mover of the chat between sessions.**
+
+`server/modules/database/repositories/session-compactions.db.ts`, exported through the database barrel as `sessionCompactionsDb`. Types: `CompactionFacts`, `CompactionRecord`, `LatestCompaction`, `ChatCompactionMarker` in `server/shared/types.ts`. Readers of the record: MAN-8054.
+
+## Columns added to `superseded_provider_sessions`
+
+Declared in `SUPERSEDED_PROVIDER_SESSIONS_TABLE_SCHEMA_SQL`; added to a database that predates them by `addSupersededCompactionColumns` in `migrations.ts`. All nullable, none backfilled.
+
+| Column | Holds |
+| --- | --- |
+| `reason` | NULL = an edit's rewind (every row written before the column). `compaction` = the old transcript of a compaction. `compaction-abandoned` = a seed transcript whose swap was taken back |
+| `compaction_trigger` | `manual` / `auto` / `idle` |
+| `summarizer_model` | the launch word (can be an alias) |
+| `summarizer_served` | the one model that answered, or NULL |
+| `summarizer_effort` | effort word it ran at |
+| `pre_tokens` | context before; NULL when no turn had reported it |
+| `post_tokens` | context after the seed append (the CLI's `getContextUsage` `full` count); NULL until `setCompactionPostTokens` |
+| `summarizer_tokens_in`, `summarizer_tokens_out`, `summarizer_chunks` | summed over every summarizer call, failed ones included; chunks = calls |
+| `seed` | the seed's blocks as a JSON array of strings, as the verb returned them and as appended to the new session. NULL on a rewind row and on a compaction recorded before the column. Written by the swap's upsert, so a redo overwrites it |
+
+`CompactionFacts.chunks` is `summarizer_chunks`; `CompactionFacts.trigger` is `compaction_trigger`. `CompactionRecord` = `CompactionFacts` + `oldProviderSessionId`, `oldJsonlPath`, `sessionId`, `createdAt`, `postTokens`. `createdAt` is ISO UTC at one-second resolution; `rowid` breaks ties.
+
+## Functions
+
+| Function | Does |
+| --- | --- |
+| `swapToCompactedSession({ sessionId, oldProviderSessionId, oldJsonlPath, newProviderSessionId, facts, seed })` | One transaction: upserts the old transcript's `compaction` row with `seed` as JSON (`post_tokens` NULL again on a redo), repoints the chat via `sessionsDb.repointSessionToProviderSession` (`provider_session_id` AND `jsonl_path` together), deletes any watcher row already made for the new id |
+| `unswapCompactedSession({ sessionId, oldProviderSessionId, oldJsonlPath, newProviderSessionId })` | One transaction: deletes only the `reason = 'compaction'` row of the old id, records the seed as `compaction-abandoned`, repoints the chat back. A no-op unless the chat stands on `newProviderSessionId`, and when the chat's row is gone |
+| `setCompactionPostTokens(oldProviderSessionId, postTokens)` | Writes `post_tokens` of a `compaction` row only; nothing when the row is gone |
+| `latestCompaction(sessionId)` | The chat's newest `compaction` row (`created_at` DESC, `rowid` DESC) as `LatestCompaction` `{ oldProviderSessionId, postTokens, seed }`; null when the chat has none. `seed` is null for a NULL column, an empty array, non-JSON or any element that is not a non-empty string; the last three log a `[compaction-record] session=<id> …` line. Read by the auto-trigger's growth guard (`postTokens`, MAN-8066), the decorator's start-over (`seed`, MAN-8067) and the composer's token-usage route (`postTokens`, MAN-8054) |
+| `listCompactions(sessionId)` | One chat's `compaction` rows, oldest first. Excludes rewind and abandoned rows |
+| `listAllCompactions()` | Every chat's `compaction` rows, oldest first |
+
+## What the swap refuses
+
+Writes nothing, throws:
+
+- an id that is not a bare file-name stem (`/^[A-Za-z0-9_-][A-Za-z0-9._-]*$/`), the new id equal to the old, a relative or empty `oldJsonlPath`
+- facts the columns would store wrong: `trigger` outside the three; counts not non-negative integers (`preTokens` may be null); `summarizerModel` / `summarizerEffort` empty; `summarizerServed` empty (null is fine)
+- a `seed` that is not an array of one or more non-empty strings (a sparse array's holes count as not strings)
+- a chat whose row is gone — a record for a deleted chat would keep the indexer refusing the old transcript, which nothing could then delete through the app
+- a chat that is not `claude`
+- a chat standing on neither `oldProviderSessionId` nor `newProviderSessionId`. Standing on the new id is a duplicate announcement and repeats the swap
+
+why: a swap handed the wrong old id strands the chat's real session with no record, and the indexer offers it back as a stray chat.
+
+A swap that throws leaves the seed's transcript unrecorded: the unswap is a no-op when the chat is not on the seed. The caller decides what a refused swap does to the running seed.
+
+## Traps
+
+| Trap | Why / do |
+| --- | --- |
+| The swap's `jsonl_path` is the new session's own sibling file when it exists, else the OLD transcript | The CLI writes the new file ~100 ms after announcing the id; a row naming a missing file is pruned with its chat by the next `pruneOrphanedSessions`. The indexer repoints once the file appears. In the gap the live read of the old file under the new id returns no rows (`readTranscriptRows` keeps only rows carrying the id it is given) |
+| A history stitch must skip the live read when the id it is handed is a record's `oldProviderSessionId` | A caller that took the id before the swap landed pairs the old id with the fresh path, which in the gap is still the old file: every compacted row would draw twice and the history cache would keep the doubled read |
+| Do not use `assignProviderSessionId` for the move | It keeps `jsonl_path` on purpose; the history reads the live transcript from `jsonl_path`, so the chat would read the old file under the new id |
+| `unswapCompactedSession` records the abandoned seed at the chat's current `jsonl_path` when the indexer already repointed it there (differs from the old path), else beside the old transcript | A transcript can sit outside `encode(project_path)`; the sibling path is only the CLI's default guess |
+| `summarizerModel` is the launch word, `summarizerServed` the single model that answered | The summarizer verb's `served` is an array; the caller picks the string when it builds the facts |
+| `reason` NULL means rewind | A reader that needs "an edit's rewind" tests `reason IS NULL`, never `reason != 'compaction'` |
+| Every other reader of the table (`resolveAppSessionId`, `isProviderSessionSuperseded`, `getSupersededTranscriptPaths`, the chat-delete clear) reads rows of every `reason` | A compaction row is covered by them with no new code; only the two list functions and `latestCompaction` here filter to `compaction` |
+| `superseded_provider_sessions` has no `session_id` index | 5 rows on 2026-10-09 (all `compaction`); add one before `listCompactions` runs over a large table |
+| A force delete between the seed's file landing and the indexer repointing leaves that file on disk | It is then indexed as a new chat; a repository cannot close it |
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/migrations.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/session-compactions.db.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/schema.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts
+
+## MAN-8060 — CompactionMarker — the divider a compaction leaves in the transcript
+
+`CompactionMarker` (`src/modules/chat/transcript/CompactionMarker.tsx`, default export) draws the boundary between the conversation a compaction summarized and the summary the chat carries in its place. Data: a `ChatCompactionMarker` (server type, MAN-8054; mirrored field for field in `src/shared/types.ts`, with `'compaction'` in `MessageKind`, `NormalizedMessage.compaction` and `ChatMessage.isCompactionMarker` / `compaction`). `normalizedToChatMessages` (`hooks/useChatMessages.ts`) turns each `kind: 'compaction'` message into one row, `{ type: 'assistant', id, timestamp, isCompactionMarker: true, compaction }` with no content, and `MessageComponent.tsx` draws a row with `isCompactionMarker` through `<CompactionMarker marker={message.compaction} resolveModelLabel={…} />`, in the branch after the user bubble and before the task notice.
+
+## Props
+
+| Prop | Meaning |
+| --- | --- |
+| `marker: ChatCompactionMarker` | the `compaction` of the row |
+| `resolveModelLabel?: (modelId) => string \| null` | the pane's own catalog lookup; null falls back to `summarizerModel`, never to the chat's provider |
+
+## Drawn
+
+| Part | Rule |
+| --- | --- |
+| Heading | hairline, `Shrink` icon (the usage panel's Compact glyph), `compaction.heading`, hairline; label span is `text-center` so a heading too wide for one line wraps centred. `title` = the swap time (`marker.at`); no visible clock |
+| Line 1 | trigger (`compaction.trigger.manual` / `auto` / `idle`), then context `before → after tokens`: `before` = `preTokens`, the chat's last turn-end context; `after` = `postTokens`, the CLI's own count of the new session's context at the compaction's end (the runtime's one `getContextUsage` `full` count after the seed append, MAN-8055; every block of the seed is in it, no reply is). `after` null: `compaction.contextPending` holds its place with `…` plus an `sr-only` `compaction.afterPending`; `before` null: `compaction.contextAfterOnly` |
+| Line 2 | `compaction.summarizedBy` (model by catalog label, effort), `compaction.read`, `compaction.wrote`, `compaction.parts` only when `chunks > 1` |
+| Arrow | `ArrowRight` icon; the locale's `→` stays for screen readers (`<to>` slot) |
+| Numbers | tokens through `formatTokenCount` (`chat/utils/chatFormatting`); never dollars |
+| Colour | neutral only: a compaction asks nothing of the operator |
+| Wrap | each fact is an `inline-block` carrying its trailing `·`: a line breaks between facts, never inside one, never starts with a dot |
+| Hooks | root carries `data-compaction-marker` (trigger), `data-compaction-after` (`pending`/`known`), `data-compaction-chunks` |
+
+## Rules for the wiring
+
+| Rule | Why |
+| --- | --- |
+| The marker row is `type: 'assistant'` with EMPTY `content` | with content, `isProseReply` (`utils/toolGrouping.ts`) takes it as the turn's closing reply; as an assistant row, the summary under it draws without a caption |
+| The marker is always shown | it is not work (what "Show work" off hides) and not the summary (what the summary preference hides) |
+| It sits inside the turn card | the pane puts every non-user row in the card; the divider spans the card |
+| The row carries the message's `id` | the live frame (`compaction-<old id>`) and the history row share it, so the refresh after a run replaces one with the other and never shows both. In `useSessionStore.ts`, `pruneRealtimeSupersededByServer` drops a live row whose id the loaded history carries (after every history load), `computeMerged` leaves it out of the merge, and `appendRealtime` replaces a live row held under an equal id. The history row also brings `postTokens` once known |
+| The card regroups when the history reloads | designed: the live row and the history row are one marker |
+| "Show work" off keeps it | `isHiddenWork` (`utils/workVisibility.ts`) answers false for it: not a tool, not a notice, not a tool result |
+| The Markdown export writes it as one line, `_— Conversation compacted —_` | `buildTranscriptMarkdown` would otherwise export the content-less row as an empty speaker section; the HTML export mounts `MessageComponent`, so it draws the divider itself |
+| Manual trigger reads "You asked to compact" | true of the button and of a typed `/compact`; "pressed Compact" is false for the typed form |
+
+Locale: `compaction.*` in `src/modules/i18n/locales/en/chat.json`.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/export/buildTranscriptMarkdown.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/transcript/CompactionMarker.tsx

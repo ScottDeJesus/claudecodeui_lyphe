@@ -6,8 +6,8 @@ import { AppError, expandHome } from '@/shared/utils.js';
 import { readFlagFile, writeFlagFile } from './deepseek-flash-switch.js';
 
 /**
- * The dispatcher's HOST-WIDE park-at-peak switch, as a file — the operator's third switch file,
- * beside the DeepSeek and execute-runner flags.
+ * The dispatcher's HOST-WIDE park-at-peak switch, as a file — the operator's fourth switch file,
+ * beside the DeepSeek and execute-runner flags and the WIP defaults.
  *
  * The dispatcher reads this exact path at both Accept doors (`hooks/dispatcher/schedule.py`, through
  * `plan_runner.state.reads_on` — the DeepSeek switch's own predicate, so the family cannot drift in

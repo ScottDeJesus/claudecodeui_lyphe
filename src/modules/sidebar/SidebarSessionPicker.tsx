@@ -40,7 +40,7 @@ export function SidebarSessionPicker(props: SidebarSessionPickerProps) {
   const nameOf = useCallback((session: ProjectSession) => getSessionName(session, t), [t]);
 
   // The list, in the reader's order, in one of the sidebar's two shapes. Each session wears the marks the
-  // sidebar's rows read: the simple list's `groupsFromSimpleList(list.rows, marks)` and the tree's
+  // sidebar's rows read: the simple list's `groupsFromSimpleList(list.rows, marks, projectHints)` and the tree's
   // `groupsFromProjects(sortProjects(projects, order), marks, nameOf)` take the same three session-id sets.
   const { groups: rows, status, hasMore, loadMore, pick } = useSessionPicker({
     projects: props.projects,

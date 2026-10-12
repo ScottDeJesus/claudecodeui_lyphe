@@ -202,7 +202,7 @@ export function MoveDialog({ kind, name, onClose }: MoveDialogProps) {
             <Button type="button" variant="ghost" className="max-md:h-11" disabled={busy} onClick={dismiss}>
               {t('roadmap.dialog.cancel')}
             </Button>
-            <Button type="submit" className="max-md:h-11" disabled={!ready || busy} aria-busy={busy || undefined}>
+            <Button type="submit" className="max-md:h-11" disabled={!ready} busy={busy}>
               {t(placing ? 'roadmap.dialog.move.placeSubmit' : 'roadmap.dialog.move.submit')}
             </Button>
           </footer>

@@ -1,18 +1,14 @@
 /**
  * Boot re-adoption: giving a registry run back to every CLI that outlived the API.
  *
- * Three rules this file exists to keep:
- * - It COMPOSES `runDetachedChatTurn` and never re-implements `dispatchRun` (D-11). The session
- *   row, the `hasRuntime` check, the busy check, the model recording and the
- *   `completeRunIfCurrent` safety net ARE the shape a run has to have; a second copy of them
- *   here would be a second answer to every question the gateway already answers.
- * - The provider run is never awaited, but the registry run is registered synchronously
- *   (`dispatchRun` calls `startRun` ahead of its first await). That is the whole reason this
- *   step runs before `server.listen`: a browser that subscribes into a registry which has not
+ * The rules of handing ONE host back (it COMPOSES `runDetachedChatTurn`, never re-implements
+ * `dispatchRun`; the registry run is registered synchronously; a host whose turn already reported
+ * `complete` has its run completed at once) are `readopt-host.ts`'s, shared with a node's link-up
+ * re-adoption. What this file keeps:
+ * - The claim. ONE server per sessions dir may adopt, retire or sweep its hosts, and everything
+ *   below it — this machine's hosts AND the watch for a node's link — happens only after it is held.
+ * - The step runs before `server.listen`: a browser that subscribes into a registry which has not
  *   re-adopted yet reads a live session as idle.
- * - A host whose turn already reported `complete` has its run completed the instant it is
- *   registered. Leaving it `running` would wedge the session behind RUN_IN_PROGRESS
- *   (chat-websocket.service.ts:228-238) with no terminal event left to release it.
  * - The boot does not hand a conversation back to a build it has already replaced: the keepers go
  *   through the same version test a message applies (`idle-version-sweep.ts`), and the process that
  *   took the claim is the one that keeps watching for the next install.
@@ -23,87 +19,14 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
-import { sessionsDb } from '@/modules/database/index.js';
-import { chatRunRegistry, runDetachedChatTurn } from '@/modules/websocket/index.js';
-import type { ProviderRuntimeGateway } from '@/modules/websocket/index.js';
-
 import { installedCliVersionForLaunch } from '../installed-cli-version.js';
 
-import { lastTurnFinishedAt, listLiveHosts, retireHost, retireOlderHosts, sessionsDir, sweepDeadHosts } from './hosts.js';
-import type { LiveHost } from './hosts.js';
+import { listLiveHosts, retireOlderHosts, sessionsDir, sweepDeadHosts } from './hosts.js';
 import { retireStaleIdleHosts, watchInstalledCliVersionChanges } from './idle-version-sweep.js';
+import { releaseNodeReadoptionWait, watchNodeLinks } from './node-readopt.js';
+import { readoptHost } from './readopt-host.js';
+import type { ReadoptDeps } from './readopt-host.js';
 import { keepaliveEnabled } from './spawner.js';
-
-/** `supervised`: this boot is the systemd unit's own child (server/index.ts knows; this module is not told how). */
-type ReadoptDeps = { runtime: ProviderRuntimeGateway; supervised: boolean };
-
-const errorText = (err: unknown): string => (err instanceof Error ? err.message : String(err));
-
-/**
- * Hands one live host back to the gateway. Returns false when the host has nothing to be
- * re-adopted INTO — a session deleted while the API was down leaves a CLI with no row, no
- * transcript to append to and no one who can ever see it again, so it is wound down instead.
- */
-function readoptHost(host: LiveHost, deps: ReadoptDeps): boolean {
-  const row = sessionsDb.getSessionById(host.appSessionId);
-  if (!row) {
-    console.log(`[keepalive] host ${host.hostId} has no session row left — retiring it`);
-    retireHost(host.hostId);
-    return false;
-  }
-
-  console.log(`[keepalive] re-adopting host ${host.hostId} for session ${host.appSessionId}`);
-  runDetachedChatTurn(
-    {
-      sessionId: host.appSessionId,
-      userId: host.userId,
-      // No prompt: the CLI is mid-conversation and the provider skips prompt building
-      // entirely in re-attach mode. This turn exists to re-attach to a stream, not to ask.
-      content: '',
-      options: {
-        cwd: row.project_path ?? host.cwd ?? undefined,
-        keepalive: {
-          reattach: true,
-          hostId: host.hostId,
-          turnCompleteSent: host.turnCompleteSent,
-          heldForBackgroundWork: host.heldForBackgroundWork,
-          profile: host.profile,
-          cliVersion: host.cliVersion,
-          deferredTools: host.deferredTools
-        }
-      },
-      beforeRun: (run) => {
-        // Before the provider is asked for anything: the run must never be observable as
-        // `running` for a turn whose `complete` this API's predecessor already sent.
-        if (host.turnCompleteSent) {
-          // Stamped only when the CLI ended a turn after the session's last recorded completion:
-          // a follow-up turn a background task pushed ends with no `complete` of its own, so that
-          // is news. A turn the predecessor already recorded is not — re-stamping it made the chat
-          // unread on every restart with no new activity.
-          const finishedAt = lastTurnFinishedAt(host.hostId);
-          const stampedAt = row.last_completed_at ? Date.parse(row.last_completed_at) : Number.NaN;
-          const alreadyRecorded = finishedAt === null || (Number.isFinite(stampedAt) && finishedAt <= stampedAt);
-          chatRunRegistry.completeRunIfCurrent(run, { exitCode: 0, alreadyRecorded });
-        }
-      }
-    },
-    deps
-  )
-    .then((outcome) => {
-      if (!outcome.started) {
-        console.warn(
-          `[keepalive] host ${host.hostId} was NOT re-adopted after all — the re-adopted count above overstates by one: ${outcome.error ?? 'the turn did not start'}`
-        );
-      }
-    })
-    .catch((err: unknown) => {
-      // Not `void`: an unhandled rejection is fatal to the whole API under Node's default
-      // policy, and a single unreachable host must never take the server down with it.
-      console.error(`[keepalive] re-adopted turn for host ${host.hostId} failed: ${errorText(err)}`);
-    });
-
-  return true;
-}
 
 /**
  * Ownership of the keepalive: ONE server per sessions dir may adopt, retire or sweep its hosts.
@@ -191,6 +114,7 @@ export async function readoptKeepaliveSessions(
   const claim = claimKeepalive(deps.supervised);
   if (!claim.owner) {
     console.log(`[keepalive] pid ${claim.holder} owns the keepalive — this boot adopts, retires and sweeps nothing`);
+    releaseNodeReadoptionWait();
     return { readopted: 0, swept: 0 };
   }
   const swept = sweepDeadHosts();
@@ -199,13 +123,21 @@ export async function readoptKeepaliveSessions(
   // here would become a REAL, promptless turn on a REAL session — tokens spent and a junk entry
   // in the transcript — while the live host it meant to rejoin is orphaned. Dead files are
   // litter under either setting, so the sweep above still stands.
-  if (!keepaliveEnabled()) return { readopted: 0, swept };
+  if (!keepaliveEnabled()) {
+    releaseNodeReadoptionWait();
+    return { readopted: 0, swept };
+  }
 
   // This process owns the keepalive from here on, so it is also the one that watches the installed
   // reading for an INSTALL: a host left idle on an older build is retired the moment the version
   // moves, not only at its next message (`idle-version-sweep.ts`). Registered after the claim,
   // never before: the process that did not take the claim touches nothing.
   watchInstalledCliVersionChanges();
+
+  // A node's hosts come back when its warden is heard, not at this boot: the gateway only starts
+  // listening after this step, so the wardens redial afterwards. Registered here, after the claim and
+  // the gate, for the reason everything above is: a process that did not take the claim touches nothing.
+  watchNodeLinks(deps);
 
   // Newest wins, exactly as the provider's supersede branch decides it at runtime (D-8). Then the
   // version test, on the survivors: a restart after an install must not re-adopt a host on the

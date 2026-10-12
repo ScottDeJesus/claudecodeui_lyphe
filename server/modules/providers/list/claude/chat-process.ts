@@ -11,7 +11,8 @@
  *   re-asked every minute until it clears; the process is closed only then.
  * - A setting the SDK can apply to a running query is applied; one it cannot forces a fresh
  *   process. Which is which is decided here, in one place, from the SDK's real surface: `setModel`,
- *   `applyFlagSettings` (effort) and `setPermissionMode` are live, and so is GROWING the allowed
+ *   `applyFlagSettings` (effort, and whether the house's compaction has taken the chat over) and
+ *   `setPermissionMode` are live, and so is GROWING the allowed
  *   tool list (a newly allowed tool merely reaches `canUseTool`, which reads the live options).
  *   cwd, MCP servers — and who each is signed in as (mcp-sign-in.ts: a CLI reads its tokens once,
  *   at launch, so a sign-in made mid-chat is invisible to it) — a resume anchor, a conversation
@@ -28,6 +29,8 @@
 import type { SDKUserMessage } from '@anthropic-ai/claude-agent-sdk';
 
 import { isBehindInstalled } from '@/shared/version-order.js';
+
+import { compactionTakenOverOf } from './claude-compaction-seams.js';
 
 /** Two hours of silence since the last message closes an idle process (the operator's ruling). */
 export const DEFAULT_IDLE_CLOSE_MS = 2 * 60 * 60 * 1000;
@@ -173,6 +176,12 @@ export type LaunchProfile = {
   model: string;
   effort: string | null;
   ultracode: boolean;
+  /**
+   * Whether the house's compaction had taken the chat over when the process was launched, read off
+   * the launch `settings` (`CLI_COMPACTION_SETTINGS`). A profile recorded before this field existed
+   * has none, and reads as not taken over.
+   */
+  compactionTakenOver: boolean;
   allowedTools: string[];
   disallowedTools: string[];
   /**
@@ -193,7 +202,7 @@ type SdkOptionsShape = {
   permissionMode?: string;
   model?: string;
   effort?: string;
-  settings?: { ultracode?: boolean } | string;
+  settings?: Record<string, unknown> | string;
   allowedTools?: string[];
   disallowedTools?: string[];
 };
@@ -217,6 +226,7 @@ export function launchProfileOf(
     model: sdkOptions.model ?? '',
     effort: sdkOptions.effort ?? null,
     ultracode: typeof sdkOptions.settings === 'object' && sdkOptions.settings?.ultracode === true,
+    compactionTakenOver: compactionTakenOverOf(sdkOptions.settings),
     allowedTools: [...(sdkOptions.allowedTools ?? [])],
     disallowedTools: [...(sdkOptions.disallowedTools ?? [])],
     cliVersion: typeof cliVersion === 'string' ? cliVersion : null
@@ -228,6 +238,8 @@ export type LiveChanges = {
   effort: { level: string | null; ultracode: boolean } | null;
   permissionMode: string | null;
   tools: { allowed: string[]; disallowed: string[] } | null;
+  /** The new "taken over" state when it changed (applied through `applyFlagSettings`), else null. */
+  compaction: boolean | null;
 };
 
 export type LivePlan = { respawn: string; changes: null } | { respawn: null; changes: LiveChanges };
@@ -280,7 +292,8 @@ export function planLiveChanges(
         model: next.model,
         effort: { level: next.effort, ultracode: next.ultracode },
         permissionMode: next.permissionMode,
-        tools: null
+        tools: null,
+        compaction: next.compactionTakenOver
       }
     };
   }
@@ -311,7 +324,9 @@ export function planLiveChanges(
       model: next.model !== live.model ? next.model : null,
       effort: effortChanged ? { level: next.effort, ultracode: next.ultracode } : null,
       permissionMode: next.permissionMode !== live.permissionMode ? next.permissionMode : null,
-      tools: toolsChanged ? { allowed: next.allowedTools, disallowed: next.disallowedTools } : null
+      tools: toolsChanged ? { allowed: next.allowedTools, disallowed: next.disallowedTools } : null,
+      // `=== true` because a profile recorded before the field existed has none, and reads as off.
+      compaction: next.compactionTakenOver !== (live.compactionTakenOver === true) ? next.compactionTakenOver : null
     }
   };
 }

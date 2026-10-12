@@ -10,8 +10,9 @@ import { useEffect } from 'react';
  * the same commit when the menu comes before the dialog in the tree. A trigger that has since left
  * with its row is skipped.
  *
- * Used by the dispatcher module (`DeletePlanDialog`) and the roadmap module's dialogs (`ItemDialog`,
- * `FeatureDialog`, `MoveDialog`, `BlockDialog`, `DeleteDialog`, `PromoteDialog`).
+ * Used by the dispatcher module (`DeletePlanDialog`), the roadmap module's dialogs (`ItemDialog`,
+ * `FeatureDialog`, `MoveDialog`, `BlockDialog`, `DeleteDialog`, `PromoteDialog`) and the cerberus
+ * module's (`MuteDialog`, `EnrollDialog`, `PromoteDialog`, `UpdateWardensDialog`).
  */
 export function useReturnFocus(): void {
   useEffect(() => {

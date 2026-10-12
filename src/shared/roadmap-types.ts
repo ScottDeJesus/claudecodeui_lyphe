@@ -30,7 +30,7 @@ export type RoadmapFeatureWord = 'idea' | 'proposed' | 'designing' | 'in flight'
 
 /**
  * The finer step under a feature's word. `designing` carries the steps `designing`, `questions`,
- * `cutting`, `parked` and `accept`; `in flight` carries `building`, `paused`, `queued`, `waiting`
+ * `cutting`, `parked` and `accept`; `in flight` carries `building`, `paused`, `queued`, `stalled`, `waiting`
  * and `starting`; every other word is its own step.
  */
 export type RoadmapFeatureStep =
@@ -45,6 +45,7 @@ export type RoadmapFeatureStep =
   | 'waiting'
   | 'queued'
   | 'paused'
+  | 'stalled'
   | 'starting'
   | 'shipped';
 
@@ -73,8 +74,8 @@ export type RoadmapCaseWord = 'holding' | 'broken' | 'regressed' | 'not run' | "
  * A feature's, an epic's or a roadmap's ACTIVE cases counted by word: `total` is every active case, and
  * the five others are `RoadmapCaseWord`'s words (`not_run` for `not run`, `cant_run` for `can't run`,
  * since a key cannot carry the space or the quote). The five sum to `total`. Zero across the board
- * where the dispatcher has no cases for the item. Read by the feature row, the epic card, the header and
- * the feature dialog.
+ * where the dispatcher has no cases for the item. Read by the roadmap's panels (the feature's, the epic's and
+ * the roadmap's) and the feature dialog.
  */
 export type RoadmapCases = {
   total: number;
@@ -113,7 +114,10 @@ export type RoadmapTask = {
  * operator's own reason, a mark the picture shows and nothing reads, or null; `waits_on` names the
  * plans it waits on. `repo` and `project` are always strings: `project` is always a label, the feature's
  * own or the one the dispatcher derives (MAN-7621). `cases` counts the feature's own active cases by
- * word.
+ * word. `runtime_s` is how long agents were out on it — the union of its planner outings' and its stage
+ * tries' intervals, whole seconds, counting what has ENDED (`report_roadmap`: a figure that moved every
+ * second would put this picture's frame on every socket every two seconds) — which a shipped feature's
+ * row says after its date.
  */
 export type RoadmapFeature = {
   name: string;
@@ -132,13 +136,16 @@ export type RoadmapFeature = {
   promoted_at: string | null;
   approved_at: string | null;
   shipped_at: string | null;
+  runtime_s: number;
   cases: RoadmapCases;
 };
 
 /**
  * One epic (an arc on the wire's other face): a body of features under a milestone.
  * `designed_whole` is true when the epic's features were cut together as one design. `standing.cases`
- * is the dispatcher's sum of its features' `cases`.
+ * is the dispatcher's sum of its features' `cases`. `runtime_s` is how long agents were out on the epic:
+ * the union over its features' intervals and its own outings (never its features' figures added), whole
+ * seconds, counting what has ENDED like `RoadmapFeature.runtime_s`.
  */
 export type RoadmapEpic = {
   name: string;
@@ -150,6 +157,7 @@ export type RoadmapEpic = {
   designed_whole: boolean;
   word: RoadmapEpicWord;
   completed_at: string | null;
+  runtime_s: number;
   standing: {
     features: number;
     shipped: number;

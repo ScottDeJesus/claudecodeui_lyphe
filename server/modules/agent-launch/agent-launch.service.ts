@@ -178,6 +178,10 @@ function setDefaultsArgv(change: AgentLaunchDefaultsChange): string[] {
     argv.push('--effort', `${model}=${effort ?? 'none'}`);
   }
   if (change.deepseek_effort !== undefined) argv.push('--deepseek-effort', change.deepseek_effort);
+  if (change.dactyl_model !== undefined) argv.push('--dactyl-model', change.dactyl_model);
+  if (change.dactyl_effort !== undefined) argv.push('--dactyl-effort', change.dactyl_effort);
+  if (change.summarizer_model !== undefined) argv.push('--summarizer-model', change.summarizer_model);
+  if (change.summarizer_effort !== undefined) argv.push('--summarizer-effort', change.summarizer_effort);
   return argv;
 }
 

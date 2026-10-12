@@ -33,7 +33,6 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
   const [activeLoginProvider, setActiveLoginProvider] = useState<LLMProvider | null>(null);
   const {
     providerAuthStatus,
-    checkProviderAuthStatus,
     refreshProviderAuthStatuses,
   } = useProviderAuthStatus();
 
@@ -71,7 +70,9 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
       && previousProvider !== null
       && activeLoginProvider === null;
 
-    // Refresh statuses after the login modal is closed.
+    // Refresh statuses after the login modal is closed — the one moment sign-in is read. `claude /login`
+    // stays at its prompt and never exits, so the window is closed with ✕ and the command's exit code
+    // never arrives; the server's own answer on close is the signal.
     if (didCloseModal) {
       void refreshProviderAuthStatuses();
     }
@@ -79,12 +80,6 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
 
   const handleProviderLoginOpen = (provider: LLMProvider) => {
     setActiveLoginProvider(provider);
-  };
-
-  const handleLoginComplete = (exitCode: number) => {
-    if (exitCode === 0 && activeLoginProvider) {
-      void checkProviderAuthStatus(activeLoginProvider);
-    }
   };
 
   const handleNextStep = async () => {
@@ -248,7 +243,6 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
           isOpen={Boolean(activeLoginProvider)}
           onClose={() => setActiveLoginProvider(null)}
           provider={activeLoginProvider}
-          onComplete={handleLoginComplete}
         />
       )}
     </>

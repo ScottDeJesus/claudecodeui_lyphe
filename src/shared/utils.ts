@@ -1,8 +1,9 @@
 import { clsx, type ClassValue } from 'clsx';
 import { extendTailwindMerge, validators } from 'tailwind-merge';
 
+import { WIP_LADDER_TOP, WIP_LIMIT_MIN } from '@/shared/constants';
 import type { RoadmapFeatureWord, RoadmapPicture } from '@/shared/roadmap-types';
-import type { DispatcherModelChoice, Project, ProjectSession } from '@/shared/types';
+import type { DispatcherModelChoice, Project, ProjectSession, SlashCommand } from '@/shared/types';
 
 //----------------- DEPLOYMENT MODE ------------
 
@@ -352,10 +353,11 @@ export function formatRelativeTime(iso: string | null | undefined): string {
 }
 
 /**
- * A UTC stamp as the reader's own short date — `Oct 3`, with the year once it is not this year's —
- * or `null` for no stamp, or one that is not a time. The roadmap's one spelling of a day, so a step
- * phrase (`useStepPhrase`), a path station (`MilestonePath`), the milestone banner (`CelebrationLayer`)
- * and a feature's dates (`FeatureFacts`) all name it alike, in the browser's own locale.
+ * An ISO stamp (the roadmap's UTC one, or a local one with its offset) as the reader's own short
+ * date — `Oct 3`, with the year once it is not this year's — or `null` for no stamp, or one that is
+ * not a time. The roadmap's one spelling of a day, so a step phrase (`useStepPhrase`), the milestone
+ * banner (`CelebrationLayer`), a feature's dates (`FeatureFacts`) and a reached milestone's panel
+ * (`panel/MilestonePanel`) all name it alike, in the browser's own locale.
  */
 export function formatShortDate(stamp: string | null | undefined): string | null {
   if (!stamp) return null;
@@ -490,6 +492,56 @@ export function firstLine(text: unknown): string {
 
 // ---------------------------
 
+//----------------- THE WIP LADDER ------------
+
+/**
+ * The top counted rung of the WIP ladder (`1, 2, … top, All`): `WIP_LADDER_TOP`, or the widest count
+ * already in play — Settings' default, the epic's own — whichever is larger. On an epic's card
+ * Settings' count is always in play, so a default above six stays a rung however the epic's own count
+ * moves; on a Settings stepper the stepper's own count is the only one in play, so a count above six steps
+ * down by one and, once stepped below it, is not climbed back to. `null` is `All` (no limit) and
+ * widens nothing. Because every count the ladder ever steps to is at most this, `+` can never produce
+ * a count wider than one the server already handed us (and so never one its reader refuses). Used by
+ * the dispatcher module's `EpicWipControl` and the settings module's `RunnerWipDefaultsRow`, which hand
+ * its answer to `wipLadderSteps`.
+ */
+export function wipLadderTop(...inPlay: Array<number | null>): number {
+  return Math.max(WIP_LADDER_TOP, ...inPlay.filter((lanes): lanes is number => lanes !== null));
+}
+
+/**
+ * Where `−` and `+` land from `current` on the one WIP ladder, `1, 2, … top, All`; `null` is `All`
+ * (a limit of `all`). A press that is refused is `null`; a
+ * press that lands is `{ lanes }`, where `lanes: null` is `All`.
+ *
+ * `+` adds one below `top`, and from `top` goes to `All`; it is refused on `All`. `−` takes `All` to
+ * `top`, and subtracts one from a count; it is refused on one lane. Used by the dispatcher module's
+ * `EpicWipControl` (an epic's two limits) and the settings module's `RunnerWipDefaultsRow` (the two
+ * defaults), so the two climb the same ladder from one copy of the rules.
+ */
+export function wipLadderSteps(
+  current: number | null,
+  top: number,
+): { down: { lanes: number | null } | null; up: { lanes: number | null } | null } {
+  if (current === null) return { down: { lanes: top }, up: null };
+  return {
+    down: current > WIP_LIMIT_MIN ? { lanes: current - 1 } : null,
+    up: { lanes: current < top ? current + 1 : null },
+  };
+}
+
+/**
+ * How many one WIP word allows, as the dispatcher reads it: `all` is no limit, which is `null` and is
+ * drawn as All, and a count is itself. The word is the dispatcher's own (`wip.py`), `'3'` or `'all'`,
+ * as `status --json` and `GET /api/settings/wip` carry it. Used by the dispatcher module's
+ * `EpicWipControl` and the settings module's `RunnerWipDefaultsRow`.
+ */
+export function wipCountOfWord(word: string): number | null {
+  return word === 'all' ? null : Number(word);
+}
+
+// ---------------------------
+
 //----------------- KEYBOARD SHORTCUTS ------------
 
 /**
@@ -554,4 +606,51 @@ export function isElementLike(target: EventTarget | null | undefined): target is
 export function resizeObserverIn(hostWindow: Window, callback: ResizeObserverCallback): ResizeObserver | null {
   const HostResizeObserver = (hostWindow as Window & typeof globalThis).ResizeObserver;
   return typeof HostResizeObserver === 'function' ? new HostResizeObserver(callback) : null;
+}
+
+// ---------------------------
+
+//----------------- ZOOM GESTURE READING ------------
+
+/** Exponential zoom rate per wheel-delta pixel: a 100px mouse-wheel notch is about 25%. */
+const WHEEL_ZOOM_RATE = 0.0022;
+
+/** A trackpad pinch arrives as `ctrl`+wheel with small deltas, so it needs a steeper rate. */
+const PINCH_WHEEL_ZOOM_RATE = 0.01;
+
+/**
+ * The most a single `ctrl`+wheel event may zoom by, in delta pixels. A pinch sends many events of a
+ * few pixels each, but a mouse-wheel notch with Ctrl held is one event of 100 or more — at the
+ * pinch rate that is 2.7× per notch, two notches from the ceiling. Capped, it lands beside a plain notch.
+ */
+const PINCH_WHEEL_MAX_DELTA_PX = 25;
+
+/** Firefox reports wheel deltas in lines; this converts them to the pixels the rates above expect. */
+const LINE_DELTA_PX = 16;
+
+/**
+ * The factor one wheel event multiplies a zoom by: above 1 for a wheel rolled up (or a pinch spread),
+ * below 1 for the other way. A plain wheel is `exp(−deltaY × 0.0022)`; a `ctrl`+wheel, which is what a
+ * trackpad pinch arrives as, is read at the steeper pinch rate with its delta capped, so a mouse-wheel
+ * notch held with Ctrl lands beside a plain one. Used by the kit's Lightbox (`useZoomPan`) and the
+ * roadmap module's tree zoom (`useTreeZoom`), so both zoom by the same wheel.
+ */
+export function wheelZoomRatio(event: WheelEvent): number {
+  const deltaPx = event.deltaY * (event.deltaMode === WheelEvent.DOM_DELTA_LINE ? LINE_DELTA_PX : 1);
+  const zoomPx = event.ctrlKey ? Math.min(PINCH_WHEEL_MAX_DELTA_PX, Math.max(-PINCH_WHEEL_MAX_DELTA_PX, deltaPx)) : deltaPx;
+  return Math.exp(-zoomPx * (event.ctrlKey ? PINCH_WHEEL_ZOOM_RATE : WHEEL_ZOOM_RATE));
+}
+
+// ---------------------------
+//----------------- SLASH COMMANDS ------------
+
+/**
+ * Whether the Claude engine itself runs a slash command: a skill, or an entry of the engine's own
+ * command list. Such an entry is inserted into the composer when picked and goes to the wire as typed
+ * text — it is never sent to `/api/commands/execute`, which only knows CloudCLI-native and custom
+ * commands. Used by the chat module's `useSlashCommands` (menu pick) and `useChatComposerState`
+ * (submit guard), so a command is picked and submitted by the same rule.
+ */
+export function isEngineHandledCommand(command: SlashCommand): boolean {
+  return command.type === 'skill' || command.type === 'engine' || command.metadata?.type === 'skill';
 }

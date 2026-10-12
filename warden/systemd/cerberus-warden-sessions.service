@@ -1,0 +1,81 @@
+# Cerberus warden — the SESSION KEEPALIVE service (restart-survival of a node's chat sessions).
+#
+# WHAT THIS IS. A do-nothing keepalive whose ONLY job is to hold a tmux server alive on the
+# private `-L cerberus-warden` socket, in its OWN cgroup, OUTSIDE cerberus-warden.service's
+# lifecycle. A chat session that runs on this machine for a project Cerberus assigned here is a tmux
+# `new-session` on THIS server — so the `claude` process lives in THIS unit's cgroup, not the
+# warden's. That is what lets `systemctl restart cerberus-warden` (every `enroll.sh --refresh`, every
+# warden update, a crash and its Restart=always) leave a running session untouched: a restart tears
+# down only the warden's own cgroup, and systemd kills EVERY process left in a cgroup it stops. A
+# session started from the warden's own cgroup would die with it, mid-turn. This server, and every
+# session pane it owns, is a different cgroup entirely — so the session keeps running, the warden
+# comes back up, and Cerberus attaches to it again over the new link, replaying from the host's own
+# journal whatever it missed.
+#
+# The same boundary as the API's own `cloudcli-sessions-tmux` unit, on its own socket and its own
+# directory: the two tmux servers share nothing, so a session belongs to exactly one of them, and one
+# machine can be both a place where the API runs sessions and a node that runs them for it.
+#
+# WHY A DEDICATED LONG-LIVED UNIT (not `systemd-run --scope` per launch). One server, created once,
+# owned by systemd, surviving independently — the warden is a mere CLIENT of it, and the only one
+# that ever needs the server is the warden's `session.open`. A per-launch transient scope would
+# re-introduce a lifecycle the warden has to track; a standing keepalive is the simplest "tmux owns
+# the terminals" boundary. The warden asks `tmux -L cerberus-warden has-session -t _keepalive` before
+# every new session and refuses with "The warden's session server is not running" when it is gone.
+#
+# Type=forking: `tmux new-session -d` forks the tmux SERVER as a daemon (reparents to PID 1)
+# and the client exits 0 — the classic double-fork daemon shape systemd's forking type
+# expects. `-f /dev/null` skips the operator's ~/.tmux.conf so a personal tmux config can
+# never reshape a chat session's pane. The `_keepalive` session (running `sleep infinity`)
+# keeps the server from exiting when it holds no other sessions; it holds no host, so no listing of a
+# node's sessions ever names it.
+#
+# RemainAfterExit=yes: the forked client exits immediately; without this systemd would
+# consider the unit dead. With it (plus Type=forking tracking the daemon), `systemctl status
+# cerberus-warden-sessions` stays ACTIVE for the tmux server's whole lifetime.
+#
+# There is deliberately no systemd runtime-dir setting here (D-1). Session journals, sockets
+# and meta live on DISK under ~/.cerberus-warden/sessions (mode 0700, made by the warden), never on
+# /run's tmpfs, where a long session's journal would sit in RAM for the whole life of that session.
+#
+# The unit runs as the same account as the warden, and the word below that names it is filled in by
+# `enroll.sh`, never by hand. `enroll.sh --refresh` rewrites this file and enables the unit when it is new,
+# but it never RESTARTS it: a restart of this unit is the deliberate "kill every live session on this
+# node" switch (ExecStop below), and a refresh must not be one.
+#
+# DEPLOY (installed and refreshed by the script, as the warden's own unit is; nothing here is copied or
+# enabled by hand):
+#   a newer warden: curl -fsSL http://<center>/cerberus/enroll.sh | sudo sh -s -- --refresh
+#   systemctl is-active cerberus-warden-sessions   # → active; tmux -L cerberus-warden ls → _keepalive
+
+[Unit]
+Description=Cerberus warden session keepalive (holds the -L cerberus-warden tmux server across warden restarts)
+After=network.target
+
+[Service]
+Type=forking
+User=__USER__
+# Hold a tmux server on the private socket with one no-op keepalive session. The forked
+# server reparents to PID 1; Type=forking + RemainAfterExit keep the unit ACTIVE.
+ExecStart=/usr/bin/tmux -L cerberus-warden -f /dev/null new-session -d -s _keepalive sleep infinity
+# Tear the WHOLE server down on stop — every chat-session pane it owns goes with it. (An
+# operator `systemctl stop cerberus-warden-sessions` is the deliberate "kill every live session on this
+# node" switch.)
+# The `-` prefix: ignore a failing kill-server. Stopping when the server is ALREADY dead (the
+# silent-death state) makes kill-server exit 1 ("no server running"), and without the `-`
+# that lands the unit in FAILED — indistinguishable from crash residue. With it a deliberate
+# stop ALWAYS lands `inactive`, keeping the state contract readable: `inactive` = the
+# operator's choice, `failed` = crash/OOM residue.
+ExecStop=-/usr/bin/tmux -L cerberus-warden kill-server
+RemainAfterExit=yes
+Restart=always
+RestartSec=2
+# OOMPolicy=continue: when the kernel OOM-killer reaps ONE process in this unit's cgroup
+# (a single runaway chat session), keep the unit — and every SIBLING session — running. The
+# default (OOMPolicy=stop) tears the WHOLE cgroup down on ANY single OOM kill, which would
+# turn one oversized session's death into the simultaneous loss of every live chat.
+# `continue` confines the blast radius to the process the kernel actually killed.
+OOMPolicy=continue
+
+[Install]
+WantedBy=multi-user.target

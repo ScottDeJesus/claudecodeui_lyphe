@@ -14,7 +14,7 @@ import {
   FoldChevron,
   Spinner,
 } from '@/shared/ui';
-import { useCollapsible } from '@/shared/ui/Collapsible';
+import { useCollapsible } from '@/shared/ui/collapsibleContext';
 
 /**
  * The job as it stands: the four steps, what became of each, and the log the runner is writing.

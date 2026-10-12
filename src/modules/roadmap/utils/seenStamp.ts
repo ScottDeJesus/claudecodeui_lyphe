@@ -4,10 +4,11 @@ import { readUserPreference, writeUserPreferenceEntries } from '@/shared/userSet
 
 // The user's seen stamp for each roadmap (`roadmapSeen`): the last completion that played for them. The
 // preference mirror in the browser is hydrated ONCE, at sign-in, so a page signed in hours ago holds the
-// stamp as it stood then, while a phone or another tab may have moved it since. Reading or moving the
-// stamp off the mirror alone would replay what the other device played, or write it backward over the
-// other device's newer one (the entry patch replaces and does not compare). So both reads here ask the
-// SERVER's copy too and take the newer. Used by `hooks/useCelebrations.ts`.
+// stamp as it stood then, while a phone or another tab may have moved it since. Reading the stamp off
+// the mirror alone would replay what the other device played, and a write made off it would be an
+// older stamp than the other device's (the entry patch refuses to move a `roadmapSeen` stamp backward,
+// `FORWARD_ONLY_ENTRY_KEYS`, but the mirror would still be a stale judge of whether to send). So both
+// reads here ask the SERVER's copy too and take the newer. Used by `hooks/useCelebrations.ts`.
 
 /** `newer(a, b)`: the later of two stamps, either of which may be absent. */
 function newer(first: string | null, second: string | null): string | null {

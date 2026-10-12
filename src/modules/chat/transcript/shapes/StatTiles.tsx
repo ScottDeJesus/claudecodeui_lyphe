@@ -36,8 +36,8 @@ const DELTA_ARROW: Record<DeltaTone, typeof ArrowUpRightIcon | null> = {
  * Each tile is the shared `Card` shell, not a hand-rolled bordered box. The delta's colour is a
  * `data-tone` token swap (`positive` / `danger` / `neutral`), the same vocabulary `Badge`, `Chip`
  * and `Banner` read, so both themes are tokens.css's decision and never this file's. The tile is
- * one of the two shapes the shared library has not built; it stays here under the two-module rule
- * and moves to `src/shared/ui/` the day a second module wants one.
+ * a shape the shared library has not built; it stays here under the two-module rule and moves to
+ * `src/shared/ui/` the day a second module wants one.
  */
 export function StatTiles({ tiles, collapseKey }: StatTilesProps) {
   const { t } = useTranslation('chat');

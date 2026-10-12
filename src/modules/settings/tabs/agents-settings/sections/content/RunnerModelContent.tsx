@@ -5,27 +5,35 @@ import { useDeepSeekFlashSwitch } from '@/shared/hooks/useDeepSeekFlashSwitch';
 import { useHealMasterSwitch } from '@/shared/hooks/useHealMasterSwitch';
 import { Button, LLMProviderLogo, SettingRow } from '@/shared/ui';
 import SettingsToggle from '@/modules/settings/SettingsToggle';
+import RunnerCompactionRow from '@/modules/settings/tabs/agents-settings/sections/content/RunnerCompactionRow';
 import RunnerHealModelRow from '@/modules/settings/tabs/agents-settings/sections/content/RunnerHealModelRow';
+import RunnerMainSessionDactylsRow from '@/modules/settings/tabs/agents-settings/sections/content/RunnerMainSessionDactylsRow';
 import RunnerParkAtPeakRow from '@/modules/settings/tabs/agents-settings/sections/content/RunnerParkAtPeakRow';
 import RunnerPlannerLanesRow from '@/modules/settings/tabs/agents-settings/sections/content/RunnerPlannerLanesRow';
+import RunnerWipDefaultsRow from '@/modules/settings/tabs/agents-settings/sections/content/RunnerWipDefaultsRow';
 
 /**
  * Rendered by AgentCategoryContentSection under Claude's "account" panel: which model the plan
- * runner's hands — the builder, his fix-pass and Athena — actually dispatch on, how many planners run
- * at once, and whether the heal reflex may launch a heal at all.
+ * runner's hands — the builder, his fix-pass and Athena — actually dispatch on, the WIP defaults every
+ * epic starts from, how many planners run at once, and whether the heal reflex may launch a heal at
+ * all.
  *
  * It sits beside the Claude connection rather than in a tab of its own because that is the
  * question it answers: this account's souls, or DeepSeek's. Every switch it writes is a file the
  * runner or the reflex's worker re-reads as it goes, so a flip here reaches the next phase — or the
  * next ending — with nothing restarted.
  *
- * The read, the write and the re-read live in `useDeepSeekFlashSwitch` and `useHealMasterSwitch` — one
- * hook per switch rather than one generalised switch, because switches sharing a module move together
- * the first time one of them is edited, and these must never. The third, `useHealModelSwitch`, is
- * drawn by `RunnerHealModelRow` below — its own file, because the row that asks WHICH MODEL a heal
- * runs on needs this card's heal poller and grew past what this file should hold.
+ * The read, the write and the re-read live in `useDeepSeekFlashSwitch` and `useHealMasterSwitch` —
+ * one hook per switch rather than one generalised switch, because switches sharing a module move
+ * together the first time one of them is edited, and these must never. The WIP defaults, the planner
+ * lanes, the park-at-peak switch, the Custom compaction switch and Dactyls for the main session each have a row of
+ * their own file (`RunnerWipDefaultsRow`, `RunnerPlannerLanesRow`, `RunnerParkAtPeakRow`, `RunnerCompactionRow` — drawn
+ * directly under the DeepSeek row, because it asks that row's question of a chat's compaction: which small model does
+ * a big model's chore — and `RunnerMainSessionDactylsRow`, drawn directly under that one, because it asks the same of
+ * a main session's edits) with a hook of its own, and the fourth heal switch, `useHealModelSwitch`, is drawn by `RunnerHealModelRow` — its own file, because
+ * the row that asks WHICH MODEL a heal runs on needs this card's heal poller and grew past what this file should hold.
  *
- * THE HEAL ROW WEARS THE HEAL PANEL'S OWN `HeartPulseIcon`, so one shape means one thing wherever it
+ * The heal row wears the heal panel's own `HeartPulseIcon`, so one shape means one thing wherever it
  * appears.
  */
 export default function RunnerModelContent() {
@@ -51,7 +59,7 @@ export default function RunnerModelContent() {
   const unknown = enabled === null;
 
   const healLabel = t('agents.runnerHeal.label', { defaultValue: 'Heal reflex' });
-  // The same rule for the row below, and the same pair of sentences. It bites hardest here: a reflex drawn
+  // The same rule again, and the same pair of sentences. It bites hardest here: a reflex drawn
   // off while it is launching is a reader told to stop looking for the switch that would stop it.
   const healUnknown = healEnabled === null;
 
@@ -94,8 +102,15 @@ export default function RunnerModelContent() {
           />
         )}
       </SettingRow>
+      <RunnerCompactionRow />
+      <RunnerMainSessionDactylsRow />
 
-      {/* HOW MANY PLANNERS RUN AT ONCE — its own file and its own hook, like the rows around it. */}
+      {/* THE WIP DEFAULTS — what every epic starts from: two steppers, features in progress and tasks
+          per feature, on the one shared ladder. Its own file and its own hook, like the rows around it. */}
+      <RunnerWipDefaultsRow />
+
+      {/* HOW MANY PLANNERS RUN AT ONCE — the WIP row's sibling for the other kind of worker; its own
+          file and its own hook, like the rows around it. */}
       <RunnerPlannerLanesRow />
 
       <RunnerParkAtPeakRow />
@@ -132,13 +147,13 @@ export default function RunnerModelContent() {
             checked={healEnabled === true}
             onChange={(next) => void setHealEnabled(next)}
             ariaLabel={healLabel}
-            // The same rule as the row above, for the same reason.
+            // The same rule as the two rows above, for the same reason.
             disabled={healEnabled === null}
           />
         )}
       </SettingRow>
 
-      {/* WHICH MODEL THE HEAL'S OWN SOULS RUN ON — its own file, beside this one: the third switch
+      {/* WHICH MODEL THE HEAL'S OWN SOULS RUN ON — its own file, beside this one: the fourth switch
           of the family, and the row that needs this card's one heal poller rather than a second
           reading of the worker's rule. */}
       <RunnerHealModelRow />

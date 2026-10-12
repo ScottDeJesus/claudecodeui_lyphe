@@ -509,6 +509,21 @@ export function normalizedToChatMessages(messages: NormalizedMessage[]): ChatMes
         });
         break;
 
+      // A custom compaction's one divider. Assistant-side with no content of its own, so the pane does
+      // not take it for the turn's closing reply and the summary row after it draws without a caption.
+      // Its `id` is what the live frame and the history row share, so a refresh replaces one with the other.
+      case 'compaction':
+        if (msg.compaction) {
+          converted.push({
+            type: 'assistant',
+            id: msg.id,
+            timestamp: msg.timestamp,
+            isCompactionMarker: true,
+            compaction: msg.compaction,
+          });
+        }
+        break;
+
       case 'stream_delta':
         if (msg.content) {
           converted.push({

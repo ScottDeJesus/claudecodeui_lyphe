@@ -1,10 +1,11 @@
 import { useBrowserUseEnabled } from '@/modules/browser-use';
+import { useCerberusNeeds } from '@/modules/cerberus';
 import { useDispatcherPlans } from '@/modules/dispatcher';
 import { useHeal } from '@/modules/heal';
 import { useMemoryIntake } from '@/modules/memory-intake';
 import { useTasksSettings } from '@/modules/task-master';
 import { useUiPreferences } from '@/shared/context/UiPreferencesContext';
-import type { AppTab } from '@/shared/types';
+import type { AppTab, Tone } from '@/shared/types';
 
 export type WorkspaceTabGates = {
   shouldShowTasksTab: boolean;
@@ -28,10 +29,14 @@ export type WorkspaceTabGates = {
    * this is above zero. Zero leaves the tab exactly as it was.
    */
   runnerWaiting: number;
+  /** What the drawn plans are doing (`useDispatcherPlans.tone`), the colour of the tab's dot: blue while anything runs, green only once all of it is finished. */
+  runnerTone: Tone | null;
   /** True while the Heal tab belongs on the bar — the same sticky, data-gated rule the Memory tab takes. */
   shouldShowHealTab: boolean;
   /** How much live friction the ledger holds, for the tab's count pill. */
   healCount: number;
+  /** How many checks need a person right now, for the Cerberus tab's count pill. Zero until the first read answers. The tab itself is never gated: it is on the bar whatever the fleet says. */
+  cerberusNeeds: number;
   /**
    * Always true. The Universe tab is GLOBAL — not per project or per session, exactly as the
    * kanban board is — so it is here whatever the workspace is pointed at and nothing can take it
@@ -81,13 +86,16 @@ export function useWorkspaceTabGates(activeTab: AppTab): WorkspaceTabGates {
   // hold. The pill counts the cards drawn, and `waiting` rides alongside as the tab's ATTENTION: the
   // asks those cards owe the operator, which the pill (a count of plans) cannot say. Neither gates
   // the tab: it is on the bar with an empty lane too.
-  const { count: runnerCount, waiting: runnerWaiting } = useDispatcherPlans();
+  const { count: runnerCount, waiting: runnerWaiting, tone: runnerTone } = useDispatcherPlans();
   // The live count off the Heal tab's own context — the one poll of the ledger, read here in the
   // sidebar, the main region and the palette as well as in the panel. Zero until a read has landed
   // AND while one is failing, so the pill and the gate can never disagree; an unreadable ledger is
   // not friction, and the tab is reachable all the same by pressing where it sat.
   const { summary } = useHeal();
   const healCount = summary?.live ?? 0;
+  // The fleet's count off Cerberus's own provider — the one read of the overview, shared with the tab's
+  // header, so the strip's pill and the tab's headline are the same number. Zero until a read has landed.
+  const cerberusNeeds = useCerberusNeeds();
 
   return {
     shouldShowTasksTab: Boolean(tasksEnabled && isTaskMasterInstalled),
@@ -99,8 +107,10 @@ export function useWorkspaceTabGates(activeTab: AppTab): WorkspaceTabGates {
     shouldShowRunnerTab: true,
     runnerCount,
     runnerWaiting,
+    runnerTone,
     shouldShowHealTab: healCount > 0 || activeTab === 'heal',
     healCount,
+    cerberusNeeds,
     // The literal true, never a reading: the Universe tab is global, the way the kanban board is.
     shouldShowUniverseTab: true,
     preferencesSettled,

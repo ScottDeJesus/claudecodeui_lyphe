@@ -11,7 +11,7 @@ import { cn, formatShortDate } from '@/shared/utils';
 
 // The milestone's moment, drawn over its scope, and the one line that says every moment in words.
 
-/** Where the burst is born: the reached station's centre, as fractions of the layer's own box, each clamped to [0, 1]. */
+/** Where the burst is born: the reached milestone's ring centre, as fractions of the layer's own box, each clamped to [0, 1]. */
 type BurstOrigin = { x: number; y: number };
 
 /** The reached milestone's size, the banner's figures: how many epics and features it took. */
@@ -60,7 +60,8 @@ const SCOPE_FRAME: Record<CelebrationLayerProps['scope'], ScopeFrame> = {
 
 /**
  * The milestone's timeline from the moment's arrival, in ms. The layer waits out `entrance` first, the
- * rail's own draw to the station (`animate-roadmap-draw`, 900 ms), invisible and inert; then it enters,
+ * tree's own draw of the connector from the goal to the milestone's ring (`animate-roadmap-draw`, 900 ms),
+ * invisible and inert; then it enters,
  * and holds until `entrance + hold`, when it leaves over 300 ms. The layer's own timers step through them.
  */
 const MILESTONE_TIMELINE = { entrance: 900, hold: 2200 } as const;
@@ -68,7 +69,7 @@ const MILESTONE_TIMELINE = { entrance: 900, hold: 2200 } as const;
 /** The entrance's wait on every animation it starts: the layer's fade, each particle's flight, the banner's rise. Timing data, inline. */
 const ENTRANCE_DELAY: CSSProperties = { animationDelay: `${MILESTONE_TIMELINE.entrance}ms` };
 
-/** Where the layer stands in that timeline: waiting out the path's travel, holding, or leaving. */
+/** Where the layer stands in that timeline: waiting out the connector's draw, holding, or leaving. */
 type LayerPhase = 'arriving' | 'holding' | 'leaving';
 
 /** What each phase does to the layer's paint: it fades as it leaves. */
@@ -120,66 +121,66 @@ const PARTICLES = Array.from({ length: 48 }, (_, index) => {
   };
 });
 
-/** Where the burst starts before a station has been measured: the middle, high, where a path usually lies. */
+/** Where the burst starts before a ring has been measured: the middle, high, where the milestones' rings usually lie. */
 const DEFAULT_ORIGIN: BurstOrigin = { x: 0.5, y: 0.2 };
 
-/** The reached milestone's station, found inside the layer's parent (the scope's own box), by the name the path puts on it. */
-function stationIn(layer: HTMLElement, name: string): HTMLElement | null {
+/** The reached milestone's node in the tree, found inside the layer's parent (the scope's own box), by the name the tree puts on it. */
+function milestoneNodeIn(layer: HTMLElement, name: string): HTMLElement | null {
   return layer.parentElement?.querySelector<HTMLElement>(`[data-roadmap-milestone="${CSS.escape(name)}"]`) ?? null;
 }
 
 /**
- * Where the burst is born: the centre of the reached station's DISC (the first child of its button is
- * the row the disc is centred in; the title and the line sit under it, so the button's own centre would
- * throw the burst from between the two), as fractions of the layer's box, each clamped to [0, 1]. A
- * station scrolled out of the box therefore bursts from the box's edge nearest it. `null` when the
- * station or the box cannot be measured, which leaves the origin where it was.
+ * Where the burst is born: the centre of the reached milestone's RING (the first child of its node is the
+ * ring's track circle; the eyebrow, the title and the line stand around it, so the node's own centre would
+ * throw the burst from beside the ring), as fractions of the layer's box, each clamped to [0, 1]. A ring
+ * scrolled out of the box therefore bursts from the box's edge nearest it. `null` when the node or the
+ * box cannot be measured, which leaves the origin where it was.
  */
 function measureOrigin(layer: HTMLElement, name: string): BurstOrigin | null {
-  const station = stationIn(layer, name);
+  const node = milestoneNodeIn(layer, name);
   const box = layer.getBoundingClientRect();
-  if (!station || box.width === 0 || box.height === 0) return null;
-  const disc = (station.firstElementChild ?? station).getBoundingClientRect();
+  if (!node || box.width === 0 || box.height === 0) return null;
+  const ring = (node.firstElementChild ?? node).getBoundingClientRect();
   const fraction = (position: number, start: number, size: number) => Math.min(1, Math.max(0, (position - start) / size));
   return {
-    x: fraction(disc.left + disc.width / 2, box.left, box.width),
-    y: fraction(disc.top + disc.height / 2, box.top, box.height),
+    x: fraction(ring.left + ring.width / 2, box.left, box.width),
+    y: fraction(ring.top + ring.height / 2, box.top, box.height),
   };
 }
 
 /**
  * When the moment goes (the hold's leave or a Skip) with focus inside the layer, hands focus on to the
- * reached station on the next frame, the one control the moment is about, so a keyboard reader never
+ * reached milestone's node on the next frame, the one control the moment is about, so a keyboard reader never
  * drops to `<body>`. Asked BEFORE the layer is removed, since the removal itself moves focus.
  */
 function handFocusOn(layer: HTMLElement, name: string): void {
   if (!layer.contains(layer.ownerDocument.activeElement)) return;
-  const station = stationIn(layer, name);
-  requestAnimationFrame(() => station?.focus());
+  const node = milestoneNodeIn(layer, name);
+  requestAnimationFrame(() => node?.focus());
 }
 
 /**
- * Used by `RoadmapPath` (the Roadmap tab's face, at `face` scope) and `RoadmapWidgetBody` (the chat
- * gutter's roadmap widget, at `frame` scope). Each hands it `useCelebrations`' `moment` and `skip` and
- * draws it as the LAST child of the `relative` box that frames its scope on screen, outside any scroll
- * container: the layer covers that box (`absolute inset-0`), centres its banner in what the reader
- * sees, and finds the reached station inside it.
+ * Used by `RoadmapTreeFace`, at `face` scope in viewport fit (the Roadmap tab and the widget at full
+ * screen) and at `frame` scope in column fit (the chat gutter's roadmap widget). It hands the layer
+ * `useCelebrations`' `moment` and `skip` and draws it as the LAST child of the `relative` box that frames
+ * its scope on screen, outside any scroll container: the layer covers that box (`absolute inset-0`),
+ * centres its banner in what the reader sees, and finds the reached milestone's node inside it.
  *
  * EVERY MOMENT IS SAID. The polite live line is always mounted, empty while nothing plays, so a screen
  * reader hears each moment of every level the instant its words land. A task, a feature or an epic
- * plays on its own row and card and draws nothing more here, with one exception: a feature moment that
- * stands for a run of features carries a `summary` ("6 features shipped while you were away"), and one
- * row sweeping says nothing of the other five, so that line is also drawn, as a pill at the top of the
+ * plays on its own dot or ring in the tree and draws nothing more here, with one exception: a feature
+ * moment that stands for a run of features carries a `summary` ("6 features shipped while you were away"),
+ * and one dot blooming says nothing of the other five, so that line is also drawn, as a pill at the top of the
  * scope, for as long as the moment holds.
  *
  * THE MILESTONE TAKES THE WHOLE SCOPE, the one moment bigger than its element, and it comes LAST. For
  * the timeline's first `entrance` (900 ms) the layer is invisible and inert, out of reach of pointer,
- * keyboard and assistive technology, so `MilestonePath`'s own part plays undimmed: the rail fills to the
- * station (`animate-roadmap-draw`, 900 ms) and the station blooms. Whatever of the path's motion runs
- * past `entrance` plays under the scrim. Then the scope dims under a `bg-background/70` scrim
- * (`vv-fade`, 250 ms, on the layer, so the banner fades with it), 48 particles burst from the reached
- * station's centre above the scrim (from the layer's edge nearest it, when the station is scrolled out
- * of view), and a centred banner rises over them. It holds until `entrance + hold` (3.1 s), then goes
+ * keyboard and assistive technology, so the tree's own part plays undimmed: the connector from the goal
+ * draws to the milestone's ring (`animate-roadmap-draw`, 900 ms) and the ring's last share draws and
+ * blooms. Whatever of that motion runs past `entrance` plays under the scrim. Then the scope dims under
+ * a `bg-background/70` scrim (`vv-fade`, 250 ms, on the layer, so the banner fades with it), 48 particles
+ * burst from the reached ring's centre above the scrim (from the layer's edge nearest it, when the ring
+ * is scrolled out of view), and a centred banner rises over them. It holds until `entrance + hold` (3.1 s), then goes
  * inert again as the banner dissolves (200 ms) inside the layer's own fade (300 ms). That is about 3.4 s
  * in all, so `useCelebrations` keeps a milestone moment up at least that long. A click anywhere on it,
  * its Skip, or Escape ends it early.
@@ -191,13 +192,13 @@ function handFocusOn(layer: HTMLElement, name: string): void {
 export function CelebrationLayer({ moment, onSkip, scope }: CelebrationLayerProps) {
   const { t } = useTranslation();
   const frame = SCOPE_FRAME[scope];
-  // The layer's own box: the reached station is found inside its parent and measured against it.
+  // The layer's own box: the reached milestone's node is found inside its parent and measured against it.
   const layerRef = useRef<HTMLDivElement>(null);
 
   const { selected } = useRoadmap();
 
-  // Where the burst starts, measured off the reached station: as each milestone moment arrives, before
-  // paint, and again as its entrance ends, since the face may still have been scrolling the station
+  // Where the burst starts, measured off the reached milestone's ring: as each milestone moment arrives, before
+  // paint, and again as its entrance ends, since the face may still have been scrolling the ring
   // into view when the moment arrived. A state because it is read off the DOM, which a render cannot do.
   const [origin, setOrigin] = useState<BurstOrigin>(DEFAULT_ORIGIN);
   // Where the layer stands in its timeline, which decides whether it can be reached and when it fades.
@@ -257,7 +258,7 @@ export function CelebrationLayer({ moment, onSkip, scope }: CelebrationLayerProp
     ? [
         tally ? t('roadmap.celebrate.epics', { count: tally.epics }) : '',
         tally ? t('roadmap.celebrate.features', { count: tally.features }) : '',
-        // The roadmap's one spelling of a day (`formatShortDate`), so the banner and the path name it alike; an unreadable stamp drops out.
+        // The roadmap's one spelling of a day (`formatShortDate`), so the banner and the milestone's panel name it alike; an unreadable stamp drops out.
         formatShortDate(moment.at) ?? '',
       ].filter(Boolean)
     : [];

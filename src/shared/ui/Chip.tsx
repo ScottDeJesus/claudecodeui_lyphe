@@ -45,9 +45,11 @@ type ChipProps = {
 
 /**
  * A pill that reads as one selectable token — a filter, a tag, a mode.
- * Used by settings (Phase 4) for the appearance and permission filters and by the chat
- * composer (Phase 6) for its model and permission tokens; both need the same pill and
- * neither should spell it a second time.
+ * Used by settings (Phase 4) for the appearance and permission filters, by the chat
+ * composer (Phase 6) for its model and permission tokens, by the cerberus module for Fleet's
+ * filters and the Mute dialog's durations, and by the agent-launch, git-panel, heal, jev,
+ * kanban, roadmap, sidebar and task-master modules; each needs the same pill and none should
+ * spell it a second time.
  *
  * With `onClick` it renders a real `<button>` so it is reachable by keyboard and announces
  * its pressed state; without one it is a `<span>`, because a static tag that takes focus

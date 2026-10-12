@@ -277,6 +277,16 @@ const COPY_BY_CODE = new Map<string, CodeCopy>([
     headline: 'Background agent finished',
     body: `${label}: a background task completed`,
   })],
+  // An automatic custom compaction (a turn's end past half the window, or the chat sitting idle) that
+  // did not take: nobody pressed Compact, so nobody is watching it fail. `meta.reason` is the verb's or
+  // the seed append's own sentence.
+  ['compaction.failed', ({ meta }) => {
+    const reason = readText(meta.reason);
+    return {
+      headline: 'Compaction failed',
+      body: `The ${meta.trigger === 'idle' ? 'idle' : 'end-of-turn'} compaction did not take${reason ? `: ${reason}` : ''}. The chat stays on its current session.`,
+    };
+  }],
   ['run.failed', ({ meta }) => ({
     headline: 'Session crashed',
     body: readText(meta.error) ?? 'The run encountered an error',

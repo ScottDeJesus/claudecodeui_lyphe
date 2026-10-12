@@ -6,8 +6,10 @@ type SpinnerProps = {
 
 /**
  * The house busy indicator: a ring that turns and drifts between accent and garnish.
- * Used by the file manager (Phase 8) while a directory listing or preview is in flight and
- * by the accounts module (Phase 13) while the account loads.
+ * Used by the file manager (Phase 8) while a directory listing or preview is in flight, by the
+ * cerberus module's Enroll dialog while it listens for a new node, and by the agent-launch,
+ * api-tab, chat, claude-updates, deepseek-spend, document-preview, git-panel, heal, jev, kanban,
+ * memory-intake, notes, roadmap, schedules, settings, shell and universe modules while a read is out.
  *
  * `role="status"` makes this a polite live region, so `label` is announced when the ring
  * appears — which is the point of passing one. The screen that owns the work still announces

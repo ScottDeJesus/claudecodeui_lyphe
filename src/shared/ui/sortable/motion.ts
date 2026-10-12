@@ -11,7 +11,10 @@
  * THE CARRIED ITEM IS BACKED WITH THE SURFACE IT STANDS ON (`surfaceBehind`). A card drawn on a
  * translucent ground (a deck is `bg-muted/40`) would show whatever it is carried over through itself,
  * two heads read at once; the item takes the colour of the ground it was lifted from, so it hides what
- * is beneath it and, over its own ground, looks exactly as it did.
+ * is beneath it and, over its own ground, looks exactly as it did. THE GROUND IS ONE OPAQUE COLOUR: a
+ * ground that is itself translucent (the sidebar is `bg-background/80`) is painted over the one under
+ * it, and so on up to the first that is not, so the backing is what the reader sees there and hides
+ * what it passes over completely.
  *
  * NOTHING SLIDES UNDER `prefers-reduced-motion`. The carried item still follows the pointer (that is
  * the carry, not a flourish), but every neighbour and the settling drop land where they land.
@@ -29,6 +32,13 @@ const SLIDE_EASING = 'cubic-bezier(.22,1,.36,1)';
 /** How near the pane's edge (px) a carry starts to scroll it, and the most it scrolls in one frame. */
 const EDGE_ZONE_PX = 56;
 const EDGE_MAX_STEP_PX = 22;
+
+/**
+ * How deep into an edge zone a pointer must be pulled, in zone depths (1 is the pane's own edge), for the
+ * edge a carry BEGAN in to let go of it: more than two zones' depth past the pane is a pull toward
+ * scrolling, which no reorder among the rows in view needs.
+ */
+const EDGE_HOLD_RELEASE_DEPTH = 3;
 
 const reducedMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
@@ -53,27 +63,72 @@ export function scrollerOf(element: Element): HTMLElement | null {
   return null;
 }
 
-/** How far the pane scrolls this frame for a pointer at `pointerY`: 0 away from its edges, up to a step near them, signed (negative is up). */
-export function edgeStep(scroller: HTMLElement, pointerY: number): number {
+/** How deep into an edge zone a pointer at `pointerY` is, in zone depths: 0 away from the edges, 1 at the pane's own edge, more past it; signed (negative is the top edge). */
+function edgeDepth(scroller: HTMLElement, pointerY: number): number {
   const box = scroller.getBoundingClientRect();
   const top = Math.max(box.top, 0) + EDGE_ZONE_PX;
   const bottom = Math.min(box.bottom, window.innerHeight) - EDGE_ZONE_PX;
-  const depth = pointerY < top ? (top - pointerY) / EDGE_ZONE_PX : pointerY > bottom ? (pointerY - bottom) / EDGE_ZONE_PX : 0;
+  if (pointerY < top) return -(top - pointerY) / EDGE_ZONE_PX;
+  return pointerY > bottom ? (pointerY - bottom) / EDGE_ZONE_PX : 0;
+}
+
+/** How far the pane scrolls this frame for a pointer at `pointerY`: 0 away from its edges, up to a step near them, signed (negative is up). */
+export function edgeStep(scroller: HTMLElement, pointerY: number): number {
+  const depth = edgeDepth(scroller, pointerY);
   if (depth === 0) return 0;
-  const step = Math.max(1, Math.round(EDGE_MAX_STEP_PX * Math.min(depth, 1)));
-  return pointerY < top ? -step : step;
+  return Math.sign(depth) * Math.max(1, Math.round(EDGE_MAX_STEP_PX * Math.min(Math.abs(depth), 1)));
+}
+
+/**
+ * The edge a carry still holds, for a pointer at `pointerY`: `held` (-1 the top zone, 1 the bottom, 0 none) while
+ * the pointer is in that zone, and 0 once it is out of it or pulled `EDGE_HOLD_RELEASE_DEPTH` zones into it. A carry
+ * begins holding the edge its first point is in (the sign of `edgeStep` there), so a row merely drawn in a zone does
+ * not run the pane, and a pointer carried far past the pane's edge — or out of the zone and back — does.
+ */
+export function edgeHoldAt(scroller: HTMLElement, pointerY: number, held: number): number {
+  const depth = edgeDepth(scroller, pointerY);
+  return Math.sign(depth) === held && Math.abs(depth) < EDGE_HOLD_RELEASE_DEPTH ? held : 0;
 }
 
 /** Whether a computed colour is wholly transparent: the keyword, `rgba(…, 0)`, or the `color(… / 0)` form `color-mix` computes to. */
 const isClear = (colour: string) => colour === 'transparent' || /^rgba\(.*,\s*0\)$/.test(colour) || /\/\s*0(?:\.0+)?\)$/.test(colour);
 
-/** The colour `element` stands on: the first ancestor background that is not clear, else the page's own. */
+/** A 1x1 canvas the computed colours are painted on, so the browser — not a colour parser written here — decides what a `color(srgb …)` or a `rgba(…)` is. */
+let swatch: CanvasRenderingContext2D | null = null;
+
+/** `layers` (CSS colours, outermost first) painted over one another on a clear swatch: the resulting 0-255 red, green, blue and alpha. */
+function composite(layers: readonly string[]): [number, number, number, number] {
+  if (swatch === null) {
+    const canvas = document.createElement('canvas');
+    canvas.width = 1;
+    canvas.height = 1;
+    swatch = canvas.getContext('2d', { willReadFrequently: true });
+  }
+  if (swatch === null) return [0, 0, 0, 0];
+  swatch.clearRect(0, 0, 1, 1);
+  for (const colour of layers) {
+    swatch.fillStyle = colour;
+    swatch.fillRect(0, 0, 1, 1);
+  }
+  const [red, green, blue, alpha] = swatch.getImageData(0, 0, 1, 1).data;
+  return [red, green, blue, alpha];
+}
+
+/**
+ * The colour `element` stands on, opaque: the grounds above it from the nearest outward, each painted over the one beyond
+ * it, up to the first that is wholly opaque; a ground that never gets there stands on the page's own.
+ */
 export function surfaceBehind(element: Element): string {
+  const layers: string[] = [];
   for (let node = element.parentElement; node !== null; node = node.parentElement) {
     const colour = getComputedStyle(node).backgroundColor;
-    if (!isClear(colour)) return colour;
+    if (isClear(colour)) continue;
+    layers.unshift(colour);
+    if (composite(layers)[3] === 255) break;
   }
-  return getComputedStyle(document.body).backgroundColor;
+  if (composite(layers)[3] !== 255) layers.unshift(getComputedStyle(document.body).backgroundColor);
+  const [red, green, blue] = composite(layers);
+  return `rgb(${red}, ${green}, ${blue})`;
 }
 
 /**

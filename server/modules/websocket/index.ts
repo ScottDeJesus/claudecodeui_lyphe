@@ -1,5 +1,8 @@
 export { WS_OPEN_STATE, connectedClients } from './services/websocket-state.service.js';
 export { createWebSocketServer } from './services/websocket-server.service.js';
+// Consumed by the cerberus module's `warden-link.ts`: every warden socket is pinged every 30 s and a
+// half-open one terminated, the same keep-alive the browser gateway's sockets get.
+export { attachWebSocketHeartbeat } from './services/websocket-server.service.js';
 export { chatRunRegistry } from './services/chat-run-registry.service.js';
 // Consumed by the providers module's sessions watcher, which announces the
 // sessions it (re)indexed from disk through the same builder the chat gateway

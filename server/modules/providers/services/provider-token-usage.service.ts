@@ -5,7 +5,7 @@ import path from 'node:path';
 
 import Database from 'better-sqlite3';
 
-import { sessionsDb } from '@/modules/database/index.js';
+import { sessionCompactionsDb, sessionsDb } from '@/modules/database/index.js';
 import type { AnyRecord } from '@/shared/types.js';
 import { AppError, getOpenCodeDatabasePath } from '@/shared/utils.js';
 
@@ -27,6 +27,8 @@ type ProviderTokenUsageServiceDependencies = {
   readTextFileTail: (filePath: string, maxBytes: number) => Promise<FileTail>;
   getClaudeContextWindow: () => string | undefined;
   isProviderSessionSuperseded: (providerSessionId: string, provider: string) => boolean;
+  /** The chat's newest compaction's `post_tokens`; null when the chat has no compaction or its count has not reported. */
+  readLatestCompactionPostTokens: (sessionId: string) => number | null;
 };
 
 type TokenUsageResult = {
@@ -69,6 +71,7 @@ const TOKEN_USAGE_TAIL_BYTES = 4 * 1024 * 1024;
 
 const defaultDependencies: ProviderTokenUsageServiceDependencies = {
   getSessionById: (sessionId) => sessionsDb.getSessionById(sessionId),
+  readLatestCompactionPostTokens: (sessionId) => sessionCompactionsDb.latestCompaction(sessionId)?.postTokens ?? null,
   getHomeDirectory: () => os.homedir(),
   getOpenCodeDatabasePath,
   fileExists: (filePath) => fsSync.existsSync(filePath),
@@ -267,6 +270,32 @@ export function summarizeClaudeTokenUsage(
       ? { sessionOutputTokens: sumClaudeSessionOutput(entries) }
       : {}),
     breakdown: { input: inputTokens, output: outputTokens },
+  };
+}
+
+/**
+ * The composer's token counter for a chat compacted onto a new session: the usage the transcript's
+ * own rows gave, or — when they hold none yet (`openingContextTokens` non-null) — the CLI's count of
+ * the session at the compaction's end, as `used` and as its input. A seed append has no reply, so
+ * until the next one the transcript has nothing to count; this is what both readers of the counter
+ * (the history page's `tokenUsage` and `getSessionTokenUsage`) answer meanwhile. Every other field
+ * of the usage it is handed is kept.
+ *
+ * Consumers: `claude-compacted-history.ts` (`stitchCompactedHistory`'s `openingContextTokens`, applied
+ * by `ClaudeSessionsProvider.fetchHistory`) and `getSessionTokenUsage` below.
+ */
+export function withOpeningContext<Usage extends { used: number; inputTokens: number; breakdown: { input: number; output: number } }>(
+  usage: Usage,
+  openingContextTokens: number | null,
+): Usage {
+  if (openingContextTokens === null) {
+    return usage;
+  }
+  return {
+    ...usage,
+    used: openingContextTokens,
+    inputTokens: openingContextTokens,
+    breakdown: { ...usage.breakdown, input: openingContextTokens },
   };
 }
 
@@ -553,9 +582,13 @@ export function createProviderTokenUsageService(
           holdsWholeTranscript = true;
         }
       }
-      return summarizeClaudeTokenUsage(entries, dependencies.getClaudeContextWindow(), {
+      const usage = summarizeClaudeTokenUsage(entries, dependencies.getClaudeContextWindow(), {
         transcriptIsComplete: holdsWholeTranscript,
       });
+      // A transcript with no usage at all is a compaction's seed append still waiting for its first
+      // reply (a tail with none is read whole above, so this is the whole file's answer): the chat's
+      // context is the CLI's own count at the compaction's end, the number the history page answers.
+      return withOpeningContext(usage, usage.used === 0 ? dependencies.readLatestCompactionPostTokens(sessionId) : null);
     },
   };
 }

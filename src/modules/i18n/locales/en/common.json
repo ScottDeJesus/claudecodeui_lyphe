@@ -32,6 +32,7 @@
     "universe": "Universe",
     "schedules": "Schedules",
     "notes": "Notes",
+    "cerberus": "Cerberus",
     "project": "This project",
     "house": "The house",
     "more": "More views"
@@ -364,6 +365,24 @@
       "noneBare": "None · the CLI’s own",
       "deepseek": "DeepSeek effort",
       "deepseekHint": "DeepSeek maps xhigh to high; only max raises it",
+      "dactyl": "Dactyls",
+      "dactylSwitch": "Dactyls for Hephaestus on Opus",
+      "dactylOn": "On: when Hephaestus launches on Opus he reads, decides and verifies, and every code edit is one dactyl’s — a child on the words below that sees only its brief and the one file. On any other model, on DeepSeek Flash, and for every other soul, the edits are made by hand. Takes effect on his next launch.",
+      "dactylWaiting": "Waiting: <why>{{why}}</why>. Hephaestus works as before until it can.",
+      "dactylReadinessUnread": "Whether this Claude Code can serve a dactyl could not be read.",
+      "dactylUnreadable": "The switch could not be read from the server, so its position is unknown — this is not the same as off. It is retried whenever this window regains focus.",
+      "dactylLoading": "Loading…",
+      "dactylModel": "Model",
+      "dactylEffort": "Effort",
+      "dactylModelLabel": "Dactyl model",
+      "dactylEffortLabel": "Dactyl effort",
+      "dactylHint": "A model id runs only once the installed Claude Code knows it; haiku is the CLI’s own alias and always runs. The same words serve Dactyls for the main session, on the Settings → Agents card",
+      "summarizer": "Summarizer",
+      "summarizerModel": "Model",
+      "summarizerEffort": "Effort",
+      "summarizerModelLabel": "Summarizer model",
+      "summarizerEffortLabel": "Summarizer effort",
+      "summarizerHint": "The model that writes a chat’s compaction while Custom compaction is on; a model id runs only once the installed Claude Code knows it, and the Custom compaction row in Settings → Agents says whether this one does",
       "saving": "Saving…",
       "notSaved": "not saved"
     },
@@ -875,9 +894,13 @@
       "waitingOnAnother": "waiting on another feature",
       "queued": "queued for its Start",
       "paused": "paused",
+      "stalled": "stalled — its run ended",
       "starting": "starting",
       "shipped": "shipped {{date}}",
       "shippedUndated": "shipped"
+    },
+    "facts": {
+      "withTime": "{{facts}} · {{time}}"
     },
     "stateLine": "{{word}} — {{phrase}}",
     "blocked": "Blocked: {{why}}",
@@ -894,9 +917,7 @@
       "reached": "Reached"
     },
     "roadmapWord": {
-      "noPath": "No path yet",
-      "onTheWay": "On the way",
-      "allReached": "Every milestone reached"
+      "noPath": "No path yet"
     },
     "standing": {
       "reached_one": "{{reached}} of {{count}} milestone reached",
@@ -912,15 +933,6 @@
       "waiting_one": "{{count}} waiting on you",
       "waiting_other": "{{count}} waiting on you"
     },
-    "rail": {
-      "label": "Waiting on you, in flight, next up and blocked",
-      "waiting": "Waiting on you",
-      "inFlight": "In flight",
-      "next": "Next up",
-      "blocked": "Blocked",
-      "more_one": "+{{count}} more",
-      "more_other": "+{{count}} more"
-    },
     "goal": {
       "missing": "Write where this roadmap leads",
       "showAll": "Show all"
@@ -929,7 +941,6 @@
       "none": "Start a roadmap",
       "noneMessage": "A roadmap is the path to a goal: the milestones on the way, the epics that make each one, and their features.",
       "noPath": "Draw the path: add the first milestone",
-      "nextMilestone": "Every milestone reached. Add the next one",
       "noEpics": "No epics yet"
     },
     "picker": {
@@ -951,26 +962,12 @@
       "delete": "Delete…",
       "actions": "Actions for {{title}}"
     },
-    "path": {
-      "label": "Milestones on the way to the goal",
-      "goalFlag": "Goal",
-      "station": "Milestone {{n}}: {{title}} — {{word}}",
-      "wordBlocked": "{{word}}, blocked",
-      "blocked": "Blocked",
-      "reachedOn": "reached {{date}}",
-      "features_one": "{{shipped}} of {{count}} feature",
-      "features_other": "{{shipped}} of {{count}} features"
-    },
     "milestone": {
       "eyebrow": "Milestone {{n}} · {{word}}"
-    },
-    "epic": {
-      "count": "{{shipped}} of {{count}} shipped"
     },
     "feature": {
       "waitingAccept": "Waiting on you: Accept",
       "waitingQuestions": "Waiting on you: answer its questions",
-      "answer": "Answer",
       "done": "Done",
       "tasks_one": "{{done}} of {{count}} task",
       "tasks_other": "{{done}} of {{count}} tasks"
@@ -1139,8 +1136,6 @@
       "shipped": "Shipped {{date}}"
     },
     "celebrate": {
-      "shipped": "Shipped",
-      "epicComplete": "Epic complete",
       "milestoneReached": "Milestone reached",
       "epics_one": "{{count}} epic",
       "epics_other": "{{count}} epics",
@@ -1170,13 +1165,39 @@
       "promote": "{{title}} sent to design"
     },
     "widget": {
-      "open": "Open the roadmap",
-      "more_one": "+{{count}} more",
-      "more_other": "+{{count}} more",
-      "focus_one": "Milestone {{n}} · {{title}} · {{complete}} of {{count}} epic complete",
-      "focus_other": "Milestone {{n}} · {{title}} · {{complete}} of {{count}} epics complete",
-      "focusWord": "Milestone {{n}} · {{title}} · {{word}}",
-      "quiet": "Nothing waiting on you, in flight or next up"
+      "open": "Open the roadmap"
+    },
+    "tree": {
+      "label": "The roadmap as a tree: its goal, milestones, epics and features",
+      "goal": "Goal",
+      "milestone": "Milestone {{n}}",
+      "milestoneLine_one": "{{shipped}} of {{count}} feature · {{word}}",
+      "milestoneLine_other": "{{shipped}} of {{count}} features · {{word}}",
+      "epicLine_one": "{{word}} · {{shipped}} of {{count}} shipped",
+      "epicLine_other": "{{word}} · {{shipped}} of {{count}} shipped",
+      "epics_one": "{{count}} epic · {{word}}",
+      "epics_other": "{{count}} epics · {{word}}",
+      "blocked": "Blocked",
+      "zoomIn": "Zoom in",
+      "zoomOut": "Zoom out",
+      "fit": "Fit to screen"
+    },
+    "panel": {
+      "label": "Details",
+      "hint": "Press the goal, a milestone, an epic or a feature dot: its details open here, below the tree, so nothing is covered.",
+      "roadmap": "Roadmap",
+      "epicLine": "Epic · Milestone {{n}} · {{word}}",
+      "featureLine": "Feature · {{epic}} · Milestone {{n}}",
+      "reachedOn": "Reached {{date}}",
+      "state": "State",
+      "tasks": "Tasks",
+      "tasksDone_one": "{{done}} of {{count}} done",
+      "tasksDone_other": "{{done}} of {{count}} done",
+      "noTasks": "None yet",
+      "project": "Project",
+      "noGoal": "No goal written yet",
+      "open": "Open",
+      "rowMeta": "{{word}} · {{done}}/{{count}}"
     }
   },
   "dispatcher": {
@@ -1196,17 +1217,22 @@
     "status": {
       "live": "LIVE",
       "paused": "PAUSED",
-      "stalled": "STALLED",
       "queued": "QUEUED",
       "scheduled": "SCHEDULED",
+      "stalled": "STALLED",
       "parked": "PARKED",
       "idle": "IDLE",
       "complete": "COMPLETE"
     },
     "phase": {
       "running": "running",
+      "stalled": "stalled",
       "done": "done",
       "notStarted": "not started"
+    },
+    "stalled": {
+      "dispatcher_down": "Nothing is running these tasks — the dispatcher is down. Resume starts it again.",
+      "ended_unrecorded": "These tasks' runs have ended and the dispatcher has not taken them up. Resume wakes it."
     },
     "settling": "settling",
     "events_one": "{{count}} event",
@@ -1245,7 +1271,12 @@
       "cache": "({{pct}}% cache)",
       "cacheTitle": "{{hit}} of the {{n}} tokens in were read from the prompt cache",
       "out": "{{n}} out",
-      "tokens": "{{n}} tokens"
+      "tokens": "{{n}} tokens",
+      "working": "{{time}} working",
+      "workingTitle": {
+        "feature": "How long agents have worked on this feature — planning, building, review and fixes, overlaps counted once, pauses not at all",
+        "epic": "How long agents have worked on this epic — its design, its cut, every feature and its judgment; features walking at the same time count once, pauses not at all"
+      }
     },
     "noStages": "No stage has launched for this task yet.",
     "arcPause": "Pause",
@@ -1256,6 +1287,12 @@
     "park": "Park",
     "unpark": "Unpark",
     "plannerResume": "Resume planner",
+    "acceptWhenCut": "Accept when cut",
+    "acceptWhenCutArmed": "Accepted · starts when cut",
+    "acceptWhenCutCancel": "Cancel",
+    "acceptWhenCutTitle": "Approve this design now; it starts by itself when its cut lands",
+    "acceptWhenCutRefused": "Accept when cut",
+    "acceptWhenCutArmedTitle": "Your press ({{by}}, {{at}}) — the first cut of the design you read is approved when it lands; a Rework disarms it",
     "delete": {
       "word": "Delete",
       "menu": "Delete feature…",
@@ -1275,7 +1312,7 @@
       "confirm": "Delete"
     },
     "waitsOn": "waits on {{names}}",
-    "wipHold": "Waiting for a WIP slot · {{reason}}",
+    "wipHold": "Waiting for a WIP slot · {{clause}}",
     "dismissDone": "Dismiss done · {{count}}",
     "plannersOut": "planners {{out}} of {{lanes}} out",
     "dismiss": "Dismiss feature",
@@ -1300,10 +1337,10 @@
       "live": "LIVE",
       "complete": "COMPLETE",
       "empty": "EMPTY",
-      "stalled": "STALLED",
       "queued": "QUEUED",
       "paused": "PAUSED",
-      "scheduled": "SCHEDULED"
+      "scheduled": "SCHEDULED",
+      "stalled": "STALLED"
     },
     "planner": {
       "soul": {
@@ -1320,6 +1357,27 @@
     "model": {
       "planLabel": "Model for this feature’s builders",
       "arcLabel": "Model for every feature of this epic"
+    },
+    "wip": {
+      "label": "WIP",
+      "groupLabel": "WIP limits for this epic",
+      "groupHint": "How much of this epic may run at once: how many of its features are in progress, and how many tasks each of them runs.",
+      "features": "Features",
+      "tasks": "Tasks",
+      "all": "All",
+      "default": "default",
+      "featuresLabel": "Most features of this epic in progress at once",
+      "featuresDown": "One feature fewer in progress",
+      "featuresUp": "One feature more in progress",
+      "featuresHint": "How many features of this epic are in progress at once. Step back to the Settings default to follow Settings again.",
+      "featuresHintDefault": "How many features of this epic are in progress at once. This is the Settings default; step to another number to give this epic its own, and back to it to follow Settings again.",
+      "tasksLabel": "Most tasks of each feature of this epic at once",
+      "tasksDown": "One task fewer at once",
+      "tasksUp": "One task more at once",
+      "tasksHint": "How many tasks each feature of this epic runs at once. Step back to the Settings default to follow Settings again.",
+      "tasksHintDefault": "How many tasks each feature of this epic runs at once. This is the Settings default; step to another number to give this epic its own, and back to it to follow Settings again.",
+      "refused": "WIP not set",
+      "done": "WIP set — the next take-up reads it"
     }
   },
   "navigation": {
@@ -1552,6 +1610,9 @@
     "zoomOut": "Zoom out",
     "fit": "Fit to screen"
   },
+  "timeline": {
+    "noDetail": "No further detail on file."
+  },
   "shapes": {
     "diagramFailed": "This diagram could not be drawn — showing its source.",
     "diagram": "Diagram",
@@ -1617,6 +1678,554 @@
     "card": { "edit": "Edit {{title}}", "delete": "Delete {{title}}" },
     "delete": { "title": "Delete this note?", "message": "\"{{title}}\" will be gone for good.", "confirm": "Delete", "cancel": "Keep it" },
     "toast": { "saveFailed": "That note could not be saved", "deleteFailed": "That note could not be deleted" }
+  },
+  "cerberus": {
+    "loading": "Loading Cerberus…",
+    "header": {
+      "eyebrow": "Cerberus · fleet health",
+      "headline": {
+        "quiet": "All",
+        "quietAccent": "quiet",
+        "needs_one": "One check",
+        "needs_other": "{{count}} checks",
+        "needsAccent_one": "needs you",
+        "needsAccent_other": "need you"
+      },
+      "summary": {
+        "of_one": "of {{count}} check passing",
+        "of_other": "of {{count}} checks passing",
+        "muted": "{{count}} muted",
+        "nodes_one": "{{count}} node",
+        "nodes_other": "{{count}} nodes",
+        "lastResult": "last result {{ago}}"
+      },
+      "live": "Live",
+      "reconnecting": "Reconnecting",
+      "enroll": "Enroll a node"
+    },
+    "status": {
+      "ok": "Passing",
+      "warn": "Close to the limit",
+      "failing": "Failing",
+      "denied": "Refused",
+      "not_enabled": "Not enabled",
+      "unknown": "No result",
+      "muted": "Muted",
+      "paused": "Paused for an update"
+    },
+    "fleet": {
+      "tabs": {
+        "fleet": "Fleet",
+        "history": "History",
+        "fleetHint": "Worst first · click a node to open it",
+        "historyHint": "Look up any check at any moment"
+      },
+      "layouts": {
+        "grid": "Grid",
+        "list": "List",
+        "rings": "Rings",
+        "label": "Fleet layout"
+      },
+      "filters": {
+        "all": "All",
+        "needs": "Needs you",
+        "unknown": "No result",
+        "muted": "Muted",
+        "updating": "Updating",
+        "empty": "Nothing assigned",
+        "label": "{{name}} · {{count}}",
+        "title": "Filter the fleet"
+      },
+      "searchPlaceholder": "Find a node or service",
+      "expandAll": "Expand all",
+      "collapseAll": "Collapse all",
+      "bar": {
+        "passing": "{{count}} passing",
+        "needs_one": "{{count}} needs you",
+        "needs_other": "{{count}} need you",
+        "unknown": "{{count}} no result",
+        "muted": "{{count}} muted",
+        "updating": "{{count}} updating",
+        "empty": "{{count}} with nothing assigned",
+        "emptyTip": "{{count}} nothing assigned"
+      },
+      "nodes_one": "{{count}} node · worst first",
+      "nodes_other": "{{count}} nodes · worst first",
+      "showing": "Showing {{shown}} of {{total}} · worst first",
+      "showMore": "Show {{count}} more",
+      "noMatch": "No node or service matches “{{query}}”.",
+      "noneInGroup": "No nodes in this group right now.",
+      "legend": {
+        "unknown": "No result — unknown",
+        "squares": "Squares are services · open a node for its last 30 minutes"
+      },
+      "rings": {
+        "hubSub": "Cerberus",
+        "hubTitle": "{{name}} · Cerberus",
+        "dotTip": "{{name}} · {{text}}",
+        "partial": "Rings show {{shown}} of {{total}}. The rest are in Grid.",
+        "note_one": "{{count}} node around center · problems sit on the inner ring",
+        "note_other": "{{count}} nodes around center · problems sit on the inner ring",
+        "legend": {
+          "title": "Every warden reports to center",
+          "body": "Each dot is a node; its line is the warden's connection. The worst nodes sit on the inner ring. Click any dot for its services.",
+          "needs": "Needs you · solid line",
+          "unknown": "No result · dashed line"
+        }
+      }
+    },
+    "needs": {
+      "title": "Needs you",
+      "count_one": "{{count}} check",
+      "count_other": "{{count}} checks",
+      "word": "· {{word}}",
+      "where": "{{service}} · {{node}} · since {{time}}",
+      "whereNoSince": "{{service}} · {{node}}",
+      "mute": "Mute",
+      "unmute": "Unmute",
+      "quiet": "Nothing needs you",
+      "quietPassing_one": "{{passing}} of {{count}} check passing.",
+      "quietPassing_other": "{{passing}} of {{count}} checks passing.",
+      "mutedTitle": "Muted · {{count}}",
+      "mutedItem": "{{label}} · {{service}}",
+      "mutedMeta": "Until {{time}} · {{left}} · {{reason}}"
+    },
+    "node": {
+      "hub": "Cerberus · this server",
+      "heard": "Warden {{version}} · heard {{ago}}",
+      "silent": "Warden {{version}} · silent since {{time}}",
+      "wardenRestarting": "Warden {{version}} · restarting",
+      "waiting": "Waiting for the first heartbeat",
+      "nothingAssigned": "Nothing assigned yet",
+      "restarting": "Warden restarting",
+      "updating": "Updating · {{step}}",
+      "updatingWarden": "Updating its warden",
+      "bad": "{{label}} — {{word}}",
+      "mutedCheck": "Passing · muted check",
+      "allPassing_one": "Its service is passing",
+      "allPassing_other": "All {{count}} services passing",
+      "squareTip": "{{label}} · {{text}}",
+      "moreSquares": "+{{count}}",
+      "emptyTitle": "Nothing to watch yet",
+      "emptyLead": "Nothing to watch yet.",
+      "emptyMessage": "Its warden is reporting. Assign a service to {{node}} and its checks show up here.",
+      "waitingTitle": "Waiting to hear from it",
+      "waitingLead": "Waiting to hear from it.",
+      "waitingMessage": "It shows up here as soon as its warden says hello.",
+      "sessions_one": "{{count}}\u00a0session\u00a0running\u00a0here",
+      "sessions_other": "{{count}}\u00a0sessions\u00a0running\u00a0here",
+      "projects": {
+        "title": "Projects that run here",
+        "titleAway": "Projects assigned here",
+        "awayNote": "{{node}} is no longer on this machine, so these projects' chats can't run there. Move each back to this server.",
+        "emptyLead": "Nothing runs here yet.",
+        "emptyMessage": "Pick a project below and its Claude chats run on {{node}}.",
+        "moveBack": "Move {{name}} back to this server",
+        "movingHere": "Moving here…",
+        "movingBack": "Moving back…",
+        "pick": "Run a project here",
+        "noChoices": "No other project to run here.",
+        "refusedLead": "{{name}} stays on this server.",
+        "refused": "{{node}} is not on this machine, so a project can't run there.",
+        "notReporting": "Messages in {{node}}'s projects are refused until its warden reports.",
+        "toast": {
+          "here": "{{name}} runs on {{node}} now",
+          "hereWaiting": "Its messages are refused until {{node}}'s warden reports.",
+          "back": "{{name}} runs on this server again"
+        }
+      }
+    },
+    "service": {
+      "oneBad": "{{label}} — {{word}}",
+      "needYou_one": "{{count}} check needs you",
+      "needYou_other": "{{count}} checks need you",
+      "someMuted": "{{passing}} of {{total}} passing · {{muted}} muted",
+      "noResult_one": "Its check has no result",
+      "noResult_other": "No result from its {{count}} checks",
+      "someNoResult": "{{passing}} of {{total}} passing · {{unknown}} no result",
+      "paused": "Paused while its warden restarts",
+      "allPassing_one": "Its check is passing",
+      "allPassing_other": "All {{count}} checks passing",
+      "cellTip": "{{time}} · {{word}}"
+    },
+    "activity": {
+      "title": "What happened",
+      "nothingYet": "Nothing has happened yet.",
+      "fix": {
+        "ranAuto": "Ran on its own: “{{name}}”",
+        "ranYou": "You ran “{{name}}”",
+        "finished": "“{{name}}” finished · {{result}}",
+        "succeeded": "Succeeded in {{count}} s",
+        "failed": "Failed",
+        "timedOut": "Timed out",
+        "refused": "The warden refused “{{name}}”"
+      },
+      "catalog": {
+        "added": "Added “{{name}}”",
+        "autoOn": "Auto-run on · “{{name}}”",
+        "autoOff": "Auto-run off · “{{name}}”"
+      },
+      "diagnosis": {
+        "asked": "You asked for a diagnosis",
+        "askedSummary": "{{label}} · read-only",
+        "ready": "Diagnosis ready",
+        "failed": "Diagnosis failed"
+      },
+      "warden": {
+        "started": "You started a warden update to {{to}}",
+        "startedSummary_one": "{{count}} node · one at a time",
+        "startedSummary_other": "{{count}} nodes · one at a time",
+        "updated": "Warden on {{node}} updated to {{to}}",
+        "updatedKept": "Warden on {{node}} updated to {{to}} · {{from}} kept for rollback",
+        "rolledBack": "Warden on {{node}} rolled back to {{from}}",
+        "rolledBackUnknown": "Warden on {{node}} rolled back",
+        "failed": "Warden on {{node}} could not update to {{to}}"
+      },
+      "source": {
+        "fix": "Fix",
+        "catalog": "Catalog",
+        "check": "Check",
+        "mute": "Mute",
+        "node": "Node",
+        "diagnosis": "Diagnosis",
+        "warden": "Warden"
+      },
+      "check": {
+        "ok": "{{label}} passes again",
+        "warn": "{{label}} is close to the limit",
+        "failing": "{{label}} is failing",
+        "unknown": "{{label}} has no result",
+        "other": "{{label}} is {{word}}"
+      },
+      "muted": "{{label}} muted until {{time}}",
+      "mutedTomorrow": "{{label}} muted until {{time}} tomorrow",
+      "lifted": "Mute lifted · {{label}}",
+      "expired": "It expired on its own",
+      "enrolled": "{{node}} enrolled",
+      "enrolledSummary": "Warden {{version}} said hello",
+      "meta": "{{service}} · {{node}}"
+    },
+    "sheet": {
+      "raw": "{{service}} · {{node}} · warden {{version}}",
+      "rawHub": "{{service}} · {{node}}",
+      "nameThis": "Name this check",
+      "save": "Save",
+      "cancel": "Cancel",
+      "mute": "Mute",
+      "unmute": "Unmute",
+      "muteNote": "Muted until {{time}} · {{reason}}",
+      "checked": "Checked {{time}} · every {{every}} · by the warden on {{node}}",
+      "checkedHub": "Checked {{time}} · every {{every}} · by Cerberus on this server",
+      "lastHour": "Last 60 minutes · click a minute",
+      "cellTip": "{{time}} · {{word}}",
+      "cellTipWorst": "{{time}} · {{word}} · {{check}}",
+      "cells": "Minutes, oldest to newest",
+      "recorded": "Recorded results · last 3 h",
+      "noChanges": "No change recorded in the last 3 h.",
+      "moreResults": "Show {{count}} more",
+      "checksOf": "Checks in {{service}}",
+      "rename": "Rename this check",
+      "clearsName": "Saved empty, it shows its key again.",
+      "notChecked": "No result yet · every {{every}} · by the warden on {{node}}",
+      "notCheckedHub": "No result yet · every {{every}} · by Cerberus on this server",
+      "loading": "Reading this check…",
+      "gone": "Cerberus no longer watches this check."
+    },
+    "lookup": {
+      "title": "Look up a moment",
+      "typeATime": "Type a time like 17:52:10.",
+      "was": "At {{time}} it was {{word}} — {{value}}.",
+      "wasNoValue": "At {{time}} it was {{word}}.",
+      "future": "That hasn't happened yet.",
+      "futureMeta": "Cerberus only knows what it has seen. The latest is {{time}}.",
+      "tooEarly": "No result recorded that early.",
+      "stale": "No result then — the last one was older than {{staleAfter}}.",
+      "unknownMeta": "Unknown — not the same as passing.",
+      "meta": "From the result recorded {{time}} by the warden on {{node}}",
+      "metaMuted": "From the result recorded {{time}} by the warden on {{node}} · muted then: {{reason}}",
+      "metaHub": "From the result recorded {{time}} by Cerberus on this server",
+      "metaHubMuted": "From the result recorded {{time}} by Cerberus on this server · muted then: {{reason}}"
+    },
+    "history": {
+      "eyebrow": "Look up a check",
+      "check": "Check",
+      "date": "Date",
+      "at": "At",
+      "atHelper": "Hours, minutes, seconds",
+      "option": "{{service}} · {{check}}",
+      "raw": "{{key}} · {{node}} · every {{every}}",
+      "since": "Everything since {{time}}",
+      "showEarlier": "Show earlier",
+      "optionOnNode": "{{service}} · {{check}} · {{node}}",
+      "choose": "Choose a check",
+      "readingChecks": "Reading the checks…",
+      "hour": "The hour up to {{time}} · click a minute",
+      "recorded": "Recorded results · 3 h up to {{time}}",
+      "noChanges": "No change recorded in the 3 h up to {{time}}.",
+      "lookingUp": "Looking it up…",
+      "chooseCheck": "Choose a check to look up.",
+      "pickADate": "Pick a date to look up.",
+      "goneMeta": "Choose another one above.",
+      "noChecks": "Nothing to look up yet.",
+      "noChecksMeta": "Checks appear here as soon as a node reports them.",
+      "everything": "Everything that happened",
+      "readingEvents": "Reading what happened…",
+      "empty": "Nothing has happened yet",
+      "emptyMessage": "Every change, mute and enrolment lands here as it happens.",
+      "readingEarlier": "Reading earlier events…",
+      "nothingEarlier": "Nothing earlier on record."
+    },
+    "catalog": {
+      "tab": "Catalog",
+      "tabHint": "Fixes Cerberus can offer, or run on its own",
+      "intro": "Each entry pairs a check with a fix. Cerberus offers it when the check fails. Entries set to run on their own do so within their limit, and every run's output is kept. Anything that reaches outside the fleet stays a step you take.",
+      "count_one": "{{count}} entry · {{auto}} run on their own",
+      "count_other": "{{count}} entries · {{auto}} run on their own",
+      "empty": "Nothing in the catalog yet.",
+      "new": "New · {{time}}",
+      "trigger": {
+        "failing": "fails · {{service}} on {{node}}",
+        "warn": "nears its limit · {{service}} on {{node}}"
+      },
+      "raw": "{{key}} · {{when}}",
+      "stats": {
+        "never": "Never run",
+        "allOk_one": "{{count}} run · all succeeded",
+        "allOk_other": "{{count}} runs · all succeeded",
+        "someOk_one": "{{count}} run · {{ok}} succeeded",
+        "someOk_other": "{{count}} runs · {{ok}} succeeded"
+      },
+      "origin": {
+        "written": "Written by you · {{date}}",
+        "diagnosis": "Promoted from a diagnosis · {{date}}",
+        "lastRun": "{{origin}} · last run {{time}}"
+      },
+      "auto": {
+        "label": "Auto-run · “{{name}}”",
+        "on_hour_one": "Runs on its own · at most {{count}} run an hour",
+        "on_hour_other": "Runs on its own · at most {{count}} runs an hour",
+        "on_day_one": "Runs on its own · at most {{count}} run a day",
+        "on_day_other": "Runs on its own · at most {{count}} runs a day",
+        "off": "Off · offered, you press it"
+      },
+      "runNow": "Run now",
+      "running": "Running…",
+      "blocked": "Another fix is running on this check"
+    },
+    "fix": {
+      "run": "Run “{{name}}”",
+      "command": "$ {{cmd}}",
+      "strip": {
+        "runningAuto": "Running on its own · {{name}}",
+        "running": "Running · {{name}}",
+        "finished": "{{name}} finished {{time}} · waiting for the next check",
+        "failed": "{{name}} finished {{time}} · Failed",
+        "failedExit": "{{name}} finished {{time}} · Failed · exit {{exit}}",
+        "timedOut": "{{name}} finished {{time}} · Timed out",
+        "refused": "The warden refused “{{name}}”"
+      },
+      "output": {
+        "title": "Fix output",
+        "ranAuto": "Ran on its own",
+        "ranYou": "You ran it",
+        "meta": "{{who}} · warden on {{node}} · started {{time}}",
+        "metaRefused": "{{who}} · warden on {{node}} · refused {{time}}",
+        "running": "Running",
+        "ok": "Succeeded",
+        "failed": "Failed",
+        "failedExit": "Failed · exit {{exit}}",
+        "timedOut": "Timed out",
+        "refused": "Refused",
+        "took": "took {{count}} s",
+        "elapsed": "{{count}} s",
+        "offset": "+{{seconds}}s"
+      },
+      "sheet": {
+        "title": "Fixes in the catalog",
+        "none": "No catalog fix covers this check yet.",
+        "offered": "Offered · you press it"
+      },
+      "headline": "One fix",
+      "headlineAccent": "running",
+      "quiet": "Fixes set to auto-run will run on their own and show up below.",
+      "fleet": {
+        "runningAuto": "Fix running on its own",
+        "running": "Fix running",
+        "legend": "Fix running or updating"
+      }
+    },
+    "diagnosis": {
+      "eyebrow": "Diagnosis · read-only",
+      "reading": "Reading…",
+      "ready": "Ready {{time}}",
+      "failed": "Failed",
+      "scope": "Read-only on {{node}}. It reads logs, status and Cerberus history. It can't run fixes or change files.",
+      "scopeHistory": "Read-only. It reads Cerberus history: {{node}}'s logs and status were not reachable.",
+      "steps_one": "{{count}} step · {{from}}",
+      "steps_other": "{{count}} steps · {{from}}–{{to}}",
+      "proposal": {
+        "title": "Proposed fix",
+        "runOnce": "Run it once",
+        "addToCatalog": "Add to catalog",
+        "running": "Running now — output below",
+        "ranOnce": "Ran once at {{time}} · {{result}} · the catalog is unchanged",
+        "result": {
+          "ok": "succeeded",
+          "failed": "failed",
+          "timedOut": "timed out"
+        },
+        "refused": "The warden refused it at {{time}} · the catalog is unchanged",
+        "expired": "Its one-off ran out at {{time}} · Diagnose again to run it once.",
+        "unpublished": "Its one-off never reached {{node}}'s warden · Diagnose again to run it once.",
+        "promotedOff": "In the catalog as “{{name}}” · auto-run off",
+        "promotedOn": "In the catalog as “{{name}}” · auto-run on",
+        "promotedRetired": "Added to the catalog as “{{name}}” · since retired",
+        "note": "Running it once leaves the catalog alone. Adding it lets Cerberus offer it next time.",
+        "noteAdd": "Adding it lets Cerberus offer it next time.",
+        "none": "No fix proposed."
+      },
+      "diagnose": "Diagnose",
+      "diagnosing": "Diagnosing…",
+      "see": "See diagnosis",
+      "again": "Diagnose again",
+      "hint": "Diagnose it — a good diagnosis can become one."
+    },
+    "promote": {
+      "title": "Add to the",
+      "accent": "catalog",
+      "from_one": "From the diagnosis at {{time}} · read-only · {{count}} piece of evidence",
+      "from_other": "From the diagnosis at {{time}} · read-only · {{count}} pieces of evidence",
+      "name": "Name",
+      "nameHelper": "What you'll see on the fix button.",
+      "when": "When",
+      "runs": "Runs",
+      "generalized": "The diagnosis used {{used}}. It's saved as “{{saved}}” so it works next time.",
+      "last": "the last {{window}}",
+      "exact": "Saved exactly as the diagnosis proposed it.",
+      "auto": "Run it on its own",
+      "autoOff": "Off — Cerberus offers it and you press it. You can turn it on later.",
+      "autoOn": "Runs on its own when the check fails, at most {{limit}}.",
+      "autoOn_warn": "Runs on its own when the check nears its limit, at most {{limit}}.",
+      "limit": "Limit",
+      "limitHelper": "It never runs more often than this, even if the check keeps failing.",
+      "perHour_one": "{{count}} run an hour",
+      "perHour_other": "{{count}} runs an hour",
+      "cancel": "Cancel",
+      "confirm": "Add to catalog",
+      "toast": {
+        "title": "Added to the catalog",
+        "messageOff": "{{name}} · auto-run off",
+        "messageOn": "{{name}} · auto-run on"
+      }
+    },
+    "mute": {
+      "title": "Mute",
+      "raw": "{{service}} · {{key}} · now {{value}}",
+      "rawNoValue": "{{service}} · {{key}}",
+      "intro": "It stops asking for you. The check keeps running and recording, and the mute lifts on its own.",
+      "forHowLong": "For how long",
+      "durations": {
+        "min15": "15 min",
+        "hour1": "1 hour",
+        "hours4": "4 hours",
+        "untilTime": "Until {{time}}"
+      },
+      "keepsRunning": "It keeps running and recording meanwhile — History shows everything.",
+      "why": "Why",
+      "reasonPlaceholder": "Expected while the failed imports are retried",
+      "reasonHelper": "Shown next to the mute until it lifts.",
+      "cancel": "Cancel",
+      "confirm": "Mute until {{time}}",
+      "toast": {
+        "title": "Muted until {{time}}",
+        "message": "{{label}} keeps running and recording."
+      }
+    },
+    "enroll": {
+      "title": "Enroll a",
+      "titleAccent": "node",
+      "steps": {
+        "name": "Name it",
+        "install": "Install",
+        "hello": "Say hello"
+      },
+      "intro": "A node is any machine with a warden on it. The warden runs checks there, reports to Cerberus on center, and runs fixes when asked.",
+      "name": "Name",
+      "nameHelper": "Lowercase letters, numbers and dashes. Shown on every check from this node.",
+      "nameEmpty": "Give it a name",
+      "nameTaken": "A node called {{name}} is already enrolled",
+      "desc": "What it is (optional)",
+      "descPlaceholder": "Office mini PC",
+      "descHelper": "Shown under the name in Fleet.",
+      "cancel": "Cancel",
+      "getCommand": "Get the install command",
+      "notListening": "Cerberus isn't listening for wardens, so a new machine would have nothing to reach.",
+      "run": "Run this on the machine as a user who can sudo. It installs the warden, which then says hello to Cerberus.",
+      "copy": "Copy",
+      "copied": "✓ Copied",
+      "expires": "The token works once and expires at {{time}}.",
+      "expired": "The token expired at {{time}}.",
+      "getNewCommand": "Get a new install command",
+      "listening": "Listening for {{name}}…",
+      "wait": {
+        "token": "Token issued",
+        "install": "Install ran on the machine",
+        "hello": "Warden said hello"
+      },
+      "helloLead": "It said",
+      "helloAccent": "hello",
+      "done": "{{name}} is enrolled · warden {{version}} · first heartbeat {{time}}",
+      "inFleet": "It's in Fleet now, with nothing on it yet. Checks appear as soon as a service is assigned to it.",
+      "finish": "Done"
+    },
+    "updates": {
+      "button": {
+        "update": "Update wardens to {{version}}",
+        "updating": "Updating wardens · {{index}} of {{total}}",
+        "upToDate": "Wardens up to date"
+      },
+      "title": "Update",
+      "titleAccent": "wardens",
+      "note": "Warden {{version}} · {{note}}. One node at a time; its checks pause for about 3 s while the warden restarts.",
+      "kept_one": "{{from}} is kept for rollback.",
+      "kept_other": "{{from}} are kept for rollback.",
+      "versions": "{{rest}} and {{last}}",
+      "node": "{{node}} · warden {{version}}",
+      "current": "Already on {{version}}",
+      "queued": "Waiting its turn",
+      "updated": "Updated",
+      "rolledBack": "Rolled back to {{from}}",
+      "cancel": "Cancel",
+      "start_one": "Update {{count}} node",
+      "start_other": "Update {{count}} nodes",
+      "running": "Closing this doesn't stop it.",
+      "close": "Close",
+      "done": "Every selected warden is on {{version}}.",
+      "missed_one": "{{count}} selected warden isn't on {{version}}.",
+      "missed_other": "{{count}} selected wardens aren't on {{version}}.",
+      "finish": "Done"
+    },
+    "time": {
+      "now": "now",
+      "justNow": "just now",
+      "secondsAgo": "{{count}} s ago",
+      "minutesAgo": "{{count}} min ago",
+      "hoursAgo": "{{count}} h ago",
+      "daysAgo": "{{count}} d ago",
+      "seconds": "{{count}} s",
+      "minutes": "{{count}} min",
+      "hours": "{{count}} h",
+      "minutesLeft": "{{count}} min left",
+      "hoursMinutesLeft": "{{hours}} h {{minutes}} min left",
+      "liftsAt": "Lifts on its own at {{time}}",
+      "liftsTomorrow": "Lifts on its own at {{time}} tomorrow"
+    },
+    "errors": {
+      "unreachable": "Cerberus can't be reached",
+      "retry": "Try again",
+      "lastAnswer": "Showing the last answer it gave.",
+      "writeFailed": "Cerberus didn't take that"
+    }
   },
   "applications": {
     "fabLabelMenu": "Open the menu",

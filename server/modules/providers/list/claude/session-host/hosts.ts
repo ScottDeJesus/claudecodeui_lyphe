@@ -1,46 +1,29 @@
 /**
- * The host registry: where a host's files live, which hosts are still alive, and how a host
- * that lost its claim on an app session is wound down.
+ * The API's host registry: its one instance of `createHostRegistry` (host-registry.js) over this
+ * machine's `cloudcli-sessions` tmux server, and the types this package reads a host through.
  *
- * Two rules this file exists to keep:
- * - Liveness is the tmux session, never the meta file. A meta says what a host believed when
- *   it last wrote; only tmux says whether anything is still running. Every ask carries a
- *   timeout so a wedged tmux server cannot block the API's event loop, and the boot path asks
- *   once for all hosts rather than once per host.
- * - Retiring a host goes through its socket, never a signal. `end_input` is the only thing
- *   that gives the CLI EOF (D-10), and a SIGTERM that skipped it would drop whatever the CLI
- *   was still writing.
+ * What the registry does — liveness is the tmux session and never the meta file; a host is retired
+ * through its socket and never a signal — and why lives in host-registry.js, which is plain
+ * JavaScript so a process other than the API can run the same code. This file fixes the three
+ * constants that make the instance THIS server's and re-exports each function under its
+ * TypeScript type, so the call sites in this package read as they always have.
  *
- * Package-internal: nothing here is re-exported from index.ts.
- * consumer: spawner.ts, readopt.ts
+ * Package-internal except `listLiveHosts` and `LiveHost`, which index.ts re-exports.
+ * consumer: spawner.ts, readopt.ts, idle-version-sweep.ts
  */
 
-import { execFileSync } from 'node:child_process';
-import fs from 'node:fs';
-import net from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
+
+import { createHostRegistry } from './host-registry.js';
 
 /** The tmux server that outlives the API. Its `_keepalive` session is what keeps it up. */
 export const TMUX_SOCKET_NAME = 'cloudcli-sessions';
 export const KEEPALIVE_SESSION = '_keepalive';
 
-const TMUX_TIMEOUT_MS = 3_000;
-// Long enough for a CLI to finish flushing what `end_input` let it write, short enough that a
-// boot does not carry a retired host for a minute.
-const RETIRE_KILL_DELAY_MS = 5_000;
-// The backstop for a host that never reports its `exit`: the retire socket is unref'd, so this
-// only decides when to stop listening for the frame, never when the boot may continue.
-const RETIRE_GIVE_UP_MS = 120_000;
-
 /** D-1: on disk, not tmpfs — a long turn's journal must not live in RAM. */
 export const sessionsDir =
   process.env.CLOUDCLI_SESSIONS_DIR || path.join(os.homedir(), '.cloudcli', 'sessions');
-
-export const hostSocketPath = (hostId: string): string => path.join(sessionsDir, `${hostId}.sock`);
-export const hostJournalPath = (hostId: string): string =>
-  path.join(sessionsDir, `${hostId}.ndjson`);
-export const hostMetaPath = (hostId: string): string => path.join(sessionsDir, `${hostId}.json`);
 
 export type HostMeta = {
   hostId: string;
@@ -87,307 +70,33 @@ export type LiveHost = {
 
 export type TmuxResult = { ok: boolean; stdout: string; error: string | null };
 
-/**
- * Every tmux call in this package. The timeout is the point: `execFileSync` with no timeout
- * against a wedged tmux server would block the whole API, and this runs on the spawn path.
- */
-export function tmuxCommand(args: string[]): TmuxResult {
-  try {
-    const stdout = execFileSync('tmux', ['-L', TMUX_SOCKET_NAME, ...args], {
-      encoding: 'utf8',
-      timeout: TMUX_TIMEOUT_MS,
-      stdio: ['ignore', 'pipe', 'pipe']
-    });
-    return { ok: true, stdout: stdout ?? '', error: null };
-  } catch (err) {
-    // A non-zero exit (no such session) and a killed-on-timeout tmux both land here; the
-    // caller only ever wants "did this work", plus a reason to log.
-    return { ok: false, stdout: '', error: err instanceof Error ? err.message : String(err) };
-  }
-}
+/** consumer: spawner.ts — `spawnHostSession` and `connectToHost` are the spawn path's own two steps. */
+export const registry = createHostRegistry({
+  tmuxSocketName: TMUX_SOCKET_NAME,
+  keepaliveSession: KEEPALIVE_SESSION,
+  sessionsDir
+});
 
-export function isTmuxSessionAlive(name: string): boolean {
-  return tmuxCommand(['has-session', '-t', name]).ok;
-}
-
+// Each name below is the registry's function under the type the rest of this package is written
+// against. The annotation is the drift guard: a registry whose JSDoc stops matching `HostMeta` or
+// `LiveHost` fails the typecheck here instead of at a call site.
+export const hostSocketPath: (hostId: string) => string = registry.hostSocketPath;
+export const hostJournalPath: (hostId: string) => string = registry.hostJournalPath;
+export const hostMetaPath: (hostId: string) => string = registry.hostMetaPath;
+export const tmuxCommand: (args: string[]) => TmuxResult = registry.tmuxCommand;
+export const isTmuxSessionAlive: (name: string) => boolean = registry.isTmuxSessionAlive;
 /** The unit's own session: its absence means the whole keepalive server is down. */
-export function isKeepaliveServerUp(): boolean {
-  return isTmuxSessionAlive(KEEPALIVE_SESSION);
-}
-
-/**
- * Every live session name in ONE call.
- *
- * The boot path (D-11) runs ahead of `server.listen`, so asking `has-session` per host id would
- * stall the whole boot by up to the tmux timeout PER stale id, with no ceiling on how many
- * there are.
- *
- * `null` means the question could not be answered, which is NOT the same as "nothing is alive":
- * both callers below decide nothing at all rather than act on an unanswered question.
- */
-export function liveSessionNames(): Set<string> | null {
-  const listed = tmuxCommand(['list-sessions', '-F', '#{session_name}']);
-  if (!listed.ok) return null;
-  return new Set(listed.stdout.split('\n').map((name) => name.trim()).filter(Boolean));
-}
-
-export function readHostMeta(hostId: string): HostMeta | null {
-  try {
-    const parsed: unknown = JSON.parse(fs.readFileSync(hostMetaPath(hostId), 'utf8'));
-    if (!parsed || typeof parsed !== 'object') return null;
-    return parsed as HostMeta;
-  } catch {
-    // Absent, half-written or not JSON: a host without a readable meta is a host we cannot
-    // re-adopt, and the sweep will collect its files once its tmux session is gone.
-    return null;
-  }
-}
-
-/** Every host id with a file under `sessionsDir`, including ones that never wrote a meta. */
-export function listHostIds(): string[] {
-  let entries: string[];
-  try {
-    entries = fs.readdirSync(sessionsDir);
-  } catch {
-    return [];
-  }
-  const ids = new Set<string>();
-  for (const name of entries) {
-    for (const suffix of ['.sock', '.ndjson', '.json']) {
-      if (name.endsWith(suffix)) ids.add(name.slice(0, -suffix.length));
-    }
-  }
-  return [...ids];
-}
-
-/** Hosts whose tmux session is still up and whose CLI has not exited. */
-export function listLiveHosts(): LiveHost[] {
-  const alive = liveSessionNames();
-  // Nothing can be re-adopted against an unanswered tmux; the next boot asks again.
-  if (!alive) return [];
-  const live: LiveHost[] = [];
-  for (const hostId of listHostIds()) {
-    const meta = readHostMeta(hostId);
-    if (!meta || meta.exited !== null || typeof meta.appSessionId !== 'string') continue;
-    if (!alive.has(hostId)) continue;
-    live.push({
-      hostId,
-      appSessionId: meta.appSessionId,
-      userId: meta.userId ?? null,
-      cwd: meta.cwd ?? null,
-      startedAt: typeof meta.startedAt === 'number' ? meta.startedAt : 0,
-      turnCompleteSent: meta.turnCompleteSent === true,
-      heldForBackgroundWork: meta.heldForBackgroundWork === true,
-      deferredTools: Array.isArray(meta.deferredTools)
-        ? meta.deferredTools.filter((id): id is string => typeof id === 'string')
-        : [],
-      profile: meta.profile && typeof meta.profile === 'object' ? meta.profile : null,
-      // Out of the journal, not the meta: what the CLI said about itself, at the one moment it said
-      // it. A host spawned before this field existed answers just the same.
-      cliVersion: lastReportedCliVersion(hostId),
-      cliPid: Number.isInteger(meta.pid) && (meta.pid as number) > 0 ? (meta.pid as number) : null
-    });
-  }
-  return live;
-}
-
-/** How far back, per read, the journal is scanned for what a boot wants out of its tail. */
-const JOURNAL_SCAN_CHUNK_BYTES = 256 * 1024;
-
-/**
- * Walks the journal's lines NEWEST first and stops at the first one `visit` claims.
- *
- * Backwards in chunks, so a multi-megabyte journal costs one chunk when the line wanted is at the
- * tail. Whether an answer is worth a deeper read is the caller's business, never this walk's.
- */
-function journalLineNewestFirst(hostId: string, visit: (raw: string) => boolean): boolean {
-  let fd: number;
-  try {
-    fd = fs.openSync(hostJournalPath(hostId), 'r');
-  } catch {
-    return false;
-  }
-  try {
-    let position = fs.fstatSync(fd).size;
-    let carry = '';
-    while (position > 0) {
-      const length = Math.min(JOURNAL_SCAN_CHUNK_BYTES, position);
-      position -= length;
-      const buffer = Buffer.alloc(length);
-      fs.readSync(fd, buffer, 0, length, position);
-      const lines = (buffer.toString('utf8') + carry).split('\n');
-      // The first piece may be the tail of a line that starts in the previous chunk.
-      carry = position > 0 ? (lines.shift() ?? '') : '';
-      for (let i = lines.length - 1; i >= 0; i -= 1) {
-        if (visit(lines[i])) return true;
-      }
-    }
-    return visit(carry);
-  } finally {
-    fs.closeSync(fd);
-  }
-}
-
-/**
- * When the host's CLI last ended a turn — the `at` of the newest `result` line in its journal — or
- * null when it never has.
- *
- * Re-adoption asks it to tell a turn whose end the previous server already recorded from one that
- * ended without a recorded completion (a follow-up turn a background task pushed): only the second
- * is news for the unread dot.
- */
-export function lastTurnFinishedAt(hostId: string): number | null {
-  let found: number | null = null;
-  journalLineNewestFirst(hostId, (raw) => {
-    found = readResultAt(raw);
-    return found !== null;
-  });
-  return found;
-}
-
-/**
- * The Claude CLI version the host's CLI announced at its own init — the newest such line in its
- * journal — or null when the journal holds none.
- *
- * The journal IS the run's own record of what its process said, written by the host as that line
- * passed through it, so a server that adopts this host later reads the version from the process it
- * is adopting rather than from the installed binary: those are two different processes, and the
- * second can be a newer build. That is the whole comparison — a live host on an older version is
- * retired at its next message (chat-process.ts, `planLiveChanges`).
- *
- * A version is a property of the PROCESS, not of a turn, so the newest such line answers for the
- * whole host — including a host that has run no turn since it was spawned, if its own start ever
- * printed one. Null is "not heard", which is never a reason to replace anything.
- */
-export function lastReportedCliVersion(hostId: string): string | null {
-  let version: string | null = null;
-  journalLineNewestFirst(hostId, (raw) => {
-    version = readInitVersion(raw);
-    return version !== null;
-  });
-  return version;
-}
-
-/** The `claude_code_version` of one journal entry when it is CLI output carrying an init, else null. */
-function readInitVersion(raw: string): string | null {
-  // Cheapest test first: almost every line is an assistant delta, and neither `JSON.parse` may run
-  // for it.
-  if (!raw.includes('claude_code_version')) return null;
-  try {
-    const entry = JSON.parse(raw) as { t?: unknown; line?: unknown };
-    if (entry.t !== 'out' || typeof entry.line !== 'string') return null;
-    const output = JSON.parse(entry.line) as { claude_code_version?: unknown };
-    return typeof output.claude_code_version === 'string' ? output.claude_code_version : null;
-  } catch {
-    return null;
-  }
-}
-
-/** The `at` of one journal entry when it is CLI output carrying a `result`, else null. */
-function readResultAt(raw: string): number | null {
-  if (!raw.includes('"t":"out"') || !raw.includes('result')) return null;
-  try {
-    const entry = JSON.parse(raw) as { t?: unknown; at?: unknown; line?: unknown };
-    if (entry.t !== 'out' || typeof entry.at !== 'number' || typeof entry.line !== 'string') return null;
-    const output = JSON.parse(entry.line) as { type?: unknown };
-    return output.type === 'result' ? entry.at : null;
-  } catch {
-    return null;
-  }
-}
-
-/** Removes the two files the attached adapter owns; the host unlinks its own socket. */
-export function removeHostJournal(hostId: string): void {
-  for (const target of [hostJournalPath(hostId), hostMetaPath(hostId)]) {
-    try {
-      fs.rmSync(target, { force: true });
-    } catch (err) {
-      console.warn(
-        `[keepalive] could not remove ${path.basename(target)}: ${err instanceof Error ? err.message : String(err)}`
-      );
-    }
-  }
-}
-
-/**
- * Winds one host down over its own socket: EOF first, then SIGTERM if the CLI is still there.
- * Fire-and-forget by design — a boot must not wait on a CLI it has already decided to drop.
- */
-export function retireHost(hostId: string): void {
-  const socket = net.connect(hostSocketPath(hostId));
-  // A host already gone needs no winding down, and its files are the sweep's business.
-  socket.on('error', () => {});
-  socket.once('connect', () => {
-    const send = (frame: Record<string, unknown>): void => {
-      if (socket.writable) socket.write(`${JSON.stringify(frame)}\n`);
-    };
-    // A cursor past the journal's end replays nothing: this connection exists to end the
-    // CLI's stdin, not to read a transcript no one is listening to.
-    send({ t: 'hello', fromSeq: Number.MAX_SAFE_INTEGER });
-    send({ t: 'end_input' });
-    // Whoever is attached when the `exit` frame lands owns the journal and the meta. On this
-    // path that is this socket; without it a retired host's files sit on disk until the NEXT
-    // boot's sweep. `hello` asked for no replay, so only a few short frames pass through here.
-    let tail = '';
-    socket.on('data', (chunk: Buffer) => {
-      tail = (tail + chunk.toString('utf8')).slice(-2_000);
-      if (!tail.includes('"t":"exit"')) return;
-      tail = '';
-      removeHostJournal(hostId);
-      socket.end();
-    });
-    const killTimer = setTimeout(() => send({ t: 'kill', signal: 'SIGTERM' }), RETIRE_KILL_DELAY_MS);
-    // The socket has to OUTLIVE the kill. Ending it with the kill (as this once did) loses the
-    // `exit` frame that licenses the cleanup above, because a CLI in the middle of a tool call
-    // takes far longer than the kill delay to actually go — measured 3 files left behind.
-    const giveUpTimer = setTimeout(() => socket.end(), RETIRE_GIVE_UP_MS);
-    // Neither the socket nor the timers may hold the API's event loop open.
-    killTimer.unref();
-    giveUpTimer.unref();
-    socket.once('close', () => {
-      clearTimeout(killTimer);
-      clearTimeout(giveUpTimer);
-    });
-  });
-  socket.unref();
-}
-
-/**
- * One live CLI per app session, decided the same way the provider's supersede branch decides
- * it at runtime: newest wins. Returns the keepers; retires everything older.
- */
-export function retireOlderHosts(hosts: LiveHost[]): LiveHost[] {
-  const newestPerSession = new Map<string, LiveHost>();
-  for (const host of hosts) {
-    const held = newestPerSession.get(host.appSessionId);
-    if (!held || host.startedAt > held.startedAt) newestPerSession.set(host.appSessionId, host);
-  }
-  const keepers = [...newestPerSession.values()];
-  const kept = new Set(keepers.map((host) => host.hostId));
-  for (const host of hosts) {
-    if (kept.has(host.hostId)) continue;
-    console.log(`[keepalive] retiring superseded host ${host.hostId}`);
-    retireHost(host.hostId);
-  }
-  return keepers;
-}
-
-/** Boot housekeeping: a host whose tmux session is gone owns nothing worth keeping. */
-export function sweepDeadHosts(): number {
-  const alive = liveSessionNames();
-  // Sweeping on an unanswered question would destroy a LIVE host's journal the one time the
-  // tmux server is merely wedged rather than gone.
-  if (!alive) return 0;
-  let swept = 0;
-  for (const hostId of listHostIds()) {
-    if (alive.has(hostId)) continue;
-    removeHostJournal(hostId);
-    try {
-      fs.rmSync(hostSocketPath(hostId), { force: true });
-    } catch {
-      // Already gone, or never existed; either way this host leaves nothing behind.
-    }
-    swept += 1;
-  }
-  return swept;
-}
+export const isKeepaliveServerUp: () => boolean = registry.isServerUp;
+export const liveSessionNames: () => Set<string> | null = registry.liveSessionNames;
+export const readHostMeta: (hostId: string) => HostMeta | null = registry.readHostMeta;
+export const listHostIds: () => string[] = registry.listHostIds;
+export const listLiveHosts: () => LiveHost[] = registry.listLiveHosts;
+export const lastTurnFinishedAt: (hostId: string) => number | null = registry.lastTurnFinishedAt;
+export const lastReportedCliVersion: (hostId: string) => string | null = registry.lastReportedCliVersion;
+export const removeHostJournal: (hostId: string) => void = registry.removeHostJournal;
+export const retireHost: (hostId: string) => void = registry.retireHost;
+export const retireOlderHosts: (
+  hosts: LiveHost[],
+  retire?: (hostId: string) => void
+) => LiveHost[] = registry.retireOlderHosts;
+export const sweepDeadHosts: () => number = registry.sweepDeadHosts;

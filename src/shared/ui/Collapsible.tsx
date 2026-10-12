@@ -1,19 +1,7 @@
 import * as React from 'react';
 
+import { CollapsibleContext, useCollapsible } from '@/shared/ui/collapsibleContext';
 import { cn } from '@/shared/utils';
-
-type CollapsibleContextValue = {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-};
-
-const CollapsibleContext = React.createContext<CollapsibleContextValue | null>(null);
-
-export function useCollapsible() {
-  const ctx = React.useContext(CollapsibleContext);
-  if (!ctx) throw new Error('Collapsible components must be used within <Collapsible>');
-  return ctx;
-}
 
 type CollapsibleProps = {
   defaultOpen?: boolean;

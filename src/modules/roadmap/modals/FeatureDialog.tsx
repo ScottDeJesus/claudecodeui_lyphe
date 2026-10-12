@@ -33,7 +33,7 @@ type Place = { feature: RoadmapFeature; epic: RoadmapEpic; milestone: RoadmapMil
 type FeatureDialogProps = {
   /** The feature's name: it is read off each new picture, so the dialog redraws from the store and closes once the feature is gone. */
   name: string;
-  /** Opens the feature's own card on the In flight face — `RoadmapPath`'s, which the tab supplies. */
+  /** Opens the feature's own card on the In flight face: `RoadmapTreeFace`'s, which is the tab's own where there is a tab and the `?runner=` landing where there is none. */
   onOpenCard: (plan: string) => void;
   onClose: () => void;
 };
@@ -80,8 +80,8 @@ function placeOf(picture: RoadmapPicture, name: string): Place | null {
  * frame, so what a follow-on hands back to already shows its write; a frame without the feature closes
  * this dialog, follow-on and all.
  *
- * Used by the roadmap module: the Roadmap face's dialog host opens it from a feature row (an epic's card,
- * the rail) and the chat gutter's roadmap widget from its rows.
+ * Used by the roadmap module: the roadmap face's dialog host (`RoadmapTreeFace`) opens it from a feature's
+ * panel (its Open), on the tab, at full screen and in the chat gutter's widget.
  */
 export function FeatureDialog({ name, onOpenCard, onClose }: FeatureDialogProps) {
   const { t } = useTranslation();

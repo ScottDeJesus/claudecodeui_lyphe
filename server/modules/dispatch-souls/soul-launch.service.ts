@@ -2,6 +2,7 @@ import path from 'node:path';
 
 import type { SoulLaunchSnapshot, SoulLaunchState } from '@/shared/types.js';
 
+import { isDispatcherWork, readDispatcherChainLaunchIds } from './dispatcher-work.service.js';
 import { listLaunchDirs, readLaunchFiles, type SoulLaunchFiles } from './soul-launch.transport.js';
 
 /**
@@ -143,11 +144,17 @@ function receiptTokens(
  * row that never finishes is worse than one that says it died.
  *
  * `now` is epoch SECONDS, like every timestamp the launcher's Python wrote with `time.time()`.
+ *
+ * `dispatcherChainLaunchIds` is the lane's one index of the launches the dispatcher's chains hold
+ * (`readDispatcherChainLaunchIds`), which settles `dispatcher_work` for a launch written before the
+ * mark existed. A caller that reads only a launch's state (`running-launchers.service.ts`) omits it
+ * and the flag then answers from the spec alone.
  */
 export function classifyLaunch(
   files: SoulLaunchFiles,
   now: number,
   keepS: number = DEFAULT_ENDED_KEEP_S,
+  dispatcherChainLaunchIds?: ReadonlySet<string>,
 ): SoulLaunchSnapshot | null {
   const { spec, result } = files;
   const startedAt = readNumberOrNull(field(spec, 'started_at'));
@@ -178,6 +185,10 @@ export function classifyLaunch(
     // it — a chain's later stages leave no receipt in any transcript. `null`, never `''`: an empty
     // stamp names nobody, and a client comparing ids must not be able to match it.
     launched_by: readString(field(spec, 'launched_by')) || null,
+    // Whether the launch is the dispatcher's own epic work rather than this stamp's chat's. The
+    // stamp is the chat an epic was started from, so it cannot say; the chat's live anchoring on
+    // the stamp skips a launch that does (`readStampedLaunchIds`).
+    dispatcher_work: isDispatcherWork(files.launchId, spec, dispatcherChainLaunchIds),
     role: readString(field(spec, 'role')),
     agent: readString(field(spec, 'agent')),
     // The task the soul was handed, as its brief's first line. `''` when it could not be read —
@@ -228,10 +239,14 @@ export function snapshotLaunches(
   onLaunchError?: (dir: string, message: string) => void,
 ): SoulLaunchSnapshot[] {
   const launches: SoulLaunchSnapshot[] = [];
+  // One pass over the dispatcher's chains for the whole walk, not one per launch. It reaches back as
+  // far as the launches do: a chain's directory is rewritten at each stage, so it is never older than
+  // the newest launch it holds.
+  const dispatcherChainLaunchIds = readDispatcherChainLaunchIds(stateDir, (now - keepS) * 1000);
   for (const name of listLaunchDirs(stateDir, (now - keepS) * 1000)) {
     const dir = path.join(stateDir, name);
     try {
-      const snapshot = classifyLaunch(readLaunchFiles(dir, name), now, keepS);
+      const snapshot = classifyLaunch(readLaunchFiles(dir, name), now, keepS, dispatcherChainLaunchIds);
       if (snapshot !== null) launches.push(snapshot);
     } catch (error) {
       // ONE unreadable launch never costs the others their reading — but it must not vanish in

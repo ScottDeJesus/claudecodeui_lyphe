@@ -1,5 +1,8 @@
 import { AppError } from '@/shared/utils.js';
 
+import { getCustomCompactionState, setCustomCompactionState } from './custom-compaction-switch.js';
+import { getDactylsState, setDactylsState } from './dactyls-switch.js';
+import { getMainSessionDactylsState, setMainSessionDactylsState } from './main-session-dactyls-switch.js';
 import { kickDispatcher } from './dispatcher-kick.js';
 import { JEV_SCOPES } from './jev-switches.js';
 import type { JevScopeKey, JevSwitches } from './jev-switches.js';
@@ -9,6 +12,7 @@ import { readHealCycle, writeHealCycle } from './heal-cycle-switch.js';
 import { readHealCap, readHealMaster, writeHealCap, writeHealMaster } from './heal-switch.js';
 import { getParkAtPeakState, setParkAtPeakState } from './park-at-peak-switch.js';
 import { getPlannerLanesState, setPlannerLanesState } from './planner-lanes.js';
+import { readWipDefaults, setWipDefaultsState } from './wip-defaults.js';
 
 /**
  * Every field a `PUT /jev` body may name — the master plus each scope in the table — for the two
@@ -222,6 +226,23 @@ export function createSettingsService(dependencies: SettingsDependencies) {
       return state;
     },
     /**
+     * The dispatcher's WIP defaults: how many of an epic's features are in progress at once, and how
+     * many tasks each of them runs at once, for every epic with no word of its own. Both bodies live in
+     * `wip-defaults.ts`, beside the file's own reader and writer, for the reason the planner-lane pair
+     * below does; what belongs here is the line that hands a press to the dispatcher.
+     */
+    async getWipDefaults() {
+      return readWipDefaults();
+    },
+    async setWipDefaults(featuresInput: unknown, tasksInput: unknown) {
+      const state = await setWipDefaultsState(featuresInput, tasksInput);
+      // The press is the event: a wider default frees phases the gate was holding, and they are taken
+      // up on the kick rather than at the next session event. A refused input has thrown by now and
+      // nothing was written, so no kick rides on a press that never moved the file.
+      void kickDispatcher();
+      return state;
+    },
+    /**
      * The dispatcher's park-at-peak switch: whether an Accept during DeepSeek's peak window queues
      * the plan and arms the hour it lifts, or walks now.
      *
@@ -239,6 +260,36 @@ export function createSettingsService(dependencies: SettingsDependencies) {
       // no kick rides on a press that never moved the file.
       void kickDispatcher();
       return state;
+    },
+    /**
+     * The plan runner's Dactyls switch. Bodies in `dactyls-switch.ts`, delegated verbatim as the pair
+     * above; no dispatcher kick, because nothing queues on this switch.
+     */
+    async getDactyls() {
+      return getDactylsState();
+    },
+    async setDactyls(enabledInput: unknown) {
+      return setDactylsState(enabledInput);
+    },
+    /**
+     * The Custom compaction switch. Bodies in `custom-compaction-switch.ts`, delegated verbatim as the
+     * pair above; no dispatcher kick, because nothing queues on this switch.
+     */
+    async getCustomCompaction() {
+      return getCustomCompactionState();
+    },
+    async setCustomCompaction(enabledInput: unknown) {
+      return setCustomCompactionState(enabledInput);
+    },
+    /**
+     * The Dactyls-for-the-main-session switch. Bodies in `main-session-dactyls-switch.ts`, delegated
+     * verbatim as the pairs above; no dispatcher kick, because nothing queues on this switch.
+     */
+    async getMainSessionDactyls() {
+      return getMainSessionDactylsState();
+    },
+    async setMainSessionDactyls(enabledInput: unknown) {
+      return setMainSessionDactylsState(enabledInput);
     },
     /**
      * The dispatcher's planner-lane dial: how many planners (designs, cuts, judgments) may be out at

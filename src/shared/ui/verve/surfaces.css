@@ -268,6 +268,41 @@ body.vv-drag-split .vv-split__divider::before {
  * adds these at the threshold and removes them in the capture phase of the release. */
 body.vv-dragging { -webkit-user-select: none; user-select: none; }
 body.vv-dragging iframe { pointer-events: none; }
+/* A handle that lifts on a touch hold (`usePointerDrag` with `holdMs` hands it `data-hold-lift`) is not to be
+ * answered by the platform's own long-press. An iPhone decides on its link menu and its selection loupe when
+ * a touch BEGINS and shows them at about half a second, with no `contextmenu` for the page to cancel, taking
+ * the touch away (`pointercancel`) just after the hold here lifts: the carry survived only for a finger that
+ * moved inside that gap. So this is the handle's state AT REST, from the first touch, never a style applied at
+ * the lift (too late). Touch screens only: a mouse keeps its selection and its link menu. A field inside stays
+ * typed into (an iPhone will not focus one set to `user-select: none`); a link or image inside must not begin
+ * a native drag. */
+@media (hover: none) and (pointer: coarse) {
+  [data-hold-lift],
+  [data-hold-lift] * { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
+  [data-hold-lift] :is(input, textarea, [contenteditable]:not([contenteditable='false'])) { -webkit-user-select: text; user-select: text; }
+  [data-hold-lift] :is(a, img) { -webkit-user-drag: none; }
+}
+/* A handle whose list scrolls its pane by hand (`usePointerDrag` with `scrollsPane` hands it `data-touch-pan`) is told
+ * the browser has no pan to take from it, from the first touch. A phone may dispatch every touch sequence as uncancelable
+ * (measured: `cancelable=false` from the `touchstart`), and then a lifted row cannot be held still by cancelling the pan
+ * — `touch-action` is the one lever the browser reads BEFORE the touch. The swipe that starts on the handle, or on a
+ * control inside it, is scrolled by `sortable/touchPan.ts` instead. Keyed on a coarse pointer being PRESENT
+ * (`any-pointer`), not on it being the primary one: a touch laptop reports a fine, hovering primary pointer and still has
+ * a finger, and `touch-action` does nothing to a mouse. A device with no touch screen is untouched. A marker of its own,
+ * never `data-hold-lift`: the runner, roadmap and dispatcher lists wear that one and keep their native scrolling. */
+@media (any-pointer: coarse) {
+  [data-touch-pan] { touch-action: none; }
+}
+/* The item in a hand (sortable/carried.ts marks it `data-carried`, and writes its place, ground and corners
+ * inline) is lifted OFF its list: `--shadow-lift`, the elevation Verve gives a lane card in the hand
+ * (board.css `--lifted`), and the hairline a Verve card is edged with (`--border-strong`) — the shadow alone is
+ * warm black at 13%, which a dark ground does not show, and the lift must read the moment it takes, before the
+ * finger has moved. That, and the item leaving its slot to follow the pointer, is the whole of the cue on a
+ * phone that cannot buzz. */
+[data-carried] { box-shadow: 0 0 0 1px var(--border-strong), var(--shadow-lift); }
+@media (forced-colors: active) {
+  [data-carried] { outline: 2px solid Highlight; }
+}
 /* The element's own cursor outranks the body's, so the held FAB is named as well as the body. */
 body.vv-drag-fab,
 body.vv-drag-fab .vv-fab { cursor: grabbing; }

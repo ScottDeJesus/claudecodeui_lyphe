@@ -1,9 +1,11 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { TFunction } from 'i18next';
 
 import { api } from '@/shared/api';
+import { projectNameHints } from '@/shared/projectNameHints';
 import { Button, ConfirmDialog, EmptyState } from '@/shared/ui';
 import { useAwaitingInputSessionIdSet, useBusySessionIdSet, useSubagentRunningSessionIdSet } from '@/shared/context/SessionProtectionContext';
+import { useSessionHostLiveSet } from '@/shared/context/SessionHostLivenessContext';
 import type { Project, ProjectSession, RecentConversationListItem, SessionWithProvider } from '@/shared/types';
 import { useSimpleChatList } from '@/modules/sidebar/hooks/useSimpleChatList';
 import { useSimpleChatProject } from '@/modules/sidebar/hooks/useSimpleChatProject';
@@ -61,6 +63,7 @@ export default function SidebarSimpleList({
   const busySessionIds = useBusySessionIdSet();
   const awaitingInputSessionIds = useAwaitingInputSessionIdSet();
   const subagentRunningSessionIds = useSubagentRunningSessionIdSet();
+  const liveHostSessionIds = useSessionHostLiveSet();
 
   const { items, hasMore, isLoading, hasError, reload, loadMore, patchLocal, patchFolderLocal, removeLocal, moveLocal } =
     useSimpleChatList(selectedSession?.id ?? null);
@@ -82,6 +85,9 @@ export default function SidebarSimpleList({
   } = useSimpleChatRemove({ onArchived: handleArchived });
 
   const effectiveProject = useSimpleChatProject(projects);
+  // Worked out over the whole project list, not per row, so a project reads the same here as in the
+  // new-chat picker and the session picker.
+  const projectHints = useMemo(() => projectNameHints(projects), [projects]);
 
   // Deliberately the ids, not the objects: a new selectedSession/selectedProject/effectiveProject
   // reference with the SAME id must not re-arm the effect below, or a parent re-render (not a
@@ -163,7 +169,7 @@ export default function SidebarSimpleList({
   } = useSimpleChatFolders({ items, reload, patchFolderLocal, moveLocal, t });
 
   // The carry, feeding the folder hook's own `move`: a drop and a "Move to folder…" are one write.
-  const { dragging, dropTarget, dragProps } = useSimpleChatDrag({ items, onMove: move });
+  const { dragging, dropTarget, dragProps, listRef } = useSimpleChatDrag({ items, onMove: move });
   // The tree's folders in drawn order: what the folder picker lists.
   const folders = items.flatMap((item) => (item.kind === 'folder' ? [item.folder] : []));
 
@@ -182,7 +188,7 @@ export default function SidebarSimpleList({
   );
 
   return (
-    <div data-testid="simple-chat-list" className="flex flex-col gap-2 px-2 py-2">
+    <div ref={listRef} data-testid="simple-chat-list" className="flex flex-col gap-2 px-2 py-2">
       {hasError && items.length === 0 ? (
         <div className="px-2 py-6 text-center text-sm text-muted-foreground">
           {t('recent.loadFailed', 'Could not load recent conversations')}
@@ -199,17 +205,15 @@ export default function SidebarSimpleList({
           {newFolderButton}
         </div>
       ) : (
-        <div
-          data-testid="simple-chat-list-rows"
-          // No text selection while a row is carried; the titles stay selectable at rest.
-          className={dragging !== null ? 'flex select-none flex-col gap-1' : 'flex flex-col gap-1'}
-        >
+        <div data-testid="simple-chat-list-rows" className="flex flex-col gap-1">
           <SidebarSimpleListItems
             items={items}
             selectedSessionId={selectedSessionId}
             busySessionIds={busySessionIds}
             awaitingInputSessionIds={awaitingInputSessionIds}
             subagentRunningSessionIds={subagentRunningSessionIds}
+            liveHostSessionIds={liveHostSessionIds}
+            projectNameHints={projectHints}
             failedSessionId={failedSessionId}
             freshFolderId={freshFolderId}
             onFreshShown={onFreshShown}

@@ -336,10 +336,10 @@ Module internals of the `/api/agent-launch` relay. Its contract (routes, bodies,
 | check | value |
 |---|---|
 | row name | `^[a-z][a-z0-9_]{0,63}$`; a shape, not a soul whitelist |
-| word (model, effort, model key) | `^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$`; a token fence, not the vocabulary — `-` first would read as a CLI flag |
+| word (`model`, `effort`, an `effort` map key, `deepseek_effort`, `dactyl_model`, `dactyl_effort`, `summarizer_model`, `summarizer_effort`) | `^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$`; a token fence, not the vocabulary — `-` first would read as a CLI flag; the dactyl's two and the summarizer's two have no `null` |
 | unknown body key | 400 |
 | `effort` map | at most 16 models (`EFFORT_MAP_MAX_ENTRIES`); more would overrun the OS argv limit; `{}` counts as no field |
-| no field named | 400 "name at least one of …" |
+| no field named | 400 "name at least one of …" (the defaults route's sentence lists all seven fields) |
 
 Which words the table accepts is the CLI's to say; its sentence reaches the caller.
 
@@ -361,7 +361,9 @@ An error thrown outside these branches goes to the app's error handler.
 ## shared types — `server/shared/types.ts`
 `AgentLaunchResult<T>` · `AgentLaunchResolved` · `AgentLaunchRowChange` · `AgentLaunchDefaultsChange`.
 
-The client mirror is `src/shared/agent-launch-types.ts`: the census key for key in the CLI's snake_case, plus `AgentLaunchRowChange` and `AgentLaunchDefaultsChange`.
+`AgentLaunchDefaultsChange` = `{model?, effort?, deepseek_effort?, dactyl_model?, dactyl_effort?, summarizer_model?, summarizer_effort?}`; the argv flags are `--dactyl-model` / `--dactyl-effort` and `--summarizer-model` / `--summarizer-effort`.
+
+The client mirror is `src/shared/agent-launch-types.ts`: the census key for key in the CLI's snake_case (`choices.dactyl_models`, `choices.summarizer_models`, `defaults.dactyl_model`, `defaults.dactyl_effort`, `defaults.summarizer_model`, `defaults.summarizer_effort` included), plus `AgentLaunchRowChange` and `AgentLaunchDefaultsChange`.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/agent-launch/agent-launch.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/agent-launch/agent-launch.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/agent-launch/agent-launch.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/agent-launch/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/agent-launch-types.ts
 
@@ -410,7 +412,7 @@ The measurers live in `.verify/lib/settings-rows-measure.mjs` (run inside the pa
 | Measures | text-column width; control over a label/description/icon line box (overlap); control past the row or pane edge (overflow); the column's ink past its own edge (spill); ANY text past its own column, in a row or not (overrun — the MCP URL); a switch-only row or a status pill below its text at a phone width (dropped); a pill set into a label's line below the words it follows; a control cut by the box that hides it (cut — its box leaves an `overflow: hidden` ancestor's or the pane's; a scroller passes): the plugin install form's button behind its input, the uninstall banner's Remove |
 | Provider strip | measured on the Agents tab at every walk and once more at 768 × 1.2×: no provider button clipped by an `overflow: hidden` ancestor, none truncated, the last one reachable when the strip scrolls |
 | Tab resize | opens Settings at 1440, picks a tab, crosses to 700, reads the tab and whether the pane node survived; then the same from a second tab back to 1440; then a phone turned to landscape and back (390×844 ↔ 844×390), the tab picked in portrait |
-| Stubs | swarm ON with no ceiling (`Unlimited`, the swarm row's widest state); TaskMaster installed; two installed plugins (the box has none; one with a 52-character name) — each answered locally, and the walk presses the first card's uninstall to draw its confirm banner, then Cancel; the box's user-scope MCP list gets a long-URL server and a long-stdio server (long command, args, env, cwd) added (a GET, answered from the real reply); every non-GET to preferences and settings is answered locally |
+| Stubs | the WIP defaults answered `all` and `all` (the row's widest state, both steppers reading `All`); TaskMaster installed; two installed plugins (the box has none; one with a 52-character name) — each answered locally, and the walk presses the first card's uninstall to draw its confirm banner, then Cancel; the box's user-scope MCP list gets a long-URL server and a long-stdio server (long command, args, env, cwd) added (a GET, answered from the real reply); every non-GET to preferences and settings is answered locally |
 | Verdict | last line `settings-rows=pass` (exit 0) or `settings-rows=fail` (exit 1); usage error exits 2 |
 | Baseline 2026-09-29, round 2 | before: plugin cards' text column 122–135px at 320 and the repo slug running out of it; MCP URLs 14–382px past their column at 320–390, 6px at 1440; the Connected badge below its text at 320; OpenCode clipped at 768 × 1.2; the open tab reset to Agents on every crossing of 768. After: 0 overlaps, 0 overflows, 0 overruns, 0 dropped switches or badges at 320/360/390 × 1.0/1.072, the plugin cards' column 246px at 320, the strip scrolls with every provider reachable, tab and pane kept across both crossings |
 | Not covered | the heal stepper value wrapping to two lines at 360 (no overlap) |
@@ -445,9 +447,9 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/mcp/McpServers.tsx, 
 - The viewer is a native modal `<dialog>`, portalled to the host window's `<body>` and opened by `showModal()` in a layout effect, in that document's TOP LAYER. No fixed layer (the PRD editor's `z-[200]`, Settings' `z-[9999]`, a later one) can cover it, and it carries no z-index. Anything that must sit above it has to be top-layer itself.
 - `showModal()` makes the page inert, focuses the close button and keeps Tab inside. Focus returns to the opener on close. The dialog's `cancel` is prevented: Esc is heard from the host window's capture phase, so closing never stops a run.
 - A `ResizeObserver` on the stage and the content re-clamps the pan on a window resize or a phone turning. It is built by the host window's constructor (`resizeObserverIn`, MAN-7451) and rebuilt on a move.
-- A `ctrl`+wheel delta is capped at 25px per event: a Ctrl+mouse-wheel notch lands near a plain one (about 1.28× against 1.25×), not 2.7×. A pinch, many small deltas, is unaffected.
+- A `ctrl`+wheel delta is capped at 25px per event: a Ctrl+mouse-wheel notch lands near a plain one (about 1.28× against 1.25×), not 2.7×. A pinch, many small deltas, is unaffected. The wheel's reading is `wheelZoomRatio` in `src/shared/utils.ts`, which the roadmap tree's zoom (MAN-7827) reads its `ctrl`+wheel through as well: one plain notch (deltaY −100) still gives 1.24608 here, then one `ctrl` notch 1.59999.
 - `useZoomPan` hears moves and releases on the HOST window (`useHostWindow()`, MAN-7443), never through pointer capture: capture retargets the `click` that ends a press, and the overlay needs the click's real target to tell the backdrop from the content.
-- Double-tap is two taps within 320ms and 32px; a touch screen sends no `dblclick`.
+- Double-tap is two taps within 320ms and 32px; a touch screen sends no `dblclick`. The button step, the double-tap zoom, the tap slop and these two numbers are `ZOOM_*` in `src/shared/constants.ts`, shared with the roadmap tree's zoom.
 - Controls carry `data-lightbox-control`; a capture handler records whether a press began on one (found with `isElementLike`, not `instanceof Element`), and the overlay's click ignores such a press.
 - The toolbar is centred with `inset-x-0 mx-auto w-fit`, never `-translate-x-1/2`: on a touch screen `src/index.css` gives a tapped `button` `transform: inherit !important`, so a button inside a translated parent jumps half its width between press and release and the click misses.
 - The same rule gives a tapped `[role="button"]` `background-color: inherit !important`: `MermaidDiagram`'s button carries no paint and the card is its child.
@@ -518,13 +520,13 @@ Returns `{ projectChoices, openProjectChat }` from `ProjectChatContext`, the inn
 
 | field | type | holds |
 |---|---|---|
-| `projectChoices` | `ProjectChoice[]` | every project a chat can be pointed at |
+| `projectChoices` | `ProjectChoice[]` | every project by name, gone-folder ones included (`isFolderMissing`); the new-chat picker leaves those out (MAN-8135) |
 | `openProjectChat` | `(projectPath: string \| null, mode: 'latest' \| 'new') => boolean` | the one door into a project's conversation |
 
-- `ProjectChoice` = `Pick<Project, 'projectId' \| 'displayName' \| 'fullPath'>` (`src/shared/types.ts`); memoised on a JSON key of `[projectId, displayName, fullPath]`, so a session upsert does not rebuild it.
+- `ProjectChoice` = `Pick<Project, 'projectId' \| 'displayName' \| 'fullPath' \| 'isFolderMissing'> & { nameHint: string \| null }` (`src/shared/types.ts`); memoised on a JSON key of `[projectId, displayName, fullPath, nameHint, isFolderMissing]` (`projectChoiceRows`), so a session upsert does not rebuild it. `nameHint` = `projectNameHints(state.projects)` over the whole list (MAN-8135).
 - Separate from `ProjectMainContext` so a reader of only these two is not woken by a selection change or a `projects` rebuild.
 - The value is memoised on the two fields and moves only when the choices do.
-- `ProjectsStateContext.tsx` is 297 lines: the next reader hook added there needs an extraction first.
+- `ProjectsStateContext.tsx` is 316 lines: the next reader hook added there needs an extraction first.
 - Readers: `ProjectWorkspaceShell` (`projectChoices`, handed to `AppSwitcherProvider`), `useChatDoor` (`openProjectChat(app.project, 'latest')`, once per visit of an application) and `FloatingChatHeader` (`openProjectChat(app.project ?? null, 'new')`).
 
 ## `openProjectChat(projectPath, mode)` — `src/modules/project-workspace/hooks/useOpenProjectChat.ts`
@@ -654,6 +656,7 @@ The kit's overlays and two shared hooks bind to `useHostWindow()` (MAN-7443), ne
 | unit | file | bound to `hostWindow` |
 | --- | --- | --- |
 | `Dialog` | `src/shared/ui/Dialog.tsx` | portal target `hostWindow.document.body`; Escape/Tab `keydown` on `hostWindow` capture; body scroll lock; focus trap and `activeElement`; autofocus frame |
+| `Sheet` | `src/shared/ui/Sheet.tsx` | portal target `hostWindow.document.body`; Escape/Tab `keydown` on `hostWindow` capture; focus trap and `activeElement`; autofocus and focus-return frames (`hostWindow.requestAnimationFrame`); no body scroll lock |
 | `Tooltip` | `src/shared/ui/Tooltip.tsx` | portal; show-delay timer; position frame; `resize`/`scroll`; outside-press on the host document |
 | `ActionMenu` | `src/shared/ui/ActionMenu.tsx` | portal; viewport clamp reads `hostWindow.innerWidth`/`innerHeight`; `resize`/`scroll`; Escape and outside press on the host document |
 | `Menu`, `Select` | `src/shared/ui/Menu.tsx`, `Select.tsx` | Escape and outside press on the host document |
@@ -679,7 +682,7 @@ Every unit above has `hostWindow` in the dependency list of each effect that bin
 - A `ResizeObserver` is built with `resizeObserverIn(hostWindow, …)` and `hostWindow` goes in the effect's dependencies. why: an observer delivers on the frame lifecycle of the window whose constructor built it. 2026-09-29, Chromium PiP: 6 resizes of a PiP element reached a PiP-built observer 6 times; an opener-built one got 0 until the opener drew a frame, and a hidden opener draws none.
 - The chat's `IntersectionObserver` (`useLazyRowObserver`) is built with the host window's constructor and rebuilt on a move (MAN-7452). An opener-built observer's delivery in a PiP window is unmeasured.
 - A timer keeps the window that armed it with its id (`Tooltip`'s `timeoutRef` = `{ id, armedOn }`) and is cleared on `armedOn`. why: a move between arm and clear otherwise clears the wrong window's timer.
-- `Dialog` binds Escape on the `hostWindow` capture phase, which runs before the chat's host-document capture listener (ChatInterface's Escape-stops-the-turn). why: closing a dialog never also stops the run; it marks the event first.
+- `Dialog` and `Sheet` bind Escape on the `hostWindow` capture phase, which runs before the chat's host-document capture listener (ChatInterface's Escape-stops-the-turn). why: closing either never also stops the run; it marks the event first.
 - `Dialog` restores focus on close (the trigger, else the element focused at open) only when `hostWindow.document.activeElement` is `null` or the body. why: the palette's Chat row closes it and floats the chat, whose composer takes focus in a layout effect before the dialog's passive restore; restoring over that undoes it. 2026-09-30: after the palette's Chat row, `document.activeElement` is the composer `TEXTAREA`, was the palette trigger `BUTTON`. An ordinary close drops focus to the body and still restores.
 - A hook that binds pointer state to a window clears that state in the cleanup that unbinds the listeners (`useZoomPan` calls `heldPointers.clear()`). why: a move re-runs the effect; a half-held gesture must not outlive its window.
 - A frame or timer spy in a probe keys on the kit callback's source (`FOCUSABLE_SELECTOR` for the `Dialog` frame, `setTooltipStyle` for the `Tooltip` frame). why: the opener draws frames constantly; a raw count is meaningless.
@@ -711,7 +714,7 @@ Every unit above has `hostWindow` in the dependency list of each effect that bin
 - Both exit 1 with the failed checks listed; neither sends a model turn or writes app data.
 - Sibling probes touched by the same change: `.verify/lightbox-zoom.mjs`, `.verify/export-menu-layer.mjs` (MAN-7426, INV-4356).
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/useDeviceSettings.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/useElapsed.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/ActionMenu.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Dialog.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Lightbox.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Menu.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Select.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Tabs.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Tooltip.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/useZoomPan.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/utils.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/host-window-home.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/host-window-kit.mjs
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/useDeviceSettings.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/useElapsed.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/ActionMenu.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Dialog.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Lightbox.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Menu.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Select.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Sheet.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Tabs.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Tooltip.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/useZoomPan.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/utils.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/host-window-home.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/host-window-kit.mjs
 
 ## MAN-7452 — Chat state layer follows the host window
 
@@ -789,7 +792,7 @@ The chat's state hooks bind timers, frames, listeners and observers to `useHostW
 
 - `PROBE_APP_URL` points the home probe at another client of the same API (a before-tree on its own port).
 - Both exit 1 with the failed checks listed. The move probe sends no model turn and writes no app data.
-- `.verify/lib/scratch-chat.mjs` is the shared helper for a probe that sends a real turn: `createScratchChat(session)` (in `PROBE_PROJECT`, `.verify/lib/probe-project.mjs`), `openScratchChatOnHaiku(session, id)` (picks Haiku in the composer's `MODEL_CHIP`; throws if the chip does not read Haiku, so no turn is sent), `sendTurn(page, text)`, `deleteScratchChat(session, id)`; constants `MODEL_CHIP`, `SCROLLER`, `COMPOSER`.
+- `.verify/lib/scratch-chat.mjs` is the shared helper for a probe that sends a real turn: `createScratchChat(session, projectPath?)` (default `PROBE_PROJECT`, `.verify/lib/probe-project.mjs`; a probe that needs a node-assigned project names a scratch project, and only `cerberus-eis-proof.mjs` may name the real `/opt/eis-app`, MAN-7924), `openScratchChatOnHaiku(session, id)` (opens `/session/<id>`, clicks the `Chat` tab when another workspace tab is selected, picks Haiku in the composer's `MODEL_CHIP`; throws if the chip does not read Haiku, so no turn is sent), `sendTurn(page, text)`, `deleteScratchChat(session, id)`; constants `MODEL_CHIP`, `SCROLLER`, `COMPOSER`.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useChatRealtimeHandlers.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useHostMoveScroll.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useLazyRowObserver.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useSessionPresence.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/utils/streamFlushTimer.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/chat-window-bindings-home.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/chat-window-bindings-move.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/scratch-chat.mjs
 
@@ -1007,7 +1010,7 @@ The floating chat's header switcher: a two-line trigger and a panel listing the 
 | `SidebarSessionPickerMenu.tsx` | default export, the view: `name`, `projectName`, `groups`, `status`, `currentSessionId`, `hasMore`, `onPick(row)`, `onNewChat`, `onLoadMore`. Draws trigger content, pinned New chat, states, groups, Show more |
 | `SidebarSessionPickerPopover.tsx` | default export, the mechanics: `trigger`, `triggerTitle`, `label`, `pinned`, `children` |
 | `SidebarSessionPickerRow.tsx` | default export, one conversation: `row`, `standalone`, `isCurrent`, `onPick` |
-| `utils/sessionPickerGroups.ts` | `groupsFromProjects(projects, marks, nameOf)`, `groupsFromSimpleList(rows, marks)` |
+| `utils/sessionPickerGroups.ts` | `groupsFromProjects(projects, marks, nameOf)`, `groupsFromSimpleList(rows, marks, projectNameHints)` |
 | `utils/projectStarOverrides.ts` | the reader's toggled stars, shared with the sidebar controller: `useProjectStarOverrides()`, `withResolvedStarState(projects, overrides)` (MAN-7507) |
 | `utils/sidebarProjectFormatting.ts` | exports `getSessionName(session: ProjectSession, t)`: summary, else name, else `projects.newSession`; `sortProjects(projects, order)` |
 
@@ -1017,18 +1020,18 @@ Types in `src/shared/types.ts`, group `SIDEBAR`: `SessionPickerStatus` (`'ready'
 
 | shape | blocks | row |
 | --- | --- | --- |
-| simple list (`groupsFromSimpleList`) | one, key `simple-list`, `heading: null`, feed order kept | `standalone`: icon (`SimpleChatIconGlyph`), 13px title, 10px project line; `unread` from the feed |
-| project tree (`groupsFromProjects`) | one per project in the order handed in, `key` = `projectId`, `heading` = `displayName \|\| projectId` | one line; `projectName`, `icon` null, `unread` false; sessions from `getAllSessions(project)`, newest first |
+| simple list (`groupsFromSimpleList`) | one, key `simple-list`, `heading: null`, feed order kept | `standalone`: icon (`SimpleChatIconGlyph`), 13px title, 10px project line, then `· <projectNameHint>` when the project's name is shared (MAN-8135); `unread` from the feed |
+| project tree (`groupsFromProjects`) | one per project in the order handed in, `key` = `projectId`, `heading` = `displayName \|\| projectId` | one line; `projectName` and `projectNameHint` null, `icon` null, `unread` false; sessions from `getAllSessions(project)`, newest first |
 
 - A project with no sessions stays a block: `projects.noConversations` under its heading. why: a missing project reads as not there.
 - Headings are `sticky top-0 bg-card`; New chat is pinned outside the scrolling list.
-- `nameOf` is passed in; the file holds no copy of the naming rule.
+- `nameOf` and `projectNameHints` are passed in; the file holds no copy of either rule.
 
 ## Data — `useSessionPicker`
 
 | when | do |
 | --- | --- |
-| `useSimpleChatListPreferences().enabled` | groups = `groupsFromSimpleList(list.rows, marks)`; `list` = `useSimpleChatList(selectedSessionId, enabled)`, whose `rows` is `flattenChats(items)` — every chat of the feed's tree, a folder's chats in its place (MAN-7524) |
+| `useSimpleChatListPreferences().enabled` | groups = `groupsFromSimpleList(list.rows, marks, projectHints)`; `projectHints` = `projectNameHints(projects)` over the whole `projects` list; `list` = `useSimpleChatList(selectedSessionId, enabled)`, whose `rows` is `flattenChats(items)` — every chat of the feed's tree, a folder's chats in its place (MAN-7524) |
 | preference off | groups = `groupsFromProjects(sortProjects(withResolvedStarState(projects, starOverrides), sortOrder), marks, nameOf)`; `starOverrides` = `useProjectStarOverrides()`; `sortOrder` = `useSyncExternalStore(subscribeToUserPreferences, readProjectSortOrder)`, so it follows the preference live |
 | marks | `useBusySessionIdSet`, `useAwaitingInputSessionIdSet`, `useSubagentRunningSessionIdSet` |
 | `status` | simple list with no rows: `list.hasError` → `'error'`, else `list.isLoading` → `'loading'`; otherwise `'ready'`, always `'ready'` in the tree. why: `reload` sets `isLoading` on every `session_upserted` and `simple_list_changed`; mapping it straight would blank the drawn list for a skeleton each time |
@@ -1327,7 +1330,7 @@ Rules of the picker's view: the panel's mechanics and the trigger and row it dra
 6. The open conversation: `aria-current="true"`, `bg-primary/10`, `font-medium` and a `Check` tick, so it survives greyscale.
 7. States, each with New chat still pinned: loading (three `vv-skeleton` rows in `role="status"`, `chatHost.pickerLoading`); error (`Banner tone="warn"`, `chatHost.pickerError`); no groups, or the simple list's one empty block (paragraph `chatHost.pickerEmpty`).
 8. Show more (`simpleList.loadMore`, "Show more") draws only when `status === 'ready'`, the list is not empty and `hasMore`; it calls `onLoadMore` and keeps the panel open.
-9. Selectors: `[data-picker-item]`, `role="group"`; `[role="menu"]` and `[role="menuitem"]` select nothing. Test ids: `session-picker-trigger`, `-panel`, `-new`, `-row` (with `data-session-id`), `-flat`, `-project`, `-project-empty`, `-empty`, `-load-more`.
+9. Selectors: `[data-picker-item]`, `role="group"`; `[role="menu"]` and `[role="menuitem"]` select nothing. Test ids: `session-picker-trigger`, `-panel`, `-new`, `-row` (with `data-session-id`), `-flat`, `-project`, `-project-hint`, `-project-empty`, `-empty`, `-load-more`.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/SidebarSessionPickerMenu.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/SidebarSessionPickerPopover.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/SidebarSessionPickerRow.tsx
 
@@ -1529,9 +1532,10 @@ Draws the tree as a fragment inside `SidebarSimpleList`'s `simple-chat-list-rows
 | `items` | `SimpleListItem[]`, server order |
 | `selectedSessionId`, `failedSessionId`, `freshFolderId` | `string \| null` each |
 | `busySessionIds`, `awaitingInputSessionIds`, `subagentRunningSessionIds` | `ReadonlySet<string>` |
+| `liveHostSessionIds` | `ReadonlySet<string> \| null` — the chats whose CLI has a live session host, from `useSessionHostLiveSet` (pushed on change, never polled); `null` until the server's first snapshot |
 | `dragging` | `SimpleListItemRef \| null` |
 | `dropTarget` | `SimpleListDropTarget \| null` |
-| `dragProps(ref)` | the carry's pointer props for one row; chat rows and folder headers both spread it; `useSimpleChatDrag` returns it (MAN-7525) |
+| `dragProps` | one object of the carry's pointer props, the same for every row; chat rows and folder headers both spread it; `useSimpleChatDrag` returns it and `SidebarSimpleListItems` takes it as given (MAN-7525) |
 | `onSelectChat`, `onArchiveChat`, `onDeleteChat`, `onChooseIcon` | `(chat) => void` |
 | `onRenameChat(sessionId, title)` | |
 | `onMoveToFolder` | `((chat) => void) \| null`; `null` = no "Move to folder…" entry on any row |
@@ -1541,12 +1545,17 @@ Draws the tree as a fragment inside `SidebarSimpleList`'s `simple-chat-list-rows
 - One `data-testid="simple-chat-block"` per top-level item, `relative flex flex-col gap-1`, carrying `data-item-kind` (`chat` \| `folder`) and `data-item-id`. The block, not the row, carries them: a carried folder lands beside a block.
 - A folder's block = header + its chats' rows (`isNested` true), the rows only while `!folder.collapsed`; a folded folder mounts no chat row.
 - The folder's dot = `folderDot(folder.chats.map(chatMarks))` (MAN-7522).
+- A chat row's `isAsleep` = `liveHostSessionIds !== null && chat.provider === 'claude' && !liveHostSessionIds.has(chat.sessionId)`: only a Claude chat has a host to lack, and nothing is grayed while the set is unknown. `SidebarSimpleListRow` draws it as `data-asleep="true"`, the title in `text-muted-foreground` (`text-secondary-foreground` while selected, where muted reads under AA on the selected wash), the glyph in `text-ink-faint` (muted while selected) and the hover title `simpleList.asleep` on the row's link. A state, not a mark: the row opens and takes a message as before, and the next message starts a host. Which chats are asleep and why: session-host MAN-695, "Which chats have a live host".
 - `holdsSelected` = folder folded and one of its chats is the open chat.
 - Rhythm is uniform on purpose: a folder's chats sit `gap-1` from the header, the same air as between blocks; the indent carries the grouping. The block's `gap-1` is the one knob.
-- Fade: a carried chat fades as its own row; a carried folder fades as its whole block (`opacity-50`).
+- Lift: a carried chat is lifted as its own row, a carried folder as its whole block, by the kit's carry (`shared/ui/sortable/carried.ts`; MAN-8139); neither fades. Every landing mark (the row and block lines, the folder ring, the end line) is `z-40`, one step over the carried item's 30, so the row drawn under the finger never hides it.
 - `simple-chat-drop-end` (`h-0.5` accent line) is drawn whenever `dropTarget.at === 'end'`.
 
-### Drop marks
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/SidebarSimpleFolderPicker.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/SidebarSimpleFolderRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/SidebarSimpleListItems.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/SidebarSimpleListRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/SidebarSimpleList.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-simple-folders.mjs
+
+## MAN-8123 — The simple list's folder scaffold — `SidebarSimpleListItems` — Drop marks
+section: The simple list's folder scaffold — `SidebarSimpleListItems`, `SidebarSimpleFolderRow`, `SidebarSimpleFolderPicker`/001 Drop marks
+
 | Carried | `dropTarget` | Mark, on |
 | --- | --- | --- |
 | chat | `row`, a chat | `dropEdge` = that edge, on that chat's row |
@@ -1563,17 +1572,17 @@ The header. Props: `folder`, `dot`, `holdsSelected`, `isFresh`, `onFreshShown`, 
 | --- | --- |
 | root | `data-testid="simple-chat-folder"`, `data-folder-id`, `data-collapsed` (`'true' \| 'false'`), `data-dragging`; spreads `dragProps` |
 | height | compact sidebar: `min-h-11`; otherwise `py-2` (the chat row's rule) |
-| glyph | `Folder` icon in a `data-drag-handle` span: the touch carry waits for it |
+| glyph | the `Folder` icon in a bare span; the header is carried by a hold anywhere that is not a control, like a chat row |
 | toggle | ONE element, `role="button"` span, `tabIndex={0}`, `data-testid="simple-chat-folder-toggle"`, `aria-expanded`; press, Enter and Space call `onToggle`; `title` = `runner.collapse` / `runner.expand`, ns `common`; `FoldChevron` + name |
 | rename | input `simple-chat-folder-rename-input`: Enter saves, Escape cancels; blank or unchanged name calls nothing |
 | dot | drawn only when `dot !== null`: `simple-chat-folder-dot`, `data-mark`, `role="img"`, label and title = the mark's word; `awaitingInput` adds `vv-pulse` |
 | menu | `ActionMenu` labelled `simpleList.folderOptions` with `{ name }`; entries Rename (`simple-chat-folder-rename`), divider, Delete folder (`simple-chat-folder-delete`, danger) |
 | selected wash | `holdsSelected`: `bg-primary/10` |
-| ring | `isDropInto`: `ring-2 ring-primary` |
+| ring | `isDropInto`: a layer of its own (`simple-chat-folder-into`: `absolute inset-0 z-40 ring-2 ring-primary`), not a ring on the header, because the carried row is drawn over the header |
 | line | `dropEdge='before'`: `h-0.5` accent line on the top edge |
 | fade | none of its own; `data-dragging` only says it is the carried header |
 
-- The name is not a `<button>`: the carry turns away any press inside a `button`, so a mouse picks the folder up by its name.
+- The name is not a `<button>`: the carry turns away any press inside a `button`, so the name carries the folder like a chat's title does (a mouse by a drag, a finger by a hold).
 - Fresh effect (`isFresh`): opens the name for typing, selects it whole on first focus, `scrollIntoView({ block: 'nearest' })`, calls `onFreshShown()`; the list clears its fresh id there, so it runs once per fresh turn.
 
 | Mark | Word key (`simpleList.`) | Disc ink |
@@ -1600,7 +1609,11 @@ Props: `open`, `folders: SimpleListFolder[]`, `currentFolderId: string \| null`,
 
 - `ml-8` = 32px = the row's icon box (`w-6`) + `gap-2`: a nested glyph starts in the folder header's chevron column and the title starts past the folder's name. Anything that moves the chevron moves this indent.
 
-## Gate — `.verify/probe-simple-folders.mjs`
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/SidebarSimpleFolderPicker.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/SidebarSimpleFolderRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/SidebarSimpleListItems.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/SidebarSimpleListRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/SidebarSimpleList.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-simple-folders.mjs
+
+## MAN-8124 — The simple list's folder scaffold — `SidebarSimpleListItems` — Gate — `.verify/probe-simple-folders.mjs`
+section: The simple list's folder scaffold — `SidebarSimpleListItems`, `SidebarSimpleFolderRow`, `SidebarSimpleFolderPicker`/002 Gate — `.verify/probe-simple-folders.mjs`
+
 - `node .verify/probe-simple-folders.mjs` (dev server on `127.0.0.1:5183`, signed in through `openConsole`); `ONLY=1440-light|1440-dark|390-light|390-dark` runs one combination. Gitignored; not a `phase-*.mjs`, so `all.mjs` does not run it.
 - Mounts fixture props over the signed-in page through `lib/mountReact.mjs`: 17 states × 4 combinations (1440×900 and 390×844, light and dark). States: header with each of the four dots and none, folded and open, holding the open chat, renaming, as a drop target; picker with and without a current folder; tree with a loose chat, an open and a folded folder, a carried folder's block, the end line.
 - Fixture host: `position:fixed`, `z-index:60` (under `ActionMenu`'s `z-[70]`, over the app), background `var(--canvas)` (`--background` is not defined); the picker's host is `display:contents` so its body-portalled Dialog shows. Frame width = the app's own sidebar width at that viewport.
@@ -1610,6 +1623,7 @@ Props: `open`, `folders: SimpleListFolder[]`, `currentFolderId: string \| null`,
 - Account: nothing is created on the server and no turn is sent. `openConsole`'s park PATCHes `simpleChatList: false`; the probe reads the stored value before it and restores it after `browser.close()`.
 - Ends `<n> states photographed, every check passed` (exit 0), else `FAILED (<n>)` (exit 1).
 - 2026-09-30: 266 `[ok]`, 0 FAIL, 70 shots (68 fixture + 2 live), on the version before the live check moved to a pin. The pinned version is `node --check`ed, not run.
+- 2026-10-10: the `fades` checks (`carriedRowOpacity` / `carriedBlockOpacity` 0.5) read a fade `SidebarSimpleListItems` no longer draws (a carried item is lifted by the kit's carry, `data-carried`: MAN-8139); they fail until the probe reads the lift instead.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/SidebarSimpleFolderPicker.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/SidebarSimpleFolderRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/SidebarSimpleListItems.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/SidebarSimpleListRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/SidebarSimpleList.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-simple-folders.mjs
 
@@ -1689,7 +1703,9 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/hooks/useSim
 ## Wiring
 - 2026-09-30: live. `SidebarSimpleList.tsx` calls `useSimpleChatDrag({ items, onMove: move })`, `move` being `useSimpleChatFolders`' (MAN-7528); `.verify/probe-simple-folder-composer.mjs` drives the carry on the mounted tree, `.verify/probe-simple-drag.mjs` at the hook level.
 - Why pointer events, not the browser's drag-and-drop: DnD never fires from a touch screen and this list is used on a phone.
-- Size: 300 LOC against the 300 default. The next addition wants an extraction, not an append.
+- Size: 244 LOC (`wc -l`, 2026-10-10). `chatTargetAt` / `folderTargetAt` and the DOM readers under them live in `src/modules/sidebar/utils/simpleChatDropTarget.ts` (153 LOC), which reads every row and block as laid out (`layoutRectOf`, transform taken off), because the carried row is drawn under the pointer by a transform.
+- 2026-10-09: the press-to-carry runs on the kit's `usePointerDrag` (kind `sort`), the mechanism the sortable lists lift on. A finger carries after holding still for `TOUCH_HOLD_MS` (400 ms, `src/shared/constants.ts`, shared with `useSortable`) anywhere on a row or header that is not a control; one that moves first is scrolling the list and lifts nothing. A mouse carries after 5 px, as before. Operator: "Can we fix drag and drop on mobile to be hold then drag on the chat please".
+- 2026-10-10, hold and drag in one motion: on a touch screen the rows are `touch-action: none` from the first touch (the `data-touch-pan` marker, `surfaces.css`), and a swipe that starts on a row, or on a control inside one, scrolls the pane by the page's own hand (`usePointerDrag`'s `scrollsPane`, `sortable/touchPan.ts`: MAN-8136). why: the operator's Galaxy Z Fold 8 dispatches every touch sequence uncancelable (`touchmove cancelable=false`), so the pane's `touchmove` canceller held nothing: the browser panned and sent `pointercancel` at the first move past the slop after the lift, and the row faded and went back. `touch-action` is the one lever the browser reads before the touch. Why the dispatch is uncancelable there is not established (the browser's policy, the device, or a busy dev build); the cure does not depend on it. Operator: "Hold and drag, one motion".
 
 ## Signature
 `useSimpleChatDrag({ items, onMove })`
@@ -1701,25 +1717,34 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/hooks/useSim
 
 | Out | Is |
 | --- | --- |
-| `dragging` | `SimpleListItemRef \| null`: the carried row, set once the press passes the threshold |
+| `dragging` | `SimpleListItemRef \| null`: the carried row, set once the carry lifts (a mouse past the threshold, a finger after the hold) |
 | `dropTarget` | `SimpleListDropTarget \| null`: where the pointer says it would land; re-rendered only when the target changes |
-| `dragProps(ref)` | `Pick<HTMLAttributes<HTMLElement>, 'onPointerDown' \| 'onClickCapture' \| 'onDragStart'>`; spread on every chat row and folder header (assigns to `SidebarSimpleListItems`' `dragProps`) |
+| `dragProps` | one `SimpleListDragProps` object (`src/shared/types.ts`: `onPointerDown`, `onClickCapture`, `onDragStart` and the kit's `data-hold-lift` and `data-touch-pan` markers), the same for every row; spread on every chat row and folder header (assigns to `SidebarSimpleListItems`' `dragProps`). The row a press lands on is read off the row's own `data-session-id` / `data-folder-id` |
+| `listRef` | ref object for the list's root (`SidebarSimpleList` puts it on `simple-chat-list`): where the pointer's capture goes at the lift, and nothing else. The list registers no `touchmove` canceller: its rows are `touch-action: none` from the first touch on any device that has a coarse pointer at all (`@media (any-pointer: coarse)`, so a touch laptop whose primary pointer is a mouse is covered too), so the browser has no pan to take. A device with no touch screen has no finger to hold still |
 
-## Gesture
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/hooks/useSimpleChatDrag.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/sortable/touchLift.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-simple-drag.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/simple-list-hold-to-drag-live.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/simple-list-hold-to-drag.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/simple-list-hold-to-drag-scratch.sh
+
+## MAN-8139 — The simple list's carry — `useSimpleChatDrag` and the pointer's reading of the — Gesture
+section: The simple list's carry — `useSimpleChatDrag` and the pointer's reading of the drawn list/001 Gesture
+
 | Rule | Is |
 | --- | --- |
-| threshold | `DRAG_THRESHOLD_PX = 5`: less travel is a click |
-| press guards | primary button only; a press inside `button, input, [data-no-drag]` stays that control's; a touch starts only inside `[data-drag-handle]` |
-| one press | a press while another is armed is ignored |
-| carry start | the text selection is cleared (`removeAllRanges`) |
-| listeners | four on `window` per press (`pointermove`, `pointerup`, `pointercancel`, `keydown`), removed at press end and on unmount |
-| release | `pointerup` of the armed pointer id ends the press and commits |
-| abandon | `Escape` or `pointercancel` ends the press and commits nothing |
+| threshold | mouse and pen: `DRAG_THRESHOLD_PX = 5`, less travel is a click |
+| hold | touch: `TOUCH_HOLD_MS` (400 ms) held still lifts the row; a finger that drifts past the kit's slop first is scrolling: from that move on the page scrolls the pane by hand (`scrollsPane`; see the pan row), and nothing lifts. The kit's `tickLift()` pulses 20 ms where the device can (Android's own long-press buzz; an iPhone and a phone on silent get none). The `contextmenu` and `selectstart` a long-press raises are cancelled while a hold is pending or lifted, and `surfaces.css` keeps the platform's callout and selection off every handle from the first touch (`data-hold-lift`, touch screens only) — an iPhone sends no `contextmenu` to cancel |
+| press guards | primary button only (the kit); in `accept`: a press that landed outside the row's own DOM is refused (React bubbles a press from a portal — the row's open action menu — through the tree to the row), and so is a press inside `button, input, [data-no-drag]`, which stays that control's: it never lifts, but a swipe that starts on it still scrolls the pane (the kit takes a refused press as a pan on a list that scrolls by hand). The three status marks in the chat row (`simple-chat-awaiting-input`, `-running`, `-subagents-running`) carry `data-no-drag`: each sits in a `Tooltip` that opens on a 350 ms touch hold, and the 400 ms carry must not lift the row under it |
+| one press | a press while another gesture runs is ignored by the kit, so a second finger never changes which row is lifted |
+| lifted row | the kit's carry (`shared/ui/sortable/carried.ts`, the copy `useSortable` runs): at the lift the pressed chat's row, or a folder's whole block, is taken up (`takeUp`: `data-carried`, above its neighbours, backed with an opaque ground) and follows the pointer up and down (`placeUnder` with a null x: on the list's rail), on every move and when the pane scrolls. Its slot stays as the gap. Verve draws `data-carried` as `--shadow-lift` plus a `--border-strong` hairline. At release the list is committed in one `flushSync` and the row slides from where it was drawn to its place (`putDown`; nothing slides under `prefers-reduced-motion`); a cancel or Escape slides it back |
+| carry start | the text selection is cleared (`removeAllRanges`); `body` wears `vv-dragging vv-drag-sort` for the carry, which also keeps iframes from swallowing it |
+| capture | the pointer is captured on the LIST's root at the lift (`captureOnStart`; the root arrives through `listRef`), never at the press, so a tap still reaches the row's link and fold toggle, and never on the row, because `:hover` follows the capture and a captured row would keep its hover wash for the whole carry |
+| edge scroll | `useCarryEdgeScroll` (`hooks/useCarryEdgeScroll.ts`): from the lift, every animation frame while the pointer rests in the pane's top or bottom 56 px zone, the pane (`scrollerOf` the list root) scrolls a step toward that edge and the target is read again under the still pointer. Step and zone are the kit's own `edgeStep`, `edgeHoldAt` (`shared/ui/sortable/motion.ts`), the ones `useSortable` runs on; a carry that began in a zone does not run toward it until the pointer has left it. A page that scrolls as a whole has no pane to run. A pane scrolled by any means (a wheel) re-places the row and re-reads the target, and the row is re-placed every frame. The lifted row is PAINTED INSIDE THE LIST'S OWN BOX (`placeLifted`): it never leaves its slot, so a row painted below the list's end would extend the pane's scrollable overflow with every pixel scrolled and the loop would never end. Ended at release, at Escape and on unmount |
+| release | `pointerup` ends the gesture and commits |
+| abandon | `Escape` (a keydown listener present while a row is carried) puts the row back at once and commits nothing; `pointercancel` after a lift commits nothing |
 | click | a carry's release is followed by a swallowed click (`onClickCapture`: `preventDefault` + `stopPropagation`); a keyboard click (`detail === 0`) passes; the next `pointerdown` disarms the swallow before its guards run |
+| pan | touch, a swipe that crosses the slop before the hold fires (anywhere on a row or header, controls included): the kit's `sortable/touchPan.ts` scrolls the list's pane (`scrollerOf` the row) one to one with the finger from the move that crossed the slop, delta-driven and clamped at the pane's own ends, so a finger dragged past an end and turned back scrolls back at once. At the lift the finger's speed over the last 100 ms carries on and brakes at a constant 2800 px/s² (so a flick of 500, 1000, 2000 and 4000 px/s travels about 45, 179, 714 and 2857 px; Android's own fling, worked from its published constants, 58, 194, 647 and 2157; headless Chromium's, measured, 47, 189, 758 and 3030; at most 8 px/ms to start) and stops at an end. `GLIDE_DECELERATION` in `touchPan.ts` is the one constant to retune. A new touch anywhere stops the glide, and the click it would end in is spent; so is the tail click of a pan. The rows are `touch-action: none` at rest (`data-touch-pan`, wherever a coarse pointer is present: `@media (any-pointer: coarse)`), so the browser takes nothing; a device with no touch screen is unchanged. The pane's end is its own `scrollHeight`, which is the list's end because the carried row is painted inside the list's box (`placeLifted`) |
 | native drag | `onDragStart` is `preventDefault`ed |
 
 ## Commit
-- On release after a carry: `positionForDrop(itemsRef.current, press.item, target)` (MAN-7520); `onMove` fires only for a non-null answer. A drop that changes nothing prints nothing.
+- On release after a carry: `positionForDrop(itemsRef.current, carried, target)` (MAN-7520); `onMove` fires only for a non-null answer. A drop that changes nothing prints nothing.
 - No target is never a move.
 
 ## DOM contract (selectors the hook reads)
@@ -1732,8 +1757,12 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/hooks/useSim
 
 - The target comes from the boxes the list draws, never from the tree: drawn order is what the reader sees.
 
-## Target — carrying a chat (`chatTargetAt`)
-Scan: every row and header under the root, in document order, carried row included. `over` = the last whose top edge is at or above the pointer (the gap between two rows belongs to the row above). `drawnBelow` = some row begins below the pointer.
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/hooks/useCarryEdgeScroll.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/hooks/useSimpleChatDrag.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-simple-drag.mjs
+
+## MAN-8140 — The simple list's carry — `useSimpleChatDrag` and the pointer's reading of the — Target — carrying a chat (`chatTargetAt`)
+section: The simple list's carry — `useSimpleChatDrag` and the pointer's reading of the drawn list/002 Target — carrying a chat (`chatTargetAt`)
+
+Scan: every row and header under the root, in document order, carried row included — each read as laid out (`layoutRectOf`), so the carried row, drawn under the pointer by a transform, is measured at its own slot. `over` = the last whose top edge is at or above the pointer (the gap between two rows belongs to the row above). `drawnBelow` = some row begins below the pointer.
 
 | Pointer | `dropTarget` |
 | --- | --- |
@@ -1753,8 +1782,12 @@ Scan: every row and header under the root, in document order, carried row includ
 - `{ at: 'row', item: <block's ref>, edge }`: `before` above the block's middle, else `after`.
 - Never `end`, never `into`: a folder lives at the top level, and past the last block the last block with `after` maps to the same place as `end`.
 
-## Gate — `.verify/probe-simple-drag.mjs`
-- `node .verify/probe-simple-drag.mjs` (dev server `127.0.0.1:5183`, signed in through `openConsole`, 1440×900). Gitignored; not a `phase-*.mjs`, so `all.mjs` does not run it. Zero model turns; creates nothing on the server.
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/hooks/useSimpleChatDrag.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-simple-drag.mjs
+
+## MAN-8141 — The simple list's carry — `useSimpleChatDrag` and the pointer's reading of the — Gate — `.verify/probe-simple-drag.mjs`
+section: The simple list's carry — `useSimpleChatDrag` and the pointer's reading of the drawn list/003 Gate — `.verify/probe-simple-drag.mjs`
+
+- `node .verify/probe-simple-drag.mjs` (dev server `127.0.0.1:5183`, signed in through `openConsole`, 1440×900). Gitignored; not a `phase-*.mjs`, so `all.mjs` does not run it. Zero model turns; creates nothing on the server. `CARRY_PROBE_APP_URL=<scratch client>` points it, `athena-carry-endzone.mjs`, `athena-carry-ownplace.mjs` and `probe-simple-folders.mjs` at a scratch client instead (`mountReact.mjs` reads React's URLs off the page's own entry module), and then no preference of the live account is read, parked or restored.
 - Fixture: `lib/mountReact.mjs` mounts a component that calls the hook over a literal tree (loose `a1`, `a2`; open `f1[c1, c2]`; open `f2[e1]`), drawn as plain elements with the test ids and data attributes above, `dragProps` spread on every row and header. Drags are real (`page.mouse.down` / `move` / `up`). The hook's own `dragging` / `dropTarget` are rendered into the host and read while the button is still down.
 - Account: reads `simpleChatList` through the API BEFORE `openConsole` (its park PATCHes `false`), restores it AFTER `browser.close()`.
 - Artifact: `.verify/artifacts/simple-drag.json`.
@@ -1773,9 +1806,26 @@ Scan: every row and header under the root, in document order, carried row includ
 
 - Each drag also checks `dragging` and `dropTarget` are `null` after release.
 - Ends `SIMPLE-DRAG PASS`, else `SIMPLE-DRAG FAIL` (exit 1); a signed-in console error also fails.
-- 2026-09-30: 9 of 9 PASS, exit 0.
+- 2026-09-30: 9 of 9 PASS, exit 0. 2026-10-09, on the `usePointerDrag` engine and a scratch client: 9 of 9 PASS.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/hooks/useSimpleChatDrag.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-simple-drag.mjs
+
+## MAN-8142 — The simple list's carry — `useSimpleChatDrag` and the pointer's reading of the — Gate — the hold on a phone, `.verify/simple-list-hold-to-drag.mjs`
+section: The simple list's carry — `useSimpleChatDrag` and the pointer's reading of the drawn list/004 Gate — the hold on a phone, `.verify/simple-list-hold-to-drag.mjs`
+
+- `SUNSET_SLOT=7 bash .verify/simple-list-hold-to-drag-scratch.sh` stands up a SCRATCH API on a copy of the database, seeds 14 top-level rows (12 loose chats, 2 folders holding 3 chats), serves the client as git HEAD has the files in `SLHD_CHANGED_FILES` (`before`) and as it is (`after`), runs the proof against each and tears everything down. The proof refuses the live app (:5183, :5184, :3011) and a list that is not the seeded one, and puts the list back after every leg. Artifacts: `.verify/artifacts/simple-list-hold-to-drag/` (`before.json`, `after.json`, a rest shot and a mid-carry shot per desktop/mobile × dark/light).
+- Phone (390×844, real touch): T1 hold a chat's title past 400 ms, slide it below another chat, let go — the chat lands there and the SERVER's order says so; T2 the same from a folder's header; T3 a quick vertical swipe from a row's title scrolls the list and lifts nothing; T4 the same from a row's icon (before the change this lifted the row and refused to scroll); T5 hold a row still and let go — nothing moves and the chat stays shut (before: it opened); T6 tap opens the chat. Desktop (a real mouse): M1 a chat carried, M2 a folder carried, M3 a click opens the chat — the same server orders before and after.
+- `.verify/lib/touch-input.mjs`: `openFinger(page)` → `{ down(point), slide(point, { stepPx, stepDelayMs }), up(), tap(point), close() }`, one finger over CDP `Input.dispatchTouchEvent`; the context needs `hasTouch: true`. why: `page.touchscreen` only taps, and a `TouchEvent` dispatched inside the page skips the browser's gesture recogniser, so neither shows a scroll begin or be refused.
+- A `before` run only records (28 of 73 checks fail, by design); an `after` run exits 1 on any failure. 2026-10-09: after 75 of 75 PASS. The one console line it allows is the 404 the seeded chats' own `token-usage` returns when opened (they have no transcript).
+- 2026-10-10, hold-then-drag made reliable and readable: the stack and its fixtures live in `.verify/lib/simple-list-stack.sh` (`SLHD_CHANGED_FILES`: the files the latest change touched, which the "before" client serves as git HEAD has them; rewritten with each change) and the page helpers in `.verify/lib/simple-list-scratch.mjs` (`restore()` also unfolds the seeded folders: a collapsed folder draws no chats, and every leg's "page order equals server order" would fail without a hint of why); both gates use them. `bash .verify/simple-list-hold-reliable-scratch.sh` runs on that stack, in turn: `simple-list-hold-reliable-trace.mjs` (Chromium, real CDP touch, 390 px: holds of 0.45 / 0.7 / 1.2 / 2.5 s then 120 px over 300 ms, a 3 px drift, a 12 px early move, a swipe, a tap — each with its event trace: `pointercancel`, `contextmenu`, `selectstart`, and whether each `touchmove` was cancelable and prevented; an `after` run exits 1 unless every case is as written), `simple-list-hold-reliable.mjs`, this gate again, and `probe-card-order.mjs`.
+- `simple-list-hold-reliable.mjs` (`lib/carry-read.mjs` reads the page, `lib/sortable-fixture.mjs` mounts the real `useSortable`; artifacts under `.verify/artifacts/simple-list-hold-reliable/`): phone and desktop, light and dark — the lift shows at the hold (`data-carried`, an elevation), mid-carry the item stands under the pointer and away from its slot, is unfaded and opaque, and its box paints its own backing with nothing of the rows beneath showing through; the landing mark is a painted pixel of a screenshot where the carried item is drawn over it; drop, cancel (CDP `touchCancel`), hold-still, Escape and the rename box; nothing left on the page (no `data-carried`, no inline marks, no `vv-dragging`); WebKit at rest (`-webkit-user-select: none` computed on the row, link and folder header of a touch-emulated phone; the served rule carries `-webkit-touch-callout: none`, which a Linux WebKit drops at parse time and cannot compute); desktop selection equal to the `before` record; the kit's sortable list on the real hook drops the same card the same way before and after. 2026-10-10 on the scratch stack: 91 checks pass (run before `placeLifted`'s clamp and `onFrame`; neither gate has run since).
+- Measured 2026-10-10, Chromium with real CDP touch: every hold from 0.45 s to 2.5 s lands the drop, with no `pointercancel`, `contextmenu` or `selectstart`, before and after. Headless Chromium does not emulate the platform's long press (a held plain link raises no `contextmenu`, no selection begins), so Android's 400 ms touch-and-hold, its 20 ms buzz, an iPhone's link callout and a fling's uncancelable touches are NOT reproduced by any run here.
+- Edge scroll: the carried row is painted inside the list's own box (`useSimpleChatDrag` `placeLifted`). The row never leaves its slot, so a row painted below the list's end extends the pane's scrollable overflow with every pixel it scrolls, and the edge loop (`useCarryEdgeScroll`) finds no end. `useCarryEdgeScroll` also reports a scroll of the pane by any means (a wheel) and calls `onFrame` every frame, so the row stays under a resting pointer. 2026-10-10, 3 s with the finger at the pane's bottom edge: the list stops at its grown limit (386 → 392); before the clamp it ran to ~1500 and snapped back at release.
+- Not proven: any real phone. `probe-card-order.mjs` is stale against the current app (its project selector matches no row and the sidebar no longer has a Runner tab), on the pre-change client alike.
+- `.verify/simple-list-hold-to-drag-live.mjs` is the read-only look at the live list (no press, no touch, nothing written): it reads that the drawn list carries no `data-drag-handle` and no `.touch-none`, that rows exist, and that the page logs no error.
+- 2026-10-10, hold and drag in one motion: `STAGE=before|after|all SUNSET_SLOT=8 bash .verify/simple-list-one-motion-scratch.sh` runs `.verify/simple-list-one-motion.mjs` on that stack — Chromium with real CDP touch at 390 px and at 690 px (a Fold's inner screen, `FOLD_SCENARIO` in `lib/simple-list-scratch.mjs`), each twice: the touch dispatched UNCANCELABLE (`lib/phone-uncancelable.mjs`: an init script wraps `EventTarget.prototype.addEventListener` so every `touchstart`/`touchmove` listener is passive; Chrome then refuses the page any cancel once the pan starts, as on the operator's Fold — the headless `touchstart` itself still reports `cancelable=true`, where the phone reported `false`) and blocking (headless default). Legs in `lib/one-motion-legs.mjs` and `lib/one-motion-others.mjs`, reads in `lib/one-motion-reads.mjs`. BEFORE (git HEAD), uncancelable: a 0.5 s hold and drag lifts, then a `pointercancel` arrives at the first move past the slop, the row goes back and nothing drops; blocking passes, which is why every earlier gate passed. The flick legs lift at once and check the glide against `speed²/2a` (`GLIDE_DECELERATION`, mirrored in `lib/one-motion-legs.mjs`), not a bare floor; `touchLaptopLeg` runs a finger on a 1280 px page whose primary pointer is a mouse (`any-pointer: coarse`, `pointer: fine`) and expects the rows `touch-action: none` and the drop to land. 2026-10-10 on the scratch stack: 281 checks pass, run before the constant-deceleration glide, the speed-based flick check and `touchLaptopLeg` existed; none of those three has run. Not measured: a real phone, the glide's distance against the phone's own.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/hooks/useSimpleChatDrag.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/utils/simpleChatDropTarget.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/sortable/carried.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/carry-read.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/simple-list-scratch.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/simple-list-stack.sh, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/sortable-fixture.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/touch-input.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/simple-list-hold-reliable.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/simple-list-hold-reliable-scratch.sh, /home/lyphe/.claude/claudecodeui_lyphe/.verify/simple-list-hold-reliable-trace.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/simple-list-hold-to-drag-live.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/simple-list-hold-to-drag.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/simple-list-hold-to-drag-scratch.sh
 
 ## MAN-7528 — The simple list's folder verbs — `useSimpleChatFolders`, the composer `SidebarSimpleList` and its walk
 
@@ -1903,47 +1953,843 @@ The folders' whole journey on the operator's own surface. Parts: MAN-7536 (folde
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-whole-folders.mjs
 
-## MAN-7665 — The `?roadmap=<name>` landing — the Roadmap tab opens on its Roadmap face with that roadmap selected
+## MAN-7819 — The roadmap tree's layout — layoutTree, TreeLayout and the dot state (src/modules/roadmap/utils/treeLayout.ts)
 
-The workspace's second landing, beside `?runner=<plan>` (MAN-7531). The hook's shared rules (held name, one strip, leave-drop): MAN-7531 §"`useRunnerLanding` — rules". The tab: MAN-7654; its face state: MAN-7640; `useRoadmap().select`: MAN-7635; `roadmapSelected`: MAN-7655.
+What it is
+`layoutTree(roadmap, goalText)` works out the roadmap tree's whole geometry once, in px at scale 1. Pure and `import type` only (`@/shared/roadmap-types`, `@/shared/types`): no React, no DOM, no i18n. Runs headless on the store's own document: `npx --no-install tsx --tsconfig tsconfig.json`.
+Readers: `RoadmapTreeFace` calls it once per picture (memoised on the roadmap and the goal text) and hands the result to `RoadmapTree` and `useTreeWords` (MAN-7827); every tree node reads its spot. `TreePanel` (MAN-7840) is handed the layout, finds its item in it, and gives `EpicPanel` `dots` for its feature rows and `FeaturePanel` the item's own `state`.
 
-| Part | File | Does |
-| --- | --- | --- |
-| `ROADMAP_LANDING_PARAM` | `src/shared/constants.ts` | `'roadmap'`; the hook imports it as `ROADMAP_PARAM` |
-| `useRunnerLanding` | `src/modules/project-workspace/hooks/useRunnerLanding.ts` | holds the name as `openRoadmap`, brings the `runner` tab forward, strips the param; `clearOpenRoadmap` is stable |
-| `WorkspaceMain` | `src/modules/project-workspace/WorkspaceMain.tsx` | passes `openRoadmap` and `onRoadmapOpened={clearOpenRoadmap}` to `RoadmapTab` |
-| `RoadmapTab` | `src/modules/roadmap/RoadmapTab.tsx` | turns the face to Roadmap on arrival; selects the roadmap once the picture is read; calls `onRoadmapOpened` |
+Public API
+| export | shape |
+|---|---|
+| `layoutTree(roadmap: Roadmap, goalText: string)` | -> `TreeLayout`; `goalText` is the label the goal draws (the goal or its "missing" words) |
+| `TreeLayout` | `{ width, height, goal: { y, r, lines, baselines, bottom }, milestones: TreeMilestoneSpot[], dots: Map<string, RoadmapDotState> }` |
+| `TreeMilestoneSpot` | `{ milestone, n, x, y, r, eyebrowY, titleLines, titleBaselines, lineY, spine: { x, top, bottom }, epics: TreeEpicSpot[] }` |
+| `TreeEpicSpot` | `{ epic, x, y, r, tickTo, labelX, titleLines, titleBaselines, dots: TreeDotSpot[], lineY }` |
+| `TreeDotSpot` | `{ feature, x, y, state: RoadmapDotState }` |
+| `RoadmapDotState` (in `src/shared/types.ts`) | `'shipped' \| 'inFlight' \| 'designing' \| 'proposed' \| 'idea' \| 'blocked'`; `inFlight` is the word `in flight` as a key |
 
-- Writer: the chat widget's foot link `roadmap.widget.open` (`RoadmapWidgetBody.openRoadmap`, MAN-7668) writes `?roadmap=<selected.name>` through `ROADMAP_LANDING_PARAM` (`replace`), as `useRevealCard` writes `RUNNER_LANDING_PARAM`; a hand-typed `?roadmap=<name>` takes the same road in.
-- `RoadmapTab` props: `openRoadmap: string | null`, `onRoadmapOpened: () => void`.
+Rules
+- `dots` is keyed by feature name; the tree and the panel's feature rows both read the dot state from it, so they cannot disagree.
+- Dot state, in order: word `shipped` -> `shipped` whatever stands above it; else `feature.blocked ?? epic.blocked ?? milestone.blocked` not null -> `blocked`; else the word (`in flight` -> `inFlight`).
+- A milestone's `x` is its ring's centre and its column's centre; the column's left edge is `x - 124`. Epic `x`, `y`, `r` are the epic ring's.
+- `spine.bottom` is the last epic's `y`; `spine.top` when the milestone has no epic.
+- Row bottoms and column ends are not exposed; derive them as `max(lineY + 3, y + 19)`.
+- Columns: `width = max(400, 248 * milestones)`, centred in the width; one milestone sits at ring x 200, under the goal. Zero milestones: 400 wide, `height` = `goal.bottom + 8`.
+- `height` = deepest column end + 8.
+- `goal.bottom` = last goal baseline + 7; the connectors start there. An empty goal still reserves line 1, so `bottom` stays 52.
+- Wrap limits count UTF-16 units: goal 48, milestone title 30, epic title 26. An emoji counts 2.
+- Wrap: at most two lines; words pack greedily; a third line folds into the second. A line past the limit is cut to exactly the limit with `…` last (an overlong first word too).
+- Cut that would land after a high surrogate steps back one unit: that line is one under the limit.
+- A cut line is not trimmed: a cut after a space keeps it (`"… a …"`).
+- Geometry numbers are named constants at the top of the file; change them there, nowhere else.
 
-## RoadmapTab — the landing's two steps
-| step | when | does |
-| --- | --- | --- |
-| turn the face | during render, once, at the render `openRoadmap` arrives in | `setFace('path')` unless `revealPlan` is non-null; `faceTurnedFor` records the request the face was turned for |
-| select and retire | effect, once `picture !== null` | name in `roadmaps`: wait for `selected !== null`, then `select(name)`; name absent: select nothing. Either way `onRoadmapOpened()` |
+Measured
+2026-10-06, `dispatcher roadmap show --json`:
+| roadmap | size | dots = store features | scale at tab 1440x900 / widget 1680x1000 / tab 1680x1000 / tab 390x844 |
+|---|---|---|---|
+| Restorly | 744x614 | 38 = 38 | 0.821 / 0.876 / 0.948 / 0.678 |
+| lyphecli | 744x443 | 39 = 39 | 1.000 / 1.000 / 1.000 / 0.940 |
 
-- `faceTurnedFor` resets to `null` when the request is retired, so the same name landing later turns the face again. A tab already on In flight when a landing arrives still turns.
-- Once, never again: a press on In flight made while the picture loads is not undone when the picture lands.
-- `revealPlan` is read at the arrival render: a `?runner=` reveal that arrived with it wins the face (the card is the more specific ask); the roadmap is selected all the same.
-- Wait for `selected !== null` before `select`. why: `selected` is `null` until preferences hydrate (MAN-7655), and a write on a cold mirror is overwritten by the hydrate.
-- A name the picture lacks needs no wait: the tab opens on the Roadmap face on the roadmap already on screen, and the request is retired at once.
-- `?runner=<plan>&roadmap=<name>` together: both params leave the URL in one pass, In flight shows with the card in view, the roadmap is selected.
-- `/?roadmap=<name>` with no project picked: the param stays in the URL and the name is held; after a project is picked it lands and the param is stripped.
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/utils/treeLayout.ts
 
-## The standing proof
-`node .verify/probe-roadmap-landing.mjs` on the live app, 1440×900, light; exit 0 and `PASS` when clean. Artifacts: `.verify/artifacts/roadmap-widget/landing-{lyphecli,no-such-roadmap,runner-in-flight}-light.png`. `roadmapSelected` is read through the harness's `api()` (the server's copy) before and after each landing, and written back last.
+## MAN-7827 — The roadmap tree — RoadmapTree, TreeGoal, TreeMilestoneNode, TreeEpicNode, TreeTip and treeWords (src/modules/roadmap/tree)
 
-| Page | Holds |
-| --- | --- |
-| `/session/<id>?roadmap=lyphecli`, account on the other roadmap, stored tab `chat` | Roadmap tab on the Roadmap face showing lyphecli; `roadmapSelected` = `lyphecli`; URL without `roadmap` |
-| the same, then a picker pick of the other roadmap, a trip to Chat and back | the pick stands: the landing was retired, no replay |
-| `?roadmap=no-such-roadmap` | tab on the Roadmap face; `roadmapSelected` and the roadmap on screen unchanged, also after a trip away and back; URL stripped |
-| `?runner=<live card's plan>` | In flight face, that card in view, `runner` gone |
-| `?runner=<plan>&roadmap=lyphecli` | both gone from the URL, In flight with the card in view, lyphecli selected |
-| `/?roadmap=lyphecli`, no project | param stays; after a project click: lands on lyphecli, param stripped |
+`RoadmapTree` draws one roadmap as an SVG tree from `layoutTree`'s layout (MAN-7819): the goal at the apex, a connector to each milestone's ring, under each a spine of epic rings with titles, feature dots and lines. Mounted by `RoadmapTreeFace` (MAN-7829). Marks, halos and moments: MAN-7828. Words: MAN-7634 (`roadmap.tree.*`).
 
-- 2026-10-04: `node .verify/probe-roadmap-landing.mjs` ends `PASS`, the `[root]` leave-drop leg and the face turn on arrival among its checks; part `landings` of `probe-roadmap-widget.mjs` (MAN-7671) ends `PASS` with 13 ok, the Answer press among them (it is a `[SKIP]` only while nothing waits on the operator).
-- Counts console errors only from each page's own life: a chat fetch aborted by `goto` leaving the previous page is not a finding.
+Files
+| file | exports | owns |
+|---|---|---|
+| `tree/RoadmapTree.tsx` | `RoadmapTree` | the pane, the svg, the fit, paint order, the memoised nodes |
+| `tree/useTreeZoom.ts` | `useTreeZoom` | the zoom: its state, gestures, anchor and the scroll a zoom makes |
+| `tree/TreeZoomControls.tsx` | `TreeZoomControls` | the +, −, Fit buttons in the wrapper's corner |
+| `tree/TreeGoal.tsx` | `TreeGoal`, `TreeGoalConnectors` | the goal's flag ring and label; one connector per milestone |
+| `tree/TreeMilestoneNode.tsx` | `TreeMilestoneNode`, `TreeMilestoneEdges` | a milestone's eyebrow, ring, title and line; its spine and ticks |
+| `tree/TreeEpicNode.tsx` | `TreeEpicNode` | an epic's ring, title, dots, line and burst |
+| `tree/TreeTip.tsx` | `TreeTip` | the tip chip |
+| `tree/treeWords.ts` | `useTreeWords` | every item's words, for the tip and every `aria-label` |
+| `tree/treeKeys.ts` | `selectionUnder`, `treeKeyOf` | the item a `data-tree-key` names, and the key an item's node carries |
+| `tree/useTreePane.ts` | `useTreePane` | the pane's scroll: the goal's x, the opening, the selection scroll, the scale hold |
+| `tree/TreeRing.tsx`, `tree/TreeHalo.tsx` | `TreeRing`; `TreeHalo`, `TreeDotCut` | the marks: MAN-7828 |
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/hooks/useRunnerLanding.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/RoadmapTab.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/constants.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-roadmap-landing.mjs
+Props
+`RoadmapTree({ roadmap: Roadmap, layout: TreeLayout, maxHeight: number | null, selected: RoadmapTreeSelection | null, onSelect(selection), paneRef: RefObject<HTMLDivElement> })`
+- `RoadmapTreeSelection` (`src/shared/types.ts`): `{ kind: 'roadmap' } | { kind: 'milestone' | 'epic' | 'feature'; name: string }`. A name the picture no longer holds reads as nothing selected.
+- `maxHeight`: `null` draws at natural size (column fit hands none). Viewport fit hands `useTreeRoom`'s room, `null` until it is measured (MAN-7829).
+- `paneRef`: the tree's scroller, which the face hands `useMilestoneMomentInView` in viewport fit (column fit hands it the column's scroller).
+
+Mount
+- `RoadmapTreeFace` draws it under its picker row, with `TreePanel` under it, while the roadmap holds a milestone. It holds the selection (`pressedBy`: `useState<Record<string, RoadmapTreeSelection>>` keyed by roadmap name), resolves it against the picture each render with `holdsItem` (a name the picture no longer holds reads as nothing selected), and hands the tree `selected` and an `onSelect` that writes the entry of the roadmap on screen (column fit also brings the panel's head into view). A switch to the other roadmap and back returns to the item pressed there (MAN-7829).
+- `layout` = `layoutTree(selected, selected.goal ?? t('roadmap.goal.missing'))`, memoised on `selected` and `goalText`.
+
+Fit and pane
+- `fitScale = clamp((maxHeight − 8) / layout.height, 0.6, 1)`; `maxHeight` `null` is 1. `scale = fitScale × zoom` (Zoom, below). svg `width`/`height` = layout × scale, `viewBox` the layout's, `mx-auto`.
+- Pane `[data-roadmap-tree]`: `overflow-x-auto overscroll-x-contain scrollbar-thin touch-pan-x touch-pan-y -mt-1 pt-1`. `overflow-y-auto` + a max height while the 0.6 floor holds the scale or `zoom > 1`; else `overflow-y-hidden`. The max height is `maxHeight`, else (column fit) the drawing's height at the fit + 8, so a zoomed pane scrolls inside its own box and never pushes the panel away.
+- why `-mt-1 pt-1` and svg `overflow-visible`: the goal's halo stands above the drawing and would be clipped flat.
+- svg: `role="group"`, `aria-label` `roadmap.tree.label`, `select-none`. why: a double press must not highlight a title.
+- Keep `overscroll-x-contain` (a sideways swipe past the end must not chain to the page's back gesture) and `select-none`.
+
+Paint order and memo
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/tree/RoadmapTree.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/tree/TreeEpicNode.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/tree/TreeGoal.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/tree/treeKeys.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/tree/TreeMilestoneNode.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/tree/TreeTip.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/tree/treeWords.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/tree/TreeZoomControls.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/tree/useTreePane.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/tree/useTreeZoom.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-roadmap-tree-zoom.mjs
+
+## MAN-7912 — The roadmap tree — RoadmapTree, TreeGoal, TreeMilestoneNode, TreeEpicNode — Edges in an `aria-hidden` group: `TreeGoalConnectors`, then each milestone's `TreeMilestoneEdges`.
+section: The roadmap tree — RoadmapTree, TreeGoal, TreeMilestoneNode, TreeEpicNode, TreeTip and treeWords (src/modules/roadmap/tree)/001 Edges in an `aria-hidden` group: `TreeGoalConnectors`, then each milestone's `TreeMilestoneEdges`.
+
+1. Edges in an `aria-hidden` group: `TreeGoalConnectors`, then each milestone's `TreeMilestoneEdges`.
+2. `TreeGoal`.
+3. Per milestone: `TreeMilestoneNode`, then each of its `TreeEpicNode`s. This is also the Tab order; epics are siblings of their milestone, never inside its button.
+- The goal and its connectors take `goalX` as a prop; everything else is memoised on `layout`, `roadmap.current`, `selected` and the words function, so a scroll redraws only them.
+- Nodes read `CelebrationContext` themselves, so the memo does not depend on it.
+
+Markers
+| attribute | on | holds |
+|---|---|---|
+| `data-tree-key` | goal `roadmap`; milestone `milestone:<name>`; epic `epic:<name>`; each dot's group `feature:<name>` | the one key a press reads off the nearest node |
+| `data-roadmap-goal` | goal group | |
+| `data-roadmap-milestone=<name>` | milestone group | `CelebrationLayer` (MAN-7636) measures its FIRST child, the ring's track circle, for the burst origin, and focuses the group when the moment ends: the ring is drawn first |
+| `data-roadmap-epic=<name>` | epic group | |
+| `data-roadmap-feature=<name>`, `data-roadmap-dot=<state>` | the visible dot circle | the dot, named by its feature |
+| `data-celebrating` | milestone group `milestone`, epic group `epic`, dot `feature` or `task` | a moment names it |
+| `data-selected` | node group, dot circle | the selected item |
+| `data-tree-halo=ring\|dot` | halo circle | |
+| `data-roadmap-tip` | tip chip | |
+| `data-roadmap-zoom` | the zoom buttons' group | |
+
+Nodes
+- Goal, milestone and epic: `role="button"`, `tabIndex=0`, `aria-pressed`, `aria-label` = `<head> — <line>` from `useTreeWords`. A milestone is `aria-current="step"` while it is `roadmap.current`.
+- A dot is not a tab stop; the keyboard reaches a feature through its epic's panel (MAN-7841).
+- A dot is a group: an invisible hit circle (r 4, `[pointer-events:all]`) then the visible circle (r 2.8), which is the topmost element at its centre. A press on a dot names the feature, never its epic.
+- A missing goal draws `roadmap.goal.missing` in italic muted.
+- No node wears an outline: `outline-none focus-visible:outline-none`. why: `outline-none` alone loses to tokens.css's `[tabindex]:focus-visible` rule; the halo is the focus ring.
+
+Words (`useTreeWords(roadmap, layout) → (item: RoadmapTreeSelection) => { head, line }`)
+| item | head | line |
+|---|---|---|
+| goal | `roadmap.tree.goal` | the goal, else `roadmap.goal.missing` |
+| milestone | `roadmap.tree.milestone` (`n`) + ` · ` + title | `roadmap.tree.epics` (`count`, `word`) |
+| epic | title | `roadmap.tree.epicLine`, or the word alone while it holds no feature; + ` · ` + `roadmap.tree.blocked` while `epic.blocked` is not null |
+| feature | title | feature word, `roadmap.feature.tasks` once it has a task, project; + ` · ` + `roadmap.tree.blocked` while its dot state is `blocked` |
+| a name the picture lacks | `''` | `''` |
+- Word maps: `ROADMAP_FEATURE_WORD_KEYS`, `ROADMAP_MILESTONE_WORD_KEYS`, `ROADMAP_EPIC_WORD_KEYS` (`src/shared/constants.ts`).
+- A blocked milestone says no "Blocked" on the tree: only its dots turn red.
+
+Tip (`TreeTip({ head, line, top, left?, right? })`)
+- `.vv-tooltip`, `max-w-60`, `pointer-events-none absolute z-10`, `aria-hidden`. The last child of `RoadmapTree`'s `relative` wrapper, outside the pane's clip. A screen reader skips it: the node labels say the same words.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/tree/RoadmapTree.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/tree/TreeEpicNode.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/tree/TreeGoal.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/tree/treeKeys.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/tree/TreeMilestoneNode.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/tree/TreeTip.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/tree/treeWords.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/tree/useTreePane.ts
+
+## MAN-7913 — The roadmap tree — RoadmapTree, TreeGoal, TreeMilestoneNode, TreeEpicNode — `onPointerMove` on the svg names the item of the nearest `[data-tree-key]` and stands the chip 14px
+section: The roadmap tree — RoadmapTree, TreeGoal, TreeMilestoneNode, TreeEpicNode, TreeTip and treeWords (src/modules/roadmap/tree)/002 `onPointerMove` on the svg names the item of the nearest `[data-tree-key]` and stands the chip 14px
+
+- `onPointerMove` on the svg names the item of the nearest `[data-tree-key]` and stands the chip 14px right of and below the pointer, in the wrapper's coordinates (`left`). Within 250px of the wrapper's right edge it stands left of the pointer: anchored by its right edge (`right = width − x + 14`), so its right edge is 14px left of the pointer whatever its width, and it wraps to the room the pointer leaves it. A pointer with less than 120px left of it keeps the chip on its right. `onPointerLeave`, a pointer over empty drawing and a touch pointer clear it, and a chip whose item a frame has taken away is not drawn (its words are empty). why touch: a finger has no hover, and its press is the selection.
+
+Presses and keys
+- One delegated `click` on the svg: `selectionUnder(event.target)` reads the nearest `[data-tree-key]` and `onSelect` receives what it names. A dot's own key is nearer than its epic's, so a press on a dot selects the feature.
+- `keydown` on the svg: Enter or Space on a focused `[role="button"][data-tree-key]` (the goal, a milestone, an epic) selects it. Space is `preventDefault`ed, so the page does not scroll.
+
+The pane's scroll (`useTreePane`)
+- The goal's x: the drawing's centre while `layout.width × scale ≤ pane.clientWidth`; else `(scrollLeft + clientWidth / 2) / scale`, held within [200, width − 200]. A passive `scroll` listener and a `ResizeObserver` on the pane read it at most once per animation frame, and only `TreeGoal` and `TreeGoalConnectors` redraw: the nodes are memoised.
+- The opening: on mount and when `roadmap.name` changes (never on a new frame of the same roadmap), an overflowing pane is set `behavior: 'instant'` so the current milestone's column (`roadmap.current`, else the last) sits at its centre. A pane with no width (the gutter's widget stays mounted under every other tab, `display: none`) cannot take a scroll: the opening is owed, and the pane's `ResizeObserver` runs it the moment the pane gains a width, with no poll or timer. The pane's own ends hold the first and the last column off-centre (`scrollLeft` clamps at 0 and at `scrollWidth − clientWidth`). When the roadmap holds a selection whose node that leaves outside the pane's width, the pane is set instant on that node instead.
+- The selection: when the selected milestone, epic or dot is not wholly inside the pane's visible box, `scrollTo` brings its mark (its node's first child) to the centre on each axis it is out on, smooth, or instant under `prefers-reduced-motion: reduce`. Down is reached only while the pane overflows downward (a floored fit, or a zoom); the goal is never scrolled to: it follows the pane. The effect is keyed on the selected key, so a press on the item already selected scrolls nothing. The commit of an opening runs no selection scroll of its own: the opening sets the pane on a held selection that the current column leaves outside the pane's width (a roadmap switched back to).
+- The scale: a new `scale` that arrives with the same `zoom` (the face's measured height arrives after the tree mounts; a resize) holds the drawing x at the pane's centre across it, while the pane overflowed. A scale that arrives with a new `zoom` is `useTreeZoom`'s to place; this hook then only re-reads the pane.
+
+Zoom (`useTreeZoom`, `TreeZoomControls`)
+- Model: `zoom` runs 1 (the fit) to 2.5 over `fitScale`, never below the fit. State `{ roadmapName, zoom }` is per mounted tree, starts at 1, is not stored, and a roadmap switch resets it while rendering, so no frame draws the new roadmap at the old zoom (not kept for a roadmap switched back to). `useTreeZoom({ paneRef, roadmapName, fitScale })` returns `zoom`, `scale`, `canZoomIn`, `canZoomOut`, `zoomIn`, `zoomOut`, `zoomToFit`; `RoadmapTree` calls it BEFORE `useTreePane`. Every surface that draws the tree zooms: the tab's face, the gutter widget, the widget at full screen.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/tree/RoadmapTree.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/tree/TreeEpicNode.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/tree/TreeGoal.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/tree/treeKeys.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/tree/TreeMilestoneNode.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/tree/TreeTip.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/tree/treeWords.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/tree/TreeZoomControls.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/tree/useTreePane.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/tree/useTreeZoom.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-roadmap-tree-zoom.mjs
+
+## MAN-7914 — The roadmap tree — RoadmapTree, TreeGoal, TreeMilestoneNode, TreeEpicNode — Anchor: every zoom is `zoomTo(next, from, to)`, the drawing point under client point `from` ends
+section: The roadmap tree — RoadmapTree, TreeGoal, TreeMilestoneNode, TreeEpicNode, TreeTip and treeWords (src/modules/roadmap/tree)/003 Anchor: every zoom is `zoomTo(next, from, to)`, the drawing point under client point `from` ends
+
+- Anchor: every zoom is `zoomTo(next, from, to)`, the drawing point under client point `from` ends under `to`. The point is read off the svg's box (`(from − box) / scale`), the zoom is committed with `flushSync` (the next event of a pinch reads a resized drawing), and a layout effect of that commit `scrollTo`s the pane (`instant`) by the error read off the svg's box. No frame shows the new size at the old scroll. Wheel and double-tap: from = to = the point. Pinch: from = the last midpoint, to = the new one, so a drifting pinch pans. Buttons: the pane's visible centre. The scroll clamps at the pane's ends, and a drawing narrower than its pane stays centred, so the anchor holds once it overflows.
+- Who places the pane: `useTreeZoom` for a zoom; `useTreePane` takes `zoom` and holds the drawing's centre only across a scale that arrives with the same zoom (a resize).
+- Gestures, native listeners on the pane: two-finger pinch (Pointer Events, `fingers` by id, touch and pen; zoom = the zoom when the second finger landed × the spread since, read from both fingers' current places once per animation frame, so a drag that holds the spread asks for no zoom; a clamp keeps no half-move; a reversal past a clamp acts only once the spread is back inside the baseline's range); `ctrl`+wheel and trackpad pinch (`wheelZoomRatio`, non-passive; a plain wheel is not heard and scrolls); double-tap and double-click (two taps within 320ms and 32px on the same node, or both on empty drawing, each node read where the press went down, each moving under 6px: fit → 2×, else → 1, about the point; two taps on neighbouring dots are two presses). The click that ends a double-tap is swallowed in the capture phase: on touch the browser aims it after the zoom, at the new layout; measured, that click lands on empty drawing or on the node the first tap already selected, so letting it through changes nothing a person sees, and it is held back so a press that zoomed never also selects what the new layout puts under the finger. The first tap's own click is not held: a tap within a finger's reach of a node selects it, then the second tap zooms. A pinch selects nothing and raises no tip.
+- Pinch against scroll, measured at 390×660 (CDP touches, both fingers down together): the default `touch-action: manipulation` gives `pointercancel` after 6 moves, the browser taking the gesture even where page zoom is forbidden; `pan-x pan-y` on the pane 24 of 24 moves with both scroll axes kept (INV-7075 holds) — chosen; a `touchmove` `preventDefault` 24 of 24; `touch-action: none` set on the second `pointerdown` fails (read when the first touch starts). A finger already scrolling when the second lands belongs to the browser, and no variant that keeps the scroll takes it back.
+- Controls: `TreeZoomControls({ canZoomIn, canZoomOut, onZoomIn, onZoomOut, onFit })`, three `Button variant="outline" size="icon"` (`h-8 w-8 bg-card`), `absolute right-2 top-2 z-10` in the wrapper beside the pane, so they do not scroll; Lucide `ZoomIn`, `ZoomOut`, `Maximize`; `aria-label` and `title` `roadmap.tree.zoomIn|zoomOut|fit`. A press steps ×1.5 (`ZOOM_BUTTON_STEP`); In is disabled at 2.5 and Out at 1; Fit stays enabled.
+- One source with the Lightbox (MAN-7426): `ZOOM_BUTTON_STEP`, `ZOOM_DOUBLE_TAP_SCALE`, `ZOOM_TAP_SLOP_PX`, `ZOOM_DOUBLE_TAP_WINDOW_MS`, `ZOOM_DOUBLE_TAP_RADIUS_PX` in `src/shared/constants.ts` and `wheelZoomRatio` in `src/shared/utils.ts`.
+- Proof: `node .verify/probe-roadmap-tree-zoom.mjs [phone|desktop|widget] [light|dark]` — surfaces and themes are filters, none runs all; `widget` is the gutter widget in column fit (ctrl+wheel, buttons, Fit, pane height kept). The probe double-taps the point farthest from every `[data-tree-key]` box (at least 24px) and asserts both pointerdowns landed on no key: a finger's hit-test reaches past `elementFromPoint` (measured: a touch 5px past a ring's rim presses the ring, a label's reach is wider), so a spot that looks empty to a script can be a press on a node, whose first tap selects it before any zoom.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/tree/RoadmapTree.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/tree/TreeEpicNode.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/tree/TreeGoal.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/tree/treeKeys.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/tree/TreeMilestoneNode.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/tree/TreeTip.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/tree/treeWords.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/tree/TreeZoomControls.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/tree/useTreePane.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/tree/useTreeZoom.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-roadmap-tree-zoom.mjs
+
+## MAN-7828 — The roadmap tree's marks and motion — TreeRing, TreeHalo, TreeDotCut, the dot paint and the moments (src/modules/roadmap/tree)
+
+The marks a tree node wears and the motion a moment gives it. Structure, props, markers and words: MAN-7827. Moment rules: MAN-7656. Layout and the dot state: MAN-7819.
+
+Dot paint
+`ROADMAP_DOT_PAINT[state]` (`src/shared/constants.ts`), put on through `style`; the state is `layout.dots`'. The details panel's `PanelDot` (MAN-7840) paints from the same table, so a row's dot and the tree's agree.
+| state | fill | stroke |
+|---|---|---|
+| `shipped` | `--accent` | `--accent` |
+| `inFlight` | `--warn-dot` | `--warn-dot` |
+| `designing` | `--garnish` | `--garnish` |
+| `proposed` | `--info-dot` | `--info-dot` |
+| `idea` | `--surface` | `--ink-faint` |
+| `blocked` | `--danger-dot` | `--danger-dot` |
+- 2026-10-06: in dark mode `designing` (gold) sits close to `inFlight` (amber).
+
+Halo (`TreeHalo`)
+| state | paint |
+|---|---|
+| selected | dashed `2 3`, `--ink` |
+| keyboard focus on a ring node | solid accent, width 2 (`group-focus-visible:`); never on a dot, which sits inside its epic's `group` |
+| named by a moment, reduced motion | solid accent for as long as the moment names it; with motion the node's own motion plays and the halo stays hidden |
+| otherwise | `hidden` |
+- Stands at `r + 6` round a ring (stroke 1.5), `r + 3.5` round a dot (stroke 2). `pointer-events-none`: a press lands on the mark beneath.
+- A dot's halo is drawn after every dot of its epic, so neighbours never paint over it.
+
+Dot cut-out (`TreeDotCut`)
+- An alpha mask (`mask-type: alpha`, set inline so no generated class can fail it), one even-odd path of the dots' box with annuli as holes: the halo's width and 0.75 either side.
+- `TreeEpicNode` renders it while any of its dots wears a halo (selected, or a moment names it) and gives it as `mask` to the dots that wear none. A haloed dot never takes it.
+- A celebrating dot's annulus is cut under reduced motion only, where its halo shows.
+- why a mask, not a canvas-coloured knock-out ring: the tree sits on `--canvas` (the tab) and on `--surface` (the widget and full-screen Card); a mask paints nothing, so it fits both.
+- A mask leaves hit-testing alone: a cut-back neighbour takes its own press (measured in Chromium, 2026-10-06).
+- Dots must stay inside their epic's group; the visible dots carry their own `mask` attribute.
+- Residual: where a selected dot's cut-out overlaps a reduced-motion celebrating dot's, a dot caught in the overlap shows uncut.
+
+Moments
+| moment | the tree draws |
+|---|---|
+| milestone | its ring: the last share draws (`roadmap-draw`) and the ring blooms (`roadmap-bloom`, 900 ms); the goal's connector to it draws itself (`roadmap-draw`); `CelebrationLayer` waits out those 900 ms before it enters (MAN-7636) |
+| epic | its ring draws and blooms; 12 particles burst from the ring's centre (`roadmap-burst`; accent, gold, deep green in turn; `--dx`/`--dy` inline) |
+| feature, task | that feature's dot blooms (`roadmap-bloom`); a task moment names its feature |
+| any, `prefers-reduced-motion: reduce` | nothing moves, no particle; the solid accent halo holds while the moment names the item |
+- A ring holds `scale-110` while its moment is named and eases back after (`motion-safe:transition-transform duration-move`).
+- The tree is the one place a moment draws on an item. A milestone reached moves nothing else, so its epics' and features' moments play on the nodes the tree always draws.
+
+Ring (`TreeRing`)
+- Track first, then arcs: the track circle is the node's first child.
+- Shipped arc: the whole circle with one dash (`pathLength` 1, dash `share` on, `strokeDashoffset` .25), not a rotated path. why: the bloom's transform is free to scale it.
+- While `moment`: the last feature's share is an arc of its own drawn on `roadmap-draw` (`pathLength` 1, dash 1; a one-feature item's is the whole ring); track and arcs bloom about the ring's centre (`[transform-box:fill-box] origin-center`).
+- An item with no feature: dashed `3 3` track in `--ink-faint`.
+
+Traps
+- The `:5183` dev server may not generate a class new to the tree: fetch `/src/index.css` and read it before trusting a look (MAN-7830 Traps). `[transform-box:fill-box]`, `[stroke-dasharray:2_3]`, `text-[11.5px]`, `tracking-[.14em]`, `stroke-ink-faint` and `fill-card` were served on 2026-10-06.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/tree/TreeHalo.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/tree/TreeRing.tsx
+
+## MAN-7840 — The roadmap tree's details panel — TreePanel and PanelRows: the frame, the heading and the shared pieces (src/modules/roadmap/panel)
+
+The details panel under the roadmap tree: the selected item fills it. Mounted by `RoadmapTreeFace` (MAN-7829) right under `RoadmapTree` (MAN-7827), in both fits. Its four bodies, menus and writes: MAN-7841. Dot state: MAN-7819; dot paint: MAN-7828; words `roadmap.panel.*`: MAN-7634.
+
+`RoadmapTreeFace` holds the selection per roadmap and hands the same `selected` to the tree and to this panel (`select` here, `selectOnTree` to the tree): a press on the tree fills the panel, a press on a row moves the selection, and with it the tree's halo. Every write and dialog goes through the face context's `openDialog` and `useRoadmapWrites()` (MAN-7841).
+
+Files
+| file | exports | owns |
+|---|---|---|
+| `panel/TreePanel.tsx` | `TreePanel` | the `Card` frame, the subject lookup, the hint, the fit, the heading id |
+| `panel/PanelRows.tsx` | `PanelHead`, `PanelDot`, `RowList`, `PanelQuote`, `PanelAdd` | the pieces all four bodies share |
+| `panel/RoadmapPanel.tsx`, `MilestonePanel.tsx`, `EpicPanel.tsx`, `FeaturePanel.tsx` | one body each | MAN-7841 |
+
+Props
+`TreePanel({ roadmap: Roadmap, layout: TreeLayout, selected: RoadmapTreeSelection | null, onSelect(selection), fit: 'viewport' | 'column' })`
+- `layout` is the tree's own (`layoutTree`): the panel finds its item there (`findSubject`), so it and the tree judge alike what the picture still holds. `selected` null, or a name the layout lacks, shows the hint.
+- `RoadmapTreeFace` mounts it directly under the tree, in the body's `gap-3` flow, `fit` the face's own, while the roadmap holds a milestone.
+
+Frame (`TreePanel`)
+| attribute | holds |
+|---|---|
+| `data-roadmap-panel` | `hint`, `roadmap`, `milestone`, `epic` or `feature` |
+| `role="region"` | named by the open body's heading (`aria-labelledby`); by `roadmap.panel.label` (`Details`) while the hint shows |
+| `data-roadmap-panel-row=<name>` | a row, on its surface |
+| `data-roadmap-dot=<state>` | a `PanelDot` |
+
+- `useTreeRoom` finds the panel by `[data-roadmap-panel]` and measures its height (MAN-7829).
+- Width: `mx-auto w-full max-w-3xl`, whatever the tree's width.
+- `viewport` fit: `h-[clamp(9rem,26vh,16rem)] shrink-0 overflow-hidden`, the inside `overflow-y-auto overscroll-contain scrollbar-thin`. why: the tree's scale must not change as the panel fills. `column` fit: natural height.
+- The scroller is `key`ed by the item (`roadmap`, `<kind>:<name>`, `hint`): a new selection draws afresh at its head with its quote folded.
+- The hint: a centred muted line under a `Pointer` icon, `roadmap.panel.hint`. No `EmptyState`: it would push the Add press out of the band.
+- The heading id is `useId()` in `TreePanel`, passed to the body as the required `headingId`; the body's `PanelHead` sets it on the `h2`.
+
+Shared pieces (`PanelRows`)
+- `PanelHead({ id, title, sub, action })`: `h2` `font-serif text-xl/tight font-normal`, `tabIndex={-1}`, `outline-none focus-visible:outline-none`; the sub line `text-xs text-muted-foreground text-pretty`.
+- `PanelDot({ state })`: `ROADMAP_DOT_PAINT[state]` (`src/shared/constants.ts`) as fill and border, `aria-hidden`.
+- `RowList({ rows, sortable, empty, onSelect })`: `sortable` null draws rows as they come; else in `sortable.order`, with `attachList` on the `ul` and `itemProps(name)` on each `li`. An empty list is a muted line on the same hairline.
+- Row: a free surface whose click selects (so `useSortable` lifts it from a free press, never from a control); its title is the real `<button>`, `aria-describedby` its meta.
+- `PanelQuote({ text })`: `blockquote` on a left rule, `^\s*>\s?` stripped per line, `line-clamp-3`; Show all (`roadmap.goal.showAll`, `ml-1`) only when the fold hides lines; its press hands the keyboard to the quote (`tabIndex={-1}`, no ring), since the button leaves with the fold. Roadmap, milestone and epic goals fold; the feature's goal never does. why: an epic goal runs to 2,400 characters and would push the rows out of a 234px band.
+- `PanelAdd({ label, onPress })`: ghost `Button` with `Plus`.
+
+Rules
+- Keep `text-xl/tight` as ONE class: `cn` drops a `leading-*` spelled before a later size.
+- No `tabular-nums` on the head's sub line: a title's comma takes a figure's width ("requested ,"). Keep `text-pretty` there: a lone "1" wraps onto its own line otherwise. Row meta keeps `tabular-nums`.
+- The heading is a focus target and never a tab stop; `outline-none` alone loses to tokens.css's `[tabindex]:focus-visible` rule, so `focus-visible:outline-none` stays.
+- A row's press hands the keyboard to the new panel's heading (`selectFromRow` names the panel, the effect on `shownKey` focuses it once drawn): the pressed row goes with the panel it stood in. A press on the tree leaves focus on the tree's node.
+- 2026-10-06: `h-[clamp(9rem,26vh,16rem)]`, `text-xl/tight` and `grid-cols-[auto_minmax(0,1fr)]` were in the served stylesheet; `src/index.css` needed no touch.
+
+Traps
+- The band is 234px and `useSortable`'s edge zone is 56px at each edge, so a row can open inside a zone (the first visible one opens within 20px of the bottom). A carry that begins there holds that edge until the pointer has left the zone or been pulled far past the pane (`Carry.edgeHold`, MAN-7577): a drag of a row's height moves it one slot (`{kind: 'plan', name, before: <next>}`) or nothing, and the band does not move. Before the hold it ran the band to the list's END and wrote `after: <last>`. Scaling the zone to `min(56, height / 4)` would not have cured it: 234 / 4 is 58.
+- The ⋯ menu closes on any scroll: a probe brings the panel into view before it presses the trigger.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/panel/PanelRows.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/panel/TreePanel.tsx
+
+## MAN-7841 — The roadmap tree's details panel — the four bodies: RoadmapPanel, MilestonePanel, EpicPanel and FeaturePanel, their menus and their writes (src/modules/roadmap/panel)
+
+What `TreePanel` draws for each kind of selection. Frame, heading and shared pieces: MAN-7840. Dot state: MAN-7819. Words `roadmap.panel.*`: MAN-7634. Case phrase: MAN-7660.
+
+Props
+| body | props |
+|---|---|
+| `RoadmapPanel` | `{ roadmap, headingId, onSelect }` |
+| `MilestonePanel` | `{ roadmap, milestone, n, headingId, onSelect }` |
+| `EpicPanel` | `{ epic, n, dots, headingId, onSelect }` |
+| `FeaturePanel` | `{ feature, epic, milestone, n, dot, headingId }` |
+- `n` is the milestone's 1-based place; `dot` and `dots` are `layout.dots`' (MAN-7819); `onSelect(selection: RoadmapTreeSelection)` takes a row's item.
+
+Bodies, in order under the head
+| body | head `sub` | then |
+|---|---|---|
+| roadmap | `roadmap.panel.roadmap` + facts joined ` · ` (`data-roadmap-standing`, each `data-roadmap-fact=<key>`): milestones reached, shipped, in flight, next, blocked (warn), waiting (warn), cases total, cases broken (warn), all holding | goal `PanelQuote`, or the press `roadmap.goal.missing` (dashed); milestone rows in path order, never sortable; Add a milestone |
+| milestone | `roadmap.milestone.eyebrow` (`n`, `word`); `word` is `roadmap.panel.reachedOn` once reached on a known day (`formatShortDate`), else the milestone word | blocked reason whole (warn `Badge`); goal quote; epic rows, sortable; Add an epic |
+| epic | `roadmap.panel.epicLine` (`n`, `word`), with the time (`roadmap.facts.withTime`, `humanizeDuration(runtime_s)`) once `runtime_s > 0` | case line `data-roadmap-epic-cases` once `cases.total > 0`: `epicHolding`, amber `epicBroken` for `broken + regressed`; blocked reason whole; goal quote; feature rows, sortable; Add a feature |
+| feature | `roadmap.panel.featureLine` (`epic`, `n`) | warn lines; facts `dl`; goal in full, or `roadmap.panel.noGoal` |
+- The epic's and roadmap's case words read `standing.cases` in place; only the feature's Cases fact goes through `caseMark`.
+
+Rows
+| row | dot | meta |
+|---|---|---|
+| milestone | reached `shipped`, in progress `inFlight`, else `idea` | `roadmap.tree.milestoneLine`, the word alone while it holds no feature; + ` · ` + `roadmap.tree.blocked` while `milestone.blocked` |
+| epic | complete `shipped`, in progress `inFlight`, else `idea` | `roadmap.panel.rowMeta` (`word`, `done`, `count`), the word alone while it holds no feature; + blocked while `epic.blocked` |
+| feature | `dots.get(name) ?? 'idea'` | `rowMeta`, the word alone before a task; + blocked while the dot is `blocked` |
+- Blocked is said in words on a row, never by colour alone: it matches the tree's tip. The tree's milestone node draws no blocked mark, so the milestone row is where a milestone's block reads.
+
+Feature panel
+- Warn lines first, in amber `Badge`s that wrap: `data-roadmap-panel-waiting=<accept|questions>` (`roadmap.feature.waitingAccept` or `waitingQuestions`) while `waiting_on_you`; `data-roadmap-panel-blocked` (`roadmap.blocked`) with the nearest reason (`feature.blocked ?? epic.blocked ?? milestone.blocked`) only while the dot is `blocked`, so a shipped feature under a blocked epic never reads blocked.
+- Facts (`dl`, `grid-cols-[auto_minmax(0,1fr)]`): State (`PanelDot`, then `roadmap.stateLine` with `useStepPhrase`; the word alone while a waiting line stands, so the warning is said once), Tasks (`panel.tasksDone` or `panel.noTasks`), Project, Cases (`caseMark`: a `warn` `Badge` or plain text, `data-roadmap-cases=<key>`; only once the feature keeps a case).
+- Open (`data-roadmap-panel-open`, outline `Button`, `roadmap.panel.open`, `aria-describedby` the heading) leads to the feature's dialog, whose menu and footer carry every write; the panel has no `ActionMenu`.
+
+Menus (`ActionMenu`, label `roadmap.menu.actions`)
+| body | items |
+|---|---|
+| roadmap | edit, add milestone, delete (only while it holds no milestone) |
+| milestone | edit, add epic, move earlier (disabled at `n <= 1`), move later (disabled at the last), mark blocked or unblock, delete (only while it holds no epic) |
+| epic | add feature, edit, move to milestone, mark blocked or unblock, delete (only while it holds no feature) |
+
+Writes (every press goes through the face context's `openDialog` or `useRoadmapWrites()`; the dialogs are `OpenDialog`'s)
+| body | presses |
+|---|---|
+| `RoadmapPanel` | ⋯: edit, add a milestone, delete (`openDialog`); the missing goal's press `openDialog({ dialog: 'edit', kind: 'roadmap', item: roadmap, goalFirst: true })`; the foot's Add a milestone; a milestone row's press selects it |
+| `MilestonePanel` | ⋯: edit, add an epic, block, delete (`openDialog`); Move earlier and Move later `writes.move({ kind: 'milestone', name, before \| after, itemTitle })` and nothing more; Unblock `writes.unblock({ kind: 'milestone', name, itemTitle })`; the foot's Add an epic; epic rows are a `useSortable` list; an epic row's press selects it |
+| `EpicPanel` | ⋯: add a feature, edit, move, block, delete (`openDialog`); Unblock `writes.unblock({ kind: 'arc', name, itemTitle })`; the foot's Add a feature; feature rows are a `useSortable` list; a feature row's press selects it |
+| `FeaturePanel` | Open `openDialog({ dialog: 'feature', name })`, which leads into FeatureDialog, whose own ⋯ and footer carry the feature's writes |
+- A moved milestone keeps the panel: the selection is held by name, so nothing re-selects after Move earlier or Move later.
+- A drop writes `writes.move({ kind: 'arc' \| 'plan', name, before \| after, itemTitle })`: the neighbour the row now stands before, else the one it follows. The promise is returned, so `useSortable` holds the row where it was dropped until the next frame lands.
+- A row is a free surface whose title is its `<button>`: a press on the title selects, a press-and-carry on the free surface reorders (`isFreePress` never lifts from a control).
+- A selection a row made hands the keyboard to the new panel's heading (`TreePanel`'s `selectFromRow` and its effect on `shownKey`); the tree's own presses leave it on the tree's node.
+- The roadmap body's cases pair stands LAST among its facts. why: the pair is bound by adjacency, so no feature fact reads as counting cases.
+- The panel is the one place a face draws the roadmap's standing line, an epic's case line and a feature's case phrase (`data-roadmap-standing`, `data-roadmap-epic-cases`, `data-roadmap-cases=<key>`: MAN-7660). A page holding the tab and the gutter's widget draws each twice: scope a probe under `[data-roadmap-face]` or `[data-roadmap-widget]`.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/panel/EpicPanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/panel/FeaturePanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/panel/MilestonePanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/panel/RoadmapPanel.tsx
+
+## MAN-7847 — Kit — `Timeline`: row layout, density, controlled open row
+
+`src/shared/ui/Timeline.tsx`: Verve's chronological feed, one button row per `TimelineEvent`. Paint: `.vv-timeline*` in `src/shared/ui/verve/panels.css` (MAN-740 rule 6). Not the transcript's `chat/transcript/shapes/Timeline.tsx`, which draws an author's own list.
+
+## Props
+| prop | meaning |
+|---|---|
+| `events: TimelineEvent[]` | `tone`, `source`, `title`, `summary?`, `when`, `meta?` |
+| `density` | `full` (default): title + summary. `dense`: no summary, title one line with an ellipsis |
+| `openIndex?: number \| null` | the open row's POSITION when the caller owns it; `null` = none; left out, the timeline keeps its own |
+| `onToggle?(index)` | the toggle when `openIndex` is given, a notification when not |
+
+- A `TimelineEvent` has no id, so only a position can be kept. A feed that grows at its head (newest first) owns `openIndex` and shifts it by the rows it prepends, or closes the row: an uncontrolled one leaves a different event open.
+- An open row is never empty: no `meta` draws `timeline.noDetail`.
+- The dot is `data-tone` + `bg-tone-dot`, so it cannot disagree with a status mark.
+
+## Row layout
+`dot` · the body (`.vv-timeline__body`: the source pill, then the words — title, then summary when `full`) · `when` · chevron.
+- STACKED OR SIDE BY SIDE IS THE LIST'S DECISION, never a row's. `.vv-timeline` is a container (`container: vv-timeline / inline-size`): under 32 rem EVERY row drops its words UNDER its pill, in either density (a `dense` title stays one line there); from 32 rem EVERY row sets them beside it, the pill capped at 45 % of the body so the words keep their 10 rem.
+- why: a wrap decided row by row, on each pill's own width, put the title of a short-pilled row beside it and the title of a long-pilled one under it, so one list's titles started in two places. Measured 2026-10-07 on the real `Timeline` with eight sources of different lengths (`.verify/cerberus-timeline-stacking.mjs`): before, 340 to 460 px split the list (6, 4 and 1 of 8 rows stacked); after, every width from 300 to 900 px is all stacked or all side by side, and the narrowest title is 165 px.
+- Measured: at 390 px a "Shadow connector" pill beside the title left it ~90 px, and titles wrapped to four lines. The stack is the cure.
+- A pill wider than its room truncates (`.vv-timeline__source`: ellipsis).
+
+## Consumers
+| consumer | density | file |
+|---|---|---|
+| Fleet's What happened card, a column ~300 px wide | `dense` | `src/modules/cerberus/fleet/WhatHappenedCard.tsx` |
+| History's feed (MAN-7877) | `full` | `src/modules/cerberus/history/EventsCard.tsx` |
+
+## Traps
+| trap | do |
+|---|---|
+| a rule that decides stacked or side by side per ROW, from that row's pill width | one list mixes both and its titles start in two places; keep the decision on the list: the `@container vv-timeline (min-width: 32rem)` rule on `.vv-timeline` in `panels.css`, which Fleet's card and History's feed share |
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Timeline.tsx
+
+## MAN-7848 — Kit — `Select`: the list opens on its chosen row
+
+`src/shared/ui/Select.tsx`: the one styled single-choice picker. Host-window binding: MAN-7451.
+
+## Opening
+- A list that scrolls opens with its chosen row (`[aria-selected="true"]`) centred, not at its top. Every `Select` in the app gets it; a list that does not scroll is untouched, and the browser clamps either end.
+- `useLayoutEffect` on `open` sets the list's `scrollTop` before the panel paints: `chosen.offsetTop - list.offsetTop - (list.clientHeight - chosen.offsetHeight) / 2`.
+- `scrollTop` and not `scrollIntoView`. why: `scrollIntoView` also scrolls the page under the panel.
+- No chosen row (`value` matches no option): the list opens at its top.
+- why: History's check picker holds every active check (84 on the live index); opened at its top it hid the choice being reconsidered (MAN-7877).
+
+## Option `hint`
+- `SelectOption` = `{ value, label, hint? }`. `hint` is secondary text after the label in `.vv-select__hint` (muted ink, 0.86em), for a choice whose label alone does not name it (two projects called `app`; MAN-8135). It is never part of `label`.
+- The trigger and every option draw it through `OptionText`, with a real space (`{' '}`) before the span. why: a CSS margin is not text, so the accessible name and a copied label ran the words together.
+- An option that has a hint truncates (`min-w-0 truncate`) like the trigger; options without one are unchanged.
+- On the chosen row's wash the hint steps up one ink (`--ink-mid`). why: `--ink-muted` read 4.44:1 there, under AA.
+
+## Rules
+- `.vv-select__panel` (`position: absolute`, `controls.css`) must stay the positioned ancestor of `.vv-select__list` and its rows. why: the offset arithmetic above reads both offsets from it; a `position: relative` on the list or a row breaks the centring.
+- `.vv-select__list` is the scroller (`overflow-y: auto`); the `action` row sits outside it.
+
+## Known
+| gap | state |
+|---|---|
+| every option is its own tab stop (`tabIndex={0}`); no arrow keys, no type-to-find | roving focus is its own piece of work |
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Select.tsx
+
+## MAN-7926 — Cerberus fixes, the whole once — .verify/cerberus-fixes-whole-scratch.sh, -live.mjs and cerberus-fixes-refused-shot.mjs: what each proves, how to run it, the verdicts
+
+The fixes screen, the catalog and the auto-run rule shown end to end: a real Run now on the live tab, auto-run and a refusal on a scratch center. The whole before the fixes: MAN-7899 (`.verify/cerberus-whole*`). Runs, the rule, the refusal's source: MAN-7904, MAN-7910, INV-7106, INV-7080. The screen: MAN-7906. The seeded entries: MAN-7925. The scratch server and its slots: MAN-673 (`cloudcli:docs`).
+
+## Files
+| file | proves | runs against |
+|---|---|---|
+| `.verify/cerberus-fixes-whole-live.mjs` | Run now on `docstore/backup.age`, pressed in the sheet as a person presses it | the live app on :5183 (`openConsole`, `openNodeCard`), `~/.cloudcli/cerberus.db` read-only |
+| `.verify/cerberus-fixes-whole-scratch.sh` | auto-run once inside its limit, the recheck, a refused `run.start` | a scratch center (`scripts/sunset-probe.sh`) and a scratch warden |
+| `.verify/cerberus-fixes-refused-shot.mjs` | `FixOutput` reads "✕ Refused" and the refusal's reason over a real run view | the running :5183 client, the scratch center's answer |
+
+## Run it
+| when | do |
+|---|---|
+| the live half | `node .verify/cerberus-fixes-whole-live.mjs --evidence <dir>` |
+| the scratch half | `SUNSET_SLOT=4 bash .verify/cerberus-fixes-whole-scratch.sh <dir>` — about 4 minutes, run it in the background |
+| the shot alone | `SCRATCH_TOKEN=<jwt of the scratch center> node .verify/cerberus-fixes-refused-shot.mjs <run url> <dir> [Refused]` — the scratch script calls it |
+
+## `cerberus-fixes-whole-live.mjs`
+- Opens eis1's card, the Document store row (the sheet opens on `docstore/backup.age`), presses "Run now" under "Fixes in the catalog", polls the page every 200 ms and prints each change of the pill, the pane's lines and the check's value.
+- Starts a REAL `docstore/bin/backup` (one `pg_dump`, ~18 s): `docstore-<weekday>.dump` is overwritten. No model is called.
+- Verdicts, all required: the POST answered 200 with a `runId`; `GET /api/cerberus/runs/<id>` is `by: you`, `result: ok`, `exit: 0`; its lines carry `backup: …/docstore-<weekday>.dump <bytes> bytes` with an offset `t`; the pane shows that line; the pill reads "✓ Succeeded"; the check's value reads "Newest file written <n> s ago (docstore-<weekday>.dump)" with n < 60; the entry has exactly one more run in the store; no console error while signed in.
+- Output: `steps.txt` and the screenshots (1440×900 running, 1440×900 and 390×844 ended, 390×844 pane) in `<dir>`.
+- No guard for the 03:25–03:35 backup `flock` (`state/docstore/backup.lock`): a press then ends `failed` (MAN-7925).
+
+## `cerberus-fixes-whole-scratch.sh`
+1. The slot is claimed by the harness's `probe_db` (`mkdir "<prefix>claim"`) before anything of it is written; a slot another probe holds is refused ("slot <N> is held by another probe") and the script exits 1, its trap leaving the holder alone.
+2. Boots the scratch center, enrolls a warden from this checkout with its own `CERBERUS_WARDEN_HOME` as a background job, sets a `file_age` probe `pass: "age < 1m"` every 10 s.
+3. Entry A touches the file (auto on, 1 run per 3 600 s, `recheck`). Entry B is on another check, auto off.
+4. Timeline until the check has moved into failing twice (counted from stored `change` rows) plus 25 s: A must have exactly one run.
+5. B's set is acked, then `update catalog set cmd='echo changed'` in the scratch store; `POST /catalog/<B>/run` makes the real center send the changed command with the acked version; the warden answers `run.refused`.
+6. Mounts `FixOutput` over B's run through `cerberus-fixes-refused-shot.mjs`.
+
+| verdict | passes when |
+|---|---|
+| A ran by auto exactly once | `count(runs where entry = A and by = 'auto')` is 1 |
+| A's auto run ended ok | `runs.result = 'ok'` |
+| the recheck passed the check | a stored `failing → ok` row with `at - prev_at < 5000` and `at` within −1 s to +5 s of A's run `ended_at` |
+| B ended refused | `result = refused`, `started_at` null, `cmd = 'echo changed'` |
+| B's refusal says why | `note` equals `The command is not catalog v<sent version>'s command for '<B id>'` |
+| B named the newest acked version | `catalog_version` is the max acked version of the node |
+
+- The recheck verdict compares `prev_at` (the warden's previous result time, `ingest.service.ts`) with the run's end: a recheck follows the failing result by ~1 s, a cadence tick by ~10 s. why: a bare `failing → ok` count passes on the next tick when `recheck` never fired.
+- The refusal verdict names the command check: a refusal for an unknown id or the wrong version fails it.
+- Cleanup on every exit: the warden (pid checked as an integer above 1 and as `warden/src/main.mjs` in `/proc/<pid>/cmdline` before `kill`), the probe server, then the `mktemp -d` scratch under `/tmp/heph-fixes-whole-*`.
+- Measured 2026-10-07: slot 4, A one auto run, recheck row 1 s after the failing result; B `refused` with no start and no exit.
+
+## `cerberus-fixes-refused-shot.mjs`
+- Reads the run from the scratch center (`<run url>`, token in `SCRATCH_TOKEN`) and hands it to the component through a Playwright route on `**/api/cerberus/runs/<id>`. why: the component reads through the live client's API base, not `$SUNSET_API`.
+- Mounts the running client's own `FixOutput` and `WebSocketContext` with `lib/mountReact.mjs` (specifiers read from served source), a quiet socket, at 1440×900 and 390×844.
+- Writes `fix-output-<expect>-<w>x<h>.png`; `expect` is the pill word, default `Refused`.
+- Six verdicts per size: pill glyph + word; eyebrow "Fix output"; the run's name; the pane's first line `$ <cmd>`; the run's note in the pane; no page error. A refused run whose `note` is null fails the note verdict; any other result accepts a null note.
+- Exit 1 when any verdict failed at either size.
+
+## Rules
+- A "recheck passed" claim is discriminated from the probe's own cadence: compare `prev_at` and the run's end, never a bare `failing → ok` count.
+- The scratch script runs in a slot of its own (`SUNSET_SLOT`, default 4 here) and never opens `~/.cloudcli/cerberus.db` or binds 3012; the live script only reads that store (`sqlite3 -readonly`).
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/cerberus-fixes-refused-shot.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/cerberus-fixes-whole-live.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/cerberus-fixes-whole-scratch.sh
+
+## MAN-7956 — Node-updating probe — .verify/cerberus-node-updating.sh, .verify/lib/signed-hello.mjs
+
+Shows MAN-7933's two rules live: a node whose update is the active one takes no new work, and a `failed` hello heard after center ended the update `updated` turns it `rolled_back`. A scratch center, one scratch warden (`probe-node`) under its launcher, no real store.
+
+```
+bash .verify/cerberus-node-updating.sh        # repo root; slot 2 unless SUNSET_SLOT says otherwise; about 6 min
+```
+
+Slot claimed by `probe_db` (`scripts/sunset-probe.sh`); a slot another probe holds is refused and the trap leaves it alone. Opens no `~/.cloudcli/cerberus.db`, writes no `dist-warden/`, binds no 3012; releases N, N+1, N+2 are built through scratch copies of the tree (`.verify/lib/scratch-wardens.sh`).
+
+| Step | Shown |
+|---|---|
+| 1 | `probe-node` on N; checks `probe/file.age`, `probe/stale.age`; entry A (a 60 s fix on the first), entry B (auto, limit 1 an hour, on the second) |
+| 2 | A's run started, N+1 offered: the warden answers `waiting`, the update stays active until the fix ends. Meanwhile `POST /catalog/<A or B>/run` → 409 `CERBERUS_NODE_UPDATING`, no `runs` row; `POST /diagnoses` first step "probe-node's warden is updating: this diagnosis reads Cerberus history only"; the stale check moves into failing and no auto run starts, nothing logged "was not run on its own" |
+| 3 | update ended `updated`, launcher stopped, a hello signed with the warden's own key carrying `failed`: +5 s naming another release → left `updated`; +10 s naming N+1 → `rolled_back`, `ended_at` unchanged, one `failed` step "Rolled back to N · <reason>"; the same hello again adds no second step |
+| 4 | launcher started, N+2 offered with no fix running: ends `updated` at once; the stale check moving into failing starts B's one run of the hour (step 2 spent none); a `failed` hello 125 s after the end amends nothing |
+
+## `.verify/lib/signed-hello.mjs`
+```
+node .verify/lib/signed-hello.mjs <scratch warden home> <version the hello reports> <updateId> <failed version> <reason>
+```
+- Connects as a warden's link does (upgrade signed over `cerberus-connect\n<node>\n<at>` with `<home>/keys/node.key`), sends ONE hello whose `update` is `{ updateId, failed, reason }`, waits for `welcome`, hangs up.
+- Prints `welcomed`, else the reason and exit 1; exit 2 on bad usage or a home outside `/tmp` (it reads a private key; nothing of it is printed).
+- The warden of that home must NOT be running: a node holds one link and a second replaces the first. Stop its launcher first.
+- The hello lists no live run (`active.runs` empty): center's reconcile ends any live run of that node `failed`. Send it only when the node has no run going.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/cerberus-node-updating.sh, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/signed-hello.mjs
+
+## MAN-7957 — The Cerberus repositories — cerberusUpdatesDb.activeNode and rolledBackAfterUpdated
+
+Two verbs of `cerberusUpdatesDb` (`repositories/cerberus-updates.db.ts`) beside those of MAN-7806. Behaviour on top of them: MAN-7933.
+
+| Verb | Does |
+|---|---|
+| `activeNode()` | the `node` of the oldest live update (`ended_at IS NULL ORDER BY started_at, rowid LIMIT 1`, the order of `running()[0]`), else `null`. A node is "updating" from the moment its update is the active one until it ends; the update behind it in its batch is not, until its turn. Read from the store, never the driver's memory, so a handover's two processes agree. Consumers: `startRun` (409 `CERBERUS_NODE_UPDATING`), `auto-run.ts`, the diagnosis service's `openSession` |
+| `rolledBackAfterUpdated(id, at, text, since, note)` | the ONE amendment of an ended update; `true` when it did it. In ONE transaction (nested into the caller's): `UPDATE updates SET result = 'rolled_back', step = 'failed', note = @note WHERE id = @id AND result = 'updated' AND ended_at >= @since`; only when that changed the row, `INSERT INTO update_steps (…, 'failed', @text) ON CONFLICT (update_id, at, step) DO NOTHING`. `ended_at` is left as it was. `at` and `since` that are not whole epoch ms THROW |
+
+- `rolledBackAfterUpdated` is the exception to "opens no transaction" (MAN-7806 Contract): its two writes are one unit however it is called.
+- An update never `updated`, one `updated` before `since`, one already `rolled_back` (a resent hello) or a failure is left as it was and answers `false`.
+- The step does not go through `insertStep`: that one keeps its `ended_at IS NULL` guard and would refuse it. No other path writes a step under an ended update or reopens one.
+- `note` is the launcher's bare reason, what a live rollback files; `text` is the whole sentence "Rolled back to <from> · <reason>".
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/cerberus-updates.db.ts
+
+## MAN-7958 — Cerberus diagnosis words — .verify/cerberus-diagnosis-words-shot.mjs: what it proves, how to run it, the write guard, the verdicts
+
+Photographs the two words a diagnosis tells the sheet — `when` (what promotion writes) and `scope` (whether the node's reads were given) — on the REAL Cerberus tab of the running :5183 client. The screen: MAN-7932. The words: MAN-7870. `.verify/` is gitignored.
+
+## Run it
+`node .verify/cerberus-diagnosis-words-shot.mjs <evidence dir> [node/service/check]` — default check `eis1/shadow-connector/approval_engine`.
+| exit | when |
+|---|---|
+| 0 | every verdict PASS |
+| 1 | any FAIL, or the check is not in `GET /api/cerberus/checks` (stops at once with a sentence naming it) |
+| 2 | no evidence dir |
+
+## What is answered, what is aborted
+- One handler on `**/api/cerberus/**` (`page.route`) decides by METHOD first: a non-GET is counted in `refusedWrites` and aborted, whatever URL it names — the fixture URLs included. why: a separate route per URL let the answering routes beat an abort route; the check route's `route.fetch()` would replay a `DELETE` to the live store.
+- Then `GET /api/cerberus/diagnoses/fixture0diagwords` is answered with the fixture (`diagnosisFixture({ when, scope })`: steps count from 1; the history step quotes its subject in “ ”); `GET /api/cerberus/checks/<node>/<service>/<check>` is the real answer with `diagnosis` put in; anything else falls through.
+- The service row on the node card is matched by the check's own `serviceLabel`, read from `GET /api/cerberus/checks` (the word the card draws), never a fixed label.
+
+## Scenarios and verdicts (each at 1440×900 and 390×844)
+| scenario | fixture | verdicts |
+|---|---|---|
+| 1 Add to catalog → Promote dialog | `when: 'warn'`, `scope: 'node'`, the check reading `failing` now | the trigger line reads "nears its limit"; the raw line ends "· warn" |
+| 2 Diagnosis panel | `when: 'failing'`, `scope: 'history'` | the panel reads "Read-only. It reads Cerberus history: <node>'s logs and status were not reachable."; it does not say "It reads logs, status and Cerberus history" |
+| both | | `refusedWrites === 0`; no console error or page error |
+
+Photographs, into the evidence dir: `promote-when-warn-<w>x<h>.png`, `diagnosis-scope-history-<w>x<h>.png`; `sheet-did-not-open.png` when the sheet never opens.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/cerberus-diagnosis-words-shot.mjs
+
+## MAN-8065 — modules/compaction procedure — one run, the steps with the seed append (step 7), Stop by phase, automatic refusals and the failure push
+
+`compact()` (`compaction-procedure.ts`) is one compaction run. The decorator hands it the run's own writer: every frame goes to that writer, so the gateway sequences it, replays it to every tab and shows it on the processing line. The old transcript is never written; the chat's row moves only inside `swapToCompactedSession` (MAN-8046).
+
+## The steps
+1. Session row. No `provider_session_id` / `jsonl_path` → error frame `This chat has no transcript to compact yet.`, `complete` exit 1.
+2. Guard `waitUntilQuiet`. Manual waits, subscribed to `activityChanged` BEFORE its first read (no timer, no poll), re-saying `Compaction waits until <why> — Stop cancels it` as the reason moves. Automatic never waits: busy → logged `left alone: the chat is busy (<why>)`, `complete` exit 0.
+3. Fresh `summarizerStatus()` → `noteSummarizerStatus`. Not ready → `refusedByReadiness`. Else status frame `Compacting with <model> · <effort>…`.
+4. `fireCompactHealTrigger`: `python3 ~/.claude/hooks/heal_trigger.py --reason compact`, the CLI's PreCompact payload with the OLD session id and transcript, 10 s bound, a failure is one log line. It fires before the verb: a refused or failed attempt fires it too.
+5. `runSummarizeVerb`: `~/.claude/scripts/summarize --transcript <path> --session <id> [--instructions -]`; 60-minute ceiling; SIGTERM, SIGKILL after 15 s; stdout cap 64 MiB. Only `signalOwnChild` signals, and only a plain pid above 1 of a child not yet exited. Its answer:
+
+| answer | do |
+|---|---|
+| exit 0, JSON `{seed: string[], model, served[], effort, chunks, tokens_in, tokens_out}` — `readVerbSuccess` takes `seed` as one or more non-empty strings (the verb gives 2 to 4: MAN-8133) and returns a copy | success |
+| exit 3 | `refusedByReadiness` |
+| exit 2 | `refuseAutomatic`; logged; error frame; no push |
+| any other exit, or exit 0 whose JSON does not read | logged; error frame `Compaction failed: <sentence>. The chat stays on its current session.`, `complete` exit 1, push |
+
+Every non-success answer except exit 3 logs `the summarizer ended without a summary (exit <n>): <sentence>` (exit 2 adds ` — the chat is under an automatic refusal until a manual Compact or a flip of the switch`) before its error frame.
+
+6. Live rows before the seed append: the `compaction` row, then the summary row (`isCompactSummary`). Ids `compaction-<oldProviderSessionId>` and `compaction-summary-<oldProviderSessionId>` equal the history's, so the post-run refresh replaces them.
+7. The seed append: `inner.run('claude', '', …)` with the triggering send's options minus `attachments`, `images`, `files`, `compactionTrigger`, plus `resumeFromScratch: true`, `transcriptAppend: seed`, `compactionSeed: true` (MAN-8055). No model call, no assistant text after the summary. `createSeedWriter({…, facts, seed: success.seed})` calls `swapToCompactedSession` (with the same `seed`, stored on the record: MAN-8046) at the first announced id other than the old one, before forwarding it, and holds the run's `complete`.
+8. Success or take-back. Success = swapped AND held `complete` exit 0 AND not aborted: `setCompactionPostTokens` with the last `token_budget.used` (the runtime's one `getContextUsage` `full` count, MAN-8055), then forward the held `complete`. Anything else:
+   - `inner.abort('claude', sessionId)` retires the seed's process (skipped after a Stop, which already did). why: it is registered under the chat's key; left alive, the next message joins it on the seed session while the row says the old one.
+   - `unswapCompactedSession` (records the seed `compaction-abandoned`) when the swap was written; a swap that failed parks the unclaimed seed as superseded.
+   - error frame, `complete` exit 1, push (step 9).
+9. The push for an automatic failure: §"The failure push".
+
+`refusedByReadiness`: `noteVerbNotReady`, `refuseAutomatic`, then one `logDecision` line. Manual → logged `handed to the CLI: the summarizer is not ready (<why>)`, status `Custom compaction is not ready (<why>); the CLI compacts this chat instead.`, then `inner.run('/compact', …)` on the same run and writer. Automatic → logged `left alone: the summarizer is not ready (<why>)`, `complete` exit 0.
+
+A manual Compact handed to the CLI before `compact()` runs (the summarizer was already known not ready) is logged by the decorator: MAN-8067 §"The decorator's `/compact` test".
+
+`compact()` never rejects: a thrown step is an error frame, `complete` exit 1 and a push.
+
+## Stop and the flight
+A flight is `{trigger, phase: waiting|summarizing|seeding, stopped, stop}`; `flight.stop` is replaced per phase. After a Stop the run writes nothing more (`emit` gates on `flight.stopped`) and pushes nothing.
+
+| phase | Stop does | result |
+|---|---|---|
+| waiting | ends the guard | no compaction |
+| summarizing | SIGTERM to the verb's child (the verb passes it on) | no verb or summarizer child left |
+| seeding | `inner.abort`; the procedure takes a written swap back | chat stays on its old session; abandoned seed = `compaction-abandoned` |
+
+- `flightOf(sessionId)` = in flight AND not stopped. A stopped flight stays registered until its verb exits; the next turn's Stop must reach `inner.abort`. Code needing "still registered" must not use `flightOf`.
+- `stopFlightsBeforeSeed()` stops every flight not yet seeding (shutdown).
+
+## Automatic refusals
+`refuseAutomatic(sessionId)` stamps the chat with `switchFlipCount()`. The triggers leave the chat alone until the count differs from the stamp (a switch flip) or a manual Compact runs (`liftAutomaticRefusal`). Set by exit 2 and by not-ready. NOT set by exit 1, an exit-0 answer that does not read, a seed that did not take or a thrown step: that chat stays due and the next turn end or idle deadline starts the run again, uncapped (MAN-8066 §"A failure is not a refusal"). A chat holding only a seed plus one exchange gets exit 2 (nothing to compact yet).
+
+## The failure push
+Code `compaction.failed`, `kind: 'error'`, `severity: 'error'`, `meta {trigger, reason}`, `dedupeKey claude:compaction:failed:<sessionId>`. Wording lives in `notification-copy.service.ts` (MAN-622). Sent for an automatic trigger with an unstopped flight. Not sent for: manual, a Stop, exit 2, not-ready.
+
+## Probing
+`node .verify/custom-compaction-chat.mjs --app <scratch client url> --api <probe api url> --leg manual|background|turn|wait|delete [--chat <id>] [--turns N] [--runs M] [--seconds S] [--evidence <dir>] [--server-log <file>]`; Haiku chats in the scratch project under `/tmp`.
+- Boot the probe server with `CUSTOM_COMPACTION_FLAG_PATH` on a scratch flag, never the live `~/.claude/state/custom_compaction.flag`. `CUSTOM_COMPACTION_AUTO_FRACTION` / `CUSTOM_COMPACTION_IDLE_AFTER_MS` make the `turn` / `wait` legs reach a run. A `turn` leg after a compaction also needs `CUSTOM_COMPACTION_MIN_GROWTH=-1`, else the growth guard holds it (MAN-8066 §"The growth guard").
+- A second probe server beside the first: `PROBE_PORT=<port>` (MAN-492). The driver's `--server-log` defaults to the 7893 log; at another port pass `--server-log "$APPS_LOG"` or its decision-lines block prints empty. `whole.sh` does not pass it.
+- The driver presses Compact in the composer's usage panel: typed `/compact` + Enter picks a built-in from the command palette.
+- Exposure (stated, not observed): a probe server booted with the switch on re-adopts the live keepalive hosts of real chats; a real chat past its fraction would be compacted at its turn end.
+
+## The whole run — `.verify/custom-compaction-whole.sh`
+`bash .verify/custom-compaction-whole.sh` (gitignored): one scratch flag reading `on` (the operator's flag is never written), a scratch Vite on :5291, four probe-server boots with `SUMMARIZE_TAIL_TOKENS=50`, evidence in `/tmp/custom-compaction-whole.*`. Exit 0 = every gate held. A held :7893 or :5291 (another run, `compaction-handover-whole.sh` uses both) exits 1 with nothing started. why: the exit trap stops the server by pid file and would stop the other run's.
+
+| leg | boot env | proves |
+|---|---|---|
+| a manual | `CUSTOM_COMPACTION_AUTO_FRACTION=1` | row toggles the flag; Compact pressed in the usage panel compacts |
+| b turn-end | `CUSTOM_COMPACTION_AUTO_FRACTION=0.02`, `CUSTOM_COMPACTION_MIN_GROWTH=-1` | the turn's end compacts (`--tool` turn: a plain exchange alone leaves verb exit 2) |
+| c idle | `CUSTOM_COMPACTION_IDLE_AFTER_MS=60000`, `CUSTOM_COMPACTION_IDLE_MIN_TOKENS=1` | one turn, then silence: the idle run is logged |
+| d not ready | `PLAN_RUNNER_CLAUDE_BIN=/bin/true` | route `ready:false`, row `Waiting`, one Compact reaches the CLI with a `handed to the CLI` decision line |
+
+- Gates (`expect` / `fail`): compactions on record with `post_tokens` filled after each leg, triggers `manual,auto,idle` in order, leg d's `compact_boundary` count, a floor of 4 heal-trigger lines, the indexer refusal beside its control (`.verify/custom-compaction-indexer.ts` on a database `.backup` copy), the search hit and its absence on the probe server, the delete, the operator's flag unchanged.
+- The search step takes a word the assistant wrote in the FIRST transcript that no later transcript holds. Every seed's operator block carries each typed message, so the `manual` leg's first turn asks the assistant for a lorem ipsum filler paragraph; the step prints the typed-versus-written counts. Measurements: MAN-8134 §"Traps".
+- `retire_chat_hosts` ends the chat's CLI hosts by tmux session name (`<chat id>-*`, `kill-session -t =<name>`, never a pid) after each of the first three stops, after the last, and in `cleanup`. why: `stop_probe_server` deletes the sessions directory, so each boot otherwise strands one live `claude` (~250 MB).
+- `cleanup` (EXIT trap) deletes the scratch chat through the app; with the probe server already down it says the chat is left standing.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/compaction/compaction-children.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/compaction/compaction-facts.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/compaction/compaction-frames.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/compaction/compaction-guard.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/compaction/compaction-procedure.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/compaction/compaction-registry.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/compaction/compaction-seed.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notifications/services/notification-copy.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/custom-compaction-chat.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/custom-compaction-indexer.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/custom-compaction-whole.sh
+
+## MAN-8066 — modules/compaction triggers — turn end and its growth guard, idle, the pending wake, startRun, shutdown and the decision line
+
+`auto-trigger.ts` (`createAutoTrigger`) holds the runtime's `turnEnded` and `activityChanged` hooks and the idle deadline. Operator ruling 2026-10-08: compaction at 50% context on turn end only, never in the middle of work; idle compaction replaced by ours, the CLI's autocompact kept as the net. Nothing here compacts mid-turn, nothing polls, and with the switch off nothing here acts. The run it starts is MAN-8065.
+
+## The two triggers
+| trigger | fires when | default | env seam (read at the call) |
+|---|---|---|---|
+| turn end | `contextTokens ≥ fraction × contextWindow`, and for a chat compacted before, `contextTokens − post_tokens ≥ growth × contextWindow` (growth guard) | fraction 0.5 (`AUTO_COMPACT_FRACTION`); growth 0.2 (`MIN_GROWTH_FRACTION`) | `CUSTOM_COMPACTION_AUTO_FRACTION`, `CUSTOM_COMPACTION_MIN_GROWTH` |
+| idle | one unref'd timeout per chat, re-armed at every turn end, fires once; `contextTokens ≥ min` | 3,240,000 ms (54 min); min 200,000 | `CUSTOM_COMPACTION_IDLE_AFTER_MS`, `CUSTOM_COMPACTION_IDLE_MIN_TOKENS` |
+
+An override that is not a positive finite number falls back to the default; `CUSTOM_COMPACTION_MIN_GROWTH` takes any finite number, a negative one included. `IDLE_AFTER_MS` above 2,147,483,647 also falls back: Node clamps a larger `setTimeout` delay to 1 ms, which would fire at once.
+
+## Turn end
+`turnEnded(report)`: remember the context (`rememberTurnContext`), drop the chat's pending report, clear its idle deadline, then decide off `takeoverSnapshot()` (MAN-8067).
+
+| when | do |
+|---|---|
+| shutdown (`stopped`) | nothing |
+| snapshot `null` (nothing has asked since boot, e.g. a re-adopted chat's first turn end) | `compactionMode()` then decide again; slower, a queued message may take the session first, the next turn end retries. A throw out of the mode read or the decision is logged `could not read the mode or decide on the turn end`, never an unhandled rejection |
+| snapshot `false` | nothing, no log |
+| `report.seed` | log `a seed append arms nothing` |
+| otherwise | arm the idle deadline, then test the report below |
+
+Not due, tested in this order: turn aborted; context or window unknown; under the fraction (`not due: 3.3% of the window, due at 50.0%`); under the growth since the last compaction (§"The growth guard"); chat placed on a node; a flight in progress; chat under an automatic refusal. Due and `activity.busy` → kept as the chat's one pending report (`due, kept pending until the process goes quiet`). Due and quiet → `startRun(report, 'auto')` synchronously inside `turnEnded`: the turn's `complete` has gone out and the queued-message pass waits on a `setImmediate`, so the reservation lands first and a queued message lands in the new session.
+
+## The growth guard
+`notDueBecause` reads `sessionCompactionsDb.latestCompaction(appSessionId)` (MAN-8046) right after the fraction test; `post_tokens` of the newest `compaction` row is the baseline. No record, or a record with `post_tokens` NULL: not held. Held → logged `not due: the context grew <n> since the last compaction, under <needed>`.
+- why: the operator block only grows; a seed at or past half the window would leave the first turn after every compaction due again, a loop of compactions each minutes long. A 60K seed on a 1M window never meets the bound (due again at 500K). The idle trigger has no guard.
+- `<n>` can be negative: the turn end's count and the compaction's post-append count are two instruments that disagree by ~1.7-2.1K (a just-compacted chat that answers once reads about −1.7K: the decision lines `grew -1623` and `grew -1758`). A probe that needs a turn end to compact right after a compaction boots with `CUSTOM_COMPACTION_MIN_GROWTH=-1`.
+
+## A failure is not a refusal
+Only verb exit 2 and not-ready put a chat under an automatic refusal (MAN-8065). Any other end of an automatic compaction leaves the chat due: verb exit 1 (including the watch's kill of a wrong-model or twice-answered reply), an exit-0 answer that does not read, a seed that did not take, a thrown step. The next turn end that finds the chat past the fraction starts the verb again, whole, and so does the next idle deadline: one start per turn end, no cap, no backoff.
+- Each start spends a full summarizer call before it can fail again: input up to `CALL_TOKENS` 600,000 estimate tokens (MAN-8049).
+- The `compaction.failed` push is deduped per chat (`claude:compaction:failed:<sessionId>`); the spend is not.
+- What ends them: a run that succeeds, a refusal (exit 2, not-ready), or the switch off. A failed manual Compact does not.
+
+## The pending wake
+`activityChanged(sessionId, activity)` first hands the change to the guard's listeners (`publishActivity`), then, with a pending report and `activity.busy` false: take the report; snapshot `false` → stop; a run in progress, a flight or an automatic refusal → logged `pending compaction dropped: <why>`; else `startRun(report, 'auto')`.
+
+## The idle deadline
+Fires `fireIdleDeadline`: chat row gone → `forgetSession` and log; `contextTokens` null or under `min` → log; `takesOver` false → log; then, synchronously up to the start: a run in progress, process busy, a flight, a refusal → `left alone: <why>`; else `idle, starting the compaction` and `startRun(report, 'idle')`. A server restart drops every deadline; the chat's next turn end arms it again.
+
+## `startRun`
+`runDetachedChatTurn({ sessionId, userId, content: '/compact', options: {...report.sendOptions, compactionTrigger}, beforeRun })` with the DECORATOR as runtime, so its `/compact` test sees the run.
+- `beforeRun` sets `run.completionAlreadyRecorded = true`: the run does not stamp `last_completed_at`, so no unread dot lights on a chat the operator read. Listeners still hear the run end.
+- That skips the registry's sidebar broadcast too, so when the outcome is `started` the trigger calls `broadcastSessionUpserted(sessionId)`: an open tab refetches and sees the marker's "after" figure.
+- Outcome not started → logged `did not start: <error>`.
+- A detached run has no socket: an open tab shows the processing state, then the refreshed history, never live frames. Watching them needs a tab that subscribes while the run is live (`watchRuns` in the probe driver).
+- If the registry gains a neutral-completion door, `startRun` should use it instead of `completionAlreadyRecorded`.
+
+## Shutdown
+`stop()`: `stopped = true`, clears every idle timer and pending report; `startRun` and `armIdleDeadline` return at once. why: a process that is leaving must not begin a verb its successor cannot see. Reached by `stopChatCompaction()` (MAN-8067).
+
+## The decision line (`compaction-log.ts`, `logDecision`)
+`[compaction] session=<id> trigger=<turn-end|activity|idle|auto|manual> contextTokens=<n|unknown> contextWindow=<n|unknown> activity=<idle|busy (<why>)|not live> decision=<sentence>`
+
+One line per decision, from the triggers, the decorator and the procedure alike; `grep '\[compaction\]'` on the server log says why a chat was or was not compacted. Where no report is at hand the measure is `lastTurnContext(sessionId)`. A run that ends also logs `compacted onto <id> (<pre> → <post> tokens)`.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/compaction/auto-trigger.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/compaction/compaction-log.ts
+
+## MAN-8067 — modules/compaction wiring — the decorator and the options it owns (`transcriptAppend`, `compactionSeed`), what takes a chat over, the files and shutdown
+
+`server/modules/compaction/` replaces the CLI's compaction of a Claude chat with the launch table's `[summarizer]` compaction (`~/.claude/scripts/summarize`) while the switch (MAN-8061) reads on and the summarizer is ready. Off or not ready: no compaction is taken over and the CLI compacts as before. The decorator's two options-level acts do not read the switch: it removes `transcriptAppend` and `compactionSeed` from every Claude run, and gives a start-over in a chat that has a stored seed that seed again (see "The options this module owns on a Claude run"). Barrel exports: `withChatCompaction`, `stopChatCompaction`. Only `server/index.ts` imports the module; the module reaches settings, providers, websocket, database and notifications through their barrels only. The Claude runtime knows the module only through `ChatCompactionHooks` (MAN-8055). The record and swap are `sessionCompactionsDb` (MAN-8046); history and the marker are MAN-8054 and MAN-8060. Triggers: MAN-8066. One run: MAN-8065.
+
+## What stays of the CLI's own compaction
+Who writes the summary: `~/.claude/scripts/summarize`, on the launch table's `[summarizer]` model and effort (read at the call, MAN-7407; edited in Edit Agent Chains, MAN-7417). The chat keeps its own model and effort: the seed append rides the triggering turn's send options.
+| CLI mechanism | taken-over chat | not taken over (switch off, summarizer not ready, node) |
+|---|---|---|
+| typed or pressed `/compact` | the summarizer's, through the decorator | the CLI's |
+| idle compaction | OFF: `idleCompaction: false` (`CLI_COMPACTION_SETTINGS`, MAN-8055); CloudCLI's idle trigger replaces it (MAN-8066) | the CLI's own |
+| auto-compact: threshold, at overflow, precompute | KEPT, `autoCompactEnabled` never set: the net under a trigger that waits, failed or was refused | the CLI's own |
+- `idleCompaction: false` is the only setting the module changes. Measured 2026-10-08, 2.1.293, no model call: at launch and through a live `applyFlagSettings`, `getSettings().effective.idleCompaction` reads `false` and `getContextUsage().isAutoCompactEnabled` stays `true`.
+- With the switch off nothing is merged and the launch is byte-identical to a chat with no module.
+
+## Wiring in `server/index.ts`
+| fact | value |
+|---|---|
+| wrap | `const chatRuntime = withChatCompaction(providerRuntimeService)`, once; it also registers the hooks with the service (`useChatCompaction`) |
+| receives `chatRuntime` | `createWebSocketServer` `chat.runtime`, `createNtfyActionRoutes`, `readoptKeepaliveSessions`, `initializeScheduledMessageDispatcher` |
+| stays on the bare service | the `getRunner` one-shots (no chat to compact) |
+| shutdown | `stopChatCompaction()` in `shutdownRuntimeServices`, right after `closeScheduledMessageDispatcher()` |
+| type | `withChatCompaction<Inner extends CompactionInnerRuntime>(inner): Inner` spreads the service; members the gateway type does not name (`recallApproval`) ride through |
+
+## Files
+| file | owns |
+|---|---|
+| `compaction-runtime.ts` | the decorator: `run` removes the options this module owns from every Claude run, re-seeds a start-over in a compacted chat, and intercepts a taken-over `/compact`; `abort` routes to the flight; `stopChatCompaction` |
+| `auto-trigger.ts` | the `turnEnded` / `activityChanged` hooks, idle deadlines, `startRun` |
+| `compaction-procedure.ts` | `compact()`, one run |
+| `compaction-mode.ts` | switch + summarizer status → `compactionMode`, `takesOver`, `takeoverSnapshot`, `switchFlipCount`, `noteSummarizerStatus`, `noteVerbNotReady` |
+| `compaction-registry.ts` | flights, activity listeners, automatic refusals, last turn contexts, `forgetSession` |
+| `compaction-guard.ts` | `waitUntilQuiet` |
+| `compaction-children.ts` | the only spawns: `runSummarizeVerb`, `fireCompactHealTrigger` |
+| `compaction-seed.ts` | `createSeedWriter`: the swap at the new session's announcement, the held `complete` |
+| `compaction-facts.ts` | `readVerbSuccess`, `verbFailureSentence`, `factsOf` |
+| `compaction-frames.ts` | the frames a run writes |
+| `compaction-log.ts` | `logDecision` |
+
+## What takes a chat over
+`takesOver({ appSessionId, node })` = `appSessionId !== null` AND `node === null` (a node's transcript is on the node) AND `compactionMode().on`. `on` = switch on AND summarizer `ready`; the switch is read at every call.
+
+| when | do |
+|---|---|
+| status cached, `ready`, binary (`cli.path` size + mtime) unchanged | serve the cache |
+| status cached but not ready, or binary changed, or none | ask `summarizerStatus()` (`summarize --status`, ~0.25 s), single-flighted: one verb process per burst, one ask per message launch while not ready |
+| switch seen to move | drop the cached status and add 1 to `switchFlipCount()`: a flip is also a retry |
+| verb exits 3 | `noteVerbNotReady(sentence)`: the cache reads not-ready until the next launch asks again |
+| status unreadable | `ready: null`, not on |
+
+why a not-ready status is never served from the cache: the operator edits the summarizer's words in Edit Agent Chains, which moves neither binary nor switch; a cached not-ready would hold chats on the CLI while Settings (which asks afresh) reads ready.
+
+`takeoverSnapshot()` = the last `compactionMode()` answer, read synchronously (`null` before any ask). The turn-end trigger needs it: its run must start in the tick of the turn's `complete`, before the queued-message pass (`setImmediate`) takes the session's reservation, and an awaited switch read lost that race. A stale snapshot is safe: the decorator re-asks `takesOver` and ends an automatic run no longer taken over with a `complete` exit 0, nothing done.
+
+## The decorator's `/compact` test
+- Claude only; the command matches `/^\/compact(?:\s+([\s\S]*))?$/`; the words after it are the summarizer's instructions.
+- `options.sessionId` is a non-empty string; no `resumeAnchorId`, no `resumeFromScratch: true`. An edit that replaces a message with `/compact` stays an edit and reaches the CLI.
+- Trigger = `options.compactionTrigger` when `auto` or `idle`, else `manual`.
+- One `compactionMode()` read per request (none for a node's chat): `on` decides (the same test as `takesOver`), `why` explains.
+- Taken over → `compact()`. Not taken over: manual → `inner.run` (the CLI compacts), logged `handed to the CLI: <why>` when the switch is on and the summarizer cannot be served (`why` set; with the switch off `why` is null and nothing is logged; a node's chat logs nothing); automatic → logged `no longer taken over, the run ends with nothing done`, `complete` exit 0.
+- `abort`: a flight not yet stopped → `flight.stop()`; else `inner.abort`.
+
+## The options this module owns on a Claude run
+- Every Claude run the decorator handles, `/compact` or not, first loses `transcriptAppend` and `compactionSeed`, and everything after reads the cleaned options: the chat gateway spreads a client's send options into the runtime's, so a client's `transcriptAppend` would ride into a transcript and its `compactionSeed` would silence a turn's push and its report. Only this module puts them on a run. The procedure's step 7 calls the inner service directly, so its own seed append never passes through here.
+- A start-over (`resumeFromScratch === true` on a command `/compact` does not match) in a chat whose `sessionCompactionsDb.latestCompaction(sessionId)` stores a seed runs with `transcriptAppend: <that seed>`. Why: when the operator's first message after a compaction joined the seed append's live process, no assistant row precedes it, only the append and its attachments, so `resolveEditAnchor` answers "start over" and the edited message's new session would start empty. Started over with the seed appended again, the session holds exactly the seed and the edited message, and the session it replaces is filed as an edit's rewind (`reason` NULL) like any start-over. `resolveEditAnchor` stays as it is: an attachment's uuid is refused as a resume point, so no anchor could make the edited message a sibling under one parent. When the CLI resumed from disk instead, its placeholder row precedes the message and the anchor rule resumes through it: not a start-over. A record with no stored seed (a NULL column) gives none: nothing is appended.
+- A read that throws ends the run (the gateway logs it and completes the run, exit 1) rather than sending the edited message into an empty session.
+
+## Shutdown
+`stopChatCompaction()` = the trigger's `stop()` (MAN-8066) + `stopFlightsBeforeSeed()` (MAN-8065): no idle deadline fires, no pending compaction starts, a waiting or summarizing flight is stopped (its verb gets SIGTERM) rather than orphaned. A seed append already running is a run like any other and finishes with the drain. Not measured: how a service stop treated an in-flight summarizer child before this call existed.
+
+`pre_tokens` of a record = the last report this server kept for the chat (`lastContextTokens`), for manual and automatic alike; null after a restart until the chat's next turn end.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/compaction/, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/compaction/compaction-mode.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/compaction/compaction-runtime.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/compaction/index.ts
+
+## MAN-8134 — Probe — compaction-handover: the re-seed on an edit, and the whole hand-over across two compactions (run, legs, traps)
+
+Proves, on real Haiku chats driven through the composer: the decorator's start-over re-seed (MAN-8067 §"The options this module owns on a Claude run") with `compaction-handover.sh`, and the whole hand-over — the seed append, the operator block carried across two seeds, a slash command answered from the seed — with `compaction-handover-whole.sh`. `.verify/` is gitignored: every file exists on disk only.
+
+## Run
+| when | do |
+|---|---|
+| prove the re-seed | `bash .verify/compaction-handover.sh` — exit 0 when every claim holds |
+| see the edit without it | `BEFORE=1 bash .verify/compaction-handover.sh` — the server boots from a scratch copy of the tree whose decorator returns the cleaned options; the leg asserts the opposite (no `queueTranscriptOnly` append in the new session; the reply does not give the code word) |
+| prove the whole hand-over | `bash .verify/compaction-handover-whole.sh` — exit 0 when every claim holds; two to three minutes (it waits for a minute boundary before the slash command) |
+| drive one leg by hand | `node .verify/compaction-handover-chat.mjs --app <vite url> --api <probe api url> --leg edit\|whole\|delete [--chat <id>] [--evidence <dir>] [--server-log <file>] [--without-seed]` |
+
+## Setup the wrappers own
+- `compaction-handover.sh`: probe server on `PROBE_PORT` (default 7895), scratch Vite on `VITE_PORT` (default 5293). `compaction-handover-whole.sh`: the default probe port 7893 and Vite on 5291, the ports `custom-compaction-whole.sh` uses; both scripts refuse to start while either port is held, so the two never run together. Both: scratch flag reading `on` under `mktemp -d`, `SUMMARIZE_TAIL_TOKENS=50`, `CUSTOM_COMPACTION_AUTO_FRACTION=1` (only the press compacts). The operator's `~/.claude/state/custom_compaction.flag` is compared at the end and never written.
+- Both ports must be free at start: a held port (a second run, a leftover server) exits 1 with nothing started. why: the exit trap stops the server by pid file and would stop the other run's.
+- Evidence directory `/tmp/compaction-handover.XXXXXX` or `/tmp/compaction-handover-whole.XXXXXX`, printed first; the driver copies the transcripts there before it checks any claim.
+- Cleanup order: retire the chat's CLI hosts (tmux sessions `<chat id>-*`) and wait for their panes to exit, then delete the chat through the app, then stop the servers. why: a host still exiting flushes metadata rows and leaves a stub transcript after the delete.
+
+## Leg `edit`
+1. New scratch chat on Haiku; a turn states a made-up code word.
+2. Compact pressed in the composer's usage panel; the record stores the seed blocks.
+3. The first message after the compaction is sent at once, so it joins the seed append's live process: no assistant row precedes it.
+4. That message is edited through "Edit and resend" into "what code word did I give you", which starts the conversation over.
+5. Asserted: the new session's first rows are the append (`queueTranscriptOnly`, exactly the stored seed's blocks), the attachments, then the edited message; the reply gives the code word; the session the edit left is in `superseded_provider_sessions` with `reason` NULL; the pre-compaction session keeps `reason=compaction`.
+
+## Leg `whole` (`lib/handover-whole.mjs`; the driver hands it the page, the socket tap and its helpers)
+1. A project skill named for the chat, `handover-recall-<first 8 characters of the chat id>`, is planted in the probe project (`/tmp/cloudcli-probe-chat/.claude/skills/<name>/SKILL.md`) and removed when the leg ends; `--leg delete --chat <id>` removes that chat's skill too, for a run that died inside the leg. why: the probe project is shared, and a fixed name let another run's `delete` leg take this run's skill away before its slash turn.
+2. Two turns, the first stating a made-up code word; Compact pressed. Asserted per compaction: the run's frames have a summary, no assistant text after it, one `token_budget` between it and the `complete`, and the summary-to-`complete` time under 10 s (measured 1.6–2.7 s); the record's `json_array_length(seed)` is 2 to 4 with the preamble first and `HANDOVER` last; the marker draws `before → after` with `data-compaction-after="known"`; the composer's counter equals `post_tokens`.
+3. `/handover-recall-<id prefix> no tools` typed in the composer: the CLI writes a `<command-name>` row, and the reply names the code word in one turn, on the chat's own model, saying nothing of a compaction or of having the context (the check also reads the seed's own preamble words, and is first shown to flag four known-bad replies and to pass the probe's own first message). Two more typed turns are held to the same; the new transcript's first rows are printed (`type`, `queueTranscriptOnly`, the head of each block), with no assistant row before the first typed message, and the appended row holding exactly the stored seed's blocks.
+4. Compact pressed again; then one turn asks for the probe's very first message word for word, and the reply gives it, filler included.
+5. Asserted on the second seed: its operator block holds the five messages typed before it, in order, the slash command as typed, each under the minute it was sent (the second stretch starts in a minute later than the first seed's newest stamp, so the entries span two minutes and one stamp on all of them would fail); `render.render(render.entries(<the second compaction's old transcript>, <its id>), 4000)` has the first stretch's messages under `### Earlier operator messages`; `GET …/messages?limit=200` holds two summary rows, each followed by a `text/user`. The decision lines are printed.
+
+## Traps
+- The dev account stores `plainMode: true`: the composer then sends every message as `/plain <text>` and the CLI writes `<command-message>` rows, not the typed words. A probe that reads transcript text pins `openConsole({ preferences: { ...HARNESS_PREFERENCES, plainMode: false } })` for its page; nothing is written to the account. `.verify/custom-compaction-chat.mjs` does not pin it.
+- A `.claude/commands/<name>.md` file is expanded by the composer itself (`handleCustomCommand` sends the body as plain text): the CLI sees the body, writes no `<command-name>` row, and the operator block can never hold the command as typed. A skill is the engine's (`isEngineHandledCommand`): the composer sends `/<name> <args>` as typed, the shape of the operator's `/tweak`. The probe's command is therefore a project skill, and the slash palette stays closed because the typed text has arguments after the name.
+- The chat pane draws a window of rows: at the second compaction only one marker is in the page. The leg finds the marker by its own figures (`before → after`), never by its place.
+- `custom-compaction-whole.sh`'s search step needs a word only the first transcript holds. Every seed's operator block carries each typed message verbatim, so nothing the first prompts say stays out of the later transcripts; the manual leg's first turn asks the assistant for a lorem ipsum filler paragraph "only for the record", which a summary drops (measured with the verb at `SUMMARIZE_TAIL_TOKENS=50`: 27 of 32 words absent from the seed). A list of thirty obscure words with definitions is carried whole (0 of 79 absent). The search reads `text` blocks only and skips `isMeta` rows, so a word in a tool result or a skill body is never found by it.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/compaction-handover-chat.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/compaction-handover.sh, /home/lyphe/.claude/claudecodeui_lyphe/.verify/compaction-handover-whole.sh, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/handover-whole.mjs
+
+## MAN-8135 — Same-named projects and gone folders — `projectNameHints`, `isFolderMissing`, where each shows
+
+Two lists of rules: a project NAME is not unique (a worktree, a copy), and a project's FOLDER can be gone. Both are decided once and drawn by every list that names a project.
+
+## `projectNameHints(projects)` — `src/shared/projectNameHints.ts`
+
+| item | value |
+|---|---|
+| signature | `projectNameHints(projects: readonly Pick<Project, 'projectId' \| 'displayName' \| 'fullPath'>[]): Map<string, string>` |
+| returns | `projectId` → hint, ONLY for projects that share a `displayName` with another; a unique name has no entry (`hints.get(id) ?? null`) |
+| input | the WHOLE visible list, never a filtered one: a filtered list can drop the other project of the name |
+| pure | no I/O; no copy of the rule lives anywhere else |
+
+Hint rule, per group of one name:
+
+| when | hint |
+|---|---|
+| parents differ | the fewest trailing parent-folder names that differ from every other project of the name; one more parent where the last ones collide (`a/x`, `b/x`, `y`) |
+| two projects share the SAME parent (`/home/me/foo` named `repo` beside `/home/me/repo`) | their own folder names (`foo`, `repo`), lengthened with the parents above only when another hint already reads the same |
+| project at the filesystem root | `/` |
+
+- Each project gets its own depth, not the group's.
+- The hint is secondary text drawn BESIDE the name in a muted ink; never fold it into `displayName`, which the rename box and the server read.
+- The helper is a shared file registered in `.oxlintrc.json`'s shared-file list; a new shared helper is added there or lint flags every import.
+
+## Callers — one list, one hint
+
+| surface | where | draws |
+|---|---|---|
+| new-chat project dropdown | `ProjectsStateProvider` computes `nameHint` into every `ProjectChoice` (MAN-7444); `ProviderSelectionEmptyState` maps it to the `Select` option `hint` | trigger and options |
+| chat list row | `SidebarSimpleList` → `SidebarSimpleListItems` → `SidebarSimpleListRow` `projectNameHint` | `· <hint>` after the 10px project line, `data-testid="simple-chat-project-hint"` |
+| session picker row | `useSessionPicker` → `groupsFromSimpleList(rows, marks, projectHints)` → `SessionPickerRow.projectNameHint` | `· <hint>` after the project line, `data-testid="session-picker-project-hint"` (MAN-7473) |
+| Settings default-project picker | `AppearanceSettingsTab` `simpleChatProjectOptions` | `Select` option `hint` |
+
+- A row's project line truncates the NAME before the hint; the hint is the part that tells the project apart (`max-w-[60%] flex-shrink-0 truncate`).
+- Not covered (a bare name): the tree-mode Recent conversations list, sidebar search results. A new surface that names a project calls `projectNameHints` over the whole list.
+
+## `isFolderMissing`
+
+| item | value |
+|---|---|
+| set by | `getProjectsWithSessions` (`projects-with-sessions-fetch.service.ts`) per project through `diagnoseProjectFolder` (`list/claude/claude-project-folder.ts`, exported by the `providers` barrel) — the SAME test the run pre-flight uses (MAN-699) |
+| never true | for a project assigned to a node (`projectsDb.nodeForPath(path) !== null`): its folder lives on the node; for an archived item |
+| type | `ProjectListItem.isFolderMissing: boolean` (server); `Project.isFolderMissing?: boolean` (client); `SettingsProject` and `AgentSettingsProject` carry it optionally, set in `normalizeProjectForSettings` |
+
+| surface | effect |
+|---|---|
+| new-chat dropdown (`ProviderSelectionEmptyState`) | project left out |
+| `useSimpleChatProject` | skipped, saved choice and first-project fallback alike; a saved gone project falls back as if absent |
+| Settings default-project picker | project left out |
+| project tree row (`SidebarProjectItem`) | `Badge tone="warn"` "Folder missing" (`projects.folderMissing`, en only, `defaultValue`), path as hover `title`, `data-testid="project-folder-missing"`, compact and desktop layouts |
+
+- The tree's own actions on a marked project are unchanged; archiving it stays the reader's click.
+- A folder that vanishes while the page is open reaches the client only if `projectsHaveChanges` (`useProjectsState.ts`) compares the field. A new field the server adds to the project list is added there too, or an idle refresh drops it.
+
+## `HIDDEN_PROJECT_ROOTS` — `server/shared/hidden-project-paths.ts`
+
+- Roots: `TEST_PROJECTS_ROOT`, `~/.claude/state`, `/tmp`, `/var/tmp`, `os.tmpdir()`. A project under one is out of every project list, feed and search.
+- Mirror: `~/.claude/scripts/heal_friction_who.py` `HIDDEN_ROOTS`. A root added to the TS list is added there, or a probe chat in it reads as operator-typed.
+
+## Proof — `.verify/project-name-hints.mjs`
+
+- Run through `.verify/project-name-hints-scratch.sh`: a scratch API on a copy of the database, fixtures under `/dev/shm`, the client served twice (`after` = now; `before` = the touched files from git HEAD via `.verify/lib/vite-scratch-before.config.mjs`). Nothing touches the operator's list.
+- Command: `node .verify/project-name-hints.mjs --label before|after --app <url> --fixture-root <dir> [--out <dir>]`. `after` exits 1 on any failed check; `before` records only.
+- Reads, per desktop and mobile × dark and light: the new-chat dropdown, the chat list, the session picker, the tree's "Folder missing" badge. Artifacts: `.verify/artifacts/project-name-hints/`.
+- 2026-10-09: after 58 checks per label, all pass, no console or page errors; before 38 fail. Hint ink contrast 5.06 or better; the chosen option row steps up one ink (`.vv-select__option[aria-selected='true'] .vv-select__hint`).
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/projects/services/projects-with-sessions-fetch.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/hidden-project-paths.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/hooks/useProjectsState.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/projectNameHints.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/project-name-hints.mjs

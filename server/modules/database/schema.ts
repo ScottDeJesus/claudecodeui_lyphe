@@ -92,7 +92,9 @@ CREATE TABLE IF NOT EXISTS projects (
     project_path TEXT NOT NULL UNIQUE,
     custom_project_name TEXT DEFAULT NULL,
     isStarred BOOLEAN DEFAULT 0,
-    isArchived BOOLEAN DEFAULT 0
+    isArchived BOOLEAN DEFAULT 0,
+    -- The Cerberus node whose warden hosts this project's Claude sessions; NULL runs them on this server.
+    node TEXT DEFAULT NULL
 );
 `;
 
@@ -267,6 +269,12 @@ CREATE TABLE IF NOT EXISTS session_drafts (
  * on disk untouched — nothing is deleted — but it is no longer the session's,
  * and the indexer would otherwise rediscover it on its next full scan and hand
  * the session back to the version the user edited away from.
+ *
+ * Custom compaction leaves transcripts behind the same way, so it writes the same
+ * row and every reader of the table (the two delete paths, `resolveAppSessionId`,
+ * the indexer's refusal) covers it with no new code. The eleven nullable columns after
+ * `created_at` are its facts and its seed, and `reason` says which kind of row this is. They are
+ * the same list `migrations.ts` adds to a database that predates them.
  */
 export const SUPERSEDED_PROVIDER_SESSIONS_TABLE_SCHEMA_SQL = `
 CREATE TABLE IF NOT EXISTS superseded_provider_sessions (
@@ -278,6 +286,25 @@ CREATE TABLE IF NOT EXISTS superseded_provider_sessions (
     -- reach every file the conversation ever lived in.
     jsonl_path TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    -- Why the session left it. NULL is an edit's rewind (every row written before
+    -- this column); 'compaction' is a custom compaction's old transcript;
+    -- 'compaction-abandoned' is a compaction's seed transcript whose swap was
+    -- taken back, kept so the indexer never offers it back as a chat.
+    reason TEXT,
+    -- The facts of a 'compaction' row; NULL on every other kind.
+    compaction_trigger TEXT,
+    summarizer_model TEXT,
+    summarizer_served TEXT,
+    summarizer_effort TEXT,
+    pre_tokens INTEGER,
+    post_tokens INTEGER,
+    summarizer_tokens_in INTEGER,
+    summarizer_tokens_out INTEGER,
+    summarizer_chunks INTEGER,
+    -- The seed's blocks as a JSON array of strings, as the summarizer returned
+    -- them and as they were appended to the new session. NULL for an edit's
+    -- rewind and for a compaction recorded before this column existed.
+    seed TEXT,
     PRIMARY KEY (provider_session_id, provider)
 );
 `;

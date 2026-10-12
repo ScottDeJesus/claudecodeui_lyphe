@@ -33,8 +33,8 @@
     color 0.2s,
     box-shadow var(--dur-move);
 }
-.vv-button:hover:not(:disabled) { transform: translateY(-1px); }
-.vv-button:active:not(:disabled) { transform: scale(0.96); }
+.vv-button:hover:not(:disabled, [aria-disabled='true']) { transform: translateY(-1px); }
+.vv-button:active:not(:disabled, [aria-disabled='true']) { transform: scale(0.96); }
 .vv-button:disabled {
   background: var(--surface2);
   color: var(--ink-faint);
@@ -43,30 +43,33 @@
   opacity: 0.7;
   transform: none;
 }
+/* A press refused with the focus kept (`busy`, or an `aria-disabled` a caller sets): dimmed exactly as far as a disabled
+ * button, but on its own fill and ink, and it neither lifts nor presses. */
+.vv-button[aria-disabled='true'] { opacity: 0.7; cursor: not-allowed; }
 .vv-button--default { background: var(--accent); color: var(--on-accent); }
-.vv-button--default:hover:not(:disabled) { background: var(--accent-deep); box-shadow: var(--shadow-hover); }
+.vv-button--default:hover:not(:disabled, [aria-disabled='true']) { background: var(--accent-deep); box-shadow: var(--shadow-hover); }
 
 .vv-button--destructive { background: var(--danger); color: var(--on-danger); }
-.vv-button--destructive:hover:not(:disabled) { background: var(--danger-deep); box-shadow: var(--shadow-hover); }
+.vv-button--destructive:hover:not(:disabled, [aria-disabled='true']) { background: var(--danger-deep); box-shadow: var(--shadow-hover); }
 
 /* Every size in Button.tsx is an explicit height, so this ring comes out of its own box. */
 .vv-button--outline { border: 1.5px solid var(--border-strong); color: var(--ink); }
-.vv-button--outline:hover:not(:disabled) { border-color: var(--accent); box-shadow: var(--shadow-hover); }
+.vv-button--outline:hover:not(:disabled, [aria-disabled='true']) { border-color: var(--accent); box-shadow: var(--shadow-hover); }
 
 /* One appearance under two names: the app spells it `secondary`, Verve spells it `tonal`, and
  * a second colour for the second name would be a fork of the same idea. */
 .vv-button--secondary,
 .vv-button--tonal { background: var(--accent-soft); color: var(--accent-ink); }
-.vv-button--secondary:hover:not(:disabled),
-.vv-button--tonal:hover:not(:disabled) { background: var(--accent-soft-hover); box-shadow: var(--shadow-hover); }
+.vv-button--secondary:hover:not(:disabled, [aria-disabled='true']),
+.vv-button--tonal:hover:not(:disabled, [aria-disabled='true']) { background: var(--accent-soft-hover); box-shadow: var(--shadow-hover); }
 
 .vv-button--ghost { color: var(--accent); }
-.vv-button--ghost:hover:not(:disabled) { background: var(--accent-soft); }
+.vv-button--ghost:hover:not(:disabled, [aria-disabled='true']) { background: var(--accent-soft); }
 
 /* Link is text, so it neither lifts nor presses — a moving line of text reads as a glitch. */
 .vv-button--link { color: var(--accent); text-underline-offset: 4px; }
-.vv-button--link:hover:not(:disabled) { text-decoration: underline; transform: none; }
-.vv-button--link:active:not(:disabled) { transform: none; }
+.vv-button--link:hover:not(:disabled, [aria-disabled='true']) { text-decoration: underline; transform: none; }
+.vv-button--link:active:not(:disabled, [aria-disabled='true']) { transform: none; }
 
 /* ---------------------------------------------------------------- Badge */
 .vv-badge {
@@ -455,9 +458,14 @@
   transition: background-color 0.15s;
 }
 .vv-select__option:hover { background: var(--surface2); }
+/* What sets a choice apart from another of the same name, after the name and quieter than it: lighter,
+   smaller and in the muted ink, so it reads as a note and not as part of the name. */
+.vv-select__hint { margin-left: 4px; font-size: 0.86em; font-weight: 400; color: var(--ink-muted); }
 /* The chosen row is filled AND ticked, so the choice survives greyscale. */
 .vv-select__option[aria-selected='true'] { background: var(--accent-soft); color: var(--accent-ink); }
 .vv-select__option[aria-selected='true']::after { content: '✓'; font-size: 12px; color: var(--accent); }
+/* On the chosen row's wash the muted ink reads 4.44:1 (AA is 4.5), so the hint steps up one ink there. */
+.vv-select__option[aria-selected='true'] .vv-select__hint { color: var(--ink-mid); }
 
 /* The row that makes a new one. Behind a hairline and in the accent, because it is not a choice
    among the choices above it — a reader scanning the list must not count it as one. */

@@ -1,3 +1,9 @@
+// FIRST, before any import that opens the database: it fills `DATABASE_PATH` exactly as the server's own
+// entry does (`server/index.ts`), so this door writes the registry the Schedules tab reads. The bootstrap
+// file is no boundary element — the same exemption `modules/cli/cli.ts` takes for the same import.
+// eslint-disable-next-line boundaries/no-unknown
+import '../../load-env.js';
+
 import { createHash } from 'node:crypto';
 import os from 'node:os';
 
@@ -39,6 +45,10 @@ import { runSync } from './schedules-sync.service.js';
  * **`busy_timeout` before the first write**, because the live database's journal mode is `delete`, not
  * WAL, and this process is a SECOND writer: without the pragma a write arriving mid-transaction fails
  * `SQLITE_BUSY` instead of waiting the five seconds that would have seen it through.
+ *
+ * **The registry is the server's own database.** `load-env` runs before the connection opens, so
+ * `DATABASE_PATH` resolves as it does for the server (the `.env` value, else `~/.cloudcli/auth.db`) and
+ * never falls back to the repo's legacy `database/auth.db` — a job this door adds appears in the Schedules tab.
  *
  * **A verb runs without touching the box** with `--tabfile <path>` — the crontab half sent to that
  * file, read and write alike — and `DATABASE_PATH` for the registry, which is NOT necessarily empty:
@@ -197,17 +207,37 @@ async function add(argv: string[]): Promise<number> {
   });
 }
 
-/** `remove --command <cmd> [--tabfile <f>]` — the line and the row that tracks it both go.
+/**
+ * The command `remove` acts on: `--command` as typed, or the command of the ONE registry row `--name`
+ * names. A name that matches no row or several is refused rather than guessed — this verb deletes.
+ */
+function commandToRemove(flags: Map<string, string>): string {
+  if (flags.has('command') && flags.has('name')) {
+    throw new UsageError('give --command or --name, not both');
+  }
+  if (flags.has('command')) return normaliseField(required(flags, 'command'));
+
+  const name = required(flags, 'name');
+  const named = cronJobsDb.listJobs().filter((job) => job.name === name);
+  if (named.length === 0) throw new UsageError(`no registry row is named '${name}'`);
+  if (named.length > 1) throw new UsageError(`${named.length} registry rows are named '${name}'; use --command`);
+  return named[0].command;
+}
+
+/** `remove (--command <cmd> | --name <n>) [--tabfile <f>]` — the line and the row that tracks it both go.
  *
- * Idempotent as `add` is, and a row whose line had already left the box is deleted here too: this is
- * the operator saying the job is off the record, the one act allowed to delete rather than mark. */
+ * Idempotent by `--command`, as `add` is — a second call reports `unchanged`/`absent`; `--name` answers a
+ * second call with a usage error, since the row it names is gone. A row whose line had already left the
+ * box is deleted here too: this is the operator saying the job is off the record, the one act allowed to
+ * delete rather than mark. */
 async function remove(argv: string[]): Promise<number> {
   const flags = readFlags(argv);
-  const command = normaliseField(required(flags, 'command'));
   const tabfile = flags.get('tabfile');
+  if (!flags.has('command') && !flags.has('name')) throw new UsageError('--command or --name is required');
 
   return withLock(tabfile ?? null, async () => {
     await openRegistry();
+    const command = commandToRemove(flags);
 
     const before = await readTab(tabfile);
     const after = removeLine(before, command);
@@ -276,7 +306,7 @@ async function sync(): Promise<number> {
 const USAGE =
   'usage: cron-registry-sync add --name <n> [--purpose <p>] [--tags <a,b>] --schedule <expr> --command <cmd> ' +
   '[--log <path>] [--tabfile <f>]\n' +
-  '       cron-registry-sync remove --command <cmd> [--tabfile <f>]\n' +
+  '       cron-registry-sync remove (--command <cmd> | --name <n>) [--tabfile <f>]\n' +
   '       cron-registry-sync list\n' +
   '       cron-registry-sync sync';
 

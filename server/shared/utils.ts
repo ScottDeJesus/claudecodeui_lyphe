@@ -1501,6 +1501,35 @@ export function dispatcherModelChoiceError(): string {
   return `model must be one of ${DISPATCHER_MODEL_CHOICES.join(', ')}`;
 }
 
+// ---------------------------
+//----------------- DISPATCHER WIP WORD UTILITIES ------------
+
+/** One canonical WIP count: ASCII digits, a whole number from 1, no leading zero. */
+const DISPATCHER_WIP_COUNT = /^[1-9][0-9]*$/;
+
+/**
+ * One epic WIP word in its CANONICAL spelling — a whole number from 1 to 9007199254740991, or `all` (no
+ * limit) — or `null` for anything else: a missing field, a number rather than a string, padding, a
+ * leading zero, `0`, `default`, another casing, a count past the safe-integer range.
+ *
+ * The grammar is the dispatcher's (`hooks/dispatcher/wip.py:spell`), and its bound is the one the
+ * dispatcher states in its own head: past 2**53 - 1 this server's double and the dispatcher's int
+ * disagree about the number, the reader that carries the word to the screen would refuse it, and one
+ * refused word freezes the whole Runner board's picture (INV-5693). So the bound is enforced HERE, on
+ * both sides of the lane: a request is refused before any process starts, and a document's word is
+ * refused by name. The count is rebuilt from its number rather than echoed, so what reaches an argv
+ * array is a string this server wrote.
+ *
+ * Used by `dispatcher-state.transport.ts` (`wipWord`, the document's `own`, `effective` and
+ * `route.wip` words) and by the arc route (`POST /arcs/:name/wip`, which adds the door's `default`).
+ */
+export function readDispatcherWipWord(value: unknown): string | null {
+  if (value === 'all') return 'all';
+  if (typeof value !== 'string' || !DISPATCHER_WIP_COUNT.test(value)) return null;
+  const count = Number(value);
+  return Number.isSafeInteger(count) ? String(count) : null;
+}
+
 
 // ---------------------------
 //----------------- DISPATCHER SCHEDULE WORD UTILITIES ------------

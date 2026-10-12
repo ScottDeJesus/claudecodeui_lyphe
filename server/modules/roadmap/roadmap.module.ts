@@ -113,10 +113,10 @@ export function createRoadmapModule(): RoadmapModule {
   /**
    * The lane's one door to the journal, and the one thing that bounds its volume: a read that fails
    * every two seconds would bury the journal in copies of one line, so each distinct message is
-   * said once for the life of the process. A message that quotes the document's opening is never the
-   * same twice (its `generated_at` moves), which is how a document past `ROADMAP_MAX_BUFFER` still
-   * floods: the cure is the sentence's, in `dispatcher-command.ts`. This server has no logger; a
-   * module that must say something takes a closure from its composition root.
+   * said once for the life of the process. A document past `ROADMAP_MAX_BUFFER` is told as the
+   * ceiling it crossed (`dispatcher-command.ts`'s `describeFailure`), one sentence for as long as it
+   * stays too big, so it is said once too. This server has no logger; a module that must say
+   * something takes a closure from its composition root.
    */
   const said = new Set<string>();
   const logErrorOnce = (message: string): void => {

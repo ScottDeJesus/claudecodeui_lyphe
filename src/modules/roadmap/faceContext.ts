@@ -14,7 +14,7 @@ type NamedItem = { name: string; title: string };
  * `edit` changes the item as it stood when pressed, asking for its goal first when `goalFirst`; `move`
  * and `feature` name their item and read it off each new picture; `block` and `delete` carry the item
  * they are about. `kind` is the dispatcher's own word: `arc` is an epic, `plan` a feature. Held by
- * `RoadmapPath` and by `RoadmapWidgetBody`, each as its one piece of dialog state, and drawn by `OpenDialog`.
+ * `RoadmapTreeFace` as its one piece of dialog state, and drawn by `OpenDialog`.
  */
 export type FaceDialog =
   | { dialog: 'add'; kind: RoadmapKind; parent: NamedItem | null }
@@ -25,27 +25,19 @@ export type FaceDialog =
   | { dialog: 'feature'; name: string };
 
 /**
- * What the Roadmap face hands every press under it: `openDialog` puts a dialog on the face (the face
- * holds one at a time); `openCard` shows a feature's live card, which is `RoadmapTab`'s doing (it turns to
- * In flight and hands the plan down), so it is `null` on a surface that has no tab above it; and `focus`
- * puts a milestone on the stage, as pressing its station does — a milestone moved along the path keeps
- * the stage, where the stage would otherwise follow the current milestone to whichever took its place.
+ * What the Roadmap face hands every press under it: `openDialog` puts a dialog on the face, which holds one
+ * at a time.
  */
 export type RoadmapFace = {
   openDialog: (dialog: FaceDialog) => void;
-  openCard: ((plan: string) => void) | null;
-  focus: (milestone: string) => void;
 };
 
 /**
- * The face's context. Provided by `RoadmapPath`; read by `RoadmapHeader`, `RoadmapPicker`, `MilestonePath`,
- * `MilestoneFocus`, `EpicCard` and `RoadmapRail` for `openDialog` (`MilestoneFocus` also for `focus`), and by
- * `FeatureRow` (through `useRevealCard`) for `openCard`. A surface that draws these pieces without the face —
- * the chat gutter's widget — provides it with a host of its own; a press with none above it says so in the
- * console rather than do nothing in silence.
+ * The face's context. Provided by `RoadmapTreeFace`, on every surface that draws the roadmap; read by
+ * `RoadmapPicker` (its New roadmap…) and by the tree's panels (`RoadmapPanel`, `MilestonePanel`, `EpicPanel` and
+ * `FeaturePanel`) for `openDialog`. A press with no face above it says so in the console rather than do
+ * nothing in silence.
  */
 export const RoadmapFaceContext = createContext<RoadmapFace>({
   openDialog: (dialog) => console.warn(`[roadmap] a press opened the ${dialog.dialog} dialog with no dialog host above it`),
-  openCard: null,
-  focus: () => {},
 });

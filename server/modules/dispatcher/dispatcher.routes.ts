@@ -1,11 +1,12 @@
 import express from 'express';
 
-import type { DispatcherOffpeak, DispatcherVerb, DispatcherVerbResult } from '@/shared/types.js';
+import type { DispatcherOffpeak, DispatcherVerb, DispatcherVerbResult, DispatcherWipChoice, DispatcherWipLimit } from '@/shared/types.js';
 import {
   dispatcherModelChoiceError,
   dispatcherScheduleWhenError,
   readDispatcherModelChoice,
   readDispatcherScheduleWhen,
+  readDispatcherWipWord,
 } from '@/shared/utils.js';
 
 import type { DispatcherPicture } from './dispatcher-state.service.js';
@@ -32,6 +33,53 @@ const PLAN_NAME = /^[a-z0-9][a-z0-9-]{0,99}$/;
  * `<name>` or `<name>.arc`, that one the bare name alone and refuses the `.arc` ending.
  */
 const ARC_NAME = /^[a-z0-9][a-z0-9-]{0,99}(\.arc)?$/;
+
+/** The two limits an epic carries, in the dispatcher's own spelling (`hooks/dispatcher/wip.py:KINDS`) — the only `limit` words the WIP route relays. */
+const WIP_LIMITS: readonly DispatcherWipLimit[] = ['features', 'tasks'];
+
+/** The 400 sentence the WIP route answers with when the body names no limit and word the dispatcher takes. */
+const WIP_BODY_ERROR = 'limit must be features or tasks, and word a whole number from 1 to 9007199254740991, all, or default';
+
+/**
+ * The argv words of an epic's WIP press — `[limit, word]` after the arc's name — or `null` for a body
+ * the dispatcher's `wip` verb would refuse.
+ *
+ * BOTH WORDS ARE OURS ONCE THEY ARE HERE, and checked BEFORE ANY PROCESS STARTS: the limit against the
+ * dispatcher's two, the word against its grammar (`readDispatcherWipWord`: a canonical count to
+ * 9007199254740991, or `all`) plus the door's own `default`. The count is bounded because the word
+ * travels back to the screen in `status --json`, and a count its reader refuses would freeze the whole
+ * Runner board's picture (INV-5693) — the bound is enforced where the word enters, not discovered
+ * where it is read. What reaches an argv array is a spelling this server wrote, never a string the
+ * request chose.
+ */
+function wipArgs(body: unknown): string[] | null {
+  const { limit, word } = (body ?? {}) as { limit?: unknown; word?: unknown };
+  const checkedLimit = WIP_LIMITS.find((entry) => entry === limit);
+  const checkedWord: DispatcherWipChoice | null = word === 'default'
+    ? 'default'
+    : (readDispatcherWipWord(word) as DispatcherWipChoice | null);
+  return checkedLimit === undefined || checkedWord === null ? null : [checkedLimit, checkedWord];
+}
+
+/** A design's stamp (`designs.loaded_at`, `store.now()`'s shape): the lock an "Accept when cut" press carries. */
+const DESIGN_STAMP = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/;
+
+/** The 400 sentence the arm route answers with when the body carries no design stamp. */
+const DESIGN_STAMP_ERROR = 'design must be the design stamp the card read (YYYY-MM-DDTHH:MM:SSZ)';
+
+/**
+ * The argv words of a card's "Accept when cut" press — `['--by', 'app:card', '--design', <stamp>]` — or
+ * `null` for a body that carries no stamp of the design's shape, checked BEFORE ANY PROCESS STARTS.
+ *
+ * THE STAMP IS THE LOCK: the press binds to the exact design the operator read, and the dispatcher
+ * refuses one whose design has since moved. `--by` is this server's own word — the press is the
+ * operator's, from the card or the phone (the same card), and a request can neither pick the door nor
+ * leave the stamp out to press on whatever the design is by then.
+ */
+function armAcceptArgs(body: unknown): string[] | null {
+  const { design } = (body ?? {}) as { design?: unknown };
+  return typeof design === 'string' && DESIGN_STAMP.test(design) ? ['--by', 'app:card', '--design', design] : null;
+}
 
 export type DispatcherRouterDependencies = {
   /**
@@ -81,23 +129,24 @@ function statusForVerb(result: DispatcherVerbResult): number {
 }
 
 /**
- * The dispatcher lane's fifteen routes: three reads of the plan list, eight presses on a plan, four on
+ * The dispatcher lane's twenty routes: three reads of the plan list, ten presses on a plan, seven on
  * an arc. Auth is the mount's `authenticateToken`, in `server/index.ts`.
  *
  * These handlers validate and translate, and do nothing else: nothing is read here, no process is
  * started here, and no route names a path from the request — the binary and the store are the
  * module's, fixed at composition, and a request can only ever choose a plan or an arc by name, a
- * word from the closed set of eight verbs, and — where the verb takes one — a word from the three
- * model words or the schedule grammar.
+ * word from the closed set of eleven verbs, and — where the verb takes one — a word from the three
+ * model words or the WIP grammar.
  *
  * A READ THAT FINDS NO PICTURE IS TOLD SO (`NOT_READ_YET` above), and the read waits a bound for one
  * first: the two together are what keep a handover from being drawn as an empty plan list.
  *
- * FOUR OF THE EIGHT ARE RELAYED TWICE, once under `/plans/:name` and once under `/arcs/:name`, because
+ * FOUR OF THE NINE ARE RELAYED TWICE, once under `/plans/:name` and once under `/arcs/:name`, because
  * the dispatcher's own doors open on both: `model`, `stop`, `resume` and `schedule` take an arc's
  * name as readily as a plan's. The two spellings are two routes rather than one param because the
  * NAME CLASSES differ (`PLAN_NAME` against `ARC_NAME` below) — a fence that would be lost the moment
- * one route accepted either adornment.
+ * one route accepted either adornment. `wip` is the ninth and an ARC'S ALONE: a feature carries no WIP
+ * word, so it has no plan route.
  */
 export function createDispatcherRouter(dependencies: DispatcherRouterDependencies): express.Router {
   const router = express.Router();
@@ -202,6 +251,15 @@ export function createDispatcherRouter(dependencies: DispatcherRouterDependencie
   // stalled is the dispatcher's own refusal (`REFUSED planner-resume …`, a 409). `--by app:card` is the
   // press's actor, written to the plan's log the way an Accept's is; the word is ours, never the request's.
   router.post('/plans/:name/planner-resume', relay('planner-resume', () => ['--by', 'app:card']));
+  // A DESIGNED plan Accepted ahead of its cut (`dispatcher arm-accept <name> --by app:card --design <stamp>`) —
+  // the card's `Accept when cut`: the daemon approves the first cut of that exact design and walks it. The
+  // stamp the card drew travels in the body and is checked before any spawn (`armAcceptArgs`); the dispatcher
+  // refuses a press on a design that has since moved (a 409 carrying its own sentence) and answers a second
+  // press with exit 3 (`already armed`), which the card reads as answered. A model never arms: the verb refuses
+  // inside a Claude session, and this server strips that variable from the command's environment.
+  router.post('/plans/:name/arm-accept', relay('arm-accept', armAcceptArgs, DESIGN_STAMP_ERROR));
+  // Its Cancel (`dispatcher disarm-accept <name>`): no body, no argument.
+  router.post('/plans/:name/disarm-accept', relay('disarm-accept'));
   // A plan's own DeepSeek / Claude word (`dispatcher model <name> <word>`). RESTARTS NOTHING AND
   // WAKES NOBODY: the word is read when a chain is launched (`phase_chain.launch_env`), so it takes
   // the plan's NEXT phase and never disturbs a walk already out — which is why no plan's state is a
@@ -216,7 +274,7 @@ export function createDispatcherRouter(dependencies: DispatcherRouterDependencie
   }));
 
   /**
-   * The ARC's four verbs — `model`, `stop`, `resume`, `schedule` — relayed to the arc's own door.
+   * The ARC's five verbs — `model`, `stop`, `resume`, `schedule`, `wip` — relayed to the arc's own door.
    *
    * AN ARC IS ADDRESSED BY ITS OWN NAME, and the dispatcher is what resolves it. Each of these four
    * verbs takes a plan's name OR an arc's and answers an arc's name with the PLAN verb applied to
@@ -233,6 +291,11 @@ export function createDispatcherRouter(dependencies: DispatcherRouterDependencie
    * for `schedule` it arms one hour for each of them (INV-201 knows no arc-level timer). The next
    * frame redraws the arc's header and its plans together — nothing here is optimistic, and nothing
    * is copied by this server.
+   *
+   * `wip` IS THE ARC'S ALONE: `dispatcher wip <arc> features|tasks <N|all|default>` sets one of the
+   * epic's two limits (or hands it back to Settings' default), never refused for the epic's state —
+   * the limit is read at the rule's next take-up (`width.reason`), and the dispatcher kicks its own
+   * daemon when the word changed, so a wider limit frees a held feature without another press.
    *
    * The same two fences as the plan routes, one name class over: the arc's own regex, and a verb word
    * that is OURS — never the request's.
@@ -272,6 +335,12 @@ export function createDispatcherRouter(dependencies: DispatcherRouterDependencie
     const when = readDispatcherScheduleWhen((body as { when?: unknown } | undefined)?.when);
     return when === null ? null : [when];
   }));
+  // The deck's `Accept when cut` and its Cancel: the dispatcher arms every DESIGNED plan of the arc on that plan's
+  // own current design, so no stamp travels — the card never read the members' designs one by one.
+  router.post('/arcs/:name/arm-accept', arcRelay('arm-accept', () => ['--by', 'app:card']));
+  router.post('/arcs/:name/disarm-accept', arcRelay('disarm-accept'));
+  // One of the epic's two WIP limits (`dispatcher wip <arc> <limit> <word>`): the epic card's WIP control.
+  router.post('/arcs/:name/wip', arcRelay('wip', wipArgs, WIP_BODY_ERROR));
 
   return router;
 }

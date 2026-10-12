@@ -96,13 +96,15 @@ function mergeGutters(stored: unknown, incoming: unknown): unknown {
  * celebration, and a whole-document write would let the device that read it last erase the other
  * roadmap's stamp and replay its completions.
  *
- * THE MERGE IS NOT MONOTONIC: the rule is "replace the named entry", so a stamp patch carrying an
- * OLDER `at` than the stored one moves the stamp backward, and the other device would play what it
- * had already played. Nothing here compares `at`, so the writer must never send a stamp older than the
- * one it read (`useCelebrations`); a merge that keeps the newer `at` per roadmap would need the same
- * rule on the client's `applyEntryPatch`, and is its own change to this shared merge.
+ * A STAMP LIST MOVES FORWARD ONLY (`FORWARD_ONLY_KEYS`). The rule is "replace the named entry", except
+ * that a `roadmapSeen` patch carrying an OLDER `at` than the stored entry is a stale device's retry and
+ * is not applied: it would move the stamp backward, and the other device would play what it had already
+ * played. The client's `applyEntryPatch` keeps the same rule (`FORWARD_ONLY_ENTRY_KEYS`), and the writer
+ * still never sends a stamp older than the one it read (`useCelebrations`).
  */
 const ENTRY_LISTED_KEYS: ReadonlySet<string> = new Set(['dispatcher', 'roadmapSeen']);
+/** The keys whose entries carry an `at` that only moves forward. Mirrors the client's `FORWARD_ONLY_ENTRY_KEYS`. */
+const FORWARD_ONLY_KEYS: ReadonlySet<string> = new Set(['roadmapSeen']);
 /** The most entries one list keeps, newest last. Mirrors the client's own cap. */
 const ENTRY_LIST_CAP = 200;
 
@@ -112,27 +114,44 @@ const entryKeyOf = (entry: unknown): string | null => {
   return isRecord(entry) && typeof entry.name === 'string' ? entry.name : null;
 };
 
-function patchEntryList(stored: unknown, listPatch: Record<string, unknown>): unknown[] {
-  const named = new Set(Object.keys(listPatch));
+/** Whether the stored entry carries a later `at` than the one a patch sends under its key: the stamp that must not be rewound. */
+function storedIsLater(stored: unknown, sent: unknown): boolean {
+  if (!isRecord(stored) || !isRecord(sent)) return false;
+  const held = Date.parse(String(stored.at));
+  const offered = Date.parse(String(sent.at));
+  return !Number.isNaN(held) && !Number.isNaN(offered) && held > offered;
+}
+
+function patchEntryList(stored: unknown, listPatch: Record<string, unknown>, forward: boolean): unknown[] {
+  const held = new Map<string, unknown>();
+  if (forward) {
+    for (const entry of Array.isArray(stored) ? stored : []) {
+      const key = entryKeyOf(entry);
+      if (key !== null) held.set(key, entry);
+    }
+  }
+  // Under a forward-only key an entry older than the stored one is a stale retry: it names nothing and adds nothing.
+  const sent = Object.entries(listPatch).filter(([key, entry]) => !(forward && storedIsLater(held.get(key), entry)));
+  const named = new Set(sent.map(([key]) => key));
   const kept = (Array.isArray(stored) ? stored : []).filter((entry) => {
     const key = entryKeyOf(entry);
     return key !== null && !named.has(key);
   });
   // An entry whose own key is not the key it was sent under is malformed and is not stored.
-  const added = Object.entries(listPatch)
+  const added = sent
     .filter(([key, entry]) => entry !== null && entryKeyOf(entry) === key)
     .map(([, entry]) => entry);
   return [...kept, ...added].slice(-ENTRY_LIST_CAP);
 }
 
-function mergeEntryLists(stored: unknown, incoming: unknown): unknown {
+function mergeEntryLists(stored: unknown, incoming: unknown, forward: boolean): unknown {
   if (!isRecord(incoming)) {
     return incoming;
   }
 
   const merged: Record<string, unknown> = isRecord(stored) ? { ...stored } : {};
   for (const [list, value] of Object.entries(incoming)) {
-    merged[list] = isRecord(value) ? patchEntryList(merged[list], value) : value;
+    merged[list] = isRecord(value) ? patchEntryList(merged[list], value, forward) : value;
   }
   return merged;
 }
@@ -202,7 +221,7 @@ export const userPreferencesDb = {
         if (key === GUTTERS_KEY || ENTRY_LISTED_KEYS.has(key)) {
           const row = readOne.get(userId, key) as PreferenceRow | undefined;
           const stored = row ? decodePreference(row)?.[1] : undefined;
-          const merged = key === GUTTERS_KEY ? mergeGutters(stored, value) : mergeEntryLists(stored, value);
+          const merged = key === GUTTERS_KEY ? mergeGutters(stored, value) : mergeEntryLists(stored, value, FORWARD_ONLY_KEYS.has(key));
           upsert.run(userId, key, JSON.stringify(merged));
           continue;
         }

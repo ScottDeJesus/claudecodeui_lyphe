@@ -421,6 +421,40 @@
       "description": "An Accept during DeepSeek’s peak window (01:00–04:00 and 06:00–10:00 UTC, weekdays) queues the feature and starts it when the window lifts. Off: Accept walks now.",
       "unreadable": "The switch could not be read from the server, so its position is unknown — this is not the same as off. It is retried whenever this page regains focus."
     },
+    "runnerCompaction": {
+      "label": "Custom compaction",
+      "description": "On: a chat’s compaction is written by <model>{{model}}</model> at {{effort}} effort instead of by the chat’s own model, in three cases:",
+      "descriptionBare": "On: a chat’s compaction is written by the summarizer instead of by the chat’s own model, in three cases:",
+      "whenPressed": "when you press Compact or type /compact;",
+      "atTurnEnd": "at the end of a turn that leaves the chat past half its context window — never in the middle of work;",
+      "whenIdle": "when the chat has sat idle for 54 minutes holding 200K tokens or more, in place of the CLI’s own idle compaction.",
+      "after": "The chat moves to a new session seeded with the summary and its latest messages, and keeps its own model and effort. The CLI’s auto-compact stays on as the net. Chats placed on a node keep the CLI’s own compaction. A flip reaches each chat at its next message.",
+      "waiting": "Waiting: <why>{{why}}</why>. Chats compact as before until it can.",
+      "readinessUnread": "Whether this Claude Code can serve the summarizer could not be read.",
+      "unreadable": "The switch could not be read from the server, so its position is unknown — this is not the same as off. It is retried whenever this page regains focus."
+    },
+    "runnerMainSessionDactyls": {
+      "label": "Dactyls for the main session",
+      "description": "On: the main session — a chat here or a terminal session — changes a repository file only through a dactyl, a <model>{{model}}</model> child at {{effort}} that sees only its brief and the files it is given.",
+      "descriptionBare": "On: the main session — a chat here or a terminal session — changes a repository file only through a dactyl, a child that sees only its brief and the files it is given.",
+      "hands": "Its own Edit and Write into repository files are refused, and so are its shell writes there; files outside any repository (scratch in /tmp), git-ignored files and /remember are untouched. Shell dumps of a repository file’s body (cat, head, tail, sed) are refused too: what a file says comes through dactyl --read, so its body never enters its context, and the Read tool keeps exact lines. A /tweak lands through a dactyl, and rail 2 logs it on the chain the file belongs to.",
+      "after": "A session that cannot reach a dactyl keeps its own hands. A flip reaches each session at its next message. The dactyl’s words are edited in Edit Agent Chains.",
+      "waiting": "Waiting: <why>{{why}}</why>. Sessions keep their own hands until it can.",
+      "readinessUnread": "Whether this Claude Code can serve a dactyl could not be read.",
+      "unreadable": "The switch could not be read from the server, so its position is unknown — this is not the same as off. It is retried whenever this page regains focus.",
+      "hand": {
+        "line": "Last {{days}}: {{dactyls}} by hand — {{reads}}, {{edits}} · <spend>{{spend}}</spend>",
+        "lineWithoutSpend": "Last {{days}}: {{dactyls}} by hand — {{reads}}, {{edits}}",
+        "days_one": "{{count, number}} day",
+        "days_other": "{{count, number}} days",
+        "dactyls_one": "{{count, number}} dactyl",
+        "dactyls_other": "{{count, number}} dactyls",
+        "reads_one": "{{count, number}} read",
+        "reads_other": "{{count, number}} reads",
+        "edits_one": "{{count, number}} edit",
+        "edits_other": "{{count, number}} edits"
+      }
+    },
     "plannerLanes": {
       "label": "Planner lanes",
       "description": "How many planners (designs, cuts, judgments) run at once — {{count}} at a time. Lowering it stops no planner already out; the lane takes no new one until it has room. Takes effect at once.",

@@ -6,6 +6,7 @@ import {
   useSubagentRunningSessionIdSet,
 } from '@/shared/context/SessionProtectionContext';
 import { useSimpleChatListPreferences } from '@/shared/hooks/useSimpleChatListPreferences';
+import { projectNameHints } from '@/shared/projectNameHints';
 import { getAllSessions } from '@/shared/sessionRecency';
 import type {
   Project,
@@ -101,11 +102,14 @@ export function useSessionPicker({
     () => (simpleListEnabled ? [] : sortProjects(withResolvedStarState(projects, starOverrides), sortOrder)),
     [simpleListEnabled, projects, starOverrides, sortOrder],
   );
+  // Over the whole list the sidebar holds, so a project's hint here is the one the chat list and the
+  // new-chat picker show for it.
+  const projectHints = useMemo(() => projectNameHints(projects), [projects]);
   const groups = useMemo(
     () => (simpleListEnabled
-      ? groupsFromSimpleList(list.rows, marks)
+      ? groupsFromSimpleList(list.rows, marks, projectHints)
       : groupsFromProjects(sortedProjects, marks, nameOf)),
-    [simpleListEnabled, list.rows, sortedProjects, marks, nameOf],
+    [simpleListEnabled, list.rows, sortedProjects, marks, nameOf, projectHints],
   );
 
   const hasRows = list.rows.length > 0;

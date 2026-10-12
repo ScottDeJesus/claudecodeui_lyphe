@@ -18,7 +18,10 @@ export const handover = supervised && process.env.CLOUDCLI_HANDOVER === '1';
 
 /**
  * Tells the supervisor this process is listening. Listening IS readiness — the supervisor retires
- * the predecessor on this message, so nothing slower than the bind may gate it.
+ * the predecessor on this message, so nothing slower than the bind may gate it. The one thing sent
+ * first is `cerberus.start()` — the store, the key, the seeds and the warden gateway's bind, of which
+ * the entrypoint waits at most 3 s for the bind: READY is what retires the predecessor, and the
+ * successor's gateway must already stand beside the old one.
  *
  * Guarded on `process.connected`, NEVER on `process.send`: the method stays a function after the
  * channel closes, and the send then fails ASYNCHRONOUSLY as an unhandled 'error' on `process`

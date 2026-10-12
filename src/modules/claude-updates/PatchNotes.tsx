@@ -5,7 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { MarkdownPreview } from '@/modules/markdown-preview';
 import type { ClaudeUpdateNote } from '@/shared/claude-update-types';
 import { Button, Collapsible, CollapsibleContent, CollapsibleTrigger, FoldChevron } from '@/shared/ui';
-import { useCollapsible } from '@/shared/ui/Collapsible';
+import { useCollapsible } from '@/shared/ui/collapsibleContext';
 
 /**
  * One package's changelog sections, newest first: a fold per version, the newest one already open.

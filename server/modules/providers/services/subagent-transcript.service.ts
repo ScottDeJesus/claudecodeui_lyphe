@@ -1,6 +1,6 @@
 import path from 'node:path';
 
-import { sessionsDb } from '@/modules/database/index.js';
+import { sessionCompactionsDb, sessionsDb } from '@/modules/database/index.js';
 import {
   NOT_FOUND_TRANSCRIPT,
   findSubagentTranscriptByToolUse,
@@ -32,6 +32,15 @@ function readSession(sessionId: string) {
   }
 }
 
+/** The chat's compaction records, oldest first; a database that throws is no records, as `readSession` is no row. */
+function readCompactions(sessionId: string) {
+  try {
+    return sessionCompactionsDb.listCompactions(sessionId);
+  } catch {
+    return [];
+  }
+}
+
 export const subagentTranscriptService = {
   async readByToolUse(sessionId: string, toolUseId: string): Promise<SubagentTranscriptResult> {
     const session = readSession(sessionId);
@@ -39,22 +48,30 @@ export const subagentTranscriptService = {
       return NOT_FOUND_TRANSCRIPT;
     }
 
-    const jsonlPath = session.jsonl_path;
-    if (!jsonlPath) {
-      return NOT_FOUND_TRANSCRIPT;
+    // The live transcript first; then the ones a custom compaction moved the chat off, newest first —
+    // the stitched history still draws an agent launched before a compaction, so its transcript has
+    // to open. Each transcript's agents live under ITS provider session id's directory.
+    const lookups: Array<{ jsonlPath: string; providerSessionId: string }> = [];
+    if (session.jsonl_path) {
+      // The provider session id, not the app id, names the CLI's own directory; the fallback covers
+      // a row that has not been mapped to a provider id yet.
+      lookups.push({ jsonlPath: session.jsonl_path, providerSessionId: session.provider_session_id ?? sessionId });
+    }
+    for (const record of readCompactions(sessionId).reverse()) {
+      lookups.push({ jsonlPath: record.oldJsonlPath, providerSessionId: record.oldProviderSessionId });
     }
 
-    // The provider session id, not the app id, names the CLI's own directory; the fallback covers
-    // a row that has not been mapped to a provider id yet.
-    const transcriptPath = await findSubagentTranscriptByToolUse(
-      path.dirname(jsonlPath),
-      session.provider_session_id ?? sessionId,
-      toolUseId,
-    );
-    if (!transcriptPath) {
-      return NOT_FOUND_TRANSCRIPT;
+    for (const lookup of lookups) {
+      const transcriptPath = await findSubagentTranscriptByToolUse(
+        path.dirname(lookup.jsonlPath),
+        lookup.providerSessionId,
+        toolUseId,
+      );
+      if (transcriptPath) {
+        return readTranscriptActivity(transcriptPath);
+      }
     }
 
-    return readTranscriptActivity(transcriptPath);
+    return NOT_FOUND_TRANSCRIPT;
   },
 };

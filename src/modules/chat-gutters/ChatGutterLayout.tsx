@@ -17,7 +17,7 @@ import { GutterWidgetFrame } from '@/modules/chat-gutters/GutterWidgetFrame';
 import { useDispatcherPlans } from '@/modules/dispatcher';
 import { MemoryWidgetBody, useMemoryIntake } from '@/modules/memory-intake';
 import { NotesWidgetBody, useNotes } from '@/modules/notes';
-import { RoadmapWidgetBody, useRoadmap } from '@/modules/roadmap';
+import { RoadmapWidgetBody, RoadmapWidgetFullscreenBody, useRoadmap } from '@/modules/roadmap';
 import { RunnerWidgetBody } from '@/modules/runner-tab';
 import { useHostWindow } from '@/shared/context/HostWindowContext';
 import type { GutterSide, GutterWidgetId, Tone } from '@/shared/types';
@@ -89,9 +89,10 @@ export function ChatGutterLayout({
   // The Runs widget lists the arcs as decks and the plans no arc holds as cards, so its badge
   // counts the plans alone: an arc's own plans are already counted, and the arc's deck is a
   // heading over cards the count has counted — the In flight face's own rule (`useDispatcherPlans.count`).
-  // `waiting` is the badge's TONE, not its number: the count stays what it always was, and turns
-  // amber while any of those plans owes the operator a word — the same amber the tab's dot wears.
-  const { count: runnerCount, waiting: runnerWaiting } = useDispatcherPlans();
+  // `tone` is the badge's colour, not its number: the count stays what it always was, and wears what
+  // the lane is DOING — amber while a plan owes the operator a word, blue while anything runs, green
+  // only once all of it is finished — the same colour the Roadmap tab's dot wears (`useDispatcherPlans.tone`).
+  const { count: runnerCount, tone: runnerTone } = useDispatcherPlans();
   // The Roadmap widget's badge counts what is being worked on — features still being designed and features in
   // flight, on the ONE roadmap on screen — and turns amber while any of them owes the operator a word: the
   // same register as the Runs badge above. These reads sit OUTSIDE every widget's boundary, so a picture whose
@@ -274,6 +275,11 @@ export function ChatGutterLayout({
       count: number;
       icon: LucideIcon;
       Body: ComponentType<{ sessionId: string | null }>;
+      /**
+       * A widget's body for while its card has the whole viewport, drawn in place of `Body` and only then.
+       * Absent, `Body` is drawn at both sizes (the Embed widget's live iframe must not be remounted by it).
+       */
+      FullscreenBody?: ComponentType<{ sessionId: string | null }>;
       /** The tone of the frame's count badge; absent means the badge's own `info` register. */
       countTone?: Tone;
       /** Set by a widget whose body is itself a frame: the card gives it its whole inside. */
@@ -285,9 +291,9 @@ export function ChatGutterLayout({
     runner: {
       title: t('gutters.runner.title'),
       count: runnerCount,
-      // Amber while a prompt on the lane is waiting on the operator — the badge is the widget's
-      // only mark that says so, and the tab it mirrors wears the same tone at the same moment.
-      countTone: runnerWaiting > 0 ? 'warn' : undefined,
+      // The lane's own mark: the badge is the widget's only one, and the tab it mirrors wears the
+      // same colour at the same moment.
+      countTone: runnerTone ?? undefined,
       icon: ActivityIcon,
       Body: RunnerWidgetBody,
     },
@@ -297,6 +303,8 @@ export function ChatGutterLayout({
       countTone: roadmapWaiting > 0 ? 'warn' : undefined,
       icon: RouteIcon,
       Body: RoadmapWidgetBody,
+      // At full screen the widget is the Roadmap tab itself — both faces; in a column it is the roadmap face alone, in its column fit.
+      FullscreenBody: RoadmapWidgetFullscreenBody,
       // A body that scrolls its own content and carries its own celebrations box: the card gives it its
       // whole inside, with no padding and no scroll area of its own (as the Embed widget's is).
       flush: true,
@@ -334,7 +342,11 @@ export function ChatGutterLayout({
   };
 
   const renderWidget = (widget: GutterWidgetId): ReactNode => {
-    const { title, count, countTone, icon, Body, flush, HeaderAction } = widgets[widget];
+    const { title, count, countTone, icon, Body, FullscreenBody, flush, HeaderAction } = widgets[widget];
+    // Which body the card draws now. Fullscreen is the layout's own state, so the layout is what tells a body
+    // apart; a widget with no `FullscreenBody` keeps its one body (and its identity) through the switch.
+    const swapsBody = fullscreen === widget && FullscreenBody !== undefined;
+    const Drawn = swapsBody ? FullscreenBody : Body;
 
     return (
       <GutterWidgetFrame
@@ -357,8 +369,10 @@ export function ChatGutterLayout({
       >
         {/* Its own boundary, inside its own frame: a body that throws costs this gutter and leaves
             the chat and the other widgets standing. */}
-        <Boundary>
-          <Body sessionId={sessionId} />
+        {/* Keyed to the body it holds, only for a widget that swaps: a crash in the full-screen body must not
+            leave the boundary tripped over the column's body after the card has left full screen. */}
+        <Boundary key={swapsBody ? 'fullscreen' : 'column'}>
+          <Drawn sessionId={sessionId} />
         </Boundary>
       </GutterWidgetFrame>
     );

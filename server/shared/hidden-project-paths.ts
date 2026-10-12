@@ -14,15 +14,15 @@ export const TEST_PROJECTS_ROOT = path.join(os.homedir(), '.claude', 'state', 't
  * folder as a project, so a probe in `/tmp` or a fixture under `~/.claude/state` became a row in
  * the sidebar, its search and the new-chat picker — and a later run there un-archives it, so
  * archiving never kept them out. The test root, the per-machine state folder that holds it and the
- * older fixtures, and the temp directory (both `/tmp` and whatever `TMPDIR` names) are scratch by
- * definition.
+ * older fixtures, and the temp directories (`/tmp`, `/var/tmp` — where a probe parks a throwaway
+ * folder that must outlive a reboot — and whatever `TMPDIR` names) are scratch by definition.
  *
  * Hidden is not gone: the rows stay in the database, and a hidden project's chats still open by
  * link. Read by the project lists, the recent-conversations feed, conversation search, the
  * session-upsert broadcast and the runner's ending notifications.
  */
 export const HIDDEN_PROJECT_ROOTS: readonly string[] = [
-  ...new Set([TEST_PROJECTS_ROOT, path.join(os.homedir(), '.claude', 'state'), '/tmp', os.tmpdir()]),
+  ...new Set([TEST_PROJECTS_ROOT, path.join(os.homedir(), '.claude', 'state'), '/tmp', '/var/tmp', os.tmpdir()]),
 ];
 
 /** Whether anything at this path — a project folder, a plan file — sits in a hidden root. */

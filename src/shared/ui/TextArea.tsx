@@ -15,8 +15,8 @@ type TextAreaProps = Omit<React.TextareaHTMLAttributes<HTMLTextAreaElement>, 'va
 /**
  * The application-wide multi-line field, ported from Verve's own `TextArea`
  * (`_ds_bundle.js`, components/forms/TextArea.jsx): a value, its onChange, a row count, a
- * placeholder, `invalid`, and whatever else a `<textarea>` takes. Consumer: the roadmap's item
- * dialog, which asks for a goal.
+ * placeholder, `invalid`, and whatever else a `<textarea>` takes. Consumers: the roadmap's item
+ * dialog, which asks for a goal, and the cerberus module's Mute dialog, which asks why.
  *
  * Paint is two classes. `vv-input` is `Input`'s own field paint — border, ground, focus ring and
  * the amber `vv-input--invalid` — so a title field and a goal field stacked in one dialog can never

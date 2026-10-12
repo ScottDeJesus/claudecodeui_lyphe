@@ -11,8 +11,8 @@ import {
 
 /**
  * What `useRoadmap` hands back: `picture` is `null` until the lane's first reading lands, and
- * `selected` is `null` until the preferences have settled as well. Read by the Roadmap tab's face and
- * picker (`RoadmapTab`, `RoadmapPath`, `RoadmapPicker`) and by the chat gutter's widget.
+ * `selected` is `null` until the preferences have settled as well. Read by the Roadmap tab, its face and
+ * its picker (`RoadmapTab`, `RoadmapTreeFace`, `RoadmapPicker`).
  */
 export type RoadmapView = {
   picture: RoadmapPicture | null;
@@ -26,10 +26,10 @@ const NO_ROADMAPS: Roadmap[] = [];
 
 /**
  * The roadmap lane's read side: the whole picture off the live bus, the roadmaps it carries, and the
- * ONE of them on screen. Used by the Roadmap tab's face (`RoadmapPath`, `RoadmapTab`), by the picker
- * (`RoadmapPicker`) and by the chat gutter's widget (`RoadmapWidgetBody`), and — through the roadmap
- * barrel — by `src/modules/chat-gutters` (`ChatGutterLayout`), which reads the selected roadmap's
- * standing for the Roadmap widget's count and its amber.
+ * ONE of them on screen. Used by the Roadmap tab and its face (`RoadmapTab`, `RoadmapTreeFace`, which also
+ * draws the chat gutter's widget), by the picker (`RoadmapPicker`) and by the widget's foot
+ * (`RoadmapWidgetBody`), and — through the roadmap barrel — by `src/modules/chat-gutters`
+ * (`ChatGutterLayout`), which reads the selected roadmap's standing for the Roadmap widget's count and its amber.
  *
  * `roadmapSelected` is a server-backed preference, so the choice follows the operator from desktop to
  * phone, and it is written WHOLE: the last device to choose wins, which is what "the roadmap on

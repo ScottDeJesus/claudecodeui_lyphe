@@ -15,8 +15,10 @@ type BannerProps = {
  *
  * Used by the chat module (Phase 6) for the tool-permission prompt and by the accounts module
  * (Phase 13) for the drift notice, whose "Save it" is the `action`, and for a write the store
- * refused — every caller needs a toned strip carrying a sentence and at most one or two buttons,
- * and none should spell a second one.
+ * refused, and by the cerberus module for "Cerberus can't be reached" with its Try again, for
+ * the Enroll dialog's refused ask and expired token, and for a node card's refused project move —
+ * every caller needs a toned strip carrying a sentence and at most one or two buttons, and none
+ * should spell a second one.
  *
  * The tone arrives as `data-tone`, so the fill, the ink and the mark all come from the one
  * `[data-tone]` block in tokens.css. The mark is not decoration: it is what makes the tone

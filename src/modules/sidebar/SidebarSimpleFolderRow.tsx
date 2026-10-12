@@ -1,11 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
-import type { HTMLAttributes } from 'react';
 import { Edit2, Folder, MoreHorizontal, Trash2 } from 'lucide-react';
 import type { TFunction } from 'i18next';
 
 import { ActionMenu, FoldChevron } from '@/shared/ui';
 import { cn } from '@/shared/utils';
-import type { SimpleChatMark, SimpleListFolder } from '@/shared/types';
+import type { SimpleChatMark, SimpleListDragProps, SimpleListFolder } from '@/shared/types';
 import { useCompactSidebar } from '@/modules/sidebar/hooks/useCompactSidebar';
 
 // File-local: read only by SidebarSimpleListItems, which draws one of these per folder.
@@ -21,7 +20,8 @@ type SidebarSimpleFolderRowProps = {
   onToggle: () => void;
   onRename: (name: string) => void;
   onDelete: () => void;
-  dragProps: Pick<HTMLAttributes<HTMLElement>, 'onPointerDown' | 'onClickCapture' | 'onDragStart'> | null;
+  dragProps: SimpleListDragProps | null;
+  /** This header's folder is the one being carried: its whole block travels (`SidebarSimpleListItems`). */
   isDragging: boolean;
   /** A carried chat would land before this folder, at the top level. */
   dropEdge: 'before' | null;
@@ -51,9 +51,9 @@ const DOT_INK: Record<SimpleChatMark, string> = {
  * height rule, its icon box, its 8px discs and their inks, its menu and its drop line.
  *
  * THE NAME IS THE FOLD, AND IT IS NOT A `<button>`. The carry behind this list turns every press
- * inside a `button` away, so a mouse has to be able to pick the folder up by its name exactly as it
- * picks a chat up by its title: the toggle is a `role="button"` span with `tabIndex`, answering a
- * press, Enter and Space, and on a touch the carry waits for the glyph's `data-drag-handle`.
+ * inside a `button` away, so the folder has to be picked up by its name exactly as a chat is picked
+ * up by its title — a mouse by a drag, a finger by a hold: the toggle is a `role="button"` span with
+ * `tabIndex`, answering a press, Enter and Space.
  *
  * ONE DOT, NEVER A SPINNER AND NEVER TWO: the folder's most pressing chat, in the same disc the
  * chat row would wear for it — a question in the warning ink and the row's pulse, a reply not read
@@ -132,19 +132,13 @@ export default function SidebarSimpleFolderRow({
         // content stretching to fill this row's box, so vertical padding here would eat into it.
         isCompact ? 'min-h-11' : 'py-2',
         holdsSelected ? 'bg-primary/10 text-foreground' : 'text-foreground hover:bg-accent/60',
-        isDropInto && 'ring-2 ring-primary',
-        // NO FADE OF ITS OWN, unlike the chat row: what is carried is the whole BLOCK — this header
-        // and the chats under it — and the block is what fades (`SidebarSimpleListItems`). Fading
-        // the header here as well would multiply the two, leaving the name at 25% while its own
-        // chats sat at 50%. `isDragging` still says which header is the carried one, through
-        // `data-dragging` below.
+        // NOTHING OF ITS OWN WHEN CARRIED, unlike the chat row: what is carried is the whole BLOCK —
+        // this header and the chats under it — and the block is what the kit lifts and moves
+        // (`SidebarSimpleListItems`). `isDragging` still says which header is the carried one,
+        // through `data-dragging` below.
       )}
     >
-      <span
-        data-drag-handle
-        title={t('simpleList.dragHandle')}
-        className="flex h-7 w-6 flex-shrink-0 cursor-grab touch-none items-center justify-center text-muted-foreground"
-      >
+      <span className="flex h-7 w-6 flex-shrink-0 items-center justify-center text-muted-foreground">
         <Folder className="h-4 w-4" aria-hidden="true" />
       </span>
 
@@ -241,7 +235,17 @@ export default function SidebarSimpleFolderRow({
       {/* The chat row's own drop line, on this row's top edge: where a carried chat lands when it
           comes down before the folder, at the top level. */}
       {dropEdge === 'before' && (
-        <span aria-hidden className="pointer-events-none absolute inset-x-1 top-0 h-0.5 rounded-full bg-primary" />
+        <span aria-hidden className="pointer-events-none absolute inset-x-1 top-0 z-40 h-0.5 rounded-full bg-primary" />
+      )}
+      {/* The ring on the folder a carried chat would land inside. It is a layer of its own, not a
+          ring on the header: the carried row is drawn over this very header, and a ring that is the
+          header's own would sit under it (`z-40` over the kit's 30). */}
+      {isDropInto && (
+        <span
+          data-testid="simple-chat-folder-into"
+          aria-hidden
+          className="pointer-events-none absolute inset-0 z-40 rounded-lg ring-2 ring-primary"
+        />
       )}
     </div>
   );

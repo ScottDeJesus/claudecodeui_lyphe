@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { AcceptWhenCut } from '@/modules/dispatcher/AcceptWhenCut';
 import { ActionBar } from '@/modules/dispatcher/ActionBar';
 import { epochOf } from '@/modules/dispatcher/dispatcherState';
 import { useDispatcherVerbs } from '@/modules/dispatcher/hooks/useDispatcherVerbs';
@@ -16,10 +17,12 @@ import { effectiveModelWord } from '@/shared/utils';
  * refuse.
  *
  * - `live` → Stop. A pause; Resume is its undo, so no dialog guards it.
- * - `stalled` → Resume and Stop. The plan is released and its running work has ended with nothing to
- *   record it, so Resume — the same `resume` verb — is the press that wakes the daemon, and Stop is
- *   still drawn because a released plan can be held rather than woken. No hour is offered: the
- *   dispatcher refuses to schedule a plan that is not paused.
+ * - `stalled` → Resume, and Stop beside it. The plan is released and its running work has ended with
+ *   nothing to record it (`report_stall`): Resume is the press that starts things again — it wakes the
+ *   dispatcher, or starts one, and its first pass settles what ended and takes the walk up — so it is
+ *   the primary; Stop stays because the plan is still released, and an operator who would rather hold
+ *   it than wake it must be able to. Never Stop alone: a card that offers only Pause over work that
+ *   is not there is the card that said the epic was moving.
  * - `paused` → Resume and `Resume at …`: a plan STOPPED mid-walk is the one an hour makes sense in
  *   front of, because the timer's press is the very Resume the button beside it sends.
  * - `queued` → Start (it IS `resume`: the plan is approved and paused and has never walked) and
@@ -27,6 +30,11 @@ import { effectiveModelWord } from '@/shared/utils';
  * - `scheduled` → the same pair, reading the armed hour: `Resume`/`Start` and `Cancel` (the schedule
  *   control). The hour itself is the card's own clock (`PlanFace.PlanClock`), said once.
  * - `parked` → Unpark. `idle` in `designed` or `questions` → Park, the way out of the Stop hold.
+ * - `idle` in `designed` → `Accept when cut` before Park (`AcceptWhenCut`): the operator's Accept on the design he
+ *   has read, ahead of the cut — the card sends the design stamp it drew (`design_loaded_at`), and the dispatcher
+ *   approves the first cut of that exact design. Pressed, the card reads `Accepted · starts when cut` with
+ *   `Cancel`, Park beside it, and keeps reading it while the plan is `loaded` and the cut is landing. A plan in
+ *   `questions` has no design to accept yet (his answers reload it, which clears a press), so Park is alone.
  * - `complete` → nothing: a finished plan has no verb left, and putting its card away is Hide, in the
  *   head's corner (`LaneCardHead`) — a press on the screen, not on the plan.
  *
@@ -49,6 +57,11 @@ import { effectiveModelWord } from '@/shared/utils';
  * control here: the arc's action bar carries the ARC's word and hands it down, and this is where one plan
  * speaks for itself again.
  *
+ * A FEATURE CARRIES NO CONCURRENCY CONTROL: how many features of an epic are in progress, and how
+ * many tasks each runs at once, are the EPIC's WIP (`EpicWipControl`, on the epic's own bar). When
+ * the epic's feature limit is what a feature is waiting on, the card says so in its head
+ * (`PlanCard`'s `data-plan-wip-hold` line) — that is a fact, not a press.
+ *
  * A STALLED PLANNER IS DRAWN BESIDE ALL OF THEM, whatever the plan's status (`plan.planner.stalled`):
  * Resume planner, the press that puts the outing that ended short back to work. Which door it goes
  * back through — `cut`, `judge`, a `tell` of `continue` — is the dispatcher's own reading of its store
@@ -67,7 +80,7 @@ export function PlanControls({ plan }: { plan: DispatcherPlan }) {
   // reads `queued`).
   const stops = plan.status === 'paused' || (plan.status === 'scheduled' && plan.launched);
   const starts = plan.status === 'queued' || (plan.status === 'scheduled' && !plan.launched);
-  const { stop, resume, schedule, park, unpark, plannerResume, setModel, busy } = useDispatcherVerbs(plan.name, 'plan',
+  const { stop, resume, schedule, park, unpark, plannerResume, setModel, armAccept, disarmAccept, busy } = useDispatcherVerbs(plan.name, 'plan',
     starts ? t('runner.start') : t('runner.resume'));
   const held = busy !== null;
   const armed = epochOf(plan.schedule?.start_at ?? null);
@@ -83,7 +96,9 @@ export function PlanControls({ plan }: { plan: DispatcherPlan }) {
   } else if (plan.status === 'stalled') {
     verbs = (
       <>
-        <Button size="sm" className="h-8" disabled={held} onClick={() => void resume()} data-dispatcher-resume>{word}</Button>
+        <Button size="sm" className="h-8" disabled={held} onClick={() => void resume()} data-dispatcher-resume>
+          {t('runner.resume')}
+        </Button>
         <Button variant="secondary" size="sm" className="h-8" disabled={held} onClick={() => void stop()} data-dispatcher-stop>
           {t('runner.stop')}
         </Button>
@@ -111,11 +126,26 @@ export function PlanControls({ plan }: { plan: DispatcherPlan }) {
         {t('dispatcher.unpark')}
       </Button>
     );
-  } else if (plan.status === 'idle' && (plan.state === 'designed' || plan.state === 'questions')) {
+  } else if (plan.status === 'idle' && (plan.state === 'designed' || plan.state === 'questions'
+    || (plan.state === 'loaded' && plan.accept_armed))) {
+    // `loaded` is drawn only for a press that is still standing (the cut has landed, the daemon has not
+    // approved it yet): the armed word and Cancel, and no Park — a loaded plan is not parkable.
+    const parkable = plan.state !== 'loaded';
     verbs = (
-      <Button variant="secondary" size="sm" className="h-8" disabled={held} onClick={() => void park()} data-dispatcher-park>
-        {t('dispatcher.park')}
-      </Button>
+      <>
+        {plan.state !== 'questions' && (
+          <AcceptWhenCut scope="plan" busy={held}
+            pressable={plan.state === 'designed' && !plan.accept_armed && Boolean(plan.design_loaded_at)}
+            armed={Boolean(plan.accept_armed)}
+            armedTitle={plan.accept_armed ? t('dispatcher.acceptWhenCutArmedTitle', { by: plan.accept_armed.by, at: plan.accept_armed.at }) : undefined}
+            onArm={() => void armAccept(plan.design_loaded_at ?? '')} onCancel={() => void disarmAccept()} />
+        )}
+        {parkable && (
+          <Button variant="secondary" size="sm" className="h-8" disabled={held} onClick={() => void park()} data-dispatcher-park>
+            {t('dispatcher.park')}
+          </Button>
+        )}
+      </>
     );
   }
 

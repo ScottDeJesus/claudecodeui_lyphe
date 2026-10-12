@@ -12,3 +12,12 @@ export { settingsRoutes } from './settings.module.js';
  * `deepseek-flash-switch.js`, so the one mechanism both callers share stays the one mechanism.
  */
 export { readFlagFile, writeFlagFile } from './deepseek-flash-switch.js';
+
+/**
+ * The Custom compaction switch's two reads, for `server/modules/compaction`: it reads the file at
+ * every message to decide whether a chat's compaction is taken over, and asks `summarize --status`
+ * (cached there by the binary's identity) whether the summarizer can be served. It reaches them
+ * through this barrel and never by deep-importing `custom-compaction-switch.js`.
+ */
+export { readCustomCompactionSwitch, summarizerStatus } from './custom-compaction-switch.js';
+export type { SummarizerStatus } from '@/shared/types.js';

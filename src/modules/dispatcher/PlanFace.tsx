@@ -75,10 +75,9 @@ export function PlanClock({ plan }: { plan: DispatcherPlan }) {
  * (`phaseWord`), filled as far as `phaseProgress` has got. A node pressed opens that phase's row
  * under the track with its stages open — the receipt — and pressed again closes it.
  *
- * THE PLAN'S POSTURE RIDES THE CAPTION (`plan.posture`, `width.word` of its route and its task WIP):
- * DeepSeek or Claude — its own model word's route — and how many of its tasks walk at once, the number
- * its epic's WIP (else the Settings default) holds it to: `claude route · WIP: 2 tasks at a time`. The
- * caption draws it through `operatorWords`. Two plans on one screen can walk under different postures,
+ * THE PLAN'S POSTURE RIDES THE CAPTION (`plan.posture`, `width.word`): DeepSeek or Claude — its own
+ * model word's route — and its task WIP, how many of its tasks run at once, as the gate acts on it:
+ * `claude route · WIP: 2 tasks at a time`. Two plans on one screen can walk under different postures,
  * and a plan that sits still under `1 task at a time` is explained by its own.
  *
  * THE EVENT LOG IS THE CARD'S FEED, folded by default: the last thirty events, newest first —
@@ -111,9 +110,9 @@ export function PlanFace({ plan }: { plan: DispatcherPlan }) {
   const caption = [
     progress.total > 0 ? t('dispatcher.flow.caption', { done: progress.done, total: progress.total }) : '',
     t('dispatcher.rounds', { count: plan.rounds }),
-    // THIS plan's width (`report.plan_dict`'s `posture`): its own route and the task WIP in force
-    // for it, in the operator's words. The box's phrase stands in only against a dispatcher build
-    // older than the field.
+    // THIS plan's width (`report.plan_dict`'s `posture`): its own route and the task WIP the gate holds
+    // it to, in the operator's words. The box's phrase stands in only against a dispatcher build older
+    // than the field.
     operatorWords(plan.posture ?? route?.word ?? ''),
   ].filter(Boolean).join(' · ');
   const receipt = plan.phases.find((phase) => phase.key === selected) ?? null;

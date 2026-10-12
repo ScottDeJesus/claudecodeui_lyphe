@@ -13,7 +13,7 @@
  * panel that is always mounted cannot lie about it.
  *
  * Carried by every panel that closes itself on Escape while it is open — `ActionMenu`, `Menu`,
- * `Select`, the file tree's context menu and the composer's menu surface. A new one claims the key
+ * `Select`, `Sheet`, the file tree's context menu and the composer's menu surface. A new one claims the key
  * the same way, and until it does the dialog above it keeps the key, which is the old behaviour
  * rather than a broken one.
  */
@@ -45,4 +45,63 @@ export function otherOverlayHoldsEscape(doc: Document): boolean {
   return doc.querySelector(
     '[role="dialog"][aria-modal="true"], [data-owns-escape]:not([data-shape-fullscreen]):not([data-fullscreen])',
   ) !== null;
+}
+
+/** Whether something matching `selector` is drawn IN FRONT OF `content` — inside it, or after it in document order. */
+function drawnInFront(content: HTMLElement, doc: Document, selector: string): boolean {
+  // `element !== content` is for a panel that matches its own selector (a Sheet is `role="dialog"`);
+  // a panel is never in front of itself.
+  return Array.from(doc.querySelectorAll(selector)).some((element) => (
+    element !== content
+    && (content.contains(element)
+      || (content.compareDocumentPosition(element) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0)
+  ));
+}
+
+/**
+ * Whether a panel that OWNS ESCAPE is drawn IN FRONT OF `content` — the one case where the key is
+ * not the content's to take. Asked by `Dialog` and `Sheet`, the two panels that listen on their host
+ * `window` in the capture phase.
+ *
+ * TWO WAYS TO BE IN FRONT, and they are the two ways these panels are drawn. *In place*: a Menu or a
+ * Select inside the dialog, whose panel is a descendant of it. *Portalled*: a panel appended to
+ * `<body>` as it opened, so it comes after the dialog's own portal node in document order — which is
+ * also what puts it above, a portalled menu carrying a higher z than the panel it belongs to.
+ * Anything earlier is BEHIND — a composer menu left open under a dialog opened after it — and then
+ * the key is the asker's again.
+ *
+ * `doc` is the asker's host document: a panel open in the picture-in-picture window lives in that
+ * window's document, and the opener's holds none of them.
+ *
+ * The candidates are the panels that STATE they own the key (`OWNS_ESCAPE`), not every element
+ * carrying some role. Scanning `[role="menu"], [role="listbox"]` here was wrong, and shipped for one
+ * pass: cmdk's list carries `role="listbox"` as STATIC content of the dialog it is placed in, so the
+ * command palette stood the dialog down on every Escape and nothing else took the key — the
+ * palette's only pointerless dismissal, dead.
+ *
+ * Why a panel has to ask at all: it listens on its host `window` in the CAPTURE phase, which fires
+ * before every `document` listener an overlay uses, and it stops the event when it acts on it. An
+ * overlay above it would never see the key. Asking first is what lets Escape mean "the menu" and
+ * then, on the next press, "the sheet".
+ */
+export function overlayInFrontHoldsEscape(content: HTMLElement | null, doc: Document): boolean {
+  // No panel: the asker is mid-mount, and nothing can be in front of one that is not on screen.
+  if (content === null) return false;
+  return drawnInFront(content, doc, OWNS_ESCAPE_SELECTOR);
+}
+
+/**
+ * `overlayInFrontHoldsEscape` for a panel with a MODAL DIALOG that can open over it: the same
+ * question, with `[role="dialog"][aria-modal="true"]` among the candidates.
+ *
+ * Asked by `Sheet`, and only by it. A `Dialog` does not carry `OWNS_ESCAPE` — it IS the thing that
+ * takes the key — so the marker rule alone leaves a sheet blind to the dialog its own Mute button
+ * opens in front of it; and since both listen on `window` in the capture phase, where
+ * `stopPropagation` does not keep the second listener from running, one press would close the dialog
+ * AND the sheet. A dialog drawn BEHIND the sheet is no candidate (document order, above), which is
+ * right: the sheet is the one in front and the key is its.
+ */
+export function modalInFrontHoldsEscape(content: HTMLElement | null, doc: Document): boolean {
+  if (content === null) return false;
+  return drawnInFront(content, doc, `${OWNS_ESCAPE_SELECTOR}, [role="dialog"][aria-modal="true"]`);
 }

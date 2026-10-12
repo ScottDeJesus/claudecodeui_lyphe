@@ -3,11 +3,11 @@ import { useTranslation } from 'react-i18next';
 
 import { useDispatcherPlans } from '@/modules/dispatcher';
 import { useRoadmap } from '@/modules/roadmap/hooks/useRoadmap';
-import { RoadmapPath } from '@/modules/roadmap/RoadmapPath';
+import { RoadmapTreeFace } from '@/modules/roadmap/RoadmapTreeFace';
 import { RunnerPanel } from '@/modules/runner-tab';
 import { Spinner, Tabs } from '@/shared/ui';
 
-/** The tab's two faces: the roadmap as a path to its goal, and the live cards of what is in flight. */
+/** The tab's two faces: the roadmap as a tree from its goal, and the live cards of what is in flight. */
 type Face = 'path' | 'inFlight';
 
 type RoadmapTabProps = {
@@ -19,12 +19,15 @@ type RoadmapTabProps = {
   openRoadmap: string | null;
   /** Called once the landing has run, whether or not the roadmap exists, so the workspace retires the request. */
   onRoadmapOpened: () => void;
+  /** The face a visit opens on: In flight, unless the surface names the other (the Roadmap widget at full screen names `path`). */
+  startFace?: Face;
 };
 
 /**
- * The Roadmap tab: a segmented switch over its two faces. Roadmap is the path to the goal
- * (`RoadmapPath`); In flight is the live cards (`RunnerPanel`, mounted whole beneath the switch with only a
- * reveal handed down). In flight carries the tab strip's own pill and amber — the
+ * The Roadmap tab: a segmented switch over its two faces. Roadmap is the tree from the goal
+ * (`RoadmapTreeFace`, in viewport fit); In flight is the live cards (`RunnerPanel`, mounted whole beneath the switch with only a
+ * reveal handed down). A visit opens on In flight (`startFace`); the Roadmap widget at full screen opens on Roadmap,
+ * the face its column body was already showing. In flight carries the tab strip's own pill and amber — the
  * cards drawn, and the sentence for the prompts waiting on the operator — so the switch says where the
  * urgent thing is before he turns to it.
  *
@@ -39,22 +42,24 @@ type RoadmapTabProps = {
  * roadmap and retires the request. A name the picture lacks selects nothing and is retired all the same:
  * the tab opens on the roadmap that was already on screen.
  *
- * Used by `WorkspaceMain` (project-workspace) as the `runner` tab's pane, through the module's barrel.
+ * Used by `WorkspaceMain` (project-workspace) as the `runner` tab's pane, through the module's barrel (lazily,
+ * `lazyRoadmapTab`), and by `RoadmapWidgetFullscreenBody` as what the chat gutter's Roadmap widget draws at
+ * full screen, handed no landing.
  */
-export function RoadmapTab({ revealPlan, onRevealed, openRoadmap, onRoadmapOpened }: RoadmapTabProps) {
+export function RoadmapTab({ revealPlan, onRevealed, openRoadmap, onRoadmapOpened, startFace = 'inFlight' }: RoadmapTabProps) {
   const { t } = useTranslation();
   const { count, waiting } = useDispatcherPlans();
   const { picture, roadmaps, selected, select } = useRoadmap();
-  // The face on screen. Local and never remembered: every visit opens on the roadmap, and only a landing
-  // or a card press turns it to In flight, so the operator always arrives where he lives.
-  const [face, setFace] = useState<Face>('path');
+  // The face on screen. Local and never remembered: every visit opens on `startFace`, and a landing, a card
+  // press or the switch turns it from there.
+  const [face, setFace] = useState<Face>(startFace);
   // The plan a card press asked to see, held until `RunnerPanel` has tried to bring its card into view. A
   // landing's plan arrives as a prop and is the workspace's to retire; this is the same request made from
   // inside the tab, which only this tab can hold. Never both at once in practice, and a landing wins.
   const [requestedPlan, setRequestedPlan] = useState<string | null>(null);
 
   // A landing turns the face while this renders, not in an effect after it: set during render, React
-  // discards the pass and renders again before anything is committed, so `RoadmapPath` never mounts under
+  // discards the pass and renders again before anything is committed, so `RoadmapTreeFace` never mounts under
   // a landing and `RunnerPanel` is the first thing drawn with the plan in hand. It holds the face on In
   // flight until the request is retired: by the pane once the bus has spoken, or by the operator's own
   // press on Roadmap (`showFace`), so nothing he does is undone and nothing waits on a quiet lane.
@@ -108,7 +113,7 @@ export function RoadmapTab({ revealPlan, onRevealed, openRoadmap, onRoadmapOpene
     onRoadmapOpened();
   }, [openRoadmap, picture, roadmaps, selected, select, onRoadmapOpened]);
 
-  // Stable too: the Roadmap face puts it in the context every row and dialog reads.
+  // Stable too: the Roadmap face holds it for the feature dialog's Open its card and Answer on its card.
   const openCard = useCallback((plan: string) => {
     setRequestedPlan(plan);
     setFace('inFlight');
@@ -137,9 +142,9 @@ export function RoadmapTab({ revealPlan, onRevealed, openRoadmap, onRoadmapOpene
 
       <div className="min-h-0 flex-1">
         {face === 'path' ? (
-          <RoadmapPath onOpenCard={openCard} />
+          <RoadmapTreeFace fit="viewport" openCard={openCard} />
         ) : (
-          // The live cards load on the face's first turn; the switch above stays put while they do.
+          // The live cards load the first time the face is drawn; the switch above stays put while they do.
           <Suspense fallback={<div className="grid h-full place-items-center"><Spinner /></div>}>
             <RunnerPanel revealPlan={revealPlan ?? requestedPlan} onRevealed={handleRevealed} />
           </Suspense>

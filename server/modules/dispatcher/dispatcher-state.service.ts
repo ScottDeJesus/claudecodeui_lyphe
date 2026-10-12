@@ -4,7 +4,7 @@ import type { DispatcherArc, DispatcherDaemon, DispatcherPlan, DispatcherPlanner
 import { arcsOf } from './dispatcher-arc.reader.js';
 import { planOf, type DocumentPlan } from './dispatcher-plan.reader.js';
 import { plannersOf } from './dispatcher-planner.reader.js';
-import { each, field, isCount, isCountOrNull, isFlag, isRecord, isText, isTextOrNull, isWipWord, need, oneOf, readDispatcherDocument } from './dispatcher-state.transport.js';
+import { each, field, isCount, isCountOrNull, isFlag, isRecord, isText, isTextOrNull, need, oneOf, readDispatcherDocument, wipWord } from './dispatcher-state.transport.js';
 
 /**
  * The dispatcher's one document, validated into the types the card draws (`server/shared/types.ts`,
@@ -96,41 +96,35 @@ function plannerLanesOf(raw: unknown): DispatcherRoute['planners'] {
 }
 
 /**
- * The Settings defaults every epic with no word of its own walks under (`route.wip`, `wip.defaults()`):
- * two WIP words, `features` and `tasks` (`isWipWord`). A dispatcher build older than the field sends
- * none (MANUAL, MAN-7682), and that is ANOTHER BUILD TALKING and not a torn document — so an absent
- * key reads as `undefined` and the frame carries none — while a key that IS there and is not two WIP
- * words is refused by name, like every other field of the route.
+ * Settings' two WIP defaults (`route.wip`, `wip.defaults`): the word each limit takes while an epic
+ * carries none of its own, which the epic's control compares a press against. Absent from a build
+ * older than the field, and ANOTHER BUILD TALKING like `route.planners`: an absent key reads as
+ * `undefined` and the control is simply not drawn, while a key that IS there and holds a word the
+ * grammar refuses is refused by name.
  */
 function wipDefaultsOf(raw: unknown): DispatcherRoute['wip'] {
   if (raw === undefined) return undefined;
   const wip = need(raw, isRecord, 'route.wip');
   return {
-    features: need(field(wip, 'features'), isWipWord, 'route.wip.features'),
-    tasks: need(field(wip, 'tasks'), isWipWord, 'route.wip.tasks'),
+    features: wipWord(field(wip, 'features'), 'route.wip.features'),
+    tasks: wipWord(field(wip, 'tasks'), 'route.wip.tasks'),
   };
 }
 
-/**
- * This box's posture. `word` is the whole posture in one phrase; `wip` the Settings defaults under it.
- *
- * The route says who walks and never how many (MAN-1496): width is the epic's two WIP limits alone
- * (`DispatcherArc.wip`), so what the route carries is the provider, the posture phrase, the Settings
- * defaults under that phrase, and the park-at-peak and planner-lane readings.
- */
+/** This box's posture. `word` is the whole posture in one phrase. */
 function routeOf(raw: unknown): DispatcherRoute {
   const route = need(raw, isRecord, 'route');
-  const wip = wipDefaultsOf(field(route, 'wip'));
   const planners = plannerLanesOf(field(route, 'planners'));
+  const wip = wipDefaultsOf(field(route, 'wip'));
   return {
     provider: oneOf(field(route, 'provider'), PROVIDERS, 'route.provider'),
     word: need(field(route, 'word'), isText, 'route.word'),
     park_at_peak: need(field(route, 'park_at_peak'), isFlag, 'route.park_at_peak'),
     peak_until: need(field(route, 'peak_until'), isTextOrNull, 'route.peak_until'),
-    // Each left off the object entirely when the build sent none, so the frame of an older dispatcher
-    // is byte-for-byte what it was and the client's `wip?.` and `planners?.` read it as absent.
-    ...(wip === undefined ? {} : { wip }),
+    // Each left off the object entirely when the build sent none, so the frame of an older dispatcher is
+    // byte-for-byte what it was and the client's `planners?.` and `wip?.` read it as absent.
     ...(planners === undefined ? {} : { planners }),
+    ...(wip === undefined ? {} : { wip }),
   };
 }
 

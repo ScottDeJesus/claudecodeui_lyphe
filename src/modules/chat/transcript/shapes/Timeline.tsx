@@ -33,8 +33,13 @@ type TimelineProps = {
  *
  * The rail is painted from `border-border` and the dot from `bg-accent-ink` — the mark the card's
  * own ink uses, and the fill that clears the 3:1 graphics floor the accent FILL does not
- * (`src/shared/ui/verve/MANUAL.md (README)`). A timeline is one of the two shapes `src/shared/ui/` has not
- * built yet, so it is drawn from tokens here and moves the day a second module wants one.
+ * (`src/shared/ui/verve/MANUAL.md (README)`).
+ *
+ * The library has a `Timeline` (`@/shared/ui`), and this shape keeps its own rail on purpose: that one
+ * renders an EVENT FEED — records with a tone, a source, a time and a row that opens to its detail —
+ * and this one renders an AUTHOR'S LIST, whose entries are the author's own rendered children under
+ * the author's own time text. It has no tone to swap, no source to pill and nothing to open, and
+ * fitting it to the feed's `TimelineEvent` would mean flattening those children to strings.
  */
 export function Timeline({ ordered, start, collapseKey, children }: TimelineProps) {
   const { t } = useTranslation('chat');

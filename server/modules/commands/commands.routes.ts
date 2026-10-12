@@ -5,6 +5,8 @@ import express from "express";
 
 import { parseFrontMatter } from "../../shared/frontmatter.js";
 
+import { listEngineCommands } from "./engine-commands.service.js";
+
 type CommandsRouterDependencies = {
   fileSystem: typeof import('node:fs/promises');
   homeDirectory(): string;
@@ -16,6 +18,8 @@ type CommandsRouterDependencies = {
    * command list — the existing router test does — need not build a filesystem for it.
    */
   tokenUsage?: typeof import('../providers/index.js').providerTokenUsageService;
+  /** The Claude Code engine's own command list: the palette's Claude Code group (`POST /list`). */
+  engineCatalog: typeof import('../providers/index.js').readClaudeCommandCatalog;
   runtime: {
     uptime(): number;
     memoryUsage(): NodeJS.MemoryUsage;
@@ -221,7 +225,7 @@ const builtInHandlers = {
   "/help": async (args, context) => {
     const helpText = `# Claude Code Commands
 
-## Built-in Commands
+## CloudCLI Commands
 
 ${builtInCommands
   .map(
@@ -486,7 +490,8 @@ Custom commands can be created in:
 
 /**
  * POST /api/commands/list
- * List all available commands from project and user directories
+ * List all available commands: CloudCLI's own (`builtIn`), the Claude Code engine's (`engine`), and the
+ * custom ones from the project and user directories (`custom`).
  */
 router.post("/list", async (req, res) => {
   try {
@@ -522,10 +527,18 @@ router.post("/list", async (req, res) => {
     // Sort commands alphabetically by name
     customCommands.sort((a, b) => a.name.localeCompare(b.name));
 
+    // The engine's own commands, minus any name CloudCLI answers itself. Never throws: a list that
+    // cannot be read is an empty group, so the palette always opens.
+    const engineCommands = await listEngineCommands(
+      dependencies.engineCatalog,
+      new Set(builtInCommands.map((command) => command.name)),
+    );
+
     res.json({
       builtIn: builtInCommands,
+      engine: engineCommands,
       custom: customCommands,
-      count: allCommands.length,
+      count: allCommands.length + engineCommands.length,
     });
   } catch (error) {
     console.error("Error listing commands:", error);

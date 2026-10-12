@@ -21,7 +21,7 @@ import { DEFAULT_APPS } from './apps.seed.js';
  * 3. **Written atomically**, to a scratch name in the SAME directory, then `renameSync` onto the
  *    real one — a half-written registry is never observable. Two live servers read this path
  *    (see the create below), so the scratch name would gain a pid
- *    (`<path>.<pid>.tmp`, the shape `server/modules/providers/.../readopt.ts:147` uses) the day
+ *    (`<path>.<pid>.tmp`, the shape `claimKeepalive` in `server/modules/providers/.../readopt.ts` uses) the day
  *    two writers race here in earnest; the plan named this one, and the window is a `renameSync`.
  */
 const APPS_FILE_NAME = 'apps.local.json';

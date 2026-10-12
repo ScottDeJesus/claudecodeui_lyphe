@@ -6,6 +6,7 @@ import { spawn } from 'cross-spawn';
 import { rgPath } from '@vscode/ripgrep';
 
 import { projectsDb, sessionsDb } from '@/modules/database/index.js';
+import { addSessionResult, listCompactedTranscriptRows } from '@/modules/providers/services/session-conversations-compacted.js';
 import { localCommandDisplayText, type LocalCommandPayload } from '@/shared/local-commands.js';
 import { isHiddenProjectPath } from '@/shared/hidden-project-paths.js';
 
@@ -145,8 +146,10 @@ function chunkArray<TItem>(items: TItem[], size: number): TItem[][] {
   return chunks;
 }
 
-function getSessionKey(session: Pick<SessionRepositoryRow, 'provider' | 'session_id'>): string {
-  return `${session.provider}:${session.session_id}`;
+// The provider session id is part of the key: a compacted chat is searched as one entry per transcript
+// it has lived in (see session-conversations-compacted.ts), all of them under one `session_id`.
+function getSessionKey(session: Pick<SessionRepositoryRow, 'provider' | 'session_id' | 'provider_session_id'>): string {
+  return `${session.provider}:${session.session_id}:${session.provider_session_id ?? ''}`;
 }
 
 function makeProjectKey(projectPath: string | null): string {
@@ -1172,7 +1175,10 @@ export async function searchConversations(
   const titleResults = findSessionTitleResults(activeSessions, safeQuery, safeLimit);
   onTitleResults?.(titleResults);
 
-  const searchableSessions = normalizeSearchableSessions(activeSessions);
+  const searchableSessions = normalizeSearchableSessions([
+    ...activeSessions,
+    ...listCompactedTranscriptRows(activeSessions),
+  ]);
   if (searchableSessions.length === 0) {
     return { results: [], titleResults, totalMatches: 0, query: safeQuery };
   }
@@ -1264,7 +1270,7 @@ export async function searchConversations(
 
       const sessionResult = await parseSessionMatches(session, runtime);
       if (sessionResult) {
-        projectResult.sessions.push(sessionResult);
+        addSessionResult(projectResult.sessions, sessionResult);
       }
     }
 

@@ -138,6 +138,7 @@ const rebuildProjectsTableWithPrimaryKeySchema = (db: Database): void => {
     addColumnToTableIfNotExists(db, 'projects', columnNames, 'custom_project_name', 'TEXT DEFAULT NULL');
     addColumnToTableIfNotExists(db, 'projects', columnNames, 'isStarred', 'BOOLEAN DEFAULT 0');
     addColumnToTableIfNotExists(db, 'projects', columnNames, 'isArchived', 'BOOLEAN DEFAULT 0');
+    addColumnToTableIfNotExists(db, 'projects', columnNames, 'node', 'TEXT DEFAULT NULL');
     db.exec(`
       UPDATE projects
       SET project_id = ${SQLITE_UUID_SQL}
@@ -164,6 +165,8 @@ const rebuildProjectsTableWithPrimaryKeySchema = (db: Database): void => {
 
   const isArchivedExpression = columnNames.includes('isArchived') ? 'COALESCE(isArchived, 0)' : '0';
 
+  const nodeExpression = columnNames.includes('node') ? 'node' : 'NULL';
+
   const projectIdExpression = columnNames.includes('project_id')
     ? `CASE
          WHEN project_id IS NULL OR trim(project_id) = ''
@@ -182,7 +185,8 @@ const rebuildProjectsTableWithPrimaryKeySchema = (db: Database): void => {
         project_path TEXT NOT NULL UNIQUE,
         custom_project_name TEXT DEFAULT NULL,
         isStarred BOOLEAN DEFAULT 0,
-        isArchived BOOLEAN DEFAULT 0
+        isArchived BOOLEAN DEFAULT 0,
+        node TEXT DEFAULT NULL
       )
     `);
     db.exec(`
@@ -192,6 +196,7 @@ const rebuildProjectsTableWithPrimaryKeySchema = (db: Database): void => {
           ${customProjectNameExpression} AS custom_project_name,
           ${isStarredExpression} AS isStarred,
           ${isArchivedExpression} AS isArchived,
+          ${nodeExpression} AS node,
           ${projectIdExpression} AS candidate_project_id,
           rowid AS source_rowid
         FROM projects
@@ -203,6 +208,7 @@ const rebuildProjectsTableWithPrimaryKeySchema = (db: Database): void => {
           custom_project_name,
           isStarred,
           isArchived,
+          node,
           candidate_project_id,
           source_rowid,
           ROW_NUMBER() OVER (PARTITION BY project_path ORDER BY source_rowid) AS project_path_rank
@@ -218,7 +224,8 @@ const rebuildProjectsTableWithPrimaryKeySchema = (db: Database): void => {
           project_path,
           custom_project_name,
           isStarred,
-          isArchived
+          isArchived,
+          node
         FROM deduped_paths
         WHERE project_path_rank = 1
       )
@@ -227,14 +234,16 @@ const rebuildProjectsTableWithPrimaryKeySchema = (db: Database): void => {
         project_path,
         custom_project_name,
         isStarred,
-        isArchived
+        isArchived,
+        node
       )
       SELECT
         project_id,
         project_path,
         custom_project_name,
         isStarred,
-        isArchived
+        isArchived,
+        node
       FROM prepared_rows
     `);
     db.exec('DROP TABLE projects');
@@ -415,12 +424,6 @@ const addProviderSessionIdMapping = (db: Database): void => {
 };
 
 /**
- * Adds the `forked_from_session_id` column recording where a branched session
- * came from.
- *
- * Nothing is backfilled: a session that predates forking was not forked.
- */
-/**
  * Adds the transcript path to the superseded-session record.
  *
  * Only rows written before this column existed lack it, and there is nothing
@@ -432,6 +435,42 @@ const addSupersededTranscriptPathColumn = (db: Database): void => {
   addColumnToTableIfNotExists(db, 'superseded_provider_sessions', columnNames, 'jsonl_path', 'TEXT');
 };
 
+/**
+ * Adds `reason`, the nine compaction facts and the seed to the superseded-session record.
+ *
+ * Nothing is backfilled: every row written before them is an edit's rewind, and a
+ * NULL `reason` is exactly how a rewind reads. A compaction recorded before `seed`
+ * keeps a NULL seed. The list is the one in
+ * `SUPERSEDED_PROVIDER_SESSIONS_TABLE_SCHEMA_SQL`, so a new database and a migrated
+ * one end with the same table.
+ */
+const SUPERSEDED_COMPACTION_COLUMNS: ReadonlyArray<readonly [name: string, type: string]> = [
+  ['reason', 'TEXT'],
+  ['compaction_trigger', 'TEXT'],
+  ['summarizer_model', 'TEXT'],
+  ['summarizer_served', 'TEXT'],
+  ['summarizer_effort', 'TEXT'],
+  ['pre_tokens', 'INTEGER'],
+  ['post_tokens', 'INTEGER'],
+  ['summarizer_tokens_in', 'INTEGER'],
+  ['summarizer_tokens_out', 'INTEGER'],
+  ['summarizer_chunks', 'INTEGER'],
+  ['seed', 'TEXT'],
+];
+
+const addSupersededCompactionColumns = (db: Database): void => {
+  const columnNames = getTableInfo(db, 'superseded_provider_sessions').map((column) => column.name);
+  for (const [name, type] of SUPERSEDED_COMPACTION_COLUMNS) {
+    addColumnToTableIfNotExists(db, 'superseded_provider_sessions', columnNames, name, type);
+  }
+};
+
+/**
+ * Adds the `forked_from_session_id` column recording where a branched session
+ * came from.
+ *
+ * Nothing is backfilled: a session that predates forking was not forked.
+ */
 const addForkedFromSessionIdColumn = (db: Database): void => {
   const columnNames = getTableInfo(db, 'sessions').map((column) => column.name);
   addColumnToTableIfNotExists(db, 'sessions', columnNames, 'forked_from_session_id', 'TEXT');
@@ -621,6 +660,7 @@ export const runMigrations = (db: Database) => {
     addLastClaimedQueueIdColumn(db);
     db.exec(SUPERSEDED_PROVIDER_SESSIONS_TABLE_SCHEMA_SQL);
     addSupersededTranscriptPathColumn(db);
+    addSupersededCompactionColumns(db);
 
     db.exec(PROJECTS_TABLE_SCHEMA_SQL);
     rebuildProjectsTableWithPrimaryKeySchema(db);

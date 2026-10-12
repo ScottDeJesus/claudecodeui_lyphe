@@ -45,11 +45,31 @@ export function createSettingsRouter(
   // Host-wide, not per-user: the switch steers one plan-runner daemon, so no `userId` is read.
   router.get('/deepseek-flash', respond(() => service.getDeepseekFlash()));
   router.put('/deepseek-flash', respond((req) => service.setDeepseekFlash(req.body?.enabled)));
-  // The dispatcher's park-at-peak switch, host-wide like the one above and read the same way: it
+  // The dispatcher's WIP defaults, host-wide for the same reason and read the same way: they steer
+  // the dispatcher on this host, so no `userId` is read. Both limits ride on the PUT body, as words
+  // (`'<N>'` or `'all'`), because the file holds both lines and is written whole.
+  router.get('/wip', respond(() => service.getWipDefaults()));
+  router.put('/wip', respond((req) => service.setWipDefaults(req.body?.features, req.body?.tasks)));
+  // The dispatcher's park-at-peak switch, host-wide like the two above and read the same way: it
   // steers the dispatcher on this host, so no `userId` is read. One word on the PUT body, because
   // the file holds one line — `off`, or `on`.
   router.get('/park-at-peak', respond(() => service.getParkAtPeak()));
   router.put('/park-at-peak', respond((req) => service.setParkAtPeak(req.body?.enabled)));
+  // The plan runner's Dactyls switch, host-wide like the ones above: it steers the runner on this host,
+  // so no `userId` is read. One word on the PUT body, because the file holds one line. The GET also
+  // carries the verb's readiness, which is not the file's to hold.
+  router.get('/dactyls', respond(() => service.getDactyls()));
+  router.put('/dactyls', respond((req) => service.setDactyls(req.body?.enabled)));
+  // The Custom compaction switch, host-wide like the ones above: it steers how chats on this host
+  // compact, so no `userId` is read. One word on the PUT body, because the file holds one line. The GET
+  // also carries the summarizer's words and readiness, which are not the file's to hold.
+  router.get('/custom-compaction', respond(() => service.getCustomCompaction()));
+  router.put('/custom-compaction', respond((req) => service.setCustomCompaction(req.body?.enabled)));
+  // The Dactyls-for-the-main-session switch, host-wide like the ones above: it steers every main session on
+  // this host, so no `userId` is read. One word on the PUT body, because the file holds one line. The GET
+  // also carries the dactyl's words, its readiness and the week's hand ledger, which are not the file's.
+  router.get('/main-session-dactyls', respond(() => service.getMainSessionDactyls()));
+  router.put('/main-session-dactyls', respond((req) => service.setMainSessionDactyls(req.body?.enabled)));
   // The dispatcher's planner-lane dial, host-wide like the switches above and read the same way: it
   // steers the dispatcher on this host, so no `userId` is read. One integer on the PUT body, because
   // the file holds one line — a bare count of at least 1.
@@ -58,7 +78,7 @@ export function createSettingsRouter(
   // The heal reflex's four switches, host-wide and read the same way: they are flag files steering a
   // worker on this host, so no `userId` is read. THE MASTER is the first of the family — one line,
   // `off` or `on`, and the only one of the four the reflex's whole launching hangs on. The CYCLE
-  // SCHEDULE carries its hour on the PUT body because that file is a
+  // SCHEDULE carries its hour on the PUT body beside `enabled`, because that file is a
   // single line (`off`, or `on <hour>`), and the cap is a route of its own because its line holds a
   // dollar amount and nothing else. Absent or null means no ceiling. The MODEL is one of its own for
   // the same reason: its line holds one of two words, or nothing at all, and nothing at all is the

@@ -1,11 +1,10 @@
 import { useState } from 'react';
-import type { HTMLAttributes } from 'react';
 import { Edit2, EyeOff, FolderInput, Loader2, MoreHorizontal, Smile, Trash2 } from 'lucide-react';
 import type { TFunction } from 'i18next';
 
 import { ActionMenu, Tooltip } from '@/shared/ui';
 import { cn } from '@/shared/utils';
-import type { RecentConversationListItem } from '@/shared/types';
+import type { RecentConversationListItem, SimpleListDragProps } from '@/shared/types';
 import { useCompactSidebar } from '@/modules/sidebar/hooks/useCompactSidebar';
 import { SimpleChatIconGlyph } from '@/modules/sidebar/SidebarSessionIcon';
 import { chatMarks } from '@/modules/sidebar/utils/simpleChatMarks';
@@ -26,7 +25,11 @@ type SidebarSimpleListRowProps = {
    * as a purple dot BESIDE whichever mark above applies, never instead of one.
    */
   isSubagentRunning: boolean;
+  /** The chat has no live session host: the row is grayed and says so on hover. It stays fully usable — the next message starts a host. */
+  isAsleep: boolean;
   isRemoveFailed: boolean;
+  // What sets the chat's project apart from another of the same name; null when its name is its own.
+  projectNameHint: string | null;
   // One step in, under the folder this chat sits in: indented, and marked `data-nested`.
   isNested: boolean;
   onSelect: () => void;
@@ -37,8 +40,8 @@ type SidebarSimpleListRowProps = {
   // The "Move to folder…" entry, or null while the list holds no folder to move this chat into.
   onMoveToFolder: (() => void) | null;
   // The pointer handlers that pick this row up; null when the list offers no reorder.
-  dragProps: Pick<HTMLAttributes<HTMLElement>, 'onPointerDown' | 'onClickCapture' | 'onDragStart'> | null;
-  // True while this very row is the one being carried: it fades so the drop line reads.
+  dragProps: SimpleListDragProps | null;
+  // True while this very row is the one being carried. The kit's carry moves it (`sortable/carried.ts`); the row itself only says so.
   isDragging: boolean;
   // Which edge of this row the carried row would land on, or null when it is not the target.
   dropEdge: 'before' | 'after' | null;
@@ -52,7 +55,9 @@ export default function SidebarSimpleListRow({
   isRunning,
   isAwaitingInput,
   isSubagentRunning,
+  isAsleep,
   isRemoveFailed,
+  projectNameHint,
   isNested,
   onSelect,
   onArchive,
@@ -99,6 +104,8 @@ export default function SidebarSimpleListRow({
       data-testid="simple-chat-row"
       data-session-id={row.sessionId}
       data-dragging={isDragging ? 'true' : 'false'}
+      // Present only on a chat with no live session host, so `[data-asleep]` finds exactly those.
+      data-asleep={isAsleep ? 'true' : undefined}
       data-drop-edge={dropEdge ?? undefined}
       // Present only on a row that sits inside a folder, so `[data-nested]` finds exactly those.
       data-nested={isNested ? 'true' : undefined}
@@ -116,15 +123,16 @@ export default function SidebarSimpleListRow({
         // Desktop is unaffected — it never carries the compact height floor at all.
         isCompact ? 'min-h-11' : 'py-2',
         isSelected ? 'bg-primary/10 text-foreground' : 'text-foreground hover:bg-accent/60',
-        isDragging && 'opacity-50',
       )}
     >
       <span
         data-testid="simple-chat-icon"
-        data-drag-handle
         data-icon={row.icon ?? 'default'}
-        title={t('simpleList.dragHandle')}
-        className="flex h-7 w-6 flex-shrink-0 cursor-grab touch-none items-center justify-center text-muted-foreground"
+        className={cn(
+          'flex h-7 w-6 flex-shrink-0 items-center justify-center',
+          // Faint only off the selected wash: on `bg-primary/10` faint ink reads 2.83:1 (graphic needs 3).
+          isAsleep && !isSelected ? 'text-ink-faint' : 'text-muted-foreground',
+        )}
       >
         <SimpleChatIconGlyph icon={row.icon} className="h-4 w-4" />
       </span>
@@ -148,6 +156,7 @@ export default function SidebarSimpleListRow({
           href={`/session/${row.sessionId}`}
           // The browser's own link drag would fight the pointer reorder the row carries.
           draggable={false}
+          title={isAsleep ? t('simpleList.asleep') : undefined}
           // `self-stretch` fills the row div's CONTENT box, which in compact mode is now exactly
           // the row's own 44px floor (no padding above to shrink it) — `flex flex-col
           // justify-center` keeps the two text lines centred inside that. Measured against the
@@ -159,9 +168,16 @@ export default function SidebarSimpleListRow({
             onSelect();
           }}
         >
-          <span className="block truncate text-[13px] font-normal leading-4">{row.sessionTitle}</span>
-          <span className="mt-0.5 block truncate text-[10px] leading-3 text-muted-foreground">
-            {row.projectDisplayName}
+          {/* Asleep: muted ink; one step up (ink-mid) on the selected wash, where muted reads 4.30:1 (AA is 4.5). */}
+          <span className={cn('block truncate text-[13px] font-normal leading-4', isAsleep && (isSelected ? 'text-secondary-foreground' : 'text-muted-foreground'))}>{row.sessionTitle}</span>
+          <span className="mt-0.5 flex min-w-0 items-center gap-1 text-[10px] leading-3 text-muted-foreground">
+            <span className="truncate">{row.projectDisplayName}</span>
+            {/* Beside the name, never in it: the name stays what the rename box and the server read. The
+                name gives way first on a narrow row, because the hint is the part that tells this project
+                from the other of its name. */}
+            {projectNameHint && (
+              <span data-testid="simple-chat-project-hint" className="max-w-[60%] flex-shrink-0 truncate">{`· ${projectNameHint}`}</span>
+            )}
           </span>
           {isRemoveFailed && (
             <span className="mt-0.5 block truncate text-[10px] leading-3 text-destructive">
@@ -171,10 +187,13 @@ export default function SidebarSimpleListRow({
         </a>
       )}
 
+      {/* The three marks below sit inside a Tooltip, which opens on a 350 ms touch hold: `data-no-drag` keeps
+          the carry's 400 ms hold from lifting the row under a tooltip that has just opened. */}
       {marks.awaitingInput && !isEditing && (
         <Tooltip content={t('simpleList.awaitingInput')} position="top">
           <span
             data-testid="simple-chat-awaiting-input"
+            data-no-drag
             role="status"
             aria-label={t('simpleList.awaitingInput')}
             className="vv-pulse flex h-5 w-5 flex-shrink-0 items-center justify-center"
@@ -189,6 +208,7 @@ export default function SidebarSimpleListRow({
         <Tooltip content={t('simpleList.running')} position="top">
           <span
             data-testid="simple-chat-running"
+            data-no-drag
             className="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-md text-muted-foreground"
           >
             <Loader2 className="h-3 w-3 animate-spin" />
@@ -200,6 +220,7 @@ export default function SidebarSimpleListRow({
         <Tooltip content={t('simpleList.subagentsRunning')} position="top">
           <span
             data-testid="simple-chat-subagents-running"
+            data-no-drag
             role="status"
             aria-label={t('simpleList.subagentsRunning')}
             className="flex h-5 w-5 flex-shrink-0 items-center justify-center"
@@ -276,12 +297,13 @@ export default function SidebarSimpleListRow({
       )}
 
       {/* Where the carried row lands. It ignores the pointer, so the row under it stays the
-          target it marks. */}
+          target it marks, and it stands one step above the carried row (`z-40` over the kit's 30),
+          which is drawn under the pointer, over this very row. */}
       {dropEdge && (
         <span
           aria-hidden
           className={cn(
-            'pointer-events-none absolute inset-x-1 h-0.5 rounded-full bg-primary',
+            'pointer-events-none absolute inset-x-1 z-40 h-0.5 rounded-full bg-primary',
             dropEdge === 'before' ? 'top-0' : 'bottom-0',
           )}
         />

@@ -1,6 +1,7 @@
 import { readDispatcherJson } from '@/shared/dispatcher-command.js';
 import { each, isCount, isCountOrNull, isFlag, isText, isTextOrNull, need, oneOf } from '@/shared/document-fields.js';
-import type { DispatcherModelChoice } from '@/shared/types.js';
+import type { DispatcherModelChoice, DispatcherStall } from '@/shared/types.js';
+import { readDispatcherWipWord } from '@/shared/utils.js';
 
 // The dispatcher lane's readers import the field vocabulary from here, so its import surface is
 // the one it always had; the readers themselves live in `@/shared/document-fields.ts`.
@@ -27,8 +28,12 @@ export { each, field, isCount, isCountOrNull, isFlag, isRecord, isText, isTextOr
  * than left to the default, so the ceiling is a number written down here. A document past it reaches
  * the journal as `did not answer:` and the document's own opening, not as a word about the buffer
  * (`readDispatcherJson` says why) — a line that quotes the document is this number too low.
+ *
+ * Measured 2026-10-09: the live document weighs 4.22 MB over 74 plans (one finished plan alone carries
+ * 520 KB of events), so the ceiling is 16 MiB. A read past the ceiling fails whole: the lane then answers
+ * `the dispatcher has not been read yet` and draws nothing.
  */
-const STATUS_MAX_BUFFER = 4 * 1024 * 1024;
+const STATUS_MAX_BUFFER = 16 * 1024 * 1024;
 
 // --------------------------- reading a field a build older than it did not write ---------------------------
 
@@ -91,6 +96,21 @@ export function flagSince(value: unknown, where: string): boolean {
   return value === undefined ? false : need(value, isFlag, where);
 }
 
+/** The two causes a `stalled` word may carry (`report_stall`), the ONE list — a cause outside it is a build this lane cannot draw. */
+export const STALL_CAUSES: readonly DispatcherStall[] = ['dispatcher_down', 'ended_unrecorded'];
+
+/**
+ * A stall cause a build OLDER than the field did not write, read as `null` (nothing stalled), and
+ * refused by name when the key IS there and is neither `null` nor one of the two causes.
+ *
+ * `null` is the honest reading of an absent key for the same reason `flagSince`'s `false` is: the
+ * word says something HAS happened (a run ended with nothing to record it), and a build that never
+ * wrote the key is one whose plans never said so — the card then draws what that build's plans are.
+ */
+export function stallSince(value: unknown, where: string): DispatcherStall | null {
+  return value === undefined || value === null ? null : oneOf(value, STALL_CAUSES, where);
+}
+
 /** The three words a model word may be (`hooks/plan_runner/run_model.py:WORDS`), the ONE list — `readDispatcherModelChoice` checks a request against the same three. */
 export const MODEL_CHOICES: readonly DispatcherModelChoice[] = ['deepseek', 'claude', 'auto'];
 
@@ -107,28 +127,18 @@ export function modelSince(value: unknown, where: string): DispatcherModelChoice
   return value === undefined || value === null ? null : oneOf(value, MODEL_CHOICES, where);
 }
 
-// --------------------------- WIP words ---------------------------
-
-/** A WIP word's two spellings: `all` (no limit), or a whole number with no sign, no padding and no leading zero. */
-const WIP_WORD = /^(?:all|[1-9][0-9]*)$/;
-
 /**
- * A WIP word as `hooks/dispatcher/wip.py:spell` writes one: `all`, or a count from 1 to 2**53 − 1.
+ * An epic WIP word — a canonical count or `all` — refused by name when it is neither (`readDispatcherWipWord`).
  *
- * The count's ceiling is the one the MANUAL (MAN-7682) states for this reader: past a safe integer
- * this server's double and the dispatcher's int disagree about the number, and one refused word
- * freezes the whole board (INV-5693), so the line is drawn where the two still agree. A 5000-digit
- * token reaches `Number` as `Infinity` and is refused there. Used by `dispatcher-state.service.ts`
- * (`route.wip`) and `dispatcher-arc.reader.ts` (`arc.wip`), which read the same grammar.
+ * NOT TOLERANT, deliberately: this reads a key that IS there. A build older than the WIP fields writes
+ * no key at all, which the callers (`arcOf`, `routeOf`) already answer with "nothing to draw" before
+ * they ask for a word; a key that is there and holds a count past 2**53 - 1, a padded number or
+ * `default` is a build this lane cannot draw, and the lane keeps its last good picture and says why.
  */
-export function isWipWord(value: unknown): value is string {
-  if (!isText(value) || !WIP_WORD.test(value)) return false;
-  return value === 'all' || Number.isSafeInteger(Number(value));
-}
-
-/** A WIP word, or `null` where the epic has none of its own (`arc.wip.<limit>.own`). Used by `dispatcher-arc.reader.ts`. */
-export function isWipWordOrNull(value: unknown): value is string | null {
-  return value === null || isWipWord(value);
+export function wipWord(value: unknown, where: string): string {
+  const word = readDispatcherWipWord(value);
+  if (word === null) throw new Error(`dispatcher status --json answered the ${where} ${String(value)}`);
+  return word;
 }
 
 /**

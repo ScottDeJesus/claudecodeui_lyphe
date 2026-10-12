@@ -13,6 +13,7 @@ import {
   waitsOnSiblings,
 } from '@/modules/dispatcher/dispatcherState';
 import { DeckFrame } from '@/modules/dispatcher/DeckFrame';
+import { useDispatcherPlans } from '@/modules/dispatcher/hooks/useDispatcherPlans';
 import { arcPutAway, doneDismiss, planPutAway, putAwayVerb } from '@/modules/dispatcher/hiddenPlans';
 import { CardDescription, LaneCardHead } from '@/modules/dispatcher/LaneCardHead';
 import { phaseWord } from '@/modules/dispatcher/phaseWord';
@@ -22,6 +23,8 @@ import { PlannerBadge } from '@/modules/dispatcher/PlannerBadge';
 import { SessionPin } from '@/modules/dispatcher/SessionPin';
 import { SnapStripItem } from '@/modules/dispatcher/SnapStrip';
 import { SpendPills } from '@/modules/dispatcher/SpendPills';
+import { WorkingPill } from '@/modules/dispatcher/WorkingPill';
+import { arcAgentOut } from '@/modules/dispatcher/workingTime';
 import { dispatchArcFoldKey, useCardFold } from '@/shared/hooks/useCardFold';
 import { spendParts } from '@/shared/spend';
 import { Badge } from '@/shared/ui';
@@ -31,7 +34,7 @@ import type { DispatcherArcGroup, DispatcherArcStatus, DispatcherPlanStatus, Lan
 import { cn } from '@/shared/utils';
 
 /**
- * The arc's own word and tone, over the STORE's eight words. A dispatch arc is a row in the store
+ * The arc's own word and tone, over the STORE's nine words. A dispatch arc is a row in the store
  * with plans hanging off it, so it states its vocabulary here rather than mapping it onto anything
  * else's shape. It lives beside the deck that wears it.
  *
@@ -39,11 +42,9 @@ import { cn } from '@/shared/utils';
  * judgment is still being designed, cut or walked. `complete` is positive, and it is the word once the
  * judgment has finished too — stamped, or every phase of it done. `empty` is warn because an arc whose every plan was dropped is the one
  * state an operator did not ask for, and it is the state nothing else on the screen would show.
- * `stalled` is warn for the same reason: the arc's only running work has ended with nothing to record
- * it, and its header's Resume is what wakes the daemon.
  *
- * THE THREE WAITING WORDS WEAR THE PLAN'S OWN TONE, through `planStatusTone` and not a colour of
- * their own: `queued`, `paused` and `scheduled` are the plans' words too (`DispatcherPlanStatus`),
+ * THE FOUR PLAN WORDS WEAR THE PLAN'S OWN TONE, through `planStatusTone` and not a colour of
+ * their own: `queued`, `paused`, `scheduled` and `stalled` are the plans' words too (`DispatcherPlanStatus`),
  * read off the arc's plans and printed on the cards in the strip below — a `queued` arc over `queued`
  * cards that were toned differently would be the header arguing with its own deck (`dispatcherState`
  * states that rule once). Every other word here is the arc's alone.
@@ -51,10 +52,10 @@ import { cn } from '@/shared/utils';
 const ARC_STATUS: Record<DispatcherArcStatus, { key: string; tone: Tone }> = {
   designing: { key: 'dispatcher.arcStatus.designing', tone: 'info' },
   judging: { key: 'dispatcher.arcStatus.judging', tone: 'info' },
+  stalled: { key: 'dispatcher.arcStatus.stalled', tone: planStatusTone('stalled') },
   live: { key: 'dispatcher.arcStatus.live', tone: 'info' },
   complete: { key: 'dispatcher.arcStatus.complete', tone: 'positive' },
   empty: { key: 'dispatcher.arcStatus.empty', tone: 'warn' },
-  stalled: { key: 'dispatcher.arcStatus.stalled', tone: 'warn' },
   queued: { key: 'dispatcher.arcStatus.queued', tone: planStatusTone('queued') },
   paused: { key: 'dispatcher.arcStatus.paused', tone: planStatusTone('paused') },
   scheduled: { key: 'dispatcher.arcStatus.scheduled', tone: planStatusTone('scheduled') },
@@ -68,7 +69,7 @@ const ARC_STATUS: Record<DispatcherArcStatus, { key: string; tone: Tone }> = {
  * feature isnt in progress, it should not have an animated play icon on it"), so `▶︎` is drawn from
  * the plan's tasks instead — one of them walking now (`phaseWord`, the task track's own rule).
  */
-const FLOW_MARK: Partial<Record<DispatcherPlanStatus, string>> = { complete: '✓', paused: '⏸︎', scheduled: '◷', stalled: '▲' };
+const FLOW_MARK: Partial<Record<DispatcherPlanStatus, string>> = { complete: '✓', paused: '⏸︎', scheduled: '◷', stalled: '!' };
 
 /**
  * ONE dispatch arc, drawn as the deck every arc on this screen is drawn as, in the lane card's ONE
@@ -91,7 +92,8 @@ const FLOW_MARK: Partial<Record<DispatcherPlanStatus, string>> = { complete: '�
  * are complete; then the arc's description (`cardDescription`: its design's `delivers` line, else its
  * goal's where that yields nothing), folded to one line until pressed (`CardDescription`), and who is
  * out on it; then its
- * books as pills, counting at first sight (`darc:<name>`). The corner is `⋯` — carrying `Dismiss done
+ * books as pills, counting at first sight (`darc:<name>`), the last of them how long agents have
+ * worked on the epic (`WorkingPill`). The corner is `⋯` — carrying `Dismiss done
  * features · N` while some plans of the deck are done and some are not — then the deck's own press, which
  * puts EVERY plan of the deck away in one write (`arcPutAway`), then the fold. That press is Dismiss
  * once every plan of the deck is complete (the deck leaves the board, and nothing lists it), and Hide
@@ -155,6 +157,10 @@ export function DispatchArcDeck({
   // itself (INV-4299), and `spendParts` is the one decision every card draws a figure from — dollars
   // or tokens by who was used, and NO pill at all where the arc has neither half.
   const spend = spendParts(arc.cost_usd, arc.tokens_in, arc.tokens_out, arc.tokens, arc.tokens_cache_read);
+  // Whether an agent is out on the epic — on any plan of it, the hidden ones too, or on its own design,
+  // cut or judge — which is what ticks its working time between frames (`arcAgentOut`).
+  const lane = useDispatcherPlans();
+  const agentsOut = arcAgentOut(arc, [...lane.plans, ...lane.hidden], lane.planners);
   // The hour a Schedule start armed, over the arc's stopped plans (`report_arcs.hour`) — the head's
   // clock, so a folded deck still says when it will start. The Cancel that clears it is in the bar.
   const armed = epochOf(arc.schedule);
@@ -207,8 +213,14 @@ export function DispatchArcDeck({
               {arc.planner && <PlannerBadge planner={arc.planner} />}
             </>
           )}
-          spend={spend.paid !== null || spend.tokens !== null
-            ? <div data-arc-spend className="min-w-0"><SpendPills parts={spend} countKey={`darc:${arc.name}`} /></div>
+          spend={spend.paid !== null || spend.tokens !== null || arc.runtime_s > 0 || agentsOut
+            ? (
+              <div data-arc-spend className="min-w-0">
+                <SpendPills parts={spend} countKey={`darc:${arc.name}`}>
+                  {(arc.runtime_s > 0 || agentsOut) && <WorkingPill seconds={arc.runtime_s} running={agentsOut} subject="epic" />}
+                </SpendPills>
+              </div>
+            )
             : undefined}
           corner={{
             menuLabel: t('dispatcher.menu'),

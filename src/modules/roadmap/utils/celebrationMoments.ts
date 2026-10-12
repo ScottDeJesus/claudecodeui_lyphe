@@ -1,4 +1,4 @@
-import type { CelebrationActive, Moment } from '@/modules/roadmap/celebrationContext';
+import type { Moment } from '@/modules/roadmap/celebrationContext';
 import type { Roadmap, RoadmapEpic, RoadmapFeature, RoadmapMilestone } from '@/shared/roadmap-types';
 
 // What a roadmap's own dates say is worth celebrating: moments READ OFF the picture, never stored. Every
@@ -60,21 +60,6 @@ export function sortMoments(moments: Moment[]): Moment[] {
   );
 }
 
-/**
- * The milestone a moment is playing on: the one `active.milestone` names, else the one holding an epic of
- * `active.epics` or a feature of `active.features`; null while nothing of those sizes plays. While it plays,
- * that milestone holds a surface's focus — the face's stage, the widget's line under its rail — because an
- * epic's card and a feature's row play their part only where they are drawn, and a milestone's last feature
- * shipping moves `current` on past it. A TASK moment is left out on purpose: its meter plays wherever its row
- * is drawn, and a task lands every few minutes while a feature walks, so following it would pull the reader
- * off the milestone he pressed and remount what he has open there. Used by `RoadmapPath` and `RoadmapWidgetBody`.
- */
-export function playingMilestone(milestones: RoadmapMilestone[], active: CelebrationActive): RoadmapMilestone | null {
-  return milestones.find((milestone) => milestone.name === active.milestone)
-    ?? milestones.find((milestone) => milestone.epics.some((epic) => active.epics.has(epic.name) || epic.features.some((feature) => active.features.has(feature.name))))
-    ?? null;
-}
-
 /** The newest completion date the roadmap holds — a `shipped_at`, a `completed_at` or a `reached_at` — or `null` when nothing has completed. */
 export function newestCompletion(roadmap: Roadmap): string | null {
   return newestOf([
@@ -98,8 +83,8 @@ export function seenStampOf(stored: unknown, roadmapName: string): string | null
 }
 
 /**
- * A feature's task moment: its meter grew. A task moment is the FEATURE's (its `name` and `title`), since
- * the meter is the row's, and is dated by its newest done task. A done task with no date stands in its
+ * A feature's task moment: its done tasks grew. A task moment is the FEATURE's (its `name` and `title`), since
+ * the dot that blooms is the feature's, and is dated by its newest done task. A done task with no date stands in its
  * count, so the key still tells this growth from the next.
  */
 function taskMoment(feature: RoadmapFeature): Moment {

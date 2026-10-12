@@ -424,7 +424,7 @@ it — brief it and ask:
    recorded there — never a question for the operator.
 
    **A card that cannot pass `/inline`'s scope test is never briefed FOR A BUILD — and
-   `/plan`, the door `/inline` names, is closed to you** (its step 1 is an
+   `/feature`, the door `/inline` names, is closed to you** (its step 1 is an
    `AskUserQuestion`, which G5 refuses). Its door is the BOARD: the writes BUILD step c
    names (`file_issue` + `create_feature`).
 
@@ -545,10 +545,10 @@ building that card — pick ANOTHER build-ready feature. For the ONE feature thi
    you.
 
    **FIRST run `/inline`'s own SCOPE TEST — a card it declines is never built here, and
-   `/plan` (the door `/inline` names for it) is CLOSED to you:** `/plan`'s step 1 is an
+   `/feature` (the door `/inline` names for it) is CLOSED to you:** `/feature`'s step 1 is an
    `AskUserQuestion`, which your G5 guard refuses by design. So a card needing more than one
    builder, a plan's phases, or a new screen or composition gets its board home in THIS
-   pass instead: `file_issue(id, 'too large for /inline — <the test it fails>; needs /plan')`
+   pass instead: `file_issue(id, 'too large for /inline — <the test it fails>; needs /feature')`
    (which reopens it to To do, so the operator's own hand routes it) and `create_feature` for
    each piece you CAN brief decision-complete (file it as step d files a follow-up: approve it if
    it clears the rule, else leave it in Backlog). A card the rule
@@ -910,7 +910,7 @@ Prometheus — they ride the same brief and the same per-project constraints blo
    | A follow-up / deferred / "we should also…" | `create_feature`, then approve or leave it in **Backlog** (BUILD step d) — name it in the remarks |
    | A decision §"When it goes to the operator" sends to him | `post_design_questions` on the card (NEVER a chat prompt — the terminal-prompt gate blocks that door) |
    | A defect / blocker on the work that just shipped | `file_issue` (reopens the card to To do) |
-   | A card too big for `/inline` (`/plan` is closed to you) | `file_issue` naming the test it fails, + `create_feature` each piece you can brief, filed as step d files a follow-up (BUILD step c) |
+   | A card too big for `/inline` (`/feature` is closed to you) | `file_issue` naming the test it fails, + `create_feature` each piece you can brief, filed as step d files a follow-up (BUILD step c) |
    | A card whose problem no longer exists | `set_closing_remarks` naming the evidence, then `archive_feature` (step 0); name it in the closing report |
    | What shipped + anything the operator must do | `set_closing_remarks` — TL;DR line, then `⚠ needs-you:` lines |
    | Build progress | `set_checklist_item` |

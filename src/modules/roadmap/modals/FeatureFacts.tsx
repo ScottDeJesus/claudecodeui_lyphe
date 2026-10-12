@@ -58,8 +58,8 @@ function TaskMark({ status }: { status: RoadmapTask['status'] }) {
 }
 
 /**
- * Everything a feature says about itself, top to bottom: where it stands on its own path (the step line
- * at `large`, its step in words, and what it waits on, each wait with its word); its goal, pre-wrapped
+ * Everything a feature says about itself, top to bottom: where it stands on its own path (the five
+ * stations of `StateLine`, its step in words, and what it waits on, each wait with its word); its goal, pre-wrapped
  * and scrolling past 40vh; its cases, each the goal's claim checked, so they sit right under it and above
  * the tasks, which are history once it ships; its tasks under a meter of how many are done; the days it was added,
  * promoted, accepted and shipped; and, small and muted, its name for Claude — the one place on the
@@ -92,7 +92,7 @@ export function FeatureFacts({ feature, picture, onWriteGoal, cases }: FeatureFa
     <div className="flex min-w-0 flex-col gap-6">
       {/* Where it stands, and what that stands on: each wait says "Waits on" itself, so the list needs no heading. */}
       <div className="flex min-w-0 flex-col gap-2.5">
-        <StateLine word={feature.word} step={feature.step} phrase={phrase} size="large" />
+        <StateLine word={feature.word} step={feature.step} phrase={phrase} />
         {phrased && (
           <p className="text-sm text-muted-foreground">{feature.step === 'building' ? <Shimmer>{phrase}</Shimmer> : phrase}</p>
         )}

@@ -21,6 +21,13 @@ type ChainRecord = {
   status: string;
   /** Every stage's launch id, in the order the record lists them. */
   launchIds: string[];
+  /**
+   * Whether the record says `until_pass: true` — the mode the dispatcher walks a phase's chain in
+   * (`plan-runner chain --until-pass`, INV-169), and `cases cure` walks its fixes in too.
+   * `dispatcher-work.service.ts` reads it to recognise a dispatcher chain that predates the mark,
+   * knowing the reading also takes a cure walk for one.
+   */
+  untilPass: boolean;
   /** Whether the walker process that owes the next stage is still there. */
   walkerAlive: boolean;
 };
@@ -78,12 +85,13 @@ function isWalkerAlive(dir: string, chainId: string): boolean {
  * `launchIds` rather than failing the record: the other stages still say who owns the chain.
  *
  * Exported for `running-launchers.service.ts`, which asks each chain whether its walker is still
- * walking and which launches it holds, to find the sessions that own it.
+ * walking and which launches it holds, to find the sessions that own it, and for
+ * `dispatcher-work.service.ts`, which asks which chains are the dispatcher's.
  */
 export function readChainRecord(root: string, chainId: string): ChainRecord | null {
   if (!isSafeRecordId(chainId)) return null;
   const dir = path.join(root, chainId);
-  const record = readJson(path.join(dir, 'chain.json')) as { status?: unknown; stages?: unknown } | null;
+  const record = readJson(path.join(dir, 'chain.json')) as { status?: unknown; stages?: unknown; until_pass?: unknown } | null;
   if (record === null || typeof record.status !== 'string') return null;
 
   const launchIds: string[] = [];
@@ -93,5 +101,11 @@ export function readChainRecord(root: string, chainId: string): ChainRecord | nu
       if (isSafeRecordId(launch)) launchIds.push(launch);
     }
   }
-  return { chainId, status: record.status, launchIds, walkerAlive: isWalkerAlive(dir, chainId) };
+  return {
+    chainId,
+    status: record.status,
+    launchIds,
+    untilPass: record.until_pass === true,
+    walkerAlive: isWalkerAlive(dir, chainId),
+  };
 }

@@ -190,8 +190,12 @@ export async function runDispatcherCommand(
  * missing binary — "was stopped" and "did not answer" are different facts, and neither claims the
  * read changed anything.
  */
-function describeFailure(door: string, command: string, error: unknown): string {
+function describeFailure(door: string, command: string, error: unknown, maxBuffer: number): string {
   const failure = error as { code?: unknown; stdout?: unknown; stderr?: unknown; signal?: unknown };
+  // An output past the ceiling arrives as this string code WITH the partial stdout, which the line below would otherwise quote: the document's opening, and no word about the buffer.
+  if (failure.code === 'ERR_CHILD_PROCESS_STDIO_MAXBUFFER') {
+    return `${door} ${command} printed more than ${maxBuffer} bytes — past the buffer this read allows`;
+  }
   const said = firstLine(failure.stderr) || firstLine(failure.stdout);
   if (typeof failure.code === 'number' && Number.isFinite(failure.code)) {
     return `${door} ${command} exited ${failure.code}${said ? `: ${said}` : ''}`;
@@ -212,11 +216,9 @@ function describeFailure(door: string, command: string, error: unknown): string 
  * `cwd` is the home directory rather than this repository, for `runDispatcherCommand`'s reason, and
  * `maxBuffer` is the caller's because only the caller knows how heavy its document runs: stated by each
  * lane rather than left to `execFile`'s default, so the ceiling is a number written beside the lane
- * that lives under it. A document past it is NOT named as such: `execFile` fails with the string code
- * `ERR_CHILD_PROCESS_STDIO_MAXBUFFER` and the partial `stdout`, and `describeFailure` prefers the first
- * line of that `stdout` to the error's own message — so the journal reads "did not answer: " and then
- * the document's own opening, capped at 200 characters, with no word about the buffer. A journal line
- * that quotes a document's opening is a ceiling too low. Such a document is printed whole by a process
+ * that lives under it. A document past it is named as such: `execFile` fails with the string code
+ * `ERR_CHILD_PROCESS_STDIO_MAXBUFFER` and the partial `stdout`, and `describeFailure` answers the
+ * ceiling it crossed ("printed more than <maxBuffer> bytes"), never the document's opening. Such a document is printed whole by a process
  * that then exits, so there is no file a live writer may be replacing at this instant and no torn read
  * to be patient with. `env` comes from the caller — each lane's module is the one place that reads the
  * environment.
@@ -240,7 +242,7 @@ export async function readDispatcherJson(
     });
     stdout = readOutput(answer.stdout);
   } catch (error) {
-    throw new Error(describeFailure(door, command, error));
+    throw new Error(describeFailure(door, command, error, maxBuffer));
   }
   try {
     return JSON.parse(stdout);

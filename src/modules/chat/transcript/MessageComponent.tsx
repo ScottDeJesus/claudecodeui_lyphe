@@ -21,6 +21,7 @@ import MessageSpeakControl from '@/modules/chat/transcript/MessageSpeakControl';
 import CollapsibleUserText from '@/modules/chat/transcript/CollapsibleUserText';
 import { useIsExportingTranscript } from '@/modules/chat/context/TranscriptRenderContext';
 import { MemoryCitations } from '@/modules/chat/transcript/MemoryCitations';
+import CompactionMarker from '@/modules/chat/transcript/CompactionMarker';
 
 type MessageComponentProps = {
   message: ChatMessage;
@@ -240,6 +241,9 @@ const MessageComponent = memo(({ message, prevMessage, previewAnchor = '', isRun
             )}
           </div>
         </div>
+      ) : message.isCompactionMarker && message.compaction ? (
+        /* A custom compaction's divider: no speaker caption, and "Show work" never hides it (see isHiddenWork). */
+        <CompactionMarker marker={message.compaction} resolveModelLabel={resolveModelLabel} />
       ) : message.isTaskNotification ? (
         /* Compact task notification on the left */
         <div className="w-full">

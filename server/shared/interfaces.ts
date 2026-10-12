@@ -1,5 +1,6 @@
 import type {
   AnyRecord,
+  ChatProcessActivity,
   FetchHistoryOptions,
   FetchHistoryResult,
   LLMProvider,
@@ -36,6 +37,12 @@ export interface IProviderRuntime {
   ): Promise<unknown>;
   abort(sessionId: string): boolean | Promise<boolean>;
   permissions?: ProviderRuntimePermissionGateway;
+  /**
+   * OPTIONAL — only a runtime that keeps a live process per chat has one. What the chat's process
+   * is doing right now (`ChatProcessActivity`); not-live when there is none. Read by
+   * `providerRuntimeService.activity`, which the compaction guard waits on.
+   */
+  activity?(appSessionId: string): ChatProcessActivity;
 }
 
 /**

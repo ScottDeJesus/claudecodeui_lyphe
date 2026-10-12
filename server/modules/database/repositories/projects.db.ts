@@ -177,6 +177,62 @@ export const projectsDb = {
         `).run(isArchived ? 1 : 0, projectId);
     },
 
+    /**
+     * Moves a project's sessions to a Cerberus node's warden, or back to this server with `null`.
+     * Consumed by the projects module's `setProjectNode`, which has already checked that the project
+     * exists and that the node runs on this machine; the column itself holds whatever it is given.
+     */
+    setNode(projectId: string, node: string | null): void {
+        const db = getConnection();
+        db.prepare(`
+            UPDATE projects
+            SET node = ?
+            WHERE project_id = ?
+        `).run(node, projectId);
+    },
+
+    /**
+     * The node a project's sessions run on, looked up by the project's folder (normalised like every
+     * other path read here), or `null` when it runs on this server or no row exists. Archived rows
+     * answer too: a session opened there is placed by where the project is assigned, not by whether
+     * the sidebar shows it. Read by the chat dispatch (`chat-websocket.service.ts` `dispatchRun`) on
+     * every turn, which hands it to the Claude runtime as the node that must spawn the CLI.
+     */
+    nodeForPath(projectPath: string): string | null {
+        const db = getConnection();
+        const normalizedProjectPath = normalizeProjectPath(projectPath);
+        const row = db.prepare(`
+            SELECT node
+            FROM projects
+            WHERE project_path = ?
+        `).get(normalizedProjectPath) as { node: string | null } | undefined;
+
+        return row?.node ?? null;
+    },
+
+    /**
+     * Every project assigned to the node, by folder, as the node card lists them: id, the custom name
+     * (else the folder's name — NOT the sidebar's `package.json` name, which needs a file read this
+     * synchronous read does not do), and the folder. Archived and hidden (scratch-root) projects are included because
+     * this is the list of what RUNS there, and `nodeForPath` places a session in either kind. Consumed
+     * by the Cerberus overview's `CerberusNodeView.projects`.
+     */
+    listByNode(node: string): Array<{ projectId: string; name: string; path: string }> {
+        const db = getConnection();
+        const rows = db.prepare(`
+            SELECT project_id, project_path, custom_project_name
+            FROM projects
+            WHERE node = ?
+            ORDER BY project_path
+        `).all(node) as Array<Pick<ProjectRepositoryRow, 'project_id' | 'project_path' | 'custom_project_name'>>;
+
+        return rows.map((row) => ({
+            projectId: row.project_id,
+            name: normalizeProjectDisplayName(row.project_path, row.custom_project_name),
+            path: row.project_path,
+        }));
+    },
+
     deleteProjectPath(projectPath: string): void {
         const db = getConnection();
         const normalizedProjectPath = normalizeProjectPath(projectPath);

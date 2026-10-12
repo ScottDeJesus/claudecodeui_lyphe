@@ -3,8 +3,9 @@ import {
   getStoredAuthToken,
   storeAuthToken,
 } from '@/shared/authToken';
-import type { AuthTraceEvent, DeepseekRange, DispatcherAsk, DispatcherModelChoice, FileLinePatch, JevRange, NoteInput, NtfySettingsInput, SimpleListItemRef, SimpleListPosition, SubagentTranscriptResult } from '@/shared/types';
+import type { AuthTraceEvent, CerberusEnrollInput, CerberusLabelInput, CerberusMuteInput, CerberusPromoteInput, DeepseekRange, DispatcherAsk, DispatcherModelChoice, DispatcherWipChoice, DispatcherWipLimit, FileLinePatch, JevRange, NoteInput, NtfySettingsInput, SimpleListItemRef, SimpleListPosition, SubagentTranscriptResult } from '@/shared/types';
 import type { AgentLaunchDefaultsChange, AgentLaunchRowChange } from '@/shared/agent-launch-types';
+import type { CerberusCatalogEntryInput } from '@/shared/cerberus-types';
 import type { ClaudeUpdateApplyRequest } from '@/shared/claude-update-types';
 import type { RoadmapWriteBody } from '@/shared/roadmap-types';
 import { IS_PLATFORM } from '@/shared/utils';
@@ -182,6 +183,43 @@ export async function readApiJson<T>(response: Response): Promise<T> {
   return data as T;
 }
 
+/**
+ * The server's own sentence out of a refusal body, or `null` when the body carried none — or was
+ * not JSON at all. Both envelope shapes `errorMessage` reads arrive here: a route's plain `error`
+ * string, and the error middleware's `{ error: { code, message } }`. For the writers that answer
+ * the person with a toast and keep the server's words under it (the notes and the Cerberus
+ * providers), where `readApiJson` would throw the sentence away with the status.
+ */
+export async function refusalSentence(response: Response): Promise<string | null> {
+  try {
+    const body: unknown = await response.json();
+    if (body === null || typeof body !== 'object') return null;
+    const envelope = body as { error?: unknown; details?: unknown };
+    return errorMessage(envelope.error) ?? errorMessage(envelope.details);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The machine-readable `error.code` of a refusal body (`PROJECT_NODE_NOT_COLOCATED`), or `null` when
+ * the body carries none or is not JSON. For the writers that treat one particular refusal as an answer
+ * of their own rather than a failure. It reads a CLONE, so `refusalSentence` can still read the body
+ * of the response it was given.
+ */
+export async function refusalCode(response: Response): Promise<string | null> {
+  try {
+    const body: unknown = await response.clone().json();
+    if (body === null || typeof body !== 'object') return null;
+    const error = (body as { error?: unknown }).error;
+    if (error === null || typeof error !== 'object') return null;
+    const code = (error as { code?: unknown }).code;
+    return typeof code === 'string' ? code : null;
+  } catch {
+    return null;
+  }
+}
+
 const get = (url: string, options: ApiRequestOptions = {}) => authenticatedFetch(url, options);
 
 const withBody =
@@ -290,7 +328,14 @@ export const api = {
   // config endpoint removed - no longer needed (frontend uses window.location)
   // After the projectName → projectId migration the path/query identifier is
   // the DB-assigned `projectId`; parameter names reflect that for clarity.
-  projects: () => get('/api/projects'),
+  projects: {
+    list: () => get('/api/projects'),
+    // Assigns a project's sessions to a node's warden, or back to this server with `null`: the next CLI a
+    // chat in the project needs is spawned there. Answers 204; a node that is not on this machine is
+    // refused with 409 `PROJECT_NODE_NOT_COLOCATED`.
+    setNode: (projectId: string, node: string | null) =>
+      put(`/api/projects/${encodeURIComponent(projectId)}/node`, { node }),
+  },
   archivedProjects: () => get('/api/projects/archived'),
   projectSessions: (
     projectId: string,
@@ -612,20 +657,53 @@ export const api = {
     deepseekFlash: () => get('/api/settings/deepseek-flash'),
     saveDeepseekFlash: (enabled: boolean) => put('/api/settings/deepseek-flash', { enabled }),
 
+    // The dispatcher's WIP defaults — how many of an epic's features are in progress at once and how
+    // many tasks each of them runs at once, for every epic with no word of its own. Same host-wide
+    // shape as the switch above, for the same reason, and the same answer read back off disk: each
+    // limit is a word, `'<N>'` for a whole number from 1 or `'all'` for no limit. One file holds both,
+    // so a write carries both.
+    wipDefaults: () => get('/api/settings/wip'),
+    saveWipDefaults: (state: { features: string; tasks: string }) => put('/api/settings/wip', state),
+
     // The dispatcher's planner-lane dial — how many planners (designs, cuts, judgments) may be out at
-    // once. A second flag file on this host, in the same host-wide shape and with the same read-back
+    // once. A fifth flag file on this host, in the same host-wide shape and with the same read-back
     // answer: `lanes` is the whole number the file holds, at least 1, with no "all" above it.
     plannerLanes: () => get('/api/settings/planner-lanes'),
     savePlannerLanes: (state: { lanes: number }) => put('/api/settings/planner-lanes', state),
 
-    // The dispatcher's park-at-peak switch — the third flag file on this host, and the same shape
-    // as the two above for the same reason: a file the dispatcher's own process re-reads, not a
+    // The dispatcher's park-at-peak switch — the fourth flag file on this host, and the same shape
+    // as the three above for the same reason: a file the dispatcher's own process re-reads, not a
     // preference the browser owns. On, an Accept during DeepSeek's peak window queues the plan and
     // arms the hour it lifts; off, Accept walks now. Both calls answer with the state read back off
     // disk, never with what was sent.
     parkAtPeakSwitch: () => get('/api/settings/park-at-peak'),
     saveParkAtPeakSwitch: (state: { enabled: boolean }) =>
       put('/api/settings/park-at-peak', state),
+
+    // The plan runner's Dactyls switch — the fifth flag file in this shape: whether Hephaestus on
+    // Claude hands his code edits to one-file children. The GET answers the position read off the file
+    // beside the verb's readiness (`model`, `effort`, `ready`, `why`, each null when that call failed);
+    // the PUT answers the same, with the position read back off the file, never what was sent.
+    dactylsSwitch: () => get('/api/settings/dactyls'),
+    saveDactylsSwitch: (state: { enabled: boolean }) => put('/api/settings/dactyls', state),
+
+    // The Custom compaction switch — the sixth flag file in this shape: whether a CloudCLI chat's
+    // compaction is written by the launch table's `[summarizer]` words instead of by the CLI. The GET
+    // answers the position read off the file beside `summarize --status`'s details (`model`, `effort`,
+    // `ready`, `why`, each null when that call failed); the PUT answers the same, with the position
+    // read back off the file, never what was sent.
+    customCompactionSwitch: () => get('/api/settings/custom-compaction'),
+    saveCustomCompactionSwitch: (state: { enabled: boolean }) =>
+      put('/api/settings/custom-compaction', state),
+
+    // The Dactyls-for-the-main-session switch — the seventh flag file in this shape: whether a main session
+    // changes a repository file only through a dactyl. The GET answers the position read off the file beside
+    // `dactyl --session-status`'s details (`model`, `effort`, `ready`, `why` and the week's `hand` ledger,
+    // each null when that call failed); the PUT answers the same, with the position read back off the file,
+    // never what was sent.
+    mainSessionDactylsSwitch: () => get('/api/settings/main-session-dactyls'),
+    saveMainSessionDactylsSwitch: (state: { enabled: boolean }) =>
+      put('/api/settings/main-session-dactyls', state),
 
     // The heal reflex's MASTER switch — the reflex's whole launching, on one word. `off` stops it
     // launching from the next ending onwards while an ending still indexes, and the typed `/heal`
@@ -635,7 +713,7 @@ export const api = {
     healMaster: () => get('/api/settings/heal-master'),
     saveHealMaster: (enabled: boolean) => put('/api/settings/heal-master', { enabled }),
 
-    // The reflex's two knob files, beside the master switch and in the same host-wide shape: the
+    // The reflex's two knob files, beside the master switch and in the shape of the switches above: the
     // nightly cycle's schedule (on/off and its UTC hour) and the day's spend ceiling. Both answer
     // the state read back off disk, never what was typed. `usd: null` is NO CEILING.
     healCycle: () => get('/api/settings/heal-cycle'),
@@ -791,6 +869,59 @@ export const api = {
     remove: (id: string) => del(`/api/notes/${encodeURIComponent(id)}`),
   },
 
+  // The Cerberus lane (server/modules/cerberus/MANUAL.md): center's read model of the fleet, read
+  // whole. Every read answers its wire shape BARE — not wrapped in `{ success, data }` — and a
+  // refusal is the app's `{ success: false, error }` envelope. The `cerberus_changed` frame is only
+  // a HINT that something moved: the screen reads again and draws the answer, never the frame. The
+  // check read takes two moments — `lookup`, the instant the sentence is about, and `end`, where the
+  // 60 cells and the recorded results stand; both are epoch milliseconds and both default to now.
+  // The mute and the lift answer the `CerberusMute` they wrote and the label answers 204; nobody
+  // draws from those answers, because the screen is drawn from the read that follows the write.
+  cerberus: {
+    // `options.signal` lets the one caller that must judge a hung read (the provider's stale rule) bring a deadline
+    // of its own: a signal handed in replaces `REQUEST_TIMEOUT_MS`'s, which older WebKit cannot build.
+    overview: (options: ApiRequestOptions = {}) => get('/api/cerberus/overview', options),
+    checks: () => get('/api/cerberus/checks'),
+    check: (node: string, service: string, id: string, { lookup, end }: { lookup?: number; end?: number } = {}) =>
+      get(`/api/cerberus/checks/${encodeURIComponent(node)}/${encodeURIComponent(service)}/${encodeURIComponent(id)}${query({ lookup, end })}`),
+    lookup: (node: string, key: string, at: number) => get(`/api/cerberus/lookup${query({ node, key, at })}`),
+    // `before` is exclusive, newest first: "Show earlier" passes the `at` of the oldest line it holds.
+    activity: ({ before, limit }: { before?: number; limit?: number } = {}) => get(`/api/cerberus/activity${query({ before, limit })}`),
+    mute: (input: CerberusMuteInput) => post('/api/cerberus/mutes', input),
+    liftMute: (id: string) => post(`/api/cerberus/mutes/${encodeURIComponent(id)}/lift`, {}),
+    setLabel: (input: CerberusLabelInput) => put('/api/cerberus/labels', input),
+    enroll: (input: CerberusEnrollInput) => post('/api/cerberus/enrollments', input),
+    enrollment: (name: string) => get(`/api/cerberus/enrollments/${encodeURIComponent(name)}`),
+    // The fixes (server/modules/cerberus/MANUAL.md): the catalog read answers every unretired entry; a write
+    // answers the entry it wrote, which nobody draws from (the screen is the read that follows). `runEntry`
+    // answers `{ runId }` once the warden has accepted, up to 10 s after the press; a 409 says why not
+    // (`CERBERUS_RUN_ACTIVE`: the check has a run going, `CERBERUS_NODE_SILENT`: its warden is not linked,
+    // `CERBERUS_NODE_UPDATING`: its warden is updating).
+    // `run(id)` is one run with every line it holds, which `useRunOutput` reads before its frames append.
+    catalog: (options: ApiRequestOptions = {}) => get('/api/cerberus/catalog', options),
+    writeEntry: (input: CerberusCatalogEntryInput) => post('/api/cerberus/catalog', input),
+    setAuto: (id: string, on: boolean) => put(`/api/cerberus/catalog/${encodeURIComponent(id)}/auto`, { on }),
+    runEntry: (id: string) => post(`/api/cerberus/catalog/${encodeURIComponent(id)}/run`, {}),
+    run: (id: string, options: ApiRequestOptions = {}) => get(`/api/cerberus/runs/${encodeURIComponent(id)}`, options),
+    // The warden updates (server/modules/cerberus/MANUAL.md): `wardens` answers the release on offer, each node's
+    // version against it and the batch running; `startUpdate` answers `{ batch, updates }` and the screen follows
+    // the batch by `updateBatch` (every update of it, with its steps). A 409 says why not (`CERBERUS_UPDATE_RUNNING`:
+    // a batch is already going, `CERBERUS_NO_RELEASE`: nothing is built).
+    wardens: (options: ApiRequestOptions = {}) => get('/api/cerberus/wardens', options),
+    startUpdate: (nodes: string[]) => post('/api/cerberus/updates', { nodes }),
+    updateBatch: (batch: string, options: ApiRequestOptions = {}) => get(`/api/cerberus/updates/${encodeURIComponent(batch)}`, options),
+    // The diagnosis (server/modules/cerberus/MANUAL.md): `diagnose` answers `{ id }` at once and the diagnosis runs on
+    // in the background (no `model`: center picks its own; a probe passes one); `diagnosis(id)` is the whole
+    // `CerberusDiagnosisView` with every step, which `useDiagnosis` reads before its `cerberus_diag_step` frames append.
+    // `runProposal` answers `{ runId }` and never touches the catalog; `promote` answers the new entry and is the only
+    // route that does. A 409 says why not (`CERBERUS_DIAG_RUNNING`: the check has a diagnosis going, and for a run:
+    // no proposal, or its one-off has expired).
+    diagnose: (input: { node: string; check: string; model?: string }) => post('/api/cerberus/diagnoses', input),
+    diagnosis: (id: string, options: ApiRequestOptions = {}) => get(`/api/cerberus/diagnoses/${encodeURIComponent(id)}`, options),
+    runProposal: (id: string) => post(`/api/cerberus/diagnoses/${encodeURIComponent(id)}/run`, {}),
+    promote: (id: string, input: CerberusPromoteInput) => post(`/api/cerberus/diagnoses/${encodeURIComponent(id)}/promote`, input),
+  },
+
   // The dispatcher lane (docs/MANUAL.md (dispatcher)): the plans in the dispatcher's own store, and the
   // seven verbs the plan cards and the arc header press. The picture is `dispatcher status --json`
   // relayed whole, and the verbs are relayed to the dispatcher's own binary by argv, never by a shell.
@@ -814,6 +945,14 @@ export const api = {
     // dispatcher reads which door from its own store — `cut`, `judge`, or a `tell` of `continue` — and
     // answers with that door's own sentence (`QUEUED cut <plan> — …`), or `REFUSED planner-resume …` as a 409.
     plannerResume: (name: string) => post(`/api/dispatcher/plans/${encodeURIComponent(name)}/planner-resume`, {}),
+    // "Accept when cut" on a DESIGNED plan (`dispatcher arm-accept <plan> --by app:card --design <stamp>`): the
+    // stamp is the plan's `design_loaded_at` as the card drew it, so a press on a design that has since moved is
+    // refused by the dispatcher. `disarmAccept` is its Cancel. The arc pair presses/cancels every designed (armed)
+    // plan of the arc on each plan's own current design — no stamp travels.
+    armAccept: (name: string, design: string) => post(`/api/dispatcher/plans/${encodeURIComponent(name)}/arm-accept`, { design }),
+    disarmAccept: (name: string) => post(`/api/dispatcher/plans/${encodeURIComponent(name)}/disarm-accept`, {}),
+    arcArmAccept: (name: string) => post(`/api/dispatcher/arcs/${encodeURIComponent(name)}/arm-accept`, {}),
+    arcDisarmAccept: (name: string) => post(`/api/dispatcher/arcs/${encodeURIComponent(name)}/disarm-accept`, {}),
     // The operator's answer to a plan's prompt, from its card: the ask exactly as the card drew
     // it, the chosen label (or typed words) by question, and a Rework's notes by question. A
     // refusal is a RESULT (409), as for every verb.
@@ -823,7 +962,7 @@ export const api = {
     // control relays it; nothing is optimistic, and the next `dispatcher_state` frame reads the
     // word back. Restarts nothing — the word is read when a chain is LAUNCHED.
     model: (name: string, model: DispatcherModelChoice) => post(`/api/dispatcher/plans/${encodeURIComponent(name)}/model`, { model }),
-    // The DISPATCH ARC header's four presses (`dispatcher model|stop|resume|schedule <arc> …`), each
+    // The DISPATCH ARC header's five presses (`dispatcher model|stop|resume|schedule|wip <arc> …`), each
     // relayed to the arc's own door. Separate routes from the plan's because an arc is addressed by
     // its own door (`.arc`), never through a plan's.
     //
@@ -837,6 +976,11 @@ export const api = {
     // The arc's Resume — or Start, for plans still at the gate — at a time: the same three shapes a
     // plan's schedule takes, through the same server-side reader.
     arcSchedule: (name: string, when: string) => post(`/api/dispatcher/arcs/${encodeURIComponent(name)}/schedule`, { when }),
+    // One of the epic's two WIP limits (`dispatcher wip <arc> <limit> <word>`) — a count, `all`, or
+    // `default` to follow Settings again. The epic card's WIP control relays it; nothing is optimistic,
+    // and the next `dispatcher_state` frame reads the word back. An epic's verb alone: no plan route.
+    arcWip: (name: string, limit: DispatcherWipLimit, word: DispatcherWipChoice) =>
+      post(`/api/dispatcher/arcs/${encodeURIComponent(name)}/wip`, { limit, word }),
     // A plan's Start at a time — `offpeak`, an ISO instant with a zone, or `none` to cancel — the
     // same three shapes the arc's own schedule takes, through the same reader.
     schedule: (name: string, when: string) => post(`/api/dispatcher/plans/${encodeURIComponent(name)}/schedule`, { when }),

@@ -7,8 +7,9 @@ type ScrollAreaProps = React.HTMLAttributes<HTMLDivElement>;
 /**
  * A pane's one scroll container, consistently styled. Used by the panes outside the chat transcript
  * that scroll a list of their own: the sidebar, the file tree, the app drawer, the chat gutter's widget
- * frame, the kanban lane and card drawer, and the Heal, Jev, Schedules, DeepSeek-spend, memory-intake
- * and Runner panels.
+ * frame, the kanban lane and card drawer, and the Heal, Jev, Schedules, DeepSeek-spend, memory-intake,
+ * Notes, agent-launch, Runner and Cerberus panels (the Cerberus tab's root scrolls its header, strip and
+ * view as one).
  *
  * THE INNER SCROLLER IS `relative`, SO IT IS THE CONTAINING BLOCK OF EVERYTHING IT SCROLLS. A static
  * scroller handed every absolutely positioned descendant with no positioned ancestor nearer — an

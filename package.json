@@ -1,6 +1,6 @@
 {
   "name": "@cloudcli-ai/cloudcli",
-  "version": "1.37.3",
+  "version": "1.37.4",
   "productName": "CloudCLI",
   "description": "A web-based UI for Claude Code CLI",
   "type": "module",
@@ -46,9 +46,10 @@
     "prebuild:server": "node -e \"require('node:fs').rmSync('dist-server.next', { recursive: true, force: true })\"",
     "build:server": "tsc -p server/tsconfig.json && tsc-alias -p server/tsconfig.json",
     "postbuild:server": "node scripts/promote-dist-server.mjs",
+    "build:warden": "node warden/build.mjs",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p server/tsconfig.json",
-    "lint": "oxlint src/ server/",
+    "lint": "oxlint src/ server/ warden/",
     "lint:server": "oxlint server/",
     "lint:client": "oxlint src/",
     "lint:fix": "oxlint src/ server/ --fix",
@@ -209,7 +210,8 @@
     "unified": "^11.0.5",
     "web-push": "^3.6.7",
     "ws": "^8.14.2",
-    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
+    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz",
+    "zod": "^4.3.6"
   },
   "devDependencies": {
     "@commitlint/cli": "^20.5.0",

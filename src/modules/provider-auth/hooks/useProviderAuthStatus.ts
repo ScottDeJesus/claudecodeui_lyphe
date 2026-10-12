@@ -100,10 +100,20 @@ export function useProviderAuthStatus(
     }));
   }, []);
 
-  const checkProviderAuthStatus = useCallback(async (provider: LLMProvider): Promise<ProviderAuthStatus> => {
-    setProviderLoading(provider);
-    const { status } = await fetchProviderAuthStatus(provider);
-    setProviderStatus(provider, status);
+  /**
+   * Re-asks the server about one provider and shows the answer. `keepLastAnswerOnFailure` is for a re-read
+   * of a status that is already on screen (Settings, as a login window closes): a check that failed — a 5xx,
+   * a dropped request — says nothing about the login, so the last answer stands and the line does not flash
+   * "Checking…" while it waits. Without it a failed check is shown as the failure it is, which is what a
+   * first read with nothing yet on screen needs.
+   */
+  const checkProviderAuthStatus = useCallback(async (
+    provider: LLMProvider,
+    { keepLastAnswerOnFailure = false }: { keepLastAnswerOnFailure?: boolean } = {},
+  ): Promise<ProviderAuthStatus> => {
+    if (!keepLastAnswerOnFailure) setProviderLoading(provider);
+    const { answered, status } = await fetchProviderAuthStatus(provider);
+    if (answered || !keepLastAnswerOnFailure) setProviderStatus(provider, status);
     return status;
   }, [setProviderLoading, setProviderStatus]);
 

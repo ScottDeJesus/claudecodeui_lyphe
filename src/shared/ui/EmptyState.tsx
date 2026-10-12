@@ -20,9 +20,9 @@ type EmptyStateProps = {
  * What a list, panel or pane shows when it is genuinely empty.
  *
  * Used by the file-manager module for an empty folder, the task-master module for an empty
- * board, and the memory-intake module for a queue with nothing waiting — all three mean "there
- * is nothing here yet", and a dashed frame around a serif line says that without any of them
- * inventing a way to.
+ * board, the memory-intake module for a queue with nothing waiting, and the cerberus module for a
+ * History with nothing in it yet — each means "there is nothing here yet", and a dashed frame
+ * around a serif line says that without any of them inventing a way to.
  *
  * "Empty" is not "we don't know" and not "zero": this belongs where the app has looked and
  * found nothing. A pane that is still loading, or that failed to read, says its own thing.

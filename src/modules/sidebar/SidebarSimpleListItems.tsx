@@ -1,9 +1,9 @@
-import type { HTMLAttributes } from 'react';
 import type { TFunction } from 'i18next';
 
 import { cn } from '@/shared/utils';
 import type {
   RecentConversationListItem,
+  SimpleListDragProps,
   SimpleListDropTarget,
   SimpleListFolder,
   SimpleListItem,
@@ -26,6 +26,13 @@ type SidebarSimpleListItemsProps = {
   awaitingInputSessionIds: ReadonlySet<string>;
   /** The chats with a subagent still running, often after their own turn has ended. */
   subagentRunningSessionIds: ReadonlySet<string>;
+  /**
+   * The chats whose CLI has a live session host, pushed by the server on change; null until the server
+   * has said. A Claude chat NOT in it is asleep and its row is grayed — nothing is grayed while null.
+   */
+  liveHostSessionIds: ReadonlySet<string> | null;
+  /** What sets a project apart from another of the same name, by project id (`projectNameHints`); a chat whose project has no entry draws none. */
+  projectNameHints: ReadonlyMap<string, string>;
   /** The chat whose removal failed, which its row says out loud; null when none has. */
   failedSessionId: string | null;
   /** The folder that has just been made: its header opens its name for typing and scrolls itself in. */
@@ -37,7 +44,7 @@ type SidebarSimpleListItemsProps = {
   /** Where the pointer says the carried row would land, or null. */
   dropTarget: SimpleListDropTarget | null;
   /** The carry's pointer handlers for one row: every chat row and every folder header spreads these. */
-  dragProps: (item: SimpleListItemRef) => Pick<HTMLAttributes<HTMLElement>, 'onPointerDown' | 'onClickCapture' | 'onDragStart'>;
+  dragProps: SimpleListDragProps;
   /** A chat row was pressed: open that chat. */
   onSelectChat: (chat: RecentConversationListItem) => void;
   /** A chat row's Archive: put the chat away, keeping its transcript. */
@@ -63,8 +70,10 @@ type SidebarSimpleListItemsProps = {
 // FILL: dropMarks — which row, header or block wears which mark, from what is carried and where the
 // pointer says it would land. A carried CHAT marks one row: a chat row's own edge, a folder
 // header's top edge, or the accent ring on the folder it would land inside. A carried FOLDER marks
-// the top or bottom edge of the block it would land beside and nothing else — its own block fades
-// instead. Either one, past the last block, wears the single line the list draws after them.
+// the top or bottom edge of the block it would land beside and nothing else — its own block is
+// lifted and moved by the kit's carry (`sortable/carried.ts`) instead. Either one, past the last
+// block, wears the single line the list draws after them. Every mark stands above the carried row
+// (`z-40`, over the kit's 30), which is drawn under the pointer and so over the row it marks.
 
 /** The line a chat's row wears: only while a CHAT is carried, and only on the row it would land on. */
 function chatDropEdge(
@@ -144,6 +153,8 @@ export default function SidebarSimpleListItems({
   busySessionIds,
   awaitingInputSessionIds,
   subagentRunningSessionIds,
+  liveHostSessionIds,
+  projectNameHints,
   failedSessionId,
   freshFolderId,
   onFreshShown,
@@ -171,6 +182,10 @@ export default function SidebarSimpleListItems({
       isRunning={busySessionIds.has(chat.sessionId)}
       isAwaitingInput={awaitingInputSessionIds.has(chat.sessionId)}
       isSubagentRunning={subagentRunningSessionIds.has(chat.sessionId)}
+      // Only a Claude chat can have a session host, so only one can be asleep: another provider's
+      // chat is never grayed, and nothing is until the server's first snapshot has arrived.
+      isAsleep={liveHostSessionIds !== null && chat.provider === 'claude' && !liveHostSessionIds.has(chat.sessionId)}
+      projectNameHint={(chat.projectId && projectNameHints.get(chat.projectId)) || null}
       isRemoveFailed={failedSessionId === chat.sessionId}
       // FILL: onSelectChat
       onSelect={() => onSelectChat(chat)}
@@ -185,7 +200,7 @@ export default function SidebarSimpleListItems({
       // FILL: onMoveToFolder
       onMoveToFolder={onMoveToFolder === null ? null : () => onMoveToFolder(chat)}
       // FILL: dragProps
-      dragProps={dragProps({ kind: 'chat', id: chat.sessionId })}
+      dragProps={dragProps}
       isDragging={dragging !== null && dragging.kind === 'chat' && dragging.id === chat.sessionId}
       dropEdge={chatDropEdge(chat.sessionId, dragging, dropTarget)}
       t={t}
@@ -196,7 +211,7 @@ export default function SidebarSimpleListItems({
     <>
       {items.map((item) => {
         const id = item.kind === 'chat' ? item.chat.sessionId : item.folder.folderId;
-        // A carried chat fades as its own row; a carried folder fades as its whole block.
+        // A carried chat is lifted as its own row; a carried folder as its whole block.
         const isCarried = dragging !== null && dragging.kind === item.kind && dragging.id === id;
         const blockEdge = blockDropEdge(item, dragging, dropTarget);
 
@@ -205,7 +220,7 @@ export default function SidebarSimpleListItems({
           <span
             aria-hidden
             className={cn(
-              'pointer-events-none absolute inset-x-1 h-0.5 rounded-full bg-primary',
+              'pointer-events-none absolute inset-x-1 z-40 h-0.5 rounded-full bg-primary',
               blockEdge === 'before' ? 'top-0' : 'bottom-0',
             )}
           />
@@ -235,7 +250,7 @@ export default function SidebarSimpleListItems({
               data-testid="simple-chat-block"
               data-item-kind="folder"
               data-item-id={id}
-              className={cn('relative flex flex-col gap-1', isCarried && 'opacity-50')}
+              className="relative flex flex-col gap-1"
             >
               <SidebarSimpleFolderRow
                 folder={folder}
@@ -251,7 +266,7 @@ export default function SidebarSimpleListItems({
                 // FILL: onDeleteFolder
                 onDelete={() => onDeleteFolder(folder)}
                 // FILL: dragProps
-                dragProps={dragProps({ kind: 'folder', id })}
+                dragProps={dragProps}
                 isDragging={isCarried}
                 dropEdge={folderDropEdge(id, dragging, dropTarget)}
                 isDropInto={folderDropInto(id, dragging, dropTarget)}
@@ -279,9 +294,10 @@ export default function SidebarSimpleListItems({
         );
       })}
 
-      {/* The last place a row can land. Drawn only while the pointer is past every block. */}
+      {/* The last place a row can land. Drawn only while the pointer is past every block, and
+          above the carried row that is then drawn over it. */}
       {dropTarget?.at === 'end' && (
-        <span data-testid="simple-chat-drop-end" aria-hidden className="mx-1 h-0.5 rounded-full bg-primary" />
+        <span data-testid="simple-chat-drop-end" aria-hidden className="relative z-40 mx-1 h-0.5 rounded-full bg-primary" />
       )}
     </>
   );

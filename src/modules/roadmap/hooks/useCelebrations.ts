@@ -37,8 +37,8 @@ const GAP_MS = 300;
 const MOMENT_MS: Record<Moment['level'], number> = { task: 400, feature: 1200, epic: 2000, milestone: 3500 };
 
 /**
- * Under `prefers-reduced-motion: reduce` every moment is still. A row or a card holds a wash for this
- * long, in ms, whatever its size; the milestone's banner keeps its own timeline, since it only fades.
+ * Under `prefers-reduced-motion: reduce` every moment is still. A tree node a moment names holds a solid
+ * accent halo for this long, in ms, whatever its size; the milestone's banner keeps its own timeline, since it only fades.
  */
 const STILL_WASH_MS = 1500;
 
@@ -70,7 +70,7 @@ type Stage = { moment: Moment; playing: boolean };
 /** The moment in play, with the claim it holds (released if the surface stops under it) and the roadmap whose stamp it advances. */
 type InPlay = { moment: Moment; key: string; roadmap: string };
 
-/** The names `moment` sets moving. A task is named by its feature, whose meter it is. */
+/** The names `moment` sets moving. A task is named by its feature, whose dot blooms for it. */
 function activeOf(moment: Moment | null): CelebrationActive {
   if (moment === null) return NOTHING_ACTIVE;
   const named = new Set([moment.name]);
@@ -83,11 +83,12 @@ function activeOf(moment: Moment | null): CelebrationActive {
 }
 
 /**
- * Used by `RoadmapPath` (the Roadmap tab's face) and the chat gutter's roadmap widget, each handing it
- * the roadmap on its screen and the ref of the box the reader sees (an element that stays mounted with
- * the surface: the hook observes it once, on mount). It returns what to draw: `moment`
- * and `skip` for `CelebrationLayer`, `active` for `CelebrationContext` (read by `FeatureRow`,
- * `EpicCard` and `MilestonePath`, which play their own part of a moment).
+ * Used by `RoadmapTreeFace` (the roadmap face of the Roadmap tab, the widget at full screen and the chat
+ * gutter's widget), handing it the roadmap on its screen and the ref of the box the reader sees (an
+ * element that stays mounted with the surface: the hook observes it once, on mount). It returns what to
+ * draw: `moment` and `skip` for `CelebrationLayer`, `active` for `CelebrationContext` (read by the tree's
+ * nodes — `tree/TreeGoal`'s connectors, `tree/TreeMilestoneNode` and `tree/TreeEpicNode` — which play
+ * their own part of a moment).
  *
  * MOMENTS ARE READ OFF THE PICTURE'S OWN DATES, never stored: every completion already carries its date.
  * Live, each new picture of the SAME roadmap is diffed against the one before it (a task, a feature, an
@@ -112,9 +113,9 @@ function activeOf(moment: Moment | null): CelebrationActive {
  * stops under a moment (off screen, another roadmap, unmounted) lets go of its claim, so it is not lost.
  *
  * ONE AT A TIME, smallest first: by size (task, feature, epic, milestone), then by date, with `GAP_MS`
- * between. The stage holds on a moment through that beat when another follows, so the face does not
- * jump to the default milestone and back; it lets go the instant the queue is empty. Two task moments
- * of one feature in a row therefore read as one (its row's motion never leaves between them).
+ * between. The stage holds on a moment through that beat when another follows, so `active` does not
+ * empty and refill between them; it lets go the instant the queue is empty. Two task moments of one
+ * feature in a row therefore read as one (its dot's bloom never leaves between them).
  */
 export function useCelebrations(roadmap: Roadmap | null, rootRef: RefObject<HTMLElement>): Celebrations {
   const { t } = useTranslation();

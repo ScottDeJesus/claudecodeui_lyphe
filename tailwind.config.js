@@ -84,6 +84,15 @@ export default {
         "ink-faint": "color-mix(in srgb, var(--ink-faint) calc(<alpha-value> * 100%), transparent)",
         "warn-ink": "color-mix(in srgb, var(--warn-ink) calc(<alpha-value> * 100%), transparent)",
         "accent-ink": "color-mix(in srgb, var(--accent-ink) calc(<alpha-value> * 100%), transparent)",
+        // The tone swap's own properties (tokens.css, the `[data-tone]` rules), named. A container
+        // that sets `data-tone` hands `--tone-soft`, `--tone-ink` and `--tone-dot` to everything inside
+        // it, and these three let that content spell them as Tailwind names: a status mark is
+        // `<span data-tone="warn" className="bg-tone-dot">`, its wash `bg-tone-soft`, its word
+        // `text-tone-ink`. They are not a sixth palette — they carry whichever of the five tones the
+        // nearest `data-tone` chose, and with none above them they resolve to nothing.
+        "tone-soft": "color-mix(in srgb, var(--tone-soft) calc(<alpha-value> * 100%), transparent)",
+        "tone-ink": "color-mix(in srgb, var(--tone-ink) calc(<alpha-value> * 100%), transparent)",
+        "tone-dot": "color-mix(in srgb, var(--tone-dot) calc(<alpha-value> * 100%), transparent)",
       },
       borderRadius: {
         lg: "var(--radius-input)",
@@ -130,30 +139,60 @@ export default {
           from: { opacity: '0', transform: 'translateX(-22px)' },
           to: { opacity: '1', transform: 'none' },
         },
-        // The roadmap's three motions Verve has no keyframe for. Verve's own (`vv-pop`, `vv-ring`,
-        // `vv-draw`) carry the other three below; none of the six animates a colour, and each is
-        // spelled behind `motion-safe:` at its call site.
+        // The roadmap's two motions Verve has no keyframe for. Verve's own (`vv-pop`, `vv-draw`) carry
+        // the other two below; none of the four animates a colour, and each is spelled behind
+        // `motion-safe:` at its call site.
         //
-        // A celebration particle leaving the point it was born at. Where it lands is that span's own
-        // `--dx`/`--dy`, set inline — position data, never colour — so one keyframe serves all 48.
+        // A celebration particle leaving the point it was born at. Where it lands is that element's own
+        // `--dx`/`--dy`, set inline — position data, never colour — so one keyframe serves the
+        // milestone banner's 48 particles and the epic ring's 12.
         'roadmap-burst': {
           from: { transform: 'none', opacity: '1' },
           to: { transform: 'translate(var(--dx), var(--dy)) scale(.4)', opacity: '0' },
         },
-        // One soft band crossing a row once. The band is the row's own className
-        // (`bg-gradient-to-r from-transparent via-primary/15 to-transparent bg-[length:50%_100%]
-        // bg-no-repeat`), so its colour stays a Tailwind name; this only moves it from fully off the
-        // left edge (-100% of a half-width image) to fully off the right (200%).
-        'roadmap-sweep': {
-          from: { backgroundPosition: '-100% 0' },
-          to: { backgroundPosition: '200% 0' },
-        },
-        // A reached milestone's station swelling past its size and settling a little over it. The
+        // A ring or a feature's dot swelling past its size and settling a little over it. The
         // peak sits early so the settle has most of the run, under `--ease-spring`'s own overshoot.
         'roadmap-bloom': {
           '0%': { transform: 'scale(1)' },
           '40%': { transform: 'scale(1.6)' },
           '100%': { transform: 'scale(1.1)' },
+        },
+        // The Cerberus tab's six motions, ported from its prototype (`cb-*` in `Cerberus Tab.dc.html`).
+        // Colour in them is `--warn-dot` through `color-mix` and nothing else: the ring is that dot's
+        // halo, and the rest move or fade an element that keeps its own ink.
+        //
+        // A status mark that needs you: a halo of the warn dot going out 8px as it fades.
+        'cerberus-ring-warn': {
+          '0%': { boxShadow: '0 0 0 0 color-mix(in srgb, var(--warn-dot) 50%, transparent)' },
+          '100%': { boxShadow: '0 0 0 8px color-mix(in srgb, var(--warn-dot) 0%, transparent)' },
+        },
+        // A heartbeat dot while its warden is reporting: opacity 1 down to .5 and back.
+        'cerberus-breathe': {
+          '0%, 100%': { opacity: '1' },
+          '50%': { opacity: '.5' },
+        },
+        // A beat riding a spoke from its node to the hub. It starts at the node's end (`left: 100%`),
+        // fades in over the first 12% and out over the last 15%, so it never pops at either end.
+        'cerberus-travel': {
+          '0%': { left: '100%', opacity: '0' },
+          '12%': { opacity: '1' },
+          '85%': { opacity: '1' },
+          '100%': { left: '0', opacity: '0' },
+        },
+        // A ✓ arriving: it grows from .4 to full while it fades in.
+        'cerberus-check': {
+          '0%': { opacity: '0', transform: 'scale(.4)' },
+          '100%': { opacity: '1', transform: 'none' },
+        },
+        // A line of output arriving: a short rise from 5px below.
+        'cerberus-line': {
+          from: { opacity: '0', transform: 'translateY(5px)' },
+          to: { opacity: '1', transform: 'none' },
+        },
+        // A terminal caret: on for the first half of the second, off for the second, no tween.
+        'cerberus-caret': {
+          '0%, 49%': { opacity: '1' },
+          '50%, 100%': { opacity: '0' },
         },
       },
       animation: {
@@ -167,7 +206,11 @@ export default {
         // The rendered transcript's entrances, both on Verve's own keyframes (`vv-rise` and
         // `vv-pagein`, `src/shared/ui/verve/tokens.css`) rather than on a second spelling of them
         // here. `shape-rise` is a FRAME arriving — a card the reader has never seen rises once, and
-        // `both` keeps it at its end state while the memory that suppressed it is consulted.
+        // `both` keeps it at its end state while the memory that suppressed it is consulted. It is
+        // named for the transcript, its first wearer, but it is the house's one spelling of Verve's
+        // rise: any screen's arriving block wears it, never a second `vv-rise` utility. A stagger's
+        // delay goes inline (`style={{ animationDelay }}`): a `[animation-delay:…]` class is emitted
+        // before the `motion-safe:` media block, whose shorthand then resets the delay to 0.
         // `shape-item` is a row or a tile following its frame, `backwards` so the stagger's delay
         // holds the item invisible instead of flashing it at full opacity before its turn.
         'shape-rise': 'vv-rise var(--dur-move) var(--ease-enter) both',
@@ -177,28 +220,28 @@ export default {
         // halo on a node whose walk is out right now, breathing for as long as it is. An arc deck's
         // plans are paged, not jumped to, so the one-shot flavour the tab's wall used is gone.
         'live-ring': 'vv-ring 2.4s ease-out infinite',
-        // The roadmap's celebrations. Three run Verve's own keyframes (`vv-pop`, `vv-ring`, `vv-draw`
-        // in `src/shared/ui/verve/tokens.css`), because Verve draws that motion; the other three run
-        // the keyframes above.
-        // A mark arriving: the shipped dot, a figure ticking up. `vv-pop` on the spring curve.
+        // The Cerberus tab's motions, the keyframes above, at the prototype's timings. `both` on the
+        // two one-shots keeps the first frame (invisible) through any delay and the last (settled) after.
+        'cerberus-ring-warn': 'cerberus-ring-warn 1.8s ease-out infinite',
+        'cerberus-breathe': 'cerberus-breathe 2.6s ease-in-out infinite',
+        'cerberus-travel': 'cerberus-travel 3.2s linear infinite',
+        'cerberus-check': 'cerberus-check .6s var(--ease-spring) both',
+        'cerberus-line': 'cerberus-line .35s var(--ease-enter) both',
+        'cerberus-caret': 'cerberus-caret 1s steps(1) infinite',
+        // The roadmap's celebrations. Two run Verve's own keyframes (`vv-pop`, `vv-draw` in
+        // `src/shared/ui/verve/tokens.css`), because Verve draws that motion; the other two run the
+        // keyframes above.
+        // A mark arriving: the milestone banner's badge. `vv-pop` on the spring curve.
         'roadmap-pop': 'vv-pop 420ms var(--ease-spring)',
-        // One halo going out from a mark, once — `live-ring`'s `vv-ring`, run a single time at 900ms
-        // instead of breathing for as long as a walk is out.
-        'roadmap-ring': 'vv-ring 900ms ease-out 1',
-        // An SVG stroke drawing itself, such as an epic ring's last segment. The stroke needs
-        // `pathLength="1"` AND `[stroke-dasharray:1]`: `vv-draw` moves only `stroke-dashoffset`
-        // (1 → 0), so without the dash the stroke is solid at every frame and nothing draws. It does
-        // nothing to a div's background, so a rail drawn as a `bg-primary` div cannot use it; a rail
-        // that fills with this is an SVG line. `forwards` keeps the line drawn when it ends.
+        // An SVG stroke drawing itself: a milestone's connector from the goal, and the last share of a
+        // ring. The stroke needs `pathLength="1"` AND `[stroke-dasharray:1]`: `vv-draw` moves only
+        // `stroke-dashoffset` (1 → 0), so without the dash the stroke is solid at every frame and nothing
+        // draws. It does nothing to a div's background. `forwards` keeps the line drawn when it ends.
         'roadmap-draw': 'vv-draw 900ms var(--ease-enter) forwards',
         // A particle's flight, `forwards` so it stays at its last frame, invisible, until its layer
         // is taken down.
         'roadmap-burst': 'roadmap-burst 1.1s ease-out forwards',
-        // The shipped row's band crossing it, once. `forwards` because the keyframe's end is the band
-        // off the right edge, which is the band gone; without it the position falls back to the
-        // default `0 0` the moment the pass ends and parks the band on the row's left half.
-        'roadmap-sweep': 'roadmap-sweep 600ms var(--ease-enter) forwards',
-        // The reached station's swell.
+        // A ring's or a dot's swell.
         'roadmap-bloom': 'roadmap-bloom 900ms var(--ease-spring)',
       },
     },

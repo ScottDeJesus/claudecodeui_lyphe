@@ -85,7 +85,8 @@
           "server/shared/roadmap-types.ts",
           "server/shared/version-order.ts",
           "server/shared/dispatcher-command.ts",
-          "server/shared/document-fields.ts"
+          "server/shared/document-fields.ts",
+          "server/shared/cerberus-types.ts"
         ],
         "mode": "file"
       },
@@ -123,7 +124,9 @@
           "src/shared/app-types.ts",
           "src/shared/claude-update-types.ts",
           "src/shared/roadmap-types.ts",
-          "src/shared/sessionRecency.ts"
+          "src/shared/cerberus-types.ts",
+          "src/shared/sessionRecency.ts",
+          "src/shared/projectNameHints.ts"
         ],
         "mode": "file"
       },

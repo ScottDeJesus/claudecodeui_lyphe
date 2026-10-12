@@ -262,9 +262,10 @@ const JUDGMENT_SUFFIX = '--judgment';
  * The epics that are finished, one ending each, keyed on the completion that finished them.
  *
  * An epic is finished when its own `status` reads `complete` — every feature carries its stamp, an
- * arc's judgment included, and the roadmap holds no feature still to be designed — so the arc's word
- * is the one reading of that, and the history cannot supply it (a roadmap idea has no plan on the
- * lane). The ending is keyed on the newest `complete` event of the epic's features, which is the
+ * arc's judgment included where it has one (an epic created with one feature is never judged and
+ * reads `complete` the moment its last feature lands), and the roadmap holds no feature still to be designed —
+ * so the arc's word is the one reading of that, and the history cannot supply it (a roadmap idea has
+ * no plan on the lane). The ending is keyed on the newest `complete` event of the epic's features, which is the
  * completion that left it complete: one finish gives one ending however many features completed in
  * the same picture, and a reopened epic that finishes again has a newer completion and so earns a
  * new one. An epic that is not yet complete says nothing, and says it when its status turns IF that

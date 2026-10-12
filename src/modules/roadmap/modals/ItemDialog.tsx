@@ -51,7 +51,7 @@ type ItemDialogProps = {
   | {
       /** An edit, of the item as the picture has it. */
       item: EditedItem;
-      /** The goal first, and asked for: `FeatureDialog` on a feature with no goal, `then` naming what follows its Save; the roadmap header's missing goal, `then: null`. */
+      /** The goal first, and asked for: `FeatureDialog` on a feature with no goal, `then` naming what follows its Save; the roadmap panel's missing-goal press, `then: null`. */
       goalFirst?: { then: 'propose' | 'promote' | null };
       parent?: never;
     }
@@ -385,7 +385,7 @@ export function ItemDialog(props: ItemDialogProps) {
             <Button type="button" variant="ghost" className="max-md:h-11" disabled={busy} onClick={dismiss}>
               {t('roadmap.dialog.cancel')}
             </Button>
-            <Button type="submit" className="max-md:h-11" disabled={!ready || busy} aria-busy={busy || undefined}>
+            <Button type="submit" className="max-md:h-11" disabled={!ready} busy={busy}>
               {submitLabel}
             </Button>
           </footer>

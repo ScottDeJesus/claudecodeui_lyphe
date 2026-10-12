@@ -1,6 +1,6 @@
 import type { DispatcherEvent, DispatcherPhase, DispatcherPlan, DispatcherStage } from '@/shared/types.js';
 
-import { each, countOrNullSince, countSince, field, flagSince, isCount, isCountOrNull, isFlag, isRecord, isText, isTextOrNull, modelSince, names, need, oneOf, textSince } from './dispatcher-state.transport.js';
+import { each, countOrNullSince, countSince, field, flagSince, isCount, isCountOrNull, isFlag, isRecord, isText, isTextOrNull, modelSince, names, need, oneOf, stallSince, textSince } from './dispatcher-state.transport.js';
 import { askingSince } from './dispatcher-ask.reader.js';
 import { plannerSince } from './dispatcher-planner.reader.js';
 
@@ -39,6 +39,21 @@ function approvedOf(value: unknown): DispatcherPlan['approved'] {
   return {
     at: need(field(approved, 'at'), isText, 'plan.approved.at'),
     by: need(field(approved, 'by'), isText, 'plan.approved.by'),
+  };
+}
+
+/**
+ * `plan.accept_armed`: the operator's "Accept when cut" press (`store_armed`) — the door, the hour and the
+ * design stamp it was pressed against — or `null`. Read tolerantly like `asking`: a dispatcher build older
+ * than the key writes none, and that reads as nothing armed.
+ */
+function acceptArmedOf(value: unknown): DispatcherPlan['accept_armed'] {
+  if (value === undefined || value === null) return null;
+  const press = need(value, isRecord, 'plan.accept_armed');
+  return {
+    at: need(field(press, 'at'), isText, 'plan.accept_armed.at'),
+    by: need(field(press, 'by'), isText, 'plan.accept_armed.by'),
+    design: need(field(press, 'design'), isText, 'plan.accept_armed.design'),
   };
 }
 
@@ -97,6 +112,10 @@ function phaseOf(raw: unknown): DispatcherPhase {
     done_at: need(field(phase, 'done_at'), isTextOrNull, 'phase.done_at'),
     waits_on: names(field(phase, 'waits_on'), 'phase.waits_on'),
     busy: need(field(phase, 'busy'), isFlag, 'phase.busy'),
+    // Why the phase's run has ended with nothing to record it (`report_stall`), or `null` — the
+    // dispatcher's own word, never re-derived from `status` and `busy` here. Read tolerantly, so a
+    // build older than the field draws what it always drew.
+    stalled: stallSince(field(phase, 'stalled'), 'phase.stalled'),
     rounds: need(field(phase, 'rounds'), isCount, 'phase.rounds'),
     cost_usd: need(field(phase, 'cost_usd'), isCount, 'phase.cost_usd'),
     tokens: countSince(field(phase, 'tokens'), 'phase.tokens'),
@@ -148,13 +167,12 @@ export function planOf(raw: unknown): DocumentPlan {
     // derived here: this is the document's own answer, and a second derivation would be a second
     // answer (`dispatcher/model.py:model.of` is the only one).
     model: modelSince(field(plan, 'model'), 'plan.model'),
-    // The plan's width phrase (`width.word` of its route and the task WIP in force for it), read
-    // tolerantly like `arc`: a build older than the field writes none. It names task WIP alone — an
-    // epic's own two words are the arc's `wip`.
+    // The plan's width phrase (`width.word` of its effective model word and its task-WIP word), read
+    // tolerantly like `arc`: a build older than the field writes none.
     posture: textSince(field(plan, 'posture'), 'plan.posture'),
-    // The sentence of the FEATURE-WIP clause holding this plan's first ready phase, or `null`
-    // (`report.wip_hold`) — the gate's own words, passed through untouched and never re-derived here.
-    // Absent from a build older than the field (MANUAL, MAN-7682), which reads as `null`: not held.
+    // Why this feature waits for an epic slot — the gate's own FEATURE-WIP clause for its first ready
+    // phase (`width.feature_hold`), or `null`. Read tolerantly like `posture`: a build older than the
+    // field writes none, and the card then draws no line.
     wip_hold: textSince(field(plan, 'wip_hold'), 'plan.wip_hold'),
     created_at: need(field(plan, 'created_at'), isText, 'plan.created_at'),
     updated_at: need(field(plan, 'updated_at'), isText, 'plan.updated_at'),
@@ -167,7 +185,15 @@ export function planOf(raw: unknown): DocumentPlan {
     // own primary button, which is Resume for the first and Start for the second. Read tolerantly,
     // so a dispatcher build older than the field draws its cards' gate verb rather than blank ones.
     launched: flagSince(field(plan, 'launched'), 'plan.launched'),
+    // Why the plan's only running work has ended with nothing to record it (`report_stall`), beside
+    // the `stalled` status word: the line the card says it by. Tolerant for a build older than it.
+    stalled: stallSince(field(plan, 'stalled'), `plan.stalled of ${name}`),
     approved: approvedOf(field(plan, 'approved')),
+    // The operator's "Accept when cut" press on this plan, and the stamp of the design it would bind to
+    // (`design_loaded_at`) — the stamp the card sends back with its press. Both tolerant of a build older
+    // than the keys, which draws no press.
+    accept_armed: acceptArmedOf(field(plan, 'accept_armed')),
+    design_loaded_at: textSince(field(plan, 'design_loaded_at'), 'plan.design_loaded_at'),
     // The prompt CloudCLI has put up for this plan and is waiting on — the one key the plan's card is
     // drawn from and the book is raised off (`dispatcher-asks.service.ts`). Tolerant for a build
     // older than it, which asks nothing.
@@ -182,6 +208,9 @@ export function planOf(raw: unknown): DocumentPlan {
     tokens_in: countSince(field(plan, 'tokens_in'), 'plan.tokens_in'),
     tokens_out: countSince(field(plan, 'tokens_out'), 'plan.tokens_out'),
     tokens_cache_read: countOrNullSince(field(plan, 'tokens_cache_read'), 'plan.tokens_cache_read'),
+    // How long at least one agent was out on this plan (`report_runtime`), in whole seconds: derived at
+    // the dispatcher's own reading time and never stored. Read tolerantly, for a build older than the key.
+    runtime_s: countSince(field(plan, 'runtime_s'), 'plan.runtime_s'),
     rounds: need(field(plan, 'rounds'), isCount, 'plan.rounds'),
     phases: each(field(plan, 'phases'), 'plan.phases', phaseOf),
     events: each(field(plan, 'events'), 'plan.events', eventOf),

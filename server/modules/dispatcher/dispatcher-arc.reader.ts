@@ -1,6 +1,6 @@
-import type { DispatcherArc, DispatcherArcStatus, DispatcherArcWip, DispatcherArcWipLimit } from '@/shared/types.js';
+import type { DispatcherArc, DispatcherArcStatus, DispatcherArcWip, DispatcherWipSetting } from '@/shared/types.js';
 
-import { countOrNullSince, countSince, each, field, flagSince, isCount, isFlag, isRecord, isText, isTextOrNull, isWipWord, isWipWordOrNull, modelSince, names, need, oneOf, textSince } from './dispatcher-state.transport.js';
+import { countOrNullSince, countSince, each, field, flagSince, isCount, isRecord, isText, isTextOrNull, modelSince, names, need, oneOf, textSince, wipWord } from './dispatcher-state.transport.js';
 import { plannerSince } from './dispatcher-planner.reader.js';
 
 /**
@@ -22,29 +22,35 @@ import { plannerSince } from './dispatcher-planner.reader.js';
 /** The nine words an arc's derived status may be (`store_arcs.arc_word`'s one precedence). Anything else is a build this lane cannot draw. */
 export const ARC_STATUSES: readonly DispatcherArcStatus[] = ['empty', 'complete', 'judging', 'stalled', 'live', 'scheduled', 'paused', 'queued', 'designing'];
 
-/** One of an epic's two limits as `wip.report` prints it: its own word or `null`, the word in force and the default under it. */
-function wipLimitOf(raw: unknown, where: string): DispatcherArcWipLimit {
-  const limit = need(raw, isRecord, where);
+/**
+ * One limit of an arc's `wip` block: the epic's own word (`null` while it follows its default), the
+ * word in force, and the default it falls back to (`default`: Settings' word for Claude work, `all`
+ * for DeepSeek's — `wip.report`). `default` is absent from a build older than it, where Settings'
+ * word is the default.
+ */
+function wipSettingOf(raw: unknown, where: string): DispatcherWipSetting {
+  const setting = need(raw, isRecord, where);
+  const own = field(setting, 'own');
+  const fallback = setting.default;
   return {
-    own: need(field(limit, 'own'), isWipWordOrNull, `${where}.own`),
-    effective: need(field(limit, 'effective'), isWipWord, `${where}.effective`),
-    default: need(field(limit, 'default'), isWipWord, `${where}.default`),
+    own: own === null ? null : wipWord(own, `${where}.own`),
+    effective: wipWord(field(setting, 'effective'), `${where}.effective`),
+    ...(fallback === undefined ? {} : { default: wipWord(fallback, `${where}.default`) }),
   };
 }
 
 /**
- * The epic's WIP block (`arc.wip`, `wip.report`): the two limits as the document prints them, passed
- * through and never summed, defaulted or compared here — the dispatcher states the `default` beside
- * each limit so that no reader has to work out which route the epic walks. A build older than the
- * block sends none (MANUAL, MAN-7682), which reads as `null`; a block that IS there and does not read
- * is refused by name.
+ * An arc's two WIP limits (`report_arcs.arc_dict.wip`), or `null` for a build OLDER than the field —
+ * the control and the line that read it then draw nothing and the board stands, which is the
+ * tolerance `modelSince` and its siblings give every field added after a build shipped. A key that IS
+ * there and does not read is refused by name, with the arc it came from.
  */
 function wipOf(value: unknown, name: string): DispatcherArcWip | null {
   if (value === undefined) return null;
   const wip = need(value, isRecord, `arc.wip of ${name}`);
   return {
-    features: wipLimitOf(field(wip, 'features'), `arc.wip.features of ${name}`),
-    tasks: wipLimitOf(field(wip, 'tasks'), `arc.wip.tasks of ${name}`),
+    features: wipSettingOf(field(wip, 'features'), `arc.wip.features of ${name}`),
+    tasks: wipSettingOf(field(wip, 'tasks'), `arc.wip.tasks of ${name}`),
   };
 }
 
@@ -61,10 +67,10 @@ export function arcOf(raw: unknown): DispatcherArc {
     // draws and presses, and pressing it hands the word to every plan of the arc
     // (`store.set_arc_model`). A build older than the field reads `null` — the store's default.
     model: modelSince(field(arc, 'model'), 'arc.model'),
-    // The epic's two WIP limits — the only concurrency switches for the work under it, and the one
-    // place the document says how wide an epic walks. Carried as printed (`wipOf`).
-    wip: wipOf(field(arc, 'wip'), name),
     status: oneOf(field(arc, 'status'), ARC_STATUSES, `status of ${name}`),
+    // The epic's two WIP limits, each as its own word and the word in force — what the epic's WIP
+    // control draws and presses back (`dispatcher wip`), carried as the document states them.
+    wip: wipOf(field(arc, 'wip'), name),
     // THE ARC'S OWN VERBS, read off its plans' status words by `report_arcs` and drawn by the header
     // here: `walking` is what Pause is drawn for and `stopped` what Start and Schedule start are —
     // and `stopped` is every plan of the arc that is approved, paused and unfinished, so a whole arc
@@ -76,33 +82,38 @@ export function arcOf(raw: unknown): DispatcherArc {
     // once, and a `designing` header draws no press while `stopped` is what Start is drawn for).
     walking: flagSince(field(arc, 'walking'), `arc.walking of ${name}`),
     stopped: flagSince(field(arc, 'stopped'), `arc.stopped of ${name}`),
+    // Whether a plan of the arc has STALLED (`report_arcs.stalled`): released, its only running work
+    // ended and nothing to record it. The header draws Resume on it where nothing is stopped, beside
+    // the Pause `walking` still draws. Tolerant: a build older than the field has no stalled plan to say.
+    stalled: flagSince(field(arc, 'stalled'), `arc.stalled of ${name}`),
     // The ONE hour an arc's plans are armed for, or null (`report_arcs.hour`: the single distinct
     // armed stamp, null when there is none or when its plans were armed apart). It is the stamp the
     // header's Cancel is drawn over and the note beside it states — never computed here.
     schedule: textSince(field(arc, 'schedule'), `arc.schedule of ${name}`),
+    // How many of the arc's plans the "Accept when cut" press reaches now, and how many carry one
+    // (`report_arcs.armable`, `armed`): the deck draws the press and its Cancel by them. Counts, so a
+    // build older than the keys reads zero and draws neither.
+    armable: countSince(field(arc, 'armable'), `arc.armable of ${name}`),
+    armed: countSince(field(arc, 'armed'), `arc.armed of ${name}`),
     plans: names(field(arc, 'plans'), 'arc.plans'),
     // The one outing whose `target` IS this arc — its design, its cut, its judgment
     // (`report_planners.of_arc`). A row naming one of the arc's plans is that PLAN's and rides
     // `plan.planner` instead, so the header and the cards under it never state one outing twice.
     planner: plannerSince(field(arc, 'planner'), `arc.planner of ${name}`),
-    // The arc's four remaining own readings, each derived by `report_arcs` off the plan rows the
-    // document already holds: how many plans the "Accept when cut" press reaches and how many carry
-    // one, whether any plan has stalled, and the epic's working time in whole seconds (the UNION of
-    // its plans' intervals, never their sum). Required: today's document always prints them.
-    armable: need(field(arc, 'armable'), isCount, `arc.armable of ${name}`),
-    armed: need(field(arc, 'armed'), isCount, `arc.armed of ${name}`),
-    stalled: need(field(arc, 'stalled'), isFlag, `arc.stalled of ${name}`),
-    runtime_s: need(field(arc, 'runtime_s'), isCount, `arc.runtime_s of ${name}`),
     created_at: need(field(arc, 'created_at'), isText, 'arc.created_at'),
     completed_at: need(field(arc, 'completed_at'), isTextOrNull, 'arc.completed_at'),
-    // The arc's books are its plans' sums, read by `report_arcs.arc_line` through the plan line's own
-    // renderer (INV-4299) — dollars OR tokens, by who was used. They are carried here so the header
-    // never has to add up the cards itself, which is how two readers of one figure start to disagree.
+    // The arc's books are its plans' sums cut at the moment each feature joined the epic
+    // (`report_arcs._books`), read by `report_arcs.arc_line` through the plan line's own renderer
+    // (INV-4299) — dollars OR tokens, by who was used. They are carried here so the header never has
+    // to add up the cards itself, which would count the past of a feature the epic took in late.
     cost_usd: need(field(arc, 'cost_usd'), isCount, 'arc.cost_usd'),
     tokens: countSince(field(arc, 'tokens'), 'arc.tokens'),
     tokens_in: countSince(field(arc, 'tokens_in'), 'arc.tokens_in'),
     tokens_out: countSince(field(arc, 'tokens_out'), 'arc.tokens_out'),
     tokens_cache_read: countOrNullSince(field(arc, 'tokens_cache_read'), 'arc.tokens_cache_read'),
+    // How long at least one agent was out on the epic: the UNION over its plans' intervals and its own
+    // outings (`report_arcs.arc_dict`), never its plans' figures added. Tolerant, like the plan's.
+    runtime_s: countSince(field(arc, 'runtime_s'), 'arc.runtime_s'),
   };
 }
 

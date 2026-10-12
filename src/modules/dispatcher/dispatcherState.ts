@@ -15,11 +15,12 @@ import type { DispatcherArc, DispatcherArcSplit, DispatcherPhase, DispatcherPlan
  */
 
 /**
- * A scheduled moment in the reader's own clock: `3:00 AM` today, `Sep 23, 3:00 AM` any other day. The
+ * A moment in the reader's own clock: `3:00 AM` today, `Sep 23, 3:00 AM` any other day. The
  * date rides whenever the moment is not today, because DeepSeek's off-peak lifts at 3 AM Pacific — past
  * the operator's midnight — and a bare `3:00 AM` read in the evening names a time that has already
- * passed. One clock, three call sites: a plan card's own clock (`PlanFace.PlanClock`), an arc's armed
- * hour (`DispatchArcControls`) and `ScheduleControl`'s `Start at …` all name one moment one way.
+ * passed. One clock for every moment the card names: a plan card's own clock (`PlanFace.PlanClock`), an
+ * arc's armed hour (`DispatchArcControls`), `ScheduleControl`'s `Start at …`, and the stage lines and
+ * event feed through {@link clockOf} all name one moment one way.
  */
 export function scheduleClock(epochSeconds: number, now: number = Date.now()): string {
   const moment = new Date(epochSeconds * 1000);
@@ -44,11 +45,11 @@ export function epochOf(iso: string | null): number | null {
 
 /**
  * How a plan's word reaches the eye. `live` and `complete` are `positive`: one is walking, the other
- * finished — neither asks for anything. `stalled` is `warn`: a released plan whose work has ended with
- * nothing to record it is the one state nobody asked for, and its Resume is waiting on the operator.
- * Everything else is `neutral`: `paused`, `queued`, `scheduled`, `parked` and `idle` are all states
- * the operator chose or is waiting on, and amber over a plan they parked themselves would be the card
- * arguing with them.
+ * finished — neither asks for anything. `stalled` is `warn`, and for the reason a planner's ended
+ * outing is: it is the one state nobody asked for — released work whose run has ended with nothing to
+ * record it — so it must not wear the green a reader takes for work in flight. Everything else is
+ * `neutral`: `paused`, `queued`, `scheduled`, `parked` and `idle` are all states the operator chose or
+ * is waiting on, and amber over a plan they parked themselves would be the card arguing with them.
  */
 export function planStatusTone(status: DispatcherPlanStatus): Tone {
   if (status === 'stalled') return 'warn';
@@ -72,8 +73,8 @@ export function plannerStatusTone(state: DispatcherPlanner['state']): Tone {
 
 /**
  * The same for one phase: `done` positive, `running` info, `not started` neutral. A phase that is
- * `running` and not busy is drawn by the card as SETTLING and never reaches here as running — that
- * decision is the card's (`PlanPhaseRow`), because it is a reading of two fields and not of a word.
+ * `running` and not busy is drawn by the card as SETTLING, or as STALLED once the dispatcher says so
+ * (`phase.stalled`), and never reaches here as running — that decision is `phaseWord`'s.
  */
 export function phaseStatusTone(phase: DispatcherPhase): Tone {
   if (phase.status === 'done') return 'positive';
@@ -103,9 +104,9 @@ export function phaseProgress(plan: DispatcherPlan): { done: number; total: numb
  * `groups` and `rest` are its decks and its plans of no arc, each keeping that order among its own
  * kind (the tab's decks above, its wall below).
  *
- * NOTHING BUT THE OPERATOR'S ARRANGEMENT MOVES A CARD. Status, `updated_at`, an owed word, a model
- * press and the open chat all change a plan every few seconds; a card that stood by any of them would
- * jump under the reader's hand. A plan that asks keeps its place and its band.
+ * NOTHING BUT THE OPERATOR'S ARRANGEMENT MOVES A CARD. Status, `updated_at`, an owed word and the
+ * open chat all change a plan every few seconds; a card that stood by any of them would jump under
+ * the reader's hand. A plan that asks keeps its place and its band.
  *
  * AN ARC'S OWN ORDER IS THE STORE'S. `arc.plans` is the arc file's walk order (`store.arc_plans`), and
  * it is what the arc's deck draws: the reader is looking at a sequence of thirteen plans that depend
@@ -159,7 +160,7 @@ export type DispatchDeckLayer = 'done' | 'top' | 'beneath';
 
 /**
  * Which layer of the arc's strip a plan is on — `done` for one that has finished, `top` for the one
- * being walked or released and stalled, `beneath` for everything else. Read by the card for the dimming a finished card wears
+ * being walked (or stalled mid-walk: it is still the arc's front card), `beneath` for everything else. Read by the card for the dimming a finished card wears
  * and written on the row as the harness's handle, so the strip can be read without measuring pixels.
  */
 export function planLayer(plan: DispatcherPlan): DispatchDeckLayer {
@@ -212,9 +213,9 @@ export function waitsOnSiblings(plan: DispatcherPlan, members: DispatcherPlan[])
  * the second gate. `report_planners.of_plan` gives a plan's OWN row first, an ending included, so a
  * plan whose own cut ended short hides its arc's queued cut, and `drop` refuses it. `live` is refused
  * as well, for the window the document cannot see: `phase_chain.launch` forks the walker before the
- * phase carries a `chain_id`, and a plan the rule can launch is exactly a released one — `live`, or
- * `stalled`, which the daemon takes up again as soon as it is woken. Where this is false the card
- * draws no Delete at all.
+ * phase carries a `chain_id`, and a plan the rule can launch is exactly a `live` one — and a `stalled`
+ * one, which is the same released plan with its ended run waiting on a daemon that may be taking it up
+ * this second (`report_stall`). Where this is false the card draws no Delete at all.
  */
 export function planDroppable(plan: DispatcherPlan, planners: readonly DispatcherPlanner[]): boolean {
   if (plan.status === 'live' || plan.status === 'stalled') return false;
@@ -240,15 +241,15 @@ export function planWaiters(plan: DispatcherPlan, lanePlans: readonly Dispatcher
 }
 
 /**
- * The time part of the document's ISO stamp (`2026-09-24T10:02:11Z` → `10:02:11Z`). Sliced, not
- * parsed: the stamp is the store's own UTC shape, and the `Z` stays so a reader knows whose clock
- * it is. A stamp with no `T` is shown whole; a missing one is empty. Used by `PlanPhaseRow`'s stage
- * lines and `PlanFace`'s event feed, so one stamp reads one way on the card.
+ * One of the document's ISO stamps in the reader's own clock, drawn by {@link scheduleClock}: `8:48 AM`
+ * today, `Oct 4, 8:48 AM` any other day. The store stamps in UTC (`2026-10-05T15:48:15Z`) and the
+ * operator reads Pacific (operator, 2026-10-05: "These aren't in PST"), so the stamp is converted,
+ * never sliced. A string that is not a time is shown whole; a missing one is empty. Used by
+ * `PlanPhaseRow`'s stage lines and `PlanFace`'s event feed, so a stamp reads as every moment on the card does.
  */
 export function clockOf(at: string | null): string {
-  if (!at) return '';
-  const marker = at.indexOf('T');
-  return marker === -1 ? at : at.slice(marker + 1);
+  const epoch = epochOf(at);
+  return epoch === null ? at ?? '' : scheduleClock(epoch);
 }
 
 /** The first line of a text with anything on it, trimmed; empty for a null or blank text. */

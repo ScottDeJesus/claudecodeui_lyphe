@@ -5,6 +5,7 @@ import fs, { promises as fsPromises } from 'fs';
 import path from 'path';
 import os from 'os';
 import http from 'http';
+import { setTimeout as delay } from 'node:timers/promises';
 
 import express, { type NextFunction, type Request, type Response } from 'express';
 import cors from 'cors';
@@ -17,8 +18,10 @@ import {
     providerRuntimeService,
     readoptKeepaliveSessions,
     releaseKeepaliveOwnership,
+    whenNodeSessionsReadopted,
 } from '@/modules/providers/index.js';
 import { createWebSocketServer, startRunStallWatchdog } from '@/modules/websocket/index.js';
+import { stopChatCompaction, withChatCompaction } from '@/modules/compaction/index.js';
 
 import { getConnectableHost } from '../shared/networkHosts.js';
 
@@ -64,6 +67,7 @@ import { createKanbanModule } from './modules/kanban/index.js';
 import { createKanbanMetisModule, kanbanMetisSecretGuard } from './modules/kanban-metis/index.js';
 import { createMemoryIntakeModule, listMemoryCandidates } from './modules/memory-intake/index.js';
 import { createNotesModule } from './modules/notes/index.js';
+import { createCerberusModule } from './modules/cerberus/index.js';
 import { createDispatchSoulsModule } from './modules/dispatch-souls/index.js';
 import { createHealModule } from './modules/heal/index.js';
 import { createAgentLaunchModule } from './modules/agent-launch/index.js';
@@ -105,6 +109,9 @@ console.log('SERVER_PORT from env:', process.env.SERVER_PORT);
 
 const app = express();
 const server = http.createServer(app);
+// The one-shot runners below stay on the bare service: they have no chat to compact. Everything that
+// carries chat traffic gets this wrapper, which also registers custom compaction's hooks with the service.
+const chatRuntime = withChatCompaction(providerRuntimeService);
 const queryClaude = providerRuntimeService.getRunner('claude');
 const queryCursor = providerRuntimeService.getRunner('cursor');
 const queryCodex = providerRuntimeService.getRunner('codex');
@@ -127,7 +134,8 @@ createWebSocketServer(server, {
         authenticateWebSocket,
     },
     chat: {
-        runtime: providerRuntimeService,
+        runtime: chatRuntime,
+        whenHostsReadopted: whenHostsHeld,
     },
     shell: {
         resolveProviderSessionId: (sessionId, provider) => {
@@ -269,6 +277,14 @@ app.use('/api/memory', authenticateToken, createMemoryIntakeModule());
 // the frame names neither a note nor an account — a client that hears it reads its own list again.
 app.use('/api/notes', authenticateToken, createNotesModule());
 
+// The fleet's health (protected), mounted at this ONE address. Its gateway — where each node's
+// warden dials in — is a listener of its own on the tailnet, never a path on this server, so
+// nothing a signed-in user holds opens it and `HOST` stays loopback. Built once here because its
+// store and gateway start after `listen`, its self-checks are a sole-server duty, and shutdown has
+// to stop all three.
+const cerberus = createCerberusModule({ supervised });
+app.use('/api/cerberus', authenticateToken, cerberus.router);
+
 // The SAME board router behind a second door, for the `kanban-pm` MCP child and nothing else —
 // no verb is duplicated here, and there is deliberately NO `authenticateToken`: a Metis is not a
 // user and holds no user token. `kanbanMetisSecretGuard` is that door's own credential check, on a
@@ -329,7 +345,7 @@ const universe = createUniverseModule();
 app.use('/api/universe', authenticateToken, universe.router);
 
 app.use('/api/notifications', authenticateToken, notificationRoutes);
-app.use('/api/ntfy/act', createNtfyActionRoutes({ runtime: providerRuntimeService })); // Public: ntfy buttons authenticate by signed token, not JWT.
+app.use('/api/ntfy/act', createNtfyActionRoutes({ runtime: chatRuntime })); // Public: ntfy buttons authenticate by signed token, not JWT.
 
 // User API Routes (protected)
 app.use('/api/user', authenticateToken, userRoutes);
@@ -346,19 +362,25 @@ app.use('/api/browser-use', authenticateToken, browserUseRoutes);
 // Unified provider MCP routes (protected)
 // Settles once this process holds the keepalive hosts: before `listen` on a plain boot, at the takeover
 // on a handover boot (`soleServerDuties`).
-let runsReadopted = false;
 let markRunsReadopted: () => void = () => {};
 const whenRunsReadopted = new Promise<void>((resolve) => { markRunsReadopted = resolve; });
+// The hosts a co-located node's warden holds come back when that warden's link does — after `listen`,
+// which is when the gateway opens — so they are a second thing to wait for, resolved by the claim
+// holder's link-up re-adoption (or at once when there is none to do).
+let hostsReadopted = false;
+void Promise.all([whenRunsReadopted, whenNodeSessionsReadopted()]).then(() => { hostsReadopted = true; });
 // The supervisor SIGKILLs a predecessor 10 s after its SIGTERM, which follows this process's READY at
 // once, and the re-adoption after the takeover measured under 0.4 s: past this, no takeover is coming.
+// A warden that has not linked by then is not coming soon either.
 const RUNS_READOPTED_WAIT_MS = 11_000;
 // A handover boot serves before its takeover — for as long as the predecessor drains (http-drain.ts) —
 // and until then its run registry holds none of the keepalive runs (D-11): this read would tell every
 // tab its live runs are idle, and the tab would drop their spinners and waiting marks. It waits for
 // the re-adoption instead, and past the bound answers as it always did, so a takeover that never
-// comes cannot hang the poll.
+// comes cannot hang the poll. The bound ends the hold for every poll after it too: a warden that is
+// down would otherwise cost each poll the whole bound, for as long as it stays down.
 app.use('/api/providers/sessions/running', (_req, _res, next) => {
-    if (runsReadopted) return next();
+    if (hostsReadopted) return next();
     // Once, never twice: a re-adoption landing after the bound must not run the route a second time.
     let released = false;
     const release = () => {
@@ -367,9 +389,26 @@ app.use('/api/providers/sessions/running', (_req, _res, next) => {
         clearTimeout(bound);
         next();
     };
-    const bound = setTimeout(release, RUNS_READOPTED_WAIT_MS);
-    void whenRunsReadopted.then(release);
+    const bound = setTimeout(() => {
+        hostsReadopted = true;
+        release();
+    }, RUNS_READOPTED_WAIT_MS);
+    void Promise.all([whenRunsReadopted, whenNodeSessionsReadopted()]).then(release);
 });
+// What the `/ws` snapshot of which chats have a live session host waits behind: the same two events and the
+// same bound as the hold above, so a handover boot never tells a page that no chat has a host while its
+// predecessor drains — every live row would blink gray until the takeover's re-adoption. A function
+// declaration so the gateway built near the top can name it; it reads the consts above only when called.
+function whenHostsHeld(): Promise<void> {
+    if (hostsReadopted) return Promise.resolve();
+    return new Promise<void>((resolve) => {
+        const bound = setTimeout(resolve, RUNS_READOPTED_WAIT_MS);
+        void Promise.all([whenRunsReadopted, whenNodeSessionsReadopted()]).then(() => {
+            clearTimeout(bound);
+            resolve();
+        });
+    });
+}
 app.use('/api/providers', authenticateToken, providerRoutes);
 app.use('/api/scheduled-messages', authenticateToken, scheduledMessagesRoutes);
 
@@ -566,15 +605,14 @@ async function soleServerDuties() {
     if (soleServerDutiesRan) return;
     soleServerDutiesRan = true;
     try { // D-11: a browser that subscribes before this ran reads a live keepalive session as idle
-        const keepalive = await readoptKeepaliveSessions({ runtime: providerRuntimeService, supervised });
+        const keepalive = await readoptKeepaliveSessions({ runtime: chatRuntime, supervised });
         // "swept" here is DEAD HOST FILES, not the version sweep: an idle host retired by the boot's
         // version test logs its own `retiring idle host …` line and is not counted in this one.
         console.log(`[keepalive] re-adopted ${keepalive.readopted} host(s), swept ${keepalive.swept} dead host file(s)`);
     } catch (error) { console.error('[keepalive] re-adopt failed (continuing):', getErrorMessage(error)); }
-    runsReadopted = true;
     markRunsReadopted();
     // Sends anything that came due while the server was not running, then keeps polling.
-    initializeScheduledMessageDispatcher(providerRuntimeService);
+    initializeScheduledMessageDispatcher(chatRuntime);
     // Start server-side plugin processes for enabled plugins
     startEnabledPluginServers().catch(err => {
         console.error('[Plugins] Error during startup:', err.message);
@@ -585,6 +623,8 @@ async function soleServerDuties() {
     // because on a handover this is the line the takeover runs, which is the moment the job's answer
     // becomes knowable.
     claudeUpdates.startReconciler();
+    // Center's own three checks and the store's daily prune: rows only the serving process may write.
+    cerberus.soleDuties();
 }
 
 // Stops the stall watchdog on shutdown. Assigned inside the `listen` callback that
@@ -618,6 +658,16 @@ async function startServer() {
         if (!handover) await soleServerDuties();
         else console.log('[keepalive] re-adoption deferred until the previous server exits (handover boot)');
         server.listen({ port: SERVER_PORT, host: HOST, reusePort: supervised }, async () => {
+            // The fleet's health: the store, the center key and the warden gateway, opened here
+            // because the gateway is a second listener and this boot has only now begun serving.
+            // It runs BEFORE READY, because the supervisor retires the predecessor on READY: the
+            // successor's gateway then binds beside the retiring one under `reusePort`, as center
+            // D3 and D12 promised, and the gateway's address is never unbound across a handover.
+            // Never rejects — a failure is logged and the API keeps serving. The race bounds the wait
+            // for the gateway's bind: past 3 s READY goes out and only the old gap returns. What
+            // `start()` does before the bind (store, key, seeds, registrations) is synchronous and
+            // nothing cuts it, so a store that blocks there holds READY for as long as it blocks.
+            await Promise.race([cerberus.start(), delay(3_000)]);
             signalReady();
             const appInstallPath = APP_ROOT;
             await writeLocalServerMarker().catch((error) => {
@@ -661,6 +711,10 @@ async function startServer() {
 
         // Clean up plugin processes on shutdown
         const shutdownRuntimeServices = async () => {
+            // The auto-run rule, the running diagnoses, the self-checks, the prune and the gateway's
+            // accepting stop before anything else: a tick, a fix or a new warden link on a process that
+            // is leaving would only meet its successor's.
+            cerberus.stop();
             // Stop accepting first and close idle sockets; websockets stay open until the exit (http-drain.ts).
             const drained = drainHttpServer();
             // Both start new work — a watcher-driven DB sync, a queued send — and the successor
@@ -669,6 +723,9 @@ async function startServer() {
                 console.error('[Sessions] Error closing session watchers during shutdown:', getErrorMessage(err));
             });
             closeScheduledMessageDispatcher();
+            // Custom compaction's idle deadlines and pending wakes start a summarizer verb and a seed append: a
+            // process that is leaving must not begin one, nor leave a verb it started behind.
+            stopChatCompaction();
             dispatcher.stop();
             roadmap.stop();
             claudeUpdates.stop();

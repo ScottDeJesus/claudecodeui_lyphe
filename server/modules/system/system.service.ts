@@ -27,12 +27,16 @@ type SystemUpdateDependencies = {
  */
 export function createSystemUpdateService(dependencies: SystemUpdateDependencies) {
   return {
-    /** Selects and executes the correct update workflow for this installation. */
+    /**
+     * Selects and executes the correct update workflow for this installation. A git install is
+     * updated on the branch it is ON: a machine may keep its own branch of this repo, and an update
+     * that checked out `main` would move it onto another machine's branch.
+     */
     async updateSystem() {
       const updateCommand = dependencies.isPlatform
         ? 'npm run update:platform'
         : dependencies.installMode === 'git'
-          ? 'git checkout main && git pull && npm install'
+          ? 'git pull && npm install'
           : 'npm install -g @cloudcli-ai/cloudcli@latest';
       const workingDirectory = dependencies.isPlatform || dependencies.installMode === 'git'
         ? dependencies.appRoot
