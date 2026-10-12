@@ -18,7 +18,8 @@
  * Every hook call is wrapped: a hook that throws (or rejects) is logged and the turn goes on, because
  * a compaction must never be able to break the reply it follows.
  *
- * consumer: claude-runtime.provider.js, chat-process.ts (the profile's reading of the constant)
+ * consumer: claude-runtime.provider.js, chat-process.ts (the profile's reading of the constant),
+ * claude-compaction-restore.ts (the report of a turn the server did not see end)
  */
 
 import { randomUUID } from 'node:crypto';
@@ -236,8 +237,8 @@ const PER_TURN_SEND_OPTIONS = [
   'keepalive'
 ] as const;
 
-/** The launch profile's fields a compaction's own send needs (chat-process.ts `LaunchProfile`). */
-type ProfileForSend = {
+/** The launch profile's fields a compaction's own send needs (chat-process.ts `LaunchProfile`). Consumer: claude-compaction-restore.ts. */
+export type ProfileForSend = {
   unknown: boolean;
   model: string;
   effort: string | null;
@@ -254,7 +255,7 @@ type ProfileForSend = {
  * are read from the launch profile the host recorded; a profile that was never recorded
  * (`unknown`) knows none of them, and the options stay bare.
  */
-function sendOptionsOfTurn(options: AnyRecord, profile: ProfileForSend | null): AnyRecord {
+export function sendOptionsOfTurn(options: AnyRecord, profile: ProfileForSend | null): AnyRecord {
   const kept: AnyRecord = { ...options };
   for (const key of PER_TURN_SEND_OPTIONS) delete kept[key];
   if (options.keepalive && profile && !profile.unknown) {
@@ -300,7 +301,7 @@ export function mainThreadBudgetOf(
  * `claude-opus-4-8[1m]`), or its `canonicalModel` is it; the largest window wins when several match.
  * Null when no entry matches or the model is unknown.
  */
-function contextWindowFor(modelUsage: unknown, model: string | null): number | null {
+export function contextWindowFor(modelUsage: unknown, model: string | null): number | null {
   if (!model || !modelUsage || typeof modelUsage !== 'object') return null;
   let largest: number | null = null;
   for (const [key, entry] of Object.entries(modelUsage as Record<string, unknown>)) {
@@ -457,8 +458,8 @@ export function liveActivityOf(entry: { process?: { activity?: ChatProcessActivi
   return entry?.process?.activity ?? notLiveActivity();
 }
 
-/** Runs one hook call, logging a throw (or a rejected promise) instead of letting it reach the turn. */
-function callHook(name: string, call: () => unknown): void {
+/** Runs one hook call, logging a throw (or a rejected promise) instead of letting it reach the turn. Consumer: claude-compaction-restore.ts. */
+export function callHook(name: string, call: () => unknown): void {
   try {
     const returned = call();
     if (returned && typeof (returned as Promise<unknown>).catch === 'function') {

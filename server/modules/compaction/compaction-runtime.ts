@@ -17,6 +17,7 @@ import { flightOf, lastTurnContext, stopFlightsBeforeSeed } from './compaction-r
 export type CompactionInnerRuntime = ProviderRuntimeGateway & {
   useChatCompaction(hooks: ChatCompactionHooks): void;
   activity(provider: LLMProvider, appSessionId: string): ChatProcessActivity;
+  markIdleCheck(provider: LLMProvider, appSessionId: string, tries: number): boolean;
 };
 
 /** `/compact` alone, or `/compact` and then the operator's words (the summarizer's instructions). */
@@ -151,6 +152,11 @@ export function withChatCompaction<Inner extends CompactionInnerRuntime>(inner: 
 
   const triggers = createAutoTrigger({ inner, runtime: () => decorated });
   activeTriggers = triggers;
-  inner.useChatCompaction({ takesOver, turnEnded: triggers.turnEnded, activityChanged: triggers.activityChanged });
+  inner.useChatCompaction({
+    takesOver,
+    turnEnded: triggers.turnEnded,
+    turnRestored: triggers.turnRestored,
+    activityChanged: triggers.activityChanged,
+  });
   return decorated;
 }

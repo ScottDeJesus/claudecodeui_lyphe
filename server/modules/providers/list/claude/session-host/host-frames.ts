@@ -67,6 +67,8 @@ export function hostTransport(send: (frame: CerberusHostFrame) => void): HostTra
         turnCompleteSent: bits.turnCompleteSent,
         heldForBackgroundWork: bits.heldForBackgroundWork,
         ...(Array.isArray(bits.deferredTools) ? { deferredTools: bits.deferredTools } : {}),
+        // Absent when the caller does not speak of it; a host from before the field ignores the key.
+        ...(bits.idleCheck !== undefined ? { idleCheck: bits.idleCheck } : {}),
         // A host from before these fields ignores them and retires nothing anyway (no result is
         // outstanding when a message joins), so the frame stays readable by every host.
         ...(bits.ack === false ? { ack: false } : {})

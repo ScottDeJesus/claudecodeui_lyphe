@@ -52,7 +52,9 @@ import type { LiveHost } from './hosts.js';
  * `claude-runtime.provider.js`): a turn that started and has not reported (`turnCompleteSent`, set
  * `false` when a turn is accepted and back to `true` at its result) and background work the result
  * did not wait for (`heldForBackgroundWork`, or the `deferredTools` list it is derived from — kept
- * as well because a meta written before that list existed holds only the boolean).
+ * as well because a meta written before that list existed holds only the boolean), and the CLI's own
+ * background tasks (`liveTasks`, rebuilt from the host's journal: a subagent or a monitor the call
+ * ledger never names holds a host exactly as a backgrounded shell job does).
  *
  * Both matter here because `retireHost` winds a host down for good: it interrupts FIRST and then ends
  * the CLI's stdin — the EOF, not the interrupt, is what takes the background work still running in
@@ -67,7 +69,9 @@ import type { LiveHost } from './hosts.js';
 export function busyReason(host: LiveHost): string | null {
   if (chatRunRegistry.isProcessing(host.appSessionId)) return 'a turn is running in this process';
   if (!host.turnCompleteSent) return 'a turn was in flight';
-  if (host.heldForBackgroundWork || host.deferredTools.length > 0) return 'background work is outstanding';
+  if (host.heldForBackgroundWork || host.deferredTools.length > 0 || (host.liveTasks?.length ?? 0) > 0) {
+    return 'background work is outstanding';
+  }
   return null;
 }
 

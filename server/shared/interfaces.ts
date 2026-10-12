@@ -43,6 +43,13 @@ export interface IProviderRuntime {
    * `providerRuntimeService.activity`, which the compaction guard waits on.
    */
   activity?(appSessionId: string): ChatProcessActivity;
+  /**
+   * OPTIONAL — only a runtime whose chat process has a durable host. Records, in that host's own state, that the
+   * compaction's idle check has started a compaction for the chat's last turn end (`tries` starts of it now); false
+   * when the chat has no live process to tell. Read by `providerRuntimeService.markIdleCheck`, which the compaction
+   * module's idle trigger and procedure call.
+   */
+  markIdleCheck?(appSessionId: string, tries: number): boolean;
 }
 
 /**

@@ -24,6 +24,8 @@ import type { Readable } from 'node:stream';
 
 import type { SpawnOptions, SpawnedProcess } from '@anthropic-ai/claude-agent-sdk';
 
+import type { IdleCheck } from '@/shared/types.js';
+
 // A consumer that stopped reading would never let stdout finish; the turn still has to end.
 const EXIT_DRAIN_TIMEOUT_MS = 2_000;
 
@@ -48,6 +50,11 @@ export type TurnBits = {
   heldForBackgroundWork: boolean;
   /** The tool-call ids whose work is still outstanding — what `heldForBackgroundWork` counts. */
   deferredTools?: string[];
+  /**
+   * The idle compaction check's record for the last turn end: a value is written to the meta, `null` clears it
+   * (a new turn end), and absent leaves the meta's as it is.
+   */
+  idleCheck?: IdleCheck | null;
   ack?: false;
 };
 

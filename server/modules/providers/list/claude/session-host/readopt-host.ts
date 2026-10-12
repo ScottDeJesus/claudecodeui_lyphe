@@ -85,6 +85,9 @@ export function readoptHost(host: ReadoptableHost, deps: ReadoptDeps, node: stri
           profile: host.profile,
           cliVersion: host.cliVersion,
           deferredTools: host.deferredTools,
+          releasedCalls: host.releasedCalls,
+          liveTasks: host.liveTasks,
+          idleCheck: host.idleCheck,
           node
         }
       },

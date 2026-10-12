@@ -404,6 +404,8 @@ export type CerberusNodeHost = {
   turnCompleteSent: boolean;
   heldForBackgroundWork: boolean;
   deferredTools: string[];
+  /** The ids of the CLI's own background tasks the host's journal shows running; `[]` from a warden that predates the field. */
+  liveTasks: string[];
   profile: Record<string, unknown> | null;
   cliVersion: string | null;
   cliPid: number | null;

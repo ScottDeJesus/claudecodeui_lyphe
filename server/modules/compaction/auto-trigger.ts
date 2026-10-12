@@ -12,6 +12,7 @@ import {
   publishActivity,
   rememberTurnContext,
 } from './compaction-registry.js';
+import { createRestoreSpacer, planIdleRestore } from './idle-restore.js';
 
 /**
  * THE TRIGGERS: the runtime's `turnEnded` and `activityChanged` hooks, and the idle deadline. The
@@ -28,8 +29,13 @@ import {
  *   later (the CLI's own moment: 0.9 of the one-hour prompt cache), and is replaced by the next turn's end.
  *   A deadline that finds the process busy or a run in progress is kept and decided again, whole, by the
  *   `activityChanged` that says the process went quiet; the next turn's end drops it with the deadline.
+ *   A server restart does not drop it: the boot's re-adoption reports each adopted chat's last turn end
+ *   (`turnRestored`), and the deadline is armed again for the remainder of the wait — or, when the wait has
+ *   run out, for a short settle after re-adoption, queued behind the other overdue chats (`idle-restore.ts`).
+ *   One turn end's idle check starts at most `IDLE_CHECK_MAX_TRIES` compactions, counted in the chat's host
+ *   meta before each start, so a restart never repeats it without bound.
  *
- * Consumer: compaction-runtime.ts, which registers `turnEnded` and `activityChanged` with the runtime.
+ * Consumer: compaction-runtime.ts, which registers `turnEnded`, `turnRestored` and `activityChanged` with the runtime.
  */
 
 const AUTO_COMPACT_FRACTION = 0.5;
@@ -74,26 +80,35 @@ const nodeOf = (report: ChatTurnReport): string | null =>
 
 /** The seam to the rest of the module; `compaction-runtime.ts` supplies both. */
 type TriggerDependencies = {
-  inner: { activity(provider: LLMProvider, appSessionId: string): ChatProcessActivity };
+  inner: {
+    activity(provider: LLMProvider, appSessionId: string): ChatProcessActivity;
+    /** Writes the idle check's start into the chat's host meta, so a restart knows how many starts this turn end has had. */
+    markIdleCheck(provider: LLMProvider, appSessionId: string, tries: number): boolean;
+  };
   /** The decorator itself: the detached run goes THROUGH it, so its `/compact` interception sees the run. */
   runtime: () => ProviderRuntimeGateway;
 };
 
 export function createAutoTrigger(
   deps: TriggerDependencies,
-): Pick<ChatCompactionHooks, 'turnEnded' | 'activityChanged'> & { stop(): void } {
+): Pick<ChatCompactionHooks, 'turnEnded' | 'turnRestored' | 'activityChanged'> & { stop(): void } {
   // Set once, at shutdown: from then on nothing here starts a run, and no deadline is armed.
   let stopped = false;
   const pending = new Map<string, ChatTurnReport>();
   const idleDeadlines = new Map<string, { timer: NodeJS.Timeout; report: ChatTurnReport }>();
   // A deadline that was left alone for a busy process or a run: the report it fired for, until the process goes quiet.
   const idleRetries = new Map<string, ChatTurnReport>();
+  // How many compactions the idle check has started for the chat's current turn end, kept beside the host's meta copy (a
+  // restart reads that one back). A turn end clears it, with the deadline: its idle check starts again from none.
+  const idleStarts = new Map<string, number>();
+  const restoreSpacer = createRestoreSpacer();
 
   const clearIdle = (sessionId: string): void => {
     const held = idleDeadlines.get(sessionId);
     if (held) clearTimeout(held.timer);
     idleDeadlines.delete(sessionId);
     idleRetries.delete(sessionId);
+    idleStarts.delete(sessionId);
   };
 
   /**
@@ -235,17 +250,42 @@ export function createAutoTrigger(
     decideIdle(report);
   };
 
-  /** (Re)arms the chat's one idle deadline. A server restart drops it; the chat's next turn end arms it again. */
-  function armIdleDeadline(report: ChatTurnReport): void {
+  /** (Re)arms the chat's one idle deadline: a whole wait after a turn end, the remainder of it after a restart. */
+  function armIdleDeadline(report: ChatTurnReport, delayMs: number = idleAfterMs()): void {
     const sessionId = report.appSessionId;
     if (stopped) return;
     const timer = setTimeout(() => {
       idleDeadlines.delete(sessionId);
       decideIdle(report);
-    }, idleAfterMs());
+    }, delayMs);
     timer.unref();
     idleDeadlines.set(sessionId, { timer, report });
   }
+
+  /**
+   * The deadline a restart dropped, armed again from the chat's last turn end as its host's journal records it. The
+   * fire goes through `fireIdleDeadline`'s own gates, so a restored deadline never starts a compaction in a chat
+   * that is mid-turn or busy: it is left for the process's next quiet like any other.
+   */
+  const turnRestored = (report: ChatTurnReport, endedAt: number, triesSoFar: number): void => {
+    const sessionId = report.appSessionId;
+    // A chat on a node runs its own copy there. A turn that ended since this boot already armed a newer deadline.
+    if (stopped || nodeOf(report) !== null || idleDeadlines.has(sessionId)) return;
+    if (takeoverSnapshot() === false) return;
+    const plan = planIdleRestore(report, endedAt, {
+      now: Date.now(),
+      idleAfterMs: idleAfterMs(),
+      minTokens: idleMinTokens(),
+      idleTries: triesSoFar,
+      spacer: restoreSpacer,
+    });
+    // A chat compacted since that turn no longer stands at the size the turn left, so its context is not kept as the chat's.
+    if (plan.current) rememberTurnContext(report);
+    logDecision(sessionId, 'idle', report, report.activity, plan.say);
+    if (!plan.arm) return;
+    idleStarts.set(sessionId, triesSoFar);
+    armIdleDeadline(report, plan.delayMs);
+  };
 
   async function fireIdleDeadline(report: ChatTurnReport): Promise<void> {
     const sessionId = report.appSessionId;
@@ -279,6 +319,10 @@ export function createAutoTrigger(
       return;
     }
     logDecision(sessionId, 'idle', report, activity, 'idle, starting the compaction');
+    // Recorded BEFORE the start, in the host's meta: a handover that cuts the compaction short must still find the try counted.
+    const starts = (idleStarts.get(sessionId) ?? 0) + 1;
+    idleStarts.set(sessionId, starts);
+    deps.inner.markIdleCheck('claude', sessionId, starts);
     startRun(report, 'idle');
   }
 
@@ -288,8 +332,9 @@ export function createAutoTrigger(
     for (const { timer } of idleDeadlines.values()) clearTimeout(timer);
     idleDeadlines.clear();
     idleRetries.clear();
+    idleStarts.clear();
     pending.clear();
   };
 
-  return { turnEnded, activityChanged, stop };
+  return { turnEnded, turnRestored, activityChanged, stop };
 }

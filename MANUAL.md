@@ -2560,7 +2560,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/compaction/compac
 | trigger | fires when | default | env seam (read at the call) |
 |---|---|---|---|
 | turn end | `contextTokens ≥ fraction × contextWindow`, and for a chat compacted before, `contextTokens − post_tokens ≥ growth × contextWindow` (growth guard) | fraction 0.5 (`AUTO_COMPACT_FRACTION`); growth 0.2 (`MIN_GROWTH_FRACTION`) | `CUSTOM_COMPACTION_AUTO_FRACTION`, `CUSTOM_COMPACTION_MIN_GROWTH` |
-| idle | one unref'd timeout per chat, re-armed at every turn end, fires once, and is decided again at each quiet of the process while it finds the process busy or a run in progress (the compaction starts at most once: "The idle deadline"); `contextTokens ≥ min` | 3,240,000 ms (54 min); min 200,000 | `CUSTOM_COMPACTION_IDLE_AFTER_MS`, `CUSTOM_COMPACTION_IDLE_MIN_TOKENS` |
+| idle | one unref'd timeout per chat, re-armed at every turn end, armed again after a restart from the chat's last turn end ("A restart"), fires once, and is decided again at each quiet of the process while it finds the process busy or a run in progress (the compaction starts at most once: "The idle deadline"); `contextTokens ≥ min` | 3,240,000 ms (54 min); min 200,000 | `CUSTOM_COMPACTION_IDLE_AFTER_MS`, `CUSTOM_COMPACTION_IDLE_MIN_TOKENS` |
 
 An override that is not a positive finite number falls back to the default; `CUSTOM_COMPACTION_MIN_GROWTH` takes any finite number, a negative one included. `IDLE_AFTER_MS` above 2,147,483,647 also falls back: Node clamps a larger `setTimeout` delay to 1 ms, which would fire at once.
 
@@ -2582,23 +2582,71 @@ Not due, tested in this order: turn aborted; context or window unknown; under th
 - why: the operator block only grows; a seed at or past half the window would leave the first turn after every compaction due again, a loop of compactions each minutes long. A 60K seed on a 1M window never meets the bound (due again at 500K). The idle trigger has no guard.
 - `<n>` can be negative: the turn end's count and the compaction's post-append count are two instruments that disagree by ~1.7-2.1K (a just-compacted chat that answers once reads about −1.7K: the decision lines `grew -1623` and `grew -1758`). A probe that needs a turn end to compact right after a compaction boots with `CUSTOM_COMPACTION_MIN_GROWTH=-1`.
 
-## A failure is not a refusal
-Only verb exit 2 and not-ready put a chat under an automatic refusal (MAN-8065). Any other end of an automatic compaction leaves the chat due: verb exit 1 (including the watch's kill of a wrong-model or twice-answered reply), an exit-0 answer that does not read, a seed that did not take, a thrown step. The next turn end that finds the chat past the fraction starts the verb again, whole, and so does the next idle deadline: one start per turn end, no cap, no backoff.
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/compaction/auto-trigger.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/compaction/compaction-log.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/compaction/idle-restore.ts
+
+## MAN-8315 — modules/compaction triggers — turn end and its growth guard, idle, the pending — A failure is not a refusal
+section: modules/compaction triggers — turn end and its growth guard, idle, the pending wake, startRun, shutdown and the decision line/001 A failure is not a refusal
+
+Only verb exit 2 and not-ready put a chat under an automatic refusal (MAN-8065). Any other end of an automatic compaction leaves the chat due: verb exit 1 (including the watch's kill of a wrong-model or twice-answered reply), an exit-0 answer that does not read, a seed that did not take, a thrown step. The next turn end that finds the chat past the fraction starts the verb again, whole, and so does the next idle deadline: one start per turn end by the turn-end trigger, no cap, no backoff. The IDLE check is bounded further, across restarts: a failed or refused start is its one attempt for that turn end, and a start that a handover cut short gets one more (MAN-8316, "Bounded across a restart"); a restart never gives a failed idle check another start.
 - Each start spends a full summarizer call before it can fail again: input up to `CALL_TOKENS` 600,000 estimate tokens (MAN-8049).
 - The `compaction.failed` push is deduped per chat (`claude:compaction:failed:<sessionId>`); the spend is not.
-- What ends them: a run that succeeds, a refusal (exit 2, not-ready), or the switch off. A failed manual Compact does not.
+- What ends them: a run that succeeds, a refusal (exit 2, not-ready), or the switch off; for the idle check also a failure, and a second start of one turn end. A failed manual Compact does not.
 
 ## The pending wake
 `activityChanged(sessionId, activity)` first hands the change to the guard's listeners (`publishActivity`), then, with a pending report and `activity.busy` false: take the report; snapshot `false` → stop; a run in progress, a flight or an automatic refusal → logged `pending compaction dropped: <why>`; else `startRun(report, 'auto')`.
 
 ## The idle deadline
-Fires `fireIdleDeadline`: chat row gone → `forgetSession` and log; `contextTokens` null or under `min` → log; `takesOver` false → log; then, synchronously up to the start: a run in progress, process busy, a flight, a refusal → `left alone: <why>`; else `idle, starting the compaction` and `startRun(report, 'idle')`. A server restart drops every deadline; the chat's next turn end arms it again.
+Fires `fireIdleDeadline`: chat row gone → `forgetSession` and log; `contextTokens` null or under `min` → log; `takesOver` false → log; then, synchronously up to the start: a run in progress, process busy, a flight, a refusal → `left alone: <why>`; else `idle, starting the compaction`, the start is counted in the chat's host meta (`markIdleCheck`, MAN-8316 "Bounded across a restart") and `startRun(report, 'idle')` runs. A server restart does not cost a chat its deadline ("A restart").
 
 A run in progress or a busy process ends on its own, so those two `left alone` answers keep the report in `idleRetries` (one per chat). The `activityChanged` that says the process went quiet takes it out and runs `fireIdleDeadline` again, whole: every condition above is read afresh (a second `left alone` keeps it again, the next quiet tries once more). A flight or an automatic refusal is not kept: a flight's own end is a turn end, which re-arms the deadline. A turn end (`clearIdle`) and `stop()` drop the kept report with the deadline. Nothing here polls: the wake is the activity edge. The decision lines are the same sentences; a retried chat reads `left alone: the process is busy` and, later, `idle, starting the compaction` under `trigger=idle`.
 
 What goes quiet without a turn end: a task whose notification wakes no follow-up turn (the follow-up latch's grace expires), and the process ending (`live: false`). A task that wakes a follow-up turn ends in a turn end, which supersedes the kept report with a fresh deadline.
 
-## `startRun`
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/compaction/auto-trigger.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/compaction/compaction-log.ts
+
+## MAN-8316 — modules/compaction triggers — turn end and its growth guard, idle, the pending — A restart
+section: modules/compaction triggers — turn end and its growth guard, idle, the pending wake, startRun, shutdown and the decision line/002 A restart
+
+The deadline is a timer in the server's memory, so every restart and handover drops it, and the dev server hands over on every save under `server/`. It is restored from what is on disk, with no store of deadlines. A chat with a deadline still to come always has a live host (the process closes after 120 minutes without a message, the idle wait is 54), and the boot's re-adoption walks exactly those hosts. For a LOCAL host whose last turn was complete, the Claude runtime reads the turn's end off the host's journal and calls `turnRestored(report, endedAt, idleTries)` (MAN-8055; `idleTries` is the host meta's count of idle starts for that turn end, "Bounded across a restart"); a host mid-turn gets its deadline from its own turn end, and a node's chat is left alone (the node runs its own copy, and `takesOver` refuses it).
+
+`turnRestored` (`auto-trigger.ts`) does nothing when stopped, for a node's report, or when the chat already holds a deadline (a turn that ended since this boot armed a newer one). Otherwise it does nothing with the switch off (`takeoverSnapshot()` false), and asks `planIdleRestore` (`idle-restore.ts`), keeps the report's context for a manual compaction's `pre_tokens` (`rememberTurnContext`) unless the plan says the chat was compacted since, logs one decision line (`trigger=idle`) and arms or not:
+
+| the chat | line, `decision=` |
+|---|---|
+| the last turn made no request (a seed append runs none), so no context | `no deadline restored: the last turn made no request, so it measured no context` |
+| compacted at or after the turn's end (`latestCompaction(...).compactedAtMs + 1000 > endedAt`: the record's time is whole seconds, so it is read as the end of its second) | `no deadline restored: the chat was compacted after its last turn (its context is now <post_tokens>)`; the stale context is not kept as the chat's (`rememberTurnContext`) |
+| the idle check has already started its limit (`IDLE_CHECK_MAX_TRIES`, 2) of compactions for this turn end | `no deadline restored: the idle check has already started <n> of its 2 compactions for this turn end` |
+| context under the idle floor | `no deadline restored: the context is under <min> tokens` |
+| `endedAt + idle wait` still ahead by 15 s or more | `deadline restored after a restart: the last turn ended <ago> ago, the check is due in <left>`: armed for the remainder |
+| passed, or less than 15 s ahead | `deadline restored after a restart, already due: the last turn ended <ago> ago, the check runs in <delay>`: armed for the settle (15 s, `RESTORE_SETTLE_MS`) plus 30 s (`RESTORE_SPACING_MS`) for each overdue chat restored before it in this boot |
+
+The remainder is never longer than a whole wait. Overdue chats are queued, not started together (`createRestoreSpacer`): the first starts at the settle, the next 30 s after it, and so on, because each start is a summarizer call of up to 600,000 tokens and a process replacement, all in the first seconds after a dev-server save. The spacing is of the starts, not a limit on how many compactions run at once: a long one still overlaps the next. A restore with time left on its wait is not queued. The settle exists because re-adoption is asynchronous: the adopted process registers its handle and replays what the previous server never acknowledged in its first seconds, and a turn that ends in that replay arms the chat's own deadline and clears this one (`clearIdle`).
+
+The report of a node's host is never made: the runtime reports only LOCAL hosts (`reportRestoredTurn` returns for a `reattach.node`), because a node's journal lives on the node.
+
+A restored deadline is the same timer as any other: its fire is `fireIdleDeadline`, so every gate above applies (chat row, the floor, `takesOver`, a run in progress, a busy process, a flight, a refusal) and a busy process keeps it for the next quiet (`idleRetries`). A restore never starts a compaction itself, and never in a chat that is mid-turn or busy. A chat that was due and busy when the server restarted is picked up the same way; there is no second mechanism.
+
+Why a compacted chat is not restored: a compaction seeds a NEW process, so its host's journal begins after the swap. Its last `result` is the seed append's, which made no request and measured no context; the chat reads as it did before a restart, and arms nothing until its next turn, exactly as a live seed append does. The `compactedAtMs` test is the second line, for a chat whose old host outlived its retirement (the journal then shows the size before the compaction). A second, third and fourth restart therefore do nothing more to a chat a restore compacted. `latestCompaction` carries `compactedAtMs` (the record's `created_at`, to the second) for this test.
+
+## Bounded across a restart
+The idle check gets at most `IDLE_CHECK_MAX_TRIES` (2) compaction starts per turn end, counted in the chat's host meta so a restart cannot repeat it without bound (it was bounded to one per turn end before the restore, by the deadline dying with the server).
+- The record is `idleCheck: { at, tries }` in the host's meta (`IdleCheck`, `shared/types.ts`), written through the host's own `note` like the background-call release: `fireIdleDeadline` calls `markIdleCheck` right before `startRun(report, 'idle')` with the start's number (1, or the restored count + 1), and the Claude runtime's process handle sends the note (`ack: false`, no cursor moves). A chat with no live process answers false and nothing is written; only the restart loses its memory then.
+- A failed or refused idle start is the limit at once: `compact()` writes `tries = 2` when an idle run ends `failed` (no transcript, the summarizer's exit 1/2/3 or an unreadable answer, not-ready, a seed that did not take, a thrown step) and was not stopped. The next boot reads it and logs `no deadline restored: the idle check has already started 2 of its 2 compactions for this turn end`.
+- A start that a handover cut short (the run was stopped, or the server died) is not a failure: its count stays at what the start wrote (1), the next boot restores the deadline and the restored fire is the second and last start (`tries` 2). A second cut short ends it. So one turn end costs at most two summarizer calls however often the dev server hands over.
+- A new turn end clears it: the live loop sets the process's record to null at every `result` and its note writes the null; the restore also reads a record only when `at` is not before the host's last `result` (a turn that ended while no server ran leaves a stale record, which counts for nothing). The in-memory count (`idleStarts`) is dropped with the deadline at `turnEnded`.
+- A left-alone answer (busy, a run in progress), a floor or a takeover refusal start nothing and count nothing.
+- A successful compaction replaces the process and its host, so the record goes with the old host.
+
+## Busy after a restart
+The process's activity reads busy for a background task (`backgroundTasks`, the CLI's own level signal). That set lived only in the process, so a re-adopted chat read idle for work that was still running (a backgrounded subagent or monitor the call ledger never names), and the restored deadline would have compacted it and ended the CLI under the work. The set is rebuilt at re-adoption from the host's journal (`host-live-tasks.js`, `LiveHost.liveTasks`, MAN-683): a `task_started` with no `task_notification` after it, less what the newest `background_tasks_changed` dropped, by the reducer the live loop uses. The process starts from those ids, so the restored deadline reads `left alone: the process is busy` and the retry waits for the task's own end. The version sweep (`busyReason`) and the process's idle closer (`isBusy`) read the same, so a host running a task is no longer retired by either.
+
+A restart during a compaction stops its summarizer (`stopChatCompaction`) and its host is told of the start before that, so the next boot restores the chat's deadline for the one retry above. The dev server hands over on every save under `server/`, so saving code while an overdue chat compacts spends its retry, and no more.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/compaction/auto-trigger.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/compaction/compaction-log.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/compaction/idle-restore.ts
+
+## MAN-8317 — modules/compaction triggers — turn end and its growth guard, idle, the pending — `startRun`
+section: modules/compaction triggers — turn end and its growth guard, idle, the pending wake, startRun, shutdown and the decision line/003 `startRun`
+
 `runDetachedChatTurn({ sessionId, userId, content: '/compact', options: {...report.sendOptions, compactionTrigger}, beforeRun })` with the DECORATOR as runtime, so its `/compact` test sees the run.
 - `beforeRun` sets `run.completionAlreadyRecorded = true`: the run does not stamp `last_completed_at`, so no unread dot lights on a chat the operator read. Listeners still hear the run end.
 - That skips the registry's sidebar broadcast too, so when the outcome is `started` the trigger calls `broadcastSessionUpserted(sessionId)`: an open tab refetches and sees the marker's "after" figure.
@@ -2643,7 +2691,8 @@ Who writes the summary: `~/.claude/scripts/summarize`, on the launch table's `[s
 | file | owns |
 |---|---|
 | `compaction-runtime.ts` | the decorator: `run` removes the options this module owns from every Claude run, re-seeds a start-over in a compacted chat, and intercepts a taken-over `/compact`; `abort` routes to the flight; `stopChatCompaction` |
-| `auto-trigger.ts` | the `turnEnded` / `activityChanged` hooks, idle deadlines, `startRun` |
+| `auto-trigger.ts` | the `turnEnded` / `turnRestored` / `activityChanged` hooks, idle deadlines, `startRun` |
+| `idle-restore.ts` | `planIdleRestore`: whether a re-adopted chat is owed its idle deadline after a restart, when it falls, and whether its turn end has used its `IDLE_CHECK_MAX_TRIES`; `createRestoreSpacer`: the queue of a boot's overdue chats |
 | `compaction-procedure.ts` | `compact()`, one run |
 | `compaction-mode.ts` | switch + summarizer status → `compactionMode`, `takesOver`, `takeoverSnapshot`, `switchFlipCount`, `noteSummarizerStatus`, `noteVerbNotReady` |
 | `compaction-registry.ts` | flights, activity listeners, automatic refusals, last turn contexts, `forgetSession` |
@@ -2797,3 +2846,42 @@ Hint rule, per group of one name:
 - 2026-10-09: after 58 checks per label, all pass, no console or page errors; before 38 fail. Hint ink contrast 5.06 or better; the chosen option row steps up one ink (`.vv-select__option[aria-selected='true'] .vv-select__hint`).
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/projects/services/projects-with-sessions-fetch.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/hidden-project-paths.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/hooks/useProjectsState.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/projectNameHints.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/project-name-hints.mjs
+
+## MAN-8320 — Probe — chat-idle-restore: a restart keeps a chat's idle compaction deadline (run, legs, setup)
+
+Proves a server restart keeps a chat's idle compaction deadline (MAN-8316, "A restart"), on a scratch stack restarted for real, with Haiku chats. `.verify/` is gitignored: both files exist on disk and are absent from `git status`.
+
+## Run
+| when | do |
+|---|---|
+| prove the restore | `bash .verify/chat-idle-restore.sh after` — exit 0 when both runs hold |
+| see the old code without it | `bash .verify/chat-idle-restore.sh before` — the code at HEAD from a throwaway `git worktree` under `/tmp`; asserts the opposite (no `trigger=idle` line after the restart) |
+| `before` after the change is committed | `BEFORE_REF=<commit before the change> bash .verify/chat-idle-restore.sh before` — why: HEAD then carries the restore and the leg fails its own assertion |
+| drive one chat by hand | `node .verify/chat-idle-restore.mjs --api <probe api url> --token <jwt> --chat-file <path>` — two short Haiku turns in `lib/probe-project.mjs`'s scratch project; the chat id goes to `--chat-file` at once; prints `TURN_ENDED <epoch seconds>` |
+
+Exit 1 prints `FAILED: <why>`; exit 2 is a bad leg name.
+
+## Setup the script owns
+- Probe server on `PROBE_PORT` 7897 with its own sessions dir; a held port exits 1 with nothing started.
+- Env on every boot: `CUSTOM_COMPACTION_IDLE_AFTER_MS=100000`, `CUSTOM_COMPACTION_IDLE_MIN_TOKENS=1`, `CUSTOM_COMPACTION_AUTO_FRACTION=1` (the turn-end trigger never fires), `SUMMARIZE_TAIL_TOKENS=20` (a compaction is cheap), `CUSTOM_COMPACTION_FLAG_PATH` at a scratch flag reading `on`; the operator's `custom_compaction.flag` is read and never written.
+- A restart is SIGTERM to the probe server and a boot on the SAME sessions dir, so the chat's host survives and is re-adopted. `stop_probe_server` deletes that dir, so it runs only between runs.
+- Evidence in `/tmp/chat-idle-restore.XXXXXX` (printed first): `server-boot-<n>.log`, `server-run<n>.log`, `driver-<n>.txt`.
+- Cleanup: delete the chat through the app, stop the server, end the chat's tmux sessions `<chat id>-*` on the `cloudcli-sessions` server, remove the worktree.
+
+## Run 1 — kept across a restart
+1. A turn ends; the server restarts 25 s later.
+2. After: `deadline restored after a restart: … the check is due in <n> s` is logged; `idle, starting the compaction` follows between 1 s before and 6 s after the original deadline (100 s after the turn's end); then `compacted onto`.
+3. Before: no `trigger=idle` line after the restart.
+
+## Run 2 — overdue, once
+1. A turn ends; the server stays down past the deadline, then boots.
+2. After: `deadline restored after a restart, already due` is logged; the compaction starts after the 15 s settle and finishes; two further restarts must not log `starting the compaction` or `compacted onto` for the chat (the line they are expected to log is `no deadline restored: the last turn made no request`; a missing line is noted, not failed).
+3. Before: no `trigger=idle` line.
+
+## Measured
+- 2026-10-12, after: run 1 restored "due in 73 s", started at 100.8 s, `compacted onto (33020 → 36125)`; run 2 started 15.0 s after the restore line.
+
+## Not covered
+The 30 s spacing of overdue chats, the 2-start limit and the `markIdleCheck` write (MAN-8316, "Bounded across a restart") have no leg here.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/chat-idle-restore.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/chat-idle-restore.sh

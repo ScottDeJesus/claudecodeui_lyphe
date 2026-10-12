@@ -978,7 +978,10 @@ export type ChatProcessActivity = { live: boolean; busy: boolean; why: string | 
  * leaves the options bare. `answered` is whether a client turn was waiting on this result (false for a background
  * follow-up turn); `aborted` whether the turn was a Stop's; `seed` whether it was a compaction's
  * own seed append. `activity` is the process's activity at that moment.
- * Produced by the Claude runtime's loop; consumed by the compaction module's triggers.
+ * Produced by the Claude runtime's loop; consumed by the compaction module's triggers. A report the
+ * runtime hands over for a turn it did not see end (`ChatCompactionHooks.turnRestored`) is read off the
+ * host's journal by the same extractor: `answered`, `aborted` and `seed` are false there, and
+ * `activity` is the adopted process's as it stands.
  */
 export type ChatTurnReport = {
   appSessionId: string;
@@ -993,20 +996,38 @@ export type ChatTurnReport = {
 };
 
 /**
- * The three questions a runtime asks of a custom compaction, answered by whoever registered them
+ * The four questions a runtime asks of a custom compaction, answered by whoever registered them
  * (`providerRuntimeService.useChatCompaction`; the default answers `takesOver` false and does
- * nothing for the other two). `takesOver` is asked each time a message resolves launch options — twice for a message that replaces the process, once to plan the respawn and once to launch:
+ * nothing for the other three). `takesOver` is asked each time a message resolves launch options — twice for a message that replaces the process, once to plan the respawn and once to launch:
  * `appSessionId` is null for a run with no chat behind it (the git and agent one-shots) and `node`
- * names the Cerberus node the chat is placed on, null for local. `turnEnded` and `activityChanged`
- * are fire-and-forget notifications; the runtime wraps every call, so a hook that throws is logged
- * and the turn goes on.
+ * names the Cerberus node the chat is placed on, null for local. `turnEnded`, `turnRestored` and
+ * `activityChanged` are fire-and-forget notifications; the runtime wraps every call, so a hook that
+ * throws is logged and the turn goes on. `turnRestored` is `turnEnded` for a turn the server did not
+ * see end: a server that adopts a live host whose last turn was complete reads that turn's end off the
+ * host's journal and hands it over, with the moment (`endedAt`, epoch ms) it ended and how many times
+ * the idle check has already started a compaction for it (`idleTries`, from the host's meta, 0 for
+ * none), so the idle deadline the restart dropped can be armed again within its bound. Only a host on
+ * this machine is reported.
  * Consumed by the Claude runtime through `ProviderRuntimeContext.compaction`.
  */
 export type ChatCompactionHooks = {
   takesOver(input: { appSessionId: string | null; node: string | null }): Promise<boolean>;
   turnEnded(report: ChatTurnReport): void;
+  turnRestored(report: ChatTurnReport, endedAt: number, idleTries: number): void;
   activityChanged(appSessionId: string, activity: ChatProcessActivity): void;
 };
+
+/**
+ * The idle compaction check a chat's session host remembers for the chat's last turn end: `at` is when the
+ * check last STARTED a compaction (epoch ms) and `tries` how many starts that turn end has had, a failed or
+ * refused one counting as the limit. The compaction module writes it through the host's own `note` (the
+ * runtime's `markIdleCheck`) and a restart reads it back out of the host's meta, so a turn end's idle check
+ * is bounded across restarts instead of repeating at every boot. It describes only the turn end it followed:
+ * a record older than the host's last `result` belongs to an earlier turn end and counts for nothing.
+ * Produced by the compaction module through the Claude runtime; carried by the host meta, `LiveHost`,
+ * `KeepaliveReattach` and `TurnBits`, and read by the compaction module's restore (`planIdleRestore`).
+ */
+export type IdleCheck = { at: number; tries: number };
 
 // ---------------------------
 //----------------- PROVIDER RUNTIME CONTEXT ------------
@@ -2381,9 +2402,10 @@ export type CompactionRecord = CompactionFacts & {
   postTokens: number | null;
 };
 
-/** What `sessionCompactionsDb.latestCompaction` answers for a chat: the three things the compaction module needs from the chat's NEWEST `compaction` row, and nothing else (`CompactionRecord` is the full row). `oldProviderSessionId` names the transcript that compaction left behind. `postTokens` is the chat's context after its seed append, `null` until the append's count has reported — the growth guard holds nothing against a chat with no `postTokens`. `seed` is the seed's blocks as the summarizer returned them, parsed back from the JSON array the swap stored; it is `null` for a compaction recorded before the column existed, and when the stored text is not a non-empty array of non-empty strings — a start-over then carries no seed and the chat reads as it did before the record. Consumers: the compaction module's auto-trigger (`postTokens`) and its decorator (`seed`). */
+/** What `sessionCompactionsDb.latestCompaction` answers for a chat: the four things the compaction module needs from the chat's NEWEST `compaction` row, and nothing else (`CompactionRecord` is the full row). `oldProviderSessionId` names the transcript that compaction left behind. `compactedAtMs` is when the swap was recorded (epoch ms, to the second): a chat compacted after a turn ended is no longer the size that turn left. `postTokens` is the chat's context after its seed append, `null` until the append's count has reported — the growth guard holds nothing against a chat with no `postTokens`. `seed` is the seed's blocks as the summarizer returned them, parsed back from the JSON array the swap stored; it is `null` for a compaction recorded before the column existed, and when the stored text is not a non-empty array of non-empty strings — a start-over then carries no seed and the chat reads as it did before the record. Consumers: the compaction module's auto-trigger (`postTokens`, and `compactedAtMs` for a restored idle deadline) and its decorator (`seed`). */
 export type LatestCompaction = {
   oldProviderSessionId: string;
+  compactedAtMs: number;
   postTokens: number | null;
   seed: string[] | null;
 };

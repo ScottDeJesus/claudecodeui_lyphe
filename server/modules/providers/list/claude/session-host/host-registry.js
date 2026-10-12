@@ -26,27 +26,46 @@ import net from 'node:net';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { createLiveTaskReader } from './host-live-tasks.js';
+
 /**
- * What a host writes to its own meta file (`host.js`). `pendingControl` is absent on a meta from
- * before the field.
+ * What a host writes to its own meta file (`host.js`). `pendingControl` and `idleCheck` are absent on a
+ * meta from before the field.
  * @typedef {{
  *   hostId: string, appSessionId: string | null, userId: string | number | null, cwd: string | null,
  *   startedAt: number, pid: number | null, turnCompleteSent: boolean, heldForBackgroundWork: boolean,
  *   deferredTools?: string[], profile?: Record<string, unknown> | null, deliveredSeq: number,
  *   pendingResults: number[], pendingControl?: { seq: number, requestId: string }[],
+ *   idleCheck?: IdleCheck | null,
  *   exited: { code: number | null, signal: string | null, at: number } | null
  * }} HostMeta
  */
 
 /**
+ * The record of the idle compaction check a chat's host keeps for its last turn end: when the check last
+ * STARTED a compaction (`at`, epoch ms) and how many such starts that turn end has had (`tries`). The
+ * compaction module writes it through the host's own `note` and a restart reads it back, so one turn end
+ * is never retried without bound. It means something only against the turn end it followed: a record older
+ * than the host's last `result` belongs to an earlier turn end.
+ * @typedef {{ at: number, tries: number }} IdleCheck
+ */
+
+/**
  * A host whose CLI is still running, as `listLiveHosts` reads it: the meta's fields, plus
  * `cliVersion` out of the host's own journal (`lastReportedCliVersion`) and `cliPid`, the CLI the
- * host owns (`child.pid` in `host.js`) — null for a meta that holds none.
+ * host owns (`child.pid` in `host.js`) — null for a meta that holds none. `releasedCalls` are the
+ * calls the meta still names that the journal shows reported finished: `deferredTools` already
+ * leaves them out, and the host — the one writer of its meta — has not been told yet. This registry
+ * always sets it; the field is optional because a node's list, read back through a warden, may not.
+ * `liveTasks` are the ids of the CLI's own background tasks the journal shows running — a `task_started`
+ * with no `task_notification` after it, less what its newest `background_tasks_changed` dropped: the
+ * live loop's `backgroundTasks`, rebuilt from the frames it could not have kept across a restart. Optional
+ * for the same reason as `releasedCalls`. `idleCheck` is the meta's record of the idle compaction check.
  * @typedef {{
  *   hostId: string, appSessionId: string, userId: string | number | null, cwd: string | null,
  *   startedAt: number, turnCompleteSent: boolean, heldForBackgroundWork: boolean,
- *   deferredTools: string[], profile: Record<string, unknown> | null,
- *   cliVersion: string | null, cliPid: number | null
+ *   deferredTools: string[], releasedCalls?: string[], liveTasks?: string[], idleCheck?: IdleCheck | null,
+ *   profile: Record<string, unknown> | null, cliVersion: string | null, cliPid: number | null
  * }} LiveHost
  */
 
@@ -123,6 +142,37 @@ function readResultAt(raw) {
 }
 
 /**
+ * A meta's idle-check record as the registry hands it on, or null for none or one that is not two finite numbers.
+ * @param {unknown} value
+ * @returns {IdleCheck | null}
+ */
+function readIdleCheck(value) {
+  if (!value || typeof value !== 'object') return null;
+  const { at, tries } = /** @type {Record<string, unknown>} */ (value);
+  return typeof at === 'number' && Number.isFinite(at) && typeof tries === 'number' && Number.isFinite(tries) ? { at, tries } : null;
+}
+
+/**
+ * One CLI output line of the journal when it is a `type` message — `{ at, output }`, the parsed message — else null.
+ * @param {string} raw
+ * @param {string} type
+ * @returns {{ at: number, output: Record<string, unknown> } | null}
+ */
+function readOutputOfType(raw, type) {
+  // The entry holds the CLI's line as an escaped string, so the type shows as `\"type\":\"<type>\"`; testing for it first
+  // keeps the parse off the thousands of stream and thinking lines a turn writes.
+  if (!raw.includes('"t":"out"') || !raw.includes(`\\"type\\":\\"${type}\\"`)) return null;
+  try {
+    const entry = JSON.parse(raw);
+    if (entry.t !== 'out' || typeof entry.at !== 'number' || typeof entry.line !== 'string') return null;
+    const output = JSON.parse(entry.line);
+    return output && output.type === type ? { at: entry.at, output } : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * One registry over one tmux server and one sessions directory.
  *
  * @param {object} config
@@ -143,6 +193,7 @@ export function createHostRegistry({ tmuxSocketName, keepaliveSession, sessionsD
    * @type {Map<string, { key: string, reported: Set<string> }>}
    */
   const reportedCallsMemo = new Map();
+  const liveTaskReader = createLiveTaskReader({ hostJournalPath, journalLineNewestFirst });
   /** `host/id` of every release already logged, so a poll that reads the same meta again does not say it again. */
   const releasesLogged = new Set();
 
@@ -262,6 +313,9 @@ export function createHostRegistry({ tmuxSocketName, keepaliveSession, sessionsD
         // before the list) has no ids to test and keeps it.
         heldForBackgroundWork: meta.heldForBackgroundWork === true && !(heldIds.length > 0 && stillHeld.length === 0),
         deferredTools: stillHeld,
+        releasedCalls: heldIds.filter((id) => reported.has(id)),
+        liveTasks: liveTaskReader.liveTasks(hostId),
+        idleCheck: readIdleCheck(meta.idleCheck),
         profile: meta.profile && typeof meta.profile === 'object' ? meta.profile : null,
         // Out of the journal, not the meta: what the CLI said about itself, at the one moment it said
         // it. A host spawned before this field existed answers just the same.
@@ -328,6 +382,37 @@ export function createHostRegistry({ tmuxSocketName, keepaliveSession, sessionsD
       return found !== null;
     });
     return found;
+  }
+
+  /**
+   * The host's last finished turn as its journal records it, for a boot that adopts a host it did not run: when the newest `result`
+   * landed (`endedAt`), that result's `modelUsage`, and `budget` — what `readBudget` makes of the turn's LAST assistant message it
+   * accepts. The walk goes newest first and stops at the previous `result`, the bound at which the live loop resets its own budget, so
+   * a turn that ran no request (a compaction's seed append) has none. `readBudget` is the caller's reading, the live stream's own
+   * extractor: this file imports nothing of the API (a warden runs it too) and so holds no opinion of what a budget is. Null when the
+   * journal holds no `result`.
+   * @template T
+   * @param {string} hostId
+   * @param {(message: Record<string, unknown>) => T | null} readBudget
+   * @returns {{ endedAt: number, modelUsage: unknown, budget: T | null } | null}
+   */
+  function lastTurnRecord(hostId, readBudget) {
+    /** @type {{ endedAt: number, modelUsage: unknown, budget: T | null } | null} */
+    let record = null;
+    journalLineNewestFirst(hostId, (raw) => {
+      if (record === null) {
+        const result = readOutputOfType(raw, 'result');
+        if (result) record = { endedAt: result.at, modelUsage: result.output.modelUsage ?? null, budget: null };
+        return false;
+      }
+      if (readOutputOfType(raw, 'result')) return true;
+      const assistant = readOutputOfType(raw, 'assistant');
+      const budget = assistant ? readBudget(assistant.output) : null;
+      if (budget === null) return false;
+      record.budget = budget;
+      return true;
+    });
+    return record;
   }
 
   /**
@@ -398,6 +483,7 @@ export function createHostRegistry({ tmuxSocketName, keepaliveSession, sessionsD
    */
   function removeHostJournal(hostId) {
     reportedCallsMemo.delete(hostId);
+    liveTaskReader.forget(hostId);
     for (const target of [hostJournalPath(hostId), hostMetaPath(hostId)]) {
       try {
         fs.rmSync(target, { force: true });
@@ -590,6 +676,7 @@ export function createHostRegistry({ tmuxSocketName, keepaliveSession, sessionsD
     listHostIds,
     listLiveHosts,
     lastTurnFinishedAt,
+    lastTurnRecord,
     lastReportedCliVersion,
     removeHostJournal,
     retireHost,

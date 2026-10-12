@@ -69,6 +69,7 @@ import {
   reportTurnEnded,
   transcriptAppendMessage
 } from './claude-compaction-seams.js';
+import { reportRestoredTurn } from './claude-compaction-restore.js';
 import { assertProjectFolderExists, ProjectFolderMissingError } from './claude-project-folder.js';
 import { createSignalState, detectRuntimeSignals } from './claude-runtime-signals.js';
 import { installedCliVersionForLaunch } from './installed-cli-version.js';
@@ -1002,10 +1003,14 @@ async function spawnProcess(command, options, initialWs, context) {
   const deferredTools = new Set(reattach?.deferredTools ?? []);
   if (reattach?.heldForBackgroundWork === true && deferredTools.size === 0) deferredTools.add('re-adopted');
   const heldForBackgroundWork = () => deferredTools.size > 0;
+  // The compaction module's record of its idle check for this process's last turn end: set by `markIdleCheck` when the
+  // check starts a compaction, cleared at the next `result`, carried by every note so the host's meta always agrees.
+  let idleCheck = reattach?.idleCheck ?? null;
   const turnBits = (turnCompleteSent) => ({
     turnCompleteSent,
     heldForBackgroundWork: heldForBackgroundWork(),
-    deferredTools: [...deferredTools]
+    deferredTools: [...deferredTools],
+    idleCheck
   });
   // The CLI is between an `init` and its `result`: a user turn, or a follow-up turn a task
   // completion pushed on its own. Either way the process must not be closed under it.
@@ -1015,8 +1020,10 @@ async function spawnProcess(command, options, initialWs, context) {
   let followUpAnswersNotification = false;
   // The CLI's own level signal for live background tasks — watchers included — replaced on
   // every `background_tasks_changed` (its documented REPLACE semantics) and edged by the
-  // task bookends in between. Empty until the first change after (re)start.
-  const backgroundTasks = new Set();
+  // task bookends in between. A re-adopted process starts from the tasks its host's journal shows running
+  // (`reattach.liveTasks`, host-live-tasks.js): the frames that built the set went to the process that died, and
+  // starting empty read a backgrounded subagent, a monitor or any task the call ledger never names as idle.
+  const backgroundTasks = new Set(reattach?.liveTasks ?? []);
   // Set once a turn publishes a budget read from an assistant message, so the
   // turn-ending `result` is only mined for usage when nothing better arrived.
   let assistantBudgetSent = false;
@@ -1091,6 +1098,17 @@ async function spawnProcess(command, options, initialWs, context) {
         backgroundTasks: backgroundTasks.size,
         deferredCalls: deferredTools.size
       });
+    },
+    /**
+     * Records that the compaction's idle check has started a compaction for this turn end (`tries` of them now), in the
+     * host's meta through the host's own note, so a restart does not repeat the check without bound. False when the
+     * process is closing: there is no host left to tell.
+     */
+    markIdleCheck(tries) {
+      if (closing) return false;
+      idleCheck = { at: Date.now(), tries };
+      keepalive?.note({ ...turnBits(pendingTurn === null), ack: false });
+      return true;
     },
     // Kills the CLI outright, for a process that did not answer an interrupt: a CLI that ignores
     // the interrupt control request will not act on the EOF `close()` sends either.
@@ -1278,6 +1296,9 @@ async function spawnProcess(command, options, initialWs, context) {
       appends.note(promptMessages);
       if (reattach?.turnCompleteSent) {
         settleFirstTurn();
+        // That turn's end happened under the server this one replaced, and the idle deadline it armed went with it: the
+        // compaction is told when the turn ended, off the host's journal (claude-compaction-restore.ts).
+        reportRestoredTurn(context, { sessionId, userId: ws?.userId ?? runUserId, reattach, options, profile, backgroundTasks: backgroundTasks.size, deferredCalls: deferredTools.size, extractTokenBudget });
       } else {
         openTurn(reattach ? null : (promptMessages.at(-1)?.uuid ?? null)).then(settleFirstTurn);
       }
@@ -1656,6 +1677,8 @@ async function spawnProcess(command, options, initialWs, context) {
           followUp.release();
           const wokenByNotification = followUpAnswersNotification;
           followUpAnswersNotification = false;
+          // A turn has ended, so the idle check's record for the one before it counts for nothing.
+          idleCheck = null;
           const turn = pendingTurn;
           const answersTurn = answersPendingTurn(message);
           const abortPending = abortedInstances.has(queryInstance);
@@ -2000,6 +2023,7 @@ export const claudeRuntime = {
   run: queryClaudeSDK,
   abort: abortClaudeSDKSession,
   activity: (appSessionId) => liveActivityOf(getSession(appSessionId)),
+  markIdleCheck: (appSessionId, tries) => getSession(appSessionId)?.process?.markIdleCheck?.(tries) ?? false,
   permissions: {
     resolve: resolveToolApproval,
     listPending: getPendingApprovalsForSession,

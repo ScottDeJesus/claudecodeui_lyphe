@@ -23,6 +23,7 @@ import { StringDecoder } from 'node:string_decoder';
 import type { SpawnOptions, SpawnedProcess } from '@anthropic-ai/claude-agent-sdk';
 
 import type { CerberusHostFrame } from '@/shared/cerberus-types.js';
+import type { IdleCheck } from '@/shared/types.js';
 
 import { attachLocalSpawn, createFacade, isApiExiting } from './facade.js';
 import type { Facade, TurnBits } from './facade.js';
@@ -51,8 +52,14 @@ export type KeepaliveReattach = {
    * hands: the meta is what the API launched the CLI with, the journal is what the CLI said.
    */
   cliVersion: string | null;
-  /** The tool-call ids whose work was still outstanding when the meta was last written. */
+  /** The tool-call ids whose work was still outstanding when the meta was last written, less those the host's journal shows finished. */
   deferredTools: string[];
+  /** The calls that list left out because the journal shows them finished; the meta still names them until the host is told. */
+  releasedCalls?: string[];
+  /** The CLI's own background tasks the host's journal shows running: the process's task set starts from them, not empty. */
+  liveTasks?: string[];
+  /** The meta's record of the idle compaction check for the host's last turn end; the process carries it forward. */
+  idleCheck?: IdleCheck | null;
   /** The node whose warden holds the host, or null for a host on this machine's own keepalive. */
   node: string | null;
 };
@@ -181,6 +188,19 @@ async function placeInHost(facade: Facade, options: SpawnOptions, ctx: SpawnCont
     // D-3: "acked" is the host's own cursor — it replays any `result` this API never
     // confirmed handling, and nothing it already did.
     bindSocket(facade, socket, hostId, ctx.appSessionId, { t: 'hello', fromSeq: 'acked' });
+    // The host is the one writer of its meta, so a call the journal shows finished stays in the file until the host is told: every
+    // boot would read it, release it and say so again. `ack: false` changes the bits and moves no cursor, and the frame rides behind
+    // the `hello` on the same socket, so a replayed `result`'s own note still lands after it.
+    const released = ctx.reattach.releasedCalls ?? [];
+    if (released.length > 0) {
+      facade.note({
+        turnCompleteSent: ctx.reattach.turnCompleteSent,
+        heldForBackgroundWork: ctx.reattach.heldForBackgroundWork,
+        deferredTools: ctx.reattach.deferredTools,
+        ack: false
+      });
+      console.log(`[keepalive] host ${hostId}: wrote the release of ${released.length} finished background call(s) back to its meta`);
+    }
     return;
   }
 

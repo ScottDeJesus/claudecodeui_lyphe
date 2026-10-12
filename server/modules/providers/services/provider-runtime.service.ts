@@ -41,6 +41,7 @@ const defaultDependencies: ProviderRuntimeServiceDependencies = {
 const NOT_TAKEN_OVER_HOOKS: ChatCompactionHooks = {
   takesOver: async () => false,
   turnEnded: () => {},
+  turnRestored: () => {},
   activityChanged: () => {},
 };
 const NOT_LIVE_ACTIVITY: ChatProcessActivity = { live: false, busy: false, why: null };
@@ -64,6 +65,7 @@ export function createProviderRuntimeService(
   const compaction: ChatCompactionHooks = {
     takesOver: (input) => compactionHooks.takesOver(input),
     turnEnded: (report) => compactionHooks.turnEnded(report),
+    turnRestored: (report, endedAt, idleTries) => compactionHooks.turnRestored(report, endedAt, idleTries),
     activityChanged: (appSessionId, activity) => compactionHooks.activityChanged(appSessionId, activity),
   };
 
@@ -114,6 +116,17 @@ export function createProviderRuntimeService(
       } catch (error) {
         console.warn(`[provider-runtime] could not read the activity of ${providerName} session ${appSessionId}:`, error);
         return { ...NOT_LIVE_ACTIVITY };
+      }
+    },
+
+    // Tells the chat's session host that the idle compaction check has started a compaction for the chat's last turn end;
+    // a provider whose runtime keeps no host (or throws when asked) answers false, which only costs the restart its memory.
+    markIdleCheck(providerName: LLMProvider, appSessionId: string, tries: number): boolean {
+      try {
+        return dependencies.resolveProvider(providerName).runtime.markIdleCheck?.(appSessionId, tries) ?? false;
+      } catch (error) {
+        console.warn(`[provider-runtime] could not record the idle check of ${providerName} session ${appSessionId}:`, error);
+        return false;
       }
     },
 

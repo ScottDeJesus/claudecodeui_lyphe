@@ -165,6 +165,7 @@ function readNodeHost(value: unknown): CerberusNodeHost | null {
     turnCompleteSent: value.turnCompleteSent === true,
     heldForBackgroundWork: value.heldForBackgroundWork === true,
     deferredTools: Array.isArray(value.deferredTools) ? value.deferredTools.filter((tool) => typeof tool === 'string') : [],
+    liveTasks: Array.isArray(value.liveTasks) ? value.liveTasks.filter((task) => typeof task === 'string') : [],
     profile: isRecord(value.profile) ? value.profile : null,
     cliVersion: text(value.cliVersion),
     cliPid: Number.isSafeInteger(value.cliPid) ? (value.cliPid as number) : null,

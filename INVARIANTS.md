@@ -9266,3 +9266,48 @@ measured 2026-10-12 by chain chain-chat-busy-ledger-20261012-105339-80e5, findin
 probe-key: a84fe822dd68800e6363c527052331b18aef6aa7
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/chat-busy-ledger.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/chat-busy-ledger.sh
+
+## INV-8001 — probe — a restored deadline compacts a chat whose background subagent is running, and kills it
+
+a restored deadline compacts a chat whose background subagent is running, and kills it
+
+```probe
+bash /home/lyphe/.claude/state/pipeline-reviews/idle-deadline-restart/athena-probe-agent-midwork.sh
+echo "[probe exit $?]"
+expect: `decision line seen: … activity=idle decision=idle, starting the compaction`, `python sleep alive at the decision: 2` and `alive 20 s after the decision: 0` while the defect stands; cured when the decision reads `left alone: the process is busy` (and the command stays alive). ~100 s, one Haiku chat plus one Haiku subagent, scratch server on :7934.
+```
+
+measured 2026-10-12 by chain chain-idle-deadline-restart-20261012-125005-5a74, finding H1, HIGH
+probe-key: 686d8d713d46ca559fe30c94b79c96f4bb32fd2a
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/compaction/idle-restore.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/chat-idle-restore.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/chat-idle-restore.sh
+
+## INV-8002 — probe — several overdue chats start their compactions at the same instant
+
+several overdue chats start their compactions at the same instant
+
+```probe
+bash /home/lyphe/.claude/state/pipeline-reviews/idle-deadline-restart/athena-probe-stampede.sh
+echo "[probe exit $?]"
+expect: `start #1 at +15.0 s after boot`, `start #2 at +15.0 s after boot`, `start #3 at +15.0 s after boot` (three within the same second) while the defect stands; cured when the starts are spread or limited. ~110 s, three Haiku chats, scratch server on :7936.
+```
+
+measured 2026-10-12 by chain chain-idle-deadline-restart-20261012-125005-5a74, finding M1, MEDIUM
+probe-key: 15316bddcc490e87384d99b3d2dff7d551e45e14
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/compaction/idle-restore.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/chat-idle-restore.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/chat-idle-restore.sh
+
+## INV-8003 — probe — a refusal or failure is forgotten at every restart, so the chat is retried at every boot
+
+a refusal or failure is forgotten at every restart, so the chat is retried at every boot
+
+```probe
+bash /home/lyphe/.claude/state/pipeline-reviews/idle-deadline-restart/athena-probe-refusal-per-boot.sh
+echo "[probe exit $?]"
+expect: `boot 2: starts=1 refusals=1` and `boot 3: starts=1 refusals=1` while the defect stands (the refusal is forgotten at the restart); cured when boot 3 reads `starts=0`. ~100 s, one Haiku chat, scratch server on :7935.
+```
+
+measured 2026-10-12 by chain chain-idle-deadline-restart-20261012-125005-5a74, finding M2, MEDIUM
+probe-key: e9bd2e0811e379e7c1981b7c36c857cfe6e804c4
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/compaction/idle-restore.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/chat-idle-restore.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/chat-idle-restore.sh

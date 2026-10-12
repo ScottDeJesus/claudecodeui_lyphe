@@ -15,6 +15,8 @@
 import os from 'node:os';
 import path from 'node:path';
 
+import type { IdleCheck } from '@/shared/types.js';
+
 import { createHostRegistry } from './host-registry.js';
 
 /** The tmux server that outlives the API. Its `_keepalive` session is what keeps it up. */
@@ -40,6 +42,8 @@ export type HostMeta = {
   pendingResults: number[];
   /** Delivered `control_request`s the API has not answered on stdin; absent on a meta from before the field. */
   pendingControl?: { seq: number; requestId: string }[];
+  /** The idle compaction check's record for the last turn end; absent on a meta from before the field. */
+  idleCheck?: IdleCheck | null;
   exited: { code: number | null; signal: string | null; at: number } | null;
 };
 
@@ -52,6 +56,21 @@ export type LiveHost = {
   turnCompleteSent: boolean;
   heldForBackgroundWork: boolean;
   deferredTools: string[];
+  /**
+   * The calls the meta still names that the host's journal shows reported finished — `deferredTools`
+   * already leaves them out. The host alone writes its meta, so re-adoption tells it (`spawner.ts`) and
+   * the next boot reads a meta that no longer holds them. Absent on a node's host: its warden lists none.
+   */
+  releasedCalls?: string[];
+  /**
+   * The ids of the CLI's own background tasks the host's journal shows running (`host-live-tasks.js`): what the
+   * runtime's `backgroundTasks` held, rebuilt for a process that has just been re-adopted. Every kind of task
+   * counts, so a host with one is busy to the version sweep and the activity reading and to the process's idle closer.
+   * Absent on a node's host whose warden predates the field.
+   */
+  liveTasks?: string[];
+  /** The meta's record of the idle compaction check for the host's last turn end, or null. Absent on a node's host. */
+  idleCheck?: IdleCheck | null;
   profile: Record<string, unknown> | null;
   /**
    * The CLI version this host's own process announced at init, read out of ITS journal — null when
@@ -92,6 +111,11 @@ export const readHostMeta: (hostId: string) => HostMeta | null = registry.readHo
 export const listHostIds: () => string[] = registry.listHostIds;
 export const listLiveHosts: () => LiveHost[] = registry.listLiveHosts;
 export const lastTurnFinishedAt: (hostId: string) => number | null = registry.lastTurnFinishedAt;
+/** consumer: claude-compaction-restore.ts — a re-adopted chat's last turn end, for its idle deadline. */
+export const lastTurnRecord: <Budget>(
+  hostId: string,
+  readBudget: (message: Record<string, unknown>) => Budget | null
+) => { endedAt: number; modelUsage: unknown; budget: Budget | null } | null = registry.lastTurnRecord;
 export const lastReportedCliVersion: (hostId: string) => string | null = registry.lastReportedCliVersion;
 export const removeHostJournal: (hostId: string) => void = registry.removeHostJournal;
 export const retireHost: (hostId: string) => void = registry.retireHost;

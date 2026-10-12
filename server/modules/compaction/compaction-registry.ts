@@ -125,7 +125,8 @@ export function liftAutomaticRefusal(sessionId: string): void {
 
 // ---------------------------
 // LAST REPORT: the chat's context as its latest turn left it, for a manual compaction's `pre_tokens`.
-// Kept in memory only: after a restart it is null until the chat's next turn ends.
+// Kept in memory only: after a restart it holds what the boot's re-adoption read off each adopted host's journal
+// (`turnRestored`), and nothing for a chat with no live host, until the chat's next turn ends.
 
 const lastContexts = new Map<string, { contextTokens: number; contextWindow: number | null }>();
 

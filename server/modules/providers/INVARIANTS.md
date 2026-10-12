@@ -87,6 +87,7 @@ Releases (the only ones; a hold with none of these stays):
 | a follow-up turn no task notification woke (a scheduled wake-up, a cron: work the task system never lists) | the OLDEST hold, at that turn's `result` |
 | a follow-up turn a notification woke (`init` seen while the follow-up latch `followUp.expected` was armed sets `followUpAnswersNotification`, read and cleared at the `result`) | none: the notification already released its call by id; the other holds may still be running |
 | re-adoption (`reattach.deferredTools`) | the ids `listLiveHosts` left after reading the host's journal (MAN-687); a meta with only the bit restores one entry `'re-adopted'` |
+| re-adoption (`reattach.liveTasks`) | not a hold of this ledger but the CLI's own task set, `backgroundTasks`, which the process's `activity`, idle closer and compaction guard also read: it starts from the tasks the host's journal shows running (a `task_started` with no `task_notification`, less what the newest `background_tasks_changed` dropped: `host-live-tasks.js`), so every kind of task holds a re-adopted process, not only the kinds `backgroundWorkIds` names |
 
 - why: a notification that arrived before its turn's `result` once still moved its call into `deferredTools` at that result, with nothing left to name it again; the chat read busy for good (2026-10-12: two calls that finished within 12 s held a chat).
 - why: a follow-up that releases "the oldest" after a notification released its own call frees a second call that may still be running.
