@@ -26,6 +26,7 @@ import { nodeSessions } from '@/modules/cerberus/index.js';
 import { sessionsDb } from '@/modules/database/index.js';
 import { chatRunRegistry, runDetachedChatTurn } from '@/modules/websocket/index.js';
 import type { ProviderRuntimeGateway } from '@/modules/websocket/index.js';
+import type { CerberusNodeHostLastTurn } from '@/shared/cerberus-types.js';
 
 import { noteNodeHostsChanged } from './colocated-hosts.js';
 import { lastTurnFinishedAt, retireHost } from './hosts.js';
@@ -33,9 +34,10 @@ import type { LiveHost } from './hosts.js';
 
 /**
  * A host to hand back: one this machine's registry listed, or one a node's warden listed — which
- * already carries the warden's own reading of when the CLI last ended a turn.
+ * already carries the warden's own reading of when the CLI last ended a turn (`lastTurnFinishedAt`) and of
+ * that turn (`lastTurn`, for the idle deadline), because its journal is the warden's and not this server's.
  */
-export type ReadoptableHost = LiveHost & { lastTurnFinishedAt?: number | null };
+export type ReadoptableHost = LiveHost & { lastTurnFinishedAt?: number | null; lastTurn?: CerberusNodeHostLastTurn | null };
 
 /** `supervised`: this boot is the systemd unit's own child (server/index.ts knows; this module is not told how). */
 export type ReadoptDeps = { runtime: ProviderRuntimeGateway; supervised: boolean };
@@ -88,6 +90,7 @@ export function readoptHost(host: ReadoptableHost, deps: ReadoptDeps, node: stri
           releasedCalls: host.releasedCalls,
           liveTasks: host.liveTasks,
           idleCheck: host.idleCheck,
+          lastTurn: host.lastTurn,
           node
         }
       },

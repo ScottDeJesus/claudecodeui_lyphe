@@ -3,6 +3,8 @@ import { stat } from 'node:fs/promises';
 import { readCustomCompactionSwitch, summarizerStatus } from '@/modules/settings/index.js';
 import type { SummarizerStatus } from '@/modules/settings/index.js';
 
+import { taskLedgerUnlisted } from './node-task-ledger.js';
+
 /**
  * Whether the house's compaction has a chat, and why not when it has not.
  *
@@ -110,15 +112,17 @@ export async function compactionMode(): Promise<CompactionMode> {
 }
 
 /**
- * The runtime's question, asked at every message launch: is this chat's compaction taken over? Only a
- * chat with an app session id that is not placed on a node can be (a node's chat keeps its
- * transcript on the node, where the verb cannot read it).
+ * The runtime's question, asked at every message launch: is this chat's compaction taken over? Any chat with
+ * an app session id can be, wherever its CLI runs. A chat placed on a Cerberus node is taken over exactly as a
+ * local one: the verb reads the transcript from this machine's disk, and a node chat's transcript is on it,
+ * because placement refuses a node that is not co-located (`node-transport.ts`, `colocationRefusal`) and the
+ * warden, its session host and this server all run as the same user. The one node chat that is not taken over is
+ * one whose warden lists no live tasks (`taskLedgerUnlisted`): a compaction could not tell it from a quiet chat.
  *
- * Consumer: the Claude runtime, through `ChatCompactionHooks.takesOver`; the decorator's `/compact`
- * test; the idle trigger.
+ * Consumer: the Claude runtime, through `ChatCompactionHooks.takesOver`; the idle trigger.
  */
-export async function takesOver(input: { appSessionId: string | null; node: string | null }): Promise<boolean> {
-  return input.appSessionId !== null && input.node === null && (await compactionMode()).on;
+export async function takesOver(input: { appSessionId: string | null }): Promise<boolean> {
+  return input.appSessionId !== null && !taskLedgerUnlisted(input.appSessionId) && (await compactionMode()).on;
 }
 
 /**

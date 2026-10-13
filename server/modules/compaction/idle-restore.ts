@@ -34,7 +34,8 @@ const RESTORE_SPACING_MS = 30_000;
 /**
  * How many times one turn end's idle check may start a compaction: the first, and one more when a handover cut
  * the first short. A start that fails or is refused is the limit at once (the procedure records it so). The count
- * lives in the chat's host meta and is cleared by the next turn end, so a restart cannot repeat the check without bound.
+ * lives in the chat's host meta (`idleCheck`, the one record of it) and is cleared by the next turn end, so a restart
+ * cannot repeat the check without bound.
  *
  * Consumer: auto-trigger.ts (counts each start), compaction-procedure.ts (a failure or a refusal spends the rest).
  */

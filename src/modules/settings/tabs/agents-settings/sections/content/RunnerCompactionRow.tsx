@@ -11,8 +11,8 @@ import { Button, SettingRow, WholeWords } from '@/shared/ui';
  * does a big model's chore. On, a chat's compaction is written by the launch table's `[summarizer]` words
  * instead of by the chat's own model — when the operator presses Compact or types `/compact`, at a turn's
  * end past half the context window, and after 54 idle minutes holding 200K tokens or more — and the chat
- * carries on in a new session seeded with the summary. Off, or for a chat placed on a node, the CLI compacts
- * as it always has.
+ * carries on in a new session seeded with the summary, wherever its CLI runs: a chat placed on a node is
+ * taken over like any other. Off, the CLI compacts as it always has.
  *
  * Its own file, as `RunnerParkAtPeakRow` is, and in the card's grammar: the unknown state in words, the retry
  * in the control's slot, a switch never disabled while a write is in flight. The Dactyls switch, which asks
@@ -98,7 +98,7 @@ export default function RunnerCompactionRow() {
             </ul>
             <p className="mt-1">
               {t('agents.runnerCompaction.after', {
-                defaultValue: 'The chat moves to a new session seeded with the summary and its latest messages, and keeps its own model and effort. The CLI’s auto-compact stays on as the net. Chats placed on a node keep the CLI’s own compaction. A flip reaches each chat at its next message.',
+                defaultValue: 'The chat moves to a new session seeded with the summary and its latest messages, and keeps its own model and effort. The CLI’s auto-compact stays on as the net. Chats placed on a node are compacted the same way. A flip reaches each chat at its next message.',
               })}
             </p>
             {waiting !== null && (

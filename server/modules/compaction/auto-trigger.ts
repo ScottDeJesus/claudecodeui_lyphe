@@ -12,6 +12,7 @@ import {
   publishActivity,
   rememberTurnContext,
 } from './compaction-registry.js';
+import { taskLedgerUnlisted } from './node-task-ledger.js';
 import { createRestoreSpacer, planIdleRestore } from './idle-restore.js';
 
 /**
@@ -33,7 +34,7 @@ import { createRestoreSpacer, planIdleRestore } from './idle-restore.js';
  *   (`turnRestored`), and the deadline is armed again for the remainder of the wait — or, when the wait has
  *   run out, for a short settle after re-adoption, queued behind the other overdue chats (`idle-restore.ts`).
  *   One turn end's idle check starts at most `IDLE_CHECK_MAX_TRIES` compactions, counted in the chat's host
- *   meta before each start, so a restart never repeats it without bound.
+ *   meta before each start (the host's `idleCheck`, the one record of it), so a restart never repeats it without bound.
  *
  * Consumer: compaction-runtime.ts, which registers `turnEnded`, `turnRestored` and `activityChanged` with the runtime.
  */
@@ -74,9 +75,6 @@ const idleAfterMs = (): number => {
   return override !== null && override <= MAX_TIMER_DELAY_MS ? override : IDLE_COMPACT_AFTER_MS;
 };
 const idleMinTokens = (): number => numberFromEnv('CUSTOM_COMPACTION_IDLE_MIN_TOKENS') ?? IDLE_COMPACT_MIN_TOKENS;
-
-const nodeOf = (report: ChatTurnReport): string | null =>
-  typeof report.sendOptions.node === 'string' && report.sendOptions.node ? report.sendOptions.node : null;
 
 /** The seam to the rest of the module; `compaction-runtime.ts` supplies both. */
 type TriggerDependencies = {
@@ -149,7 +147,7 @@ export function createAutoTrigger(
     );
   };
 
-  /** Why a report is not due, or null when it is. Order follows the rules: window, growth, takeover, flight, refusal. */
+  /** Why a report is not due, or null when it is. Order follows the rules: window, growth, takeover (a node whose warden lists no tasks), flight, refusal. */
   const notDueBecause = (report: ChatTurnReport): string | null => {
     if (report.aborted) return 'not due: the turn was stopped';
     const { contextTokens, contextWindow } = report;
@@ -167,7 +165,7 @@ export function createAutoTrigger(
         return `not due: the context grew ${Math.round(grew)} since the last compaction, under ${Math.round(needed)}`;
       }
     }
-    if (nodeOf(report) !== null) return 'not taken over: the chat is placed on a node';
+    if (taskLedgerUnlisted(report.appSessionId)) return 'not taken over: the chat\'s node warden lists no background tasks';
     if (flightOf(report.appSessionId)) return 'not due: a compaction is already in flight';
     if (isRefusedAutomatic(report.appSessionId)) return 'not due: the chat is under an automatic refusal';
     return null;
@@ -269,8 +267,8 @@ export function createAutoTrigger(
    */
   const turnRestored = (report: ChatTurnReport, endedAt: number, triesSoFar: number): void => {
     const sessionId = report.appSessionId;
-    // A chat on a node runs its own copy there. A turn that ended since this boot already armed a newer deadline.
-    if (stopped || nodeOf(report) !== null || idleDeadlines.has(sessionId)) return;
+    // A turn that ended since this boot already armed a newer deadline.
+    if (stopped || idleDeadlines.has(sessionId)) return;
     if (takeoverSnapshot() === false) return;
     const plan = planIdleRestore(report, endedAt, {
       now: Date.now(),
@@ -300,7 +298,7 @@ export function createAutoTrigger(
       logDecision(sessionId, 'idle', report, activityNow(), `not due: the context is under ${minTokens} tokens`);
       return;
     }
-    if (!(await takesOver({ appSessionId: sessionId, node: nodeOf(report) }))) {
+    if (!(await takesOver({ appSessionId: sessionId }))) {
       logDecision(sessionId, 'idle', report, activityNow(), 'not taken over');
       return;
     }

@@ -999,19 +999,19 @@ export type ChatTurnReport = {
  * The four questions a runtime asks of a custom compaction, answered by whoever registered them
  * (`providerRuntimeService.useChatCompaction`; the default answers `takesOver` false and does
  * nothing for the other three). `takesOver` is asked each time a message resolves launch options — twice for a message that replaces the process, once to plan the respawn and once to launch:
- * `appSessionId` is null for a run with no chat behind it (the git and agent one-shots) and `node`
- * names the Cerberus node the chat is placed on, null for local. `turnEnded`, `turnRestored` and
+ * `appSessionId` is null for a run with no chat behind it (the git and agent one-shots); a chat is
+ * taken over wherever its CLI runs, on this machine or on a co-located Cerberus node. `turnEnded`, `turnRestored` and
  * `activityChanged` are fire-and-forget notifications; the runtime wraps every call, so a hook that
  * throws is logged and the turn goes on. `turnRestored` is `turnEnded` for a turn the server did not
  * see end: a server that adopts a live host whose last turn was complete reads that turn's end off the
  * host's journal and hands it over, with the moment (`endedAt`, epoch ms) it ended and how many times
  * the idle check has already started a compaction for it (`idleTries`, from the host's meta, 0 for
- * none), so the idle deadline the restart dropped can be armed again within its bound. Only a host on
- * this machine is reported.
+ * none), so the idle deadline the restart dropped can be armed again within its bound. A host on a node is
+ * reported too: its warden lists the turn its journal records.
  * Consumed by the Claude runtime through `ProviderRuntimeContext.compaction`.
  */
 export type ChatCompactionHooks = {
-  takesOver(input: { appSessionId: string | null; node: string | null }): Promise<boolean>;
+  takesOver(input: { appSessionId: string | null }): Promise<boolean>;
   turnEnded(report: ChatTurnReport): void;
   turnRestored(report: ChatTurnReport, endedAt: number, idleTries: number): void;
   activityChanged(appSessionId: string, activity: ChatProcessActivity): void;
@@ -1022,8 +1022,8 @@ export type ChatCompactionHooks = {
  * check last STARTED a compaction (epoch ms) and `tries` how many starts that turn end has had, a failed or
  * refused one counting as the limit. The compaction module writes it through the host's own `note` (the
  * runtime's `markIdleCheck`) and a restart reads it back out of the host's meta, so a turn end's idle check
- * is bounded across restarts instead of repeating at every boot. It describes only the turn end it followed:
- * a record older than the host's last `result` belongs to an earlier turn end and counts for nothing.
+ * is bounded across restarts instead of repeating at every boot. The host's meta is the one record of it. It describes only
+ * the turn end it followed: a record older than the host's last `result` belongs to an earlier turn end and counts for nothing.
  * Produced by the compaction module through the Claude runtime; carried by the host meta, `LiveHost`,
  * `KeepaliveReattach` and `TurnBits`, and read by the compaction module's restore (`planIdleRestore`).
  */

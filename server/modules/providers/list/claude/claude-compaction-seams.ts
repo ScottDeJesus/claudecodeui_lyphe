@@ -124,11 +124,10 @@ const TAKES_OVER_DEADLINE_MS = 10_000;
 export async function askCompactionTakesOver(context: CompactionContext, options: AnyRecord): Promise<boolean> {
   const appSessionId = typeof options.sessionId === 'string' && options.sessionId ? options.sessionId : null;
   if (appSessionId === null) return false;
-  const node = typeof options.node === 'string' && options.node ? options.node : null;
   let deadline: NodeJS.Timeout | undefined;
   try {
     const answer = await Promise.race([
-      context.compaction.takesOver({ appSessionId, node }),
+      context.compaction.takesOver({ appSessionId }),
       new Promise<'late'>((resolve) => {
         deadline = setTimeout(() => resolve('late'), TAKES_OVER_DEADLINE_MS);
         deadline.unref();
@@ -276,24 +275,8 @@ export function isSeedAppend(options: AnyRecord | null | undefined): boolean {
   return options?.compactionSeed === true;
 }
 
-/** The last main-thread assistant request of a turn: its whole context, and the model it ran on. */
+/** The last main-thread assistant request of a turn — what `mainThreadRequestOf` (session-host) answers: its whole context, and the model it ran on. */
 type MainThreadBudget = { used: number; model: string | null };
-
-/**
- * The main-thread budget one assistant message reports, or null when it reports none worth keeping.
- * `tokenBudget` is what `extractTokenBudget` already read off the message (null for subagent traffic
- * and for a message with no usage). A synthetic assistant message — the CLI's own stand-in for an API
- * error — carries all-zero usage and would overwrite the last real request, so it is not a budget.
- */
-export function mainThreadBudgetOf(
-  message: { type?: string; message?: { model?: unknown } } | null | undefined,
-  tokenBudget: { used: number } | null | undefined
-): MainThreadBudget | null {
-  if (message?.type !== 'assistant' || !tokenBudget) return null;
-  const model = typeof message.message?.model === 'string' ? message.message.model : null;
-  if (model === '<synthetic>' || !(tokenBudget.used > 0)) return null;
-  return { used: tokenBudget.used, model };
-}
 
 /**
  * The context window of the model a request ran on, read off a result's `modelUsage`. An entry

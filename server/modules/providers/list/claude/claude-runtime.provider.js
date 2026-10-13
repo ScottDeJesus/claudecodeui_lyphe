@@ -44,7 +44,7 @@ import { createCompleteMessage, createNormalizedMessage } from '@/shared/utils.j
 import { capToolResult } from '@/shared/message-unification.js';
 import { userFacingEnv } from '@/shared/child-env.js';
 
-import { armKeepaliveSpawn, keepaliveReadopt } from './session-host/index.js';
+import { armKeepaliveSpawn, keepaliveReadopt, mainThreadRequestOf } from './session-host/index.js';
 import { noteTerminalCommands } from './claude-command-catalog.js';
 import {
   createIdleCloser,
@@ -63,7 +63,6 @@ import {
   describeProcessActivity,
   isSeedAppend,
   liveActivityOf,
-  mainThreadBudgetOf,
   movesBackgroundActivity,
   reportActivityChanged,
   reportTurnEnded,
@@ -1298,7 +1297,7 @@ async function spawnProcess(command, options, initialWs, context) {
         settleFirstTurn();
         // That turn's end happened under the server this one replaced, and the idle deadline it armed went with it: the
         // compaction is told when the turn ended, off the host's journal (claude-compaction-restore.ts).
-        reportRestoredTurn(context, { sessionId, userId: ws?.userId ?? runUserId, reattach, options, profile, backgroundTasks: backgroundTasks.size, deferredCalls: deferredTools.size, extractTokenBudget });
+        reportRestoredTurn(context, { sessionId, userId: ws?.userId ?? runUserId, reattach, options, profile, backgroundTasks: backgroundTasks.size, deferredCalls: deferredTools.size });
       } else {
         openTurn(reattach ? null : (promptMessages.at(-1)?.uuid ?? null)).then(settleFirstTurn);
       }
@@ -1664,7 +1663,7 @@ async function spawnProcess(command, options, initialWs, context) {
         if (tokenBudgetData) {
           if (message.type === 'assistant') {
             assistantBudgetSent = true;
-            mainThreadBudget = mainThreadBudgetOf(message, tokenBudgetData) ?? mainThreadBudget;
+            mainThreadBudget = mainThreadRequestOf(message) ?? mainThreadBudget;
           }
           ws.send(createNormalizedMessage({ kind: 'status', text: 'token_budget', tokenBudget: tokenBudgetData, sessionId: capturedSessionId || sessionId || null, provider: 'claude' }));
         }

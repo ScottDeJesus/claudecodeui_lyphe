@@ -6,6 +6,7 @@ import { createAutoTrigger } from './auto-trigger.js';
 import { completeFrame } from './compaction-frames.js';
 import { logDecision } from './compaction-log.js';
 import { compactionMode, takesOver } from './compaction-mode.js';
+import { taskLedgerUnlisted } from './node-task-ledger.js';
 import { compact } from './compaction-procedure.js';
 import { flightOf, lastTurnContext, stopFlightsBeforeSeed } from './compaction-registry.js';
 
@@ -114,11 +115,12 @@ export function withChatCompaction<Inner extends CompactionInnerRuntime>(inner: 
       const request = compactionRequestOf(provider, command, options);
       if (request === null) return inner.run(provider, command, options, writer);
 
-      const node = typeof options.node === 'string' && options.node ? options.node : null;
       // ONE mode read both decides (it is `takesOver`'s own test) and explains: a switch that is on while the
-      // summarizer cannot be served says why below. A node's chat keeps the CLI's compaction and asks nothing.
-      const mode = node === null ? await compactionMode() : null;
-      if (mode?.on) {
+      // summarizer cannot be served says why below. A chat on a node is read the same way as a local one, unless
+      // its node's warden lists no live tasks (`taskLedgerUnlisted`): that chat keeps the CLI's own compaction.
+      const mode = await compactionMode();
+      const unlisted = taskLedgerUnlisted(request.sessionId);
+      if (mode.on && !unlisted) {
         return compact(inner, { ...request, options, writer });
       }
       if (request.trigger !== 'manual') {
@@ -136,8 +138,9 @@ export function withChatCompaction<Inner extends CompactionInnerRuntime>(inner: 
       }
       // The operator pressed Compact with the switch on and the CLI left to do it: one line says why. With the
       // switch off `why` is null and nothing is said, so an off switch changes nothing.
-      if (mode?.why) {
-        logDecision(request.sessionId, request.trigger, lastTurnContext(request.sessionId), inner.activity('claude', request.sessionId), `handed to the CLI: ${mode.why}`);
+      const why = unlisted ? 'the chat\'s node warden lists no live tasks' : mode.why;
+      if (why) {
+        logDecision(request.sessionId, request.trigger, lastTurnContext(request.sessionId), inner.activity('claude', request.sessionId), `handed to the CLI: ${why}`);
       }
       return inner.run(provider, command, options, writer);
     },

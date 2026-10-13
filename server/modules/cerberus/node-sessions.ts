@@ -8,6 +8,7 @@ import type {
   CerberusSessionOpenBody,
 } from '@/shared/cerberus-types.js';
 
+import { readNodeHost } from './node-host-reading.js';
 import { wardenLinks, type CerberusWardenLink } from './warden-links.js';
 
 /**
@@ -145,32 +146,6 @@ function onSessionClosed(node: string, body: unknown): void {
   channels.delete(body.chan as string);
   const reason = typeof body.reason === 'string' && body.reason !== '' ? body.reason : 'the host closed the channel';
   runHolderHandler(node, 'closed', () => channel.handlers.closed(reason));
-}
-
-/**
- * One listed host, made into exactly a `CerberusNodeHost`: a field of the wrong type becomes its
- * empty value, so a consumer walking the cache never meets `undefined` or a string where a list is
- * expected. Null when the two fields everything keys on — `hostId`, `appSessionId` — are not strings.
- */
-function readNodeHost(value: unknown): CerberusNodeHost | null {
-  if (!isRecord(value) || typeof value.hostId !== 'string' || typeof value.appSessionId !== 'string') return null;
-  const text = (field: unknown): string | null => (typeof field === 'string' ? field : null);
-  const finite = (field: unknown): number | null => (typeof field === 'number' && Number.isFinite(field) ? field : null);
-  return {
-    hostId: value.hostId,
-    appSessionId: value.appSessionId,
-    userId: typeof value.userId === 'string' || typeof value.userId === 'number' ? value.userId : null,
-    cwd: text(value.cwd),
-    startedAt: finite(value.startedAt) ?? 0,
-    turnCompleteSent: value.turnCompleteSent === true,
-    heldForBackgroundWork: value.heldForBackgroundWork === true,
-    deferredTools: Array.isArray(value.deferredTools) ? value.deferredTools.filter((tool) => typeof tool === 'string') : [],
-    liveTasks: Array.isArray(value.liveTasks) ? value.liveTasks.filter((task) => typeof task === 'string') : [],
-    profile: isRecord(value.profile) ? value.profile : null,
-    cliVersion: text(value.cliVersion),
-    cliPid: Number.isSafeInteger(value.cliPid) ? (value.cliPid as number) : null,
-    lastTurnFinishedAt: finite(value.lastTurnFinishedAt),
-  };
 }
 
 function onSessionsListed(node: string, body: unknown): void {

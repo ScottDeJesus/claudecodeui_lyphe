@@ -654,7 +654,7 @@ Both files are siblings of the over-ceiling `types.ts`, the `kanban-types.ts` pa
 |---|---|---|
 | VOCABULARY | both | `CerberusStoredStatus`, `CerberusStatus`, `CerberusDocStatus`, `CerberusProbeKind`, `CerberusUpdateStep` |
 | WARDEN WIRE | server only | `CerberusEnvelope<B>`, `CerberusSignedFrame`, `CerberusHostFacts`, `CerberusHelloBody`, `CerberusNodeCert`, `CerberusWelcomeBody`, `CerberusChecksSet`, `CerberusResultWire`, `CerberusHeartbeatBody`, `CerberusResultBody`, `CerberusAckBody`, `CerberusChecksAckBody`, `CerberusErrorBody`, `CerberusFrameType` |
-| NODE SESSIONS | server only | `CerberusHostFrame`, `CerberusNodeHost`, `CerberusSessionOpenBody`, `CerberusSessionFrameBody`, `CerberusSessionDetachBody`, `CerberusSessionClosedBody`, `CerberusSessionsListBody`, `CerberusSessionsListedBody`, `CerberusSessionRetireBody`, `CerberusSessionsChangedBody` (`sessions.changed`, warden → center: a retire is over, list the node again); none rides the outbox: the host's journal and acked cursor are the replay |
+| NODE SESSIONS | server only | `CerberusHostFrame`, `CerberusNodeHost`, `CerberusNodeHostLastTurn` (a listed host's last finished turn: `endedAt`, `modelUsage`, and `request`, the turn's last main-thread request cut to `type`, `parent_tool_use_id`, `message.model`, `message.usage`; null when none), `CerberusSessionOpenBody`, `CerberusSessionFrameBody`, `CerberusSessionDetachBody`, `CerberusSessionClosedBody`, `CerberusSessionsListBody`, `CerberusSessionsListedBody`, `CerberusSessionRetireBody`, `CerberusSessionsChangedBody` (`sessions.changed`, warden → center: a retire is over, list the node again); none rides the outbox: the host's journal and acked cursor are the replay |
 | FIXES: CATALOG AND RUNS | server only | `CerberusCatalogSet`, `CerberusCatalogAckBody`, `CerberusRunStartBody`, `CerberusRunAcceptedBody`, `CerberusRunRefusedBody`, `CerberusRunOutputBody`, `CerberusRunEndBody`, `CerberusProbeRunBody`; every warden → center run frame rides the outbox (same `seq` counter as `result`, acked by `ack`), center → warden frames never queue |
 | DIAGNOSIS | server only | `CerberusDiagTool`, `CerberusDiagOpenBody`, `CerberusDiagOpenedBody`, `CerberusDiagCallBody`, `CerberusDiagResultBody`, `CerberusDiagCloseBody`; the five `diag.*` frame types of `CerberusFrameType`; none rides the outbox, `seq` is null both ways (MAN-7902) |
 | WARDEN UPDATES | server only | `CerberusUpdateOfferBody`, `CerberusUpdateProgressBody`; the two `update.*` frame types of `CerberusFrameType`; `update.progress` rides the outbox (same `seq` counter as `result`, acked by `ack`), `update.offer` never queues; the offer's signature is the frame's own, the `sha256` inside it center's vouched hash; an update that restarts the warden ends on the next `hello`'s `update` member, one that does not (`failed`, or an offer for the version already running) ends on its last step (MAN-7902) |
@@ -1174,6 +1174,7 @@ Center's side of running a Claude session on a node's machine: one channel per r
 | file | owns |
 |---|---|
 | `node-sessions.ts` | `nodeSessions`, exported from the cerberus barrel (`index.ts`); imports nothing from providers |
+| `node-host-reading.ts` | `readNodeHost`: one listed host made into exactly a `CerberusNodeHost` |
 | `.verify/probe-cerberus-node-sessions.mjs` | end-to-end probe with a stand-in warden |
 
 ## API — `nodeSessions`
@@ -1182,7 +1183,7 @@ Center's side of running a Claude session on a node's machine: one channel per r
 | `isLinked(node)` | a warden socket is open now (`wardenLinks.isLinked`) |
 | `isColocated(node)` | `nodes.machine_id` (from the last `hello`'s `facts.machineId`) equals the first line of this machine's `/etc/machine-id`. False when this machine has no such file: two machines without an id are never co-located |
 | `openChannel(node, { op, hostId, cwd, frame }, { frame, closed })` | sends `session.open` under a fresh `chan`; returns `{ send(frame), detach() }`, or `null` when the node has no link or the link took no frame (nothing was opened, no handler will be called) |
-| `listHosts(node)` | `sessions.list` → `Promise<CerberusNodeHost[]>`; keeps the answer for `lastListed`. Rejects at once when the node is not linked, when the frame cannot be put on the link, or when the link is lost before the answer; else rejects at 10 s (`LIST_TIMEOUT_MS`) |
+| `listHosts(node)` | `sessions.list` → `Promise<CerberusNodeHost[]>`; keeps the answer for `lastListed`. Each host is read by `readNodeHost` (`node-host-reading.ts`) into exactly a `CerberusNodeHost`: a field of the wrong type, or one a warden from before it does not list (`releasedCalls`, `idleCheck`, `lastTurn`), becomes its empty value; `liveTasks` becomes `null`, "this warden cannot say", which is not `[]`, "none running" (`compaction/node-task-ledger.ts`). Rejects at once when the node is not linked, when the frame cannot be put on the link, or when the link is lost before the answer; else rejects at 10 s (`LIST_TIMEOUT_MS`) |
 | `lastListed(node)` | the node's last answer, `[]` before the first; survives the link dropping |
 | `retireHost(node, hostId)` | `session.retire`; `true` when the frame went out. The warden answers later, when the retire is over, with `sessions.changed` (`onHostsChanged`) |
 | `onHostsChanged(listener)` | `listener(node)` for each `sessions.changed` a warden sends; returns the unsubscribe. A throw or rejection is logged with the node. A warden older than the frame never sends it. The session host's `watchNodeLinks` subscribes `noteNodeHostsChanged`, which lists the node again |
@@ -1239,7 +1240,7 @@ case "$D" in /tmp/cerberus-node-sessions.*) rm -rf "$D" ;; esac
 ## Open
 - `node-sessions.ts` is past the 300-line ceiling (371); a split is its own pure move.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/node-sessions.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/projects.db.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/projects/services/project-node.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-cerberus-node-sessions.mjs
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/node-host-reading.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/node-sessions.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/projects.db.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/projects/services/project-node.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-cerberus-node-sessions.mjs
 
 ## MAN-7904 — Runs — `startRun`, the run frames, the recheck, the reconciliation on `hello`, and Cerberus's own auto-run rule
 

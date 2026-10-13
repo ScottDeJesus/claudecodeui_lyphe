@@ -76,6 +76,42 @@ export function hostTransport(send: (frame: CerberusHostFrame) => void): HostTra
   };
 }
 
+/**
+ * The bits a re-adoption knows about a host's meta, and the calls its journal shows finished that the meta still names.
+ * `turnCompleteSent`, `heldForBackgroundWork` and `deferredTools` are the host's own, as its listing read them;
+ * `releasedCalls` are the finished calls the listing already left out of `deferredTools`.
+ */
+export type HostRelease = {
+  turnCompleteSent: boolean;
+  heldForBackgroundWork: boolean;
+  deferredTools: string[];
+  releasedCalls?: string[];
+};
+
+/**
+ * Tells a re-attached host which background calls its journal shows finished, so its meta stops naming them. The host is
+ * the one writer of its meta, so a call the journal shows finished stays in the file until it is told: every boot would
+ * read it, release it and say so again. `ack: false` changes the bits and moves no cursor, and the frame rides behind the
+ * `hello` on the same pipe, so a replayed `result`'s own note still lands after it. Nothing is sent when nothing was released.
+ *
+ * Written ONCE for both transports: a chat's host answers to the same note wherever it runs, and a node's chat is as
+ * stuck by a mark nobody released as a local one.
+ *
+ * consumer: spawner.ts (`placeInHost`, after the `hello`), node-transport.ts (`placeInNodeHost`, after the facade attaches)
+ */
+export function writeReleaseBack(facade: Facade, hostId: string, reattach: HostRelease, node: string | null = null): void {
+  const released = reattach.releasedCalls ?? [];
+  if (released.length === 0) return;
+  facade.note({
+    turnCompleteSent: reattach.turnCompleteSent,
+    heldForBackgroundWork: reattach.heldForBackgroundWork,
+    deferredTools: reattach.deferredTools,
+    ack: false
+  });
+  const where = node === null ? '' : ` on node ${node}`;
+  console.log(`[keepalive] host ${hostId}${where}: wrote the release of ${released.length} finished background call(s) back to its meta`);
+}
+
 /** `env` is held by the host in memory only — it never reaches the meta or the journal. */
 export function plainEnv(env: SpawnOptions['env']): Record<string, string> {
   const copy: Record<string, string> = {};

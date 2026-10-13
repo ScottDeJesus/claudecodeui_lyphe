@@ -56,15 +56,17 @@ import { createLiveTaskReader } from './host-live-tasks.js';
  * host owns (`child.pid` in `host.js`) — null for a meta that holds none. `releasedCalls` are the
  * calls the meta still names that the journal shows reported finished: `deferredTools` already
  * leaves them out, and the host — the one writer of its meta — has not been told yet. This registry
- * always sets it; the field is optional because a node's list, read back through a warden, may not.
+ * always sets it; the field is optional because a node's list, read back through a warden that predates
+ * it, carries none (center reads that as `[]`).
  * `liveTasks` are the ids of the CLI's own background tasks the journal shows running — a `task_started`
  * with no `task_notification` after it, less what its newest `background_tasks_changed` dropped: the
  * live loop's `backgroundTasks`, rebuilt from the frames it could not have kept across a restart. Optional
- * for the same reason as `releasedCalls`. `idleCheck` is the meta's record of the idle compaction check.
+ * for the same reason as `releasedCalls`, and null in a node's list read back through a warden that predates it
+ * (its tasks are unknown, which is not none). `idleCheck` is the meta's record of the idle compaction check.
  * @typedef {{
  *   hostId: string, appSessionId: string, userId: string | number | null, cwd: string | null,
  *   startedAt: number, turnCompleteSent: boolean, heldForBackgroundWork: boolean,
- *   deferredTools: string[], releasedCalls?: string[], liveTasks?: string[], idleCheck?: IdleCheck | null,
+ *   deferredTools: string[], releasedCalls?: string[], liveTasks?: string[] | null, idleCheck?: IdleCheck | null,
  *   profile: Record<string, unknown> | null, cliVersion: string | null, cliPid: number | null
  * }} LiveHost
  */
@@ -170,6 +172,47 @@ function readOutputOfType(raw, type) {
   } catch {
     return null;
   }
+}
+
+/** A usage field as a count: anything that is not a finite number reads as zero. @param {unknown} value */
+function readTokenCount(value) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+/**
+ * THE ONE RULE for which assistant message counts as a turn's request — the request whose usage is the chat's context size —
+ * and what it measures. A message counts when it is an assistant message of the main thread (no `parent_tool_use_id`: a
+ * subagent's request reports the subagent's own window), carries a `message.usage` object, was not made by the CLI's
+ * `<synthetic>` stand-in for an API error, and reports more than zero tokens (a request with all-zero usage would overwrite the
+ * last real one). `used` is that request's whole context: its input, both cache counts and its output, each in the snake_case
+ * the CLI writes or the camelCase spelling the SDK types use (the sum `buildTokenBudget` shows the composer, which is a display
+ * and not part of this rule).
+ *
+ * The one implementation, so its readers cannot disagree: this file is the API's own and the warden's, and the API's
+ * runtime (a live stream's message, a local host's journal, a node's listed request) and the warden's listing
+ * (`warden/src/last-turn.mjs`) all ask it, and nowhere is the rule restated.
+ *
+ * consumer: claude-runtime.provider.js (each assistant message of a live stream), claude-compaction-restore.ts (a re-adopted
+ * host's last turn, from a local journal or a node's listing), warden/src/last-turn.mjs (which journal message a node lists)
+ * @param {unknown} message A stream message or a journal's parsed CLI line.
+ * @returns {{ used: number, model: string | null } | null} Null when the message is not a request of the main thread.
+ */
+export function mainThreadRequestOf(message) {
+  if (!message || typeof message !== 'object') return null;
+  const streamMessage = /** @type {Record<string, unknown>} */ (message);
+  if (streamMessage.type !== 'assistant' || streamMessage.parent_tool_use_id) return null;
+  const inner = streamMessage.message;
+  if (!inner || typeof inner !== 'object') return null;
+  const { model, usage } = /** @type {Record<string, unknown>} */ (inner);
+  if (!usage || typeof usage !== 'object' || model === '<synthetic>') return null;
+  const fields = /** @type {Record<string, unknown>} */ (usage);
+  const cacheTokens =
+    readTokenCount(fields.cache_creation_input_tokens ?? fields.cacheCreationInputTokens ?? fields.cacheCreationTokens) +
+    readTokenCount(fields.cache_read_input_tokens ?? fields.cacheReadInputTokens ?? fields.cacheReadTokens);
+  const used =
+    readTokenCount(fields.input_tokens ?? fields.inputTokens) + cacheTokens + readTokenCount(fields.output_tokens ?? fields.outputTokens);
+  return used > 0 ? { used, model: typeof model === 'string' ? model : null } : null;
 }
 
 /**
@@ -388,9 +431,9 @@ export function createHostRegistry({ tmuxSocketName, keepaliveSession, sessionsD
    * The host's last finished turn as its journal records it, for a boot that adopts a host it did not run: when the newest `result`
    * landed (`endedAt`), that result's `modelUsage`, and `budget` — what `readBudget` makes of the turn's LAST assistant message it
    * accepts. The walk goes newest first and stops at the previous `result`, the bound at which the live loop resets its own budget, so
-   * a turn that ran no request (a compaction's seed append) has none. `readBudget` is the caller's reading, the live stream's own
-   * extractor: this file imports nothing of the API (a warden runs it too) and so holds no opinion of what a budget is. Null when the
-   * journal holds no `result`.
+   * a turn that ran no request (a compaction's seed append) has none. `readBudget` is the caller's reading of one message, null for one
+   * that is not the turn's request: the API passes `mainThreadRequestOf` itself, and the warden a reading that keeps the message's own
+   * request fields for its listing but accepts exactly the messages `mainThreadRequestOf` does. Null when the journal holds no `result`.
    * @template T
    * @param {string} hostId
    * @param {(message: Record<string, unknown>) => T | null} readBudget

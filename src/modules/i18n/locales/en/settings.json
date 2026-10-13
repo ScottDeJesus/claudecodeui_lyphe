@@ -428,7 +428,7 @@
       "whenPressed": "when you press Compact or type /compact;",
       "atTurnEnd": "at the end of a turn that leaves the chat past half its context window — never in the middle of work;",
       "whenIdle": "when the chat has sat idle for 54 minutes holding 200K tokens or more, in place of the CLI’s own idle compaction.",
-      "after": "The chat moves to a new session seeded with the summary and its latest messages, and keeps its own model and effort. The CLI’s auto-compact stays on as the net. Chats placed on a node keep the CLI’s own compaction. A flip reaches each chat at its next message.",
+      "after": "The chat moves to a new session seeded with the summary and its latest messages, and keeps its own model and effort. The CLI’s auto-compact stays on as the net. Chats placed on a node are compacted the same way. A flip reaches each chat at its next message.",
       "waiting": "Waiting: <why>{{why}}</why>. Chats compact as before until it can.",
       "readinessUnread": "Whether this Claude Code can serve the summarizer could not be read.",
       "unreadable": "The switch could not be read from the server, so its position is unknown — this is not the same as off. It is retried whenever this page regains focus."

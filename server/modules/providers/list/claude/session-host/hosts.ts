@@ -59,17 +59,18 @@ export type LiveHost = {
   /**
    * The calls the meta still names that the host's journal shows reported finished — `deferredTools`
    * already leaves them out. The host alone writes its meta, so re-adoption tells it (`spawner.ts`) and
-   * the next boot reads a meta that no longer holds them. Absent on a node's host: its warden lists none.
+   * the next boot reads a meta that no longer holds them. A node's host carries it from its warden's listing (`[]`
+   * from a warden that predates the field).
    */
   releasedCalls?: string[];
   /**
    * The ids of the CLI's own background tasks the host's journal shows running (`host-live-tasks.js`): what the
    * runtime's `backgroundTasks` held, rebuilt for a process that has just been re-adopted. Every kind of task
    * counts, so a host with one is busy to the version sweep and the activity reading and to the process's idle closer.
-   * Absent on a node's host whose warden predates the field.
+   * `null` on a node's host whose warden predates the field: its tasks are unknown, which is not the same as none.
    */
-  liveTasks?: string[];
-  /** The meta's record of the idle compaction check for the host's last turn end, or null. Absent on a node's host. */
+  liveTasks?: string[] | null;
+  /** The meta's record of the idle compaction check for the host's last turn end, or null. */
   idleCheck?: IdleCheck | null;
   profile: Record<string, unknown> | null;
   /**

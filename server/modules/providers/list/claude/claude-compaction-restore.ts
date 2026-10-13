@@ -11,27 +11,44 @@
  * consumer: claude-runtime.provider.js (at the adoption of a host whose turn is complete)
  */
 
+import type { CerberusNodeHostLastTurn } from '@/shared/cerberus-types.js';
 import type { AnyRecord, ChatTurnReport, IdleCheck, ProviderRuntimeContext } from '@/shared/types.js';
 
 import {
   callHook,
   contextWindowFor,
   describeProcessActivity,
-  mainThreadBudgetOf,
   sendOptionsOfTurn
 } from './claude-compaction-seams.js';
 import type { ProfileForSend } from './claude-compaction-seams.js';
-import { lastTurnRecord } from './session-host/index.js';
+import { lastTurnRecord, mainThreadRequestOf } from './session-host/index.js';
+
+/**
+ * A node host's last turn as `lastTurnRecord` would have returned it for a local one: the warden's record, with the
+ * budget read out of its request. Null when the warden listed no turn.
+ */
+function turnOfListing<Budget>(
+  listed: CerberusNodeHostLastTurn | null | undefined,
+  readBudget: (message: AnyRecord) => Budget | null
+): { endedAt: number; modelUsage: unknown; budget: Budget | null } | null {
+  if (!listed) return null;
+  return { endedAt: listed.endedAt, modelUsage: listed.modelUsage, budget: listed.request ? readBudget(listed.request) : null };
+}
 
 /**
  * Reports the re-adopted host's last finished turn to the compaction. Nothing is reported for a chat with no
- * app session id, for a host on a node (its journal lives on the node, and its chat runs the node's own copy of
- * the compaction), for a host that never ended a turn, or when the compaction's hook fails (logged, never thrown:
- * a compaction must not break the adoption it follows).
+ * app session id, for a host that never ended a turn (or, on a node, whose warden lists no last turn: one from
+ * before the field), or when the compaction's hook fails (logged, never thrown: a compaction must not break the
+ * adoption it follows).
+ *
+ * A local host's last turn is read off its journal here. A node's journal is the warden's own, at a path this
+ * server is never handed, so its warden reads it with the same registry function and lists the record
+ * (`reattach.lastTurn`); the one request in it goes through `mainThreadRequestOf`, the rule a live stream's message
+ * and a local journal go through as well.
  *
  * `options` and `profile` are the adopted run's own, so the report's send options are what a live turn end of
- * this process would carry. `extractTokenBudget` is the runtime's reading of one stream message: the journal's
- * lines are those messages, so the restored context is the number the turn end would have reported.
+ * this process would carry. The journal's lines are the stream's own messages and `mainThreadRequestOf` reads them as the
+ * live loop does, so the restored context is the number the turn end would have reported.
  * `backgroundTasks` and `deferredCalls` are what the adopted process still waits for (the tasks its host's journal
  * shows running, the calls its meta holds), so the report's activity reads busy exactly when the process does.
  */
@@ -40,20 +57,20 @@ export function reportRestoredTurn(
   adopted: {
     sessionId: string | null | undefined;
     userId: string | number | null;
-    reattach: { hostId: string; node: string | null; idleCheck?: IdleCheck | null };
+    reattach: { hostId: string; node: string | null; idleCheck?: IdleCheck | null; lastTurn?: CerberusNodeHostLastTurn | null };
     options: AnyRecord;
     profile: ProfileForSend | null;
     backgroundTasks: number;
     deferredCalls: number;
-    extractTokenBudget: (message: AnyRecord) => { used: number } | null;
   }
 ): void {
   const appSessionId = adopted.sessionId;
-  if (!appSessionId || adopted.reattach.node) return;
+  if (!appSessionId) return;
   callHook('turnRestored', () => {
-    const turn = lastTurnRecord(adopted.reattach.hostId, (message) =>
-      mainThreadBudgetOf(message as { type?: string; message?: { model?: unknown } }, adopted.extractTokenBudget(message))
-    );
+    const turn =
+      adopted.reattach.node === null
+        ? lastTurnRecord(adopted.reattach.hostId, mainThreadRequestOf)
+        : turnOfListing(adopted.reattach.lastTurn, mainThreadRequestOf);
     if (turn === null) return undefined;
     const report: ChatTurnReport = {
       appSessionId,

@@ -30,6 +30,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 import { createHostRegistry } from '../../server/modules/providers/list/claude/session-host/host-registry.js';
+import { listedLastTurn } from './last-turn.mjs';
 import { log } from './log.mjs';
 import { oneLine } from './wire.mjs';
 
@@ -275,7 +276,11 @@ export function createSessions({ link, home }) {
   }
 
   function list(_body, envelope) {
-    const hosts = registry.listLiveHosts().map((host) => ({ ...host, lastTurnFinishedAt: registry.lastTurnFinishedAt(host.hostId) }));
+    const hosts = registry.listLiveHosts().map((host) => ({
+      ...host,
+      lastTurnFinishedAt: registry.lastTurnFinishedAt(host.hostId),
+      lastTurn: listedLastTurn(registry, host.hostId),
+    }));
     say('sessions.listed', { re: envelope?.id, hosts });
   }
 

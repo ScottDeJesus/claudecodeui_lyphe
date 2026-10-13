@@ -2575,7 +2575,7 @@ An override that is not a positive finite number falls back to the default; `CUS
 | `report.seed` | log `a seed append arms nothing` |
 | otherwise | arm the idle deadline, then test the report below |
 
-Not due, tested in this order: turn aborted; context or window unknown; under the fraction (`not due: 3.3% of the window, due at 50.0%`); under the growth since the last compaction (§"The growth guard"); chat placed on a node; a flight in progress; chat under an automatic refusal. Due and `activity.busy` → kept as the chat's one pending report (`due, kept pending until the process goes quiet`). Due and quiet → `startRun(report, 'auto')` synchronously inside `turnEnded`: the turn's `complete` has gone out and the queued-message pass waits on a `setImmediate`, so the reservation lands first and a queued message lands in the new session.
+Not due, tested in this order: turn aborted; context or window unknown; under the fraction (`not due: 3.3% of the window, due at 50.0%`); under the growth since the last compaction (§"The growth guard"); a chat whose node's warden lists no live tasks (`not taken over: the chat's node warden lists no background tasks`); a flight in progress; chat under an automatic refusal. Due and `activity.busy` → kept as the chat's one pending report (`due, kept pending until the process goes quiet`). Due and quiet → `startRun(report, 'auto')` synchronously inside `turnEnded`: the turn's `complete` has gone out and the queued-message pass waits on a `setImmediate`, so the reservation lands first and a queued message lands in the new session.
 
 ## The growth guard
 `notDueBecause` reads `sessionCompactionsDb.latestCompaction(appSessionId)` (MAN-8046) right after the fraction test; `post_tokens` of the newest `compaction` row is the baseline. No record, or a record with `post_tokens` NULL: not held. Held → logged `not due: the context grew <n> since the last compaction, under <needed>`.
@@ -2607,9 +2607,9 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/compaction/auto-t
 ## MAN-8316 — modules/compaction triggers — turn end and its growth guard, idle, the pending — A restart
 section: modules/compaction triggers — turn end and its growth guard, idle, the pending wake, startRun, shutdown and the decision line/002 A restart
 
-The deadline is a timer in the server's memory, so every restart and handover drops it, and the dev server hands over on every save under `server/`. It is restored from what is on disk, with no store of deadlines. A chat with a deadline still to come always has a live host (the process closes after 120 minutes without a message, the idle wait is 54), and the boot's re-adoption walks exactly those hosts. For a LOCAL host whose last turn was complete, the Claude runtime reads the turn's end off the host's journal and calls `turnRestored(report, endedAt, idleTries)` (MAN-8055; `idleTries` is the host meta's count of idle starts for that turn end, "Bounded across a restart"); a host mid-turn gets its deadline from its own turn end, and a node's chat is left alone (the node runs its own copy, and `takesOver` refuses it).
+The deadline is a timer in the server's memory, so every restart and handover drops it, and the dev server hands over on every save under `server/`. It is restored from what is on disk, with no store of deadlines. A chat with a deadline still to come always has a live host (the process closes after 120 minutes without a message, the idle wait is 54), and the boot's re-adoption walks exactly those hosts. For a host whose last turn was complete, the Claude runtime reads the turn's end off the host's journal — a LOCAL host's from this machine's own, a node's from the warden's listing, which carries the same registry function's record of it (`lastTurn`; the server is never handed the warden's home path) — and calls `turnRestored(report, endedAt, idleTries)` (MAN-8055; `idleTries` is the host meta's count of idle starts for that turn end, "Bounded across a restart"); a host mid-turn gets its deadline from its own turn end. A chat on a node is taken over like any other, so it is restored like any other; a node whose warden predates `lastTurn` lists none, and its chats are restored from their next turn end. A node whose warden predates `liveTasks` (0.12.0) lists no task ledger either, and is read as unknown, not as none: such a chat is not taken over at all (`takesOver` false, MAN-8067), so no idle check fires for it and it keeps the CLI's own compaction.
 
-`turnRestored` (`auto-trigger.ts`) does nothing when stopped, for a node's report, or when the chat already holds a deadline (a turn that ended since this boot armed a newer one). Otherwise it does nothing with the switch off (`takeoverSnapshot()` false), and asks `planIdleRestore` (`idle-restore.ts`), keeps the report's context for a manual compaction's `pre_tokens` (`rememberTurnContext`) unless the plan says the chat was compacted since, logs one decision line (`trigger=idle`) and arms or not:
+`turnRestored` (`auto-trigger.ts`) does nothing when stopped, or when the chat already holds a deadline (a turn that ended since this boot armed a newer one). Otherwise it does nothing with the switch off (`takeoverSnapshot()` false), and asks `planIdleRestore` (`idle-restore.ts`), keeps the report's context for a manual compaction's `pre_tokens` (`rememberTurnContext`) unless the plan says the chat was compacted since, logs one decision line (`trigger=idle`) and arms or not:
 
 | the chat | line, `decision=` |
 |---|---|
@@ -2622,7 +2622,7 @@ The deadline is a timer in the server's memory, so every restart and handover dr
 
 The remainder is never longer than a whole wait. Overdue chats are queued, not started together (`createRestoreSpacer`): the first starts at the settle, the next 30 s after it, and so on, because each start is a summarizer call of up to 600,000 tokens and a process replacement, all in the first seconds after a dev-server save. The spacing is of the starts, not a limit on how many compactions run at once: a long one still overlaps the next. A restore with time left on its wait is not queued. The settle exists because re-adoption is asynchronous: the adopted process registers its handle and replays what the previous server never acknowledged in its first seconds, and a turn that ends in that replay arms the chat's own deadline and clears this one (`clearIdle`).
 
-The report of a node's host is never made: the runtime reports only LOCAL hosts (`reportRestoredTurn` returns for a `reattach.node`), because a node's journal lives on the node.
+A node host's report is made from the warden's listing: `reportRestoredTurn` (`claude-compaction-restore.ts`) takes `reattach.lastTurn` (`CerberusNodeHostLastTurn`: `endedAt`, `modelUsage`, and the turn's last main-thread request cut down to the fields the token reading uses) where a local host's is read off its journal, and runs the one request through `mainThreadRequestOf` (`session-host/host-registry.js`), the rule a live stream's message and a local journal go through too. The warden computes it with the registry's own `lastTurnRecord` and the same `mainThreadRequestOf` (`warden/src/last-turn.mjs` only cuts the message it chose down to the fields the rule reads), so there is one reading of a journal and one rule for which message is its request.
 
 A restored deadline is the same timer as any other: its fire is `fireIdleDeadline`, so every gate above applies (chat row, the floor, `takesOver`, a run in progress, a busy process, a flight, a refusal) and a busy process keeps it for the next quiet (`idleRetries`). A restore never starts a compaction itself, and never in a chat that is mid-turn or busy. A chat that was due and busy when the server restarted is picked up the same way; there is no second mechanism.
 
@@ -2670,7 +2670,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/compaction/auto-t
 
 ## What stays of the CLI's own compaction
 Who writes the summary: `~/.claude/scripts/summarize`, on the launch table's `[summarizer]` model and effort (read at the call, MAN-7407; edited in Edit Agent Chains, MAN-7417). The chat keeps its own model and effort: the seed append rides the triggering turn's send options.
-| CLI mechanism | taken-over chat | not taken over (switch off, summarizer not ready, node) |
+| CLI mechanism | taken-over chat | not taken over (switch off, summarizer not ready) |
 |---|---|---|
 | typed or pressed `/compact` | the summarizer's, through the decorator | the CLI's |
 | idle compaction | OFF: `idleCompaction: false` (`CLI_COMPACTION_SETTINGS`, MAN-8055); CloudCLI's idle trigger replaces it (MAN-8066) | the CLI's own |
@@ -2687,7 +2687,11 @@ Who writes the summary: `~/.claude/scripts/summarize`, on the launch table's `[s
 | shutdown | `stopChatCompaction()` in `shutdownRuntimeServices`, right after `closeScheduledMessageDispatcher()` |
 | type | `withChatCompaction<Inner extends CompactionInnerRuntime>(inner): Inner` spreads the service; members the gateway type does not name (`recallApproval`) ride through |
 
-## Files
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/compaction/, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/compaction/compaction-mode.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/compaction/compaction-runtime.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/compaction/index.ts
+
+## MAN-8338 — modules/compaction wiring — the decorator and the options it owns — Files
+section: modules/compaction wiring — the decorator and the options it owns (`transcriptAppend`, `compactionSeed`), what takes a chat over, the files and shutdown/001 Files
+
 | file | owns |
 |---|---|
 | `compaction-runtime.ts` | the decorator: `run` removes the options this module owns from every Claude run, re-seeds a start-over in a compacted chat, and intercepts a taken-over `/compact`; `abort` routes to the flight; `stopChatCompaction` |
@@ -2695,6 +2699,7 @@ Who writes the summary: `~/.claude/scripts/summarize`, on the launch table's `[s
 | `idle-restore.ts` | `planIdleRestore`: whether a re-adopted chat is owed its idle deadline after a restart, when it falls, and whether its turn end has used its `IDLE_CHECK_MAX_TRIES`; `createRestoreSpacer`: the queue of a boot's overdue chats |
 | `compaction-procedure.ts` | `compact()`, one run |
 | `compaction-mode.ts` | switch + summarizer status → `compactionMode`, `takesOver`, `takeoverSnapshot`, `switchFlipCount`, `noteSummarizerStatus`, `noteVerbNotReady` |
+| `node-task-ledger.ts` | `taskLedgerUnlisted(appSessionId)`: the chat's node's last list holds its host with `liveTasks === null`; read by `takesOver`, the turn-end test and the decorator's `/compact` |
 | `compaction-registry.ts` | flights, activity listeners, automatic refusals, last turn contexts, `forgetSession` |
 | `compaction-guard.ts` | `waitUntilQuiet` |
 | `compaction-children.ts` | the only spawns: `runSummarizeVerb`, `fireCompactHealTrigger` |
@@ -2704,7 +2709,7 @@ Who writes the summary: `~/.claude/scripts/summarize`, on the launch table's `[s
 | `compaction-log.ts` | `logDecision` |
 
 ## What takes a chat over
-`takesOver({ appSessionId, node })` = `appSessionId !== null` AND `node === null` (a node's transcript is on the node) AND `compactionMode().on`. `on` = switch on AND summarizer `ready`; the switch is read at every call.
+`takesOver({ appSessionId })` = `appSessionId !== null` AND NOT `taskLedgerUnlisted(appSessionId)` AND `compactionMode().on`. `on` = switch on AND summarizer `ready`; the switch is read at every call. A chat placed on a Cerberus node is taken over exactly as a local one: the verb reads the transcript from this machine's disk, and a node chat's transcript is on it, because placement refuses a node that is not co-located (`node-transport.ts`, `colocationRefusal`) and the warden, its session host and this server run as the same user. The one node chat that is not taken over is one whose node's warden lists no live tasks for its host (`taskLedgerUnlisted`, `node-task-ledger.ts`: its last list carries `liveTasks: null`, a warden from before 0.12.0): a re-adopted process starts its task set from that list, so a chat re-adopted from such a warden would read as having no task while a subagent or monitor ran, and a compaction would end it. That chat keeps the CLI's own compaction until its warden is updated; the answer follows the node's last list, so it changes the moment a newer warden is listed.
 
 | when | do |
 |---|---|
@@ -2718,12 +2723,16 @@ why a not-ready status is never served from the cache: the operator edits the su
 
 `takeoverSnapshot()` = the last `compactionMode()` answer, read synchronously (`null` before any ask). The turn-end trigger needs it: its run must start in the tick of the turn's `complete`, before the queued-message pass (`setImmediate`) takes the session's reservation, and an awaited switch read lost that race. A stale snapshot is safe: the decorator re-asks `takesOver` and ends an automatic run no longer taken over with a `complete` exit 0, nothing done.
 
-## The decorator's `/compact` test
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/compaction/, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/compaction/compaction-mode.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/compaction/compaction-runtime.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/compaction/index.ts
+
+## MAN-8339 — modules/compaction wiring — the decorator and the options it owns — The decorator's `/compact` test
+section: modules/compaction wiring — the decorator and the options it owns (`transcriptAppend`, `compactionSeed`), what takes a chat over, the files and shutdown/002 The decorator's `/compact` test
+
 - Claude only; the command matches `/^\/compact(?:\s+([\s\S]*))?$/`; the words after it are the summarizer's instructions.
 - `options.sessionId` is a non-empty string; no `resumeAnchorId`, no `resumeFromScratch: true`. An edit that replaces a message with `/compact` stays an edit and reaches the CLI.
 - Trigger = `options.compactionTrigger` when `auto` or `idle`, else `manual`.
-- One `compactionMode()` read per request (none for a node's chat): `on` decides (the same test as `takesOver`), `why` explains.
-- Taken over → `compact()`. Not taken over: manual → `inner.run` (the CLI compacts), logged `handed to the CLI: <why>` when the switch is on and the summarizer cannot be served (`why` set; with the switch off `why` is null and nothing is logged; a node's chat logs nothing); automatic → logged `no longer taken over, the run ends with nothing done`, `complete` exit 0.
+- One `compactionMode()` read per request, for a node's chat too: `on` decides (with `taskLedgerUnlisted`, the same test as `takesOver`), `why` explains.
+- Taken over → `compact()`. Not taken over: manual → `inner.run` (the CLI compacts), logged `handed to the CLI: <why>` when the switch is on and the summarizer cannot be served, or the chat's node warden lists no live tasks (`why` set; with the switch off `why` is null and nothing is logged); automatic → logged `no longer taken over, the run ends with nothing done`, `complete` exit 0.
 - `abort`: a flight not yet stopped → `flight.stop()`; else `inner.abort`.
 
 ## The options this module owns on a Claude run

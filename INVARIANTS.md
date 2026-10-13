@@ -9163,41 +9163,6 @@ probe-key: 7ca27a952a6523848a29ee5fcb33608395a31d37
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/chat-busy-ledger.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/chat-busy-ledger.sh
 
-## INV-7980 — probe — the one other chat with stuck marks (Adjuster comms, `9abcf102`) is the SAME bug and stays stuck: the node-side release is not live
-
-the one other chat with stuck marks (Adjuster comms, `9abcf102`) is the SAME bug and stays stuck: the node-side release is not live
-
-```probe
-D=$(mktemp -d /tmp/athena-p.XXXXXX) || exit 1
-cat > "$D/p.sh" <<'EOF'
-cd ~/.cerberus-warden/sessions 2>/dev/null || { echo "no warden sessions dir"; exit 0; }
-python3 -I - <<'PY'
-import glob, json
-metas = glob.glob("9abcf102-*.json")
-if not metas: print("no host for 9abcf102 (the chat ended or the warden moved)")
-for mp in metas:
-    ids = set(json.load(open(mp)).get("deferredTools") or [])
-    seen = set()
-    for line in open(mp[:-5] + ".ndjson"):
-        if "task_notification" not in line: continue
-        try: o = json.loads(json.loads(line)["line"])
-        except Exception: continue
-        if o.get("subtype") == "task_notification" and o.get("tool_use_id") in ids: seen.add(o["tool_use_id"])
-    print("held calls:", len(ids), "- of them the journal shows reported:", len(seen))
-PY
-echo "warden registry copies carrying reportedCalls: $(grep -rl reportedCalls ~/.cerberus-warden/releases 2>/dev/null | wc -l)"
-EOF
-bash "$D/p.sh"
-cd /tmp; case "$D" in /tmp/athena-p.??????) rm -r "$D";; esac
-echo "[probe exit $?]"
-expect: `held calls: 8 - of them the journal shows reported: 8` and `copies carrying reportedCalls: 0` while the defect stands; cured when the held count is 0 (a warden release carrying the new host-registry.js, or the chat ended — then `no host for 9abcf102`).
-```
-
-measured 2026-10-12 by chain chain-chat-busy-ledger-20261012-105339-80e5, finding L1, LOW
-probe-key: 4ba42137c694451d5bb924620bd5ac09bca5f2b0
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/chat-busy-ledger.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/chat-busy-ledger.sh
-
 ## INV-7981 — probe — MAN-8066 says the retry runs "once" in one place and repeatedly in another
 
 MAN-8066 says the retry runs "once" in one place and repeatedly in another
@@ -9272,3 +9237,137 @@ measured 2026-10-12 by chain chain-idle-deadline-restart-20261012-125005-5a74, f
 probe-key: e9bd2e0811e379e7c1981b7c36c857cfe6e804c4
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/compaction/idle-restore.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/chat-idle-restore.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/chat-idle-restore.sh
+
+## INV-8053 — probe — a node on a warden older than 0.12.0 is taken over with an empty live-task ledger; a running CLI task can be compacted over
+
+a node on a warden older than 0.12.0 is taken over with an empty live-task ledger; a running CLI task can be compacted over
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) && cat > "$D/p.sh" <<'EOF'
+#!/usr/bin/env bash
+# A host whose journal shows a CLI task running (task_started, no task_notification), listed by the warden release the node had before
+# 0.12.0 and by the repo's, each read the way center reads a listing (`readNodeHost`). A node on 0.11.0 lists no `liveTasks`.
+set -u
+REPO=/home/lyphe/.claude/claudecodeui_lyphe
+S=$(mktemp -d /tmp/athena-probe-mixed.XXXXXX) || exit 1
+tmux -L athena-probe-tmux -f /dev/null new-session -d -s athena-probe-mixed sleep 120 || { rmdir "$S"; exit 1; }
+cat > "$S/run.mts" <<'TS'
+const { readNodeHost } = await import(`${process.env.REPO}/server/modules/cerberus/node-host-reading.ts`);
+for (const [label, root] of [['warden 0.11.0', `${process.env.HOME}/.cerberus-warden/releases/0.11.0`], ['warden 0.12.0', process.env.REPO!]] as const) {
+  const { createHostRegistry } = await import(`${root}/server/modules/providers/list/claude/session-host/host-registry.js`);
+  const registry = createHostRegistry({ tmuxSocketName: 'athena-probe-tmux', keepaliveSession: '_keepalive', sessionsDir: process.env.SESS! });
+  const read = registry.listLiveHosts().map((h: object) => readNodeHost(JSON.parse(JSON.stringify(h))));
+  console.log(`${label}: the task the journal shows running reads at center as liveTasks=${JSON.stringify(read[0]?.liveTasks)}`);
+}
+TS
+python3 -I - "$S" <<'PY'
+import json, sys
+s = sys.argv[1]; h = 'athena-probe-mixed'
+line = lambda seq, o: json.dumps({'t': 'out', 'seq': seq, 'at': 1791900000000 + seq, 'line': json.dumps(o, separators=(',', ':'))}, separators=(',', ':'))
+open(f'{s}/{h}.ndjson', 'w').write('\n'.join([line(1, {'type': 'result', 'subtype': 'success', 'modelUsage': {}}), line(2, {'type': 'system', 'subtype': 'task_started', 'task_id': 'bg-watch-1'})]) + '\n')
+json.dump({'hostId': h, 'appSessionId': 'athena-probe', 'userId': 1, 'cwd': '/tmp', 'startedAt': 1, 'turnCompleteSent': True, 'heldForBackgroundWork': False, 'deferredTools': [], 'exited': None, 'pid': 1, 'profile': None, 'deliveredSeq': 1, 'pendingResults': [], 'pendingControl': []}, open(f'{s}/{h}.json', 'w'))
+PY
+(cd /tmp && REPO="$REPO" SESS="$S" "$REPO/node_modules/.bin/tsx" --tsconfig "$REPO/server/tsconfig.json" "$S/run.mts" 2>&1 | tail -3)
+tmux -L athena-probe-tmux kill-server 2>/dev/null
+case "$S" in /tmp/athena-probe-mixed.*) rm -rf "$S";; esac
+EOF
+bash "$D/p.sh"; case "$D" in /tmp/athena-probe.*) rm -rf "$D";; esac
+echo "[probe exit $?]"
+expect: `warden 0.11.0: … liveTasks=[]` and `warden 0.12.0: … liveTasks=["bg-watch-1"]` while the defect stands; cured when center no longer reads a listing with no `liveTasks` as an empty ledger (the 0.11.0 line prints something other than `[]`, e.g. `null`) or a node whose warden does not list it is refused the takeover
+```
+
+measured 2026-10-13 by chain chain-node-chat-compaction-20261013-103559-d5e3, finding M1, MEDIUM
+probe-key: 0bdc44559e3715d4f93811a0f9774114efa5770b
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/node-host-reading.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/node-sessions.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/compaction/compaction-mode.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/compaction/node-task-ledger.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/cerberus-types.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/cerberus-node-compaction.mjs, /home/lyphe/.claude/claudecodeui_lyphe/warden/package.json, /home/lyphe/.claude/claudecodeui_lyphe/warden/src/last-turn.mjs, /home/lyphe/.claude/claudecodeui_lyphe/warden/src/sessions.mjs
+
+## INV-8054 — probe — the warden's choice of "the turn's request" differs from the server's for a request that reports zero tokens
+
+the warden's choice of "the turn's request" differs from the server's for a request that reports zero tokens
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) && cat > "$D/p.sh" <<'EOF'
+#!/usr/bin/env bash
+# The warden lists a host's last main-thread request with its own selection (warden/src/last-turn.mjs); the server's reading of a
+# local host's journal also drops a request that reports no tokens. Same journal, newest request reporting zero tokens and not synthetic.
+set -u
+S=$(mktemp -d /tmp/athena-probe-last.XXXXXX) || exit 1
+cat > "$S/run.mjs" <<'JS'
+import fs from 'node:fs';
+const REPO = '/home/lyphe/.claude/claudecodeui_lyphe';
+const { createHostRegistry } = await import(`${REPO}/server/modules/providers/list/claude/session-host/host-registry.js`);
+const { listedLastTurn } = await import(`${REPO}/warden/src/last-turn.mjs`);
+const dir = process.argv[2];
+const out = (seq, o) => JSON.stringify({ t: 'out', seq, at: 1791900000000 + seq, line: JSON.stringify(o) });
+const asst = (usage) => ({ type: 'assistant', parent_tool_use_id: null, message: { model: 'claude-opus-5-5', usage, content: [] } });
+const lines = [
+  out(1, asst({ input_tokens: 5, cache_read_input_tokens: 141000, output_tokens: 317 })),
+  out(2, asst({ input_tokens: 0, cache_creation_input_tokens: 0, cache_read_input_tokens: 0, output_tokens: 0 })),
+  out(3, { type: 'result', subtype: 'success', modelUsage: {} }),
+];
+fs.writeFileSync(`${dir}/h.ndjson`, lines.join('\n') + '\n');
+const registry = createHostRegistry({ tmuxSocketName: 'athena-no-such-server', keepaliveSession: '_keepalive', sessionsDir: dir });
+const used = (u) => ['input_tokens', 'cache_creation_input_tokens', 'cache_read_input_tokens', 'output_tokens'].reduce((n, k) => n + (Number(u?.[k]) || 0), 0);
+// the server's reading of a LOCAL host's journal (mainThreadBudgetOf + extractTokenBudget): a request with used <= 0 is skipped
+const local = registry.lastTurnRecord('h', (m) => (m.type === 'assistant' && !m.parent_tool_use_id && m.message?.model !== '<synthetic>' && used(m.message?.usage) > 0 ? { used: used(m.message.usage) } : null));
+const listed = listedLastTurn(registry, 'h');
+console.log(`local host's context: ${local?.budget?.used ?? 'none'} | node host's request as listed: ${listed?.request ? used(listed.request.message.usage) : 'none'} tokens`);
+JS
+node "$S/run.mjs" "$S" 2>&1 | tail -3
+case "$S" in /tmp/athena-probe-last.*) rm -rf "$S";; esac
+EOF
+bash "$D/p.sh"; case "$D" in /tmp/athena-probe.*) rm -rf "$D";; esac
+echo "[probe exit $?]"
+expect: `local host's context: 141322 | node host's request as listed: 0 tokens` while the defect stands; cured when the listed request is the earlier one (`… listed: 141322 tokens`)
+```
+
+measured 2026-10-13 by chain chain-node-chat-compaction-20261013-103559-d5e3, finding L1, LOW
+probe-key: e0158dd192bf472df4aca9f1bc38a81aade8407e
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/node-host-reading.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/node-sessions.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/compaction/compaction-mode.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/compaction/node-task-ledger.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/cerberus-types.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/cerberus-node-compaction.mjs, /home/lyphe/.claude/claudecodeui_lyphe/warden/package.json, /home/lyphe/.claude/claudecodeui_lyphe/warden/src/last-turn.mjs, /home/lyphe/.claude/claudecodeui_lyphe/warden/src/sessions.mjs
+
+## INV-8055 — probe — the 0.12.0 note does not name the third change that ships with it
+
+the 0.12.0 note does not name the third change that ships with it
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) && cat > "$D/p.sh" <<'EOF'
+#!/usr/bin/env bash
+# What the delivered 0.12.0 carries that 0.11.0 did not, against what its one-line note says it carries.
+R=$HOME/.cerberus-warden/releases
+H=server/modules/providers/list/claude/session-host/host.js
+echo "host.js lines naming the spawn-failure explanation, 0.11.0 -> 0.12.0: $(grep -c explainSpawnError "$R/0.11.0/$H") -> $(grep -c explainSpawnError "$R/0.12.0/$H")"
+python3 -I - "$R/0.12.0/warden/package.json" <<'PY'
+import json, sys
+note = json.load(open(sys.argv[1]))["cerberus"]["note"]
+print("the 0.12.0 note names it:", any(w in note.lower() for w in ("spawn", "cannot start", "could not start", "working folder", "never ran")))
+PY
+EOF
+bash "$D/p.sh"; case "$D" in /tmp/athena-probe.*) rm -rf "$D";; esac
+echo "[probe exit $?]"
+expect: `0 -> 2` and `the 0.12.0 note names it: False`; this stands for 0.12.0 for good (a delivered version is never re-noted); the probe is for the next release's note, which must name what its diff against 0.12.0 carries
+```
+
+measured 2026-10-13 by chain chain-node-chat-compaction-20261013-103559-d5e3, finding L2, LOW
+probe-key: a680e7e83e035a83fe9590a12b22259cc353bcaa
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/node-host-reading.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/node-sessions.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/compaction/compaction-mode.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/compaction/node-task-ledger.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/cerberus-types.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/cerberus-node-compaction.mjs, /home/lyphe/.claude/claudecodeui_lyphe/warden/package.json, /home/lyphe/.claude/claudecodeui_lyphe/warden/src/last-turn.mjs, /home/lyphe/.claude/claudecodeui_lyphe/warden/src/sessions.mjs
+
+## INV-8056 — probe — the phases file still carries the removed `node` input of `takesOver`
+
+the phases file still carries the removed `node` input of `takesOver`
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) && cat > "$D/p.sh" <<'EOF'
+#!/usr/bin/env bash
+grep -n 'takesOver({ appSessionId: sessionId ?? null, node' "$HOME/.claude/plans/custom-compaction.phases.toml" | cut -c1-140 || echo none
+EOF
+bash "$D/p.sh"; case "$D" in /tmp/athena-probe.*) rm -rf "$D";; esac
+echo "[probe exit $?]"
+expect: a line starting `276:` while it stands; `none` once the line reads `takesOver({ appSessionId: sessionId ?? null })`
+```
+
+measured 2026-10-13 by chain chain-node-chat-compaction-20261013-103559-d5e3, finding L3, LOW
+probe-key: c390a95442059689d1b4f24f9348ef92fc15d5ea
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/node-host-reading.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/node-sessions.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/compaction/compaction-mode.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/compaction/node-task-ledger.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/cerberus-types.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/cerberus-node-compaction.mjs, /home/lyphe/.claude/claudecodeui_lyphe/warden/package.json, /home/lyphe/.claude/claudecodeui_lyphe/warden/src/last-turn.mjs, /home/lyphe/.claude/claudecodeui_lyphe/warden/src/sessions.mjs
