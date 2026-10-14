@@ -3182,10 +3182,12 @@ that must not answer an unread lane waits for that first landing (`whenLanded`, 
 `FIRST_READ_WAIT_MS` in `dispatcher.module.ts`) and then answers the lane's not-read-yet body: a
 200, because a read with nothing to say yet is not a fault, and a body that is not the picture, so
 no client draws it (`DispatcherFeed`'s `asPicture` refuses anything that is not the whole picture),
-and the frame the first landing broadcasts fills the tab a moment later. A read of the live store is
-~170 ms for a 27 KB document, under a tenth of the interval, and a
-read that throws leaves the LAST good picture on the tab with one line in the journal per distinct
-message.
+and the frame the first landing broadcasts fills the tab a moment later. The tick is a bare
+`setInterval` (`polled-lane.service.ts`): it reads whether or not a socket is open. A read of the live
+store, 2026-10-14: a 5 MB document, 1.4–1.9 s wall (3.2 s before the `stages_by_phase`, `events_by_phase` and
+`events_by_plan` indexes, MAN-1444): 70–95% of the 2 s interval, and a read that runs past it skips the next
+tick; the roadmap's read is 0.3 s. A read that throws leaves the LAST good picture on the tab with one line in the
+journal per distinct message.
 
 The keys of that picture this lane treats as a clock rather than as content are `generated_at` and,
 on every plan and every arc, `runtime_s`: the dispatcher derives the first at second resolution on
