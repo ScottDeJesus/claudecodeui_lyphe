@@ -174,6 +174,10 @@ export function planOf(raw: unknown): DocumentPlan {
     // phase (`width.feature_hold`), or `null`. Read tolerantly like `posture`: a build older than the
     // field writes none, and the card then draws no line.
     wip_hold: textSince(field(plan, 'wip_hold'), 'plan.wip_hold'),
+    // Why this plan waits for its EPIC'S turn — the gate's own queue clause for its first ready phase
+    // (`line_gate.hold`, asked before the feature clause), or `null`. Read tolerantly like `wip_hold`
+    // beside it: a build older than the field writes none, and the card then draws no line.
+    queue_hold: textSince(field(plan, 'queue_hold'), 'plan.queue_hold'),
     created_at: need(field(plan, 'created_at'), isText, 'plan.created_at'),
     updated_at: need(field(plan, 'updated_at'), isText, 'plan.updated_at'),
     completed_at: need(field(plan, 'completed_at'), isTextOrNull, 'plan.completed_at'),

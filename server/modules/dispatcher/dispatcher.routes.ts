@@ -61,6 +61,35 @@ function wipArgs(body: unknown): string[] | null {
   return checkedLimit === undefined || checkedWord === null ? null : [checkedLimit, checkedWord];
 }
 
+/** The 400 sentence the queue route answers with when the body is not exactly one of the three moves the dispatcher's `queue` verb takes. */
+const QUEUE_BODY_ERROR = 'body must be exactly one of { "before": <epic name> }, { "last": true } or { "at": <whole number from 1 to 9999> }';
+
+/** The largest place `{ "at": N }` may name: past the end of the queue the dispatcher reads it as last, so the bound only keeps the argv word a short number. */
+const QUEUE_AT_MAX = 9999;
+
+/**
+ * The argv words of an epic's move in the queue — `['--before', <epic>]`, `['--last']` or `['--at', <N>]`
+ * after the arc's name — or `null` for a body that is not EXACTLY one of the three, checked BEFORE ANY
+ * PROCESS STARTS. The `before` name goes through the same fence as the URL's (`ARC_NAME`); `at` must be
+ * a whole number from 1 to `QUEUE_AT_MAX`; `last` must be `true`. What reaches an argv array is a
+ * spelling this server wrote, never a string the request chose.
+ */
+function queueArgs(body: unknown): string[] | null {
+  if (typeof body !== 'object' || body === null || Array.isArray(body)) return null;
+  const move = body as { before?: unknown; last?: unknown; at?: unknown };
+  if (Object.keys(move).length !== 1) return null;
+  if (typeof move.before === 'string' && ARC_NAME.test(move.before)) return ['--before', move.before];
+  if (move.last === true) return ['--last'];
+  if (typeof move.at === 'number' && Number.isInteger(move.at) && move.at >= 1 && move.at <= QUEUE_AT_MAX) return ['--at', String(move.at)];
+  return null;
+}
+
+/** The eight words the epic dial takes (`hooks/dispatcher/epic_dial.py:WORDS`): a limit of `1` to `5` or `all`, and the pause. The only `word` values the epics route relays. */
+const EPIC_WORDS: readonly string[] = ['1', '2', '3', '4', '5', 'all', 'pause', 'resume'];
+
+/** The 400 sentence the epics route answers with when the body names none of the eight. */
+const EPICS_BODY_ERROR = 'word must be one of 1, 2, 3, 4, 5, all, pause or resume';
+
 /** A design's stamp (`designs.loaded_at`, `store.now()`'s shape): the lock an "Accept when cut" press carries. */
 const DESIGN_STAMP = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/;
 
@@ -129,24 +158,26 @@ function statusForVerb(result: DispatcherVerbResult): number {
 }
 
 /**
- * The dispatcher lane's twenty routes: three reads of the plan list, ten presses on a plan, seven on
- * an arc. Auth is the mount's `authenticateToken`, in `server/index.ts`.
+ * The dispatcher lane's twenty-two routes: three reads of the plan list, ten presses on a plan, eight on
+ * an arc, one on the board. Auth is the mount's `authenticateToken`, in `server/index.ts`.
  *
  * These handlers validate and translate, and do nothing else: nothing is read here, no process is
  * started here, and no route names a path from the request — the binary and the store are the
  * module's, fixed at composition, and a request can only ever choose a plan or an arc by name, a
- * word from the closed set of eleven verbs, and — where the verb takes one — a word from the three
- * model words or the WIP grammar.
+ * word from the closed set of thirteen verbs, and — where the verb takes one — a word from the three
+ * model words, the WIP grammar, the queue's three moves or the epic dial's eight words.
  *
  * A READ THAT FINDS NO PICTURE IS TOLD SO (`NOT_READ_YET` above), and the read waits a bound for one
  * first: the two together are what keep a handover from being drawn as an empty plan list.
  *
- * FOUR OF THE NINE ARE RELAYED TWICE, once under `/plans/:name` and once under `/arcs/:name`, because
- * the dispatcher's own doors open on both: `model`, `stop`, `resume` and `schedule` take an arc's
- * name as readily as a plan's. The two spellings are two routes rather than one param because the
- * NAME CLASSES differ (`PLAN_NAME` against `ARC_NAME` below) — a fence that would be lost the moment
- * one route accepted either adornment. `wip` is the ninth and an ARC'S ALONE: a feature carries no WIP
- * word, so it has no plan route.
+ * SIX OF THE THIRTEEN ARE RELAYED TWICE, once under `/plans/:name` and once under `/arcs/:name`, because
+ * the dispatcher's own doors open on both: `model`, `stop`, `resume`, `schedule` and the `arm-accept` /
+ * `disarm-accept` pair take an arc's name as readily as a plan's. The two spellings are two routes
+ * rather than one param because the NAME CLASSES differ (`PLAN_NAME` against `ARC_NAME` below) — a
+ * fence that would be lost the moment one route accepted either adornment. `wip` and `queue` are an
+ * ARC'S ALONE: a feature carries no WIP word and holds no place in a queue of epics, so neither has a
+ * plan route. `epics` is the BOARD'S: the dial names no plan and no arc, so it is the one route with no
+ * `:name`, and its answer carries `plan: ""`.
  */
 export function createDispatcherRouter(dependencies: DispatcherRouterDependencies): express.Router {
   const router = express.Router();
@@ -274,7 +305,8 @@ export function createDispatcherRouter(dependencies: DispatcherRouterDependencie
   }));
 
   /**
-   * The ARC's five verbs — `model`, `stop`, `resume`, `schedule`, `wip` — relayed to the arc's own door.
+   * The ARC's eight verbs — `model`, `stop`, `resume`, `schedule`, `arm-accept`, `disarm-accept`, `wip`
+   * and `queue` — relayed to the arc's own door.
    *
    * AN ARC IS ADDRESSED BY ITS OWN NAME, and the dispatcher is what resolves it. Each of these four
    * verbs takes a plan's name OR an arc's and answers an arc's name with the PLAN verb applied to
@@ -296,6 +328,11 @@ export function createDispatcherRouter(dependencies: DispatcherRouterDependencie
    * epic's two limits (or hands it back to Settings' default), never refused for the epic's state —
    * the limit is read at the rule's next take-up (`width.reason`), and the dispatcher kicks its own
    * daemon when the word changed, so a wider limit frees a held feature without another press.
+   *
+   * `queue` IS THE ARC'S ALONE TOO: `dispatcher queue <arc> --before <arc> | --last | --at N` moves the
+   * epic in the order In flight runs them top down, and the dispatcher refuses an epic that is not in
+   * the queue (`REFUSED queue …`, a 409 carrying that sentence). The body is one of three moves,
+   * checked here before any process starts (`queueArgs`); the order itself is the dispatcher's store's.
    *
    * The same two fences as the plan routes, one name class over: the arc's own regex, and a verb word
    * that is OURS — never the request's.
@@ -341,6 +378,24 @@ export function createDispatcherRouter(dependencies: DispatcherRouterDependencie
   router.post('/arcs/:name/disarm-accept', arcRelay('disarm-accept'));
   // One of the epic's two WIP limits (`dispatcher wip <arc> <limit> <word>`): the epic card's WIP control.
   router.post('/arcs/:name/wip', arcRelay('wip', wipArgs, WIP_BODY_ERROR));
+  // An epic moved in the queue (`dispatcher queue <arc> --before <arc> | --last | --at N`): In flight's drag.
+  router.post('/arcs/:name/queue', arcRelay('queue', queueArgs, QUEUE_BODY_ERROR));
+
+  // The epic dial's one word (`dispatcher epics <1|2|3|4|5|all|pause|resume>`): a BOARD verb, so it names
+  // no plan and no arc and the name the relay is handed is empty (`runDispatcherVerb` leaves it out of the argv).
+  router.post('/epics', async (request, response, next) => {
+    const word = EPIC_WORDS.find((entry) => entry === (request.body as { word?: unknown } | undefined)?.word);
+    if (word === undefined) {
+      response.status(400).json({ error: EPICS_BODY_ERROR });
+      return;
+    }
+    try {
+      const result = await dependencies.runVerb('epics', '', [word]);
+      response.status(statusForVerb(result)).json(result);
+    } catch (error) {
+      next(error); // one this lane has no word for: the app's error handler, as every route here
+    }
+  });
 
   return router;
 }

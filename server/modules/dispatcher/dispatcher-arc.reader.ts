@@ -1,6 +1,6 @@
-import type { DispatcherArc, DispatcherArcStatus, DispatcherArcWip, DispatcherWipSetting } from '@/shared/types.js';
+import type { DispatcherArc, DispatcherArcQueue, DispatcherArcStatus, DispatcherArcWip, DispatcherWipSetting } from '@/shared/types.js';
 
-import { countOrNullSince, countSince, each, field, flagSince, isCount, isRecord, isText, isTextOrNull, modelSince, names, need, oneOf, textSince, wipWord } from './dispatcher-state.transport.js';
+import { countOrNullSince, countSince, each, field, flagSince, isCount, isRecord, isText, isTextOrNull, isWholeFrom, modelSince, names, need, oneOf, textSince, wipWord } from './dispatcher-state.transport.js';
 import { plannerSince } from './dispatcher-planner.reader.js';
 
 /**
@@ -51,6 +51,28 @@ function wipOf(value: unknown, name: string): DispatcherArcWip | null {
   return {
     features: wipSettingOf(field(wip, 'features'), `arc.wip.features of ${name}`),
     tasks: wipSettingOf(field(wip, 'tasks'), `arc.wip.tasks of ${name}`),
+  };
+}
+
+/** The three words an epic's turn may be (`line_gate.places`). Anything else is a build this lane cannot draw. */
+const QUEUE_TURNS: readonly DispatcherArcQueue['turn'][] = ['now', 'waiting', 'paused'];
+
+/** A place in the queue is counted from 1, so `0` and `1.5` are refused where `isCount` would pass them. */
+const isPlace = isWholeFrom(1);
+
+/**
+ * An arc's place in the queue (`report_arcs.arc_dict.queue`), or `null` — for an epic not in the queue
+ * (`null`, its turn is over) and for a build OLDER than the field (absent). Both read the same on
+ * purpose: the deck then draws no note and the board stands, which is the tolerance every field added
+ * after a build shipped has. A key that IS there and does not read is refused by name, with the arc it
+ * came from, so the journal line says which epic's place this build could not read.
+ */
+function queueOf(value: unknown, name: string): DispatcherArcQueue | null {
+  if (value === undefined || value === null) return null;
+  const queue = need(value, isRecord, `arc.queue of ${name}`);
+  return {
+    position: need(field(queue, 'position'), isPlace, `arc.queue.position of ${name}`),
+    turn: oneOf(field(queue, 'turn'), QUEUE_TURNS, `arc.queue.turn of ${name}`),
   };
 }
 
@@ -114,6 +136,10 @@ export function arcOf(raw: unknown): DispatcherArc {
     // How long at least one agent was out on the epic: the UNION over its plans' intervals and its own
     // outings (`report_arcs.arc_dict`), never its plans' figures added. Tolerant, like the plan's.
     runtime_s: countSince(field(arc, 'runtime_s'), 'arc.runtime_s'),
+    // The epic's place in the queue and what it means now (`report_arcs.arc_dict.queue`, from
+    // `line_gate.places`): carried as the document states it, `null` for an epic not in the queue and
+    // for a build older than the key. The server never orders epics — the dispatcher's own store does.
+    queue: queueOf(field(arc, 'queue'), name),
   };
 }
 

@@ -2,6 +2,7 @@ import { sessionsDb } from '@/modules/database/index.js';
 import type { DispatcherArc, DispatcherDaemon, DispatcherPlan, DispatcherPlanner, DispatcherRoute } from '@/shared/types.js';
 
 import { arcsOf } from './dispatcher-arc.reader.js';
+import { epicsOf } from './dispatcher-epics.reader.js';
 import { planOf, type DocumentPlan } from './dispatcher-plan.reader.js';
 import { plannersOf } from './dispatcher-planner.reader.js';
 import { each, field, isCount, isCountOrNull, isFlag, isRecord, isText, isTextOrNull, need, oneOf, readDispatcherDocument, wipWord } from './dispatcher-state.transport.js';
@@ -125,6 +126,9 @@ function routeOf(raw: unknown): DispatcherRoute {
     // byte-for-byte what it was and the client's `planners?.` and `wip?.` read it as absent.
     ...(planners === undefined ? {} : { planners }),
     ...(wip === undefined ? {} : { wip }),
+    // The epic dial's census, `null` for a build older than the key (`epicsOf`). Always present as a
+    // key, unlike the two above, because the type states `null` — the client reads `epics?.` either way.
+    epics: epicsOf(field(route, 'epics')),
   };
 }
 

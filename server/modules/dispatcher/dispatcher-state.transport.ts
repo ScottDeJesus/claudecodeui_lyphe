@@ -5,7 +5,7 @@ import { readDispatcherWipWord } from '@/shared/utils.js';
 
 // The dispatcher lane's readers import the field vocabulary from here, so its import surface is
 // the one it always had; the readers themselves live in `@/shared/document-fields.ts`.
-export { each, field, isCount, isCountOrNull, isFlag, isRecord, isText, isTextOrNull, need, oneOf } from '@/shared/document-fields.js';
+export { each, field, isCount, isCountOrNull, isFlag, isRecord, isText, isTextOrNull, isWholeFrom, need, oneOf } from '@/shared/document-fields.js';
 
 /**
  * The dispatcher lane's side of reading `dispatcher status --json`: the one command it runs, the
