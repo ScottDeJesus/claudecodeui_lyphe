@@ -2894,3 +2894,38 @@ Exit 1 prints `FAILED: <why>`; exit 2 is a bad leg name.
 The 30 s spacing of overdue chats, the 2-start limit and the `markIdleCheck` write (MAN-8316, "Bounded across a restart") have no leg here.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/chat-idle-restore.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/chat-idle-restore.sh
+
+## MAN-8432 — The epic queue on the live lane — .verify/epic-queue-live.mjs
+
+## run
+`node .verify/epic-queue-live.mjs [--api http://127.0.0.1:3011] [--url http://127.0.0.1:5183]` from `claudecodeui_lyphe/`; exit 0 prints `ALL CHECKS PASS`, exit 1 lists the failed checks.
+- Reads the LIVE dispatcher through the dev server as the dev user; writes nothing to it. Shot: `.verify/shots/epic-queue-live/in-flight-1440x900.png`.
+- Opens the workspace on an older chat of this repo, never the newest (`quietChatId`).
+- Fixture-lane proofs of the same face: MAN-8431. The verbs it reads: MAN-8425.
+
+## what it compares
+| reading | against |
+|---|---|
+| `GET /api/dispatcher/plans` → each arc's `queue`, each plan's `queue_hold`, `route.epics` | the same keys in `dispatcher status --json`, by value (the server fills an absent key with `null`, so presence proves nothing) |
+| the served places, sorted by position | `dispatcher queue`'s own listing: position, name, turn |
+| `route.epics.running` | the `· <k> running` head of `dispatcher queue` |
+| the live queue | holds at least one epic (an empty list fails) |
+| In flight, read after an 800 ms settle | decks in the served order; each deck's note `<position> · <turn word>`; dial readout `<running> running`; no sideways overflow |
+
+## fails when
+- The live dial is not `limit all`, `paused no`: `route.epics reads limit all, not paused` and `the dial reads All` are checks.
+- The live queue is empty.
+- `dispatcher queue`'s line shape changes (`listedQueue` parses `N. <name>.arc — <its turn|waiting|paused> — `).
+
+## the one press
+`POST /api/dispatcher/arcs/no-such-epic/queue {"last": true}` → 409 containing `no arc no-such-epic`; the door writes nothing.
+
+## nothing moved
+- Every non-GET the page makes to `/api/dispatcher/` or `/api/user/` is aborted and counted; any such call fails the run. Other non-GETs pass and are printed.
+- `liveReading` before and after must be equal: `dispatcher epics`, the count of `arcs` rows with a `queue_position` (`sqlite3 -readonly` on `state/dispatcher/dispatcher.db`), size and mtime of `state/epics.flag`.
+- Every `DISPATCHER_*` variable is dropped from the child environment (`LIVE_ENV`): a shell holding the scratch walk's exports would otherwise make `dispatcher epics` read a scratch dial.
+
+## keeping
+`.verify/` is git-ignored: the file lives on disk only.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/epic-queue-live.mjs

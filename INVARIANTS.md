@@ -9265,3 +9265,112 @@ measured 2026-10-15 by chain chain-epic-queue--fill-20261015-005844-c25e, findin
 probe-key: 975240c9c19e2f8d2287776f956833d71b8a0da8
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/hooks/useVerbSend.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-epic-queue.mjs
+
+## INV-8344 — probe — the probe's key-presence checks cannot fail, and three checks name more than they test
+
+the probe's key-presence checks cannot fail, and three checks name more than they test
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+D="$1"
+~/.claude/scripts/dispatcher status --json > "$D/doc.json"
+python3 -I -c '
+import json, sys
+d = sys.argv[1]
+doc = json.load(open(d + "/doc.json"))
+for arc in doc["arcs"]: arc.pop("queue", None)
+for plan in doc["plans"]: plan.pop("queue_hold", None)
+doc["route"].pop("epics", None)
+json.dump(doc, open(d + "/stripped.json", "w"))
+' "$D"
+cd ~/.claude/claudecodeui_lyphe && node_modules/.bin/tsx --tsconfig server/tsconfig.json .verify/lib/lane-picture.ts "$D/stripped.json" "$D/pic.json" > /dev/null
+node -e '
+const p = JSON.parse(require("fs").readFileSync(process.argv[1], "utf8"));
+console.log("arcs with a `queue` key:", p.arcs.every((a) => "queue" in a), "| plans with a `queue_hold` key:", p.plans.every((a) => "queue_hold" in a), "| route.epics:", JSON.stringify(p.route.epics));
+' "$D/pic.json" || echo none
+EOF
+bash "$D/p.sh" "$D"
+cd /tmp && case "$D" in /tmp/athena-probe.*) rm -r "$D";; esac
+```
+
+measured 2026-10-15 by chain chain-epic-queue--whole-20261015-023028-6e9f, finding L1, LOW
+probe-key: 22b343b5352702547ac0a19c38974dfc1d66eb92
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/epic-queue-live.mjs
+
+## INV-8345 — probe — the "live" before/after witness reads whatever dial the caller's environment names
+
+the "live" before/after witness reads whatever dial the caller's environment names
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+D="$1"
+printf 'limit 3\npaused yes\n' > "$D/epics.flag"
+cd ~/.claude/claudecodeui_lyphe
+DISPATCHER_EPICS_FLAG_PATH="$D/epics.flag" timeout 240 node .verify/epic-queue-live.mjs > "$D/out.txt" 2>&1
+grep -E "^  live  |ALL CHECKS PASS|FAILED" "$D/out.txt" || echo none
+echo "the real dial: $(~/.claude/scripts/dispatcher epics)"
+EOF
+bash "$D/p.sh" "$D"
+cd /tmp && case "$D" in /tmp/athena-probe.*) rm -r "$D";; esac
+```
+
+measured 2026-10-15 by chain chain-epic-queue--whole-20261015-023028-6e9f, finding L2, LOW
+probe-key: a3f7d6ec9e4cecb93108f63fdec0296380e7ad2c
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/epic-queue-live.mjs
+
+## INV-8346 — probe — a door that prints `MOVED` when the move does not count
+
+a door that prints `MOVED` when the move does not count
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+D="$1"
+mkdir "$D/home" || exit 1
+export DISPATCHER_HOME="$D/home" DISPATCHER_EPICS_FLAG_PATH="$D/epics.flag"
+unset DISPATCHER_SCRATCH_DAEMON
+cat > "$D/build.py" <<'PY'
+import sys, datetime
+D = sys.argv[1]
+sys.path.insert(0, "/home/lyphe/.claude/hooks")
+from dispatcher import store, store_arcs
+conn = store.connect()
+base = datetime.datetime.now(datetime.timezone.utc)
+def stamp(minutes): return (base + datetime.timedelta(minutes=minutes)).strftime("%Y-%m-%dT%H:%M:%SZ")
+for epic, minutes in (("qb", 1), ("qc", 2)):
+    arc = store_arcs.open_arc(conn, epic, repo=D, goal="walk", architecture="", delivers="", session=None)
+    when = stamp(minutes)
+    plan = conn.execute("INSERT INTO plans (name, state, repo, model, arc_id, approved_at, approved_by, created_at, updated_at, paused) VALUES (?,?,?,?,?,?,?,?,?,0)",
+        (epic + "-f", "approved", D, "claude", arc, when, "athena", when, when)).lastrowid
+    conn.execute("INSERT INTO phases (plan_id, key, position, title, goal, assignee, status) VALUES (?,?,?,?,?,?,?)", (plan, "p1", 1, "phase 1", "walk", "hephaestus", "not started"))
+conn.commit()
+PY
+python3 -I "$D/build.py" "$D"
+~/.claude/scripts/dispatcher queue qc --before qb 2>&1 | grep -v "started no daemon"
+~/.claude/scripts/dispatcher queue | grep -E "qb.arc|qc.arc"
+EOF
+bash "$D/p.sh" "$D"
+cd /tmp && case "$D" in /tmp/athena-probe.*) rm -r "$D";; esac
+```
+
+measured 2026-10-15 by chain chain-epic-queue--whole-20261015-023028-6e9f, finding L3, LOW
+probe-key: 41784687b4cd5da66e3458b5b00607076f275b92
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/epic-queue-live.mjs
+
+## INV-8347 — probe — the probe opens the live store read-write
+
+the probe opens the live store read-write
+
+```probe
+grep -c -- "-readonly" ~/.claude/claudecodeui_lyphe/.verify/epic-queue-live.mjs || true
+```
+
+measured 2026-10-15 by chain chain-epic-queue--whole-20261015-023028-6e9f, finding L4, LOW
+probe-key: 8f8a9727fa6574fca1521fbe96f7305ac007520e
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/epic-queue-live.mjs
