@@ -84,11 +84,14 @@ function queueArgs(body: unknown): string[] | null {
   return null;
 }
 
-/** The eight words the epic dial takes (`hooks/dispatcher/epic_dial.py:WORDS`): a limit of `1` to `5` or `all`, and the pause. The only `word` values the epics route relays. */
-const EPIC_WORDS: readonly string[] = ['1', '2', '3', '4', '5', 'all', 'pause', 'resume'];
+/** The seven words the epic dial takes (`hooks/dispatcher/epic_dial.py:WORDS`): a limit of `1` to `5`, and the pause. The only `word` values the epics route relays. */
+const EPIC_WORDS: readonly string[] = ['1', '2', '3', '4', '5', 'pause', 'resume'];
 
-/** The 400 sentence the epics route answers with when the body names none of the eight. */
-const EPICS_BODY_ERROR = 'word must be one of 1, 2, 3, 4, 5, all, pause or resume';
+/** The 400 sentence the epics route answers with when the body names none of the seven. */
+const EPICS_BODY_ERROR = 'word must be one of 1, 2, 3, 4, 5, pause or resume';
+
+/** The 400 sentence the start route answers with when a body names anything: the board's Start takes none. */
+const START_BODY_ERROR = 'the board\'s Start takes no body';
 
 /** A design's stamp (`designs.loaded_at`, `store.now()`'s shape): the lock an "Accept when cut" press carries. */
 const DESIGN_STAMP = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/;
@@ -158,26 +161,28 @@ function statusForVerb(result: DispatcherVerbResult): number {
 }
 
 /**
- * The dispatcher lane's twenty-two routes: three reads of the plan list, ten presses on a plan, eight on
- * an arc, one on the board. Auth is the mount's `authenticateToken`, in `server/index.ts`.
+ * The dispatcher lane's twenty-two routes: three reads of the plan list, ten presses on a plan, seven on
+ * an arc, two on the board. Auth is the mount's `authenticateToken`, in `server/index.ts`.
  *
  * These handlers validate and translate, and do nothing else: nothing is read here, no process is
  * started here, and no route names a path from the request — the binary and the store are the
  * module's, fixed at composition, and a request can only ever choose a plan or an arc by name, a
- * word from the closed set of thirteen verbs, and — where the verb takes one — a word from the three
- * model words, the WIP grammar, the queue's three moves or the epic dial's eight words.
+ * word from the closed set of fourteen verbs, and — where the verb takes one — a word from the three
+ * model words, the WIP grammar, the queue's three moves or the epic dial's seven words.
  *
  * A READ THAT FINDS NO PICTURE IS TOLD SO (`NOT_READ_YET` above), and the read waits a bound for one
  * first: the two together are what keep a handover from being drawn as an empty plan list.
  *
- * SIX OF THE THIRTEEN ARE RELAYED TWICE, once under `/plans/:name` and once under `/arcs/:name`, because
- * the dispatcher's own doors open on both: `model`, `stop`, `resume`, `schedule` and the `arm-accept` /
+ * FIVE OF THE FOURTEEN ARE RELAYED TWICE, once under `/plans/:name` and once under `/arcs/:name`, because
+ * the dispatcher's own doors open on both: `model`, `stop`, `resume` and the `arm-accept` /
  * `disarm-accept` pair take an arc's name as readily as a plan's. The two spellings are two routes
  * rather than one param because the NAME CLASSES differ (`PLAN_NAME` against `ARC_NAME` below) — a
- * fence that would be lost the moment one route accepted either adornment. `wip` and `queue` are an
- * ARC'S ALONE: a feature carries no WIP word and holds no place in a queue of epics, so neither has a
- * plan route. `epics` is the BOARD'S: the dial names no plan and no arc, so it is the one route with no
- * `:name`, and its answer carries `plan: ""`.
+ * fence that would be lost the moment one route accepted either adornment. `schedule` is a PLAN'S alone
+ * here (the card's `Resume at …`): the deck's `Schedule start` is gone, though the terminal's
+ * `dispatcher schedule <arc>` stays. `wip` and `queue` are an ARC'S ALONE: a feature carries no WIP word
+ * and holds no place in a queue of epics, so neither has a plan route. `epics` and `start` are the
+ * BOARD'S: the dial and the one Start name no plan and no arc, so they are the routes with no `:name`,
+ * and their answers carry `plan: ""`.
  */
 export function createDispatcherRouter(dependencies: DispatcherRouterDependencies): express.Router {
   const router = express.Router();
@@ -192,7 +197,7 @@ export function createDispatcherRouter(dependencies: DispatcherRouterDependencie
   });
 
   // BEFORE `/plans/:name`, which would otherwise answer `no such plan` for the word `offpeak`. The
-  // time a queued plan's `Start at …` button shows: the dispatcher's own clock, never computed here.
+  // time a stopped plan's `Resume at …` button shows: the dispatcher's own clock, never computed here.
   router.get('/plans/offpeak', async (_request, response) => {
     const body: DispatcherOffpeak = { at: await dependencies.offpeak() };
     response.json(body);
@@ -254,9 +259,10 @@ export function createDispatcherRouter(dependencies: DispatcherRouterDependencie
   };
 
   /**
-   * A model word, out of the three the store spells (`readDispatcherModelChoice`), or `null`.
+   * A model word, out of the three the door spells (`readDispatcherModelChoice`: the two words and
+   * `default`, which clears the row), or `null`.
    *
-   * The word is OURS ONCE IT IS HERE: it is checked against the store's own three by the shared
+   * The word is OURS ONCE IT IS HERE: it is checked against the door's own three by the shared
    * reader, and only then does it become an argv word — so what reaches the dispatcher's command is
    * a spelling this server wrote down, never a string a request chose.
    */
@@ -296,20 +302,20 @@ export function createDispatcherRouter(dependencies: DispatcherRouterDependencie
   // the plan's NEXT phase and never disturbs a walk already out — which is why no plan's state is a
   // reason to refuse this verb, and why the dispatcher's own answer is the whole verdict.
   router.post('/plans/:name/model', relay('model', modelArgs, dispatcherModelChoiceError()));
-  // A QUEUED plan's Start at a time, and the only verb here with an argument:
-  // `dispatcher schedule <name> offpeak|<iso>|none`. The dispatcher refuses a plan that is live or
-  // has never waited, and a time already past; that sentence is the 409's body, untouched.
+  // A STOPPED plan's Resume at a time (the card's `Resume at …`, and its Cancel), and the only verb here
+  // with an argument: `dispatcher schedule <name> offpeak|<iso>|none`. The dispatcher refuses a plan that
+  // is live or has never waited, and a time already past; that sentence is the 409's body, untouched.
   router.post('/plans/:name/schedule', relay('schedule', (body) => {
     const when = readDispatcherScheduleWhen((body as { when?: unknown } | undefined)?.when);
     return when === null ? null : [when];
   }));
 
   /**
-   * The ARC's eight verbs — `model`, `stop`, `resume`, `schedule`, `arm-accept`, `disarm-accept`, `wip`
-   * and `queue` — relayed to the arc's own door.
+   * The ARC's seven verbs — `model`, `stop`, `resume`, `arm-accept`, `disarm-accept`, `wip` and `queue` —
+   * relayed to the arc's own door.
    *
-   * AN ARC IS ADDRESSED BY ITS OWN NAME, and the dispatcher is what resolves it. Each of the six
-   * verbs a plan's door shares (`model`, `stop`, `resume`, `schedule`, `arm-accept`, `disarm-accept`) takes a
+   * AN ARC IS ADDRESSED BY ITS OWN NAME, and the dispatcher is what resolves it. Each of the five
+   * verbs a plan's door shares (`model`, `stop`, `resume`, `arm-accept`, `disarm-accept`) takes a
    * plan's name OR an arc's and answers an arc's name with the PLAN verb applied to
    * the arc's plans in one step (`hooks/dispatcher/arc_verbs.py` holds which plans and why) — so the
    * plan-first-then-arc resolution is deliberately not repeated here: this route names an arc, the
@@ -321,8 +327,7 @@ export function createDispatcherRouter(dependencies: DispatcherRouterDependencie
    * `stop` and `resume` it moves the arc's live, or its stopped, plans in one transaction and one
    * kick — a stopped plan being any plan of the arc that is approved, paused and unfinished, whether
    * it waits at the gate or was stopped mid-walk, which is what makes `resume <arc>` the arc's Start;
-   * for `schedule` it arms one hour for each of them (INV-201 knows no arc-level timer). The next
-   * frame redraws the arc's header and its plans together — nothing here is optimistic, and nothing
+   * The next frame redraws the arc's header and its plans together — nothing here is optimistic, and nothing
    * is copied by this server.
    *
    * `wip` IS THE ARC'S ALONE: `dispatcher wip <arc> features|tasks <N|all|default>` sets one of the
@@ -364,15 +369,9 @@ export function createDispatcherRouter(dependencies: DispatcherRouterDependencie
 
   router.post('/arcs/:name/model', arcRelay('model', modelArgs, dispatcherModelChoiceError()));
   router.post('/arcs/:name/stop', arcRelay('stop'));
+  // The deck's Resume (`dispatcher resume <arc>`): its plans stopped mid-walk and its stalled ones, as the
+  // operator's own press on the epic. The plans held for their first Start are the board's Start's, below.
   router.post('/arcs/:name/resume', arcRelay('resume'));
-  // The arc's Start at a time — the row's `Schedule start`: the same three shapes a plan's schedule
-  // takes, through the same reader, so an operator who can name an hour for one plan can name it for
-  // a whole arc. One timer per stopped plan, and a stopped plan is one at the gate as readily as one
-  // down mid-walk (`report_arcs.stopped`).
-  router.post('/arcs/:name/schedule', arcRelay('schedule', (body) => {
-    const when = readDispatcherScheduleWhen((body as { when?: unknown } | undefined)?.when);
-    return when === null ? null : [when];
-  }));
   // The deck's `Accept when cut` and its Cancel: the dispatcher arms every DESIGNED plan of the arc on that plan's
   // own current design, so no stamp travels — the card never read the members' designs one by one.
   router.post('/arcs/:name/arm-accept', arcRelay('arm-accept', () => ['--by', 'app:card']));
@@ -382,7 +381,7 @@ export function createDispatcherRouter(dependencies: DispatcherRouterDependencie
   // An epic moved in the queue (`dispatcher queue <arc> --before <arc> | --last | --at N`): In flight's drag.
   router.post('/arcs/:name/queue', arcRelay('queue', queueArgs, QUEUE_BODY_ERROR));
 
-  // The epic dial's one word (`dispatcher epics <1|2|3|4|5|all|pause|resume>`): a BOARD verb, so it names
+  // The epic dial's one word (`dispatcher epics <1|2|3|4|5|pause|resume>`): a BOARD verb, so it names
   // no plan and no arc and the name the relay is handed is empty (`runDispatcherVerb` leaves it out of the argv).
   // THE BODY IS EXACTLY `{ "word": … }`, as the queue's is exactly one move: a body carrying another key is
   // not one this route knows, and is a 400 like any other.
@@ -397,6 +396,25 @@ export function createDispatcherRouter(dependencies: DispatcherRouterDependencie
     }
     try {
       const result = await dependencies.runVerb('epics', '', [word]);
+      response.status(statusForVerb(result)).json(result);
+    } catch (error) {
+      next(error); // one this lane has no word for: the app's error handler, as every route here
+    }
+  });
+
+  // THE BOARD'S ONE START (`dispatcher start`): every plan held for its first Start let go at once, the
+  // queue's order and the dial then deciding what runs. A BOARD verb like `epics` — no plan, no arc, an
+  // empty name the relay leaves out of the argv — and it takes NO body at all: there is nothing to say
+  // but "start", so any key a request carries is a 400, as the epics route's extra keys are. The
+  // dispatcher answers `STARTED <k> plan(s)`, or `REFUSED start: …` (a 409) when nothing waits.
+  router.post('/start', async (request, response, next) => {
+    const body = request.body as Record<string, unknown> | null | undefined;
+    if (typeof body === 'object' && body !== null && !Array.isArray(body) && Object.keys(body).length > 0) {
+      response.status(400).json({ error: START_BODY_ERROR });
+      return;
+    }
+    try {
+      const result = await dependencies.runVerb('start', '', []);
       response.status(statusForVerb(result)).json(result);
     } catch (error) {
       next(error); // one this lane has no word for: the app's error handler, as every route here

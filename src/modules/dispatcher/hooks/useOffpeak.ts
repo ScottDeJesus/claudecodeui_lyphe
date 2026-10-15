@@ -30,11 +30,11 @@ function askOffpeak(): Promise<number | null> {
 }
 
 /**
- * The dispatcher's next DeepSeek off-peak moment, epoch SECONDS, or `null` until it answers (the `Start at …`
+ * The dispatcher's next DeepSeek off-peak moment, epoch SECONDS, or `null` until it answers (the `Resume at …`
  * button waits for it rather than guessing). The card NEVER computes DeepSeek's clock: the moment is the
  * dispatcher's own (`dispatcher offpeak`, relayed by `GET /api/dispatcher/plans/offpeak`). Re-asked when it
- * passes, so a tab left open across 3 AM offers the next day's time. Used by `ScheduleControl`, on the plan
- * card and the dispatch arc's header.
+ * passes, so a tab left open across 3 AM offers the next day's time. Used by `ScheduleControl`, on the card of a
+ * plan stopped mid-walk.
  */
 export function useOffpeak(): number | null {
   const [at, setAt] = useState<number | null>(sharedAt);

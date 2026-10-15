@@ -2051,8 +2051,8 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/kanban-metis/brie
 INV-4355 and a `store_arcs.py` docstring still say a fenced typo becomes `deepseek`
 
 ```probe
-cd /home/lyphe/.claude && docstore get INV-4355 | python3 -c "import sys,json,re; b=json.load(sys.stdin)['row']['body']; print(re.findall(r'silent .deepseek.', b))"; rg -n "never a silent" hooks/dispatcher/store_arcs.py; PYTHONPATH=$HOME/.claude/hooks python3 -c "from dispatcher import model; print(model.clean('deepseekk'))"
-expect: [] , then a store_arcs.py line that does not name `deepseek`, then `claude` (today: `['silent `deepseek`']`, then line 522 ending "never a silent `deepseek`.", then `claude`)
+cd /home/lyphe/.claude && docstore get INV-4355 | python3 -c "import sys,json,re; b=json.load(sys.stdin)['row']['body']; print(re.findall(r'silent .deepseek.', b))"; rg -n "never a silent" hooks/dispatcher/store_arcs.py; PYTHONPATH=$HOME/.claude/hooks python3 -c "from dispatcher import model; print(model.own('deepseekk'))"
+expect: [] , then a store_arcs.py line that does not name `deepseek`, then `None` (a word nobody wrote is no word of its own: the row follows the house switch, and is never read as `claude` or `deepseek`)
 ```
 
 measured 2026-10-01 by chain chain-plan-model-default-claude-20261001-165404-dcb1, finding L1, LOW
@@ -2232,7 +2232,7 @@ CloudCLI's text names arcs, plans and phases as epics, features and tasks. Ident
 **CloudCLI's own words — where they are written**
 - The en locale: `src/modules/i18n/locales/en/{common,chat,settings}.json`.
 - The roadmap screen: the `roadmap` block of `en/common.json` (MAN-7634) and the Roadmap tab's `tabs.runner`, `runner.title`, `runner.empty` (MAN-7654). It says milestone, epic, feature and task everywhere, and shows a slug only as the `Name for Claude: <name>` line of a feature's dialog (MAN-7645).
-- The `defaultValue` beside a key: the drawn text when its key is absent, the fallback when present — both carry the new words (`ComposerDeepSeekSwitch.tsx`, `RunnerWipDefaultsRow.tsx` with its `agents.wipDefaults.*` keys no locale holds, `RunnerParkAtPeakRow.tsx`).
+- The `defaultValue` beside a key: the drawn text when its key is absent, the fallback when present — both carry the new words (`ComposerDeepSeekSwitch.tsx`, `RunnerParkAtPeakRow.tsx`).
 - The command palette's `Go to Roadmap` keywords carry both vocabularies (`CommandPalette.tsx`).
 - The ten other locales hold none of the dispatcher keys and fall back to English. Their values whose English changed say what the new English says: `chat.json` `input.deepseekFlashTooltip`, `settings.json` `agents.runnerModel.description`, fr `agents.runnerParkAtPeak.*`. "plan runner" is "runner" in them, left in English.
 - The push copy: `notification-copy.service.ts` — `Feature finished`, `Epic finished`, `Feature paused`, `Features paused …`, `Task relaunched`, `Task <key> was taken up again`, `<done>/<n> tasks`.
@@ -2849,21 +2849,7 @@ expect: `PASS every reading` then `daemons left on a wip_hold scratch home: 1` w
 measured 2026-10-04 by chain chain-wip-2a-board-20261004-131759-e3d6, finding B1, BLOCKING
 probe-key: 634be2b8694fa43cd6554024add5f2a73629d113
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/settings/dispatcher-kick.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/EpicWipControl.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-epic-wip.mjs, /home/lyphe/.claude/hooks/dispatcher/wake.py, /home/lyphe/.claude/scripts/runner_fixtures/wip_hold.py
-
-## INV-6776 — probe — `probe-epic-wip.mjs` fails forever once the operator uses the control it ships
-
-`probe-epic-wip.mjs` fails forever once the operator uses the control it ships
-
-```probe
-grep -n "arcsWithWipWords !== 0" /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-epic-wip.mjs || echo none
-expect: line 631 prints while the defect stands (`after !== 0 || witness.arcsWithWipWords !== 0`); cured when the test compares `after` to `witness.arcsWithWipWords` and the line no longer prints
-```
-
-measured 2026-10-04 by chain chain-wip-2a-board-20261004-131759-e3d6, finding L1, LOW
-probe-key: 26c99d0b96a1f37da4f19bf18f79413d699ae50f
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/settings/dispatcher-kick.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/EpicWipControl.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-epic-wip.mjs, /home/lyphe/.claude/hooks/dispatcher/wake.py, /home/lyphe/.claude/scripts/runner_fixtures/wip_hold.py
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/settings/dispatcher-kick.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/EpicWipControl.tsx, /home/lyphe/.claude/hooks/dispatcher/wake.py, /home/lyphe/.claude/scripts/runner_fixtures/wip_hold.py
 
 ## INV-6798 — probe — (LOW) — `wip-defaults.ts` and the dispatcher's `read_flag` disagree on a U+FEFF inside the file, and MAN-629 says they agree "clause for clause"
 
@@ -2878,7 +2864,7 @@ expect: `dispatcher reads: {'features': '5', 'tasks': '2'}` and `CloudCLI row re
 measured 2026-10-04 by chain chain-wip-2b-settings-20261004-142546-89c5, finding L1, LOW
 probe-key: abc85d0cb1158931d214bef81eb18a6416580cf7
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/settings/wip-defaults.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/hooks/useWipDefaults.ts
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/settings/wip-defaults.ts
 
 ## INV-6799 — probe — (LOW) — the standing proof cannot tell whether the gate honours an epic's own task WIP
 
@@ -2893,22 +2879,7 @@ expect: `mutation applied: True`, then `PASS every reading` / `wip_tasks exit: 0
 measured 2026-10-04 by chain chain-wip-2b-settings-20261004-142546-89c5, finding L2, LOW
 probe-key: f565b145c6b92093daa868908464db77bb44e75c
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/settings/wip-defaults.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/hooks/useWipDefaults.ts
-
-## INV-6800 — probe — (LOW) — a Settings tab that was not refocused writes the other default back stale
-
-(LOW) — a Settings tab that was not refocused writes the other default back stale
-
-```probe
-node /home/lyphe/.claude/state/pipeline-reviews/wip-2b-settings/athena-probes/stale-tab-clobber.mjs
-echo "[probe exit $?]"
-expect: `the file held features 5; this tab then sent {"features":"2","tasks":"3"} → file now {"features":"2","tasks":"3"}` while the defect stands (every write is stubbed at the route); cured when the body keeps features 5 or carries only tasks
-```
-
-measured 2026-10-04 by chain chain-wip-2b-settings-20261004-142546-89c5, finding L3, LOW
-probe-key: bdfa1ba791ed15458d5eb2509e0ed8e32dc497c1
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/settings/wip-defaults.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/hooks/useWipDefaults.ts
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/settings/wip-defaults.ts
 
 ## INV-6801 — probe — (LOW) — one `status --json` document reads `wip.flag` about 85 times, so a press mid-document gives plans a caption their own `route` contradicts
 
@@ -2923,7 +2894,7 @@ expect: `plan a → claude route · WIP: 2 tasks at a time`, `plan b` and `plan 
 measured 2026-10-04 by chain chain-wip-2b-settings-20261004-142546-89c5, finding L4, LOW
 probe-key: dc101b5e3845f6c7c957fe5499a06b0aab1de076
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/settings/wip-defaults.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/hooks/useWipDefaults.ts
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/settings/wip-defaults.ts
 
 ## INV-6809 — probe — LOW — the purge grep looks for `swarm` only, so the other deleted name, `ceiling`, still stands in two places
 
@@ -9179,3 +9150,434 @@ measured 2026-10-15 by chain chain-epic-queue--whole-20261015-023028-6e9f, findi
 probe-key: 8f8a9727fa6574fca1521fbe96f7305ac007520e
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/epic-queue-live.mjs
+
+## INV-8353 — probe — HIGH — every dropdown inside a fold has its list clipped by the fold body: the override controls cannot be used with a pointer
+
+HIGH — every dropdown inside a fold has its list clipped by the fold body: the override controls cannot be used with a pointer
+
+```probe
+D=$(mktemp -d /tmp/athena-probe-clip.XXXXXX) || exit 1
+cat > "$D/p.mjs" <<'EOF'
+// READ-ONLY: every non-GET to /api is aborted; a dropdown is opened and closed with Escape, never chosen.
+import pw from '/opt/shadow-connector/node_modules/playwright/index.js';
+import { DEV_USER } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/console.mjs';
+import { pinPreferences } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/prefs-pin.mjs';
+import { answerThirdParties } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/wip-stub.mjs';
+const API = 'http://127.0.0.1:3011', APP = 'http://127.0.0.1:5183';
+const call = async (token, path, init = {}) => (await fetch(API + path, { ...init, headers: { 'content-type': 'application/json', ...(token ? { authorization: `Bearer ${token}` } : {}) } })).json();
+const token = (await call(null, '/api/auth/login', { method: 'POST', body: JSON.stringify(DEV_USER) })).token;
+const project = (await call(token, '/api/projects')).find((p) => String(p.fullPath ?? p.path ?? '').endsWith('claudecodeui_lyphe'));
+const chat = (await call(token, `/api/projects/${encodeURIComponent(project.projectId)}/sessions?limit=8`)).sessions.at(-1).id;
+const browser = await pw.chromium.launch();
+const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, colorScheme: 'light', locale: 'en-US', serviceWorkers: 'block' });
+await ctx.addInitScript(([v]) => { localStorage.setItem('auth-token', v); localStorage.setItem('activeTab', 'runner'); }, [token]);
+await pinPreferences(ctx, { theme: 'light' }, { writes: 'drop' }); await answerThirdParties(ctx);
+await ctx.route(/\/api\//, (r) => (['GET', 'HEAD'].includes(r.request().method()) || /\/api\/(auth\/refresh|commands\/list)/.test(r.request().url()) ? r.fallback() : r.abort()));
+const page = await ctx.newPage();
+await page.goto(`${APP}/session/${chat}`, { waitUntil: 'domcontentloaded' });
+await page.waitForSelector('[data-master-controller]', { timeout: 30000 }); await page.waitForTimeout(1200);
+const read = () => page.evaluate(() => { const lb = document.querySelector('[role="listbox"]'); if (!lb) return 'no listbox';
+  const o = [...lb.querySelectorAll('[role="option"]')]; const ok = o.filter((x) => { const b = x.getBoundingClientRect(); const e = document.elementFromPoint(b.left + b.width / 2, b.top + b.height / 2); return e && (x === e || x.contains(e)); });
+  return `${ok.length} of ${o.length} options can be clicked`; });
+const header = page.locator('[data-master-wip-features] button[aria-haspopup="listbox"]'); await header.click(); await page.waitForTimeout(300);
+console.log('header  "Features at once":', await read()); await page.keyboard.press('Escape');
+const fold = page.locator('[data-dispatch-arc] [data-override-fold="dispatch-arc"]').first(); await fold.locator('button').first().click(); await page.waitForTimeout(600);
+await fold.locator('button[aria-haspopup="listbox"]').first().click(); await page.waitForTimeout(300);
+console.log('epic fold "Features at once":', await read()); await page.keyboard.press('Escape');
+await browser.close();
+EOF
+printf 'cd /tmp && timeout 120 node "$1/p.mjs"\n' > "$D/p.sh"
+bash "$D/p.sh" "$D"
+cd /tmp; case "$D" in /tmp/athena-probe-clip.??????) rm -r "$D";; esac
+echo "[probe exit $?]"
+expect: `header "Features at once": 7 of 7 options can be clicked`, then `epic fold "Features at once": 0 of 8 options can be clicked` while the defect stands; `8 of 8` once cured
+```
+
+measured 2026-10-15 by chain chain-in-flight-master-controller-20261015-073906-ff48, finding H1, HIGH
+probe-key: 0ef624d3be9c54b6e3f97a3b66a1b903e911e4e9
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/ArcControls.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/EpicWipControl.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/PlanControls.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/ScheduleControl.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/master-controller-folds.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/master-controller-live.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/master-controller-scratch.py, /home/lyphe/.claude/hooks/dispatcher/line_gate.py, /home/lyphe/.claude/hooks/dispatcher/model.py, /home/lyphe/.claude/hooks/dispatcher/release.py, /home/lyphe/.claude/hooks/plan_runner/run_model.py
+
+## INV-8354 — probe — MEDIUM — five docstore rows still state or write All for the epic dial, or call a retired function; the intent names them
+
+MEDIUM — five docstore rows still state or write All for the epic dial, or call a retired function; the intent names them
+
+```probe
+cd /home/lyphe/.claude && for t in INV-6329 INV-8330 INV-8332 INV-8316 MAN-8432; do printf '%s ' "$t"; docstore get "$t" --text | grep -c -E "model\.clean|Dial\(\"all\"|Dial\('all'|Dial\(limit='all'|limit all|dial reads All"; done
+echo "[probe exit $?]"
+expect: `1` after each of the five tokens while they are stale; `0` for each once corrected
+```
+
+measured 2026-10-15 by chain chain-in-flight-master-controller-20261015-073906-ff48, finding M1, MEDIUM
+probe-key: cb98f12deb6ca252bb8e01a0042e3c5733a9db80
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/ArcControls.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/EpicWipControl.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/PlanControls.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/ScheduleControl.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/master-controller-folds.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/master-controller-live.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/master-controller-scratch.py, /home/lyphe/.claude/hooks/dispatcher/line_gate.py, /home/lyphe/.claude/hooks/dispatcher/model.py, /home/lyphe/.claude/hooks/dispatcher/release.py, /home/lyphe/.claude/hooks/plan_runner/run_model.py
+
+## INV-8355 — probe — MEDIUM — the standing Settings-rows proof pins the WIP row the build removed, and fails
+
+MEDIUM — the standing Settings-rows proof pins the WIP row the build removed, and fails
+
+```probe
+cd /home/lyphe/.claude/claudecodeui_lyphe && grep -n "WIP_LABEL" .verify/probe-settings-rows.mjs .verify/lib/settings-rows-walk.mjs | cut -c1-110 || echo none
+echo "[probe exit $?]"; grep -n "WIP defaults row" docs/MANUAL.md | cut -c1-100 || echo none
+expect: four `WIP_LABEL` lines and two `WIP defaults row` lines while it stands; `none` for both once the proof stops expecting the row and the two lines are corrected
+```
+
+measured 2026-10-15 by chain chain-in-flight-master-controller-20261015-073906-ff48, finding M2, MEDIUM
+probe-key: c3fb403bf51267c516202bf83aa681d6076d3bfb
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/ArcControls.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/EpicWipControl.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/PlanControls.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/ScheduleControl.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/master-controller-folds.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/master-controller-live.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/master-controller-scratch.py, /home/lyphe/.claude/hooks/dispatcher/line_gate.py, /home/lyphe/.claude/hooks/dispatcher/model.py, /home/lyphe/.claude/hooks/dispatcher/release.py, /home/lyphe/.claude/hooks/plan_runner/run_model.py
+
+## INV-8356 — probe — LOW — two Starts at once do not "start each plan once and kick once": `held` is read outside the write
+
+LOW — two Starts at once do not "start each plan once and kick once": `held` is read outside the write
+
+```probe
+D=$(mktemp -d /tmp/athena-p4.XXXXXX) || exit 1
+cat > "$D/p.py" <<'EOF'
+import os, sys, time
+D, which, go = sys.argv[1], sys.argv[2], float(sys.argv[3])
+os.environ["DISPATCHER_HOME"] = f"{D}/home"
+os.environ.pop("DISPATCHER_SCRATCH_DAEMON", None)
+sys.path.insert(0, os.path.expanduser("~/.claude/hooks"))
+from dispatcher import first_start, store, store_arcs, wake
+from dispatcher.cmd import start as cmd_start
+import types
+if which == "seed":
+    c = store.connect()
+    for i, name in enumerate(("ea", "eb"), start=1):
+        st = f"2026-10-15T06:0{i}:00Z"
+        with c:
+            aid = store_arcs.open_arc(c, name, repo=D, goal="g", architecture="", delivers="", session=None)
+            pid = c.execute("INSERT INTO plans (name, state, repo, model, arc_id, approved_at, approved_by, paused, created_at, updated_at) VALUES (?, 'loaded', ?, NULL, ?, ?, 'x', 1, ?, ?)", (name + "-f", D, aid, st, st, st)).lastrowid
+            c.execute("INSERT INTO phases (plan_id, key, position, title, goal, assignee, status) VALUES (?, 'p1', 1, 'p1', 'g', 'hephaestus', 'not started')", (pid,))
+            store.event(c, name + "-f", "approved", detail="probe")
+    sys.exit(0)
+real = first_start.held                      # both presses read the waiting set, then wait for the same instant, then write
+def held(conn):
+    names = real(conn); time.sleep(max(0, go - time.time())); return names
+first_start.held = held
+wake.kick = lambda *a, **k: open(f"{D}/kicks", "a").write("k\n")
+cmd_start.start(types.SimpleNamespace())
+EOF
+cat > "$D/p.sh" <<'EOF'
+D=$1
+cd /tmp && python3 -B "$D/p.py" "$D" seed 0 || exit 1
+GO=$(python3 -c "import time;print(time.time()+2.5)")
+python3 -B "$D/p.py" "$D" a "$GO" > "$D/a.out" 2>&1 &
+python3 -B "$D/p.py" "$D" b "$GO" > "$D/b.out" 2>&1 &
+wait
+echo "press A said: $(cat "$D/a.out")  | press B said: $(cat "$D/b.out")"
+echo "kicks: $(wc -l < "$D/kicks")"
+echo "resumed events: $(sqlite3 "$D/home/dispatcher.db" "select count(*) from events where kind='resumed'") for 2 plans"
+EOF
+bash "$D/p.sh" "$D" 2>&1 | tail -6
+cd /tmp; case "$D" in /tmp/athena-p4.??????) rm -r "$D";; esac
+echo "[probe exit $?]"
+expect: `STARTED 2 plan(s)` from BOTH presses, `kicks: 2`, `resumed events: 4 for 2 plans` while it stands; once cured one press says `REFUSED start: …` (or `STARTED 0`), `kicks: 1`, `resumed events: 2 for 2 plans`
+```
+
+measured 2026-10-15 by chain chain-in-flight-master-controller-20261015-073906-ff48, finding L1, LOW
+probe-key: 6138ae320e212c5162a3c0ac634c48df77dd461d
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/ArcControls.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/EpicWipControl.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/PlanControls.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/ScheduleControl.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/master-controller-folds.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/master-controller-live.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/master-controller-scratch.py, /home/lyphe/.claude/hooks/dispatcher/line_gate.py, /home/lyphe/.claude/hooks/dispatcher/model.py, /home/lyphe/.claude/hooks/dispatcher/release.py, /home/lyphe/.claude/hooks/plan_runner/run_model.py
+
+## INV-8357 — probe — LOW — `model.effective` is dead code beside the rule that replaced it
+
+LOW — `model.effective` is dead code beside the rule that replaced it
+
+```probe
+cd ~/.claude/hooks && echo "def effective in model.py: $(grep -c '^def effective' dispatcher/model.py)"; echo "callers of effective(): $(grep -rn --include=*.py -E '(^|[^_a-zA-Z])effective\(' dispatcher plan_runner ../scripts | grep -v 'def effective' | wc -l)"
+echo "[probe exit $?]"
+expect: `def effective in model.py: 1` and `callers of effective(): 0` while it stands; `0` and `0` once removed
+```
+
+measured 2026-10-15 by chain chain-in-flight-master-controller-20261015-073906-ff48, finding L2, LOW
+probe-key: a6d793827f5888c4b744e263bb0b364ddc365f81
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/ArcControls.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/EpicWipControl.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/PlanControls.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/ScheduleControl.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/master-controller-folds.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/master-controller-live.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/master-controller-scratch.py, /home/lyphe/.claude/hooks/dispatcher/line_gate.py, /home/lyphe/.claude/hooks/dispatcher/model.py, /home/lyphe/.claude/hooks/dispatcher/release.py, /home/lyphe/.claude/hooks/plan_runner/run_model.py
+
+## INV-8358 — probe — LOW — comments, type docs and rows still state what the build removed
+
+LOW — comments, type docs and rows still state what the build removed
+
+```probe
+cd /home/lyphe/.claude && { grep -c "a dial at All" claudecodeui_lyphe/server/shared/types.ts claudecodeui_lyphe/src/shared/types.ts; grep -c "a queued plan's Start at a time" claudecodeui_lyphe/server/shared/types.ts claudecodeui_lyphe/src/shared/types.ts; grep -c "arc's Start\|Start lets the stopped\|header's \`Schedule start\`" hooks/dispatcher/arc_verbs.py hooks/dispatcher/cmd/run.py hooks/dispatcher/cmd/schedule.py hooks/dispatcher/judgment_accept.py; grep -c "default = follow Settings" hooks/dispatcher/cmd/wip.py; docstore get MAN-6796 | python3 -c "import sys,json; print(json.load(sys.stdin)['row']['section_path'][:90])"; echo "MAN-7774: $(docstore get MAN-7774 --text | grep -c 'what its Start and its')"; }
+echo "[probe exit $?]"
+expect: every count `1` (or more) and MAN-6796's path naming `RunModelControl` while it stands; all `0` and the path corrected once healed
+```
+
+measured 2026-10-15 by chain chain-in-flight-master-controller-20261015-073906-ff48, finding L3, LOW
+probe-key: 36eafe5a038bf5f5bb8fde98d4ebeffd15f55d80
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/ArcControls.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/EpicWipControl.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/PlanControls.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/ScheduleControl.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/master-controller-folds.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/master-controller-live.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/master-controller-scratch.py, /home/lyphe/.claude/hooks/dispatcher/line_gate.py, /home/lyphe/.claude/hooks/dispatcher/model.py, /home/lyphe/.claude/hooks/dispatcher/release.py, /home/lyphe/.claude/hooks/plan_runner/run_model.py
+
+## INV-8359 — probe — LOW — at his text scale a header list leaves the viewport 5 px before the builder's "under about 340 px"
+
+LOW — at his text scale a header list leaves the viewport 5 px before the builder's "under about 340 px"
+
+```probe
+D=$(mktemp -d /tmp/athena-probe-narrow.XXXXXX) || exit 1
+cat > "$D/p.mjs" <<'EOF'
+// READ-ONLY: every non-GET to /api is aborted; a dropdown is opened and closed with Escape, never chosen.
+import pw from '/opt/shadow-connector/node_modules/playwright/index.js';
+import { DEV_USER } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/console.mjs';
+import { pinPreferences } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/prefs-pin.mjs';
+import { answerThirdParties } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/wip-stub.mjs';
+const API = 'http://127.0.0.1:3011', APP = 'http://127.0.0.1:5183';
+const call = async (token, path, init = {}) => (await fetch(API + path, { ...init, headers: { 'content-type': 'application/json', ...(token ? { authorization: `Bearer ${token}` } : {}) } })).json();
+const token = (await call(null, '/api/auth/login', { method: 'POST', body: JSON.stringify(DEV_USER) })).token;
+const project = (await call(token, '/api/projects')).find((p) => String(p.fullPath ?? p.path ?? '').endsWith('claudecodeui_lyphe'));
+const chat = (await call(token, `/api/projects/${encodeURIComponent(project.projectId)}/sessions?limit=8`)).sessions.at(-1).id;
+const browser = await pw.chromium.launch();
+for (const [width, scale] of [[360, 1.072], [344, 1], [344, 1.072]]) {
+  const ctx = await browser.newContext({ viewport: { width, height: 800 }, colorScheme: 'light', locale: 'en-US', serviceWorkers: 'block' });
+  await ctx.addInitScript(([v]) => { localStorage.setItem('auth-token', v); localStorage.setItem('activeTab', 'runner'); }, [token]);
+  await pinPreferences(ctx, { theme: 'light' }, { writes: 'drop' }); await answerThirdParties(ctx);
+  await ctx.route(/\/api\//, (r) => (['GET', 'HEAD'].includes(r.request().method()) || /\/api\/(auth\/refresh|commands\/list)/.test(r.request().url()) ? r.fallback() : r.abort()));
+  const page = await ctx.newPage();
+  await page.goto(`${APP}/session/${chat}`, { waitUntil: 'domcontentloaded' });
+  await page.waitForSelector('[data-master-controller]', { timeout: 30000 });
+  await page.evaluate((s) => { document.documentElement.style.fontSize = `${16 * s}px`; }, scale); await page.waitForTimeout(900);
+  const out = [];
+  for (const h of ['data-master-epics', 'data-master-wip-features', 'data-master-wip-tasks']) {
+    await page.locator(`[${h}] button[aria-haspopup="listbox"]`).click(); await page.waitForTimeout(300);
+    out.push(`${h.replace('data-master-', '')}: ${await page.evaluate(() => { const r = document.querySelector('[role="listbox"]').getBoundingClientRect(); return `${Math.round(r.left)}..${Math.round(r.right)}`; })}`);
+    await page.keyboard.press('Escape'); await page.waitForTimeout(200);
+  }
+  console.log(`viewport ${width}px, text x${scale}: list spans ${out.join(' · ')}  (clipped when a span leaves 0..${width})`);
+  await ctx.close();
+}
+await browser.close();
+EOF
+printf 'cd /tmp && timeout 150 node "$1/p.mjs"\n' > "$D/p.sh"
+bash "$D/p.sh" "$D"
+cd /tmp; case "$D" in /tmp/athena-probe-narrow.??????) rm -r "$D";; esac
+echo "[probe exit $?]"
+expect: the third line's `wip-features` span ends at 349 for a 344 viewport while it stands (the first line's ends at 349 for 360: fine); every span inside `0..<width>` once cured
+```
+
+measured 2026-10-15 by chain chain-in-flight-master-controller-20261015-073906-ff48, finding L4, LOW
+probe-key: 92c34bda5fd69485ede6e4b9d762f71d8c27fd7f
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/ArcControls.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/EpicWipControl.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/PlanControls.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/ScheduleControl.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/master-controller-folds.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/master-controller-live.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/master-controller-scratch.py, /home/lyphe/.claude/hooks/dispatcher/line_gate.py, /home/lyphe/.claude/hooks/dispatcher/model.py, /home/lyphe/.claude/hooks/dispatcher/release.py, /home/lyphe/.claude/hooks/plan_runner/run_model.py
+
+## INV-8360 — probe — MEDIUM — the gate's last check, "the live box is as found", fails whenever the dispatcher writes one event during the run
+
+MEDIUM — the gate's last check, "the live box is as found", fails whenever the dispatcher writes one event during the run
+
+```probe
+D=$(mktemp -d /tmp/athena-p.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+echo "gate lines reading the events table into its live-box comparison: $(grep -c 'eventsTotal' .verify/master-controller-widget.mjs)"
+sqlite3 -readonly ~/.claude/state/dispatcher/dispatcher.db "select at from events where at > datetime('now','-1 day') order by at" | python3 -I -c "
+import sys, datetime as dt
+ts = [dt.datetime.fromisoformat(l.strip().replace('Z', '+00:00')) for l in sys.stdin if l.strip()]
+if len(ts) < 2: print('fewer than 2 events in 24h'); raise SystemExit
+w = dt.timedelta(minutes=3.5); t = ts[0]; hit = total = 0
+while t + w <= ts[-1]:
+    total += 1; hit += any(t <= x < t + w for x in ts); t += dt.timedelta(minutes=1)
+print(f'{len(ts)} dispatcher events in 24h; a gate run (~3.5 min) would have seen one in {hit} of {total} windows = {100 * hit // total}%')"
+EOF
+bash "$D/p.sh"
+cd /tmp; case "$D" in /tmp/athena-p.??????) rm -r "$D";; esac
+echo "[probe exit $?]"
+expect: line 1 prints `1` and line 2 prints a percentage above 0 (measured 18% on 2026-10-15) while the defect stands; cured when line 1 prints `0`
+```
+
+measured 2026-10-15 by chain chain-runs-widget-master-controller-20261015-085947-0a41, finding M1, MEDIUM
+probe-key: 83b1064e8f507ae451aac3ed398dc93131ca34c4
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/MasterController.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Select.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/master-controller-live.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/master-controller-widget.mjs
+
+## INV-8361 — probe — LOW — a list left open while the widget scrolls floats loose over the next widget, its trigger half hidden
+
+LOW — a list left open while the widget scrolls floats loose over the next widget, its trigger half hidden
+
+```probe
+D=$(mktemp -d /tmp/athena-p.XXXXXX) || exit 1
+cat > "$D/p.mjs" <<'EOF'
+import pw from "/opt/shadow-connector/node_modules/playwright/index.js";
+const V = "/home/lyphe/.claude/claudecodeui_lyphe/.verify", API = "http://127.0.0.1:3011", APP = "http://127.0.0.1:5183";
+const { DEV_USER } = await import(`${V}/lib/console.mjs`); const { pinPreferences } = await import(`${V}/lib/prefs-pin.mjs`); const { answerThirdParties, waitUntil } = await import(`${V}/lib/wip-stub.mjs`);
+const call = async (p, i = {}, t) => JSON.parse(await (await fetch(API + p, { ...i, headers: { "content-type": "application/json", ...(t ? { authorization: `Bearer ${t}` } : {}) } })).text());
+const token = (await call("/api/auth/login", { method: "POST", body: JSON.stringify(DEV_USER) })).token;
+const project = (await call("/api/projects", {}, token)).find((e) => String(e.fullPath ?? e.path ?? "").endsWith("claudecodeui_lyphe"));
+const chat = (await call(`/api/projects/${encodeURIComponent(project.projectId)}/sessions?limit=8`, {}, token)).sessions.at(-1).id;
+const CARD = "[data-testid=gutter-widget][data-widget=runner]", W = "[data-runner-widget]";
+const browser = await pw.chromium.launch();
+const ctx = await browser.newContext({ viewport: { width: 1830, height: 1000 }, colorScheme: "light", locale: "en-US", serviceWorkers: "block" });
+await ctx.addInitScript((v) => { try { localStorage.setItem("auth-token", v); localStorage.setItem("activeTab", "chat"); } catch {} }, token);
+await answerThirdParties(ctx);
+const refused = [];
+await ctx.route(/\/api\//, (r) => { const q = r.request(); if (["GET", "HEAD"].includes(q.method())) return r.fallback(); const { pathname } = new URL(q.url()); if (pathname === "/api/user/preferences") return r.fallback(); if (/^\/api\/(dispatcher|user|settings)\//.test(pathname)) { refused.push(pathname); return r.abort(); } return r.fallback(); });
+await pinPreferences(ctx, { userLanguage: "en", uiPreferences: { sidebarVisible: true }, theme: "light", themeFollowsSun: false }, { writes: "drop" });
+let SWITCH = null; await ctx.route("**/api/settings/deepseek-flash", (r) => (r.request().method() === "GET" && SWITCH !== null ? r.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ enabled: SWITCH }) }) : r.fallback()));
+const page = await ctx.newPage();
+await page.goto(`${APP}/session/${chat}`, { waitUntil: "domcontentloaded" });
+await page.waitForSelector(CARD, { timeout: 30000 });
+if ((await page.locator(CARD).getAttribute("data-open")) !== "true") await page.locator(`${CARD} [data-testid=gutter-widget-header]`).click();
+await waitUntil(async () => page.$(`${W} [data-master-controller]`), 20000); await page.waitForTimeout(1200);
+const SCROLLER = () => { const w = document.querySelector("[data-runner-widget]"); return [...document.querySelectorAll("[data-testid=gutter-widget][data-widget=runner] *")].find((n) => /(auto|scroll)/.test(getComputedStyle(n).overflowY) && n.contains(w)); };
+await page.locator(`${W} [data-master-epics] button[aria-haspopup=listbox]`).click(); await page.waitForTimeout(450);
+const o = await page.evaluate(() => { const s = [...document.querySelectorAll("[data-testid=gutter-widget][data-widget=runner] *")].find((n) => /(auto|scroll)/.test(getComputedStyle(n).overflowY) && n.contains(document.querySelector("[data-runner-widget]"))).getBoundingClientRect(); return { x: s.left + 280, y: s.top + 40 }; });
+await page.mouse.move(o.x, o.y); await page.mouse.wheel(0, 90); await page.waitForTimeout(500);
+const r = await page.evaluate(() => { const w = document.querySelector("[data-runner-widget]"); const sc = [...document.querySelectorAll("[data-testid=gutter-widget][data-widget=runner] *")].find((n) => /(auto|scroll)/.test(getComputedStyle(n).overflowY) && n.contains(w)); const s = sc.getBoundingClientRect(), t = w.querySelector("[data-master-epics] button[aria-haspopup=listbox]").getBoundingClientRect(), p = document.querySelector(".vv-select__panel")?.getBoundingClientRect(); return { listboxes: document.querySelectorAll("[role=listbox]").length, triggerTop: Math.round(t.top), scrollerTop: Math.round(s.top), scrollerBottom: Math.round(s.bottom), panelBottom: p ? Math.round(p.bottom) : null }; });
+console.log(`widget scrolled 90px, Epics list open: listboxes=${r.listboxes} triggerTop=${r.triggerTop} scrollerTop=${r.scrollerTop} panelBottom=${r.panelBottom} scrollerBottom=${r.scrollerBottom} -> ${r.listboxes === 1 && r.triggerTop < r.scrollerTop && r.panelBottom > r.scrollerBottom ? "DETACHED" : "not detached"} (writes refused: ${refused.length})`);
+await browser.close();
+EOF
+cat > "$D/p.sh" <<'EOF'
+cd /home/lyphe/.claude/claudecodeui_lyphe/.verify || exit 1
+node "$1" 2>&1 | tail -4
+EOF
+bash "$D/p.sh" "$D/p.mjs"
+cd /tmp; case "$D" in /tmp/athena-p.??????) rm -r "$D";; esac
+echo "[probe exit $?]"
+expect: the last line ends `-> DETACHED (writes refused: 0)` with `listboxes=1 triggerTop=31 scrollerTop=59 panelBottom=245 scrollerBottom=225` while the defect stands; cured when it reads `not detached` (the list closed, `listboxes=0`, or was held inside the scroller)
+```
+
+measured 2026-10-15 by chain chain-runs-widget-master-controller-20261015-085947-0a41, finding L1, LOW
+probe-key: 9ab9493d7034bd03a724a60b2590ad6568337a30
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/MasterController.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Select.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/master-controller-live.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/master-controller-widget.mjs
+
+## INV-8362 — probe — LOW — a `Select` disabled while open hides its list but stays open, and the list comes back by itself
+
+LOW — a `Select` disabled while open hides its list but stays open, and the list comes back by itself
+
+```probe
+D=$(mktemp -d /tmp/athena-p.XXXXXX) || exit 1
+cat > "$D/p.mjs" <<'EOF'
+import pw from "/opt/shadow-connector/node_modules/playwright/index.js";
+const V = "/home/lyphe/.claude/claudecodeui_lyphe/.verify", API = "http://127.0.0.1:3011", APP = "http://127.0.0.1:5183";
+const { DEV_USER } = await import(`${V}/lib/console.mjs`); const { pinPreferences } = await import(`${V}/lib/prefs-pin.mjs`); const { answerThirdParties, waitUntil } = await import(`${V}/lib/wip-stub.mjs`);
+const call = async (p, i = {}, t) => JSON.parse(await (await fetch(API + p, { ...i, headers: { "content-type": "application/json", ...(t ? { authorization: `Bearer ${t}` } : {}) } })).text());
+const token = (await call("/api/auth/login", { method: "POST", body: JSON.stringify(DEV_USER) })).token;
+const project = (await call("/api/projects", {}, token)).find((e) => String(e.fullPath ?? e.path ?? "").endsWith("claudecodeui_lyphe"));
+const chat = (await call(`/api/projects/${encodeURIComponent(project.projectId)}/sessions?limit=8`, {}, token)).sessions.at(-1).id;
+const CARD = "[data-testid=gutter-widget][data-widget=runner]", W = "[data-runner-widget]";
+const browser = await pw.chromium.launch();
+const ctx = await browser.newContext({ viewport: { width: 1830, height: 1000 }, colorScheme: "light", locale: "en-US", serviceWorkers: "block" });
+await ctx.addInitScript((v) => { try { localStorage.setItem("auth-token", v); localStorage.setItem("activeTab", "chat"); } catch {} }, token);
+await answerThirdParties(ctx);
+const refused = [];
+await ctx.route(/\/api\//, (r) => { const q = r.request(); if (["GET", "HEAD"].includes(q.method())) return r.fallback(); const { pathname } = new URL(q.url()); if (pathname === "/api/user/preferences") return r.fallback(); if (/^\/api\/(dispatcher|user|settings)\//.test(pathname)) { refused.push(pathname); return r.abort(); } return r.fallback(); });
+await pinPreferences(ctx, { userLanguage: "en", uiPreferences: { sidebarVisible: true }, theme: "light", themeFollowsSun: false }, { writes: "drop" });
+let SWITCH = null; await ctx.route("**/api/settings/deepseek-flash", (r) => (r.request().method() === "GET" && SWITCH !== null ? r.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ enabled: SWITCH }) }) : r.fallback()));
+const page = await ctx.newPage();
+await page.goto(`${APP}/session/${chat}`, { waitUntil: "domcontentloaded" });
+await page.waitForSelector(CARD, { timeout: 30000 });
+if ((await page.locator(CARD).getAttribute("data-open")) !== "true") await page.locator(`${CARD} [data-testid=gutter-widget-header]`).click();
+await waitUntil(async () => page.$(`${W} [data-master-controller]`), 20000); await page.waitForTimeout(1200);
+const SCROLLER = () => { const w = document.querySelector("[data-runner-widget]"); return [...document.querySelectorAll("[data-testid=gutter-widget][data-widget=runner] *")].find((n) => /(auto|scroll)/.test(getComputedStyle(n).overflowY) && n.contains(w)); };
+const trig = page.locator(`${W} [data-master-wip-features] button[aria-haspopup=listbox]`);
+const read = () => page.evaluate(() => { const b = document.querySelector("[data-runner-widget] [data-master-wip-features] button[aria-haspopup=listbox]"); return `expanded=${b.getAttribute("aria-expanded")} disabled=${b.disabled} listboxes=${document.querySelectorAll("[role=listbox]").length}`; });
+await trig.click(); await page.waitForTimeout(400);
+console.log("list open:                       ", await read());
+SWITCH = true; await page.evaluate(() => window.dispatchEvent(new Event("focus"))); await page.waitForTimeout(800);
+console.log("switch re-read as DeepSeek (focus):", await read());
+SWITCH = false; await page.evaluate(() => window.dispatchEvent(new Event("focus"))); await page.waitForTimeout(800);
+console.log("switch re-read as Claude, no press:", await read(), `(writes refused: ${refused.length})`);
+await browser.close();
+EOF
+cat > "$D/p.sh" <<'EOF'
+cd /home/lyphe/.claude/claudecodeui_lyphe/.verify || exit 1
+node "$1" 2>&1 | tail -4
+EOF
+bash "$D/p.sh" "$D/p.mjs"
+cd /tmp; case "$D" in /tmp/athena-p.??????) rm -r "$D";; esac
+echo "[probe exit $?]"
+expect: line 2 reads `expanded=true disabled=true listboxes=0` and line 3 `expanded=true disabled=false listboxes=1` while the defect stands; cured when line 2 reads `expanded=false` and line 3 `listboxes=0`
+```
+
+measured 2026-10-15 by chain chain-runs-widget-master-controller-20261015-085947-0a41, finding L2, LOW
+probe-key: 22efde869e8df151e1dacb90291e14d5cab03246
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/MasterController.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Select.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/master-controller-live.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/master-controller-widget.mjs
+
+## INV-8363 — probe — LOW — the gate's negative control passes only in the operator's present four-widget arrangement
+
+LOW — the gate's negative control passes only in the operator's present four-widget arrangement
+
+```probe
+D=$(mktemp -d /tmp/athena-p.XXXXXX) || exit 1
+cat > "$D/p.mjs" <<'EOF'
+import pw from "/opt/shadow-connector/node_modules/playwright/index.js";
+const V = "/home/lyphe/.claude/claudecodeui_lyphe/.verify", API = "http://127.0.0.1:3011", APP = "http://127.0.0.1:5183";
+const { DEV_USER } = await import(`${V}/lib/console.mjs`); const { pinPreferences } = await import(`${V}/lib/prefs-pin.mjs`); const { answerThirdParties, waitUntil } = await import(`${V}/lib/wip-stub.mjs`);
+const call = async (p, i = {}, t) => JSON.parse(await (await fetch(API + p, { ...i, headers: { "content-type": "application/json", ...(t ? { authorization: `Bearer ${t}` } : {}) } })).text());
+const token = (await call("/api/auth/login", { method: "POST", body: JSON.stringify(DEV_USER) })).token;
+const project = (await call("/api/projects", {}, token)).find((e) => String(e.fullPath ?? e.path ?? "").endsWith("claudecodeui_lyphe"));
+const chat = (await call(`/api/projects/${encodeURIComponent(project.projectId)}/sessions?limit=8`, {}, token)).sessions.at(-1).id;
+const CARD = "[data-testid=gutter-widget][data-widget=runner]", W = "[data-runner-widget]";
+const browser = await pw.chromium.launch();
+const ctx = await browser.newContext({ viewport: { width: 1830, height: 1000 }, colorScheme: "light", locale: "en-US", serviceWorkers: "block" });
+await ctx.addInitScript((v) => { try { localStorage.setItem("auth-token", v); localStorage.setItem("activeTab", "chat"); } catch {} }, token);
+await answerThirdParties(ctx);
+const refused = [];
+await ctx.route(/\/api\//, (r) => { const q = r.request(); if (["GET", "HEAD"].includes(q.method())) return r.fallback(); const { pathname } = new URL(q.url()); if (pathname === "/api/user/preferences") return r.fallback(); if (/^\/api\/(dispatcher|user|settings)\//.test(pathname)) { refused.push(pathname); return r.abort(); } return r.fallback(); });
+await pinPreferences(ctx, { userLanguage: "en", uiPreferences: { sidebarVisible: true }, theme: "light", themeFollowsSun: false }, { writes: "drop" });
+let SWITCH = null; await ctx.route("**/api/settings/deepseek-flash", (r) => (r.request().method() === "GET" && SWITCH !== null ? r.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ enabled: SWITCH }) }) : r.fallback()));
+const page = await ctx.newPage();
+await page.goto(`${APP}/session/${chat}`, { waitUntil: "domcontentloaded" });
+await page.waitForSelector(CARD, { timeout: 30000 });
+if ((await page.locator(CARD).getAttribute("data-open")) !== "true") await page.locator(`${CARD} [data-testid=gutter-widget-header]`).click();
+await waitUntil(async () => page.$(`${W} [data-master-controller]`), 20000); await page.waitForTimeout(1200);
+const SCROLLER = () => { const w = document.querySelector("[data-runner-widget]"); return [...document.querySelectorAll("[data-testid=gutter-widget][data-widget=runner] *")].find((n) => /(auto|scroll)/.test(getComputedStyle(n).overflowY) && n.contains(w)); };
+const measure = async (label) => {
+  const r = await page.evaluate((fn) => {
+    const w = document.querySelector("[data-runner-widget]"); const sc = [...document.querySelectorAll("[data-testid=gutter-widget][data-widget=runner] *")].find((n) => /(auto|scroll)/.test(getComputedStyle(n).overflowY) && n.contains(w));
+    for (let n = sc; n; n = n.parentElement) n.scrollTop = 0;
+    const select = w.querySelector("[data-master-epics] .vv-select"); const trigger = select.querySelector("button[aria-haspopup=listbox]");
+    const panel = document.createElement("div"); panel.className = "vv-select__panel"; Object.assign(panel.style, { position: "absolute", top: "calc(100% + 6px)", left: "0", right: "0", width: "auto", zIndex: "20" });
+    panel.innerHTML = "<ul class=\"vv-select__list\" role=\"listbox\">" + ["1", "2", "3", "4", "5"].map((x) => `<li class="vv-select__option" role="option">${x}</li>`).join("") + "</ul>";
+    select.appendChild(panel); trigger.setAttribute("aria-expanded", "true");
+    return new Promise((done) => setTimeout(() => { const hits = [...panel.querySelectorAll("[role=option]")].filter((o) => { const b = o.getBoundingClientRect(); const e = document.elementFromPoint(b.left + b.width / 2, b.top + b.height / 2); return e !== null && o.contains(e); }).length; panel.remove(); trigger.setAttribute("aria-expanded", "false"); done({ windowPx: sc.clientHeight, hits }); }, 450));
+  });
+  console.log(`${label}: the widget's window is ${r.windowPx}px; an in-place list (the control the gate uses) answers a hit on ${r.hits} of 5 options -> the gate's control would ${r.hits < 5 ? "PASS" : "FAIL (it can no longer fail)"}`);
+};
+await measure("the operator's arrangement (four widgets open)");
+for (const id of ["roadmap", "memory", "subagents"]) { const c = page.locator(`[data-testid=gutter-widget][data-widget=${id}]`); if (await c.count() && (await c.getAttribute("data-open")) === "true") await c.locator("[data-testid=gutter-widget-header]").click(); }
+await page.waitForTimeout(700);
+await measure("the other three widgets collapsed        ");
+console.log(`gate pins the column's arrangement: ${(await import("node:fs")).readFileSync(V + "/master-controller-widget.mjs", "utf8").match(/placements|collapse|gutterPlacements/gi)?.length ?? 0} mentions (writes refused: ${refused.length})`);
+await browser.close();
+EOF
+cat > "$D/p.sh" <<'EOF'
+cd /home/lyphe/.claude/claudecodeui_lyphe/.verify || exit 1
+node "$1" 2>&1 | tail -4
+EOF
+bash "$D/p.sh" "$D/p.mjs"
+cd /tmp; case "$D" in /tmp/athena-p.??????) rm -r "$D";; esac
+echo "[probe exit $?]"
+expect: line 1 says the window is 166px and the in-place control would PASS (2 of 5 hit), line 2 says 734px and `FAIL (it can no longer fail)` (5 of 5), line 3 `0 mentions` while the defect stands; cured when line 3 counts a pin of the arrangement (or line 2 also says PASS). The window height reads whatever his arrangement holds today: the contrast between lines 1 and 2 is the measurement
+```
+
+measured 2026-10-15 by chain chain-runs-widget-master-controller-20261015-085947-0a41, finding L3, LOW
+probe-key: 0c261c9afa0bf6d245ba443f0397f2051f460e5a
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/MasterController.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Select.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/master-controller-live.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/master-controller-widget.mjs
+
+## INV-8364 — probe — LOW — the gate's own bookkeeping: two checks that pass on `null`, a dead field, a wrong figure
+
+LOW — the gate's own bookkeeping: two checks that pass on `null`, a dead field, a wrong figure
+
+```probe
+D=$(mktemp -d /tmp/athena-p.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+echo "sideways checks that pass when the scroller is not found (null <= 0 is $(node -p 'null <= 0')): $(grep -c 'scrollerSideways <= 0\|cards.sideways <= 0' .verify/master-controller-widget.mjs)"
+echo "fields computed and never read (plannerReadoutAbove): $(grep -c 'plannerReadoutAbove' .verify/master-controller-widget.mjs) mention(s)"
+echo "'lines' counts distinct tops, not rows: $(grep -c 'new Set(children.map((child) => Math.round(child.top))).size' .verify/master-controller-widget.mjs) site(s); the cards' alignment is items-end: $(grep -c 'items-end' src/modules/dispatcher/MasterController.tsx)"
+EOF
+bash "$D/p.sh"
+cd /tmp; case "$D" in /tmp/athena-p.??????) rm -r "$D";; esac
+echo "[probe exit $?]"
+expect: line 1 `…(null <= 0 is true): 2`, line 2 `1 mention(s)`, line 3 `1 site(s)` … `1` while the defect stands; cured when line 1 ends `: 0`, line 2 prints `0 mention(s)`
+```
+
+measured 2026-10-15 by chain chain-runs-widget-master-controller-20261015-085947-0a41, finding L4, LOW
+probe-key: 4330da8486d795daa7695f6864601bbbc8a4d934
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/MasterController.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Select.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/master-controller-live.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/master-controller-widget.mjs

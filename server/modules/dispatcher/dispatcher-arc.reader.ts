@@ -87,30 +87,31 @@ export function arcOf(raw: unknown): DispatcherArc {
     delivers: need(field(arc, 'delivers'), isTextOrNull, 'arc.delivers'),
     // The ARC's OWN word, never one of its plans' effective one: this row is what the arc's control
     // draws and presses, and pressing it hands the word to every plan of the arc
-    // (`store.set_arc_model`). A build older than the field reads `null` — the store's default.
+    // (`store.set_arc_model`). `null` while the arc carries none and follows the house switch, and
+    // for a build older than the field.
     model: modelSince(field(arc, 'model'), 'arc.model'),
     status: oneOf(field(arc, 'status'), ARC_STATUSES, `status of ${name}`),
     // The epic's two WIP limits, each as its own word and the word in force — what the epic's WIP
     // control draws and presses back (`dispatcher wip`), carried as the document states them.
     wip: wipOf(field(arc, 'wip'), name),
-    // THE ARC'S OWN VERBS, read off its plans' status words by `report_arcs` and drawn by the header
-    // here: `walking` is what Pause is drawn for and `stopped` what Start and Schedule start are —
-    // and `stopped` is every plan of the arc that is approved, paused and unfinished, so a whole arc
-    // the operator accepted with Queue draws a Start. Both are read tolerantly, so a dispatcher build
-    // older than the fields draws no control at all rather than a wrong one — which is what that
-    // build's arc really is: an arc this lane cannot move. Neither word is the arc's `status` (the
-    // module head says why: the two draw different controls, and the status does not tell them apart —
-    // an arc with one plan at the gate and one still unapproved reads `designing` and `stopped` at
-    // once, and a `designing` header draws no press while `stopped` is what Start is drawn for).
+    // THE ARC'S OWN VERBS, read off its plans' status words by `report_arcs` and drawn by the deck
+    // here: `walking` is what Pause is drawn for, `midwalk` and `stalled` what Resume is, and `stopped`
+    // the whole set a terminal's `resume <arc>` reaches (the plans held for their first Start are among
+    // it and are the board's Start's). All are read tolerantly, so a dispatcher build older than the
+    // fields draws no control at all rather than a wrong one — which is what that build's arc really
+    // is: an arc this lane cannot move. None is the arc's `status` (the module head says why: the
+    // status does not tell them apart — an arc with one plan at the gate and one still unapproved
+    // reads `designing`).
     walking: flagSince(field(arc, 'walking'), `arc.walking of ${name}`),
     stopped: flagSince(field(arc, 'stopped'), `arc.stopped of ${name}`),
+    midwalk: flagSince(field(arc, 'midwalk'), `arc.midwalk of ${name}`),
     // Whether a plan of the arc has STALLED (`report_arcs.stalled`): released, its only running work
-    // ended and nothing to record it. The header draws Resume on it where nothing is stopped, beside
-    // the Pause `walking` still draws. Tolerant: a build older than the field has no stalled plan to say.
+    // ended and nothing to record it. The deck draws Resume on it beside the Pause `walking` still
+    // draws. Tolerant: a build older than the field has no stalled plan to say.
     stalled: flagSince(field(arc, 'stalled'), `arc.stalled of ${name}`),
     // The ONE hour an arc's plans are armed for, or null (`report_arcs.hour`: the single distinct
     // armed stamp, null when there is none or when its plans were armed apart). It is the stamp the
-    // header's Cancel is drawn over and the note beside it states — never computed here.
+    // deck's note states — never computed here.
     schedule: textSince(field(arc, 'schedule'), `arc.schedule of ${name}`),
     // How many of the arc's plans the "Accept when cut" press reaches now, and how many carry one
     // (`report_arcs.armable`, `armed`): the deck draws the press and its Cancel by them. Counts, so a

@@ -37,7 +37,7 @@ type VerbSend<Verb extends string> = {
 
 /**
  * Relay one press to the dispatcher and say what it answered — the one path every press of the lane takes:
- * the plan card's and the arc deck's verbs (`useDispatcherVerbs`), the epic dial (`useEpicDialVerbs`) and the
+ * the plan card's and the arc deck's verbs (`useDispatcherVerbs`), the board's presses (`useBoardVerbs`) and the
  * queue's moves (`useEpicQueueVerbs`). `call` is the whole of what differs between presses — which door of
  * the API this verb goes through — written at each press so the route a button presses is readable at the button.
  *
@@ -56,7 +56,7 @@ type VerbSend<Verb extends string> = {
  * is out. Essential, not derivable — several of these verbs arm and disarm timers or move the dial's file, and
  * a double press would race two dispatcher processes at the same store.
  *
- * Used by `useDispatcherVerbs`, `useEpicDialVerbs` and `useEpicQueueVerbs` (this module).
+ * Used by `useDispatcherVerbs`, `useBoardVerbs` and `useEpicQueueVerbs` (this module).
  */
 export function useVerbSend<Verb extends string>(options: VerbSendOptions<Verb>): VerbSend<Verb> {
   const { t } = useTranslation();

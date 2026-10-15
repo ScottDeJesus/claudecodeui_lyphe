@@ -19,7 +19,7 @@ import type { DispatcherArc, DispatcherArcSplit, DispatcherPhase, DispatcherPlan
  * date rides whenever the moment is not today, because DeepSeek's off-peak lifts at 3 AM Pacific — past
  * the operator's midnight — and a bare `3:00 AM` read in the evening names a time that has already
  * passed. One clock for every moment the card names: a plan card's own clock (`PlanFace.PlanClock`), an
- * arc's armed hour (`DispatchArcControls`), `ScheduleControl`'s `Start at …`, and the stage lines and
+ * arc's armed hour (`DispatchArcDeck`'s head), `ScheduleControl`'s `Resume at …`, and the stage lines and
  * event feed through {@link clockOf} all name one moment one way.
  */
 export function scheduleClock(epochSeconds: number, now: number = Date.now()): string {

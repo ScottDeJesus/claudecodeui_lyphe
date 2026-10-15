@@ -10,13 +10,13 @@ import RunnerHealModelRow from '@/modules/settings/tabs/agents-settings/sections
 import RunnerMainSessionDactylsRow from '@/modules/settings/tabs/agents-settings/sections/content/RunnerMainSessionDactylsRow';
 import RunnerParkAtPeakRow from '@/modules/settings/tabs/agents-settings/sections/content/RunnerParkAtPeakRow';
 import RunnerPlannerLanesRow from '@/modules/settings/tabs/agents-settings/sections/content/RunnerPlannerLanesRow';
-import RunnerWipDefaultsRow from '@/modules/settings/tabs/agents-settings/sections/content/RunnerWipDefaultsRow';
 
 /**
  * Rendered by AgentCategoryContentSection under Claude's "account" panel: which model the plan
- * runner's hands — the builder, his fix-pass and Athena — actually dispatch on, the WIP defaults every
- * epic starts from, how many planners run at once, and whether the heal reflex may launch a heal at
- * all.
+ * runner's hands — the builder, his fix-pass and Athena — actually dispatch on, how many planners run at
+ * once, and whether the heal reflex may launch a heal at all. (The WIP defaults every epic starts from
+ * are not here: they are two dropdowns of the master controller in the Roadmap tab's In flight header,
+ * beside the same DeepSeek switch.)
  *
  * It sits beside the Claude connection rather than in a tab of its own because that is the
  * question it answers: this account's souls, or DeepSeek's. Every switch it writes is a file the
@@ -25,9 +25,9 @@ import RunnerWipDefaultsRow from '@/modules/settings/tabs/agents-settings/sectio
  *
  * The read, the write and the re-read live in `useDeepSeekFlashSwitch` and `useHealMasterSwitch` —
  * one hook per switch rather than one generalised switch, because switches sharing a module move
- * together the first time one of them is edited, and these must never. The WIP defaults, the planner
+ * together the first time one of them is edited, and these must never. The planner
  * lanes, the park-at-peak switch, the Custom compaction switch and Dactyls for the main session each have a row of
- * their own file (`RunnerWipDefaultsRow`, `RunnerPlannerLanesRow`, `RunnerParkAtPeakRow`, `RunnerCompactionRow` — drawn
+ * their own file (`RunnerPlannerLanesRow`, `RunnerParkAtPeakRow`, `RunnerCompactionRow` — drawn
  * directly under the DeepSeek row, because it asks that row's question of a chat's compaction: which small model does
  * a big model's chore — and `RunnerMainSessionDactylsRow`, drawn directly under that one, because it asks the same of
  * a main session's edits) with a hook of its own, and the fourth heal switch, `useHealModelSwitch`, is drawn by `RunnerHealModelRow` — its own file, because
@@ -105,12 +105,8 @@ export default function RunnerModelContent() {
       <RunnerCompactionRow />
       <RunnerMainSessionDactylsRow />
 
-      {/* THE WIP DEFAULTS — what every epic starts from: two steppers, features in progress and tasks
-          per feature, on the one shared ladder. Its own file and its own hook, like the rows around it. */}
-      <RunnerWipDefaultsRow />
-
-      {/* HOW MANY PLANNERS RUN AT ONCE — the WIP row's sibling for the other kind of worker; its own
-          file and its own hook, like the rows around it. */}
+      {/* HOW MANY PLANNERS RUN AT ONCE — its own file and its own hook, like the rows around it. How many
+          features and tasks run at once is not set here: it is In flight's header (`MasterController`). */}
       <RunnerPlannerLanesRow />
 
       <RunnerParkAtPeakRow />

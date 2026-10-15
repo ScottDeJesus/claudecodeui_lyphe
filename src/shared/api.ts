@@ -955,22 +955,19 @@ export const api = {
     // control relays it; nothing is optimistic, and the next `dispatcher_state` frame reads the
     // word back. Restarts nothing — the word is read when a chain is LAUNCHED.
     model: (name: string, model: DispatcherModelChoice) => post(`/api/dispatcher/plans/${encodeURIComponent(name)}/model`, { model }),
-    // The DISPATCH ARC header's five presses (`dispatcher model|stop|resume|schedule|wip <arc> …`), each
+    // The DISPATCH ARC deck's four presses (`dispatcher model|stop|resume|wip <arc> …`), each
     // relayed to the arc's own door. Separate routes from the plan's because an arc is addressed by
     // its own door (`.arc`), never through a plan's.
     //
     // AN ARC HAS NO WALK OF ITS OWN: the dispatcher applies the PLAN verb to the arc's plans in one
-    // step — `stop` over the arc's walking plans, `resume` and `schedule` over its stopped ones — so
-    // the header's press and one typed at a terminal are the same verb on the same set of plans. A
+    // step — `stop` over the arc's walking plans, `resume` over its stopped ones — so
+    // the deck's press and one typed at a terminal are the same verb on the same set of plans. A
     // `/arcs/…` route for each is the whole reason the two surfaces cannot drift.
     arcModel: (name: string, model: DispatcherModelChoice) => post(`/api/dispatcher/arcs/${encodeURIComponent(name)}/model`, { model }),
     arcStop: (name: string) => post(`/api/dispatcher/arcs/${encodeURIComponent(name)}/stop`, {}),
     arcResume: (name: string) => post(`/api/dispatcher/arcs/${encodeURIComponent(name)}/resume`, {}),
-    // The arc's Resume — or Start, for plans still at the gate — at a time: the same three shapes a
-    // plan's schedule takes, through the same server-side reader.
-    arcSchedule: (name: string, when: string) => post(`/api/dispatcher/arcs/${encodeURIComponent(name)}/schedule`, { when }),
     // One of the epic's two WIP limits (`dispatcher wip <arc> <limit> <word>`) — a count, `all`, or
-    // `default` to follow Settings again. The epic card's WIP control relays it; nothing is optimistic,
+    // `default` to follow the top again. The epic deck's fold relays it; nothing is optimistic,
     // and the next `dispatcher_state` frame reads the word back. An epic's verb alone: no plan route.
     arcWip: (name: string, limit: DispatcherWipLimit, word: DispatcherWipChoice) =>
       post(`/api/dispatcher/arcs/${encodeURIComponent(name)}/wip`, { limit, word }),
@@ -980,11 +977,14 @@ export const api = {
     // queue); nothing is optimistic, and the next `dispatcher_state` frame draws the order the store holds.
     arcQueue: (name: string, move: DispatcherQueueMove) =>
       post(`/api/dispatcher/arcs/${encodeURIComponent(name)}/queue`, move),
-    // The epic dial's one word (`dispatcher epics <word>`): a limit of `1` to `5` or `all`, or `pause` /
+    // The epic dial's one word (`dispatcher epics <word>`): a limit of `1` to `5`, or `pause` /
     // `resume` — a BOARD verb that names no plan and no arc, so its route has no name in it.
     epics: (word: DispatcherEpicsWord) => post('/api/dispatcher/epics', { word }),
-    // A plan's Start at a time — `offpeak`, an ISO instant with a zone, or `none` to cancel — the
-    // same three shapes the arc's own schedule takes, through the same reader.
+    // The board's one Start (`dispatcher start`): every plan held for its first Start let go at once, the
+    // queue and the dial then ordering them. A BOARD verb like `epics`, with no name and no body.
+    start: () => post('/api/dispatcher/start', {}),
+    // A stopped plan's Resume at a time — `offpeak`, an ISO instant with a zone, or `none` to cancel —
+    // through the server's one reader of the three shapes.
     schedule: (name: string, when: string) => post(`/api/dispatcher/plans/${encodeURIComponent(name)}/schedule`, { when }),
     // The dispatcher's next DeepSeek off-peak moment (`{ at }`, epoch seconds, or null), relayed
     // from the dispatcher's own binary.

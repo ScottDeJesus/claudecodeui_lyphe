@@ -1479,18 +1479,16 @@ export function dispatchSoulsStateDir(): string {
 
 /**
  * The only words the dispatcher's own `model` verb accepts (`hooks/plan_runner/run_model.py:WORDS`,
- * unpacked by `hooks/dispatcher/model.py`) in the order the controls draw them. The routes relay a
- * member of THIS list, never the request's own string, so the argv word a verb is spawned with is
- * always ours.
+ * unpacked by `hooks/dispatcher/model.py`, and the door's `default` that clears a row) in the order the
+ * controls draw them. The routes relay a member of THIS list, never the request's own string, so the
+ * argv word a verb is spawned with is always ours.
  */
-const DISPATCHER_MODEL_CHOICES: readonly DispatcherModelChoice[] = ['deepseek', 'claude', 'auto'];
+const DISPATCHER_MODEL_CHOICES: readonly DispatcherModelChoice[] = ['deepseek', 'claude', 'default'];
 
 /**
  * A model word as one of `DISPATCHER_MODEL_CHOICES`, or `null` for anything else — a missing field, another
  * casing, a word with padding. Used by the plan route (`POST /plans/:name/model`) and the arc route
- * (`POST /arcs/:name/model`) to refuse a body with a 400 before anything is spawned, and by
- * `dispatcher-state.transport.ts` (`modelSince`) to carry a document's stored word into the picture (`null` for
- * a build older than the field, which the client reads as the store's default — `effectiveModelWord`).
+ * (`POST /arcs/:name/model`) to refuse a body with a 400 before anything is spawned.
  */
 export function readDispatcherModelChoice(value: unknown): DispatcherModelChoice | null {
   return DISPATCHER_MODEL_CHOICES.find((choice) => choice === value) ?? null;

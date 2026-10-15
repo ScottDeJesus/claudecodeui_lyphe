@@ -9,6 +9,7 @@ import {
   HiddenPlans,
   landFocusInHome,
   LoosePlannerBadges,
+  MasterController,
   moveCard,
   PlanCard,
   PlannerLanesReadout,
@@ -75,6 +76,13 @@ function openedBy(plan: DispatcherPlan, sessionId: string | null): boolean {
  * fold store what this widget draws AND what it has hidden, so a card folded here is folded on the tab,
  * a card shown again keeps its fold, and the folds of cards that have left the lane go with them — one
  * memory, two homes.
+ *
+ * THE MASTER CONTROLLER HEADS THE WIDGET, under the planner readout (operator, 2026-10-15: "those changes need to
+ * be reflected in the widget too"): `MasterController`, the very component the tab's header draws — Epics at once,
+ * Features at once, Tasks at once, the Claude · DeepSeek switch, one Start while a plan waits, Pause all — so a press
+ * here is the press there and both homes redraw from the one frame. It has no compact form: its controls wrap between
+ * whole pieces at the gutter's narrowest (300px), and its dropdowns are drawn on `body`, so this widget's scroller never
+ * clips them. The cards below carry the same override folds as the tab's, through `PlanCard` and `DispatchArcDecks`.
  *
  * `Dismiss done · N` heads the list (every drawn plan that is done, off the board in one write — the
  * tab header's own button) and `Hidden · N` closes it as the way back from any Hide. `data-runner-widget`
@@ -149,6 +157,9 @@ export function RunnerWidgetBody({ sessionId }: { sessionId: string | null }) {
       {/* How full the planner lane is — the tab header's own readout. Not drawn when the frame states
           no dial (an older dispatcher). */}
       <PlannerLanesReadout />
+      {/* THE MASTER CONTROLLER, the tab header's own component: one component, two mounts, one frame, so a
+          press here is the one In flight shows. Not drawn when the frame states no dial. */}
+      <MasterController />
       {nothingDrawn ? (
         <EmptyState icon={ActivityIcon} title={t(hidden.length > 0 ? 'dispatcher.hidden.allHidden' : 'runner.empty')} />
       ) : (

@@ -2334,13 +2334,24 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Timeline.tsx
 - On the chosen row's wash the hint steps up one ink (`--ink-mid`). why: `--ink-muted` read 4.44:1 there, under AA.
 
 ## Rules
-- `.vv-select__panel` (`position: absolute`, `controls.css`) must stay the positioned ancestor of `.vv-select__list` and its rows. why: the offset arithmetic above reads both offsets from it; a `position: relative` on the list or a row breaks the centring.
+- `.vv-select__panel` (`position: fixed`, drawn on `body`, `controls.css`) must stay the positioned ancestor of `.vv-select__list` and its rows. why: the offset arithmetic above reads both offsets from it; a `position: relative` on the list or a row breaks the centring.
 - `.vv-select__list` is the scroller (`overflow-y: auto`); the `action` row sits outside it.
 
 ## Known
 | gap | state |
 |---|---|
-| every option is its own tab stop (`tabIndex={0}`); no arrow keys, no type-to-find | roving focus is its own piece of work |
+| no type-to-find (the arrows, Home and End walk the rows; Tab closes the panel and hands focus back to the trigger) | its own piece of work |
+| an open list stays up when its trigger is scrolled out of its own scroller but is still inside the window: `placePanel` tests the window only, so the panel hangs over the scroller's edge | follow-up; `placePanel` serves every picker in every scroller, so a change to it needs its own review |
+
+## The panel is drawn on `body` (the master controller in the Runs widget, MAN-8430)
+- `createPortal(panel, hostWindow.document.body)`, `position: fixed`, `z-index: 10000`; `placePanel` (`Select.tsx`) puts it against the trigger before it paints: below when the whole panel fits, above when that side is roomier, `PANEL_MARGIN` (8px) in from the screen's edges, capped to the room it has (the list then scrolls inside the panel); its width is the trigger's, widened by the CSS `min-width`. It follows the trigger on every scroll and resize, and closes when the trigger leaves the screen. why: drawn in place it was cut off by the first ancestor with an overflow — the chat gutter's Runs widget scroller (under 200px tall in a column of four widgets), a deck's swipe strip, a card's fold — and the options past that edge could not be reached; the panel is held inside the screen wherever its control wrapped to.
+- `z-index: 10000`, and the panel is appended to `body` as it opens, so at an equal z it is in front of a layer already up. why: Settings' own `fixed z-[9999]` layer draws a z-70 portalled panel UNDER its content (INV-4356), and Settings holds `Select`s (Appearance); 10000 is the app's ceiling, one under the toast stack.
+- KEYBOARD. why: the panel is no longer after the trigger in the tab order, so Tab could never reach it. Opening focuses the chosen row (the first when none is chosen); ArrowUp / ArrowDown / Home / End walk the rows; Tab closes the panel and focuses the trigger; Escape closes and focuses the trigger. Options stay `tabIndex={0}`.
+- Measured before the panel left its ancestors (`document.elementFromPoint` at each option's centre, 2026-10-15): an epic fold's lists reached 0 of 8 options at 1440 and 4 of 8 / 2 of 8 at 360; a feature fold's, 0 of 3 (Athena's review of the master controller). After: 31 lists across the header, every epic and feature fold, the Runs widget, RoadmapPicker, Settings → Appearance and the Tasks filters, every option reachable.
+- The listbox is NOT inside the trigger's group in the DOM: a probe finds the open list by its role (`[role="listbox"]`; one is open at a time), and proves it whole by hit-testing the centre of every option (`.verify/master-controller-widget.mjs`).
+
+## `disabled` (the master controller, MAN-8442)
+- `disabled?: boolean` (default false): the trigger is a real `disabled` button (`.vv-select__trigger:disabled` — dimmed to 0.6, `not-allowed`, no hover border) and the panel never opens; a picker that turns disabled with its list open closes it (so the list does not come back on its own when the picker is enabled again). A picker that shows a value the reader cannot change now — the master controller's WIP dropdowns while the DeepSeek switch is on.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Select.tsx
 
@@ -2913,7 +2924,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/chat-idle-restore.mjs, /
 | In flight, read after an 800 ms settle | decks in the served order; each deck's note `<position> · <turn word>`; dial readout `<running> running`; no sideways overflow |
 
 ## fails when
-- The live dial is not `limit all`, `paused no`: `route.epics reads limit all, not paused` and `the dial reads All` are checks.
+- The live dial is not a limit of 1 to 5 with `paused no`: `route.epics reads a limit of 1 to 5, not paused` is the check, and `Epics at once reads the served limit` compares the header's dropdown with it.
 - The live queue is empty.
 - `dispatcher queue`'s line shape changes (`listedQueue` parses `N. <name>.arc — <its turn|waiting|paused> — `).
 

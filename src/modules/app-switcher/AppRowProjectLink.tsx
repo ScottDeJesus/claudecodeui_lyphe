@@ -40,9 +40,8 @@ type AppRowProjectPickerProps = {
  * the drawer hands them, because the sidebar already taught the reader that order. The trigger takes
  * focus as the picker appears, as the description field's input does; Enter or Space opens the list.
  * A path no project carries stands in the trigger in the warn tone behind the ▲, as the line does.
- * The open list is brought into view as it appears: it is drawn `position: absolute` under the
- * trigger and the drawer's scroller does not follow it, so on a long list of rows it opened below
- * the fold with nothing to show for the tap.
+ * The open list needs nothing from this picker to be seen: the `Select` draws it fixed on `body`, held inside the screen
+ * (`placePanel`), where it once opened below the drawer's fold on a long list of rows with nothing to show for the tap.
  *
  * LEAVING IS TWO WAYS, and neither needs the keyboard's focus to be anywhere in particular. The ✕
  * is the way out a touch reader can see: it is the 32px slot the kebab holds on a resting row, so
@@ -69,25 +68,6 @@ export function AppRowProjectPicker({ appName, value, choices, error, onChoose, 
     rootRef.current?.querySelector<HTMLButtonElement>('button[aria-haspopup="listbox"]')?.focus();
   }, []);
 
-  // The Select draws its list as a new child of its own root, and offers no hook for it. Watching
-  // for that child is how the picker brings the list into the drawer's scroller. `nearest` moves
-  // nothing when the list is already fully in view, and the margin leaves room under its last option.
-  useEffect(() => {
-    const root = rootRef.current;
-    if (!root) return undefined;
-    const observer = new MutationObserver((records) => {
-      for (const record of records) {
-        for (const node of Array.from(record.addedNodes)) {
-          if (node.nodeType !== 1 || !(node as Element).classList.contains('vv-select__panel')) continue;
-          const panel = node as HTMLElement;
-          panel.style.scrollMarginBottom = '12px';
-          panel.scrollIntoView({ block: 'nearest' });
-        }
-      }
-    });
-    observer.observe(root, { childList: true, subtree: true });
-    return () => observer.disconnect();
-  }, []);
 
   // Escape on the document's capture phase, so it is heard wherever focus is and before any
   // bubbling listener can re-render the list away. `onCancel` is a dependency because the handler

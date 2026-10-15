@@ -850,12 +850,10 @@
     "model": {
       "deepseek": "DeepSeek",
       "claude": "Claude",
-      "auto": "Chat switch",
       "refused": "Model not set"
     },
     "schedule": {
       "label": "Scheduled start",
-      "startAt": "Start at {{time}}",
       "resumeAt": "Resume at {{time}}",
       "cancel": "Cancel",
       "starts": "starts {{time}}",
@@ -1280,10 +1278,7 @@
     },
     "noStages": "No stage has launched for this task yet.",
     "arcPause": "Pause",
-    "arcScheduleStart": "Schedule start",
-    "scheduleTitle": "Start this feature when DeepSeek’s daily peak lifts — a one-shot timer sends Resume at that hour",
     "resumeTitle": "Resume this feature when DeepSeek’s daily peak lifts — a one-shot timer sends Resume at that hour",
-    "arcScheduleTitle": "Start every feature of this epic that is not moving when DeepSeek’s daily peak lifts — one timer per feature, at the gate or stopped mid-walk alike, each pressing Start at that hour",
     "park": "Park",
     "unpark": "Unpark",
     "plannerResume": "Resume planner",
@@ -1356,41 +1351,51 @@
       "endedShortCause": "ended short: {{outcome}}"
     },
     "model": {
-      "planLabel": "Model for this feature’s builders",
-      "arcLabel": "Model for every feature of this epic"
+      "label": "Runs on",
+      "planLabel": "The model this feature’s builders run on. Follow what is above it, or give this feature its own.",
+      "arcLabel": "The model every feature of this epic runs on. Follow the top, or give this epic its own — it goes to every feature of it."
+    },
+    "fold": {
+      "label": "Overrides",
+      "follow": {
+        "top": "Follow top · {{value}}",
+        "epic": "Follow epic · {{value}}"
+      }
     },
     "wip": {
-      "label": "WIP",
-      "groupLabel": "WIP limits for this epic",
-      "groupHint": "How much of this epic may run at once: how many of its features are in progress, and how many tasks each of them runs.",
-      "features": "Features",
-      "tasks": "Tasks",
       "all": "All",
-      "default": "default",
-      "featuresLabel": "Most features of this epic in progress at once",
-      "featuresDown": "One feature fewer in progress",
-      "featuresUp": "One feature more in progress",
-      "featuresHint": "How many features of this epic are in progress at once. Step back to the Settings default to follow Settings again.",
-      "featuresHintDefault": "How many features of this epic are in progress at once. This is the Settings default; step to another number to give this epic its own, and back to it to follow Settings again.",
-      "tasksLabel": "Most tasks of each feature of this epic at once",
-      "tasksDown": "One task fewer at once",
-      "tasksUp": "One task more at once",
-      "tasksHint": "How many tasks each feature of this epic runs at once. Step back to the Settings default to follow Settings again.",
-      "tasksHintDefault": "How many tasks each feature of this epic runs at once. This is the Settings default; step to another number to give this epic its own, and back to it to follow Settings again.",
+      "featuresHint": "How many features of this epic are in progress at once. Follow the top, or give this epic its own number.",
+      "tasksHint": "How many tasks each feature of this epic runs at once. Follow the top, or give this epic its own number.",
       "refused": "WIP not set",
       "done": "WIP set — the next take-up reads it"
     },
+    "master": {
+      "label": "Run controls",
+      "switchLabel": "Runs on",
+      "switchHint": "The house switch — the same one Settings and the chat box draw. Epics and features with no choice of their own follow it, and builds started from chat run on it.",
+      "switchUnreadable": "The switch could not be read — press a side to ask again.",
+      "startTitle_one": "Let the {{count}} feature waiting for its Start go. The queue’s order and Epics at once decide what runs first; a feature’s own Start skips both.",
+      "startTitle_other": "Let the {{count}} features waiting for their Start go. The queue’s order and Epics at once decide what runs first; a feature’s own Start skips both.",
+      "startRefused": "Nothing started",
+      "noteDeepseek": "DeepSeek work runs with no feature or task limit unless an epic sets its own.",
+      "wip": {
+        "features": "Features at once",
+        "tasks": "Tasks at once",
+        "featuresShort": "Features",
+        "tasksShort": "Tasks",
+        "featuresHint": "How many features of an epic are in progress at once, for every epic that sets none of its own.",
+        "tasksHint": "How many tasks each feature runs at once, for every epic that sets none of its own."
+      },
+      "wipRefused": "WIP not set",
+      "wipUnreadable": "The defaults could not be read, so nothing was written.",
+      "wipDone": "{{limit}}: {{word}}"
+    },
     "epics": {
       "label": "Epics at once",
-      "limit": "Epic limit",
       "hint": "How many epics run at once, top down. An epic that has started runs till completed.",
-      "all": "All",
-      "down": "Fewer epics at once",
-      "up": "More epics at once",
       "pause": "Pause all",
       "resume": "Resume all",
       "running": "{{running}} of {{limit}} running",
-      "runningAll": "{{running}} running",
       "paused": "Paused · tasks out finish",
       "done": "Epics",
       "refused": "Epics not changed"

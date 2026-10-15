@@ -6,10 +6,10 @@ import {
   byArc,
   DispatchArcDecks,
   doneDismiss,
-  EpicDial,
   HiddenPlans,
   landFocusInHome,
   LoosePlannerBadges,
+  MasterController,
   moveCard,
   PlanCard,
   PlannerLanesReadout,
@@ -87,7 +87,7 @@ function pageStripToCard(deck: Element, plan: string): HTMLElement | null {
  * IN FLIGHT IS THE QUEUE, WORKED TOP DOWN (operator, 2026-10-14). The decks of the epics whose turn is
  * open come FIRST, as a list of their own (`byArc`'s `line`), in the order the dispatcher starts them
  * in, each head carrying its place and its turn; the dial in the header says how many run at once
- * (`EpicDial`). A drop among them moves the epic in the dispatcher's queue (`useQueueLineSort`). The
+ * (`MasterController`). A drop among them moves the epic in the dispatcher's queue (`useQueueLineSort`). The
  * queue moves a deck on its own only at a turn's ends: a new epic joins at the back, a finished one
  * goes below the queue, among the other decks.
  *
@@ -200,10 +200,12 @@ export function RunnerPanel({ revealPlan = null, onRevealed }: RunnerPanelProps)
     // `tabIndex={-1}`: the last place a press that emptied the board hands the keyboard (`landFocusInHome`).
     <div ref={panelRef} tabIndex={-1} className="flex h-full flex-col outline-none" data-runner-panel>
       {/* The header spans the pane, inset as the wall under it is, so the icon stands over the
-          wall's left edge and `Dismiss done · N` over its right. Its wrapped rows stand 12px apart
-          (`gap-y-3`): the dial's 32px presses and Dismiss done's 36px one are each pulled into the
-          row's 28px line, and a wrapped Dismiss done lands under the dial's press — at a 4px gap the
-          two pulls overlapped the targets by 2px; at 12px they keep 6px between them. */}
+          wall's left edge and `Dismiss done · N` over its right. Its first row is the title, the
+          count, the planner readout and `Dismiss done · N`; its second is the master controller on a
+          line of its own (`basis-full`), which is why `Dismiss done` comes BEFORE it in the markup — a
+          full-width row pushes whatever follows it under, and the button belongs at the title's row
+          end. The rows stand 12px apart (`gap-y-3`) so the 36px press never touches the controller's
+          dropdowns under it. */}
       <div className="flex flex-wrap items-center gap-x-2 gap-y-3 border-b border-border px-4 py-3 lg:px-6">
         <span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg border border-primary/25 bg-primary/10 text-primary">
           <ActivityIcon className="h-4 w-4" aria-hidden="true" />
@@ -216,9 +218,6 @@ export function RunnerPanel({ revealPlan = null, onRevealed }: RunnerPanelProps)
             frame states no dial (an older dispatcher). The header wraps so a phone-wide one drops the
             phrase to a second line whole rather than cutting it. */}
         <PlannerLanesReadout />
-        {/* The queue's dial beside it — how many epics run at once and Pause all — drawn only when
-            the frame states one. Whole on a line of its own when a phone-wide header has no room. */}
-        <EpicDial />
         {/* Every drawn plan that is done, off the board in ONE write, with nothing added to
             `Hidden`. Not drawn when none is, so the button never offers to dismiss nothing. No
             dialog: it deletes nothing, and the dispatcher keeps every plan. `-my-1` lets the 36px
@@ -229,6 +228,11 @@ export function RunnerPanel({ revealPlan = null, onRevealed }: RunnerPanelProps)
             {t('dispatcher.dismissDone', { count: done.count })}
           </Button>
         )}
+        {/* THE MASTER CONTROLLER, the header's second row: Epics at once, the two WIP defaults, the
+            Claude · DeepSeek house switch, the board's one Start (only while a plan waits for it),
+            Pause all and the running readout — drawn only when the frame states a dial. Whole controls
+            wrap onto further lines when a phone-wide header has no room. */}
+        <MasterController className="basis-full" />
       </div>
 
       {/* A LOOSE PLANNER COUNTS AS A ROW of this pane: it is something out on the lane with no card

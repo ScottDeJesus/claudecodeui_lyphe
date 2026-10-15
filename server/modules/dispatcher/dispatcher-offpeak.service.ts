@@ -5,7 +5,7 @@ import { promisify } from 'node:util';
 import { userFacingEnv } from '@/shared/child-env.js';
 
 /**
- * The dispatcher's next DeepSeek off-peak moment, for the cards' `Start at …` button.
+ * The dispatcher's next DeepSeek off-peak moment, for the card's `Resume at …` button.
  *
  * ONE CLOCK. The moment is `dispatcher offpeak`'s answer — derived by the dispatcher from
  * `deepseek.PEAK_UTC`, the same table that parks a start in peak hours — and never computed here or in

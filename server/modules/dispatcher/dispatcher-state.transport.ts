@@ -1,6 +1,6 @@
 import { readDispatcherJson } from '@/shared/dispatcher-command.js';
 import { each, isCount, isCountOrNull, isFlag, isText, isTextOrNull, need, oneOf } from '@/shared/document-fields.js';
-import type { DispatcherModelChoice, DispatcherStall } from '@/shared/types.js';
+import type { DispatcherModelWord, DispatcherStall } from '@/shared/types.js';
 import { readDispatcherWipWord } from '@/shared/utils.js';
 
 // The dispatcher lane's readers import the field vocabulary from here, so its import surface is
@@ -111,20 +111,20 @@ export function stallSince(value: unknown, where: string): DispatcherStall | nul
   return value === undefined || value === null ? null : oneOf(value, STALL_CAUSES, where);
 }
 
-/** The three words a model word may be (`hooks/plan_runner/run_model.py:WORDS`), the ONE list — `readDispatcherModelChoice` checks a request against the same three. */
-export const MODEL_CHOICES: readonly DispatcherModelChoice[] = ['deepseek', 'claude', 'auto'];
+/** The two words a stored model word may be (`hooks/plan_runner/run_model.py:WORDS`); a request adds the door's `default` (`readDispatcherModelChoice`). */
+const MODEL_WORDS: readonly DispatcherModelWord[] = ['deepseek', 'claude'];
 
 /**
  * A model word a build OLDER than the field did not write, read as `null`, and refused by name when
- * the key is there and is not one of the three.
+ * the key is there and is not one of the two.
  *
  * `null` is the shape a row with no word of its own already has downstream — a plan that carries none
- * follows its arc, and `effectiveModelWord` turns the end of that chain into the store's default
- * (`claude`). So an older dispatcher's document draws the default its plans would really run under,
- * rather than a lane that went stale for a field it never wrote.
+ * follows its arc, and `effectiveModelWord` turns the end of that chain into the house switch's word.
+ * So an older dispatcher's document draws what its plans would really run under, rather than a lane
+ * that went stale for a field it never wrote.
  */
-export function modelSince(value: unknown, where: string): DispatcherModelChoice | null {
-  return value === undefined || value === null ? null : oneOf(value, MODEL_CHOICES, where);
+export function modelSince(value: unknown, where: string): DispatcherModelWord | null {
+  return value === undefined || value === null ? null : oneOf(value, MODEL_WORDS, where);
 }
 
 /**

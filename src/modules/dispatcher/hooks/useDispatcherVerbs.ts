@@ -38,29 +38,30 @@ export type DispatcherPlanVerbs = ArmAcceptPlanVerbs & {
 };
 
 /**
- * What an arc header may press — the four verbs the dispatcher's own arc door opens on, and the
- * epic's own `wip`. `park`, `unpark` and `drop` are the plan card's own and no arc header draws them,
- * so no arc callback exists for them rather than one that would have no route to reach.
+ * What an arc header may press — the three verbs the dispatcher's own arc door opens on that a deck
+ * draws, and the epic's own `wip`. `park`, `unpark`, `drop` and `schedule` are the plan card's own and no
+ * arc deck draws them (the deck has no Schedule start), so no arc callback exists for them rather than
+ * one that would have no route to reach.
  */
 export type DispatcherArcVerbs = ArmAcceptArcVerbs & {
   stop(): Promise<void>;
   resume(): Promise<void>;
-  schedule(when: string): Promise<void>;
+  /** `default` hands the epic's model back to the top; a word is its own override and goes to every plan of it. */
   setModel(choice: DispatcherModelChoice): Promise<void>;
-  /** One of the epic's two WIP limits set to a count, `all`, or `default` (follow Settings again). */
+  /** One of the epic's two WIP limits set to a count, `all`, or `default` (follow the top again). */
   setWip(limit: DispatcherWipLimit, choice: DispatcherWipChoice): Promise<void>;
   busy: DispatcherPress | null;
 };
 
 /**
  * Stop, Resume, Schedule, Park, Unpark, Model, Drop, Resume planner and Answer for one plan — or Stop, Resume,
- * Schedule, Model and WIP for one dispatch ARC — and what to say about each.
+ * Model and WIP for one dispatch ARC — and what to say about each.
  *
  * ONE HOOK, TWO DOORS, because the two are the same act on the same store through the same verbs:
  * `scope` decides which route a press is relayed through (`POST /api/dispatcher/plans/:name/…` or
  * `POST /api/dispatcher/arcs/:name/…`) and how much of the surface it gets back, and nothing else.
- * The arc arm is what the header's controls press, and its first four are deliberately the same `stop`,
- * `resume`, `schedule` and `model` a plan card presses: the dispatcher resolves an arc's name to the
+ * The arc arm is what the header's controls press, and its first three are deliberately the same `stop`,
+ * `resume` and `model` a plan card presses: the dispatcher resolves an arc's name to the
  * PLAN verb applied to its plans in one step, so the card and the terminal say the same thing because
  * they say it with the same verb.
  *
@@ -81,12 +82,13 @@ export type DispatcherArcVerbs = ArmAcceptArcVerbs & {
  *
  * The toast is amber rather than red on a refusal: a refused verb denied nothing and destroyed
  * nothing (design doctrine :145). The relay itself — the busy flag, the toast, the refusal's wording — is
- * `useVerbSend`'s, shared with the board's own presses (`useEpicDialVerbs`, `useEpicQueueVerbs`), which
+ * `useVerbSend`'s, shared with the board's own presses (`useBoardVerbs`, `useEpicQueueVerbs`), which
  * name no plan and no arc of their own.
  *
  * `resumeWord` IS THE WORD ON THE BUTTON THAT PRESSED IT, and a refusal answers in that word: a
  * queued or scheduled plan's button says Start, a stopped plan's says Resume, and a refusal headed
- * with the other would name a verb the operator never saw. It is `resume` that runs either way.
+ * with the other would name a verb the operator never saw. It is `resume` that runs either way. (An
+ * epic's deck draws Resume alone: the plans waiting for their first Start are the board's one Start's.)
  *
  * ANSWER IS THE ONE PRESS THAT REPORTS BACK, and the only one whose outcome a control reads: the
  * card draws its answered state from a `true`, so `send` resolves whether the lane took the word
@@ -179,13 +181,12 @@ export function useDispatcherVerbs(
     },
     [name, scope, send],
   );
+  // A plan's Resume at a time: the one schedule press left (the arc's `Schedule start` is gone).
   const schedule = useCallback(
     async (when: string) => {
-      await send('schedule', () => (scope === 'arc'
-        ? api.dispatcher.arcSchedule(name, when)
-        : api.dispatcher.schedule(name, when)));
+      await send('schedule', () => api.dispatcher.schedule(name, when));
     },
-    [name, scope, send],
+    [name, send],
   );
   const setModel = useCallback(
     async (choice: DispatcherModelChoice) => {
@@ -225,6 +226,6 @@ export function useDispatcherVerbs(
   // "Accept when cut" and its Cancel: this hook's `send` carries them (`useArmAcceptVerbs`), both doors.
   const armVerbs = useArmAcceptVerbs(name, scope, send);
 
-  if (scope === 'arc') return { stop, resume, schedule, setModel, setWip, ...armVerbs, busy };
+  if (scope === 'arc') return { stop, resume, setModel, setWip, ...armVerbs, busy };
   return { stop, resume, schedule, park, unpark, drop, plannerResume, setModel, answer, ...armVerbs, busy };
 }

@@ -163,10 +163,12 @@ export function planOf(raw: unknown): DocumentPlan {
     // same row — one outing, two places it is true of. Read tolerantly (`plannerSince`), because a
     // dispatcher build older than the field writes no key at all.
     planner: plannerSince(field(plan, 'planner'), `plan.planner of ${name}`),
-    // The plan's EFFECTIVE model word — its own, else its arc's, else the store's default. Never
+    // The plan's EFFECTIVE model word — its own, else its arc's, else the house switch's. Never
     // derived here: this is the document's own answer, and a second derivation would be a second
-    // answer (`dispatcher/model.py:model.of` is the only one).
+    // answer (`dispatcher/model.py:model.of` is the only one). `model_own` is the plan's OWN word, or
+    // null while it follows its epic and the switch: the override a card's fold names.
     model: modelSince(field(plan, 'model'), 'plan.model'),
+    model_own: modelSince(field(plan, 'model_own'), `plan.model_own of ${name}`),
     // The plan's width phrase (`width.word` of its effective model word and its task-WIP word), read
     // tolerantly like `arc`: a build older than the field writes none.
     posture: textSince(field(plan, 'posture'), 'plan.posture'),

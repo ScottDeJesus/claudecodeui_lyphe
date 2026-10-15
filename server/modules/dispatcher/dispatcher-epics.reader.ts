@@ -11,8 +11,8 @@ import { field, isFlag, isRecord, isWholeFrom, need, oneOf } from './dispatcher-
  * opening one: `.verify/lib/lane-picture.ts` reads the key through it over a saved document.
  */
 
-/** The six limits the dial takes (`epic_dial.LIMITS` and `ALL`): `1` to `5`, or `all` for the no-limit walk. Anything else is a build this lane cannot draw. */
-const EPIC_LIMITS: readonly string[] = ['1', '2', '3', '4', '5', 'all'];
+/** The five limits the dial takes (`epic_dial.LIMITS`): `1` to `5`. Anything else is a build this lane cannot draw. */
+const EPIC_LIMITS: readonly string[] = ['1', '2', '3', '4', '5'];
 
 /** How many epics have started: a whole number from 0, which `isCount` alone would not hold to (`-1` and `1.5` pass it). */
 const isRunning = isWholeFrom(0);
@@ -20,7 +20,7 @@ const isRunning = isWholeFrom(0);
 /**
  * `route.epics`, or `null` for a dispatcher build OLDER than the key — and for an explicit `null`, which reads
  * the same: that is ANOTHER BUILD TALKING and not a torn document, so the dial is simply not drawn and every card reads the queue it can. A key that
- * IS there and does not read is refused by name — `limit` outside the six words, `paused` not a flag,
+ * IS there and does not read is refused by name — `limit` outside the five words, `paused` not a flag,
  * `running` not a whole count — like every other field of the route, and the lane keeps its last good
  * picture.
  */

@@ -413,15 +413,24 @@
 }
 .vv-select__trigger:hover,
 .vv-select__trigger[aria-expanded='true'] { border-color: var(--accent); }
+/* A value the reader cannot change now: dimmed, and no hover to suggest a press. */
+.vv-select__trigger:disabled { opacity: 0.6; cursor: not-allowed; border-color: var(--border-strong); }
 .vv-select__placeholder { color: var(--ink-faint); }
 .vv-select__chevron { font-size: 11px; color: var(--ink-faint); transition: transform 0.3s var(--ease-enter); }
 .vv-select__trigger[aria-expanded='true'] .vv-select__chevron { transform: rotate(180deg); }
+/* The panel is drawn on `body` and FIXED against its trigger (`Select`'s `placePanel` writes `top`, `left`, the
+   trigger's width as `--vv-select-trigger-width` and, when the room is short, `max-height`), so no ancestor's overflow
+   can clip it and a scroll cannot strand it. Z-10000 is the app's ceiling (`McpServerFormModal`), one under the toast
+   stack: a picker inside Settings' own `fixed z-[9999]` layer would be drawn UNDER that layer's content at the menu
+   layer's z-70 (`ActionMenu`, INV-4356), and 10000 is the one number above every layer a picker is opened in. It
+   is appended to `body` as it opens, so at an equal z it is in front of a layer already on screen. */
 .vv-select__panel {
-  position: absolute;
-  top: calc(100% + 6px);
+  position: fixed;
+  top: 0;
   left: 0;
-  right: 0;
-  z-index: 20;
+  width: var(--vv-select-trigger-width, auto);
+  max-width: calc(100vw - 16px);
+  z-index: 10000;
   margin: 0;
   padding: 6px;
   background: var(--surface);
@@ -437,7 +446,7 @@
   max-height: min(20rem, 50dvh);
   /* The panel is as wide as its trigger, and a trigger that has been squeezed — the board
      switcher on a phone is 115px — wrapped every name onto two lines and "New board" onto three.
-     A floor lets it grow rightwards off its `left: 0` anchor, capped at the viewport so it can
+     A floor lets it grow rightwards off the trigger's left edge, capped at the viewport so it can
      never hang off the edge. Wider triggers are untouched: they are already past the floor. */
   min-width: min(14rem, calc(100vw - 24px));
 }
