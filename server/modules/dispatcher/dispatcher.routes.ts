@@ -308,8 +308,9 @@ export function createDispatcherRouter(dependencies: DispatcherRouterDependencie
    * The ARC's eight verbs — `model`, `stop`, `resume`, `schedule`, `arm-accept`, `disarm-accept`, `wip`
    * and `queue` — relayed to the arc's own door.
    *
-   * AN ARC IS ADDRESSED BY ITS OWN NAME, and the dispatcher is what resolves it. Each of these four
-   * verbs takes a plan's name OR an arc's and answers an arc's name with the PLAN verb applied to
+   * AN ARC IS ADDRESSED BY ITS OWN NAME, and the dispatcher is what resolves it. Each of the six
+   * verbs a plan's door shares (`model`, `stop`, `resume`, `schedule`, `arm-accept`, `disarm-accept`) takes a
+   * plan's name OR an arc's and answers an arc's name with the PLAN verb applied to
    * the arc's plans in one step (`hooks/dispatcher/arc_verbs.py` holds which plans and why) — so the
    * plan-first-then-arc resolution is deliberately not repeated here: this route names an arc, the
    * name it forwards carries the arc's own adornment, and the dispatcher decides the rest. Which is
@@ -383,8 +384,13 @@ export function createDispatcherRouter(dependencies: DispatcherRouterDependencie
 
   // The epic dial's one word (`dispatcher epics <1|2|3|4|5|all|pause|resume>`): a BOARD verb, so it names
   // no plan and no arc and the name the relay is handed is empty (`runDispatcherVerb` leaves it out of the argv).
+  // THE BODY IS EXACTLY `{ "word": … }`, as the queue's is exactly one move: a body carrying another key is
+  // not one this route knows, and is a 400 like any other.
   router.post('/epics', async (request, response, next) => {
-    const word = EPIC_WORDS.find((entry) => entry === (request.body as { word?: unknown } | undefined)?.word);
+    const body = request.body as { word?: unknown } | null | undefined;
+    const word = typeof body === 'object' && body !== null && !Array.isArray(body) && Object.keys(body).length === 1
+      ? EPIC_WORDS.find((entry) => entry === body.word)
+      : undefined;
     if (word === undefined) {
       response.status(400).json({ error: EPICS_BODY_ERROR });
       return;

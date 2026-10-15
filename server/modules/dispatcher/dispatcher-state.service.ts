@@ -122,8 +122,8 @@ function routeOf(raw: unknown): DispatcherRoute {
     word: need(field(route, 'word'), isText, 'route.word'),
     park_at_peak: need(field(route, 'park_at_peak'), isFlag, 'route.park_at_peak'),
     peak_until: need(field(route, 'peak_until'), isTextOrNull, 'route.peak_until'),
-    // Each left off the object entirely when the build sent none, so the frame of an older dispatcher is
-    // byte-for-byte what it was and the client's `planners?.` and `wip?.` read it as absent.
+    // `planners` and `wip` are each left off the object entirely when the build sent none, so the client's
+    // `planners?.` and `wip?.` read them as absent. (`epics`, below, is always a key: `null` is its absence.)
     ...(planners === undefined ? {} : { planners }),
     ...(wip === undefined ? {} : { wip }),
     // The epic dial's census, `null` for a build older than the key (`epicsOf`). Always present as a

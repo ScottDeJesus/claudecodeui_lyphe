@@ -23,11 +23,13 @@ export const isCount = (value: unknown): value is number => typeof value === 'nu
 /**
  * A reader for a whole number from `floor` up: a place in a line counted from 1, a census counted from 0.
  * `isCount` admits any finite number, so `1.5` and `-1` pass it; a key that is a PLACE or a HEADCOUNT
- * must be refused by name when it is not whole. Consumed by the dispatcher lane's arc reader
- * (`arc.queue.position`) and epic dial reader (`route.epics.running`).
+ * must be refused by name when it is not whole — and not past 2**53 - 1, where a JSON number no longer
+ * names one count (`9007199254740993` parses to `…992`), as `readDispatcherWipWord` stops there too.
+ * Consumed by the dispatcher lane's arc reader (`arc.queue.position`) and epic dial reader
+ * (`route.epics.running`).
  */
 export const isWholeFrom = (floor: number) => (value: unknown): value is number =>
-  isCount(value) && Number.isInteger(value) && value >= floor;
+  isCount(value) && Number.isSafeInteger(value) && value >= floor;
 
 /** A member of the document's two-valued and three-valued fields. */
 export const isFlag = (value: unknown): value is boolean => typeof value === 'boolean';

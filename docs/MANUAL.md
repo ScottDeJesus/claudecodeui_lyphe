@@ -10338,7 +10338,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/AppDraw
 
 `DispatcherStage`, `DispatcherPhase`, `DispatcherEvent`, `DispatcherPlanner`, `DispatcherPlanStatus`,
 `DispatcherPlan`,
-`DispatcherArc`, `DispatcherArcStatus`, `DispatcherRoute`, `DispatcherDaemon`, `DispatcherStateEvent`,
+`DispatcherArc`, `DispatcherArcStatus`, `DispatcherArcQueue`, `DispatcherRoute`, `DispatcherDaemon`, `DispatcherStateEvent`,
 `DispatcherVerb`, `DispatcherVerbResult`, `DispatcherModelChoice` and `DispatcherOffpeak` are declared in the DISPATCHER block of `src/shared/types.ts` and `server/shared/types.ts` — ONE TEXT IN BOTH FILES, so the copies cannot
 drift; a change belongs in both at once.
 
@@ -10365,17 +10365,18 @@ key for key. The emitted document is the source of the shape.
   `running`, `done`.
 - `offpeak_at` is a `string`, never null: `plan_runner.when.stamp` answers the literal `none` when
   the clock cannot.
-- `DispatcherVerb` is eleven of the CLI's own verbs: `stop`, `resume`, `schedule`, `park`, `unpark`,
+- `DispatcherVerb` is thirteen words, eleven of them the CLI's own verbs: `stop`, `resume`, `schedule`, `park`, `unpark`,
   `planner-resume`, `arm-accept` and `disarm-accept` (the operator's Accept when cut and its Cancel,
   `hooks/dispatcher/cmd/arm_accept.py`, MAN-8075), `wip` (an epic's feature or task limit, `hooks/dispatcher/cmd/wip.py`),
   `model` (the plan's own DeepSeek / Claude word — one verb serving a plan and an arc, resolved
   plan-first-then-arc, `hooks/dispatcher/cmd/model.py`) and `drop` (the plan out of the store for
-  good, `hooks/dispatcher/cmd/drop.py`). SIX OF THEM — `stop`, `resume`, `schedule`,
+  good, `hooks/dispatcher/cmd/drop.py`). SIX OF THE ELEVEN — `stop`, `resume`, `schedule`,
   `model`, `arm-accept`, `disarm-accept` — take an ARC's name as readily as a plan's (`arc_verbs.py`, MAN-1465), which is why the
   client's `api.dispatcher` posts all six to `/api/dispatcher/arcs/:name/…` beside the plan routes
   (`arcStop`, `arcResume`, `arcSchedule`, `arcModel`, `arcArmAccept` and `arcDisarmAccept`) and why `DispatcherVerbResult`'s refusal is
   worded for both. `wip` is the arc's alone (`arcWip`); `park`, `unpark`, `drop` and
   `planner-resume` name a plan only.
+- `queue` and `epics` are the other two. `queue` is an epic's alone: `POST /arcs/:name/queue` relays `queue <arc> --before <epic> | --last | --at <n>`. `epics` is a BOARD verb that names no plan or arc: `POST /epics { word }` relays `epics <word>` (`1`..`5`, `all`, `pause`, `resume`); `runDispatcherVerb` leaves the empty name out of the argv and the answer carries `plan: ""`; its refusal reads `REFUSED epics '<word>': <reason>`. `hooks/dispatcher/cmd/` has no door for either yet: 2026-10-15, `POST /arcs/no-such-epic/queue {"last":true}` answered 409 with argparse's `invalid choice: 'queue'` on `stderr`, exit 2.
 - `DispatcherPlan.model` is the plan's EFFECTIVE model word — its own, else its arc's, else the runner's
   default, resolved by the document (`hooks/dispatcher/model.py::of`) — and `DispatcherArc.model` is the ARC's
   OWN (MAN-5406, INV-4355): both are `DispatcherModelChoice | null`, one of `deepseek` | `claude` | `auto`.
@@ -10431,6 +10432,15 @@ section: The dispatcher types — the store's document, mirrored in two files/00
   `tokens` and `cost_usd` are READ, NEVER STORED (INV-172): a planner rides the operator's Claude
   subscription, so its dollars are 0.00 and its tokens are the figure — both off one read of the outing's
   own `result.json`, exactly as a stage's are.
+- THE EPIC QUEUE rides three keys, each `null` against a dispatcher build older than it and each read tolerantly, so the readers are live before the document speaks the keys (2026-10-15: the live store prints none yet — every `queue`, `queue_hold` and `route.epics` reads `null`):
+
+| key | type | read by | refused BY NAME when |
+|---|---|---|---|
+| `DispatcherArc.queue` | `DispatcherArcQueue \| null` — `{ position: number; turn: 'now' \| 'waiting' \| 'paused' }` (`report_arcs.arc_dict`, `line_gate.places`); `null` for an epic not in the queue | `arcOf` | `arc.queue.position of <name>` is not a whole number from 1 (`isWholeFrom(1)`); `arc.queue.turn of <name>` is not one of the three words |
+| `DispatcherPlan.queue_hold` | `string \| null` — the gate's QUEUE clause with its `queue:` lead (`queue: paused`, `queue: at most N epics at once`, `queue: <epic> goes first`); `null` when none; `wip_hold` is `null` whenever it is set | `planOf`, `textSince` | the value is neither text nor `null` |
+| `DispatcherRoute.epics` | `{ limit: string; paused: boolean; running: number } \| null` — the dial's census (`route.epics`, `line_gate.census`, MAN-8413); `running` may stand above a number `limit` after the dial is lowered | `epicsOf` (`dispatcher-epics.reader.ts`, its own file so `.verify/lib/lane-picture.ts` reaches it without `sessionsDb`) | `limit` is outside `1`..`5`/`all`; `paused` is not a flag; `running` is not a whole number from 0 (`isWholeFrom(0)`) |
+
+  `routeOf` always emits `epics` (`null` when absent), unlike `planners` and `wip`, which it leaves off the object.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts
 
@@ -12456,6 +12466,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispat
 | `runDispatcherCommand(argv, dependencies)` | relays one argv, NEVER throws, `maxBuffer` `VERB_MAX_BUFFER` (1 MiB), `cwd` the home, no stdin; outcome rules MAN-5636, MAN-5637 |
 | `readDispatcherJson(argv, dependencies, maxBuffer)` | runs a command that prints one JSON document and returns the parsed body; every failure is a throw; `maxBuffer` is the caller's |
 | `isText` `isCount` `isFlag` `isRecord` `isList` `isTextOrNull` `isCountOrNull` `field` `need` `each` `oneOf` | read a field or refuse it BY NAME; no coercion to a default. `need`, `each` and `oneOf` take an optional last argument `document` (default `'dispatcher status --json'`) that names the command in the refusal |
+| `isWholeFrom(floor)` | a reader for a whole number `>= floor` and `<= 2**53 - 1` (`isCount` plus `Number.isSafeInteger`): a PLACE counted from 1 (`arc.queue.position`) or a HEADCOUNT from 0 (`route.epics.running`). `isCount` alone passes `1.5` and `-1`; past 2**53 - 1 a JSON number no longer names one count (`9007199254740993` parses to `…992`) |
 
 Callers
 | caller | file | adds |
@@ -12465,7 +12476,7 @@ Callers
 | roadmap writes and `roadmap show --json` read | `server/modules/roadmap/`, MAN-7631 | `act` and `name` to the result; the read's own ceiling and `document` `'dispatcher roadmap show --json'` |
 | `readFeatureCases` | `server/modules/roadmap/roadmap-cases.service.ts`, MAN-7658 | the cases door's binary (`CASES_BIN`) and `door: 'cases'` in the dependencies, argv `list --plan <feature> --state active --json`, its own 1 MiB ceiling, `document` `'cases list --plan <feature> --state active --json'` |
 
-- `dispatcher-state.transport.ts` re-exports `each field isCount isCountOrNull isFlag isRecord isText isTextOrNull need oneOf`: the dispatcher lane's readers import them from the transport, not from `@/shared/document-fields.js`.
+- `dispatcher-state.transport.ts` re-exports `each field isCount isCountOrNull isFlag isRecord isText isTextOrNull isWholeFrom need oneOf`: the dispatcher lane's readers import them from the transport, not from `@/shared/document-fields.js`. `server/shared/index.ts` does not list `isWholeFrom` (no consumer imports the vocabulary through that barrel).
 - `readDispatcherJson` failure sentences: `<door> <argv joined by spaces> exited <n>: <first line>` (`<door>` is `dependencies.door`, default `dispatcher`), `… was stopped before it answered (<signal>)`, `… printed more than <maxBuffer> bytes — past the buffer this read allows`, `… did not answer: <first line or error message>`, `… did not answer JSON`. `status --json` reads `dispatcher status --json exited 1: …`; the cases door's reads `cases list --plan x --state active --json exited 2: REFUSED list: no plan x in the store`.
 - Spreading the result (`{ ...result, verb, plan }`) puts `verb` and `plan` last and moves a 409's bytes; write the keys out.
 

@@ -18,8 +18,8 @@ const EPIC_LIMITS: readonly string[] = ['1', '2', '3', '4', '5', 'all'];
 const isRunning = isWholeFrom(0);
 
 /**
- * `route.epics`, or `null` for a dispatcher build OLDER than the key: that is ANOTHER BUILD TALKING and
- * not a torn document, so the dial is simply not drawn and every card reads the queue it can. A key that
+ * `route.epics`, or `null` for a dispatcher build OLDER than the key — and for an explicit `null`, which reads
+ * the same: that is ANOTHER BUILD TALKING and not a torn document, so the dial is simply not drawn and every card reads the queue it can. A key that
  * IS there and does not read is refused by name — `limit` outside the six words, `paused` not a flag,
  * `running` not a whole count — like every other field of the route, and the lane keeps its last good
  * picture.

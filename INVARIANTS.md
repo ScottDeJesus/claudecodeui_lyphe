@@ -9155,3 +9155,26 @@ measured 2026-10-13 by chain chain-node-chat-compaction-20261013-103559-d5e3, fi
 probe-key: c390a95442059689d1b4f24f9348ef92fc15d5ea
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/node-host-reading.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/node-sessions.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/compaction/compaction-mode.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/compaction/node-task-ledger.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/cerberus-types.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/cerberus-node-compaction.mjs, /home/lyphe/.claude/claudecodeui_lyphe/warden/package.json, /home/lyphe/.claude/claudecodeui_lyphe/warden/src/last-turn.mjs, /home/lyphe/.claude/claudecodeui_lyphe/warden/src/sessions.mjs
+
+## INV-8319 — probe — LOW — outside the target paths, `dispatcher.routes.ts`: the two new routes decide an extra key differently, and neither says so
+
+LOW — outside the target paths, `dispatcher.routes.ts`: the two new routes decide an extra key differently, and neither says so
+
+```probe
+cd /home/lyphe/.claude/claudecodeui_lyphe && TSX_TSCONFIG_PATH=server/tsconfig.json timeout 120 node --import tsx --input-type=module -e "
+const express=(await import('/home/lyphe/.claude/claudecodeui_lyphe/node_modules/express/index.js')).default;
+const {createDispatcherRouter}=await import('/home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher.routes.ts');
+const seen=[];const app=express();app.use(express.json());
+app.use('/',createDispatcherRouter({current:async()=>null,offpeak:async()=>null,runVerb:async(v,p,a)=>{seen.push([v,p,...a]);return {ok:true,verb:v,plan:p,exit:0,stdout:'',stderr:''};}}));
+const s=app.listen(0);const b='http://127.0.0.1:'+s.address().port;
+const post=async(path,body)=>{const r=await fetch(b+path,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body)});return r.status;};
+console.log('epics {word:1,extra:1} ->',await post('/epics',{word:'1',extra:1}),'| queue {last:true,extra:1} ->',await post('/arcs/qa/queue',{last:true,extra:1}),'| relayed',JSON.stringify(seen));
+s.close();process.exit(0);
+"
+expect: epics {word:1,extra:1} -> 200 | queue {last:true,extra:1} -> 400 | relayed [["epics","","1"]] — while the two routes disagree
+```
+
+measured 2026-10-15 by chain chain-epic-queue--lane-server-20261014-234205-0dd7, finding L3, LOW
+probe-key: 233399a3f4551fa487e1eb58171ad3a09e9ba1d8
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/shared/document-fields.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts
