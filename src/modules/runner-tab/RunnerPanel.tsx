@@ -132,13 +132,7 @@ export function RunnerPanel({ revealPlan = null, onRevealed }: RunnerPanelProps)
   const retained = useLiveTopic<DispatcherLanePicture>(DISPATCHER_ALL_TOPIC);
   const ranks = useCardRanks();
   const split = useMemo(() => byArc(plans, arcs, ranks), [plans, arcs, ranks]);
-  // FILL: line — `byArc`'s own `split.line` (the queue's decks, by `queue.position`) and `split.groups` (the other
-  // decks), once it answers them. Until it does, the frame's own `queue` splits the decks here.
-  const { line, decks } = useMemo(() => {
-    const queued = split.groups.filter((group) => group.arc.queue);
-    queued.sort((a, b) => (a.arc.queue?.position ?? 0) - (b.arc.queue?.position ?? 0));
-    return { line: queued, decks: split.groups.filter((group) => !group.arc.queue) };
-  }, [split]);
+  const { line, groups: decks } = split;
   const sortLine = useQueueLineSort(line);
   // The other two sortable lists: the decks, and the plans of no arc in the wall. A drop hands `moveCard`
   // the cards of ITS list for the neighbours' ranks, and the whole lane's names to prune against.
@@ -206,8 +200,11 @@ export function RunnerPanel({ revealPlan = null, onRevealed }: RunnerPanelProps)
     // `tabIndex={-1}`: the last place a press that emptied the board hands the keyboard (`landFocusInHome`).
     <div ref={panelRef} tabIndex={-1} className="flex h-full flex-col outline-none" data-runner-panel>
       {/* The header spans the pane, inset as the wall under it is, so the icon stands over the
-          wall's left edge and `Dismiss done · N` over its right. */}
-      <div className="flex flex-wrap items-center gap-x-2 gap-y-1 border-b border-border px-4 py-3 lg:px-6">
+          wall's left edge and `Dismiss done · N` over its right. Its wrapped rows stand 12px apart
+          (`gap-y-3`): the dial's 32px presses and Dismiss done's 36px one are each pulled into the
+          row's 28px line, and a wrapped Dismiss done lands under the dial's press — at a 4px gap the
+          two pulls overlapped the targets by 2px; at 12px they keep 6px between them. */}
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-3 border-b border-border px-4 py-3 lg:px-6">
         <span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg border border-primary/25 bg-primary/10 text-primary">
           <ActivityIcon className="h-4 w-4" aria-hidden="true" />
         </span>
@@ -258,8 +255,9 @@ export function RunnerPanel({ revealPlan = null, onRevealed }: RunnerPanelProps)
             <DispatchArcDecks groups={line} carriedNames={carriedNames} sort={sortLine} line />
             {/* THE OTHER ARCS SIT BELOW IT AND ABOVE THE PLANS NO ARC HOLDS, by the operator's card
                 order, each deck holding the plans of its own arc: an arc's word and verbs reach every
-                plan of it, so its plans are that arc's own strip rather than cards beside it. */}
-            <DispatchArcDecks groups={decks} carriedNames={carriedNames} sort={sortDecks} />
+                plan of it, so its plans are that arc's own strip rather than cards beside it. A
+                hairline over them marks where the queue ends (`belowLine`). */}
+            <DispatchArcDecks groups={decks} carriedNames={carriedNames} sort={sortDecks} belowLine={line.length > 0} />
             {/* The plans of no arc, in the pane's own wall. They are the ONLY cards in this grid: an
                 arc's plans are paged one per view inside their deck's strip, so a loose card is the
                 width the wall gives every card that has no arc to be read under. */}

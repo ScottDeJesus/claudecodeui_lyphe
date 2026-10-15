@@ -12,6 +12,10 @@ export { useDispatcherPlans } from '@/modules/dispatcher/hooks/useDispatcherPlan
 // one and re-draws from the next frame; nothing is guessed here. `drop` is the one verb a card
 // guards with a dialog, because it is the one no press undoes.
 export { useDispatcherVerbs } from '@/modules/dispatcher/hooks/useDispatcherVerbs';
+// The board's one queue press, which names no epic of its own: an epic moved `--before` another or `--last` in
+// the dispatcher's queue. Both lists that draw the queue's decks (In flight's, the gutter's column) press
+// through it, because a drop carries whichever epic was dragged and a hook cannot be called per card.
+export { useEpicQueueVerbs } from '@/modules/dispatcher/hooks/useEpicQueueVerbs';
 // The pure vocabulary of a plan, so a card never re-derives a tone or a progress count — and the
 // lane's own split, so the Roadmap tab's In flight face and the chat gutter's widget group the arcs'
 // plans and order every card by ONE rule instead of two.

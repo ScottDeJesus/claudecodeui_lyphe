@@ -3,7 +3,7 @@ import {
   getStoredAuthToken,
   storeAuthToken,
 } from '@/shared/authToken';
-import type { AuthTraceEvent, CerberusEnrollInput, CerberusLabelInput, CerberusMuteInput, CerberusPromoteInput, DeepseekRange, DispatcherAsk, DispatcherModelChoice, DispatcherWipChoice, DispatcherWipLimit, FileLinePatch, JevRange, NoteInput, NtfySettingsInput, SimpleListItemRef, SimpleListPosition, SubagentTranscriptResult } from '@/shared/types';
+import type { AuthTraceEvent, CerberusEnrollInput, CerberusLabelInput, CerberusMuteInput, CerberusPromoteInput, DeepseekRange, DispatcherAsk, DispatcherEpicsWord, DispatcherModelChoice, DispatcherQueueMove, DispatcherWipChoice, DispatcherWipLimit, FileLinePatch, JevRange, NoteInput, NtfySettingsInput, SimpleListItemRef, SimpleListPosition, SubagentTranscriptResult } from '@/shared/types';
 import type { AgentLaunchDefaultsChange, AgentLaunchRowChange } from '@/shared/agent-launch-types';
 import type { CerberusCatalogEntryInput } from '@/shared/cerberus-types';
 import type { ClaudeUpdateApplyRequest } from '@/shared/claude-update-types';
@@ -916,8 +916,8 @@ export const api = {
   },
 
   // The dispatcher lane (docs/MANUAL.md (dispatcher)): the plans in the dispatcher's own store, and the
-  // seven verbs the plan cards and the arc header press. The picture is `dispatcher status --json`
-  // relayed whole, and the verbs are relayed to the dispatcher's own binary by argv, never by a shell.
+  // verbs the plan cards, the arc header and In flight's queue press. The picture is `dispatcher status
+  // --json` relayed whole, and the verbs are relayed to the dispatcher's own binary by argv, never by a shell.
   //
   // The verbs are read from the RAW response for one reason worth naming: the dispatcher prints its
   // refusals on STDOUT (`REFUSED schedule
@@ -974,6 +974,15 @@ export const api = {
     // and the next `dispatcher_state` frame reads the word back. An epic's verb alone: no plan route.
     arcWip: (name: string, limit: DispatcherWipLimit, word: DispatcherWipChoice) =>
       post(`/api/dispatcher/arcs/${encodeURIComponent(name)}/wip`, { limit, word }),
+    // An epic moved in the queue In flight runs top down (`dispatcher queue <arc> --before <arc> | --last`):
+    // a drop on the queue's decks, named by a neighbour — `{ before }` or `{ last: true }` — never by an
+    // index. A 409 carries the dispatcher's own refusal (an epic whose turn has ended is no longer in the
+    // queue); nothing is optimistic, and the next `dispatcher_state` frame draws the order the store holds.
+    arcQueue: (name: string, move: DispatcherQueueMove) =>
+      post(`/api/dispatcher/arcs/${encodeURIComponent(name)}/queue`, move),
+    // The epic dial's one word (`dispatcher epics <word>`): a limit of `1` to `5` or `all`, or `pause` /
+    // `resume` — a BOARD verb that names no plan and no arc, so its route has no name in it.
+    epics: (word: DispatcherEpicsWord) => post('/api/dispatcher/epics', { word }),
     // A plan's Start at a time — `offpeak`, an ISO instant with a zone, or `none` to cancel — the
     // same three shapes the arc's own schedule takes, through the same reader.
     schedule: (name: string, when: string) => post(`/api/dispatcher/plans/${encodeURIComponent(name)}/schedule`, { when }),

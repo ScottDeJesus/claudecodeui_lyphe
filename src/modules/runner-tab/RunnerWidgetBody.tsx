@@ -16,6 +16,7 @@ import {
   SessionPin,
   useCardRanks,
   useDispatcherPlans,
+  useEpicQueueVerbs,
 } from '@/modules/dispatcher';
 import { useLaneFoldPrune } from '@/modules/runner-tab/hooks/useLaneFoldPrune';
 import { LANE_CARD_GAP } from '@/shared/constants';
@@ -55,15 +56,19 @@ function openedBy(plan: DispatcherPlan, sessionId: string | null): boolean {
  * Every item is drawn whole and at once (operator, 2026-09-28: "please remove the arrows and show a
  * list of plans instead").
  *
- * THE ITEMS ARE THE TAB'S SPLIT AND THE TAB'S ORDER (`byArc`'s `cards`): decks and plans interleaved
- * where the operator put them, and nowhere else — a plan that asks keeps its place, and so does the
- * plan the open chat opened, which wears this chat's `SessionPin` where it stands. Which chat is open
- * moves no card, and a chat switch moves no scroll. An arc is the SAME deck the tab draws
- * (`DispatchArcDecks`' `home="gutter"`), its plans still swiped one card per view in its own strip; a
- * plan of no arc is its `PlanCard`.
+ * THE ITEMS ARE THE TAB'S SPLIT AND THE TAB'S ORDER (`byArc`'s `cards`): the queue's decks first, in the
+ * order the dispatcher runs their epics in, then the other decks and the plans of no arc interleaved where
+ * the operator put them, and nowhere else — a plan that asks keeps its place, and so does the plan the
+ * open chat opened, which wears this chat's `SessionPin` where it stands. Which chat is open moves no card,
+ * and a chat switch moves no scroll. An arc is the SAME deck the tab draws (`DispatchArcDecks`'
+ * `home="gutter"`), its plans still swiped one card per view in its own strip, its place and turn noted in
+ * its head; a plan of no arc is its `PlanCard`.
  *
  * THE COLUMN IS ONE SORTABLE LIST: any item, deck or plan, is carried by a free press and put down
- * between any two others, and the drop writes one rank (`moveCard`) that the tab reads as well.
+ * between any two others. A drop of a QUEUE deck is an order and moves the epic in the dispatcher's queue
+ * (`useEpicQueueVerbs`): `--before` the next queue deck after it in the dropped order, or `--last` when none
+ * follows — a neighbour, never an index, since a queue deck put away is not drawn. Any other item writes
+ * one rank (`moveCard`) that the tab reads as well, and stands below the queue wherever it is dropped.
  *
  * THE FOLDS ARE THE TAB'S FOLDS, AND THIS BODY PRUNES THE SAME MEMORY. `useLaneFoldPrune` hands the
  * fold store what this widget draws AND what it has hidden, so a card folded here is folded on the tab,
@@ -92,10 +97,20 @@ export function RunnerWidgetBody({ sessionId }: { sessionId: string | null }) {
   const cards = split.cards;
   const cardsByName = useMemo(() => new Map(cards.map((card) => [cardName(card), card])), [cards]);
   const keys = useMemo(() => cards.map(cardName), [cards]);
+  const lineNames = useMemo(() => new Set(split.line.map((group) => group.arc.name)), [split]);
+  const { moveEpic } = useEpicQueueVerbs();
   const { order, attachList, itemProps } = useSortable({
     keys,
-    // The carried item's neighbours in the dropped order are cards of either kind: both are ranked.
-    onReorder: (carried, order) => moveCard(carried, order, cards.map(rankedOf), carriedNames),
+    onReorder: (carried, order) => {
+      // A queue deck's drop is the dispatcher's order: it goes in front of the next queue deck the dropped
+      // order puts after it, or last. Non-queue items stand between and are not places in the queue.
+      if (lineNames.has(carried)) {
+        const next = order.slice(order.indexOf(carried) + 1).find((name) => lineNames.has(name));
+        return moveEpic(carried, next === undefined ? { last: true } : { before: next });
+      }
+      // The carried item's neighbours in the dropped order are cards of either kind: both are ranked.
+      return moveCard(carried, order, cards.map(rankedOf), carriedNames);
+    },
   });
   const items = order.flatMap((name) => cardsByName.get(name) ?? []);
   useLaneFoldPrune(plans, hidden, arcs);

@@ -2,6 +2,7 @@ import { useId } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { useDispatcherPlans } from '@/modules/dispatcher/hooks/useDispatcherPlans';
+import { useEpicDialVerbs } from '@/modules/dispatcher/hooks/useEpicDialVerbs';
 import { Button, Stepper } from '@/shared/ui';
 import { cn } from '@/shared/utils';
 
@@ -43,10 +44,16 @@ function rungIndex(limit: string): number {
  * NOTHING OPTIMISTIC: a press relays a word and the next frame redraws the dial. While a press is out
  * all three refuse a second one (`busy`), so two words never race to the flag.
  *
- * PAUSED IS THE ONE STATE IT PAINTS. A board-wide pause holds every new start on every deck below, and
- * nothing else on the screen says so, so the readout wears `warn` while it lasts and Resume all wears
- * the fill a Start does (`ArcControls`): the way out is the press the eye lands on. Pause all is
+ * PAUSED READS IN INK, NEVER IN A TONE. A pause is the operator's own press, and amber is the house's error
+ * tone (MAN-577), so the readout takes the foreground's ink and weight while it lasts — the rule
+ * `planStatusTone` keeps for a plan he paused or parked himself. It is not alone in saying so: every queue
+ * deck's note reads `paused` with it, and a feature the pause holds reads `Waiting · paused`. Resume all
+ * wears the fill a Start does (`ArcControls`): the way out is the press the eye lands on. Pause all is
  * `secondary`, as an epic's own Pause is.
+ *
+ * THE GROUP AND ITS STEPPER ARE NAMED APART, as the epic's WIP control names its group and its steppers:
+ * the group is the visible label (`Epics at once`) and the stepper the number it holds (`Epic limit`), so
+ * a screen reader announces each once.
  *
  * Handles: `data-epic-dial` (the group) with `data-epic-dial-limit` (the word in force) and
  * `data-epic-dial-paused`; `data-epic-dial-readout`; `data-epic-dial-pause`, valued with the word the
@@ -63,10 +70,10 @@ export function EpicDial({ className }: { className?: string }) {
 
   // ── The wires: the dial's three presses (`dispatcher epics <word>`) and the flag that refuses them while
   //    one is out. Everything below them is composition. ──
-  const busy = false; // FILL: busy
-  const onDown = (_word: EpicDialRung): void => {}; // FILL: onDown
-  const onUp = (_word: EpicDialRung): void => {}; // FILL: onUp
-  const onPause = (_word: 'pause' | 'resume'): void => {}; // FILL: onPause
+  const { setDial, busy } = useEpicDialVerbs();
+  const onDown = (word: EpicDialRung): void => { void setDial(word); };
+  const onUp = (word: EpicDialRung): void => { void setDial(word); };
+  const onPause = (word: 'pause' | 'resume'): void => { void setDial(word); };
 
   if (epics === null) return null;
   const at = rungIndex(epics.limit);
@@ -104,14 +111,13 @@ export function EpicDial({ className }: { className?: string }) {
           canIncrease={!busy && up !== null}
           decreaseLabel={t('dispatcher.epics.down')}
           increaseLabel={t('dispatcher.epics.up')}
-          ariaLabel={t('dispatcher.epics.label')}
+          ariaLabel={t('dispatcher.epics.limit')}
         />
       </span>
       <span className="inline-flex flex-none items-center gap-2">
         <span
           data-epic-dial-readout=""
-          data-tone={epics.paused ? 'warn' : undefined}
-          className={cn('whitespace-nowrap text-xs tabular-nums', epics.paused ? 'font-medium text-tone-ink' : 'text-muted-foreground')}
+          className={cn('whitespace-nowrap text-xs tabular-nums', epics.paused ? 'font-medium text-foreground' : 'text-muted-foreground')}
         >
           {readout}
         </span>

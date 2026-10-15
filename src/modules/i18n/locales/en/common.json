@@ -1382,6 +1382,7 @@
     },
     "epics": {
       "label": "Epics at once",
+      "limit": "Epic limit",
       "hint": "How many epics run at once, top down. An epic that has started runs till completed.",
       "all": "All",
       "down": "Fewer epics at once",

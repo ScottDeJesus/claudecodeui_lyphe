@@ -1,30 +1,16 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { alreadyArmed, useArmAcceptVerbs, type ArmAcceptArcVerbs, type ArmAcceptPlanVerbs } from '@/modules/dispatcher/hooks/useArmAcceptVerbs';
-import { operatorWords } from '@/modules/dispatcher/operatorWords';
+import { useVerbSend } from '@/modules/dispatcher/hooks/useVerbSend';
 import { api } from '@/shared/api';
-import { useToast } from '@/shared/context/ToastContext';
 import type { DispatcherAsk, DispatcherModelChoice, DispatcherVerb, DispatcherWipChoice, DispatcherWipLimit } from '@/shared/types';
-import { firstLine } from '@/shared/utils';
-
-/** The dispatcher's answer, as much of it as this hook reads. Both fields are free text it wrote. */
-type VerbBody = { stdout?: unknown; stderr?: unknown; exit?: unknown };
 
 /** The two doors a press can be relayed through: one plan's, or one dispatch arc's. */
 export type DispatcherVerbScope = 'plan' | 'arc';
 
-/** A verdict is the dispatcher's own body, so it is read BEFORE the status is judged — a 409 carries it too. */
-async function readBody(response: Response): Promise<VerbBody | null> {
-  try {
-    return (await response.json()) as VerbBody;
-  } catch {
-    return null;
-  }
-}
-
 /**
- * The verb a press is relaying: the dispatcher's own nine, plus the card's `answer`. The answer is
+ * The verb a press is relaying: the dispatcher's own verbs, plus the card's `answer`. The answer is
  * a door of its own (`POST /api/dispatcher/answer`, never one of the verb routes), and the union
  * stays LOCAL to this hook — `DispatcherVerb` remains exactly the set the server spawns, so no
  * route or service is ever read against a word the dispatcher's binary does not know.
@@ -94,7 +80,9 @@ export type DispatcherArcVerbs = ArmAcceptArcVerbs & {
  * never spoke and the server's own sentence stands in; they travel the same field and need no branch here.
  *
  * The toast is amber rather than red on a refusal: a refused verb denied nothing and destroyed
- * nothing (design doctrine :145).
+ * nothing (design doctrine :145). The relay itself — the busy flag, the toast, the refusal's wording — is
+ * `useVerbSend`'s, shared with the board's own presses (`useEpicDialVerbs`, `useEpicQueueVerbs`), which
+ * name no plan and no arc of their own.
  *
  * `resumeWord` IS THE WORD ON THE BUTTON THAT PRESSED IT, and a refusal answers in that word: a
  * queued or scheduled plan's button says Start, a stopped plan's says Resume, and a refusal headed
@@ -102,7 +90,7 @@ export type DispatcherArcVerbs = ArmAcceptArcVerbs & {
  *
  * ANSWER IS THE ONE PRESS THAT REPORTS BACK, and the only one whose outcome a control reads: the
  * card draws its answered state from a `true`, so `send` resolves whether the lane took the word
- * (2xx) and the other nine resolve `void`, their outcome nobody's but the next frame's. It travels
+ * (2xx) and the others resolve `void`, their outcome nobody's but the next frame's. It travels
  * the plan door alone (`POST /api/dispatcher/answer`, never one of the verb routes) and is not a
  * `DispatcherVerb` — that set is exactly what the server spawns.
  *
@@ -127,24 +115,6 @@ export function useDispatcherVerbs(
   resumeWord?: string,
 ): DispatcherPlanVerbs | DispatcherArcVerbs {
   const { t } = useTranslation();
-  const toast = useToast();
-
-  // The verb in flight, so every control refuses a second press while one is out. Essential: these
-  // verbs arm and disarm systemd timers and move the plan's state, and a double-press would race
-  // two dispatcher processes at the same store. The answer rides the same flag — its form disables
-  // while `answer` is out — so the card cannot carry one word twice.
-  const [busy, setBusy] = useState<DispatcherPress | null>(null);
-
-  // A verb that resolves after the card is gone must not set state or raise a toast about a plan
-  // nobody is looking at any more. `drop` alone still speaks (`speaks`): its card leaving IS what a
-  // drop that worked does, and the 2-second poll can deliver that frame before the answer arrives.
-  const mountedRef = useRef(true);
-  useEffect(() => {
-    mountedRef.current = true;
-    return () => {
-      mountedRef.current = false;
-    };
-  }, []);
 
   // The word a toast is headed with when the dispatcher said nothing this hook can show. The two
   // park words and the delete word are the card's own (`dispatcher.park` / `dispatcher.unpark` /
@@ -181,58 +151,20 @@ export function useDispatcherVerbs(
     [t, word],
   );
 
-  /**
-   * Relay one press. `call` is the whole of what `scope` decides — which door of the API this verb
-   * goes through — written at each callback below rather than in a table, so the route a given
-   * button presses is readable at the button.
-   *
-   * It resolves `true` exactly when the response was 2xx and `false` on a refusal or a request that
-   * never completed. Only `answer` hands that back (its card draws its answered state from it); the
-   * nine verbs discard it at their callbacks — the toast above is what a human reads.
-   */
-  const send = useCallback(
-    async (verb: DispatcherPress, call: () => Promise<Response>): Promise<boolean> => {
-      if (!mountedRef.current) return false;
-      setBusy(verb);
-      const speaks = () => mountedRef.current || verb === 'drop';
+  // The one relay every press goes through (`useVerbSend`): the busy flag that refuses a second press while
+  // one is out — these verbs arm and disarm systemd timers and move the plan's state, and a double press
+  // would race two dispatcher processes at the same store; the answer rides the same flag, its form
+  // disables while `answer` is out, so the card cannot carry one word twice — and the toast. `drop` alone
+  // still speaks after its card is gone: its card leaving IS what a drop that worked does, and the
+  // 2-second poll can deliver that frame before the answer arrives.
+  const { busy, send } = useVerbSend<DispatcherPress>({
+    keep: [name],
+    titles: { refused: word, done: doneWord },
+    alreadyDone: alreadyArmed,
+    speaksAfterUnmount: ['drop'],
+  });
 
-      try {
-        const response = await call();
-        const body = await readBody(response);
-        if (!speaks()) return response.ok;
-
-        // Read before the status, because a 409 carries the very same shape — and because the
-        // dispatcher's successes are sentences too (`PARKED dispatcher-ready`), not empty bodies.
-        const said = operatorWords(firstLine(body?.stdout) || firstLine(body?.stderr), [name]);
-
-        if (response.ok) {
-          // The dispatcher's own sentence IS the answer, and every one of its verbs answers with one, shown in
-          // the operator's words: `RESUMED dr-arc.arc — 2 plan(s)` is its stdout, the toast reads
-          // `RESUMED dr-arc — 2 feature(s)`. `doneWord` is the fallback for an empty body.
-          toast({ tone: 'positive', title: said || doneWord(verb) });
-          return true;
-        }
-
-        if (alreadyArmed(verb, body)) {      // an answer that arrived second is the state asked for: no warning
-          toast({ tone: 'info', title: word(verb), message: said });
-          return true;
-        }
-        toast({ tone: 'warn', title: word(verb), message: said || t('messages.operationFailed') });
-        return false;
-      } catch (error) {
-        // The request never completed — the API is down, or the deadline passed. That is the
-        // network's word, not the dispatcher's, and it is said as such.
-        console.warn(`[useDispatcherVerbs] the ${verb} request did not complete:`, error);
-        if (speaks()) toast({ tone: 'warn', title: t('messages.networkError') });
-        return false;
-      } finally {
-        if (mountedRef.current) setBusy(null);
-      }
-    },
-    [doneWord, name, t, toast, word],
-  );
-
-  // The nine verbs are one-way presses: each awaits `send` and returns `void`, because nothing
+  // The verbs are one-way presses: each awaits `send` and returns `void`, because nothing
   // reads their outcome — the card redraws from the next frame. `answer`, below, is the one that
   // hands the boolean back.
   const stop = useCallback(

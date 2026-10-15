@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 
+import { useEpicQueueVerbs } from '@/modules/dispatcher';
 import { useSortable } from '@/shared/ui/sortable/useSortable';
 import type { SortableList } from '@/shared/ui/sortable/useSortable';
 import type { DispatcherArcGroup } from '@/shared/types';
@@ -24,7 +25,7 @@ export function useQueueLineSort(line: readonly DispatcherArcGroup[]): SortableL
   const keys = useMemo(() => line.map((group) => group.arc.name), [line]);
   // ── The wire: the board's one queue move (`dispatcher queue <epic> --before <epic> | --last`), answering
   //    whether the dispatcher took it. Everything below it is composition. ──
-  const moveEpic = (_epic: string, _move: { before: string } | { last: true }): void | Promise<boolean> => undefined; // FILL: moveEpic
+  const { moveEpic } = useEpicQueueVerbs();
   return useSortable({
     keys,
     onReorder: (carried, order) => {

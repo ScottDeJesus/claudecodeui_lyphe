@@ -90,11 +90,11 @@ const FLOW_MARK: Partial<Record<DispatcherPlanStatus, string>> = { complete: '�
  * THE HEAD, ROW BY ROW: the Epic tag (`LaneCardHead` draws it from `kind="epic"`) and the arc's name, its
  * word (`ARC_STATUS`) and how many of its plans are complete, then the clock slot: the epic's place in the
  * queue and its turn (`1 · its turn`, `data-dispatch-arc-queue-note` valued `now`, `waiting` or `paused`,
- * while `arc.queue` is set) before the hour a Schedule start armed (`data-dispatch-arc-schedule-note`);
- * then the arc's description (`cardDescription`: its design's `delivers` line, else its
- * goal's where that yields nothing), folded to one line until pressed (`CardDescription`), and who is
- * out on it; then its
- * books as pills, counting at first sight (`darc:<name>`), the last of them how long agents have
+ * while `arc.queue` is set) before the hour a Schedule start armed, led by the flow's `◷`
+ * (`data-dispatch-arc-schedule-note`); then the arc's description (`cardDescription`: its design's
+ * `delivers` line, else its goal's where that yields nothing), folded to one line until pressed
+ * (`CardDescription`), and who is out on it; then its books as pills, counting at first sight
+ * (`darc:<name>`), the last of them how long agents have
  * worked on the epic (`WorkingPill`). The corner is `⋯` — carrying `Dismiss done
  * features · N` while some plans of the deck are done and some are not — then the deck's own press, which
  * puts EVERY plan of the deck away in one write (`arcPutAway`), then the fold. That press is Dismiss
@@ -205,19 +205,25 @@ export function DispatchArcDeck({
           // own item of the head's wrapping row, so a narrow head breaks between them, never inside one.
           clock={queue !== null || armed !== null ? (
             <>
-              {/* `its turn` wears the positive ink a live epic's word wears: the epics the queue is running,
-                  or starts next, stand out from the ones waiting, which stay muted like any clock. */}
+              {/* `its turn` wears the arc's own in-flight tone — `info`, the tone of its LIVE word — and
+                  only while something of the epic is released to run (`arc.walking`): the queue is
+                  running it, or starts it next. A held epic whose turn has come waits on a Start, so its
+                  note stays muted like any clock and no go signal stands on a deck that will not start
+                  by itself; so does every `waiting` and `paused`. */}
               {queue !== null && (
                 <span
                   data-dispatch-arc-queue-note={queue.turn}
-                  data-tone={queue.turn === 'now' ? 'positive' : undefined}
-                  className={cn('flex-none whitespace-nowrap text-xs tabular-nums', queue.turn === 'now' ? 'font-medium text-tone-ink' : 'text-muted-foreground')}
+                  data-tone={queue.turn === 'now' && arc.walking ? 'info' : undefined}
+                  className={cn('flex-none whitespace-nowrap text-xs tabular-nums', queue.turn === 'now' && arc.walking ? 'font-medium text-tone-ink' : 'text-muted-foreground')}
                 >
                   {t('dispatcher.queue.note', { position: queue.position, turn: t(`dispatcher.queue.turn.${queue.turn}`) })}
                 </span>
               )}
+              {/* The flow's own scheduled mark leads the hour, so beside the queue's note it reads as a
+                  second fact (`2 · waiting ◷ starts 3:00 AM`), never as one sentence. */}
               {armed !== null && (
                 <span className="flex-none font-mono text-xs text-muted-foreground" data-dispatch-arc-schedule-note>
+                  <span aria-hidden="true">{FLOW_MARK.scheduled} </span>
                   {t('runner.schedule.starts', { time: scheduleClock(armed) })}
                 </span>
               )}
@@ -312,6 +318,8 @@ export function DispatchArcDeck({
  *
  * `line` MARKS THE QUEUE'S LIST: the tab draws the queue's decks as a stack of their own above the rest,
  * and `data-dispatch-arc-line` on that `<ul>` is how a probe tells the queue from the decks below it.
+ * `belowLine` is the eye's half of the same seam: the decks under a queue wear a hairline over them, so
+ * where the queue ends — and a drop stops being an order the dispatcher runs — is seen, not guessed.
  *
  * Used by `RunnerPanel` (the tab home) twice — the queue's decks (`line`), then the other decks, both
  * above the plans of no arc — and by `RunnerWidgetBody` (the gutter), once per arc item of its list
@@ -324,6 +332,7 @@ export function DispatchArcDecks({
   carriedNames,
   sort,
   line = false,
+  belowLine = false,
 }: {
   groups: DispatcherArcGroup[];
   /** Which home is drawing these decks. It changes no layout — an arc is drawn the same in both — and exists to write `data-dispatch-arcs`, so a probe always reads ONE home's decks and never both. */
@@ -334,12 +343,19 @@ export function DispatchArcDecks({
   sort?: SortableList;
   /** These are the queue's decks, in the queue's order: writes `data-dispatch-arc-line` on the list. */
   line?: boolean;
+  /** These decks stand under the queue's list: a hairline over them marks where the queue ends. */
+  belowLine?: boolean;
 }) {
   if (groups.length === 0) return null;
   const byName = new Map(groups.map((group) => [group.arc.name, group]));
   const drawn = sort === undefined ? groups : sort.order.flatMap((name) => byName.get(name) ?? []);
   return (
-    <ul ref={sort?.attachList} data-dispatch-arcs={home} data-dispatch-arc-line={line ? '' : undefined} className="flex min-w-0 flex-col gap-6">
+    <ul
+      ref={sort?.attachList}
+      data-dispatch-arcs={home}
+      data-dispatch-arc-line={line ? '' : undefined}
+      className={cn('flex min-w-0 flex-col gap-6', belowLine && 'border-t border-border pt-6')}
+    >
       {drawn.map((group) => (
         <li key={group.arc.name} className="min-w-0" {...sort?.itemProps(group.arc.name)}>
           <DispatchArcDeck
