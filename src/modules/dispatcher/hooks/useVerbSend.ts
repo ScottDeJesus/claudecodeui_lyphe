@@ -17,7 +17,7 @@ async function readBody(response: Response): Promise<VerbBody | null> {
   }
 }
 
-/** What a caller of {@link useVerbSend} says about its own verbs. Read at the moment an answer lands, so a caller may hand a fresh object on every render. */
+/** What a caller of {@link useVerbSend} says about its own verbs. Read when a press STARTS, so a toast names what was pressed — a word that changes while the request is out never re-heads it — and a caller may hand a fresh object on every render. */
 type VerbSendOptions<Verb extends string> = {
   /** The names every sentence of this caller is about — a feature literally called `plan` — which `operatorWords` never reads as the word. */
   keep: readonly string[];
@@ -75,7 +75,7 @@ export function useVerbSend<Verb extends string>(options: VerbSendOptions<Verb>)
     };
   }, []);
 
-  // The caller's latest words, read when an answer lands — written in an effect, never during render — so
+  // The caller's latest words, read when a press starts — written in an effect, never during render — so
   // `send` keeps one identity however the caller rebuilds its options, and the callbacks built on it stay put.
   const latest = useRef(options);
   useEffect(() => {

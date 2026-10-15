@@ -9156,25 +9156,112 @@ probe-key: c390a95442059689d1b4f24f9348ef92fc15d5ea
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/node-host-reading.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/node-sessions.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/compaction/compaction-mode.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/compaction/node-task-ledger.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/cerberus-types.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/cerberus-node-compaction.mjs, /home/lyphe/.claude/claudecodeui_lyphe/warden/package.json, /home/lyphe/.claude/claudecodeui_lyphe/warden/src/last-turn.mjs, /home/lyphe/.claude/claudecodeui_lyphe/warden/src/sessions.mjs
 
-## INV-8319 — probe — LOW — outside the target paths, `dispatcher.routes.ts`: the two new routes decide an extra key differently, and neither says so
+## INV-8336 — probe — a non-queue card dropped in the gutter takes its rank from a queue deck's, so the drop can be undone and queue decks get saved ranks
 
-LOW — outside the target paths, `dispatcher.routes.ts`: the two new routes decide an extra key differently, and neither says so
+a non-queue card dropped in the gutter takes its rank from a queue deck's, so the drop can be undone and queue decks get saved ranks
 
 ```probe
-cd /home/lyphe/.claude/claudecodeui_lyphe && TSX_TSCONFIG_PATH=server/tsconfig.json timeout 120 node --import tsx --input-type=module -e "
-const express=(await import('/home/lyphe/.claude/claudecodeui_lyphe/node_modules/express/index.js')).default;
-const {createDispatcherRouter}=await import('/home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher.routes.ts');
-const seen=[];const app=express();app.use(express.json());
-app.use('/',createDispatcherRouter({current:async()=>null,offpeak:async()=>null,runVerb:async(v,p,a)=>{seen.push([v,p,...a]);return {ok:true,verb:v,plan:p,exit:0,stdout:'',stderr:''};}}));
-const s=app.listen(0);const b='http://127.0.0.1:'+s.address().port;
-const post=async(path,body)=>{const r=await fetch(b+path,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body)});return r.status;};
-console.log('epics {word:1,extra:1} ->',await post('/epics',{word:'1',extra:1}),'| queue {last:true,extra:1} ->',await post('/arcs/qa/queue',{last:true,extra:1}),'| relayed',JSON.stringify(seen));
-s.close();process.exit(0);
-"
-expect: epics {word:1,extra:1} -> 200 | queue {last:true,extra:1} -> 400 | relayed [["epics","","1"]] — while the two routes disagree
+D=$(mktemp -d /tmp/athena-probe-s21.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+cat > "$1/s21.mts" <<'EOT'
+import { byArc } from '@/modules/dispatcher/dispatcherState';
+import { ranksForMove, rankOf } from '@/modules/dispatcher/cardOrder';
+const plan = (name: string, arc: string | null, created_at: string) => ({ name, arc, created_at }) as any;
+const arc = (name: string, plans: string[], created_at: string, queue: any) => ({ name, plans, created_at, queue }) as any;
+const arcs = [arc('Q1', ['q1p'], '2026-10-01T00:00:00Z', { position: 1, turn: 'now' }), arc('Q2', ['q2p'], '2026-10-02T00:00:00Z', { position: 2, turn: 'waiting' }), arc('D1', ['d1p'], '2026-10-07T00:00:00Z', null)];
+const plans = [plan('q1p', 'Q1', '2026-10-01T00:00:00Z'), plan('q2p', 'Q2', '2026-10-02T00:00:00Z'), plan('d1p', 'D1', '2026-10-07T00:00:00Z'), plan('P1', null, '2026-10-06T00:00:00Z'), plan('P2', null, '2026-10-05T00:00:00Z')];
+const nameOf = (c: any) => (c.kind === 'arc' ? c.group.arc.name : c.plan.name);
+const ranks = new Map<string, number>();
+const split = byArc(plans, arcs, ranks);
+const cards = split.cards as any[];
+const lineNames = new Set(split.line.map((g) => g.arc.name));
+console.log('column:', cards.map(nameOf).join(' '));
+for (const [label, at] of [['very top', 0], ['head of the non-queue region', 2]] as const) {
+  const carried = 'P2';
+  const rest = cards.map(nameOf).filter((n) => n !== carried);
+  const order = [...rest.slice(0, at), carried, ...rest.slice(at)];
+  const rankedOf = (n: string) => { const c = cards.find((x) => nameOf(x) === n); return rankOf(c.kind === 'arc' ? c.group.arc : c.plan, ranks); };
+  const written = ranksForMove(carried, order, rankedOf);
+  const after = byArc(plans, arcs, new Map(written.map((e) => [e.name, e.rank]))).cards.map(nameOf).filter((n: string) => !lineNames.has(n));
+  console.log(`${label}: P2 lands first among the non-queue cards = ${after[0] === carried} (column below the queue: ${after.join(' ')}) | queue decks given a saved rank = ${written.filter((e) => lineNames.has(e.name)).length}`);
+}
+EOT
+timeout 120 npx tsx --tsconfig tsconfig.json "$1/s21.mts" 2>&1 | tail -6
+EOF
+bash "$D/p.sh" "$D"; cd /tmp; case "$D" in /tmp/athena-probe-s21.*) rm -r "$D";; esac
+expect: the "very top" line reads `P2 lands first … = false (column below the queue: D1 P1 P2)` and the "head of the non-queue region" line reads `… = true … | queue decks given a saved rank = 2` while the defect stands; cured, both read `= true` and `queue decks given a saved rank = 0`
 ```
 
-measured 2026-10-15 by chain chain-epic-queue--lane-server-20261014-234205-0dd7, finding L3, LOW
-probe-key: 233399a3f4551fa487e1eb58171ad3a09e9ba1d8
+measured 2026-10-15 by chain chain-epic-queue--fill-20261015-005844-c25e, finding M1, MEDIUM
+probe-key: 871f731035c0aedcb504a14dc1bc6b46e127605b
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/shared/document-fields.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/hooks/useVerbSend.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-epic-queue.mjs
+
+## INV-8337 — probe — the probe's gutter leg cannot see the rank of a non-queue drop
+
+the probe's gutter leg cannot see the rank of a non-queue drop
+
+```probe
+cd /home/lyphe/.claude/claudecodeui_lyphe/.verify && grep -n "onRefuse" probe-epic-queue.mjs; grep -c "cardOrder" probe-epic-queue.mjs || echo none
+expect: one `onRefuse: () => { session.preferenceWrites += 1; }` that reads no body, and `cardOrder` count 0 (the probe never reads a rank it wrote); cured, the probe names the written entry
+```
+
+measured 2026-10-15 by chain chain-epic-queue--fill-20261015-005844-c25e, finding L1, LOW
+probe-key: d0f6fd8a3b390136c69b740eba5a358a1590e20b
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/hooks/useVerbSend.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-epic-queue.mjs
+
+## INV-8338 — probe — "a press in flight refuses a second (both steppers …)" proves `+` and the press, not `−`
+
+"a press in flight refuses a second (both steppers …)" proves `+` and the press, not `−`
+
+```probe
+cd /home/lyphe/.claude/claudecodeui_lyphe/.verify && sed -n '146p;307p' probe-epic-queue.mjs | cut -c1-200; grep -n "^  one: " lib/queue-lane.mjs | cut -c1-80
+expect: `state: 'one'` at 146, the check reading `downOff === true && out.dial.upOff === true` at 307, and `one: { epics: { limit: '1' …` in queue-lane; cured, the in-flight check runs on a state whose `−` is enabled
+```
+
+measured 2026-10-15 by chain chain-epic-queue--fill-20261015-005844-c25e, finding L2, LOW
+probe-key: a4d28acd07b9e5e291d3376f5377685df4b9f8c7
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/hooks/useVerbSend.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-epic-queue.mjs
+
+## INV-8339 — probe — `useVerbSend` says its options are read "when an answer lands"; they are read when the press starts
+
+`useVerbSend` says its options are read "when an answer lands"; they are read when the press starts
+
+```probe
+cd /home/lyphe/.claude/claudecodeui_lyphe && awk '/latest.current;/{print "options read at line " NR} /await call\(\)/{print "await call() at line " NR}' src/modules/dispatcher/hooks/useVerbSend.ts; sed -n 20p src/modules/dispatcher/hooks/useVerbSend.ts | grep -o "Read at the moment an answer lands" || echo "doc corrected"
+expect: `options read at line 89`, then `await call() at line 93`, then `Read at the moment an answer lands` while the doc stands; cured, the doc says the options are read when the press starts
+```
+
+measured 2026-10-15 by chain chain-epic-queue--fill-20261015-005844-c25e, finding L3, LOW
+probe-key: 38aaa73018dcb21c5b7fbf1c8df885afab5c0d96
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/hooks/useVerbSend.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-epic-queue.mjs
+
+## INV-8340 — probe — a new epic joining while a deck is carried (or a drop is held) is drawn at the FRONT of the queue's list
+
+a new epic joining while a deck is carried (or a drop is held) is drawn at the FRONT of the queue's list
+
+```probe
+D=$(mktemp -d /tmp/athena-probe-rec.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+cat > "$1/rec.mts" <<'EOT'
+import { reconcile } from '@/shared/ui/sortable/carryState';
+const preview = ['intake', 'approvals', 'drafts'];
+const keys = ['intake', 'drafts', 'approvals', 'newcomer'];
+console.log('drawn mid-carry (and while a drop is held):', JSON.stringify(reconcile(preview, keys)));
+console.log('newcomer drawn last:', reconcile(preview, keys).at(-1) === 'newcomer');
+EOT
+timeout 120 npx tsx --tsconfig tsconfig.json "$1/rec.mts" 2>&1 | tail -4
+EOF
+bash "$D/p.sh" "$D"; cd /tmp; case "$D" in /tmp/athena-probe-rec.*) rm -r "$D";; esac
+expect: `["newcomer","intake","approvals","drafts"]` and `newcomer drawn last: false` while the defect stands; cured, the queue's list draws the newcomer last
+```
+
+measured 2026-10-15 by chain chain-epic-queue--fill-20261015-005844-c25e, finding L4, LOW
+probe-key: 975240c9c19e2f8d2287776f956833d71b8a0da8
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/hooks/useVerbSend.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-epic-queue.mjs

@@ -68,7 +68,8 @@ function openedBy(plan: DispatcherPlan, sessionId: string | null): boolean {
  * between any two others. A drop of a QUEUE deck is an order and moves the epic in the dispatcher's queue
  * (`useEpicQueueVerbs`): `--before` the next queue deck after it in the dropped order, or `--last` when none
  * follows — a neighbour, never an index, since a queue deck put away is not drawn. Any other item writes
- * one rank (`moveCard`) that the tab reads as well, and stands below the queue wherever it is dropped.
+ * one rank (`moveCard`) that the tab reads as well, placed among the other non-queue items alone (a queue
+ * deck is never the neighbour of a rank), and stands below the queue wherever it is dropped.
  *
  * THE FOLDS ARE THE TAB'S FOLDS, AND THIS BODY PRUNES THE SAME MEMORY. `useLaneFoldPrune` hands the
  * fold store what this widget draws AND what it has hidden, so a card folded here is folded on the tab,
@@ -108,8 +109,16 @@ export function RunnerWidgetBody({ sessionId }: { sessionId: string | null }) {
         const next = order.slice(order.indexOf(carried) + 1).find((name) => lineNames.has(name));
         return moveEpic(carried, next === undefined ? { last: true } : { before: next });
       }
-      // The carried item's neighbours in the dropped order are cards of either kind: both are ranked.
-      return moveCard(carried, order, cards.map(rankedOf), carriedNames);
+      // A rank orders a card among the cards the operator can order: the queue's decks are never its neighbours,
+      // because their ranks (their creation moments) say nothing about the cards under the line — `byArc` ranks
+      // only those — and a drop that took a queue deck's rank would be undone by the next frame, or would write
+      // ranks for decks the queue owns. The carried item's neighbours are the other cards of either kind, decks and plans.
+      return moveCard(
+        carried,
+        order.filter((name) => !lineNames.has(name)),
+        cards.filter((card) => !lineNames.has(cardName(card))).map(rankedOf),
+        carriedNames,
+      );
     },
   });
   const items = order.flatMap((name) => cardsByName.get(name) ?? []);
