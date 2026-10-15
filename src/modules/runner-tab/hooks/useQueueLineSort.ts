@@ -15,6 +15,10 @@ import type { DispatcherArcGroup } from '@/shared/types';
  * the dropped order only until then (`dropHold.ts`) and puts it back on a refusal, rather than snapping
  * to the old order while the write is out.
  *
+ * A NEWCOMER JOINS AT THE BACK. A new epic reaches the dispatcher's queue last, so a deck that arrives
+ * while another is in the hand, or while a drop's write is out, is drawn last (`newKeys: 'back'`) — where the
+ * next frame puts it — and not at the front, where the kit draws the highest ranked card of a card order.
+ *
  * ONE MOVE, NAMED BY A NEIGHBOUR: the carried epic goes `--before` the queue deck it now stands in front
  * of, or `--last` when it lands last. A queue deck the operator has put away is not drawn, so a place on
  * screen is never an index into the queue — the neighbour is the same epic on screen and in the store.
@@ -28,6 +32,7 @@ export function useQueueLineSort(line: readonly DispatcherArcGroup[]): SortableL
   const { moveEpic } = useEpicQueueVerbs();
   return useSortable({
     keys,
+    newKeys: 'back',
     onReorder: (carried, order) => {
       const next = order[order.indexOf(carried) + 1];
       return moveEpic(carried, next === undefined ? { last: true } : { before: next });

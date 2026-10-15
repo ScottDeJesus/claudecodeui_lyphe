@@ -5,7 +5,7 @@ import { TOUCH_HOLD_MS } from '@/shared/constants';
 import { isFreePress, SORTABLE_ITEM_ATTRIBUTE } from '@/shared/ui/sortable/freePress';
 import { dropNow, placeUnder, putDown, takeUp } from '@/shared/ui/sortable/carried';
 import { reconcile, sameOrder } from '@/shared/ui/sortable/carryState';
-import type { Carry } from '@/shared/ui/sortable/carryState';
+import type { Carry, NewKeysJoin } from '@/shared/ui/sortable/carryState';
 import { useDropHold } from '@/shared/ui/sortable/dropHold';
 import { edgeHoldAt, edgeStep, restoreScrollOffsets, scrollerOf, scrollOffsetsWithin, slideFrom } from '@/shared/ui/sortable/motion';
 import { layoutRectOf, moveKey, slotAt } from '@/shared/ui/sortable/slotAt';
@@ -56,9 +56,11 @@ export type SortableList = {
  * edge, the row it lifted was merely drawn there. Without it a short pane, whose two zones cover half of it,
  * runs away under any carry of a row that opens in one.
  * A CANCELLED carry (the browser took the touch) puts the card back. THE POLL DOES NOT RESET A CARRY:
- * the preview order lives here and is `reconcile`d against the keys on each render; a carried item
- * whose key leaves the list is let go. A drop calls `onReorder` once and clears the preview in the same
- * batch, so the list never draws the old order between the two.
+ * the preview order lives here and is `reconcile`d against the keys on each render — a key the list
+ * gains meanwhile is drawn at the front, or at the back for a list that says `newKeys: 'back'` (a queue,
+ * where a newcomer joins last); a carried item whose key leaves the list is let go. A drop calls
+ * `onReorder` once and clears the preview in the same batch, so the list never draws the old order
+ * between the two.
  *
  * A STORE THAT ANSWERS LATER KEEPS THE DROP'S ORDER MEANWHILE. When `onReorder` returns a promise (a write
  * whose next reading is what redraws the keys), the order the drop made stays drawn until the store has
@@ -69,8 +71,9 @@ export type SortableList = {
  * which hand their list to `PanelRows`' `RowList`: a milestone's epics and an epic's features, as rows the
  * operator carries by their free surface.
  */
-export function useSortable({ keys, onReorder }: {
+export function useSortable({ keys, onReorder, newKeys = 'front' }: {
   keys: readonly string[];                                              // the items' keys in their committed order
+  newKeys?: NewKeysJoin;                                                // where a key the list gains mid-carry (or while a drop is held) is drawn
   onReorder: (carried: string, order: readonly string[]) => void | Promise<boolean>; // a drop that moved something: the key carried, the whole order it now stands in; a promise answers whether the store took it
 }): SortableList {
   // The order drawn WHILE a carry is in the hand (`null` otherwise: the keys' own order stands). Essential, not
@@ -85,15 +88,15 @@ export function useSortable({ keys, onReorder }: {
   const carry = useRef<Carry | null>(null);
   const swallowClick = useRef<((event: Event) => void) | null>(null);
   // The order on screen: the carry's preview, else the drop still being written (`dropHold.ts`), else the keys' own.
-  const drawn = preview !== null ? reconcile(preview, keys) : heldOrder !== null ? reconcile(heldOrder, keys) : keys;
-  // The latest keys, drawn order and callback, read by handlers that outlive a render; written in an effect, never during render.
-  const latest = useRef({ keys, drawn, onReorder });
-  useEffect(() => { latest.current = { keys, drawn, onReorder }; });
+  const drawn = preview !== null ? reconcile(preview, keys, newKeys) : heldOrder !== null ? reconcile(heldOrder, keys, newKeys) : keys;
+  // The latest keys, drawn order, callback and join, read by handlers that outlive a render; written in an effect, never during render.
+  const latest = useRef({ keys, drawn, onReorder, newKeys });
+  useEffect(() => { latest.current = { keys, drawn, onReorder, newKeys }; });
 
   /** The preview order, reconciled with whatever the list holds now. */
   const orderNow = (): readonly string[] => {
     const held = carry.current?.order;
-    return held === undefined ? latest.current.keys : reconcile(held, latest.current.keys);
+    return held === undefined ? latest.current.keys : reconcile(held, latest.current.keys, latest.current.newKeys);
   };
 
   /** The carried item drawn under the pointer, whatever its slot in the layout has become. */

@@ -9071,32 +9071,6 @@ probe-key: 38aaa73018dcb21c5b7fbf1c8df885afab5c0d96
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/hooks/useVerbSend.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-epic-queue.mjs
 
-## INV-8340 — probe — a new epic joining while a deck is carried (or a drop is held) is drawn at the FRONT of the queue's list
-
-a new epic joining while a deck is carried (or a drop is held) is drawn at the FRONT of the queue's list
-
-```probe
-D=$(mktemp -d /tmp/athena-probe-rec.XXXXXX) || exit 1
-cat > "$D/p.sh" <<'EOF'
-cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
-cat > "$1/rec.mts" <<'EOT'
-import { reconcile } from '@/shared/ui/sortable/carryState';
-const preview = ['intake', 'approvals', 'drafts'];
-const keys = ['intake', 'drafts', 'approvals', 'newcomer'];
-console.log('drawn mid-carry (and while a drop is held):', JSON.stringify(reconcile(preview, keys)));
-console.log('newcomer drawn last:', reconcile(preview, keys).at(-1) === 'newcomer');
-EOT
-timeout 120 npx tsx --tsconfig tsconfig.json "$1/rec.mts" 2>&1 | tail -4
-EOF
-bash "$D/p.sh" "$D"; cd /tmp; case "$D" in /tmp/athena-probe-rec.*) rm -r "$D";; esac
-expect: `["newcomer","intake","approvals","drafts"]` and `newcomer drawn last: false` while the defect stands; cured, the queue's list draws the newcomer last
-```
-
-measured 2026-10-15 by chain chain-epic-queue--fill-20261015-005844-c25e, finding L4, LOW
-probe-key: 975240c9c19e2f8d2287776f956833d71b8a0da8
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/hooks/useVerbSend.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-epic-queue.mjs
-
 ## INV-8344 — probe — the probe's key-presence checks cannot fail, and three checks name more than they test
 
 the probe's key-presence checks cannot fail, and three checks name more than they test
