@@ -260,3 +260,65 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/docs/
 - `PreferenceListEntry` (`src/shared/types.ts`) is `string | { name: string; [field: string]: unknown }`, so `{ name, at }` is legal as a literal.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/user-preferences.db.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/preferenceEntryPatch.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/userSettings.ts
+
+## INV-8341 — probe — MEDIUM — MAN-8137 (part of MAN-7577) still says the In flight face's lists never hold a drop; its queue list does
+
+MEDIUM — MAN-8137 (part of MAN-7577) still says the In flight face's lists never hold a drop; its queue list does
+
+```probe
+D=$(mktemp -d /tmp/athena-probe-m1.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+echo "row hits: $(docstore get MAN-8137 --text | grep -c 'the In flight face.s) never holds')"
+grep -n "return moveEpic" src/modules/runner-tab/hooks/useQueueLineSort.ts || echo "no async queue onReorder"
+EOF
+bash "$D/p.sh"; cd /tmp; case "$D" in /tmp/athena-probe-m1.*) rm -r "$D";; esac
+expect: `row hits: 1` and `…useQueueLineSort.ts:NN:      return moveEpic(carried, …` while the defect stands; cured, `row hits: 0` (the sentence names the queue's list as holding until the next frame)
+```
+
+measured 2026-10-15 by chain chain-epic-queue--docs-cloudcli-20261015-015416-7a64, finding M1, MEDIUM
+probe-key: 3fc8d670f108173120f2f6e6058891d3a14c2168
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/docs/
+
+## INV-8342 — probe — MEDIUM — MAN-5638 and MAN-5636 give the wrong refusal line for an unknown epic name, and MAN-5636 counts the verbs wrong
+
+MEDIUM — MAN-5638 and MAN-5636 give the wrong refusal line for an unknown epic name, and MAN-5636 counts the verbs wrong
+
+```probe
+D=$(mktemp -d /tmp/athena-probe-m2.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+cd /tmp || exit 1
+echo "MAN-5638 'names both doors': $(docstore get MAN-5638 --text | grep -c 'names both doors')"
+echo "MAN-5636 'any of the four verbs': $(docstore get MAN-5636 --text | grep -c 'any of the four verbs')"
+echo "queue -> $(timeout 30 ~/.claude/scripts/dispatcher queue athena-no-such-epic-x --last 2>&1 | head -1)"
+echo "stop  -> $(timeout 30 ~/.claude/scripts/dispatcher stop athena-no-such-epic-x 2>&1 | head -1)"
+EOF
+bash "$D/p.sh"; cd /tmp; case "$D" in /tmp/athena-probe-m2.*) rm -r "$D";; esac
+expect: `names both doors': 1`, `any of the four verbs': 1`, `queue -> no arc athena-no-such-epic-x`, `stop  -> no plan or arc athena-no-such-epic-x` while the defect stands (an unknown name is refused before any write); cured, the two row counts are 0 and the rows name `no arc <name>` for `wip` and `queue` and `no plan or arc <name>` for the six others
+```
+
+measured 2026-10-15 by chain chain-epic-queue--docs-cloudcli-20261015-015416-7a64, finding M2, MEDIUM
+probe-key: 96851bfab7f6cf6c087d9b51d8ce7eaf69c341a3
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/docs/
+
+## INV-8343 — probe — LOW — MAN-8431 names a standing proof whose `ALL CHECKS PASS` does not print today; the failing check expects a revert the app never makes
+
+LOW — MAN-8431 names a standing proof whose `ALL CHECKS PASS` does not print today; the failing check expects a revert the app never makes
+
+```probe
+D=$(mktemp -d /tmp/athena-probe-l1.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+timeout 400 node .verify/probe-epic-queue.mjs --only gutter > "$1/out.log" 2>&1; echo "exit $?"
+grep -E "\[FAIL\]|ALL CHECKS" "$1/out.log" | cut -c1-120 || echo none
+EOF
+bash "$D/p.sh" "$D"; cd /tmp; case "$D" in /tmp/athena-probe-l1.*) rm -r "$D";; esac
+expect: `exit 1` and two `[FAIL] 1920-…-gutter: …the pin dropped that write (1) and the done deck stands below the queue still` lines while it stands; cured, `exit 0` and `ALL CHECKS PASS`
+```
+
+measured 2026-10-15 by chain chain-epic-queue--docs-cloudcli-20261015-015416-7a64, finding L1, LOW
+probe-key: 468d81300e74aad24711ab83df7acd7fd3cf051b
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/docs/
