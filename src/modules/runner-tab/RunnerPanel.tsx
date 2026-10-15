@@ -6,6 +6,7 @@ import {
   byArc,
   DispatchArcDecks,
   doneDismiss,
+  EpicDial,
   HiddenPlans,
   landFocusInHome,
   LoosePlannerBadges,
@@ -18,6 +19,7 @@ import {
 } from '@/modules/dispatcher';
 import { DISPATCHER_ALL_TOPIC, useLiveTopic } from '@/modules/live-bus';
 import { useLaneFoldPrune } from '@/modules/runner-tab/hooks/useLaneFoldPrune';
+import { useQueueLineSort } from '@/modules/runner-tab/hooks/useQueueLineSort';
 import { LANE_WALL_GRID } from '@/shared/constants';
 import { Badge, Button, EmptyState, ScrollArea } from '@/shared/ui';
 import { useSortable } from '@/shared/ui/sortable/useSortable';
@@ -82,9 +84,16 @@ function pageStripToCard(deck: Element, plan: string): HTMLElement | null {
  * arc in the ARC's own walk order — one strip inside the deck, with the arc's flow over it — and
  * the plans no arc holds are `PlanCard`s in the wall's grid below the decks.
  *
- * THE CARDS STAND WHERE THE OPERATOR PUT THEM AND NOWHERE ELSE. Decks and wall cards each keep the
- * shared order among their own kind (`byArc`'s `groups` and `rest`; the order is `cardOrder.ts`'s),
- * and each of the two lists is sortable: a free press on a card carries it, the grid lays itself out
+ * IN FLIGHT IS THE QUEUE, WORKED TOP DOWN (operator, 2026-10-14). The decks of the epics whose turn is
+ * open come FIRST, as a list of their own (`byArc`'s `line`), in the order the dispatcher starts them
+ * in, each head carrying its place and its turn; the dial in the header says how many run at once
+ * (`EpicDial`). A drop among them moves the epic in the dispatcher's queue (`useQueueLineSort`). The
+ * queue moves a deck on its own only at a turn's ends: a new epic joins at the back, a finished one
+ * goes below the queue, among the other decks.
+ *
+ * THE OTHER CARDS STAND WHERE THE OPERATOR PUT THEM AND NOWHERE ELSE. The other decks and the wall's
+ * cards each keep the shared order among their own kind (`byArc`'s `groups` and `rest`; the order is
+ * `cardOrder.ts`'s), and each of those two lists is sortable: a free press on a card carries it, the grid lays itself out
  * around the gap, and a drop writes one rank (`moveCard`). The wall is two-dimensional, so a card
  * can be dropped into any slot of its rows; decks reorder among decks and plans among plans — a
  * deck and a plan swap places only in the widget, which draws them in one column. Every press passes the lane's own carried names, which is what the put-away store
@@ -123,7 +132,15 @@ export function RunnerPanel({ revealPlan = null, onRevealed }: RunnerPanelProps)
   const retained = useLiveTopic<DispatcherLanePicture>(DISPATCHER_ALL_TOPIC);
   const ranks = useCardRanks();
   const split = useMemo(() => byArc(plans, arcs, ranks), [plans, arcs, ranks]);
-  // The two sortable lists: the decks, and the plans of no arc in the wall. A drop hands `moveCard`
+  // FILL: line — `byArc`'s own `split.line` (the queue's decks, by `queue.position`) and `split.groups` (the other
+  // decks), once it answers them. Until it does, the frame's own `queue` splits the decks here.
+  const { line, decks } = useMemo(() => {
+    const queued = split.groups.filter((group) => group.arc.queue);
+    queued.sort((a, b) => (a.arc.queue?.position ?? 0) - (b.arc.queue?.position ?? 0));
+    return { line: queued, decks: split.groups.filter((group) => !group.arc.queue) };
+  }, [split]);
+  const sortLine = useQueueLineSort(line);
+  // The other two sortable lists: the decks, and the plans of no arc in the wall. A drop hands `moveCard`
   // the cards of ITS list for the neighbours' ranks, and the whole lane's names to prune against.
   const deckKeys = useMemo(() => split.groups.map((group) => group.arc.name), [split]);
   const wallKeys = useMemo(() => split.rest.map((plan) => plan.name), [split]);
@@ -202,6 +219,9 @@ export function RunnerPanel({ revealPlan = null, onRevealed }: RunnerPanelProps)
             frame states no dial (an older dispatcher). The header wraps so a phone-wide one drops the
             phrase to a second line whole rather than cutting it. */}
         <PlannerLanesReadout />
+        {/* The queue's dial beside it — how many epics run at once and Pause all — drawn only when
+            the frame states one. Whole on a line of its own when a phone-wide header has no room. */}
+        <EpicDial />
         {/* Every drawn plan that is done, off the board in ONE write, with nothing added to
             `Hidden`. Not drawn when none is, so the button never offers to dismiss nothing. No
             dialog: it deletes nothing, and the dispatcher keeps every plan. `-my-1` lets the 36px
@@ -233,10 +253,13 @@ export function RunnerPanel({ revealPlan = null, onRevealed }: RunnerPanelProps)
               wall's grid, and the way back from a Hide. */}
           <div className="flex min-w-0 flex-col gap-6 px-4 py-5 lg:px-6">
             <LoosePlannerBadges planners={loosePlanners} />
-            {/* THE ARCS SIT ABOVE THE PLANS NO ARC HOLDS, each deck holding the plans of its own arc:
-                an arc's word and verbs reach every plan of it, so its plans are that arc's own strip
-                rather than cards beside it (`DispatchArcDecks`). */}
-            <DispatchArcDecks groups={split.groups} carriedNames={carriedNames} sort={sortDecks} />
+            {/* THE QUEUE FIRST, top down in the order its epics run, as a list of its own: a drop
+                here moves an epic in the dispatcher's queue, never a card rank. */}
+            <DispatchArcDecks groups={line} carriedNames={carriedNames} sort={sortLine} line />
+            {/* THE OTHER ARCS SIT BELOW IT AND ABOVE THE PLANS NO ARC HOLDS, by the operator's card
+                order, each deck holding the plans of its own arc: an arc's word and verbs reach every
+                plan of it, so its plans are that arc's own strip rather than cards beside it. */}
+            <DispatchArcDecks groups={decks} carriedNames={carriedNames} sort={sortDecks} />
             {/* The plans of no arc, in the pane's own wall. They are the ONLY cards in this grid: an
                 arc's plans are paged one per view inside their deck's strip, so a loose card is the
                 width the wall gives every card that has no arc to be read under. */}

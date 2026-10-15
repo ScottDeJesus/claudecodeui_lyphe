@@ -87,9 +87,11 @@ const FLOW_MARK: Partial<Record<DispatcherPlanStatus, string>> = { complete: '�
  * plan whose turn has not come among them (`FLOW_MARK`); toned as the plan's own badge
  * is (`planStatusTone`), named `<plan> · <word>`, and filled as far as the arc's complete plans reach.
  *
- * THE HEAD, ROW BY ROW: the Epic tag (`LaneCardHead` draws it from `kind="epic"`) and the arc's name, its word (`ARC_STATUS`), the hour a
- * Schedule start armed (the clock slot, `data-dispatch-arc-schedule-note`) and how many of its plans
- * are complete; then the arc's description (`cardDescription`: its design's `delivers` line, else its
+ * THE HEAD, ROW BY ROW: the Epic tag (`LaneCardHead` draws it from `kind="epic"`) and the arc's name, its
+ * word (`ARC_STATUS`) and how many of its plans are complete, then the clock slot: the epic's place in the
+ * queue and its turn (`1 · its turn`, `data-dispatch-arc-queue-note` valued `now`, `waiting` or `paused`,
+ * while `arc.queue` is set) before the hour a Schedule start armed (`data-dispatch-arc-schedule-note`);
+ * then the arc's description (`cardDescription`: its design's `delivers` line, else its
  * goal's where that yields nothing), folded to one line until pressed (`CardDescription`), and who is
  * out on it; then its
  * books as pills, counting at first sight (`darc:<name>`), the last of them how long agents have
@@ -164,6 +166,9 @@ export function DispatchArcDeck({
   // The hour a Schedule start armed, over the arc's stopped plans (`report_arcs.hour`) — the head's
   // clock, so a folded deck still says when it will start. The Cancel that clears it is in the bar.
   const armed = epochOf(arc.schedule);
+  // The epic's place in the queue and what it means now (`line_gate.places`), or null for an epic not
+  // in it. `??` because a frame from a dispatcher older than the key never names it.
+  const queue = arc.queue ?? null;
   const verb = putAwayVerb(plans);
   const done = verb === 'hide' ? doneDismiss(plans, carriedNames) : null;
   const doneCount = plans.filter((plan) => plan.status === 'complete').length;
@@ -196,10 +201,27 @@ export function DispatchArcDeck({
           kind="epic"
           title={<span data-arc-title className="font-mono">{arc.name}</span>}
           badge={<Badge tone={word.tone} className="shrink-0">{t(word.key)}</Badge>}
-          clock={armed !== null ? (
-            <span className="flex-none font-mono text-xs text-muted-foreground" data-dispatch-arc-schedule-note>
-              {t('runner.schedule.starts', { time: scheduleClock(armed) })}
-            </span>
+          // The queue's note first — the epic's place and its turn — then the armed hour's; each is its
+          // own item of the head's wrapping row, so a narrow head breaks between them, never inside one.
+          clock={queue !== null || armed !== null ? (
+            <>
+              {/* `its turn` wears the positive ink a live epic's word wears: the epics the queue is running,
+                  or starts next, stand out from the ones waiting, which stay muted like any clock. */}
+              {queue !== null && (
+                <span
+                  data-dispatch-arc-queue-note={queue.turn}
+                  data-tone={queue.turn === 'now' ? 'positive' : undefined}
+                  className={cn('flex-none whitespace-nowrap text-xs tabular-nums', queue.turn === 'now' ? 'font-medium text-tone-ink' : 'text-muted-foreground')}
+                >
+                  {t('dispatcher.queue.note', { position: queue.position, turn: t(`dispatcher.queue.turn.${queue.turn}`) })}
+                </span>
+              )}
+              {armed !== null && (
+                <span className="flex-none font-mono text-xs text-muted-foreground" data-dispatch-arc-schedule-note>
+                  {t('runner.schedule.starts', { time: scheduleClock(armed) })}
+                </span>
+              )}
+            </>
           ) : undefined}
           progress={{ done: doneCount, total: plans.length }}
           lead={(
@@ -288,8 +310,12 @@ export function DispatchArcDeck({
  * Nothing here reads the lane either — the caller hands it the split it already has, so a caller that
  * filters its list and one that does not can never draw different decks.
  *
- * Used by `RunnerPanel` (the tab home), above the plans of no arc, and by `RunnerWidgetBody` (the
- * gutter), once per arc item of its list (`groups={[group]}`).
+ * `line` MARKS THE QUEUE'S LIST: the tab draws the queue's decks as a stack of their own above the rest,
+ * and `data-dispatch-arc-line` on that `<ul>` is how a probe tells the queue from the decks below it.
+ *
+ * Used by `RunnerPanel` (the tab home) twice — the queue's decks (`line`), then the other decks, both
+ * above the plans of no arc — and by `RunnerWidgetBody` (the gutter), once per arc item of its list
+ * (`groups={[group]}`).
  */
 export function DispatchArcDecks({
   groups,
@@ -297,6 +323,7 @@ export function DispatchArcDecks({
   pinnedSessionId = null,
   carriedNames,
   sort,
+  line = false,
 }: {
   groups: DispatcherArcGroup[];
   /** Which home is drawing these decks. It changes no layout — an arc is drawn the same in both — and exists to write `data-dispatch-arcs`, so a probe always reads ONE home's decks and never both. */
@@ -305,12 +332,14 @@ export function DispatchArcDecks({
   carriedNames: string[];
   /** The sortable list over these decks (keyed by arc name), when the operator may rearrange them here. */
   sort?: SortableList;
+  /** These are the queue's decks, in the queue's order: writes `data-dispatch-arc-line` on the list. */
+  line?: boolean;
 }) {
   if (groups.length === 0) return null;
   const byName = new Map(groups.map((group) => [group.arc.name, group]));
   const drawn = sort === undefined ? groups : sort.order.flatMap((name) => byName.get(name) ?? []);
   return (
-    <ul ref={sort?.attachList} data-dispatch-arcs={home} className="flex min-w-0 flex-col gap-6">
+    <ul ref={sort?.attachList} data-dispatch-arcs={home} data-dispatch-arc-line={line ? '' : undefined} className="flex min-w-0 flex-col gap-6">
       {drawn.map((group) => (
         <li key={group.arc.name} className="min-w-0" {...sort?.itemProps(group.arc.name)}>
           <DispatchArcDeck

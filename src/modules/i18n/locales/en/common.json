@@ -892,7 +892,7 @@
       "building": "building",
       "waiting": "waiting on {{title}}",
       "waitingOnAnother": "waiting on another feature",
-      "queued": "queued for its Start",
+      "queued": "held for its Start",
       "paused": "paused",
       "stalled": "stalled — its run ended",
       "starting": "starting",
@@ -1217,7 +1217,7 @@
     "status": {
       "live": "LIVE",
       "paused": "PAUSED",
-      "queued": "QUEUED",
+      "queued": "HELD",
       "scheduled": "SCHEDULED",
       "stalled": "STALLED",
       "parked": "PARKED",
@@ -1312,6 +1312,7 @@
       "confirm": "Delete"
     },
     "waitsOn": "waits on {{names}}",
+    "queueHold": "Waiting · {{clause}}",
     "wipHold": "Waiting for a WIP slot · {{clause}}",
     "dismissDone": "Dismiss done · {{count}}",
     "plannersOut": "planners {{out}} of {{lanes}} out",
@@ -1337,7 +1338,7 @@
       "live": "LIVE",
       "complete": "COMPLETE",
       "empty": "EMPTY",
-      "queued": "QUEUED",
+      "queued": "HELD",
       "paused": "PAUSED",
       "scheduled": "SCHEDULED",
       "stalled": "STALLED"
@@ -1378,6 +1379,30 @@
       "tasksHintDefault": "How many tasks each feature of this epic runs at once. This is the Settings default; step to another number to give this epic its own, and back to it to follow Settings again.",
       "refused": "WIP not set",
       "done": "WIP set — the next take-up reads it"
+    },
+    "epics": {
+      "label": "Epics at once",
+      "hint": "How many epics run at once, top down. An epic that has started runs till completed.",
+      "all": "All",
+      "down": "Fewer epics at once",
+      "up": "More epics at once",
+      "pause": "Pause all",
+      "resume": "Resume all",
+      "running": "{{running}} of {{limit}} running",
+      "runningAll": "{{running}} running",
+      "paused": "Paused · tasks out finish",
+      "done": "Epics",
+      "refused": "Epics not changed"
+    },
+    "queue": {
+      "note": "{{position}} · {{turn}}",
+      "turn": {
+        "now": "its turn",
+        "waiting": "waiting",
+        "paused": "paused"
+      },
+      "moved": "Queue",
+      "refused": "Queue not changed"
     }
   },
   "navigation": {

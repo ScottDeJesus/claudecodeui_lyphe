@@ -40,6 +40,9 @@ export { DispatchArcDecks } from '@/modules/dispatcher/ArcDeck';
 // the header of the Roadmap tab's In flight face and the chat gutter's widget, and by neither when the
 // frame states none.
 export { PlannerLanesReadout } from '@/modules/dispatcher/PlannerLanesReadout';
+// The queue's dial — how many epics run at once, top down, and Pause all — drawn from the frame's own
+// route by the header of the Roadmap tab's In flight face, and not at all when the frame states none.
+export { EpicDial } from '@/modules/dispatcher/EpicDial';
 // The presses that put a card away, each one write to the put-away store: one plan's corner, an arc
 // deck's and `Dismiss done · N`. A done card's is Dismiss and an unfinished card's Hide.
 export { doneDismiss, planPutAway } from '@/modules/dispatcher/hiddenPlans';
