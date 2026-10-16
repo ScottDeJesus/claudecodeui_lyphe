@@ -10013,3 +10013,14 @@ measured 2026-10-16 by chain chain-toolset-skeleton--docs-20261016-092338-5af2, 
 probe-key: d11c501bcd2456dd0b141441eca51f4e4c61f776
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/
+
+## INV-8499 — usage-hold-account probes — a scratch chain that names its own HEAL_LEDGER_PATH launches a Chiron judge on the default model
+
+A scratch chain that sets `HEAL_LEDGER_PATH` files friction rows and opens the heal worker's door (`chain_walk._friction_ending`); the worker's cycle launches a Chiron judge on `claude-sonnet-5-5`, not Haiku.
+
+- Measured 2026-10-16: 7 judges in 4 scratch dirs, 46k–81k tokens each.
+- `usage-hold-account-scratch.py` therefore sets `HEAL_REFLEX_DISABLE=1` and `QUIET_CHECKPOINT_DISABLE=1`, pops `HEAL_LEDGER_PATH`, and ends both modes with a reading that fails when any heal cycle or Chiron judge appears.
+- Any probe added to these files keeps all four.
+- Proof commands and what they cover: MAN-8514.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/usage-hold-account-kick-entry.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/usage-hold-account-kick.sh, /home/lyphe/.claude/claudecodeui_lyphe/.verify/usage-hold-account-scratch.py

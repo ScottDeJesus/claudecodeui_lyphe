@@ -1,6 +1,7 @@
 import express from 'express';
 import type { NextFunction, Response } from 'express';
 
+import { kickDispatcher } from '@/modules/settings/index.js';
 import type { ClaudeAccounts } from '@/shared/types.js';
 
 import {
@@ -40,6 +41,15 @@ import { readUsage } from './usage.service.js';
  * answers `{ error: "<words>" }` with the store's 422, never the global handler's nested shape. A
  * genuine fault on a WRITE (a full disk on a path the store did not wrap) belongs to `next`: unlike
  * the reads, a write that did not happen must not read as one that did.
+ *
+ * A SWITCH AND A CAPTURE ANNOUNCE THEMSELVES TO THE DISPATCHER. A usage-limit hold belongs to the account
+ * it was met on and ends when that account is no longer the one in use (`hooks/dispatcher/account_release.py`),
+ * but every plan held on a limit is paused, so the daemon has usually exited and nothing else would tell
+ * it the login changed. Both writes therefore end in `void kickDispatcher()` once the swap has landed
+ * and the active mark follows it: the daemon that wakes, or starts for the debt, reads the new identity
+ * out of `~/.claude.json` itself. The kick never raises and is never awaited, so it can neither delay nor
+ * fail the answer; a `claude /login` made outside this board sends none, and the next pass anything
+ * wakes releases the hold all the same.
  */
 
 /**
@@ -163,6 +173,7 @@ export function createAccountsRoutes(): express.Router {
       // the store's own doc says so, and a mark written first would name an account the box is not
       // switched to if the copy then failed.
       setActiveSlug(result.installed);
+      void kickDispatcher();
       return { status: 200, body: result };
     });
   });
@@ -173,6 +184,7 @@ export function createAccountsRoutes(): express.Router {
       // A capture records what is LIVE right now, so the active mark follows it — which is what keeps
       // the mark true after a `claude /login` outside this board's knowledge.
       setActiveSlug(captured);
+      void kickDispatcher();
       return { status: 201, body: { captured } };
     });
   });

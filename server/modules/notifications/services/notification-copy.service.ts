@@ -384,8 +384,10 @@ const COPY_BY_CODE = new Map<string, CodeCopy>([
       .join(' · '),
   })],
   // ONE push for a usage limit however many plans it paused (`dispatcher-endings.service.ts`): the
-  // limit is the account's, the time is when the dispatcher's own armed Resume fires, and an early
-  // Resume after an account switch is the operator's.
+  // limit is the account's, and the plans it paused come back at the time below — the dispatcher's own
+  // armed Resume — or sooner, the moment the account in use is no longer the one that hit it
+  // (`hooks/dispatcher/account_release.py`). The `resumed` event that early return writes pushes nothing
+  // of its own; the relaunch it buys is the ordinary `dispatcher.relaunched` push.
   ['dispatcher.limit_paused', ({ meta }) => ({
     headline: 'Claude usage limit',
     // A limit that named no reset time carries the dispatcher's own GUESS: it says so, and does not
