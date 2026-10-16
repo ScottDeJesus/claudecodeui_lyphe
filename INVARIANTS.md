@@ -121,62 +121,6 @@ probe-key: 97ead18614765315f7387937ac19f5cc982cfe5f
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/dispatcherState.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-card-description.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-dispatch-card-version-word.mjs
 
-## INV-5685 — probe — the CLI card prints a mid-turn sentence with the version hole in it (MED)
-
-the CLI card prints a mid-turn sentence with the version hole in it (MED)
-
-```probe
-node /tmp/athena-probe-claude-updates/probe8b.mjs
-expect: the CLI card reads "Claude Code | the Claude CLI did not answer --version | 1 conversation mid-turn on an older Claude Code moves to when its turn ends | Full changelog" — the sentence with the version hole
-```
-
-measured 2026-09-28 by chain chain-claude-update-pipeline--fill-20260928-171627-a599, finding M1, MEDIUM
-probe-key: d44df19ee6cfb716eeb5cfd3783a7d7855682d57
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/claude-updates/ClaudeUpdatesSettingsTab.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/claude-updates/hooks/useClaudeUpdates.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts
-
-## INV-5688 — probe — with no reading yet, the pane offers nothing at all for up to a poll (LOW)
-
-with no reading yet, the pane offers nothing at all for up to a poll (LOW)
-
-```probe
-node /tmp/athena-probe-claude-updates/probe4.mjs
-expect: "pane with no reading: \"Claude updates | Reading the update report…\"" / "its buttons: []" / "pane filled after 51 s" — no manual retry anywhere in the branch
-```
-
-measured 2026-09-28 by chain chain-claude-update-pipeline--fill-20260928-171627-a599, finding L2, LOW
-probe-key: d8df40e2919b689a77d33f8ffd61032e5bfa0430
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/claude-updates/ClaudeUpdatesSettingsTab.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/claude-updates/hooks/useClaudeUpdates.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts
-
-## INV-5690 — probe — A null version reading overwrites the version-keyed record: one transient `--version` failure costs two catalog spawns
-
-A null version reading overwrites the version-keyed record: one transient `--version` failure costs two catalog spawns
-
-```probe
-D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1; printf '#!/bin/sh\nif [ "$1" = "--version" ]; then [ -f %s/fail ] && exit 1; echo "2.1.284 (Claude Code)"; exit 0; fi\necho x >> %s/spawns\nexec /home/lyphe/.npm-global/bin/claude "$@"\n' "$D" "$D" > "$D/claude" && chmod +x "$D/claude" && touch "$D/spawns" && cp ~/.cloudcli/claude-model-catalog.json "$D/cat.json"; printf "import fs from 'node:fs';\nimport { readClaudeModelsDefinition as r } from '/home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-model-catalog.ts';\nconst D = '%s', bump = () => { const t = new Date(Date.now() + Math.random() * 1e6); fs.utimesSync(D + '/claude', t, t); };\nconst say = (s: string) => console.log(s, 'spawns=' + fs.readFileSync(D + '/spawns', 'utf8').split('\\\\n').filter(Boolean).length, 'disk=' + JSON.parse(fs.readFileSync(D + '/cat.json', 'utf8')).cliVersion);\nawait r(); say('keyed:'); fs.writeFileSync(D + '/fail', ''); bump(); await r(); say('--version failed:'); fs.unlinkSync(D + '/fail'); bump(); await r(); say('--version back:');\n" "$D" > "$D/n.mts"; cd /home/lyphe/.claude/claudecodeui_lyphe && CLAUDE_CLI_PATH="$D/claude" CLOUDCLI_CLAUDE_MODEL_CATALOG_PATH="$D/cat.json" npx tsx --tsconfig server/tsconfig.json "$D/n.mts" 2>&1 | grep -v '^\[Claude models\]'; case "$D" in /tmp/athena-probe.*) rm -rf "$D";; esac
-expect: the `--version failed:` line still reads `spawns=0 disk=2.1.284` (today: `spawns=1 disk=null`, then `spawns=2` once --version answers)
-```
-
-measured 2026-09-28 by chain chain-claude-model-catalog-20260928-173328-cec2, finding L1, LOW
-probe-key: dd0a2efc1160028611ad23a567f37a22490e65af
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-model-catalog.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-model-options.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/utils/modelLabels.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-claude-catalog-picker.mjs
-
-## INV-5691 — probe — A catalog without `resolvedModel` offers `default` as its own row, "Default (recommended)"
-
-A catalog without `resolvedModel` offers `default` as its own row, "Default (recommended)"
-
-```probe
-cd /home/lyphe/.claude/claudecodeui_lyphe && npx tsx -e "import('/home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-model-options.ts').then(({buildClaudeModelsDefinition:b})=>{const m=JSON.parse(require('fs').readFileSync(process.env.HOME+'/.cloudcli/claude-model-catalog.json','utf8')).models.map(({resolvedModel,...r})=>r);console.log(b(m).OPTIONS.map(o=>o.value+'='+o.label).join(', '))})"
-expect: no `default=` entry in the printed list (today: `default=Default (recommended), opus[1m]=Opus 5.5, fable=Fable 5.1, sonnet[1m]=Sonnet 5.5, haiku=Haiku 4.5`)
-```
-
-measured 2026-09-28 by chain chain-claude-model-catalog-20260928-173328-cec2, finding L2, LOW
-probe-key: 9c5a0b10a091733a3a774a77800310216aaa0ef5
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-model-catalog.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-model-options.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/utils/modelLabels.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-claude-catalog-picker.mjs
-
 ## INV-5697 — probe — After a Rework, the re-cut's fresh Accept prompt comes back silently: no phone push, no lane bell (`DispatcherAskBell`, MAN-7540)
 
 After a Rework, the re-cut's fresh Accept prompt comes back silently: no phone push, no lane bell (`DispatcherAskBell`, MAN-7540)
@@ -219,20 +163,6 @@ probe-key: fe6d7103d88f1c1ee9fa2ec5dd75af2c64bd3197
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher-answer.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher-ask.reader.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher-asks.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher-ask.transport.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher-prompts.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher-raise.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/tools/InteractiveRenderers/QuestionTextField.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/hooks/dispatcher/ask.py, /home/lyphe/.claude/hooks/dispatcher/cmd/ask.py, /home/lyphe/.claude/hooks/dispatcher/owed.py, /home/lyphe/.claude/hooks/dispatcher_stop_planners.py, /home/lyphe/.claude/hooks/dispatcher_stop.py, /home/lyphe/.claude/hooks/intent_lock.py, /home/lyphe/.claude/skills/epic/SKILL.md, /home/lyphe/.claude/skills/feature/SKILL.md
 
-## INV-5701 — probe — the builder's docs hand-off omits INV-4355, which now names a deleted function and a reader that no longer reads
-
-the builder's docs hand-off omits INV-4355, which now names a deleted function and a reader that no longer reads
-
-```probe
-cd /home/lyphe/.claude && docstore get INV-4355 | python3 -c "import sys,json; b=json.load(sys.stdin)['row']['body']; print([l[:70]+'…' for l in b.splitlines() if 'word_of' in l])"
-expect: [] — the Enforced line names neither the deleted `word_of` nor `reason` as a reader of the model word (today: one line, the Enforced line naming `route_of`/`word_of`/`reason`)
-```
-
-measured 2026-09-28 by chain chain-claude-swarm-20260928-195521-ce60, finding L1, LOW
-probe-key: 60d2230d13605ada2fae5d4f237d4d3e83cff8c1
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/common.json, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/hooks/dispatcher/width.py, /home/lyphe/.claude/skills/epic/SKILL.md
-
 ## INV-5709 — probe — Every replay of a spent-out, genuine ntfy token costs a full store read, uncapped, on a public route
 
 Every replay of a spent-out, genuine ntfy token costs a full store read, uncapped, on a public route
@@ -274,62 +204,6 @@ measured 2026-09-28 by chain chain-plan-ask-survives-restart-20260928-202000-d5a
 probe-key: 8fa53d1bac9f9cec9c9d2c27e055571fbe5bc7a7
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher-ask-names.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher-asks.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher-prompts.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notifications/ntfy-action.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notifications/services/ntfy-action-token.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/services/provider-runtime.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useChatRealtimeHandlers.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts
-
-## INV-5713 — probe — Two comments now say the opposite of `resolveToolApproval`
-
-Two comments now say the opposite of `resolveToolApproval`
-
-```probe
-cd /home/lyphe/.claude/claudecodeui_lyphe && grep -n "hears every answer\|Every gateway hears" server/shared/types.ts server/modules/providers/list/claude/claude-runtime.provider.js
-expect: no output — both comments say the first gateway that claims a key settles it (today: two lines, server/shared/types.ts:816 and claude-runtime.provider.js:240)
-```
-
-measured 2026-09-28 by chain chain-plan-ask-survives-restart-20260928-202000-d5a0, finding L4, LOW
-probe-key: 895a0f6a64f0ae719ff6b4d83f7a4e2d11c62560
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher-ask-names.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher-asks.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher-prompts.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notifications/ntfy-action.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notifications/services/ntfy-action-token.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/services/provider-runtime.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useChatRealtimeHandlers.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts
-
-## INV-5718 — probe — `restart-after-light.png` / `tabAfter` are captioned "the tab on the new server", but the tab has not re-read yet
-
-`restart-after-light.png` / `tabAfter` are captioned "the tab on the new server", but the tab has not re-read yet
-
-```probe
-grep -n "const POLL_MS\|waitForTimeout(6000)" src/modules/claude-updates/hooks/useClaudeUpdates.ts .verify/claude-updates-final.mjs
-expect: POLL_MS = 60_000 in the hook and waitForTimeout(6000) in the driver's restart tail — so the tab's pane 6 s after the press is still the pre-restart picture (staged: only GETs at load and press+13 ms)
-```
-
-measured 2026-09-28 by chain chain-claude-update-pipeline--final-20260928-212031-af1e, finding M1, MEDIUM
-probe-key: d24d7fd0a03eb06421805c6499e0066fdd40cd03
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/claude-updates-final.mjs
-
-## INV-5719 — probe — `record.md` §3 and §5 print a reshaped object under the `$ node .verify/claude-updates-final.mjs …` lines
-
-`record.md` §3 and §5 print a reshaped object under the `$ node .verify/claude-updates-final.mjs …` lines
-
-```probe
-jq -r 'keys_unsorted|join(",")' .verify/artifacts/claude-updates-final/tab-observations.json
-expect: mode,shots,checks,errors,reportBefore,blockedWrites,checkNow — while record.md §3 under the same command shows shots,tab-light,tab-dark,sidebarExpanded,rail,consoleErrors,blockedWrites and a "paneLines" string
-```
-
-measured 2026-09-28 by chain chain-claude-update-pipeline--final-20260928-212031-af1e, finding L1, LOW
-probe-key: 60ef1843fd0d9f06e026df2a8a98f15456e1c9d7
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/claude-updates-final.mjs
-
-## INV-5720 — probe — `handoverSeen` (and the loop that ends on it) is cause-blind
-
-`handoverSeen` (and the loop that ends on it) is cause-blind
-
-```probe
-journalctl -u cloudcli-server-dev --since "2026-09-28 21:30:50" --until "2026-09-28 21:35:40" --no-pager | grep -c 'handover complete'
-expect: 4 — all from other sessions' edits (zero "reboot requested" in that window), each one the driver's /handover complete/ gate would count
-```
-
-measured 2026-09-28 by chain chain-claude-update-pipeline--final-20260928-212031-af1e, finding L2, LOW
-probe-key: c4a153faf954a45362c67244b279e561a14df8ef
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/claude-updates-final.mjs
 
 ## INV-5727 — probe — HIGH — the chat door arms the park-at-peak hour BEFORE the store refuses, so a refused second Accept still schedules a Start for the plan the operator Queued
 
