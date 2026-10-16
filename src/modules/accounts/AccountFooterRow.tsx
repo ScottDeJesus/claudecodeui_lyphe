@@ -117,6 +117,18 @@ export function AccountFooterRow({ collapsed = false, onExpand }: AccountFooterR
 
   const picture = accounts?.reachable ? accounts : null;
 
+  // A newly loaded account is read at once. A switch, a re-login and a capture all move the account in
+  // use, and the three-minute tick would otherwise leave the last account's figures under the new name;
+  // the server's cache misses on the swap (`usage.service.ts`), so this reading is the new account's own.
+  // The first account seen is the mount's own reading already (`useClaudeUsage`), so only a change reads.
+  const activeSlug = picture ? picture.active : undefined;
+  const seenSlugRef = useRef(activeSlug);
+  useEffect(() => {
+    if (activeSlug === undefined) return;
+    if (seenSlugRef.current !== undefined && seenSlugRef.current !== activeSlug) void refreshUsage();
+    seenSlugRef.current = activeSlug;
+  }, [activeSlug, refreshUsage]);
+
   // The two windows worth a glance, as bars. `weekly_scoped:*` plans are deliberately left out:
   // the row has space for two, and the panel below carries every window the provider reports.
   //

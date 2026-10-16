@@ -287,7 +287,7 @@ section: accounts/006 The rules that bite
    comes through the server's own three-minute cache (`HEALTHY_TTL_MS` in `usage.service.ts`), and
    money moves on the scale of a build. `togglePanel` forces
    a fresh reading of BOTH on open — on open only, so a close costs nothing — so what a person looks
-   at is current without paying for it every minute. The balance is the one a person would otherwise
+   at is current without paying for it every minute. A change of the account in use reads usage once more (`AccountFooterRow`'s effect on `picture.active`): a switch, a re-login or a capture would otherwise leave the last account's figures under the new name until the next tick, and the server's cache misses on the swap, so that reading is the new account's own. The first account seen is the mount's reading already, so only a change reads. The balance is the one a person would otherwise
    check twice by hand: a figure that only moves on a timer reads as stale the moment it is the
    number you opened the panel for. It also carries a five-second floor of its own
    (`useDeepseekBalance`), because the row is a button pressed while thinking and each press would
