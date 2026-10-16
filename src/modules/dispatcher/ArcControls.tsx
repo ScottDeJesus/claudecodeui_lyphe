@@ -31,11 +31,12 @@ function wipOverrides(wip: DispatcherArc['wip'], allWord: string, labelOf: (limi
  * alike: the verbs that move the plans under the arc (Pause, Resume), then the FOLD of the epic's own
  * overrides (`OverrideFold`): its feature and task limits (`EpicWipControl`) and its model (`ModelPick`).
  *
- * THERE IS NO START HERE. The plans an epic's operator accepted with Queue wait for their FIRST Start, and the
- * board has one Start for all of them, in the master controller at the top of In flight (`MasterController`);
- * a feature's own Start, on its card, is the override. So the deck draws RESUME alone, and only while the epic has
- * a plan that needs it: one STOPPED MID-WALK (`arc.midwalk`) or STALLED (`arc.stalled`) — never for an epic
- * whose waiting plans are all held for their first Start, which would be a second Start under another word.
+ * THERE IS NO START HERE. An approval puts a plan in the queue, so a plan waits for a Start only when the operator
+ * held it back with a Stop before its first walk, and the board has one Start for all of them, in the master
+ * controller at the top of In flight (`MasterController`); a feature's own Start, on its card, is the override. So
+ * the deck draws RESUME alone, and only while the epic has a plan that needs it: one STOPPED MID-WALK (`arc.midwalk`)
+ * or STALLED (`arc.stalled`) — never for an epic whose waiting plans are all held for their first Start, which would
+ * be a second Start under another word, and never for a HIDDEN plan, which only Show lifts.
  * There is no `Schedule start` either: an hour armed from a terminal is still named on the deck's head
  * (`DispatchArcDeck`), and the card of a plan stopped mid-walk keeps its `Resume at …`.
  *

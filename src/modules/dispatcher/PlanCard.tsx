@@ -62,12 +62,13 @@ function queueClause(hold: string): string {
  * the prompt folds with the card and is never taken off the screen with the verbs. A fold is not an
  * answer, and the only thing that ends a band is the frame that stops carrying the ask.
  *
- * THE CORNER PUTS THE CARD AWAY, NOT THE PLAN, and the dispatcher is never told (`hiddenPlans.ts`). A
- * COMPLETE plan's corner is Dismiss: the card leaves the board, and no list or count keeps it. Any
- * other plan's is Hide: `Hidden · N` lists it and `Show` brings it back, because a plan still walking
- * must stay reachable. Neither deletes anything, so no dialog guards either. `onPutAway` is the
- * caller's `planPutAway(plan, carriedNames)`, because only the caller holds the lane's carried names
- * the store prunes against.
+ * THE CORNER PUTS THE CARD AWAY. A COMPLETE plan's corner is Dismiss: the card leaves the board, and no
+ * list or count keeps it (`hiddenPlans.ts`; the dispatcher is never told). Any other plan's is Hide, and a
+ * hide is the dispatcher's (`usePutAway`): the plan is paused and held out of the queue, `Hidden · N` lists
+ * it and `Show` brings it back and lets it take its turn. News on a hidden plan draws its card again, still
+ * reading HIDDEN, with a `Show` of its own (`PlanControls`). Neither deletes anything, so no dialog guards
+ * either. `onPutAway` is the caller's `usePutAway(carriedNames).plan(plan)`, because only the caller holds
+ * the lane's carried names the store prunes against.
  *
  * DELETE IS THE MENU'S, AND ONLY WHERE THE DISPATCHER WOULD TAKE IT. `⋯` carries `Delete feature…`
  * exactly when `planDroppable(plan, planners)` holds. It is never drawn disabled on a `live` or `stalled` plan,
@@ -122,7 +123,7 @@ export function PlanCard({
   plan: DispatcherPlan;
   /** The plan names of this plan's own arc that it waits on, as the document spells them; `[]` for a plan of no arc. */
   waitsOn?: readonly string[];
-  /** The corner's press, Dismiss or Hide by the plan's state: the caller's `planPutAway(plan, carriedNames)`. */
+  /** The corner's press, Dismiss or Hide by the plan's state: the caller's `usePutAway(carriedNames).plan(plan)`. */
   onPutAway: () => void;
   /** The title's heading level: 4 inside an arc deck, whose own title is the 3 its plans sit under. */
   headingLevel?: 3 | 4;

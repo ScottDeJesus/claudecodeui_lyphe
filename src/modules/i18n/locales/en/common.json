@@ -1220,6 +1220,7 @@
       "stalled": "STALLED",
       "parked": "PARKED",
       "idle": "IDLE",
+      "hidden": "HIDDEN",
       "complete": "COMPLETE"
     },
     "phase": {
@@ -1316,11 +1317,13 @@
     "dismissDonePlans": "Dismiss done features · {{count}}",
     "hide": "Hide feature",
     "hideArc": "Hide epic",
+    "hideRefused": "Not hidden",
     "menu": "More actions",
     "hidden": {
       "title": "Hidden · {{count}}",
       "show": "Show",
       "showAll": "Show all",
+      "showRefused": "Not shown",
       "allHidden": "Every unfinished feature is hidden"
     },
     "kind": {
@@ -1336,7 +1339,8 @@
       "queued": "HELD",
       "paused": "PAUSED",
       "scheduled": "SCHEDULED",
-      "stalled": "STALLED"
+      "stalled": "STALLED",
+      "hidden": "HIDDEN"
     },
     "planner": {
       "soul": {

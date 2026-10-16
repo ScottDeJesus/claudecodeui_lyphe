@@ -2,7 +2,7 @@ import { runDispatcherCommand, type DispatcherCommandDependencies } from '@/shar
 import type { DispatcherVerb, DispatcherVerbResult } from '@/shared/types.js';
 
 /**
- * Relaying the dispatcher's own fourteen verbs: `stop`, `resume`, `schedule` (a stopped plan's Resume
+ * Relaying the dispatcher's own sixteen verbs: `stop`, `resume`, `schedule` (a stopped plan's Resume
  * at a time), `park` (a designed plan set aside), `unpark` (handed
  * back to be cut), `model` (a plan's or an arc's own DeepSeek / Claude word, or `default` to follow the
  * top), `wip` (an epic's own
@@ -13,10 +13,13 @@ import type { DispatcherVerb, DispatcherVerbResult } from '@/shared/types.js';
  * the press's `--by` and nothing else), `arm-accept` / `disarm-accept` (the operator's "Accept when
  * cut" on a designed plan — the card's press carries `--by app:card` and the design stamp it read — and its
  * Cancel), `queue` (an epic moved in the queue In flight runs top down — `--before` another epic,
- * `--last`, or `--at` a place), `epics` (the epic dial's word: `1` to `5`, `pause` or `resume`) and
- * `start` (the board's one Start: every plan held for its first Start let go at once).
+ * `--last`, or `--at` a place), `epics` (the epic dial's word: `1` to `5`, `pause` or `resume`),
+ * `start` (the board's one Start: every plan held for its first Start let go at once), `hide` (plans, or an
+ * epic's open plans, paused and held out of the queue until shown — a walk in flight stops once its task
+ * in flight finishes) and `unhide` (Show: each hidden plan takes its turn in the queue). Hide and Show take
+ * plan or epic names, any number of them, and are BOARD verbs for the relay: the names are the argv.
  *
- * FIVE OF THE FOURTEEN NAME AN ARC AS READILY AS A PLAN — `stop`, `resume`, `model`, and the
+ * FIVE OF THE SIXTEEN NAME AN ARC AS READILY AS A PLAN — `stop`, `resume`, `model`, and the
  * `arm-accept` / `disarm-accept` pair (every designed, or every armed, plan of it), each
  * resolved by the dispatcher's own door and by nothing on this side (`schedule <arc>` is the terminal's
  * alone: the deck has no Schedule start). An arc has no walk of its own:
@@ -48,11 +51,11 @@ export type DispatcherVerbDependencies = DispatcherCommandDependencies;
 
 /**
  * Runs one verb against one name — a plan's, or an arc's for the five the arc's door also opens on — or,
- * for a board verb (`epics`, `start`), against NONE: the empty name `""` is left out of the argv, and the answer
+ * for a board verb (`epics`, `start`, `hide`, `unhide`), against NONE: the empty name `""` is left out of the argv, and the answer
  * still carries `plan: ""`. `verbArgs` follow the name — `schedule`'s hour, `model`'s word, `wip`'s limit and
- * word, `queue`'s move and `epics`' word, each already checked by the route against the shapes the
- * dispatcher accepts, and `planner-resume`'s `--by app:card`, which the route spells itself; `stop`,
- * `resume`, `park`, `unpark` and `drop` take none.
+ * word, `queue`'s move and `epics`' word, and for `hide` / `unhide` the plan and epic names themselves, each already
+ * checked by the route against the shapes the dispatcher accepts, and `planner-resume`'s `--by app:card`,
+ * which the route spells itself; `stop`, `resume`, `park`, `unpark` and `drop` take none.
  */
 export async function runDispatcherVerb(
   verb: DispatcherVerb,

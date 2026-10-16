@@ -207,11 +207,11 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispat
 
 ## INV-5727 — probe — HIGH — the chat door arms the park-at-peak hour BEFORE the store refuses, so a refused second Accept still schedules a Start for the plan the operator Queued
 
-HIGH — the chat door arms the park-at-peak hour BEFORE the store refuses, so a refused second Accept still schedules a Start for the plan the operator Queued
+HIGH — the chat door arms the park-at-peak hour BEFORE the store refuses, so a refused second Accept still schedules a Start for the plan the operator already answered
 
 ```probe
 bash /home/lyphe/.claude/state/pipeline-reviews/accept-once/athena-probes/hold_then_refuse.sh
-expect: `hour armed on the Queued plan: None` (today: `2026-09-29T10:00:00Z`, with the second answer's text still reading "This answer recorded nothing")
+expect: `hour armed on the answered plan: None` (today: `2026-09-29T10:00:00Z`, with the second answer's text still reading "This answer recorded nothing")
 ```
 
 measured 2026-09-28 by chain chain-accept-once-20260928-214132-9473, finding H1, HIGH
@@ -229,8 +229,8 @@ from dispatcher import store
 R='$S/r'; D={'repo':R,'goal':'g','delivers':'d','architecture':'a','interfaces':'i','constraints':'c','waits_on':[],'decisions':[],'questions':[]}
 PH=[{'key':'a','title':'t','goal':'g','assignee':'hephaestus','waits_on':[],'start_here':[]}]
 c=store.connect()
-with c: store.open_plan(c,'dupname',repo=R,session='athena-probe'); store.put_design(c,'dupname',D); store.put_phases(c,'dupname',PH,'-')"; env -u CLAUDE_CODE_SESSION_ID scripts/dispatcher accept --paused dupname dupname; echo "exit $?"; scripts/dispatcher status dupname 2>&1 | grep -i "approved\|unapproved" | head -2; case "$S" in /tmp/athena-dup-*) rm -rf "$S";; esac
-expect: one `ACCEPTED dupname — paused` (the name deduplicated), or a refusal that does not call the plan already approved — today: `REFUSED accept dupname: dupname is already approved (… by cli, now paused) …`, exit 3, and the plan unapproved
+with c: store.open_plan(c,'dupname',repo=R,session='athena-probe'); store.put_design(c,'dupname',D); store.put_phases(c,'dupname',PH,'-')"; env -u CLAUDE_CODE_SESSION_ID scripts/dispatcher accept --hidden dupname dupname; echo "exit $?"; scripts/dispatcher status dupname 2>&1 | grep -i "approved\|unapproved" | head -2; case "$S" in /tmp/athena-dup-*) rm -rf "$S";; esac
+expect: one `ACCEPTED dupname — hidden` (the name deduplicated), or a refusal that does not call the plan already approved — today: `REFUSED accept dupname: dupname is already approved (… by cli, now hidden) …`, exit 3, and the plan unapproved
 ```
 
 measured 2026-09-28 by chain chain-accept-once-20260928-214132-9473, finding L1, LOW
@@ -5672,20 +5672,6 @@ probe-key: bb7e695842749df4ad233864e6b3bba1da280daa
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/migrations.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/projects.db.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/schema.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/projects/services/project-node.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts
 
-## INV-7101 — probe — `nodeForPath` names a consumer that does not exist; the assignment is inert and the report does not say so
-
-`nodeForPath` names a consumer that does not exist; the assignment is inert and the report does not say so
-
-```probe
-grep -c nodeForPath /home/lyphe/.claude/claudecodeui_lyphe/server/modules/websocket/services/chat-websocket.service.ts
-expect: 0   (the defect stands while it is 0; once dispatch reads the node, the count is ≥1 and the comment is true)
-```
-
-measured 2026-10-06 by chain chain-cerberus--sessions--project-node-20261006-215420-fadd, finding L2, LOW
-probe-key: a210cc480d5484bd3d86d27be87cd9af480576cc
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/migrations.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/projects.db.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/schema.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/projects/services/project-node.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts
-
 ## INV-7102 — probe — the assignment sends no `cerberus_changed` hint, so a second tab keeps the old project list
 
 the assignment sends no `cerberus_changed` hint, so a second tab keeps the old project list
@@ -9455,3 +9441,575 @@ measured 2026-10-15 by chain chain-runs-widget-master-controller-20261015-085947
 probe-key: 4330da8486d795daa7695f6864601bbbc8a4d934
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/MasterController.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Select.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/master-controller-live.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/master-controller-widget.mjs
+
+## INV-8440 — `loopbackApiOrigin()` reads `SERVER_PORT` only — never `PORT`
+
+An origin for a child of this box that calls back into the API is `loopbackApiOrigin()` (`server/shared/utils.ts`), never a port expression written at the call site. It is `SERVER_PORT || '3001'`, the expression the listener reads (`server/index.ts`, `const SERVER_PORT`).
+
+- why no `PORT`: the server never listens on `PORT`. The `cloudcli` CLI is the one place that accepts it, and copies it into `SERVER_PORT` before the server starts (`server/modules/cli/cli.service.ts`: `else if (!SERVER_PORT && PORT) SERVER_PORT = PORT`). An origin built from `PORT` is right only where `SERVER_PORT` is already set, and wrong for a server started directly with `PORT=4000`: it listens on 3001 and the origin answers `:4000`.
+- symptom: a child's call back into the API (`CLOUDCLI_TOOLSET_URL`, the Metis board origin, the browser-use MCP URL) refuses to connect or reaches a different server.
+- fix: call `loopbackApiOrigin()`; if the listener learns another port variable, change the helper with it.
+- `KANBAN_PM_API_URL` stays the one explicit override, in `resolveApiOrigin` (`kanban-metis.module.ts`).
+- measured 2026-10-16: `grep -rn "process.env.PORT" server/` prints nothing.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/browser-use/browser-use.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/kanban-metis/kanban-metis.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/utils.ts
+
+## INV-8441 — probe — `loopbackApiOrigin`'s comment promises the running process's port, but with only `PORT` set the listener is on 3001
+
+`loopbackApiOrigin`'s comment promises the running process's port, but with only `PORT` set the listener is on 3001
+
+```probe
+D=$(mktemp -d /tmp/athena-probe-port.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+D="$(cd "$(dirname "$0")" && pwd)"
+cat > "$D/o.mjs" <<'JS'
+const { loopbackApiOrigin } = await import('/home/lyphe/.claude/claudecodeui_lyphe/server/shared/utils.ts');
+console.log('origin with only PORT=4000 set:', loopbackApiOrigin());
+JS
+cd /home/lyphe/.claude/claudecodeui_lyphe
+env -u SERVER_PORT PORT=4000 TSX_TSCONFIG_PATH=server/tsconfig.json timeout 60 node --import tsx "$D/o.mjs" 2>&1 | tail -1
+echo "listener: $(grep -n '^const SERVER_PORT = ' server/index.ts | cut -c1-120)"
+echo "server entry files reading process.env.PORT: $(grep -l 'process.env.PORT' server/index.ts server/load-env.ts server/supervised-boot.ts 2>/dev/null | wc -l)"
+EOF
+bash "$D/p.sh"; cd /tmp && case "$D" in /tmp/athena-probe-port.*) rm -r "$D";; esac
+expect: the origin ends :4000, the listener line reads only SERVER_PORT with default 3001, and the count of entry files reading PORT is 0 (the defect stands); once cured the origin ends :3001 or the listener reads PORT
+```
+
+measured 2026-10-16 by chain chain-toolset-skeleton--contracts-20261016-054640-9dd2, finding L1, LOW
+probe-key: b6a677af8c070e438275dfa9aed3e1be1e8cbb7a
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/auth/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/interfaces.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/toolset-types.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/utils.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/toolset-types.ts
+
+## INV-8443 — ChatComposer's footer is a query container — the model pill's tool-set count depends on it
+
+- `PromptInputFooter` in `ChatComposer.tsx` carries `[container-type:inline-size]`. Keep it.
+- why: the pill's count in `ComposerModelMenu.tsx` (`data-toolset-count`) is `hidden … [@container(min-width:45rem)]:inline`; with no query container above it the count never shows.
+- The query follows the composer's own width — page, floating panel and PiP window alike — not the viewport. The count shows at ≥45rem (720px) and gives way before the model's name and the send button below it. At 1440 with the sidebar open the footer is ~842px.
+- Inline-size containment is safe on this footer: its width comes from the form, tooltips and menus are portalled, the voice error bubble is positioned against its own wrapper. Anything added to the footer that sizes the footer from its content breaks the query.
+- Section contract: MAN-8490.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/composer/ChatComposer.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/composer/ComposerModelMenu.tsx
+
+## INV-8452 — probe — a view that is not a view, or a switch answer with no data, takes the chat pane down (S35/S18) — MEDIUM
+
+a view that is not a view, or a switch answer with no data, takes the chat pane down (S35/S18) — MEDIUM
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.mjs" <<'EOF2'
+const L = "/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib";
+const { openConsole } = await import(`${L}/console.mjs`);
+const sc = await import(`${L}/scratch-chat.mjs`);
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const s = await openConsole();
+const json = (status, body) => ({ status, contentType: "application/json", body: JSON.stringify(body) });
+const id = (await s.api("/api/providers/sessions", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ provider: "claude", projectPath: "/tmp/cloudcli-probe-chat", initialMessage: "" }) })).body.data.sessionId;
+const errs = [];
+s.page.on("pageerror", (e) => errs.push(e.message));
+await s.page.route("**/api/toolsets/sessions/**", (r) => (r.request().method() === "GET" ? r.fulfill(json(200, { success: true, data: {} })) : r.continue()));
+await s.page.goto(`${s.appUrl}/session/${id}`, { waitUntil: "networkidle" });
+await sleep(2000);
+console.log("composer textareas:", await s.page.locator("textarea").count(), "| pageerrors:", errs.length, "|", errs[0] ?? "none");
+await sc.deleteScratchChat(s, id);
+await s.browser.close();
+EOF2
+printf 'node "$1/p.mjs"\n' > "$D/p.sh"
+bash "$D/p.sh" "$D"
+case "$D" in /tmp/athena-probe.*) rm -rf "$D";; esac
+expect: prints `composer textareas: 0 | pageerrors: 2 | Cannot read properties of undefined (reading 'filter')` while the defect stands; cured when it prints `composer textareas: 1 | pageerrors: 0 | none`
+```
+
+measured 2026-10-16 by chain chain-toolset-skeleton--menu-fill-20261016-071936-654e, finding M1, MEDIUM
+probe-key: 8c199dea72bce1fe48fd5696839b8d0a01edeb87
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/composer/ComposerModelMenu.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/composer/ComposerToolsetSection.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useSessionToolsets.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts
+
+## INV-8453 — probe — a chat of another provider is asked the toolsets door, and refused (S7) — MEDIUM
+
+a chat of another provider is asked the toolsets door, and refused (S7) — MEDIUM
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.mjs" <<'EOF2'
+const L = "/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib";
+const { openConsole } = await import(`${L}/console.mjs`);
+const sc = await import(`${L}/scratch-chat.mjs`);
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const s = await openConsole();
+const id = (await s.api("/api/providers/sessions", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ provider: "codex", projectPath: "/tmp/cloudcli-probe-chat", initialMessage: "" }) })).body.data.sessionId;
+const seen = [];
+s.page.on("response", (x) => { if (x.url().includes("/api/toolsets/")) seen.push(x.status()); });
+await s.page.evaluate(() => localStorage.setItem("selected-provider", "claude"));
+await s.page.goto(`${s.appUrl}/session/${id}`, { waitUntil: "networkidle" });
+await sleep(1500);
+console.log("tool-set reads answered for a codex chat opened from a claude-state UI:", JSON.stringify(seen));
+await sc.deleteScratchChat(s, id);
+await s.browser.close();
+EOF2
+printf 'node "$1/p.mjs"\n' > "$D/p.sh"
+bash "$D/p.sh" "$D"
+case "$D" in /tmp/athena-probe.*) rm -rf "$D";; esac
+expect: prints `[400,400]` in the dev build (`[400]` in a production build) while the defect stands; cured when it prints `[]`
+```
+
+measured 2026-10-16 by chain chain-toolset-skeleton--menu-fill-20261016-071936-654e, finding M2, MEDIUM
+probe-key: c8e933d2ceca1dd4992536495d5990b4d1705099
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/composer/ComposerModelMenu.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/composer/ComposerToolsetSection.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useSessionToolsets.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts
+
+## INV-8454 — probe — a switch that outlives the client's 30 s deadline is reported "Not updated: signal timed out" though it landed (S20) — MEDIUM
+
+a switch that outlives the client's 30 s deadline is reported "Not updated: signal timed out" though it landed (S20) — MEDIUM
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.mjs" <<'EOF2'
+const L = "/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib";
+const { openConsole } = await import(`${L}/console.mjs`);
+const sc = await import(`${L}/scratch-chat.mjs`);
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const s = await openConsole();
+const json = (status, body) => ({ status, contentType: "application/json", body: JSON.stringify(body) });
+const id = (await s.api("/api/providers/sessions", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ provider: "claude", projectPath: "/tmp/cloudcli-probe-chat", initialMessage: "" }) })).body.data.sessionId;
+const view = (on) => ({ sessionId: id, availability: "available", node: null, strays: [], registryError: null, registryFile: "/x/toolsets.local.json", sets: [{ name: "probe", description: "Echo probe", servers: ["probe"], on }] });
+await s.page.route("**/api/toolsets/sessions/**", async (route) => {
+  if (route.request().method() === "GET") return route.fulfill(json(200, { success: true, data: view(false) }));
+  await sleep(33000);
+  return route.fulfill(json(200, { success: true, data: { set: "probe", on: true, changed: true, live: "unconfirmed", servers: [{ name: "probe", outcome: "unconfirmed", detail: "no answer" }], view: view(true) } })).catch(() => {});
+});
+await s.page.goto(`${s.appUrl}/session/${id}`, { waitUntil: "networkidle" });
+await s.page.click(sc.MODEL_CHIP);
+await s.page.waitForSelector("[data-toolset-section]");
+const t0 = Date.now();
+await s.page.locator('[data-toolset-section] [role="menuitemcheckbox"]').first().click();
+await sleep(31500);
+const line = await s.page.locator('[data-toolset-line="error"]').allInnerTexts();
+console.log(`after ${Math.round((Date.now() - t0) / 1000)} s the section says:`, JSON.stringify(line));
+await sc.deleteScratchChat(s, id);
+await s.browser.close();
+EOF2
+printf 'node "$1/p.mjs"\n' > "$D/p.sh"
+bash "$D/p.sh" "$D"
+case "$D" in /tmp/athena-probe.*) rm -rf "$D";; esac
+expect: prints `after 32 s the section says: ["▲\nNot updated: signal timed out"]` while the defect stands; cured when the line is absent or is the answer's own `unconfirmed` sentence (the PUT deadline passes the server's 30 s bound)
+```
+
+measured 2026-10-16 by chain chain-toolset-skeleton--menu-fill-20261016-071936-654e, finding M3, MEDIUM
+probe-key: dc87c579bbc4d956142d19971149453b69350eb6
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/composer/ComposerModelMenu.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/composer/ComposerToolsetSection.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useSessionToolsets.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts
+
+## INV-8455 — probe — a failure that is not the server's envelope reaches the screen as the engine's own text (S18) — LOW
+
+a failure that is not the server's envelope reaches the screen as the engine's own text (S18) — LOW
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.mjs" <<'EOF2'
+const L = "/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib";
+const { openConsole } = await import(`${L}/console.mjs`);
+const sc = await import(`${L}/scratch-chat.mjs`);
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const s = await openConsole();
+const json = (status, body) => ({ status, contentType: "application/json", body: JSON.stringify(body) });
+const id = (await s.api("/api/providers/sessions", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ provider: "claude", projectPath: "/tmp/cloudcli-probe-chat", initialMessage: "" }) })).body.data.sessionId;
+const view = { sessionId: id, availability: "available", node: null, strays: [], registryError: null, registryFile: "/x/toolsets.local.json", sets: [{ name: "probe", description: "Echo probe", servers: ["probe"], on: false }] };
+await s.page.route("**/api/toolsets/sessions/**", (route) => (route.request().method() === "GET" ? route.fulfill(json(200, { success: true, data: view })) : route.fulfill({ status: 502, contentType: "text/html", body: "<html><body><h1>502 Bad Gateway</h1></body></html>" })));
+await s.page.goto(`${s.appUrl}/session/${id}`, { waitUntil: "networkidle" });
+await s.page.click(sc.MODEL_CHIP);
+await s.page.waitForSelector("[data-toolset-section]");
+await s.page.locator('[data-toolset-section] [role="menuitemcheckbox"]').first().click();
+await sleep(900);
+console.log("error line:", JSON.stringify(await s.page.locator('[data-toolset-line="error"]').allInnerTexts()));
+await sc.deleteScratchChat(s, id);
+await s.browser.close();
+EOF2
+printf 'node "$1/p.mjs"\n' > "$D/p.sh"
+bash "$D/p.sh" "$D"
+case "$D" in /tmp/athena-probe.*) rm -rf "$D";; esac
+expect: prints `error line: ["▲\nNot updated: Unexpected token '<', \"<html><bod\"... is not valid JSON"]` while the defect stands; cured when the line has no `Unexpected token` text
+```
+
+measured 2026-10-16 by chain chain-toolset-skeleton--menu-fill-20261016-071936-654e, finding L1, LOW
+probe-key: ca13a72d9d4b58cc28fec1b04a428798e3e29ca4
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/composer/ComposerModelMenu.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/composer/ComposerToolsetSection.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useSessionToolsets.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts
+
+## INV-8456 — probe — a press in chat B is silently dropped while chat A's switch is still out (S14) — LOW
+
+a press in chat B is silently dropped while chat A's switch is still out (S14) — LOW
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.mjs" <<'EOF2'
+const L = "/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib";
+const { openConsole } = await import(`${L}/console.mjs`);
+const sc = await import(`${L}/scratch-chat.mjs`);
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const s = await openConsole();
+const mk = async () => (await s.api("/api/providers/sessions", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ provider: "claude", projectPath: "/tmp/cloudcli-probe-chat", initialMessage: "" }) })).body.data.sessionId;
+const json = (status, body) => ({ status, contentType: "application/json", body: JSON.stringify(body) });
+const A = await mk();
+const B = await mk();
+const view = (id, on = false) => ({ sessionId: id, availability: "available", node: null, strays: [], registryError: null, registryFile: "/x/toolsets.local.json", sets: [{ name: "probe", description: "Echo probe", servers: ["probe"], on }] });
+const puts = [];
+await s.page.route("**/api/toolsets/sessions/**", async (route) => {
+  const req = route.request();
+  const who = req.url().includes(A) ? "A" : "B";
+  const id = who === "A" ? A : B;
+  if (req.method() === "GET") return route.fulfill(json(200, { success: true, data: view(id) }));
+  puts.push(who);
+  if (who === "A") await sleep(6000);
+  return route.fulfill(json(200, { success: true, data: { set: "probe", on: true, changed: true, live: "applied", servers: [{ name: "probe", outcome: "connected" }], view: view(id, true) } })).catch(() => {});
+});
+await s.page.goto(`${s.appUrl}/session/${A}`, { waitUntil: "networkidle" });
+await s.page.click(sc.MODEL_CHIP);
+await s.page.waitForSelector("[data-toolset-section]");
+await s.page.locator('[data-toolset-section] [role="menuitemcheckbox"]').first().click();
+await sleep(500);
+await s.page.evaluate((id) => { history.pushState(null, "", `/session/${id}`); window.dispatchEvent(new PopStateEvent("popstate")); }, B);
+await sleep(1500);
+if ((await s.page.locator("div[role=menu]").count()) === 0) await s.page.click(sc.MODEL_CHIP);
+await s.page.waitForSelector("[data-toolset-section]");
+await s.page.locator('[data-toolset-section] [role="menuitemcheckbox"]').first().click();
+await sleep(1500);
+console.log("PUTs sent (A's press, then B's press while A's is out):", JSON.stringify(puts));
+await sleep(5000);
+for (const id of [A, B]) await sc.deleteScratchChat(s, id);
+await s.browser.close();
+EOF2
+printf 'node "$1/p.mjs"\n' > "$D/p.sh"
+bash "$D/p.sh" "$D"
+case "$D" in /tmp/athena-probe.*) rm -rf "$D";; esac
+expect: prints `["A"]` while the defect stands (B's press sent nothing); cured when it prints `["A","B"]`
+```
+
+measured 2026-10-16 by chain chain-toolset-skeleton--menu-fill-20261016-071936-654e, finding L2, LOW
+probe-key: e2b4820ffa01388a3f5c7ef7dc25286fa874110f
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/composer/ComposerModelMenu.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/composer/ComposerToolsetSection.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useSessionToolsets.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts
+
+## INV-8459 — probe — MEDIUM — Show while the hidden epic's task is still in flight leaves two epics running at a dial of 1, and its next task launches
+
+MEDIUM — Show while the hidden epic's task is still in flight leaves two epics running at a dial of 1, and its next task launches
+
+```probe
+bash /home/lyphe/.claude/state/pipeline-reviews/approve-queues-hide-holds/athena-probes/show_in_flight.sh
+expect: `epics running after the Show: 2 (limit 1)` and `ex-a p2 launched while ey-a holds the slot: True` while it stands; cured, `1 (limit 1)` and `False`
+```
+
+measured 2026-10-16 by chain chain-approve-queues-hide-holds-20261016-063302-f463, finding M1, MEDIUM
+probe-key: 69a9fadc3905f5f4e9ae6550d488277326bd5f8d
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/hide-holds-board.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/hide-holds-scratch.py, /home/lyphe/.claude/hooks/dispatcher/cmd/hide.py, /home/lyphe/.claude/hooks/dispatcher/epic_line.py, /home/lyphe/.claude/hooks/dispatcher/line_gate.py, /home/lyphe/.claude/hooks/dispatcher/store_hidden.py, /home/lyphe/.claude/hooks/intent_lock.py, /home/lyphe/.claude/scripts/runner_fixtures/dispatch_arc_start.py
+
+## INV-8460 — probe — MEDIUM — a feature Queued into an epic that was hidden whole wakes it "started": two epics at a dial of 1
+
+MEDIUM — a feature Queued into an epic that was hidden whole wakes it "started": two epics at a dial of 1
+
+```probe
+bash /home/lyphe/.claude/state/pipeline-reviews/approve-queues-hide-holds/athena-probes/join_hidden.sh
+expect: `epics running: 2 (limit 1)` and `ex-b launched while ey-a holds the slot: True` while it stands; cured, `1 (limit 1)` and `False`
+```
+
+measured 2026-10-16 by chain chain-approve-queues-hide-holds-20261016-063302-f463, finding M2, MEDIUM
+probe-key: ba7ca6336ecee2ecda1187636aed0d376f2f9dc4
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/hide-holds-board.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/hide-holds-scratch.py, /home/lyphe/.claude/hooks/dispatcher/cmd/hide.py, /home/lyphe/.claude/hooks/dispatcher/epic_line.py, /home/lyphe/.claude/hooks/dispatcher/line_gate.py, /home/lyphe/.claude/hooks/dispatcher/store_hidden.py, /home/lyphe/.claude/hooks/intent_lock.py, /home/lyphe/.claude/scripts/runner_fixtures/dispatch_arc_start.py
+
+## INV-8461 — probe — MEDIUM — six docstore rows that restate what this build changed were not rewritten
+
+MEDIUM — six docstore rows that restate what this build changed were not rewritten
+
+```probe
+bash /home/lyphe/.claude/state/pipeline-reviews/approve-queues-hide-holds/athena-probes/stale_rows.sh
+expect: six lines, each printing `1` while the row still carries the old text; cured, each prints `0`
+```
+
+measured 2026-10-16 by chain chain-approve-queues-hide-holds-20261016-063302-f463, finding M3, MEDIUM
+probe-key: e01ed061fb8c1c60259934083c59be6198c115e1
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/hide-holds-board.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/hide-holds-scratch.py, /home/lyphe/.claude/hooks/dispatcher/cmd/hide.py, /home/lyphe/.claude/hooks/dispatcher/epic_line.py, /home/lyphe/.claude/hooks/dispatcher/line_gate.py, /home/lyphe/.claude/hooks/dispatcher/store_hidden.py, /home/lyphe/.claude/hooks/intent_lock.py, /home/lyphe/.claude/scripts/runner_fixtures/dispatch_arc_start.py
+
+## INV-8462 — probe — LOW — a HIDDEN plan of a started epic that waits on another epic's plan still pulls it past the epic limit
+
+LOW — a HIDDEN plan of a started epic that waits on another epic's plan still pulls it past the epic limit
+
+```probe
+bash /home/lyphe/.claude/state/pipeline-reviews/approve-queues-hide-holds/athena-probes/hidden_pulls.sh
+expect: `epics running: 2 (limit 1)` and `et-a launched past the limit for a plan that is hidden: True` while it stands; cured, `1` and `False`
+```
+
+measured 2026-10-16 by chain chain-approve-queues-hide-holds-20261016-063302-f463, finding L1, LOW
+probe-key: 189f46f1ada597eb0f524512da468fd05667b604
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/hide-holds-board.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/hide-holds-scratch.py, /home/lyphe/.claude/hooks/dispatcher/cmd/hide.py, /home/lyphe/.claude/hooks/dispatcher/epic_line.py, /home/lyphe/.claude/hooks/dispatcher/line_gate.py, /home/lyphe/.claude/hooks/dispatcher/store_hidden.py, /home/lyphe/.claude/hooks/intent_lock.py, /home/lyphe/.claude/scripts/runner_fixtures/dispatch_arc_start.py
+
+## INV-8463 — probe — LOW — an epic deck of finished plans and one parked plan cannot be put away from its corner
+
+LOW — an epic deck of finished plans and one parked plan cannot be put away from its corner
+
+```probe
+bash /home/lyphe/.claude/state/pipeline-reviews/approve-queues-hide-holds/athena-probes/parked_deck.sh
+expect: `hide ez.arc -> exit 2 | REFUSED hide ez.arc: every plan of it is finished or set aside …` while it stands; cured, exit 0 (or the board offers Dismiss for such a deck)
+```
+
+measured 2026-10-16 by chain chain-approve-queues-hide-holds-20261016-063302-f463, finding L2, LOW
+probe-key: e5b3e69b031c00a62d68078d266a51687b64141b
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/hide-holds-board.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/hide-holds-scratch.py, /home/lyphe/.claude/hooks/dispatcher/cmd/hide.py, /home/lyphe/.claude/hooks/dispatcher/epic_line.py, /home/lyphe/.claude/hooks/dispatcher/line_gate.py, /home/lyphe/.claude/hooks/dispatcher/store_hidden.py, /home/lyphe/.claude/hooks/intent_lock.py, /home/lyphe/.claude/scripts/runner_fixtures/dispatch_arc_start.py
+
+## INV-8464 — probe — LOW — a typed "do not queue it" now approves the plan into the queue and starts it
+
+LOW — a typed "do not queue it" now approves the plan into the queue and starts it
+
+```probe
+bash /home/lyphe/.claude/state/pipeline-reviews/approve-queues-hide-holds/athena-probes/typed_not_queue.sh
+expect: `'do not queue it' -> hide=False (Queue: approved into the queue)` while it stands; cured, `hide=None` (Rework) or `hide=True`
+```
+
+measured 2026-10-16 by chain chain-approve-queues-hide-holds-20261016-063302-f463, finding L3, LOW
+probe-key: 5951e86a010d7ce9234d1e837fbb947694e661df
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/hide-holds-board.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/hide-holds-scratch.py, /home/lyphe/.claude/hooks/dispatcher/cmd/hide.py, /home/lyphe/.claude/hooks/dispatcher/epic_line.py, /home/lyphe/.claude/hooks/dispatcher/line_gate.py, /home/lyphe/.claude/hooks/dispatcher/store_hidden.py, /home/lyphe/.claude/hooks/intent_lock.py, /home/lyphe/.claude/scripts/runner_fixtures/dispatch_arc_start.py
+
+## INV-8465 — probe — LOW — a fixture comment still names `approve --paused`
+
+LOW — a fixture comment still names `approve --paused`
+
+```probe
+bash /home/lyphe/.claude/state/pipeline-reviews/approve-queues-hide-holds/athena-probes/fixture_comment.sh
+expect: `lines naming approve --paused in the fixture: 1` while it stands; cured, `0`
+```
+
+measured 2026-10-16 by chain chain-approve-queues-hide-holds-20261016-063302-f463, finding L4, LOW
+probe-key: be1db4d5ca5a9bfc00f530f295213ec8d816eb13
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/hide-holds-board.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/hide-holds-scratch.py, /home/lyphe/.claude/hooks/dispatcher/cmd/hide.py, /home/lyphe/.claude/hooks/dispatcher/epic_line.py, /home/lyphe/.claude/hooks/dispatcher/line_gate.py, /home/lyphe/.claude/hooks/dispatcher/store_hidden.py, /home/lyphe/.claude/hooks/intent_lock.py, /home/lyphe/.claude/scripts/runner_fixtures/dispatch_arc_start.py
+
+## INV-8466 — probe — The hold check cannot fail when the hold is broken
+
+The hold check cannot fail when the hold is broken
+
+```probe
+D=/tmp/athena-probe-m1; mkdir -p "$D" || exit 1
+cat > "$D/p.sh" <<'EOF'
+cd /home/lyphe/.claude/claudecodeui_lyphe
+echo "ordering asserted: $(grep -n 'holdLines\[0\].at < firstCall.at' .verify/toolset-whole.mjs | cut -c1-90 || echo none)"
+echo "queue-operation referenced in driver/kit: $(cat .verify/toolset-whole.mjs .verify/lib/toolset-whole-kit.mjs | grep -c queue-operation || true)"
+echo "line count asserted for the hold: $(grep -c 'holdLines.length === 1' .verify/toolset-whole.mjs || true)"
+EOF
+bash "$D/p.sh"; rm -f "$D/p.sh"; rmdir "$D"
+```
+
+measured 2026-10-16 by chain chain-toolset-skeleton--proof-20261016-080025-6387, finding M1, MEDIUM
+probe-key: 4373fe03c23a30841e4ae3b30e2348b6da3f45af
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/toolset-whole-kit.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/toolset-whole.mjs
+
+## INV-8467 — probe — An aborted run prints `SUMMARY n/n checks ok`, and its evidence file stops without the summary
+
+An aborted run prints `SUMMARY n/n checks ok`, and its evidence file stops without the summary
+
+```probe
+D=/tmp/athena-probe-abort; mkdir -p "$D" || exit 1
+cat > "$D/p.sh" <<'EOF'
+D=/tmp/athena-probe-abort
+R=$D/root
+mkdir -p "$R/.verify" "$R/evid" || exit 1
+REAL=/home/lyphe/.claude/claudecodeui_lyphe
+cp "$REAL/.verify/toolset-whole.mjs" "$R/.verify/toolset-whole.mjs"
+ln -s "$REAL/.verify/keepalive-lib.mjs" "$R/.verify/keepalive-lib.mjs"
+ln -s "$REAL/.verify/lib" "$R/.verify/lib"
+ln -s "$REAL/node_modules" "$R/node_modules"
+printf '{}\n' > "$R/toolsets.local.json"
+( cd "$R" && PLAYWRIGHT_BROWSERS_PATH=/nonexistent timeout 60 node .verify/toolset-whole.mjs --evidence "$R/evid" > "$D/out.txt" 2> "$D/err.txt"; echo "exit=$?" )
+echo "stdout summary: $(grep -h SUMMARY "$D/out.txt" || echo none)"
+echo "run.log summary: $(grep -h SUMMARY "$R/evid/run.log" || echo none)"
+echo "stderr carries the error: $(grep -c 'Executable' "$D/err.txt")"
+rm -f "$R/node_modules" "$R/.verify/lib" "$R/.verify/keepalive-lib.mjs" "$R/.verify/toolset-whole.mjs" "$R/toolsets.local.json" "$R/evid/run.log" "$R/evid/toolsets.local.json.before" "$D/out.txt" "$D/err.txt"
+rmdir "$R/evid" "$R/.verify" "$R"
+EOF
+bash "$D/p.sh"; rm -f "$D/p.sh"; rmdir "$D"
+```
+
+measured 2026-10-16 by chain chain-toolset-skeleton--proof-20261016-080025-6387, finding L1, LOW
+probe-key: 73c9f79e6ab28b883ad6f3dbe950db093acf172e
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/toolset-whole-kit.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/toolset-whole.mjs
+
+## INV-8468 — probe — SIGINT/SIGTERM restores the box and leaks everything else
+
+SIGINT/SIGTERM restores the box and leaks everything else
+
+```probe
+D=/tmp/athena-probe-l2; mkdir -p "$D" || exit 1
+cat > "$D/p.sh" <<'EOF'
+cd /home/lyphe/.claude/claudecodeui_lyphe
+grep -n "process.on(signal" .verify/toolset-whole.mjs
+echo "cleanup calls in that handler: $(grep -n "process.on(signal" .verify/toolset-whole.mjs | grep -c 'endHosts\|deleteScratchChat')"
+EOF
+bash "$D/p.sh"; rm -f "$D/p.sh"; rmdir "$D"
+```
+
+measured 2026-10-16 by chain chain-toolset-skeleton--proof-20261016-080025-6387, finding L2, LOW
+probe-key: 540af512f9321d5c2e73557c05454c4b6fc74651
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/toolset-whole-kit.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/toolset-whole.mjs
+
+## INV-8469 — probe — Several claims are shown in the output but asserted by no check
+
+Several claims are shown in the output but asserted by no check
+
+```probe
+D=/tmp/athena-probe-l3; mkdir -p "$D" || exit 1
+cat > "$D/p.sh" <<'EOF'
+cd /home/lyphe/.claude/claudecodeui_lyphe
+echo "checks that count A's sync lines: $(grep -c "check(.*\(readoptedSyncLines.length\|holdLines.length\)" .verify/toolset-whole.mjs)"
+echo "checks that read server.log: $(grep -c "check(.*serverLogSince\|check(.*SERVER_LOG" .verify/toolset-whole.mjs || true)"
+echo "B null read: $(grep -n "lastRows\[chats.B\]" .verify/toolset-whole.mjs | cut -c1-110)"
+EOF
+bash "$D/p.sh"; rm -f "$D/p.sh"; rmdir "$D"
+```
+
+measured 2026-10-16 by chain chain-toolset-skeleton--proof-20261016-080025-6387, finding L3, LOW
+probe-key: 48544ccece43c9bab0c6053fb8f037ec3657c3b8
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/toolset-whole-kit.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/toolset-whole.mjs
+
+## INV-8470 — probe — The header's cost line is stale
+
+The header's cost line is stale
+
+```probe
+D=/tmp/athena-probe-l4; mkdir -p "$D" || exit 1
+cat > "$D/p.sh" <<'EOF'
+cd /home/lyphe/.claude/claudecodeui_lyphe
+echo "header says: $(grep -o 'Spends ~[0-9]* Haiku turns' .verify/toolset-whole.mjs)"
+echo "turns in the closing run: $(grep -c '^  -> \[' .verify/artifacts/toolset-whole-closing/run.log)"
+EOF
+bash "$D/p.sh"; rm -f "$D/p.sh"; rmdir "$D"
+```
+
+measured 2026-10-16 by chain chain-toolset-skeleton--proof-20261016-080025-6387, finding L4, LOW
+probe-key: 9fa0de82839fdcfa0f3efc352c23672f55a6a42e
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/toolset-whole-kit.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/toolset-whole.mjs
+
+## INV-8473 — probe — The seam manual and the command manual never reach an editor of their files; the report's claim about `chat-process.ts` is false at the hook's limit
+
+The seam manual and the command manual never reach an editor of their files; the report's claim about `chat-process.ts` is false at the hook's limit
+
+```probe
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+for f in server/modules/providers/list/claude/claude-toolset-seams.ts bin/toolset.mjs server/modules/providers/list/claude/chat-process.ts; do
+  echo "$(basename "$f"): $(~/.claude/scripts/docstore govern "/home/lyphe/.claude/claudecodeui_lyphe/$f" --touch write --limit 3 --text | cut -d' ' -f1 | tr '\n' ' ')"
+done
+expect: while the defect stands the seams file prints `INV-8445 INV-8446 INV-8444`, `toolset.mjs` prints `INV-8449 INV-8450 INV-8451`, and `chat-process.ts` prints `INV-8471 MAN-8055 MAN-699`; cured when MAN-8495/8502/8503 appear for the first, MAN-8501 for the second and MAN-8502 for the third
+```
+
+measured 2026-10-16 by chain chain-toolset-skeleton--docs-20261016-092338-5af2, finding M1, MEDIUM
+probe-key: e9897634edc005783765ab5ebad0b8e0091eac47
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/
+
+## INV-8474 — probe — `src/shared/api.ts:865` points at the wrong file for MAN-8490 (outside TARGET; from the menu-fill phase)
+
+`src/shared/api.ts:865` points at the wrong file for MAN-8490 (outside TARGET; from the menu-fill phase)
+
+```probe
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+echo "docs/MANUAL.md: $(grep -c '^## MAN-8490' docs/MANUAL.md) | MANUAL.md: $(grep -c '^## MAN-8490' MANUAL.md) | pointer: $(grep -c 'docs/MANUAL.md MAN-8490' src/shared/api.ts)"
+expect: `docs/MANUAL.md: 0 | MANUAL.md: 1 | pointer: 1` while the defect stands; cured when the pointer count is 0 or the first number is 1
+```
+
+measured 2026-10-16 by chain chain-toolset-skeleton--docs-20261016-092338-5af2, finding L1, LOW
+probe-key: 98d5e8e19815eea0fe50ec6523a01fa6c0d9adf9
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts
+
+## INV-8475 — probe — INV-8471 is not governed on the files four of its six clauses name
+
+INV-8471 is not governed on the files four of its six clauses name
+
+```probe
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+for f in bin/toolset.mjs server/modules/toolsets/toolsets.credential.ts server/modules/toolsets/toolsets.module.ts; do
+  echo "$f: $(~/.claude/scripts/docstore govern "/home/lyphe/.claude/claudecodeui_lyphe/$f" --limit 200 --text | grep -c INV-8471)"
+done
+expect: `0` for all three while the defect stands; cured when each prints 1
+```
+
+measured 2026-10-16 by chain chain-toolset-skeleton--docs-20261016-092338-5af2, finding L2, LOW
+probe-key: 17be1484daa8bef0412d51d93e7a170876d36963
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/
+
+## INV-8476 — probe — INV-8471 says "the FULL map, every call" and leaves out the base-name landmine
+
+INV-8471 says "the FULL map, every call" and leaves out the base-name landmine
+
+```probe
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+echo "INV-8471 says FULL map: $(~/.claude/scripts/docstore get INV-8471 --text | grep -c 'FULL map') | names base server: $(~/.claude/scripts/docstore get INV-8471 --text | grep -c -i 'base server') | code calls with a reduced map: $(grep -c 'setMcpServers(without)' server/modules/providers/list/claude/claude-toolset-seams.ts)"
+expect: `INV-8471 says FULL map: 1 | names base server: 0 | code calls with a reduced map: 1` while the defect stands; cured when the base-server count is ≥1 and the "FULL map" wording names the retry exception
+```
+
+measured 2026-10-16 by chain chain-toolset-skeleton--docs-20261016-092338-5af2, finding L3, LOW
+probe-key: 8630d7e8083fad6623cb74b878dd30d01f924a5c
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/
+
+## INV-8477 — probe — Two refusal texts the rows state do not match what the code prints
+
+Two refusal texts the rows state do not match what the code prints
+
+```probe
+D=$(mktemp -d /tmp/athena-probe-f4.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+D="$1"
+cat > "$D/sse.mts" <<'TS'
+import { writeFileSync } from 'node:fs';
+import { readToolsetRegistry } from '/home/lyphe/.claude/claudecodeui_lyphe/server/modules/toolsets/toolsets.registry.ts';
+process.env.TOOLSETS_FILE = process.argv[2] + '/r.json';
+writeFileSync(process.env.TOOLSETS_FILE, '{"a":{"mcpServers":{"s":{"type":"sse"}}}}');
+try { readToolsetRegistry(); } catch (e: any) { console.log(e.message); }
+TS
+TSX_TSCONFIG_PATH=server/tsconfig.json node --import tsx "$D/sse.mts" "$D" 2>&1 | tail -1
+echo "MAN-8498 lines with the sse text: $(~/.claude/scripts/docstore get MAN-8498 --text | grep -c 'an sse server needs a url')"
+cat > "$D/stub.mjs" <<'JS'
+import http from 'node:http';
+http.createServer((q, r) => { r.writeHead(401, { 'content-type': 'application/json' }); r.end('{"error":"Invalid API key"}'); })
+  .listen(0, '127.0.0.1', function () { console.log(this.address().port); });
+JS
+node "$D/stub.mjs" > "$D/port" &
+SP=$!
+for i in 1 2 3 4 5 6 7 8 9 10; do [ -s "$D/port" ] && break; sleep 0.3; done
+env -i PATH=/usr/bin:/bin CLAUDE_SURFACE=cloudcli CLAUDE_CODE_SESSION_ID=s CLOUDCLI_TOOLSET_TOKEN=T CLOUDCLI_TOOLSET_URL="http://127.0.0.1:$(cat "$D/port")" node bin/toolset.mjs list 2>&1 | sed 's/:[0-9]\{4,5\}/:<port>/'
+case "$SP" in ''|*[!0-9]*|0|1) echo "bad pid";; *) kill "$SP";; esac
+EOF
+bash "$D/p.sh" "$D"
+cd /tmp && case "$D" in /tmp/athena-probe-f4.*) rm -r "$D";; esac
+expect: while the defect stands: `…an sse server needs a url`, then `MAN-8498 lines with the sse text: 0`, then `toolset: unavailable — http://127.0.0.1:<port> answered HTTP 401, which is not a CloudCLI answer`; cured when the MAN-8498 count is ≥1 and MAN-8501 says a non-envelope 401 reads "not a CloudCLI answer"
+```
+
+measured 2026-10-16 by chain chain-toolset-skeleton--docs-20261016-092338-5af2, finding L4, LOW
+probe-key: 260b5ea30b0024e181f0d4d58a9a3c5db11acbea
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/
+
+## INV-8478 — probe — Two measured facts dropped from the retired MAN-8491 without a stated reason
+
+Two measured facts dropped from the retired MAN-8491 without a stated reason
+
+```probe
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+echo "retired MAN-8491 had: $(~/.claude/scripts/docstore history MAN-8491 --json | grep -o -E 'shell-snapshots|well under a second' | sort -u | tr '\n' '+') | MAN-8501 has: $(~/.claude/scripts/docstore get MAN-8501 --text | grep -c -E 'shell-snapshots|under a second')"
+expect: `retired MAN-8491 had: shell-snapshots+well under a second+ | MAN-8501 has: 0` while the defect stands; cured when the second number is ≥1
+```
+
+measured 2026-10-16 by chain chain-toolset-skeleton--docs-20261016-092338-5af2, finding L5, LOW
+probe-key: d11c501bcd2456dd0b141441eca51f4e4c61f776
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/

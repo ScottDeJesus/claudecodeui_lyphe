@@ -862,6 +862,21 @@ export const api = {
     remove: (id: string) => del(`/api/notes/${encodeURIComponent(id)}`),
   },
 
+  // The tool-set lane (MAN-8490): which of the box's named MCP sets one chat has on.
+  // Both verbs answer `{ success: true, data }` and a refusal is the app's `{ success: false, error }`
+  // envelope, so a caller reads them through `readApiJson`. `read` answers the chat's `SessionToolsetsView`;
+  // `set` answers the `ToolsetSwitchResult` of the switch, whose `view` is the read that would follow it,
+  // so the menu draws from the answer and never asks twice. The chat is the APP's session id, and a set
+  // goes by NAME only: no verb here carries a server config, and the box's file is the one place one lives.
+  // The switch outlasts the default deadline by design: on a live chat the server waits up to 30 s for the
+  // process to confirm the servers, and the answer that says `unconfirmed` or `failed` is the one the
+  // menu exists to show, so the deadline is the `toolset` command's 45 s (bin/toolset.mjs), never 30.
+  toolsets: {
+    read: (sessionId: string) => get(`/api/toolsets/sessions/${encodeURIComponent(sessionId)}`),
+    set: (sessionId: string, set: string, on: boolean) =>
+      put(`/api/toolsets/sessions/${encodeURIComponent(sessionId)}/sets/${encodeURIComponent(set)}`, { on }, { timeoutMs: 45_000 }),
+  },
+
   // The Cerberus lane (server/modules/cerberus/MANUAL.md): center's read model of the fleet, read
   // whole. Every read answers its wire shape BARE — not wrapped in `{ success, data }` — and a
   // refusal is the app's `{ success: false, error }` envelope. The `cerberus_changed` frame is only
@@ -983,6 +998,12 @@ export const api = {
     // The board's one Start (`dispatcher start`): every plan held for its first Start let go at once, the
     // queue and the dial then ordering them. A BOARD verb like `epics`, with no name and no body.
     start: () => post('/api/dispatcher/start', {}),
+    // Hide and Show (`dispatcher hide <name>…`, `dispatcher unhide <name>…`): the operator's hold on a plan and the way
+    // back. BOARD verbs like `epics` and `start` — the names travel in the body, plans' and epics' alike (an epic's
+    // name acts on every open, or every hidden, plan of it) — and the dispatcher's sentence is the answer, a refusal
+    // (a finished plan, a plan that is not hidden) a 409. Nothing is optimistic: the next frame reads the store back.
+    hide: (names: readonly string[]) => post('/api/dispatcher/hide', { names }),
+    unhide: (names: readonly string[]) => post('/api/dispatcher/unhide', { names }),
     // A stopped plan's Resume at a time — `offpeak`, an ISO instant with a zone, or `none` to cancel —
     // through the server's one reader of the three shapes.
     schedule: (name: string, when: string) => post(`/api/dispatcher/plans/${encodeURIComponent(name)}/schedule`, { when }),

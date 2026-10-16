@@ -7,3 +7,5 @@ export { authenticateToken } from './auth.middleware.js';
 export { authenticateWebSocket } from './auth.middleware.js';
 // validateApiKey: used by the server entrypoint for optional API-wide key validation.
 export { validateApiKey } from './auth.middleware.js';
+// JWT_SECRET: used by the toolsets module to derive each chat's tool-set credential.
+export { JWT_SECRET } from './auth.middleware.js';

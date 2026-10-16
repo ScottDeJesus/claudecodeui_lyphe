@@ -11,10 +11,12 @@
  *   re-asked every minute until it clears; the process is closed only then.
  * - A setting the SDK can apply to a running query is applied; one it cannot forces a fresh
  *   process. Which is which is decided here, in one place, from the SDK's real surface: `setModel`,
- *   `applyFlagSettings` (effort, and whether the house's compaction has taken the chat over) and
- *   `setPermissionMode` are live, and so is GROWING the allowed
+ *   `applyFlagSettings` (effort, and whether the house's compaction has taken the chat over),
+ *   `setPermissionMode` and `setMcpServers` (the chat's tool sets, and only ever through that call:
+ *   a set's servers are never a launch argument) are live, and so is GROWING the allowed
  *   tool list (a newly allowed tool merely reaches `canUseTool`, which reads the live options).
- *   cwd, MCP servers, a resume anchor, a conversation restarted from scratch, any change to the
+ *   cwd, the BASE MCP servers (the map `loadMcpConfig` reads, which tool sets never enter), a
+ *   resume anchor, a conversation restarted from scratch, any change to the
  *   disallowed list (it shapes the model's tool context at launch), a SHRUNK allowed list (the
  *   CLI holds the launch list as allow rules it resolves before ever asking `canUseTool`) and the
  *   installed CLI version (a running process is the build it was started with) are launch
@@ -174,6 +176,15 @@ export type LaunchProfile = {
    * has none, and reads as not taken over.
    */
   compactionTakenOver: boolean;
+  /**
+   * The digest of the tool-set map APPLIED to this process: '' for none, null when not known (a
+   * re-adopted process, or a sync that failed, went unanswered or left a server unconnected, which
+   * the next message then tries again). Not a launch argument — a set's
+   * servers reach a CLI only through `setMcpServers`, so this is a live setting, kept by the sync.
+   * On a profile built for a message (`launchProfileOf`) it is instead the digest that message WANTS,
+   * and null when the chat has nothing in play.
+   */
+  toolsets: string | null;
   allowedTools: string[];
   disallowedTools: string[];
   /**
@@ -203,7 +214,8 @@ export function launchProfileOf(
   sdkOptions: SdkOptionsShape,
   mcpUnreadable = false,
   unknown = false,
-  cliVersion: string | null = null
+  cliVersion: string | null = null,
+  toolsets: string | null = null
 ): LaunchProfile {
   const permissionMode = sdkOptions.permissionMode ?? 'default';
   return {
@@ -217,6 +229,7 @@ export function launchProfileOf(
     effort: sdkOptions.effort ?? null,
     ultracode: typeof sdkOptions.settings === 'object' && sdkOptions.settings?.ultracode === true,
     compactionTakenOver: compactionTakenOverOf(sdkOptions.settings),
+    toolsets,
     allowedTools: [...(sdkOptions.allowedTools ?? [])],
     disallowedTools: [...(sdkOptions.disallowedTools ?? [])],
     cliVersion: typeof cliVersion === 'string' ? cliVersion : null
@@ -230,6 +243,8 @@ export type LiveChanges = {
   tools: { allowed: string[]; disallowed: string[] } | null;
   /** The new "taken over" state when it changed (applied through `applyFlagSettings`), else null. */
   compaction: boolean | null;
+  /** True when the process must sync its tool sets (`setMcpServers`) before the turn. */
+  toolsets: boolean;
 };
 
 export type LivePlan = { respawn: string; changes: null } | { respawn: null; changes: LiveChanges };
@@ -271,7 +286,9 @@ export function planLiveChanges(
         effort: { level: next.effort, ultracode: next.ultracode },
         permissionMode: next.permissionMode,
         tools: null,
-        compaction: next.compactionTakenOver
+        compaction: next.compactionTakenOver,
+        // Nothing is known of what the process holds; a chat with sets in play syncs once.
+        toolsets: next.toolsets !== null
       }
     };
   }
@@ -298,7 +315,9 @@ export function planLiveChanges(
       permissionMode: next.permissionMode !== live.permissionMode ? next.permissionMode : null,
       tools: toolsChanged ? { allowed: next.allowedTools, disallowed: next.disallowedTools } : null,
       // `=== true` because a profile recorded before the field existed has none, and reads as off.
-      compaction: next.compactionTakenOver !== (live.compactionTakenOver === true) ? next.compactionTakenOver : null
+      compaction: next.compactionTakenOver !== (live.compactionTakenOver === true) ? next.compactionTakenOver : null,
+      // A difference is a LIVE change, never a respawn reason; a chat with nothing in play (null) never syncs.
+      toolsets: next.toolsets !== null && next.toolsets !== live.toolsets
     }
   };
 }

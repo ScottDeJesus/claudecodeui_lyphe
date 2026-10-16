@@ -2,6 +2,7 @@ import { providerRegistry } from '@/modules/providers/provider.registry.js';
 import { providerModelsService } from '@/modules/providers/services/provider-models.service.js';
 import { sessionsService } from '@/modules/providers/services/sessions.service.js';
 import type { IProvider } from '@/shared/interfaces.js';
+import type { ChatToolsetHooks, ToolsetSyncOutcome } from '@/shared/toolset-types.js';
 import type {
   AnyRecord,
   ChatCompactionHooks,
@@ -46,6 +47,13 @@ const NOT_TAKEN_OVER_HOOKS: ChatCompactionHooks = {
 };
 const NOT_LIVE_ACTIVITY: ChatProcessActivity = { live: false, busy: false, why: null };
 
+// What a chat is answered while the toolsets module has registered nothing: no variables, no
+// servers, no prompt line, so its launch is today's. Every call answers a FRESH object, so no caller
+// can change an answer another one will read.
+const INERT_TOOLSET_HOOKS: ChatToolsetHooks = {
+  launchFor: async () => ({ env: {}, servers: null, promptLine: null }),
+};
+
 /**
  * Creates the application-facing provider runtime dispatcher.
  *
@@ -69,6 +77,14 @@ export function createProviderRuntimeService(
     activityChanged: (appSessionId, activity) => compactionHooks.activityChanged(appSessionId, activity),
   };
 
+  let toolsetHooks: ChatToolsetHooks = INERT_TOOLSET_HOOKS;
+  // The same shape and the same reason as `compaction` above: one object every context carries,
+  // reading the registered hooks at CALL time, because a Claude process keeps the context of the
+  // message that spawned it for its whole life.
+  const toolsets: ChatToolsetHooks = {
+    launchFor: (input) => toolsetHooks.launchFor(input),
+  };
+
   const createRuntimeContext = (
     provider: IProvider,
   ): ProviderRuntimeContext => ({
@@ -86,6 +102,7 @@ export function createProviderRuntimeService(
       }
     },
     compaction,
+    toolsets,
   });
 
   const run = (
@@ -105,6 +122,26 @@ export function createProviderRuntimeService(
     // before or after carries it (see `compaction` above).
     useChatCompaction(hooks: ChatCompactionHooks): void {
       compactionHooks = hooks;
+    },
+
+    // Registered once, by the toolsets module when the app boots; every context built before or
+    // after carries it (see `toolsets` above).
+    useChatToolsets(hooks: ChatToolsetHooks): void {
+      toolsetHooks = hooks;
+    },
+
+    // Pushes the chat's on-sets into its live process, asked of the provider's runtime; a provider whose
+    // runtime keeps no such process, a chat with none, or a runtime that throws or rejects when asked
+    // (the provider's resolution included) answers `{ live: false }`, which the next message makes good.
+    async syncToolsets(providerName: LLMProvider, appSessionId: string): Promise<ToolsetSyncOutcome> {
+      try {
+        // Called as a method, so the runtime's `this` holds.
+        const runtime = dependencies.resolveProvider(providerName).runtime;
+        return (await runtime.syncToolsets?.(appSessionId)) ?? { live: false };
+      } catch (error) {
+        console.warn(`[provider-runtime] could not sync the tool sets of ${providerName} session ${appSessionId}:`, error);
+        return { live: false };
+      }
     },
 
     // What the chat's process is doing, asked of the provider's runtime; a provider whose runtime

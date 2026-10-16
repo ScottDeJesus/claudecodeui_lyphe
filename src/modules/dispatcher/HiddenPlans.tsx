@@ -1,26 +1,27 @@
 import { ChevronDownIcon } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
-import { showPlans } from '@/modules/dispatcher/hiddenPlans';
+import { usePutAway } from '@/modules/dispatcher/hooks/usePutAway';
 import { PlanStatusBadge } from '@/modules/dispatcher/PlanFace';
 import type { DispatcherPlan } from '@/shared/types';
 import { Button, Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/shared/ui';
 
 /**
  * The way back from a Hide: `Hidden · N`, a disclosure listing every plan the operator has hidden,
- * each as its name, its word and a `Show`, then `Show all`. EVERY ONE IS UNFINISHED: a done card put
- * away is dismissed (`hiddenPlans.ts`), off the board and off this list, so the list never fills up
- * with work that has ended (operator, 2026-09-28: "otherwise ill have a ton of hidden cards that are
- * done").
+ * each as its name, its word and a `Show`, then `Show all`. EVERY ONE IS UNFINISHED and HELD BY THE
+ * DISPATCHER: a hide is its (`dispatcher hide`), so a hidden plan is paused and out of the queue until Show.
+ * A done card put away is dismissed (`hiddenPlans.ts`), off the board and off this list, so the list never
+ * fills up with work that has ended (operator, 2026-09-28: "otherwise ill have a ton of hidden cards that
+ * are done").
  *
  * CLOSED BY DEFAULT, and drawn only when something is hidden. The list is what the operator put away,
  * so it stays one quiet line until asked for. At zero it draws nothing at all, since a `Hidden · 0`
  * would be a line about nothing.
  *
- * THE STATUS WORD RIDES EVERY ROW because an unfinished plan is still moving or waiting: a plan
- * hidden while it walks is still walking, and the row is the one place on the screen that says so.
- * `Show` and `Show all` are each ONE write to the put-away store (`showPlans`), pruned against the
- * whole lane (`carriedNames`), and a shown card returns to the grid on the render the write triggers.
+ * THE STATUS WORD RIDES EVERY ROW (`hidden`), the one place on the screen that says what the plan is:
+ * a plan hidden while it walked stops once its task in flight finishes. `Show` and `Show all` are each ONE
+ * press of the dispatcher's `unhide` (`usePutAway`): the plans take their turn in the queue — they start when
+ * it comes, and not before — and a shown card returns to the grid on the next frame, which is the store read back.
  *
  * `data-hidden-plans` is the root's handle and `data-show-plan=<name>` each row's button, so a probe
  * presses one plan's Show without reading the rows' text.
@@ -31,6 +32,7 @@ import { Button, Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/s
  */
 export function HiddenPlans({ hidden, carriedNames }: { hidden: DispatcherPlan[]; carriedNames: string[] }) {
   const { t } = useTranslation();
+  const putAway = usePutAway(carriedNames);
   if (hidden.length === 0) return null;
 
   return (
@@ -49,7 +51,7 @@ export function HiddenPlans({ hidden, carriedNames }: { hidden: DispatcherPlan[]
               <span className="min-w-0 flex-1 break-words font-mono text-xs">{plan.name}</span>
               <PlanStatusBadge plan={plan} />
               <Button variant="ghost" size="sm" data-show-plan={plan.name}
-                onClick={() => showPlans([plan.name], carriedNames)}>
+                onClick={() => putAway.show([plan])}>
                 {t('dispatcher.hidden.show')}
               </Button>
             </li>
@@ -57,7 +59,7 @@ export function HiddenPlans({ hidden, carriedNames }: { hidden: DispatcherPlan[]
         </ul>
         <div className="px-2 pb-1">
           <Button variant="secondary" size="sm" data-show-all
-            onClick={() => showPlans(hidden.map((plan) => plan.name), carriedNames)}>
+            onClick={() => putAway.show(hidden)}>
             {t('dispatcher.hidden.showAll')}
           </Button>
         </div>

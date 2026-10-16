@@ -29,8 +29,10 @@ const WIP_LIMITS: readonly DispatcherWipLimit[] = ['features', 'tasks'];
  * - **Claude · DeepSeek** — the house switch (`HouseSwitch`), the very one Settings and the chat box draw. Epics
  *   and features with no model word of their own follow it.
  * - **Start** — drawn ONLY while a plan waits for its first Start (`route.waiting`, the dispatcher's own count
- *   of what `dispatcher start` reaches): it lets every one of them go at once, and the queue's order and the
- *   dial then decide what runs. A feature's own Start (on its card) is the override that skips both.
+ *   of what `dispatcher start` reaches): an approval joins the queue by itself, so what waits is what the operator
+ *   held back with a Stop on a feature that was waiting its turn. It lets every one of them go at once, and the
+ *   queue's order and the dial then decide what runs. A HIDDEN plan is never counted or reached — Show is its
+ *   press. A feature's own Start (on its card) is the override that skips both.
  * - **Pause all** / **Resume all** and the running readout.
  *
  * WHILE THE DEEPSEEK SWITCH IS ON the two WIP dropdowns show All and are dimmed, with one line under the

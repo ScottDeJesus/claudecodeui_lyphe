@@ -19,8 +19,8 @@ import { plannerSince } from './dispatcher-planner.reader.js';
  * one would be a second answer.
  */
 
-/** The nine words an arc's derived status may be (`store_arcs.arc_word`'s one precedence). Anything else is a build this lane cannot draw. */
-export const ARC_STATUSES: readonly DispatcherArcStatus[] = ['empty', 'complete', 'judging', 'stalled', 'live', 'scheduled', 'paused', 'queued', 'designing'];
+/** The ten words an arc's derived status may be (`store_arcs.arc_word`'s one precedence). Anything else is a build this lane cannot draw. */
+export const ARC_STATUSES: readonly DispatcherArcStatus[] = ['empty', 'complete', 'hidden', 'judging', 'stalled', 'live', 'scheduled', 'paused', 'queued', 'designing'];
 
 /**
  * One limit of an arc's `wip` block: the epic's own word (`null` while it follows its default), the
@@ -54,8 +54,8 @@ function wipOf(value: unknown, name: string): DispatcherArcWip | null {
   };
 }
 
-/** The three words an epic's turn may be (`line_gate.places`). Anything else is a build this lane cannot draw. */
-const QUEUE_TURNS: readonly DispatcherArcQueue['turn'][] = ['now', 'waiting', 'paused'];
+/** The four words an epic's turn may be (`line_gate.places`). Anything else is a build this lane cannot draw. */
+const QUEUE_TURNS: readonly DispatcherArcQueue['turn'][] = ['now', 'waiting', 'paused', 'hidden'];
 
 /** A place in the queue is counted from 1, so `0` and `1.5` are refused where `isCount` would pass them. */
 const isPlace = isWholeFrom(1);

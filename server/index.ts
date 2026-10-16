@@ -12,6 +12,7 @@ import cors from 'cors';
 
 import { AppError, findApplicationRoot, getModuleDirectory, IS_PLATFORM, terminalTextStyles } from '@/shared/utils.js';
 import { createAppsModule } from '@/modules/apps/index.js';
+import { createToolsetsModule } from '@/modules/toolsets/index.js';
 import {
     closeSessionsWatcher,
     initializeSessionsWatcher,
@@ -295,6 +296,18 @@ app.use('/api/kanban-pm', kanbanMetisSecretGuard, createKanbanModule(kanbanReadi
 // The applications this host serves, and the registry file the switcher's drawer reads (protected).
 // The registry file is created at module creation, so it exists from the first boot.
 app.use('/api/apps', authenticateToken, createAppsModule());
+
+// The named MCP tool sets this box defines, and a chat's switch of them (protected). The module is
+// built once here because creating it also registers the launch hook with the Claude runtime and
+// creates the box's `toolsets.local.json`. A caller names a set; no route here takes a server config.
+const toolsets = createToolsetsModule();
+app.use('/api/toolsets', authenticateToken, toolsets.userRouter);
+
+// The SAME module's second door, for the `toolset` command a chat's CLI runs and nothing else — there
+// is deliberately NO `authenticateToken`: the command holds no user token, and the operator's JWT never
+// enters a CLI's environment. The router's own first middleware checks a credential derived from the
+// chat (`toolsetCredential`), so a chat can switch its own sets and no other chat's.
+app.use('/api/toolsets-cmd', toolsets.commandRouter);
 
 // Installed CLI version + what the live runs are on (protected)
 app.use('/api/cli-version', authenticateToken, createCliVersionModule());

@@ -44,7 +44,7 @@ export type UserPreferences = {
   themeFollowsSun: boolean;
   /** The transcript's reading size in px. See `useChatFontSize`. */
   chatFontSize: number;
-  /** The memory of the Roadmap tab's In flight face, four entry lists written by entry patch (`writeUserPreferenceEntries`): `{ collapsedCards: string[], hiddenPlans: {name, at}[], cardOrder: {name, rank}[], askDrafts: AskDraft[] }` — the folded cards, the put-away plans, the rank of each card the operator has moved (a plan's or an arc's name, higher first), and the half-typed answer to each open ask (`name` the ask's `askIdentity`, then a round's picks or a lock's Rework notes). See `shared/hooks/useCardFold.ts`, `modules/dispatcher/hiddenPlans.ts`, `modules/dispatcher/cardOrderEntries.ts` and `modules/dispatcher/askDrafts.ts`. */
+  /** The memory of the Roadmap tab's In flight face, four entry lists written by entry patch (`writeUserPreferenceEntries`): `{ collapsedCards: string[], hiddenPlans: {name, at}[], cardOrder: {name, rank}[], askDrafts: AskDraft[] }` — the folded cards, the plans the operator dismissed (done cards put away — a hide of an unfinished plan is the dispatcher's, not kept here), the rank of each card the operator has moved (a plan's or an arc's name, higher first), and the half-typed answer to each open ask (`name` the ask's `askIdentity`, then a round's picks or a lock's Rework notes). See `shared/hooks/useCardFold.ts`, `modules/dispatcher/hiddenPlans.ts`, `modules/dispatcher/cardOrderEntries.ts` and `modules/dispatcher/askDrafts.ts`. */
   dispatcher: unknown;
   /** Composer toggle: every sent message rides under the `/plain` command. See `usePlainModePreference`. */
   plainMode: boolean;

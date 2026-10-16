@@ -27,6 +27,7 @@ import { useChatComposerState } from '@/modules/chat/hooks/useChatComposerState'
 import { useIsLookingAtSession, useSessionPresence } from '@/modules/chat/hooks/useSessionPresence';
 import { useSessionStore } from '@/modules/chat/hooks/useSessionStore';
 import { useCliSessionId } from '@/modules/chat/hooks/useCliSessionId';
+import { useSessionToolsets } from '@/modules/chat/hooks/useSessionToolsets';
 import { clearStreamFlush } from '@/modules/chat/utils/streamFlushTimer';
 import {
   useProcessingSessions,
@@ -500,6 +501,10 @@ function ChatInterface({
   // Which conversation this screen is showing, spelled the way the composer's own send spells it
   // (`selectedSession?.id || currentSessionId`), so the banner can never describe a different one.
   const openSessionId = selectedSession?.id || currentSessionId || null;
+  // The open chat's tool sets, for the model menu; inert unless this is a Claude chat. Keyed by the opened
+  // session's OWN provider: `provider` is brought in line with it by an effect a render later, so on the
+  // first render of a chat of another provider it still names the previous chat's.
+  const toolsets = useSessionToolsets(openSessionId, selectedSession?.__provider ?? provider);
   const { installed: installedCliVersion, staleSessionIds, staleVersionOf } = useCliVersion();
   const openSessionCliVersion = openSessionId && staleSessionIds.has(openSessionId)
     ? staleVersionOf(openSessionId)
@@ -680,6 +685,7 @@ function ChatInterface({
           availableModelLabelsById={currentProviderModelLabelsById}
           onSelectModel={handleSelectComposerModel}
           modelsLoading={providerModelsLoading}
+          toolsets={toolsets}
           tokenBudget={tokenBudget}
           onShowTokenUsage={showCostModal}
           isEditingSentMessage={Boolean(editingAnchorId)}

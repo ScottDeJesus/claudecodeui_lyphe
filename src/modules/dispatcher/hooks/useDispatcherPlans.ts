@@ -23,17 +23,21 @@ import type { DispatcherArc, DispatcherAsk, DispatcherDaemon, DispatcherLanePict
  * a posture it may state.
  *
  * A PLAN THE OPERATOR PUT AWAY IS STILL ON THE LANE, AND THIS IS WHERE THE PRESS TAKES EFFECT, so the
- * tab's badge and its lists agree. The entries are `hiddenPlans` under the `dispatcher` preference
- * (`hiddenPlans.ts`): a plan's name beside the moment it was put away. Every plan of the lane reads as
- * ONE of three here (`putAwayReading`): DRAWN (`plans`), HIDDEN (`hidden`, the `Hidden` list's, which
- * holds only unfinished plans) or DISMISSED, a done plan that is on no list and in no count at all.
+ * tab's badge and its lists agree. There are two kinds of put-away and each is read from where it is
+ * kept (`putAwayReading`). A HIDE is the dispatcher's: the plan carries `plan.hidden`, since when the
+ * hide was made (`store_hidden`), and it is held out of the queue until he Shows it. A DISMISSAL is the
+ * client's: `hiddenPlans` under the `dispatcher` preference (`hiddenPlans.ts`), a done plan's name beside
+ * the moment it was put away. Every plan of the lane reads as ONE of three here: DRAWN (`plans`), HIDDEN
+ * (`hidden`, the `Hidden` list's, which holds only unfinished plans) or DISMISSED, a done plan that is on
+ * no list and in no count at all.
  */
 export function useDispatcherPlans(): {
   /** The plans this screen DRAWS: the lane less the hidden and the dismissed ones, in the lane's order. */
   plans: DispatcherPlan[];
   /**
    * The lane's hidden plans, in the lane's order: what the `Hidden` list at the foot of both homes
-   * offers back. Every one is unfinished; a done plan put away is dismissed, and is not here.
+   * offers back. Every one is unfinished and hidden at the dispatcher (`plan.hidden`); a done plan put
+   * away is dismissed, and is not here.
    */
   hidden: DispatcherPlan[];
   /**
@@ -97,7 +101,8 @@ export function useDispatcherPlans(): {
   return useMemo(() => {
     const picture = value?.payload;
     const lane = Array.isArray(picture?.plans) ? picture.plans : [];
-    // One entry per name is the store's own guarantee (`hiddenPlans.ts`), so a map loses nothing.
+    // One entry per name is the store's own guarantee (`hiddenPlans.ts`), so a map loses nothing. Entries
+    // are the dismissals of DONE plans; a hide is read off the plan itself.
     const entryOf = new Map(entries.map((entry) => [entry.name, entry]));
     const arcNews = arcNewsOf(lane);
     const plans = lane.filter((plan) => putAwayReading(plan, entryOf.get(plan.name), arcNews) === 'drawn');
@@ -153,14 +158,16 @@ export function useDispatcherPlans(): {
 }
 
 /**
- * How the operator's entry for this plan reads NOW: `drawn` (no entry, or it has let go), `hidden` (it
- * holds an unfinished plan) or `dismissed` (it holds a done one). The plan decides between the last
- * two, never the press, so a done plan that sat in `Hidden` from before Dismiss existed is dismissed.
+ * How the operator's put-away of this plan reads NOW: `drawn` (not put away, or it has let go), `hidden`
+ * (the dispatcher holds it hidden: `plan.hidden`) or `dismissed` (an entry holds a done plan). A hide is the
+ * dispatcher's and a dismissal is an entry: an entry that names a plan with work still ahead is none of
+ * this reading's business, and reads as no entry at all.
  *
  * - A plan CREATED after the press is a different plan under a reused name (dropped and opened
  *   again), and the entry was never of it. An entry outlives its plan until the next press or show
  *   prunes it, so without this gate a re-opened plan would be born put away. A `created_at` nothing
- *   can parse cannot prove it is newer, and the entry holds.
+ *   can parse cannot prove it is newer, and the entry holds. (A hide cannot outlive its plan: `drop`
+ *   deletes the plan's whole log.)
  * - A plan that ENDED after the press comes back as a card: an ending the operator never saw is news.
  *   One that has not ended, cannot be dated, or ended at or before the press (he had that ending in
  *   front of him) stays put away.
@@ -169,27 +176,39 @@ export function useDispatcherPlans(): {
  *   card he cannot see is a card he cannot answer. The press it respects is the one made AFTER the ask
  *   (`newestMoment`): a Hide with that prompt already on the screen was a decision about a plan he had
  *   just read, and it holds.
- * - Held, a plan that is not complete is HIDDEN, because unfinished work must stay reachable. That
- *   covers a done plan re-cut and walking again under its dismissal: it waits in `Hidden` while it
- *   walks, and comes back as a card at the new ending.
+ * - Held, an UNFINISHED plan is HIDDEN, because unfinished work must stay reachable. A done plan that is
+ *   re-cut and walking again is unfinished: its dismissal no longer holds it, and its card is back.
+ *   News on a HIDDEN plan draws its card again, and the card reads HIDDEN with a Show: the dispatcher
+ *   still holds the plan, and it does not start until the operator Shows it.
  *
- * - An entry an ARC's corner wrote reads the arc's news instead of its own plan's: the newest
- *   creation, ending or ask across every plan of that arc the lane carries (`arcNewsOf`), so an arc
- *   pressed away returns whole the moment one plan of it is asked.
+ * - A press an ARC's corner made reads the arc's news instead of its own plan's: the newest creation,
+ *   ending or ask across every plan of that arc the lane carries (`arcNewsOf`), so an arc pressed away
+ *   returns whole the moment one plan of it is asked. For a dismissal that press is the entry's `arc`; for
+ *   a hide it is the plan's own `hidden.arc`, the epic whose deck pressed it.
  *
- * Every side is epoch SECONDS: `at` as `putAwayPlans` stamps it, the stamps through `epochOf`, so an
- * entry and this reading compare one number and not two spellings of one moment.
+ * Every side is epoch SECONDS: `at` as `dismissPlans` stamps it, the hide's stamp and the plan's stamps
+ * through `epochOf`, so a press and this reading compare one number and not two spellings of one moment.
  */
 function putAwayReading(
   plan: DispatcherPlan,
   entry: { at: number; arc?: string } | undefined,
   arcNews: ReadonlyMap<string, number>,
 ): 'drawn' | 'hidden' | 'dismissed' {
-  if (entry === undefined) return 'drawn';
-  // An ARC PRESS lets go as one (`hiddenPlans.ts`): its entries read the arc's newest moment, so a
-  // plan of the arc that opens or ends after the press brings the whole deck back, not one card of it.
-  const news = entry.arc !== undefined ? arcNews.get(entry.arc) ?? null : newestMoment(plan);
-  if (news !== null && news > entry.at) return 'drawn';
+  // WHICH PRESS holds the plan: the hide the dispatcher carries or, for a DONE plan alone, the dismissal.
+  let press: { at: number; arc?: string } | undefined;
+  if (plan.hidden) {
+    const at = epochOf(plan.hidden.at);
+    // A hide whose stamp nothing can parse cannot prove any news is newer, and holds (as an undatable entry does).
+    if (at === null) return 'hidden';
+    press = plan.hidden.arc === null ? { at } : { at, arc: plan.hidden.arc };
+  } else if (plan.status === 'complete') {
+    press = entry;
+  }
+  if (press === undefined) return 'drawn';
+  // AN ARC PRESS lets go as one (`hiddenPlans.ts`): it reads the arc's newest moment, so a plan of the
+  // arc that opens or ends after the press brings the whole deck back, not one card of it.
+  const news = press.arc !== undefined ? arcNews.get(press.arc) ?? null : newestMoment(plan);
+  if (news !== null && news > press.at) return 'drawn';
   return plan.status === 'complete' ? 'dismissed' : 'hidden';
 }
 

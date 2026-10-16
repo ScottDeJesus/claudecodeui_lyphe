@@ -2940,3 +2940,207 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/chat-idle-restore.mjs, /
 `.verify/` is git-ignored: the file lives on disk only.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/epic-queue-live.mjs
+
+## MAN-8487 — Tool sets' contracts — the two toolset-types files, `ProviderRuntimeContext.toolsets`, `syncToolsets`, `session_toolsets_changed`, `loopbackApiOrigin`, the `JWT_SECRET` export
+
+The seams tool sets cross, as types and one hook. The Claude runtime reaches the toolsets module only through its context and imports nothing from it; the module registers the hook, the way custom compaction does (MAN-8055).
+
+## Types — `server/shared/toolset-types.ts` (server) and `src/shared/toolset-types.ts` (client mirror)
+
+| type | crosses a wire | mirrored in `src/shared` | produced by → read by |
+| --- | --- | --- | --- |
+| `ToolsetSetView` | yes | yes | service → composer, `toolset list` |
+| `SessionToolsetsView` | yes | yes | service (GET, tail of every switch) → composer, `toolset list` |
+| `ToolsetServerOutcome` | yes | yes | service → composer, command |
+| `ToolsetSwitchResult` | yes | yes | service → PUT caller, command door caller |
+| `ToolsetCommandRequest` | yes | yes | `bin/toolset.mjs` → command door |
+| `SessionToolsetsChangedEvent` | yes | yes | service after a switch → composer's hook |
+| `ToolsetServerConfig` | no | no | registry reader → hook, service |
+| `ToolsetDefinition` | no | no | registry reader → hook, service |
+| `ChatToolsetLaunch` | no | no | hook → Claude runtime |
+| `ChatToolsetHooks` | no | no | toolsets module → Claude runtime, via context |
+| `ToolsetSyncOutcome` | no | no | Claude runtime → toolsets service |
+
+- The six wire shapes are edited in both files together, field for field; a one-sided edit is a response the composer cannot read. why: the client tsconfig cannot import `server/`, so the mirror is a copy.
+- `src/shared/toolset-types.ts` imports nothing from `server/`.
+- `ToolsetSyncOutcome` is `{ live: false }` | `{ live: true, confirmed: true, added, removed, errors }` | `{ live: true, confirmed: false, reason }`. Importers take it from `@/shared/toolset-types.js`, not from `types.ts`.
+- Both files are listed in `.oxlintrc.json` (INV-6548, INV-5890).
+
+## The runtime seam — `providerRuntimeService`
+
+| name | where | contract |
+| --- | --- | --- |
+| `ProviderRuntimeContext.toolsets` (`ChatToolsetHooks`) | `server/shared/types.ts` | always present; one hook, `launchFor({ appSessionId, onNode })` → `ChatToolsetLaunch` |
+| `useChatToolsets(hooks)` | `provider-runtime.service.ts` | stores the hooks every context carries |
+| `INERT_TOOLSET_HOOKS` | same | default; `launchFor` answers `{ env: {}, servers: null, promptLine: null }`, a fresh object per call, so a launch is today's |
+| `IProviderRuntime.syncToolsets?(appSessionId)` | `server/shared/interfaces.ts` | optional; only a runtime with a live process per chat has it; answers `ToolsetSyncOutcome` |
+| `syncToolsets(provider, appSessionId)` | `provider-runtime.service.ts` | asks the provider's runtime, calling the verb as a method (`this` holds); answers `{ live: false }` for a runtime without the verb, a sync that throws or rejects, or a provider that fails to resolve; the last three log `[provider-runtime] could not sync the tool sets of <provider> session <id>:` |
+
+- `context.toolsets` is one delegating object that reads the registered hooks at CALL time, so a context built before `useChatToolsets` sees the hooks afterwards. why: a Claude process keeps the context of the message that spawned it.
+
+- `useChatToolsets` is called by `toolsets.module.ts` at boot (MAN-8499); `session_toolsets_changed` is emitted by `toolsets.service.ts` after a switch that changed the on-sets (MAN-8500). The Claude runtime reads `context.toolsets` at every launch and answers `syncToolsets` for a chat with a live process (its call-ins, the one `setMcpServers` mechanism and the base-name guard: MAN-8495); a chat without one answers `live: 'next-message'`.
+- A probe script imports the app through `modules/providers/index.ts`. Importing `provider-runtime.service.ts` first dies on `Cannot access 'providerRegistry' before initialization` (circular import).
+
+## `session_toolsets_changed`
+
+- Member of `GatewayEventKind` (`server/shared/types.ts`); shape `SessionToolsetsChangedEvent` = `{ kind, sessionId, at }`. A client that hears it reads the chat's view again.
+- Sent to every open `/ws` socket by `broadcastToolsetsChanged` (`toolsets.service.ts`), only when the switch changed the stored list.
+
+## `loopbackApiOrigin()` — `server/shared/utils.ts`
+
+- Answers `http://127.0.0.1:${process.env.SERVER_PORT || '3001'}`, re-read at every call. Callers: `resolveApiOrigin` (`kanban-metis.module.ts`), `getMcpApiUrl` (`browser-use.service.ts`), the toolsets module.
+- It names no `PORT` (INV-8440). A server on another port (a probe on 7893) hands its children its own origin.
+
+## `JWT_SECRET` export — `server/modules/auth/index.ts`
+
+- `export { JWT_SECRET }` from `auth.middleware.js`; the toolsets module derives each chat's credential from it.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/auth/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/services/provider-runtime.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/interfaces.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/toolset-types.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/utils.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/toolset-types.ts
+
+## MAN-8490 — Composer tool-set section — ComposerToolsetSection, useSessionToolsets, the pill's count, the busy and waiting rows
+
+The model menu's last group: which of the box's tool sets are on for this chat, one press each (MAN-8487 types, MAN-8497 server). Live in every Claude chat: `ChatInterface` reads the chat's sets through `useSessionToolsets` and hands them down through `ChatComposer` to `ComposerModelMenu`.
+
+## Parts
+
+| file | owns |
+| --- | --- |
+| `ComposerToolsetSection.tsx` | `ComposerToolsetSection({ toolsets })`: heading, the lines, the set rows, the stray rows, one `sr-only` status region. `null` while `toolsets.view` is `null` |
+| `hooks/useSessionToolsets.ts` | `useSessionToolsets(sessionId, provider)` and its answer type `SessionToolsetsState` (`view`, `pendingSet`, `lastResult`, `error`, `toggle`); the wire shapes are `src/shared/toolset-types.ts`'s |
+| `src/shared/api.ts` | `api.toolsets.read(sessionId)` (GET `/api/toolsets/sessions/:id`) and `api.toolsets.set(sessionId, set, on)` (PUT `…/sets/:set`, body `{ on }`), beside `api.notes` |
+| `ComposerMenuPrimitives.tsx` | `ComposerMenuItem` `role="menuitemcheckbox"` (sets `aria-checked`); props `busy`, `waiting` |
+| `ComposerModelMenu.tsx` | optional prop `toolsets?: SessionToolsetsState`; renders the section as the last group under `ComposerMenuSeparator`; the pill's count |
+| `ChatComposer.tsx`, `ChatInterface.tsx` | `ChatInterface` calls `useSessionToolsets(openSessionId, selectedSession?.__provider ?? provider)` and passes the answer as `toolsets`; `ChatComposer` hands it to `ComposerModelMenu` |
+
+## The hook
+
+- Inert (`view` null, no read, no subscription) unless the provider is `claude` and there is a session id. The session id is the APP's. `ChatInterface` keys it by the opened session's own provider (`selectedSession?.__provider ?? provider`), because `provider` state is brought in line with a newly opened chat by an effect one render later and would still name the previous chat's.
+- It subscribes through `useWebSocket().subscribe` BEFORE its first read and reads again on a `session_toolsets_changed` naming its chat and on `websocket_reconnected`. Never on a timer. Every switch that changed a row raises the frame, the model's own `toolset` in Bash included, so the section moves live.
+- Each read takes a ticket. An answer is dropped when a newer ticket has already answered, or when the chat changed. A newer read that fails drops nothing.
+- `toggle(set, on)` sets `pendingSet`, PUTs, and takes `view` and `lastResult` from the answer. A second press while one is out for the SAME chat is ignored; leaving a chat lets go of its switch, so the next chat's press is never swallowed. A refusal puts the envelope's `error.message` in `error` and reads the view again, since a refusal can mean the box's file changed under the menu.
+- An answer is accepted only when its shape is what the menu and the section read (`sets` and `strays` arrays, each set's `servers` array; a switch's `servers` array and a valid `view`). A wrong-shaped 2xx is a failed read or a refusal, never state: the menu draws from the view at every render of the composer, and a bad one takes the whole chat pane down.
+- A failure that is not the server's envelope says so in the app's own words (`composer.toolsets.noAnswer`, `composer.toolsets.badAnswer`), never the engine's ("Unexpected token '<'", "Failed to fetch").
+- The PUT's deadline is 45 s (`api.toolsets.set`, `timeoutMs: 45_000`), above the server's 30 s bound on a live process's sync, so the answer that says `unconfirmed` or `failed` is the one that reaches the screen. The literal and `bin/toolset.mjs`'s deadline move together.
+- The answer's identity changes only when a read or a switch lands, or the chat changes (the menu is memoized on it). Leaving a chat drops what was held for it.
+- A registry file edit raises no frame, so an open menu reads the new file at the next frame, reconnect, chat switch or reload.
+
+## Rows
+
+| state | what the row does |
+| --- | --- |
+| set | checkbox row, `isSelected` = `set.on`; description = the set's description and its servers line |
+| `busy` (`pendingSet === name`) | `aria-busy` + `aria-disabled`, keeps focus, takes no press; box becomes the `vv-spinner__ring` paint (`aria-hidden`); "Switching on…"/"Switching off…" replaces the servers line, so the row keeps its height |
+| `waiting` (`pendingSet` set, another row) | `aria-disabled`, keeps focus, takes no press, 60% opacity, no hover wash, `cursor-not-allowed`. why: the hook tracks one `pendingSet`, so a second press would take the first row's spinner |
+| stray (on-name no longer defined) | ticked, amber words behind ▲; its press switches it off |
+
+- `busy` draws no spinner on a radio row; a checkbox row draws no caller trailing mark.
+- Node chat (`availability: 'node'`): no rows, one note; the pill counts none.
+
+## Lines
+
+| `data-toolset-line` | words | shown when |
+| --- | --- | --- |
+| `error` (warn) | "Not updated: {{error}}" | `toolsets.error` set |
+| `node` | "This chat runs on {{node}}. …" | node chat |
+| `unreadable` (warn) | "The tool-set file could not be read: …" | `registryError` |
+| `none` | "No tool sets are defined on this box yet. They live in {{file}}." | no sets, no strays, no error |
+| `trouble` (warn) | one sentence per `failed`/`unconfirmed` server | under its row, only while the row still stands where `lastResult` left it (`result.set`, `result.on`) and no press of it is out |
+| `next-message` | "Applies from the next message." | same condition, `live: 'next-message'`, no trouble |
+
+- One `<p role="status" class="sr-only" data-toolset-announce>` is always mounted; the error, trouble and next-message words are copied into it. why: a live region inserted already holding its words is often skipped. The visible lines carry no `role`.
+- `data-toolset-section` marks the group; `data-toolset-count` marks the pill's count.
+- Notes use `text-muted-foreground`. why: the menu's faint ink measures 3.34:1 in light, under AA at 12px.
+- Every line wraps (`[overflow-wrap:anywhere]`). why: a path, node, name or server error is one token wider than a phone.
+
+## The pill's count
+
+- Count = sets on + strays; zero on a node chat. Shown as "· n set(s)" in the pill and as "· n tool set(s) on" on the trigger's `aria-label`/tooltip (still starts "Select model").
+- The count span shows only when `ChatComposer`'s footer is ≥45rem (`[@container(min-width:45rem)]:inline`). INV-8443.
+- Locale keys: `composer.toolsets.*` in `src/modules/i18n/locales/en/chat.json`; `count` and `onLabel` carry `_one`/`_other`. The other locales have none; each call's `defaultValue` carries the English.
+
+## Open — not fixed
+
+- The empty box's edge measures 1.41:1 light, 1.57:1 dark; on this screen it is usually the only sign a row can be ticked. Verve's own draw, an operator colour decision (MAN-742).
+- The menu's existing headings and model note use the faint ink (3.34:1 light), under AA.
+- `lastResult` never expires in the hook, so "Applies from the next message." outlives the next message. The hook's signature carries no send signal and no frame announces a turn's start.
+- On a phone (390px) the menu is already ~779 of 844px tall; the section is below the fold and the pill shows no count.
+- The composer strip at 640–767px with "· High · 2 sets" is unmeasured.
+
+## Probing
+
+- `aria-disabled` rows need `{ force: true }` in Playwright.
+- The count span computes `display: block` inside the chip; test `!== 'none'`.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/composer/ComposerMenuPrimitives.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/composer/ComposerModelMenu.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/composer/ComposerToolsetSection.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useSessionToolsets.ts
+
+## MAN-8496 — Tool sets whole proof — toolset-whole.mjs and its helpers
+
+The tool sets as one system on the real app: two Haiku scratch chats (A, B), five steps, menus, registry back to empty. Parts: MAN-8497 (the module: MAN-8498, MAN-8499, MAN-8500, MAN-8501), MAN-8487, MAN-8490, MAN-8495.
+
+## Run it — `node .verify/toolset-whole.mjs [--evidence <dir>]`
+
+- Needs the dev API on `:3011` (`cloudcli-server-dev`) and the client on `:5183`.
+- Evidence: `--evidence <dir>`, default `.verify/artifacts/toolset-whole-<epoch ms>/`; holds `run.log` and `toolsets.local.json.before` (the saved box bytes).
+- Spends 10 Haiku turns (A 8, B 2), in `lib/probe-project.mjs`'s project under `/tmp`.
+- Writes the LIVE `toolsets.local.json` (adds set `probe`) and hands the dev API over once (`touch server/index.ts`). Never run it while another probe or a conversation that matters is mid-turn.
+- `.verify/` is gitignored; force-add to commit.
+
+| exit | when |
+|---|---|
+| 0 | every check ok |
+| 1 | a check failed, or the run aborted (`RUN ABORTED` + stack in `run.log`; SUMMARY reads `ABORTED after n check(s)…`) |
+| 130 | SIGINT, SIGTERM or SIGHUP |
+
+- Cleanup, on every ending: the box file written back byte for byte (`finally`, process exit, the three signals). A signal also ends both chats' hosts and deletes both chats through the app.
+- `SUMMARY` is the last line of `run.log`: `<ok>/<n> checks ok`, then `; FAILED: <names>`.
+
+## Steps
+
+| # | does | proves |
+|---|---|---|
+| 1 | A: `toolset on probe` in Bash, `probe_echo "same-turn"` loaded through ToolSearch, one turn | live sync: one journal line `+probe`, one probe-server pid whose parent is A's CLI, `tools/list` + `tools/call` in the server log |
+| 2 | B (never asked) is asked for `probe_echo` | ToolSearch finds nothing, a direct call is refused, no probe server is B's child |
+| 3 | A's next message, no switch | same pid, one `tools/call` from it, no new sync line |
+| 4 | `toolset off probe` | `removed`; journal `+ -probe`; the CLI's `deferred_tools_delta` drops the tool; no `tools/call` after the off; `pgrep` empty |
+| 5a | `toolset on probe` again | `connected`; one probe-server process, A's CLI its parent; third sync line |
+| 5b | the handover (`touch server/index.ts`), then A's next message | `[keepalive] re-adopting host`; A's CLI keeps its pid; the message joins the re-adopted process; it echoes from the new server pid with no switch; exactly one sync line since the handover |
+| 5c | idle close (`idleCloseMs: 5000`, at least 5 s after the send) | CLI and server gone |
+| 5d | a send to the closed chat | the fresh process calls `probe_echo` in its first turn, no `toolset` command, set read from A's row `["probe"]`: the HOLD |
+| + | menus, `toolset list` outside a chat, empty registry, row readback, delete both chats | A's menu: probe `aria-checked=true` + pill "· 1 set"; B's: false, no pill; menu off answers PUT 200 `removed`; `toolset list` without `CLAUDE_SURFACE` exits 3; empty-registry note; A's row `[]`, B's NULL |
+
+- Sync-line counts (journal `Tool sets for session <A>`), cumulative: 1 after step 1, 1 after step 3, 2 after 4 (newest `+ -probe`), 3 after 5a, 6 after the menu's off press (newest `+ -probe`). B's row is read with `toolsets is null`.
+- Every turn also checks it ran on Haiku, read off its own assistant rows (`turnModels`, `<synthetic>` left out).
+- The pointer sentence is proved by the CLI's own `prompt_snapshot` attachment plus `CLAUDE_SURFACE=cloudcli`, the loopback URL and a 64-character credential in the CLI's environment (shape printed, never the value). B's verbatim quote is printed, never asserted: Haiku sometimes declines.
+- Shots (1440×900, light): `.verify/shots/toolset-whole-{A-menu-probe-on,B-menu-probe-off,A-menu-probe-off,A-menu-empty-registry}-light.png`.
+
+## The hold check
+
+- Passes when the fresh process has exactly one sync line, `+probe`, and `promptReleasedAt` (the CLI's `queue-operation` `enqueue` row) lands no more than 100 ms before it. why: 100 ms covers journald-vs-CLI clock skew.
+- With the hold the enqueue lands 4–10 ms after the line; with no hold it sits about 750–1000 ms before it.
+- The first tool call is printed, never decisive: it trails the prompt by the model's latency (1.2–2 s), longer than the sync, so it is green without a hold.
+
+## Helpers
+
+| file | owns |
+|---|---|
+| `lib/toolset-whole-kit.mjs` | `probeProcesses` / `describeProbeProcesses` (`pgrep` counting real `node …/probe-server.mjs` only), `journalWithTimes`, `serverLogSince`, `transcriptRows`, `turnEntries`, `systemPromptTexts`, `deferredToolNames`, `promptReleasedAt`, `turnModels`, `openChatSocket`, `cliToolsetEnvironment` |
+| `lib/toolset-menu-kit.mjs` | `readMenu(page)`, `photograph(page, name)` |
+| `lib/toolset-probe-server-source.mjs` | `PROBE_SERVER_SOURCE`: the stdio MCP server (`probe_echo`) written to `probe-server.mjs` in the probe project when `/tmp/mcp-probe/probe-server.mjs` is gone |
+
+## Traps
+
+- A Bash wrapper whose text names `probe-server.mjs` matches `pgrep -f`; count only `node …/probe-server.mjs` (`probeProcesses`).
+- Haiku sometimes obeys the CLI's removal notice and makes no `probe_echo` call in steps 4a/4b; asking again hardens the refusal. The checks rest on `deferred_tools_delta`, no echo, an error for any call made, no process; never on a call being made.
+- A removed stdio server is ended by signal: its log shows no `stdin end, exiting` line. Do not assert one.
+- `DELETE /api/providers/sessions/:id?force=true` removes the row and the transcript and closes no process (`deleteOrArchiveSessionById`). The chat's CLI and its MCP servers live to the 2-hour idle close and then write stub rows (`last-prompt`, `ai-title`, `cost-state`) into the removed transcript path. The script ends both hosts (`endHosts`, tmux `kill-session`) BEFORE the delete.
+- A new chat's row has been seen with `provider_session_id` set to its own app id before its first send (2 of ~30 first launches; writer not found; `toolsets` NULL, nothing synced). The launch then dies on `No conversation found with session ID`. `ensurePristine` reads each row before the first send and, on a flip, prints the row, deletes the chat, makes a fresh one (3 attempts).
+- Pages' `GET …/token-usage` 404s (`SESSION_FILE_NOT_FOUND`) are the existing route answering a chat with no transcript yet; none are on `/api/toolsets`.
+- The box restore is write-in-place, not write-then-rename.
+
+## Measured
+
+- 2026-10-16 closing run: 67 of 67 checks, box file `7b 7d 0a` before and after, no probe-server process, no transcript left.
+- The hold-order check, the per-turn Haiku check, the sync-line / server-log count checks and the signal cleanup were added after that run; no run of them is recorded.
+- Sizes: `toolset-whole.mjs` 610 lines, `toolset-whole-kit.mjs` 301, `toolset-menu-kit.mjs` 34, `toolset-probe-server-source.mjs` 43.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/toolset-menu-kit.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/toolset-probe-server-source.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/toolset-whole-kit.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/toolset-whole.mjs

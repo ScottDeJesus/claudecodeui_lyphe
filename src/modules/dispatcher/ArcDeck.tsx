@@ -13,8 +13,9 @@ import {
   waitsOnSiblings,
 } from '@/modules/dispatcher/dispatcherState';
 import { DeckFrame } from '@/modules/dispatcher/DeckFrame';
+import { doneDismiss, putAwayVerb } from '@/modules/dispatcher/hiddenPlans';
 import { useDispatcherPlans } from '@/modules/dispatcher/hooks/useDispatcherPlans';
-import { arcPutAway, doneDismiss, planPutAway, putAwayVerb } from '@/modules/dispatcher/hiddenPlans';
+import { usePutAway } from '@/modules/dispatcher/hooks/usePutAway';
 import { CardDescription, LaneCardHead } from '@/modules/dispatcher/LaneCardHead';
 import { phaseWord } from '@/modules/dispatcher/phaseWord';
 import { PlanAsk } from '@/modules/dispatcher/PlanAsk';
@@ -43,8 +44,8 @@ import { cn } from '@/shared/utils';
  * judgment has finished too — stamped, or every phase of it done. `empty` is warn because an arc whose every plan was dropped is the one
  * state an operator did not ask for, and it is the state nothing else on the screen would show.
  *
- * THE FOUR PLAN WORDS WEAR THE PLAN'S OWN TONE, through `planStatusTone` and not a colour of
- * their own: `queued`, `paused`, `scheduled` and `stalled` are the plans' words too (`DispatcherPlanStatus`),
+ * THE FIVE PLAN WORDS WEAR THE PLAN'S OWN TONE, through `planStatusTone` and not a colour of
+ * their own: `queued`, `paused`, `scheduled`, `stalled` and `hidden` are the plans' words too (`DispatcherPlanStatus`),
  * read off the arc's plans and printed on the cards in the strip below — a `queued` arc over `queued`
  * cards that were toned differently would be the header arguing with its own deck (`dispatcherState`
  * states that rule once). Every other word here is the arc's alone.
@@ -59,6 +60,7 @@ const ARC_STATUS: Record<DispatcherArcStatus, { key: string; tone: Tone }> = {
   queued: { key: 'dispatcher.arcStatus.queued', tone: planStatusTone('queued') },
   paused: { key: 'dispatcher.arcStatus.paused', tone: planStatusTone('paused') },
   scheduled: { key: 'dispatcher.arcStatus.scheduled', tone: planStatusTone('scheduled') },
+  hidden: { key: 'dispatcher.arcStatus.hidden', tone: planStatusTone('hidden') },
 };
 
 /**
@@ -97,12 +99,13 @@ const FLOW_MARK: Partial<Record<DispatcherPlanStatus, string>> = { complete: '�
  * (`darc:<name>`), the last of them how long agents have
  * worked on the epic (`WorkingPill`). The corner is `⋯` — carrying `Dismiss done
  * features · N` while some plans of the deck are done and some are not — then the deck's own press, which
- * puts EVERY plan of the deck away in one write (`arcPutAway`), then the fold. That press is Dismiss
- * once every plan of the deck is complete (the deck leaves the board, and nothing lists it), and Hide
- * before then (its unfinished plans go to the `Hidden` list, its done ones leave with the deck), by
- * the one rule a plan's corner follows (`putAwayVerb`). It is ONE press: a `Show` of any of its plans,
- * or news on any plan of the arc, brings the whole deck back (`hiddenPlans.ts`). A wholly done deck
- * draws no `Dismiss done features`, which would be its corner again.
+ * puts the whole deck away (`usePutAway`), then the fold. That press is Dismiss once every plan of the deck
+ * is complete (the deck leaves the board, and nothing lists it), and Hide before then: the dispatcher hides
+ * the EPIC — every unfinished plan of it, paused and held out of the queue, in the `Hidden` list — and the
+ * deck's done plans are dismissed, so the deck leaves; by the one rule a plan's corner follows
+ * (`putAwayVerb`). It is ONE press: a `Show` of any of its plans, or news on any plan of the arc, brings the
+ * whole deck back (`hiddenPlans.ts`; news draws the cards again, still reading HIDDEN, and Show lets them
+ * run). A wholly done deck draws no `Dismiss done features`, which would be its corner again.
  *
  * A FOLD KEEPS THAT WHOLE HEAD (MAN-5412) and takes the bar, the flow and the cards: the model
  * switch and Start/Pause are VERBS, and the reader who folded a deck away asked for the row, not for a
@@ -148,11 +151,12 @@ export function DispatchArcDeck({
   group: DispatcherArcGroup;
   /** The open chat's session id, in the gutter home; `null` in the tab, where there is no open chat and so no "mine". */
   pinnedSessionId?: string | null;
-  /** The lane's unfiltered plan names, which is what a press prunes the stored list against (`planPutAway`). */
+  /** The lane's unfiltered plan names, which is what a dismissal prunes the stored list against (`usePutAway`). */
   carriedNames: string[];
 }) {
   const { t } = useTranslation();
   const { arc, plans } = group;
+  const putAway = usePutAway(carriedNames);
   const word = ARC_STATUS[arc.status] ?? ARC_STATUS.designing;
   const description = cardDescription(arc.delivers, arc.goal);
   // The arc's own books: the store carries them on the arc row so no head has to add up the cards
@@ -253,7 +257,7 @@ export function DispatchArcDeck({
           corner={{
             menuLabel: t('dispatcher.menu'),
             menuItems,
-            putAway: { verb, label: t(verb === 'dismiss' ? 'dispatcher.dismissArc' : 'dispatcher.hideArc'), onPress: arcPutAway(arc.name, plans, carriedNames) },
+            putAway: { verb, label: t(verb === 'dismiss' ? 'dispatcher.dismissArc' : 'dispatcher.hideArc'), onPress: putAway.arc(arc.name, plans) },
           }}
         />
       )}
@@ -283,7 +287,7 @@ export function DispatchArcDeck({
             className={cn('flex flex-col gap-1', layer === 'done' && 'opacity-60')}
           >
             {mine && <SessionPin />}
-            <PlanCard plan={plan} waitsOn={waitsOnSiblings(plan, plans)} onPutAway={planPutAway(plan, carriedNames)} headingLevel={4} showAsk={false} />
+            <PlanCard plan={plan} waitsOn={waitsOnSiblings(plan, plans)} onPutAway={putAway.plan(plan)} headingLevel={4} showAsk={false} />
           </SnapStripItem>
         );
       })}

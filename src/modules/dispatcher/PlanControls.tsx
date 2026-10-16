@@ -6,6 +6,7 @@ import { ActionBar } from '@/modules/dispatcher/ActionBar';
 import { epochOf } from '@/modules/dispatcher/dispatcherState';
 import { useDispatcherPlans } from '@/modules/dispatcher/hooks/useDispatcherPlans';
 import { useDispatcherVerbs } from '@/modules/dispatcher/hooks/useDispatcherVerbs';
+import { usePutAway } from '@/modules/dispatcher/hooks/usePutAway';
 import { ModelPick } from '@/modules/dispatcher/ModelPick';
 import { OverrideFold } from '@/modules/dispatcher/OverrideFold';
 import { ScheduleControl } from '@/modules/dispatcher/ScheduleControl';
@@ -34,6 +35,9 @@ import { effectiveModelWord } from '@/shared/utils';
  *   `Start at …`: the hour a feature never walked was armed for is gone from the card.
  * - `scheduled` → the same, reading the armed hour: `Resume`/`Start` and `Cancel` (the schedule
  *   control). The hour itself is the card's own clock (`PlanFace.PlanClock`), said once.
+ * - `hidden` → Show. The operator hid the plan, and a hide is the dispatcher's: the plan is paused and held out of the
+ *   queue until he Shows it, which is also what lets it take its turn (`usePutAway`). The card is drawn at all only
+ *   when news brought it back (an ask, an ending); the `Hidden` list is the usual way back.
  * - `parked` → Unpark. `idle` in `designed` or `questions` → Park, the way out of the Stop hold.
  * - `idle` in `designed` → `Accept when cut` before Park (`AcceptWhenCut`): the operator's Accept on the design he
  *   has read, ahead of the cut — the card sends the design stamp it drew (`design_loaded_at`), and the dispatcher
@@ -77,7 +81,8 @@ import { effectiveModelWord } from '@/shared/utils';
  */
 export function PlanControls({ plan }: { plan: DispatcherPlan }) {
   const { t } = useTranslation();
-  const { route, arcs } = useDispatcherPlans();
+  const { route, arcs, carriedNames } = useDispatcherPlans();
+  const putAway = usePutAway(carriedNames);
   // A STOPPED plan is one that has walked: `report.launched` is that fact, and it is what tells the
   // two `scheduled` plans apart — one waiting for the Start it was queued with, one waiting for the
   // Resume that ends the stop. `paused` is stopped by definition (a paused plan that never walked
@@ -122,6 +127,12 @@ export function PlanControls({ plan }: { plan: DispatcherPlan }) {
           <ScheduleControl busy={held} onSchedule={(when) => void schedule(when)} startAt={armed} />
         )}
       </>
+    );
+  } else if (plan.status === 'hidden') {
+    verbs = (
+      <Button size="sm" className="h-8" disabled={held} onClick={() => putAway.show([plan])} data-dispatcher-show>
+        {t('dispatcher.hidden.show')}
+      </Button>
     );
   } else if (plan.status === 'parked') {
     verbs = (

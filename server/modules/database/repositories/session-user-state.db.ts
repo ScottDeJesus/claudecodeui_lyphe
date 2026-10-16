@@ -56,4 +56,41 @@ export const sessionUserStateDb = {
 
     return result.changes > 0;
   },
+
+  /**
+   * The tool sets a chat has switched on, or null when it never switched one (the column is NULL).
+   * A value that is not a JSON array of strings reads null as well, with one warning naming the
+   * session: a hand-edited cell must cost a chat its sets, never its launch. Consumed by the
+   * toolsets module, which reads it at every launch and every switch.
+   */
+  getToolsets(sessionId: string): string[] | null {
+    const db = getConnection();
+    const row = db.prepare('SELECT toolsets FROM sessions WHERE session_id = ?').get(sessionId) as
+      | { toolsets: string | null }
+      | undefined;
+    if (!row || row.toolsets === null) return null;
+
+    try {
+      const parsed: unknown = JSON.parse(row.toolsets);
+      if (Array.isArray(parsed) && parsed.every((name) => typeof name === 'string')) return parsed;
+    } catch {
+      // Falls through to the one warning below, which says the same thing as a parse error would.
+    }
+    console.warn(`[sessions] session ${sessionId} has an unreadable toolsets value; reading it as never switched`);
+    return null;
+  },
+
+  /**
+   * Records a chat's on-sets: the sorted, de-duplicated list as a JSON array. An empty list is
+   * written `[]` and never goes back to NULL, because "switched a set on and off" and "never
+   * switched" are different facts to the next launch. False when no row has the id. Consumed by the
+   * toolsets module's switch.
+   */
+  setToolsets(sessionId: string, names: string[]): boolean {
+    const db = getConnection();
+    const value = JSON.stringify([...new Set(names)].sort());
+    const result = db.prepare('UPDATE sessions SET toolsets = ? WHERE session_id = ?').run(value, sessionId);
+
+    return result.changes > 0;
+  },
 };

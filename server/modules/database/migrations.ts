@@ -527,6 +527,21 @@ const addSimpleListFolders = (db: Database): void => {
 };
 
 /**
+ * Adds `sessions.toolsets`: the names of the tool sets a chat has switched on, as a JSON array of
+ * strings (`["home"]`). The column sits on the chat's own row because the row IS the session — it is
+ * deleted with the chat, and it follows the chat through a compaction or an edited first message,
+ * both of which move it to a new provider id.
+ *
+ * Nothing is backfilled: NULL means "this chat never switched a set", which is what every existing
+ * chat is, and which launches exactly as it did before the column existed. An empty list is a
+ * different fact — a chat that switched a set on and off again — and is only ever written by a switch.
+ */
+const addSessionToolsetsColumn = (db: Database): void => {
+  const columnNames = getTableInfo(db, 'sessions').map((column) => column.name);
+  addColumnToTableIfNotExists(db, 'sessions', columnNames, 'toolsets', 'TEXT');
+};
+
+/**
  * Adds the `model` column that records which model each session runs with.
  *
  * Left NULL for pre-existing rows on purpose: the model resolver falls back to
@@ -675,6 +690,7 @@ export const runMigrations = (db: Database) => {
     addSimpleListAtColumn(db);
     addSessionUserStateColumns(db);
     addSimpleListFolders(db);
+    addSessionToolsetsColumn(db);
     ensureProjectsForSessionPaths(db);
     db.exec(SCHEDULED_MESSAGES_TABLE_SCHEMA_SQL);
     // The cron registry: what the box schedules, and one row per sync that read it. Neither

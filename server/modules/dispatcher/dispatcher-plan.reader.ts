@@ -26,8 +26,8 @@ import { plannerSince } from './dispatcher-planner.reader.js';
  */
 export type DocumentPlan = Omit<DispatcherPlan, 'session_app_id'>;
 
-/** The eight words a plan's status may be (`report.status_word`'s one precedence). Anything else is a build this lane cannot draw. */
-export const PLAN_STATUSES: readonly DispatcherPlan['status'][] = ['idle', 'parked', 'queued', 'scheduled', 'paused', 'stalled', 'live', 'complete'];
+/** The nine words a plan's status may be (`report.status_word`'s one precedence). Anything else is a build this lane cannot draw. */
+export const PLAN_STATUSES: readonly DispatcherPlan['status'][] = ['idle', 'parked', 'queued', 'scheduled', 'paused', 'stalled', 'live', 'hidden', 'complete'];
 
 /** The three words a phase's status may be (`phase_chain`'s own column). */
 export const PHASE_STATUSES: readonly DispatcherPhase['status'][] = ['not started', 'running', 'done'];
@@ -54,6 +54,20 @@ function acceptArmedOf(value: unknown): DispatcherPlan['accept_armed'] {
     at: need(field(press, 'at'), isText, 'plan.accept_armed.at'),
     by: need(field(press, 'by'), isText, 'plan.accept_armed.by'),
     design: need(field(press, 'design'), isText, 'plan.accept_armed.design'),
+  };
+}
+
+/**
+ * `plan.hidden`: since when the operator has had the plan hidden (`store_hidden`), and the epic whose press it
+ * was, or `null` while it is shown. Read tolerantly like `accept_armed`: a dispatcher build older than the
+ * key writes none, and that reads as shown — the card then draws nothing it cannot answer.
+ */
+function hiddenOf(value: unknown, name: string): DispatcherPlan['hidden'] {
+  if (value === undefined || value === null) return null;
+  const hide = need(value, isRecord, `plan.hidden of ${name}`);
+  return {
+    at: need(field(hide, 'at'), isText, `plan.hidden.at of ${name}`),
+    arc: textSince(field(hide, 'arc'), `plan.hidden.arc of ${name}`),
   };
 }
 
@@ -147,6 +161,7 @@ export function planOf(raw: unknown): DocumentPlan {
     name,
     state: need(field(plan, 'state'), isText, 'plan.state'),
     status: oneOf(field(plan, 'status'), PLAN_STATUSES, `status of ${name}`),
+    hidden: hiddenOf(field(plan, 'hidden'), name),
     repo: need(field(plan, 'repo'), isText, 'plan.repo'),
     goal: need(field(plan, 'goal'), isTextOrNull, 'plan.goal'),
     delivers: need(field(plan, 'delivers'), isTextOrNull, 'plan.delivers'),

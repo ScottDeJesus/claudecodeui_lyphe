@@ -29,11 +29,12 @@ const BLANK_LOCK: LockCompose = { rework: false, notes: '' };
  * THE THREE TAKE ONE PRESS EACH, AND THEIR LABELS ARE VERBATIM. `lockOptions(ask)` is
  * `intent_lock.OPTIONS`' three, in contract order, and the label IS the word sent back as the answer
  * — a prettified one would be an answer the prompt never offered. Each button carries its own
- * description as its `title`, so what a press does is readable before it is made: Accept records the
- * verdict and launches the runner, Queue records it and brings the run up parked, Rework sends the
- * operator's notes to the plan's designer and launches nothing. They are one row of one weight in
- * three variants — primary, secondary, outline — so the press that starts work reads strongest and
- * the one that sends words back reads quietest.
+ * description as its `title`, so what a press does is readable before it is made: Queue records the
+ * verdict and puts the run in the queue, where it starts when its turn comes; Hide records it and keeps
+ * the run hidden and not started until he Shows it; Rework sends the operator's notes to the plan's
+ * designer and launches nothing. They are one row of one weight in three variants — primary,
+ * secondary, outline — so the press that starts work reads strongest and the one that sends words
+ * back reads quietest.
  *
  * REWORK IS A FIELD, NOT A PRESS. It swaps the three for a notes textarea — the one answer that
  * carries words — and `Send notes` stays disabled until those words exist, so no Rework is ever sent
@@ -47,7 +48,7 @@ const BLANK_LOCK: LockCompose = { rework: false, notes: '' };
  * open, with the notes in it, and nothing focused. A draft is never sent by itself: every send is the
  * operator's press, and a TAKEN answer — any of the three — clears it.
  *
- * `busy` IS READ, NEVER GUESSED: every control THAT LEADS TO A SEND — Accept, Queue, Rework and
+ * `busy` IS READ, NEVER GUESSED: every control THAT LEADS TO A SEND — Queue, Hide, Rework and
  * Send notes — refuses a press while the lane is carrying one, because a lock is ONE word, and two
  * presses racing at the same store is how a plan is approved twice. The two compose-only controls,
  * the notes field and Cancel, stay live on purpose: neither puts anything on the wire, and gating
@@ -63,7 +64,7 @@ export function LockAnswer({ ask, onAnswered }: { ask: LockAsk; onAnswered: () =
   const { answer, busy: carrying } = useDispatcherVerbs(ask.plan);
 
   // Whether the lane is carrying this plan's answer right now. Essential: a lock is ONE word, and the
-  // four controls below that lead to it being sent (Accept, Queue, Rework, Send notes) each read it,
+  // four controls below that lead to it being sent (Queue, Hide, Rework, Send notes) each read it,
   // so two presses racing at the same store cannot approve the plan twice.
   const busy = carrying === 'answer';
 
@@ -78,14 +79,15 @@ export function LockAnswer({ ask, onAnswered }: { ask: LockAsk; onAnswered: () =
     onAnswered();
   };
 
-  // Accept, in one press: the lock's own label as the answer to its one question.
-  const pressAccept = () => {
-    void answer(ask, { [ask.question]: options.accept.label }).then(settle);
-  };
-
-  // Queue: the same press with the queue label — the verdict is recorded and the run comes up parked.
+  // Queue, in one press: the lock's own label as the answer to its one question — the verdict is
+  // recorded and the run joins the queue, starting when its turn comes.
   const pressQueue = () => {
     void answer(ask, { [ask.question]: options.queue.label }).then(settle);
+  };
+
+  // Hide: the same press with the hide label — the verdict is recorded and the run is held hidden.
+  const pressHide = () => {
+    void answer(ask, { [ask.question]: options.hide.label }).then(settle);
   };
 
   // Send notes: Rework's own label, with the words typed above it, by that same one question. The
@@ -140,20 +142,8 @@ export function LockAnswer({ ask, onAnswered }: { ask: LockAsk; onAnswered: () =
       ) : (
         <div className="flex min-w-0 flex-wrap items-center gap-2">
           <Button
-            data-ask-accept
-            type="button"
-            size="sm"
-            className="h-8"
-            title={options.accept.description}
-            disabled={busy}
-            onClick={pressAccept}
-          >
-            {options.accept.label}
-          </Button>
-          <Button
             data-ask-queue
             type="button"
-            variant="secondary"
             size="sm"
             className="h-8"
             title={options.queue.description}
@@ -161,6 +151,18 @@ export function LockAnswer({ ask, onAnswered }: { ask: LockAsk; onAnswered: () =
             onClick={pressQueue}
           >
             {options.queue.label}
+          </Button>
+          <Button
+            data-ask-hide
+            type="button"
+            variant="secondary"
+            size="sm"
+            className="h-8"
+            title={options.hide.description}
+            disabled={busy}
+            onClick={pressHide}
+          >
+            {options.hide.label}
           </Button>
           <Button
             data-ask-rework

@@ -48,12 +48,13 @@ export { PlannerLanesReadout } from '@/modules/dispatcher/PlannerLanesReadout';
 // Start and Pause all — drawn from the frame's own route by the header of the Roadmap tab's In flight face and at the
 // top of the chat gutter's Runs widget (one component, two mounts), and not at all when the frame states no dial.
 export { MasterController } from '@/modules/dispatcher/MasterController';
-// The presses that put a card away, each one write to the put-away store: one plan's corner, an arc
-// deck's and `Dismiss done · N`. A done card's is Dismiss and an unfinished card's Hide.
-export { doneDismiss, planPutAway } from '@/modules/dispatcher/hiddenPlans';
+// The presses that put a card away: one plan's corner and an arc deck's (`usePutAway`), and `Dismiss done · N`.
+// A done card's is Dismiss, an entry in the operator's own list; an unfinished card's is Hide, the dispatcher's.
+export { doneDismiss } from '@/modules/dispatcher/hiddenPlans';
+export { usePutAway } from '@/modules/dispatcher/hooks/usePutAway';
 // Where the keyboard lands once a press has taken its own control away with the card.
 export { landFocusInHome } from '@/modules/dispatcher/putAwayFocus';
-// The `Hidden · N` list at the foot of both homes: every hidden (unfinished) plan, each with its `Show`.
+// The `Hidden · N` list at the foot of both homes: every plan the dispatcher holds hidden, each with its `Show`.
 export { HiddenPlans } from '@/modules/dispatcher/HiddenPlans';
 // The pin a plan wears when the open chat is the one that launched it, drawn by both homes.
 export { SessionPin } from '@/modules/dispatcher/SessionPin';

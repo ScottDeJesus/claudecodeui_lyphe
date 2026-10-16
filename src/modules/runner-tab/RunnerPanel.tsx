@@ -13,9 +13,9 @@ import {
   moveCard,
   PlanCard,
   PlannerLanesReadout,
-  planPutAway,
   useCardRanks,
   useDispatcherPlans,
+  usePutAway,
 } from '@/modules/dispatcher';
 import { DISPATCHER_ALL_TOPIC, useLiveTopic } from '@/modules/live-bus';
 import { useLaneFoldPrune } from '@/modules/runner-tab/hooks/useLaneFoldPrune';
@@ -97,8 +97,8 @@ function pageStripToCard(deck: Element, plan: string): HTMLElement | null {
  * around the gap, and a drop writes one rank (`moveCard`). The wall is two-dimensional, so a card
  * can be dropped into any slot of its rows; decks reorder among decks and plans among plans — a
  * deck and a plan swap places only in the widget, which draws them in one column. Every press passes the lane's own carried names, which is what the put-away store
- * (`hiddenPlans.ts`) prunes its list against: `planPutAway` is a card's corner (Dismiss on a done card,
- * Hide on an unfinished one), `doneDismiss` the header's `Dismiss done · N`, and `HiddenPlans` at the
+ * (`hiddenPlans.ts`) prunes its list against: `usePutAway` is a card's corner (Dismiss on a done card,
+ * the dispatcher's Hide on an unfinished one), `doneDismiss` the header's `Dismiss done · N`, and `HiddenPlans` at the
  * foot is the way back from a Hide. A dismissed card has no way back and needs none: the dispatcher
  * still holds the plan, and the card returns by itself when the plan has news.
  *
@@ -126,6 +126,7 @@ type RunnerPanelProps = {
 export function RunnerPanel({ revealPlan = null, onRevealed }: RunnerPanelProps) {
   const { t } = useTranslation();
   const { plans, hidden, arcs, loosePlanners, count, carriedNames } = useDispatcherPlans();
+  const putAway = usePutAway(carriedNames);
   // The topic's own value, for the one fact `useDispatcherPlans` folds away on purpose: `undefined` is
   // "nothing retained yet", which a board that has been dealt and drawn empty is NOT. Same topic, so
   // the two reads agree within one render. The reveal effect below is the only reader.
@@ -240,7 +241,7 @@ export function RunnerPanel({ revealPlan = null, onRevealed }: RunnerPanelProps)
       {count === 0 && arcs.length === 0 && loosePlanners.length === 0 ? (
         <div className="flex flex-1 flex-col items-center justify-center gap-4 p-4">
           {/* Over hidden plans the words are "every unfinished feature is hidden", never "nothing is
-              running": a hidden plan may still be walking, and the list below says which. */}
+              running": a hidden plan may still be finishing the task it had in flight, and the list below says which. */}
           <EmptyState icon={ActivityIcon} title={t(hidden.length > 0 ? 'dispatcher.hidden.allHidden' : 'runner.empty')} />
           <div className="w-full max-w-md">
             <HiddenPlans hidden={hidden} carriedNames={carriedNames} />
@@ -269,7 +270,7 @@ export function RunnerPanel({ revealPlan = null, onRevealed }: RunnerPanelProps)
               <ul ref={attachWall} className={cn('min-w-0', LANE_WALL_GRID)} data-runner-loose-plans>
                 {wallOrder.flatMap((name) => wallPlans.get(name) ?? []).map((plan) => (
                   <li key={plan.name} className="min-w-0" {...wallItemProps(plan.name)}>
-                    <PlanCard plan={plan} onPutAway={planPutAway(plan, carriedNames)} />
+                    <PlanCard plan={plan} onPutAway={putAway.plan(plan)} />
                   </li>
                 ))}
               </ul>

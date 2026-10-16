@@ -29,14 +29,14 @@ export function askIdentity(ask: DispatcherAsk): string {
 }
 
 /**
- * A lock's three answers by their contract position — Accept, Queue, Rework (`intent_lock.OPTIONS`)
+ * A lock's three answers by their contract position — Queue, Hide, Rework (`intent_lock.OPTIONS`)
  * — each `{ label, description }` verbatim.
  *
  * Read by `LockAnswer`, which draws one button per answer: the labels are what the operator presses
  * and what the answer is sent back as, and each description is that button's own `title`.
  */
-export function lockOptions(ask: Extract<DispatcherAsk, { kind: 'accept' }>): { accept: LockOption; queue: LockOption; rework: LockOption } {
-  return { accept: ask.options[0], queue: ask.options[1], rework: ask.options[2] };
+export function lockOptions(ask: Extract<DispatcherAsk, { kind: 'accept' }>): { queue: LockOption; hide: LockOption; rework: LockOption } {
+  return { queue: ask.options[0], hide: ask.options[1], rework: ask.options[2] };
 }
 
 /**

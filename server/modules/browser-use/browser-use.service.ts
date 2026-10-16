@@ -11,6 +11,7 @@ import { appConfigDb } from '@/modules/database/index.js';
 import { providerMcpService } from '@/modules/providers/index.js';
 import { userFacingEnv } from '@/shared/child-env.js';
 import { resolveMcpCommand } from '@/shared/mcp-command.js';
+import { loopbackApiOrigin } from '@/shared/utils.js';
 
 import { getBrowserUseRuntime } from './browser-use-runtime.js';
 
@@ -147,8 +148,7 @@ function getPlaywright(): any | null {
 }
 
 function getMcpApiUrl(): string {
-  const port = process.env.SERVER_PORT || process.env.PORT || '3001';
-  return `http://127.0.0.1:${port}/api/browser-use-mcp`;
+  return `${loopbackApiOrigin()}/api/browser-use-mcp`;
 }
 
 async function removeMcpServerFromAllProviders(name: string) {

@@ -69,6 +69,7 @@ import {
   transcriptAppendMessage
 } from './claude-compaction-seams.js';
 import { reportRestoredTurn } from './claude-compaction-restore.js';
+import { applyToolsetLaunch, askToolsetLaunch, createToolsetSync, toolsetDigest } from './claude-toolset-seams.js';
 import { assertProjectFolderExists, ProjectFolderMissingError } from './claude-project-folder.js';
 import { createSignalState, detectRuntimeSignals } from './claude-runtime-signals.js';
 import { installedCliVersionForLaunch } from './installed-cli-version.js';
@@ -835,12 +836,14 @@ async function resolveSdkOptions(options, context) {
     effortModels,
   });
   applyCompactionSettings(sdkOptions, await askCompactionTakesOver(context, options));
+  const launch = await askToolsetLaunch(context, { appSessionId: options.sessionId ?? null, onNode: Boolean(options.node) });
+  applyToolsetLaunch(sdkOptions, launch);
   const mcpServers = await loadMcpConfig(options.cwd);
   const mcpUnreadable = mcpServers === MCP_CONFIG_UNREADABLE;
   if (mcpServers && !mcpUnreadable) {
     sdkOptions.mcpServers = mcpServers;
   }
-  return { sdkOptions, mcpUnreadable };
+  return { sdkOptions, mcpUnreadable, toolsets: { digest: toolsetDigest(launch.servers), servers: launch.servers } };
 }
 
 /**
@@ -858,7 +861,7 @@ async function joinProcess(live, command, options, ws, context) {
   const installedCliVersion = typeof live.profile?.cliVersion === 'string'
     ? await installedCliVersionForLaunch()
     : null;
-  const next = launchProfileOf(resolved.sdkOptions, resolved.mcpUnreadable, false, installedCliVersion);
+  const next = launchProfileOf(resolved.sdkOptions, resolved.mcpUnreadable, false, installedCliVersion, resolved.toolsets.digest);
   const plan = planLiveChanges(live.profile, next, { resumeFromScratch: options.resumeFromScratch === true });
   if (plan.respawn) {
     console.log(`[Claude SDK] Replacing the process for session ${sessionId}: ${plan.respawn}`);
@@ -1080,10 +1083,26 @@ async function spawnProcess(command, options, initialWs, context) {
   const isBusy = () => pendingTurn !== null || turnInFlight || hasBackgroundWork();
   const processAbort = new AbortController();
 
+  // Pushes the chat's on-sets into the CLI (claude-toolset-seams.ts); every run on this process goes through it, in order.
+  const toolsetSync = createToolsetSync({
+    getQuery: () => queryInstance,
+    isClosing: () => closing,
+    context,
+    appSessionId: sessionId ?? null,
+    onNode: Boolean(options.node),
+    setApplied: (digest) => { profile.toolsets = digest; },
+    // The launch's own servers: a set's server must not take one of their names (claude-toolset-seams.ts).
+    baseServerNames: () => Object.keys(sdkOptions?.mcpServers ?? {})
+  });
+
   // The handle later messages join through, registered under the session key.
   const handle = {
     get closing() {
       return closing;
+    },
+    /** Syncs the tool sets into the CLI; never rejects. Asked by a joining message, a fresh spawn and `claudeRuntime.syncToolsets`. */
+    syncToolsets(boundMs) {
+      return toolsetSync.sync(boundMs);
     },
     get profile() {
       return profile;
@@ -1164,7 +1183,7 @@ async function spawnProcess(command, options, initialWs, context) {
     // Everything the SDK can change on a running query (see chat-process.ts). `sdkOptions` is
     // what `canUseTool` reads on every call, so the permission fields are mutated in place.
     async applyChanges(changes, next) {
-      const applied = Object.entries(changes).filter(([, value]) => value !== null).map(([key]) => key);
+      const applied = Object.entries(changes).filter(([key, value]) => value !== null && !(key === 'toolsets' && value === false)).map(([key]) => key);
       if (applied.length > 0) {
         console.log(`[Claude SDK] Applying to the running process for session ${sessionKey()}: ${applied.join(', ')}`);
       }
@@ -1190,6 +1209,14 @@ async function spawnProcess(command, options, initialWs, context) {
         await withinGrace(queryInstance.applyFlagSettings(compactionFlagSettings(changes.compaction, launchedTakenOver)), 'applyFlagSettings');
         profile.compactionTakenOver = next.compactionTakenOver;
       }
+      if (changes.toolsets) {
+        // A sync's failure is never what retires a process (the catch in joinProcess does): the turn goes on, and the next message asks again.
+        try {
+          await withinGrace(handle.syncToolsets(INTERRUPT_GRACE_MS), 'setMcpServers');
+        } catch (error) {
+          console.warn(`[Claude SDK] The tool sets of session ${sessionKey()} could not be synced before the turn:`, error?.message || error);
+        }
+      }
       if (changes.tools) {
         sdkOptions.allowedTools = [...changes.tools.allowed];
         sdkOptions.disallowedTools = [...changes.tools.disallowed];
@@ -1202,7 +1229,8 @@ async function spawnProcess(command, options, initialWs, context) {
         // version is only ever the one its init announced. Adopting that one would mark an
         // unread host current for as long as it lives.
         const announced = profile.cliVersion;
-        Object.assign(profile, next, { unknown: false, cliVersion: announced });
+        // `next.toolsets` is the digest the message WANTS; what the process HOLDS is what the sync above recorded.
+        Object.assign(profile, next, { unknown: false, cliVersion: announced, toolsets: profile.toolsets });
         sdkOptions.allowedTools = [...next.allowedTools];
         sdkOptions.disallowedTools = [...next.disallowedTools];
       }
@@ -1276,6 +1304,9 @@ async function spawnProcess(command, options, initialWs, context) {
             ? { ...reattach.profile, unknown: false, cliVersion: reportedCliVersion }
             : launchProfileOf(sdkOptions, resolved.mcpUnreadable, true, reportedCliVersion))
         : launchProfileOf(sdkOptions, resolved.mcpUnreadable);
+      // What tool sets the process HOLDS: none yet for a fresh one (its first sync, below, records them), and
+      // unknown for a re-adopted one whatever its host recorded — the host knew only the spawn-time profile.
+      profile.toolsets = reattach ? null : '';
       launchedTakenOver = profile.unknown || profile.compactionTakenOver === true;
       // Known the moment the run is adopted, so the report (and the banner beside the
       // transcript) never reads a live host as "not heard yet" until its next turn.
@@ -1451,7 +1482,11 @@ async function spawnProcess(command, options, initialWs, context) {
         });
       };
 
-      queue = createPromptQueue(promptMessages);
+      // A fresh process with tool sets in play is not handed its prompt until they are synced, so its
+      // first turn already has the tools; the prompt is released when the sync settles (below).
+      const holdsPromptForToolsets = !reattach && Object.keys(resolved.toolsets.servers ?? {}).length > 0;
+      const initialMessages = holdsPromptForToolsets ? [] : promptMessages;
+      queue = createPromptQueue(initialMessages);
       try {
         queryInstance = query({
           prompt: queue.stream,
@@ -1464,7 +1499,7 @@ async function spawnProcess(command, options, initialWs, context) {
         delete sdkOptions.hooks;
         // Discard the abandoned stream and build a fresh one for the retry.
         queue.end();
-        queue = createPromptQueue(promptMessages);
+        queue = createPromptQueue(initialMessages);
         queryInstance = query({
           prompt: queue.stream,
           options: sdkOptions
@@ -1488,6 +1523,14 @@ async function spawnProcess(command, options, initialWs, context) {
         addSession(sessionKey(), queryInstance, handle);
       }
       releaseReservation();
+      if (holdsPromptForToolsets) {
+        // Not awaited: the message loop below must start at once, because it is what answers the SDK's
+        // control request. Whatever the outcome (a sync never rejects), the prompt goes in; past the grace
+        // it goes anyway and the next message tries again.
+        handle.syncToolsets(INTERRUPT_GRACE_MS).then(() => {
+          for (const message of promptMessages) queue.push(message);
+        });
+      }
 
       // Process streaming messages
       console.log('Starting async generator loop for session:', capturedSessionId || 'NEW');
@@ -2023,6 +2066,10 @@ export const claudeRuntime = {
   abort: abortClaudeSDKSession,
   activity: (appSessionId) => liveActivityOf(getSession(appSessionId)),
   markIdleCheck: (appSessionId, tries) => getSession(appSessionId)?.process?.markIdleCheck?.(tries) ?? false,
+  syncToolsets: (appSessionId) => {
+    const chatProcess = getSession(appSessionId)?.process;
+    return chatProcess && !chatProcess.closing ? chatProcess.syncToolsets(30_000) : Promise.resolve({ live: false });
+  },
   permissions: {
     resolve: resolveToolApproval,
     listPending: getPendingApprovalsForSession,

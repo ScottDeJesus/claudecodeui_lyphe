@@ -6,6 +6,8 @@ The provider contract: every wrapper exposes the same seven facets — runtime, 
 
 Custom compaction (Claude chats): the stitched history, indexer and search are MAN-8054; the runtime seams are MAN-8055; MAN-8068 says which row holds which seam.
 
+Tool sets (Claude chats): the runtime's seam — context hook, launch, `setMcpServers` sync, hold, live change — is MAN-8495, beside MAN-8055; the module behind it is MAN-8497.
+
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/
 
 ## MAN-696 — Providers Module Guide
@@ -613,6 +615,8 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/cl
 
 The Claude runtime reaches a custom compaction (`server/modules/compaction/`) only through its context, `ProviderRuntimeContext.compaction` (`ChatCompactionHooks`: `takesOver`, `turnEnded`, `turnRestored`, `activityChanged`), and imports nothing from that module. `providerRuntimeService.useChatCompaction(hooks)` stores the hooks every context then carries — one delegating object that reads the registered hooks at CALL time, because a process keeps the context of the message that spawned it. The default answers `takesOver` false and does nothing for the other three, so with nothing registered the runtime behaves as it did before the seams. `providerRuntimeService.activity(provider, appSessionId)` asks the provider's runtime (`IProviderRuntime.activity?`) and answers `{ live: false, busy: false, why: null }` when it has none.
 
+Sibling seam, same context-hook shape: the chat's tool sets, `list/claude/claude-toolset-seams.ts` (MAN-8495). Tool sets are a live setting beside the compaction flip below — `planLiveChanges` `changes.toolsets`, applied by `setMcpServers`, never a respawn; MAN-8502 lists every live setting and every respawn reason of `chat-process.ts`.
+
 `claude-runtime.provider.js` takes call-in lines only; every body is `list/claude/claude-compaction-seams.ts`:
 
 - **Taken over at launch.** `resolveSdkOptions` asks `takesOver({ appSessionId })` (a run with no app session id never asks; a chat placed on a Cerberus node is asked and answered exactly as a local one) and `applyCompactionSettings` merges `CLI_COMPACTION_SETTINGS` (`{ idleCompaction: false }`, the one constant) into `sdkOptions.settings` beside ultracode's. `autoCompactEnabled` is never touched: the CLI's threshold compaction, its compaction at overflow and its precompute stay as the net. With the answer false nothing is merged and the launch is byte-identical.
@@ -657,3 +661,127 @@ The chat palette's **Claude Code** group is the command list the installed Claud
 - **Proof.** `node .verify/palette-claude-code-group.mjs` (the open palette at 1440x900 and 390x844, light and dark; the live list reply; one Haiku `/usage` turn in the scratch probe project; the model picker as the shared mechanism's regression guard; the provider gate, no turn sent: a Codex, Cursor or OpenCode composer's palette has no Claude Code group and Claude's has it again, skipped with a `skip:` line when the picker offers no other provider with a model). The group follows the composer's provider, which is a stored per-user preference (`selectedProvider`), so every session pins the composer on Claude and drops its preference writes (`lib/prefs-pin.mjs`; the picker switches in `lib/composer-provider.mjs` move the page, never the shared dev account): a run neither depends on nor changes the stored value. The `/doctor` and `/model` hint checks compare against the hint in the live `POST /api/commands/list` reply, never a literal. The turn's `/doctor` → `terminal` check proves the init-frame hand-off only when `/doctor` was not badged `terminal` before the turn (the stored set was empty for the CLI version); otherwise it prints a `note:` and checks only that the badge stands.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/commands/commands.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/commands/engine-commands.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-command-catalog.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-engine-catalog.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/composer/CommandMenu.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useSlashCommands.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/palette-claude-code-group.mjs
+
+## MAN-8495 — The Claude runtime's seams to tool sets — entry points, the `claude-toolset-seams.ts` functions, the call-ins
+
+The Claude runtime learns a chat's tool sets through `context.toolsets` only (MAN-8487) and imports nothing from the toolsets module (MAN-8500, map MAN-8497). Sibling of MAN-8055 (custom compaction): the same context-hook shape. `claude-runtime.provider.js` takes call-in lines; every body is `list/claude/claude-toolset-seams.ts`.
+
+## Entry points
+
+| name | where | does |
+| --- | --- | --- |
+| `ProviderRuntimeContext.toolsets` (`ChatToolsetHooks`) | `server/shared/types.ts` | always present; one delegating object that reads the registered hooks at CALL time (a process keeps the context of the message that spawned it) |
+| `providerRuntimeService.useChatToolsets(hooks)` | `provider-runtime.service.ts` | stores the hooks; the default answers the inert launch, so with nothing registered a launch is today's |
+| `IProviderRuntime.syncToolsets?(appSessionId)` | `server/shared/interfaces.ts` | optional; only a runtime that keeps a live process per chat has it |
+| `providerRuntimeService.syncToolsets(provider, id)` | `provider-runtime.service.ts` | `runtime.syncToolsets?.(id) ?? { live: false }`; a throw or reject → `{ live: false }` with one warning |
+| `claudeRuntime.syncToolsets(id)` | `claude-runtime.provider.js` | a live, non-closing process → `handle.syncToolsets(30_000)`; else `{ live: false }` |
+
+## Functions — `claude-toolset-seams.ts`
+
+| function | does |
+| --- | --- |
+| `askToolsetLaunch(context, { appSessionId, onNode }, deadlineMs = 2_000)` | asks `context.toolsets.launchFor`; a throw, a reject, a non-record answer or no answer in `deadlineMs` → the inert launch `{ env: {}, servers: null, promptLine: null }`; each distinct failure text logs one `[Claude SDK]` warning per server process |
+| `applyToolsetLaunch(sdkOptions, launch)` | `launch.env` into `sdkOptions.env`; `launch.promptLine` after `systemPrompt.append`; an inert launch changes neither; `servers` are never put on the launch |
+| `toolsetDigest(servers)` | `null` for null/undefined (nothing in play), `''` for `{}`, else sha256 of the map's JSON; digests only, never configs (a config can carry a token) |
+| `createToolsetSync(deps)` → `{ sync(boundMs) }` | one process's sync into its CLI; never throws, never retires the process |
+
+`ToolsetSyncDeps`: `getQuery`, `isClosing`, `context`, `appSessionId`, `onNode`, `setApplied(digest | null)`, optional `baseServerNames()` (omitted → the base-name guard is off; the runtime always passes it).
+
+## Call-ins — `claude-runtime.provider.js`, `chat-process.ts`
+
+| where | call-in |
+| --- | --- |
+| `resolveSdkOptions` | `askToolsetLaunch` + `applyToolsetLaunch`; returns `toolsets: { digest: toolsetDigest(launch.servers), servers }` |
+| `launchProfileOf(…, toolsets)` (5th arg) | `LaunchProfile.toolsets` = the digest the message WANTS; `null` when nothing is in play |
+| process creation | `createToolsetSync({ …, setApplied: d => { profile.toolsets = d }, baseServerNames: () => Object.keys(sdkOptions?.mcpServers ?? {}) })`; `handle.syncToolsets(boundMs)` |
+| `planLiveChanges` | `changes.toolsets = next.toolsets !== null && next.toolsets !== live.toolsets` (re-adopted: `next.toolsets !== null`); a tool-set difference is never a respawn reason |
+| `applyChanges` | `changes.toolsets` → `withinGrace(handle.syncToolsets(INTERRUPT_GRACE_MS = 5_000))`; a failure warns and the turn goes on; the "Applying to the running process" log skips `toolsets: false` |
+| spawn | `profile.toolsets = reattach ? null : ''`; the hold on a fresh process: MAN-8502 |
+| re-adopt profile merge | `Object.assign(profile, next, { …, toolsets: profile.toolsets })` — what the process HOLDS is what the sync recorded, not what the message wants |
+| `claudeRuntime.syncToolsets(appSessionId)` | live non-closing process → `handle.syncToolsets(30_000)`; else `{ live: false }` |
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/chat-process.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-runtime.provider.js, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-toolset-seams.ts
+
+## MAN-8502 — The Claude runtime's seams to tool sets — the hold on a fresh process, the applied digest, the live settings, why a sync never retires a process
+section: The Claude runtime's seams to tool sets — `claude-toolset-seams.ts`, the one `setMcpServers` mechanism, the base-name guard, the sync's bound/001 The hold on a fresh process
+
+- Applies when the launch's `servers` map is non-empty and the run is not a re-adoption. Then the prompt queue starts EMPTY (the hooks-retry branch builds its queue from the same messages), and right after `addSession` registers the handle `handle.syncToolsets(INTERRUPT_GRACE_MS = 5_000)` runs; whatever it answers (it never rejects), its settle pushes the spawn's prompt messages. why: the chat's first turn already has the tools.
+- Not awaited: the message loop starts at once, because it answers the SDK's control request.
+- Bound: 5 s for the whole run (the hook's ask included). Past it the prompt goes in anyway, the applied digest is `null`, and the next joining message syncs again. Measured 2026-10-16: a hook answering at 1.9 s and a CLI that never answers `setMcpServers` → settled at 5002 ms, `confirmed: false`, "setMcpServers was not answered within 5000 ms".
+- A launch with `servers` null or `{}` holds nothing: the queue starts with the prompt, as before.
+
+## Applied digest — `LaunchProfile.toolsets`
+
+| value | on the process's profile | on a message's profile (`launchProfileOf`, 5th argument) |
+| --- | --- | --- |
+| `null` | not known: a re-adopted process, or a sync that failed, went unanswered or left a server unconnected | nothing in play for the chat: never syncs |
+| `''` | none applied (a fresh process before its first sync) | the chat's on-sets define no server (`{}`) |
+| 64-hex | sha256 of the map's JSON applied to this process | the digest the message WANTS |
+
+| `planLiveChanges` | `changes.toolsets` | result |
+| --- | --- | --- |
+| wanted `null` | false | no sync |
+| wanted ≠ held (a new set on, a set off, a held `null`) | true | `applyChanges` syncs before the turn |
+| wanted = held | false | no sync |
+| process re-adopted (`live.unknown`) | `next.toolsets !== null` | one sync; the held digest is what that sync recorded, not what the message wants |
+
+A tool-set difference is never a respawn reason.
+
+## Live settings of a running process — `planLiveChanges` (`chat-process.ts`)
+
+| setting | applied by |
+| --- | --- |
+| model | `setModel` |
+| effort, ultracode | `applyFlagSettings` |
+| permission mode (a bypass request on a process not launched with it respawns) | `setPermissionMode` |
+| allowed tools, GROWN | in place (`sdkOptions.allowedTools`) |
+| compaction taken over | `applyFlagSettings` (MAN-8055) |
+| **tool sets** | `setMcpServers`, through `createToolsetSync` |
+
+Respawn reasons (launch arguments): `resumeFromScratch`, a resume anchor, `cwd`, the installed CLI newer than the process's, the base `mcpServers` map, a bypass request, any change to the disallowed list, a SHRUNK allowed list.
+
+## Why a sync never retires a process
+
+- `joinProcess` retires the process and spawns afresh when `applyChanges` throws for another setting; `applyChanges` catches the tool-set sync's own failure, warns, and the turn goes on. `createToolsetSync` never throws and `claudeRuntime.syncToolsets` never rejects.
+- why: `retire` interrupts the turn, then ends the queue (EOF), and a background task still running at that EOF dies with the CLI; the respawn would meet the same server again. A server that fails to connect is reported (`failed`, or `unconfirmed` past the bound) and a slow http server is not a broken conversation.
+- The failure is not lost: the applied digest goes `null`, so the next joining message syncs again.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/chat-process.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-runtime.provider.js, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-toolset-seams.ts
+
+## MAN-8503 — The Claude runtime's seams to tool sets — the one `setMcpServers` mechanism, one sync run, the base-name guard, the journal line, the traps
+section: The Claude runtime's seams to tool sets — `claude-toolset-seams.ts`, the one `setMcpServers` mechanism, the base-name guard, the sync's bound/002 One sync run — `createToolsetSync(...).sync(boundMs)`
+
+## Mechanism — INV-8471
+
+- A set's servers reach a CLI only through `Query.setMcpServers(map)`, handed the FULL map of the chat's on-sets every call: the call REPLACES the servers it owns. why: one code path for on, off, a fresh process and a re-adopted one.
+- Never in the launch's `mcpServers` option (a launch argument: a change replaces the process). Never `toggleMcpServer` (writes `disabledMcpServers` into the project's `~/.claude.json` entry, shared by every session in the folder).
+- `setMcpServers` also replaces every IN-PROCESS SDK server (measured 2026-10-15: a call without the new set tore down the SDK server hosting the switch tool mid-call, "Connection closed"). No chat launch carries one today; one that does must be re-passed in the sent map on every call, in `runOnce`.
+
+## One sync run — `createToolsetSync(...).sync(boundMs)`
+
+Runs are chained (one at a time, in ask order); each re-asks the hook when its turn comes, so racing switches leave the CLI holding what the row says last.
+
+1. `isClosing()` → `{ live: false }`.
+2. Ask the hook (`min(2 s, boundMs)`). Hook failed → `{ live: true, confirmed: false, reason }`; nothing sent, applied digest untouched.
+3. `servers === null` → `{ live: true, confirmed: true, added: [], removed: [], errors: {} }`; no request, no journal line.
+4. No query → `{ live: false }`.
+5. `shapeForCli`: a server named like a launch `mcpServers` key is dropped from the call and goes to `errors` (settled for the process: no resync per message); a stdio server (type unset or `stdio`) without `args` is sent with `args: []`.
+6. Names in `failedNames` that are still wanted: call 1 without them, then call 2 with the full map; `mergeResults` joins both; a name removed only to retry is not in `removed`.
+7. `boundMs` bounds the WHOLE run (ask + every `setMcpServers`; each call gets what is left, min 1 ms). A call past it → `{ live: true, confirmed: false, reason }`, applied digest `null`.
+
+| result | applied digest recorded (`setApplied`) | answer |
+| --- | --- | --- |
+| CLI reports no errors | `toolsetDigest(hook's servers)` | `confirmed: true`, `added`, `removed`, `errors` = rejected base names |
+| CLI reports ≥1 `errors` | `null` (next joining message syncs again) | `confirmed: true`, `errors` = rejected + CLI's |
+| call throws or exceeds `boundMs` | `null` | `confirmed: false`, `reason` |
+
+- `failedNames` = keys of the last result's `errors`: the CLI treats a repeat of an identical map as a no-op and stops reporting the failure, hence remove-then-add. A server that stays down is retried by every joining message.
+- Journal: `[Claude SDK] Tool sets for session <id>: +<added> -<removed> errors=<names> (<ms> ms)` or `… unconfirmed: <reason ≤200 chars> (<ms> ms)`; `(ms)` starts before the hook ask.
+
+## Traps
+
+- Base-name collision, measured on Claude Code 2.1.301: a `setMcpServers` naming a launch-option server TAKES THE NAME OVER, and the call that later omits it removes the operator's server. The guard covers the launch `mcpServers` option only; a base server from a settings file or a plugin cannot be named here (unmeasured).
+- `loggedFailures` (the once-per-text set) is never bounded.
+- Prompt order for a joining message while the first prompt is held: its sync queues behind the spawn's, so its `pushTurn` runs after the held prompt is released (by construction; unexercised live).
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/chat-process.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-runtime.provider.js, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-toolset-seams.ts

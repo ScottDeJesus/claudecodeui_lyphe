@@ -42,6 +42,20 @@ import type {
  */
 export const IS_PLATFORM = process.env.VITE_IS_PLATFORM === 'true';
 
+/**
+ * This server's own origin on the loopback interface, for a child of this box that calls back into
+ * its API. It answers the port the RUNNING process listens on — `SERVER_PORT`, then the house
+ * default, the very expression the listener reads (`server/index.ts`) — and reads the environment at
+ * every call, so a server started on another port by a probe hands its children its own origin and
+ * never the operator's. It names no `PORT`: the server never listens on one, and the `cloudcli` CLI,
+ * the one place that accepts `PORT`, copies it into `SERVER_PORT` before the server starts, so an
+ * origin built from `PORT` could only point at a port nothing here listens on. Consumed by
+ * `kanban-metis.module.ts`, `browser-use.service.ts` and the toolsets module.
+ */
+export function loopbackApiOrigin(): string {
+  return `http://127.0.0.1:${process.env.SERVER_PORT || '3001'}`;
+}
+
 // ---------------------------
 //----------------- NORMALIZED MESSAGE HELPER INPUT TYPES ------------
 /**

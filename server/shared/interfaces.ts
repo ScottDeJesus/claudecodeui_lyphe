@@ -19,6 +19,7 @@ import type {
   ProviderRuntimeWriter,
   UpsertProviderMcpServerInput,
 } from '@/shared/types.js';
+import type { ToolsetSyncOutcome } from '@/shared/toolset-types.js';
 
 //----------------- PROVIDER CONTRACT INTERFACES ------------
 
@@ -50,6 +51,13 @@ export interface IProviderRuntime {
    * module's idle trigger and procedure call.
    */
   markIdleCheck?(appSessionId: string, tries: number): boolean;
+  /**
+   * OPTIONAL — only a runtime that keeps a live process per chat has one. Pushes the chat's on-sets into that
+   * process (the full map, so its tools arrive or leave without a respawn) and answers what the CLI did with them;
+   * `{ live: false }` when the chat has no live process to push into. Read by `providerRuntimeService.syncToolsets`,
+   * which the toolsets service calls after a switch.
+   */
+  syncToolsets?(appSessionId: string): Promise<ToolsetSyncOutcome>;
 }
 
 /**

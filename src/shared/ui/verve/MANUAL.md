@@ -238,7 +238,9 @@ them means picking a colour Verve did not, which is the operator's call:
   **1.57:1** in dark, under the 3:1 a control's outline needs (WCAG 1.4.11). It is Verve's own
   `forms/Checkbox` draw, a 1.5px `--border-strong` edge (`_ds_bundle.js` :1570). Its first screen,
   the Cerberus Update wardens dialog, opens with every box it offers ticked, so an empty box there
-  is one the operator emptied.
+  is one the operator emptied. The composer's tool-set section (MAN-8490) is the opposite case: most
+  of its boxes are empty, so this edge is usually the only sign a row can be ticked. Its box is
+  Verve's draw, kept as is.
 
 ## MAN-743 — What a composed screen looks like
 section: README/005 What a composed screen looks like

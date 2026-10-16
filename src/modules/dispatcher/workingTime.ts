@@ -27,8 +27,9 @@ export function planAgentOut(plan: DispatcherPlan, planners: readonly Dispatcher
 /**
  * Whether an agent is out on this epic right now: on any plan of it, or on an outing whose subject is the
  * epic itself — its design, its cut, its judge. `lanePlans` is every plan the lane carries, the ones the
- * operator put away included (`useDispatcherPlans`' `plans` and `hidden`): a hidden plan is still walked
- * and the epic's figure counts it, so a tick that skipped it would stand still over work that is moving.
+ * operator put away included (`useDispatcherPlans`' `plans` and `hidden`): a hidden plan may still be finishing
+ * the task it had in flight, and the epic's figure counts it, so a tick that skipped it would stand still over
+ * work that is moving.
  *
  * Used by `DispatchArcDeck`, for its head's working pill.
  */

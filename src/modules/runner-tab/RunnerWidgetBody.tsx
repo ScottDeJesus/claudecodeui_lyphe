@@ -13,11 +13,11 @@ import {
   moveCard,
   PlanCard,
   PlannerLanesReadout,
-  planPutAway,
   SessionPin,
   useCardRanks,
   useDispatcherPlans,
   useEpicQueueVerbs,
+  usePutAway,
 } from '@/modules/dispatcher';
 import { useLaneFoldPrune } from '@/modules/runner-tab/hooks/useLaneFoldPrune';
 import { LANE_CARD_GAP } from '@/shared/constants';
@@ -148,7 +148,7 @@ export function RunnerWidgetBody({ sessionId }: { sessionId: string | null }) {
 
   // The empty state speaks of the LANE: a planner outing with no card at all is on this lane too — a
   // soul out on an arc the store has no row for yet — even though nothing here can draw it an item.
-  // Over hidden plans the words say "hidden", never "nothing is running": a hidden plan may still walk.
+  // Over hidden plans the words say "hidden", never "nothing is running": a hidden plan may still be finishing the task it had in flight.
   const nothingDrawn = plans.length === 0 && arcs.length === 0 && loosePlanners.length === 0;
 
   return (
@@ -208,10 +208,11 @@ export function RunnerWidgetBody({ sessionId }: { sessionId: string | null }) {
  * the same at either depth.
  */
 function PlanItem({ plan, mine, carriedNames }: { plan: DispatcherPlan; mine: boolean; carriedNames: string[] }) {
+  const putAway = usePutAway(carriedNames);
   return (
     <div data-testid="runner-widget-plan" data-plan-name={plan.name} data-pinned={String(mine)} className="flex min-w-0 flex-col gap-1">
       {mine && <SessionPin />}
-      <PlanCard plan={plan} onPutAway={planPutAway(plan, carriedNames)} />
+      <PlanCard plan={plan} onPutAway={putAway.plan(plan)} />
     </div>
   );
 }

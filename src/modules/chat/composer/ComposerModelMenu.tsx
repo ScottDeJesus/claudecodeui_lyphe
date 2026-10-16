@@ -13,8 +13,11 @@ import {
   ComposerMenuHeading,
   ComposerMenuItem,
   ComposerMenuNote,
+  ComposerMenuSeparator,
   ComposerMenuSurface,
 } from '@/modules/chat/composer/ComposerMenuPrimitives';
+import { ComposerToolsetSection } from '@/modules/chat/composer/ComposerToolsetSection';
+import type { SessionToolsetsState } from '@/modules/chat/hooks/useSessionToolsets';
 
 type EffortOption = NonNullable<ProviderModelOption['effort']>['values'][number];
 
@@ -38,6 +41,8 @@ type ComposerModelMenuProps = {
   permissionMode?: PermissionMode;
   permissionModes?: PermissionMode[];
   onSelectPermissionMode?: (mode: PermissionMode) => void;
+  /** The open chat's tool sets; with no view read, no section and no count. Compared by identity (`memo`), so it must hold still between reads. */
+  toolsets?: SessionToolsetsState;
 };
 
 /**
@@ -54,6 +59,8 @@ type ComposerModelMenuProps = {
  * Measured at 390px the two chips plus their gap took ~198px of a row that also has to hold
  * the scheduler, the send button and four icon buttons — one pill saying both is the only way
  * both fit. Nothing merges on desktop: two decisions get two chips wherever there is room.
+ * Given `toolsets`, the last group is the chat's tool sets (ComposerToolsetSection), under a rule and
+ * across both columns, and the pill counts the sets that are on wherever the composer's row has room.
  */
 function ComposerModelMenu({
   effort,
@@ -67,6 +74,7 @@ function ComposerModelMenu({
   permissionMode,
   permissionModes,
   onSelectPermissionMode,
+  toolsets,
 }: ComposerModelMenuProps) {
   const { t } = useTranslation('chat');
   // The menu is portalled into the window the composer is drawn in, not the opener's body.
@@ -108,12 +116,23 @@ function ComposerModelMenu({
   const permissionLabel = (mode: PermissionMode) => t(`composer.editMode.labels.${mode}`, { defaultValue: mode });
   const permissionHelp = (mode: PermissionMode) => t(`composer.editMode.help.${mode}`, { defaultValue: '' }) || undefined;
 
+  // The pill counts what the tool-set section ticks: the sets on, and the strays the chat still holds.
+  // A chat on a Cerberus node draws no rows and launches with no set, so it counts none.
+  const toolsetView = toolsets?.view ?? null;
+  const toolsetsOn = toolsetView && toolsetView.availability !== 'node'
+    ? toolsetView.sets.filter((set) => set.on).length + toolsetView.strays.length
+    : 0;
+
   const triggerLabel = hasModelSection ? modelLabel : effortLabel;
   // The mark on the pill is colour and fill; the words it replaced live on here, so the
-  // current mode is still readable by anyone hovering, or on a screen reader.
-  const ariaLabel = hasPermissionSection && permissionMode
+  // current mode is still readable by anyone hovering, or on a screen reader. The count of sets on
+  // joins them, the one way to read it where the pill has no room for it. The label keeps its
+  // "Select model" start: the probe harness's MODEL_CHIP matches on it.
+  const menuLabel = hasPermissionSection && permissionMode
     ? `${t('composer.setupMenu', { defaultValue: 'Select model, reasoning effort and how edits happen' })} — ${permissionLabel(permissionMode)}`
     : t('composer.modelMenu', { defaultValue: 'Select model and reasoning effort' });
+  const toolsetsOnLabel = t('composer.toolsets.onLabel', { count: toolsetsOn, defaultValue_one: '{{count}} tool set on', defaultValue_other: '{{count}} tool sets on' });
+  const ariaLabel = toolsetsOn > 0 ? `${menuLabel} · ${toolsetsOnLabel}` : menuLabel;
 
   return (
     <>
@@ -148,6 +167,15 @@ function ComposerModelMenu({
           <span className="max-w-20 truncate sm:max-w-56">{triggerLabel}</span>
           {hasModelSection && hasEffortSection && effort !== DEFAULT_EFFORT_VALUE && (
             <span className="hidden shrink-0 capitalize sm:inline">· {effortLabel}</span>
+          )}
+          {/* Outside `span.truncate`, which the probe harness reads the model's name from. It shows only
+              while the composer's row (ChatComposer's footer, a query container) is 45rem wide. Measured,
+              the row's other controls take up to ~504px from `md` up and the widest pill ~206px, so below
+              that the count gives way first, before the model's name and before the send button. */}
+          {toolsetsOn > 0 && (
+            <span className="hidden shrink-0 [@container(min-width:45rem)]:inline" data-toolset-count>
+              · {t('composer.toolsets.count', { count: toolsetsOn, defaultValue_one: '{{count}} set', defaultValue_other: '{{count}} sets' })}
+            </span>
           )}
         </Chip>
       </button>
@@ -251,6 +279,13 @@ function ComposerModelMenu({
               </>
             )}
           </div>
+
+          {toolsets?.view && (
+            <>
+              <ComposerMenuSeparator />
+              <ComposerToolsetSection toolsets={toolsets} />
+            </>
+          )}
         </ComposerMenuSurface>,
         hostWindow.document.body,
       )}

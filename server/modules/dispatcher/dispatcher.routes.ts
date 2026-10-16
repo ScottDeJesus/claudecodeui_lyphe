@@ -93,6 +93,26 @@ const EPICS_BODY_ERROR = 'word must be one of 1, 2, 3, 4, 5, pause or resume';
 /** The 400 sentence the start route answers with when a body names anything: the board's Start takes none. */
 const START_BODY_ERROR = 'the board\'s Start takes no body';
 
+/** The most names one Hide or Show may carry: a board holds a few hundred plans at most, and the bound only keeps the argv short. */
+const HIDE_NAMES_MAX = 200;
+
+/** The 400 sentence the hide and unhide routes answer with when the body is not exactly a list of plan or epic names. */
+const HIDE_BODY_ERROR = `body must be exactly { "names": [<plan or epic name>, …] }, one to ${HIDE_NAMES_MAX} names`;
+
+/**
+ * The argv words of a Hide or a Show — the plan and epic names after the verb — or `null` for a body that is
+ * not EXACTLY `{ "names": [...] }` with one to `HIDE_NAMES_MAX` names, each through the arc fence (`ARC_NAME`:
+ * a plan's bare name or an epic's, with or without `.arc`; the dispatcher resolves which). Checked BEFORE ANY
+ * PROCESS STARTS, so what reaches an argv array is a spelling this server wrote down, never a string the
+ * request chose.
+ */
+function hideArgs(body: unknown): string[] | null {
+  if (typeof body !== 'object' || body === null || Array.isArray(body)) return null;
+  const { names } = body as { names?: unknown };
+  if (Object.keys(body).length !== 1 || !Array.isArray(names) || names.length < 1 || names.length > HIDE_NAMES_MAX) return null;
+  return names.every((name): name is string => typeof name === 'string' && ARC_NAME.test(name)) ? [...names] : null;
+}
+
 /** A design's stamp (`designs.loaded_at`, `store.now()`'s shape): the lock an "Accept when cut" press carries. */
 const DESIGN_STAMP = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/;
 
@@ -161,28 +181,29 @@ function statusForVerb(result: DispatcherVerbResult): number {
 }
 
 /**
- * The dispatcher lane's twenty-two routes: three reads of the plan list, ten presses on a plan, seven on
- * an arc, two on the board. Auth is the mount's `authenticateToken`, in `server/index.ts`.
+ * The dispatcher lane's twenty-four routes: three reads of the plan list, ten presses on a plan, seven on
+ * an arc, four on the board. Auth is the mount's `authenticateToken`, in `server/index.ts`.
  *
  * These handlers validate and translate, and do nothing else: nothing is read here, no process is
  * started here, and no route names a path from the request — the binary and the store are the
  * module's, fixed at composition, and a request can only ever choose a plan or an arc by name, a
- * word from the closed set of fourteen verbs, and — where the verb takes one — a word from the three
+ * word from the closed set of sixteen verbs, and — where the verb takes one — a word from the three
  * model words, the WIP grammar, the queue's three moves or the epic dial's seven words.
  *
  * A READ THAT FINDS NO PICTURE IS TOLD SO (`NOT_READ_YET` above), and the read waits a bound for one
  * first: the two together are what keep a handover from being drawn as an empty plan list.
  *
- * FIVE OF THE FOURTEEN ARE RELAYED TWICE, once under `/plans/:name` and once under `/arcs/:name`, because
+ * FIVE OF THE SIXTEEN ARE RELAYED TWICE, once under `/plans/:name` and once under `/arcs/:name`, because
  * the dispatcher's own doors open on both: `model`, `stop`, `resume` and the `arm-accept` /
  * `disarm-accept` pair take an arc's name as readily as a plan's. The two spellings are two routes
  * rather than one param because the NAME CLASSES differ (`PLAN_NAME` against `ARC_NAME` below) — a
  * fence that would be lost the moment one route accepted either adornment. `schedule` is a PLAN'S alone
  * here (the card's `Resume at …`): the deck's `Schedule start` is gone, though the terminal's
  * `dispatcher schedule <arc>` stays. `wip` and `queue` are an ARC'S ALONE: a feature carries no WIP word
- * and holds no place in a queue of epics, so neither has a plan route. `epics` and `start` are the
- * BOARD'S: the dial and the one Start name no plan and no arc, so they are the routes with no `:name`,
- * and their answers carry `plan: ""`.
+ * and holds no place in a queue of epics, so neither has a plan route. `epics` `start`, `hide` and
+ * `unhide` are the BOARD'S: the dial and the one Start name no plan and no arc, and Hide and Show carry any
+ * number of plan and epic names in their body (one route each, because one press may carry the whole
+ * Hidden list), so they are the routes with no `:name`, and their answers carry `plan: ""`.
  */
 export function createDispatcherRouter(dependencies: DispatcherRouterDependencies): express.Router {
   const router = express.Router();
@@ -420,6 +441,29 @@ export function createDispatcherRouter(dependencies: DispatcherRouterDependencie
       next(error); // one this lane has no word for: the app's error handler, as every route here
     }
   });
+
+  // HIDE AND SHOW (`dispatcher hide <name>…`, `dispatcher unhide <name>…`): the operator's hold on a plan
+  // and the way back. A BOARD verb pair like `epics` and `start` — the names travel in the body, plans'
+  // and epics' alike, because the dispatcher resolves each (plan first, then epic) and an epic's name
+  // hides every open plan of it — so the relay is handed the empty name and the argv is exactly
+  // `["hide", name, …]`. The dispatcher answers `HIDDEN <name>` / `SHOWN <name>` per name, or a
+  // `REFUSED hide|unhide …` (a 409 carrying that sentence, nothing written) — a finished plan, a plan that
+  // is not hidden.
+  for (const verb of ['hide', 'unhide'] as const) {
+    router.post(`/${verb}`, async (request, response, next) => {
+      const names = hideArgs(request.body);
+      if (names === null) {
+        response.status(400).json({ error: HIDE_BODY_ERROR });
+        return;
+      }
+      try {
+        const result = await dependencies.runVerb(verb, '', names);
+        response.status(statusForVerb(result)).json(result);
+      } catch (error) {
+        next(error); // one this lane has no word for: the app's error handler, as every route here
+      }
+    });
+  }
 
   return router;
 }
