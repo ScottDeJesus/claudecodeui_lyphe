@@ -84,7 +84,9 @@ const isUniqueConstraintError = (error: unknown): boolean => (
  * the same boundary.
  */
 export const createProviderModelsService = (dependencies: ProviderModelsServiceDependencies = {}) => {
-  const resolveProvider = dependencies.resolveProvider ?? providerRegistry.resolveProvider;
+  // Read at the CALL, not here: `providerModelsService` below is built while this module is evaluated, and the
+  // registry may still be mid-evaluation then (entered through a provider file, the read was a TDZ ReferenceError).
+  const resolveProvider = dependencies.resolveProvider ?? ((provider: string) => providerRegistry.resolveProvider(provider));
   const catalog = dependencies.catalog ?? providerModelsDb;
   const sessions = dependencies.sessions ?? sessionsDb;
 

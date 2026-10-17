@@ -496,6 +496,7 @@ section: README/011 Common Mistakes
 - Forgetting that Claude plugin skills are discovered differently from normal
   user/project skill folders.
 - Assuming one provider's MCP config file format works for the others.
+- Reading `providerRegistry` — or building a service on it (`createProviderModelsService()` resolves the registry) — at module-evaluation time. The registry builds its four providers on the FIRST call that needs one (`allProviders()`), because a provider's own files import services that import the registry; a provider built at evaluation made the import order decide whether the module loaded (`Cannot access 'providerRegistry' before initialization`, ten modules of `providers/` failing a cold import in a fresh process until 2026-10-17). A factory reads the registry inside the function it returns, never in its own body.
 
 ## MAN-7519 — The simple list's feed, four routes and simple_list_changed frame
 

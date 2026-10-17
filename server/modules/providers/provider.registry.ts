@@ -6,12 +6,26 @@ import type { IProvider } from '@/shared/interfaces.js';
 import type { LLMProvider, ProviderRuntimePermissionGateway } from '@/shared/types.js';
 import { AppError } from '@/shared/utils.js';
 
-const providers: Record<LLMProvider, IProvider> = {
-  claude: new ClaudeProvider(),
-  codex: new CodexProvider(),
-  cursor: new CursorProvider(),
-  opencode: new OpenCodeProvider(),
-};
+let providers: Record<LLMProvider, IProvider> | undefined;
+
+/**
+ * The four providers, built on the first call that needs one — never when this module is evaluated.
+ * A provider's own files import services that import this registry (`provider-models.service`,
+ * `session-synchronizer.service`, …), so building them at evaluation time made the module graph
+ * order-dependent: entered through the registry or through any provider file, the import ended
+ * `ReferenceError: Cannot access 'providerRegistry' / 'ClaudeProvider' before initialization` (ten
+ * modules of `providers/` failed a cold import in a fresh process), while the server's own entry
+ * order happened to work.
+ */
+function allProviders(): Record<LLMProvider, IProvider> {
+  providers ??= {
+    claude: new ClaudeProvider(),
+    codex: new CodexProvider(),
+    cursor: new CursorProvider(),
+    opencode: new OpenCodeProvider(),
+  };
+  return providers;
+}
 
 /**
  * The holders of asks the APP raised itself, beside the ones a provider's run raises — registered at
@@ -24,7 +38,7 @@ const appPermissionGateways = new Set<ProviderRuntimePermissionGateway>();
  */
 export const providerRegistry = {
   listProviders(): IProvider[] {
-    return Object.values(providers);
+    return Object.values(allProviders());
   },
 
   /**
@@ -38,7 +52,7 @@ export const providerRegistry = {
    * Roadmap tab's In flight face and the phone are where it is answered.
    */
   listPermissionGateways(): ProviderRuntimePermissionGateway[] {
-    const runtimes = Object.values(providers)
+    const runtimes = Object.values(allProviders())
       .map((provider) => provider.runtime.permissions)
       .filter((gateway): gateway is ProviderRuntimePermissionGateway => gateway !== undefined);
     return [...runtimes, ...appPermissionGateways];
@@ -46,7 +60,7 @@ export const providerRegistry = {
 
   resolveProvider(provider: string): IProvider {
     const key = provider as LLMProvider;
-    const resolvedProvider = providers[key];
+    const resolvedProvider = allProviders()[key];
     if (!resolvedProvider) {
       throw new AppError(`Unsupported provider "${provider}".`, {
         code: 'UNSUPPORTED_PROVIDER',
