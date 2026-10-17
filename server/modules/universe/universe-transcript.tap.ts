@@ -1,5 +1,6 @@
 import path from 'node:path';
 
+import { isClaudeTurnLookalike } from '@/shared/claude-transcript-rows.js';
 import { expandHome } from '@/shared/utils.js';
 import type { UniverseActivityInput } from '@/shared/types.js';
 
@@ -124,6 +125,9 @@ export function createTranscriptTap(dependencies: TranscriptTapDependencies): Tr
       return;
     }
     if (typeof record !== 'object' || record === null) return;
+    // A bookkeeping record that wears an assistant message (`api-request-blob`) replays tool calls the
+    // transcript already holds: every one of them would pulse its star a second time.
+    if (isClaudeTurnLookalike(record)) return;
     const message = (record as { message?: unknown }).message;
     if (typeof message !== 'object' || message === null) return;
     const content = (message as { content?: unknown }).content;

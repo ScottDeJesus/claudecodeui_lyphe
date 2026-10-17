@@ -73,6 +73,7 @@
           "server/shared/image-attachments.ts",
           "server/shared/message-unification.ts",
           "server/shared/local-commands.ts",
+          "server/shared/claude-transcript-rows.ts",
           "server/shared/child-env.ts",
           "server/shared/hidden-project-paths.ts",
           "server/shared/mcp-command.ts",

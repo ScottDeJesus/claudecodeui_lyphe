@@ -7,7 +7,8 @@ import { rgPath } from '@vscode/ripgrep';
 
 import { projectsDb, sessionsDb } from '@/modules/database/index.js';
 import { addSessionResult, listCompactedTranscriptRows } from '@/modules/providers/services/session-conversations-compacted.js';
-import { localCommandDisplayText, type LocalCommandPayload } from '@/shared/local-commands.js';
+import { isClaudeTurnLookalike, isResumePlaceholderRow } from '@/shared/claude-transcript-rows.js';
+import { localCommandDisplayText, stripTransparentWrapperPrefix, type LocalCommandPayload } from '@/shared/local-commands.js';
 import { isHiddenProjectPath } from '@/shared/hidden-project-paths.js';
 
 type AnyRecord = Record<string, any>;
@@ -417,6 +418,13 @@ function extractClaudeSearchableMessage(entry: AnyRecord): ClaudeSearchableMessa
     return null;
   }
 
+  // Neither is something said in the chat: a bookkeeping record that wears a turn's shape would
+  // surface every prompt a second time (a hit with no uuid and no time to jump to), and the CLI's
+  // resume stand-in would read as the chat's last assistant text.
+  if (isClaudeTurnLookalike(entry) || isResumePlaceholderRow(entry)) {
+    return null;
+  }
+
   const rawRole = entry.message.role;
   if (rawRole !== 'user' && rawRole !== 'assistant') {
     return null;
@@ -487,8 +495,10 @@ function extractClaudeSearchableMessage(entry: AnyRecord): ClaudeSearchableMessa
     return null;
   }
 
+  // A send with an image is a content array the CLI does not expand: its text block still wears the
+  // plain-mode `/plain `, which the chat takes off (`claude-sessions.provider.ts`) and a hit must too.
   return {
-    text,
+    text: rawRole === 'user' ? stripTransparentWrapperPrefix(text) : text,
     role: rawRole,
   };
 }

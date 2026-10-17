@@ -10024,3 +10024,57 @@ A scratch chain that sets `HEAL_LEDGER_PATH` files friction rows and opens the h
 - Proof commands and what they cover: MAN-8514.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/usage-hold-account-kick-entry.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/usage-hold-account-kick.sh, /home/lyphe/.claude/claudecodeui_lyphe/.verify/usage-hold-account-scratch.py
+
+## INV-8514 — probe — MEDIUM — a message sent with an image is drawn twice, and stays twice until the page reloads (plain mode on)
+
+MEDIUM — a message sent with an image is drawn twice, and stays twice until the page reloads (plain mode on)
+
+```probe
+D=$(mktemp -d /tmp/athena-p.XXXXXX) || exit 1
+cat > "$D/img.mts" <<'TS'
+import { ClaudeSessionsProvider } from '/home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-sessions.provider.ts';
+import { removeOptimisticUserEchoes } from '/home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/utils/sessionMessageReconciliation.ts';
+const provider = new ClaudeSessionsProvider();
+const png = 'iVBORw0KGgo=';
+const saved = (text: string) => ({ type: 'user', uuid: '11111111-2222-4333-8444-555555555555', sessionId: 's', timestamp: '2026-10-17T02:09:19.596Z',
+  message: { role: 'user', content: [{ type: 'text', text }, { type: 'image', source: { type: 'base64', media_type: 'image/png', data: png } }] } });
+const typed = 'In one word, what colour is the attached image?';
+const local: any = { id: 'local_1', kind: 'text', role: 'user', content: typed, timestamp: '2026-10-17T02:09:19.556Z', images: [{ data: `data:image/png;base64,${png}` }] };
+for (const [label, wire] of [['plain mode ON  (wire text "/plain …")', `/plain ${typed}`], ['plain mode OFF (wire text as typed)', typed]] as const) {
+  const server = provider.normalizeMessage(saved(wire), 'sess') as any[];
+  const kept = removeOptimisticUserEchoes(server, [local]);
+  console.log(`${label}: server rows ${server.length}, images ${server[0]?.images?.length}; optimistic echoes left on screen: ${kept.length}`);
+}
+process.exit(0);
+TS
+cat > "$D/p.sh" <<'EOF'
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+TSX_TSCONFIG_PATH=server/tsconfig.json timeout 120 node --import tsx "$1/img.mts" 2>&1 | tail -6
+EOF
+bash "$D/p.sh" "$D"
+cd /tmp; case "$D" in /tmp/athena-p.??????) rm -r "$D";; esac
+echo "[probe exit $?]"
+expect: `plain mode ON … optimistic echoes left on screen: 1` and `plain mode OFF … left on screen: 0` while the defect stands; cured when the ON line also prints 0
+```
+
+measured 2026-10-16 by chain chain-trailing-old-message-20261016-182307-9d20, finding M1, MEDIUM
+probe-key: 56916b9e81696df2b5a4ea20069f4e98df53b9c8
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-sessions.provider.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/services/session-conversations-search.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/claude-transcript-rows.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/local-commands.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/trailing-message-kit.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/trailing-old-message-before.sh, /home/lyphe/.claude/claudecodeui_lyphe/.verify/trailing-old-message-proof.mjs
+
+## INV-8515 — probe — LOW — the proof can pass without ever meeting the defect it is the proof of
+
+LOW — the proof can pass without ever meeting the defect it is the proof of
+
+```probe
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+echo "report.ok lines about blobs in the proof: $(grep -c 'report.ok(.*[Bb]lob' .verify/trailing-old-message-proof.mjs)"
+grep -n 'blobsPerPrompt' .verify/trailing-old-message-proof.mjs | cut -c1-150
+echo "[probe exit $?]"
+expect: `report.ok lines about blobs in the proof: 0` and one `[NOTE]` line that only prints the count, while the defect stands; cured when a report.ok line asserts blobsPerPrompt
+```
+
+measured 2026-10-16 by chain chain-trailing-old-message-20261016-182307-9d20, finding L1, LOW
+probe-key: a4738a37326b696e2545993f2a47495e6c5433e4
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-sessions.provider.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/services/session-conversations-search.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/claude-transcript-rows.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/local-commands.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/trailing-message-kit.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/trailing-old-message-before.sh, /home/lyphe/.claude/claudecodeui_lyphe/.verify/trailing-old-message-proof.mjs
