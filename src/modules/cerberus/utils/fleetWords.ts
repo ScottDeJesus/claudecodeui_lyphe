@@ -45,8 +45,8 @@ function fixingSentence(t: TFunction, by: 'auto' | 'you' | null): string {
  * - passing but for a mute: "2 of 3 passing · 1 muted";
  * - every check switched off on the service's own side: the status word, "Not enabled";
  * - passing: "Its check is passing", "All 3 checks passing".
- * The service's folded status picks the case, so the pill's glyph and its words never disagree; a run
- * going takes the pill's glyph too (●). A switched-off check is in no count, as the read model has it
+ * The service's folded status picks the case, so the pill's icon and its words never disagree; a run
+ * going takes the pill's icon too (the wrench). A switched-off check is in no count, as the read model has it
  * ("never counted in “of N checks”").
  */
 export function serviceSentence(t: TFunction, service: CerberusServiceView, run: CerberusRunView | null = null): string {

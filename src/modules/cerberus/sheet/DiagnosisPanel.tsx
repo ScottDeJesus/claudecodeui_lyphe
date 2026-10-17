@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { useCerberus } from '@/modules/cerberus/context/CerberusContext';
 import { useDiagnosis } from '@/modules/cerberus/hooks/useDiagnosis';
 import { FixOutput } from '@/modules/cerberus/sheet/FixOutput';
+import { MarkIcon } from '@/modules/cerberus/StatusMarks';
 import { UnreachableBanner } from '@/modules/cerberus/UnreachableBanner';
 import { RUN_LOOK } from '@/modules/cerberus/utils/cerberusStatus';
 import { hms } from '@/modules/cerberus/utils/cerberusTime';
@@ -51,7 +52,7 @@ function promotedEntry(promotedTo: string | null, catalog: CerberusCatalogEntryV
   return entry === undefined ? { retired: true, name: promotedTo } : { retired: false, name: entry.name, auto: entry.auto };
 }
 
-/** The pill: "Reading…" breathing in the info tone, "Ready 17:53:48" settled in neutral, "▲ Failed" in warn. */
+/** The pill: "Reading…" breathing in the info tone, "Ready 17:53:48" settled in neutral, "Failed" after a failed run's icon, in warn. */
 function DiagnosisPill({ diagnosis, t }: { diagnosis: CerberusDiagnosisView; t: TFunction }) {
   if (diagnosis.status === 'running') {
     return (
@@ -63,7 +64,7 @@ function DiagnosisPill({ diagnosis, t }: { diagnosis: CerberusDiagnosisView; t: 
   if (diagnosis.status === 'failed') {
     return (
       <Badge as="span" tone={RUN_LOOK.failed.tone} className="gap-1.5 whitespace-nowrap motion-safe:animate-cerberus-check">
-        <span aria-hidden className="flex-none">{RUN_LOOK.failed.glyph}</span>
+        <MarkIcon icon={RUN_LOOK.failed.icon} className="size-3.5" />
         <span>{t('cerberus.diagnosis.failed')}</span>
       </Badge>
     );
@@ -148,7 +149,7 @@ type DiagnosisPanelProps = {
 /**
  * THE DIAGNOSIS, read-only (`design/cerberus/Cerberus Tab.dc.html` :447-487; the composition in full: MAN-7932), in
  * the check sheet between Fix output and "Fixes in the catalog": the pill ("Reading…" info, "Ready 17:53:48" neutral —
- * a document, not a health signal — "▲ Failed" warn) in the one polite region; the scope; the steps, folded into one
+ * a document, not a health signal — "Failed" warn, with a failed run's icon) in the one polite region; the scope; the steps, folded into one
  * line once it is over so the answer stands near the top; the summary, the evidence and the Proposed fix box, with the
  * one-off's output straight under it, where "Running now — output below" points.
  *

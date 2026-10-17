@@ -2364,7 +2364,7 @@ The fixes screen, the catalog and the auto-run rule shown end to end: a real Run
 |---|---|---|
 | `.verify/cerberus-fixes-whole-live.mjs` | Run now on `docstore/backup.age`, pressed in the sheet as a person presses it | the live app on :5183 (`openConsole`, `openNodeCard`), `~/.cloudcli/cerberus.db` read-only |
 | `.verify/cerberus-fixes-whole-scratch.sh` | auto-run once inside its limit, the recheck, a refused `run.start` | a scratch center (`scripts/sunset-probe.sh`) and a scratch warden |
-| `.verify/cerberus-fixes-refused-shot.mjs` | `FixOutput` reads "✕ Refused" and the refusal's reason over a real run view | the running :5183 client, the scratch center's answer |
+| `.verify/cerberus-fixes-refused-shot.mjs` | `FixOutput` reads "Refused" after the refusal's crossed-octagon icon (`lucide-octagon-x`), and the refusal's reason, over a real run view | the running :5183 client, the scratch center's answer |
 
 ## Run it
 | when | do |
@@ -2376,7 +2376,7 @@ The fixes screen, the catalog and the auto-run rule shown end to end: a real Run
 ## `cerberus-fixes-whole-live.mjs`
 - Opens eis1's card, the Document store row (the sheet opens on `docstore/backup.age`), presses "Run now" under "Fixes in the catalog", polls the page every 200 ms and prints each change of the pill, the pane's lines and the check's value.
 - Starts a REAL `docstore/bin/backup` (one `pg_dump`, ~18 s): `docstore-<weekday>.dump` is overwritten. No model is called.
-- Verdicts, all required: the POST answered 200 with a `runId`; `GET /api/cerberus/runs/<id>` is `by: you`, `result: ok`, `exit: 0`; its lines carry `backup: …/docstore-<weekday>.dump <bytes> bytes` with an offset `t`; the pane shows that line; the pill reads "✓ Succeeded"; the check's value reads "Newest file written <n> s ago (docstore-<weekday>.dump)" with n < 60; the entry has exactly one more run in the store; no console error while signed in.
+- Verdicts, all required: the POST answered 200 with a `runId`; `GET /api/cerberus/runs/<id>` is `by: you`, `result: ok`, `exit: 0`; its lines carry `backup: …/docstore-<weekday>.dump <bytes> bytes` with an offset `t`; the pane shows that line; the pill reads "Succeeded" after its circle-check icon (`lucide-circle-check`); the check's value reads "Newest file written <n> s ago (docstore-<weekday>.dump)" with n < 60; the entry has exactly one more run in the store; no console error while signed in.
 - Output: `steps.txt` and the screenshots (1440×900 running, 1440×900 and 390×844 ended, 390×844 pane) in `<dir>`.
 - No guard for the 03:25–03:35 backup `flock` (`state/docstore/backup.lock`): a press then ends `failed` (MAN-7925).
 
@@ -2406,7 +2406,7 @@ The fixes screen, the catalog and the auto-run rule shown end to end: a real Run
 - Reads the run from the scratch center (`<run url>`, token in `SCRATCH_TOKEN`) and hands it to the component through a Playwright route on `**/api/cerberus/runs/<id>`. why: the component reads through the live client's API base, not `$SUNSET_API`.
 - Mounts the running client's own `FixOutput` and `WebSocketContext` with `lib/mountReact.mjs` (specifiers read from served source), a quiet socket, at 1440×900 and 390×844.
 - Writes `fix-output-<expect>-<w>x<h>.png`; `expect` is the pill word, default `Refused`.
-- Six verdicts per size: pill glyph + word; eyebrow "Fix output"; the run's name; the pane's first line `$ <cmd>`; the run's note in the pane; no page error. A refused run whose `note` is null fails the note verdict; any other result accepts a null note.
+- Six verdicts per size: pill word + its `RUN_LOOK` icon (the svg's `lucide-*` class; "Failed" and "Failed · exit N" take the triangle); eyebrow "Fix output"; the run's name; the pane's first line `$ <cmd>`; the run's note in the pane; no page error. A refused run whose `note` is null fails the note verdict; any other result accepts a null note.
 - Exit 1 when any verdict failed at either size.
 
 ## Rules
@@ -3144,3 +3144,37 @@ The tool sets as one system on the real app: two Haiku scratch chats (A, B), fiv
 - Sizes: `toolset-whole.mjs` 610 lines, `toolset-whole-kit.mjs` 301, `toolset-menu-kit.mjs` 34, `toolset-probe-server-source.mjs` 43.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/toolset-menu-kit.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/toolset-probe-server-source.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/toolset-whole-kit.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/toolset-whole.mjs
+
+## MAN-8551 — Cerberus Needs you, read for urgency — .verify/cerberus-needs-you-severity.mjs: what it proves, how to run it, the verdicts
+
+Browser gate for the Needs-you card's severity: order, tone, stripe, tinted head, icon, contrast. Rules it checks: MAN-7808 (`needsYouOrder`), MAN-7879 (the card), MAN-7873 (`STATUS_TABLE`).
+
+## Run
+`node .verify/cerberus-needs-you-severity.mjs <evidence dir>`; exit 0 when every verdict passes, 1 on any FAIL, 2 without the dir. Needs the running :5183 client (`openConsole`, `openCerberusTab`).
+
+## What it does
+1. Reads the live `/api/cerberus/overview` once (a GET made by the script, not by the page).
+2. Answers the page's overview request with that copy, `needsYou` rewritten to five checks on live services: `warn`, `denied`, `warn`, `failing`, `warn`, `since` rising in that order; `counts.needsYou` 5.
+3. Serves the five in the order the server under test would send: sorted by `needsYouOrder`, imported straight from `server/modules/cerberus/read-model/status-rules.ts` (Node loads the `.ts`); a server with no such export gets them as written (oldest `since` first). why: a stub never passes through the server and the client keeps the order it is sent.
+4. Photographs 1280×800 and 390×844 (`isMobile`, `hasTouch`), dark and light: four PNGs in the evidence dir.
+5. Aborts and counts every non-GET to `/api/cerberus/`; nothing the page does reaches a write.
+
+## Verdicts, per width and theme
+| verdict | passes when |
+|---|---|
+| order | cards draw `denied, failing, warn, warn, warn` |
+| tone | each card's `<li>` carries its status's `data-tone` (`danger`, `warn`, `warn`) |
+| icon | each card's mark is a lucide icon; `denied`, `failing`, `warn` draw three different ones |
+| stripe | each card has its 4 px accent bar |
+| head | `denied` and `failing` tint the header band; `warn` does not |
+| word | each card says its status in words |
+| contrast | each header line on a tinted head is ≥ 4.5:1, or ≥ its contrast on a plain card where that is lower |
+| console | zero console or page errors |
+
+Once per run: the live server's own `needsYou` is in `needsYouOrder`; the five as written are oldest `since` first; no write was tried.
+
+## Measured
+- 2026-10-17 before the change: exit 1, 20 FAIL (no `data-tone`, no stripe, glyph text). After: exit 0, all pass.
+- Plain light card's raw key measures 3.34:1 (the house's faint ink); the gate accepts it because it demands no more than the plain card gives.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/cerberus-needs-you-severity.mjs

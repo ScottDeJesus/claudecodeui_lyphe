@@ -2346,7 +2346,7 @@ export type NoteInput = { title: string; description: string };
 //----------------- CERBERUS STATUS VOCABULARY ------------
 // How the Cerberus tab draws a status. The one table that fills it is
 // `src/modules/cerberus/utils/cerberusStatus.ts`, and the marks that paint it are
-// `src/modules/cerberus/StatusMarks.tsx`. Nothing else in the tab decides a status's tone, glyph or shape.
+// `src/modules/cerberus/StatusMarks.tsx`. Nothing else in the tab decides a status's tone, icon or shape.
 
 /**
  * The shape of a status's minute cell, and of a service's square in a collapsed node card. The shape
@@ -2413,9 +2413,9 @@ export type CerberusProjectMove = 'moved' | 'refused' | 'failed';
 export type FleetStatus = Exclude<CerberusStatus, 'not_enabled'> | 'fixing' | 'updating' | 'enrolling' | 'empty';
 
 /**
- * What a node's or a service's mark can be drawn as: any check status, or `fixing`, a fix running (info
- * ●, `FLEET_FIXING_LOOK`). `nodeMark` answers it for a node's word; `markLook` turns it into the tone,
- * glyph, shape and word every mark is painted from.
+ * What a node's or a service's mark can be drawn as: any check status, or `fixing`, a fix running (the
+ * info wrench, `FLEET_FIXING_LOOK`). `nodeMark` answers it for a node's word; `markLook` turns it into the
+ * tone, icon, shape and word every mark is painted from.
  */
 export type CerberusMark = CerberusStatus | 'fixing';
 

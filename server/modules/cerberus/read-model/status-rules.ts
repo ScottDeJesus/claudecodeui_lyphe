@@ -1,4 +1,4 @@
-import type { CerberusStatus, CerberusStoredStatus } from '@/shared/cerberus-types.js';
+import type { CerberusNeed, CerberusStatus, CerberusStoredStatus } from '@/shared/cerberus-types.js';
 
 /**
  * How bad each word is, the one ranking every worst-of in the read model uses: a window of a check, a
@@ -111,4 +111,24 @@ export function statusOf(word: string | null): CerberusStatus {
  */
 export function needsAttention(status: CerberusStatus): boolean {
   return SEV[status] >= SEV.warn;
+}
+
+/**
+ * The order "Needs you" lists its checks in: worst first by `SEV` (denied, then failing, then warn),
+ * so the card to act on first is the first one read. Within one word, the oldest `since` first, a
+ * check whose beginning ingest does not know after the ones it does; then key, then node, so the
+ * order is stable from one read to the next.
+ *
+ * Consumers: `overview.ts` (`needsYou`). It lives here, beside `SEV`, pure, so the browser gate
+ * `.verify/cerberus-needs-you-severity.mjs` loads this very function to order the stand-in `needsYou`
+ * it serves: a stand-in answer never passes through the server.
+ */
+export function needsYouOrder(a: CerberusNeed, b: CerberusNeed): number {
+  const bySeverity = SEV[b.check.status] - SEV[a.check.status];
+  if (bySeverity !== 0) return bySeverity;
+  const sinceA = a.check.since ?? Number.POSITIVE_INFINITY;
+  const sinceB = b.check.since ?? Number.POSITIVE_INFINITY;
+  if (sinceA !== sinceB) return sinceA < sinceB ? -1 : 1;
+  if (a.check.key !== b.check.key) return a.check.key < b.check.key ? -1 : 1;
+  return a.check.node < b.check.node ? -1 : a.check.node > b.check.node ? 1 : 0;
 }

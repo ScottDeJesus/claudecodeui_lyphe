@@ -33,7 +33,7 @@ The Cerberus tab: the fleet's health on the house row. One provider reads `GET /
 - Every endpoint is a verb of `api.cerberus` in `src/shared/api.ts`.
 - Layout of the module: `context/` (provider), `hooks/`, `utils/` (pure), `fleet/`, `sheet/`, `history/`, `catalog/` (the Catalog view), `modals/` (the dialogs).
 - Colour: no hex, `rgba(` or `var(--` in a className or style under `src/modules/cerberus/` (2026-10-06: none outside one comment). Tone reaches paint only as `data-tone` plus a `tone-*` name (MAN-739 rule 3); the set stays five, so denied is `danger` (MAN-739 rule 4).
-- A status is painted from one table, `STATUS_TABLE` (MAN-7873), and a state that speaks in colour also carries its glyph or word (MAN-578).
+- A status is painted from one table, `STATUS_TABLE` (MAN-7873), and a state that speaks in colour also carries its icon or word (MAN-578).
 - Words: every sentence is a `cerberus.*` key through `t()`, English only; a label, reason, node name or description is data, never a key (MAN-7870).
 - No unit tests: each seam is shown on the real app against the live center.
 
@@ -107,9 +107,9 @@ The tab's six motions, named in `tailwind.config.js` (`keyframes` + `animation`)
 | name | motion | drawn by |
 |---|---|---|
 | `cerberus-ring-warn` | halo of the warn dot, `box-shadow` 0 → 8px as it fades; 1.8 s ease-out, infinite | a mark that needs you: `StatusGlyph` while `failing` (not `still`), the rings' node dot while `failing` and not selected, the newest cell of a service row while `failing` |
-| `cerberus-breathe` | opacity 1 ↔ .5; 2.6 s ease-in-out, infinite | `Heartbeat` (`NodeCard.tsx`) while the warden is reporting (`link === 'reporting'`, so never while `paused`); the clock pill's dot while live (`CerberusHeader.tsx`); the newest cell of a service row that is not failing; the running ● of a fix's output header while it goes (`FixOutput.tsx`) |
+| `cerberus-breathe` | opacity 1 ↔ .5; 2.6 s ease-in-out, infinite | `Heartbeat` (`NodeCard.tsx`) while the warden is reporting (`link === 'reporting'`, so never while `paused`); the clock pill's dot while live (`CerberusHeader.tsx`); the newest cell of a service row that is not failing; the running wrench of a fix's output pill while it goes (`FixOutput.tsx`) |
 | `cerberus-travel` | a beat from the node's end of a spoke to the hub (`left: 100%` → `0`), in over the first 12%, out over the last 15%; 3.2 s linear, infinite | `FleetRings.tsx`, on a live spoke (MAN-7886) |
-| `cerberus-check` | a ✓ grows .4 → 1 as it fades in; .6 s `--ease-spring`, both | `NeedsYouCard.tsx`'s quiet ✓ (100 ms delay), a landed step in `EnrollInstall.tsx`, the hello mark in `EnrollDialog.tsx` (as an arbitrary `animate-[…]` beside `vv-ring`), the Catalog's empty-state ✓ (`CatalogView.tsx`, 200 ms delay), the result badge of a fix's output once it ended (`FixOutput.tsx`), and the "Ready" and "Failed" badges of a diagnosis (`DiagnosisPanel.tsx`) |
+| `cerberus-check` | a ✓ grows .4 → 1 as it fades in; .6 s `--ease-spring`, both | `NeedsYouCard.tsx`'s quiet passing glyph (100 ms delay), a landed step in `EnrollInstall.tsx`, the hello mark in `EnrollDialog.tsx` (as an arbitrary `animate-[…]` beside `vv-ring`), the Catalog's empty-state ✓ (`CatalogView.tsx`, 200 ms delay), the result badge of a fix's output once it ended (`FixOutput.tsx`), and the "Ready" and "Failed" badges of a diagnosis (`DiagnosisPanel.tsx`) |
 | `cerberus-line` | a rise from 5px below; .35 s `--ease-enter`, both | `history/LookupCard.tsx`: each answer of the look-up as it arrives; each output line of a fix as it arrives (`FixOutput.tsx`), each step of a diagnosis as it is said (`DiagnosisPanel.tsx`), each step line of an update (`UpdateWardensDialog.tsx`) |
 | `cerberus-caret` | on 0–49%, off 50–100%, no tween; 1 s `steps(1)`, infinite | the cursor block after the output of a fix that is still going (`FixOutput.tsx`) |
 
@@ -153,7 +153,7 @@ Every word the Cerberus screen draws, in the top-level `cerberus` block of `src/
 - `status.*` is keyed by the status value itself (`ok warn failing denied not_enabled unknown muted paused`): `` t(`cerberus.status.${status}`) `` needs no map. Every legend or cell that names a status reads it; only a different word has its own key.
 - `{{word}}` is the lowercased status word, passed by the caller: `lookup.was`, `lookup.wasNoValue`, `service.oneBad`, `node.bad`, `activity.check.other`.
 - A reason, a check label and a node description are data, never keys. The server stores "No reason given" itself (`NO_REASON_GIVEN`, `server/modules/cerberus/mutes.service.ts`), so the mute dialog has no key for it.
-- Glyphs `✓ ▲ ✕ — · ●` stay in code (`RUN_LOOK`, MAN-7873). The two keys with a glyph inside: `enroll.copied` (`✓ Copied`) and `needs.word` (`· {{word}}`). `needs.quiet` carries no `✓`: the badge draws it.
+- A status's or a run's mark is a lucide icon in code (`STATUS_TABLE`, `RUN_LOOK`, MAN-7873), never in the words. Text characters still in code: the update dialog's `✓ ✕ ▲ ●` (MAN-7934), the diagnosis steps' `● ✓` and `↳`, the enroll ticks' `✓`. The two keys with a glyph inside: `enroll.copied` (`✓ Copied`) and `needs.word` (`· {{word}}`). `needs.quiet` carries no `✓`: the badge draws it.
 - A two-part headline is two keys, the second drawn in the accent by code: `header.headline.quiet` + `quietAccent`, `needs_*` + `needsAccent_*`, `enroll.title` + `titleAccent`, `enroll.helloLead` + `helloAccent`.
 - `node.projects.refusedLead` + `refused` are `PROJECT_NODE_NOT_COLOCATED` said in words, in `NodeProjects`' warn banner; the server's two sentences under that code ("not enrolled", "not on this machine") are not shown. `toast.here` and `toast.back` are the toasts the provider's `setProjectNode` raises when a move lands; `toast.hereWaiting` is `toast.here`'s message while the node's warden is not reporting, the case `notReporting` names under the section's heading. `node.sessions_*` carries no `·`: `sessionsTail` (`utils/fleetWords.ts`) draws it, after the warden line's words and only while the warden reports. Its words are bound by no-break spaces (` `), and the code joins the dot to them with one, so on a phone the phrase wraps whole rather than leaving "here" alone.
 - `enroll.notListening` is `CERBERUS_NOT_LISTENING` said in words, drawn by `EnrollRefusal` (MAN-7884) both after a 409 and up front while the overview says the gateway is not listening.
@@ -167,7 +167,7 @@ Every word the Cerberus screen draws, in the top-level `cerberus` block of `src/
 - `catalog.count_*`, `catalog.stats.allOk_*` / `someOk_*` and `catalog.auto.on_*` are plural pairs on `count`; `catalog.auto.on_hour_*` / `on_day_*` pick by `context` (`hour` or `day`).
 - `promote.from_*` and `promote.perHour_*` are plural pairs on `count`; `promote.autoOn` picks `autoOn_warn` by `context` (the entry's `when`), and falls back to `autoOn` for `failing`. `diagnosis.steps_*` is a plural pair on `count`, with `{{from}}` and `{{to}}` (the first and last step's `hms()`; `_one` has no range). `diagnosis.ready`, `.proposal.ranOnce`, `.proposal.refused`, `.proposal.expired` and `promote.from_*` take `{{time}}` as `hms()`; `.proposal.unpublished` takes `{{node}}`. `promote.generalized`'s `{{used}}` and `{{saved}}` are spans of the proposal's two commands, `saved` read through `promote.last` + `time.minutes` / `time.hours` when it is a relative window (MAN-7932). A summary, a piece of evidence, an error and a command are data, never keys.
 - `updates.kept_*`, `updates.start_*` and `updates.missed_*` are plural pairs on `count`; `kept_*` counts the versions kept for rollback, its `{{from}}` one version or `updates.versions` joining several. A version, a release note, a node's id and a warden's step sentence are data, never keys; `note` drops the release note's own trailing full stop. The ✓ before `updated` and `done`, the ✕ before `rolledBack`, the ▲ before a failed step's sentence and before `missed_*`, and the running ● stay in code (MAN-7934). `activity.warden.*` (8: `started`, `startedSummary_*`, `updated`, `updatedKept`, `rolledBack`, `rolledBackUnknown`, `failed`) and `activity.source.warden` are the warden update's lines of What happened.
-- `diagnosis.proposal.ranOnce`'s `{{result}}` is `proposal.result.*` (`ok`, `failed`, `timedOut`), so a run that did not succeed never says "succeeded"; a refusal never started, so it is `proposal.refused`, never "Ran once"; the ↳ before a piece of evidence, the ✓ before `promotedOff` / `promotedOn` and the ▲ before `diagnosis.failed` stay in code.
+- `diagnosis.proposal.ranOnce`'s `{{result}}` is `proposal.result.*` (`ok`, `failed`, `timedOut`), so a run that did not succeed never says "succeeded"; a refusal never started, so it is `proposal.refused`, never "Ran once"; the ↳ before a piece of evidence, and the ✓ before `promotedOff` / `promotedOn` stay in code; the `diagnosis.failed` pill draws `RUN_LOOK.failed`'s icon before the word.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/common.json
 
@@ -330,7 +330,7 @@ The Cerberus tab's pure half: the overview as sorted fleet items, filter counts,
 | `src/modules/cerberus/fleet/fleetModel.ts` | `fleetItems`, `groupOf`, `filterGroups`, `applyFilter`, `defaultExpanded`, `ringsLayout` |
 | `src/modules/cerberus/utils/activityEvents.ts` | `toTimelineEvent(activity, t, now)` |
 | `src/shared/types.ts` § CERBERUS FLEET MODEL | `FleetStatus`, `FleetGroup`, `FleetFilter`, `FleetFilterGroup`, `FleetService`, `FleetItem`, `RingSpokeKind`, `RingsNode`, `RingsLayout`, `FleetLayout`, `FleetEntry` (client-only; the Fleet views read them: MAN-7880) |
-| `src/modules/cerberus/utils/cerberusStatus.ts` | `STATUS_TABLE`: the one owner of a status's tone, glyph, word key and cell shape; `activityEvents.ts` and the marks read it: MAN-7873 |
+| `src/modules/cerberus/utils/cerberusStatus.ts` | `STATUS_TABLE`: the one owner of a status's tone, icon, word key and cell shape; `activityEvents.ts` and the marks read it: MAN-7873 |
 
 ## Functions — `fleetModel.ts`
 | function | answers |
@@ -395,7 +395,7 @@ The Cerberus tab's drawing vocabulary and the check sheet's three pieces. Pure o
 | file | holds |
 |---|---|
 | `src/modules/cerberus/utils/cerberusStatus.ts` | `STATUS_TABLE`; `RUN_LOOK`, `FLEET_FIXING_LOOK`; `markLook(mark)`, the look a mark paints from (`STATUS_TABLE`'s row, or `FLEET_FIXING_LOOK` for `fixing`); `nodeMark(status)`, the mark a node's word draws with (`null` for `empty`, `enrolling`; `fixing` for `updating`), read by the node card and the rings |
-| `src/modules/cerberus/StatusMarks.tsx` | `StatusGlyph`, `StatusCell`, `StatusSquare`, `StatusPill` (each takes a `CerberusMark`: a status, or `fixing`) |
+| `src/modules/cerberus/StatusMarks.tsx` | `MarkIcon`; `StatusGlyph`, `StatusCell`, `StatusSquare`, `StatusPill` (each takes a `CerberusMark`: a status, or `fixing`) |
 | `src/modules/cerberus/sheet/MinuteCells.tsx` | `MinuteCells` |
 | `src/modules/cerberus/sheet/LookupMoment.tsx` | `LookupMoment`, `LookupSentence`, `SentenceRow` |
 | `src/modules/cerberus/sheet/RecordedResults.tsx` | `RecordedResults` |
@@ -404,37 +404,38 @@ The Cerberus tab's drawing vocabulary and the check sheet's three pieces. Pure o
 No file outside the module imports the marks or the sheet pieces. Inside it, `sheet/CheckSheet.tsx` composes `MinuteCells`, `LookupMoment` and `RecordedResults` (MAN-7878) and `history/LookupCard.tsx` composes `LookupSentence`, `SentenceRow`, `MinuteCells` and `RecordedResults` (MAN-7877).
 
 ## `STATUS_TABLE` — the one owner
-`Record<CerberusStatus, { tone, glyph, wordKey, cell }>`. Nothing else in the tab decides a status's tone, glyph or shape; a view reads it here. `activityEvents.ts` reads it too (MAN-7872).
+`Record<CerberusStatus, { tone, icon, wordKey, cell }>`. `icon` is a lucide `LucideIcon`. Nothing else in the tab decides a status's tone, icon or shape; a view reads it here. `activityEvents.ts` reads it too (MAN-7872).
 
-| status | tone | glyph | cell |
+| status | tone | icon | cell |
 |---|---|---|---|
-| `ok` | positive | ✓ | `soft` |
-| `warn` | warn | ▲ | `outline` |
-| `failing` | warn | ▲ | `solid` |
-| `denied` | danger | ✕ | `solid` |
-| `not_enabled` | neutral | · | `flat` |
-| `unknown` | neutral | — | `dashed` |
-| `muted` | neutral | — | `surface` |
-| `paused` | neutral | — | `dashed` |
+| `ok` | positive | `CircleCheck` | `soft` |
+| `warn` | warn | `TriangleAlert` | `outline` |
+| `failing` | warn | `OctagonAlert` | `solid` |
+| `denied` | danger | `OctagonX` | `solid` |
+| `not_enabled` | neutral | `CircleDashed` | `flat` |
+| `unknown` | neutral | `Clock` | `dashed` |
+| `muted` | neutral | `BellOff` | `surface` |
+| `paused` | neutral | `CirclePause` | `dashed` |
 
 - `wordKey` = `cerberus.status.<status>` (MAN-7870).
 - `denied` is the only red; a sixth tone for it is refused (MAN-739 rule 4).
-- `unknown` and `paused` draw the same cell: no reading either way; only the word says why.
+- The three that need you differ by outline alone (crossed octagon, octagon with `!`, triangle with `!`); measured at 8× zoom.
+- `unknown` and `paused` draw the same tone and cell: no reading either way. Where a mark has room the icon says why (`Clock`, `CirclePause`); the word always does.
 - `not_enabled` never needs you.
 
 ## `RUN_LOOK` and `FLEET_FIXING_LOOK` — a fix's look
-`RUN_LOOK: Record<'going' | 'ok' | 'failed' | 'timed_out' | 'refused', { tone, glyph }>`: how a fix's run is drawn. A refusal is a run's outcome, never a check's status, so it is no row of `STATUS_TABLE`.
+`RUN_LOOK: Record<'going' | 'ok' | 'failed' | 'timed_out' | 'refused', { tone, icon }>`: how a fix's run is drawn. A run wears the icon of the status it reads like (`ok`, `warn`, `denied`). A refusal is a run's outcome, never a check's status, so it is no row of `STATUS_TABLE`.
 
-| run | tone | glyph |
+| run | tone | icon |
 |---|---|---|
-| `going` | info | ● |
-| `ok` | positive | ✓ |
-| `failed`, `timed_out` | warn | ▲ |
-| `refused` | danger | ✕ |
+| `going` | info | `Wrench` |
+| `ok` | positive | `CircleCheck` |
+| `failed`, `timed_out` | warn | `TriangleAlert` |
+| `refused` | danger | `OctagonX` |
 
-- Read by `fleet/NeedFix.tsx` (the strip; a run that succeeded takes the glyph but a neutral tone) and `sheet/FixOutput.tsx` (the pill): MAN-7906; and by `sheet/DiagnosisPanel.tsx` (its ▲ Failed pill, and its one-off's ran line in the result's ink): MAN-7932. The glyph stays in code (MAN-7870).
-- `FLEET_FIXING_LOOK: { tone, glyph, cell, wordKey, glyphMotion }` = `RUN_LOOK.going`'s tone, ●, cell `solid`, `cerberus.fix.fleet.running`, `glyphMotion` `vv-pulse` 1.4 s: how the fleet draws a node or service with a fix running (`fixing`), through `markLook`; the glyph, the pill's ● and the ring dot pulse in place of the failing ring. The `solid` cell makes every paint map keyed by shape draw it as the prototype does: the tile edged 1.5 px in the info dot, ring dot and service square filled.
-- `fixing` is fed from `overview.running` (`fleetModel.runOnService`) and drawn by `NodeGlyph`, the tile's edge, the rings' dot, hub and label glyph and panel (`nodeMark` → `markLook`), `nodeLine` ("Fix running on its own" / "Fix running" by `FleetItem.fixBy`), the service row's pill and the collapsed card's squares (`serviceSentence(t, service, run)`), and the rings' key row. An `updating` node draws the same ● and shares the rings' key row ("Fix running or updating"); `enrolling` shares it too.
+- Read by `fleet/NeedFix.tsx` (the strip; a run that succeeded takes the icon but a neutral tone) and `sheet/FixOutput.tsx` (the pill): MAN-7906; and by `sheet/DiagnosisPanel.tsx` (its Failed pill, and its one-off's ran line in the result's ink): MAN-7932. Each draws the icon through `MarkIcon` (MAN-7874).
+- `FLEET_FIXING_LOOK: { tone, icon, cell, wordKey, glyphMotion }` = `RUN_LOOK.going`'s tone and icon (`Wrench`), cell `solid`, `cerberus.fix.fleet.running`, `glyphMotion` `vv-pulse` 1.4 s: how the fleet draws a node or service with a fix running (`fixing`), through `markLook`; the glyph, the pill's wrench and the ring dot pulse in place of the failing ring. The `solid` cell makes every paint map keyed by shape draw it as the prototype does: the tile edged 1.5 px in the info dot, ring dot and service square filled.
+- `fixing` is fed from `overview.running` (`fleetModel.runOnService`) and drawn by `NodeGlyph`, the tile's edge, the rings' dot, hub and label icon and panel (`nodeMark` → `markLook`), `nodeLine` ("Fix running on its own" / "Fix running" by `FleetItem.fixBy`), the service row's pill and the collapsed card's squares (`serviceSentence(t, service, run)`), and the rings' key row. An `updating` node draws the same wrench and shares the rings' key row ("Fix running or updating"); `enrolling` shares it too.
 
 ## `CerberusCellShape` — paint in `StatusMarks.tsx` `CELL_PAINT`
 | shape | paint | reads as |
@@ -457,14 +458,15 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/index.css, /home/lyphe/.clau
 
 | mark | props | draws |
 |---|---|---|
-| `StatusGlyph` | `status` (a `CerberusMark`: a status, or `fixing`, the info ● that pulses), `size` `sm`\|`md`\|`lg` (20, 24, 32 px; default `md`), `decorative`, `still` | round glyph in the tone's ink on its wash |
+| `MarkIcon` | `icon` (a `LucideIcon` from a look), `className` | the icon, `aria-hidden`, `strokeWidth` 2.25, `flex-none`; the caller gives size, flow and motion |
+| `StatusGlyph` | `status` (a `CerberusMark`: a status, or `fixing`, the info wrench that pulses), `size` `sm`\|`md`\|`lg` (rounds of 20, 24, 32 px holding icons of 12, 14, 18 px; default `md`), `decorative`, `still` | round glyph holding the table's icon in the tone's ink on its wash |
 | `StatusCell` | `status`, `label`, any span attribute | one minute; the caller gives size, flow and role |
 | `StatusSquare` | `status`, `label` | 10 px square in the cell's shape, with `title` |
-| `StatusPill` | `status`, `text` | `Badge` (`tone`) holding glyph then word or `text`; `text` is cut with an ellipsis |
+| `StatusPill` | `status`, `text` | `Badge` (`tone`) holding a 14 px icon then word or `text`; `text` is cut with an ellipsis |
 
 - `StatusGlyph` names its word as `role="img"` + `aria-label` + `title`; `decorative` replaces that with `aria-hidden` (the word is written beside it).
 - `StatusGlyph` rings only for `failing` and not `still`. A lookup's glyph is `still`: the ring means needs you NOW, and a looked-up moment may be long past.
-- `·` is drawn at 1.8em inside the glyph; the glyph still comes from the table.
+- `MarkIcon` is the one way the module draws a look's icon: the rings' hub and labels, a Needs-you card's run strip, Fix output's pill and the diagnosis panel's Failed pill use it too. Stroke 2.25 is the one that still reads at 12 px. No mark draws a status as a text character.
 - `StatusCell` and `StatusSquare` default `label` to the bare word; a caller passes the sentence (`Shadow connector · All 4 checks passing`).
 - `StatusPill` is the library's `Badge`: every tone pill in the app shares one paint.
 
@@ -539,7 +541,7 @@ The Cerberus tab's History view, filled and live: `HistoryView` reads the check 
 | piece | rule |
 |---|---|
 | `checks`, `checksFailed` | `api.cerberus.checks()` once on mount (the effect keyed by `indexAsks`; Try again adds one, never a poll); `checks` is `null` until it answers, `checksFailed` while the latest read did not |
-| `chosen` | `<node>/<key>`, `null` at first. Set ONCE, during render, when the index has a check and the overview has answered (or failed): the check that has needed you longest (`overview.needsYou[0]`), else `checks[0]`. A later read never moves it |
+| `chosen` | `<node>/<key>`, `null` at first. Set ONCE, during render, when the index has a check and the overview has answered (or failed): the check that has needed you longest (the oldest `since` among `overview.needsYou`, then key, then node: the overview lists them worst first, so `firstChoice` picks it), else `checks[0]`. A later read never moves it |
 | `date`, `time` | the fields' text: today and now at first; `""` while cleared or half typed |
 | `moment` | the last WHOLE moment the two fields named (`momentOf`), epoch ms; while a field is not whole it stands. `lookupAt` and `end` of `useCheckDetail` are both `moment`, so the 60 cells and the recorded results follow the moment looked up |
 | `opened` | `Date.now()` when the view opened; the date, time and `moment` start there, and it is `now` until the overview's first read |
@@ -686,11 +688,13 @@ Takes `t` and `now` from the caller, so a sentence is a function of what it is h
 - A restart is `link === 'paused'`, which outranks silence for as long as the update runs; when the update fails the node reads silent, and that is the thing to see.
 - A switched-off service counts as passing for the node.
 - `serviceSentence` also names a service's square in a collapsed card (`node.squareTip`).
-- The service's folded status picks the case, so the pill's glyph and words never disagree.
+- The service's folded status picks the case, so the pill's icon and words never disagree.
 
 ## `NeedsYouCard`
 `NeedsYouCard({ needs, muted, counts, now, onOpen, onMute })`.
-- Cards in the read model's order (oldest `since` first); each: glyph, label (else key in mono) and `needs.word`, where and since (`needs.where`, `needs.whereNoSince`), the raw key, the value cut at two lines (`title` carries the whole), Mute.
+- Cards in the read model's order, kept as sent (`needsYouOrder`, MAN-7808: worst first — refused, failing, close to the limit — then oldest `since`); each: round glyph (the status's icon), label (else key in mono) and `needs.word`, where and since (`needs.where`, `needs.whereNoSince`), the raw key, the value cut at two lines (`title` carries the whole), Mute.
+- Severity on the card, all from `STATUS_TABLE` (MAN-7873): the `<li>` carries `data-tone`; a 4 px `bg-tone-dot` bar runs down its left edge (`absolute inset-y-0 left-0 w-1`). A status whose cell is `solid` (failing, refused) also tints the head row with `bg-tone-soft`; `warn` keeps the bar only.
+- Under the tint the "where" line is `text-secondary-foreground` and the raw key `text-muted-foreground`, each one ink darker than on a plain card. why: on the light refused tint they measured 4.43:1 and 2.92:1; one step up, 7.46:1 and 4.43:1.
 - Quiet (`needs` empty): `needs.quiet` and `needs.quietPassing_*`.
 - No cap on the cards: with dozens, the fleet drops below the fold. 2026-10-06: 19 cards stood 3,925 px tall on a phone and 1,117 px at 1440.
 - Muted list while any mute is set: `needs.mutedTitle`, `needs.mutedItem`, `needs.mutedMeta` (`hm(until)`, minutes left from `now`, reason), Unmute.
@@ -920,8 +924,8 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/fleet/Fleet
 - The panel's ✕ is the library's ghost icon `Button`, named by `buttons.close`: 40 px at a desk, 44 px below md.
 - ✕ hands focus back to the selected node's dot (the hub when that node is not drawn) before letting it go. why: the dot stays mounted and only its `aria-pressed` flips, so focus never falls to `<body>` with the panel's button.
 - Positions are the layout's pixels drawn as shares of the box it was laid out in (`center` × 2). A fixed fake fills any width, and a resize being measured stays in place. Dots and spokes keep their px.
-- Marks (`RingMarks.tsx`) read `nodeMark` and `STATUS_TABLE`. `RingDot` paints by the word's cell shape; `soft` (passing) takes the tone's edge too. why: a lone dot needs one to be seen; a strip's minute does not. `RingHub` is center: glyph, name, "Cerberus", a fifth of the box (66–92 px). `surface` (muted) takes the neutral dot's solid edge on the raised grey. why: the strip's `border-input` edge measured 1.41:1 on the light card, and a lone dot needs 3:1 to be found. A node with no mark (nothing assigned, as every newly enrolled node starts), and an unmarked hub, is a hollow round in the neutral dot's solid edge under `data-tone="neutral"`: kept dashed it would read as no result. `RingsKey`'s swatches are `RingDot`s; its "Fix running or updating" row is the `fixing` row of `KEY`, second after Needs you, as the prototype orders it.
-- A label (glyph + name) stands on the side away from the hub: above a node on a ring's upper half, below one on its lower half. It is capped at `max-w-[30cqi]` (the box is an inline-size container) and cut with an ellipsis, and in the box's outer left or right fifth it runs inward from its dot. why: names have no length cap, and at a phone's 320 px box long ones ran past the card; the dot's title, its name and the panel carry a name whole.
+- Marks (`RingMarks.tsx`) read `nodeMark` and `STATUS_TABLE`. `RingDot` paints by the word's cell shape; `soft` (passing) takes the tone's edge too. why: a lone dot needs one to be seen; a strip's minute does not. `RingHub` is center: icon, name, "Cerberus", a fifth of the box (66–92 px). `surface` (muted) takes the neutral dot's solid edge on the raised grey. why: the strip's `border-input` edge measured 1.41:1 on the light card, and a lone dot needs 3:1 to be found. A node with no mark (nothing assigned, as every newly enrolled node starts), and an unmarked hub, is a hollow round in the neutral dot's solid edge under `data-tone="neutral"`: kept dashed it would read as no result. `RingsKey`'s swatches are `RingDot`s; its "Fix running or updating" row is the `fixing` row of `KEY`, second after Needs you, as the prototype orders it.
+- A label (icon + name; the icon is `markLook(mark).icon` through `MarkIcon`, 12 px, lowered 2 px to centre on the name's capitals) stands on the side away from the hub: above a node on a ring's upper half, below one on its lower half. It is capped at `max-w-[30cqi]` (the box is an inline-size container) and cut with an ellipsis, and in the box's outer left or right fifth it runs inward from its dot. why: names have no length cap, and at a phone's 320 px box long ones ran past the card; the dot's title, its name and the panel carry a name whole.
 - Spokes: dashed `border-tone-dot` under `data-tone="neutral"` for no result (why: `border-input` measured 1.41:1 on the light card, and the line that says no result must read on its own); amber `border-t-2` under `data-tone="warn"` for needs you; plain `border-input` otherwise; a selected plain spoke turns `border-primary`. why 2 px: Chromium floors a border under 2 px to whole device pixels, so the prototype's 1.5 px drew as 1 px on a 1× screen.
 - Beats: `motion-safe:animate-cerberus-travel`, base `opacity-0`, phases `-(index % 7) × 0.45 s`. Every live spoke beats while every node on the rings is `labelled`; past that, only amber spokes beat. why: sixty beats are texture, and a silent node is told by its dashed spoke and hollow dot.
 - Each dot is a button (`aria-pressed`, named "<id> · <line>"); its press area is ≥ 24 px. The keyboard walks the hub, then the nodes worst first.
@@ -933,7 +937,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/fleet/Fleet
 - `list` face: a row (chevron, glyph, name and description, squares, line, warden line) opening a canvas band; an empty node is one sentence at the band's indent. `narrow` moves the warden line from the row's end into the open band.
 - A list row does not repeat the warden line when it equals the node's line ("Waiting for the first heartbeat").
 - The tile's edge is `markLook(mark).cell`: `solid` 1.5 px tone edge, `outline` 1 px, `dashed` 1.5 px dashed, the rest the plain border. A node with no mark (`empty`, `enrolling`) draws a dashed edge and a dashed round glyph.
-- `fixing` is fed (a fix running on one of its services) and draws the info ● — its tile edged 1.5 px in the info dot, the glyph pulsing. `updating` (an update queued or running) draws the same look through `nodeMark` and names itself "Updating its warden" (`StatusGlyph`'s `label`); `paused` keeps the dashed neutral of its checks. `enrolling` is fed by nothing yet and draws as a node with no mark.
+- `fixing` is fed (a fix running on one of its services) and draws the info wrench — its tile edged 1.5 px in the info dot, the glyph pulsing. `updating` (an update queued or running) draws the same look through `nodeMark` and names itself "Updating its warden" (`StatusGlyph`'s `label`); `paused` keeps the dashed neutral of its checks. `enrolling` is fed by nothing yet and draws as a node with no mark.
 - `FleetGrid` columns: `repeat(auto-fill,minmax(150px,1fr))`; never packed `dense`. why: dense pulled later tiles above an open card, broke worst-first order and made keyboard order differ from the eye's.
 - Entrance: `motion-safe:animate-shape-rise`, delay inline `min(index, 24) * 18` ms (INV-7053).
 - Heartbeat dot: positive and breathing while `link === 'reporting'` and not restarting, else still neutral; named (`role="img"`) only on a collapsed tile.
@@ -1190,13 +1194,13 @@ The fixes screen's four pieces, drawn from the provider and the run reads, and m
 
 ## `NeedFix`
 - Draws nothing for a need with no `run` and no `fix`.
-- Strip (a `button`, `basis-full`, opens the sheet), from the run: going `strip.running` / `strip.runningAuto` (info, no glyph); `ok` `strip.finished` (neutral, ✓ in positive ink); `failed` `strip.failed` / `strip.failedExit`; `timed_out` `strip.timedOut`; `refused` `strip.refused` (danger).
+- Strip (a `button`, `basis-full`, opens the sheet), from the run: going `strip.running` / `strip.runningAuto` (info, no icon); `ok` `strip.finished` (neutral, the check icon in positive ink); an ended run's icon is `RUN_LOOK`'s, through `MarkIcon`; `failed` `strip.failed` / `strip.failedExit`; `timed_out` `strip.timedOut`; `refused` `strip.refused` (danger).
 - Second line: `run.note` (body face, `line-clamp-2`), else `run.lastLine` (mono, one line, `title` carries it whole), else `$ cmd`.
 - Button `fix.run`, tonal, while `fix !== null` and no run is going. Pending press: "Running…", `aria-disabled`.
 - `leaving` disables both: a card on its way out takes no press.
 
 ## `FixOutput`
-- Head: eyebrow `fix.output.title`, the fix's name, `output.meta` (who, node, start time; `output.metaRefused` for a refusal). Right: pill `Badge` (`RUN_LOOK` tone and glyph, `role="status"`) and `output.elapsed` while going / `output.took` once ended; none for a refusal.
+- Head: eyebrow `fix.output.title`, the fix's name, `output.meta` (who, node, start time; `output.metaRefused` for a refusal). Right: pill `Badge` (`RUN_LOOK` tone and icon, `role="status"`; a going run's wrench breathes) and `output.elapsed` while going / `output.took` once ended; none for a refusal.
 - Pane `role="log"`: `$ cmd`, then `+NNs text` per line (`output.offset`); a line opening `✓` is positive ink; `run.note` after the lines in the result's ink; a blinking caret while going.
 - Pane `max-h-[min(26rem,60vh)]`, scrolls itself. It follows a new line only while the reader is within 8 px of the bottom (`followingRef` + `useLayoutEffect`, no state); scrolled back, it holds still.
 - Pane sits on `bg-background`. why: on the darker grey, muted and green text measured 4.46 and 4.49:1 light; on the page background 4.73 and 4.77.
@@ -1210,7 +1214,7 @@ The fixes screen's four pieces, drawn from the provider and the run reads, and m
 ## Rules
 - A pending or running Run button is the kit `Button`'s `busy` (`aria-disabled`, never `disabled`; the kit refuses the press itself — `Button.tsx`). why: `disabled` blurs the button under the keyboard user who pressed it. `disabled` only when another run holds the check.
 - No `Trans` in these pieces: a label, name or command reaches the screen as text through `t()`. why: `Trans` escapes `<` in a check label ("p95 < 300 ms") to protect its own tags.
-- Glyphs live in code (`RUN_LOOK`, MAN-7873), not in the words (MAN-7870).
+- Icons live in code (`RUN_LOOK`, MAN-7873), not in the words (MAN-7870).
 - Feed words sit under `cerberus.activity` (`fix`, `catalog`), not under `cerberus.fix`: each kind of event keeps its words there (MAN-7872).
 - Light-mode contrast under 4.5:1 that is the kit's, not this screen's (2026-10-06): green `Badge` 4.48, tonal `Button` 4.48, the sheet's ✕ 4.46. Every colour these pieces choose passes.
 - Phrases with no design source: `catalog.empty`, `catalog.auto.label`, `catalog.blocked`, the failed and timed-out strips, `output.metaRefused`.
@@ -1252,7 +1256,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/projects/projects
 The diagnosis plan's screen, live on the tab: `DiagnosisPanel` in the check sheet, `PromoteDialog` over it, the Diagnose buttons of the Needs-you card and the sheet, and the reads and writes behind them. Words: MAN-7870 (`cerberus.diagnosis.*`, `cerberus.promote.*`, `cerberus.activity.diagnosis.*`). Wire shapes: `CerberusDiagnosisView`, `CerberusDiagnosisStep`, `CerberusDiagStepEvent` in `src/shared/cerberus-types.ts`; `CerberusPromoteInput` in `src/shared/types.ts`. The buttons, `useDiagnosis` and the provider's three writes: MAN-7945. Routes: MAN-7918. Row map: MAN-7868. Design: `design/cerberus/Cerberus Tab.dc.html` :447-487 (the panel), :560-594 (Promote), :85 (the card's buttons).
 
 ## `sheet/DiagnosisPanel.tsx` — `DiagnosisPanel({ diagnosisId, held, onPromote })`
-- Frame and eyebrows are Fix output's (`FRAME`, `EYEBROW`), `vv-pop` on arrival. Head: `diagnosis.eyebrow`, then the pill in a `role="status"`, keyed by `status`: `running` → `diagnosis.reading`, info `Badge`, `vv-pulse` 1.6 s; `done` → `diagnosis.ready` with `hms(endedAt)`, neutral, `cerberus-check` once; `failed` → `RUN_LOOK.failed` (▲, warn) and `diagnosis.failed`. why neutral for Ready: a diagnosis is a document, not a health signal; a green pill would say the check is fine while it is still red.
+- Frame and eyebrows are Fix output's (`FRAME`, `EYEBROW`), `vv-pop` on arrival. Head: `diagnosis.eyebrow`, then the pill in a `role="status"`, keyed by `status`: `running` → `diagnosis.reading`, info `Badge`, `vv-pulse` 1.6 s; `done` → `diagnosis.ready` with `hms(endedAt)`, neutral, `cerberus-check` once; `failed` → `RUN_LOOK.failed` (`TriangleAlert` through `MarkIcon`, warn) and `diagnosis.failed`. why neutral for Ready: a diagnosis is a document, not a health signal; a green pill would say the check is fine while it is still red.
 - Body: the scope sentence, by `diagnosis.scope`: `node` draws `diagnosis.scope` ("Read-only on <node>. It reads logs, status and Cerberus history. It can't run fixes or change files."), `history` draws `diagnosis.scopeHistory` ("Read-only. It reads Cerberus history: <node>'s logs and status were not reachable."); the steps in a `role="log"` labelled by the eyebrow, each a memoised `StepRow` rising in on `cerberus-line`: ● in the info ink breathing (`vv-pulse` 1.2 s) on the last step while `running`, ✓ (muted) otherwise, the text, `hms(startedAt + t × 1000)`.
 - The steps fold once the diagnosis is over: a `Collapsible`, open while `running`, then on the person's press of its one line, `diagnosis.steps_*` ("7 steps · 17:53:14–17:53:45", a `CollapsibleTrigger` with the kit's `FoldChevron`, 44 px under `md`); the list sits in `CardFoldBody`, so a folded trail leaves the tab order and the accessibility tree. why: a finished diagnosis's answer is the signal and its steps the detail; unfolded, 14 steps put the summary below a phone's fold.
 - `done`: under a rule (`shape-rise`), the summary in the serif display face (20 px, `text-wrap: pretty`), then each piece of evidence after an `aria-hidden` ↳ with a hanging indent. `failed`: `error` in the warn ink under a rule; no summary, no proposal, no "No fix proposed.".

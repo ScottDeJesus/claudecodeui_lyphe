@@ -34,7 +34,7 @@ const UNMARKED_EDGE = 'border-[1.5px] border-dashed border-input';
 
 /**
  * The node's round glyph from the table, or an empty dashed round when its word has no mark. An updating
- * node wears the fixing ●, and names itself "Updating its warden".
+ * node wears the fixing wrench, and names itself "Updating its warden".
  *
  * Used by this card and by the rings' `RingsNodePanel`, which heads a selected node with the glyph its
  * card wears.
@@ -134,8 +134,8 @@ const STAGGER_PLACES = 24;
  * band under its row, where an empty node is one sentence at the band's indent, as the list's rows are.
  *
  * Every mark is the one table's: the glyph, the squares, and the tile's edge by its cell shape. A node
- * with a fix running is `fixing`: the info ●, its tile edged in the info dot. A node with an update
- * queued or running is `updating`, which draws that same ● and says so: a pill on a list row and on an
+ * with a fix running is `fixing`: the info wrench, its tile edged in the info dot. A node with an update
+ * queued or running is `updating`, which draws that same wrench and says so: a pill on a list row and on an
  * open card ("Updating · Restarting the warden", `UpdatingPill`), and "Updating its warden" as the
  * collapsed tile's line, which has no room for a pill. While its warden restarts its heartbeat dot stands
  * neutral and its warden line reads "Warden 0.4.2 · restarting". `enrolling` is a held place; until
