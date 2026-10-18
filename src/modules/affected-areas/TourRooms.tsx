@@ -8,7 +8,7 @@ import { Card } from '@/shared/ui';
 import { cn } from '@/shared/utils';
 
 type TourRoomsProps = {
-  /** The tour's rooms as the lane answers them (`TourDetail.rooms`): one per room key, in DocuSketch's walk order. */
+  /** The tour's rooms as the lane answers them (`TourDetail.rooms`): one per room (a room key on a floor), in DocuSketch's walk order. */
   rooms: RoomEntry[];
 };
 
@@ -32,7 +32,7 @@ function authorityWords(room: RoomEntry, t: TFunction): string | null {
  * whose word.
  *
  * Each row reads as the room's name (never its key, INV-76; "Unnamed room" for a nameless one), its floor ("Floor 2",
- * nothing when the room's panos disagree on it), and under them who calls it affected: "Affected per DocuSketch",
+ * nothing when DocuSketch gave the room no floor), and under them who calls it affected: "Affected per DocuSketch",
  * "Affected per the photos", or "Affected per DocuSketch and the photos". A room nobody calls affected carries
  * no words.
  *

@@ -3220,7 +3220,7 @@ Every answer is the wire shape bare, the type named in a `// →` comment above 
 ## Rules an editor must not break
 - A shape changes in `wire.py` first; the mirror moves in the same change. why: a field renamed on one side is a screen that stops reading.
 - Field names are the wire's camelCase; `class` is a key (`wire.py`'s `cls` alias). Dates are ISO text, ids text, a point `[x, y]` and a box `[x0, y0, x1, y1]`, both in 0..1 of one view.
-- A response field is never optional. A field a later plan fills (`read`, `understanding`, `regions`, `mark`, `standing`, `threshold`, `holdout`, `regionsStanding`, `markedAreasAffected`, `marksCount`, `standingCount`, `photosAffected`, `understandingMark`, `current`, `effectiveClass`, `tourName`, …) is `T | null`: `null` is "not judged", never "judged and found nothing".
+- A response field is never optional. A field a later plan fills (`read`, `understanding`, `regions`, `mark`, `standing`, `threshold`, `holdout`, `regionsStanding`, `marksCount`, `standingCount`, `photosAffected`, `understandingMark`, `current`, `effectiveClass`, `tourName`, …) is `T | null`: `null` is "not judged", never "judged and found nothing".
 - A request field `wire.py` defaults is optional (`newClass?: string | null`).
 - `ViewDetail` is `ViewEntry & {…}`, as `wire.py` inherits it.
 - A new verb names its answer type in a `// → Type` comment, as this file's other blocks do.
@@ -3228,7 +3228,7 @@ Every answer is the wire shape bare, the type named in a `// →` comment above 
 ## Measured on the live engine
 - 2026-10-17, `.verify/affected-areas-marking.mjs` (66 of 66): `mark` and `missed` answered 200 with a `Region` whose `mark` and `standing` equal the same region from `GET …/panos/{pano}`; `setThreshold` answered 200 with the `ProvingClass` that `GET /proving` then held (`threshold`, `isDefault`, `thresholdSetAt`); `markUnderstanding` answered 200 with the `UnderstandingMarkResult`. `wire.py` names only that last answer: the other three are read from the routes' bodies, not from a model.
 - 2026-10-17: `GET /queue` answered 200 with the keys `mode`, `items`, `remaining` (an item: `tourId`, `panoId`, `roomName`, `jobLabel`, `view`, `region`); `GET /proving` answered 200 with `model`, `contractVersion`, `contractHash`, `understanding`, `classes` (a class: the twelve fields of `ProvingClass`). Each is the typed key set.
-- Field sets checked against `model_json_schema(by_alias=True)` per model on 2026-10-17: 39 of 39 match, nullability and `Literal` values included.
+- 2026-10-18: the file's property names, read by the TypeScript compiler, against `model_json_schema(by_alias=True)` per model: 39 of 39 equal. The five fields the fix added (`photosAffected`, `understandingMark`, `current`, `effectiveClass`, `tourName`) are each `T | null` here as `T | None` there; no model class was added.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/affected-areas-types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts
 
@@ -3437,7 +3437,7 @@ section: The Tours view — src/modules/affected-areas: where state lives, what 
 | `proposed` | anything else, a null `mark`, `standing` or `threshold` included | info | solid | full | `proposed` "Proposed" |
 
 Info is the reader's word and positive the operator's; a dashed edge is anything the reader's word alone does not carry. `PanoScreen` turns each region into a `RegionShape` with `tone`, `edge` and `wash` (drawn by `RegionImage`, MAN-8579); `RegionList` shows the word.
-- A room is affected on two authorities, both named (MAN-3035): `docusketchAffected` and `markedAreasAffected === true`, never `regionsStanding`, which counts older damage. The words and the tone are MAN-8578.
+- A room is affected on two authorities, both named (MAN-3035): `docusketchAffected` and `photosAffected === true`, never `regionsStanding`, which counts older damage. A `RoomEntry` is one per `(roomKey, floor)`. The words and the tone are MAN-8578.
 - Names, never ids, in any line a person reads (INV-76); a tour is named by its job's label, else DocuSketch's own name for it (`tourName`: a pre-job tour), else its address, else "Tour with no job or address"; the address stands as a line of its own whenever the name above it is not the address (`addressBesideName`).
 - A bare `YYYY-MM-DD` (date of loss) goes through `formatShortDate`, which reads it as that local day.
 - `index.ts` exports the lazy view and `ViewBoundary` (its surround) only; siblings import each other by path, never through the barrel. `ViewBoundary` is not lazy: it must be there to catch the failure of the chunk it surrounds.
@@ -3448,42 +3448,42 @@ Info is the reader's word and positive the operator's; a dashed edge is anything
 ## Measured 2026-10-17 (live engine, :5183)
 - `.verify/affected-areas-view.mjs`: Cerberus → Tours → CLARENCE TSE → Dinning Room → each face at 1280 and 390 px: the polygons on the photo equal the engine's regions per face, the badges read 1..n and are the list's rows and the engine's ordinals, a region chosen on the photo is the row's and back, Enlarge keeps every outline on the photo (0.00 px off), nothing is read while the pano idles or Fleet shows, and Read this pano on one unread pano answers 200 `read`, 6 views, and the face strip counts the engine's areas at once.
 - `.verify/affected-areas-walk.mjs`: Stop after this pano ends the walk after the pano in hand; a view hidden mid-walk sends no second press and reads nothing until it returns, then reads the tour once; the walk goes pano to pano on each answer, in capture order.
-- `.verify/affected-areas-rooms.mjs --tour <24-hex tourId> [--evidence <dir>]` (the tour must be linked to a job, else exit 2): Cerberus → Tours → the tour → the Rooms card at 1280 then 390 px, once in a light and once in a dark `openConsole({ dark })` context (no stored setting written). `WIDTHS[0]` stays 1280: `openCerberusTab` finds "More views" only on the wide layout. Holds against `GET /api/affected-areas/tours/{tour}`: one row per wire room in its order, with name and floor; the words from `docusketchAffected` and `markedAreasAffected` alone (written out in the script, not read from the component); warn tone and dot on the rows with words only; no fetch/XHR path of its own for rooms; no sideways scroll, measured on the Rooms card (`scrollWidth - clientWidth`; the card clips its overflow, so the page-level number is 0 whatever the rows do); no authenticated console error. Writes `rooms-<theme>-<width>.png`, `rooms-card-<theme>-<width>.png` and `rooms.json` (keys `<theme>-<width>`) under `.verify/shots/affected-areas-rooms/`.
-- 2026-10-17, `.verify/affected-areas-rooms.mjs` on tour `6acd745c36f92c16415b6f97` (three affected rooms, Kitchen and Entry floor 1, Hvac Closet floor 2; `docusketchAffected` false, `markedAreasAffected` true) passes 26 of 26 checks, exit 0, light and dark, 1280 and 390 px. At 390 px one column, overflow `{"page":0,"rooms":0}`, warn tone and dot on exactly the three rows with words; at 1280 three columns.
+- `.verify/affected-areas-rooms.mjs --tour <24-hex tourId> [--evidence <dir>]` (the tour must be linked to a job, else exit 2): Cerberus → Tours → the tour → the Rooms card at 1280 then 390 px, once in a light and once in a dark `openConsole({ dark })` context (no stored setting written). `WIDTHS[0]` stays 1280: `openCerberusTab` finds "More views" only on the wide layout. Holds against `GET /api/affected-areas/tours/{tour}`: one row per wire room in its order, with name and floor; the words from `docusketchAffected` and `photosAffected` alone (written out in the script, not read from the component); warn tone and dot on the rows with words only; no fetch/XHR path of its own for rooms; no sideways scroll, measured on the Rooms card (`scrollWidth - clientWidth`; the card clips its overflow, so the page-level number is 0 whatever the rows do); no authenticated console error. Writes `rooms-<theme>-<width>.png`, `rooms-card-<theme>-<width>.png` and `rooms.json` (keys `<theme>-<width>`) under `.verify/shots/affected-areas-rooms/`.
+- 2026-10-18, `.verify/affected-areas-rooms.mjs --tour 6ace5eb736f92c16415baa7e` with one demonstration confirm on its Garage drying-equipment region (deleted by its mark id after; the ledger counted back to 0 marks, 0 thresholds, 0 drawn areas): 26 PASS, 0 FAIL, exit 0, light and dark, 1280 and 390 px. One row, Garage, Floor 1, "Affected per the photos" (`docusketchAffected` false, `photosAffected` true, `regionsStanding` 1); at 390 px overflow `{"page":0,"rooms":0}`, warn tone and dot on that row.
 - `.verify/affected-areas-tours-told.mjs [--evidence <dir>]` (reads the live lane first and exits 2 when it holds no unlinked tour with a loss type or none without facts; buys and writes nothing; its one stub is the rewritten pano GET below): at 1280 and 390 px, no picker row reads "Tour with no job or address" and every pre-job tour (8 on 2026-10-18) is in the picker by its DocuSketch name, with "No job linked"; an unlinked tour with a loss type draws it ("Water loss", from its own `context.lossType`) and the DocuSketch-alone line, no Property and no "isn't linked", its address beside its name; a factless unlinked tour draws the DocuSketch-alone line only; a room whose `demoBeforeTour` is false says "No demo recorded before the tour", true "Demo had begun before the tour". `openTour` throws unless the client asked the lane for the pressed tour's id (a label can belong to two tours). At 1280 only: the pano GET is rewritten so its first view reads `current: false` and no view `contextChanged` (every shown read on file is current today), and the pano offers Read again with `affectedAreas.read.againCurrent` naming the codebook's `contractVersion` and `model`. 2026-10-18: 27 PASS, 0 FAIL, exit 0.
 - `.verify/affected-areas-view.mjs` presses nothing unless `--press` is given (one armed press, counted; it needs a cut, unread pano, which each press uses up), and `.verify/affected-areas-walk.mjs` runs nothing unless `--cases` names what to buy (A and B six reads each, C twelve; each pano read is read for good).
 - Open: Read the rest has not met a refusal (a spent budget) on the live engine; a refusal is drawn from `ReadControl`'s own words.
 - 2026-10-18, `.verify/affected-areas-gallery-fetch.mjs` (the 45-pano ESTHER VILLA tour; the live engine answers its GET, and the panos with no view cut are given a stand-in Ahead view, because cutting is paid and no live tour has 24 cut panos): 8 of 8 checks pass. Opening fetches 24 distinct photos and none of the other 21; "+N" fetches the 21 and none of the 24 again; a pano opened and left collapses the gallery and asks for none of the 21.
-- Open: "Affected per DocuSketch" and "Affected per DocuSketch and marked areas" have not been seen on a live tour: `docusketchAffected` is false on all 125 tours sampled (5 read, 120 unread).
+- Open: "Affected per DocuSketch" and "Affected per DocuSketch and the photos" have not been seen on a live tour: `docusketchAffected` is false on all 210 stored views of the 9 tours cut (2026-10-18).
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/
 
-## MAN-8578 — TourRooms.tsx — the tour's room list: affected rooms and the authority that calls each (DocuSketch, marked areas), beside the pano gallery
+## MAN-8578 — TourRooms.tsx — the tour's room list: affected rooms and the authority that calls each (DocuSketch, the tour's photos), beside the pano gallery
 
-`src/modules/affected-areas/TourRooms.tsx` is the Rooms card of `TourScreen`, between `ContextCard` and the pano gallery. Props: `rooms: RoomEntry[]` = `TourDetail.rooms` (wire MAN-8558): one row per room key, in DocuSketch's walk order. A row is not a control; it opens nothing.
+`src/modules/affected-areas/TourRooms.tsx` is the Rooms card of `TourScreen`, between `ContextCard` and the pano gallery. Props: `rooms: RoomEntry[]` = `TourDetail.rooms` (wire MAN-8558): one row per room, a `(roomKey, floor)` pair (React key `roomKey:floor`), in DocuSketch's walk order. A row is not a control; it opens nothing.
 
 ## A row
 | part | source |
 |---|---|
 | name | `roomWords(room.roomName, null, false, t)`; "Unnamed room" when null; never the key (INV-76) |
-| floor | "Floor 2" from `room.floor`; nothing when null (a room whose panos disagree on it) |
+| floor | "Floor 2" from `room.floor`; nothing when null (DocuSketch gave the room no floor) |
 | authority words | `authorityWords(room, t)` below; none when nobody calls the room affected |
 | dot | `bg-tone-dot` under `data-tone="warn"` on every affected row, whichever authority spoke; the dot's column is kept on the other rows so the names align |
 
 ## Authority words (`affectedAreas.rooms.*` in `common.json`)
-Two wire fields, both on `RoomEntry`: `docusketchAffected` (`boolean`, DocuSketch's sketch flag) and `markedAreasAffected` (`boolean | null`, the marked areas' verdict, MAN-8573; null = not judged).
-| `docusketchAffected` | `markedAreasAffected` | words | key |
+Two wire fields, both on `RoomEntry`: `docusketchAffected` (`boolean`, DocuSketch's sketch flag) and `photosAffected` (`boolean | null`, the verdict from the tour's photos for THIS room, MAN-8573; null = not judged).
+| `docusketchAffected` | `photosAffected` | words | key |
 |---|---|---|---|
 | true | not true | Affected per DocuSketch | `affectedDocusketch` |
-| false | true | Affected per marked areas | `affectedMarked` |
-| true | true | Affected per DocuSketch and marked areas | `affectedBoth` |
+| false | true | Affected per the photos | `affectedPhotos` |
+| true | true | Affected per DocuSketch and the photos | `affectedBoth` |
 | false | false or null | (none) | |
 - Never `regionsStanding`: it counts older damage, which never makes a room affected.
-- The sketch stays an authority and the marked areas are a second; the words name which spoke (MAN-3035).
+- The sketch stays an authority and the photos are a second; the words name which spoke (MAN-3035).
 - Empty list: "DocuSketch named no rooms on this tour". Title "Rooms", inside the card, with no count (MAN-8576 §"What the numbers mean").
 
 ## Why a list of rooms beside a gallery of panos
-- why: the units differ. A verdict is per room (`(room_key, floor)`, MAN-8573) and a `RoomEntry` is one per room key; a gallery tile is one pano and a room has several (100 newest tours: 2,156 panos in 632 room keys, MAN-8543).
+- why: the units differ. A verdict is per room (`(room_key, floor)`, MAN-8573) and a `RoomEntry` is one per pair; a gallery tile is one pano and a room has several (100 newest tours: 2,156 panos in 632 room keys, MAN-8543).
 - A tile's badge counts the areas that stand on its pano's views ("3 areas"), or says "2 found" while the reader found some and none stands yet, or "None found" (`listedAreas`, MAN-8576); older damage counts there and never affects, so a badge cannot say whether the room is.
 - The gallery draws at most 24 tiles then "+N" (`RoomGallery` `GALLERY_MAX`), so an affected room's pano can sit behind "+N"; the list has every room.
 
@@ -3594,7 +3594,7 @@ section: The marking pieces — src/modules/affected-areas: the mark bar, Missed
 | piece | file | does |
 |---|---|---|
 | `useMarkedRegions(pano.value)` | `AffectedAreasView.tsx`, `hooks/useMarkedRegions.ts` | holds the operator's answers by pano beside the read: a mark's answer replaces its region where it stands, `onMissed` appends the drawn one to its view, never a refetch; `PanoScreen` draws the laid-over pano. An answer outranks a read of the same region that carries no mark or an older one (compared by `markId` and `markedAt`); a read that carries the same mark takes over, with its current `standing` and line. `onMarked` / `onMissed` write under the pano the answer is FOR |
-| Back to the tour | `AffectedAreasView.tsx` | calls `tour.reload()` quietly: a judgment moves the tour's tile counts, its rooms' "Affected per marked areas" and the face a pano opens on. The pano is not refetched |
+| Back to the tour | `AffectedAreasView.tsx` | calls `tour.reload()` quietly: a judgment moves the tour's tile counts, its rooms' "Affected per the photos" and the face a pano opens on. The pano is not refetched |
 | the switch | `AffectedAreasView.tsx` | `ToursSwitch` outside the keyed entrance; Mark and Tables mount on first show (`openedScreens`) and stay mounted, `hidden` while another shows. A surface shown again reads again, quietly, on that press: Tours the open pano (`pano.reload()`), else the open tour, else the list; Mark and Tables when their `shown` turns true (`useWhenShown`) |
 | the layer | `AffectedAreasView.tsx` (`layer`, All at first and on each pano opened), `PanoScreen.tsx` | `LayerSwitch` as `MissedDraw`'s `tools`. On Standing the photo keeps the regions whose wire `standing` is not false, and the chosen area whatever its flag; the list and the caption keep every area |
 | Missed one · the bar | `PanoScreen.tsx` | `MissedDraw` in place of the photo div when the pano has answered and the face has a view (`key={view.sha256}`; `nextOrdinal` = highest ordinal of ALL the view's regions + 1); `MarkBar` on the chosen region as its `bar` (`queue` `browse`) |
