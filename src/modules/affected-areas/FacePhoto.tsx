@@ -33,7 +33,8 @@ type FacePhotoProps = {
   stage: MissedStage;
   /** The note kept for Save; '' when there is none. */
   note: string;
-  /** Why the last Save was refused; null when it was not. */
+  /** Why a box was not kept: a release under the area floor (said in the drawing step, in the floor line's place) or the
+   *  last Save's refusal (said under the presses); null when there is none. */
   refusal: string | null;
   /** Missed one. */
   onDraw: () => void;
@@ -61,8 +62,9 @@ function corners([x0, y0, x1, y1]: number[]): number[][] {
  *    Escape cancels). A box released stays on the photo, numbered as it will be and in the hand-drawn look it will
  *    take, while its kind is asked; the regions under it are inert until Save or Cancel. While drawing, a line under
  *    the photo says the floor: the engine takes no box under about 10 by 10 pixels, whatever its shape. The library
- *    reports every box that has a width and a height; `MissedDraw` turns one under the floor back in the engine's
- *    sentence.
+ *    reports every box that has a width and a height; `MissedDraw` turns one under the floor back, leaving the drawing
+ *    step as it was and putting the engine's sentence ("drag a bigger one") in the floor line's place until the next
+ *    drag, which the photo takes at once.
  * 3. Under the photo, ONE group of presses at a time: the chosen area's (`bar`) while Missed one is idle; once a box is
  *    held, "New area", then the kind (a `Menu` of the codebook's kinds in codebook order, each row carrying its group's
  *    word beneath its name: Damage, Work already done, The source, Older damage), Add a note, Save (in the hand-drawn
@@ -70,8 +72,8 @@ function corners([x0, y0, x1, y1]: number[]): number[][] {
  * 4. Choosing an area brings this block into view, the photo and its presses together (`blockRef`, below).
  *
  * States: idle (with or without a chosen area's presses); drawing; a box held with no kind; a kind chosen; a note
- * kept; saving (Save's ring turning, the rest refusing); refused (the reason under the presses, the box and kind kept
- * for a second Save).
+ * kept; saving (Save's ring turning, the rest refusing); refused (a drawn box under the floor: the sentence in the
+ * drawing step, still drawing; a refused Save: the reason under the presses, the box and kind kept for a second Save).
  *
  * Handles: `data-missed-step` (the stage) on the block, `data-missed-press` on each press (`start`, `cancel`, `kind`,
  * `note`, `save`), `data-missed-form` on the form.
@@ -143,7 +145,7 @@ export function FacePhoto({
         />
       </div>
 
-      {stage.step === 'drawing' && <p className="text-xs text-muted-foreground">{t('affectedAreas.missed.floor')}</p>}
+      {stage.step === 'drawing' && (refusal === null ? <p className="text-xs text-muted-foreground">{t('affectedAreas.missed.floor')}</p> : <MarkRefusal reason={refusal} />)}
       {bar ? <div hidden={!idle} className="min-w-0">{bar}</div> : null}
       {held !== null && (
         <section role="group" aria-label={newArea} data-missed-form="" className="flex min-w-0 flex-col gap-3 border-t border-border pt-3">

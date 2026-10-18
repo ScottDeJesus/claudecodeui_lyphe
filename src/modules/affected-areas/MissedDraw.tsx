@@ -45,8 +45,9 @@ type MissedDrawProps = {
  * asked (a `Menu`), then an optional note, then Save, which is one `api.affectedAreas.missed` — the box becomes a human
  * region with its `missed` mark in one transaction, answered whole, and appears numbered after the last, dashed and
  * green (the region-look table's `human`). A box is one gesture on a phone, where a polygon would be many taps. A box
- * under the engine's area floor (`MIN_REGION_AREA`) is turned back here, never sent: its release and its Save both say
- * `bad_box`, the engine's own sentence for it, and the box stays on the photo to be cancelled.
+ * under the engine's area floor (`MIN_REGION_AREA`) is turned back here, never sent: its release leaves Missed one
+ * drawing, so the next drag is a new box at once, and says `bad_box` (the engine's own sentence for it) in the line under
+ * the photo that says the floor. No box under the floor ever reaches the kind, the note or Save.
  *
  * It stands where the pano screen's photo stood, the photo with it: the drawing state has to reach `RegionImage`'s
  * `drawing` and keep the held box on the photo, so the photo is drawn here (`FacePhoto`). The chosen area's presses
@@ -67,8 +68,8 @@ export function MissedDraw({ view, photo, alt, shapes, nextOrdinal, selectedId, 
   const [note, setNote] = useState('');
   // Whether the note dialog is up. The dialog is mounted only while open, so each opening starts from the kept note.
   const [noteOpen, setNoteOpen] = useState(false);
-  // Why the box was not kept, in the engine's or the lane's word, until the next press: a box under the area floor at its release
-  // and at Save, or the answer to a Save that was sent. Said under the presses.
+  // Why the box was not kept, in the engine's or the lane's word, until the next press: a release under the area floor (said in
+  // the drawing step, which stays live) or the answer to a Save that was sent (said under the presses).
   const [refusal, setRefusal] = useState<string | null>(null);
 
   const onDraw = (): void => {
@@ -83,10 +84,15 @@ export function MissedDraw({ view, photo, alt, shapes, nextOrdinal, selectedId, 
     setRefusal(null);
   };
   // The library hands over every box that has a width and a height, so the engine's area floor is held here: a box under it
-  // is kept on the photo with the engine's own sentence (`bad_box`) at once, and Save turns it back again before sending.
+  // is turned back with the engine's own sentence (`bad_box`) and the stage stays `drawing`, where the photo still takes a
+  // drag — the sentence says "drag a bigger one" and the next drag does. Only a box over the floor goes on to its kind.
   const onDrawn = (box: [number, number, number, number]): void => {
+    if (underAreaFloor(box)) {
+      setRefusal('bad_box');
+      return;
+    }
     setStage({ step: 'drawn', box, kind: null });
-    setRefusal(underAreaFloor(box) ? 'bad_box' : null);
+    setRefusal(null);
   };
   const onKind = (cls: string): void => setStage((current) => (current.step === 'drawn' ? { ...current, kind: cls } : current));
   const onNote = (): void => setNoteOpen(true);
@@ -98,10 +104,6 @@ export function MissedDraw({ view, photo, alt, shapes, nextOrdinal, selectedId, 
   const save = async (): Promise<void> => {
     if (stage.step !== 'drawn' || stage.kind === null) return;
     const { box, kind } = stage;
-    if (underAreaFloor(box)) {
-      setRefusal('bad_box');
-      return;
-    }
     setStage({ step: 'saving', box, kind });
     setRefusal(null);
     const result = await answerOfWrite<Region>(() => api.affectedAreas.missed(view.sha256, { class: kind, box, note: note || null, queue: 'browse' }));

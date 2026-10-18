@@ -10933,3 +10933,81 @@ measured 2026-10-18 by chain chain-tour-affected-areas--judgment--told-20261018-
 probe-key: 470e0358931a895df7f56622a35c36b3a44439e0
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/affected-areas-tours-told.mjs
+
+## INV-8768 — probe — (MEDIUM) — the refusal says "drag a bigger one" in the one stage where the photo takes no drag
+
+(MEDIUM) — the refusal says "drag a bigger one" in the one stage where the photo takes no drag
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX)
+cat > "$D/p.sh" <<'EOF'
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+printf 'layer mounted only while drawing: '; grep -c "drawing={stage.step === 'drawing'" src/modules/affected-areas/FacePhoto.tsx
+printf 'refusal set at release, in the drawn stage: '; grep -c "setRefusal(underAreaFloor(box)" src/modules/affected-areas/MissedDraw.tsx
+printf 'the sentence: '; jq -r '.affectedAreas.mark.refused.bad_box' src/modules/i18n/locales/en/common.json
+EOF
+bash "$D/p.sh"
+expect: today 1, 1 and "That box is too small to be an area: drag a bigger one"; cured when either count is 0 (the layer stays mounted in the drawn stage, or the refusal is not set at release). Live: `node /home/lyphe/.claude/state/pipeline-reviews/tour-affected-areas--judgment--drawing/athena-slip-probe.mjs <dir>` prints RESULT with `dragBiggerAfterRefusal` equal to `slip3px` while the defect stands (read-only; needs :5183 and a read tour)
+```
+
+measured 2026-10-18 by chain chain-tour-affected-areas--judgment--drawing-20261018-044450-f4c1, finding M1, MEDIUM
+probe-key: eacd925bc66394ab536578b32a985b720893911f
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/affected-areas-marking-boxes.mjs
+
+## INV-8769 — probe — (LOW) — `api.ts` still describes two slow presses and a 90 s view cut
+
+(LOW) — `api.ts` still describes two slow presses and a 90 s view cut
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX)
+cat > "$D/p.sh" <<'EOF'
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+grep -n "The two slow presses" src/shared/api.ts || echo none
+printf 'cutViews in api.ts: '; grep -c "cutViews" src/shared/api.ts
+EOF
+bash "$D/p.sh"
+expect: today "942:  // The two slow presses …" and 0; cured: "none"
+```
+
+measured 2026-10-18 by chain chain-tour-affected-areas--judgment--drawing-20261018-044450-f4c1, finding L1, LOW
+probe-key: 1ee0a109e4b051dab31a32aa4d7e41e973f0e556
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/affected-areas-marking-boxes.mjs
+
+## INV-8770 — probe — (LOW) — MAN-8582's words row names `failed_queue` and not the new `gone_queue`
+
+(LOW) — MAN-8582's words row names `failed_queue` and not the new `gone_queue`
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX)
+cat > "$D/p.sh" <<'EOF'
+printf 'MAN-8582 names gone_queue: '; docstore get MAN-8582 --text | grep -c "gone_queue"
+printf 'common.json has gone_queue: '; jq '.affectedAreas.trouble | has("gone_queue")' /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/common.json
+EOF
+bash "$D/p.sh"
+expect: today 0 and true; cured when the first count is 1 or more
+```
+
+measured 2026-10-18 by chain chain-tour-affected-areas--judgment--drawing-20261018-044450-f4c1, finding L2, LOW
+probe-key: 5d88c1d8ecaf9af587b203edc68cca29da3eb744
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/affected-areas-marking-boxes.mjs
+
+## INV-8771 — probe — (LOW) — the Mark screen's Rename menu overhangs the 390 window by 10 px; a swipe beside a tall menu closes it
+
+(LOW) — the Mark screen's Rename menu overhangs the 390 window by 10 px; a swipe beside a tall menu closes it
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX)
+cat > "$D/p.sh" <<'EOF'
+node /home/lyphe/.claude/state/pipeline-reviews/tour-affected-areas--judgment--drawing/athena-mark-rename-probe.mjs "$1" 2>&1 | grep RESULT || echo "no result: no read tour or Mark item"
+EOF
+bash "$D/p.sh" "$D"
+expect: today RESULT {"390":{"panelLeft":152,"panelRight":400,"innerWidth":390,"overhangPx":10}}; cured when overhangPx is 0 or less (read-only; needs :5183, a read tour, and one item on the Mark screen)
+```
+
+measured 2026-10-18 by chain chain-tour-affected-areas--judgment--drawing-20261018-044450-f4c1, finding L3, LOW
+probe-key: a74295d75344f0cab89abbe822e9445329591bad
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/affected-areas-marking-boxes.mjs

@@ -939,8 +939,8 @@ export const api = {
   // reader routes, passed through (404 `no such tour`, FastAPI's list-shaped 422); `{ error, detail }` (`Refusal`) from
   // its marks routes. The answer type of each verb is named beside it. Ids are encoded here, so a caller passes them as
   // it holds them.
-  // The two slow presses outlast the default deadline by design: cutting a pano's six views takes up to 90 s and a
-  // read of them 120 s (the lane's own deadlines), and the answer that says `refused` is the one the screen shows.
+  // The slow press, `readPano`, outlasts the default deadline by design: a read of a pano's views takes up to 120 s (the
+  // lane's own deadline), and the answer that says `refused` is the one the screen shows.
   affectedAreas: {
     // → TourList
     tours: ({ q, limit }: { q?: string; limit?: number } = {}) => get(`/api/affected-areas/tours${query({ q, limit })}`),
