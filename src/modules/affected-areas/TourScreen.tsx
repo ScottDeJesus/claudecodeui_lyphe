@@ -7,7 +7,7 @@ import { LaneTrouble } from '@/modules/affected-areas/LaneTrouble';
 import { ReadControl } from '@/modules/affected-areas/ReadControl';
 import { RoomGallery } from '@/modules/affected-areas/RoomGallery';
 import { TourRooms } from '@/modules/affected-areas/TourRooms';
-import { tourFacts, tourName } from '@/modules/affected-areas/utils/tourModel';
+import { addressBesideName, tourFacts, tourName } from '@/modules/affected-areas/utils/tourModel';
 import type { TourDetail, TourSummary } from '@/shared/affected-areas-types';
 import type { AffectedAreasTrouble, TourReaderProgress } from '@/shared/types';
 import { Button } from '@/shared/ui';
@@ -85,8 +85,8 @@ export function TourScreen({
           ) : (
             <>
               <h2 className="text-[20px] font-bold leading-tight tracking-[-0.01em] text-foreground [overflow-wrap:anywhere]">{tourName(tour, t)}</h2>
-              {tour.jobLabel !== null && tour.address !== null && (
-                <p className="text-[13.5px] text-muted-foreground [overflow-wrap:anywhere]">{tour.address}</p>
+              {addressBesideName(tour) !== null && (
+                <p className="text-[13.5px] text-muted-foreground [overflow-wrap:anywhere]">{addressBesideName(tour)}</p>
               )}
               <p className="text-[12.5px] text-muted-foreground">{tourFacts(tour, t, true)}</p>
             </>

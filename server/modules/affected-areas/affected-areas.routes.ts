@@ -41,6 +41,15 @@ const PATH_RULES: Record<string, Rule> = {
 };
 
 const CLASS_RULE = PATH_RULES.class;
+
+/** The most regions one `GET /queue` may pass over: shadow-connector's `routes/ids.py` `MAX_SKIP`, which answers more with a 422. */
+const MAX_SKIP = 50;
+const LOWER_UUID = '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}';
+/** `skip`: up to `MAX_SKIP` lowercase uuids, comma-joined and none blank, as the engine's `SKIP_PATTERN` holds them; an empty value is no skip. */
+const SKIP_RULE = pattern(
+  new RegExp(`^(${LOWER_UUID}(,${LOWER_UUID}){0,${MAX_SKIP - 1}})?$`),
+  `at most ${MAX_SKIP} lowercase uuids, comma-joined`,
+);
 // A model name, a codebook version or a contract hash: one token, not a sentence.
 const TOKEN_RULE = pattern(/^[\w.:-]{1,80}$/, 'one token of at most 80 characters');
 
@@ -75,7 +84,7 @@ const ALLOWLIST: AllowedRoute[] = [
   { method: 'post', route: '/images/:sha/regions', timeoutMs: LANE_TIMEOUT_MS, expect: 'json', body: 'object' },
   { method: 'post', route: '/reads/:read/marks', timeoutMs: LANE_TIMEOUT_MS, expect: 'json', body: 'object' },
   { method: 'get', route: '/queue', timeoutMs: LANE_TIMEOUT_MS, expect: 'json', body: 'none',
-    query: { mode: oneOf('unsure', 'random'), class: CLASS_RULE, limit: wholeNumber(1, 50) } },
+    query: { mode: oneOf('unsure', 'random'), class: CLASS_RULE, limit: wholeNumber(1, 50), skip: SKIP_RULE } },
   { method: 'get', route: '/proving', timeoutMs: LANE_TIMEOUT_MS, expect: 'json', body: 'none',
     query: { model: TOKEN_RULE, contract: TOKEN_RULE } },
   { method: 'put', route: '/thresholds/:class', timeoutMs: LANE_TIMEOUT_MS, expect: 'json', body: 'object' },

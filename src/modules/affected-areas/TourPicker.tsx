@@ -3,7 +3,7 @@ import { useId } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { LaneTrouble } from '@/modules/affected-areas/LaneTrouble';
-import { tourFacts, tourName, tourReadState } from '@/modules/affected-areas/utils/tourModel';
+import { addressBesideName, tourFacts, tourName, tourReadState } from '@/modules/affected-areas/utils/tourModel';
 import type { TourSummary } from '@/shared/affected-areas-types';
 import type { AffectedAreasTrouble, Tone } from '@/shared/types';
 import { Badge, Card, EmptyState, Input } from '@/shared/ui';
@@ -90,8 +90,8 @@ export function TourPicker({ query, tours, trouble, onQuery, onOpenTour, onRetry
                     <span className="text-[15px] font-medium text-foreground [overflow-wrap:anywhere]">{tourName(tour, t)}</span>
                     {tour.jobId === null && <Badge as="span" tone="neutral" className="text-[11.5px]">{t('affectedAreas.picker.noJob')}</Badge>}
                   </span>
-                  {tour.jobLabel !== null && tour.address !== null && (
-                    <span className="text-[13px] text-muted-foreground [overflow-wrap:anywhere]">{tour.address}</span>
+                  {addressBesideName(tour) !== null && (
+                    <span className="text-[13px] text-muted-foreground [overflow-wrap:anywhere]">{addressBesideName(tour)}</span>
                   )}
                   <span className="text-[12.5px] text-muted-foreground">{tourFacts(tour, t, false)}</span>
                 </span>

@@ -1,6 +1,6 @@
 import type { TFunction } from 'i18next';
 
-import type { Codebook, Face, PanoEntry, ReadState, Region, TourSummary, ViewDetail, ViewEntry } from '@/shared/affected-areas-types';
+import type { Codebook, Face, PanoEntry, ReadState, TourSummary, ViewDetail, ViewEntry } from '@/shared/affected-areas-types';
 import { regionState } from '@/modules/affected-areas/utils/regionLook';
 import { formatRelativeTime, formatShortDate } from '@/shared/utils';
 
@@ -37,23 +37,40 @@ export function tourReadState(tour: TourSummary): ReadExtent {
 }
 
 /**
- * What Read the rest would still read on a tour: its panos with a face not read yet (a pano never cut included) and
- * those panos' unread views, six for a pano never cut. The press says both before it spends — "45 panos · 270 views
- * not read yet" — because a walk of a whole tour buys every one of them. Read by the view root.
+ * Whether a view needs a read: it has none, or its read is not `current`, which is the engine's answer to "is this read
+ * under the contract and model the reader reads under now" (`ReadState.current`, null on a view never read). The browser
+ * compares no contract or model itself. Read by `tourUnread`, the walk's queue (`useTourReader`) and `ReadControl`'s
+ * Read again.
+ */
+export function needsRead(view: ViewEntry): boolean {
+  return view.read?.status !== 'read' || view.read.current !== true;
+}
+
+/**
+ * What Read the rest would still read on a tour: its panos with a view that needs a read (`needsRead`: none yet, or one
+ * made under an older contract or model; a pano never cut included) and those views, six for a pano never cut. The press
+ * says both before it spends — "45 panos · 270 views not read yet" — because a walk of a whole tour buys every one of
+ * them. Read by the view root.
  */
 export function tourUnread(panos: PanoEntry[]): { panos: number; views: number } {
   const unread = panos
-    .map((pano) => FACES.length - pano.views.filter((view) => view.read?.status === 'read').length)
+    .map((pano) => FACES.length - pano.views.filter((view) => !needsRead(view)).length)
     .filter((views) => views > 0);
   return { panos: unread.length, views: unread.reduce((sum, views) => sum + views, 0) };
 }
 
 /**
- * The tour's name as a person reads it: the job's, else its address, else a sentence saying it has neither.
- * Never its id (INV-76). Read by the picker's rows, the tour screen's title and the pano screen's way back.
+ * The tour's name as a person reads it: the job's, else DocuSketch's own name for the tour (a pre-job tour is named
+ * there), else its address, else a sentence saying it has none of them. Never its id (INV-76). Read by the picker's
+ * rows, the tour screen's title and the pano screen's way back.
  */
 export function tourName(tour: TourSummary, t: TFunction): string {
-  return tour.jobLabel ?? tour.address ?? t('affectedAreas.tour.unnamed');
+  return tour.jobLabel ?? tour.tourName ?? tour.address ?? t('affectedAreas.tour.unnamed');
+}
+
+/** The address as a line of its own: whenever the name above it is not already the address (`tourName`), else null. */
+export function addressBesideName(tour: TourSummary): string | null {
+  return tour.jobLabel !== null || tour.tourName !== null ? tour.address : null;
 }
 
 /**
@@ -125,14 +142,6 @@ export function kindName(cls: string, codebook: Codebook | null): string {
   return codebook?.classes.find((kind) => kind.key === cls)?.label ?? capitalized(spoken(cls));
 }
 
-/**
- * The kind an area counts as: the one the operator renamed it to when its newest mark is a rename, else the one the
- * reader gave it. It is shadow-connector's `effective_class` read off the mark the wire carries, because the wire's
- * `class` stays the reader's after a rename. Read by `MarkPresses` and `MarkBar`.
- */
-export function countedKind(region: Region): string {
-  return region.mark?.verdict === 'rename' && region.mark.newClass !== null ? region.mark.newClass : region.class;
-}
 
 /**
  * A read's areas as the tour's listing counts them, before any pano has answered with its regions: `standing` is the

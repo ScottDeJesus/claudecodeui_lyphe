@@ -20,6 +20,19 @@ const markedMs = (mark: Mark): number => {
 };
 
 /**
+ * The mark that stands between a press's answer and the mark a read of the pano carries: the later of the two, and the
+ * read's own when they are the same mark. A read that began before the press and landed after it carries the older mark
+ * (the answer stands); a read made after it carries the same one, or another session's newer one (the read stands).
+ *
+ * Used by `UnderstandingMark`, for the judgment of a read's whole account.
+ */
+export function standingMark(answered: Mark | null, read: Mark | null): Mark | null {
+  if (answered === null || read === null) return answered ?? read;
+  if (answered.markId === read.markId) return read;
+  return markedMs(answered) > markedMs(read) ? answered : read;
+}
+
+/**
  * Whether the engine's answer to a press outranks the region a read brought. A read that began before the press and
  * landed after it carries the region unjudged, or under an older mark: the answer outranks it, so a judged area is never
  * redrawn unjudged. The same mark in a read (the read is later, and may carry a line the operator moved since) or a newer

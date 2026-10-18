@@ -1,5 +1,6 @@
 import { useState } from 'react';
 
+import { standingMark } from '@/modules/affected-areas/hooks/useMarkedRegions';
 import { UnderstandingVerdict } from '@/modules/affected-areas/UnderstandingVerdict';
 import { answerOfWrite } from '@/modules/affected-areas/utils/laneTrouble';
 import type { Mark, ReadState, UnderstandingMarkRequest, UnderstandingMarkResult } from '@/shared/affected-areas-types';
@@ -13,7 +14,8 @@ type UnderstandingMarkProps = {
 /**
  * THE UNDERSTANDING TAKES RIGHT OR WRONG: what the reader made of the whole face, judged in one press — Right, or
  * Wrong with a note saying what was wrong. Each is one `api.affectedAreas.markUnderstanding(readId, …)`, a row of its
- * own: a changed mind is a new press, and the history stays.
+ * own: a changed mind is a new press, and the history stays. The judgment drawn is the read's newest mark: the one the
+ * wire carries (`read.understandingMark`) or the answer of a press made here, whichever is later (`standingMark`).
  *
  * A caller keys it by the read (`key={read.readId}`), so an answer, a refusal or a Wrong note typed for one face's
  * account never rides to another face's.
@@ -23,15 +25,15 @@ type UnderstandingMarkProps = {
  * Used by the affected-areas module's `UnderstandingCard`, as its last block.
  */
 export function UnderstandingMark({ read }: UnderstandingMarkProps) {
-  // ── The wires: the press out, its refusal, this visit's answer, the Wrong field, and the presses. Everything they
+  // ── The wires: the press out, its refusal, the last press's answer, the Wrong field, and the presses. Everything they
   //    hand `UnderstandingVerdict` is composition. ──
   // The verdict whose mark is out: while it is, both presses refuse a second, so one mark is sent at a time.
   const [out, setOut] = useState<UnderstandingMarkRequest['verdict'] | null>(null);
   // Why the last press was not kept, in the engine's or the lane's word, until the next press: said under the presses.
   const [refusal, setRefusal] = useState<string | null>(null);
-  // The mark the last press of this visit was answered with. The pano's read carries no understanding mark, so there is
-  // nothing to draw this from: a press answered is said as "marked just now", for this visit only.
-  const [answer, setAnswer] = useState<Mark | null>(null);
+  // The mark the last press made here was answered with, null before one. The wire's mark was fetched before the press, so
+  // this is what is drawn from the press until a read of the pano brings the same mark or a later one (`standingMark`).
+  const [answered, setAnswered] = useState<Mark | null>(null);
   // Whether Wrong was pressed and its field is open: a Wrong is sent from there, with the note of what was wrong.
   const [writing, setWriting] = useState(false);
 
@@ -47,7 +49,7 @@ export function UnderstandingMark({ read }: UnderstandingMarkProps) {
       setRefusal(result.refusal);
       return;
     }
-    setAnswer(result.answer.mark);
+    setAnswered(result.answer.mark);
     setWriting(false);
   };
   const onRight = (): void => {
@@ -66,7 +68,7 @@ export function UnderstandingMark({ read }: UnderstandingMarkProps) {
     <UnderstandingVerdict
       out={out}
       refusal={refusal}
-      answer={answer}
+      mark={standingMark(answered, read.understandingMark)}
       writing={writing}
       onRight={onRight}
       onWrong={onWrong}

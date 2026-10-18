@@ -3,7 +3,6 @@ import { useEffect, useId, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { REGION_LOOK, regionState } from '@/modules/affected-areas/utils/regionLook';
-import { countedKind } from '@/modules/affected-areas/utils/tourModel';
 import type { Region } from '@/shared/affected-areas-types';
 import { Badge, Card } from '@/shared/ui';
 import { cn } from '@/shared/utils';
@@ -94,7 +93,7 @@ export function RegionList({ regions, selectedId, kindLabel, label, onSelect }: 
                 </Badge>
                 <span className="flex min-w-0 flex-1 flex-col gap-0.5">
                   {/* The kind the area counts as, so a rename redraws the list as it redraws the bar. */}
-                  <span className="text-sm font-medium text-foreground">{kindLabel(countedKind(region))}</span>
+                  <span className="text-sm font-medium text-foreground">{kindLabel(region.effectiveClass ?? region.class)}</span>
                   {region.label !== null && <span className="text-[13px] text-foreground [overflow-wrap:anywhere]">{region.label}</span>}
                   {region.evidence !== null && region.evidence !== '' && (
                     <span className="text-[12.5px] text-muted-foreground [overflow-wrap:anywhere]">“{region.evidence}”</span>

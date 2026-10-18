@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 
 import { JudgmentPress, KeyCap, MarkRefusal } from '@/modules/affected-areas/MarkPress';
 import { REGION_LOOK, regionState } from '@/modules/affected-areas/utils/regionLook';
-import { countedKind, kindName } from '@/modules/affected-areas/utils/tourModel';
+import { kindName } from '@/modules/affected-areas/utils/tourModel';
 import type { Codebook, MarkRequest, Region } from '@/shared/affected-areas-types';
 import { Badge, Button, buttonVariants, Menu } from '@/shared/ui';
 import { cn } from '@/shared/utils';
@@ -73,8 +73,9 @@ export function MarkPresses({ region, codebook, browsing, out, refusal, note, on
 
   const busy = out !== null;
   const look = REGION_LOOK[regionState(region)];
-  // The kind the area counts as, and the one the operator renamed it to (null when it was not renamed).
-  const counted = countedKind(region);
+  // The kind the area counts as (the engine's `effectiveClass`; the reader's own for a region it left unjudged), and the one
+  // the operator renamed it to (null when it was not renamed).
+  const counted = region.effectiveClass ?? region.class;
   const renamedTo = counted === region.class ? null : counted;
   const shownKind = kindName(counted, codebook);
   const drawnByHand = region.source === 'human';

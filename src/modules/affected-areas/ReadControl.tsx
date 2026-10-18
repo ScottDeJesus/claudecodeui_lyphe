@@ -1,7 +1,7 @@
 import type { TFunction } from 'i18next';
 import { useTranslation } from 'react-i18next';
 
-import { FACES, listWords } from '@/modules/affected-areas/utils/tourModel';
+import { FACES, listWords, needsRead } from '@/modules/affected-areas/utils/tourModel';
 import type { Budget, ReadResult, ViewEntry } from '@/shared/affected-areas-types';
 import type { PanoPress, TourReaderProgress } from '@/shared/types';
 import { Banner, Button, Meter } from '@/shared/ui';
@@ -12,8 +12,8 @@ type ReadControlProps = {
     press: PanoPress;
     /** The pano's views: whose reads Read again answers, and which faces are still unread. */
     views: ViewEntry[];
-    /** The contract the codebook reads under now; null until the codebook answers, which offers no contract reason. */
-    contract: string | null;
+    /** The contract and model the reader reads under now (the codebook's); null until the codebook answers, which offers no reason that names them. */
+    today: { contract: string; model: string } | null;
     onRead: () => void;
     onReadAgain: () => void;
   } | null;
@@ -60,12 +60,13 @@ function refusalWords(reason: string, t: TFunction, budget?: Budget): string {
 
 /**
  * Why Read again is offered, or null: the job's context changed since a face was read (the reader would be told
- * something new), or a face was read under a contract older than the codebook's.
+ * something new), or a face has a read that is not current (`needsRead` with a read on it: made under an older contract
+ * or model than the reader reads under now).
  */
-function againReason(views: ViewEntry[], contract: string | null, t: TFunction): string | null {
+function againReason(views: ViewEntry[], today: { contract: string; model: string } | null, t: TFunction): string | null {
   if (views.some((view) => view.read?.contextChanged === true)) return t('affectedAreas.read.againContext');
-  const older = views.find((view) => view.read?.status === 'read' && contract !== null && view.read.contractVersion !== contract);
-  return older?.read ? t('affectedAreas.read.againContract', { old: older.read.contractVersion, current: contract }) : null;
+  const older = views.some((view) => view.read?.status === 'read' && needsRead(view));
+  return older && today !== null ? t('affectedAreas.read.againCurrent', today) : null;
 }
 
 /**
@@ -102,7 +103,7 @@ function Wall({ words }: { words: string }) {
  * 30 views not read yet"), why Read again is offered when it is; then each wall in words, BEFORE the presses it
  * refuses — the lane's fault, a dry run refused, the last press refused or part read, where the walk stopped, a walk
  * and a press stopped by the same wall said once; then the presses — Read this pano while any view is left to buy,
- * Read again (forced) when the context changed or an older contract read it, Read the rest of this tour while any
+ * Read again (forced) when the context changed or an older contract or model read it, Read the rest of this tour while any
  * pano is left. While a wall no retry clears today stands (a spent budget, a switch, a missing key), the presses drop
  * to outline. A press that is out holds both pano presses busy and says how long it takes.
  *
@@ -118,7 +119,7 @@ export function ReadControl({ pano, walk, unreadPanos, unreadViews, onReadRest, 
   const press = pano?.press ?? null;
   const plan = press?.plan ?? null;
   const planRefusal = plan?.status === 'refused' ? plan.reason ?? 'views_refused' : null;
-  const again = pano === null ? null : againReason(pano.views, pano.contract, t);
+  const again = pano === null ? null : againReason(pano.views, pano.today, t);
   const left = plan === null || planRefusal !== null || plan.viewsToRead > 0;
   const rest = t(pano === null ? 'affectedAreas.read.rest' : 'affectedAreas.read.restOfTour', {
     panos: t('affectedAreas.tour.panos', { count: unreadPanos }),

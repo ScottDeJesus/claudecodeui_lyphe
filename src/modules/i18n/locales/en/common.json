@@ -2369,7 +2369,6 @@
       "toTourDays_other": "{{count}} days",
       "built": "Built",
       "carrier": "Carrier",
-      "property": "Property",
       "from": "From {{sources}}.",
       "source": {
         "docusketch": "DocuSketch",
@@ -2377,7 +2376,7 @@
         "xactanalysis": "XactAnalysis",
         "drying": "drying reports"
       },
-      "unlinked": "This tour isn't linked to a job, so the reader is told only what DocuSketch knows: the rooms and when each was captured.",
+      "docusketchOnly": "No job claims this tour, so these facts come from DocuSketch alone.",
       "nothing": "The job carries no loss details yet."
     },
     "rooms": {
@@ -2538,6 +2537,8 @@
         "ceiling": "ceiling"
       },
       "above18": "Water rose above 18 inches.",
+      "demoBefore": "Demo had begun before the tour",
+      "noDemoBefore": "No demo recorded before the tour",
       "report": "From the drying report of {{date}}.",
       "none": "No drying report names this room."
     },
@@ -2560,7 +2561,7 @@
       "readAgain": "Read again",
       "readingAgain": "Reading again…",
       "againContext": "The job's details changed since this pano was read.",
-      "againContract": "Read under contract {{old}}; the reader now reads under {{current}}.",
+      "againCurrent": "Read under an older contract or model; the reader now reads under {{contract}} on {{model}}.",
       "readRest": "Read the rest of this tour",
       "readingRest": "Reading the rest…",
       "stopRest": "Stop after this pano",

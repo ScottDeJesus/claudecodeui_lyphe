@@ -971,9 +971,9 @@ export const api = {
     // → UnderstandingMarkResult
     markUnderstanding: (readId: string, body: UnderstandingMarkRequest) =>
       post(`/api/affected-areas/reads/${encodeURIComponent(readId)}/marks`, body),
-    // → Queue
-    queue: ({ mode, cls, limit }: { mode: Queue['mode']; cls?: string; limit?: number }) =>
-      get(`/api/affected-areas/queue${query({ mode, class: cls, limit })}`),
+    // → Queue. `skip` is the region ids a walk has passed over, at most 50: they leave the items and stay in `remaining`.
+    queue: ({ mode, cls, limit, skip }: { mode: Queue['mode']; cls?: string; limit?: number; skip?: string[] }) =>
+      get(`/api/affected-areas/queue${query({ mode, class: cls, limit, skip: skip?.join(',') })}`),
     // → Proving
     proving: ({ model, contract }: { model?: string; contract?: string } = {}) =>
       get(`/api/affected-areas/proving${query({ model, contract })}`),

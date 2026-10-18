@@ -14,8 +14,8 @@ type UnderstandingVerdictProps = {
   out: UnderstandingMarkRequest['verdict'] | null;
   /** Why the last press was refused — the engine's reason or the lane's fault — or null. The next press clears it. */
   refusal: string | null;
-  /** The mark this session's last press was answered with; null until one is made here. */
-  answer: Mark | null;
+  /** The read's standing judgment: its newest understanding mark, from the wire or from a press made here; null when none. */
+  mark: Mark | null;
   /** Wrong was pressed and the field asking what was wrong is open. */
   writing: boolean;
   onRight: () => void;
@@ -79,19 +79,20 @@ function WrongNote({ sending, onSend, onCancel }: { sending: boolean; onSend: (n
  * with that note: the note is what a reader's account is corrected by.
  *
  * Right wears the confirmed area's green and Wrong the set-aside grey (the region-look table), so a green press means
- * the reader was right wherever it stands. Once a press is answered the block says so ("You marked this account
- * wrong just now", with the note); a pano read again later carries no such mark, so it is said for this visit only.
+ * the reader was right wherever it stands. Once the read has a mark the block says so ("You marked this account
+ * wrong 3 minutes ago.", with the note), after a press and after any reload alike: the mark is the engine's, not this
+ * visit's.
  *
  * Handles: `data-understanding-mark` on the block, `data-understanding-press` on each press (`right`, `wrong`,
  * `send-wrong`).
  *
  * Used by the affected-areas module's `UnderstandingMark`, which holds the presses' state and sends them.
  */
-export function UnderstandingVerdict({ out, refusal, answer, writing, onRight, onWrong, onSendWrong, onCancelWrong }: UnderstandingVerdictProps) {
+export function UnderstandingVerdict({ out, refusal, mark, writing, onRight, onWrong, onSendWrong, onCancelWrong }: UnderstandingVerdictProps) {
   const { t } = useTranslation();
   const questionId = useId();
   const busy = out !== null;
-  const wrong = answer?.verdict === 'understanding_wrong';
+  const wrong = mark?.verdict === 'understanding_wrong';
 
   return (
     <div className="flex min-w-0 flex-col gap-3 border-t border-border pt-3" data-understanding-mark="">
@@ -122,14 +123,14 @@ export function UnderstandingVerdict({ out, refusal, answer, writing, onRight, o
       </div>
 
       {writing && <WrongNote sending={out === 'understanding_wrong'} onSend={onSendWrong} onCancel={onCancelWrong} />}
-      {answer !== null && !writing && (
+      {mark !== null && !writing && (
         <p className="flex min-w-0 items-start gap-1.5 text-[12.5px] text-muted-foreground [overflow-wrap:anywhere]">
           <span aria-hidden="true" data-tone={wrong ? REGION_LOOK.not_a_change.tone : REGION_LOOK.confirmed.tone} className="flex-none font-bold text-tone-ink">
             {wrong ? '✕' : '✓'}
           </span>
           <span>
-            {t(wrong ? 'affectedAreas.understanding.markedWrong' : 'affectedAreas.understanding.markedRight', { when: formatRelativeTime(answer.markedAt) })}
-            {wrong && answer.note !== null && <> {t('affectedAreas.understanding.markedNote', { note: answer.note })}</>}
+            {t(wrong ? 'affectedAreas.understanding.markedWrong' : 'affectedAreas.understanding.markedRight', { when: formatRelativeTime(mark.markedAt) })}
+            {wrong && mark.note !== null && <> {t('affectedAreas.understanding.markedNote', { note: mark.note })}</>}
           </span>
         </p>
       )}

@@ -12,7 +12,7 @@ import { RegionList } from '@/modules/affected-areas/RegionList';
 import { RoomDrying } from '@/modules/affected-areas/RoomDrying';
 import { UnderstandingCard } from '@/modules/affected-areas/UnderstandingCard';
 import { REGION_LOOK, regionState } from '@/modules/affected-areas/utils/regionLook';
-import { countedKind, faceCounts, kindName, roomWords } from '@/modules/affected-areas/utils/tourModel';
+import { faceCounts, kindName, roomWords } from '@/modules/affected-areas/utils/tourModel';
 import type { Codebook, Face, PanoDetail, PanoEntry, Region, RoomEntry, ViewDetail, ViewEntry } from '@/shared/affected-areas-types';
 import type { AffectedAreasTrouble, PanoPress, RegionLayer, RegionShape, TourReaderProgress } from '@/shared/types';
 import { Button, Card, EmptyState, Lightbox, RegionImage } from '@/shared/ui';
@@ -28,7 +28,7 @@ type PanoScreenProps = {
   tourName: string;
   /** The pano's room in its tour: its drying numbers. */
   room: RoomEntry | null;
-  /** The kinds' labels and the contract a read is current under; null until the codebook answers. */
+  /** The kinds' labels and the contract and model a read is current under; null until the codebook answers. */
   codebook: Codebook | null;
   face: Face;
   selectedRegionId: string | null;
@@ -114,7 +114,7 @@ export function PanoScreen({
     const look = REGION_LOOK[regionState(region)];
     return {
       id: region.regionId, ordinal: region.ordinal, polygon: region.polygon, box: region.box,
-      tone: look.tone, edge: look.edge, wash: look.wash, label: kindName(countedKind(region), codebook),
+      tone: look.tone, edge: look.edge, wash: look.wash, label: kindName(region.effectiveClass ?? region.class, codebook),
     };
   });
 
@@ -182,7 +182,7 @@ export function PanoScreen({
               pano={{
                 press: press.trouble !== null && press.trouble === trouble ? { ...press, trouble: null } : press,
                 views,
-                contract: codebook?.contractVersion ?? null,
+                today: codebook === null ? null : { contract: codebook.contractVersion, model: codebook.model },
                 onRead: onReadPano,
                 onReadAgain,
               }}

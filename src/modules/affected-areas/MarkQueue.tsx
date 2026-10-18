@@ -6,7 +6,7 @@ import { LaneTrouble } from '@/modules/affected-areas/LaneTrouble';
 import { MarkBar } from '@/modules/affected-areas/MarkBar';
 import { KeyCap } from '@/modules/affected-areas/MarkPress';
 import { REGION_LOOK, regionState } from '@/modules/affected-areas/utils/regionLook';
-import { countedKind, kindName, roomWords } from '@/modules/affected-areas/utils/tourModel';
+import { kindName, roomWords } from '@/modules/affected-areas/utils/tourModel';
 import type { Codebook, Queue, Region } from '@/shared/affected-areas-types';
 import type { MarkWalk, RegionShape } from '@/shared/types';
 import { Button, EmptyState, RegionImage, SegmentedControl, Select } from '@/shared/ui';
@@ -38,7 +38,7 @@ function shapeOf(region: Region, codebook: Codebook | null): RegionShape {
   const look = REGION_LOOK[regionState(region)];
   return {
     id: region.regionId, ordinal: region.ordinal, polygon: region.polygon, box: region.box,
-    tone: look.tone, edge: look.edge, wash: look.wash, label: kindName(countedKind(region), codebook),
+    tone: look.tone, edge: look.edge, wash: look.wash, label: kindName(region.effectiveClass ?? region.class, codebook),
   };
 }
 

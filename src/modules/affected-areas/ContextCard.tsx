@@ -10,7 +10,7 @@ import { cn, formatShortDate, resizeObserverIn } from '@/shared/utils';
 
 type ContextCardProps = {
   context: ContextSummary;
-  /** Whether a job claims the tour. An unlinked tour's reader is told only what DocuSketch knows, and the card says so. */
+  /** Whether a job claims the tour. An unlinked tour's facts come from DocuSketch alone, and the card says so in a line of its own. */
   linked: boolean;
 };
 
@@ -33,16 +33,17 @@ function sourceWords(sources: string[], t: TFunction): string {
 }
 
 /**
- * WHAT THE READER IS TOLD: the job's facts as the reader receives them with every view, so a finding can be read
- * against what it was told.
+ * WHAT THE READER IS TOLD: the facts the reader receives with every view, so a finding can be read against what it
+ * was told. They are the same facts for every tour; an unlinked tour's come from DocuSketch alone (its loss type and
+ * carrier, when it has them).
  *
  * Read top to bottom: the loss in one line ("Water loss · category 2 · class 2"), a stated cause when there is one,
  * the insured's own account folded to two lines with Show all, then the facts that frame it — date of loss, days
- * from the loss to the tour, year built, carrier, property — and last, where all of it came from. A fact the job does
- * not carry is left out rather than drawn empty.
+ * from the loss to the tour, year built, carrier — and last, where all of it came from. A fact the tour does not
+ * carry is left out rather than drawn empty. The property type is not among them: the reader is never told it.
  *
- * An unlinked tour says plainly that the reader is told only what DocuSketch knows; a linked one whose job carries no
- * loss details yet says that.
+ * A linked job that carries no loss details yet says that, and that the account is not on file. An unlinked tour adds
+ * one line saying no job claims it; when it has no facts at all, that line is all it shows besides its source.
  *
  * Used by the affected-areas module's `TourScreen`, which keys it by tour, so the next tour's account opens folded.
  */
@@ -87,52 +88,46 @@ export function ContextCard({ context, linked }: ContextCardProps) {
   if (context.daysLossToTour !== null) facts.push([t('affectedAreas.context.toTour'), t('affectedAreas.context.toTourDays', { count: context.daysLossToTour })]);
   if (context.yearBuilt !== null) facts.push([t('affectedAreas.context.built'), String(context.yearBuilt)]);
   if (context.carrier !== null) facts.push([t('affectedAreas.context.carrier'), context.carrier]);
-  if (context.propertyType !== null) facts.push([t('affectedAreas.context.property'), capitalized(spoken(context.propertyType))]);
 
   return (
     <Card role="region" aria-labelledby={headingId} className="flex min-w-0 flex-col gap-3 px-[18px] py-4">
       <h3 id={headingId} className={EYEBROW}>{t('affectedAreas.context.title')}</h3>
-      {!linked ? (
-        <p className="max-w-[680px] text-[13.5px] text-muted-foreground">{t('affectedAreas.context.unlinked')}</p>
+      {loss !== '' && <p className="text-[15px] font-medium text-foreground">{loss}</p>}
+      {context.statedCause !== null && <p className="text-[13.5px]">{t('affectedAreas.context.cause', { cause: context.statedCause })}</p>}
+      {context.lossAccount !== null ? (
+        <div className="flex max-w-[760px] flex-col items-start gap-0.5">
+          <blockquote
+            ref={quoteRef}
+            tabIndex={-1}
+            className={cn(
+              'm-0 w-full whitespace-pre-wrap border-l-2 border-border pl-3 text-[13.5px] leading-relaxed text-foreground outline-none [overflow-wrap:anywhere] focus-visible:outline-none',
+              !whole && 'line-clamp-2',
+            )}
+          >
+            {context.lossAccount}
+          </blockquote>
+          {long && !whole && (
+            <Button variant="link" size="sm" className="ml-1.5 h-7 px-1.5 max-md:h-11" onClick={onShowAll}>
+              {t('affectedAreas.context.showAll')}
+            </Button>
+          )}
+        </div>
       ) : (
-        <>
-          {loss !== '' && <p className="text-[15px] font-medium text-foreground">{loss}</p>}
-          {context.statedCause !== null && <p className="text-[13.5px]">{t('affectedAreas.context.cause', { cause: context.statedCause })}</p>}
-          {context.lossAccount !== null ? (
-            <div className="flex max-w-[760px] flex-col items-start gap-0.5">
-              <blockquote
-                ref={quoteRef}
-                tabIndex={-1}
-                className={cn(
-                  'm-0 w-full whitespace-pre-wrap border-l-2 border-border pl-3 text-[13.5px] leading-relaxed text-foreground outline-none [overflow-wrap:anywhere] focus-visible:outline-none',
-                  !whole && 'line-clamp-2',
-                )}
-              >
-                {context.lossAccount}
-              </blockquote>
-              {long && !whole && (
-                <Button variant="link" size="sm" className="ml-1.5 h-7 px-1.5 max-md:h-11" onClick={onShowAll}>
-                  {t('affectedAreas.context.showAll')}
-                </Button>
-              )}
-            </div>
-          ) : (
-            <p className="text-[13.5px] text-muted-foreground">{t('affectedAreas.context.noAccount')}</p>
-          )}
-          {facts.length > 0 ? (
-            <dl className="m-0 grid grid-cols-[repeat(auto-fill,minmax(128px,1fr))] gap-x-6 gap-y-3">
-              {facts.map(([term, detail]) => (
-                <div key={term} className="flex min-w-0 flex-col gap-0.5">
-                  <dt className="text-xs text-muted-foreground">{term}</dt>
-                  <dd className="m-0 text-[13.5px] text-foreground [overflow-wrap:anywhere]">{detail}</dd>
-                </div>
-              ))}
-            </dl>
-          ) : (
-            loss === '' && <p className="text-[13.5px] text-muted-foreground">{t('affectedAreas.context.nothing')}</p>
-          )}
-        </>
+        linked && <p className="text-[13.5px] text-muted-foreground">{t('affectedAreas.context.noAccount')}</p>
       )}
+      {facts.length > 0 ? (
+        <dl className="m-0 grid grid-cols-[repeat(auto-fill,minmax(128px,1fr))] gap-x-6 gap-y-3">
+          {facts.map(([term, detail]) => (
+            <div key={term} className="flex min-w-0 flex-col gap-0.5">
+              <dt className="text-xs text-muted-foreground">{term}</dt>
+              <dd className="m-0 text-[13.5px] text-foreground [overflow-wrap:anywhere]">{detail}</dd>
+            </div>
+          ))}
+        </dl>
+      ) : (
+        linked && loss === '' && <p className="text-[13.5px] text-muted-foreground">{t('affectedAreas.context.nothing')}</p>
+      )}
+      {!linked && <p className="text-[13.5px] text-muted-foreground">{t('affectedAreas.context.docusketchOnly')}</p>}
       <p className="text-xs text-muted-foreground">{t('affectedAreas.context.from', { sources: sourceWords(context.sources, t) })}</p>
     </Card>
   );

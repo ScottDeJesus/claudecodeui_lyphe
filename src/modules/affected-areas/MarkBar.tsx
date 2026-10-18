@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { MarkPresses } from '@/modules/affected-areas/MarkPresses';
 import { NoteDialog } from '@/modules/affected-areas/NoteDialog';
 import { answerOfWrite } from '@/modules/affected-areas/utils/laneTrouble';
-import { countedKind, kindName } from '@/modules/affected-areas/utils/tourModel';
+import { kindName } from '@/modules/affected-areas/utils/tourModel';
 import type { Codebook, MarkQueue, MarkRequest, Region } from '@/shared/affected-areas-types';
 import { api } from '@/shared/api';
 
@@ -68,7 +68,7 @@ export function MarkBar({ region, codebook, queue, onMarked }: MarkBarProps) {
   // Keep is a rename to the kind the area already counts as: the engine takes it (it refuses only the reader's own kind),
   // and it is the press that lets a note ride on a renamed area without undoing the rename.
   const onKeep = (): void => {
-    void press('keep', { verdict: 'rename', newClass: countedKind(region), note: note || null, queue });
+    void press('keep', { verdict: 'rename', newClass: region.effectiveClass ?? region.class, note: note || null, queue });
   };
   const onNote = (): void => setNoteOpen(true);
   const onKeepNote = (kept: string): void => {
@@ -93,7 +93,7 @@ export function MarkBar({ region, codebook, queue, onMarked }: MarkBarProps) {
       />
       {noteOpen && (
         <NoteDialog
-          subject={`${region.ordinal}. ${kindName(countedKind(region), codebook)}`}
+          subject={`${region.ordinal}. ${kindName(region.effectiveClass ?? region.class, codebook)}`}
           note={note}
           onKeep={onKeepNote}
           onDismiss={onCloseNote}
