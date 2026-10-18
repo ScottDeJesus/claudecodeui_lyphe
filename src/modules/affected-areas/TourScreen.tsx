@@ -20,7 +20,7 @@ type TourScreenProps = {
   trouble: AffectedAreasTrouble | null;
   /** Each tile's photo, by the sha of its pano's Ahead view. */
   photos: Record<string, string | null>;
-  /** Panos with a face not yet read: what Read the rest would read. */
+  /** Panos with a view that needs a read (none yet, or one that is not current): what Read the rest would read. */
   unreadPanos: number;
   /** Those panos' unread views: what Read the rest would spend. */
   unreadViews: number;

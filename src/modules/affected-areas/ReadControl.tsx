@@ -18,7 +18,7 @@ type ReadControlProps = {
     onReadAgain: () => void;
   } | null;
   walk: TourReaderProgress;
-  /** Panos of the tour with a face not yet read: what Read the rest would read. Zero takes the press away. */
+  /** Panos of the tour with a view that needs a read (none yet, or one that is not current): what Read the rest would read. Zero takes the press away. */
   unreadPanos: number;
   /** Those panos' unread views, six for a pano never cut: what Read the rest would spend, said before it does. */
   unreadViews: number;

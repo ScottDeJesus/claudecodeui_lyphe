@@ -10371,17 +10371,17 @@ probe-key: 5b421fcf604f06bcb83fc47bcf981801d718f3be
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/hooks/useMarkedRegions.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/hooks/useProving.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/hooks/useQueue.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/MarkScreen.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/affected-areas-marking.mjs
 
-## INV-8688 — probe — LOW (open from round 1, disclosed) — Skip has no memory, and the Mark screen does not keep its item across the switch
+## INV-8688 — probe — LOW (open from round 1, disclosed) — the Mark screen does not keep its item across the switch
 
-LOW (open from round 1, disclosed) — Skip has no memory, and the Mark screen does not keep its item across the switch
+LOW (open from round 1, disclosed) — the Mark screen does not keep its item across the switch
 
 ```probe
 D=$(mktemp -d /tmp/athena-p.XXXXXX) || exit 1
 cat > "$D/p.sh" <<'EOF'
-cd "$HOME/.claude/state/pipeline-reviews/tour-affected-areas--marking--fill/athena-probes" && for p in p5-skipwall p7-place; do timeout 170 node $p.mjs 2>&1 | grep -E 'RESULT|PROBE ERROR'; done
+cd "$HOME/.claude/state/pipeline-reviews/tour-affected-areas--marking--fill/athena-probes" && for p in p7-place; do timeout 170 node $p.mjs 2>&1 | grep -E 'RESULT|PROBE ERROR'; done
 EOF
 bash "$D/p.sh"
-expect: while it stands `distinct items over 21 skips = 20 | after the 20th skip the screen shows the first item again = true` and `back on Mark the item is item 1 (place lost)`; cured: more than 20 distinct (or a word that the batch is skipped) and `item 3 (place kept)`.
+expect: while it stands `back on Mark the item is item 1 (place lost)`; cured: `item 3 (place kept)`. (Its skip half, `distinct items over 21 skips = 20`, was cured 2026-10-18 by `GET /queue?skip=`: the same probe now prints `21 | after the 20th skip the screen shows the first item again = false`.)
 ```
 
 measured 2026-10-17 by chain chain-tour-affected-areas--marking--fill-20261017-200005-ba7f, finding L4, LOW

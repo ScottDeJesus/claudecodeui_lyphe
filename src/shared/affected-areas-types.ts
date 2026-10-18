@@ -247,7 +247,11 @@ export type Understanding = {
 export type Region = {
   regionId: string;
   source: 'model' | 'human';
-  /** The badge number on its view. */
+  /**
+   * The badge number it is SERVED under. A model region's is its own; a drawn area's is the shown read's region count plus
+   * its rank among the view's drawn areas, so it is one past the read's last. The ordinal stored when it was drawn is
+   * history and never leaves.
+   */
   ordinal: number;
   class: string;
   /** Marks. The kind the area counts as, a rename applied. */

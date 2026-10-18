@@ -128,7 +128,7 @@ export function AffectedAreasView() {
   const room = panoRoom === null
     ? null
     : (detail?.rooms.find((candidate) => candidate.roomKey === panoRoom.roomKey && candidate.floor === panoRoom.floor) ?? null);
-  // What Read the rest would read and spend: every pano with a face not read yet, a pano never cut included, and
+  // What Read the rest would read and spend: every pano with a view that needs a read (none yet, or not current), a pano never cut included, and
   // their unread views; the press says both before it spends.
   const unread = tourUnread(detail?.panos ?? []);
 
