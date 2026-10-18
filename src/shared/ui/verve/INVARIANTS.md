@@ -31,23 +31,3 @@ measured 2026-10-17 by chain chain-tour-affected-areas--viewer--docs-20261017-16
 probe-key: 561cc9c48776d39e0d11f22e3298513176d56476
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/verve/
-
-## INV-8680 — probe — LOW — The brief's one proof of findability does not print the library row, and the title carries only part of what an editor would type
-
-LOW — The brief's one proof of findability does not print the library row, and the title carries only part of what an editor would type
-
-```probe
-D=$(mktemp -d /tmp/athena-probe.XXXXXX)
-cat > "$D/p.sh" <<'EOF'
-cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
-printf 'brief query : '; docstore search "affected areas tours view lane RegionImage Gallery" --text | cut -d' ' -f1 | tr '\n' ' '; echo
-printf 'PhotoFill   : '; docstore search "PhotoFill" --text | cut -d' ' -f1 | tr '\n' ' '; echo
-EOF
-bash "$D/p.sh"
-expect: today "brief query : MAN-8575 MAN-8545 MAN-8577" and "PhotoFill   : MAN-4995"; cured: MAN-8579 printed on both lines
-```
-
-measured 2026-10-17 by chain chain-tour-affected-areas--viewer--docs-20261017-161343-c51e, finding L3, LOW
-probe-key: 1a7f535b283f4912ff907778d576f4800c99c69d
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/verve/

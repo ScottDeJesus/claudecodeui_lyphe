@@ -10052,37 +10052,6 @@ Trap: a unit that exports `EIS_INTERNAL_SECRET` in its own environment overrides
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/affected-areas/affected-areas.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/affected-areas/affected-areas.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/affected-areas/affected-areas.service.ts
 
-## INV-8634 — probe — (LOW) — the `affectedAreas` block comment's account of failure bodies leaves out two bodies the lane really sends
-
-(LOW) — the `affectedAreas` block comment's account of failure bodies leaves out two bodies the lane really sends
-
-```probe
-D=$(mktemp -d /tmp/athena-p1.XXXXXX) || exit 1
-cat > "$D/p.sh" <<'EOF'
-D="$(cd "$(dirname "$0")" && pwd)"
-cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
-cat > "$D/p.mts" <<'MTS'
-import { execFileSync } from 'node:child_process';
-import { loginToken } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/whole-check-kit.mjs';
-const tok = loginToken();
-for (const p of ['/tours/zzz', '/nope', '/tours/ffffffffffffffffffffffff']) {
-  const r = execFileSync('curl', ['-s', '-m', '30', '-w', ' -> %{http_code}', '-H', 'Authorization: Bearer ' + tok, 'http://127.0.0.1:3011/api/affected-areas' + p], { encoding: 'utf8' });
-  console.log(p.padEnd(34), r);
-}
-MTS
-TSX_TSCONFIG_PATH=tsconfig.json node --import tsx "$D/p.mts"
-EOF
-bash "$D/p.sh"
-cd /tmp && case "$D" in /tmp/athena-p1.*) rm -r "$D";; esac
-grep -n -E "a refusal is|marks routes' .Refusal" /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts || echo "comment-gone"
-expect: three lines — `422 {"error":"tour must be 24 …"}`, `404 {"error":"not a route of the affected-areas lane"}`, `404 {"detail":"no such tour"}` — beside the api.ts comment that names only 503/502 and the marks `Refusal`; cured when the grep prints `comment-gone` or the comment names the 422/404 `{error}` and the reader routes' `{detail}` bodies
-```
-
-measured 2026-10-17 by chain chain-tour-affected-areas--viewer--types-20261017-113212-78fd, finding L1, LOW
-probe-key: f1f48aa7db5ca1f0db67d7e975b6ac81a0a7dc79
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/affected-areas-types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts
-
 ## INV-8644 — probe — LOW — The gallery tag is 3.55:1 over a white photo, and neither the sheet nor the report says so
 
 LOW — The gallery tag is 3.55:1 over a white photo, and neither the sheet nor the report says so
@@ -10283,20 +10252,6 @@ probe-key: a67a6cb79a3c89a42d0addefb4d99d5900d04af5
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/
 
-## INV-8672 — probe — (MEDIUM) — A Read this pano pressed while a never-cut pano is still being cut leaves the faces unread after the read lands
-
-(MEDIUM) — A Read this pano pressed while a never-cut pano is still being cut leaves the faces unread after the read lands
-
-```probe
-cd /home/lyphe/.claude/claudecodeui_lyphe && node /home/lyphe/.claude/state/pipeline-reviews/tour-affected-areas--viewer--fill/athena-probes/uncut-press.mjs 150
-expect: the "t+8 s (answered)" line reads "6 views · all read" with "Not read yet" and captions "Ahead,Right,Behind,Left,Ceiling,Floor" with no counts (cured: captions "Ahead,Right1,Behind3,Left1,Ceiling1,Floor1", the same as `… uncut-press.mjs 3500`); if Israel Serrano has no never-cut pano left it prints that and exits
-```
-
-measured 2026-10-17 by chain chain-tour-affected-areas--viewer--fill-20261017-140745-860f, finding M1, MEDIUM
-probe-key: 9a6c57fd7923a05cfd12596bf0554d027bcb40ae
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/hooks/useImageUrl.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/hooks/useLaneRead.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/hooks/usePano.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/utils/laneTrouble.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/CerberusPanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/common.json, /home/lyphe/.claude/claudecodeui_lyphe/.verify/affected-areas-view.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/affected-areas-walk.mjs
-
 ## INV-8673 — probe — (LOW) — still open (builder-acknowledged): the tour screen fetches every cut pano's photo, not the 24 it draws
 
 (LOW) — still open (builder-acknowledged): the tour screen fetches every cut pano's photo, not the 24 it draws
@@ -10308,20 +10263,6 @@ expect: "image requests after the tour opens: 30 | unique shas: 30 | tiles drawn
 
 measured 2026-10-17 by chain chain-tour-affected-areas--viewer--fill-20261017-140745-860f, finding L1, LOW
 probe-key: a7177ed89906e14a4ad694f7ee445c78b126b296
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/hooks/useImageUrl.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/hooks/useLaneRead.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/hooks/usePano.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/utils/laneTrouble.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/CerberusPanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/common.json, /home/lyphe/.claude/claudecodeui_lyphe/.verify/affected-areas-view.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/affected-areas-walk.mjs
-
-## INV-8674 — probe — (LOW) — Read the rest stops at a pano the engine cannot cut, though the engine's own walker goes past it
-
-(LOW) — Read the rest stops at a pano the engine cannot cut, though the engine's own walker goes past it
-
-```probe
-cd /home/lyphe/.claude/claudecodeui_lyphe && node /home/lyphe/.claude/state/pipeline-reviews/tour-affected-areas--viewer--fill/athena-probes/walk-skip-refused.mjs
-expect: "walk of 5 unread panos; presses sent: 2" and "Stopped at 2 of 5." (cured: 5 presses, the refused pano said in words)
-```
-
-measured 2026-10-17 by chain chain-tour-affected-areas--viewer--fill-20261017-140745-860f, finding L2, LOW
-probe-key: 4d00c3f04300f04476c3c0ff5dc5b4e10d89dc93
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/hooks/useImageUrl.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/hooks/useLaneRead.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/hooks/usePano.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/utils/laneTrouble.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/CerberusPanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/common.json, /home/lyphe/.claude/claudecodeui_lyphe/.verify/affected-areas-view.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/affected-areas-walk.mjs
 
@@ -10370,27 +10311,6 @@ measured 2026-10-17 by chain chain-tour-affected-areas--marking--fill-20261017-2
 probe-key: 5b421fcf604f06bcb83fc47bcf981801d718f3be
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/hooks/useMarkedRegions.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/hooks/useProving.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/hooks/useQueue.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/MarkScreen.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/affected-areas-marking.mjs
-
-## INV-8689 — probe — MEDIUM — An editor of any of four new library files is shown three cured probe rows, not the manual that governs the file
-
-MEDIUM — An editor of any of four new library files is shown three cured probe rows, not the manual that governs the file
-
-```probe
-D=$(mktemp -d /tmp/athena-probe.XXXXXX)
-cat > "$D/p.sh" <<'EOF'
-cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
-for f in SegmentedControl.tsx DataTable.tsx RegionDrawLayer.tsx verve/data.css; do
-  printf '%-22s ' "$f"; docstore govern "/home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/$f" --touch write --limit 3 --text | cut -d' ' -f1 | tr '\n' ' '; echo
-done
-EOF
-bash "$D/p.sh"
-expect: today each line prints "INV-8681 INV-8682 INV-8683"; cured: MAN-8580 (MAN-8579 for RegionDrawLayer.tsx) appears within the three tokens printed
-```
-
-measured 2026-10-17 by chain chain-tour-affected-areas--marking--docs-20261017-212539-905c, finding M1, MEDIUM
-probe-key: 313b69f31bb5d48c2e033a7be6c11e2aa1c3ebae
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/
 
 ## INV-8690 — probe — MEDIUM — MAN-8558's "Not yet measured" says `/queue` and `/proving` answered 404 and orders a correction this plan was to make
 
@@ -10586,26 +10506,6 @@ expect: today 0 and 0; cured: the second is 1 (the row says no caller passes `co
 
 measured 2026-10-17 by chain chain-tour-affected-areas--marking--docs-20261017-212539-905c, finding L8, LOW
 probe-key: e214705f08e46ac68956e239ecbfeadf86156da8
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/
-
-## INV-8699 — probe — LOW — Two code comments still say what the healed rows no longer say
-
-LOW — Two code comments still say what the healed rows no longer say
-
-```probe
-D=$(mktemp -d /tmp/athena-probe.XXXXXX)
-cat > "$D/p.sh" <<'EOF'
-cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
-printf 'proving.py "none calls this yet": '; grep -c "none calls this yet" /opt/shadow-connector/core/affected_areas/judgment/proving.py
-printf 'routes.ts "a route not yet built": '; grep -c "a route not yet built answers its own 404" server/modules/affected-areas/affected-areas.routes.ts
-EOF
-bash "$D/p.sh"
-expect: today 1 and 1; cured: 0 and 0
-```
-
-measured 2026-10-17 by chain chain-tour-affected-areas--marking--docs-20261017-212539-905c, finding L9, LOW
-probe-key: d5b3d89f4508ca9ad11f99c9e4f3e19a14e72baa
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/
 
