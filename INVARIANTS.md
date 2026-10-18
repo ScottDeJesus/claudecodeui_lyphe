@@ -10835,3 +10835,101 @@ measured 2026-10-18 by chain chain-tour-affected-areas--judgment--seen-back-2026
 probe-key: 23de0c066dc4d185bb3b3be303ec0435fda03f5e
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/affected-areas-judgments-seen.mjs
+
+## INV-8761 — probe — The tour header says "48 of 48 cut views read" and, in the same block, "1 pano · 6 views not read yet" the moment one read is not current. The picker badge and the gallery's read state do not know `current` at all.
+
+The tour header says "48 of 48 cut views read" and, in the same block, "1 pano · 6 views not read yet" the moment one read is not current. The picker badge and the gallery's read state do not know `current` at all.
+
+```probe
+node /home/lyphe/.claude/state/pipeline-reviews/tour-affected-areas--judgment--told/athena-probes/stale-tour-header.mjs
+expect: prints "facts line: 48 of 48 cut views read" and "rest line : 1 pano · 6 views not read yet" while the defect stands; "none" for a line means its wording changed
+```
+
+measured 2026-10-18 by chain chain-tour-affected-areas--judgment--told-20261018-035727-4558, finding M1, MEDIUM
+probe-key: 428d12a50b1101fb6c8d1de7c7beb63c27df2dde
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/affected-areas-tours-told.mjs
+
+## INV-8762 — probe — The demo line's words are looser than the field. "Demo had begun before the tour" is `first_removed_at <= THIS ROOM's capture`; the reader's own prompt says "before this room was photographed".
+
+The demo line's words are looser than the field. "Demo had begun before the tour" is `first_removed_at <= THIS ROOM's capture`; the reader's own prompt says "before this room was photographed".
+
+```probe
+python3 /home/lyphe/.claude/state/pipeline-reviews/tour-affected-areas--judgment--told/athena-probes/demo-mid-tour.py
+expect: prints the tour's first pano (2026-09-29…), the latest demo=False room pano (2026-09-29…) and the earliest demo=True pano (2026-10-09…), then "… the tour began before the demo: True"
+```
+
+measured 2026-10-18 by chain chain-tour-affected-areas--judgment--told-20261018-035727-4558, finding L1, LOW
+probe-key: dc1fe4ddf573ebf8e688a79b855628a961e8a0cf
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/affected-areas-tours-told.mjs
+
+## INV-8763 — probe — The builder's script picks rows by position and asserts a literal on them; one `.first()` click is unguarded; one measured number is dropped.
+
+The builder's script picks rows by position and asserts a literal on them; one `.first()` click is unguarded; one measured number is dropped.
+
+```probe
+python3 /home/lyphe/.claude/state/pipeline-reviews/tour-affected-areas--judgment--told/athena-probes/script-pick.py
+expect: lists the unlinked-with-facts tours in list order (water, other, water, water, other, fire), "script picks: ('Martin, Debra - 103', 'water')", and two ids for the label 'Israel Serrano'
+```
+
+measured 2026-10-18 by chain chain-tour-affected-areas--judgment--told-20261018-035727-4558, finding L2, LOW
+probe-key: 86ff5ecb74019ef92e7640405abd1e0e31f240b7
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/affected-areas-tours-told.mjs
+
+## INV-8764 — probe — A sentence this phase made false is left in a sibling script ("Healed means deleted").
+
+A sentence this phase made false is left in a sibling script ("Healed means deleted").
+
+```probe
+grep -n "picker names it by address" /home/lyphe/.claude/claudecodeui_lyphe/.verify/affected-areas-rooms.mjs || echo none
+expect: line 48 while the stale wording stands; "none" once healed
+```
+
+measured 2026-10-18 by chain chain-tour-affected-areas--judgment--told-20261018-035727-4558, finding L3, LOW
+probe-key: 7ab57ba400cf860f4bfe69c06026ebbf7617bb74
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/affected-areas-tours-told.mjs
+
+## INV-8765 — probe — The Mark screen still names a pre-job tour "Tour with no job or address". Latent.
+
+The Mark screen still names a pre-job tour "Tour with no job or address". Latent.
+
+```probe
+grep -n "item.jobLabel ?? t('affectedAreas.tour.unnamed')" /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/MarkQueue.tsx || echo none
+expect: line 126 while the Mark screen names a tour by job label alone; "none" once it falls back to the tour's name
+```
+
+measured 2026-10-18 by chain chain-tour-affected-areas--judgment--told-20261018-035727-4558, finding L4, LOW
+probe-key: 260959f5d0d4309873f2b46d614e0116e7739745
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/affected-areas-tours-told.mjs
+
+## INV-8766 — probe — `ContextSummary.propertyType` is a dead wire field whose class docstring says it is what the reader is told.
+
+`ContextSummary.propertyType` is a dead wire field whose class docstring says it is what the reader is told.
+
+```probe
+bash /home/lyphe/.claude/state/pipeline-reviews/tour-affected-areas--judgment--told/athena-probes/property-type.sh
+expect: "wire propertyType: RESIDENTIAL" and "src/modules readers: none" while the field is dead
+```
+
+measured 2026-10-18 by chain chain-tour-affected-areas--judgment--told-20261018-035727-4558, finding L5, LOW
+probe-key: 21e487dfc90a652f7e0c90770c3e0842f68292e1
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/affected-areas-tours-told.mjs
+
+## INV-8767 — probe — `is_current` is described as the buy rule's home, and it is a different predicate. The report does not say which one the intent meant (my S8 asked it to).
+
+`is_current` is described as the buy rule's home, and it is a different predicate. The report does not say which one the intent meant (my S8 asked it to).
+
+```probe
+bash /home/lyphe/.claude/state/pipeline-reviews/tour-affected-areas--judgment--told/athena-probes/predicates.sh
+expect: three lines — is_current's pair test (shown.py), lookup's "ORDER BY read_seq DESC LIMIT 1" per (sha, contract, model) (seat/store.py), and the shown view's "created_at DESC, read_seq DESC" over ANY contract (schema); the first and the third judge the newest read, the second any read
+```
+
+measured 2026-10-18 by chain chain-tour-affected-areas--judgment--told-20261018-035727-4558, finding L6, LOW
+probe-key: 470e0358931a895df7f56622a35c36b3a44439e0
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/affected-areas-tours-told.mjs
