@@ -54,6 +54,8 @@ export type TourSummary = {
   tourId: string;
   jobId: string | null;
   jobLabel: string | null;
+  /** Tours view. DocuSketch's own name for the tour, `null` when blank. */
+  tourName: string | null;
   address: string | null;
   capturedAt: string | null;
   panoCount: number;
@@ -124,6 +126,20 @@ export type RoomEntry = {
   regionsStanding: number | null;
   /** Marks. The marked areas call this room affected on some floor; `regionsStanding` counts older damage too. */
   markedAreasAffected: boolean | null;
+  /** Photos. The room's verdict from the tour's photos: what the Tours view reads in place of `markedAreasAffected`. */
+  photosAffected: boolean | null;
+};
+
+/** One operator judgment. Marks. */
+export type Mark = {
+  markId: string;
+  verdict: Verdict;
+  newClass: string | null;
+  note: string | null;
+  queue: MarkQueue | null;
+  /** Display only; the channel it came through is never on the wire. */
+  markedBy: string | null;
+  markedAt: string;
 };
 
 /**
@@ -139,9 +155,13 @@ export type ReadState = {
   contextHash: string | null;
   /** Today's room packet differs from the one the read was fed. */
   contextChanged: boolean | null;
+  /** Tours view. True when this read is under today's contract and the profile's pinned model; `null` on an unread view. */
+  current: boolean | null;
   regionsCount: number;
   /** Marks. */
   standingCount: number | null;
+  /** Marks. The newest understanding mark on this read. */
+  understandingMark: Mark | null;
 };
 
 /** One face of a pano, cut to a still; `sha256` names the image `GET /images/{sha}` answers. */
@@ -219,18 +239,6 @@ export type Understanding = {
   couldNotSee: string[];
 };
 
-/** One operator judgment. Marks. */
-export type Mark = {
-  markId: string;
-  verdict: Verdict;
-  newClass: string | null;
-  note: string | null;
-  queue: MarkQueue | null;
-  /** Display only; the channel it came through is never on the wire. */
-  markedBy: string | null;
-  markedAt: string;
-};
-
 /**
  * A marked patch of one view. `sphere` is derived from `polygon` in the view's own frame and never
  * stored; it is empty until a region exists.
@@ -241,6 +249,8 @@ export type Region = {
   /** The badge number on its view. */
   ordinal: number;
   class: string;
+  /** Marks. The kind the area counts as, a rename applied. */
+  effectiveClass: string | null;
   label: string | null;
   basis: Basis;
   evidence: string | null;
@@ -256,7 +266,7 @@ export type Region = {
   mark: Mark | null;
   /** Marks: whether the system currently believes it. */
   standing: boolean | null;
-  /** Marks: the line in force for its class. */
+  /** Marks: the line the operator set for this kind on this read's model and contract, or `null` when none is set. */
   threshold: number | null;
 };
 
