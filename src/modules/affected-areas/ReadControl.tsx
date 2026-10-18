@@ -29,12 +29,12 @@ type ReadControlProps = {
 
 /** The reason codes with words of their own; any other code is said as it is, inside a sentence. */
 const KNOWN_REFUSALS = [
-  'budget', 'flag_off', 'restorly_ai_off', 'gemini_off', 'no_key', 'permanent', 'views_refused',
+  'budget', 'flag_off', 'gemini_off', 'no_key', 'permanent', 'views_refused', 'context_degraded',
   'unreachable', 'no_secret', 'unreadable', 'gone', 'failed',
 ];
 
 /** Refusals no retry clears today — a spent budget, or a switch or a key a person has to set — so while one stands, the press it refused stops being the loudest control. */
-const LASTING_REFUSALS = ['budget', 'flag_off', 'restorly_ai_off', 'gemini_off', 'no_key'];
+const LASTING_REFUSALS = ['budget', 'flag_off', 'gemini_off', 'no_key'];
 
 /** The module's words are English only, so its counts are set as English sets them: "2,000". */
 const COUNT = new Intl.NumberFormat('en');
