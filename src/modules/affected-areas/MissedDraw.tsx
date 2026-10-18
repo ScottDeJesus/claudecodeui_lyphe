@@ -6,7 +6,18 @@ import { NoteDialog } from '@/modules/affected-areas/NoteDialog';
 import { answerOfWrite } from '@/modules/affected-areas/utils/laneTrouble';
 import type { Codebook, Region, ViewEntry } from '@/shared/affected-areas-types';
 import { api } from '@/shared/api';
+import { MIN_REGION_AREA } from '@/shared/constants';
 import type { MissedStage, RegionShape } from '@/shared/types';
+
+/**
+ * Whether a drawn box covers less than the engine's floor (`bad_box`, `MIN_REGION_AREA`). The engine rounds the corners to 6
+ * places and compares the area rounded to 8, so a box of exactly the floor is kept; this compares the same way.
+ */
+function underAreaFloor([x0, y0, x1, y1]: [number, number, number, number]): boolean {
+  const corner = (value: number): number => Math.round(value * 1e6) / 1e6;
+  const area = (corner(x1) - corner(x0)) * (corner(y1) - corner(y0));
+  return Math.round(area * 1e8) / 1e8 < MIN_REGION_AREA;
+}
 
 type MissedDrawProps = {
   /** The shown face: its photo's sha names the view to the engine, its size is the photo's box. */
@@ -33,7 +44,9 @@ type MissedDrawProps = {
  * MISSED ONE IS A BOX. The pano screen's face photo, which Missed one turns into a box to drag: on release the kind is
  * asked (a `Menu`), then an optional note, then Save, which is one `api.affectedAreas.missed` — the box becomes a human
  * region with its `missed` mark in one transaction, answered whole, and appears numbered after the last, dashed and
- * green (the region-look table's `human`). A box is one gesture on a phone, where a polygon would be many taps.
+ * green (the region-look table's `human`). A box is one gesture on a phone, where a polygon would be many taps. A box
+ * under the engine's area floor (`MIN_REGION_AREA`) is turned back here, never sent: its release and its Save both say
+ * `bad_box`, the engine's own sentence for it, and the box stays on the photo to be cancelled.
  *
  * It stands where the pano screen's photo stood, the photo with it: the drawing state has to reach `RegionImage`'s
  * `drawing` and keep the held box on the photo, so the photo is drawn here (`FacePhoto`). The chosen area's presses
@@ -54,7 +67,8 @@ export function MissedDraw({ view, photo, alt, shapes, nextOrdinal, selectedId, 
   const [note, setNote] = useState('');
   // Whether the note dialog is up. The dialog is mounted only while open, so each opening starts from the kept note.
   const [noteOpen, setNoteOpen] = useState(false);
-  // Why the last Save was not kept, in the engine's or the lane's word, until the next press: said under the presses.
+  // Why the box was not kept, in the engine's or the lane's word, until the next press: a box under the area floor at its release
+  // and at Save, or the answer to a Save that was sent. Said under the presses.
   const [refusal, setRefusal] = useState<string | null>(null);
 
   const onDraw = (): void => {
@@ -68,8 +82,12 @@ export function MissedDraw({ view, photo, alt, shapes, nextOrdinal, selectedId, 
     setNote('');
     setRefusal(null);
   };
-  // The library hands over no box under 2% of the photo on a side, so every box here clears the engine's 1e-4 floor.
-  const onDrawn = (box: [number, number, number, number]): void => setStage({ step: 'drawn', box, kind: null });
+  // The library hands over every box that has a width and a height, so the engine's area floor is held here: a box under it
+  // is kept on the photo with the engine's own sentence (`bad_box`) at once, and Save turns it back again before sending.
+  const onDrawn = (box: [number, number, number, number]): void => {
+    setStage({ step: 'drawn', box, kind: null });
+    setRefusal(underAreaFloor(box) ? 'bad_box' : null);
+  };
   const onKind = (cls: string): void => setStage((current) => (current.step === 'drawn' ? { ...current, kind: cls } : current));
   const onNote = (): void => setNoteOpen(true);
   const onKeepNote = (kept: string): void => {
@@ -80,6 +98,10 @@ export function MissedDraw({ view, photo, alt, shapes, nextOrdinal, selectedId, 
   const save = async (): Promise<void> => {
     if (stage.step !== 'drawn' || stage.kind === null) return;
     const { box, kind } = stage;
+    if (underAreaFloor(box)) {
+      setRefusal('bad_box');
+      return;
+    }
     setStage({ step: 'saving', box, kind });
     setRefusal(null);
     const result = await answerOfWrite<Region>(() => api.affectedAreas.missed(view.sha256, { class: kind, box, note: note || null, queue: 'browse' }));

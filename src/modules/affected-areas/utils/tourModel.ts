@@ -13,6 +13,14 @@ import { formatRelativeTime, formatShortDate } from '@/shared/utils';
 /** A pano's six faces, in the order the face strip offers them. The reader cuts every pano into these six. */
 export const FACES: readonly Face[] = ['ahead', 'right', 'behind', 'left', 'ceiling', 'floor'];
 
+/**
+ * The most tiles the tour screen's gallery draws before its last one collapses the rest into "+N": three rows at a desk,
+ * eight on a phone. A forty-five pano tour opens on twenty-three and the count, and one press opens the rest in place.
+ * The collapsed last tile shows the photo of the first pano it hides, so `GALLERY_MAX` photos are drawn: no more than
+ * these are fetched until the overflow opens (`useTilePhotos`).
+ */
+export const GALLERY_MAX = 24;
+
 /** How far something is read: nothing yet, some of it, or all of it. */
 type ReadExtent = 'unread' | 'partly' | 'read';
 

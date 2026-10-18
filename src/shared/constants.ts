@@ -492,6 +492,14 @@ export const TOUCH_HOLD_MS = 400;
  */
 export const MARK_NOTE_MAX = 500;
 
+/**
+ * The smallest area a drawn box may cover, as a share of the photo (0..1 squared): shadow-connector's
+ * `seat/normalize.MIN_AREA_FRAC`, below which the engine refuses a Missed one box as `bad_box` (about 10 by 10 pixels of a
+ * 1024 px view). The engine stays the authority; this mirror is how the affected-areas module's `MissedDraw` turns a box
+ * back before sending it, in the engine's own sentence, and how the photo's box drag stays free of any floor of its own.
+ */
+export const MIN_REGION_AREA = 1e-4;
+
 // ---------------------------
 
 //----------------- AFFECTED AREAS LANE ------------

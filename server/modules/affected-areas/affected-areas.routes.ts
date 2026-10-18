@@ -30,13 +30,13 @@ const oneOf = (...allowed: string[]): Rule => ({
   expects: `one of ${allowed.join(', ')}`,
 });
 
-/** The ids a path may carry. The hex ids are lowercase only, as shadow-connector's own `routes/ids.py` holds them; a uuid is accepted in either case. */
+/** The ids a path may carry. Every id is lowercase only, as shadow-connector's own `routes/ids.py` holds them: the hex ids and the uuids. */
 const PATH_RULES: Record<string, Rule> = {
   tour: pattern(/^[0-9a-f]{24}$/, '24 lowercase hex characters'),
   pano: pattern(/^[0-9a-f]{24}$/, '24 lowercase hex characters'),
   sha: pattern(/^[0-9a-f]{64}$/, '64 lowercase hex characters'),
-  region: pattern(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i, 'a uuid'),
-  read: pattern(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i, 'a uuid'),
+  region: pattern(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/, 'a lowercase uuid'),
+  read: pattern(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/, 'a lowercase uuid'),
   class: pattern(/^[a-z_]{2,40}$/, '2 to 40 lowercase letters or underscores'),
 };
 

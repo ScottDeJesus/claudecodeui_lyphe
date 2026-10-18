@@ -1,7 +1,7 @@
 import type { TFunction } from 'i18next';
 import { useTranslation } from 'react-i18next';
 
-import { listedAreas, panoReadState, roomWords, spansFloors } from '@/modules/affected-areas/utils/tourModel';
+import { GALLERY_MAX, listedAreas, panoReadState, roomWords, spansFloors } from '@/modules/affected-areas/utils/tourModel';
 import type { PanoEntry } from '@/shared/affected-areas-types';
 import type { GalleryItem } from '@/shared/types';
 import { Gallery } from '@/shared/ui';
@@ -14,13 +14,9 @@ type RoomGalleryProps = {
   /** The gallery's accessible name: whose panos these are. */
   label: string;
   onOpenPano: (panoId: string) => void;
+  /** Told once, when the "+N" tile opens the rest: until then only the first `GALLERY_MAX` panos need a photo. */
+  onOverflowOpen: () => void;
 };
-
-/**
- * The most tiles drawn before the last one collapses the rest into "+N": three rows at a desk, eight on a phone.
- * A forty-five pano tour opens on twenty-three and the count, and one press opens the rest in place.
- */
-const GALLERY_MAX = 24;
 
 /**
  * The tile's badge, the pano's state in two words: "3 areas" once all six faces are read and some stand, "2 found"
@@ -46,7 +42,7 @@ function tileBadge(pano: PanoEntry, t: TFunction): string {
  * Used by the affected-areas module's `TourScreen`, which keys it by tour: the gallery's open overflow belongs to
  * one tour's set.
  */
-export function RoomGallery({ panos, photos, label, onOpenPano }: RoomGalleryProps) {
+export function RoomGallery({ panos, photos, label, onOpenPano, onOverflowOpen }: RoomGalleryProps) {
   const { t } = useTranslation();
   const withFloor = spansFloors(panos);
   const items: GalleryItem[] = panos.map((pano) => {
@@ -58,5 +54,5 @@ export function RoomGallery({ panos, photos, label, onOpenPano }: RoomGalleryPro
       badge: tileBadge(pano, t),
     };
   });
-  return <Gallery items={items} max={GALLERY_MAX} label={label} onSelect={onOpenPano} />;
+  return <Gallery items={items} max={GALLERY_MAX} label={label} onSelect={onOpenPano} onOverflowOpen={onOverflowOpen} />;
 }

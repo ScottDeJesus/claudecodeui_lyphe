@@ -10371,24 +10371,6 @@ probe-key: 5b421fcf604f06bcb83fc47bcf981801d718f3be
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/hooks/useMarkedRegions.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/hooks/useProving.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/hooks/useQueue.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/MarkScreen.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/affected-areas-marking.mjs
 
-## INV-8688 — probe — LOW (open from round 1, disclosed) — the Mark screen does not keep its item across the switch
-
-LOW (open from round 1, disclosed) — the Mark screen does not keep its item across the switch
-
-```probe
-D=$(mktemp -d /tmp/athena-p.XXXXXX) || exit 1
-cat > "$D/p.sh" <<'EOF'
-cd "$HOME/.claude/state/pipeline-reviews/tour-affected-areas--marking--fill/athena-probes" && for p in p7-place; do timeout 170 node $p.mjs 2>&1 | grep -E 'RESULT|PROBE ERROR'; done
-EOF
-bash "$D/p.sh"
-expect: while it stands `back on Mark the item is item 1 (place lost)`; cured: `item 3 (place kept)`. (Its skip half, `distinct items over 21 skips = 20`, was cured 2026-10-18 by `GET /queue?skip=`: the same probe now prints `21 | after the 20th skip the screen shows the first item again = false`.)
-```
-
-measured 2026-10-17 by chain chain-tour-affected-areas--marking--fill-20261017-200005-ba7f, finding L4, LOW
-probe-key: bf41fb1b343d7fb9786fe2efaf2dad44201d8634
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/hooks/useMarkedRegions.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/hooks/useProving.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/hooks/useQueue.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/MarkScreen.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/affected-areas-marking.mjs
-
 ## INV-8689 — probe — MEDIUM — An editor of any of four new library files is shown three cured probe rows, not the manual that governs the file
 
 MEDIUM — An editor of any of four new library files is shown three cured probe rows, not the manual that governs the file
@@ -10758,3 +10740,98 @@ measured 2026-10-18 by chain chain-tour-affected-areas--judgment--switches-20261
 probe-key: 21145de4c05b837e3028c5c999d24cb70037bc41
 
 governs: /opt/shadow-connector/core/affected_areas/read.py, /opt/shadow-connector/core/affected_areas/seat/gate.py, /opt/shadow-connector/core/restorly_ai.py
+
+## INV-8752 — probe — LOW — the served regions array is not in badge order once a drawn area's served number passes a model region's
+
+LOW — the served regions array is not in badge order once a drawn area's served number passes a model region's
+
+```probe
+D=$(mktemp -d /tmp/athena-p.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+bash "$HOME/.claude/state/pipeline-reviews/tour-affected-areas--judgment--seen-back/probes/served_order.sh"
+EOF
+bash "$D/p.sh"
+cd /tmp && case "$D" in /tmp/athena-p.??????) rm -r "$D";; esac
+expect: while it stands `served array (source, badge): [('model', 1), ('human', 3), ('model', 2)] | unique: True | ascending: False | pano_detail sorts: False`; cured: `ascending: True` (a sort in the SQL or in `pano_detail`; if the cure is a sort inside `pano_detail`, `pano_detail sorts: True` is the word, and the first half of the line may still print the SQL's order)
+```
+
+measured 2026-10-18 by chain chain-tour-affected-areas--judgment--seen-back-20261018-034440-f5c2, finding L1, LOW
+probe-key: 4b9a50fdf1026d2ee0994e0a406c49a2161edbd7
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/affected-areas-judgments-seen.mjs
+
+## INV-8753 — probe — LOW — INV-8688 stays a live row, though both of its halves now print the cured answer, and its `expect` carries a correction-history note
+
+LOW — INV-8688 stays a live row, though both of its halves now print the cured answer, and its `expect` carries a correction-history note
+
+```probe
+D=$(mktemp -d /tmp/athena-p.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+bash "$HOME/.claude/state/pipeline-reviews/tour-affected-areas--judgment--seen-back/probes/inv8688.sh"
+EOF
+bash "$D/p.sh"
+cd /tmp && case "$D" in /tmp/athena-p.??????) rm -r "$D";; esac
+expect: while it stands `RESULT place: left on item 3 = true | back on Mark the item is item 3 (place kept)`, `INV-8688 still a live row: 1` and `INV-8688 carries a cured-on-date history note: 1`; cured: the row is retired, both counts print 0
+```
+
+measured 2026-10-18 by chain chain-tour-affected-areas--judgment--seen-back-20261018-034440-f5c2, finding L2, LOW
+probe-key: 07e32078077657b8875dddff2f86f1d345f6bbc3
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/affected-areas-judgments-seen.mjs
+
+## INV-8754 — probe — LOW — MAN-8582 still names a script that exits 2 as the whole-run proof, and does not name the one that runs
+
+LOW — MAN-8582 still names a script that exits 2 as the whole-run proof, and does not name the one that runs
+
+```probe
+D=$(mktemp -d /tmp/athena-p.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+bash "$HOME/.claude/state/pipeline-reviews/tour-affected-areas--judgment--seen-back/probes/marking_script.sh"
+EOF
+bash "$D/p.sh"
+cd /tmp && case "$D" in /tmp/athena-p.??????) rm -r "$D";; esac
+expect: while it stands `rc=2`, `MAN-8582 still names it as the whole-run proof: 1` and `MAN-8582 names the script that runs: 0`; cured: `rc=0` (or the row names the script that runs)
+```
+
+measured 2026-10-18 by chain chain-tour-affected-areas--judgment--seen-back-20261018-034440-f5c2, finding L3, LOW
+probe-key: 1f07ec948062d56d53b4ed47a3684d06372d5edf
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/affected-areas-judgments-seen.mjs
+
+## INV-8755 — probe — LOW — the new verify script's drawn-area check cannot tell the served rule from the stored one
+
+LOW — the new verify script's drawn-area check cannot tell the served rule from the stored one
+
+```probe
+D=$(mktemp -d /tmp/athena-p.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+bash "$HOME/.claude/state/pipeline-reviews/tour-affected-areas--judgment--seen-back/probes/script_discriminates.sh"
+EOF
+bash "$D/p.sh"
+cd /tmp && case "$D" in /tmp/athena-p.??????) rm -r "$D";; esac
+expect: while it stands `7 of 7` (every re-read view: stored next == shown count + 1) and `verdicts in the script that compare against the stored ordinal: 0`; cured: a verdict that compares the served badge against a stored one that differs (the second count ≥ 1)
+```
+
+measured 2026-10-18 by chain chain-tour-affected-areas--judgment--seen-back-20261018-034440-f5c2, finding L4, LOW
+probe-key: e4a998811a5bb10d9585f475491755d013471d85
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/affected-areas-judgments-seen.mjs
+
+## INV-8756 — probe — LOW — "skips are reset on a mode or kind change" is not what the screen does: they come back on the return
+
+LOW — "skips are reset on a mode or kind change" is not what the screen does: they come back on the return
+
+```probe
+D=$(mktemp -d /tmp/athena-p.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+bash "$HOME/.claude/state/pipeline-reviews/tour-affected-areas--judgment--seen-back/probes/skip_switch.sh"
+EOF
+bash "$D/p.sh"
+cd /tmp && case "$D" in /tmp/athena-p.??????) rm -r "$D";; esac
+expect: while it stands `… => SKIPS KEPT` and `MAN-8583 says the skips are reset on a mode or kind change: 1`; cured: the words say they are kept per queue (count 0), or the behaviour is reset (`=> SKIPS RESET`). The probe writes nothing and ends `CLEANUP … EQUAL`
+```
+
+measured 2026-10-18 by chain chain-tour-affected-areas--judgment--seen-back-20261018-034440-f5c2, finding L5, LOW
+probe-key: 23de0c066dc4d185bb3b3be303ec0435fda03f5e
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/affected-areas-judgments-seen.mjs

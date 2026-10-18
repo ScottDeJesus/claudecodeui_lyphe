@@ -355,9 +355,10 @@ Rules:
 | prop | meaning |
 |---|---|
 | `items` | `GalleryItem[]`: `id`, `src` (`null` = the neutral tile), `tag`, `badge?` |
-| `selectedId?` | the chosen tile: `aria-current="true"`, an accent ring and an accent tag. Shown only on a pressable tile: without `onSelect` the tiles are `<div>`s, carry no `aria-current` and draw no ring. The ring survives hover. No caller passes it today (`RoomGallery` passes `items`, `max`, `label`, `onSelect`) |
+| `selectedId?` | the chosen tile: `aria-current="true"`, an accent ring and an accent tag. Shown only on a pressable tile: without `onSelect` the tiles are `<div>`s, carry no `aria-current` and draw no ring. The ring survives hover. No caller passes it today (`RoomGallery` passes `items`, `max`, `label`, `onSelect`, `onOverflowOpen`) |
 | `onSelect?` | called with a tile's id. Omitted: the tiles are `<div>`s, not buttons; the overflow tile is a `<button>` either way |
 | `max?` | the most tiles drawn, floored and at least 1 (`max 0` draws the overflow tile alone); omitted draws every item |
+| `onOverflowOpen?` | called once, from an effect after the commit that shows the whole set (the overflow tile pressed, or a selection the collapse would hide forced it); never for a set that does not collapse, never again once open. It lets a caller that loads each tile's photo load only the drawn ones until then (`useTilePhotos`, MAN-8575) |
 | `label` | the `<ul>`'s accessible name |
 
 - Every tile carries its `tag` (bottom-left) and, when given, its `badge` (top-right, on the surface, so it never reads as a second tag). Square tiles in `repeat(auto-fill, minmax(96px, 1fr))`, gap 8 px; the entrance staggers by `min(index, 8) × 50 ms`.

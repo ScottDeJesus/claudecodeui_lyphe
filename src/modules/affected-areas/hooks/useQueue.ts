@@ -43,7 +43,8 @@ const skippedLast = (ids: Record<string, true>, id: string): Record<string, true
  * hands over its answered region, a Skip hands over null and writes nothing. The queue is the engine's: an area it
  * served stays in it until a mark is written, so a skipped area is still counted in what remains.
  *
- * A skipped area is remembered (by region id, until the mode or kind changes) and its newest 50 ride the next batch's read
+ * A skipped area is remembered (by region id, for the mode and kind it was skipped in: the first read of another queue sends
+ * none, the walk of another queue starts with none, and a skip made there replaces them) and its newest 50 ride the next batch's read
  * as `skip`, so the engine leaves them out and the batch after a batch of skips brings the next areas, not the same ones.
  * Those skipped in the batch now on screen are passed over locally, and the screen shown again after Tables comes up where it
  * was left. When the engine serves nothing and still counts some, every area left was skipped: the skips are forgotten and
@@ -84,8 +85,8 @@ export function useQueue(mode: Queue['mode'], kind: string | undefined, shown: b
   const [answers, setAnswers] = useState<Record<string, Region>>({});
   // The areas skipped in this queue, by region id and oldest first, with the queue (mode and kind) they were skipped in. The
   // newest 50 ride the next batch's read as `skip`; the rest, and the ones skipped inside the batch on screen, are passed over
-  // here, and the screen shown again after Tables comes up where the operator was. A different mode or kind is a new walk and
-  // starts with none.
+  // here, and the screen shown again after Tables comes up where the operator was. They are kept for the queue they were made
+  // in: another mode or kind starts with none, a skip made there replaces them, and coming back before one is made finds them.
   const [skipped, setSkipped] = useState<{ queue: string; ids: Record<string, true> }>({ queue: '', ids: {} });
   const skippedIds = skipped.queue === queueKey ? skipped.ids : NONE_SKIPPED;
 

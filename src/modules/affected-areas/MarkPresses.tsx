@@ -44,7 +44,8 @@ type MarkPressesProps = {
  * A press's tone is the look the area takes when it is pressed (the region-look table, through `JudgmentPress`), so
  * the redraw that answers it is the same colour. Rename to… lands the area confirmed too, so it wears that tone as an
  * outline (`RENAME_FACE`). Its kinds stand in the codebook's order, which is its groups' order — Damage, Work already
- * done, The source, Older damage; `Menu` draws no group headings, so the groups are the order alone.
+ * done, The source, Older damage; `Menu` draws no group headings, so each row carries its group's word as its description
+ * (`affectedAreas.groups.<group>`, from the `group` its codebook class carries).
  *
  * States: at rest; one press out (its glyph a turning ring, every press refusing a second; a polite "Sending your
  * mark…"); refused (the reason in one sentence under the presses, until the next press); a note kept (said under the
@@ -85,7 +86,7 @@ export function MarkPresses({ region, codebook, browsing, out, refusal, note, on
   // already renamed to is ticked (`selected`), so the menu says where the area stands.
   const kinds = (codebook?.classes ?? [])
     .filter((kind) => kind.key !== region.class)
-    .map((kind) => ({ id: kind.key, label: kind.label, selected: kind.key === renamedTo }));
+    .map((kind) => ({ id: kind.key, label: kind.label, description: t(`affectedAreas.groups.${kind.group}`), selected: kind.key === renamedTo }));
   const where = [t(look.wordKey), renamedTo === null ? null : t('affectedAreas.mark.renamedFrom', { kind: kindName(region.class, codebook) })]
     .filter((part) => part !== null)
     .join(' · ');

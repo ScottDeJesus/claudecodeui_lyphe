@@ -27,6 +27,8 @@ type TourScreenProps = {
   walk: TourReaderProgress;
   onBack: () => void;
   onOpenPano: (panoId: string) => void;
+  /** The gallery's "+N" opened the rest of the panos: their photos may be fetched now. */
+  onOverflowOpen: () => void;
   onReadRest: () => void;
   onStopRest: () => void;
   onRetry: () => void;
@@ -63,7 +65,7 @@ function ReadingBody() {
  * Used by the affected-areas module's view root.
  */
 export function TourScreen({
-  summary, detail, trouble, photos, unreadPanos, unreadViews, walk, onBack, onOpenPano, onReadRest, onStopRest, onRetry,
+  summary, detail, trouble, photos, unreadPanos, unreadViews, walk, onBack, onOpenPano, onOverflowOpen, onReadRest, onStopRest, onRetry,
 }: TourScreenProps) {
   const { t } = useTranslation();
   const panosHeadingId = useId();
@@ -117,6 +119,7 @@ export function TourScreen({
               photos={photos}
               label={t('affectedAreas.tour.galleryLabel', { tour: tourName(detail.tour, t) })}
               onOpenPano={onOpenPano}
+              onOverflowOpen={onOverflowOpen}
             />
           </section>
         </>

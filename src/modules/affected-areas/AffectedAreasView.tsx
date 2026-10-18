@@ -2,9 +2,10 @@ import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { useCodebook } from '@/modules/affected-areas/hooks/useCodebook';
-import { useImageUrl, useImageUrls } from '@/modules/affected-areas/hooks/useImageUrl';
+import { useImageUrl } from '@/modules/affected-areas/hooks/useImageUrl';
 import { useMarkedRegions } from '@/modules/affected-areas/hooks/useMarkedRegions';
 import { usePano } from '@/modules/affected-areas/hooks/usePano';
+import { useTilePhotos } from '@/modules/affected-areas/hooks/useTilePhotos';
 import { useTour } from '@/modules/affected-areas/hooks/useTour';
 import { useTourReader } from '@/modules/affected-areas/hooks/useTourReader';
 import { useTours } from '@/modules/affected-areas/hooks/useTours';
@@ -136,11 +137,9 @@ export function AffectedAreasView() {
   // The shown face's photo: the pano's view for that face, from the pano once it answered, else from the tour's listing.
   const shownView = (pano.value ?? entry)?.views.find((candidate) => candidate.face === face);
   const photo = useImageUrl(shownView?.sha256 ?? null);
-  // The gallery's tiles: each pano's Ahead view, fetched only while the tour screen shows them.
-  const tileShas = tourId !== null && panoId === null && detail !== null
-    ? detail.panos.flatMap((candidate) => candidate.views.filter((view) => view.face === 'ahead').map((view) => view.sha256))
-    : [];
-  const photos = useImageUrls(tileShas);
+  // The gallery's tiles: each pano's Ahead view, fetched only while the tour screen shows them, and only the tiles it draws
+  // until its "+N" opens the rest.
+  const { photos, onOverflowOpen } = useTilePhotos(tourId, panoId, detail?.panos ?? null);
 
   // The walk of the tour's unread panos. It is the viewer's: one armed press per pano, each answer read into the tour
   // (and into the pano on screen, when the walk just read that one), and none sent while the view is hidden.
@@ -233,6 +232,7 @@ export function AffectedAreasView() {
         walk={walk}
         onBack={onBack}
         onOpenPano={onOpenPano}
+        onOverflowOpen={onOverflowOpen}
         onReadRest={onReadRest}
         onStopRest={onStopRest}
         onRetry={tour.retry}

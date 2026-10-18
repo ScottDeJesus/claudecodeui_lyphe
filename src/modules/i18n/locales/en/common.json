@@ -2306,6 +2306,7 @@
       "failed_pano": "This pano could not be read",
       "gone_tables": "The tables could not be read",
       "failed_tables": "The tables could not be read",
+      "gone_queue": "The queue could not be read",
       "failed_queue": "The queue could not be read",
       "retry": "Try again"
     },
@@ -2514,7 +2515,7 @@
     "missed": {
       "missedOne": "Missed one",
       "hint": "Drag a box around what it missed",
-      "floor": "A box narrower or shorter than 2% of the photo is ignored.",
+      "floor": "A box smaller than about 10 by 10 pixels is too small to be an area.",
       "newArea": "New area {{number}}",
       "newAreaTitle": "New area",
       "chooseKind": "Choose its kind",

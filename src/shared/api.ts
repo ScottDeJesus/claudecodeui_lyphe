@@ -949,14 +949,9 @@ export const api = {
     // → PanoDetail
     pano: (tourId: string, panoId: string) =>
       get(`/api/affected-areas/tours/${encodeURIComponent(tourId)}/panos/${encodeURIComponent(panoId)}`),
-    // → ViewsResult
-    cutViews: (tourId: string, panoId: string) =>
-      post(`/api/affected-areas/tours/${encodeURIComponent(tourId)}/panos/${encodeURIComponent(panoId)}/views`, {}, { timeoutMs: 90_000 }),
     // → ReadResult
     readPano: (tourId: string, panoId: string, body: ReadRequest) =>
       post(`/api/affected-areas/tours/${encodeURIComponent(tourId)}/panos/${encodeURIComponent(panoId)}/read`, body, { timeoutMs: 120_000 }),
-    // → TourPlan
-    planTour: (tourId: string) => post(`/api/affected-areas/tours/${encodeURIComponent(tourId)}/read`, {}),
     // The bytes of one view's JPEG, not JSON: the caller reads `.blob()`. `options.signal` lets it abort a fetch
     // whose view has since changed.
     image: (sha: string, options: ApiRequestOptions = {}) => get(`/api/affected-areas/images/${encodeURIComponent(sha)}`, options),

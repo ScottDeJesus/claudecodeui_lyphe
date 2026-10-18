@@ -60,12 +60,13 @@ function corners([x0, y0, x1, y1]: number[]): number[][] {
  * 2. The photo (`RegionImage`): its regions, and while drawing the library's box drag (mouse, pen or one finger;
  *    Escape cancels). A box released stays on the photo, numbered as it will be and in the hand-drawn look it will
  *    take, while its kind is asked; the regions under it are inert until Save or Cancel. While drawing, a line under
- *    the photo says the floor: the library ignores a box narrower or shorter than 2% of the photo, without a word of
- *    its own (`RegionDrawLayer`'s `MIN_DRAWN_SIDE`), which also keeps every box it hands over clear of the engine's
- *    1e-4 floor.
+ *    the photo says the floor: the engine takes no box under about 10 by 10 pixels, whatever its shape. The library
+ *    reports every box that has a width and a height; `MissedDraw` turns one under the floor back in the engine's
+ *    sentence.
  * 3. Under the photo, ONE group of presses at a time: the chosen area's (`bar`) while Missed one is idle; once a box is
- *    held, "New area", then the kind (a `Menu` of the codebook's fourteen kinds, in its groups' order), Add a note,
- *    Save (in the hand-drawn area's tone) and Cancel. Save waits for a kind.
+ *    held, "New area", then the kind (a `Menu` of the codebook's kinds in codebook order, each row carrying its group's
+ *    word beneath its name: Damage, Work already done, The source, Older damage), Add a note, Save (in the hand-drawn
+ *    area's tone) and Cancel. Save waits for a kind.
  * 4. Choosing an area brings this block into view, the photo and its presses together (`blockRef`, below).
  *
  * States: idle (with or without a chosen area's presses); drawing; a box held with no kind; a kind chosen; a note
@@ -170,7 +171,12 @@ export function FacePhoto({
                     <ChevronDown aria-hidden="true" />
                   </span>
                 )}
-                items={codebook.classes.map((kind) => ({ id: kind.key, label: kind.label, selected: kind.key === held.kind }))}
+                items={codebook.classes.map((kind) => ({
+                  id: kind.key,
+                  label: kind.label,
+                  description: t(`affectedAreas.groups.${kind.group}`),
+                  selected: kind.key === held.kind,
+                }))}
                 onSelect={onKind}
                 width={248}
               />
