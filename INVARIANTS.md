@@ -10081,63 +10081,6 @@ probe-key: 2890e8a5da79b7b74745bd594f6024f790079fdb
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/common.json, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Gallery.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/PhotoFill.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/RegionImage.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/verve/media.css
 
-## INV-8662 — probe — . The script's "nothing scrolls sideways" check measures the Context card, so it cannot see the room list overflow (`affected-areas-rooms.mjs:140`)
-
-. The script's "nothing scrolls sideways" check measures the Context card, so it cannot see the room list overflow (`affected-areas-rooms.mjs:140`)
-
-```probe
-D=$(mktemp -d /tmp/aa-sideways.XXXXXX)
-grep -n 'role="region"\]\[aria-labelledby\]' /home/lyphe/.claude/claudecodeui_lyphe/.verify/affected-areas-rooms.mjs || echo "selector line: none"
-cat > "$D/p.mjs" <<'EOF'
-import { openConsole, resize } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/console.mjs';
-import { openCerberusTab } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/node-card.mjs';
-const session = await openConsole({ viewport: { width: 1280, height: 900 } });
-const { page } = session;
-try {
-  await openCerberusTab(page);
-  await page.getByRole('tab', { name: 'Tours', exact: true }).click();
-  const panel = page.locator('[role="tabpanel"][aria-label="Tours"]');
-  const search = panel.getByRole('searchbox', { name: 'Search by customer, claim or address' });
-  await search.waitFor({ timeout: 20000 });
-  await search.fill('Mimi Winer');
-  const rows = panel.locator('ul button', { hasText: 'Mimi Winer' });
-  await rows.first().waitFor({ timeout: 20000 });
-  await page.waitForTimeout(900);
-  await rows.first().click();
-  const region = page.getByRole('region', { name: 'Rooms' });
-  await region.waitFor({ timeout: 20000 });
-  await resize(page, { width: 390, height: 844 });
-  await region.locator('ul > li').first().evaluate((li) => { li.style.minWidth = '900px'; });
-  await page.waitForTimeout(300);
-  const script = await page.evaluate(() => { const c = document.querySelector('[role="region"][aria-labelledby]'); return { page: document.documentElement.scrollWidth - window.innerWidth, card: c === null ? 0 : c.scrollWidth - c.clientWidth, cardTitle: c?.querySelector('h3')?.textContent ?? null }; });
-  const rooms = await region.evaluate((el) => el.scrollWidth - el.clientWidth);
-  console.log('script measure:', JSON.stringify(script), '| rooms region overflow:', rooms);
-} catch (error) { console.log('probe error:', String(error).slice(0, 200)); }
-finally { await session.browser.close(); }
-EOF
-( cd /home/lyphe/.claude/claudecodeui_lyphe && timeout 200 node "$D/p.mjs" )
-expect: script measure {"page":0,"card":0,"cardTitle":"What the reader is told"} while the rooms region overflow is 544 (the check reads the Context card; cured when the title it reads is "Rooms" or the script's number moves with the injection)
-```
-
-measured 2026-10-17 by chain chain-tour-affected-areas--rooms--fill-20261017-144953-e97f, finding M1, MEDIUM
-probe-key: d7a7b786c580cad4642fdf30546df2091da2f924
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/affected-areas-rooms.mjs
-
-## INV-8663 — probe — . The script photographs and measures the light theme only
-
-. The script photographs and measures the light theme only
-
-```probe
-grep -c "dark" /home/lyphe/.claude/claudecodeui_lyphe/.verify/affected-areas-rooms.mjs || echo none
-expect: 0 (cured when the script runs a dark pass)
-```
-
-measured 2026-10-17 by chain chain-tour-affected-areas--rooms--fill-20261017-144953-e97f, finding L1, LOW
-probe-key: 5a6c71947ea10f92b0fa71ce171ba38d0e7b5d9c
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/affected-areas-rooms.mjs
-
 ## INV-8665 — probe — LOW — MAN-8573's "19 of 60 recent tours … 8 of those" drops the population that makes it true
 
 LOW — MAN-8573's "19 of 60 recent tours … 8 of those" drops the population that makes it true
@@ -10509,20 +10452,6 @@ probe-key: e214705f08e46ac68956e239ecbfeadf86156da8
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/
 
-## INV-8733 — probe — MAN-8573 (judgment MANUAL §rooms, lines 238 and 253) names a file the tree no longer has, and now contradicts INV-8635.
-
-MAN-8573 (judgment MANUAL §rooms, lines 238 and 253) names a file the tree no longer has, and now contradicts INV-8635.
-
-```probe
-cd /opt/shadow-connector && echo "MAN-8573 names marked_areas: $(docstore get MAN-8573 --text | grep -c 'marked_areas')"; ls core/preliminary_estimator/marked_areas.py 2>&1 | tail -n 1; echo "INV-8635 names photo_areas: $(docstore get INV-8635 --text | grep -c 'photo_areas')"
-expect: MAN-8573 names marked_areas: 2, then "No such file or directory", then INV-8635 names photo_areas: 1 while stale (the first count 0 once healed)
-```
-
-measured 2026-10-18 by chain chain-tour-affected-areas--judgment--lines-20261017-234250-2ce4, finding L1, LOW
-probe-key: 5d0fd31310b175c3dafd1f1fbaf0a7ca65909962
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/
-
 ## INV-8734 — probe — before the pano answers, `faceCounts` (listing branch) calls every area of a pano that has none standing "proposed", including areas the operator set aside; the tile and the tour line read "N found" for the same pano.
 
 before the pano answers, `faceCounts` (listing branch) calls every area of a pano that has none standing "proposed", including areas the operator set aside; the tile and the tour line read "N found" for the same pano.
@@ -10828,3 +10757,56 @@ measured 2026-10-18 by chain chain-tour-affected-areas--judgment--drawing-202610
 probe-key: a74295d75344f0cab89abbe822e9445329591bad
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/affected-areas-marking-boxes.mjs
+
+## INV-8791 — probe — LOW — the script's header says a run writes nothing to the shared account; each run writes its stored theme twice
+
+LOW — the script's header says a run writes nothing to the shared account; each run writes its stored theme twice
+
+```probe
+D=$(mktemp -d /tmp/aa-theme.XXXXXX) || exit 1
+cat > "$D/p.mjs" <<'EOF'
+import { openConsole } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/console.mjs';
+const API = 'http://127.0.0.1:3011';
+const login = await fetch(`${API}/api/auth/login`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ username: 'verve', password: 'verve-dev-2026' }) });
+const { token } = await login.json();
+const stored = async () => (await (await fetch(`${API}/api/user/preferences`, { headers: { Authorization: `Bearer ${token}` } })).json()).preferences?.theme ?? null;
+const pass = async (dark) => { const s = await openConsole({ viewport: { width: 1280, height: 900 }, dark }); const t = s.theme.viaToggle; await s.browser.close(); return t; };
+const before = await stored();
+const lightToggled = await pass(false);
+const afterLight = await stored();
+await pass(before === 'dark');
+console.log(`stored theme before: ${before} | a light pass drove the Dark Mode switch: ${lightToggled} | stored after the light pass: ${afterLight} | restored to: ${await stored()}`);
+EOF
+cat > "$D/p.sh" <<'EOF'
+grep -n "no setting of the shared account" /home/lyphe/.claude/claudecodeui_lyphe/.verify/affected-areas-rooms.mjs | cut -c1-200 || echo "header claim: none"
+( cd /home/lyphe/.claude/claudecodeui_lyphe && timeout 200 node "$1/p.mjs" 2>&1 | tail -2 )
+EOF
+bash "$D/p.sh" "$D"
+case "$D" in /tmp/aa-theme.*) rm -rf "$D";; esac
+```
+
+measured 2026-10-18 by chain chain-tour-affected-areas--judgment--join-20261018-080148-ae9d, finding L1, LOW
+probe-key: f0f85a1eaaf984472d707a2b0996b9bd1ce3a2e6
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/affected-areas-rooms.mjs
+
+## INV-8792 — probe — LOW — the script is green with no affected room on the screen, so its exit code cannot say the join's demonstration happened
+
+LOW — the script is green with no affected room on the screen, so its exit code cannot say the join's demonstration happened
+
+```probe
+D=$(mktemp -d /tmp/aa-vacuous.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+D="$1"
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+timeout 300 node .verify/affected-areas-rooms.mjs --tour 6ace5eb736f92c16415baa7e --evidence "$D/ev" > "$D/out.log" 2>&1
+echo "script exit=$? | rows whose words say Affected: $(grep -c 'words: "Affected' "$D/out.log") | $(grep -E '^[0-9]+ PASS' "$D/out.log")"
+EOF
+bash "$D/p.sh" "$D"
+case "$D" in /tmp/aa-vacuous.*) rm -rf "$D";; esac
+```
+
+measured 2026-10-18 by chain chain-tour-affected-areas--judgment--join-20261018-080148-ae9d, finding L2, LOW
+probe-key: ac6b0f9ce4c9535ca4a117fa7661a2b65b6388fd
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/affected-areas-rooms.mjs
