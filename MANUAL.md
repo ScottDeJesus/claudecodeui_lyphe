@@ -3677,3 +3677,24 @@ section: The marking pieces — rules an editor must not break: presses, the cou
 - `MarkQueue`'s `shapeOf` and `PanoScreen`'s shapes map derive the same `RegionShape` (tone, edge, wash, the name of the kind it counts as): one of them should go.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/AffectedAreasView.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/FacePhoto.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/LayerSwitch.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/MarkBar.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/MarkPresses.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/MarkPress.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/MarkQueue.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/MarkScreen.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/MissedDraw.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/NoteDialog.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/PanoScreen.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/RegionList.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/UnderstandingCard.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/UnderstandingMark.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/UnderstandingVerdict.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/affected-areas-marking-boxes.mjs
+
+## MAN-8621 — memory-assert — how a rules / requirements card lands on its shelf
+
+`memory-compose.ts::compose`, `section` branch. Targets: `rules` → `~/.claude/RULES.md`, anchor `## Rules`; `requirements` → `~/.claude/REQUIREMENTS.md`, anchor `## Requirements`. Both are `mustExist`: a missing file refuses before `compose` runs. "Blank" is `current.trim() === ''`. "Carries the anchor" is a line of the body that trims to the anchor.
+
+| shelf | body | result |
+|---|---|---|
+| blank | carries the anchor | body is the whole file plus one trailing `\n` — a restore, title and note included |
+| blank | does not | `<title>\n\n<anchor>\n\n<body>\n` — the title (`# RULES.md` / `# REQUIREMENTS.md`) and the heading are minted here, so the session-start shape check (`hooks/shelf_health.py`) finds the shelf healthy; a heading-carrying restore is written exactly as given and judged as written |
+| content, anchor present | does not | body lands at the END of the anchor's section: before the next `## ` heading, else at file end |
+| content, anchor present | carries it | refused: "already has content … only an empty shelf takes it … queue them without the heading line" |
+| content, anchor absent | any | refused: "has no “<anchor>” section to add this under … will not invent one" (checked before the row above) |
+
+- why blank is writable: no session can add a line to a shelf (`hooks/enforce_shelf_channel.py`), so a wiped shelf has no heading to land under and the queue is the only door that refills it.
+- why content refuses a heading-carrying body: its title, note and second heading would land INSIDE the section, and every later entry above them.
+- Caps run on the composed result against `''` for a blank file. `rules` / `requirements` hold 60 lines / 2,000 chars (MAN-604): a restore past them refuses and the file stays blank.
+- Refusal remedy for the total-size reason: blank shelf → "the file is empty, so there is no entry to trim — shorten this body."; shelf with content → "trim an entry before adding another."
+- Landing mode: the `rules`, `requirements` and `claude` steps carry `readOnly` (`memory-plan.ts`), and `memory-assert.ts::atomicWrite` sets the temp file to 0444 BEFORE the rename — the shelf never exists writable at its real path, so a stray `> RULES.md` fails with "Permission denied". The rename needs only the directory's write bit, so the door passes over the 0444 file it replaces. Memory notes and the project `MEMORY.md` keep a plain write's mode. `hooks/shelf_health.py` re-applies 0444 at every main session start (`SHELF_MODE` there, `SHELF_FILE_MODE` here: one number in two languages).
+- Restore a wiped shelf: queue its full text as ONE `rules` / `requirements` card, before any other entry, with no line reworded. `commands/remember.md` §2 gives the same instruction to the proposing session.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/memory-intake/memory-assert.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/memory-intake/memory-caps.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/memory-intake/memory-compose.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/memory-intake/memory-plan.ts, /home/lyphe/.claude/commands/remember.md

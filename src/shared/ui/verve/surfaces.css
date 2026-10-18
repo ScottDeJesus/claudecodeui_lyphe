@@ -289,7 +289,9 @@ body.vv-dragging iframe { pointer-events: none; }
  * control inside it, is scrolled by `sortable/touchPan.ts` instead. Keyed on a coarse pointer being PRESENT
  * (`any-pointer`), not on it being the primary one: a touch laptop reports a fine, hovering primary pointer and still has
  * a finger, and `touch-action` does nothing to a mouse. A device with no touch screen is untouched. A marker of its own,
- * never `data-hold-lift`: the runner, roadmap and dispatcher lists wear that one and keep their native scrolling. */
+ * never `data-hold-lift`: it is `scrollsPane`'s, and a hold-lift handle without that option keeps the browser's own scrolling.
+ * A scroller inside the handle (a deck's plan strip) pans natively whatever this says, and `usePointerDrag` leaves its touches
+ * to the browser. */
 @media (any-pointer: coarse) {
   [data-touch-pan] { touch-action: none; }
 }

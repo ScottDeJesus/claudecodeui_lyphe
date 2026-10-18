@@ -28,7 +28,8 @@ import { scrollerOf } from '@/shared/ui/sortable/motion';
  * keeps its lifted row inside the list's box (`useSimpleChatDrag`), so the pane's end is the list's end
  * whenever a touch can begin; a list that painted its carried item past its end would pan past it.
  *
- * Used by `usePointerDrag` (its `scrollsPane` option), for the sidebar's chat list.
+ * Used by `usePointerDrag` (its `scrollsPane` option), for the sidebar's chat list and every list on the kit's `useSortable`
+ * (the runner, roadmap and dispatcher lists).
  */
 
 /** How far back a release looks for the finger's speed: the last tenth of a second of its moves. */
@@ -56,10 +57,28 @@ const MOVED_BY_OTHER_PX = 1.5;
 type Sample = { y: number; time: number };
 
 /**
+ * Whether a press on `target` landed inside a scroller of `handle`'s own: an element between the two (the target included, the
+ * handle not) whose `overflow-x` or `overflow-y` is `auto` or `scroll`, such as a deck's plan strip or a phase track. THE BROWSER
+ * PANS INSIDE ANY SCROLLER, whatever the handle's `touch-action` says, so that touch is the browser's: a lift there would be taken
+ * away at the first move on a phone that dispatches every touch uncancelable, and a pan by hand would scroll the pane a second time
+ * beside the browser's own. Read from the computed style, not from whether it overflows now, as the browser reads it. A press
+ * outside the handle answers false (`paneToPan` refuses it).
+ */
+export function inOwnScroller(handle: Element, target: EventTarget | null): boolean {
+  if (!(target instanceof Element) || !handle.contains(target)) return false;
+  for (let node: Element | null = target; node !== null && node !== handle; node = node.parentElement) {
+    const { overflowX, overflowY } = getComputedStyle(node);
+    if (/(auto|scroll)/.test(overflowX) || /(auto|scroll)/.test(overflowY)) return true;
+  }
+  return false;
+}
+
+/**
  * The pane a swipe that began on `target`, inside `handle`, scrolls by hand — or `null` when the browser still owns that swipe: the
  * press landed outside the handle (a portal's, bubbled through React), or the handle is not `touch-action: none` (a hybrid
  * laptop's finger, where the browser pans as ever and a second scroll would double it). A page that scrolls as a whole is the pane
  * when no ancestor does.
+ * A press inside a scroller of the handle's own never comes here: `usePointerDrag` leaves it to the browser (`inOwnScroller`).
  */
 export function paneToPan(handle: Element, target: EventTarget | null): HTMLElement | null {
   if (!(target instanceof Node) || !handle.contains(target)) return null;

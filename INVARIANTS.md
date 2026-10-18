@@ -10851,3 +10851,11 @@ measured 2026-10-18 by chain chain-tour-affected-areas--judgment--docs-20261018-
 probe-key: 514e72fcd79a91ee4c5418316f984f6a81e9ce95
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/
+
+## INV-8819 — capRefusals measures a blank shelf as empty; a heading-carrying restore is accepted only onto a blank shelf
+
+- `capRefusals(caps, display, next, current)` (`memory-caps.ts`): `current` is `''` for a file that is missing or holds only blank space — never the raw whitespace. why: the ratchet compares `next` against `current`, and blank space hides an over-budget write behind its own size; the total-size remedy text also keys on `current === ''`.
+- The one caller is `assertIntoTarget` (`memory-assert.ts`); it passes `''` for any step kind when `current.trim() === ''`, the blank test `compose` uses. A new caller does the same.
+- A body carrying its own `## Rules` / `## Requirements` heading is a whole-file restore: `compose` accepts it only onto a blank shelf and refuses it on a shelf with content. Do not relax that refusal. Landing table: MAN-8621.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/memory-intake/memory-assert.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/memory-intake/memory-caps.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/memory-intake/memory-compose.ts

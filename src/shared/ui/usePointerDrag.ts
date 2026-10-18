@@ -1,6 +1,6 @@
 import { type PointerEvent as ReactPointerEvent, useCallback, useEffect, useRef } from 'react';
 
-import { beginPan, paneToPan } from '@/shared/ui/sortable/touchPan';
+import { beginPan, inOwnScroller, paneToPan } from '@/shared/ui/sortable/touchPan';
 import type { Pan } from '@/shared/ui/sortable/touchPan';
 
 /** The five gestures this hook serves, and the two body classes a drag of any one sets. */
@@ -85,6 +85,8 @@ type Gesture = {
  *   instead of being let go to the browser's own pan. The handles are `touch-action: none` at rest
  *   (`handleProps`), because a phone may dispatch every touch as uncancelable, and the browser's pan can
  *   then be refused only before the touch begins. A press `accept` refuses still pans, and never lifts.
+ *   A touch that starts inside a scroller of the handle's own (a deck's plan strip: `touchPan.ts`'s `inOwnScroller`)
+ *   is the browser's, which pans inside any scroller whatever the handle's `touch-action`: it neither lifts nor pans.
  *
  * A HOLD'S HANDLE IS MARKED, because those cancels are events and not every platform sends the event.
  * An iPhone answers its own long-press (the link menu, the selection loupe) at about half a second
@@ -186,12 +188,15 @@ export function usePointerDrag(options: {
   const onPointerDown = useCallback((event: ReactPointerEvent<HTMLElement>) => {
     // The primary button only; every other one belongs to the browser's own menu.
     if (event.button !== 0 || gesture.current) return;
+    const handle = event.currentTarget;
+    const isTouch = event.pointerType === 'touch';
+    const pansByHand = isTouch && latest.current.holdMs !== undefined && latest.current.scrollsPane === true;
+    // Inside a scroller of the handle's own the browser pans, whatever the handle's `touch-action`: that touch is wholly its own.
+    if (pansByHand && inOwnScroller(handle, event.target)) return;
     const accepted = latest.current.accept?.(event) !== false;
 
-    const handle = event.currentTarget;
     const pointerId = event.pointerId;
-    const isTouch = event.pointerType === 'touch';
-    const pane = isTouch && latest.current.holdMs !== undefined && latest.current.scrollsPane === true ? paneToPan(handle, event.target) : null;
+    const pane = pansByHand ? paneToPan(handle, event.target) : null;
     // A refused press is the page's own, except where the finger's swipe is the pane's by hand: there it pans.
     if (!accepted && pane === null) return;
     const holdMs = isTouch && accepted ? latest.current.holdMs : undefined;
