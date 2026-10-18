@@ -123,8 +123,11 @@ export function AffectedAreasView() {
   const detail = tour.value;
   const summary = tours.value?.find((candidate) => candidate.tourId === tourId) ?? null;
   const named = detail?.tour ?? summary;
-  const roomKey = pano.value?.roomKey ?? entry?.roomKey ?? null;
-  const room = detail?.rooms.find((candidate) => candidate.roomKey === roomKey) ?? null;
+  // A room is a (roomKey, floor) pair: a key on two floors is two rooms, and the pano stands in the one on its own floor.
+  const panoRoom = pano.value ?? entry;
+  const room = panoRoom === null
+    ? null
+    : (detail?.rooms.find((candidate) => candidate.roomKey === panoRoom.roomKey && candidate.floor === panoRoom.floor) ?? null);
   // What Read the rest would read and spend: every pano with a face not read yet, a pano never cut included, and
   // their unread views; the press says both before it spends.
   const unread = tourUnread(detail?.panos ?? []);

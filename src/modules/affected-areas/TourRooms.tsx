@@ -68,7 +68,7 @@ export function TourRooms({ rooms }: TourRoomsProps) {
             const words = authorityWords(room, t);
             return (
               <li
-                key={room.roomKey}
+                key={`${room.roomKey}:${room.floor ?? 'none'}`}
                 data-tone={words === null ? undefined : 'warn'}
                 className="flex min-w-0 items-start gap-2.5 border-b border-border px-4 py-2.5"
               >
