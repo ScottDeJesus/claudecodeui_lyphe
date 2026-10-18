@@ -55,7 +55,7 @@ function ReadingBody() {
  *
  * Read top to bottom: All tours (the way back), the job's name, its address, and one line of what the tour holds
  * and how far it is read, with the walk beside them where the pano screen keeps its press (what it would spend —
- * "45 panos · 270 views not read yet" — and Read the rest of this tour, or "Reading 3 of 45" with Stop after this
+ * "45 panos · 270 views need a read" — and Read the rest of this tour, or "Reading 3 of 45" with Stop after this
  * pano while it runs); then `ContextCard`; then `TourRooms`, each room and who calls it affected; then "PANOS · 12"
  * and `RoomGallery`, whose tiles open a pano.
  *

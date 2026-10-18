@@ -57,7 +57,7 @@ export function needsRead(view: ViewEntry): boolean {
 /**
  * What Read the rest would still read on a tour: its panos with a view that needs a read (`needsRead`: none yet, or one
  * made under an older contract or model; a pano never cut included) and those views, six for a pano never cut. The press
- * says both before it spends — "45 panos · 270 views not read yet" — because a walk of a whole tour buys every one of
+ * says both before it spends — "45 panos · 270 views need a read" — because a walk of a whole tour buys every one of
  * them. Read by the view root.
  */
 export function tourUnread(panos: PanoEntry[]): { panos: number; views: number } {

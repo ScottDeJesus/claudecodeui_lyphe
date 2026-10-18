@@ -89,7 +89,6 @@ export type ContextSummary = {
   daysLossToTour: number | null;
   yearBuilt: number | null;
   carrier: string | null;
-  propertyType: string | null;
   sources: string[];
 };
 

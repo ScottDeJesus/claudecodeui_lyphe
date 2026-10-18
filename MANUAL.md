@@ -3391,7 +3391,7 @@ A step reads only what the steps above it produce. why: the shown face's photo i
 | tour line "26 areas found" | `regionsStanding`, or `regionsTotal` while none stands: a tour the reader marked never reads as empty |
 | tour line "42 of 42 cut views read · 5 panos not cut" | views read of views cut; `uncut = panoCount − round(viewsTotal / 6)`; "none cut yet" when `viewsTotal === 0` |
 | `tourReadState` | against six views per pano (`panoCount × 6`), never against views cut: a tour with an uncut pano is `partly` |
-| `tourUnread` | panos with a view that needs a read (`needsRead`: none yet, or a read whose `ReadState.current` is not true), and those views (six for a pano never cut); the press names both before it spends |
+| `tourUnread` | panos with a view that needs a read (`needsRead`: none yet, or a read whose `ReadState.current` is not true), and those views (six for a pano never cut); the press says them as "5 panos · 30 views need a read" (`affectedAreas.read.rest`, `viewsNeedRead`) before it spends. The tour line's "N of M cut views read" is a different count (reads under ANY contract, `viewsRead`), so a stale read counts in it and in "need a read" both |
 | room list title "Rooms" | no count, on purpose: the header's "in 5 rooms" is `roomCount` (`docusketch_tours.rooms`, DocuSketch's own count), while the list has one row per room key, and `canonical_key` folds names ("Office2 / Office1" is one row). The two differed on 14 of the 60 newest tours (El Camino College: 39 against 35, measured 2026-10-17) |
 
 ## Read presses
