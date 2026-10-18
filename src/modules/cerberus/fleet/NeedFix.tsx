@@ -1,9 +1,11 @@
 import type { TFunction } from 'i18next';
+import type { LucideIcon } from 'lucide-react';
 import { useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { useCerberus } from '@/modules/cerberus/context/CerberusContext';
 import { useRunLastLine } from '@/modules/cerberus/hooks/useRunLastLine';
+import { MarkIcon } from '@/modules/cerberus/StatusMarks';
 import { RUN_LOOK } from '@/modules/cerberus/utils/cerberusStatus';
 import { hms } from '@/modules/cerberus/utils/cerberusTime';
 import type { CerberusCatalogEntryView, CerberusNeed, CerberusRunView } from '@/shared/cerberus-types';
@@ -12,21 +14,21 @@ import { Button } from '@/shared/ui';
 import { cn } from '@/shared/utils';
 
 /**
- * The strip's tone, glyph and first line. A going run is info and wears no glyph: its words say it. An
- * ended one takes `RUN_LOOK`'s glyph, and its tone too but for a run that succeeded, which is neutral —
+ * The strip's tone, icon and first line. A going run is info and wears no icon: its words say it. An
+ * ended one takes `RUN_LOOK`'s icon, and its tone too but for a run that succeeded, which is neutral —
  * the fix did its part, and the check is still failing until its next result says otherwise.
  */
-function stripLook(t: TFunction, run: CerberusRunView): { tone: Tone; glyph: string | null; title: string } {
+function stripLook(t: TFunction, run: CerberusRunView): { tone: Tone; icon: LucideIcon | null; title: string } {
   const { name } = run;
   if (run.result === null) {
-    return { tone: 'info', glyph: null, title: t(run.by === 'auto' ? 'cerberus.fix.strip.runningAuto' : 'cerberus.fix.strip.running', { name }) };
+    return { tone: 'info', icon: null, title: t(run.by === 'auto' ? 'cerberus.fix.strip.runningAuto' : 'cerberus.fix.strip.running', { name }) };
   }
   const look = RUN_LOOK[run.result];
   // An ended run is stamped when it ended, by its warden's clock: the moment it printed its last word.
   const time = hms(run.endedAt ?? run.requestedAt);
   switch (run.result) {
     case 'ok':
-      return { tone: 'neutral', glyph: look.glyph, title: t('cerberus.fix.strip.finished', { name, time }) };
+      return { tone: 'neutral', icon: look.icon, title: t('cerberus.fix.strip.finished', { name, time }) };
     case 'refused':
       return { ...look, title: t('cerberus.fix.strip.refused', { name }) };
     case 'timed_out':
@@ -56,11 +58,13 @@ type NeedFixProps = {
  * the row's indent (`basis-full`), and the button joins the row.
  *
  * THE STRIP, while the check has a recent run (going, or ended under 90 s ago; the read model decides):
- * - going — "Running on its own · <name>" or "Running · <name>", info;
- * - ended ok — "✓ <name> finished 17:50:14 · waiting for the next check", neutral: the fix did its part,
- *   and the check passes when its next result says so;
- * - failed or timed out — "▲ <name> finished 17:49:21 · Failed · exit 1" or "· Timed out", warn;
- * - refused — "✕ The warden refused “<name>”", danger: the only red, a command no acked catalog holds.
+ * - going — "Running on its own · <name>" or "Running · <name>", info, with no icon: its words say it;
+ * - ended ok — the passing check icon, then "<name> finished 17:50:14 · waiting for the next check",
+ *   neutral: the fix did its part, and the check passes when its next result says so;
+ * - failed or timed out — the warn triangle, then "<name> finished 17:49:21 · Failed · exit 1" or
+ *   "· Timed out", warn;
+ * - refused — the crossed octagon, then "The warden refused “<name>”", danger: the only red, a command no
+ *   acked catalog holds.
  * Under the words, the run's last line in mono, cut at one line (the whole of it on hover); the warden's
  * or center's own sentence when the run ended on one (a refusal's reason) in the body face, since it is
  * not output, kept to two lines rather than one: it is what the person acts on, and a phone shows no
@@ -124,10 +128,15 @@ export function NeedFix({ need, leaving, onOpen }: NeedFixProps) {
           onClick={() => onOpen({ node: check.node, service: check.service, check: check.id, run: run.id })}
           className="flex min-w-0 basis-full flex-col gap-[3px] rounded-[10px] bg-tone-soft px-3 py-[9px] text-left motion-safe:transition-transform motion-safe:hover:-translate-y-px"
         >
-          <span className={cn('text-[12.5px] font-medium', run.result === 'ok' ? 'text-secondary-foreground' : 'text-tone-ink')}>
-            {/* An ended run's glyph; a run that succeeded keeps its ✓ in the positive ink on the neutral strip. */}
-            {look.glyph !== null && <span aria-hidden data-tone={run.result === 'ok' ? 'positive' : undefined} className={cn(run.result === 'ok' && 'text-tone-ink')}>{look.glyph} </span>}
-            {look.title}
+          <span className={cn('flex items-start gap-1.5 text-[12.5px] font-medium', run.result === 'ok' ? 'text-secondary-foreground' : 'text-tone-ink')}>
+            {/* An ended run's icon, on the first line's centre; a run that succeeded keeps its check in the positive
+                ink on the neutral strip. A title that wraps stays in its own column. */}
+            {look.icon !== null && (
+              <span data-tone={run.result === 'ok' ? 'positive' : undefined} className={cn('mt-0.5 flex-none', run.result === 'ok' && 'text-tone-ink')}>
+                <MarkIcon icon={look.icon} className="size-3.5" />
+              </span>
+            )}
+            <span className="min-w-0">{look.title}</span>
           </span>
           <span
             title={detail}

@@ -53,7 +53,9 @@ function text(value: unknown): string {
  * the position on disk whatever the dispatcher is doing — a switch that failed because a daemon was
  * busy would be a switch that lies about a file it had already written — so every failure, including
  * a script that is not there and a kick that hung past its bound, is swallowed and said once.
- * Callers write `void kickDispatcher()`: the HTTP answer is the flip's, not the kick's.
+ * Callers write `void kickDispatcher()`: the HTTP answer is the flip's, not the kick's. The callers are this
+ * module's toggles and, through the barrel, the accounts module's switch and capture routes: a changed
+ * login is an event the dispatcher's usage-limit holds are waiting on (`account_release.py`).
  *
  * The child inherits this server's environment, which is what puts it in the same home the
  * dispatcher's own readers resolve. Whatever it starts is sealed on the far side: the daemon runs

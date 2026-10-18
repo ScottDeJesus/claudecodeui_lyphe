@@ -32,6 +32,18 @@
  * the copy the next module to need it re-draws slightly differently. The chat module's transcript
  * and subagent rows now draw it too, for Claude, through `LLMProviderLogo`'s `claudeMark="mascot"`
  * — the same door and the same one glyph, not a copy of it with its own grid.
+ *
+ * RegionImage came in with one consumer, the affected-areas module, on the mechanism test: an SVG layer that
+ * shares an image's coordinate space, a polygon hit-test and a badge clamped inside the image are what no
+ * arrangement of the parts here produces, and the photo-match viewer is its next consumer. Gallery came in
+ * because Verve draws it (§10 Media) — "If Verve draws it, it is in the library", with or without a second
+ * module. Both paint in verve/media.css; both put a photo in a box through PhotoFill, which is not exported
+ * from here: the broken-image tile is one drawing for the two, and nothing outside this folder asks for it.
+ *
+ * SegmentedControl and DataTable came in because Verve draws them (§11 Plumbing and §5), with or without a second
+ * module ("If Verve draws it, it is in the library. Full stop."), for the affected-areas module's marking screens: the
+ * three switches and the proving tables. They paint in verve/data.css. The chat transcript's own `DataTable`
+ * (modules/chat/transcript/shapes) is a different job — react-markdown children with a CSV copy — and stays there.
  */
 
 // The library's paint, imported once for its side effect so that every consumer of this
@@ -50,6 +62,14 @@ import '@/shared/ui/verve/surfaces.css';
 // here depends on its place against controls.css, feedback.css or surfaces.css, and the one constraint
 // is that board.css stays last, below.
 import '@/shared/ui/verve/panels.css';
+// media.css holds the paint of RegionImage and Gallery. Its place is free: no selector in it is shared with
+// any sibling sheet (`.vv-region*` and `.vv-gallery*` are its own), and every rule reads only tokens, so
+// nothing depends on its landing before or after controls.css, feedback.css, surfaces.css or panels.css.
+// The one constraint is still that board.css stays last, below.
+import '@/shared/ui/verve/media.css';
+// data.css holds the paint of SegmentedControl and DataTable. Like media.css, its place is free: `.vv-segmented*` and
+// `.vv-datatable*` are its own and every rule reads only tokens. The one constraint is still that board.css stays last, below.
+import '@/shared/ui/verve/data.css';
 // The board layer goes LAST on purpose, and the order is load-bearing: a lane card composes
 // `.vv-card`'s ground and then overrides its background, shadow and transition. Imported first,
 // `.vv-card` won every one of those at equal specificity and a selected card lost its wash.
@@ -78,6 +98,9 @@ export { ClaudeCodeMark } from '@/shared/ui/ClaudeCodeMark';
 export { Collapsible, CollapsibleTrigger, CollapsibleContent } from '@/shared/ui/Collapsible';
 export { Command, CommandInput, CommandList, CommandEmpty, CommandGroup, CommandItem } from '@/shared/ui/Command';
 export { DarkModeToggle } from '@/shared/ui/DarkModeToggle';
+// Verve's §5 sortable data table: sort arrows on the heads, `aria-sort` on the sorted one, a row that opens under
+// itself. The affected-areas module's proving tables are drawn with it.
+export { DataTable } from '@/shared/ui/DataTable';
 export { AppLogo } from '@/shared/ui/AppLogo';
 export { default as DeepSeekLogo } from '@/shared/ui/DeepSeekLogo';
 export { Dialog, DialogTrigger, DialogContent, DialogTitle } from '@/shared/ui/Dialog';
@@ -91,6 +114,9 @@ export type { DockableFabPosition } from '@/shared/ui/DockableFab';
 export { ResizeGrip } from '@/shared/ui/ResizeGrip';
 export { EmptyState } from '@/shared/ui/EmptyState';
 export { Field } from '@/shared/ui/Field';
+// Verve's §10 Media gallery: square photo tiles, each with its tag, the final tile collapsing the overflow into
+// "+N", the grey tile where a photo is missing. The affected-areas module draws a tour's panos with it.
+export { Gallery } from '@/shared/ui/Gallery';
 export { Input } from '@/shared/ui/Input';
 export { KanbanCard } from '@/shared/ui/KanbanCard';
 export type { CardPriority, KanbanCardModel, KanbanCardSignals } from '@/shared/ui/KanbanCard';
@@ -117,7 +143,15 @@ export type {
   PromptInputSubmitProps,
 } from '@/shared/ui/PromptInput';
 export { QuestionOptionRow } from '@/shared/ui/QuestionOptionRow';
+// A photo with its regions drawn over it: one SVG in the image's own 0..1 space (outline weight constant at any size
+// and zoom), a numbered badge at each region's corner, a press on either selecting it. The affected-areas module draws
+// a view's regions with it; the photo-match viewer is next. It also takes a box dragged on the photo (`drawing`) and
+// dims every region but the focused one (`focusId`).
+export { RegionImage } from '@/shared/ui/RegionImage';
 export { ScrollArea } from '@/shared/ui/ScrollArea';
+// Verve's §11 SegmentedControl: a radio group drawn as one tray, the chosen option lifted, an optional count on each.
+// The affected-areas module's Tours · Mark · Tables switch, the pano's layer switch and the Mark screen's queue mode.
+export { SegmentedControl } from '@/shared/ui/SegmentedControl';
 export { Select } from '@/shared/ui/Select';
 export { SettingRow } from '@/shared/ui/SettingRow';
 // The panel pinned to the right edge over a scrim, on Dialog's host-window portal and Escape rule. The

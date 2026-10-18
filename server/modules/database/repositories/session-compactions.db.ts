@@ -376,8 +376,8 @@ export const sessionCompactionsDb = {
   },
 
   /**
-   * The chat's newest `compaction` row as the three facts the compaction module reads — where its
-   * context stood after the seed append and the seed itself — or null when the chat has none. Newest
+   * The chat's newest `compaction` row as the four facts the compaction module reads — when the swap was
+   * recorded, where the context stood after the seed append, and the seed itself — or null when the chat has none. Newest
    * by `created_at` then `rowid`, the way `COMPACTION_ORDER_SQL` breaks a tie, reversed. The seed is
    * null for a compaction recorded before the column; nothing is backfilled.
    */
@@ -385,17 +385,20 @@ export const sessionCompactionsDb = {
     const db = getConnection();
     const row = db
       .prepare(
-        `SELECT provider_session_id, post_tokens, seed
+        `SELECT provider_session_id, post_tokens, seed, CAST(strftime('%s', created_at) AS INTEGER) AS created_epoch
          FROM superseded_provider_sessions
          WHERE reason = '${REASON_COMPACTION}' AND session_id = ?
          ORDER BY created_at DESC, rowid DESC
          LIMIT 1`
       )
-      .get(sessionId) as { provider_session_id: string; post_tokens: number | null; seed: string | null } | undefined;
+      .get(sessionId) as
+      | { provider_session_id: string; post_tokens: number | null; seed: string | null; created_epoch: number }
+      | undefined;
     if (!row) return null;
 
     return {
       oldProviderSessionId: row.provider_session_id,
+      compactedAtMs: row.created_epoch * 1000,
       postTokens: row.post_tokens,
       seed: parseStoredSeed(sessionId, row.seed),
     };

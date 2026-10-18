@@ -9,13 +9,15 @@ import {
   HiddenPlans,
   landFocusInHome,
   LoosePlannerBadges,
+  MasterController,
   moveCard,
   PlanCard,
   PlannerLanesReadout,
-  planPutAway,
   SessionPin,
   useCardRanks,
   useDispatcherPlans,
+  useEpicQueueVerbs,
+  usePutAway,
 } from '@/modules/dispatcher';
 import { useLaneFoldPrune } from '@/modules/runner-tab/hooks/useLaneFoldPrune';
 import { LANE_CARD_GAP } from '@/shared/constants';
@@ -55,20 +57,32 @@ function openedBy(plan: DispatcherPlan, sessionId: string | null): boolean {
  * Every item is drawn whole and at once (operator, 2026-09-28: "please remove the arrows and show a
  * list of plans instead").
  *
- * THE ITEMS ARE THE TAB'S SPLIT AND THE TAB'S ORDER (`byArc`'s `cards`): decks and plans interleaved
- * where the operator put them, and nowhere else — a plan that asks keeps its place, and so does the
- * plan the open chat opened, which wears this chat's `SessionPin` where it stands. Which chat is open
- * moves no card, and a chat switch moves no scroll. An arc is the SAME deck the tab draws
- * (`DispatchArcDecks`' `home="gutter"`), its plans still swiped one card per view in its own strip; a
- * plan of no arc is its `PlanCard`.
+ * THE ITEMS ARE THE TAB'S SPLIT AND THE TAB'S ORDER (`byArc`'s `cards`): the queue's decks first, in the
+ * order the dispatcher runs their epics in, then the other decks and the plans of no arc interleaved where
+ * the operator put them, and nowhere else — a plan that asks keeps its place, and so does the plan the
+ * open chat opened, which wears this chat's `SessionPin` where it stands. Which chat is open moves no card,
+ * and a chat switch moves no scroll. An arc is the SAME deck the tab draws (`DispatchArcDecks`'
+ * `home="gutter"`), its plans still swiped one card per view in its own strip, its place and turn noted in
+ * its head; a plan of no arc is its `PlanCard`.
  *
  * THE COLUMN IS ONE SORTABLE LIST: any item, deck or plan, is carried by a free press and put down
- * between any two others, and the drop writes one rank (`moveCard`) that the tab reads as well.
+ * between any two others. A drop of a QUEUE deck is an order and moves the epic in the dispatcher's queue
+ * (`useEpicQueueVerbs`): `--before` the next queue deck after it in the dropped order, or `--last` when none
+ * follows — a neighbour, never an index, since a queue deck put away is not drawn. Any other item writes
+ * one rank (`moveCard`) that the tab reads as well, placed among the other non-queue items alone (a queue
+ * deck is never the neighbour of a rank), and stands below the queue wherever it is dropped.
  *
  * THE FOLDS ARE THE TAB'S FOLDS, AND THIS BODY PRUNES THE SAME MEMORY. `useLaneFoldPrune` hands the
  * fold store what this widget draws AND what it has hidden, so a card folded here is folded on the tab,
  * a card shown again keeps its fold, and the folds of cards that have left the lane go with them — one
  * memory, two homes.
+ *
+ * THE MASTER CONTROLLER HEADS THE WIDGET, under the planner readout (operator, 2026-10-15: "those changes need to
+ * be reflected in the widget too"): `MasterController`, the very component the tab's header draws — Epics at once,
+ * Features at once, Tasks at once, the Claude · DeepSeek switch, one Start while a plan waits, Pause all — so a press
+ * here is the press there and both homes redraw from the one frame. It has no compact form: its controls wrap between
+ * whole pieces at the gutter's narrowest (300px), and its dropdowns are drawn on `body`, so this widget's scroller never
+ * clips them. The cards below carry the same override folds as the tab's, through `PlanCard` and `DispatchArcDecks`.
  *
  * `Dismiss done · N` heads the list (every drawn plan that is done, off the board in one write — the
  * tab header's own button) and `Hidden · N` closes it as the way back from any Hide. `data-runner-widget`
@@ -92,10 +106,28 @@ export function RunnerWidgetBody({ sessionId }: { sessionId: string | null }) {
   const cards = split.cards;
   const cardsByName = useMemo(() => new Map(cards.map((card) => [cardName(card), card])), [cards]);
   const keys = useMemo(() => cards.map(cardName), [cards]);
+  const lineNames = useMemo(() => new Set(split.line.map((group) => group.arc.name)), [split]);
+  const { moveEpic } = useEpicQueueVerbs();
   const { order, attachList, itemProps } = useSortable({
     keys,
-    // The carried item's neighbours in the dropped order are cards of either kind: both are ranked.
-    onReorder: (carried, order) => moveCard(carried, order, cards.map(rankedOf), carriedNames),
+    onReorder: (carried, order) => {
+      // A queue deck's drop is the dispatcher's order: it goes in front of the next queue deck the dropped
+      // order puts after it, or last. Non-queue items stand between and are not places in the queue.
+      if (lineNames.has(carried)) {
+        const next = order.slice(order.indexOf(carried) + 1).find((name) => lineNames.has(name));
+        return moveEpic(carried, next === undefined ? { last: true } : { before: next });
+      }
+      // A rank orders a card among the cards the operator can order: the queue's decks are never its neighbours,
+      // because their ranks (their creation moments) say nothing about the cards under the line — `byArc` ranks
+      // only those — and a drop that took a queue deck's rank would be undone by the next frame, or would write
+      // ranks for decks the queue owns. The carried item's neighbours are the other cards of either kind, decks and plans.
+      return moveCard(
+        carried,
+        order.filter((name) => !lineNames.has(name)),
+        cards.filter((card) => !lineNames.has(cardName(card))).map(rankedOf),
+        carriedNames,
+      );
+    },
   });
   const items = order.flatMap((name) => cardsByName.get(name) ?? []);
   useLaneFoldPrune(plans, hidden, arcs);
@@ -116,7 +148,7 @@ export function RunnerWidgetBody({ sessionId }: { sessionId: string | null }) {
 
   // The empty state speaks of the LANE: a planner outing with no card at all is on this lane too — a
   // soul out on an arc the store has no row for yet — even though nothing here can draw it an item.
-  // Over hidden plans the words say "hidden", never "nothing is running": a hidden plan may still walk.
+  // Over hidden plans the words say "hidden", never "nothing is running": a hidden plan may still be finishing the task it had in flight.
   const nothingDrawn = plans.length === 0 && arcs.length === 0 && loosePlanners.length === 0;
 
   return (
@@ -125,6 +157,9 @@ export function RunnerWidgetBody({ sessionId }: { sessionId: string | null }) {
       {/* How full the planner lane is — the tab header's own readout. Not drawn when the frame states
           no dial (an older dispatcher). */}
       <PlannerLanesReadout />
+      {/* THE MASTER CONTROLLER, the tab header's own component: one component, two mounts, one frame, so a
+          press here is the one In flight shows. Not drawn when the frame states no dial. */}
+      <MasterController />
       {nothingDrawn ? (
         <EmptyState icon={ActivityIcon} title={t(hidden.length > 0 ? 'dispatcher.hidden.allHidden' : 'runner.empty')} />
       ) : (
@@ -173,10 +208,11 @@ export function RunnerWidgetBody({ sessionId }: { sessionId: string | null }) {
  * the same at either depth.
  */
 function PlanItem({ plan, mine, carriedNames }: { plan: DispatcherPlan; mine: boolean; carriedNames: string[] }) {
+  const putAway = usePutAway(carriedNames);
   return (
     <div data-testid="runner-widget-plan" data-plan-name={plan.name} data-pinned={String(mine)} className="flex min-w-0 flex-col gap-1">
       {mine && <SessionPin />}
-      <PlanCard plan={plan} onPutAway={planPutAway(plan, carriedNames)} />
+      <PlanCard plan={plan} onPutAway={putAway.plan(plan)} />
     </div>
   );
 }

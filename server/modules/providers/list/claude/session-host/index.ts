@@ -54,6 +54,20 @@ export { listLiveHosts } from './hosts.js';
 export type { LiveHost } from './hosts.js';
 
 /**
+ * A host's last finished turn as its journal records it — when it ended, the result's `modelUsage`, and the turn's last budget
+ * through the caller's own reading. The Claude runtime reports it to the compaction when it adopts a host whose turn is complete.
+ * consumer: claude-compaction-restore.ts
+ */
+export { lastTurnRecord } from './hosts.js';
+
+/**
+ * THE ONE RULE for which assistant message counts as a turn's request, and its context size — the warden asks the same function of
+ * the journal it lists (`host-registry.js` is shipped to the node as it stands), so a local host and a node's cannot be read apart.
+ * consumer: claude-runtime.provider.js (a live stream's assistant message), claude-compaction-restore.ts (a re-adopted host's last turn)
+ */
+export { mainThreadRequestOf } from './host-registry.js';
+
+/**
  * The hosts a co-located node's warden holds — their CLIs are this machine's `claude` processes — and
  * the ask that makes that list current. The claude-activity module reads them beside `listLiveHosts`.
  * consumer: the claude-activity module, through the providers barrel

@@ -595,7 +595,8 @@ export type CerberusActivity =
 
 /**
  * What `GET /api/cerberus/overview` answers: the whole fleet at `now`. `nodes` is hub first;
- * `needsYou` sorts by `since` then key; `muted` lists the checks a mute is covering; `running` is
+ * `needsYou` is worst first (denied, failing, warn), then by `since`, then key; `muted` lists the
+ * checks a mute is covering; `running` is
  * every fix run that has not ended, oldest first and without `lines` — what marks a node or a
  * service as fixing; `activity` is the newest seven lines of "What happened"; `lastResultAt` is the
  * latest `at` of any stored result; `gateway` says whether the warden listener is bound and where.

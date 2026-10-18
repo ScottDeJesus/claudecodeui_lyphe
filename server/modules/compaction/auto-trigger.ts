@@ -12,6 +12,8 @@ import {
   publishActivity,
   rememberTurnContext,
 } from './compaction-registry.js';
+import { taskLedgerUnlisted } from './node-task-ledger.js';
+import { createRestoreSpacer, planIdleRestore } from './idle-restore.js';
 
 /**
  * THE TRIGGERS: the runtime's `turnEnded` and `activityChanged` hooks, and the idle deadline. The
@@ -26,8 +28,15 @@ import {
  *   pending compaction and started by the `activityChanged` that says the process went quiet.
  * - IDLE: every turn end (re)arms ONE unref'd timeout per chat; it fires once, `IDLE_COMPACT_AFTER_MS`
  *   later (the CLI's own moment: 0.9 of the one-hour prompt cache), and is replaced by the next turn's end.
+ *   A deadline that finds the process busy or a run in progress is kept and decided again, whole, by the
+ *   `activityChanged` that says the process went quiet; the next turn's end drops it with the deadline.
+ *   A server restart does not drop it: the boot's re-adoption reports each adopted chat's last turn end
+ *   (`turnRestored`), and the deadline is armed again for the remainder of the wait — or, when the wait has
+ *   run out, for a short settle after re-adoption, queued behind the other overdue chats (`idle-restore.ts`).
+ *   One turn end's idle check starts at most `IDLE_CHECK_MAX_TRIES` compactions, counted in the chat's host
+ *   meta before each start (the host's `idleCheck`, the one record of it), so a restart never repeats it without bound.
  *
- * Consumer: compaction-runtime.ts, which registers `turnEnded` and `activityChanged` with the runtime.
+ * Consumer: compaction-runtime.ts, which registers `turnEnded`, `turnRestored` and `activityChanged` with the runtime.
  */
 
 const AUTO_COMPACT_FRACTION = 0.5;
@@ -67,28 +76,37 @@ const idleAfterMs = (): number => {
 };
 const idleMinTokens = (): number => numberFromEnv('CUSTOM_COMPACTION_IDLE_MIN_TOKENS') ?? IDLE_COMPACT_MIN_TOKENS;
 
-const nodeOf = (report: ChatTurnReport): string | null =>
-  typeof report.sendOptions.node === 'string' && report.sendOptions.node ? report.sendOptions.node : null;
-
 /** The seam to the rest of the module; `compaction-runtime.ts` supplies both. */
 type TriggerDependencies = {
-  inner: { activity(provider: LLMProvider, appSessionId: string): ChatProcessActivity };
+  inner: {
+    activity(provider: LLMProvider, appSessionId: string): ChatProcessActivity;
+    /** Writes the idle check's start into the chat's host meta, so a restart knows how many starts this turn end has had. */
+    markIdleCheck(provider: LLMProvider, appSessionId: string, tries: number): boolean;
+  };
   /** The decorator itself: the detached run goes THROUGH it, so its `/compact` interception sees the run. */
   runtime: () => ProviderRuntimeGateway;
 };
 
 export function createAutoTrigger(
   deps: TriggerDependencies,
-): Pick<ChatCompactionHooks, 'turnEnded' | 'activityChanged'> & { stop(): void } {
+): Pick<ChatCompactionHooks, 'turnEnded' | 'turnRestored' | 'activityChanged'> & { stop(): void } {
   // Set once, at shutdown: from then on nothing here starts a run, and no deadline is armed.
   let stopped = false;
   const pending = new Map<string, ChatTurnReport>();
   const idleDeadlines = new Map<string, { timer: NodeJS.Timeout; report: ChatTurnReport }>();
+  // A deadline that was left alone for a busy process or a run: the report it fired for, until the process goes quiet.
+  const idleRetries = new Map<string, ChatTurnReport>();
+  // How many compactions the idle check has started for the chat's current turn end, kept beside the host's meta copy (a
+  // restart reads that one back). A turn end clears it, with the deadline: its idle check starts again from none.
+  const idleStarts = new Map<string, number>();
+  const restoreSpacer = createRestoreSpacer();
 
   const clearIdle = (sessionId: string): void => {
     const held = idleDeadlines.get(sessionId);
     if (held) clearTimeout(held.timer);
     idleDeadlines.delete(sessionId);
+    idleRetries.delete(sessionId);
+    idleStarts.delete(sessionId);
   };
 
   /**
@@ -129,7 +147,7 @@ export function createAutoTrigger(
     );
   };
 
-  /** Why a report is not due, or null when it is. Order follows the rules: window, growth, takeover, flight, refusal. */
+  /** Why a report is not due, or null when it is. Order follows the rules: window, growth, takeover (a node whose warden lists no tasks), flight, refusal. */
   const notDueBecause = (report: ChatTurnReport): string | null => {
     if (report.aborted) return 'not due: the turn was stopped';
     const { contextTokens, contextWindow } = report;
@@ -147,7 +165,7 @@ export function createAutoTrigger(
         return `not due: the context grew ${Math.round(grew)} since the last compaction, under ${Math.round(needed)}`;
       }
     }
-    if (nodeOf(report) !== null) return 'not taken over: the chat is placed on a node';
+    if (taskLedgerUnlisted(report.appSessionId)) return 'not taken over: the chat\'s node warden lists no background tasks';
     if (flightOf(report.appSessionId)) return 'not due: a compaction is already in flight';
     if (isRefusedAutomatic(report.appSessionId)) return 'not due: the chat is under an automatic refusal';
     return null;
@@ -195,6 +213,7 @@ export function createAutoTrigger(
 
   const activityChanged = (sessionId: string, activity: ChatProcessActivity): void => {
     publishActivity(sessionId, activity);
+    if (!stopped && !activity.busy) retryIdle(sessionId);
     const report = pending.get(sessionId);
     if (stopped || !report || activity.busy) return;
     pending.delete(sessionId);
@@ -214,19 +233,57 @@ export function createAutoTrigger(
     startRun(report, 'auto');
   };
 
-  /** (Re)arms the chat's one idle deadline. A server restart drops it; the chat's next turn end arms it again. */
-  function armIdleDeadline(report: ChatTurnReport): void {
+  /** Runs the idle decision for a report; a throw is logged, never left to surface as an unhandled rejection. */
+  const decideIdle = (report: ChatTurnReport): void => {
+    fireIdleDeadline(report).catch((error: unknown) => {
+      console.error(`[compaction] session=${report.appSessionId} the idle deadline failed:`, error instanceof Error ? error.message : error);
+    });
+  };
+
+  /** The idle deadline's second chance: the process just went quiet, so a deadline kept for it is decided again. Once per kept deadline. */
+  const retryIdle = (sessionId: string): void => {
+    const report = idleRetries.get(sessionId);
+    if (!report) return;
+    idleRetries.delete(sessionId);
+    decideIdle(report);
+  };
+
+  /** (Re)arms the chat's one idle deadline: a whole wait after a turn end, the remainder of it after a restart. */
+  function armIdleDeadline(report: ChatTurnReport, delayMs: number = idleAfterMs()): void {
     const sessionId = report.appSessionId;
     if (stopped) return;
     const timer = setTimeout(() => {
       idleDeadlines.delete(sessionId);
-      fireIdleDeadline(report).catch((error: unknown) => {
-        console.error(`[compaction] session=${sessionId} the idle deadline failed:`, error instanceof Error ? error.message : error);
-      });
-    }, idleAfterMs());
+      decideIdle(report);
+    }, delayMs);
     timer.unref();
     idleDeadlines.set(sessionId, { timer, report });
   }
+
+  /**
+   * The deadline a restart dropped, armed again from the chat's last turn end as its host's journal records it. The
+   * fire goes through `fireIdleDeadline`'s own gates, so a restored deadline never starts a compaction in a chat
+   * that is mid-turn or busy: it is left for the process's next quiet like any other.
+   */
+  const turnRestored = (report: ChatTurnReport, endedAt: number, triesSoFar: number): void => {
+    const sessionId = report.appSessionId;
+    // A turn that ended since this boot already armed a newer deadline.
+    if (stopped || idleDeadlines.has(sessionId)) return;
+    if (takeoverSnapshot() === false) return;
+    const plan = planIdleRestore(report, endedAt, {
+      now: Date.now(),
+      idleAfterMs: idleAfterMs(),
+      minTokens: idleMinTokens(),
+      idleTries: triesSoFar,
+      spacer: restoreSpacer,
+    });
+    // A chat compacted since that turn no longer stands at the size the turn left, so its context is not kept as the chat's.
+    if (plan.current) rememberTurnContext(report);
+    logDecision(sessionId, 'idle', report, report.activity, plan.say);
+    if (!plan.arm) return;
+    idleStarts.set(sessionId, triesSoFar);
+    armIdleDeadline(report, plan.delayMs);
+  };
 
   async function fireIdleDeadline(report: ChatTurnReport): Promise<void> {
     const sessionId = report.appSessionId;
@@ -241,25 +298,29 @@ export function createAutoTrigger(
       logDecision(sessionId, 'idle', report, activityNow(), `not due: the context is under ${minTokens} tokens`);
       return;
     }
-    if (!(await takesOver({ appSessionId: sessionId, node: nodeOf(report) }))) {
+    if (!(await takesOver({ appSessionId: sessionId }))) {
       logDecision(sessionId, 'idle', report, activityNow(), 'not taken over');
       return;
     }
     // Everything below is synchronous up to the start, so nothing can slip in between check and run.
     if (stopped) return;
     const activity = activityNow();
-    const reason = chatRunRegistry.isProcessing(sessionId)
-      ? 'a run is in progress'
-      : activity.busy
-        ? 'the process is busy'
-        : flightOf(sessionId)
-          ? 'a compaction is already in flight'
-          : isRefusedAutomatic(sessionId) ? 'the chat is under an automatic refusal' : null;
+    // A run or a busy process ends on its own, so those two are kept for the activity hook's next "quiet"; a flight or a
+    // refusal is not waited out (a flight's own end is a turn end, which re-arms the deadline).
+    const busyReason = chatRunRegistry.isProcessing(sessionId) ? 'a run is in progress' : activity.busy ? 'the process is busy' : null;
+    const reason = busyReason ?? (flightOf(sessionId)
+      ? 'a compaction is already in flight'
+      : isRefusedAutomatic(sessionId) ? 'the chat is under an automatic refusal' : null);
     if (reason !== null) {
       logDecision(sessionId, 'idle', report, activity, `left alone: ${reason}`);
+      if (busyReason !== null) idleRetries.set(sessionId, report);
       return;
     }
     logDecision(sessionId, 'idle', report, activity, 'idle, starting the compaction');
+    // Recorded BEFORE the start, in the host's meta: a handover that cuts the compaction short must still find the try counted.
+    const starts = (idleStarts.get(sessionId) ?? 0) + 1;
+    idleStarts.set(sessionId, starts);
+    deps.inner.markIdleCheck('claude', sessionId, starts);
     startRun(report, 'idle');
   }
 
@@ -268,8 +329,10 @@ export function createAutoTrigger(
     stopped = true;
     for (const { timer } of idleDeadlines.values()) clearTimeout(timer);
     idleDeadlines.clear();
+    idleRetries.clear();
+    idleStarts.clear();
     pending.clear();
   };
 
-  return { turnEnded, activityChanged, stop };
+  return { turnEnded, turnRestored, activityChanged, stop };
 }

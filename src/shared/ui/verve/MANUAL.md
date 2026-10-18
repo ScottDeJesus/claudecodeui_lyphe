@@ -104,7 +104,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/main.tsx, /home/lyphe/.claud
 ## MAN-740 — The library those tokens paint
 section: README/002 The library those tokens paint
 
-32 components carry Verve paint (2026-10-07: a file in `src/shared/ui/` that puts a `.vv-*` class in its markup; a comment naming one does not count, and `Toast` with `ToastStack`, `Tabs` with `TabsMore` count once). The sheet that paints each (rule 6):
+36 components carry Verve paint (2026-10-17: a file in `src/shared/ui/` that puts a `.vv-*` class in its markup; a comment naming one does not count, and `Toast` with `ToastStack`, `Tabs` with `TabsMore`, `Gallery` with `PhotoFill`, `RegionImage` with `RegionDrawLayer` count once). The sheet that paints each (rule 6):
 
 | sheet | components |
 |---|---|
@@ -112,6 +112,8 @@ section: README/002 The library those tokens paint
 | `feedback.css` | Banner, Toast, Tabs, EmptyState, Menu, Dialog, Tooltip, ActionMenu |
 | `surfaces.css` | DockableFab, SplitPane, ResizeGrip |
 | `panels.css` | TextArea, Sheet, Timeline, Steps, Checkbox, DialogFrame |
+| `media.css` | RegionImage, Gallery |
+| `data.css` | SegmentedControl, DataTable |
 | `board.css` | KanbanLane, KanbanCard |
 
 - `Sheet` (a panel on the right edge over a scrim), `Timeline` (an event feed, dense or full; props and open-row rules: MAN-7847) and `Steps` (Verve's navigation stepper) joined for the Cerberus tab: `CheckSheet`, Fleet's "What happened" and History's feed, the Enroll dialog. `TextArea` joined for the roadmap's goal field; the Mute dialog's reason takes it too.
@@ -120,6 +122,8 @@ section: README/002 The library those tokens paint
 - `Checkbox` is Verve's `forms/Checkbox`, in the library because Verve draws it; its first consumer is the Cerberus Update wardens dialog. A real `<input type="checkbox">` hidden with `sr-only`, its box and ✓ painted from the input's own `:checked`, `:disabled` and `:focus-visible` by sibling selectors, so the state has one home. The focus ring is `Input`'s (2px `--accent`, 2px offset) moved onto the box; the rule that silences the hidden input's own ring has three class-level parts because `src/index.css` pins `input[type="checkbox"]:focus` at (0,2,1). Its `className` is size and flow on the `<label>`, the press target, never paint: the dialog's rows pass `py-3`, so a whole row is one 44 px target.
 - `DialogFrame` is Verve's `overlays/Modal` on the house `Dialog`, in the library because Verve draws it (MAN-571): its props, behaviour and paint are MAN-7963.
 - `DockableFab`, `SplitPane` and `ResizeGrip` were admitted on the barrel's *mechanism* test, not its two-module rule (`index.ts`'s own header). `ResizeGrip`'s one consumer is `ChatHostPanel`.
+- `RegionImage` and `Gallery` joined for the Cerberus Tours tab; props, drawing and paint: MAN-8579. `RegionImage` is admitted on the *mechanism* test (`index.ts`'s own header): an SVG layer in the image's own 0..1 space, a polygon hit-test and a badge clamped inside the image are what no arrangement of the parts here produces. `Gallery` is admitted because Verve draws it (§10 Media, MAN-571), with or without a second module. Both put a photo in a box through `PhotoFill`, which the barrel does not export.
+- `SegmentedControl` and `DataTable` joined for the affected-areas module's marking screens, because Verve draws them (§11 Plumbing and §5, MAN-571), with or without a second module; props, behaviour and paint: MAN-8580. `RegionImage` also gained `drawing` (a box dragged on the photo) and `focusId` (one region at full wash, the rest dimmed): MAN-8579.
 - `ConfirmDialog` was admitted on the two-module rule and paints nothing of its own: it is `Dialog` and `Button`, both already painted. It is not in the table.
 
 What they share is the contract every later one joins:
@@ -138,24 +142,26 @@ What they share is the contract every later one joins:
 3. **Marker classes are surface, not decoration.** `vv-button--<variant>`, `vv-badge--<variant>`
    and `data-tone` are what a verify script queries to prove a variant painted; rename one and a
    gate that never reads your source goes quiet. A variant emitting no marker is unprovable.
-4. **Import from the barrel, `@/shared/ui`.** It side-effect-imports all five stylesheets (rule
+4. **Import from the barrel, `@/shared/ui`.** It side-effect-imports all seven stylesheets (rule
    6), so the barrel — not the component file — is what puts the paint in the document. A deep
    import by path gets an unpainted component unless something else loaded the barrel first.
 5. **Props come from a site you can point at** — the integration plan's §4 table
    (`~/.claude/plans/cloudcli-verve-integration.md`), or a real call. A prop nobody passes is a
    prop nobody proves: `Card`'s `interactive` has no consumer today.
 6. **A stylesheet at its ceiling opens a new file; it never wins lines back by squeezing what is
-   there.** The barrel imports five sheets, in this order (lines measured 2026-10-07):
+   there.** The barrel imports seven sheets, in this order (lines measured 2026-10-17):
 
    | import | sheet | opened | lines | also holds |
    |---|---|---|---|---|
-   | 1 | `controls.css` | 1st | 496 | past its stated ceiling (the headers of `surfaces.css` and `panels.css` say so) |
-   | 2 | `feedback.css` | 2nd | 438 | — |
+   | 1 | `controls.css` | 1st | 510 | past its stated ceiling (the headers of `surfaces.css` and `panels.css` say so) |
+   | 2 | `feedback.css` | 2nd | 440 | — |
    | 3 | [`surfaces.css`](surfaces.css) | 4th | 402 | the `body.vv-dragging` / `vv-drag-fab` / `vv-drag-split` / `vv-drag-resize` classes a drag of any piece sets for its length (why a new file: that sheet's own header); `[data-hold-lift]` (a hold-lift handle's callout, selection and native drag, off on touch screens from the first touch), `[data-touch-pan]` (a handle whose list scrolls its pane by hand: `touch-action: none`, wherever a coarse pointer is present (`any-pointer: coarse`), from the first touch, so a phone that dispatches every touch uncancelable has no browser pan to take) and `[data-carried]` (an item in a hand: `--shadow-lift` and a `--border-strong` hairline) |
    | 4 | [`panels.css`](panels.css) | 5th | 341 | `.vv-input`'s colours and ground said back over `src/index.css`'s `!important` pins on every bare `textarea` (the piece's own header says why) |
-   | 5 | `board.css` | 3rd | 227 | the `.vv-lane`, `.vv-lane__head` and `.vv-lane-card` rules and their variants |
+   | 5 | [`media.css`](media.css) | 6th | 238 | the one literal-colour exception: the gallery tag's and count's near-black scrim and white ink, which sit on a photograph and must not flip with the theme (the sheet's own header says why) |
+   | 6 | [`data.css`](data.css) | 7th | 171 | the segmented count pill, spelt again because feedback.css is at its ceiling and takes no more lines |
+   | 7 | `board.css` | 3rd | 227 | the `.vv-lane`, `.vv-lane__head` and `.vv-lane-card` rules and their variants |
 
-   `panels.css` is the fifth sheet opened and the fourth imported. The order is load-bearing at one end:
+   `panels.css` is the fifth sheet opened and the fourth imported; `media.css` is the sixth opened and the fifth imported; `data.css` is the seventh opened and the sixth imported. The order is load-bearing at one end:
    - `board.css` stays LAST. A lane card composes `.vv-card`'s ground and overrides its background,
      shadow and transition, and at equal specificity the LATER rule wins, so imported any earlier
      `board.css` would lose all three to `.vv-card`.
@@ -168,7 +174,7 @@ What they share is the contract every later one joins:
 Which components exist at all, and when a screen composes instead of asking for a new one, is
 doctrine §1–§3. Read it there, not here.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Checkbox.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/DialogFrame.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Sheet.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Steps.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/TextArea.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Timeline.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/verve/panels.css
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Checkbox.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/DialogFrame.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Gallery.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/PhotoFill.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/RegionImage.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Sheet.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Steps.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/TextArea.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Timeline.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/verve/media.css, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/verve/panels.css
 
 ## MAN-741 — The overlay half
 section: README/003 The overlay half
@@ -223,10 +229,10 @@ Tabs, EmptyState and Menu new, Dialog, Tooltip and ActionMenu restyled.
   outright, which would overwrite the `-translate-*` that centres the panel. The retuned
   `animate-dialog-content-show` is that motion carried onto a centred box.
 
-## MAN-742 — Three open design-language questions
-section: README/004 Three open design-language questions
+## MAN-742 — Five open design-language questions
+section: README/004 Five open design-language questions
 
-All three are measured facts about Verve's own palette, recorded rather than fixed. Changing any of
+All five are measured facts about Verve's own palette, recorded rather than fixed. Changing any of
 them means picking a colour Verve did not, which is the operator's call:
 
 - The accent on the canvas measures **2.81:1** in light, under the 3:1 floor for graphics.
@@ -238,7 +244,23 @@ them means picking a colour Verve did not, which is the operator's call:
   **1.57:1** in dark, under the 3:1 a control's outline needs (WCAG 1.4.11). It is Verve's own
   `forms/Checkbox` draw, a 1.5px `--border-strong` edge (`_ds_bundle.js` :1570). Its first screen,
   the Cerberus Update wardens dialog, opens with every box it offers ticked, so an empty box there
-  is one the operator emptied.
+  is one the operator emptied. The composer's tool-set section (MAN-8490) is the opposite case: most
+  of its boxes are empty, so this edge is usually the only sign a row can be ticked. Its box is
+  Verve's draw, kept as is.
+- The five tone dots (`--*-dot`, declared once in `:root` and never in `.dark`) on a card's
+  `--surface` measure, light / dark: neutral 3.34 / 5.14, info **2.86** / 5.99, positive 3.01 /
+  5.71, warn **2.21** / 7.77, danger 5.95 / **2.88**. The three in bold are under the 3:1 floor for
+  graphics. Measured 2026-10-17 from the token values, and confirmed on painted pixels for warn: the
+  Tours view's room list, `#d9a64a` on `#ffffff` at 2.21:1 and on `#1a1b22` at 7.77:1. Each dot of
+  the Timeline, of RoomDrying's wet and dry readings and of the room list's affected rooms (all
+  `bg-tone-dot`) has its words beside it, so a dot is never the only sign there (MAN-578). It is also
+  why a dot cannot be the one mark of a state.
+- Verve's caption (`--text-caption`: 12px, uppercase, `.14em` tracking, `--ink-faint`; the house
+  eyebrow `text-xs uppercase tracking-[0.14em] text-ink-faint`, written out in 22 `.tsx` files) measures **3.12:1**
+  on the canvas and **3.34:1** on a card in light, and 4.74:1 / **4.32:1** in dark. All are under AA's
+  4.5:1 for text that size except the dark canvas. Measured 2026-10-17 from the token values and on
+  the Tours view's painted page (a caption on the canvas, 3.12:1 light, 4.74:1 dark). A caption names a
+  section ("PANOS · 12" adds how many it holds), and no state is said in it alone.
 
 ## MAN-743 — What a composed screen looks like
 section: README/005 What a composed screen looks like
@@ -297,3 +319,124 @@ section: README/006 Where the rest lives
 - The panel's width and scroll are layout, spelled in the component; the paint is the `.vv-dialogframe*` rules (MAN-740).
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/DialogFrame.tsx
+
+## MAN-8579 — `PhotoFill`, `RegionImage` and `Gallery` — the Tours view (affected areas) library pieces: a photo with its regions, a set of photo tiles; props, drawing, paint (`verve/media.css`)
+
+`src/shared/ui/RegionImage.tsx`, `Gallery.tsx` and `PhotoFill.tsx` put a photograph on screen: `RegionImage` draws a view's regions over it and `Gallery` lays a tour's panos out as tiles, for the Cerberus Tours view (affected areas). `RegionImage` and `Gallery` are in the library by the barrel's admission tests (MAN-740): `RegionImage` on the *mechanism* test, `Gallery` because Verve draws it (§10 Media, MAN-571). Consumer: the Tours view (MAN-8575); the photo-match viewer is `RegionImage`'s next. Paint: `verve/media.css`, imported by the barrel after `panels.css` and before `board.css` (MAN-740 rule 6). Both are exported from `@/shared/ui`; the types `RegionShape` and `GalleryItem` are in `src/shared/types.ts`.
+
+## `RegionImage`
+| prop | meaning |
+|---|---|
+| `src` | the photo; `null` draws the neutral tile, and the regions still draw and select over it |
+| `alt` | the photo's name |
+| `width`, `height` | the photo's natural size; only the ratio is used, as the box's `aspect-ratio`. A pair that is not positive and finite reads as `1 / 1`. why: every child is absolute, so the ratio is the box's only height |
+| `regions` | `RegionShape[]`: `id`, `ordinal`, `polygon` (`[x, y]` points), `box` (`[x0, y0, x1, y1]`), `tone`, `edge` (`solid` \| `dashed`), `wash` (`full` \| `light` \| `none`), `label`; coordinates in 0..1 of the image, drawn as stored |
+| `selectedId?` | the chosen region |
+| `onSelect?` | called with a region id by its outline or its badge. Omitted: the regions are drawn and inert. Ignored while `drawing` is set |
+| `drawing?` | `{ onDrawn(box), onCancel() }` or null. Set: a box can be dragged on the photo (mouse, pen or one finger), drawn live in the image's 0..1 space; `onDrawn([x0, y0, x1, y1])` on release with x0 < x1 and y0 < y1; Escape calls `onCancel`. Site: the Mark flow's Missed one. A box is one gesture on a phone, where the operator works; a polygon would be many taps |
+| `focusId?` | the focused region: drawn at full wash whatever wash it was given; every other region and badge wears `.vv-region--dim`. An id that names no region here dims nothing. Site: the Mark screen. No caller passes `drawing` or `focusId` yet (2026-10-17) |
+
+Draws, in one `relative w-full` box:
+1. `PhotoFill` (`fit="fill"`): the `<img>`, or the neutral tile when `src` is null or the image errors (remembered per `src`).
+2. One `<svg viewBox="0 0 1 1" preserveAspectRatio="none">` over the box (`overflow-visible`, `pointer-events-none`). One `<polygon>` per region: `data-tone`, `vector-effect="non-scaling-stroke"`, `aria-hidden`, `aria-label` "{ordinal}. {label}". A polygon with fewer than three finite points draws nothing. Outlines stack by box area, largest first (equal areas keep the caller's order), so a small region inside a large one stays reachable; the stacking never follows the selection.
+3. One badge per region at its box's top-left, showing the ordinal. `left` and `top` are the box corner as a percentage clamped to 0–100, then `min(…, calc(100% - var(--vv-region-badge-extent)))`, so a corner region's number is never cut off. With `onSelect`: a `<button>` named "{ordinal}. {label}" with `aria-pressed`, in the caller's order (the tab order). Without: an inert `<span>`.
+
+4. With `drawing`: one `RegionDrawLayer` (`RegionDrawLayer.tsx`, not exported by the barrel) over the whole box, above the outlines and badges. It is the kit's `usePointerDrag` (kind `draw`), so the drag survives what is under the pointer and sets `vv-dragging` for its length; `.vv-region-draw` is `touch-action: none` from the first touch, so one finger draws where it would scroll. The live box is a `<rect>` (`.vv-region.vv-region--drawing`) in the layer's own 0..1 svg. A drag the browser takes away, a press that never moved and a box under 0.02 of the image on either side report nothing (0.02² = 4e-4 clears the engine's 1e-4 `bad_box` floor). The release point is held inside the photo and the corners are normalised, so a drag up-left reports the same box as one down-right. Escape calls `onCancel` unless a dialog or a menu in front owns the key (`otherOverlayHoldsEscape`), and it ends the drag in progress: the box vanishes at once and the release reports no `onDrawn`, whether or not the caller then leaves drawing mode.
+
+Rules:
+- Words never sit on the photo. why: the number is how a reader finds the region's row in the list beside it.
+- The badge is the one control for keyboard and screen reader; the outline is the pointer's second way in, hidden from the accessibility tree with no tab stop. why: each region would otherwise be spoken twice, the second time by a button no key can reach.
+- Region selection is off while `drawing` is set: no outline is pressable and every badge is an inert `<span>`, so a press on the photo can only start a box.
+- Only `.vv-region--pressable` (set exactly when `onSelect` is given and nothing is being drawn) takes the pointer, the cursor and the hover. why: a display-only copy inside the `Lightbox` must pan with the picture; give a `Lightbox` copy no `onSelect` (MAN-7426).
+- The svg is not clipped. why: an edge is centred on its path, so a clip would halve the weight of a region on the photo's border.
+- Tone reaches paint as `data-tone` alone: no `--tone-*` is declared in `media.css` (MAN-739 rule 4).
+
+## `Gallery`
+| prop | meaning |
+|---|---|
+| `items` | `GalleryItem[]`: `id`, `src` (`null` = the neutral tile), `tag`, `badge?` |
+| `selectedId?` | the chosen tile: `aria-current="true"`, an accent ring and an accent tag. Shown only on a pressable tile: without `onSelect` the tiles are `<div>`s, carry no `aria-current` and draw no ring. The ring survives hover. No caller passes it today (`RoomGallery` passes `items`, `max`, `label`, `onSelect`) |
+| `onSelect?` | called with a tile's id. Omitted: the tiles are `<div>`s, not buttons; the overflow tile is a `<button>` either way |
+| `max?` | the most tiles drawn, floored and at least 1 (`max 0` draws the overflow tile alone); omitted draws every item |
+| `label` | the `<ul>`'s accessible name |
+
+- Every tile carries its `tag` (bottom-left) and, when given, its `badge` (top-right, on the surface, so it never reads as a second tag). Square tiles in `repeat(auto-fill, minmax(96px, 1fr))`, gap 8 px; the entrance staggers by `min(index, 8) × 50 ms`.
+- With `items.length > max` the first `max - 1` draw as tiles and the final slot is the overflow tile: the photo of the first hidden item under a scrim and "+N" (N counts that item). Pressing it opens the whole set in place. A selected item the collapse would hide opens it too. Once open the set stays open (`opened` latch). A caller that shows a different set passes a new `key`.
+- The overflow tile's screen-reader text is `media.showMore` ("Show {{remaining}} more").
+
+## `PhotoFill` (not exported by the barrel)
+The one broken-image tile for both pieces. Verve's rule: never a blank cell or a broken-image glyph. Props `src`, `alt`, `fit` (`fill` \| `cover`). It draws `.vv-gallery__fallback` with the word `media.photo` ("Photo"); the tile is named (`role="img"`) only when `alt` is non-empty. Words `media.photo` and `media.showMore` live at the root of `en/common.json`; `en` only.
+
+## Paint — `verve/media.css` (238 lines, 2026-10-17)
+| class | holds |
+|---|---|
+| `.vv-region` | the outline: fill 30% of `--tone-dot`, a 2 px edge in it |
+| `.vv-region--pressable` | `pointer-events: all`, pointer cursor; under `(hover: hover)` a hover fill of 42% (full wash), 26% (light), 14% (none), 40% (selected) |
+| `.vv-region--dashed` | dashes 7 / 5 px (selected: 12 / 6 px) |
+| `.vv-region--wash-light` · `.vv-region--wash-none` | fill 13% · transparent |
+| `.vv-region--selected` | edge 3.5 px and fill 40%: two channels, so it survives greyscale; follows the washes, so it wins over them |
+| `.vv-region--dim` | `opacity: .28`, one rule over whatever the region was given (wash, dashes, hover); on a badge `.5`, so its number stays legible. Set on every region but the focused one |
+| `.vv-region-draw` | the drawing layer: crosshair, `touch-action: none`, an inset ring in `--tone-dot` of its own `data-tone="positive"` (the human region's tone) |
+| `.vv-region--drawing` | the live box: composes `.vv-region` and adds the 7 / 5 px dashes a hand-drawn region wears; inert |
+| `.vv-region-badge` | 22 px square, 1.5 px tone border, `--tone-soft` ground, `--tone-ink` number (11 px, 700), a 6 px invisible margin on the press; `[aria-pressed='true']` adds a two-ring shadow |
+| `.vv-gallery` · `.vv-gallery__tile` | the grid · a tile: 10 px radius, `--surface2` ground, hover lift under `(hover: hover)`, `[aria-current='true']` accent ring |
+| `.vv-gallery__tag` · `.vv-gallery__badge` · `.vv-gallery__more` | the tag · the caller's mark · the "+N" over its scrim |
+| `.vv-gallery__fallback` | the neutral tile |
+
+- Inside the `Lightbox` (MAN-7426) the content carries `--lightbox-scale` (a number, 1 at fit; unset elsewhere, so every use falls back to 1). The edge, the dashes and the badge divide by it. why: `non-scaling-stroke` does not hold under an ancestor's CSS transform (measured: 2 px at fit, 4.5 px at 225%).
+- The one literal-colour exception: the tag's scrim `rgba(16,17,22,.5)`, the count's `.55` and the ink `#fff`. why: they sit on a photograph and must not flip with the theme. The tag measures 19.9:1 over a black photo and 3.55:1 over a white one, under AA's 4.5:1; a darker scrim is the operator's call.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Gallery.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/PhotoFill.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/RegionDrawLayer.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/RegionImage.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/verve/media.css
+
+## MAN-8580 — `SegmentedControl` and `DataTable` — Verve's §11 switch and §5 sortable table: props, behaviour, paint (`verve/data.css`)
+
+`src/shared/ui/SegmentedControl.tsx` and `DataTable.tsx` are in the library because Verve draws them (§11 Plumbing "IconButton · SegmentedControl" and §5 "Data table · sortable"; MAN-571), with or without a second module. Callers: none yet (2026-10-17); the `site` column names the affected-areas module's marking screens each prop is for. Paint: `verve/data.css`, imported by the barrel after `media.css` and before `board.css` (MAN-740 rule 6). Both are exported from `@/shared/ui`; the type `DataTableColumn<Row>` is in `src/shared/types.ts`. The chat transcript's own `DataTable` (`src/modules/chat/transcript/shapes/DataTable.tsx`) renders react-markdown children with a CSV copy, a different job; it stays where it is.
+
+## `SegmentedControl`
+| prop | meaning | site |
+|---|---|---|
+| `options` | `{ value, label, count? }[]`, drawn in order; `count` is a number beside the word | Tours · Mark · Tables; the pano's layer switch; the Mark screen's queue mode |
+| `value` | the chosen option's `value`. A value no option carries leaves nothing chosen and gives the first option the Tab stop | each |
+| `onChange` | called with an option's `value` | each |
+| `label` | the group's accessible name | each |
+
+- A radio group: `role="radiogroup"` with `aria-label`, each option a `<button role="radio" aria-checked>`. It chooses a value and owns no panel; `Tabs` is the strip that does.
+- Alt, Ctrl and Meta with an arrow are the browser's, not the group's, and a group of one option does nothing on any of these keys: it has nowhere to move and `onChange` is never called with the value it already holds.
+- Roving tabindex: the chosen option (else the first) is the one Tab stop. ArrowRight and ArrowDown choose the next, ArrowLeft and ArrowUp the previous, both wrapping; Home and End go to the ends. Focus moves with the choice, as a native radio group's does.
+- The count is part of the option's name ("Mark 12"), not hidden from a screen reader.
+- Hit target: 32 px tall, 44 px under `(pointer: coarse)` (Verve: "32px hit target minimum; 44px on touch screens").
+- A departure from Verve, the one `Tabs` already records (feedback.css): the pill does not slide. The chosen option paints its own ground and lifts, so nothing is measured and no box moves.
+- A tray squeezed past its content shrinks: each label ellipsises and the count keeps its width. At 480 px and under the option padding is 8 px and the gap 5, not Verve's 15 and 7, because three options with counts need about 400 px at Verve's spacing and a 390 px phone's column is 342 (measured: they fit, none ellipsised).
+
+## `DataTable`
+| prop | meaning | site |
+|---|---|---|
+| `rows`, `columns`, `rowKey`, `label` | the rows, `DataTableColumn<Row>[]`, a row's identity, the table's accessible name | the proving tables |
+| `sort?` | `{ column, direction: 'asc' \| 'desc' }`, held by the caller | the proving tables |
+| `onSort?` | called with the pressed head's column `key`; omitted, the heads are plain words and draw no sort mark (a head that holds the caller's `sort` still shows ▲ / ▼) | the proving tables |
+| `expanded?`, `onExpand?`, `renderExpanded?` | the open row's key (or null), called with a key to open or null to close, and what the open row shows under itself | a proving row's per-kind detail |
+
+`DataTableColumn<Row>`: `key`, `label`, `align?: 'start' | 'end'`, `sortValue?: (row) => number | string | null`, `render: (row) => ReactNode`.
+
+- A column sorts when it has `sortValue`. Its head is a `<button>` (with `onSort`) and carries the arrow: ▲ ascending and ▼ descending on the sorted head (Verve's own), a faint ↕ on one not chosen (Verve draws nothing there; the mark says "this sorts"). The three marks share one 12 px box at one size, so a head's width does not change when the sort moves and the columns do not shuffle under the press. The keyboard ring on a head is drawn inside it (`outline-offset: -2px`), because the frame clips one that stands outside. The sorted head carries `aria-sort` and reads in `--ink`; the others in `--ink-faint`.
+- The table sorts, the caller owns which sort: it answers `onSort(column)` (ascending on a new column, flipped on the same one) and passes `sort` back. Numbers sort by size, text by locale with its digits read as numbers (`localeCompare`, `numeric`), a number before text. `null` (and NaN) is last in BOTH directions. Equal keys keep the caller's order, and the caller's array is never touched. A `sort` naming a column with no `sortValue` sorts nothing.
+- With `renderExpanded` and `onExpand`, every row is pressable: the whole row is the press (a press that lands on a link, button, input or label inside a cell keeps its own), the row takes a tab stop, answers Enter and Space on the row itself, and carries `aria-expanded`. The open row's panel is a following `<tr>` spanning every column. `expanded` is one key, so one row is open; pressing the open row calls `onExpand(null)`.
+- A table wider than its column scrolls sideways inside its frame and never breaks the page. Under `(pointer: coarse)` a sortable head is 44 px tall.
+
+## Paint — `verve/data.css` (171 lines, 2026-10-17)
+| class | holds |
+|---|---|
+| `.vv-segmented` | the tray: `--surface2`, 3 px padding and gap, 10 px radius |
+| `.vv-segmented__option` | 32 px tall (44 under `(pointer: coarse)`), 13 px / 500, `--ink-muted`; `[aria-checked='true']` is `--surface` ground, `--ink` and `--shadow-rest`: filled AND lifted, so it survives greyscale |
+| `.vv-segmented__label` · `.vv-segmented__count` | the word, ellipsised when squeezed · the count pill on `--tone-soft` and `--tone-ink` through its own `data-tone="neutral"`; the face of `.vv-tabs__count`, spelt again because feedback.css is at its ceiling |
+| `.vv-datatable` | the frame: `--border`, 12 px radius, scrolls sideways |
+| `.vv-datatable__head` · `__label` · `__sort` · `__arrow` | the head on `--canvas`: 12 px, upper-case, tracked, 700; padding on the label or button inside, so a head is one press target |
+| `.vv-datatable__row` · `__cell` | a `--surface2` hairline under each row; the first cell is the row's name (`--ink`, 500), the others figures (`--ink-muted`, tabular) |
+| `.vv-datatable__row--pressable` · `--open` | pointer cursor and an `--accent-soft` hover under `(hover: hover)` · the open row keeps that wash |
+| `.vv-datatable__panel` | the open row's panel: `--canvas` ground |
+
+No tone is declared in `data.css` (MAN-739 rule 4).
+
+Contrast, light theme, Verve's own pairs reproduced as drawn (measured off `tokens.css`; the sheet's header says the same): an unsorted sortable head 3.12:1 (`--ink-faint` 12 px bold on `--canvas`), an unchosen segmented label 4.46:1 (`--ink-muted` on the `--surface2` tray), muted figures on the `--accent-soft` hover and open row 4.44:1 — each under AA's 4.5:1 for small text. The dark theme clears all three (4.74, 6.51, 5.32). A darker ink for them is the operator's call.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/DataTable.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/SegmentedControl.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/verve/data.css

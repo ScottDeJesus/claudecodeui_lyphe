@@ -1,0 +1,171 @@
+/* Verve data paint — the rules for the two pieces a screen of numbers is switched and read with:
+ * SegmentedControl (Verve §11 Plumbing, "IconButton · SegmentedControl") and DataTable (§5, "Data table ·
+ * sortable").
+ *
+ * The seventh paint file, opened rather than squeezed in: controls.css is past its stated ceiling, feedback.css
+ * is at it, and media.css is the photographs' (RegionImage, Gallery), which neither of these is. README rule 6:
+ * the next file opens the same way again.
+ *
+ * Same contract as its siblings. A library class string carries `vv-<name>` plus layout utilities and nothing
+ * else; colour comes from tokens.css; no rule here declares a `--tone-*` property, because tone is a token swap
+ * (README rule 4) — the one tone in this sheet is the count pill's, handed down by its own `data-tone`.
+ *
+ * Three pairs are Verve's own and sit under AA's 4.5:1 for small text in the LIGHT theme, reproduced as drawn and
+ * measured off tokens.css: an unsorted sortable head (`--ink-faint` 12px bold on `--canvas`) 3.12:1, an unchosen
+ * segmented label (`--ink-muted` on the `--surface2` tray) 4.46:1, and the muted figures on the `--accent-soft` hover
+ * and open row 4.44:1. The dark theme clears all three (4.74, 6.51, 5.32). A darker ink for them is the operator's
+ * call, as the gallery tag's 3.55:1 is (media.css).
+ *
+ * Imported once, for side effect, from src/shared/ui/index.ts — after media.css and before board.css, which keeps
+ * the last word. The place is free: nothing here shares a selector with a sibling sheet.
+ */
+
+/* ---------------------------------------------------------------- SegmentedControl */
+/* Verve's tray: `--surface2`, 3px padding and gap, a 10px radius, 8px options at 13px/500. The chosen option
+ * paints its own ground and lifts (`--shadow-rest`) — filled AND raised, so the choice survives greyscale — and
+ * nothing slides: the departure `Tabs` records in feedback.css (a slid pill must be measured, and reads a stale
+ * box for a frame after a relabel). Only colour and ground animate, so no option's BOX ever moves. */
+.vv-segmented { gap: 3px; padding: 3px; border-radius: 10px; background: var(--surface2); }
+.vv-segmented__option {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  /* An option may shrink below its content so a tray in a narrow column never spills out of it; the label
+   * ellipsises (below) and the count keeps its width. */
+  min-width: 0;
+  /* Verve: "32px hit target minimum; 44px on touch screens." */
+  min-height: 32px;
+  padding: 0 15px;
+  border: none;
+  border-radius: 8px;
+  background: none;
+  color: var(--ink-muted);
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background-color 0.35s var(--ease-spring), color 0.3s;
+}
+.vv-segmented__label { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+/* Three options with counts need about 400px at Verve's 15px padding: more than a 390px phone's column (342px) holds.
+ * Tighter padding and gap bring that fixture to about 330px; a column narrower still falls back to the ellipsis. */
+@media (max-width: 480px) {
+  .vv-segmented__option { gap: 5px; padding: 0 8px; }
+}
+.vv-segmented__option:hover { color: var(--ink-mid); }
+.vv-segmented__option[aria-checked='true'] {
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: var(--shadow-rest);
+}
+@media (pointer: coarse) {
+  .vv-segmented__option { min-height: 44px; }
+}
+/* The count is the same pill `Tabs` draws (`.vv-tabs__count`, feedback.css), read off the same two tone tokens; it
+ * is spelt again here because feedback.css is at its ceiling and takes no more lines. */
+.vv-segmented__count {
+  flex: none;
+  padding: 1px 7px;
+  border-radius: var(--radius-pill);
+  background: var(--tone-soft);
+  color: var(--tone-ink);
+  font-size: 11.5px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------------------------------------------------------------- DataTable */
+/* The frame is what scrolls, so a table wider than a phone moves sideways inside its own border instead of
+ * breaking the page. The head is `--canvas`, 12px, upper-case, tracked; the sorted head reads in `--ink`, the
+ * rest in `--ink-faint`; a row is 14px with a `--surface2` hairline under it. The first cell is the row's name
+ * (ink, 500) and the rest are figures (muted, tabular), as Verve draws it. */
+.vv-datatable {
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+}
+.vv-datatable table { width: 100%; border-collapse: collapse; font-family: var(--font-body); }
+
+/* The padding lives on the label or the button inside the head, never on the head: a sortable head is ONE press
+ * target, and padding on the <th> would leave its rim dead. */
+.vv-datatable__head {
+  padding: 0;
+  border-bottom: 1px solid var(--border);
+  background: var(--canvas);
+  color: var(--ink-faint);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-align: start;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.vv-datatable__head[aria-sort] { color: var(--ink); }
+.vv-datatable__label,
+.vv-datatable__sort {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 11px 16px;
+}
+.vv-datatable__sort {
+  border: none;
+  background: none;
+  color: inherit;
+  font: inherit;
+  letter-spacing: inherit;
+  text-align: inherit;
+  text-transform: inherit;
+  cursor: pointer;
+  transition: color 0.2s;
+}
+@media (hover: hover) {
+  .vv-datatable__sort:hover { color: var(--ink); }
+}
+@media (pointer: coarse) {
+  .vv-datatable__sort { min-height: 44px; }
+}
+.vv-datatable__head[data-align='end'] .vv-datatable__label,
+.vv-datatable__head[data-align='end'] .vv-datatable__sort { justify-content: flex-end; }
+/* The ring sits inside the head: the frame clips an outline that stands outside it (the top of every head, the left of
+ * the first), as it does a row's, below. */
+.vv-datatable__sort:focus-visible { outline-offset: -2px; }
+/* One box for all three marks (▲ ▼ ↕), the same size, so a head's width never changes when the sort moves onto or off it
+ * and the auto-width table does not shuffle its columns under the press. */
+.vv-datatable__arrow { flex: none; width: 12px; font-size: 10px; line-height: 1; text-align: center; }
+/* A sortable head not chosen carries a quieter mark: the arrow says "this sorts", not "this is sorted". */
+.vv-datatable__head:not([aria-sort]) .vv-datatable__arrow { opacity: 0.6; }
+
+.vv-datatable__cell {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--surface2);
+  color: var(--ink-muted);
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+  text-align: start;
+}
+.vv-datatable__cell:first-child { color: var(--ink); font-weight: 500; }
+.vv-datatable__cell[data-align='end'] { text-align: end; }
+.vv-datatable tbody tr:last-child > td { border-bottom: none; }
+
+/* A pressable row opens under itself. The hover is for a pointer that really hovers (a tapped row would stay
+ * "hovered" on a touch screen), and the open row keeps its wash so the panel under it reads as belonging to it. */
+.vv-datatable__row--pressable { cursor: pointer; transition: background-color 0.15s; }
+@media (hover: hover) {
+  .vv-datatable__row--pressable:hover { background: var(--accent-soft); }
+}
+.vv-datatable__row--open { background: var(--accent-soft); }
+/* The house ring, drawn inside the row: the frame clips an outline that sits outside it. */
+.vv-datatable__row:focus-visible { outline-offset: -2px; }
+
+.vv-datatable__panel {
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--surface2);
+  background: var(--canvas);
+  color: var(--ink-mid);
+  font-size: 14px;
+}

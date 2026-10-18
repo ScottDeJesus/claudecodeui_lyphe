@@ -209,7 +209,7 @@ export function createDispatcherModule(): DispatcherModule {
     current: () => watcher.whenLanded(FIRST_READ_WAIT_MS),
     runVerb: (verb: DispatcherVerb, plan: string, verbArgs?: readonly string[]) =>
       runDispatcherVerb(verb, plan, commands, verbArgs),
-    // The dispatcher's own `offpeak` verb prints the hour, so the card's `Start at …` button shows the
+    // The dispatcher's own `offpeak` verb prints the hour, so the card's `Resume at …` button shows the
     // moment this box will really start a plan.
     offpeak: createOffpeakClock({ bin, timeoutMs: VERB_TIMEOUT_MS }),
   });

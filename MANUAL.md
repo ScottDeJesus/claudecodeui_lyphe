@@ -444,6 +444,8 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/mcp/McpServers.tsx, 
 ## Lightbox — rules
 
 - Zoom runs fit (1×) to 8×. It is a CSS transform on the content, so an svg redraws sharp at every level. No `will-change: transform`: it pins the raster and blurs an svg.
+- A transform scales a child's strokes and boxes with the picture, and `vector-effect: non-scaling-stroke` does not undo that (measured 2026-10-17: a 2px edge reads 4.5px at 225%). The content element therefore carries the zoom as the custom property `--lightbox-scale` (a bare number, 1 at fit; unset outside the Lightbox, so a reader writes `var(--lightbox-scale, 1)`). A child that wants marks at screen size divides by it: `RegionImage`'s outlines, dashes and badges do (`verve/media.css`), so a region's edge stays one weight at every zoom.
+- The overlay swallows only its own close after a drag (`wasDrag`); a child's `onClick` runs first. A pan that starts and ends on one pressable child (a `RegionImage` outline given `onSelect`) still fires that child's click (read from `Lightbox.tsx` and `useZoomPan.ts`, 2026-10-17; not run). Give a child inside the Lightbox no handler its pan would trip.
 - The viewer is a native modal `<dialog>`, portalled to the host window's `<body>` and opened by `showModal()` in a layout effect, in that document's TOP LAYER. No fixed layer (the PRD editor's `z-[200]`, Settings' `z-[9999]`, a later one) can cover it, and it carries no z-index. Anything that must sit above it has to be top-layer itself.
 - `showModal()` makes the page inert, focuses the close button and keeps Tab inside. Focus returns to the opener on close. The dialog's `cancel` is prevented: Esc is heard from the host window's capture phase, so closing never stops a run.
 - A `ResizeObserver` on the stage and the content re-clamps the pan on a window resize or a phone turning. It is built by the host window's constructor (`resizeObserverIn`, MAN-7451) and rebuilt on a move.
@@ -2334,13 +2336,24 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Timeline.tsx
 - On the chosen row's wash the hint steps up one ink (`--ink-mid`). why: `--ink-muted` read 4.44:1 there, under AA.
 
 ## Rules
-- `.vv-select__panel` (`position: absolute`, `controls.css`) must stay the positioned ancestor of `.vv-select__list` and its rows. why: the offset arithmetic above reads both offsets from it; a `position: relative` on the list or a row breaks the centring.
+- `.vv-select__panel` (`position: fixed`, drawn on `body`, `controls.css`) must stay the positioned ancestor of `.vv-select__list` and its rows. why: the offset arithmetic above reads both offsets from it; a `position: relative` on the list or a row breaks the centring.
 - `.vv-select__list` is the scroller (`overflow-y: auto`); the `action` row sits outside it.
 
 ## Known
 | gap | state |
 |---|---|
-| every option is its own tab stop (`tabIndex={0}`); no arrow keys, no type-to-find | roving focus is its own piece of work |
+| no type-to-find (the arrows, Home and End walk the rows; Tab closes the panel and hands focus back to the trigger) | its own piece of work |
+| an open list stays up when its trigger is scrolled out of its own scroller but is still inside the window: `placePanel` tests the window only, so the panel hangs over the scroller's edge | follow-up; `placePanel` serves every picker in every scroller, so a change to it needs its own review |
+
+## The panel is drawn on `body` (the master controller in the Runs widget, MAN-8430)
+- `createPortal(panel, hostWindow.document.body)`, `position: fixed`, `z-index: 10000`; `placePanel` (`Select.tsx`) puts it against the trigger before it paints: below when the whole panel fits, above when that side is roomier, `PANEL_MARGIN` (8px) in from the screen's edges, capped to the room it has (the list then scrolls inside the panel); its width is the trigger's, widened by the CSS `min-width`. It follows the trigger on every scroll and resize, and closes when the trigger leaves the screen. why: drawn in place it was cut off by the first ancestor with an overflow — the chat gutter's Runs widget scroller (under 200px tall in a column of four widgets), a deck's swipe strip, a card's fold — and the options past that edge could not be reached; the panel is held inside the screen wherever its control wrapped to.
+- `z-index: 10000`, and the panel is appended to `body` as it opens, so at an equal z it is in front of a layer already up. why: Settings' own `fixed z-[9999]` layer draws a z-70 portalled panel UNDER its content (INV-4356), and Settings holds `Select`s (Appearance); 10000 is the app's ceiling, one under the toast stack.
+- KEYBOARD. why: the panel is no longer after the trigger in the tab order, so Tab could never reach it. Opening focuses the chosen row (the first when none is chosen); ArrowUp / ArrowDown / Home / End walk the rows; Tab closes the panel and focuses the trigger; Escape closes and focuses the trigger. Options stay `tabIndex={0}`.
+- Measured before the panel left its ancestors (`document.elementFromPoint` at each option's centre, 2026-10-15): an epic fold's lists reached 0 of 8 options at 1440 and 4 of 8 / 2 of 8 at 360; a feature fold's, 0 of 3 (Athena's review of the master controller). After: 31 lists across the header, every epic and feature fold, the Runs widget, RoadmapPicker, Settings → Appearance and the Tasks filters, every option reachable.
+- The listbox is NOT inside the trigger's group in the DOM: a probe finds the open list by its role (`[role="listbox"]`; one is open at a time), and proves it whole by hit-testing the centre of every option (`.verify/master-controller-widget.mjs`).
+
+## `disabled` (the master controller, MAN-8442)
+- `disabled?: boolean` (default false): the trigger is a real `disabled` button (`.vv-select__trigger:disabled` — dimmed to 0.6, `not-allowed`, no hover border) and the panel never opens; a picker that turns disabled with its list open closes it (so the list does not come back on its own when the picker is enabled again). A picker that shows a value the reader cannot change now — the master controller's WIP dropdowns while the DeepSeek switch is on.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Select.tsx
 
@@ -2353,7 +2366,7 @@ The fixes screen, the catalog and the auto-run rule shown end to end: a real Run
 |---|---|---|
 | `.verify/cerberus-fixes-whole-live.mjs` | Run now on `docstore/backup.age`, pressed in the sheet as a person presses it | the live app on :5183 (`openConsole`, `openNodeCard`), `~/.cloudcli/cerberus.db` read-only |
 | `.verify/cerberus-fixes-whole-scratch.sh` | auto-run once inside its limit, the recheck, a refused `run.start` | a scratch center (`scripts/sunset-probe.sh`) and a scratch warden |
-| `.verify/cerberus-fixes-refused-shot.mjs` | `FixOutput` reads "✕ Refused" and the refusal's reason over a real run view | the running :5183 client, the scratch center's answer |
+| `.verify/cerberus-fixes-refused-shot.mjs` | `FixOutput` reads "Refused" after the refusal's crossed-octagon icon (`lucide-octagon-x`), and the refusal's reason, over a real run view | the running :5183 client, the scratch center's answer |
 
 ## Run it
 | when | do |
@@ -2365,7 +2378,7 @@ The fixes screen, the catalog and the auto-run rule shown end to end: a real Run
 ## `cerberus-fixes-whole-live.mjs`
 - Opens eis1's card, the Document store row (the sheet opens on `docstore/backup.age`), presses "Run now" under "Fixes in the catalog", polls the page every 200 ms and prints each change of the pill, the pane's lines and the check's value.
 - Starts a REAL `docstore/bin/backup` (one `pg_dump`, ~18 s): `docstore-<weekday>.dump` is overwritten. No model is called.
-- Verdicts, all required: the POST answered 200 with a `runId`; `GET /api/cerberus/runs/<id>` is `by: you`, `result: ok`, `exit: 0`; its lines carry `backup: …/docstore-<weekday>.dump <bytes> bytes` with an offset `t`; the pane shows that line; the pill reads "✓ Succeeded"; the check's value reads "Newest file written <n> s ago (docstore-<weekday>.dump)" with n < 60; the entry has exactly one more run in the store; no console error while signed in.
+- Verdicts, all required: the POST answered 200 with a `runId`; `GET /api/cerberus/runs/<id>` is `by: you`, `result: ok`, `exit: 0`; its lines carry `backup: …/docstore-<weekday>.dump <bytes> bytes` with an offset `t`; the pane shows that line; the pill reads "Succeeded" after its circle-check icon (`lucide-circle-check`); the check's value reads "Newest file written <n> s ago (docstore-<weekday>.dump)" with n < 60; the entry has exactly one more run in the store; no console error while signed in.
 - Output: `steps.txt` and the screenshots (1440×900 running, 1440×900 and 390×844 ended, 390×844 pane) in `<dir>`.
 - No guard for the 03:25–03:35 backup `flock` (`state/docstore/backup.lock`): a press then ends `failed` (MAN-7925).
 
@@ -2395,7 +2408,7 @@ The fixes screen, the catalog and the auto-run rule shown end to end: a real Run
 - Reads the run from the scratch center (`<run url>`, token in `SCRATCH_TOKEN`) and hands it to the component through a Playwright route on `**/api/cerberus/runs/<id>`. why: the component reads through the live client's API base, not `$SUNSET_API`.
 - Mounts the running client's own `FixOutput` and `WebSocketContext` with `lib/mountReact.mjs` (specifiers read from served source), a quiet socket, at 1440×900 and 390×844.
 - Writes `fix-output-<expect>-<w>x<h>.png`; `expect` is the pill word, default `Refused`.
-- Six verdicts per size: pill glyph + word; eyebrow "Fix output"; the run's name; the pane's first line `$ <cmd>`; the run's note in the pane; no page error. A refused run whose `note` is null fails the note verdict; any other result accepts a null note.
+- Six verdicts per size: pill word + its `RUN_LOOK` icon (the svg's `lucide-*` class; "Failed" and "Failed · exit N" take the triangle); eyebrow "Fix output"; the run's name; the pane's first line `$ <cmd>`; the run's note in the pane; no page error. A refused run whose `note` is null fails the note verdict; any other result accepts a null note.
 - Exit 1 when any verdict failed at either size.
 
 ## Rules
@@ -2560,7 +2573,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/compaction/compac
 | trigger | fires when | default | env seam (read at the call) |
 |---|---|---|---|
 | turn end | `contextTokens ≥ fraction × contextWindow`, and for a chat compacted before, `contextTokens − post_tokens ≥ growth × contextWindow` (growth guard) | fraction 0.5 (`AUTO_COMPACT_FRACTION`); growth 0.2 (`MIN_GROWTH_FRACTION`) | `CUSTOM_COMPACTION_AUTO_FRACTION`, `CUSTOM_COMPACTION_MIN_GROWTH` |
-| idle | one unref'd timeout per chat, re-armed at every turn end, fires once; `contextTokens ≥ min` | 3,240,000 ms (54 min); min 200,000 | `CUSTOM_COMPACTION_IDLE_AFTER_MS`, `CUSTOM_COMPACTION_IDLE_MIN_TOKENS` |
+| idle | one unref'd timeout per chat, re-armed at every turn end, armed again after a restart from the chat's last turn end ("A restart"), fires once, and is decided again at each quiet of the process while it finds the process busy or a run in progress (the compaction starts at most once: "The idle deadline"); `contextTokens ≥ min` | 3,240,000 ms (54 min); min 200,000 | `CUSTOM_COMPACTION_IDLE_AFTER_MS`, `CUSTOM_COMPACTION_IDLE_MIN_TOKENS` |
 
 An override that is not a positive finite number falls back to the default; `CUSTOM_COMPACTION_MIN_GROWTH` takes any finite number, a negative one included. `IDLE_AFTER_MS` above 2,147,483,647 also falls back: Node clamps a larger `setTimeout` delay to 1 ms, which would fire at once.
 
@@ -2575,26 +2588,78 @@ An override that is not a positive finite number falls back to the default; `CUS
 | `report.seed` | log `a seed append arms nothing` |
 | otherwise | arm the idle deadline, then test the report below |
 
-Not due, tested in this order: turn aborted; context or window unknown; under the fraction (`not due: 3.3% of the window, due at 50.0%`); under the growth since the last compaction (§"The growth guard"); chat placed on a node; a flight in progress; chat under an automatic refusal. Due and `activity.busy` → kept as the chat's one pending report (`due, kept pending until the process goes quiet`). Due and quiet → `startRun(report, 'auto')` synchronously inside `turnEnded`: the turn's `complete` has gone out and the queued-message pass waits on a `setImmediate`, so the reservation lands first and a queued message lands in the new session.
+Not due, tested in this order: turn aborted; context or window unknown; under the fraction (`not due: 3.3% of the window, due at 50.0%`); under the growth since the last compaction (§"The growth guard"); a chat whose node's warden lists no live tasks (`not taken over: the chat's node warden lists no background tasks`); a flight in progress; chat under an automatic refusal. Due and `activity.busy` → kept as the chat's one pending report (`due, kept pending until the process goes quiet`). Due and quiet → `startRun(report, 'auto')` synchronously inside `turnEnded`: the turn's `complete` has gone out and the queued-message pass waits on a `setImmediate`, so the reservation lands first and a queued message lands in the new session.
 
 ## The growth guard
 `notDueBecause` reads `sessionCompactionsDb.latestCompaction(appSessionId)` (MAN-8046) right after the fraction test; `post_tokens` of the newest `compaction` row is the baseline. No record, or a record with `post_tokens` NULL: not held. Held → logged `not due: the context grew <n> since the last compaction, under <needed>`.
 - why: the operator block only grows; a seed at or past half the window would leave the first turn after every compaction due again, a loop of compactions each minutes long. A 60K seed on a 1M window never meets the bound (due again at 500K). The idle trigger has no guard.
 - `<n>` can be negative: the turn end's count and the compaction's post-append count are two instruments that disagree by ~1.7-2.1K (a just-compacted chat that answers once reads about −1.7K: the decision lines `grew -1623` and `grew -1758`). A probe that needs a turn end to compact right after a compaction boots with `CUSTOM_COMPACTION_MIN_GROWTH=-1`.
 
-## A failure is not a refusal
-Only verb exit 2 and not-ready put a chat under an automatic refusal (MAN-8065). Any other end of an automatic compaction leaves the chat due: verb exit 1 (including the watch's kill of a wrong-model or twice-answered reply), an exit-0 answer that does not read, a seed that did not take, a thrown step. The next turn end that finds the chat past the fraction starts the verb again, whole, and so does the next idle deadline: one start per turn end, no cap, no backoff.
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/compaction/auto-trigger.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/compaction/compaction-log.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/compaction/idle-restore.ts
+
+## MAN-8315 — modules/compaction triggers — turn end and its growth guard, idle, the pending — A failure is not a refusal
+section: modules/compaction triggers — turn end and its growth guard, idle, the pending wake, startRun, shutdown and the decision line/001 A failure is not a refusal
+
+Only verb exit 2 and not-ready put a chat under an automatic refusal (MAN-8065). Any other end of an automatic compaction leaves the chat due: verb exit 1 (including the watch's kill of a wrong-model or twice-answered reply), an exit-0 answer that does not read, a seed that did not take, a thrown step. The next turn end that finds the chat past the fraction starts the verb again, whole, and so does the next idle deadline: one start per turn end by the turn-end trigger, no cap, no backoff. The IDLE check is bounded further, across restarts: a failed or refused start is its one attempt for that turn end, and a start that a handover cut short gets one more (MAN-8316, "Bounded across a restart"); a restart never gives a failed idle check another start.
 - Each start spends a full summarizer call before it can fail again: input up to `CALL_TOKENS` 600,000 estimate tokens (MAN-8049).
 - The `compaction.failed` push is deduped per chat (`claude:compaction:failed:<sessionId>`); the spend is not.
-- What ends them: a run that succeeds, a refusal (exit 2, not-ready), or the switch off. A failed manual Compact does not.
+- What ends them: a run that succeeds, a refusal (exit 2, not-ready), or the switch off; for the idle check also a failure, and a second start of one turn end. A failed manual Compact does not.
 
 ## The pending wake
 `activityChanged(sessionId, activity)` first hands the change to the guard's listeners (`publishActivity`), then, with a pending report and `activity.busy` false: take the report; snapshot `false` → stop; a run in progress, a flight or an automatic refusal → logged `pending compaction dropped: <why>`; else `startRun(report, 'auto')`.
 
 ## The idle deadline
-Fires `fireIdleDeadline`: chat row gone → `forgetSession` and log; `contextTokens` null or under `min` → log; `takesOver` false → log; then, synchronously up to the start: a run in progress, process busy, a flight, a refusal → `left alone: <why>`; else `idle, starting the compaction` and `startRun(report, 'idle')`. A server restart drops every deadline; the chat's next turn end arms it again.
+Fires `fireIdleDeadline`: chat row gone → `forgetSession` and log; `contextTokens` null or under `min` → log; `takesOver` false → log; then, synchronously up to the start: a run in progress, process busy, a flight, a refusal → `left alone: <why>`; else `idle, starting the compaction`, the start is counted in the chat's host meta (`markIdleCheck`, MAN-8316 "Bounded across a restart") and `startRun(report, 'idle')` runs. A server restart does not cost a chat its deadline ("A restart").
 
-## `startRun`
+A run in progress or a busy process ends on its own, so those two `left alone` answers keep the report in `idleRetries` (one per chat). The `activityChanged` that says the process went quiet takes it out and runs `fireIdleDeadline` again, whole: every condition above is read afresh (a second `left alone` keeps it again, the next quiet tries once more). A flight or an automatic refusal is not kept: a flight's own end is a turn end, which re-arms the deadline. A turn end (`clearIdle`) and `stop()` drop the kept report with the deadline. Nothing here polls: the wake is the activity edge. The decision lines are the same sentences; a retried chat reads `left alone: the process is busy` and, later, `idle, starting the compaction` under `trigger=idle`.
+
+What goes quiet without a turn end: a task whose notification wakes no follow-up turn (the follow-up latch's grace expires), and the process ending (`live: false`). A task that wakes a follow-up turn ends in a turn end, which supersedes the kept report with a fresh deadline.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/compaction/auto-trigger.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/compaction/compaction-log.ts
+
+## MAN-8316 — modules/compaction triggers — turn end and its growth guard, idle, the pending — A restart
+section: modules/compaction triggers — turn end and its growth guard, idle, the pending wake, startRun, shutdown and the decision line/002 A restart
+
+The deadline is a timer in the server's memory, so every restart and handover drops it, and the dev server hands over on every save under `server/`. It is restored from what is on disk, with no store of deadlines. A chat with a deadline still to come always has a live host (the process closes after 120 minutes without a message, the idle wait is 54), and the boot's re-adoption walks exactly those hosts. For a host whose last turn was complete, the Claude runtime reads the turn's end off the host's journal — a LOCAL host's from this machine's own, a node's from the warden's listing, which carries the same registry function's record of it (`lastTurn`; the server is never handed the warden's home path) — and calls `turnRestored(report, endedAt, idleTries)` (MAN-8055; `idleTries` is the host meta's count of idle starts for that turn end, "Bounded across a restart"); a host mid-turn gets its deadline from its own turn end. A chat on a node is taken over like any other, so it is restored like any other; a node whose warden predates `lastTurn` lists none, and its chats are restored from their next turn end. A node whose warden predates `liveTasks` (0.12.0) lists no task ledger either, and is read as unknown, not as none: such a chat is not taken over at all (`takesOver` false, MAN-8067), so no idle check fires for it and it keeps the CLI's own compaction.
+
+`turnRestored` (`auto-trigger.ts`) does nothing when stopped, or when the chat already holds a deadline (a turn that ended since this boot armed a newer one). Otherwise it does nothing with the switch off (`takeoverSnapshot()` false), and asks `planIdleRestore` (`idle-restore.ts`), keeps the report's context for a manual compaction's `pre_tokens` (`rememberTurnContext`) unless the plan says the chat was compacted since, logs one decision line (`trigger=idle`) and arms or not:
+
+| the chat | line, `decision=` |
+|---|---|
+| the last turn made no request (a seed append runs none), so no context | `no deadline restored: the last turn made no request, so it measured no context` |
+| compacted at or after the turn's end (`latestCompaction(...).compactedAtMs + 1000 > endedAt`: the record's time is whole seconds, so it is read as the end of its second) | `no deadline restored: the chat was compacted after its last turn (its context is now <post_tokens>)`; the stale context is not kept as the chat's (`rememberTurnContext`) |
+| the idle check has already started its limit (`IDLE_CHECK_MAX_TRIES`, 2) of compactions for this turn end | `no deadline restored: the idle check has already started <n> of its 2 compactions for this turn end` |
+| context under the idle floor | `no deadline restored: the context is under <min> tokens` |
+| `endedAt + idle wait` still ahead by 15 s or more | `deadline restored after a restart: the last turn ended <ago> ago, the check is due in <left>`: armed for the remainder |
+| passed, or less than 15 s ahead | `deadline restored after a restart, already due: the last turn ended <ago> ago, the check runs in <delay>`: armed for the settle (15 s, `RESTORE_SETTLE_MS`) plus 30 s (`RESTORE_SPACING_MS`) for each overdue chat restored before it in this boot |
+
+The remainder is never longer than a whole wait. Overdue chats are queued, not started together (`createRestoreSpacer`): the first starts at the settle, the next 30 s after it, and so on, because each start is a summarizer call of up to 600,000 tokens and a process replacement, all in the first seconds after a dev-server save. The spacing is of the starts, not a limit on how many compactions run at once: a long one still overlaps the next. A restore with time left on its wait is not queued. The settle exists because re-adoption is asynchronous: the adopted process registers its handle and replays what the previous server never acknowledged in its first seconds, and a turn that ends in that replay arms the chat's own deadline and clears this one (`clearIdle`).
+
+A node host's report is made from the warden's listing: `reportRestoredTurn` (`claude-compaction-restore.ts`) takes `reattach.lastTurn` (`CerberusNodeHostLastTurn`: `endedAt`, `modelUsage`, and the turn's last main-thread request cut down to the fields the token reading uses) where a local host's is read off its journal, and runs the one request through `mainThreadRequestOf` (`session-host/host-registry.js`), the rule a live stream's message and a local journal go through too. The warden computes it with the registry's own `lastTurnRecord` and the same `mainThreadRequestOf` (`warden/src/last-turn.mjs` only cuts the message it chose down to the fields the rule reads), so there is one reading of a journal and one rule for which message is its request.
+
+A restored deadline is the same timer as any other: its fire is `fireIdleDeadline`, so every gate above applies (chat row, the floor, `takesOver`, a run in progress, a busy process, a flight, a refusal) and a busy process keeps it for the next quiet (`idleRetries`). A restore never starts a compaction itself, and never in a chat that is mid-turn or busy. A chat that was due and busy when the server restarted is picked up the same way; there is no second mechanism.
+
+Why a compacted chat is not restored: a compaction seeds a NEW process, so its host's journal begins after the swap. Its last `result` is the seed append's, which made no request and measured no context; the chat reads as it did before a restart, and arms nothing until its next turn, exactly as a live seed append does. The `compactedAtMs` test is the second line, for a chat whose old host outlived its retirement (the journal then shows the size before the compaction). A second, third and fourth restart therefore do nothing more to a chat a restore compacted. `latestCompaction` carries `compactedAtMs` (the record's `created_at`, to the second) for this test.
+
+## Bounded across a restart
+The idle check gets at most `IDLE_CHECK_MAX_TRIES` (2) compaction starts per turn end, counted in the chat's host meta so a restart cannot repeat it without bound (it was bounded to one per turn end before the restore, by the deadline dying with the server).
+- The record is `idleCheck: { at, tries }` in the host's meta (`IdleCheck`, `shared/types.ts`), written through the host's own `note` like the background-call release: `fireIdleDeadline` calls `markIdleCheck` right before `startRun(report, 'idle')` with the start's number (1, or the restored count + 1), and the Claude runtime's process handle sends the note (`ack: false`, no cursor moves). A chat with no live process answers false and nothing is written; only the restart loses its memory then.
+- A failed or refused idle start is the limit at once: `compact()` writes `tries = 2` when an idle run ends `failed` (no transcript, the summarizer's exit 1/2/3 or an unreadable answer, not-ready, a seed that did not take, a thrown step) and was not stopped. The next boot reads it and logs `no deadline restored: the idle check has already started 2 of its 2 compactions for this turn end`.
+- A start that a handover cut short (the run was stopped, or the server died) is not a failure: its count stays at what the start wrote (1), the next boot restores the deadline and the restored fire is the second and last start (`tries` 2). A second cut short ends it. So one turn end costs at most two summarizer calls however often the dev server hands over.
+- A new turn end clears it: the live loop sets the process's record to null at every `result` and its note writes the null; the restore also reads a record only when `at` is not before the host's last `result` (a turn that ended while no server ran leaves a stale record, which counts for nothing). The in-memory count (`idleStarts`) is dropped with the deadline at `turnEnded`.
+- A left-alone answer (busy, a run in progress), a floor or a takeover refusal start nothing and count nothing.
+- A successful compaction replaces the process and its host, so the record goes with the old host.
+
+## Busy after a restart
+The process's activity reads busy for a background task (`backgroundTasks`, the CLI's own level signal). That set lived only in the process, so a re-adopted chat read idle for work that was still running (a backgrounded subagent or monitor the call ledger never names), and the restored deadline would have compacted it and ended the CLI under the work. The set is rebuilt at re-adoption from the host's journal (`host-live-tasks.js`, `LiveHost.liveTasks`, MAN-683): a `task_started` with no `task_notification` after it, less what the newest `background_tasks_changed` dropped, by the reducer the live loop uses. The process starts from those ids, so the restored deadline reads `left alone: the process is busy` and the retry waits for the task's own end. The version sweep (`busyReason`) and the process's idle closer (`isBusy`) read the same, so a host running a task is no longer retired by either.
+
+A restart during a compaction stops its summarizer (`stopChatCompaction`) and its host is told of the start before that, so the next boot restores the chat's deadline for the one retry above. The dev server hands over on every save under `server/`, so saving code while an overdue chat compacts spends its retry, and no more.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/compaction/auto-trigger.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/compaction/compaction-log.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/compaction/idle-restore.ts
+
+## MAN-8317 — modules/compaction triggers — turn end and its growth guard, idle, the pending — `startRun`
+section: modules/compaction triggers — turn end and its growth guard, idle, the pending wake, startRun, shutdown and the decision line/003 `startRun`
+
 `runDetachedChatTurn({ sessionId, userId, content: '/compact', options: {...report.sendOptions, compactionTrigger}, beforeRun })` with the DECORATOR as runtime, so its `/compact` test sees the run.
 - `beforeRun` sets `run.completionAlreadyRecorded = true`: the run does not stamp `last_completed_at`, so no unread dot lights on a chat the operator read. Listeners still hear the run end.
 - That skips the registry's sidebar broadcast too, so when the outcome is `started` the trigger calls `broadcastSessionUpserted(sessionId)`: an open tab refetches and sees the marker's "after" figure.
@@ -2618,7 +2683,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/compaction/auto-t
 
 ## What stays of the CLI's own compaction
 Who writes the summary: `~/.claude/scripts/summarize`, on the launch table's `[summarizer]` model and effort (read at the call, MAN-7407; edited in Edit Agent Chains, MAN-7417). The chat keeps its own model and effort: the seed append rides the triggering turn's send options.
-| CLI mechanism | taken-over chat | not taken over (switch off, summarizer not ready, node) |
+| CLI mechanism | taken-over chat | not taken over (switch off, summarizer not ready) |
 |---|---|---|
 | typed or pressed `/compact` | the summarizer's, through the decorator | the CLI's |
 | idle compaction | OFF: `idleCompaction: false` (`CLI_COMPACTION_SETTINGS`, MAN-8055); CloudCLI's idle trigger replaces it (MAN-8066) | the CLI's own |
@@ -2635,13 +2700,19 @@ Who writes the summary: `~/.claude/scripts/summarize`, on the launch table's `[s
 | shutdown | `stopChatCompaction()` in `shutdownRuntimeServices`, right after `closeScheduledMessageDispatcher()` |
 | type | `withChatCompaction<Inner extends CompactionInnerRuntime>(inner): Inner` spreads the service; members the gateway type does not name (`recallApproval`) ride through |
 
-## Files
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/compaction/, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/compaction/compaction-mode.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/compaction/compaction-runtime.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/compaction/index.ts
+
+## MAN-8338 — modules/compaction wiring — the decorator and the options it owns — Files
+section: modules/compaction wiring — the decorator and the options it owns (`transcriptAppend`, `compactionSeed`), what takes a chat over, the files and shutdown/001 Files
+
 | file | owns |
 |---|---|
 | `compaction-runtime.ts` | the decorator: `run` removes the options this module owns from every Claude run, re-seeds a start-over in a compacted chat, and intercepts a taken-over `/compact`; `abort` routes to the flight; `stopChatCompaction` |
-| `auto-trigger.ts` | the `turnEnded` / `activityChanged` hooks, idle deadlines, `startRun` |
+| `auto-trigger.ts` | the `turnEnded` / `turnRestored` / `activityChanged` hooks, idle deadlines, `startRun` |
+| `idle-restore.ts` | `planIdleRestore`: whether a re-adopted chat is owed its idle deadline after a restart, when it falls, and whether its turn end has used its `IDLE_CHECK_MAX_TRIES`; `createRestoreSpacer`: the queue of a boot's overdue chats |
 | `compaction-procedure.ts` | `compact()`, one run |
 | `compaction-mode.ts` | switch + summarizer status → `compactionMode`, `takesOver`, `takeoverSnapshot`, `switchFlipCount`, `noteSummarizerStatus`, `noteVerbNotReady` |
+| `node-task-ledger.ts` | `taskLedgerUnlisted(appSessionId)`: the chat's node's last list holds its host with `liveTasks === null`; read by `takesOver`, the turn-end test and the decorator's `/compact` |
 | `compaction-registry.ts` | flights, activity listeners, automatic refusals, last turn contexts, `forgetSession` |
 | `compaction-guard.ts` | `waitUntilQuiet` |
 | `compaction-children.ts` | the only spawns: `runSummarizeVerb`, `fireCompactHealTrigger` |
@@ -2651,7 +2722,7 @@ Who writes the summary: `~/.claude/scripts/summarize`, on the launch table's `[s
 | `compaction-log.ts` | `logDecision` |
 
 ## What takes a chat over
-`takesOver({ appSessionId, node })` = `appSessionId !== null` AND `node === null` (a node's transcript is on the node) AND `compactionMode().on`. `on` = switch on AND summarizer `ready`; the switch is read at every call.
+`takesOver({ appSessionId })` = `appSessionId !== null` AND NOT `taskLedgerUnlisted(appSessionId)` AND `compactionMode().on`. `on` = switch on AND summarizer `ready`; the switch is read at every call. A chat placed on a Cerberus node is taken over exactly as a local one: the verb reads the transcript from this machine's disk, and a node chat's transcript is on it, because placement refuses a node that is not co-located (`node-transport.ts`, `colocationRefusal`) and the warden, its session host and this server run as the same user. The one node chat that is not taken over is one whose node's warden lists no live tasks for its host (`taskLedgerUnlisted`, `node-task-ledger.ts`: its last list carries `liveTasks: null`, a warden from before 0.12.0): a re-adopted process starts its task set from that list, so a chat re-adopted from such a warden would read as having no task while a subagent or monitor ran, and a compaction would end it. That chat keeps the CLI's own compaction until its warden is updated; the answer follows the node's last list, so it changes the moment a newer warden is listed.
 
 | when | do |
 |---|---|
@@ -2665,12 +2736,16 @@ why a not-ready status is never served from the cache: the operator edits the su
 
 `takeoverSnapshot()` = the last `compactionMode()` answer, read synchronously (`null` before any ask). The turn-end trigger needs it: its run must start in the tick of the turn's `complete`, before the queued-message pass (`setImmediate`) takes the session's reservation, and an awaited switch read lost that race. A stale snapshot is safe: the decorator re-asks `takesOver` and ends an automatic run no longer taken over with a `complete` exit 0, nothing done.
 
-## The decorator's `/compact` test
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/compaction/, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/compaction/compaction-mode.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/compaction/compaction-runtime.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/compaction/index.ts
+
+## MAN-8339 — modules/compaction wiring — the decorator and the options it owns — The decorator's `/compact` test
+section: modules/compaction wiring — the decorator and the options it owns (`transcriptAppend`, `compactionSeed`), what takes a chat over, the files and shutdown/002 The decorator's `/compact` test
+
 - Claude only; the command matches `/^\/compact(?:\s+([\s\S]*))?$/`; the words after it are the summarizer's instructions.
 - `options.sessionId` is a non-empty string; no `resumeAnchorId`, no `resumeFromScratch: true`. An edit that replaces a message with `/compact` stays an edit and reaches the CLI.
 - Trigger = `options.compactionTrigger` when `auto` or `idle`, else `manual`.
-- One `compactionMode()` read per request (none for a node's chat): `on` decides (the same test as `takesOver`), `why` explains.
-- Taken over → `compact()`. Not taken over: manual → `inner.run` (the CLI compacts), logged `handed to the CLI: <why>` when the switch is on and the summarizer cannot be served (`why` set; with the switch off `why` is null and nothing is logged; a node's chat logs nothing); automatic → logged `no longer taken over, the run ends with nothing done`, `complete` exit 0.
+- One `compactionMode()` read per request, for a node's chat too: `on` decides (with `taskLedgerUnlisted`, the same test as `takesOver`), `why` explains.
+- Taken over → `compact()`. Not taken over: manual → `inner.run` (the CLI compacts), logged `handed to the CLI: <why>` when the switch is on and the summarizer cannot be served, or the chat's node warden lists no live tasks (`why` set; with the switch off `why` is null and nothing is logged); automatic → logged `no longer taken over, the run ends with nothing done`, `complete` exit 0.
 - `abort`: a flight not yet stopped → `flight.stop()`; else `inner.abort`.
 
 ## The options this module owns on a Claude run
@@ -2793,3 +2868,621 @@ Hint rule, per group of one name:
 - 2026-10-09: after 58 checks per label, all pass, no console or page errors; before 38 fail. Hint ink contrast 5.06 or better; the chosen option row steps up one ink (`.vv-select__option[aria-selected='true'] .vv-select__hint`).
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/projects/services/projects-with-sessions-fetch.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/hidden-project-paths.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/hooks/useProjectsState.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/projectNameHints.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/project-name-hints.mjs
+
+## MAN-8320 — Probe — chat-idle-restore: a restart keeps a chat's idle compaction deadline (run, legs, setup)
+
+Proves a server restart keeps a chat's idle compaction deadline (MAN-8316, "A restart"), on a scratch stack restarted for real, with Haiku chats. `.verify/` is gitignored: both files exist on disk and are absent from `git status`.
+
+## Run
+| when | do |
+|---|---|
+| prove the restore | `bash .verify/chat-idle-restore.sh after` — exit 0 when both runs hold |
+| see the old code without it | `bash .verify/chat-idle-restore.sh before` — the code at HEAD from a throwaway `git worktree` under `/tmp`; asserts the opposite (no `trigger=idle` line after the restart) |
+| `before` after the change is committed | `BEFORE_REF=<commit before the change> bash .verify/chat-idle-restore.sh before` — why: HEAD then carries the restore and the leg fails its own assertion |
+| drive one chat by hand | `node .verify/chat-idle-restore.mjs --api <probe api url> --token <jwt> --chat-file <path>` — two short Haiku turns in `lib/probe-project.mjs`'s scratch project; the chat id goes to `--chat-file` at once; prints `TURN_ENDED <epoch seconds>` |
+
+Exit 1 prints `FAILED: <why>`; exit 2 is a bad leg name.
+
+## Setup the script owns
+- Probe server on `PROBE_PORT` 7897 with its own sessions dir; a held port exits 1 with nothing started.
+- Env on every boot: `CUSTOM_COMPACTION_IDLE_AFTER_MS=100000`, `CUSTOM_COMPACTION_IDLE_MIN_TOKENS=1`, `CUSTOM_COMPACTION_AUTO_FRACTION=1` (the turn-end trigger never fires), `SUMMARIZE_TAIL_TOKENS=20` (a compaction is cheap), `CUSTOM_COMPACTION_FLAG_PATH` at a scratch flag reading `on`; the operator's `custom_compaction.flag` is read and never written.
+- A restart is SIGTERM to the probe server and a boot on the SAME sessions dir, so the chat's host survives and is re-adopted. `stop_probe_server` deletes that dir, so it runs only between runs.
+- Evidence in `/tmp/chat-idle-restore.XXXXXX` (printed first): `server-boot-<n>.log`, `server-run<n>.log`, `driver-<n>.txt`.
+- Cleanup: delete the chat through the app, stop the server, end the chat's tmux sessions `<chat id>-*` on the `cloudcli-sessions` server, remove the worktree.
+
+## Run 1 — kept across a restart
+1. A turn ends; the server restarts 25 s later.
+2. After: `deadline restored after a restart: … the check is due in <n> s` is logged; `idle, starting the compaction` follows between 1 s before and 6 s after the original deadline (100 s after the turn's end); then `compacted onto`.
+3. Before: no `trigger=idle` line after the restart.
+
+## Run 2 — overdue, once
+1. A turn ends; the server stays down past the deadline, then boots.
+2. After: `deadline restored after a restart, already due` is logged; the compaction starts after the 15 s settle and finishes; two further restarts must not log `starting the compaction` or `compacted onto` for the chat (the line they are expected to log is `no deadline restored: the last turn made no request`; a missing line is noted, not failed).
+3. Before: no `trigger=idle` line.
+
+## Measured
+- 2026-10-12, after: run 1 restored "due in 73 s", started at 100.8 s, `compacted onto (33020 → 36125)`; run 2 started 15.0 s after the restore line.
+
+## Not covered
+The 30 s spacing of overdue chats, the 2-start limit and the `markIdleCheck` write (MAN-8316, "Bounded across a restart") have no leg here.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/chat-idle-restore.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/chat-idle-restore.sh
+
+## MAN-8432 — The epic queue on the live lane — .verify/epic-queue-live.mjs
+
+## run
+`node .verify/epic-queue-live.mjs [--api http://127.0.0.1:3011] [--url http://127.0.0.1:5183]` from `claudecodeui_lyphe/`; exit 0 prints `ALL CHECKS PASS`, exit 1 lists the failed checks.
+- Reads the LIVE dispatcher through the dev server as the dev user; writes nothing to it. Shot: `.verify/shots/epic-queue-live/in-flight-1440x900.png`.
+- Opens the workspace on an older chat of this repo, never the newest (`quietChatId`).
+- Fixture-lane proofs of the same face: MAN-8431. The verbs it reads: MAN-8425.
+
+## what it compares
+| reading | against |
+|---|---|
+| `GET /api/dispatcher/plans` → each arc's `queue`, each plan's `queue_hold`, `route.epics` | the same keys in `dispatcher status --json`, by value (the server fills an absent key with `null`, so presence proves nothing) |
+| the served places, sorted by position | `dispatcher queue`'s own listing: position, name, turn |
+| `route.epics.running` | the `· <k> running` head of `dispatcher queue` |
+| the live queue | holds at least one epic (an empty list fails) |
+| In flight, read after an 800 ms settle | decks in the served order; each deck's note `<position> · <turn word>`; dial readout `<running> running`; no sideways overflow |
+
+## fails when
+- The live dial is not a limit of 1 to 5 with `paused no`: `route.epics reads a limit of 1 to 5, not paused` is the check, and `Epics at once reads the served limit` compares the header's dropdown with it.
+- The live queue is empty.
+- `dispatcher queue`'s line shape changes (`listedQueue` parses `N. <name>.arc — <its turn|waiting|paused> — `).
+
+## the one press
+`POST /api/dispatcher/arcs/no-such-epic/queue {"last": true}` → 409 containing `no arc no-such-epic`; the door writes nothing.
+
+## nothing moved
+- Every non-GET the page makes to `/api/dispatcher/` or `/api/user/` is aborted and counted; any such call fails the run. Other non-GETs pass and are printed.
+- `liveReading` before and after must be equal: `dispatcher epics`, the count of `arcs` rows with a `queue_position` (`sqlite3 -readonly` on `state/dispatcher/dispatcher.db`), size and mtime of `state/epics.flag`.
+- Every `DISPATCHER_*` variable is dropped from the child environment (`LIVE_ENV`): a shell holding the scratch walk's exports would otherwise make `dispatcher epics` read a scratch dial.
+
+## keeping
+`.verify/` is git-ignored: the file lives on disk only.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/epic-queue-live.mjs
+
+## MAN-8487 — Tool sets' contracts — the two toolset-types files, `ProviderRuntimeContext.toolsets`, `syncToolsets`, `session_toolsets_changed`, `loopbackApiOrigin`, the `JWT_SECRET` export
+
+The seams tool sets cross, as types and one hook. The Claude runtime reaches the toolsets module only through its context and imports nothing from it; the module registers the hook, the way custom compaction does (MAN-8055).
+
+## Types — `server/shared/toolset-types.ts` (server) and `src/shared/toolset-types.ts` (client mirror)
+
+| type | crosses a wire | mirrored in `src/shared` | produced by → read by |
+| --- | --- | --- | --- |
+| `ToolsetSetView` | yes | yes | service → composer, `toolset list` |
+| `SessionToolsetsView` | yes | yes | service (GET, tail of every switch) → composer, `toolset list` |
+| `ToolsetServerOutcome` | yes | yes | service → composer, command |
+| `ToolsetSwitchResult` | yes | yes | service → PUT caller, command door caller |
+| `ToolsetCommandRequest` | yes | yes | `bin/toolset.mjs` → command door |
+| `SessionToolsetsChangedEvent` | yes | yes | service after a switch → composer's hook |
+| `ToolsetServerConfig` | no | no | registry reader → hook, service |
+| `ToolsetDefinition` | no | no | registry reader → hook, service |
+| `ChatToolsetLaunch` | no | no | hook → Claude runtime |
+| `ChatToolsetHooks` | no | no | toolsets module → Claude runtime, via context |
+| `ToolsetSyncOutcome` | no | no | Claude runtime → toolsets service |
+
+- The six wire shapes are edited in both files together, field for field; a one-sided edit is a response the composer cannot read. why: the client tsconfig cannot import `server/`, so the mirror is a copy.
+- `src/shared/toolset-types.ts` imports nothing from `server/`.
+- `ToolsetSyncOutcome` is `{ live: false }` | `{ live: true, confirmed: true, added, removed, errors }` | `{ live: true, confirmed: false, reason }`. Importers take it from `@/shared/toolset-types.js`, not from `types.ts`.
+- Both files are listed in `.oxlintrc.json` (INV-6548, INV-5890).
+
+## The runtime seam — `providerRuntimeService`
+
+| name | where | contract |
+| --- | --- | --- |
+| `ProviderRuntimeContext.toolsets` (`ChatToolsetHooks`) | `server/shared/types.ts` | always present; one hook, `launchFor({ appSessionId, onNode })` → `ChatToolsetLaunch` |
+| `useChatToolsets(hooks)` | `provider-runtime.service.ts` | stores the hooks every context carries |
+| `INERT_TOOLSET_HOOKS` | same | default; `launchFor` answers `{ env: {}, servers: null, promptLine: null }`, a fresh object per call, so a launch is today's |
+| `IProviderRuntime.syncToolsets?(appSessionId)` | `server/shared/interfaces.ts` | optional; only a runtime with a live process per chat has it; answers `ToolsetSyncOutcome` |
+| `syncToolsets(provider, appSessionId)` | `provider-runtime.service.ts` | asks the provider's runtime, calling the verb as a method (`this` holds); answers `{ live: false }` for a runtime without the verb, a sync that throws or rejects, or a provider that fails to resolve; the last three log `[provider-runtime] could not sync the tool sets of <provider> session <id>:` |
+
+- `context.toolsets` is one delegating object that reads the registered hooks at CALL time, so a context built before `useChatToolsets` sees the hooks afterwards. why: a Claude process keeps the context of the message that spawned it.
+
+- `useChatToolsets` is called by `toolsets.module.ts` at boot (MAN-8499); `session_toolsets_changed` is emitted by `toolsets.service.ts` after a switch that changed the on-sets (MAN-8500). The Claude runtime reads `context.toolsets` at every launch and answers `syncToolsets` for a chat with a live process (its call-ins, the one `setMcpServers` mechanism and the base-name guard: MAN-8495); a chat without one answers `live: 'next-message'`.
+- A probe script imports the app through `modules/providers/index.ts`. Importing `provider-runtime.service.ts` first dies on `Cannot access 'providerRegistry' before initialization` (circular import).
+
+## `session_toolsets_changed`
+
+- Member of `GatewayEventKind` (`server/shared/types.ts`); shape `SessionToolsetsChangedEvent` = `{ kind, sessionId, at }`. A client that hears it reads the chat's view again.
+- Sent to every open `/ws` socket by `broadcastToolsetsChanged` (`toolsets.service.ts`), only when the switch changed the stored list.
+
+## `loopbackApiOrigin()` — `server/shared/utils.ts`
+
+- Answers `http://127.0.0.1:${process.env.SERVER_PORT || '3001'}`, re-read at every call. Callers: `resolveApiOrigin` (`kanban-metis.module.ts`), `getMcpApiUrl` (`browser-use.service.ts`), the toolsets module.
+- It names no `PORT` (INV-8440). A server on another port (a probe on 7893) hands its children its own origin.
+
+## `JWT_SECRET` export — `server/modules/auth/index.ts`
+
+- `export { JWT_SECRET }` from `auth.middleware.js`; the toolsets module derives each chat's credential from it.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/auth/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/services/provider-runtime.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/interfaces.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/toolset-types.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/utils.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/toolset-types.ts
+
+## MAN-8490 — Composer tool-set section — ComposerToolsetSection, useSessionToolsets, the pill's count, the busy and waiting rows
+
+The model menu's last group: which of the box's tool sets are on for this chat, one press each (MAN-8487 types, MAN-8497 server). Live in every Claude chat: `ChatInterface` reads the chat's sets through `useSessionToolsets` and hands them down through `ChatComposer` to `ComposerModelMenu`.
+
+## Parts
+
+| file | owns |
+| --- | --- |
+| `ComposerToolsetSection.tsx` | `ComposerToolsetSection({ toolsets })`: heading, the lines, the set rows, the stray rows, one `sr-only` status region. `null` while `toolsets.view` is `null` |
+| `hooks/useSessionToolsets.ts` | `useSessionToolsets(sessionId, provider)` and its answer type `SessionToolsetsState` (`view`, `pendingSet`, `lastResult`, `error`, `toggle`); the wire shapes are `src/shared/toolset-types.ts`'s |
+| `src/shared/api.ts` | `api.toolsets.read(sessionId)` (GET `/api/toolsets/sessions/:id`) and `api.toolsets.set(sessionId, set, on)` (PUT `…/sets/:set`, body `{ on }`), beside `api.notes` |
+| `ComposerMenuPrimitives.tsx` | `ComposerMenuItem` `role="menuitemcheckbox"` (sets `aria-checked`); props `busy`, `waiting` |
+| `ComposerModelMenu.tsx` | optional prop `toolsets?: SessionToolsetsState`; renders the section as the last group under `ComposerMenuSeparator`; the pill's count |
+| `ChatComposer.tsx`, `ChatInterface.tsx` | `ChatInterface` calls `useSessionToolsets(openSessionId, selectedSession?.__provider ?? provider)` and passes the answer as `toolsets`; `ChatComposer` hands it to `ComposerModelMenu` |
+
+## The hook
+
+- Inert (`view` null, no read, no subscription) unless the provider is `claude` and there is a session id. The session id is the APP's. `ChatInterface` keys it by the opened session's own provider (`selectedSession?.__provider ?? provider`), because `provider` state is brought in line with a newly opened chat by an effect one render later and would still name the previous chat's.
+- It subscribes through `useWebSocket().subscribe` BEFORE its first read and reads again on a `session_toolsets_changed` naming its chat and on `websocket_reconnected`. Never on a timer. Every switch that changed a row raises the frame, the model's own `toolset` in Bash included, so the section moves live.
+- Each read takes a ticket. An answer is dropped when a newer ticket has already answered, or when the chat changed. A newer read that fails drops nothing.
+- `toggle(set, on)` sets `pendingSet`, PUTs, and takes `view` and `lastResult` from the answer. A second press while one is out for the SAME chat is ignored; leaving a chat lets go of its switch, so the next chat's press is never swallowed. A refusal puts the envelope's `error.message` in `error` and reads the view again, since a refusal can mean the box's file changed under the menu.
+- An answer is accepted only when its shape is what the menu and the section read (`sets` and `strays` arrays, each set's `servers` array; a switch's `servers` array and a valid `view`). A wrong-shaped 2xx is a failed read or a refusal, never state: the menu draws from the view at every render of the composer, and a bad one takes the whole chat pane down.
+- A failure that is not the server's envelope says so in the app's own words (`composer.toolsets.noAnswer`, `composer.toolsets.badAnswer`), never the engine's ("Unexpected token '<'", "Failed to fetch").
+- The PUT's deadline is 45 s (`api.toolsets.set`, `timeoutMs: 45_000`), above the server's 30 s bound on a live process's sync, so the answer that says `unconfirmed` or `failed` is the one that reaches the screen. The literal and `bin/toolset.mjs`'s deadline move together.
+- The answer's identity changes only when a read or a switch lands, or the chat changes (the menu is memoized on it). Leaving a chat drops what was held for it.
+- A registry file edit raises no frame, so an open menu reads the new file at the next frame, reconnect, chat switch or reload.
+
+## Rows
+
+| state | what the row does |
+| --- | --- |
+| set | checkbox row, `isSelected` = `set.on`; description = the set's description and its servers line |
+| `busy` (`pendingSet === name`) | `aria-busy` + `aria-disabled`, keeps focus, takes no press; box becomes the `vv-spinner__ring` paint (`aria-hidden`); "Switching on…"/"Switching off…" replaces the servers line, so the row keeps its height |
+| `waiting` (`pendingSet` set, another row) | `aria-disabled`, keeps focus, takes no press, 60% opacity, no hover wash, `cursor-not-allowed`. why: the hook tracks one `pendingSet`, so a second press would take the first row's spinner |
+| stray (on-name no longer defined) | ticked, amber words behind ▲; its press switches it off |
+
+- `busy` draws no spinner on a radio row; a checkbox row draws no caller trailing mark.
+- Node chat (`availability: 'node'`): no rows, one note; the pill counts none.
+
+## Lines
+
+| `data-toolset-line` | words | shown when |
+| --- | --- | --- |
+| `error` (warn) | "Not updated: {{error}}" | `toolsets.error` set |
+| `node` | "This chat runs on {{node}}. …" | node chat |
+| `unreadable` (warn) | "The tool-set file could not be read: …" | `registryError` |
+| `none` | "No tool sets are defined on this box yet. They live in {{file}}." | no sets, no strays, no error |
+| `trouble` (warn) | one sentence per `failed`/`unconfirmed` server | under its row, only while the row still stands where `lastResult` left it (`result.set`, `result.on`) and no press of it is out |
+| `next-message` | "Applies from the next message." | same condition, `live: 'next-message'`, no trouble |
+
+- One `<p role="status" class="sr-only" data-toolset-announce>` is always mounted; the error, trouble and next-message words are copied into it. why: a live region inserted already holding its words is often skipped. The visible lines carry no `role`.
+- `data-toolset-section` marks the group; `data-toolset-count` marks the pill's count.
+- Notes use `text-muted-foreground`. why: the menu's faint ink measures 3.34:1 in light, under AA at 12px.
+- Every line wraps (`[overflow-wrap:anywhere]`). why: a path, node, name or server error is one token wider than a phone.
+
+## The pill's count
+
+- Count = sets on + strays; zero on a node chat. Shown as "· n set(s)" in the pill and as "· n tool set(s) on" on the trigger's `aria-label`/tooltip (still starts "Select model").
+- The count span shows only when `ChatComposer`'s footer is ≥45rem (`[@container(min-width:45rem)]:inline`). INV-8443.
+- Locale keys: `composer.toolsets.*` in `src/modules/i18n/locales/en/chat.json`; `count` and `onLabel` carry `_one`/`_other`. The other locales have none; each call's `defaultValue` carries the English.
+
+## Open — not fixed
+
+- The empty box's edge measures 1.41:1 light, 1.57:1 dark; on this screen it is usually the only sign a row can be ticked. Verve's own draw, an operator colour decision (MAN-742).
+- The menu's existing headings and model note use the faint ink (3.34:1 light), under AA.
+- `lastResult` never expires in the hook, so "Applies from the next message." outlives the next message. The hook's signature carries no send signal and no frame announces a turn's start.
+- On a phone (390px) the menu is already ~779 of 844px tall; the section is below the fold and the pill shows no count.
+- The composer strip at 640–767px with "· High · 2 sets" is unmeasured.
+
+## Probing
+
+- `aria-disabled` rows need `{ force: true }` in Playwright.
+- The count span computes `display: block` inside the chip; test `!== 'none'`.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/composer/ComposerMenuPrimitives.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/composer/ComposerModelMenu.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/composer/ComposerToolsetSection.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useSessionToolsets.ts
+
+## MAN-8496 — Tool sets whole proof — toolset-whole.mjs and its helpers
+
+The tool sets as one system on the real app: two Haiku scratch chats (A, B), five steps, menus, registry back to empty. Parts: MAN-8497 (the module: MAN-8498, MAN-8499, MAN-8500, MAN-8501), MAN-8487, MAN-8490, MAN-8495.
+
+## Run it — `node .verify/toolset-whole.mjs [--evidence <dir>]`
+
+- Needs the dev API on `:3011` (`cloudcli-server-dev`) and the client on `:5183`.
+- Evidence: `--evidence <dir>`, default `.verify/artifacts/toolset-whole-<epoch ms>/`; holds `run.log` and `toolsets.local.json.before` (the saved box bytes).
+- Spends 10 Haiku turns (A 8, B 2), in `lib/probe-project.mjs`'s project under `/tmp`.
+- Writes the LIVE `toolsets.local.json` (adds set `probe`) and hands the dev API over once (`touch server/index.ts`). Never run it while another probe or a conversation that matters is mid-turn.
+- `.verify/` is gitignored; force-add to commit.
+
+| exit | when |
+|---|---|
+| 0 | every check ok |
+| 1 | a check failed, or the run aborted (`RUN ABORTED` + stack in `run.log`; SUMMARY reads `ABORTED after n check(s)…`) |
+| 130 | SIGINT, SIGTERM or SIGHUP |
+
+- Cleanup, on every ending: the box file written back byte for byte (`finally`, process exit, the three signals). A signal also ends both chats' hosts and deletes both chats through the app.
+- `SUMMARY` is the last line of `run.log`: `<ok>/<n> checks ok`, then `; FAILED: <names>`.
+
+## Steps
+
+| # | does | proves |
+|---|---|---|
+| 1 | A: `toolset on probe` in Bash, `probe_echo "same-turn"` loaded through ToolSearch, one turn | live sync: one journal line `+probe`, one probe-server pid whose parent is A's CLI, `tools/list` + `tools/call` in the server log |
+| 2 | B (never asked) is asked for `probe_echo` | ToolSearch finds nothing, a direct call is refused, no probe server is B's child |
+| 3 | A's next message, no switch | same pid, one `tools/call` from it, no new sync line |
+| 4 | `toolset off probe` | `removed`; journal `+ -probe`; the CLI's `deferred_tools_delta` drops the tool; no `tools/call` after the off; `pgrep` empty |
+| 5a | `toolset on probe` again | `connected`; one probe-server process, A's CLI its parent; third sync line |
+| 5b | the handover (`touch server/index.ts`), then A's next message | `[keepalive] re-adopting host`; A's CLI keeps its pid; the message joins the re-adopted process; it echoes from the new server pid with no switch; exactly one sync line since the handover |
+| 5c | idle close (`idleCloseMs: 5000`, at least 5 s after the send) | CLI and server gone |
+| 5d | a send to the closed chat | the fresh process calls `probe_echo` in its first turn, no `toolset` command, set read from A's row `["probe"]`: the HOLD |
+| + | menus, `toolset list` outside a chat, empty registry, row readback, delete both chats | A's menu: probe `aria-checked=true` + pill "· 1 set"; B's: false, no pill; menu off answers PUT 200 `removed`; `toolset list` without `CLAUDE_SURFACE` exits 3; empty-registry note; A's row `[]`, B's NULL |
+
+- Sync-line counts (journal `Tool sets for session <A>`), cumulative: 1 after step 1, 1 after step 3, 2 after 4 (newest `+ -probe`), 3 after 5a, 6 after the menu's off press (newest `+ -probe`). B's row is read with `toolsets is null`.
+- Every turn also checks it ran on Haiku, read off its own assistant rows (`turnModels`, `<synthetic>` left out).
+- The pointer sentence is proved by the CLI's own `prompt_snapshot` attachment plus `CLAUDE_SURFACE=cloudcli`, the loopback URL and a 64-character credential in the CLI's environment (shape printed, never the value). B's verbatim quote is printed, never asserted: Haiku sometimes declines.
+- Shots (1440×900, light): `.verify/shots/toolset-whole-{A-menu-probe-on,B-menu-probe-off,A-menu-probe-off,A-menu-empty-registry}-light.png`.
+
+## The hold check
+
+- Passes when the fresh process has exactly one sync line, `+probe`, and `promptReleasedAt` (the CLI's `queue-operation` `enqueue` row) lands no more than 100 ms before it. why: 100 ms covers journald-vs-CLI clock skew.
+- With the hold the enqueue lands 4–10 ms after the line; with no hold it sits about 750–1000 ms before it.
+- The first tool call is printed, never decisive: it trails the prompt by the model's latency (1.2–2 s), longer than the sync, so it is green without a hold.
+
+## Helpers
+
+| file | owns |
+|---|---|
+| `lib/toolset-whole-kit.mjs` | `probeProcesses` / `describeProbeProcesses` (`pgrep` counting real `node …/probe-server.mjs` only), `journalWithTimes`, `serverLogSince`, `transcriptRows`, `turnEntries`, `systemPromptTexts`, `deferredToolNames`, `promptReleasedAt`, `turnModels`, `openChatSocket`, `cliToolsetEnvironment` |
+| `lib/toolset-menu-kit.mjs` | `readMenu(page)`, `photograph(page, name)` |
+| `lib/toolset-probe-server-source.mjs` | `PROBE_SERVER_SOURCE`: the stdio MCP server (`probe_echo`) written to `probe-server.mjs` in the probe project when `/tmp/mcp-probe/probe-server.mjs` is gone |
+
+## Traps
+
+- A Bash wrapper whose text names `probe-server.mjs` matches `pgrep -f`; count only `node …/probe-server.mjs` (`probeProcesses`).
+- Haiku sometimes obeys the CLI's removal notice and makes no `probe_echo` call in steps 4a/4b; asking again hardens the refusal. The checks rest on `deferred_tools_delta`, no echo, an error for any call made, no process; never on a call being made.
+- A removed stdio server is ended by signal: its log shows no `stdin end, exiting` line. Do not assert one.
+- `DELETE /api/providers/sessions/:id?force=true` removes the row and the transcript and closes no process (`deleteOrArchiveSessionById`). The chat's CLI and its MCP servers live to the 2-hour idle close and then write stub rows (`last-prompt`, `ai-title`, `cost-state`) into the removed transcript path. The script ends both hosts (`endHosts`, tmux `kill-session`) BEFORE the delete.
+- A new chat's row has been seen with `provider_session_id` set to its own app id before its first send (2 of ~30 first launches; writer not found; `toolsets` NULL, nothing synced). The launch then dies on `No conversation found with session ID`. `ensurePristine` reads each row before the first send and, on a flip, prints the row, deletes the chat, makes a fresh one (3 attempts).
+- Pages' `GET …/token-usage` 404s (`SESSION_FILE_NOT_FOUND`) are the existing route answering a chat with no transcript yet; none are on `/api/toolsets`.
+- The box restore is write-in-place, not write-then-rename.
+
+## Measured
+
+- 2026-10-16 closing run: 67 of 67 checks, box file `7b 7d 0a` before and after, no probe-server process, no transcript left.
+- The hold-order check, the per-turn Haiku check, the sync-line / server-log count checks and the signal cleanup were added after that run; no run of them is recorded.
+- Sizes: `toolset-whole.mjs` 610 lines, `toolset-whole-kit.mjs` 301, `toolset-menu-kit.mjs` 34, `toolset-probe-server-source.mjs` 43.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/toolset-menu-kit.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/toolset-probe-server-source.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/toolset-whole-kit.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/toolset-whole.mjs
+
+## MAN-8551 — Cerberus Needs you, read for urgency — .verify/cerberus-needs-you-severity.mjs: what it proves, how to run it, the verdicts
+
+Browser gate for the Needs-you card's severity: order, tone, stripe, tinted head, icon, contrast. Rules it checks: MAN-7808 (`needsYouOrder`), MAN-7879 (the card), MAN-7873 (`STATUS_TABLE`).
+
+## Run
+`node .verify/cerberus-needs-you-severity.mjs <evidence dir>`; exit 0 when every verdict passes, 1 on any FAIL, 2 without the dir. Needs the running :5183 client (`openConsole`, `openCerberusTab`).
+
+## What it does
+1. Reads the live `/api/cerberus/overview` once (a GET made by the script, not by the page).
+2. Answers the page's overview request with that copy, `needsYou` rewritten to five checks on live services: `warn`, `denied`, `warn`, `failing`, `warn`, `since` rising in that order; `counts.needsYou` 5.
+3. Serves the five in the order the server under test would send: sorted by `needsYouOrder`, imported straight from `server/modules/cerberus/read-model/status-rules.ts` (Node loads the `.ts`); a server with no such export gets them as written (oldest `since` first). why: a stub never passes through the server and the client keeps the order it is sent.
+4. Photographs 1280×800 and 390×844 (`isMobile`, `hasTouch`), dark and light: four PNGs in the evidence dir.
+5. Aborts and counts every non-GET to `/api/cerberus/`; nothing the page does reaches a write.
+
+## Verdicts, per width and theme
+| verdict | passes when |
+|---|---|
+| order | cards draw `denied, failing, warn, warn, warn` |
+| tone | each card's `<li>` carries its status's `data-tone` (`danger`, `warn`, `warn`) |
+| icon | each card's mark is a lucide icon; `denied`, `failing`, `warn` draw three different ones |
+| stripe | each card has its 4 px accent bar |
+| head | `denied` and `failing` tint the header band; `warn` does not |
+| word | each card says its status in words |
+| contrast | each header line on a tinted head is ≥ 4.5:1, or ≥ its contrast on a plain card where that is lower |
+| console | zero console or page errors |
+
+Once per run: the live server's own `needsYou` is in `needsYouOrder`; the five as written are oldest `since` first; no write was tried.
+
+## Measured
+- 2026-10-17 before the change: exit 1, 20 FAIL (no `data-tone`, no stripe, glyph text). After: exit 0, all pass.
+- Plain light card's raw key measures 3.34:1 (the house's faint ink); the gate accepts it because it demands no more than the plain card gives.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/cerberus-needs-you-severity.mjs
+
+## MAN-8558 — Affected-areas client wire — src/shared/affected-areas-types.ts and api.affectedAreas
+
+The browser's typed view of `/api/affected-areas` (the Tours tab): one wire-type file and one `api` block. The one home of every shape is shadow-connector's `core/affected_areas/wire.py` (INV-8564); the routes are MAN-8540.
+
+## Files
+| file | holds |
+|---|---|
+| `src/shared/affected-areas-types.ts` | 39 exported types: every `wire.py` model, its 11 nested ones and the four envelopes `TourList`, `ViewsResult`, `UnderstandingMarkResult`, `Refusal`; plus the unions `Face`, `Basis`, `Verdict`, `MarkQueue`. `Point` and `Box` are file-private (`number[]`). Imports nothing from `server/`. |
+| `src/shared/api.ts` | `api.affectedAreas`, 14 verbs, beside `api.cerberus`; a type-only import from the mirror |
+| `.oxlintrc.json` | `src/shared/affected-areas-types.ts` in the `frontend-shared-file` list (INV-5890) |
+
+## Verbs
+Every answer is the wire shape bare, the type named in a `// →` comment above the verb. Ids go through `encodeURIComponent`.
+
+| verb | route | answer |
+|---|---|---|
+| `tours({ q?, limit? })` | `GET /tours` | `TourList` |
+| `tour(tourId)` | `GET /tours/:tourId` | `TourDetail` |
+| `pano(tourId, panoId)` | `GET /tours/:tourId/panos/:panoId` | `PanoDetail` |
+| `cutViews(tourId, panoId)` | `POST …/panos/:panoId/views` | `ViewsResult`; `timeoutMs` 90 000 |
+| `readPano(tourId, panoId, ReadRequest)` | `POST …/panos/:panoId/read` | `ReadResult`; `timeoutMs` 120 000 |
+| `planTour(tourId)` | `POST /tours/:tourId/read` | `TourPlan` |
+| `image(sha, options?)` | `GET /images/:sha` | JPEG bytes: the caller reads `.blob()`; `options.signal` aborts |
+| `codebook()` | `GET /codebook` | `Codebook` |
+| `mark(regionId, MarkRequest)` | `POST /regions/:regionId/marks` | `Region` (comment only) |
+| `missed(sha, MissedRequest)` | `POST /images/:sha/regions` | `Region` (comment only) |
+| `markUnderstanding(readId, UnderstandingMarkRequest)` | `POST /reads/:readId/marks` | `UnderstandingMarkResult` |
+| `queue({ mode, cls?, limit? })` | `GET /queue?mode&class&limit` | `Queue`; `mode` is required, typed `Queue['mode']` |
+| `proving({ model?, contract? })` | `GET /proving` | `Proving` |
+| `setThreshold(cls, ThresholdRequest)` | `PUT /thresholds/:cls` | `ProvingClass` (comment only) |
+
+## Failure bodies (read `.error` AND `.detail`)
+| body | from |
+|---|---|
+| `{ error: string }` | the lane: 503 `no_secret` / `unreachable`, 502 `unreadable`, 422 malformed id or query value, 404 path not forwarded |
+| `{ detail: string }` or `{ detail: [...] }` | shadow-connector's reader routes, passed through: 404 `no such tour`, FastAPI's list-shaped 422 |
+| `{ error, detail }` (`Refusal`) | shadow-connector's marks routes |
+
+## Rules an editor must not break
+- A shape changes in `wire.py` first; the mirror moves in the same change. why: a field renamed on one side is a screen that stops reading.
+- Field names are the wire's camelCase; `class` is a key (`wire.py`'s `cls` alias). Dates are ISO text, ids text, a point `[x, y]` and a box `[x0, y0, x1, y1]`, both in 0..1 of one view.
+- A response field is never optional. A field a later plan fills (`read`, `understanding`, `regions`, `mark`, `standing`, `threshold`, `holdout`, `regionsStanding`, `markedAreasAffected`, `marksCount`, `standingCount`, …) is `T | null`: `null` is "not judged", never "judged and found nothing".
+- A request field `wire.py` defaults is optional (`newClass?: string | null`).
+- `ViewDetail` is `ViewEntry & {…}`, as `wire.py` inherits it.
+- A new verb names its answer type in a `// → Type` comment, as this file's other blocks do.
+
+## Not yet measured
+- `mark`, `missed` and `setThreshold` answer `Region` / `ProvingClass` by reading of the marks design: `wire.py` names only `UnderstandingMarkResult`. Correct the comments when the marks routes land.
+- `Queue`, `Proving` and their nested types have met no real body: `/queue` and `/proving` answered 404 on 2026-10-17.
+- Field sets checked against `model_json_schema(by_alias=True)` per model on 2026-10-17: 39 of 39 match, nullability and `Literal` values included.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/affected-areas-types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts
+
+## MAN-8559 — The affected-areas lane — /api/affected-areas forwarded to shadow-connector
+
+`server/modules/affected-areas/` is the one hop between the browser and shadow-connector's internal-caller gate (R-CAP-11, `X-Internal-Secret` required even from loopback). The browser never holds the secret. Mounted in `server/index.ts` at `/api/affected-areas` behind `authenticateToken`. The engine's side of the same surface: MAN-8540.
+
+| File | Holds |
+|---|---|
+| `affected-areas.module.ts` | `createAffectedAreasModule()`; the ONLY reader of the environment |
+| `affected-areas.routes.ts` | `createAffectedAreasRouter({ forward })`: the allowlist, id/query/body checks, status mapping |
+| `affected-areas.service.ts` | `createAffectedAreasService({ baseUrl, envFile })` → `forward(LaneRequest): Promise<LaneAnswer>`; the secret read; the one `fetch` |
+| `index.ts` | barrel the entrypoint imports |
+
+`LaneRequest`, `LaneAnswer`, `AffectedAreasService` are exported from the service file (Jev-lane precedent), not `server/shared/types.ts` (2,483 lines).
+
+## Configuration
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `SHADOW_CONNECTOR_URL` | `http://127.0.0.1:8001` | engine origin |
+| `SHADOW_CONNECTOR_ENV_FILE` | `/opt/shadow-connector/.env` | file holding `EIS_INTERNAL_SECRET=` |
+
+## Allowlist (14 rows in `ALLOWLIST`)
+
+A method+path not in the table is the lane's own 404 `{ error: 'not a route of the affected-areas lane' }`; it never reaches :8001. The table is the marking plan's whole contract: a row whose engine route is unbuilt answers the engine's own 404 through the lane.
+
+| Method path | Timeout | Reply | Body | Query (forwarded keys only) |
+|---|---|---|---|---|
+| `GET /tours` | 20 s | json | none | `q` ≤ 80 code points, `limit` 1–100 |
+| `GET /tours/:tour` | 20 s | json | none | — |
+| `POST /tours/:tour/panos/:pano/views` | 90 s | json | none | — |
+| `GET /tours/:tour/panos/:pano` | 20 s | json | none | — |
+| `POST /tours/:tour/panos/:pano/read` | 120 s | json | object | — |
+| `POST /tours/:tour/read` | 20 s | json | none | — |
+| `GET /images/:sha` | 20 s | bytes (`image/jpeg`) | none | — |
+| `GET /codebook` | 20 s | json | none | — |
+| `POST /regions/:region/marks` | 20 s | json | object | — |
+| `POST /images/:sha/regions` | 20 s | json | object | — |
+| `POST /reads/:read/marks` | 20 s | json | object | — |
+| `GET /queue` | 20 s | json | none | `mode` unsure\|random, `class`, `limit` 1–50 |
+| `GET /proving` | 20 s | json | none | `model`, `contract`: one token `[\w.:-]{1,80}` |
+| `PUT /thresholds/:class` | 20 s | json | object | — |
+
+## Checks before forwarding (a failure is the lane's 422 `{ error }`, nothing sent)
+
+| Input | Rule |
+|---|---|
+| `:tour`, `:pano` | `^[0-9a-f]{24}$` lowercase |
+| `:sha` | `^[0-9a-f]{64}$` lowercase |
+| `:region`, `:read` | uuid, either case |
+| `:class` | `^[a-z_]{2,40}$` |
+| query key not in the row | dropped, not forwarded |
+| query value that is an array/dict (`?q=a&q=b`) | 422 |
+| body on a `body: object` row | JSON object; array/null/scalar → 422 |
+| malformed percent-escape in the path (`%ZZ`) | 422 `the path holds a malformed percent-escape` (error handler at the end of the router) |
+
+The lane's own 422 is `{ error }`; the engine's is `{ detail: [...] }`: a client reads both.
+
+## Status mapping
+
+| Case | Answer |
+|---|---|
+| upstream answered JSON | its status and body, untouched (404 `no such tour`, 403 wrong secret, 422, refusals) |
+| network error / timeout | 503 `{ error }` (`unreachable`) |
+| non-JSON from a json route; 2xx image that is not `image/jpeg`; 3xx with no JSON | 502 `{ error }` (`unreadable`) |
+| secret missing, empty, padded, non-ASCII, unclosed quote | 503 `no_secret` (`CloudCLI could not read shadow-connector's internal secret`); nothing sent |
+| a thrown error the service cannot name | `next(error)` → the app's handler |
+
+Image 2xx: `Content-Type: image/jpeg`, `Cache-Control: private, max-age=31536000, immutable`; a non-2xx image answer passes through as its JSON.
+
+## The secret read (`parseSecret`, `currentSecret`)
+
+1. `fs.stat(envFile)` on EVERY call; re-parse only when `mtimeMs` or `size` changes. A rotation lands on the next request: no restart, no watcher.
+2. Last `EIS_INTERNAL_SECRET=` line wins; `export ` prefix, CRLF, and an unquoted trailing ` # comment` are handled as dotenv does.
+3. Quoted value: whatever stands between the quotes, verbatim; only whitespace or a `# comment` may follow the closing quote. A quote that never closes, or other text after it → `no_secret`. A secret that really begins with `"` or `'` must be quoted.
+4. Usable = printable ASCII, no whitespace at either end (`USABLE_SECRET`): the gate compares bytes and an HTTP stack trims header edges.
+5. A missing file logs one `[affected-areas] no usable internal secret in <file>: <cause>` line per distinct cause; never the line parsed.
+6. The secret is held in the browser nowhere and in CloudCLI's own environment nowhere: read from the engine's file per call, never written to `process.env`, this server's `.env`, a log or a cache (INV-8633). why: a copy drifts on rotation, and the agent sessions this server spawns inherit its environment.
+
+## Headers sent
+
+| Header | Value |
+|---|---|
+| `X-Internal-Secret` | the secret |
+| `Accept` | `application/json`, or `image/jpeg` for a bytes route |
+| `Content-Type` | `application/json` when a body is sent |
+| `X-Acting-User` | signed-in username, non-printable → `?`, trimmed, ≤ 64 chars; absent when none. Display only: the engine derives `origin` itself (R-CAP-21) |
+
+`fetch` runs `redirect: 'manual'` so the secret header never follows a `Location`; timeout is `AbortSignal.timeout(timeoutMs)`.
+
+## Probes (2026-10-17)
+
+- `GET /api/affected-areas/tours?limit=3` → 200, three tours; `GET …/images/<sha>` → 200 JPEG whose `sha256sum` equals the id.
+- `GET /nope`, `DELETE /tours`, `POST /codebook` → 404 with no `shadow-connector` journal line; 422 cases (bad id, `limit=0|101`, 81-char `q`, `mode=bogus`) likewise never reach the journal.
+- An empty env file → 503 `no_secret`, 0 engine requests; writing the secret into it → next request 200, no restart.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/affected-areas/affected-areas.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/affected-areas/affected-areas.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/affected-areas/affected-areas.service.ts
+
+## MAN-8575 — The Tours view — src/modules/affected-areas: where state lives, what the counts mean, the reads and the presses
+
+The Tours view: a DocuSketch tour's affected areas drawn on the single photo. Three screens, one at a time: `TourPicker` → `TourScreen` → `PanoScreen`. Data is `api.affectedAreas` (wire MAN-8558, lane MAN-8559, routes MAN-8540). Drawn with the library's `RegionImage` and `Gallery` (MAN-8579).
+
+## State of the module
+| fact | value |
+|---|---|
+| phase | live: the Cerberus tab's fourth view, reading the lane; run whole against the live engine 2026-10-17 (`.verify/affected-areas-view.mjs`, `.verify/affected-areas-walk.mjs`) |
+| mounted | `CerberusPanel` imports the lazy `AffectedAreasView` through this module's barrel and draws it after History in the strip, only once center's overview has answered (`overview !== null`, as every view): mounted on the first show of the Tours tab (`toursShown`), `hidden` after, kept mounted while the Cerberus workspace tab stands (leaving that tab for Chat unmounts the panel and the view with it, and the tour, pano and face are lost then). why: the tour, pano, face and scroll survive a visit to Fleet (MAN-7891); the views share ONE scroller, so `CerberusPanel` keeps Tours's offset itself (`toursScrollRef`, written as Tours is left, restored as it returns) |
+| words | `affectedAreas.*` and `cerberus.tours.{tab,tabHint}` in `src/modules/i18n/locales/en/common.json` |
+| shared types | `AffectedAreasRead<T>` (`{ value, trouble, retry }`), `PanoPress`, `TourReaderProgress`, `AffectedAreasTrouble` in `src/shared/types.ts` |
+
+## Files
+| file | holds |
+|---|---|
+| `AffectedAreasView.tsx` | the root: the ONLY file that calls the hooks and holds the handlers; picks the screen by `tourId` / `panoId` |
+| `hooks/useLaneRead.ts` | one JSON read of the lane kept for its key: `{ value, trouble, retry }` plus `reload` (quiet, keeps the value) and `replace(value, forKey)` (writes an answer that came by another road under the key it is GIVEN, and drops every read begun before it); reads when the key is set or `retry`/`reload` is called, never on a timer |
+| `hooks/useTours.ts` · `useTour.ts` · `useCodebook.ts` | the picker's list (30 newest, the search text cut at 80 characters, read once typing has rested 300 ms, and only while the view is shown; `reload` when the picker comes back) · the open tour · the codebook |
+| `hooks/usePano.ts` | the open pano, the dry run beside it (what a read would buy), and `pressRead(force)`: one armed press at a time per pano (kept in `inFlight`, so a press still out shows as busy when the person leaves the pano and comes back), its answer replaces the pano and the plan at once, under the key the press was made for and outranking any read begun before it, unless the person has gone to another pano. A pano the tour lists with no views is not read (its GET is a 404 until it is cut): its dry run cuts it, and until then the screen is handed it with no views; a cut that brings no answer is that pano's trouble, drawn as the header and a banner with Try again |
+| `hooks/useTourReader.ts` | Read the rest: the unread panos in capture order, one armed press each, after the last one answered, passing a pano whose views cannot be cut; `{ walk, start, stop }` |
+| `hooks/useImageUrl.ts` | `useImageUrls(shas)` (the gallery's tiles) and `useImageUrl(sha)` (the shown face): bytes fetched with the token, object URLs revoked on unmount and on a change, aborted on a change, null on failure |
+| `hooks/useViewShown.ts` | `isInLayout(element)` (asked before a read starts), `useViewShown(ref)` (whether the view is in layout, as state) and `useWhenShown(shown, fn)` (a word when it comes back) |
+| `utils/laneTrouble.ts` | a non-2xx answer or a thrown fetch as an `AffectedAreasTrouble` |
+| `ViewBoundary.tsx` | the lazy view's surround, exported by the barrel with the view: a waiting ring while its chunk loads, and a Tours-only warn banner (Reload the page) when it cannot load or crashes, so the failure never replaces the whole Cerberus tab |
+| `TourPicker.tsx` | search field, recent tours with a read-state badge |
+| `TourScreen.tsx` | tour header with the walk (Read the rest), then `ContextCard`, then `TourRooms`, then `RoomGallery` |
+| `TourRooms.tsx` | the tour's rooms in DocuSketch's walk order: name, floor, and who calls each affected, in words (MAN-8578) |
+| `PanoScreen.tsx` | header + `ReadControl`, six face tabs, `RegionImage` beside `RegionList`, caption, Enlarge (`Lightbox`), `UnderstandingCard`, `RoomDrying` |
+| `ReadControl.tsx` | the read presses (Read this pano / Read again / Read the rest), refusals in words, the walk's meter and Stop |
+| `LaneTrouble.tsx` | one warn banner with Try again for a read that brought no answer |
+| `ContextCard.tsx` · `UnderstandingCard.tsx` · `RoomDrying.tsx` · `RoomGallery.tsx` · `RegionList.tsx` | what the reader is told · what it understood · the room's drying numbers · the pano tiles (`Gallery`, max 24 then "+N") · the face's regions |
+| `utils/regionLook.ts` | `REGION_LOOK` and `regionState(region)` |
+| `utils/tourModel.ts` | `FACES`, `panoReadState`, `tourReadState`, `tourUnread`, `tourFacts`, `tourName`, `roomWords`, `spansFloors`, `spoken`, `listWords`, `capitalized`: pure, no fetch, no state |
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/
+
+## MAN-8576 — The Tours view — src/modules/affected-areas: where state lives, what the counts mean, the reads and the presses — Root order (`AffectedAreasView.tsx`)
+section: The Tours view — src/modules/affected-areas: where state lives, what the counts mean, the reads and the presses/001 Root order (`AffectedAreasView.tsx`)
+
+1. state (`query`, `tourId`, `panoId`, `face`, `selectedRegionId`, `enlarged`)
+2. reads (`useTours`, `useTour`, `usePano`, `useCodebook`), each `{ value, trouble, retry }`; `useTour` adds `reload`, `usePano` adds `press`, `pressRead`, `reload`
+3. derivations (`summary`, `entry`, `room`, `unread = tourUnread(...)`)
+4. photos, walk, handlers (`useImageUrl` ×2, `useTourReader`, `on*`)
+
+A step reads only what the steps above it produce. why: the shown face's photo is read off `entry` with no reordering.
+
+## What the numbers mean
+| where | counts |
+|---|---|
+| face tab, caption "3 areas · 2 set aside · read 3h ago" | `faceCounts` in `PanoScreen.tsx`: once the pano answered, set aside = regions with `standing === false`, areas = the rest; before it answers, areas = `standingCount ?? regionsCount` and set aside is hidden |
+| region list "Marked on this view", badges, outlines | every region of the face, set aside included; areas + set aside = outlines drawn |
+| gallery tile badge, tour line areas | `standingCount ?? regionsCount`, summed over a pano's views |
+| tour line "42 of 42 cut views read · 5 panos not cut" | views read of views cut; `uncut = panoCount − round(viewsTotal / 6)`; "none cut yet" when `viewsTotal === 0` |
+| `tourReadState` | against six views per pano (`panoCount × 6`), never against views cut: a tour with an uncut pano is `partly` |
+| `tourUnread` | panos with a face not read, and their unread views (six for a pano never cut); the press names both before it spends |
+| room list title "Rooms" | no count, on purpose: the header's "in 5 rooms" is `roomCount` (`docusketch_tours.rooms`, DocuSketch's own count), while the list has one row per room key, and `canonical_key` folds names ("Office2 / Office1" is one row). The two differed on 14 of the 60 newest tours (El Camino College: 39 against 35, measured 2026-10-17) |
+
+## Read presses
+- The press is synchronous per pano: `POST …/panos/:pano/read` answers when the pano's six views are read (7–10 s, longer behind the tour's lock) with `pano` filled, so nothing is polled (`core/affected_areas/routes/read.py`). The browser waits up to 120 s (`api.affectedAreas.readPano`). A client that gives up does not cancel the purchase: the next press finds the reads cached.
+- `armed: false` is the dry run (`planned`, buys nothing); `armed: true` buys; `force: true` re-reads views that already have a read under this contract.
+- The engine reads one pano per press. A whole tour is the viewer's walk: Read the rest sends one armed press per unread pano, in capture order, the next only after the last one answered.
+
+| press | offered when | sends |
+|---|---|---|
+| Read this pano | the dry run is not back, was refused, or has `viewsToRead > 0` | `{ armed: true, force: false }` |
+| Read again | `againReason` in `ReadControl.tsx` is non-null: (1) a view's `read.contextChanged === true`, the job's details having changed since that face was read; (2) a view with `read.status === 'read'` has a `read.contractVersion` other than the codebook's `contractVersion`. Condition 2 is off until the codebook has answered | `{ armed: true, force: true }` |
+| Read the rest | `unreadPanos > 0`, or a walk is running | `useTourReader.start` |
+
+- A refusal is drawn before the presses it refuses. While one no retry clears stands (`budget`, `flag_off`, `restorly_ai_off`, `gemini_off`, `no_key`), the presses drop to outline.
+- A walk and a press stopped by the same wall show one banner.
+- A pano that did not answer draws its header and banner alone: no press, no face. A lane fault the press repeats is said once.
+- `usePano` sets `press.trouble` when a dry run or press gets no answer. why: "Working out…" must not hang.
+- A pano never cut is cut by its dry run (`readPano` armed false); the screen says "Cutting this pano into its six views…".
+- The walk is the viewer's: one armed `readPano` per pano; `useTourReader` must expose a stop (`onStopRest`, ends after the pano in hand).
+- Every press and Show all is 44 px tall below `md` (`max-md:h-11`).
+- Reads happen on open and on a press: a tour or pano opening, a search that has rested, Try again, Back to the picker (it reads the list again quietly, since a press or a walk changed how far each tour is read), a press and the answer of one. No timer reads anything but the search's 300 ms rest. why: Cerberus's History polls every 30 s and so mounts only while shown; Tours stays mounted, so it must cost nothing hidden.
+- Nothing starts while the view is hidden. The walk asks `isInLayout` before each press and stops after the pano in hand when the view is away; the search's rest timer runs only while `useViewShown` says the view is shown, so text typed just before leaving is read on the return; an answer that arrives hidden is held (`heldRef`) and the list, the tour and the pano are read once when the view comes back. why: a walk spends, and no one is watching its meter or Stop.
+- The walk stops at a refusal (`status: 'refused'`, or a lane fault) with the reason as `lastRefusal`, except a refusal of that pano alone (`PER_PANO_REFUSALS` in `useTourReader.ts`: `views_refused`, a photo the engine cannot cut), which it passes and counts in `skipped`; a part read (`partial`) goes on to the next pano. why: the engine's own walker stops only at `_STOPS` (`budget`, `flag_off` and the four systemic reasons, `core/affected_areas/read.py`), the refusals every later pano would meet too. A walk that passed panos says so when it ends (`affectedAreas.read.skipped`), and a passed pano stays unread, so each later Read the rest tries it again (a refusal in 270 ms).
+- The press's answer is the progress: the plan after a press is counted off the answer's pano (`planAfter`), not asked of the lane again. An answer that lands after the person went to another pano writes nothing of the pano on screen (`openKeyRef`; `patchedUnlessElsewhere`): the single press record and the single pano slot belong to the pano open now. A walk's answer for the open pano reads the pano AND its dry run again (`reload`), so the plan line and Read this pano follow the faces.
+- A pano the tour lists with no views is never GET: the lane answers 404 "no kept views" until it is cut, which reads as "no longer on its tour". `usePano` hands the screen that pano with no views while the dry run cuts it (the "Cutting this pano…" line and the uncut sentence), the dry run's pano replaces it, and a cut tells the root to read the tour again so its listing and gallery tile follow. A dry run that is refused (`views_refused`) leaves it uncut with the refusal said in `ReadControl`.
+- A reading of the client in dev shows each read of an open twice: `React.StrictMode` runs mount effects twice there. A build reads once.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/
+
+## MAN-8577 — The Tours view — src/modules/affected-areas: where state lives, what the counts mean, the reads and the presses — Rules an editor must not break
+section: The Tours view — src/modules/affected-areas: where state lives, what the counts mean, the reads and the presses/002 Rules an editor must not break
+
+- Screens draw what they are handed; the hooks are called from `AffectedAreasView.tsx` only, and `fetch` and `api` calls live in `hooks/` alone.
+- Tone is by judgment, never by kind: a region is painted by where it stands (`regionState` in `utils/regionLook.ts`), not by its codebook kind. why: the tone set stays five (MAN-739 rule 4) and the codebook has fourteen kinds. The kind is words (the list's label, the badge's accessible name).
+- Null is "not judged": `regionState` reads a null `mark` or `standing` as `proposed`, never as unsure or rejected.
+
+`REGION_LOOK` (`RegionState`, five). `regionState` takes the first row that matches, top to bottom:
+| state | when | tone | edge | wash | word (`affectedAreas.look.*`) |
+|---|---|---|---|---|---|
+| `human` | `source === 'human'`, whatever mark it later carries | positive | dashed | full | `human` "Drawn by hand" |
+| `not_a_change` | `mark.verdict === 'not_a_change'` | neutral | dashed | none | `notAChange` "Not a change" |
+| `confirmed` | `mark.verdict` is `confirm` or `rename` | positive | solid | full | `confirmed` "Confirmed" |
+| `unsure` | `mark === null && standing === false` | info | dashed | light | `unsure` "Unsure" |
+| `proposed` | anything else, a null `mark` or `standing` included | info | solid | full | `proposed` "Proposed" |
+
+Info is the reader's word and positive the operator's; a dashed edge is anything the reader's word alone does not carry. `PanoScreen` turns each region into a `RegionShape` with `tone`, `edge` and `wash` (drawn by `RegionImage`, MAN-8579); `RegionList` shows the word.
+- A room is affected on two authorities, both named (MAN-3035): `docusketchAffected` and `markedAreasAffected === true`, never `regionsStanding`, which counts older damage. The words and the tone are MAN-8578.
+- Names, never ids, in any line a person reads (INV-76); a tour with no job or address reads "Tour with no job or address".
+- A bare `YYYY-MM-DD` (date of loss) goes through `formatShortDate`, which reads it as that local day.
+- `index.ts` exports the lazy view and `ViewBoundary` (its surround) only; siblings import each other by path, never through the barrel. `ViewBoundary` is not lazy: it must be there to catch the failure of the chunk it surrounds.
+- `useLaneRead.replace(value, forKey)` takes the key its answer is for, never the render's own: a press made while the tour still listed the pano uncut has a null key in its render. It outranks every read begun before it (`replacedRef`). why: without both, a pano GET answering with the pre-press detail landed over the press's pano and left the faces unread.
+- A refusal of one pano alone is passed by the walk, not a stop: `PER_PANO_REFUSALS` in `useTourReader.ts` holds only `views_refused`, as the engine's walker does (MAN-8576).
+- An object URL is revoked with the record that names it (`useImageUrls` clears its record in the effect's cleanup). why: a list that comes back (the tour screen after a pano) would find its own old key and hand `<img>` revoked URLs: eight `ERR_FILE_NOT_FOUND` errors in the viewer run of 2026-10-17.
+
+## Measured 2026-10-17 (live engine, :5183)
+- `.verify/affected-areas-view.mjs`: Cerberus → Tours → CLARENCE TSE → Dinning Room → each face at 1280 and 390 px: the polygons on the photo equal the engine's regions per face, the badges read 1..n and are the list's rows and the engine's ordinals, a region chosen on the photo is the row's and back, Enlarge keeps every outline on the photo (0.00 px off), nothing is read while the pano idles or Fleet shows, and Read this pano on one unread pano answers 200 `read`, 6 views, and the face strip counts the engine's areas at once.
+- `.verify/affected-areas-walk.mjs`: Stop after this pano ends the walk after the pano in hand; a view hidden mid-walk sends no second press and reads nothing until it returns, then reads the tour once; the walk goes pano to pano on each answer, in capture order.
+- `.verify/affected-areas-rooms.mjs --tour <24-hex tourId> [--evidence <dir>]` (the tour must be linked to a job, else exit 2): Cerberus → Tours → the tour → the Rooms card at 1280 then 390 px, once in a light and once in a dark `openConsole({ dark })` context (no stored setting written). `WIDTHS[0]` stays 1280: `openCerberusTab` finds "More views" only on the wide layout. Holds against `GET /api/affected-areas/tours/{tour}`: one row per wire room in its order, with name and floor; the words from `docusketchAffected` and `markedAreasAffected` alone (written out in the script, not read from the component); warn tone and dot on the rows with words only; no fetch/XHR path of its own for rooms; no sideways scroll, measured on the Rooms card (`scrollWidth - clientWidth`; the card clips its overflow, so the page-level number is 0 whatever the rows do); no authenticated console error. Writes `rooms-<theme>-<width>.png`, `rooms-card-<theme>-<width>.png` and `rooms.json` (keys `<theme>-<width>`) under `.verify/shots/affected-areas-rooms/`.
+- 2026-10-17, run end to end at the review: tour `6acd745c36f92c16415b6f97` (three affected rooms, Kitchen and Entry floor 1, Hvac Closet floor 2; `docusketchAffected` false, `markedAreasAffected` true) passes 26 of 26 checks, exit 0, light and dark, 1280 and 390 px. At 390 px one column, overflow `{"page":0,"rooms":0}`, warn tone and dot on exactly the three rows with words; at 1280 three columns.
+- `.verify/affected-areas-view.mjs` presses nothing unless `--press` is given (one armed press, counted; it needs a cut, unread pano, which each press uses up), and `.verify/affected-areas-walk.mjs` runs nothing unless `--cases` names what to buy (A and B six reads each, C twelve; each pano read is read for good).
+- Open: Read the rest has not met a refusal (a spent budget) on the live engine; a refusal is drawn from `ReadControl`'s own words.
+- Open: the tour screen fetches the photo of every cut pano (a 45-pano tour: 45 requests) though the gallery draws 24 tiles until "+N" opens. The cure needs the Gallery's overflow-open signal (`Gallery` is the shared kit's): a follow-up.
+- Open: "Affected per DocuSketch" and "Affected per DocuSketch and marked areas" have not been seen on a live tour: `docusketchAffected` is false on all 125 tours sampled (5 read, 120 unread).
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/
+
+## MAN-8578 — TourRooms.tsx — the tour's room list: affected rooms and the authority that calls each (DocuSketch, marked areas), beside the pano gallery
+
+`src/modules/affected-areas/TourRooms.tsx` is the Rooms card of `TourScreen`, between `ContextCard` and the pano gallery. Props: `rooms: RoomEntry[]` = `TourDetail.rooms` (wire MAN-8558): one row per room key, in DocuSketch's walk order. A row is not a control; it opens nothing.
+
+## A row
+| part | source |
+|---|---|
+| name | `roomWords(room.roomName, null, false, t)`; "Unnamed room" when null; never the key (INV-76) |
+| floor | "Floor 2" from `room.floor`; nothing when null (a room whose panos disagree on it) |
+| authority words | `authorityWords(room, t)` below; none when nobody calls the room affected |
+| dot | `bg-tone-dot` under `data-tone="warn"` on every affected row, whichever authority spoke; the dot's column is kept on the other rows so the names align |
+
+## Authority words (`affectedAreas.rooms.*` in `common.json`)
+Two wire fields, both on `RoomEntry`: `docusketchAffected` (`boolean`, DocuSketch's sketch flag) and `markedAreasAffected` (`boolean | null`, the marked areas' verdict, MAN-8573; null = not judged).
+| `docusketchAffected` | `markedAreasAffected` | words | key |
+|---|---|---|---|
+| true | not true | Affected per DocuSketch | `affectedDocusketch` |
+| false | true | Affected per marked areas | `affectedMarked` |
+| true | true | Affected per DocuSketch and marked areas | `affectedBoth` |
+| false | false or null | (none) | |
+- Never `regionsStanding`: it counts older damage, which never makes a room affected.
+- The sketch stays an authority and the marked areas are a second; the words name which spoke (MAN-3035).
+- Empty list: "DocuSketch named no rooms on this tour". Title "Rooms", inside the card, with no count (MAN-8576 §"What the numbers mean").
+
+## Why a list of rooms beside a gallery of panos
+- why: the units differ. A verdict is per room (`(room_key, floor)`, MAN-8573) and a `RoomEntry` is one per room key; a gallery tile is one pano and a room has several (100 newest tours: 2,156 panos in 632 room keys, MAN-8543).
+- A tile's badge counts the areas on its pano's views (`standingCount ?? regionsCount`); older damage counts there and never affects, so a badge cannot say whether the room is.
+- The gallery draws at most 24 tiles then "+N" (`RoomGallery` `GALLERY_MAX`), so an affected room's pano can sit behind "+N"; the list has every room.
+
+## Layout
+- Rows tile into 260 px columns (`repeat(auto-fill,minmax(260px,1fr))`): one on a phone, two at 1024, three at 1280, four from about 1440.
+- 40-room commercial tour: 497 px tall at 1440, 684 px at 1280, about 1,731 px in one column. Median tour: 5 rooms.
+- Check: `.verify/affected-areas-rooms.mjs` (MAN-8577 §"Measured 2026-10-17").
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/TourRooms.tsx

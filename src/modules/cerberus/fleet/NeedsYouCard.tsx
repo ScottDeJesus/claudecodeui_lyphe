@@ -31,30 +31,40 @@ type NeedCardProps = {
 };
 
 /**
- * One check that needs you: its glyph (ringing while it fails), its name and word, where it runs and
- * since when, its raw key, and what it last reported, cut at two lines so a health document's prose
- * cannot stretch a row of cards (the whole of it on hover, and in the sheet); then its actions. A check
+ * One check that needs you, the whole card in its status's tone (`data-tone`): a bar of the tone's dot
+ * down its left edge, so a column of cards reads by severity before a word is read; its round glyph (the
+ * status's icon, ringing while it fails), its name and word, where it runs and since when, its raw key,
+ * and what it last reported, cut at two lines so a health document's prose cannot stretch a row of cards
+ * (the whole of it on hover, and in the sheet); then its actions. A status the table draws `solid` —
+ * failing, refused: broken now, not close to a limit — also washes the card's head in its tone. A check
  * with no label yet is named by its key, in mono, which then is not written a second time under it.
- * The glyph is decoration: its word is written beside it.
+ * The bar, the wash and the glyph are decoration: the word is written beside them.
  */
 function NeedCard({ need, leaving, onOpen, onMute }: NeedCardProps) {
   const { t } = useTranslation();
   const { check } = need;
   const look = STATUS_TABLE[check.status];
+  // The table's `solid` cell (failing, refused) is the minute that is broken, and its card says so too: a washed head.
+  const washed = look.cell === 'solid';
   const service = check.serviceLabel ?? check.service;
   // The sheet on this check, at now: the root's onOpenCell with the check's id inside its service.
   const target: CerberusSheetTarget = { node: check.node, service: check.service, check: check.id };
   return (
     <li
+      data-tone={look.tone}
       aria-hidden={leaving || undefined}
       className={cn(
-        'flex min-w-0 max-w-[560px] flex-[1_1_320px] flex-col gap-[9px] rounded-[10px] border border-border bg-card px-3.5 pb-3.5 pt-3',
+        'relative flex min-w-0 max-w-[560px] flex-[1_1_320px] flex-col gap-[9px] overflow-hidden rounded-[10px] border border-border bg-card pb-3.5 pl-[18px] pr-3.5',
+        !washed && 'pt-3',
         leaving
           ? 'pointer-events-none motion-safe:animate-[vv-toast-out_.55s_ease_both] motion-reduce:hidden'
           : 'motion-safe:animate-[vv-pop_.5s_theme(transitionTimingFunction.enter)_both]',
       )}
     >
-      <div className="flex items-start gap-2.5">
+      {/* The tone's bar down the left edge, flush, its ends clipped by the card's corners. */}
+      <span aria-hidden className="absolute inset-y-0 left-0 w-1 bg-tone-dot" />
+      {/* A washed head reaches the card's edges: its margins undo the card's padding, which it takes back inside. */}
+      <div className={cn('flex items-start gap-2.5', washed && '-ml-[18px] -mr-3.5 bg-tone-soft pb-2.5 pl-[18px] pr-3.5 pt-3')}>
         <StatusGlyph status={check.status} still={leaving} decorative />
         <button
           type="button"
@@ -64,14 +74,18 @@ function NeedCard({ need, leaving, onOpen, onMute }: NeedCardProps) {
         >
           <span className="block text-[14.5px] font-medium">
             {check.label ?? <span className="font-mono text-[13px] [overflow-wrap:anywhere]">{check.key}</span>}{' '}
-            <span data-tone={look.tone} className="text-tone-ink">{t('cerberus.needs.word', { word: t(look.wordKey) })}</span>
+            <span className="text-tone-ink">{t('cerberus.needs.word', { word: t(look.wordKey) })}</span>
           </span>
-          <span className="block text-[12.5px] tabular-nums text-muted-foreground">
+          {/* On the wash each line under the name steps one ink darker. Measured on the light refused wash: the
+              muted ink 4.43:1 and the faint 2.92:1, against 7.46:1 and 4.43:1 one step up. */}
+          <span className={cn('block text-[12.5px] tabular-nums', washed ? 'text-secondary-foreground' : 'text-muted-foreground')}>
             {check.since === null
               ? t('cerberus.needs.whereNoSince', { service, node: check.node })
               : t('cerberus.needs.where', { service, node: check.node, time: hms(check.since) })}
           </span>
-          {check.label !== null && <span className="block font-mono text-[11.5px] text-ink-faint [overflow-wrap:anywhere]">{check.key}</span>}
+          {check.label !== null && (
+            <span className={cn('block font-mono text-[11.5px] [overflow-wrap:anywhere]', washed ? 'text-muted-foreground' : 'text-ink-faint')}>{check.key}</span>
+          )}
         </button>
       </div>
       {check.value !== null && (
@@ -105,7 +119,7 @@ function NeedCard({ need, leaving, onOpen, onMute }: NeedCardProps) {
 }
 
 type NeedsYouCardProps = {
-  /** The overview's checks that need a person, oldest `since` first: the read model's own order, kept. */
+  /** The overview's checks that need a person, worst first, then oldest `since`: the read model's own order, kept. */
   needs: CerberusNeed[];
   /** The checks a mute covers now. */
   muted: CerberusCheckView[];
@@ -119,17 +133,20 @@ type NeedsYouCardProps = {
 };
 
 /**
- * NEEDS YOU: the top of the Fleet, the checks a person should look at now, oldest first.
+ * NEEDS YOU: the top of the Fleet, the checks a person should look at now, worst first — refused, then
+ * failing, then close to the limit — and the oldest first within each.
  *
- * Each card says what is wrong in words before anything else ("Session is valid · Failing"), then
- * where and since when, then what it reported, then what can be done: first the card's fix (`NeedFix`,
- * its run's strip on a line of its own, then Run “<fix>”), then Diagnose (outline; “Diagnosing…” while the
- * check's diagnosis since it went bad runs, “See diagnosis” once it ended: both open the sheet), then Mute.
+ * Each card wears its status's tone and icon, and says what is wrong in words before anything else
+ * ("Session is valid · Failing"), then where and since when, then what it reported, then what can be
+ * done: first the card's fix (`NeedFix`, its run's strip on a line of its own, then Run “<fix>”), then
+ * Diagnose (outline; “Diagnosing…” while the check's diagnosis since it went bad runs, “See diagnosis”
+ * once it ended: both open the sheet), then Mute.
  * A card that stops needing you does not blink out: it stays where it was for .55 s, its strip as it was
  * drawn, and leaves on `vv-toast-out`. With motion reduced it is simply gone.
  *
- * With nothing to ask for, the card says so: "✓ Nothing needs you" and "N of M checks passing." Then, while
- * any catalog entry is set to run on its own, "Fixes set to auto-run will run on their own and show up below."
+ * With nothing to ask for, the card says so: the passing glyph, "Nothing needs you" and "N of M checks
+ * passing." Then, while any catalog entry is set to run on its own, "Fixes set to auto-run will run on
+ * their own and show up below."
  *
  * Under them, while any mute is set, "Muted · N": each muted check, "Until 18:40 · 48 min left · <the
  * reason>", and Unmute.
@@ -167,7 +184,7 @@ export function NeedsYouCard({ needs, muted, counts, now, onOpen, onMute }: Need
       {needs.length === 0 && (
         <div className="flex flex-col gap-1 px-[18px] pb-[18px]">
           <div className="flex items-center gap-3">
-            {/* The ✓ grows in, then rings once: two motions on two boxes, because one box runs one animation. */}
+            {/* The passing glyph grows in, then rings once: two motions on two boxes, because one box runs one animation. */}
             <span className="flex-none rounded-full motion-safe:animate-[vv-ring_1.4s_.5s_ease-out_1]">
               <span className="block motion-safe:animate-cerberus-check" style={{ animationDelay: '100ms' }}>
                 <StatusGlyph status="ok" size="lg" decorative />

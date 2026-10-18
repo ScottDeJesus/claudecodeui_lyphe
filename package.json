@@ -49,7 +49,7 @@
     "build:warden": "node warden/build.mjs",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p server/tsconfig.json",
-    "lint": "oxlint src/ server/ warden/",
+    "lint": "oxlint src/ server/ warden/ bin/",
     "lint:server": "oxlint server/",
     "lint:client": "oxlint src/",
     "lint:fix": "oxlint src/ server/ --fix",

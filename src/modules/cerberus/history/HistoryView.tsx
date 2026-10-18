@@ -9,7 +9,7 @@ import { useCheckDetail } from '@/modules/cerberus/hooks/useCheckDetail';
 import { toTimelineEvent } from '@/modules/cerberus/utils/activityEvents';
 import { dateOf, dayAndTime, hm, hms, momentOf, sameLocalDay } from '@/modules/cerberus/utils/cerberusTime';
 import { api } from '@/shared/api';
-import type { CerberusCell, CerberusCheckIndexEntry, CerberusOverview } from '@/shared/cerberus-types';
+import type { CerberusCell, CerberusCheckIndexEntry, CerberusCheckView, CerberusOverview } from '@/shared/cerberus-types';
 
 const SECOND_MS = 1_000;
 
@@ -38,11 +38,27 @@ async function readIndex(): Promise<{ entries: CerberusCheckIndexEntry[]; clockL
 }
 
 /**
- * The check a look-up opens on, as `<node>/<key>`: the one that has needed a person longest (the
- * overview lists them by `since`), else the index's first. `checks` is never empty here.
+ * Whether `a` has needed a person longer than `b`: the older `since`, an unknown one never older than a
+ * known one; then the key, then the node, so a tie always lands on the same check.
+ */
+function waitedLonger(a: CerberusCheckView, b: CerberusCheckView): boolean {
+  const sinceA = a.since ?? Number.POSITIVE_INFINITY;
+  const sinceB = b.since ?? Number.POSITIVE_INFINITY;
+  if (sinceA !== sinceB) return sinceA < sinceB;
+  if (a.key !== b.key) return a.key < b.key;
+  return a.node < b.node;
+}
+
+/**
+ * The check a look-up opens on, as `<node>/<key>`: the one that has needed a person longest, else the
+ * index's first. It is picked here from every need, because the overview lists them worst first, not
+ * by `since`. `checks` is never empty here.
  */
 function firstChoice(checks: CerberusCheckIndexEntry[], overview: CerberusOverview | null): string {
-  const longest = overview?.needsYou[0]?.check;
+  let longest: CerberusCheckView | undefined;
+  for (const { check } of overview?.needsYou ?? []) {
+    if (longest === undefined || waitedLonger(check, longest)) longest = check;
+  }
   const entry = checks.find((candidate) => candidate.node === longest?.node && candidate.key === longest?.key) ?? checks[0];
   return `${entry.node}/${entry.key}`;
 }

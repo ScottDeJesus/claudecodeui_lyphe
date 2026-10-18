@@ -5,10 +5,10 @@ import { PLANNER_LANES_MIN, usePlannerLanes } from '@/modules/settings/hooks/use
 import { Button, SettingRow, Stepper } from '@/shared/ui';
 
 /**
- * HOW MANY PLANNERS RUN AT ONCE — the dispatcher's own dial, `~/.claude/state/planners.flag`, drawn
- * directly below the WIP defaults row because the two answer the same question about different workers:
- * the WIP row is how many features and tasks walk at once, this one how many PLANNERS (designs, cuts,
- * judgments) are out at once. They are separate files and neither bounds the other.
+ * HOW MANY PLANNERS RUN AT ONCE — the dispatcher's own dial, `~/.claude/state/planners.flag`. It answers
+ * the question the master controller's WIP dropdowns (In flight's header) answer for features and tasks,
+ * about a different worker: how many PLANNERS (designs, cuts, judgments) are out at once. They are
+ * separate files and neither bounds the other.
  *
  * Its own file, as `RunnerParkAtPeakRow` is: `RunnerModelContent` is past what it should hold, and a
  * row whose read, write and re-read are its own hook has nothing to share with the rows around it
@@ -21,7 +21,7 @@ import { Button, SettingRow, Stepper } from '@/shared/ui';
  *
  * It wears `PencilRuler` — the designer's shape — which no other row on this card uses.
  *
- * Used by `RunnerModelContent`, which draws it directly beneath the WIP defaults row.
+ * Used by `RunnerModelContent`, which draws it after the Dactyls row.
  */
 export default function RunnerPlannerLanesRow() {
   const { t } = useTranslation('settings');

@@ -28,6 +28,11 @@ function wipClause(hold: string): string {
   return hold.replace(/^WIP:\s*/, '');
 }
 
+/** The clause of a `queue_hold` sentence without its `queue:` lead — the card says "Waiting" itself, and the queue is the screen it stands on. */
+function queueClause(hold: string): string {
+  return hold.replace(/^queue:\s*/, '');
+}
+
 /**
  * One plan the dispatcher is carrying, in the lane card's ONE anatomy — the arc deck's too: a head
  * that says which plan this is and how it stands, the action bar directly under it, and the face.
@@ -37,7 +42,7 @@ function wipClause(hold: string): string {
  *   and `done/total` phases on row one; the plan's description (`cardDescription`: its design's
  *   `delivers` line, else its goal's where that yields nothing) folded to one line until pressed, when
  *   it opens whole (`CardDescription`) — then who is out on the plan (`PlannerBadge`), what of its
- *   arc it waits on and, while its epic's feature limit holds it, the WIP slot it waits for, on row two; the plan's total as pills
+ *   arc it waits on and, while the queue or its epic's feature limit holds it, its epic's turn or the WIP slot it waits for, on row two; the plan's total as pills
  *   (`SpendPills`, counting at first sight), the last of them how long agents have worked on it
  *   (`WorkingPill`), on row three; Dismiss or Hide, and the fold, in the corner.
  * - THE BAR (`PlanControls` → `ActionBar`): the verbs the plan's status allows and its model switch.
@@ -57,12 +62,13 @@ function wipClause(hold: string): string {
  * the prompt folds with the card and is never taken off the screen with the verbs. A fold is not an
  * answer, and the only thing that ends a band is the frame that stops carrying the ask.
  *
- * THE CORNER PUTS THE CARD AWAY, NOT THE PLAN, and the dispatcher is never told (`hiddenPlans.ts`). A
- * COMPLETE plan's corner is Dismiss: the card leaves the board, and no list or count keeps it. Any
- * other plan's is Hide: `Hidden · N` lists it and `Show` brings it back, because a plan still walking
- * must stay reachable. Neither deletes anything, so no dialog guards either. `onPutAway` is the
- * caller's `planPutAway(plan, carriedNames)`, because only the caller holds the lane's carried names
- * the store prunes against.
+ * THE CORNER PUTS THE CARD AWAY. A COMPLETE plan's corner is Dismiss: the card leaves the board, and no
+ * list or count keeps it (`hiddenPlans.ts`; the dispatcher is never told). Any other plan's is Hide, and a
+ * hide is the dispatcher's (`usePutAway`): the plan is paused and held out of the queue, `Hidden · N` lists
+ * it and `Show` brings it back and lets it take its turn. News on a hidden plan draws its card again, still
+ * reading HIDDEN, with a `Show` of its own (`PlanControls`). Neither deletes anything, so no dialog guards
+ * either. `onPutAway` is the caller's `usePutAway(carriedNames).plan(plan)`, because only the caller holds
+ * the lane's carried names the store prunes against.
  *
  * DELETE IS THE MENU'S, AND ONLY WHERE THE DISPATCHER WOULD TAKE IT. `⋯` carries `Delete feature…`
  * exactly when `planDroppable(plan, planners)` holds. It is never drawn disabled on a `live` or `stalled` plan,
@@ -90,6 +96,11 @@ function wipClause(hold: string): string {
  * and standing still because its epic already has its limit in progress says why, in the gate's own
  * words, beside `waits on …`. A frame without the key (an older dispatcher) draws no line.
  *
+ * `WAITING · <clause>` IS THE QUEUE'S, IN THE SAME ROW AND THE SAME WORDS' RULE (`plan.queue_hold`): the
+ * clause the queue's gate returned — `paused`, `at most N epics at once`, `<epic> goes first` — for a
+ * feature whose epic's turn has not come. The gate asks the queue first, so the dispatcher sends this one
+ * and nulls `wip_hold` while it is set: the card says the first clause the gate asks, as the gate does.
+ *
  * A STALLED PLAN SAYS WHY (`plan.stalled`, the dispatcher's own cause word — `report_stall`): the head's
  * second row carries one line, `data-plan-stalled`, naming whether the dispatcher is down or the run
  * ended unrecorded, and that Resume starts things again. The card words the cause and decides none of it.
@@ -97,7 +108,7 @@ function wipClause(hold: string): string {
  * `data-dispatcher-card`, `data-plan-name`, `data-plan-status` and `data-collapsed` are the browser
  * harness's handles, on the ROOT so a probe scopes every reading and every press to ONE plan — the
  * live plan walking beside a probe must never be pressed. `data-card-description` marks the lead's
- * description line, the arc deck's too, and `data-plan-wip-hold` the line above.
+ * description line, the arc deck's too, and `data-plan-queue-hold` and `data-plan-wip-hold` the two lines above.
  *
  * Used by `RunnerPanel` and `RunnerWidgetBody` (runner-tab), for the plans no arc holds, and by
  * `DispatchArcDeck`, for each plan of an arc.
@@ -112,7 +123,7 @@ export function PlanCard({
   plan: DispatcherPlan;
   /** The plan names of this plan's own arc that it waits on, as the document spells them; `[]` for a plan of no arc. */
   waitsOn?: readonly string[];
-  /** The corner's press, Dismiss or Hide by the plan's state: the caller's `planPutAway(plan, carriedNames)`. */
+  /** The corner's press, Dismiss or Hide by the plan's state: the caller's `usePutAway(carriedNames).plan(plan)`. */
   onPutAway: () => void;
   /** The title's heading level: 4 inside an arc deck, whose own title is the 3 its plans sit under. */
   headingLevel?: 3 | 4;
@@ -164,12 +175,19 @@ export function PlanCard({
                 {/* WHO IS OUT ON THIS PLAN and what it waits on, under its description: the word says
                     what the PLAN is (`designing`), the badge who is doing something about it; the wait is
                     a fact about THIS plan ("before this, that"). Neither draws anything when absent. */}
-                {(plan.planner || waitsOn.length > 0 || plan.wip_hold || plan.stalled) && (
+                {(plan.planner || waitsOn.length > 0 || plan.queue_hold || plan.wip_hold || plan.stalled) && (
                   <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
                     {plan.planner && <PlannerBadge planner={plan.planner} />}
                     {waitsOn.length > 0 && (
                       <span data-plan-waits-on className="min-w-0 break-words font-mono text-xs text-muted-foreground">
                         {t('dispatcher.waitsOn', { names: waitsOn.join(', ') })}
+                      </span>
+                    )}
+                    {/* The queue's clause before the WIP one, the order the gate asks them in; the
+                        dispatcher sends one or the other, never both (`queue_hold` nulls `wip_hold`). */}
+                    {plan.queue_hold && (
+                      <span data-plan-queue-hold className="min-w-0 break-words text-xs text-muted-foreground">
+                        {t('dispatcher.queueHold', { clause: queueClause(plan.queue_hold) })}
                       </span>
                     )}
                     {plan.wip_hold && (

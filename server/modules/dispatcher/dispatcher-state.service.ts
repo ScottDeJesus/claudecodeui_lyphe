@@ -2,6 +2,7 @@ import { sessionsDb } from '@/modules/database/index.js';
 import type { DispatcherArc, DispatcherDaemon, DispatcherPlan, DispatcherPlanner, DispatcherRoute } from '@/shared/types.js';
 
 import { arcsOf } from './dispatcher-arc.reader.js';
+import { epicsOf } from './dispatcher-epics.reader.js';
 import { planOf, type DocumentPlan } from './dispatcher-plan.reader.js';
 import { plannersOf } from './dispatcher-planner.reader.js';
 import { each, field, isCount, isCountOrNull, isFlag, isRecord, isText, isTextOrNull, need, oneOf, readDispatcherDocument, wipWord } from './dispatcher-state.transport.js';
@@ -96,7 +97,7 @@ function plannerLanesOf(raw: unknown): DispatcherRoute['planners'] {
 }
 
 /**
- * Settings' two WIP defaults (`route.wip`, `wip.defaults`): the word each limit takes while an epic
+ * The master controller's two WIP defaults (`route.wip`, `wip.defaults`): the word each limit takes while an epic
  * carries none of its own, which the epic's control compares a press against. Absent from a build
  * older than the field, and ANOTHER BUILD TALKING like `route.planners`: an absent key reads as
  * `undefined` and the control is simply not drawn, while a key that IS there and holds a word the
@@ -111,20 +112,36 @@ function wipDefaultsOf(raw: unknown): DispatcherRoute['wip'] {
   };
 }
 
+/**
+ * How many plans the board's Start would let go (`route.waiting`, `first_start.held`): a count the dispatcher
+ * derives so the button and its press read one set. Absent from a build older than the field — ANOTHER BUILD
+ * TALKING, like `route.planners` — so it reads `undefined` and no Start is drawn; a key that IS there and is
+ * not a count is refused by name.
+ */
+function waitingOf(raw: unknown): number | undefined {
+  return raw === undefined ? undefined : need(raw, isCount, 'route.waiting');
+}
+
 /** This box's posture. `word` is the whole posture in one phrase. */
 function routeOf(raw: unknown): DispatcherRoute {
   const route = need(raw, isRecord, 'route');
   const planners = plannerLanesOf(field(route, 'planners'));
   const wip = wipDefaultsOf(field(route, 'wip'));
+  const waiting = waitingOf(field(route, 'waiting'));
   return {
     provider: oneOf(field(route, 'provider'), PROVIDERS, 'route.provider'),
     word: need(field(route, 'word'), isText, 'route.word'),
     park_at_peak: need(field(route, 'park_at_peak'), isFlag, 'route.park_at_peak'),
     peak_until: need(field(route, 'peak_until'), isTextOrNull, 'route.peak_until'),
-    // Each left off the object entirely when the build sent none, so the frame of an older dispatcher is
-    // byte-for-byte what it was and the client's `planners?.` and `wip?.` read it as absent.
+    // `planners`, `wip` and `waiting` are each left off the object entirely when the build sent none, so the
+    // client's `planners?.`, `wip?.` and `waiting` read them as absent. (`epics`, below, is always a key:
+    // `null` is its absence.)
     ...(planners === undefined ? {} : { planners }),
     ...(wip === undefined ? {} : { wip }),
+    ...(waiting === undefined ? {} : { waiting }),
+    // The epic dial's census, `null` for a build older than the key (`epicsOf`). Always present as a
+    // key, unlike the two above, because the type states `null` — the client reads `epics?.` either way.
+    epics: epicsOf(field(route, 'epics')),
   };
 }
 

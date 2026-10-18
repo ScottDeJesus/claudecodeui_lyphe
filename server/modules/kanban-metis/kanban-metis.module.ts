@@ -5,6 +5,7 @@ import { readDeepseekApiKey } from '@/modules/deepseek/index.js';
 import { WS_OPEN_STATE, connectedClients } from '@/modules/websocket/index.js';
 import { createPolledLane } from '@/shared/polled-lane.service.js';
 import type { KanbanMetisSession, KanbanMetisStateEvent } from '@/shared/types.js';
+import { loopbackApiOrigin } from '@/shared/utils.js';
 
 import { createKanbanMetisRouter, readAppJwtSecret } from './kanban-metis.routes.js';
 import { createMetisDriver } from './metis-driver.service.js';
@@ -24,8 +25,7 @@ import { startTelemetryWatcher } from './metis-telemetry.service.js';
 
 /**
  * The port this process is listening on, resolved from the environment the server itself starts
- * with — the shape `browser-use.service.ts:190-193` uses for its own MCP URL, `SERVER_PORT` then
- * `PORT` then the house default.
+ * with — `loopbackApiOrigin` in `server/shared/utils.ts`: `SERVER_PORT` then the house default.
  *
  * It matters that the answer is the RUNNING process's port and not a constant: a Metis child writes
  * to the board through this origin, so a server started on 7893 by a probe would otherwise have its
@@ -37,8 +37,7 @@ function resolveApiOrigin(): string {
   // wants to hand a child an origin it can observe, says so explicitly rather than being guessed at.
   const override = process.env.KANBAN_PM_API_URL;
   if (override !== undefined && override !== '') return override.replace(/\/+$/, '');
-  const port = process.env.SERVER_PORT || process.env.PORT || '3001';
-  return `http://127.0.0.1:${port}`;
+  return loopbackApiOrigin();
 }
 
 /**

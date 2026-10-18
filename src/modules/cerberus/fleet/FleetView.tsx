@@ -31,7 +31,7 @@ type FleetViewProps = {
 
 /**
  * THE FLEET, the tab's first view, read top to bottom in the order a person needs it:
- * 1. Needs you: what to look at now, or "✓ Nothing needs you".
+ * 1. Needs you: what to look at now, worst first, or "Nothing needs you" beside the passing glyph.
  * 2. Beside What happened (under it on a phone):
  *    - the toolbar: Grid · List · Rings, a chip per filter with its count, the search, Expand all and
  *      Collapse all;

@@ -1,7 +1,6 @@
 import { cerberusDefinitionsDb, cerberusNodesDb, projectsDb } from '@/modules/database/index.js';
 import type {
   CerberusCheckView,
-  CerberusNeed,
   CerberusNodeView,
   CerberusOverview,
   CerberusReadInputs,
@@ -22,7 +21,7 @@ import { resolveNodeLink } from './node-links.js';
 import { NO_OVERLAY, type NodeOverlay } from './overlays.js';
 import { needRuns, runningViews } from './run-views.js';
 import { loadSeries, type CheckSeries } from './series.js';
-import { needsAttention, worst } from './status-rules.js';
+import { needsAttention, needsYouOrder, worst } from './status-rules.js';
 import { updatingByNode } from './update-views.js';
 
 /** The strip every service draws on the fleet screen: thirty one-minute cells. */
@@ -39,8 +38,9 @@ const OVERVIEW_ACTIVITY = 7;
  * What it counts: a check is in `counts.checks` unless it is not enabled (a retired check is not in
  * the active index at all); `not_enabled` never needs you, and a muted check keeps recording, so it
  * is in `muted` and never in `needsYou`. `needsYou` lists the active checks whose current status is
- * warn, failing or denied, ordered by how long ago they began (ingest's `since`) then key; a check
- * whose beginning ingest does not know sorts after the ones it does. Each need carries the fix offered
+ * warn, failing or denied, worst first (`needsYouOrder`: denied, failing, warn), then by how long ago
+ * they began (ingest's `since`), then key; within a word, a check whose beginning ingest does not know
+ * sorts after the ones it does. Each need carries the fix offered
  * for it, the run it shows (`run-views.ts`) and the diagnosis it shows (`diagnosis-views.ts`); `running`
  * is every fix run that has not ended.
  */
@@ -137,15 +137,6 @@ function readNode(node: string, overlay: NodeOverlay, inputs: CerberusReadInputs
   return { services, newestResultAt, newestHeardAt };
 }
 
-/** Oldest `since` first, an unknown one last; then by key, then node, so the order is stable. */
-function sinceThenKey(a: CerberusNeed, b: CerberusNeed): number {
-  const sinceA = a.check.since ?? Number.POSITIVE_INFINITY;
-  const sinceB = b.check.since ?? Number.POSITIVE_INFINITY;
-  if (sinceA !== sinceB) return sinceA < sinceB ? -1 : 1;
-  if (a.check.key !== b.check.key) return a.check.key < b.check.key ? -1 : 1;
-  return a.check.node < b.check.node ? -1 : a.check.node > b.check.node ? 1 : 0;
-}
-
 /**
  * Builds the overview. Nodes come hub first — `center`, role `hub`, link `reporting`, `lastHeardAt`
  * its newest self-check, no `nodes` row, never silent — then every enrolled node with its link from
@@ -227,7 +218,7 @@ export function buildOverview(inputs: CerberusReadInputs): CerberusOverview {
         run: runs.get(`${check.node}/${check.key}`) ?? null,
         diagnosis: diagnoses.get(`${check.node}/${check.key}`) ?? null,
       }))
-      .sort(sinceThenKey),
+      .sort(needsYouOrder),
     muted: checks.filter((check) => check.mute !== null),
     running: runningViews(nodes.map((node) => node.id)),
     counts: {

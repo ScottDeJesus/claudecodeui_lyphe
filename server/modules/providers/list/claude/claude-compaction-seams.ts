@@ -18,7 +18,8 @@
  * Every hook call is wrapped: a hook that throws (or rejects) is logged and the turn goes on, because
  * a compaction must never be able to break the reply it follows.
  *
- * consumer: claude-runtime.provider.js, chat-process.ts (the profile's reading of the constant)
+ * consumer: claude-runtime.provider.js, chat-process.ts (the profile's reading of the constant),
+ * claude-compaction-restore.ts (the report of a turn the server did not see end)
  */
 
 import { randomUUID } from 'node:crypto';
@@ -123,11 +124,10 @@ const TAKES_OVER_DEADLINE_MS = 10_000;
 export async function askCompactionTakesOver(context: CompactionContext, options: AnyRecord): Promise<boolean> {
   const appSessionId = typeof options.sessionId === 'string' && options.sessionId ? options.sessionId : null;
   if (appSessionId === null) return false;
-  const node = typeof options.node === 'string' && options.node ? options.node : null;
   let deadline: NodeJS.Timeout | undefined;
   try {
     const answer = await Promise.race([
-      context.compaction.takesOver({ appSessionId, node }),
+      context.compaction.takesOver({ appSessionId }),
       new Promise<'late'>((resolve) => {
         deadline = setTimeout(() => resolve('late'), TAKES_OVER_DEADLINE_MS);
         deadline.unref();
@@ -236,8 +236,8 @@ const PER_TURN_SEND_OPTIONS = [
   'keepalive'
 ] as const;
 
-/** The launch profile's fields a compaction's own send needs (chat-process.ts `LaunchProfile`). */
-type ProfileForSend = {
+/** The launch profile's fields a compaction's own send needs (chat-process.ts `LaunchProfile`). Consumer: claude-compaction-restore.ts. */
+export type ProfileForSend = {
   unknown: boolean;
   model: string;
   effort: string | null;
@@ -254,7 +254,7 @@ type ProfileForSend = {
  * are read from the launch profile the host recorded; a profile that was never recorded
  * (`unknown`) knows none of them, and the options stay bare.
  */
-function sendOptionsOfTurn(options: AnyRecord, profile: ProfileForSend | null): AnyRecord {
+export function sendOptionsOfTurn(options: AnyRecord, profile: ProfileForSend | null): AnyRecord {
   const kept: AnyRecord = { ...options };
   for (const key of PER_TURN_SEND_OPTIONS) delete kept[key];
   if (options.keepalive && profile && !profile.unknown) {
@@ -275,24 +275,8 @@ export function isSeedAppend(options: AnyRecord | null | undefined): boolean {
   return options?.compactionSeed === true;
 }
 
-/** The last main-thread assistant request of a turn: its whole context, and the model it ran on. */
+/** The last main-thread assistant request of a turn — what `mainThreadRequestOf` (session-host) answers: its whole context, and the model it ran on. */
 type MainThreadBudget = { used: number; model: string | null };
-
-/**
- * The main-thread budget one assistant message reports, or null when it reports none worth keeping.
- * `tokenBudget` is what `extractTokenBudget` already read off the message (null for subagent traffic
- * and for a message with no usage). A synthetic assistant message — the CLI's own stand-in for an API
- * error — carries all-zero usage and would overwrite the last real request, so it is not a budget.
- */
-export function mainThreadBudgetOf(
-  message: { type?: string; message?: { model?: unknown } } | null | undefined,
-  tokenBudget: { used: number } | null | undefined
-): MainThreadBudget | null {
-  if (message?.type !== 'assistant' || !tokenBudget) return null;
-  const model = typeof message.message?.model === 'string' ? message.message.model : null;
-  if (model === '<synthetic>' || !(tokenBudget.used > 0)) return null;
-  return { used: tokenBudget.used, model };
-}
 
 /**
  * The context window of the model a request ran on, read off a result's `modelUsage`. An entry
@@ -300,7 +284,7 @@ export function mainThreadBudgetOf(
  * `claude-opus-4-8[1m]`), or its `canonicalModel` is it; the largest window wins when several match.
  * Null when no entry matches or the model is unknown.
  */
-function contextWindowFor(modelUsage: unknown, model: string | null): number | null {
+export function contextWindowFor(modelUsage: unknown, model: string | null): number | null {
   if (!model || !modelUsage || typeof modelUsage !== 'object') return null;
   let largest: number | null = null;
   for (const [key, entry] of Object.entries(modelUsage as Record<string, unknown>)) {
@@ -457,8 +441,8 @@ export function liveActivityOf(entry: { process?: { activity?: ChatProcessActivi
   return entry?.process?.activity ?? notLiveActivity();
 }
 
-/** Runs one hook call, logging a throw (or a rejected promise) instead of letting it reach the turn. */
-function callHook(name: string, call: () => unknown): void {
+/** Runs one hook call, logging a throw (or a rejected promise) instead of letting it reach the turn. Consumer: claude-compaction-restore.ts. */
+export function callHook(name: string, call: () => unknown): void {
   try {
     const returned = call();
     if (returned && typeof (returned as Promise<unknown>).catch === 'function') {

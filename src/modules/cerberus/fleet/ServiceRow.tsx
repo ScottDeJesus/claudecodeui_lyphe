@@ -41,10 +41,10 @@ function checkIdFor(service: CerberusServiceView, worst: string | null): string 
  * last 30 minutes. With no label yet, the raw id stands in as the name, in mono, and is not written a
  * second time under itself.
  *
- * The pill is the service's folded status, so its glyph and its sentence (`serviceSentence`) always
+ * The pill is the service's folded status, so its icon and its sentence (`serviceSentence`) always
  * agree: "Session is valid — failing", "2 checks need you", "2 of 3 passing · 1 muted", "All 3 checks
  * passing", "Its check is passing". While a fix runs on one of its checks (`overview.running`) the pill is
- * the info ● and says "Fix running on its own" / "Fix running" by who started it.
+ * the info wrench and says "Fix running on its own" / "Fix running" by who started it.
  *
  * The minutes are the read model's strip, oldest on the left, each a `StatusCell` named on hover by
  * its time, its word and, when it folds several checks, the check that set it. The newest minute is

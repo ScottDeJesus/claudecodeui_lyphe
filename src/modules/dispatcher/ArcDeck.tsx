@@ -13,8 +13,9 @@ import {
   waitsOnSiblings,
 } from '@/modules/dispatcher/dispatcherState';
 import { DeckFrame } from '@/modules/dispatcher/DeckFrame';
+import { doneDismiss, putAwayVerb } from '@/modules/dispatcher/hiddenPlans';
 import { useDispatcherPlans } from '@/modules/dispatcher/hooks/useDispatcherPlans';
-import { arcPutAway, doneDismiss, planPutAway, putAwayVerb } from '@/modules/dispatcher/hiddenPlans';
+import { usePutAway } from '@/modules/dispatcher/hooks/usePutAway';
 import { CardDescription, LaneCardHead } from '@/modules/dispatcher/LaneCardHead';
 import { phaseWord } from '@/modules/dispatcher/phaseWord';
 import { PlanAsk } from '@/modules/dispatcher/PlanAsk';
@@ -43,8 +44,8 @@ import { cn } from '@/shared/utils';
  * judgment has finished too — stamped, or every phase of it done. `empty` is warn because an arc whose every plan was dropped is the one
  * state an operator did not ask for, and it is the state nothing else on the screen would show.
  *
- * THE FOUR PLAN WORDS WEAR THE PLAN'S OWN TONE, through `planStatusTone` and not a colour of
- * their own: `queued`, `paused`, `scheduled` and `stalled` are the plans' words too (`DispatcherPlanStatus`),
+ * THE FIVE PLAN WORDS WEAR THE PLAN'S OWN TONE, through `planStatusTone` and not a colour of
+ * their own: `queued`, `paused`, `scheduled`, `stalled` and `hidden` are the plans' words too (`DispatcherPlanStatus`),
  * read off the arc's plans and printed on the cards in the strip below — a `queued` arc over `queued`
  * cards that were toned differently would be the header arguing with its own deck (`dispatcherState`
  * states that rule once). Every other word here is the arc's alone.
@@ -59,6 +60,7 @@ const ARC_STATUS: Record<DispatcherArcStatus, { key: string; tone: Tone }> = {
   queued: { key: 'dispatcher.arcStatus.queued', tone: planStatusTone('queued') },
   paused: { key: 'dispatcher.arcStatus.paused', tone: planStatusTone('paused') },
   scheduled: { key: 'dispatcher.arcStatus.scheduled', tone: planStatusTone('scheduled') },
+  hidden: { key: 'dispatcher.arcStatus.hidden', tone: planStatusTone('hidden') },
 };
 
 /**
@@ -87,20 +89,23 @@ const FLOW_MARK: Partial<Record<DispatcherPlanStatus, string>> = { complete: '�
  * plan whose turn has not come among them (`FLOW_MARK`); toned as the plan's own badge
  * is (`planStatusTone`), named `<plan> · <word>`, and filled as far as the arc's complete plans reach.
  *
- * THE HEAD, ROW BY ROW: the Epic tag (`LaneCardHead` draws it from `kind="epic"`) and the arc's name, its word (`ARC_STATUS`), the hour a
- * Schedule start armed (the clock slot, `data-dispatch-arc-schedule-note`) and how many of its plans
- * are complete; then the arc's description (`cardDescription`: its design's `delivers` line, else its
- * goal's where that yields nothing), folded to one line until pressed (`CardDescription`), and who is
- * out on it; then its
- * books as pills, counting at first sight (`darc:<name>`), the last of them how long agents have
+ * THE HEAD, ROW BY ROW: the Epic tag (`LaneCardHead` draws it from `kind="epic"`) and the arc's name, its
+ * word (`ARC_STATUS`) and how many of its plans are complete, then the clock slot: the epic's place in the
+ * queue and its turn (`1 · its turn`, `data-dispatch-arc-queue-note` valued `now`, `waiting` or `paused`,
+ * while `arc.queue` is set) before the hour a Schedule start armed, led by the flow's `◷`
+ * (`data-dispatch-arc-schedule-note`); then the arc's description (`cardDescription`: its design's
+ * `delivers` line, else its goal's where that yields nothing), folded to one line until pressed
+ * (`CardDescription`), and who is out on it; then its books as pills, counting at first sight
+ * (`darc:<name>`), the last of them how long agents have
  * worked on the epic (`WorkingPill`). The corner is `⋯` — carrying `Dismiss done
  * features · N` while some plans of the deck are done and some are not — then the deck's own press, which
- * puts EVERY plan of the deck away in one write (`arcPutAway`), then the fold. That press is Dismiss
- * once every plan of the deck is complete (the deck leaves the board, and nothing lists it), and Hide
- * before then (its unfinished plans go to the `Hidden` list, its done ones leave with the deck), by
- * the one rule a plan's corner follows (`putAwayVerb`). It is ONE press: a `Show` of any of its plans,
- * or news on any plan of the arc, brings the whole deck back (`hiddenPlans.ts`). A wholly done deck
- * draws no `Dismiss done features`, which would be its corner again.
+ * puts the whole deck away (`usePutAway`), then the fold. That press is Dismiss once every plan of the deck
+ * is complete (the deck leaves the board, and nothing lists it), and Hide before then: the dispatcher hides
+ * the EPIC — every unfinished plan of it, paused and held out of the queue, in the `Hidden` list — and the
+ * deck's done plans are dismissed, so the deck leaves; by the one rule a plan's corner follows
+ * (`putAwayVerb`). It is ONE press: a `Show` of any of its plans, or news on any plan of the arc, brings the
+ * whole deck back (`hiddenPlans.ts`; news draws the cards again, still reading HIDDEN, and Show lets them
+ * run). A wholly done deck draws no `Dismiss done features`, which would be its corner again.
  *
  * A FOLD KEEPS THAT WHOLE HEAD (MAN-5412) and takes the bar, the flow and the cards: the model
  * switch and Start/Pause are VERBS, and the reader who folded a deck away asked for the row, not for a
@@ -146,11 +151,12 @@ export function DispatchArcDeck({
   group: DispatcherArcGroup;
   /** The open chat's session id, in the gutter home; `null` in the tab, where there is no open chat and so no "mine". */
   pinnedSessionId?: string | null;
-  /** The lane's unfiltered plan names, which is what a press prunes the stored list against (`planPutAway`). */
+  /** The lane's unfiltered plan names, which is what a dismissal prunes the stored list against (`usePutAway`). */
   carriedNames: string[];
 }) {
   const { t } = useTranslation();
   const { arc, plans } = group;
+  const putAway = usePutAway(carriedNames);
   const word = ARC_STATUS[arc.status] ?? ARC_STATUS.designing;
   const description = cardDescription(arc.delivers, arc.goal);
   // The arc's own books: the store carries them on the arc row so no head has to add up the cards
@@ -164,6 +170,9 @@ export function DispatchArcDeck({
   // The hour a Schedule start armed, over the arc's stopped plans (`report_arcs.hour`) — the head's
   // clock, so a folded deck still says when it will start. The Cancel that clears it is in the bar.
   const armed = epochOf(arc.schedule);
+  // The epic's place in the queue and what it means now (`line_gate.places`), or null for an epic not
+  // in it. `??` because a frame from a dispatcher older than the key never names it.
+  const queue = arc.queue ?? null;
   const verb = putAwayVerb(plans);
   const done = verb === 'hide' ? doneDismiss(plans, carriedNames) : null;
   const doneCount = plans.filter((plan) => plan.status === 'complete').length;
@@ -196,10 +205,33 @@ export function DispatchArcDeck({
           kind="epic"
           title={<span data-arc-title className="font-mono">{arc.name}</span>}
           badge={<Badge tone={word.tone} className="shrink-0">{t(word.key)}</Badge>}
-          clock={armed !== null ? (
-            <span className="flex-none font-mono text-xs text-muted-foreground" data-dispatch-arc-schedule-note>
-              {t('runner.schedule.starts', { time: scheduleClock(armed) })}
-            </span>
+          // The queue's note first — the epic's place and its turn — then the armed hour's; each is its
+          // own item of the head's wrapping row, so a narrow head breaks between them, never inside one.
+          clock={queue !== null || armed !== null ? (
+            <>
+              {/* `its turn` wears the arc's own in-flight tone — `info`, the tone of its LIVE word — and
+                  only while something of the epic is released to run (`arc.walking`): the queue is
+                  running it, or starts it next. A held epic whose turn has come waits on a Start, so its
+                  note stays muted like any clock and no go signal stands on a deck that will not start
+                  by itself; so does every `waiting` and `paused`. */}
+              {queue !== null && (
+                <span
+                  data-dispatch-arc-queue-note={queue.turn}
+                  data-tone={queue.turn === 'now' && arc.walking ? 'info' : undefined}
+                  className={cn('flex-none whitespace-nowrap text-xs tabular-nums', queue.turn === 'now' && arc.walking ? 'font-medium text-tone-ink' : 'text-muted-foreground')}
+                >
+                  {t('dispatcher.queue.note', { position: queue.position, turn: t(`dispatcher.queue.turn.${queue.turn}`) })}
+                </span>
+              )}
+              {/* The flow's own scheduled mark leads the hour, so beside the queue's note it reads as a
+                  second fact (`2 · waiting ◷ starts 3:00 AM`), never as one sentence. */}
+              {armed !== null && (
+                <span className="flex-none font-mono text-xs text-muted-foreground" data-dispatch-arc-schedule-note>
+                  <span aria-hidden="true">{FLOW_MARK.scheduled} </span>
+                  {t('runner.schedule.starts', { time: scheduleClock(armed) })}
+                </span>
+              )}
+            </>
           ) : undefined}
           progress={{ done: doneCount, total: plans.length }}
           lead={(
@@ -225,7 +257,7 @@ export function DispatchArcDeck({
           corner={{
             menuLabel: t('dispatcher.menu'),
             menuItems,
-            putAway: { verb, label: t(verb === 'dismiss' ? 'dispatcher.dismissArc' : 'dispatcher.hideArc'), onPress: arcPutAway(arc.name, plans, carriedNames) },
+            putAway: { verb, label: t(verb === 'dismiss' ? 'dispatcher.dismissArc' : 'dispatcher.hideArc'), onPress: putAway.arc(arc.name, plans) },
           }}
         />
       )}
@@ -255,7 +287,7 @@ export function DispatchArcDeck({
             className={cn('flex flex-col gap-1', layer === 'done' && 'opacity-60')}
           >
             {mine && <SessionPin />}
-            <PlanCard plan={plan} waitsOn={waitsOnSiblings(plan, plans)} onPutAway={planPutAway(plan, carriedNames)} headingLevel={4} showAsk={false} />
+            <PlanCard plan={plan} waitsOn={waitsOnSiblings(plan, plans)} onPutAway={putAway.plan(plan)} headingLevel={4} showAsk={false} />
           </SnapStripItem>
         );
       })}
@@ -288,8 +320,14 @@ export function DispatchArcDeck({
  * Nothing here reads the lane either — the caller hands it the split it already has, so a caller that
  * filters its list and one that does not can never draw different decks.
  *
- * Used by `RunnerPanel` (the tab home), above the plans of no arc, and by `RunnerWidgetBody` (the
- * gutter), once per arc item of its list (`groups={[group]}`).
+ * `line` MARKS THE QUEUE'S LIST: the tab draws the queue's decks as a stack of their own above the rest,
+ * and `data-dispatch-arc-line` on that `<ul>` is how a probe tells the queue from the decks below it.
+ * `belowLine` is the eye's half of the same seam: the decks under a queue wear a hairline over them, so
+ * where the queue ends — and a drop stops being an order the dispatcher runs — is seen, not guessed.
+ *
+ * Used by `RunnerPanel` (the tab home) twice — the queue's decks (`line`), then the other decks, both
+ * above the plans of no arc — and by `RunnerWidgetBody` (the gutter), once per arc item of its list
+ * (`groups={[group]}`).
  */
 export function DispatchArcDecks({
   groups,
@@ -297,6 +335,8 @@ export function DispatchArcDecks({
   pinnedSessionId = null,
   carriedNames,
   sort,
+  line = false,
+  belowLine = false,
 }: {
   groups: DispatcherArcGroup[];
   /** Which home is drawing these decks. It changes no layout — an arc is drawn the same in both — and exists to write `data-dispatch-arcs`, so a probe always reads ONE home's decks and never both. */
@@ -305,12 +345,21 @@ export function DispatchArcDecks({
   carriedNames: string[];
   /** The sortable list over these decks (keyed by arc name), when the operator may rearrange them here. */
   sort?: SortableList;
+  /** These are the queue's decks, in the queue's order: writes `data-dispatch-arc-line` on the list. */
+  line?: boolean;
+  /** These decks stand under the queue's list: a hairline over them marks where the queue ends. */
+  belowLine?: boolean;
 }) {
   if (groups.length === 0) return null;
   const byName = new Map(groups.map((group) => [group.arc.name, group]));
   const drawn = sort === undefined ? groups : sort.order.flatMap((name) => byName.get(name) ?? []);
   return (
-    <ul ref={sort?.attachList} data-dispatch-arcs={home} className="flex min-w-0 flex-col gap-6">
+    <ul
+      ref={sort?.attachList}
+      data-dispatch-arcs={home}
+      data-dispatch-arc-line={line ? '' : undefined}
+      className={cn('flex min-w-0 flex-col gap-6', belowLine && 'border-t border-border pt-6')}
+    >
       {drawn.map((group) => (
         <li key={group.arc.name} className="min-w-0" {...sort?.itemProps(group.arc.name)}>
           <DispatchArcDeck

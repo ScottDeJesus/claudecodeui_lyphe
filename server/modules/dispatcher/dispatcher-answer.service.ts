@@ -8,11 +8,12 @@ import { firstLine } from './dispatcher-ask.transport.js';
  *
  * THE ANSWER IS HIS, WORD FOR WORD, and it goes through the dispatcher's own doors and no other:
  *
- * - `accept` — Accept runs `dispatcher accept --lock <token> --by app:<door> <plans…>`, Queue the same
- *   with `--paused`. The token is the census he was shown, re-checked by the verb itself (`lock.stale`),
- *   so an Accept whose plans moved on since approves NOTHING and the current prompt is raised again.
- *   `--by` names his press — the card or the phone — in `approved_by`. A plan is approved ONCE per load
- *   (`store.approve`): an Accept that reaches a plan already approved approves nothing and exits
+ * - `accept` — Queue runs `dispatcher accept --lock <token> --by app:<door> <plans…>` and the plans join the
+ *   queue, starting when their turn comes; Hide is the same with `--hidden`, approved and held out of the
+ *   queue until he Shows them. The token is the census he was shown, re-checked by the verb itself
+ *   (`lock.stale`), so an answer whose plans moved on since approves NOTHING and the current prompt is
+ *   raised again. `--by` names his press — the card or the phone — in `approved_by`. A plan is approved ONCE
+ *   per load (`store.approve`): an answer that reaches a plan already approved approves nothing and exits
  *   `ACCEPT_ALREADY_APPROVED_EXIT`, which is an answer that arrived second — `already-answered`, never a
  *   refusal to put the prompt back for.
  * - Rework approves nothing (the ask already stamped `prompted_at`, which is the hold standing down,
@@ -25,7 +26,7 @@ import { firstLine } from './dispatcher-ask.transport.js';
  * with no notes. `readReply` answers `null`, and the prompt stays up — the operator's word is still owed.
  */
 
-/** The Rework answer's POSITION among the Accept prompt's three (`intent_lock.OPTIONS`: Accept, Queue, Rework). */
+/** The Rework answer's POSITION among the Accept prompt's three (`intent_lock.OPTIONS`: Queue, Hide, Rework). */
 export const REWORK_OPTION = 2;
 
 /**
@@ -34,9 +35,9 @@ export const REWORK_OPTION = 2;
  */
 const ACCEPT_ALREADY_APPROVED_EXIT = 3;
 
-/** One answer, read: an approval (live or paused), a Rework's notes, or a questions round as one brief. */
+/** One answer, read: an approval (into the queue, or hidden), a Rework's notes, or a questions round as one brief. */
 export type AskReply =
-  | { kind: 'accept'; paused: boolean }
+  | { kind: 'accept'; hidden: boolean }
   | { kind: 'rework'; notes: string }
   | { kind: 'answers'; brief: string };
 
@@ -89,9 +90,9 @@ export function readReply(ask: DispatcherAsk, decision: ProviderPermissionDecisi
   const input = decision.updatedInput as { answers?: unknown; notes?: unknown } | undefined;
   if (ask.kind === 'accept') {
     const chosen = textAtAsk(input?.answers, ask.question);
-    const [accept, queue, rework] = ask.options.map((option) => option.label);
-    if (chosen === accept) return { kind: 'accept', paused: false };
-    if (chosen === queue) return { kind: 'accept', paused: true };
+    const [queue, hide, rework] = ask.options.map((option) => option.label);
+    if (chosen === queue) return { kind: 'accept', hidden: false };
+    if (chosen === hide) return { kind: 'accept', hidden: true };
     const notes = textAtAsk(input?.notes, ask.question);
     return chosen === rework && notes !== '' ? { kind: 'rework', notes } : null;
   }
@@ -133,7 +134,7 @@ export async function carryReply(
 ): Promise<CarriedAnswer> {
   const runs: Array<{ args: string[]; stdin?: string }> = [];
   if (reply.kind === 'accept' && ask.kind === 'accept') {
-    runs.push({ args: ['accept', '--lock', ask.token, '--by', `app:${door}`, ...(reply.paused ? ['--paused'] : []), ...ask.plans] });
+    runs.push({ args: ['accept', '--lock', ask.token, '--by', `app:${door}`, ...(reply.hidden ? ['--hidden'] : []), ...ask.plans] });
   } else if (reply.kind === 'rework' && ask.kind === 'accept') {
     for (const target of ask.rework) runs.push({ args: ['tell', target, '--brief', '-'], stdin: reply.notes });
   } else if (reply.kind === 'answers' && ask.kind === 'questions') {
@@ -150,7 +151,7 @@ export async function carryReply(
     dependencies.say(`[Dispatcher] ${ask.plan}: the operator's ${door} answer ran \`${shown(args)}\` → exit ${result.exit ?? 'none'}: ${line || '(nothing)'}`);
     said = line;
     if (result.exit === 0) continue;
-    // Only an Accept has an "already" to be told; a refusal of any verb outranks it, so a run that
+    // Only an approval has an "already" to be told; a refusal of any verb outranks it, so a run that
     // carried more than one is never reported answered while part of it was not.
     if (args[0] === 'accept' && result.exit === ACCEPT_ALREADY_APPROVED_EXIT) {
       if (outcome === 'took') outcome = 'already-answered';

@@ -161,6 +161,10 @@ apps.local.json.tmp
 apps.icons.local.json
 apps.icons.local.json.*.tmp
 
+# The tool-set registry — which MCP servers each named set holds on this box. Created as `{}` on
+# first boot (toolsets.registry.ts), private to this machine, and never written by the server again.
+toolsets.local.json
+
 # Per-box build records and design exports: kept on disk, never published.
 /docs/plans/
 /design/

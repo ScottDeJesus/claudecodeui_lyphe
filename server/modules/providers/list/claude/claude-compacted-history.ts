@@ -87,40 +87,6 @@ function readFirstTextBlock(content: unknown): string | null {
   return block ? block.text : null;
 }
 
-/** The only text of the stand-in reply the CLI writes when it resumes a session whose last row is a user row. */
-const RESUME_PLACEHOLDER_TEXT = 'No response requested.';
-
-/** True for the CLI's `<synthetic>` assistant row whose only text is "No response requested." */
-function isResumePlaceholderRow(row: AnyRecord): boolean {
-  if (row.type !== 'assistant' || row.message?.model !== '<synthetic>') {
-    return false;
-  }
-  const content = row.message?.content;
-  if (typeof content === 'string') {
-    return content.trim() === RESUME_PLACEHOLDER_TEXT;
-  }
-  return Array.isArray(content)
-    && content.length > 0
-    && content.every((part: AnyRecord) => part?.type === 'text' && typeof part.text === 'string' && part.text.trim() === RESUME_PLACEHOLDER_TEXT);
-}
-
-/**
- * Drops the resume placeholder that lies between the seed row (at `seedIndex`) and the next user
- * prompt. A seed append has no reply of its own, so when the session resumes from disk the CLI
- * answers the append's dangling user row with this stand-in before the operator's message — and
- * drawn, it would read as the model speaking after the summary. The row stays in the transcript
- * (it is the resume point an edit's anchor rule uses); only the reading leaves it out. A placeholder
- * anywhere else in the conversation is the CLI's own business and is drawn as before.
- */
-function dropResumePlaceholder(rows: AnyRecord[], seedIndex: number): AnyRecord[] {
-  let nextPromptIndex = rows.findIndex((row, index) => index > seedIndex && isUserPromptRow(row));
-  if (nextPromptIndex === -1) {
-    nextPromptIndex = rows.length;
-  }
-  const kept = rows.filter((row, index) => index <= seedIndex || index >= nextPromptIndex || !isResumePlaceholderRow(row));
-  return kept.length === rows.length ? rows : kept;
-}
-
 /**
  * Rewrites the seed — the first prompt of a transcript a compaction began — into the shape the
  * CLI's own summary row has, so the existing `isCompactSummary` branch draws it as assistant-side
@@ -141,14 +107,12 @@ function rewriteSeedAsSummary(rows: AnyRecord[], beganBy: CompactionRecord | nul
     return rows;
   }
   const seed = rows[seedIndex];
-  // Rows leave only AFTER the seed, so `seedIndex` still names it in what is kept.
-  const kept = dropResumePlaceholder(rows, seedIndex);
   const summaryText = readFirstTextBlock(seed.message?.content);
   if (summaryText === null) {
-    return kept;
+    return rows;
   }
 
-  const rewritten = kept.slice();
+  const rewritten = rows.slice();
   rewritten[seedIndex] = {
     ...seed,
     isCompactSummary: true,

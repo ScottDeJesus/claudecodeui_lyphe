@@ -30,7 +30,7 @@ type SelectedCheckProps = {
  * THE CHECK THE SHEET SHOWS, the head of everything under it:
  * - its name: the label in the serif display face, or, for a check no one has named, its key in mono.
  *   The editor takes that place while it is open.
- * - its status as a pill with the glyph and the word, right against the name: it is what the sheet
+ * - its status as a pill with the icon and the word, right against the name: it is what the sheet
  *   was opened for. Then the way to name it, a ✎ to rename a label or "Name this check" for a key,
  *   which is what wraps to the next line on a phone.
  * - the value it reported; "Checked 17:52:10 · every 30 s · by the warden on eis1" (by Cerberus on

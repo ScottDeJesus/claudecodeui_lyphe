@@ -26,8 +26,8 @@ import { plannerSince } from './dispatcher-planner.reader.js';
  */
 export type DocumentPlan = Omit<DispatcherPlan, 'session_app_id'>;
 
-/** The eight words a plan's status may be (`report.status_word`'s one precedence). Anything else is a build this lane cannot draw. */
-export const PLAN_STATUSES: readonly DispatcherPlan['status'][] = ['idle', 'parked', 'queued', 'scheduled', 'paused', 'stalled', 'live', 'complete'];
+/** The nine words a plan's status may be (`report.status_word`'s one precedence). Anything else is a build this lane cannot draw. */
+export const PLAN_STATUSES: readonly DispatcherPlan['status'][] = ['idle', 'parked', 'queued', 'scheduled', 'paused', 'stalled', 'live', 'hidden', 'complete'];
 
 /** The three words a phase's status may be (`phase_chain`'s own column). */
 export const PHASE_STATUSES: readonly DispatcherPhase['status'][] = ['not started', 'running', 'done'];
@@ -54,6 +54,20 @@ function acceptArmedOf(value: unknown): DispatcherPlan['accept_armed'] {
     at: need(field(press, 'at'), isText, 'plan.accept_armed.at'),
     by: need(field(press, 'by'), isText, 'plan.accept_armed.by'),
     design: need(field(press, 'design'), isText, 'plan.accept_armed.design'),
+  };
+}
+
+/**
+ * `plan.hidden`: since when the operator has had the plan hidden (`store_hidden`), and the epic whose press it
+ * was, or `null` while it is shown. Read tolerantly like `accept_armed`: a dispatcher build older than the
+ * key writes none, and that reads as shown — the card then draws nothing it cannot answer.
+ */
+function hiddenOf(value: unknown, name: string): DispatcherPlan['hidden'] {
+  if (value === undefined || value === null) return null;
+  const hide = need(value, isRecord, `plan.hidden of ${name}`);
+  return {
+    at: need(field(hide, 'at'), isText, `plan.hidden.at of ${name}`),
+    arc: textSince(field(hide, 'arc'), `plan.hidden.arc of ${name}`),
   };
 }
 
@@ -147,6 +161,7 @@ export function planOf(raw: unknown): DocumentPlan {
     name,
     state: need(field(plan, 'state'), isText, 'plan.state'),
     status: oneOf(field(plan, 'status'), PLAN_STATUSES, `status of ${name}`),
+    hidden: hiddenOf(field(plan, 'hidden'), name),
     repo: need(field(plan, 'repo'), isText, 'plan.repo'),
     goal: need(field(plan, 'goal'), isTextOrNull, 'plan.goal'),
     delivers: need(field(plan, 'delivers'), isTextOrNull, 'plan.delivers'),
@@ -163,10 +178,12 @@ export function planOf(raw: unknown): DocumentPlan {
     // same row — one outing, two places it is true of. Read tolerantly (`plannerSince`), because a
     // dispatcher build older than the field writes no key at all.
     planner: plannerSince(field(plan, 'planner'), `plan.planner of ${name}`),
-    // The plan's EFFECTIVE model word — its own, else its arc's, else the store's default. Never
+    // The plan's EFFECTIVE model word — its own, else its arc's, else the house switch's. Never
     // derived here: this is the document's own answer, and a second derivation would be a second
-    // answer (`dispatcher/model.py:model.of` is the only one).
+    // answer (`dispatcher/model.py:model.of` is the only one). `model_own` is the plan's OWN word, or
+    // null while it follows its epic and the switch: the override a card's fold names.
     model: modelSince(field(plan, 'model'), 'plan.model'),
+    model_own: modelSince(field(plan, 'model_own'), `plan.model_own of ${name}`),
     // The plan's width phrase (`width.word` of its effective model word and its task-WIP word), read
     // tolerantly like `arc`: a build older than the field writes none.
     posture: textSince(field(plan, 'posture'), 'plan.posture'),
@@ -174,6 +191,10 @@ export function planOf(raw: unknown): DocumentPlan {
     // phase (`width.feature_hold`), or `null`. Read tolerantly like `posture`: a build older than the
     // field writes none, and the card then draws no line.
     wip_hold: textSince(field(plan, 'wip_hold'), 'plan.wip_hold'),
+    // Why this plan waits for its EPIC'S turn — the gate's own queue clause for its first ready phase
+    // (`line_gate.hold`, asked before the feature clause), or `null`. Read tolerantly like `wip_hold`
+    // beside it: a build older than the field writes none, and the card then draws no line.
+    queue_hold: textSince(field(plan, 'queue_hold'), 'plan.queue_hold'),
     created_at: need(field(plan, 'created_at'), isText, 'plan.created_at'),
     updated_at: need(field(plan, 'updated_at'), isText, 'plan.updated_at'),
     completed_at: need(field(plan, 'completed_at'), isTextOrNull, 'plan.completed_at'),

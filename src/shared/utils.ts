@@ -1,9 +1,9 @@
 import { clsx, type ClassValue } from 'clsx';
 import { extendTailwindMerge, validators } from 'tailwind-merge';
 
-import { WIP_LADDER_TOP, WIP_LIMIT_MIN } from '@/shared/constants';
+import { WIP_LADDER_TOP } from '@/shared/constants';
 import type { RoadmapFeatureWord, RoadmapPicture } from '@/shared/roadmap-types';
-import type { DispatcherModelChoice, Project, ProjectSession, SlashCommand } from '@/shared/types';
+import type { DispatcherModelWord, Project, ProjectSession, SlashCommand } from '@/shared/types';
 
 //----------------- DEPLOYMENT MODE ------------
 
@@ -358,10 +358,16 @@ export function formatRelativeTime(iso: string | null | undefined): string {
  * not a time. The roadmap's one spelling of a day, so a step phrase (`useStepPhrase`), the milestone
  * banner (`CelebrationLayer`), a feature's dates (`FeatureFacts`) and a reached milestone's panel
  * (`panel/MilestonePanel`) all name it alike, in the browser's own locale.
+ *
+ * A bare calendar date (`2026-09-11`, the affected-areas module's date of loss) is that day wherever the
+ * reader is: `Date.parse` reads it as UTC midnight, which west of Greenwich is the evening before.
  */
 export function formatShortDate(stamp: string | null | undefined): string | null {
   if (!stamp) return null;
-  const milliseconds = Date.parse(stamp);
+  const calendarDay = /^(\d{4})-(\d{2})-(\d{2})$/.exec(stamp);
+  const milliseconds = calendarDay
+    ? new Date(Number(calendarDay[1]), Number(calendarDay[2]) - 1, Number(calendarDay[3])).getTime()
+    : Date.parse(stamp);
   if (Number.isNaN(milliseconds)) return null;
   const day = new Date(milliseconds);
   const thisYear = day.getFullYear() === new Date().getFullYear();
@@ -462,13 +468,14 @@ export function roadmapTextBreak(text: string, max: number, oneLine: boolean): '
 //----------------- THE DISPATCHER'S MODEL WORD ------------
 
 /**
- * The model word a plan's or an arc's control shows as pressed: the stored word, or `claude` for a record with
- * none (`null` / absent — a store row carrying no word of its own), because that is how the store itself reads it
- * (`run_model.DEFAULT`). Used by `PlanControls` and `DispatchArcControls` to hand `RunModelControl` its value, so
- * `Chat switch` is pressed only when the record says `auto`.
+ * The model word a record RUNS ON: the stored word, or — for a record that names none (`null` / absent) — the
+ * HOUSE switch's word (`deepseek` while the DeepSeek switch reads on, else `claude`), because that is how the
+ * dispatcher itself reads it (`model.effective`). `house` is the switch's position as `useDeepSeekFlashSwitch`
+ * last read it, `null` while that read has not landed — which reads as Claude, the off side. Used by the model
+ * control's "follow the top" option to name the word it follows.
  */
-export function effectiveModelWord(stored: DispatcherModelChoice | null | undefined): DispatcherModelChoice {
-  return stored ?? 'claude';
+export function effectiveModelWord(stored: DispatcherModelWord | null | undefined, house: boolean | null): DispatcherModelWord {
+  return stored ?? (house === true ? 'deepseek' : 'claude');
 }
 
 // ---------------------------
@@ -496,45 +503,31 @@ export function firstLine(text: unknown): string {
 
 /**
  * The top counted rung of the WIP ladder (`1, 2, … top, All`): `WIP_LADDER_TOP`, or the widest count
- * already in play — Settings' default, the epic's own — whichever is larger. On an epic's card
- * Settings' count is always in play, so a default above six stays a rung however the epic's own count
- * moves; on a Settings stepper the stepper's own count is the only one in play, so a count above six steps
- * down by one and, once stepped below it, is not climbed back to. `null` is `All` (no limit) and
- * widens nothing. Because every count the ladder ever steps to is at most this, `+` can never produce
- * a count wider than one the server already handed us (and so never one its reader refuses). Used by
- * the dispatcher module's `EpicWipControl` and the settings module's `RunnerWipDefaultsRow`, which hand
- * its answer to `wipLadderSteps`.
+ * already in play — the header's default, the epic's own — whichever is larger. So a limit above six that
+ * is already set stays a rung of the list that shows it, and the list never offers a count wider than one
+ * the server already handed us (and so never one its reader refuses). `null` is `All` (no limit) and widens
+ * nothing. Used by the dispatcher module's master controller and epic fold, which hand its answer to
+ * `wipLadderWords`.
  */
 export function wipLadderTop(...inPlay: Array<number | null>): number {
   return Math.max(WIP_LADDER_TOP, ...inPlay.filter((lanes): lanes is number => lanes !== null));
 }
 
 /**
- * Where `−` and `+` land from `current` on the one WIP ladder, `1, 2, … top, All`; `null` is `All`
- * (a limit of `all`). A press that is refused is `null`; a
- * press that lands is `{ lanes }`, where `lanes: null` is `All`.
- *
- * `+` adds one below `top`, and from `top` goes to `All`; it is refused on `All`. `−` takes `All` to
- * `top`, and subtracts one from a count; it is refused on one lane. Used by the dispatcher module's
- * `EpicWipControl` (an epic's two limits) and the settings module's `RunnerWipDefaultsRow` (the two
- * defaults), so the two climb the same ladder from one copy of the rules.
+ * Every word of the one WIP ladder, in the order a dropdown lists them: `['1', … String(top), 'all']`.
+ * The words are the dispatcher's own grammar (`wip.py`) — a count is its digits, no limit is `all` — so a
+ * chosen option is sent as it stands. Used by the dispatcher module's master controller (the two
+ * defaults) and epic fold (an epic's two limits), so the two list one ladder from one copy of the rules.
  */
-export function wipLadderSteps(
-  current: number | null,
-  top: number,
-): { down: { lanes: number | null } | null; up: { lanes: number | null } | null } {
-  if (current === null) return { down: { lanes: top }, up: null };
-  return {
-    down: current > WIP_LIMIT_MIN ? { lanes: current - 1 } : null,
-    up: { lanes: current < top ? current + 1 : null },
-  };
+export function wipLadderWords(top: number): string[] {
+  return [...Array.from({ length: top }, (_, index) => String(index + 1)), 'all'];
 }
 
 /**
  * How many one WIP word allows, as the dispatcher reads it: `all` is no limit, which is `null` and is
  * drawn as All, and a count is itself. The word is the dispatcher's own (`wip.py`), `'3'` or `'all'`,
- * as `status --json` and `GET /api/settings/wip` carry it. Used by the dispatcher module's
- * `EpicWipControl` and the settings module's `RunnerWipDefaultsRow`.
+ * as `status --json` and `GET /api/settings/wip` carry it. Used by the dispatcher module's master
+ * controller and epic fold.
  */
 export function wipCountOfWord(word: string): number | null {
   return word === 'all' ? null : Number(word);

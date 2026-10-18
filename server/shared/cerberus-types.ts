@@ -21,6 +21,8 @@
 // What the browser never sees — the warden wire, the node-session, fix and diagnosis frames, and the
 // server-only seam types at the end — stays in this file alone.
 
+import type { IdleCheck } from './types.js';
+
 // ---------------------------
 
 //----------------- VOCABULARY ------------
@@ -388,12 +390,38 @@ export type CerberusFrameType =
 export type CerberusHostFrame = { t: string; [field: string]: unknown };
 
 /**
+ * A node host's last finished turn as the warden reads it off the host's journal with the registry's own
+ * `lastTurnRecord` (the one reading a local host gets): `endedAt` is the `at` of the newest `result` line,
+ * `modelUsage` that result's own, and `request` the turn's last main-thread assistant request, chosen by
+ * `mainThreadRequestOf` (`host-registry.js`, the one rule for which message is a turn's request) and cut down to the
+ * fields that rule reads (`type`, `parent_tool_use_id`, `message.model`, `message.usage`) — null for a turn that
+ * ran no request. Center reads the context out of `request` with the same `mainThreadRequestOf` it applies to a
+ * live stream's message and a local host's journal.
+ */
+export type CerberusNodeHostLastTurn = {
+  endedAt: number;
+  modelUsage: unknown;
+  request: {
+    type: string;
+    parent_tool_use_id: null;
+    message: { model: string | null; usage: Record<string, unknown> };
+  } | null;
+};
+
+/**
  * One live session host on a node, as the warden lists it: today's `LiveHost` fields of the
  * session host (`session-host/hosts.ts`) plus `lastTurnFinishedAt`, when the host's CLI last ended
- * a turn — the `at` of the newest `result` line in its journal, null when it never has. Center keeps
+ * a turn — the `at` of the newest `result` line in its journal, null when it never has — and `lastTurn`,
+ * that turn's record for the compaction's idle deadline. Center keeps
  * the last list it was given per node (`nodeSessions.lastListed`) and shows its length as "N
  * sessions running here". `cwd` and `profile` are what the host's meta recorded at spawn; `cliPid`
  * is the pid of the CLI the host owns on the NODE's machine.
+ *
+ * `releasedCalls`, `liveTasks`, `idleCheck` and `lastTurn` are what the listing of a warden from before each
+ * field leaves out; `readNodeHost` reads that as the field's empty value (`[]`, null, null, null), so such a
+ * node's chat is re-adopted as it was before the field, and a warden that has the field gives its chat the
+ * re-adoption a local host gets. `liveTasks` alone keeps "not listed" (`null`) apart from "none running" (`[]`):
+ * a chat whose warden cannot list its tasks is not taken over by the house's compaction.
  */
 export type CerberusNodeHost = {
   hostId: string;
@@ -404,10 +432,18 @@ export type CerberusNodeHost = {
   turnCompleteSent: boolean;
   heldForBackgroundWork: boolean;
   deferredTools: string[];
+  /** The calls the host's meta still names that its journal shows finished (`deferredTools` already leaves them out); the host is told at re-adoption. */
+  releasedCalls: string[];
+  /** The ids of the CLI's own background tasks the host's journal shows running; `null` from a warden that predates the field. */
+  liveTasks: string[] | null;
+  /** The host meta's record of the idle compaction check for its last turn end; null for none. */
+  idleCheck: IdleCheck | null;
   profile: Record<string, unknown> | null;
   cliVersion: string | null;
   cliPid: number | null;
   lastTurnFinishedAt: number | null;
+  /** The host's last finished turn, null when it has none or its warden does not list it. */
+  lastTurn: CerberusNodeHostLastTurn | null;
 };
 
 /**
@@ -1300,7 +1336,8 @@ export type CerberusActivity =
 
 /**
  * What `GET /api/cerberus/overview` answers: the whole fleet at `now`. `nodes` is hub first;
- * `needsYou` sorts by `since` then key; `muted` lists the checks a mute is covering; `running` is
+ * `needsYou` is worst first (denied, failing, warn), then by `since`, then key; `muted` lists the
+ * checks a mute is covering; `running` is
  * every fix run that has not ended, oldest first and without `lines` — what marks a node or a
  * service as fixing; `activity` is the newest seven lines of "What happened"; `lastResultAt` is the
  * latest `at` of any stored result; `gateway` says whether the warden listener is bound and where.

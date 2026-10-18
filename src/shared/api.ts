@@ -3,8 +3,9 @@ import {
   getStoredAuthToken,
   storeAuthToken,
 } from '@/shared/authToken';
-import type { AuthTraceEvent, CerberusEnrollInput, CerberusLabelInput, CerberusMuteInput, CerberusPromoteInput, DeepseekRange, DispatcherAsk, DispatcherModelChoice, DispatcherWipChoice, DispatcherWipLimit, FileLinePatch, JevRange, NoteInput, NtfySettingsInput, SimpleListItemRef, SimpleListPosition, SubagentTranscriptResult } from '@/shared/types';
+import type { AuthTraceEvent, CerberusEnrollInput, CerberusLabelInput, CerberusMuteInput, CerberusPromoteInput, DeepseekRange, DispatcherAsk, DispatcherEpicsWord, DispatcherModelChoice, DispatcherQueueMove, DispatcherWipChoice, DispatcherWipLimit, FileLinePatch, JevRange, NoteInput, NtfySettingsInput, SimpleListItemRef, SimpleListPosition, SubagentTranscriptResult } from '@/shared/types';
 import type { AgentLaunchDefaultsChange, AgentLaunchRowChange } from '@/shared/agent-launch-types';
+import type { MarkRequest, MissedRequest, Queue, ReadRequest, ThresholdRequest, UnderstandingMarkRequest } from '@/shared/affected-areas-types';
 import type { CerberusCatalogEntryInput } from '@/shared/cerberus-types';
 import type { ClaudeUpdateApplyRequest } from '@/shared/claude-update-types';
 import type { RoadmapWriteBody } from '@/shared/roadmap-types';
@@ -869,6 +870,21 @@ export const api = {
     remove: (id: string) => del(`/api/notes/${encodeURIComponent(id)}`),
   },
 
+  // The tool-set lane (MAN-8490): which of the box's named MCP sets one chat has on.
+  // Both verbs answer `{ success: true, data }` and a refusal is the app's `{ success: false, error }`
+  // envelope, so a caller reads them through `readApiJson`. `read` answers the chat's `SessionToolsetsView`;
+  // `set` answers the `ToolsetSwitchResult` of the switch, whose `view` is the read that would follow it,
+  // so the menu draws from the answer and never asks twice. The chat is the APP's session id, and a set
+  // goes by NAME only: no verb here carries a server config, and the box's file is the one place one lives.
+  // The switch outlasts the default deadline by design: on a live chat the server waits up to 30 s for the
+  // process to confirm the servers, and the answer that says `unconfirmed` or `failed` is the one the
+  // menu exists to show, so the deadline is the `toolset` command's 45 s (bin/toolset.mjs), never 30.
+  toolsets: {
+    read: (sessionId: string) => get(`/api/toolsets/sessions/${encodeURIComponent(sessionId)}`),
+    set: (sessionId: string, set: string, on: boolean) =>
+      put(`/api/toolsets/sessions/${encodeURIComponent(sessionId)}/sets/${encodeURIComponent(set)}`, { on }, { timeoutMs: 45_000 }),
+  },
+
   // The Cerberus lane (server/modules/cerberus/MANUAL.md): center's read model of the fleet, read
   // whole. Every read answers its wire shape BARE — not wrapped in `{ success, data }` — and a
   // refusal is the app's `{ success: false, error }` envelope. The `cerberus_changed` frame is only
@@ -922,9 +938,59 @@ export const api = {
     promote: (id: string, input: CerberusPromoteInput) => post(`/api/cerberus/diagnoses/${encodeURIComponent(id)}/promote`, input),
   },
 
+  // The affected-areas lane (the Tours tab; wire shapes in `@/shared/affected-areas-types`): DocuSketch tours,
+  // what the reader saw in each pano, and the operator's marks, forwarded to shadow-connector by CloudCLI. Every
+  // answer is its wire shape BARE. A failure arrives in one of three bodies, so read `.error` AND `.detail`, never one:
+  // `{ error: string }` from the lane itself (503 `no_secret` / `unreachable`, 502 `unreadable`, 422 a malformed id or
+  // query value, 404 a path the lane does not forward); `{ detail: string }` or `{ detail: [...] }` from shadow-connector's
+  // reader routes, passed through (404 `no such tour`, FastAPI's list-shaped 422); `{ error, detail }` (`Refusal`) from
+  // its marks routes. The answer type of each verb is named beside it. Ids are encoded here, so a caller passes them as
+  // it holds them.
+  // The two slow presses outlast the default deadline by design: cutting a pano's six views takes up to 90 s and a
+  // read of them 120 s (the lane's own deadlines), and the answer that says `refused` is the one the screen shows.
+  affectedAreas: {
+    // → TourList
+    tours: ({ q, limit }: { q?: string; limit?: number } = {}) => get(`/api/affected-areas/tours${query({ q, limit })}`),
+    // → TourDetail
+    tour: (tourId: string) => get(`/api/affected-areas/tours/${encodeURIComponent(tourId)}`),
+    // → PanoDetail
+    pano: (tourId: string, panoId: string) =>
+      get(`/api/affected-areas/tours/${encodeURIComponent(tourId)}/panos/${encodeURIComponent(panoId)}`),
+    // → ViewsResult
+    cutViews: (tourId: string, panoId: string) =>
+      post(`/api/affected-areas/tours/${encodeURIComponent(tourId)}/panos/${encodeURIComponent(panoId)}/views`, {}, { timeoutMs: 90_000 }),
+    // → ReadResult
+    readPano: (tourId: string, panoId: string, body: ReadRequest) =>
+      post(`/api/affected-areas/tours/${encodeURIComponent(tourId)}/panos/${encodeURIComponent(panoId)}/read`, body, { timeoutMs: 120_000 }),
+    // → TourPlan
+    planTour: (tourId: string) => post(`/api/affected-areas/tours/${encodeURIComponent(tourId)}/read`, {}),
+    // The bytes of one view's JPEG, not JSON: the caller reads `.blob()`. `options.signal` lets it abort a fetch
+    // whose view has since changed.
+    image: (sha: string, options: ApiRequestOptions = {}) => get(`/api/affected-areas/images/${encodeURIComponent(sha)}`, options),
+    // → Codebook
+    codebook: () => get('/api/affected-areas/codebook'),
+    // The marks writes (`mark`, `missed`, `markUnderstanding`, `setThreshold`) are the marks plan's. wire.py names the
+    // answer of `markUnderstanding` alone; the others answer the shape the contract already holds for what they wrote.
+    // → Region (the one judged, its `mark` filled)
+    mark: (regionId: string, body: MarkRequest) => post(`/api/affected-areas/regions/${encodeURIComponent(regionId)}/marks`, body),
+    // → Region (the new human one)
+    missed: (sha: string, body: MissedRequest) => post(`/api/affected-areas/images/${encodeURIComponent(sha)}/regions`, body),
+    // → UnderstandingMarkResult
+    markUnderstanding: (readId: string, body: UnderstandingMarkRequest) =>
+      post(`/api/affected-areas/reads/${encodeURIComponent(readId)}/marks`, body),
+    // → Queue
+    queue: ({ mode, cls, limit }: { mode: Queue['mode']; cls?: string; limit?: number }) =>
+      get(`/api/affected-areas/queue${query({ mode, class: cls, limit })}`),
+    // → Proving
+    proving: ({ model, contract }: { model?: string; contract?: string } = {}) =>
+      get(`/api/affected-areas/proving${query({ model, contract })}`),
+    // → ProvingClass (the class as it now stands, its line moved)
+    setThreshold: (cls: string, body: ThresholdRequest) => put(`/api/affected-areas/thresholds/${encodeURIComponent(cls)}`, body),
+  },
+
   // The dispatcher lane (docs/MANUAL.md (dispatcher)): the plans in the dispatcher's own store, and the
-  // seven verbs the plan cards and the arc header press. The picture is `dispatcher status --json`
-  // relayed whole, and the verbs are relayed to the dispatcher's own binary by argv, never by a shell.
+  // verbs the plan cards, the arc header and In flight's queue press. The picture is `dispatcher status
+  // --json` relayed whole, and the verbs are relayed to the dispatcher's own binary by argv, never by a shell.
   //
   // The verbs are read from the RAW response for one reason worth naming: the dispatcher prints its
   // refusals on STDOUT (`REFUSED schedule
@@ -962,27 +1028,42 @@ export const api = {
     // control relays it; nothing is optimistic, and the next `dispatcher_state` frame reads the
     // word back. Restarts nothing — the word is read when a chain is LAUNCHED.
     model: (name: string, model: DispatcherModelChoice) => post(`/api/dispatcher/plans/${encodeURIComponent(name)}/model`, { model }),
-    // The DISPATCH ARC header's five presses (`dispatcher model|stop|resume|schedule|wip <arc> …`), each
+    // The DISPATCH ARC deck's four presses (`dispatcher model|stop|resume|wip <arc> …`), each
     // relayed to the arc's own door. Separate routes from the plan's because an arc is addressed by
     // its own door (`.arc`), never through a plan's.
     //
     // AN ARC HAS NO WALK OF ITS OWN: the dispatcher applies the PLAN verb to the arc's plans in one
-    // step — `stop` over the arc's walking plans, `resume` and `schedule` over its stopped ones — so
-    // the header's press and one typed at a terminal are the same verb on the same set of plans. A
+    // step — `stop` over the arc's walking plans, `resume` over its stopped ones — so
+    // the deck's press and one typed at a terminal are the same verb on the same set of plans. A
     // `/arcs/…` route for each is the whole reason the two surfaces cannot drift.
     arcModel: (name: string, model: DispatcherModelChoice) => post(`/api/dispatcher/arcs/${encodeURIComponent(name)}/model`, { model }),
     arcStop: (name: string) => post(`/api/dispatcher/arcs/${encodeURIComponent(name)}/stop`, {}),
     arcResume: (name: string) => post(`/api/dispatcher/arcs/${encodeURIComponent(name)}/resume`, {}),
-    // The arc's Resume — or Start, for plans still at the gate — at a time: the same three shapes a
-    // plan's schedule takes, through the same server-side reader.
-    arcSchedule: (name: string, when: string) => post(`/api/dispatcher/arcs/${encodeURIComponent(name)}/schedule`, { when }),
     // One of the epic's two WIP limits (`dispatcher wip <arc> <limit> <word>`) — a count, `all`, or
-    // `default` to follow Settings again. The epic card's WIP control relays it; nothing is optimistic,
+    // `default` to follow the top again. The epic deck's fold relays it; nothing is optimistic,
     // and the next `dispatcher_state` frame reads the word back. An epic's verb alone: no plan route.
     arcWip: (name: string, limit: DispatcherWipLimit, word: DispatcherWipChoice) =>
       post(`/api/dispatcher/arcs/${encodeURIComponent(name)}/wip`, { limit, word }),
-    // A plan's Start at a time — `offpeak`, an ISO instant with a zone, or `none` to cancel — the
-    // same three shapes the arc's own schedule takes, through the same reader.
+    // An epic moved in the queue In flight runs top down (`dispatcher queue <arc> --before <arc> | --last`):
+    // a drop on the queue's decks, named by a neighbour — `{ before }` or `{ last: true }` — never by an
+    // index. A 409 carries the dispatcher's own refusal (an epic whose turn has ended is no longer in the
+    // queue); nothing is optimistic, and the next `dispatcher_state` frame draws the order the store holds.
+    arcQueue: (name: string, move: DispatcherQueueMove) =>
+      post(`/api/dispatcher/arcs/${encodeURIComponent(name)}/queue`, move),
+    // The epic dial's one word (`dispatcher epics <word>`): a limit of `1` to `5`, or `pause` /
+    // `resume` — a BOARD verb that names no plan and no arc, so its route has no name in it.
+    epics: (word: DispatcherEpicsWord) => post('/api/dispatcher/epics', { word }),
+    // The board's one Start (`dispatcher start`): every plan held for its first Start let go at once, the
+    // queue and the dial then ordering them. A BOARD verb like `epics`, with no name and no body.
+    start: () => post('/api/dispatcher/start', {}),
+    // Hide and Show (`dispatcher hide <name>…`, `dispatcher unhide <name>…`): the operator's hold on a plan and the way
+    // back. BOARD verbs like `epics` and `start` — the names travel in the body, plans' and epics' alike (an epic's
+    // name acts on every open, or every hidden, plan of it) — and the dispatcher's sentence is the answer, a refusal
+    // (a finished plan, a plan that is not hidden) a 409. Nothing is optimistic: the next frame reads the store back.
+    hide: (names: readonly string[]) => post('/api/dispatcher/hide', { names }),
+    unhide: (names: readonly string[]) => post('/api/dispatcher/unhide', { names }),
+    // A stopped plan's Resume at a time — `offpeak`, an ISO instant with a zone, or `none` to cancel —
+    // through the server's one reader of the three shapes.
     schedule: (name: string, when: string) => post(`/api/dispatcher/plans/${encodeURIComponent(name)}/schedule`, { when }),
     // The dispatcher's next DeepSeek off-peak moment (`{ at }`, epoch seconds, or null), relayed
     // from the dispatcher's own binary.

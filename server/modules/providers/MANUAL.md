@@ -6,6 +6,8 @@ The provider contract: every wrapper exposes the same seven facets — runtime, 
 
 Custom compaction (Claude chats): the stitched history, indexer and search are MAN-8054; the runtime seams are MAN-8055; MAN-8068 says which row holds which seam.
 
+Tool sets (Claude chats): the runtime's seam — context hook, launch, `setMcpServers` sync, hold, live change — is MAN-8495, beside MAN-8055; the module behind it is MAN-8497.
+
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/
 
 ## MAN-696 — Providers Module Guide
@@ -317,7 +319,7 @@ Current session sync roots are:
 
 8. Register the provider.
 
-- Add the new provider class to `server/modules/providers/provider.registry.ts`.
+- Add the new provider class to the table `allProviders()` builds in `server/modules/providers/provider.registry.ts`.
 - Update `server/modules/providers/provider.routes.ts` provider parsing.
 - If the provider introduces a new service or lifecycle hook, export it from the module entrypoint that consumes providers.
 
@@ -494,6 +496,7 @@ section: README/011 Common Mistakes
 - Forgetting that Claude plugin skills are discovered differently from normal
   user/project skill folders.
 - Assuming one provider's MCP config file format works for the others.
+- Reading `providerRegistry` — or building a service on it (`createProviderModelsService()` resolves the registry) — at module-evaluation time. The registry builds its four providers on the FIRST call that needs one (`allProviders()`); a provider's own files import services that import the registry, so a provider built at evaluation lets import order decide whether a module loads (`Cannot access 'providerRegistry' before initialization`). A factory reads the registry inside the function it returns, never in its own body.
 
 ## MAN-7519 — The simple list's feed, four routes and simple_list_changed frame
 
@@ -572,10 +575,10 @@ Records come from `sessionCompactionsDb.listCompactions` (MAN-8046). Claude only
 | --- | --- |
 | Order | per record, oldest first: that transcript's rows, then one divider row; then the live rows |
 | Read of a compacted transcript | `readTranscriptRows(record.oldJsonlPath, record.oldProviderSessionId)`: its own id, so its subagents are found under its own folder |
-| Reader | `getSessionMessages(sessionId, transcriptPath, providerSessionId, limit, offset)` reads ONE transcript; a missing file is no rows, never an error; `readTranscriptRows` keeps only rows carrying `providerSessionId` |
+| Reader | `getSessionMessages(sessionId, transcriptPath, providerSessionId, limit, offset)` reads ONE transcript; a missing file is no rows, never an error; `readTranscriptRows` keeps only rows carrying `providerSessionId` and drops every record that wears a turn's shape without being one (`isClaudeTurnLookalike`, `server/shared/claude-transcript-rows.ts`: a `message.role` of `user`/`assistant` on a record not typed `user`/`assistant` — the CLI's `api-request-blob`, which stores the request body it is about to send, with no `uuid` and no `timestamp`). Read as a turn it is a second copy of a message the file already holds, with an id and a time minted at read time: the old message that reappeared at the foot of a chat. The subagent reader, transcript search and the universe's transcript tap read lines of their own and make the same refusal |
 | Divider | raw row `type: 'cloudcli-compaction'`, `uuid: compaction-<old provider id>`, `timestamp` = `createdAt`, or the millisecond before the following seed's stamp when the seed is stamped no later (the record keeps the swap to the second, the seed to the millisecond, and the store's timestamp sort would otherwise put the summary above its divider; the marker's own `at` stays `createdAt`); `normalizeMessage` → `isCompactionRow` / `normalizeCompactionRow` → one `kind: 'compaction'` message whose `compaction` is a `ChatCompactionMarker` (`server/shared/types.ts`; the client mirrors it in `src/shared/types.ts`, keep identical) |
 | Seed | the first user prompt row (`isUserPromptRow`) of every transcript after the first becomes `isCompactSummary: true`, `uuid: compaction-summary-<previous record's old provider id>`, first text block only; drawn under `showCompactSummary`. The id equals the live frames' id, so the refresh after a compaction replaces the live row |
-| Resume placeholder | when the session resumes from disk, the CLI writes one `<synthetic>` assistant row whose only text is "No response requested." before the operator's message. In a transcript a compaction began, that row is dropped from the reading when it lies between the seed row and the next user prompt (`dropResumePlaceholder`, called from `rewriteSeedAsSummary`, and only there); anywhere else it is drawn as before. It stays in the transcript: it is the resume point an edit's anchor rule uses. The resumed turn's live frames carry no such row (measured), so the runtime drops nothing |
+| Resume placeholder | when the session resumes from disk, the CLI writes one `<synthetic>` assistant row whose only text is "No response requested." before the operator's message. `normalizeMessage` turns it into no message (`isResumePlaceholderRow`, `server/shared/claude-transcript-rows.ts`), in a compacted chat and in every other: it is the CLI keeping the turns alternating, not the assistant answering, and drawn it reads as a reply nothing earned. Search skips it too, so it is never a chat's last assistant text. A rate-limit refusal, an expired login or an API error is `<synthetic>` as well but says something the reader needs (`isApiErrorMessage: true`), and is drawn. The row stays in the transcript: it is the resume point an edit's anchor rule uses (`readTranscriptRows` keeps it). The resumed turn's live frames carry no such row (measured) |
 | Anchors | `withoutAnchors` strips `transcriptAnchorId` from every row of a compacted transcript (`supersededRows`): no edit, no fork there |
 | `tokenUsage` | `withOpeningContext(summarizeClaudeTokenUsage(liveRows), openingContextTokens)` (`withOpeningContext` lives in `provider-token-usage.service.ts`): the context the chat holds now. The composer has a second reader, `GET /sessions/:id/token-usage` (`getSessionTokenUsage`, called on every session select), and it answers the same number: when its transcript reads `used` 0 it applies `withOpeningContext` with the latest record's `post_tokens` (`latestCompaction`). Whichever lands last, the counter reads `post_tokens`. `openingContextTokens` is the latest record's `post_tokens` (the CLI's own count at the compaction's end) while the live transcript holds no assistant usage (`summarizeClaudeTokenUsage` reads `used` 0: the seed append has no reply, and the placeholder is a zero-usage `<synthetic>` row), else null; it then stands as `used`, `inputTokens` and `breakdown.input`. Null in a chat with no compaction, and when the record has no `post_tokens` yet |
 
@@ -596,6 +599,7 @@ Records come from `sessionCompactionsDb.listCompactions` (MAN-8046). Claude only
 | `listCompactedTranscriptRows(chatRows)` (`session-conversations-compacted.ts`) | one extra search entry per record whose chat is in `chatRows`: the chat's row with `provider_session_id` = old id and `jsonl_path` = old path; appended after the live rows; same hidden-root and archived-project filters as every row. An archived chat adds none |
 | `getSessionKey` | `provider:session_id:provider_session_id`; without the third part a hit in the old transcript makes the live row scan its live file |
 | `addSessionResult(sessionResults, result)` | ONE result per chat and provider (the sidebar keys results by chat id); appends hits whose `messageUuid`, `timestamp` and `snippet` together are not already held |
+| `extractClaudeSearchableMessage` (`session-conversations-search.service.ts`) | null for a lookalike and for the resume placeholder; a user text hit shows the typed words: `stripTransparentWrapperPrefix` (`server/shared/local-commands.ts`) takes a leading `/plain ` off, as the chat does for a send with an image |
 
 ## Traps
 
@@ -607,22 +611,35 @@ Records come from `sessionCompactionsDb.listCompactions` (MAN-8046). Claude only
 | `listCompactions` runs on every stamp read | no `session_id` index (MAN-8046) |
 | A whitespace-only seed block is not guarded | the summarizer's block 0 always opens with its preamble; only a hand-edited transcript reaches it |
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-compacted-history.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-sessions.provider.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-session-synchronizer.provider.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/services/provider-token-usage.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/services/session-conversations-compacted.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/services/session-conversations-search.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/services/session-soul-launches.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/services/subagent-transcript.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts
+## Proof — the chat shows each message once
+
+| Command | Does |
+| --- | --- |
+| `node .verify/trailing-old-message-proof.mjs [--app URL] [--api URL] [--label x]` | defaults `--app http://127.0.0.1:5183`, `--api http://127.0.0.1:3011`. In a scratch chat under `/tmp` on Haiku: a long ask, Stop once the CLI has written it, then a one-word ask; fails unless the transcript holds the interrupt, the stand-in reply and an `api-request-blob` record carrying each prompt. Held against the transcript's rows at the second send, after its reply, after a reload, and in desktop-dark, phone-dark and phone-light: no "No response requested." bubble, each prompt drawn once and in order, each stamp the row's own; over the sessions API one user row per prompt, every id a transcript uuid. Console errors fail it. 2 Haiku turns. Exit 0 held, 1 a check failed, 2 the run could not finish. Shots `.verify/shots/trailing-old-message-<label>-<desktop\|phone>-<light\|dark>-<state>.png` |
+| `bash .verify/trailing-old-message-before.sh` | the same proof against a copy of the tree with the changed server files from HEAD (probe server :7897, scratch Vite :5297); exit 0 only when the proof FAILED. Never put the old reader back on the live :3011 for it |
+
+2026-10-16: pre-change server 41 of 49 checks failed; fixed tree 49 of 49 on :5183 and on :5184.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-compacted-history.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-sessions.provider.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-session-synchronizer.provider.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/services/provider-token-usage.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/services/session-conversations-compacted.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/services/session-conversations-search.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/services/session-soul-launches.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/services/subagent-transcript.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/claude-transcript-rows.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/local-commands.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/trailing-message-kit.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/trailing-old-message-before.sh, /home/lyphe/.claude/claudecodeui_lyphe/.verify/trailing-old-message-proof.mjs
 
 ## MAN-8055 — The Claude runtime's seams to custom compaction — the seed append (`transcriptAppend`), the taken-over launch, the turn-end report
 
-The Claude runtime reaches a custom compaction (`server/modules/compaction/`) only through its context, `ProviderRuntimeContext.compaction` (`ChatCompactionHooks`: `takesOver`, `turnEnded`, `activityChanged`), and imports nothing from that module. `providerRuntimeService.useChatCompaction(hooks)` stores the hooks every context then carries — one delegating object that reads the registered hooks at CALL time, because a process keeps the context of the message that spawned it. The default answers `takesOver` false and does nothing for the other two, so with nothing registered the runtime behaves as it did before the seams. `providerRuntimeService.activity(provider, appSessionId)` asks the provider's runtime (`IProviderRuntime.activity?`) and answers `{ live: false, busy: false, why: null }` when it has none.
+The Claude runtime reaches a custom compaction (`server/modules/compaction/`) only through its context, `ProviderRuntimeContext.compaction` (`ChatCompactionHooks`: `takesOver`, `turnEnded`, `turnRestored`, `activityChanged`), and imports nothing from that module. `providerRuntimeService.useChatCompaction(hooks)` stores the hooks every context then carries — one delegating object that reads the registered hooks at CALL time, because a process keeps the context of the message that spawned it. The default answers `takesOver` false and does nothing for the other three, so with nothing registered the runtime behaves as it did before the seams. `providerRuntimeService.activity(provider, appSessionId)` asks the provider's runtime (`IProviderRuntime.activity?`) and answers `{ live: false, busy: false, why: null }` when it has none.
+
+Sibling seam, same context-hook shape: the chat's tool sets, `list/claude/claude-toolset-seams.ts` (MAN-8495). Tool sets are a live setting beside the compaction flip below — `planLiveChanges` `changes.toolsets`, applied by `setMcpServers`, never a respawn; MAN-8502 lists every live setting and every respawn reason of `chat-process.ts`.
 
 `claude-runtime.provider.js` takes call-in lines only; every body is `list/claude/claude-compaction-seams.ts`:
 
-- **Taken over at launch.** `resolveSdkOptions` asks `takesOver({ appSessionId, node })` (a run with no app session id never asks) and `applyCompactionSettings` merges `CLI_COMPACTION_SETTINGS` (`{ idleCompaction: false }`, the one constant) into `sdkOptions.settings` beside ultracode's. `autoCompactEnabled` is never touched: the CLI's threshold compaction, its compaction at overflow and its precompute stay as the net. With the answer false nothing is merged and the launch is byte-identical.
+- **Taken over at launch.** `resolveSdkOptions` asks `takesOver({ appSessionId })` (a run with no app session id never asks; a chat placed on a Cerberus node is asked and answered exactly as a local one) and `applyCompactionSettings` merges `CLI_COMPACTION_SETTINGS` (`{ idleCompaction: false }`, the one constant) into `sdkOptions.settings` beside ultracode's. `autoCompactEnabled` is never touched: the CLI's threshold compaction, its compaction at overflow and its precompute stay as the net. With the answer false nothing is merged and the launch is byte-identical.
 - **A flip is live.** `LaunchProfile.compactionTakenOver` is read off the launch settings (a profile recorded before the field reads as off); `planLiveChanges` makes a change of it a live `compaction` change, never a respawn, applied once for a re-adopted profile; `applyChanges` hands `applyFlagSettings` the constant, or — to give the chat back — `null` for a process that was only flipped on live (it removes the live value, so the operator's own setting shows again) and the CLI's DEFAULT (`idleCompaction: true`) for a process LAUNCHED taken over. Not `null` for that one: measured on 2.1.293 with no model call, the launch holds the key in the flag layer's base and a live `null` only removes what a live apply added, so `effective.idleCompaction` keeps reading `false` under it. The default also overrides an `idleCompaction` the operator set in a settings file; a launch argument cannot be taken back live, and the only other way is a respawn. Whether a process was launched on is fixed at launch (`launchedTakenOver`), and a re-adopted host with no profile on record counts as launched on.
 - **The turn's end is reported.** At the end of every `result` branch — after the turn's own `complete` — `turnEnded(report)` gets the turn's last MAIN-THREAD assistant request (`contextTokens`), the window of the model that request ran on (`contextWindow`, from the result's `modelUsage`), the turn's send options without anything one turn carries (`PER_TURN_SEND_OPTIONS`: `transcriptAppend`, `compactionSeed`, `resumeFromScratch`, the attachments among them), whether a client turn was waiting (`answered`), `aborted`, `seed` and the process's `activity`. `activityChanged` follows every `result`, `task_started`, `task_notification` and `background_tasks_changed`, and once when the process ends with `live: false` (not when a newer process already holds the session key, nor while a replacement is spawning for the chat). `get activity` on the process handle is `busy` for a turn pending or in flight, a follow-up turn about to start, or background work, with `why` naming which. A non-ambient `task_notification` outside a running turn holds the process busy ("a turn is about to start") until the follow-up's `init` or any `result`, or for 2 s — the CLI starts that turn ~100 ms later, and an idle report in the gap would let a compaction swap the process under it. A re-adopted run's report has no model options of its own, so its `sendOptions` are filled from the host's recorded launch profile (bare only for a host with none). Every hook call is wrapped: a hook that throws is logged and the turn goes on, and `takesOver`, which a send awaits, answers "not taken over" after 10 s.
+- **A turn the server did not see end is reported too.** The idle deadline is a timer a turn end arms, so a restart drops it, and the host the boot re-adopts has no turn end left to arm one. When `spawnProcess` adopts a host whose turn was complete (`reattach.turnCompleteSent`), `reportRestoredTurn` (`claude-compaction-restore.ts`) reads the host's last turn — a local host's off its journal on this machine (`lastTurnRecord`, MAN-683: the newest `result`'s time and `modelUsage`, and the last main-thread assistant message since the `result` before it), a node host's from the record its warden lists (`reattach.lastTurn`, `CerberusNodeHostLastTurn`: the warden runs the same `lastTurnRecord` over its own journal, picks the request with the same `mainThreadRequestOf`, and sends it cut down to `type`, `parent_tool_use_id`, `message.model` and `message.usage`) — and calls `turnRestored(report, endedAt, idleTries)` (`idleTries`: the host meta's `idleCheck.tries` when its `at` is not before `endedAt`, else 0 — MAN-8316, "Bounded across a restart"). The budget goes through `mainThreadRequestOf` (`session-host/host-registry.js`: the one rule for which assistant message is a turn's request and what it measures — main thread, not `<synthetic>`, more than zero tokens), the same function the live stream asks of each assistant message and the warden asks of a node host's journal, so the restored `contextTokens` is the number the turn end logged (Uploads, 2026-10-12: 321,120 both ways); `contextWindow` is `contextWindowFor` over the result's `modelUsage`; `answered`, `aborted` and `seed` are false and `activity` is the adopted process's (busy while `deferredTools` is non-empty or `backgroundTasks` is). A host that never ended a turn reports nothing (a node host whose warden predates `lastTurn` lists none, so reports nothing), and a host whose turn is still running gets its deadline from its own turn end. What the compaction does with it is MAN-8066, "A restart".
+- **A re-adopted process knows what its host was running.** `backgroundTasks` (the CLI's own task signal, which the process's idle closer, its `activity` and the compaction's guard read) starts from `reattach.liveTasks`, the tasks the host's journal shows running (`host-live-tasks.js`, MAN-683): a restart used to empty it, and a backgrounded subagent or monitor the call ledger (`backgroundWorkIds`) never names read idle until its next change. The process's `idleCheck` (the compaction's record of its idle check for the last turn end) starts from `reattach.idleCheck`; every note it sends carries it, a `result` clears it, and `handle.markIdleCheck(tries)` — reached through `claudeRuntime.markIdleCheck` and `providerRuntimeService.markIdleCheck` — sets it and writes the host's meta through the host's own note (`ack: false`).
 - **A seed append** is `options.transcriptAppend` (strings, each a text block; `options.compactionSeed` marks the run, `isSeedAppend`). `transcriptAppendMessage` makes it one SDK user message with `shouldQuery: false` and its own uuid: the CLI writes it to the transcript, calls no model, and merges it into the next message that queries. `buildPromptMessages` answers the append first, then the send's own message; the own message is dropped only when an append exists and the command is empty with nothing attached. A seed append files no run-stopped push. A push's pending turn is named by its LAST message (`openTurn` in `spawnProcess` and in `pushTurn`): an append-only push waits for the append's own `result`, an append pushed with a message waits for the message's.
 - **An append's `result`** (`num_turns: 0`, all-zero usage, `user_message_uuids` naming only appends the process pushed — `createAppendLedger().namesOnlyAppends`) is no turn's end. Alone in its push it answers the pending turn; pushed beside a message it is skipped with `continue` and the message's own result answers. It skips the reconciliation block, and the all-zero cumulative-usage fallback is blocked for it. Before its `complete` the runtime sends one `token_budget` from `askContextTokens(getContextUsage({ detail: 'full' }))` inside the grace window; `totalTokens` not above 0, a late or a failed ask gives one `console.warn` and no `token_budget`. why `full`: `summary` reads ~5-8K tokens high on a session that has made no request; `full` is the nearer count but still reads 1,758 above the next request's own prompt, the same on three Haiku chats (`post_tokens` 35,971 / 35,937 / 36,147 against a first request of 34,213 / 34,179 / 34,389; 2026-10-09, 2.1.295, ~0.5 s against ~64 ms); the two whole-leg chats read 2,075 and 2,141 (35,523 against 33,448; 36,478 against 34,337). So the composer's counter steps down by that, 1.8-2.1K, at the first reply.
 - **A run that resumes nothing** (`resumeFromScratch`: an edited first prompt, a compaction's seed append) seeds the session-id capture with null, so the session it starts is captured, handed to `ws.setSessionId` and announced with `session_created`; seeded with the chat's old provider id, as it was, the capture never fired and the chat stayed on the old session. When the run registry then moves a Claude chat's row from one provider session to another it marks the session it leaves superseded first, so the abandoned original is kept on disk, goes with the chat and is never indexed as a second sidebar chat.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/chat-process.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-compaction-seams.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-runtime.provider.js, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/services/provider-runtime.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/websocket/services/chat-run-registry.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/interfaces.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/chat-process.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-compaction-restore.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-compaction-seams.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-runtime.provider.js, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/services/provider-runtime.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/websocket/services/chat-run-registry.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/interfaces.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts
 
 ## MAN-8068 — Custom compaction — the providers' seams at a glance: history, indexer, search, runtime hooks, which row holds each
 
@@ -637,7 +654,7 @@ Claude only. The module that compacts is `server/modules/compaction/` (MAN-8067)
 | indexer | `ClaudeSessionSynchronizer.processSessionFile` skips a transcript whose provider id is superseded (the Codex rule): a compacted transcript is never a second sidebar chat | MAN-8054 |
 | search | `listCompactedTranscriptRows` adds one search entry per record, the chat's own row with the old provider id and path: a hit in a compacted transcript names its chat | MAN-8054 |
 | launches | `sessions.service.ts` `fetchHistory` collects stamped soul launches for the live provider id AND each record's old id | MAN-8054 |
-| runtime hooks | `ProviderRuntimeContext.compaction: ChatCompactionHooks` (`takesOver`, `turnEnded`, `activityChanged`); `providerRuntimeService.useChatCompaction(hooks)`; default: `takesOver` false, the others nothing | MAN-8055 |
+| runtime hooks | `ProviderRuntimeContext.compaction: ChatCompactionHooks` (`takesOver`, `turnEnded`, `turnRestored`, `activityChanged`); `providerRuntimeService.useChatCompaction(hooks)`; default: `takesOver` false, the others nothing | MAN-8055 |
 | `activity` | optional `IProviderRuntime.activity(appSessionId)` → `{ live, busy, why }`; `providerRuntimeService.activity(provider, id)` answers not-live when a runtime has none | MAN-8055 |
 | seed append | `options.transcriptAppend` (strings) is pushed as one `shouldQuery: false` message with no turn of its own, ahead of the send's own message; its `result` is no turn's end and is answered with one `token_budget` from `getContextUsage({ detail: 'full' })`; `options.compactionSeed` files no run-stopped push | MAN-8055 |
 | `resumeFromScratch` | the run seeds the session-id capture with null, so the session it starts is announced (`session_created`) and the registry moves the chat's row; the transcript the chat leaves is marked superseded first. An edited first prompt and a compaction's seed append both ride it | MAN-8055 |
@@ -655,3 +672,127 @@ The chat palette's **Claude Code** group is the command list the installed Claud
 - **Proof.** `node .verify/palette-claude-code-group.mjs` (the open palette at 1440x900 and 390x844, light and dark; the live list reply; one Haiku `/usage` turn in the scratch probe project; the model picker as the shared mechanism's regression guard; the provider gate, no turn sent: a Codex, Cursor or OpenCode composer's palette has no Claude Code group and Claude's has it again, skipped with a `skip:` line when the picker offers no other provider with a model). The group follows the composer's provider, which is a stored per-user preference (`selectedProvider`), so every session pins the composer on Claude and drops its preference writes (`lib/prefs-pin.mjs`; the picker switches in `lib/composer-provider.mjs` move the page, never the shared dev account): a run neither depends on nor changes the stored value. The `/doctor` and `/model` hint checks compare against the hint in the live `POST /api/commands/list` reply, never a literal. The turn's `/doctor` → `terminal` check proves the init-frame hand-off only when `/doctor` was not badged `terminal` before the turn (the stored set was empty for the CLI version); otherwise it prints a `note:` and checks only that the badge stands.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/commands/commands.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/commands/engine-commands.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-command-catalog.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-engine-catalog.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/composer/CommandMenu.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useSlashCommands.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/palette-claude-code-group.mjs
+
+## MAN-8495 — The Claude runtime's seams to tool sets — entry points, the `claude-toolset-seams.ts` functions, the call-ins
+
+The Claude runtime learns a chat's tool sets through `context.toolsets` only (MAN-8487) and imports nothing from the toolsets module (MAN-8500, map MAN-8497). Sibling of MAN-8055 (custom compaction): the same context-hook shape. `claude-runtime.provider.js` takes call-in lines; every body is `list/claude/claude-toolset-seams.ts`.
+
+## Entry points
+
+| name | where | does |
+| --- | --- | --- |
+| `ProviderRuntimeContext.toolsets` (`ChatToolsetHooks`) | `server/shared/types.ts` | always present; one delegating object that reads the registered hooks at CALL time (a process keeps the context of the message that spawned it) |
+| `providerRuntimeService.useChatToolsets(hooks)` | `provider-runtime.service.ts` | stores the hooks; the default answers the inert launch, so with nothing registered a launch is today's |
+| `IProviderRuntime.syncToolsets?(appSessionId)` | `server/shared/interfaces.ts` | optional; only a runtime that keeps a live process per chat has it |
+| `providerRuntimeService.syncToolsets(provider, id)` | `provider-runtime.service.ts` | `runtime.syncToolsets?.(id) ?? { live: false }`; a throw or reject → `{ live: false }` with one warning |
+| `claudeRuntime.syncToolsets(id)` | `claude-runtime.provider.js` | a live, non-closing process → `handle.syncToolsets(30_000)`; else `{ live: false }` |
+
+## Functions — `claude-toolset-seams.ts`
+
+| function | does |
+| --- | --- |
+| `askToolsetLaunch(context, { appSessionId, onNode }, deadlineMs = 2_000)` | asks `context.toolsets.launchFor`; a throw, a reject, a non-record answer or no answer in `deadlineMs` → the inert launch `{ env: {}, servers: null, promptLine: null }`; each distinct failure text logs one `[Claude SDK]` warning per server process |
+| `applyToolsetLaunch(sdkOptions, launch)` | `launch.env` into `sdkOptions.env`; `launch.promptLine` after `systemPrompt.append`; an inert launch changes neither; `servers` are never put on the launch |
+| `toolsetDigest(servers)` | `null` for null/undefined (nothing in play), `''` for `{}`, else sha256 of the map's JSON; digests only, never configs (a config can carry a token) |
+| `createToolsetSync(deps)` → `{ sync(boundMs) }` | one process's sync into its CLI; never throws, never retires the process |
+
+`ToolsetSyncDeps`: `getQuery`, `isClosing`, `context`, `appSessionId`, `onNode`, `setApplied(digest | null)`, optional `baseServerNames()` (omitted → the base-name guard is off; the runtime always passes it).
+
+## Call-ins — `claude-runtime.provider.js`, `chat-process.ts`
+
+| where | call-in |
+| --- | --- |
+| `resolveSdkOptions` | `askToolsetLaunch` + `applyToolsetLaunch`; returns `toolsets: { digest: toolsetDigest(launch.servers), servers }` |
+| `launchProfileOf(…, toolsets)` (5th arg) | `LaunchProfile.toolsets` = the digest the message WANTS; `null` when nothing is in play |
+| process creation | `createToolsetSync({ …, setApplied: d => { profile.toolsets = d }, baseServerNames: () => Object.keys(sdkOptions?.mcpServers ?? {}) })`; `handle.syncToolsets(boundMs)` |
+| `planLiveChanges` | `changes.toolsets = next.toolsets !== null && next.toolsets !== live.toolsets` (re-adopted: `next.toolsets !== null`); a tool-set difference is never a respawn reason |
+| `applyChanges` | `changes.toolsets` → `withinGrace(handle.syncToolsets(INTERRUPT_GRACE_MS = 5_000))`; a failure warns and the turn goes on; the "Applying to the running process" log skips `toolsets: false` |
+| spawn | `profile.toolsets = reattach ? null : ''`; the hold on a fresh process: MAN-8502 |
+| re-adopt profile merge | `Object.assign(profile, next, { …, toolsets: profile.toolsets })` — what the process HOLDS is what the sync recorded, not what the message wants |
+| `claudeRuntime.syncToolsets(appSessionId)` | live non-closing process → `handle.syncToolsets(30_000)`; else `{ live: false }` |
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/chat-process.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-runtime.provider.js, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-toolset-seams.ts
+
+## MAN-8502 — The Claude runtime's seams to tool sets — the hold on a fresh process, the applied digest, the live settings, why a sync never retires a process
+section: The Claude runtime's seams to tool sets — `claude-toolset-seams.ts`, the one `setMcpServers` mechanism, the base-name guard, the sync's bound/001 The hold on a fresh process
+
+- Applies when the launch's `servers` map is non-empty and the run is not a re-adoption. Then the prompt queue starts EMPTY (the hooks-retry branch builds its queue from the same messages), and right after `addSession` registers the handle `handle.syncToolsets(INTERRUPT_GRACE_MS = 5_000)` runs; whatever it answers (it never rejects), its settle pushes the spawn's prompt messages. why: the chat's first turn already has the tools.
+- Not awaited: the message loop starts at once, because it answers the SDK's control request.
+- Bound: 5 s for the whole run (the hook's ask included). Past it the prompt goes in anyway, the applied digest is `null`, and the next joining message syncs again. Measured 2026-10-16: a hook answering at 1.9 s and a CLI that never answers `setMcpServers` → settled at 5002 ms, `confirmed: false`, "setMcpServers was not answered within 5000 ms".
+- A launch with `servers` null or `{}` holds nothing: the queue starts with the prompt, as before.
+
+## Applied digest — `LaunchProfile.toolsets`
+
+| value | on the process's profile | on a message's profile (`launchProfileOf`, 5th argument) |
+| --- | --- | --- |
+| `null` | not known: a re-adopted process, or a sync that failed, went unanswered or left a server unconnected | nothing in play for the chat: never syncs |
+| `''` | none applied (a fresh process before its first sync) | the chat's on-sets define no server (`{}`) |
+| 64-hex | sha256 of the map's JSON applied to this process | the digest the message WANTS |
+
+| `planLiveChanges` | `changes.toolsets` | result |
+| --- | --- | --- |
+| wanted `null` | false | no sync |
+| wanted ≠ held (a new set on, a set off, a held `null`) | true | `applyChanges` syncs before the turn |
+| wanted = held | false | no sync |
+| process re-adopted (`live.unknown`) | `next.toolsets !== null` | one sync; the held digest is what that sync recorded, not what the message wants |
+
+A tool-set difference is never a respawn reason.
+
+## Live settings of a running process — `planLiveChanges` (`chat-process.ts`)
+
+| setting | applied by |
+| --- | --- |
+| model | `setModel` |
+| effort, ultracode | `applyFlagSettings` |
+| permission mode (a bypass request on a process not launched with it respawns) | `setPermissionMode` |
+| allowed tools, GROWN | in place (`sdkOptions.allowedTools`) |
+| compaction taken over | `applyFlagSettings` (MAN-8055) |
+| **tool sets** | `setMcpServers`, through `createToolsetSync` |
+
+Respawn reasons (launch arguments): `resumeFromScratch`, a resume anchor, `cwd`, the installed CLI newer than the process's, the base `mcpServers` map, a bypass request, any change to the disallowed list, a SHRUNK allowed list.
+
+## Why a sync never retires a process
+
+- `joinProcess` retires the process and spawns afresh when `applyChanges` throws for another setting; `applyChanges` catches the tool-set sync's own failure, warns, and the turn goes on. `createToolsetSync` never throws and `claudeRuntime.syncToolsets` never rejects.
+- why: `retire` interrupts the turn, then ends the queue (EOF), and a background task still running at that EOF dies with the CLI; the respawn would meet the same server again. A server that fails to connect is reported (`failed`, or `unconfirmed` past the bound) and a slow http server is not a broken conversation.
+- The failure is not lost: the applied digest goes `null`, so the next joining message syncs again.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/chat-process.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-runtime.provider.js, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-toolset-seams.ts
+
+## MAN-8503 — The Claude runtime's seams to tool sets — the one `setMcpServers` mechanism, one sync run, the base-name guard, the journal line, the traps
+section: The Claude runtime's seams to tool sets — `claude-toolset-seams.ts`, the one `setMcpServers` mechanism, the base-name guard, the sync's bound/002 One sync run — `createToolsetSync(...).sync(boundMs)`
+
+## Mechanism — INV-8471
+
+- A set's servers reach a CLI only through `Query.setMcpServers(map)`, handed the FULL map of the chat's on-sets every call: the call REPLACES the servers it owns. why: one code path for on, off, a fresh process and a re-adopted one.
+- Never in the launch's `mcpServers` option (a launch argument: a change replaces the process). Never `toggleMcpServer` (writes `disabledMcpServers` into the project's `~/.claude.json` entry, shared by every session in the folder).
+- `setMcpServers` also replaces every IN-PROCESS SDK server (measured 2026-10-15: a call without the new set tore down the SDK server hosting the switch tool mid-call, "Connection closed"). No chat launch carries one today; one that does must be re-passed in the sent map on every call, in `runOnce`.
+
+## One sync run — `createToolsetSync(...).sync(boundMs)`
+
+Runs are chained (one at a time, in ask order); each re-asks the hook when its turn comes, so racing switches leave the CLI holding what the row says last.
+
+1. `isClosing()` → `{ live: false }`.
+2. Ask the hook (`min(2 s, boundMs)`). Hook failed → `{ live: true, confirmed: false, reason }`; nothing sent, applied digest untouched.
+3. `servers === null` → `{ live: true, confirmed: true, added: [], removed: [], errors: {} }`; no request, no journal line.
+4. No query → `{ live: false }`.
+5. `shapeForCli`: a server named like a launch `mcpServers` key is dropped from the call and goes to `errors` (settled for the process: no resync per message); a stdio server (type unset or `stdio`) without `args` is sent with `args: []`.
+6. Names in `failedNames` that are still wanted: call 1 without them, then call 2 with the full map; `mergeResults` joins both; a name removed only to retry is not in `removed`.
+7. `boundMs` bounds the WHOLE run (ask + every `setMcpServers`; each call gets what is left, min 1 ms). A call past it → `{ live: true, confirmed: false, reason }`, applied digest `null`.
+
+| result | applied digest recorded (`setApplied`) | answer |
+| --- | --- | --- |
+| CLI reports no errors | `toolsetDigest(hook's servers)` | `confirmed: true`, `added`, `removed`, `errors` = rejected base names |
+| CLI reports ≥1 `errors` | `null` (next joining message syncs again) | `confirmed: true`, `errors` = rejected + CLI's |
+| call throws or exceeds `boundMs` | `null` | `confirmed: false`, `reason` |
+
+- `failedNames` = keys of the last result's `errors`: the CLI treats a repeat of an identical map as a no-op and stops reporting the failure, hence remove-then-add. A server that stays down is retried by every joining message.
+- Journal: `[Claude SDK] Tool sets for session <id>: +<added> -<removed> errors=<names> (<ms> ms)` or `… unconfirmed: <reason ≤200 chars> (<ms> ms)`; `(ms)` starts before the hook ask.
+
+## Traps
+
+- Base-name collision, measured on Claude Code 2.1.301: a `setMcpServers` naming a launch-option server TAKES THE NAME OVER, and the call that later omits it removes the operator's server. The guard covers the launch `mcpServers` option only; a base server from a settings file or a plugin cannot be named here (unmeasured).
+- `loggedFailures` (the once-per-text set) is never bounded.
+- Prompt order for a joining message while the first prompt is held: its sync queues behind the spawn's, so its `pushTurn` runs after the held prompt is released (by construction; unexercised live).
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/chat-process.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-runtime.provider.js, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-toolset-seams.ts

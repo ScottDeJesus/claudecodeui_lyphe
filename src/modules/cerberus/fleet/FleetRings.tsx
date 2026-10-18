@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { ringsLayout } from '@/modules/cerberus/fleet/fleetModel';
 import { RingDot, RingHub, RingsKey } from '@/modules/cerberus/fleet/RingMarks';
 import { RingsNodePanel } from '@/modules/cerberus/fleet/RingsNodePanel';
+import { MarkIcon } from '@/modules/cerberus/StatusMarks';
 import { markLook, nodeMark } from '@/modules/cerberus/utils/cerberusStatus';
 import { nodeLine } from '@/modules/cerberus/utils/fleetWords';
 import type { CerberusNodeView } from '@/shared/cerberus-types';
@@ -67,7 +68,7 @@ type FleetRingsProps = {
  *
  * In the ring's card, center is the hub (`RingHub`). Every other node sits on a ring around it, worst
  * first, so the worst sit on the inner ring. Each node is a dot in its word's shape (`RingDot`), with its
- * glyph and its name on the side away from the hub: above a node on a ring's upper half, below one on its
+ * icon and its name on the side away from the hub: above a node on a ring's upper half, below one on its
  * lower half, so a name never sits on its own spoke or crowds center. A spoke joins each node to the hub:
  * dashed for no result, solid amber for needs you, plain otherwise. A beat travels each live spoke from
  * its node to the hub while the rings name every node on them. Past that, only a node that needs you
@@ -238,8 +239,9 @@ export function FleetRings({ items, nodes, now, onOpenCell }: FleetRingsProps) {
                     )}
                   >
                     {mark !== null && (
-                      <span data-tone={markLook(mark).tone} className="mr-1 text-tone-ink">
-                        {markLook(mark).glyph}
+                      // On the label's baseline, lowered 2px so the 12px icon centres on the 11.5px name's capitals.
+                      <span data-tone={markLook(mark).tone} className="mr-1 inline-block align-[-2px] text-tone-ink">
+                        <MarkIcon icon={markLook(mark).icon} className="size-3" />
                       </span>
                     )}
                     {item.id}

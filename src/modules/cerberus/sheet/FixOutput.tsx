@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 
 import { useClock } from '@/modules/cerberus/hooks/useClock';
 import { useRunOutput } from '@/modules/cerberus/hooks/useRunOutput';
+import { MarkIcon } from '@/modules/cerberus/StatusMarks';
 import { UnreachableBanner } from '@/modules/cerberus/UnreachableBanner';
 import { RUN_LOOK } from '@/modules/cerberus/utils/cerberusStatus';
 import { hms } from '@/modules/cerberus/utils/cerberusTime';
@@ -11,7 +12,7 @@ import type { CerberusRunLine, CerberusRunView } from '@/shared/cerberus-types';
 import { Badge } from '@/shared/ui';
 import { cn } from '@/shared/utils';
 
-/** The pill's word for where a run stands: Running, Succeeded, Failed · exit 1, Timed out, Refused. Its glyph is `RUN_LOOK`'s. */
+/** The pill's word for where a run stands: Running, Succeeded, Failed · exit 1, Timed out, Refused. Its icon is `RUN_LOOK`'s. */
 function pillWord(t: TFunction, run: CerberusRunView): string {
   switch (run.result) {
     case null:
@@ -112,8 +113,8 @@ function UnreadRun({ eyebrowId, onRetry }: { eyebrowId: string; onRetry: () => v
  * :429-449). In the check sheet, under the check and its actions.
  *
  * The head: the eyebrow "Fix output", the fix's name, who started it on which warden and when ("Ran on its
- * own · warden on eis1 · started 17:52:01"); on the right the pill (`Badge`, `RUN_LOOK`'s tone and glyph)
- * — ● Running (its dot breathing), ✓ Succeeded, ▲ Failed · exit 1, ▲ Timed out, ✕ Refused — and "took
+ * own · warden on eis1 · started 17:52:01"); on the right the pill (`Badge`, `RUN_LOOK`'s tone and icon)
+ * — Running (its wrench breathing), Succeeded, Failed · exit 1, Timed out, Refused — and "took
  * 12 s", or the seconds so far while it runs. The pill is the one polite region, so the end of a run is
  * heard; the seconds are not.
  *
@@ -175,14 +176,14 @@ export function FixOutput({ runId }: { runId: string }) {
         <div className="flex flex-none flex-col items-end gap-1">
           <div role="status">
             {/* Keyed by the result, so the pill an ended run lands on springs in, once. While it runs only the
-                dot breathes, so the word never dims under the eye. */}
+                wrench breathes, so the word never dims under the eye. */}
             <Badge
               key={run.result ?? 'going'}
               as="span"
               tone={look.tone}
               className={cn('gap-1.5 whitespace-nowrap', !going && 'motion-safe:animate-cerberus-check')}
             >
-              <span aria-hidden className={cn('flex-none', going && 'motion-safe:animate-cerberus-breathe')}>{look.glyph}</span>
+              <MarkIcon icon={look.icon} className={cn('size-3.5', going && 'motion-safe:animate-cerberus-breathe')} />
               <span>{pillWord(t, run)}</span>
             </Badge>
           </div>

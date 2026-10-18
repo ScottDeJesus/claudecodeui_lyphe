@@ -126,6 +126,19 @@ const ENDING_CODES = new Map<string, DispatcherEndingCode>([
  */
 const LIMIT_TAIL = / \((until|retry at) (\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z)\)$/;
 
+/**
+ * The detail the operator's own Hide writes on the `paused` event it logs (`hooks/dispatcher/cmd/hide.py`,
+ * `store_hidden.HIDDEN`). A Hide pauses the plan like a Stop does, but it is something he pressed a moment
+ * ago, so it earns no push — and it opens no wave either (`waveStarters`), or an hour of hides would hush the
+ * next pause that really needs a hand.
+ */
+const HIDE_PAUSE_DETAIL = 'hidden';
+
+/** Is this event the pause a Hide logged — the one `paused` that is the operator's own press and no news. */
+function isHidePause(event: DispatcherEvent): boolean {
+  return event.kind === 'paused' && event.detail === HIDE_PAUSE_DETAIL;
+}
+
 type LimitPause = { id: number; at: number; resetsAt: number; guess: boolean };
 
 function limitPause(event: DispatcherEvent): LimitPause | null {
@@ -232,7 +245,7 @@ function waveStarters(plans: DispatcherPlan[]): Set<number> {
   for (const plan of plans) {
     if (plan.arc === null) continue;
     for (const event of plan.events) {
-      if (!WAVE_KINDS.has(event.kind) || limitPause(event) !== null) continue;
+      if (!WAVE_KINDS.has(event.kind) || limitPause(event) !== null || isHidePause(event)) continue;
       const at = Date.parse(event.at) / 1000;
       // A stamp that does not parse cannot prove a quiet hour or a busy one; the conservative
       // direction is the one the operator can see, so it speaks.
@@ -344,7 +357,7 @@ export function createDispatcherEndingsNotifier(
     for (const plan of plans) {
       for (const event of plan.events) {
         const code = ENDING_CODES.get(event.kind);
-        if (code === undefined || event.id <= mark) continue;
+        if (code === undefined || event.id <= mark || isHidePause(event)) continue;
         const limit = limitPause(event);
         // ONE push per wall, whichever plan it paused and however many minutes apart: see
         // `speakingLimitPauses`.

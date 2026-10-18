@@ -1,5 +1,6 @@
 import { useTranslation } from 'react-i18next';
 
+import { MarkIcon } from '@/modules/cerberus/StatusMarks';
 import { FLEET_FIXING_LOOK, markLook, nodeMark, STATUS_TABLE } from '@/modules/cerberus/utils/cerberusStatus';
 import type { CerberusCellShape, FleetItem, FleetStatus } from '@/shared/types';
 import { cn } from '@/shared/utils';
@@ -14,7 +15,8 @@ import { cn } from '@/shared/utils';
 /**
  * A node's dot, by its word's cell shape in the one table. Passing and close to the limit share a shape,
  * a wash inside the tone's edge, as the prototype draws them: a lone dot needs its edge to be seen at all
- * (a strip's passing minute does not), and the hue and the label's glyph, ✓ against ▲, tell the two apart.
+ * (a strip's passing minute does not), and the hue and the label's icon, a circled check against a
+ * triangle, tell the two apart.
  * Failing and refused are filled. No result is a hollow dashed round, grounded on the card so its spoke
  * stops at the edge. Muted is the raised grey inside the neutral dot's solid edge: the strip's
  * `border-input` edge measured 1.41:1 on the light card, and a lone dot needs 3:1 to be found as a node.
@@ -90,7 +92,7 @@ export function RingDot({ status, size, selected = false, still = false }: {
 
 /**
  * CENTER, the hub at the middle of the rings, drawn as the prototype draws it: a round lifted off the
- * card, a fifth of the box across (66 to 92 px), holding the glyph of its word, its name, and "Cerberus"
+ * card, a fifth of the box across (66 to 92 px), holding the icon of its word, its name, and "Cerberus"
  * in the display face. It springs a little larger under the pointer and smaller under the press. A press
  * selects it like any node, and it wears the ink ring while selected.
  *
@@ -121,7 +123,7 @@ export function RingHub({ hub, selected, label, onPress }: {
         selected && SELECTED_RING,
       )}
     >
-      {look !== null && <span aria-hidden className="text-[10px] leading-none text-tone-ink">{look.glyph}</span>}
+      {look !== null && <MarkIcon icon={look.icon} className="size-3 text-tone-ink" />}
       <span className="max-w-full truncate text-[15px] font-bold leading-tight tracking-[-0.01em]">{hub.id}</span>
       <span className="font-serif text-sm italic leading-tight text-accent-ink">{t('cerberus.fleet.rings.hubSub')}</span>
     </button>

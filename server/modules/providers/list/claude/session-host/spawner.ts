@@ -22,11 +22,12 @@ import { StringDecoder } from 'node:string_decoder';
 
 import type { SpawnOptions, SpawnedProcess } from '@anthropic-ai/claude-agent-sdk';
 
-import type { CerberusHostFrame } from '@/shared/cerberus-types.js';
+import type { CerberusHostFrame, CerberusNodeHostLastTurn } from '@/shared/cerberus-types.js';
+import type { IdleCheck } from '@/shared/types.js';
 
 import { attachLocalSpawn, createFacade, isApiExiting } from './facade.js';
 import type { Facade, TurnBits } from './facade.js';
-import { deliverHostFrame, hostTransport, plainEnv } from './host-frames.js';
+import { deliverHostFrame, hostTransport, plainEnv, writeReleaseBack } from './host-frames.js';
 import { trackHostLiveness } from './host-liveness.js';
 import { isKeepaliveServerUp, isTmuxSessionAlive, registry, removeHostJournal } from './hosts.js';
 import { placeInNodeHost } from './node-transport.js';
@@ -51,8 +52,21 @@ export type KeepaliveReattach = {
    * hands: the meta is what the API launched the CLI with, the journal is what the CLI said.
    */
   cliVersion: string | null;
-  /** The tool-call ids whose work was still outstanding when the meta was last written. */
+  /** The tool-call ids whose work was still outstanding when the meta was last written, less those the host's journal shows finished. */
   deferredTools: string[];
+  /** The calls that list left out because the journal shows them finished; the meta still names them until the host is told. */
+  releasedCalls?: string[];
+  /** The CLI's own background tasks the host's journal shows running: the process's task set starts from them, not empty. Null when a node's warden lists none (`compaction/node-task-ledger.ts`). */
+  liveTasks?: string[] | null;
+  /** The meta's record of the idle compaction check for the host's last turn end; the process carries it forward. */
+  idleCheck?: IdleCheck | null;
+  /**
+   * The last finished turn of a host on a NODE, as its warden read it off the host's journal. A local host's is read
+   * from this machine's own journal at re-adoption (`claude-compaction-restore.ts`); a node's journal is the warden's,
+   * which this server is never handed the path of, so the warden's listing carries it. Absent for a local host, and
+   * null from a warden that does not list it.
+   */
+  lastTurn?: CerberusNodeHostLastTurn | null;
   /** The node whose warden holds the host, or null for a host on this machine's own keepalive. */
   node: string | null;
 };
@@ -181,6 +195,7 @@ async function placeInHost(facade: Facade, options: SpawnOptions, ctx: SpawnCont
     // D-3: "acked" is the host's own cursor — it replays any `result` this API never
     // confirmed handling, and nothing it already did.
     bindSocket(facade, socket, hostId, ctx.appSessionId, { t: 'hello', fromSeq: 'acked' });
+    writeReleaseBack(facade, hostId, ctx.reattach);
     return;
   }
 

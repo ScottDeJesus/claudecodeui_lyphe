@@ -23,7 +23,10 @@
  * - CO-LOCATED AT EVERY PLACEMENT, fresh and re-attach alike. The CLI runs this machine's command with this
  *   machine's environment, in a folder that is a path on this machine's disk, so a node that is not on this
  *   machine (`nodeSessions.isColocated`: its last hello's machine id is not this one's) is refused with the way
- *   back, whatever it was when the project was assigned (`project-node.service.ts` checks only then).
+ *   back, whatever it was when the project was assigned (`project-node.service.ts` checks only then). The same
+ *   refusal is what keeps a node chat's transcript readable here: the CLI writes it under this machine's own
+ *   `~/.claude/projects`, so the house's compaction (`server/modules/compaction/`) takes a node chat over exactly
+ *   as it takes a local one, and reads its transcript from this disk.
  * - A FRESH PLACEMENT THAT IS REFUSED AFTER ITS `spawn` WENT OUT RETIRES ITS HOST. Detaching the channel leaves
  *   the CLI running, the person is told the turn failed, and the next link-up would re-adopt the orphan as a
  *   live run; so the host is asked to wind down and the node's count is listed again. When the refusal IS the
@@ -49,7 +52,8 @@ import type { CerberusHostFrame } from '@/shared/cerberus-types.js';
 import { isApiExiting } from './facade.js';
 import type { Facade } from './facade.js';
 import { noteNodeHostsChanged } from './colocated-hosts.js';
-import { deliverHostFrame, hostTransport, plainEnv } from './host-frames.js';
+import { deliverHostFrame, hostTransport, plainEnv, writeReleaseBack } from './host-frames.js';
+import type { HostRelease } from './host-frames.js';
 import { trackHostLiveness } from './host-liveness.js';
 import { retireRefusedHost } from './refused-hosts.js';
 
@@ -62,7 +66,8 @@ const LINK_LOST = 'link lost';
 
 /**
  * Where a turn goes and who it is for. `reattach` is the host a re-adoption rejoins, null for a
- * fresh turn.
+ * fresh turn: its id, and what the listing read of its meta, so the release of the calls its journal
+ * shows finished is written back to it (`writeReleaseBack`).
  *
  * consumer: spawner.ts
  */
@@ -70,7 +75,7 @@ export type NodePlacement = {
   node: string;
   appSessionId: string;
   userId: string | number | null;
-  reattach: { hostId: string } | null;
+  reattach: ({ hostId: string } & HostRelease) | null;
   profile: Record<string, unknown> | null;
 };
 
@@ -110,6 +115,9 @@ const notConnected = (node: string): Error =>
  * The sentence that refuses a placement on a node that is not on this machine, or null when it is. The
  * answer reads the node's stored machine id, which can fail with the store: that is a refusal too, since a
  * turn that cannot be placed must reject here rather than throw out of the spawn function.
+ *
+ * This gate is what lets the house's compaction take a node chat over like a local one: a chat placed here
+ * runs on this machine's own disk, so its transcript is a file this server reads (see the header).
  */
 function colocationRefusal(node: string): string | null {
   try {
@@ -325,5 +333,7 @@ export function placeInNodeHost(facade: Facade, options: SpawnOptions, ctx: Node
   firstFrameTimer.unref();
 
   facade.attach(hostTransport(sendToHost));
+  // Behind the `hello` the open carries: the warden writes that first, then the frames that follow it in order.
+  if (ctx.reattach) writeReleaseBack(facade, hostId, ctx.reattach, node);
   return placed;
 }

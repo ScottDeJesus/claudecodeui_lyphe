@@ -1,3 +1,4 @@
+import type { LucideIcon } from 'lucide-react';
 import type { HTMLAttributes } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -11,11 +12,24 @@ import { cn } from '@/shared/utils';
  * `data-tone` plus a `tone-*` Tailwind name, which the `[data-tone]` swap (tokens.css) resolves to
  * the tone's soft, ink or dot. No hex, no `rgba(` and no `var(--` appear here (MAN-739 rules 3-4).
  *
- * Colour is never the whole signal (MAN-578). A glyph carries its ✓ ▲ ✕ — ·, a pill carries the glyph
- * and the word, and a cell or square, too small for a glyph, carries its shape and gives its word to
+ * Colour is never the whole signal (MAN-578). A round glyph carries its status's icon, a pill carries the
+ * icon and the word, and a cell or square, too small for an icon, carries its shape and gives its word to
  * the tooltip and to assistive tech. Colour does not animate between statuses (MAN-739 rule 5). The
  * only motion is the failing glyph's ring, and the pulse of a fix running.
  */
+
+/**
+ * A look's icon as every mark draws it: decorative, since the word beside it or the mark's own name says
+ * the status, at the one stroke that still reads at 12 px. The caller gives it its size, its flow and any
+ * motion.
+ *
+ * Used here by `StatusGlyph` and `StatusPill`, and by every other mark drawn from a look: the rings' hub and
+ * labels (`fleet/RingMarks`, `fleet/FleetRings`), a Needs-you card's run strip (`fleet/NeedFix`), Fix
+ * output's pill (`sheet/FixOutput`) and the diagnosis panel's Failed pill (`sheet/DiagnosisPanel`).
+ */
+export function MarkIcon({ icon: Icon, className }: { icon: LucideIcon; className?: string }) {
+  return <Icon aria-hidden strokeWidth={2.25} className={cn('flex-none', className)} />;
+}
 
 /**
  * Each cell shape's paint. Size and flow belong to the caller.
@@ -44,24 +58,25 @@ const CELL_PAINT: Record<CerberusCellShape, string> = {
 };
 
 /**
- * The round glyph's three sizes, from the prototype: `sm` (20px) a collapsed node card, `md` (24px)
- * a Needs-you card, a check row, the lookup sentence, `lg` (32px) the quiet "✓ Nothing needs you".
+ * The round glyph's three sizes, from the prototype, and the icon each holds: `sm` (a 20px round, a 12px
+ * icon) a collapsed node card, `md` (24px, 14px) a Needs-you card, a check row, the lookup sentence, `lg`
+ * (32px, 18px) the quiet "Nothing needs you".
  */
 const GLYPH_SIZE = {
-  sm: 'size-5 text-[9px]',
-  md: 'size-6 text-[10.5px]',
-  lg: 'size-8 text-sm',
+  sm: { round: 'size-5', icon: 'size-3' },
+  md: { round: 'size-6', icon: 'size-3.5' },
+  lg: { round: 'size-8', icon: 'size-[18px]' },
 } as const;
 
 /**
- * A status as a round glyph: ✓ ▲ ✕ — or · in the tone's ink, on its soft fill. While a check is
- * failing it rings with `cerberus-ring-warn`, the halo that says it needs you now; a fix running (●) pulses
- * instead, since one is already on it. With reduced
+ * A status as a round glyph: the table's icon in the tone's ink, on its soft fill. While a check is
+ * failing it rings with `cerberus-ring-warn`, the halo that says it needs you now; a fix running (the
+ * wrench) pulses instead, since one is already on it. With reduced
  * motion it is still. It names its word to assistive tech and on hover. Pass `decorative` when the
  * word is already written beside it, so it isn't read twice. Pass `still` for the status at an
  * asked moment rather than now (a lookup), which never rings: the moment may be long past, and
  * the ring means now. Pass `label` when the mark stands for more than one word: a node updating draws
- * the fixing ●, and says "Updating its warden", never "Fix running".
+ * the fixing wrench, and says "Updating its warden", never "Fix running".
  *
  * Used by `SentenceRow` in `sheet/LookupMoment.tsx` (the status at an asked moment: `LookupSentence` and
  * `LookupMoment`), `sheet/CheckRows`, `fleet/NodeCard` and `fleet/NeedsYouCard`.
@@ -81,15 +96,13 @@ export function StatusGlyph({ status, size = 'md', decorative = false, still = f
       data-tone={look.tone}
       {...(decorative ? { 'aria-hidden': true } : { role: 'img', 'aria-label': word, title: word })}
       className={cn(
-        'inline-flex flex-none select-none items-center justify-center rounded-full bg-tone-soft leading-none text-tone-ink',
-        GLYPH_SIZE[size],
+        'inline-flex flex-none select-none items-center justify-center rounded-full bg-tone-soft text-tone-ink',
+        GLYPH_SIZE[size].round,
         status === 'failing' && !still && 'motion-safe:animate-cerberus-ring-warn',
         status === 'fixing' && !still && FLEET_FIXING_LOOK.glyphMotion,
       )}
     >
-      {/* A middle dot is optically a fraction of ✓ ▲ ✕ —, and alone in its round it reads as no mark at
-          all, so it is drawn larger. The glyph itself still comes from the table. */}
-      {look.glyph === '·' ? <span className="text-[1.8em] leading-none">{look.glyph}</span> : look.glyph}
+      <MarkIcon icon={look.icon} className={GLYPH_SIZE[size].icon} />
     </span>
   );
 }
@@ -145,7 +158,7 @@ export function StatusSquare({ status, label }: { status: CerberusMark; label?: 
 }
 
 /**
- * A status as a pill: its glyph, then its word or the caller's own text ("2 checks need you"),
+ * A status as a pill: its icon, then its word or the caller's own text ("2 checks need you"),
  * which is cut with an ellipsis when the pill runs out of room. It composes the library's `Badge`,
  * whose `tone` lands as `data-tone`, so a status pill and every other tone pill in the app share one
  * paint.
@@ -158,7 +171,7 @@ export function StatusPill({ status, text }: { status: CerberusMark; text?: stri
   const look = markLook(status);
   return (
     <Badge as="span" tone={look.tone} className="max-w-full gap-1.5 whitespace-nowrap">
-      <span aria-hidden className={cn('flex-none', status === 'fixing' && FLEET_FIXING_LOOK.glyphMotion)}>{look.glyph}</span>
+      <MarkIcon icon={look.icon} className={cn('size-3.5', status === 'fixing' && FLEET_FIXING_LOOK.glyphMotion)} />
       <span className="truncate">{text ?? t(look.wordKey)}</span>
     </Badge>
   );

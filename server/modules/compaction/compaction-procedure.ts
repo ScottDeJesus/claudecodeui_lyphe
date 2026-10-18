@@ -26,6 +26,7 @@ import {
 } from './compaction-registry.js';
 import type { CompactionFlight } from './compaction-registry.js';
 import { createSeedWriter } from './compaction-seed.js';
+import { IDLE_CHECK_MAX_TRIES } from './idle-restore.js';
 
 /**
  * THE COMPACTION: the nine steps of one run, in order. The decorator (`compaction-runtime.ts`) hands a
@@ -43,6 +44,7 @@ type ProcedureRuntime = {
   run(provider: LLMProvider, command: string, options: AnyRecord, writer: ProviderRuntimeWriter): Promise<unknown>;
   abort(provider: LLMProvider, sessionId: string): Promise<boolean>;
   activity(provider: LLMProvider, appSessionId: string): ChatProcessActivity;
+  markIdleCheck(provider: LLMProvider, appSessionId: string, tries: number): boolean;
 };
 
 export type CompactionInput = {
@@ -58,10 +60,14 @@ export type CompactionInput = {
 // attachments, and `compactionTrigger`, which made the run a compaction.
 const NOT_FOR_THE_SEED = ['attachments', 'images', 'files', 'compactionTrigger'] as const;
 
-/** How one run ended, for `compact`'s caller: only a refused summarizer hands the chat back to the CLI. */
-type Ending = { handOffToCli: false } | { handOffToCli: true; sentence: string };
+/**
+ * How one run ended, for `compact`'s caller: only a refused summarizer hands the chat back to the CLI, and `failed`
+ * marks an end that tried to compact and could not (a failure or a refusal, which an idle check counts as its attempt).
+ */
+type Ending = { handOffToCli: false; failed?: true } | { handOffToCli: true; sentence: string };
 
 const ENDED: Ending = { handOffToCli: false };
+const FAILED: Ending = { handOffToCli: false, failed: true };
 
 /** Everything one run needs at hand, so the steps are small functions of it. */
 type Run = CompactionInput & {
@@ -90,8 +96,15 @@ export async function compact(inner: ProcedureRuntime, input: CompactionInput): 
     run.emit(errorFrame(input.sessionId, `Compaction failed: ${message}. The chat stays on its current session.`));
     run.emit(completeFrame(input.sessionId, 1));
     pushAutomaticFailure(run, message);
+    ending = FAILED;
   } finally {
     endFlight(input.sessionId, flight);
+  }
+  // An idle check that tried and failed, or was refused, has spent its attempt for this turn end: the chat's host is told,
+  // so no restart repeats it. A run that was stopped (a shutdown, the operator's Stop) tried nothing to the end and is not
+  // spent; the host already holds the start it was cut short in, which bounds a retry.
+  if (input.trigger === 'idle' && 'failed' in ending && ending.failed && !flight.stopped) {
+    inner.markIdleCheck('claude', input.sessionId, IDLE_CHECK_MAX_TRIES);
   }
 
   if (ending.handOffToCli) {
@@ -111,7 +124,7 @@ async function runSteps(run: Run): Promise<Ending> {
   if (!oldProviderSessionId || !oldTranscriptPath) {
     run.emit(errorFrame(sessionId, 'This chat has no transcript to compact yet.'));
     run.emit(completeFrame(sessionId, 1));
-    return ENDED;
+    return FAILED;
   }
 
   // 2. THE GUARD. An automatic compaction never holds a chat the operator is using, so it does not wait.
@@ -175,7 +188,7 @@ async function runSteps(run: Run): Promise<Ending> {
     run.emit(errorFrame(sessionId, `Compaction failed: ${sentence}. The chat stays on its current session.`));
     run.emit(completeFrame(sessionId, 1));
     if (answer.exitCode !== 2) pushAutomaticFailure(run, sentence);
-    return ENDED;
+    return FAILED;
   }
 
   return seedTheNewSession(run, { oldProviderSessionId, oldTranscriptPath, success });
@@ -192,7 +205,7 @@ function refusedByReadiness(run: Run, sentence: string): Ending {
   );
   if (!manual) {
     run.emit(completeFrame(run.sessionId, 0));
-    return ENDED;
+    return FAILED;
   }
   run.emit(statusFrame(run.sessionId, `Custom compaction is not ready (${sentence}); the CLI compacts this chat instead.`));
   return { handOffToCli: true, sentence };
@@ -271,7 +284,7 @@ async function seedTheNewSession(
   run.emit(errorFrame(sessionId, `Compaction failed: ${reason}. The chat stays on its current session.`));
   run.emit(completeFrame(sessionId, 1));
   pushAutomaticFailure(run, reason);
-  return ENDED;
+  return FAILED;
 }
 
 /** Puts the chat back on its old session when the swap was written; the unswap also records the abandoned seed. */

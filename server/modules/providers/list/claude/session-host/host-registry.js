@@ -26,27 +26,48 @@ import net from 'node:net';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { createLiveTaskReader } from './host-live-tasks.js';
+
 /**
- * What a host writes to its own meta file (`host.js`). `pendingControl` is absent on a meta from
- * before the field.
+ * What a host writes to its own meta file (`host.js`). `pendingControl` and `idleCheck` are absent on a
+ * meta from before the field.
  * @typedef {{
  *   hostId: string, appSessionId: string | null, userId: string | number | null, cwd: string | null,
  *   startedAt: number, pid: number | null, turnCompleteSent: boolean, heldForBackgroundWork: boolean,
  *   deferredTools?: string[], profile?: Record<string, unknown> | null, deliveredSeq: number,
  *   pendingResults: number[], pendingControl?: { seq: number, requestId: string }[],
+ *   idleCheck?: IdleCheck | null,
  *   exited: { code: number | null, signal: string | null, at: number } | null
  * }} HostMeta
  */
 
 /**
+ * The record of the idle compaction check a chat's host keeps for its last turn end: when the check last
+ * STARTED a compaction (`at`, epoch ms) and how many such starts that turn end has had (`tries`). The
+ * compaction module writes it through the host's own `note` and a restart reads it back, so one turn end
+ * is never retried without bound. It means something only against the turn end it followed: a record older
+ * than the host's last `result` belongs to an earlier turn end.
+ * @typedef {{ at: number, tries: number }} IdleCheck
+ */
+
+/**
  * A host whose CLI is still running, as `listLiveHosts` reads it: the meta's fields, plus
  * `cliVersion` out of the host's own journal (`lastReportedCliVersion`) and `cliPid`, the CLI the
- * host owns (`child.pid` in `host.js`) — null for a meta that holds none.
+ * host owns (`child.pid` in `host.js`) — null for a meta that holds none. `releasedCalls` are the
+ * calls the meta still names that the journal shows reported finished: `deferredTools` already
+ * leaves them out, and the host — the one writer of its meta — has not been told yet. This registry
+ * always sets it; the field is optional because a node's list, read back through a warden that predates
+ * it, carries none (center reads that as `[]`).
+ * `liveTasks` are the ids of the CLI's own background tasks the journal shows running — a `task_started`
+ * with no `task_notification` after it, less what its newest `background_tasks_changed` dropped: the
+ * live loop's `backgroundTasks`, rebuilt from the frames it could not have kept across a restart. Optional
+ * for the same reason as `releasedCalls`, and null in a node's list read back through a warden that predates it
+ * (its tasks are unknown, which is not none). `idleCheck` is the meta's record of the idle compaction check.
  * @typedef {{
  *   hostId: string, appSessionId: string, userId: string | number | null, cwd: string | null,
  *   startedAt: number, turnCompleteSent: boolean, heldForBackgroundWork: boolean,
- *   deferredTools: string[], profile: Record<string, unknown> | null,
- *   cliVersion: string | null, cliPid: number | null
+ *   deferredTools: string[], releasedCalls?: string[], liveTasks?: string[] | null, idleCheck?: IdleCheck | null,
+ *   profile: Record<string, unknown> | null, cliVersion: string | null, cliPid: number | null
  * }} LiveHost
  */
 
@@ -86,6 +107,26 @@ function readInitVersion(raw) {
 }
 
 /**
+ * The `tool_use_id` one journal entry's `task_notification` names when it is CLI output carrying one — the CLI's own word that the
+ * work that call launched has ended — else null.
+ * @param {string} raw
+ * @returns {string | null}
+ */
+function readNotifiedToolUseId(raw) {
+  if (!raw.includes('task_notification')) return null;
+  try {
+    const entry = JSON.parse(raw);
+    if (entry.t !== 'out' || typeof entry.line !== 'string') return null;
+    const output = JSON.parse(entry.line);
+    return output.type === 'system' && output.subtype === 'task_notification' && typeof output.tool_use_id === 'string'
+      ? output.tool_use_id
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * The `at` of one journal entry when it is CLI output carrying a `result`, else null.
  * @param {string} raw
  * @returns {number | null}
@@ -103,6 +144,78 @@ function readResultAt(raw) {
 }
 
 /**
+ * A meta's idle-check record as the registry hands it on, or null for none or one that is not two finite numbers.
+ * @param {unknown} value
+ * @returns {IdleCheck | null}
+ */
+function readIdleCheck(value) {
+  if (!value || typeof value !== 'object') return null;
+  const { at, tries } = /** @type {Record<string, unknown>} */ (value);
+  return typeof at === 'number' && Number.isFinite(at) && typeof tries === 'number' && Number.isFinite(tries) ? { at, tries } : null;
+}
+
+/**
+ * One CLI output line of the journal when it is a `type` message — `{ at, output }`, the parsed message — else null.
+ * @param {string} raw
+ * @param {string} type
+ * @returns {{ at: number, output: Record<string, unknown> } | null}
+ */
+function readOutputOfType(raw, type) {
+  // The entry holds the CLI's line as an escaped string, so the type shows as `\"type\":\"<type>\"`; testing for it first
+  // keeps the parse off the thousands of stream and thinking lines a turn writes.
+  if (!raw.includes('"t":"out"') || !raw.includes(`\\"type\\":\\"${type}\\"`)) return null;
+  try {
+    const entry = JSON.parse(raw);
+    if (entry.t !== 'out' || typeof entry.at !== 'number' || typeof entry.line !== 'string') return null;
+    const output = JSON.parse(entry.line);
+    return output && output.type === type ? { at: entry.at, output } : null;
+  } catch {
+    return null;
+  }
+}
+
+/** A usage field as a count: anything that is not a finite number reads as zero. @param {unknown} value */
+function readTokenCount(value) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+/**
+ * THE ONE RULE for which assistant message counts as a turn's request — the request whose usage is the chat's context size —
+ * and what it measures. A message counts when it is an assistant message of the main thread (no `parent_tool_use_id`: a
+ * subagent's request reports the subagent's own window), carries a `message.usage` object, was not made by the CLI's
+ * `<synthetic>` stand-in for an API error, and reports more than zero tokens (a request with all-zero usage would overwrite the
+ * last real one). `used` is that request's whole context: its input, both cache counts and its output, each in the snake_case
+ * the CLI writes or the camelCase spelling the SDK types use (the sum `buildTokenBudget` shows the composer, which is a display
+ * and not part of this rule).
+ *
+ * The one implementation, so its readers cannot disagree: this file is the API's own and the warden's, and the API's
+ * runtime (a live stream's message, a local host's journal, a node's listed request) and the warden's listing
+ * (`warden/src/last-turn.mjs`) all ask it, and nowhere is the rule restated.
+ *
+ * consumer: claude-runtime.provider.js (each assistant message of a live stream), claude-compaction-restore.ts (a re-adopted
+ * host's last turn, from a local journal or a node's listing), warden/src/last-turn.mjs (which journal message a node lists)
+ * @param {unknown} message A stream message or a journal's parsed CLI line.
+ * @returns {{ used: number, model: string | null } | null} Null when the message is not a request of the main thread.
+ */
+export function mainThreadRequestOf(message) {
+  if (!message || typeof message !== 'object') return null;
+  const streamMessage = /** @type {Record<string, unknown>} */ (message);
+  if (streamMessage.type !== 'assistant' || streamMessage.parent_tool_use_id) return null;
+  const inner = streamMessage.message;
+  if (!inner || typeof inner !== 'object') return null;
+  const { model, usage } = /** @type {Record<string, unknown>} */ (inner);
+  if (!usage || typeof usage !== 'object' || model === '<synthetic>') return null;
+  const fields = /** @type {Record<string, unknown>} */ (usage);
+  const cacheTokens =
+    readTokenCount(fields.cache_creation_input_tokens ?? fields.cacheCreationInputTokens ?? fields.cacheCreationTokens) +
+    readTokenCount(fields.cache_read_input_tokens ?? fields.cacheReadInputTokens ?? fields.cacheReadTokens);
+  const used =
+    readTokenCount(fields.input_tokens ?? fields.inputTokens) + cacheTokens + readTokenCount(fields.output_tokens ?? fields.outputTokens);
+  return used > 0 ? { used, model: typeof model === 'string' ? model : null } : null;
+}
+
+/**
  * One registry over one tmux server and one sessions directory.
  *
  * @param {object} config
@@ -117,6 +230,15 @@ export function createHostRegistry({ tmuxSocketName, keepaliveSession, sessionsD
   const hostJournalPath = (hostId) => path.join(sessionsDir, `${hostId}.ndjson`);
   /** @type {(hostId: string) => string} */
   const hostMetaPath = (hostId) => path.join(sessionsDir, `${hostId}.json`);
+  /**
+   * `reportedCalls`'s answers by host, each with what it was read from (the journal's size and the ids asked about): a journal only
+   * grows, so the same size is the same answer, and a poll of a quiet host costs one `stat`.
+   * @type {Map<string, { key: string, reported: Set<string> }>}
+   */
+  const reportedCallsMemo = new Map();
+  const liveTaskReader = createLiveTaskReader({ hostJournalPath, journalLineNewestFirst });
+  /** `host/id` of every release already logged, so a poll that reads the same meta again does not say it again. */
+  const releasesLogged = new Set();
 
   /**
    * Every tmux call in this registry. The timeout is the point: `execFileSync` with no timeout
@@ -218,6 +340,11 @@ export function createHostRegistry({ tmuxSocketName, keepaliveSession, sessionsD
       const meta = readHostMeta(hostId);
       if (!meta || meta.exited !== null || typeof meta.appSessionId !== 'string') continue;
       if (!alive.has(hostId)) continue;
+      // The calls the meta still holds as outstanding, less those the CLI has reported finished since. A meta written by an API whose
+      // ledger missed a notification names a call that will never report again; the journal still has the frame.
+      const heldIds = Array.isArray(meta.deferredTools) ? meta.deferredTools.filter((id) => typeof id === 'string') : [];
+      const reported = heldIds.length > 0 ? reportedCalls(hostId, heldIds) : new Set();
+      const stillHeld = heldIds.filter((id) => !reported.has(id));
       live.push({
         hostId,
         appSessionId: meta.appSessionId,
@@ -225,10 +352,13 @@ export function createHostRegistry({ tmuxSocketName, keepaliveSession, sessionsD
         cwd: meta.cwd ?? null,
         startedAt: typeof meta.startedAt === 'number' ? meta.startedAt : 0,
         turnCompleteSent: meta.turnCompleteSent === true,
-        heldForBackgroundWork: meta.heldForBackgroundWork === true,
-        deferredTools: Array.isArray(meta.deferredTools)
-          ? meta.deferredTools.filter((id) => typeof id === 'string')
-          : [],
+        // A meta that names its calls holds the host only while one of them is unreported; a meta with just the bit (a host from
+        // before the list) has no ids to test and keeps it.
+        heldForBackgroundWork: meta.heldForBackgroundWork === true && !(heldIds.length > 0 && stillHeld.length === 0),
+        deferredTools: stillHeld,
+        releasedCalls: heldIds.filter((id) => reported.has(id)),
+        liveTasks: liveTaskReader.liveTasks(hostId),
+        idleCheck: readIdleCheck(meta.idleCheck),
         profile: meta.profile && typeof meta.profile === 'object' ? meta.profile : null,
         // Out of the journal, not the meta: what the CLI said about itself, at the one moment it said
         // it. A host spawned before this field existed answers just the same.
@@ -298,6 +428,37 @@ export function createHostRegistry({ tmuxSocketName, keepaliveSession, sessionsD
   }
 
   /**
+   * The host's last finished turn as its journal records it, for a boot that adopts a host it did not run: when the newest `result`
+   * landed (`endedAt`), that result's `modelUsage`, and `budget` — what `readBudget` makes of the turn's LAST assistant message it
+   * accepts. The walk goes newest first and stops at the previous `result`, the bound at which the live loop resets its own budget, so
+   * a turn that ran no request (a compaction's seed append) has none. `readBudget` is the caller's reading of one message, null for one
+   * that is not the turn's request: the API passes `mainThreadRequestOf` itself, and the warden a reading that keeps the message's own
+   * request fields for its listing but accepts exactly the messages `mainThreadRequestOf` does. Null when the journal holds no `result`.
+   * @template T
+   * @param {string} hostId
+   * @param {(message: Record<string, unknown>) => T | null} readBudget
+   * @returns {{ endedAt: number, modelUsage: unknown, budget: T | null } | null}
+   */
+  function lastTurnRecord(hostId, readBudget) {
+    /** @type {{ endedAt: number, modelUsage: unknown, budget: T | null } | null} */
+    let record = null;
+    journalLineNewestFirst(hostId, (raw) => {
+      if (record === null) {
+        const result = readOutputOfType(raw, 'result');
+        if (result) record = { endedAt: result.at, modelUsage: result.output.modelUsage ?? null, budget: null };
+        return false;
+      }
+      if (readOutputOfType(raw, 'result')) return true;
+      const assistant = readOutputOfType(raw, 'assistant');
+      const budget = assistant ? readBudget(assistant.output) : null;
+      if (budget === null) return false;
+      record.budget = budget;
+      return true;
+    });
+    return record;
+  }
+
+  /**
    * The Claude CLI version the host's CLI announced at its own init — the newest such line in its
    * journal — or null when the journal holds none.
    *
@@ -324,10 +485,48 @@ export function createHostRegistry({ tmuxSocketName, keepaliveSession, sessionsD
   }
 
   /**
+   * Which of `ids` — tool calls a meta holds as background work still outstanding — the host's CLI has reported finished: those its
+   * journal holds a `task_notification` frame for. The live loop releases a call on that very frame; this reads it back for a call the
+   * loop's ledger missed (a notification that arrived before the turn's `result` moved the call in), so a host stuck "busy" for a call
+   * that ended is cleared by evidence, never by a blanket reset. A call with no frame stays held.
+   * @param {string} hostId
+   * @param {string[]} ids
+   * @returns {Set<string>}
+   */
+  function reportedCalls(hostId, ids) {
+    let size;
+    try {
+      size = fs.statSync(hostJournalPath(hostId)).size;
+    } catch {
+      return new Set();
+    }
+    const key = `${size}:${ids.join(',')}`;
+    const memo = reportedCallsMemo.get(hostId);
+    if (memo && memo.key === key) return memo.reported;
+    const wanted = new Set(ids);
+    /** @type {Set<string>} */
+    const reported = new Set();
+    journalLineNewestFirst(hostId, (raw) => {
+      const id = readNotifiedToolUseId(raw);
+      if (id !== null && wanted.has(id)) reported.add(id);
+      return reported.size === wanted.size;
+    });
+    reportedCallsMemo.set(hostId, { key, reported });
+    const fresh = [...reported].filter((id) => !releasesLogged.has(`${hostId}/${id}`));
+    for (const id of fresh) releasesLogged.add(`${hostId}/${id}`);
+    if (fresh.length > 0) {
+      console.log(`[keepalive] host ${hostId}: ${fresh.length} held background call(s) already reported finished in its journal — released (${fresh.join(', ')})`);
+    }
+    return reported;
+  }
+
+  /**
    * Removes the two files the attached adapter owns; the host unlinks its own socket.
    * @param {string} hostId
    */
   function removeHostJournal(hostId) {
+    reportedCallsMemo.delete(hostId);
+    liveTaskReader.forget(hostId);
     for (const target of [hostJournalPath(hostId), hostMetaPath(hostId)]) {
       try {
         fs.rmSync(target, { force: true });
@@ -520,6 +719,7 @@ export function createHostRegistry({ tmuxSocketName, keepaliveSession, sessionsD
     listHostIds,
     listLiveHosts,
     lastTurnFinishedAt,
+    lastTurnRecord,
     lastReportedCliVersion,
     removeHostJournal,
     retireHost,

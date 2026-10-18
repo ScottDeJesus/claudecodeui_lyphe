@@ -42,6 +42,20 @@ import type {
  */
 export const IS_PLATFORM = process.env.VITE_IS_PLATFORM === 'true';
 
+/**
+ * This server's own origin on the loopback interface, for a child of this box that calls back into
+ * its API. It answers the port the RUNNING process listens on — `SERVER_PORT`, then the house
+ * default, the very expression the listener reads (`server/index.ts`) — and reads the environment at
+ * every call, so a server started on another port by a probe hands its children its own origin and
+ * never the operator's. It names no `PORT`: the server never listens on one, and the `cloudcli` CLI,
+ * the one place that accepts `PORT`, copies it into `SERVER_PORT` before the server starts, so an
+ * origin built from `PORT` could only point at a port nothing here listens on. Consumed by
+ * `kanban-metis.module.ts`, `browser-use.service.ts` and the toolsets module.
+ */
+export function loopbackApiOrigin(): string {
+  return `http://127.0.0.1:${process.env.SERVER_PORT || '3001'}`;
+}
+
 // ---------------------------
 //----------------- NORMALIZED MESSAGE HELPER INPUT TYPES ------------
 /**
@@ -1479,18 +1493,16 @@ export function dispatchSoulsStateDir(): string {
 
 /**
  * The only words the dispatcher's own `model` verb accepts (`hooks/plan_runner/run_model.py:WORDS`,
- * unpacked by `hooks/dispatcher/model.py`) in the order the controls draw them. The routes relay a
- * member of THIS list, never the request's own string, so the argv word a verb is spawned with is
- * always ours.
+ * unpacked by `hooks/dispatcher/model.py`, and the door's `default` that clears a row) in the order the
+ * controls draw them. The routes relay a member of THIS list, never the request's own string, so the
+ * argv word a verb is spawned with is always ours.
  */
-const DISPATCHER_MODEL_CHOICES: readonly DispatcherModelChoice[] = ['deepseek', 'claude', 'auto'];
+const DISPATCHER_MODEL_CHOICES: readonly DispatcherModelChoice[] = ['deepseek', 'claude', 'default'];
 
 /**
  * A model word as one of `DISPATCHER_MODEL_CHOICES`, or `null` for anything else — a missing field, another
  * casing, a word with padding. Used by the plan route (`POST /plans/:name/model`) and the arc route
- * (`POST /arcs/:name/model`) to refuse a body with a 400 before anything is spawned, and by
- * `dispatcher-state.transport.ts` (`modelSince`) to carry a document's stored word into the picture (`null` for
- * a build older than the field, which the client reads as the store's default — `effectiveModelWord`).
+ * (`POST /arcs/:name/model`) to refuse a body with a 400 before anything is spawned.
  */
 export function readDispatcherModelChoice(value: unknown): DispatcherModelChoice | null {
   return DISPATCHER_MODEL_CHOICES.find((choice) => choice === value) ?? null;

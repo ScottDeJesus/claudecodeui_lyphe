@@ -40,6 +40,7 @@ import { ScheduledMessageList } from '@/modules/chat/composer/ScheduledMessageLi
 import ComposerDeepSeekSwitch from '@/modules/chat/composer/ComposerDeepSeekSwitch';
 import ComposerModelMenu from '@/modules/chat/composer/ComposerModelMenu';
 import ComposerPermissionMenu from '@/modules/chat/composer/ComposerPermissionMenu';
+import type { SessionToolsetsState } from '@/modules/chat/hooks/useSessionToolsets';
 import ChatExportMenu, { type ChatExportSurface } from '@/modules/chat/transcript/ChatExportMenu';
 
 type MentionableFile = {
@@ -68,6 +69,8 @@ type ChatComposerProps = {
   availableModelLabelsById?: Record<string, string>;
   onSelectModel: (model: string) => void;
   modelsLoading: boolean;
+  /** The open chat's tool sets, handed on to the model menu. Hold its identity between reads: the menu is memoized on it. */
+  toolsets: SessionToolsetsState;
   tokenBudget: Record<string, unknown> | null;
   onShowTokenUsage: () => void;
   onToggleCommandMenu: () => void;
@@ -165,6 +168,7 @@ export default function ChatComposer({
   availableModelLabelsById,
   onSelectModel,
   modelsLoading,
+  toolsets,
   tokenBudget,
   onShowTokenUsage,
   onToggleCommandMenu,
@@ -513,7 +517,11 @@ export default function ChatComposer({
             />
         </PromptInputBody>
 
-        <PromptInputFooter className="flex-wrap gap-y-1">
+        {/* A query container (`[container-type:inline-size]`): the model pill's tool-set count shows only
+            where this row is wide enough to hold it (ComposerModelMenu), in whatever window or panel the
+            composer stands. The row takes its width from the form, never from its content, so the
+            containment changes nothing it draws. */}
+        <PromptInputFooter className="flex-wrap gap-y-1 [container-type:inline-size]">
           {/* At 320px with the voice button in the row, the widest of the operator's model labels
               (Haiku 4.5, an 80px pill) leaves these two clusters 2px short of the track — and the
               last thing on this row that can give ground is the space between the controls
@@ -613,6 +621,7 @@ export default function ChatComposer({
               modelLabelsById={availableModelLabelsById}
               onSelectModel={onSelectModel}
               modelsLoading={modelsLoading}
+              toolsets={toolsets}
               permissionMode={isNarrowComposer ? permissionMode : undefined}
               permissionModes={isNarrowComposer ? availablePermissionModes : undefined}
               onSelectPermissionMode={isNarrowComposer ? onSelectPermissionMode : undefined}

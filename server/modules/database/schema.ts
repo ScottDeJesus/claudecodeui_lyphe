@@ -161,6 +161,9 @@ CREATE TABLE IF NOT EXISTS sessions (
     -- When this session was last on screen, in the same format as above.
     -- NULL until it has been looked at once.
     last_read_at TEXT,
+    -- The tool sets this chat has switched on, a JSON array of set names. NULL
+    -- means it never switched one; [] means it switched one on and off again.
+    toolsets TEXT,
     isArchived BOOLEAN DEFAULT 0,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,

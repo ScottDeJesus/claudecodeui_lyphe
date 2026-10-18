@@ -6,12 +6,16 @@ export { DispatcherFeed } from '@/modules/dispatcher/DispatcherFeed';
 // `Hidden` list; the tab strip and the Roadmap tab's In flight switch read the `count` and `waiting`
 // that mark them.
 export { useDispatcherPlans } from '@/modules/dispatcher/hooks/useDispatcherPlans';
-// Both hands, one hook: the plan card's seven verbs and the arc header's four — stop, resume, schedule
-// and the arc's model word — relayed to the dispatcher's own binary and answered with its own
+// Both hands, one hook: the plan card's verbs and the arc header's four — stop, resume,
+// the arc's model word and an epic's WIP limits — relayed to the dispatcher's own binary and answered with its own
 // sentence. `scope` is the whole of what differs: which door a press goes through. A caller presses
 // one and re-draws from the next frame; nothing is guessed here. `drop` is the one verb a card
 // guards with a dialog, because it is the one no press undoes.
 export { useDispatcherVerbs } from '@/modules/dispatcher/hooks/useDispatcherVerbs';
+// The board's one queue press, which names no epic of its own: an epic moved `--before` another or `--last` in
+// the dispatcher's queue. Both lists that draw the queue's decks (In flight's, the gutter's column) press
+// through it, because a drop carries whichever epic was dragged and a hook cannot be called per card.
+export { useEpicQueueVerbs } from '@/modules/dispatcher/hooks/useEpicQueueVerbs';
 // The pure vocabulary of a plan, so a card never re-derives a tone or a progress count — and the
 // lane's own split, so the Roadmap tab's In flight face and the chat gutter's widget group the arcs'
 // plans and order every card by ONE rule instead of two.
@@ -40,12 +44,17 @@ export { DispatchArcDecks } from '@/modules/dispatcher/ArcDeck';
 // the header of the Roadmap tab's In flight face and the chat gutter's widget, and by neither when the
 // frame states none.
 export { PlannerLanesReadout } from '@/modules/dispatcher/PlannerLanesReadout';
-// The presses that put a card away, each one write to the put-away store: one plan's corner, an arc
-// deck's and `Dismiss done · N`. A done card's is Dismiss and an unfinished card's Hide.
-export { doneDismiss, planPutAway } from '@/modules/dispatcher/hiddenPlans';
+// The master controller — Epics at once, the two WIP defaults, the Claude · DeepSeek house switch, the board's one
+// Start and Pause all — drawn from the frame's own route by the header of the Roadmap tab's In flight face and at the
+// top of the chat gutter's Runs widget (one component, two mounts), and not at all when the frame states no dial.
+export { MasterController } from '@/modules/dispatcher/MasterController';
+// The presses that put a card away: one plan's corner and an arc deck's (`usePutAway`), and `Dismiss done · N`.
+// A done card's is Dismiss, an entry in the operator's own list; an unfinished card's is Hide, the dispatcher's.
+export { doneDismiss } from '@/modules/dispatcher/hiddenPlans';
+export { usePutAway } from '@/modules/dispatcher/hooks/usePutAway';
 // Where the keyboard lands once a press has taken its own control away with the card.
 export { landFocusInHome } from '@/modules/dispatcher/putAwayFocus';
-// The `Hidden · N` list at the foot of both homes: every hidden (unfinished) plan, each with its `Show`.
+// The `Hidden · N` list at the foot of both homes: every plan the dispatcher holds hidden, each with its `Show`.
 export { HiddenPlans } from '@/modules/dispatcher/HiddenPlans';
 // The pin a plan wears when the open chat is the one that launched it, drawn by both homes.
 export { SessionPin } from '@/modules/dispatcher/SessionPin';

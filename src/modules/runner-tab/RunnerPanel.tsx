@@ -9,15 +9,17 @@ import {
   HiddenPlans,
   landFocusInHome,
   LoosePlannerBadges,
+  MasterController,
   moveCard,
   PlanCard,
   PlannerLanesReadout,
-  planPutAway,
   useCardRanks,
   useDispatcherPlans,
+  usePutAway,
 } from '@/modules/dispatcher';
 import { DISPATCHER_ALL_TOPIC, useLiveTopic } from '@/modules/live-bus';
 import { useLaneFoldPrune } from '@/modules/runner-tab/hooks/useLaneFoldPrune';
+import { useQueueLineSort } from '@/modules/runner-tab/hooks/useQueueLineSort';
 import { LANE_WALL_GRID } from '@/shared/constants';
 import { Badge, Button, EmptyState, ScrollArea } from '@/shared/ui';
 import { useSortable } from '@/shared/ui/sortable/useSortable';
@@ -82,14 +84,21 @@ function pageStripToCard(deck: Element, plan: string): HTMLElement | null {
  * arc in the ARC's own walk order — one strip inside the deck, with the arc's flow over it — and
  * the plans no arc holds are `PlanCard`s in the wall's grid below the decks.
  *
- * THE CARDS STAND WHERE THE OPERATOR PUT THEM AND NOWHERE ELSE. Decks and wall cards each keep the
- * shared order among their own kind (`byArc`'s `groups` and `rest`; the order is `cardOrder.ts`'s),
- * and each of the two lists is sortable: a free press on a card carries it, the grid lays itself out
+ * IN FLIGHT IS THE QUEUE, WORKED TOP DOWN (operator, 2026-10-14). The decks of the epics whose turn is
+ * open come FIRST, as a list of their own (`byArc`'s `line`), in the order the dispatcher starts them
+ * in, each head carrying its place and its turn; the dial in the header says how many run at once
+ * (`MasterController`). A drop among them moves the epic in the dispatcher's queue (`useQueueLineSort`). The
+ * queue moves a deck on its own only at a turn's ends: a new epic joins at the back, a finished one
+ * goes below the queue, among the other decks.
+ *
+ * THE OTHER CARDS STAND WHERE THE OPERATOR PUT THEM AND NOWHERE ELSE. The other decks and the wall's
+ * cards each keep the shared order among their own kind (`byArc`'s `groups` and `rest`; the order is
+ * `cardOrder.ts`'s), and each of those two lists is sortable: a free press on a card carries it, the grid lays itself out
  * around the gap, and a drop writes one rank (`moveCard`). The wall is two-dimensional, so a card
  * can be dropped into any slot of its rows; decks reorder among decks and plans among plans — a
  * deck and a plan swap places only in the widget, which draws them in one column. Every press passes the lane's own carried names, which is what the put-away store
- * (`hiddenPlans.ts`) prunes its list against: `planPutAway` is a card's corner (Dismiss on a done card,
- * Hide on an unfinished one), `doneDismiss` the header's `Dismiss done · N`, and `HiddenPlans` at the
+ * (`hiddenPlans.ts`) prunes its list against: `usePutAway` is a card's corner (Dismiss on a done card,
+ * the dispatcher's Hide on an unfinished one), `doneDismiss` the header's `Dismiss done · N`, and `HiddenPlans` at the
  * foot is the way back from a Hide. A dismissed card has no way back and needs none: the dispatcher
  * still holds the plan, and the card returns by itself when the plan has news.
  *
@@ -117,13 +126,16 @@ type RunnerPanelProps = {
 export function RunnerPanel({ revealPlan = null, onRevealed }: RunnerPanelProps) {
   const { t } = useTranslation();
   const { plans, hidden, arcs, loosePlanners, count, carriedNames } = useDispatcherPlans();
+  const putAway = usePutAway(carriedNames);
   // The topic's own value, for the one fact `useDispatcherPlans` folds away on purpose: `undefined` is
   // "nothing retained yet", which a board that has been dealt and drawn empty is NOT. Same topic, so
   // the two reads agree within one render. The reveal effect below is the only reader.
   const retained = useLiveTopic<DispatcherLanePicture>(DISPATCHER_ALL_TOPIC);
   const ranks = useCardRanks();
   const split = useMemo(() => byArc(plans, arcs, ranks), [plans, arcs, ranks]);
-  // The two sortable lists: the decks, and the plans of no arc in the wall. A drop hands `moveCard`
+  const { line, groups: decks } = split;
+  const sortLine = useQueueLineSort(line);
+  // The other two sortable lists: the decks, and the plans of no arc in the wall. A drop hands `moveCard`
   // the cards of ITS list for the neighbours' ranks, and the whole lane's names to prune against.
   const deckKeys = useMemo(() => split.groups.map((group) => group.arc.name), [split]);
   const wallKeys = useMemo(() => split.rest.map((plan) => plan.name), [split]);
@@ -189,8 +201,13 @@ export function RunnerPanel({ revealPlan = null, onRevealed }: RunnerPanelProps)
     // `tabIndex={-1}`: the last place a press that emptied the board hands the keyboard (`landFocusInHome`).
     <div ref={panelRef} tabIndex={-1} className="flex h-full flex-col outline-none" data-runner-panel>
       {/* The header spans the pane, inset as the wall under it is, so the icon stands over the
-          wall's left edge and `Dismiss done · N` over its right. */}
-      <div className="flex flex-wrap items-center gap-x-2 gap-y-1 border-b border-border px-4 py-3 lg:px-6">
+          wall's left edge and `Dismiss done · N` over its right. Its first row is the title, the
+          count, the planner readout and `Dismiss done · N`; its second is the master controller on a
+          line of its own (`basis-full`), which is why `Dismiss done` comes BEFORE it in the markup — a
+          full-width row pushes whatever follows it under, and the button belongs at the title's row
+          end. The rows stand 12px apart (`gap-y-3`) so the 36px press never touches the controller's
+          dropdowns under it. */}
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-3 border-b border-border px-4 py-3 lg:px-6">
         <span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg border border-primary/25 bg-primary/10 text-primary">
           <ActivityIcon className="h-4 w-4" aria-hidden="true" />
         </span>
@@ -212,6 +229,11 @@ export function RunnerPanel({ revealPlan = null, onRevealed }: RunnerPanelProps)
             {t('dispatcher.dismissDone', { count: done.count })}
           </Button>
         )}
+        {/* THE MASTER CONTROLLER, the header's second row: Epics at once, the two WIP defaults, the
+            Claude · DeepSeek house switch, the board's one Start (only while a plan waits for it),
+            Pause all and the running readout — drawn only when the frame states a dial. Whole controls
+            wrap onto further lines when a phone-wide header has no room. */}
+        <MasterController className="basis-full" />
       </div>
 
       {/* A LOOSE PLANNER COUNTS AS A ROW of this pane: it is something out on the lane with no card
@@ -219,7 +241,7 @@ export function RunnerPanel({ revealPlan = null, onRevealed }: RunnerPanelProps)
       {count === 0 && arcs.length === 0 && loosePlanners.length === 0 ? (
         <div className="flex flex-1 flex-col items-center justify-center gap-4 p-4">
           {/* Over hidden plans the words are "every unfinished feature is hidden", never "nothing is
-              running": a hidden plan may still be walking, and the list below says which. */}
+              running": a hidden plan may still be finishing the task it had in flight, and the list below says which. */}
           <EmptyState icon={ActivityIcon} title={t(hidden.length > 0 ? 'dispatcher.hidden.allHidden' : 'runner.empty')} />
           <div className="w-full max-w-md">
             <HiddenPlans hidden={hidden} carriedNames={carriedNames} />
@@ -233,10 +255,14 @@ export function RunnerPanel({ revealPlan = null, onRevealed }: RunnerPanelProps)
               wall's grid, and the way back from a Hide. */}
           <div className="flex min-w-0 flex-col gap-6 px-4 py-5 lg:px-6">
             <LoosePlannerBadges planners={loosePlanners} />
-            {/* THE ARCS SIT ABOVE THE PLANS NO ARC HOLDS, each deck holding the plans of its own arc:
-                an arc's word and verbs reach every plan of it, so its plans are that arc's own strip
-                rather than cards beside it (`DispatchArcDecks`). */}
-            <DispatchArcDecks groups={split.groups} carriedNames={carriedNames} sort={sortDecks} />
+            {/* THE QUEUE FIRST, top down in the order its epics run, as a list of its own: a drop
+                here moves an epic in the dispatcher's queue, never a card rank. */}
+            <DispatchArcDecks groups={line} carriedNames={carriedNames} sort={sortLine} line />
+            {/* THE OTHER ARCS SIT BELOW IT AND ABOVE THE PLANS NO ARC HOLDS, by the operator's card
+                order, each deck holding the plans of its own arc: an arc's word and verbs reach every
+                plan of it, so its plans are that arc's own strip rather than cards beside it. A
+                hairline over them marks where the queue ends (`belowLine`). */}
+            <DispatchArcDecks groups={decks} carriedNames={carriedNames} sort={sortDecks} belowLine={line.length > 0} />
             {/* The plans of no arc, in the pane's own wall. They are the ONLY cards in this grid: an
                 arc's plans are paged one per view inside their deck's strip, so a loose card is the
                 width the wall gives every card that has no arc to be read under. */}
@@ -244,7 +270,7 @@ export function RunnerPanel({ revealPlan = null, onRevealed }: RunnerPanelProps)
               <ul ref={attachWall} className={cn('min-w-0', LANE_WALL_GRID)} data-runner-loose-plans>
                 {wallOrder.flatMap((name) => wallPlans.get(name) ?? []).map((plan) => (
                   <li key={plan.name} className="min-w-0" {...wallItemProps(plan.name)}>
-                    <PlanCard plan={plan} onPutAway={planPutAway(plan, carriedNames)} />
+                    <PlanCard plan={plan} onPutAway={putAway.plan(plan)} />
                   </li>
                 ))}
               </ul>

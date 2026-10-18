@@ -4,17 +4,19 @@ import { useTranslation } from 'react-i18next';
 import { AcceptWhenCut } from '@/modules/dispatcher/AcceptWhenCut';
 import { ActionBar } from '@/modules/dispatcher/ActionBar';
 import { epochOf } from '@/modules/dispatcher/dispatcherState';
+import { useDispatcherPlans } from '@/modules/dispatcher/hooks/useDispatcherPlans';
 import { useDispatcherVerbs } from '@/modules/dispatcher/hooks/useDispatcherVerbs';
-import { RunModelControl } from '@/modules/dispatcher/RunModelControl';
+import { usePutAway } from '@/modules/dispatcher/hooks/usePutAway';
+import { ModelPick } from '@/modules/dispatcher/ModelPick';
+import { OverrideFold } from '@/modules/dispatcher/OverrideFold';
 import { ScheduleControl } from '@/modules/dispatcher/ScheduleControl';
 import { Button } from '@/shared/ui';
 import type { DispatcherPlan } from '@/shared/types';
 import { effectiveModelWord } from '@/shared/utils';
 
 /**
- * The plan card's `ActionBar`: the verbs that apply to a plan, chosen by its status, then its model
- * switch. A verb is drawn where the dispatcher would take it, never drawn disabled where it would
- * refuse.
+ * The plan card's `ActionBar`: the verbs that apply to a plan, chosen by its status, then its fold of overrides.
+ * A verb is drawn where the dispatcher would take it, never drawn disabled where it would refuse.
  *
  * - `live` → Stop. A pause; Resume is its undo, so no dialog guards it.
  * - `stalled` → Resume, and Stop beside it. The plan is released and its running work has ended with
@@ -25,10 +27,17 @@ import { effectiveModelWord } from '@/shared/utils';
  *   is not there is the card that said the epic was moving.
  * - `paused` → Resume and `Resume at …`: a plan STOPPED mid-walk is the one an hour makes sense in
  *   front of, because the timer's press is the very Resume the button beside it sends.
- * - `queued` → Start (it IS `resume`: the plan is approved and paused and has never walked) and
- *   `Start at …`, the same press made ahead of time as a one-shot systemd timer.
- * - `scheduled` → the same pair, reading the armed hour: `Resume`/`Start` and `Cancel` (the schedule
+ * - `queued` → Start (it IS `resume`: the plan is approved and paused and has never walked). THIS START IS THE
+ *   OVERRIDE: the master controller's one Start, at the top of In flight, lets every waiting plan go and leaves
+ *   the queue's order and the epic limits to decide what runs, while this one lets THIS feature go right away —
+ *   past the queue's order, the epics-at-once limit and its epic's feature limit (`release.own_press`). Pause all
+ *   still holds it, and its own tasks still run as many at a time as its task WIP allows. There is no
+ *   `Start at …`: the hour a feature never walked was armed for is gone from the card.
+ * - `scheduled` → the same, reading the armed hour: `Resume`/`Start` and `Cancel` (the schedule
  *   control). The hour itself is the card's own clock (`PlanFace.PlanClock`), said once.
+ * - `hidden` → Show. The operator hid the plan, and a hide is the dispatcher's: the plan is paused and held out of the
+ *   queue until he Shows it, which is also what lets it take its turn (`usePutAway`). The card is drawn at all only
+ *   when news brought it back (an ask, an ending); the `Hidden` list is the usual way back.
  * - `parked` → Unpark. `idle` in `designed` or `questions` → Park, the way out of the Stop hold.
  * - `idle` in `designed` → `Accept when cut` before Park (`AcceptWhenCut`): the operator's Accept on the design he
  *   has read, ahead of the cut — the card sends the design stamp it drew (`design_loaded_at`), and the dispatcher
@@ -41,24 +50,22 @@ import { effectiveModelWord } from '@/shared/utils';
  * `paused` AND `scheduled` ARE BOTH THE STOPPED PLAN, and `launched` is what tells which word the
  * hour wears. A plan that has WALKED and been stopped reads `paused` with no hour and `scheduled`
  * with one; a plan still waiting at the gate reads `queued`, and `scheduled` once armed. The two are
- * drawn differently on purpose — Resume at 3:00 AM against Start at 3:00 AM — because the dispatcher's
- * Resume is a promise about a walk that is already out and its Start about one that never began, and
- * the operator pressing either should read the same word on the button as the plan's own state.
+ * drawn differently on purpose — Resume against Start — because the dispatcher's Resume is a promise about a walk
+ * that is already out and its Start about one that never began, and the operator pressing either should read
+ * the same word on the button as the plan's own state.
  *
- * THE PLAN'S OWN MODEL WORD RIDES THE SAME BAR, on every plan a press could still move — a
- * COMPLETE plan has no next phase for the word to reach, so its bar draws nothing at all. It is not
- * a verb chosen by status, so it is drawn beside them rather than among them: `dispatcher model` is
- * never refused for the state a plan is in (the word is read when a chain is LAUNCHED), so no status
- * can be a reason to hide it.
- *
- * The control draws the plan's EFFECTIVE word — its own, else its arc's, else the configured default
- * (`dispatcher.model.of`) — so what it shows is what this plan's next chain is really launched with,
- * including a word it merely inherited from its arc. A plan that belongs to an arc keeps its own
- * control here: the arc's action bar carries the ARC's word and hands it down, and this is where one plan
- * speaks for itself again.
+ * THE PLAN'S OWN MODEL WORD IS AN OVERRIDE, in the fold under the verbs (`OverrideFold`, closed by default), on every
+ * plan a press could still move — a COMPLETE plan has no next phase for the word to reach, so its bar draws
+ * nothing at all. It is not a verb chosen by status, so no status can be a reason to hide it: `dispatcher model`
+ * is never refused for the state a plan is in (the word is read when a chain is LAUNCHED). The dropdown's
+ * first option follows what sits above the card — its epic's word when the epic carries one, else the top (the
+ * house switch the master controller draws) — and any other option is the plan's own word. The folded line
+ * names the plan's own model word when it departs from that, and nothing when it does not: an epic's press hands its
+ * word to each of its features (`store.set_arc_model`), so a feature carrying the very word its epic says overrides
+ * nothing. The arc's deck carries the ARC's word and hands it down, and this is where one plan speaks for itself again.
  *
  * A FEATURE CARRIES NO CONCURRENCY CONTROL: how many features of an epic are in progress, and how
- * many tasks each runs at once, are the EPIC's WIP (`EpicWipControl`, on the epic's own bar). When
+ * many tasks each runs at once, are the EPIC's WIP (`EpicWipControl`, in the epic deck's fold). When
  * the epic's feature limit is what a feature is waiting on, the card says so in its head
  * (`PlanCard`'s `data-plan-wip-hold` line) — that is a fact, not a press.
  *
@@ -74,6 +81,8 @@ import { effectiveModelWord } from '@/shared/utils';
  */
 export function PlanControls({ plan }: { plan: DispatcherPlan }) {
   const { t } = useTranslation();
+  const { route, arcs, carriedNames } = useDispatcherPlans();
+  const putAway = usePutAway(carriedNames);
   // A STOPPED plan is one that has walked: `report.launched` is that fact, and it is what tells the
   // two `scheduled` plans apart — one waiting for the Start it was queued with, one waiting for the
   // Resume that ends the stop. `paused` is stopped by definition (a paused plan that never walked
@@ -105,20 +114,25 @@ export function PlanControls({ plan }: { plan: DispatcherPlan }) {
       </>
     );
   } else if (stops || starts) {
-    // ONE PAIR, TWO STATES: the plan is at the gate (`starts` — Start, and `Start at …`) or the plan
-    // is down mid-walk (`stops` — Resume, and `Resume at …`). The control is identical and only the
-    // word differs, which is the point: the dispatcher's `resume` verb is what either press runs, and
-    // the wording is what tells the operator whether he is beginning something or taking it back up.
-    // Once the hour IS set the pair becomes the press and its `Cancel`; where that hour is, the
-    // card's own clock already says (`PlanFace.PlanClock`), and a second copy beside the buttons
-    // would be the same fact twice on one card.
+    // ONE BUTTON, TWO STATES: the plan is at the gate (`starts` — Start, the override of the board's one Start) or
+    // the plan is down mid-walk (`stops` — Resume, and `Resume at …`). The dispatcher's `resume` verb is what either
+    // press runs, and the wording is what tells the operator whether he is beginning something or taking it back up.
+    // The hour is offered only to a plan that walked; once an hour IS set — on either — the control is its `Cancel`,
+    // and where that hour is, the card's own clock already says (`PlanFace.PlanClock`).
     verbs = (
       <>
         <Button size="sm" className="h-8" disabled={held} onClick={() => void resume()}
           {...(stops ? { 'data-dispatcher-resume': '' } : { 'data-dispatcher-start': '' })}>{word}</Button>
-        <ScheduleControl scope="plan" verb={stops ? 'resume' : 'start'} busy={held}
-          onSchedule={(when) => void schedule(when)} startAt={armed} />
+        {(stops || armed !== null) && (
+          <ScheduleControl busy={held} onSchedule={(when) => void schedule(when)} startAt={armed} />
+        )}
       </>
+    );
+  } else if (plan.status === 'hidden') {
+    verbs = (
+      <Button size="sm" className="h-8" disabled={held} onClick={() => putAway.show([plan])} data-dispatcher-show>
+        {t('dispatcher.hidden.show')}
+      </Button>
     );
   } else if (plan.status === 'parked') {
     verbs = (
@@ -163,13 +177,19 @@ export function PlanControls({ plan }: { plan: DispatcherPlan }) {
   }
 
   const movable = plan.status !== 'complete';
-  const modelWord = effectiveModelWord(plan.model);
+  // What this feature follows when it has no word of its own: its epic's, if the epic carries one, else the
+  // house switch's as the frame read it. A word of its own that equals its epic's departs from nothing.
+  const epicWord = plan.arc === null ? null : (arcs.find((arc) => arc.name === plan.arc)?.model ?? null);
+  const follows = epicWord ?? effectiveModelWord(null, route ? route.provider === 'deepseek' : null);
+  const override = plan.model_own !== null && plan.model_own !== epicWord ? plan.model_own : null;
   return (
     <ActionBar
       verbs={verbs}
-      model={movable ? (
-        <RunModelControl scope="plan" value={modelWord} busy={held}
-          onChoose={(choice) => void setModel(choice)} />
+      fold={movable ? (
+        <OverrideFold scope="plan" overrides={override === null ? [] : [t(`runner.model.${override}`)]}>
+          <ModelPick scope="plan" own={override} follows={follows} source={epicWord === null ? 'top' : 'epic'} busy={held}
+            onChoose={(choice) => void setModel(choice)} />
+        </OverrideFold>
       ) : null}
     />
   );

@@ -85,6 +85,7 @@ export function createJournal({ hostId, sessionsDir }) {
     turnCompleteSent: false,
     heldForBackgroundWork: false,
     deferredTools: [],
+    idleCheck: null,
     profile: null,
     deliveredSeq: 0,
     pendingResults: [],
@@ -201,7 +202,7 @@ export function createJournal({ hostId, sessionsDir }) {
      * done". A note with nothing outstanding is a duplicate; it records the bits and retires
      * nothing, and says so rather than silently moving the D-3 cursor.
      */
-    note({ turnCompleteSent, heldForBackgroundWork, deferredTools, ack }) {
+    note({ turnCompleteSent, heldForBackgroundWork, deferredTools, idleCheck, ack }) {
       if (ack === false) {
         // A message joined the running process: the bits change, the cursor does not.
       } else if (meta.pendingResults.length === 0) {
@@ -212,7 +213,12 @@ export function createJournal({ hostId, sessionsDir }) {
       writeMeta({
         turnCompleteSent: turnCompleteSent === true,
         heldForBackgroundWork: heldForBackgroundWork === true,
-        ...(Array.isArray(deferredTools) ? { deferredTools: deferredTools.filter((id) => typeof id === 'string') } : {})
+        ...(Array.isArray(deferredTools) ? { deferredTools: deferredTools.filter((id) => typeof id === 'string') } : {}),
+        // The compaction module's record of the idle check for this turn end: `null` clears it, an absent key leaves it.
+        ...(idleCheck === null ? { idleCheck: null } : {}),
+        ...(idleCheck && Number.isFinite(idleCheck.at) && Number.isFinite(idleCheck.tries)
+          ? { idleCheck: { at: idleCheck.at, tries: idleCheck.tries } }
+          : {})
       });
     },
 

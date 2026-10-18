@@ -260,3 +260,260 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/docs/
 - `PreferenceListEntry` (`src/shared/types.ts`) is `string | { name: string; [field: string]: unknown }`, so `{ name, at }` is legal as a literal.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/user-preferences.db.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/preferenceEntryPatch.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/userSettings.ts
+
+## INV-8341 — probe — MEDIUM — MAN-8137 (part of MAN-7577) still says the In flight face's lists never hold a drop; its queue list does
+
+MEDIUM — MAN-8137 (part of MAN-7577) still says the In flight face's lists never hold a drop; its queue list does
+
+```probe
+D=$(mktemp -d /tmp/athena-probe-m1.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+echo "row hits: $(docstore get MAN-8137 --text | grep -c 'the In flight face.s) never holds')"
+grep -n "return moveEpic" src/modules/runner-tab/hooks/useQueueLineSort.ts || echo "no async queue onReorder"
+EOF
+bash "$D/p.sh"; cd /tmp; case "$D" in /tmp/athena-probe-m1.*) rm -r "$D";; esac
+expect: `row hits: 1` and `…useQueueLineSort.ts:NN:      return moveEpic(carried, …` while the defect stands; cured, `row hits: 0` (the sentence names the queue's list as holding until the next frame)
+```
+
+measured 2026-10-15 by chain chain-epic-queue--docs-cloudcli-20261015-015416-7a64, finding M1, MEDIUM
+probe-key: 3fc8d670f108173120f2f6e6058891d3a14c2168
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/docs/
+
+## INV-8342 — probe — MEDIUM — MAN-5638 and MAN-5636 give the wrong refusal line for an unknown epic name, and MAN-5636 counts the verbs wrong
+
+MEDIUM — MAN-5638 and MAN-5636 give the wrong refusal line for an unknown epic name, and MAN-5636 counts the verbs wrong
+
+```probe
+D=$(mktemp -d /tmp/athena-probe-m2.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+cd /tmp || exit 1
+echo "MAN-5638 'names both doors': $(docstore get MAN-5638 --text | grep -c 'names both doors')"
+echo "MAN-5636 'any of the four verbs': $(docstore get MAN-5636 --text | grep -c 'any of the four verbs')"
+echo "queue -> $(timeout 30 ~/.claude/scripts/dispatcher queue athena-no-such-epic-x --last 2>&1 | head -1)"
+echo "stop  -> $(timeout 30 ~/.claude/scripts/dispatcher stop athena-no-such-epic-x 2>&1 | head -1)"
+EOF
+bash "$D/p.sh"; cd /tmp; case "$D" in /tmp/athena-probe-m2.*) rm -r "$D";; esac
+expect: `names both doors': 1`, `any of the four verbs': 1`, `queue -> no arc athena-no-such-epic-x`, `stop  -> no plan or arc athena-no-such-epic-x` while the defect stands (an unknown name is refused before any write); cured, the two row counts are 0 and the rows name `no arc <name>` for `wip` and `queue` and `no plan or arc <name>` for the six others
+```
+
+measured 2026-10-15 by chain chain-epic-queue--docs-cloudcli-20261015-015416-7a64, finding M2, MEDIUM
+probe-key: 96851bfab7f6cf6c087d9b51d8ce7eaf69c341a3
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/docs/
+
+## INV-8343 — probe — LOW — MAN-8431 names a standing proof whose `ALL CHECKS PASS` does not print today; the failing check expects a revert the app never makes
+
+LOW — MAN-8431 names a standing proof whose `ALL CHECKS PASS` does not print today; the failing check expects a revert the app never makes
+
+```probe
+D=$(mktemp -d /tmp/athena-probe-l1.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+timeout 400 node .verify/probe-epic-queue.mjs --only gutter > "$1/out.log" 2>&1; echo "exit $?"
+grep -E "\[FAIL\]|ALL CHECKS" "$1/out.log" | cut -c1-120 || echo none
+EOF
+bash "$D/p.sh" "$D"; cd /tmp; case "$D" in /tmp/athena-probe-l1.*) rm -r "$D";; esac
+expect: `exit 1` and two `[FAIL] 1920-…-gutter: …the pin dropped that write (1) and the done deck stands below the queue still` lines while it stands; cured, `exit 0` and `ALL CHECKS PASS`
+```
+
+measured 2026-10-15 by chain chain-epic-queue--docs-cloudcli-20261015-015416-7a64, finding L1, LOW
+probe-key: 468d81300e74aad24711ab83df7acd7fd3cf051b
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/docs/
+
+## INV-8681 — probe — LOW — Escape mid-drag calls `onCancel` but does not end the drag: a caller that stays in drawing mode still gets `onDrawn` on release
+
+LOW — Escape mid-drag calls `onCancel` but does not end the drag: a caller that stays in drawing mode still gets `onDrawn` on release
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX)
+cat > "$D/p.mjs" <<'EOF'
+import { open } from '/home/lyphe/.claude/state/pipeline-reviews/tour-affected-areas--viewer--library/athena-kit.mjs';
+const { page, browser } = await open();
+try {
+  await page.evaluate(() => {
+    const m = window.__mountReact, ui = window.__ui, { h, React } = m; window.__log = [];
+    // a caller that stays in drawing mode after a cancel (it only notes the cancel)
+    const P = () => h('div', { id: 'w', style: { width: 600 } }, h(ui.RegionImage, { src: window.__grey, alt: 'x', width: 400, height: 400, regions: [], drawing: { onDrawn: (b) => window.__log.push('drawn'), onCancel: () => window.__log.push('cancel') } }));
+    return m.mount('t', h(P), 'position:fixed;inset:0;padding:24px;background:var(--canvas)');
+  });
+  const r = await page.locator('#w > div').first().boundingBox();
+  await page.mouse.move(r.x + r.width * .25, r.y + r.height * .25); await page.mouse.down();
+  await page.mouse.move(r.x + r.width * .6, r.y + r.height * .6, { steps: 8 });
+  await page.keyboard.press('Escape'); await page.mouse.up(); await page.waitForTimeout(100);
+  console.log('after Escape mid-drag then release, the caller saw:', JSON.stringify(await page.evaluate(() => window.__log)));
+} finally { await browser.close(); }
+EOF
+node "$D/p.mjs"
+expect: today `["cancel","drawn"]`; cured `["cancel"]`
+```
+
+measured 2026-10-17 by chain chain-tour-affected-areas--marking--library-20261017-163819-f3a2, finding L1, LOW
+probe-key: f5264a8b44176923423d610fbb24abd11956a04a
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/DataTable.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/RegionDrawLayer.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/SegmentedControl.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/verve/data.css
+
+## INV-8682 — probe — LOW — `SegmentedControl` takes modified arrows, and a one-option group calls `onChange` with its own value
+
+LOW — `SegmentedControl` takes modified arrows, and a one-option group calls `onChange` with its own value
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX)
+cat > "$D/p.mjs" <<'EOF'
+import { open } from '/home/lyphe/.claude/state/pipeline-reviews/tour-affected-areas--viewer--library/athena-kit.mjs';
+const { page, browser } = await open();
+try {
+  const run = (opts, value, init) => page.evaluate(({ opts, value }) => {
+    const m = window.__mountReact, ui = window.__ui, { h } = m; window.__log = [];
+    m.unmount('t').catch?.(() => {});
+    return m.mount('t', h(ui.SegmentedControl, { options: opts, value, onChange: (v) => window.__log.push(v), label: 'L' }), 'position:fixed;inset:0;padding:24px;background:var(--canvas)').then(() => 1);
+  }, { opts, value });
+  await run([{ value: 'a', label: 'A' }, { value: 'b', label: 'B' }], 'a');
+  await page.locator('[role=radio]').first().focus();
+  const alt = await page.evaluate(() => { const ev = new KeyboardEvent('keydown', { key: 'ArrowRight', altKey: true, bubbles: true, cancelable: true }); document.activeElement.dispatchEvent(ev); return { defaultPrevented: ev.defaultPrevented, changes: window.__log.slice() }; });
+  console.log('Alt+ArrowRight (a modified arrow is the browser\'s):', JSON.stringify(alt));
+  await page.evaluate(() => window.__mountReact.unmount('t'));
+  await run([{ value: 'only', label: 'Only' }], 'only');
+  await page.locator('[role=radio]').focus(); await page.keyboard.press('ArrowRight');
+  console.log('one option, ArrowRight, onChange calls:', JSON.stringify(await page.evaluate(() => window.__log)));
+} finally { await browser.close(); }
+EOF
+node "$D/p.mjs"
+expect: today `defaultPrevented:true, changes:["b"]` and one-option `["only"]`; cured `defaultPrevented:false, changes:[]` and `[]`
+```
+
+measured 2026-10-17 by chain chain-tour-affected-areas--marking--library-20261017-163819-f3a2, finding L2, LOW
+probe-key: a150a09baf4b8dee85b4789ce583fcff51248182
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/DataTable.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/RegionDrawLayer.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/SegmentedControl.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/verve/data.css
+
+## INV-8683 — probe — LOW — The keyboard ring on a sortable head is clipped by the table's frame on its top and left edges
+
+LOW — The keyboard ring on a sortable head is clipped by the table's frame on its top and left edges
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX)
+cat > "$D/p.mjs" <<'EOF'
+import { open } from '/home/lyphe/.claude/state/pipeline-reviews/tour-affected-areas--viewer--library/athena-kit.mjs';
+const { page, browser } = await open();
+try {
+  await page.evaluate(() => {
+    const m = window.__mountReact, ui = window.__ui, { h } = m;
+    const cols = [{ key: 'a', label: 'Alpha', sortValue: (r) => r.a, render: (r) => r.a }, { key: 'b', label: 'Beta', sortValue: (r) => r.b, render: (r) => r.b }];
+    return m.mount('t', h('div', { style: { width: 400 } }, h(ui.DataTable, { rows: [{ id: '1', a: 'x', b: 1 }], columns: cols, rowKey: (r) => r.id, label: 'T', onSort: () => {} })), 'position:fixed;inset:0;padding:40px;background:var(--canvas)');
+  });
+  await page.locator('thead button').first().focus(); await page.keyboard.press('Shift+Tab'); await page.keyboard.press('Tab');
+  const b = await page.locator('thead button').first().boundingBox();
+  const px = async (x, y) => { const png = await page.screenshot({ clip: { x: Math.round(x), y: Math.round(y), width: 1, height: 1 } }); return page.evaluate(async (d) => { const im = new Image(); im.src = d; await im.decode(); const c = document.createElement('canvas'); c.width = c.height = 1; const g = c.getContext('2d'); g.drawImage(im, 0, 0); return [...g.getImageData(0, 0, 1, 1).data].slice(0, 3); }, 'data:image/png;base64,' + png.toString('base64')); };
+  const ring = (p) => Math.abs(p[0] - 47) < 25 && Math.abs(p[1] - 168) < 25 && Math.abs(p[2] - 118) < 25;
+  const cx = b.x + b.width / 2, cy = b.y + b.height / 2;
+  const any = async (pts) => { for (const p of pts) if (ring(await px(p[0], p[1]))) return true; return false; };
+  const top = await any([-4, -3, -2, -1].map((d) => [cx, b.y + d]));
+  const left = await any([-4, -3, -2, -1].map((d) => [b.x + d, cy]));
+  const bottom = await any([0, 1, 2, 3].map((d) => [cx, b.y + b.height + d]));
+  console.log('focus ring seen outside the first sortable head (top, left, bottom):', JSON.stringify({ top, left, bottom }));
+} finally { await browser.close(); }
+EOF
+node "$D/p.mjs"
+expect: today `{"top":false,"left":false,"bottom":true}`; cured `top:true, left:true, bottom:true`
+```
+
+measured 2026-10-17 by chain chain-tour-affected-areas--marking--library-20261017-163819-f3a2, finding L3, LOW
+probe-key: 3a51a4d93a567e2972d90d2f439eb40293acc946
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/DataTable.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/RegionDrawLayer.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/SegmentedControl.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/verve/data.css
+
+## INV-8684 — probe — LOW — Pressing a sort head moves the columns: the ↕ and ▲/▼ marks have different widths
+
+LOW — Pressing a sort head moves the columns: the ↕ and ▲/▼ marks have different widths
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX)
+cat > "$D/p.mjs" <<'EOF'
+import { open } from '/home/lyphe/.claude/state/pipeline-reviews/tour-affected-areas--viewer--library/athena-kit.mjs';
+const { page, browser } = await open();
+try {
+  await page.evaluate(() => {
+    const m = window.__mountReact, ui = window.__ui, { h, React } = m;
+    const cols = [{ key: 'name', label: 'Name', sortValue: (r) => r.name, render: (r) => r.name }, { key: 'tasks', label: 'Tasks', align: 'end', sortValue: (r) => r.tasks, render: (r) => r.tasks }, { key: 'note', label: 'Note', render: (r) => r.note }];
+    const rows = [{ id: 'a', name: 'b', tasks: 10, note: 'x' }, { id: 'b', name: 'a', tasks: 9, note: 'y' }];
+    function P() { const [s, setS] = React.useState(undefined); return h('div', { style: { width: 1000 } }, h(ui.DataTable, { rows, columns: cols, rowKey: (r) => r.id, label: 'T', sort: s, onSort: (c) => setS({ column: c, direction: 'asc' }) })); }
+    return m.mount('t', h(P), 'position:fixed;inset:0;padding:24px;background:var(--canvas)');
+  });
+  const w = () => page.evaluate(() => [...document.querySelectorAll('thead th')].map((t) => t.getBoundingClientRect().width));
+  const none = await w(); await page.locator('thead button').nth(1).click(); const tasks = await w(); await page.locator('thead button').nth(0).click(); const name = await w();
+  const shift = (a, b) => Math.max(...a.map((v, i) => Math.abs(v - b[i]))).toFixed(1);
+  console.log('largest head-width change when a head is first sorted (px), none->tasks:', shift(none, tasks), ' tasks->name:', shift(tasks, name));
+} finally { await browser.close(); }
+EOF
+node "$D/p.mjs"
+expect: today `none->tasks: 8.7  tasks->name: 13.8`; cured both ≤ 1
+```
+
+measured 2026-10-17 by chain chain-tour-affected-areas--marking--library-20261017-163819-f3a2, finding L4, LOW
+probe-key: 852000cbb88a8e76b9b7da4f8ff4cba9b65fd2db
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/DataTable.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/RegionDrawLayer.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/SegmentedControl.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/verve/data.css
+
+## INV-8685 — probe — LOW — Three light-theme pairs are under AA and neither `data.css`'s header nor MAN-8580 says so
+
+LOW — Three light-theme pairs are under AA and neither `data.css`'s header nor MAN-8580 says so
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX)
+cat > "$D/p.mjs" <<'EOF'
+import { open } from '/home/lyphe/.claude/state/pipeline-reviews/tour-affected-areas--viewer--library/athena-kit.mjs';
+import fs from 'node:fs';
+const { page, browser } = await open();
+try {
+  await page.evaluate(() => {
+    const m = window.__mountReact, ui = window.__ui, { h } = m;
+    const cols = [{ key: 'a', label: 'Alpha', sortValue: (r) => r.a, render: (r) => r.a }];
+    return m.mount('t', h('div', null, h(ui.SegmentedControl, { options: [{ value: 'a', label: 'A' }, { value: 'b', label: 'B' }], value: 'a', onChange: () => {}, label: 'L' }), h(ui.DataTable, { rows: [{ id: '1', a: 'x' }], columns: cols, rowKey: (r) => r.id, label: 'T', onSort: () => {} })), 'position:fixed;inset:0;padding:24px;background:var(--canvas)');
+  });
+  const c = await page.evaluate(() => { const cs = (e) => getComputedStyle(e); return { head: [cs(document.querySelector('thead th')).color, cs(document.querySelector('thead th')).backgroundColor], label: [cs(document.querySelectorAll('[role=radio]')[1]).color, cs(document.querySelector('[role=radiogroup]')).backgroundColor] }; });
+  const rgb = (s) => s.match(/\d+/g).slice(0, 3).map(Number);
+  const lin = (v) => { v /= 255; return v <= .03928 ? v / 12.92 : ((v + .055) / 1.055) ** 2.4; };
+  const L = (a) => .2126 * lin(a[0]) + .7152 * lin(a[1]) + .0722 * lin(a[2]);
+  const cr = (a, b) => { const x = L(a), y = L(b); return ((Math.max(x, y) + .05) / (Math.min(x, y) + .05)).toFixed(2); };
+  const css = fs.readFileSync('/home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/verve/data.css', 'utf8');
+  console.log('light: unsorted sortable head', cr(rgb(c.head[0]), rgb(c.head[1])) + ':1, unchosen option label', cr(rgb(c.label[0]), rgb(c.label[1])) + ':1; data.css header names a contrast number:', /\d\.\d+:1|AA/.test(css.split('*/')[0]));
+} finally { await browser.close(); }
+EOF
+node "$D/p.mjs"
+expect: today `3.12:1`, `4.46:1`, header names a contrast number `false`; cured both ≥ 4.5 or the header names the number (`true`)
+```
+
+measured 2026-10-17 by chain chain-tour-affected-areas--marking--library-20261017-163819-f3a2, finding L5, LOW
+probe-key: cb218058d637d82a76d79db7046760653392277b
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/DataTable.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/RegionDrawLayer.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/SegmentedControl.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/verve/data.css
+
+## INV-8686 — probe — LOW — Heads with `sortValue` and no `onSort` still draw the ↕ "this sorts" mark
+
+LOW — Heads with `sortValue` and no `onSort` still draw the ↕ "this sorts" mark
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX)
+cat > "$D/p.mjs" <<'EOF'
+import { open } from '/home/lyphe/.claude/state/pipeline-reviews/tour-affected-areas--viewer--library/athena-kit.mjs';
+const { page, browser } = await open();
+try {
+  await page.evaluate(() => {
+    const m = window.__mountReact, ui = window.__ui, { h } = m;
+    const cols = [{ key: 'a', label: 'Alpha', sortValue: (r) => r.a, render: (r) => r.a }, { key: 'b', label: 'Beta', sortValue: (r) => r.b, render: (r) => r.b }];
+    return m.mount('t', h(ui.DataTable, { rows: [{ id: '1', a: 'x', b: 1 }], columns: cols, rowKey: (r) => r.id, label: 'T' }), 'position:fixed;inset:0;padding:24px;background:var(--canvas)');
+  });
+  console.log('no onSort: head buttons', await page.locator('thead button').count(), '· sort arrows drawn (a mark that says "this sorts")', await page.locator('.vv-datatable__arrow').count());
+} finally { await browser.close(); }
+EOF
+node "$D/p.mjs"
+expect: today `head buttons 0 · sort arrows drawn 2`; cured arrows `0` (or only on a head that holds `aria-sort`)
+```
+
+measured 2026-10-17 by chain chain-tour-affected-areas--marking--library-20261017-163819-f3a2, finding L6, LOW
+probe-key: 4254c2b0b6d2e95b42a5c152bf3792b17cea06eb
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/DataTable.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/RegionDrawLayer.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/SegmentedControl.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/verve/data.css

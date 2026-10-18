@@ -228,7 +228,7 @@ export function createDispatcherAsks(dependencies: DispatcherAsksDependencies): 
   /**
    * Says that an answer just carried was the SECOND word on a plan the store had approved already, so it
    * changed nothing: one line in the journal, for every door — the dispatcher's own refusal (when, by
-   * whom, paused or live) is in the line `carryReply` journalled beside the command. Nothing is sent:
+   * whom, hidden, paused or live) is in the line `carryReply` journalled beside the command. Nothing is sent:
    * the card's door hands its own card the outcome it carried, and a phone tap is answered in its own
    * HTTP reply.
    */

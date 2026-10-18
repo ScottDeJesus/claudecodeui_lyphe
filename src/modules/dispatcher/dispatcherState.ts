@@ -19,7 +19,7 @@ import type { DispatcherArc, DispatcherArcSplit, DispatcherPhase, DispatcherPlan
  * date rides whenever the moment is not today, because DeepSeek's off-peak lifts at 3 AM Pacific — past
  * the operator's midnight — and a bare `3:00 AM` read in the evening names a time that has already
  * passed. One clock for every moment the card names: a plan card's own clock (`PlanFace.PlanClock`), an
- * arc's armed hour (`DispatchArcControls`), `ScheduleControl`'s `Start at …`, and the stage lines and
+ * arc's armed hour (`DispatchArcDeck`'s head), `ScheduleControl`'s `Resume at …`, and the stage lines and
  * event feed through {@link clockOf} all name one moment one way.
  */
 export function scheduleClock(epochSeconds: number, now: number = Date.now()): string {
@@ -93,20 +93,28 @@ export function phaseProgress(plan: DispatcherPlan): { done: number; total: numb
 }
 
 /**
- * The lane split by `plan.arc`, every card in the operator's order — the one split the Roadmap tab's In flight face and
+ * The lane split by `plan.arc`, every card in its order — the one split the Roadmap tab's In flight face and
  * the chat gutter's widget both read.
  *
  * ONE FUNCTION, TWO HOMES, AND NO THIRD READING. The tab and the widget draw the same lane, and a home
  * that grouped or ordered for itself is how the two would come to disagree about which card sits under
  * which arc and which stands first — so the split is here, a total function of the frame and of the
- * operator's saved ranks (`cardOrderEntries.ts`), and both homes read it. `cards` is every top-level
- * card in the ONE order (`cardOrder.ts`: rank, higher first, ties by name — the widget's column);
- * `groups` and `rest` are its decks and its plans of no arc, each keeping that order among its own
- * kind (the tab's decks above, its wall below).
+ * operator's saved ranks (`cardOrderEntries.ts`), and both homes read it. `line` is the QUEUE'S decks, in
+ * the order the dispatcher starts their epics in; `cards` is every top-level card, `line` first and then
+ * the rest in the ONE card order (`cardOrder.ts`: rank, higher first, ties by name — the widget's
+ * column); `groups` and `rest` are the other decks and the plans of no arc, each keeping that order
+ * among its own kind (the tab's second list of decks, its wall below).
  *
- * NOTHING BUT THE OPERATOR'S ARRANGEMENT MOVES A CARD. Status, `updated_at`, an owed word and the
- * open chat all change a plan every few seconds; a card that stood by any of them would jump under
- * the reader's hand. A plan that asks keeps its place and its band.
+ * THE QUEUE IS THE ORDER THE EPICS RUN IN, so its decks stand by `arc.queue.position` — which the
+ * dispatcher derives and the operator moves (`dispatcher queue`) — and by no rank of the card order. The
+ * queue moves a deck on its own only at a turn's ends: a new epic joins at the back, and a finished one
+ * leaves the queue and goes below it, among the other decks, where its card rank puts it until it is
+ * dismissed. Both are rare events, never status churn. An arc with no `queue` (an older dispatcher's
+ * frame carries none) is not in the line, so such a frame is today's split with `line` empty.
+ *
+ * NOTHING BUT THE OPERATOR'S ARRANGEMENT MOVES A CARD OUTSIDE THE QUEUE. Status, `updated_at`, an owed
+ * word and the open chat all change a plan every few seconds; a card that stood by any of them would
+ * jump under the reader's hand. A plan that asks keeps its place and its band.
  *
  * AN ARC'S OWN ORDER IS THE STORE'S. `arc.plans` is the arc file's walk order (`store.arc_plans`), and
  * it is what the arc's deck draws: the reader is looking at a sequence of thirteen plans that depend
@@ -143,15 +151,23 @@ export function byArc(plans: DispatcherPlan[], arcs: DispatcherArc[], ranks: Rea
     return { arc, plans: mine };
   });
 
-  const cards = inCardOrder<LaneCard>(
-    [...groups.map((group): LaneCard => ({ kind: 'arc', group })), ...rest.map((plan): LaneCard => ({ kind: 'plan', plan }))],
+  // The queue's decks by their place; a tie (a frame never states one) falls to the name, so the list never shuffles.
+  const line = groups
+    .filter((group) => group.arc.queue)
+    .sort((a, b) => (a.arc.queue?.position ?? 0) - (b.arc.queue?.position ?? 0) || (a.arc.name < b.arc.name ? -1 : 1));
+  const others = inCardOrder<LaneCard>(
+    [
+      ...groups.filter((group) => !group.arc.queue).map((group): LaneCard => ({ kind: 'arc', group })),
+      ...rest.map((plan): LaneCard => ({ kind: 'plan', plan })),
+    ],
     (card) => (card.kind === 'arc' ? card.group.arc : card.plan),
     ranks,
   );
   return {
-    cards,
-    groups: cards.flatMap((card) => (card.kind === 'arc' ? [card.group] : [])),
-    rest: cards.flatMap((card) => (card.kind === 'plan' ? [card.plan] : [])),
+    line,
+    cards: [...line.map((group): LaneCard => ({ kind: 'arc', group })), ...others],
+    groups: others.flatMap((card) => (card.kind === 'arc' ? [card.group] : [])),
+    rest: others.flatMap((card) => (card.kind === 'plan' ? [card.plan] : [])),
   };
 }
 

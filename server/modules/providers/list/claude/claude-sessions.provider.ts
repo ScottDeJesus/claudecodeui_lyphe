@@ -23,7 +23,8 @@ import {
   withoutAnchors,
   type StitchedClaudeHistory,
 } from '@/modules/providers/list/claude/claude-compacted-history.js';
-import { localCommandDisplayText, type LocalCommandPayload } from '@/shared/local-commands.js';
+import { isClaudeTurnLookalike, isResumePlaceholderRow } from '@/shared/claude-transcript-rows.js';
+import { localCommandDisplayText, stripTransparentWrapperPrefix, type LocalCommandPayload } from '@/shared/local-commands.js';
 import { prepareTranscriptMessages } from '@/shared/message-unification.js';
 import {
   createNormalizedMessage,
@@ -190,6 +191,9 @@ export async function readClaudeSubagentTranscript(filePath: string): Promise<Cl
 
       try {
         const entry = JSON.parse(line) as AnyRecord;
+        if (isClaudeTurnLookalike(entry)) {
+          continue;
+        }
         const timestamp = typeof entry.timestamp === 'string' ? entry.timestamp : undefined;
         if (timestamp) {
           lastRecordTimestamp = timestamp;
@@ -493,7 +497,9 @@ async function readTranscriptRows(jsonlPath: string, providerSessionId: string):
     }
     try {
       const entry = JSON.parse(line) as AnyRecord;
-      if (entry.sessionId !== providerSessionId) {
+      // A record that wears a turn's shape without being one (`api-request-blob`) is not a row of the
+      // conversation: left in, it reads as a second copy of a message the file already holds.
+      if (entry.sessionId !== providerSessionId || isClaudeTurnLookalike(entry)) {
         continue;
       }
       const uuid = typeof entry.uuid === 'string' ? entry.uuid : null;
@@ -920,6 +926,12 @@ export class ClaudeSessionsProvider implements IProviderSessions {
       return normalizeCompactionRow(raw, sessionId);
     }
 
+    // The CLI's stand-in reply on a resume is its own upkeep of the alternating turns, not the
+    // assistant answering: no bubble, in the history or on the live stream.
+    if (isResumePlaceholderRow(raw)) {
+      return [];
+    }
+
     if (raw.type === 'content_block_delta' && raw.delta?.text) {
       return [createNormalizedMessage({ kind: 'stream_delta', content: raw.delta.text, sessionId, provider: PROVIDER })];
     }
@@ -978,7 +990,8 @@ export class ClaudeSessionsProvider implements IProviderSessions {
                 provider: PROVIDER,
                 kind: 'text',
                 role: 'user',
-                content: parsedFiles.text,
+                // A send with an image is a content array the CLI does not expand: its text block still wears the plain-mode `/plain `.
+                content: stripTransparentWrapperPrefix(parsedFiles.text),
                 images: !imagesAttached && imageAttachments.length > 0 ? imageAttachments : undefined,
                 files: !filesAttached && parsedFiles.attachments.length > 0
                   ? parsedFiles.attachments

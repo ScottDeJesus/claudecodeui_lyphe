@@ -1,0 +1,238 @@
+/* Verve media paint — the rules for the two pieces that put a photograph on screen: RegionImage, the
+ * regions drawn over one photo, and Gallery, Verve's §10 Media gallery.
+ *
+ * RegionImage's focus and drawing (`.vv-region--dim`, `.vv-region-draw`, `.vv-region--drawing`) sit with its
+ * outline rules below; SegmentedControl and DataTable are not photographs and paint in data.css.
+ *
+ * The sixth paint file, opened rather than squeezed in: controls.css is past its stated ceiling,
+ * feedback.css is at it, and the other four are each one family's. README rule 6: the next file opens
+ * the same way again.
+ *
+ * Same contract as its siblings. A library class string carries `vv-<name>` plus layout utilities and
+ * nothing else; colour comes from tokens.css; no rule here declares a `--tone-*` property, because tone
+ * is a token swap (README rule 4) — a region's `data-tone` hands `--tone-soft`, `--tone-ink` and
+ * `--tone-dot` to the outline and badge, and every rule below only reads them.
+ *
+ * The ONE place this file spells a colour that is not a token: the tag, the count scrim and the "+N" ink on
+ * a gallery tile. They sit on a PHOTOGRAPH, not on a surface, so they must be the same near-black scrim
+ * and white ink in both modes — Verve's own literals (`rgba(16,17,22,.5)` and `#fff`, §10), the same
+ * reasoning as the Dialog's backdrop in feedback.css. A token would flip with the theme and put pale ink
+ * on a pale photo. Reproduced as drawn, so the tag's reading is Verve's: measured 19.9:1 over a black photo
+ * and 3.55:1 over a pure-white one (a white wall or ceiling, the commonest ground in a restoration photo set),
+ * under the 4.5:1 AA line for small text. A darker scrim is the operator's call, not this sheet's.
+ *
+ * Imported once, for side effect, from src/shared/ui/index.ts — after panels.css and before board.css,
+ * which keeps the last word. The place is free: nothing here shares a selector with a sibling sheet, and
+ * every rule reads tokens that tokens.css declares, so no rule here depends on landing before or after one.
+ */
+
+/* ---------------------------------------------------------------- RegionImage: the outline */
+/* The polygon lives in an SVG whose viewBox is 0 0 1 1 stretched over the photo, so its coordinates are the
+ * stored ones. `vector-effect: non-scaling-stroke` (an attribute on the element) makes `stroke-width` and
+ * the dash lengths SCREEN pixels — the edge is one weight at every size and zoom, instead of being scaled
+ * with a 1x1 box into a hairline or a slab. The layer takes no pointer (`pointer-events: none` on the
+ * svg, inherited by every outline): a display-only region is inert, so inside the Lightbox a press on it
+ * pans the photo and the cursor stays the Lightbox's own `grab`. Only a PRESSABLE outline (`--pressable`,
+ * which RegionImage sets exactly when it is given `onSelect`) takes `all` — a pointer over its fill whether
+ * or not the wash paints one — and the pointer cursor and the hover lift below.
+ *
+ * Inside the Lightbox the picture is scaled by a CSS transform, and the attribute does not undo that: a 2px
+ * edge measured 4.5px at 225%. The Lightbox hands its zoom factor to its content as `--lightbox-scale`
+ * (1 at fit, and unset anywhere else — hence the fallback), so every length here that is meant as screen
+ * pixels is divided by it, and the edge is one weight at every zoom. */
+.vv-region {
+  fill: color-mix(in srgb, var(--tone-dot) 30%, transparent);
+  stroke: var(--tone-dot);
+  stroke-width: calc(2px / var(--lightbox-scale, 1));
+  stroke-linejoin: round;
+  transition: fill var(--dur-quick) ease, stroke-width var(--dur-quick) ease, opacity var(--dur-quick) ease;
+}
+.vv-region--pressable { pointer-events: all; cursor: pointer; }
+.vv-region--dashed { stroke-dasharray: calc(7px / var(--lightbox-scale, 1)) calc(5px / var(--lightbox-scale, 1)); }
+.vv-region--wash-light { fill: color-mix(in srgb, var(--tone-dot) 13%, transparent); }
+.vv-region--wash-none { fill: transparent; }
+
+/* Chosen: a heavier edge AND a stronger wash — two channels, so it survives greyscale — and a wash even on a
+ * region that has none, because the selection is the one thing that must always be seen. After the washes,
+ * at the same specificity, so it wins over them. */
+.vv-region--selected {
+  fill: color-mix(in srgb, var(--tone-dot) 40%, transparent);
+  stroke-width: calc(3.5px / var(--lightbox-scale, 1));
+}
+
+/* Touch screens leave a tapped outline "hovered" until the next tap elsewhere, so the lift is for a pointer
+ * that really hovers, and only for an outline that can be pressed. Each wash has its own hover so a lighter
+ * wash is never raised past the full one's; each rule is two classes deep plus `:hover` and the chosen
+ * region's is last, so a hovered chosen region keeps its own fill. */
+@media (hover: hover) {
+  .vv-region--pressable:hover { fill: color-mix(in srgb, var(--tone-dot) 42%, transparent); }
+  .vv-region--pressable.vv-region--wash-light:hover { fill: color-mix(in srgb, var(--tone-dot) 26%, transparent); }
+  .vv-region--pressable.vv-region--wash-none:hover { fill: color-mix(in srgb, var(--tone-dot) 14%, transparent); }
+  .vv-region--pressable.vv-region--selected:hover { fill: color-mix(in srgb, var(--tone-dot) 40%, transparent); }
+}
+/* A dashed edge keeps its dashes when chosen: at the heavier weight the 7-5 pattern would read as beads. */
+.vv-region--selected.vv-region--dashed { stroke-dasharray: calc(12px / var(--lightbox-scale, 1)) calc(6px / var(--lightbox-scale, 1)); }
+
+/* Out of focus (RegionImage `focusId`): every region but the one the screen is about. An OPACITY, not a lighter
+ * fill, so one rule dims whatever the region was given — its wash, its dashes, its hover and a selection — and
+ * the focused region, which RegionImage draws at full wash, is the only one left at full strength. Still seen
+ * and still counted: the edge stays a line, only quieter. The badge wears the same class and a touch more
+ * opacity, because its number is how the reader finds the row and must stay legible. */
+.vv-region--dim { opacity: 0.28; }
+.vv-region-badge.vv-region--dim { opacity: 0.5; }
+
+/* ---------------------------------------------------------------- RegionImage: drawing a box */
+/* RegionImage `drawing`: a layer over the whole photo that takes the press (`usePointerDrag`). `touch-action:
+ * none` is on it from the first touch — a phone that dispatches every touch as uncancelable cannot be told "not
+ * a scroll" after the fact — so one finger draws instead of panning the page. The ring says the photo is in
+ * drawing mode before a box exists; the tone (`data-tone` on the layer) is the human region's own, positive,
+ * because what is drawn here becomes one. */
+.vv-region-draw {
+  cursor: crosshair;
+  touch-action: none;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+  box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--tone-dot) 55%, transparent);
+}
+/* The live box composes `.vv-region` (fill, edge, weight) and adds the dashes a hand-drawn region wears, so the
+ * box under the pointer already looks like the region it will become. It is inert and never animates a fill. */
+.vv-region--drawing {
+  stroke-dasharray: calc(7px / var(--lightbox-scale, 1)) calc(5px / var(--lightbox-scale, 1));
+  pointer-events: none;
+  transition: none;
+}
+
+/* ---------------------------------------------------------------- RegionImage: the badge */
+/* A small numbered tab at the region's top-left, in the tone's own pair (`--tone-soft` ground,
+ * `--tone-ink` number, `--tone-dot` edge) so the number reads on any photograph in both modes and
+ * every tone has its measured contrast; the badge is a number, never a word. The size is a custom property
+ * because RegionImage reads its on-screen extent back to keep the badge inside the image. The ::before
+ * widens the press to 34px without widening the mark; the outline itself is the large target.
+ *
+ * Inside the Lightbox the badge is scaled down by the zoom (`--lightbox-scale`, see the outline above) from
+ * its top-left corner, which is where it is anchored: it stays one size and stays on its region's corner. The
+ * extent is that same size in the image's own units, so the clamp in RegionImage holds at every zoom. */
+.vv-region-badge {
+  --vv-region-badge-size: 22px;
+  --vv-region-badge-extent: calc(var(--vv-region-badge-size) / var(--lightbox-scale, 1));
+  transform: scale(calc(1 / var(--lightbox-scale, 1)));
+  transform-origin: 0 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--vv-region-badge-size);
+  height: var(--vv-region-badge-size);
+  padding: 0;
+  border: 1.5px solid var(--tone-dot);
+  border-radius: 6px;
+  background: var(--tone-soft);
+  color: var(--tone-ink);
+  font-family: var(--font-body);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+}
+.vv-region-badge::before { content: ''; position: absolute; inset: -6px; }
+/* A display-only badge (a span: RegionImage got no `onSelect`) is inert like its outline, so a press on it pans. */
+span.vv-region-badge { cursor: default; pointer-events: none; }
+
+/* The chosen badge wears a ring — a surface gap, then the tone's dot — and lifts above its neighbours. */
+.vv-region-badge[aria-pressed='true'] {
+  box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--tone-dot);
+  z-index: 1;
+}
+
+/* ---------------------------------------------------------------- Gallery */
+/* Verve's grid, `repeat(auto-fill, minmax(96px, 1fr))` at 8px: as many 96px-and-up squares as fit. */
+.vv-gallery {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* A tile is a square with its photo cropped to it, on the neutral ground so a slow photo never leaves a hole.
+ * Its entrance is Verve's `vv-rise`; `backwards` (not `both`) because a held end frame would pin
+ * `transform: none` over the hover lift below. The delay is set per tile, by position. */
+.vv-gallery__tile {
+  position: relative;
+  display: block;
+  width: 100%;
+  aspect-ratio: 1;
+  padding: 0;
+  border: 0;
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--surface2);
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: transform 0.3s var(--ease-enter), box-shadow 0.3s var(--ease-enter);
+}
+div.vv-gallery__tile { cursor: default; }
+@media screen and (prefers-reduced-motion: no-preference) {
+  .vv-gallery__tile { animation: vv-rise 0.5s var(--ease-enter) backwards; }
+}
+
+/* The chosen tile: an accent ring set off by a surface gap, and its tag turns accent — a second channel
+ * beside the ring, so the choice reads in greyscale too. The ring is a custom property so the hover below
+ * can keep it: the pointer that just pressed a tile is still over it, and a hover shadow that replaced the
+ * ring would take the choice off the tile at the moment of every desktop click. */
+.vv-gallery__tile[aria-current='true'] {
+  --vv-gallery-ring: 0 0 0 2px var(--surface), 0 0 0 4px var(--accent);
+  box-shadow: var(--vv-gallery-ring);
+}
+@media (hover: hover) {
+  button.vv-gallery__tile:hover { transform: scale(1.03); box-shadow: var(--shadow-hover); }
+  button.vv-gallery__tile[aria-current='true']:hover { box-shadow: var(--vv-gallery-ring), var(--shadow-hover); }
+}
+
+.vv-gallery__tile[aria-current='true'] .vv-gallery__tag { background: var(--accent); color: var(--on-accent); }
+
+/* The room tag: every tile carries one (Verve). The scrim literal is explained in this file's header. */
+.vv-gallery__tag {
+  padding: 2px 7px;
+  border-radius: 6px;
+  background: rgba(16, 17, 22, 0.5);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  line-height: 1.4;
+}
+
+/* The caller's optional mark, top right: on the surface, not the photo's scrim, so it never reads as a second tag. */
+.vv-gallery__badge {
+  padding: 2px 7px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--ink);
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1.4;
+  font-variant-numeric: tabular-nums;
+}
+
+/* The final tile's collapse of the overflow into a count: the scrim over its photo and the number, as Verve draws it. */
+.vv-gallery__more {
+  background: rgba(16, 17, 22, 0.55);
+  color: #fff;
+  font-size: 15px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+/* The grey tile — Verve's broken-image fallback, and the one RegionImage shows where its photo is missing.
+ * Never a blank cell or a browser's broken-image glyph. In a gallery the word is lifted to clear the tag. */
+.vv-gallery__fallback {
+  background: var(--surface2);
+  color: var(--ink-faint);
+  font-size: 11px;
+}
+.vv-gallery__tile .vv-gallery__fallback { padding-bottom: 22px; box-sizing: border-box; }

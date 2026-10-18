@@ -183,6 +183,27 @@
         "auto": "Claude decides per edit.",
         "bypassPermissions": "Claude never asks."
       }
+    },
+    "toolsets": {
+      "heading": "Tool sets for this conversation",
+      "onNode": "This chat runs on {{node}}. Tool sets are this box's own.",
+      "unreadable": "The tool-set file could not be read: {{error}}",
+      "none": "No tool sets are defined on this box yet. They live in {{file}}.",
+      "stray": "{{name}} — no longer defined on this box",
+      "switchingOn": "Switching on…",
+      "switchingOff": "Switching off…",
+      "nextMessage": "Applies from the next message.",
+      "failed": "{{server}} did not connect: {{detail}}",
+      "failedBare": "{{server}} did not connect.",
+      "unconfirmed": "{{server}} could not be confirmed: {{detail}}",
+      "unconfirmedBare": "{{server}} could not be confirmed.",
+      "error": "Not updated: {{error}}",
+      "noAnswer": "CloudCLI did not answer.",
+      "badAnswer": "CloudCLI answered {{status}}, and its answer could not be read.",
+      "count_one": "{{count}} set",
+      "count_other": "{{count}} sets",
+      "onLabel_one": "{{count}} tool set on",
+      "onLabel_other": "{{count}} tool sets on"
     }
   },
   "providerSelection": {

@@ -38,14 +38,19 @@ export type Carry = {
 
 export const sameOrder = (a: readonly string[], b: readonly string[]) => a.length === b.length && a.every((key, at) => key === b[at]);
 
+/** Where a key the list gained mid-carry is drawn: the front (a card order's highest rank) or the back (a queue's newest member). */
+export type NewKeysJoin = 'front' | 'back';
+
 /**
  * The keys of `preview` that are still in the list, in the carry's order, with keys the list gained
- * since put at the front: a card that arrives while another is in the hand (a poll's news) is drawn,
- * and nothing about the carry resets. A newly arrived card is the highest ranked there is.
+ * since drawn where the list's owner says new keys join (`join`): a card that arrives while another is
+ * in the hand (a poll's news) is drawn, and nothing about the carry resets. A card order draws a newcomer
+ * at the front, the highest ranked there is (the default); a queue draws it at the back, where it joins.
  */
-export function reconcile(preview: readonly string[], keys: readonly string[]): readonly string[] {
+export function reconcile(preview: readonly string[], keys: readonly string[], join: NewKeysJoin = 'front'): readonly string[] {
   const live = new Set(keys);
   const kept = preview.filter((key) => live.has(key));
   const known = new Set(kept);
-  return [...keys.filter((key) => !known.has(key)), ...kept];
+  const joined = keys.filter((key) => !known.has(key));
+  return join === 'front' ? [...joined, ...kept] : [...kept, ...joined];
 }

@@ -44,7 +44,7 @@ import { createCompleteMessage, createNormalizedMessage } from '@/shared/utils.j
 import { capToolResult } from '@/shared/message-unification.js';
 import { userFacingEnv } from '@/shared/child-env.js';
 
-import { armKeepaliveSpawn, keepaliveReadopt } from './session-host/index.js';
+import { armKeepaliveSpawn, keepaliveReadopt, mainThreadRequestOf } from './session-host/index.js';
 import { noteTerminalCommands } from './claude-command-catalog.js';
 import {
   createIdleCloser,
@@ -63,12 +63,13 @@ import {
   describeProcessActivity,
   isSeedAppend,
   liveActivityOf,
-  mainThreadBudgetOf,
   movesBackgroundActivity,
   reportActivityChanged,
   reportTurnEnded,
   transcriptAppendMessage
 } from './claude-compaction-seams.js';
+import { reportRestoredTurn } from './claude-compaction-restore.js';
+import { applyToolsetLaunch, askToolsetLaunch, createToolsetSync, toolsetDigest } from './claude-toolset-seams.js';
 import { assertProjectFolderExists, ProjectFolderMissingError } from './claude-project-folder.js';
 import { createSignalState, detectRuntimeSignals } from './claude-runtime-signals.js';
 import { installedCliVersionForLaunch } from './installed-cli-version.js';
@@ -836,6 +837,8 @@ async function resolveSdkOptions(options, context) {
     effortModels,
   });
   applyCompactionSettings(sdkOptions, await askCompactionTakesOver(context, options));
+  const launch = await askToolsetLaunch(context, { appSessionId: options.sessionId ?? null, onNode: Boolean(options.node) });
+  applyToolsetLaunch(sdkOptions, launch);
   const mcpServers = await loadMcpConfig(options.cwd);
   const mcpUnreadable = mcpServers === MCP_CONFIG_UNREADABLE;
   if (mcpServers && !mcpUnreadable) {
@@ -845,7 +848,7 @@ async function resolveSdkOptions(options, context) {
   // ones the CLI loads itself (mcp-sign-in.ts). With the MCP map unreadable there is no list of
   // servers to read for, so there is no reading.
   const mcpSignIn = mcpUnreadable ? null : await readMcpSignIn(sdkOptions.mcpServers, sdkOptions.cwd, sdkOptions.env);
-  return { sdkOptions, mcpUnreadable, mcpSignIn };
+  return { sdkOptions, mcpUnreadable, mcpSignIn, toolsets: { digest: toolsetDigest(launch.servers), servers: launch.servers } };
 }
 
 /**
@@ -863,7 +866,7 @@ async function joinProcess(live, command, options, ws, context) {
   const installedCliVersion = typeof live.profile?.cliVersion === 'string'
     ? await installedCliVersionForLaunch()
     : null;
-  const next = launchProfileOf(resolved.sdkOptions, resolved.mcpUnreadable, false, installedCliVersion, resolved.mcpSignIn);
+  const next = launchProfileOf(resolved.sdkOptions, resolved.mcpUnreadable, false, installedCliVersion, resolved.mcpSignIn, resolved.toolsets.digest);
   const plan = planLiveChanges(live.profile, next, { resumeFromScratch: options.resumeFromScratch === true });
   if (plan.respawn) {
     console.log(`[Claude SDK] Replacing the process for session ${sessionId}: ${plan.respawn}`);
@@ -994,29 +997,40 @@ async function spawnProcess(command, options, initialWs, context) {
   let settleFirstTurn;
   const firstTurnSettled = new Promise((resolve) => { settleFirstTurn = resolve; });
 
-  // Tool calls seen during the current turn that leave work running past its `result`; moved
-  // into `deferredTools` at that result.
+  // Tool calls launched during the current turn that may leave work running past its `result`.
+  // A call whose `task_notification` arrives before that result has nothing left to wait for and
+  // leaves this set; the rest move into `deferredTools` at the result.
   const launchedThisTurn = new Set();
-  // The tool-call ids whose work is still outstanding and will report back — released by the
-  // `task_notification` that names the call, or, for work the task system never lists (a
-  // scheduled wake-up, a cron), by the follow-up turn it pushes. Identity, not a count: two
-  // completions folded into one follow-up turn release both. Persisted in the host meta and
-  // restored on re-adoption; an older host's meta carries only the bit, restored as one entry.
+  // The tool-call ids whose work was still outstanding when a turn ended and will report back —
+  // released by the `task_notification` that names the call, or, for work the task system never
+  // lists (a scheduled wake-up, a cron), by the follow-up turn it pushes. Identity, not a count:
+  // two completions folded into one follow-up turn release both. Persisted in the host meta and
+  // restored on re-adoption, less the calls the host's journal shows already reported (the host
+  // registry's `listLiveHosts`); an older host's meta carries only the bit, restored as one entry.
   const deferredTools = new Set(reattach?.deferredTools ?? []);
   if (reattach?.heldForBackgroundWork === true && deferredTools.size === 0) deferredTools.add('re-adopted');
   const heldForBackgroundWork = () => deferredTools.size > 0;
+  // The compaction module's record of its idle check for this process's last turn end: set by `markIdleCheck` when the
+  // check starts a compaction, cleared at the next `result`, carried by every note so the host's meta always agrees.
+  let idleCheck = reattach?.idleCheck ?? null;
   const turnBits = (turnCompleteSent) => ({
     turnCompleteSent,
     heldForBackgroundWork: heldForBackgroundWork(),
-    deferredTools: [...deferredTools]
+    deferredTools: [...deferredTools],
+    idleCheck
   });
   // The CLI is between an `init` and its `result`: a user turn, or a follow-up turn a task
   // completion pushed on its own. Either way the process must not be closed under it.
   let turnInFlight = false;
+  // Set at an `init` the follow-up latch was waiting for — the turn the CLI pushed to answer a task's
+  // notification — and read at that turn's `result`, which then has no other hold to release.
+  let followUpAnswersNotification = false;
   // The CLI's own level signal for live background tasks — watchers included — replaced on
   // every `background_tasks_changed` (its documented REPLACE semantics) and edged by the
-  // task bookends in between. Empty until the first change after (re)start.
-  const backgroundTasks = new Set();
+  // task bookends in between. A re-adopted process starts from the tasks its host's journal shows running
+  // (`reattach.liveTasks`, host-live-tasks.js): the frames that built the set went to the process that died, and
+  // starting empty read a backgrounded subagent, a monitor or any task the call ledger never names as idle.
+  const backgroundTasks = new Set(reattach?.liveTasks ?? []);
   // Set once a turn publishes a budget read from an assistant message, so the
   // turn-ending `result` is only mined for usage when nothing better arrived.
   let assistantBudgetSent = false;
@@ -1074,10 +1088,26 @@ async function spawnProcess(command, options, initialWs, context) {
   const isBusy = () => pendingTurn !== null || turnInFlight || hasBackgroundWork();
   const processAbort = new AbortController();
 
+  // Pushes the chat's on-sets into the CLI (claude-toolset-seams.ts); every run on this process goes through it, in order.
+  const toolsetSync = createToolsetSync({
+    getQuery: () => queryInstance,
+    isClosing: () => closing,
+    context,
+    appSessionId: sessionId ?? null,
+    onNode: Boolean(options.node),
+    setApplied: (digest) => { profile.toolsets = digest; },
+    // The launch's own servers: a set's server must not take one of their names (claude-toolset-seams.ts).
+    baseServerNames: () => Object.keys(sdkOptions?.mcpServers ?? {})
+  });
+
   // The handle later messages join through, registered under the session key.
   const handle = {
     get closing() {
       return closing;
+    },
+    /** Syncs the tool sets into the CLI; never rejects. Asked by a joining message, a fresh spawn and `claudeRuntime.syncToolsets`. */
+    syncToolsets(boundMs) {
+      return toolsetSync.sync(boundMs);
     },
     get profile() {
       return profile;
@@ -1091,6 +1121,17 @@ async function spawnProcess(command, options, initialWs, context) {
         backgroundTasks: backgroundTasks.size,
         deferredCalls: deferredTools.size
       });
+    },
+    /**
+     * Records that the compaction's idle check has started a compaction for this turn end (`tries` of them now), in the
+     * host's meta through the host's own note, so a restart does not repeat the check without bound. False when the
+     * process is closing: there is no host left to tell.
+     */
+    markIdleCheck(tries) {
+      if (closing) return false;
+      idleCheck = { at: Date.now(), tries };
+      keepalive?.note({ ...turnBits(pendingTurn === null), ack: false });
+      return true;
     },
     // Kills the CLI outright, for a process that did not answer an interrupt: a CLI that ignores
     // the interrupt control request will not act on the EOF `close()` sends either.
@@ -1147,7 +1188,7 @@ async function spawnProcess(command, options, initialWs, context) {
     // Everything the SDK can change on a running query (see chat-process.ts). `sdkOptions` is
     // what `canUseTool` reads on every call, so the permission fields are mutated in place.
     async applyChanges(changes, next) {
-      const applied = Object.entries(changes).filter(([, value]) => value !== null).map(([key]) => key);
+      const applied = Object.entries(changes).filter(([key, value]) => value !== null && !(key === 'toolsets' && value === false)).map(([key]) => key);
       if (applied.length > 0) {
         console.log(`[Claude SDK] Applying to the running process for session ${sessionKey()}: ${applied.join(', ')}`);
       }
@@ -1173,6 +1214,14 @@ async function spawnProcess(command, options, initialWs, context) {
         await withinGrace(queryInstance.applyFlagSettings(compactionFlagSettings(changes.compaction, launchedTakenOver)), 'applyFlagSettings');
         profile.compactionTakenOver = next.compactionTakenOver;
       }
+      if (changes.toolsets) {
+        // A sync's failure is never what retires a process (the catch in joinProcess does): the turn goes on, and the next message asks again.
+        try {
+          await withinGrace(handle.syncToolsets(INTERRUPT_GRACE_MS), 'setMcpServers');
+        } catch (error) {
+          console.warn(`[Claude SDK] The tool sets of session ${sessionKey()} could not be synced before the turn:`, error?.message || error);
+        }
+      }
       if (changes.tools) {
         sdkOptions.allowedTools = [...changes.tools.allowed];
         sdkOptions.disallowedTools = [...changes.tools.disallowed];
@@ -1189,7 +1238,8 @@ async function spawnProcess(command, options, initialWs, context) {
         // version is only ever the one its init announced. Adopting that one would mark an
         // unread host current for as long as it lives.
         const announced = profile.cliVersion;
-        Object.assign(profile, next, { unknown: false, cliVersion: announced });
+        // `next.toolsets` is the digest the message WANTS; what the process HOLDS is what the sync above recorded.
+        Object.assign(profile, next, { unknown: false, cliVersion: announced, toolsets: profile.toolsets });
         sdkOptions.allowedTools = [...next.allowedTools];
         sdkOptions.disallowedTools = [...next.disallowedTools];
       }
@@ -1263,6 +1313,9 @@ async function spawnProcess(command, options, initialWs, context) {
             ? { ...reattach.profile, unknown: false, cliVersion: reportedCliVersion }
             : launchProfileOf(sdkOptions, resolved.mcpUnreadable, true, reportedCliVersion, resolved.mcpSignIn))
         : launchProfileOf(sdkOptions, resolved.mcpUnreadable, false, null, resolved.mcpSignIn);
+      // What tool sets the process HOLDS: none yet for a fresh one (its first sync, below, records them), and
+      // unknown for a re-adopted one whatever its host recorded — the host knew only the spawn-time profile.
+      profile.toolsets = reattach ? null : '';
       launchedTakenOver = profile.unknown || profile.compactionTakenOver === true;
       // Known the moment the run is adopted, so the report (and the banner beside the
       // transcript) never reads a live host as "not heard yet" until its next turn.
@@ -1282,6 +1335,9 @@ async function spawnProcess(command, options, initialWs, context) {
       appends.note(promptMessages);
       if (reattach?.turnCompleteSent) {
         settleFirstTurn();
+        // That turn's end happened under the server this one replaced, and the idle deadline it armed went with it: the
+        // compaction is told when the turn ended, off the host's journal (claude-compaction-restore.ts).
+        reportRestoredTurn(context, { sessionId, userId: ws?.userId ?? runUserId, reattach, options, profile, backgroundTasks: backgroundTasks.size, deferredCalls: deferredTools.size });
       } else {
         openTurn(reattach ? null : (promptMessages.at(-1)?.uuid ?? null)).then(settleFirstTurn);
       }
@@ -1435,7 +1491,11 @@ async function spawnProcess(command, options, initialWs, context) {
         });
       };
 
-      queue = createPromptQueue(promptMessages);
+      // A fresh process with tool sets in play is not handed its prompt until they are synced, so its
+      // first turn already has the tools; the prompt is released when the sync settles (below).
+      const holdsPromptForToolsets = !reattach && Object.keys(resolved.toolsets.servers ?? {}).length > 0;
+      const initialMessages = holdsPromptForToolsets ? [] : promptMessages;
+      queue = createPromptQueue(initialMessages);
       try {
         queryInstance = query({
           prompt: queue.stream,
@@ -1448,7 +1508,7 @@ async function spawnProcess(command, options, initialWs, context) {
         delete sdkOptions.hooks;
         // Discard the abandoned stream and build a fresh one for the retry.
         queue.end();
-        queue = createPromptQueue(promptMessages);
+        queue = createPromptQueue(initialMessages);
         queryInstance = query({
           prompt: queue.stream,
           options: sdkOptions
@@ -1472,6 +1532,14 @@ async function spawnProcess(command, options, initialWs, context) {
         addSession(sessionKey(), queryInstance, handle);
       }
       releaseReservation();
+      if (holdsPromptForToolsets) {
+        // Not awaited: the message loop below must start at once, because it is what answers the SDK's
+        // control request. Whatever the outcome (a sync never rejects), the prompt goes in; past the grace
+        // it goes anyway and the next message tries again.
+        handle.syncToolsets(INTERRUPT_GRACE_MS).then(() => {
+          for (const message of promptMessages) queue.push(message);
+        });
+      }
 
       // Process streaming messages
       console.log('Starting async generator loop for session:', capturedSessionId || 'NEW');
@@ -1500,6 +1568,7 @@ async function spawnProcess(command, options, initialWs, context) {
 
         if (message.type === 'system' && message.subtype === 'init') {
           turnInFlight = true;
+          if (followUp.expected) followUpAnswersNotification = true;
           followUp.release();
           // The engine's list of terminal-bound commands rides this frame and no other (an idle read
           // never gets one); the command catalog keeps it under the CLI version that sent it. Not awaited.
@@ -1519,9 +1588,14 @@ async function spawnProcess(command, options, initialWs, context) {
             backgroundTasks.add(message.task_id);
           } else if (message.subtype === 'task_notification' && typeof message.task_id === 'string') {
             backgroundTasks.delete(message.task_id);
-            // The notification names the call whose work ended: that hold is released here,
-            // whether the follow-up turn it triggers is merged with another's or not.
-            if (typeof message.tool_use_id === 'string') deferredTools.delete(message.tool_use_id);
+            // The notification names the call whose work ended: released here, whether it already
+            // moved to `deferredTools` or ended inside its own turn and is still in
+            // `launchedThisTurn` (it never becomes a hold), and whether the follow-up turn it
+            // triggers is merged with another's or not.
+            if (typeof message.tool_use_id === 'string') {
+              deferredTools.delete(message.tool_use_id);
+              launchedThisTurn.delete(message.tool_use_id);
+            }
             // The CLI answers a finished task with a turn of its own, ~100 ms later; an ambient task
             // wakes nothing, and one that ends mid-turn is absorbed by that turn.
             if (message.ambient !== true && !turnInFlight) followUp.expect();
@@ -1641,7 +1715,7 @@ async function spawnProcess(command, options, initialWs, context) {
         if (tokenBudgetData) {
           if (message.type === 'assistant') {
             assistantBudgetSent = true;
-            mainThreadBudget = mainThreadBudgetOf(message, tokenBudgetData) ?? mainThreadBudget;
+            mainThreadBudget = mainThreadRequestOf(message) ?? mainThreadBudget;
           }
           ws.send(createNormalizedMessage({ kind: 'status', text: 'token_budget', tokenBudget: tokenBudgetData, sessionId: capturedSessionId || sessionId || null, provider: 'claude' }));
         }
@@ -1652,6 +1726,10 @@ async function spawnProcess(command, options, initialWs, context) {
           firstResultHandled = true;
           turnInFlight = false;
           followUp.release();
+          const wokenByNotification = followUpAnswersNotification;
+          followUpAnswersNotification = false;
+          // A turn has ended, so the idle check's record for the one before it counts for nothing.
+          idleCheck = null;
           const turn = pendingTurn;
           const answersTurn = answersPendingTurn(message);
           const abortPending = abortedInstances.has(queryInstance);
@@ -1700,12 +1778,15 @@ async function spawnProcess(command, options, initialWs, context) {
               sessionName: sessionSummary
             });
             // Work the task system never lists (a wake-up, a cron) has no notification to
-            // release it: its own follow-up turn does, oldest first.
+            // release it: its own follow-up turn does, oldest first. A follow-up that answers a
+            // task's notification is that task's alone — the notification released its call by id
+            // — and says nothing about the other holds, which may still be running.
             const oldest = deferredTools.values().next();
-            if (!oldest.done) deferredTools.delete(oldest.value);
+            if (!wokenByNotification && !oldest.done) deferredTools.delete(oldest.value);
           }
-          // Work started during this turn reports back as a turn of its own; the idle closer
-          // keeps its hands off the process until it has.
+          // Work still running as this turn ends (a launch whose notification has not come)
+          // reports back as a turn of its own; the idle closer keeps its hands off the process
+          // until it has.
           for (const id of launchedThisTurn) deferredTools.add(id);
           launchedThisTurn.clear();
           // The turn a Stop ended has now reported. The process a Stop kept alive for its
@@ -1993,6 +2074,11 @@ export const claudeRuntime = {
   run: queryClaudeSDK,
   abort: abortClaudeSDKSession,
   activity: (appSessionId) => liveActivityOf(getSession(appSessionId)),
+  markIdleCheck: (appSessionId, tries) => getSession(appSessionId)?.process?.markIdleCheck?.(tries) ?? false,
+  syncToolsets: (appSessionId) => {
+    const chatProcess = getSession(appSessionId)?.process;
+    return chatProcess && !chatProcess.closing ? chatProcess.syncToolsets(30_000) : Promise.resolve({ live: false });
+  },
   permissions: {
     resolve: resolveToolApproval,
     listPending: getPendingApprovalsForSession,

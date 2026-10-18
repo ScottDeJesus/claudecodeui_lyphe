@@ -9,13 +9,14 @@ import { writeFlagText } from './deepseek-flash-switch.js';
 /**
  * The dispatcher's two WIP DEFAULTS, as a file: how many of an epic's features may be in progress at
  * once, and how many tasks each of those features may run at once, for every epic that has no word of
- * its own. An epic's own numbers are set on its card; this is only what the rest start from.
+ * its own. An epic's own numbers are set in its card's fold of overrides; this is only what the rest start from.
  *
  * The dispatcher reads this exact path at every take-up (`hooks/dispatcher/wip.py`, `read_flag`), so a
  * press here reaches the next pass with nothing restarted on either side. It is deliberately not a row
  * in `auth.db`: the dispatcher is a separate daemon that must be able to read the defaults with no
- * database and no HTTP in the way. The settings row and the transport call under it live in
- * `src/modules/settings/hooks/useWipDefaults.ts` and `src/shared/api.ts`.
+ * database and no HTTP in the way. The two dropdowns that write it — the master controller's Features at
+ * once and Tasks at once, in the Roadmap tab's In flight header — and the transport call under them live
+ * in `src/modules/dispatcher/hooks/useWipDefaultsVerbs.ts` and `src/shared/api.ts`.
  *
  * The file holds TWO lines, and that is the whole contract between the two languages:
  *

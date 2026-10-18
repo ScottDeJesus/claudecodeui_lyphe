@@ -1524,7 +1524,7 @@ section: 03-conversation-handoff/002 The pieces
 | `server/modules/websocket/services/session-upsert-broadcast.service.ts` | `buildSessionUpsertedEvent` — the single builder of the sidebar delta |
 | `server/modules/providers/services/sessions-watcher.service.ts` | Watches provider directories, debounces, broadcasts upserts in batches |
 | `server/modules/providers/services/session-synchronizer.service.ts` | Shared full scan, per-file indexing, `pruneOrphanedSessions` |
-| `server/modules/providers/list/claude/claude-sessions.provider.ts` | `resolveEditAnchor` — walks `parentUuid` back to the previous assistant row; `fetchHistory` reads a compacted chat as one conversation through `stitchCompactedHistory` (MAN-8054) |
+| `server/modules/providers/list/claude/claude-sessions.provider.ts` | `resolveEditAnchor` — walks `parentUuid` back to the previous assistant row; `fetchHistory` reads a compacted chat as one conversation through `stitchCompactedHistory` (MAN-8054); only records that are turns become rows (`server/shared/claude-transcript-rows.ts`: `isClaudeTurnLookalike` refuses the CLI's `api-request-blob`, `isResumePlaceholderRow` the "No response requested." stand-in); a plain-mode send with an image is a content array the CLI does not expand, so its text block loses the `/plain ` prefix in `stripTransparentWrapperPrefix` (`server/shared/local-commands.ts`) as the tagged form does — otherwise the optimistic echo (the typed words) never retires against it and the message draws twice |
 | `server/modules/providers/list/codex/codex-sessions.provider.ts` | `resolveEditAnchor` and `rewindSession` — forks the thread and repoints the session row |
 | `server/modules/providers/list/claude/claude-fork.provider.ts`, `.../codex/codex-fork.provider.ts` | Branch a conversation into an independent one |
 | `src/modules/chat/hooks/useChatComposerState.ts` | Allocates the session on the first send; builds `chat.send` and `chat.edit-send` |
@@ -6114,12 +6114,17 @@ deliberately: shared with the durable cursors next door, they would replay month
 written to inside a two-minute window — because the corpus is over four thousand files and statting all of them
 four times a second is a core burnt to learn nothing (`:20-32,218-240`).
 
-The meaning is the tap's (`universe-transcript.tap.ts:9-17`). `ADMITTED_TOOLS` (`:26`) admits
+The meaning is the tap's (`universe-transcript.tap.ts:10-18`). `ADMITTED_TOOLS` (`:27`) admits
 `Edit|Write|MultiEdit|NotebookEdit`, which name a file and become an **edit**, and `Skill|Agent|Task`, which
 name a tracked definition and become an **execution**; a tool named `mcp__<server>__<tool>` is admitted by the
-SHAPE of its name and becomes an execution against that server's endpoint (`:28-29,67-96`). **It drops `Read`
+SHAPE of its name and becomes an execution against that server's endpoint (`:29-30,68-97`). **It drops `Read`
 and `Bash`** — thousands a day, which would bury the edits that mean something, because a read is not an edit
-and a shell command is not a file (`:12-16,74-75`).
+and a shell command is not a file (`:13-17,75-76`). **It reads only records that are turns.** The CLI's
+`api-request-blob` stores the request body it is about to send — an earlier assistant message with its tool
+calls among it — and wears that message's shape; read as a turn it would pulse every star a second time, so
+`emit` skips it (`isClaudeTurnLookalike`, `server/shared/claude-transcript-rows.ts`).
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/universe/universe-transcript-tail.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/universe/universe-transcript.tap.ts
 
 ## MAN-443 — The two frames
 section: 09-universe/008 The two frames

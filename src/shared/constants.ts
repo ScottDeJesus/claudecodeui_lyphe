@@ -277,22 +277,12 @@ export const MARKDOWN_CARDS_CLASS = 'chat-md-cards';
 //----------------- WIP LADDER ------------
 
 /**
- * The floor of every WIP limit, mirrored from the dispatcher's own grammar (`wip.spell`): a limit is a
- * whole number from one, or `all`. Nothing is narrowed above it — the count the operator sets is the
- * count the file holds.
- *
- * Used by `wipLadderSteps`, where the ladder stops there.
- */
-export const WIP_LIMIT_MIN = 1;
-
-/**
- * The count the WIP ladder climbs to before `All`: `1, 2, … 6, All`. Six is the widest count the
+ * The count the WIP ladder lists up to before `All`: `1, 2, … 6, All`. Six is the widest count the
  * operator has ever chosen. It is only the FLOOR of the ladder's top rung — a wider count in play
- * raises it (`wipLadderTop`). On an epic's card Settings' default is always in play, so it stays a rung
- * however the epic's own count moves; on a Settings stepper the stepper's own count is the only one.
+ * raises it (`wipLadderTop`), so a limit already set above six stays on the list that shows it.
  *
- * Used by `wipLadderTop` in `utils.ts`, which both steppers of the ladder — the epic card's
- * `EpicWipControl` and the settings module's `RunnerWipDefaultsRow` — climb through.
+ * Used by `wipLadderTop` in `utils.ts`, which the dispatcher module's master controller and epic fold
+ * list their dropdowns from.
  */
 export const WIP_LADDER_TOP = 6;
 

@@ -54,7 +54,7 @@ function askOf(raw: unknown, where: string): DispatcherAsk {
   };
   if (kind === 'accept') {
     const options = each(field(ask, 'options'), `${where}.options`, optionOf);
-    // THE THREE, OR NOTHING: an answer is read by its option's POSITION (Accept, Queue, Rework —
+    // THE THREE, OR NOTHING: an answer is read by its option's POSITION (Queue, Hide, Rework —
     // `intent_lock.OPTIONS`' order is the contract), so a build that offered a different count is a
     // prompt whose answers this lane would misread.
     if (options.length !== 3) throw new Error(`${where}.options: expected the three Accept answers, read ${options.length}`);

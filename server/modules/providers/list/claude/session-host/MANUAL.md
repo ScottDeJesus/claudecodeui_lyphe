@@ -24,7 +24,7 @@ This directory is the mechanism's one home; every other doc describes what an op
 ## MAN-683 — Public surface
 section: README/001 Public surface
 
-`index.ts` is the surface the API imports from this directory; nothing outside the directory imports past it except `warden/src/sessions.mjs`, which imports `host-registry.js` by relative path. The other files in §"Past `index.ts`" are imported only from inside the directory.
+`index.ts` is the surface the API imports from this directory; nothing outside the directory imports past it except `warden/src/sessions.mjs` and `warden/src/last-turn.mjs`, which import `host-registry.js` by relative path. The other files in §"Past `index.ts`" are imported only from inside the directory.
 
 | Export | Consumer | What it is |
 |---|---|---|
@@ -32,18 +32,21 @@ section: README/001 Public surface
 | `keepaliveReadopt(reattach, appSessionId)` | `claude-runtime.provider.js` | The same armed/not-armed answer, asked before `sdkOptions` exists, so the two can never disagree |
 | `readoptKeepaliveSessions({ runtime })`, `releaseKeepaliveOwnership()` | `server/index.ts`, through the providers barrel | The boot step (below) — before `server.listen` on a plain boot, deferred to the supervisor's takeover on a handover boot; the release drops this process's keepalive claim at shutdown |
 | `whenNodeSessionsReadopted()` | `server/index.ts`, through the providers barrel | Resolves once every co-located node heard in the ten minutes before this boot has linked and been re-adopted (§"Node hosts come back"); the running-sessions hold waits for it beside the boot step |
-| `listLiveHosts()`, `LiveHost`, `busyReason(host)` | the claude-activity module, through the providers barrel | This machine's live hosts and the one test of whether a host is mid-work, asked of every host so an update never installs under a conversation the idle sweep would leave alone |
+| `listLiveHosts()`, `LiveHost`, `busyReason(host)` | the claude-activity module, through the providers barrel | This machine's live hosts and the one test of whether a host is mid-work, asked of every host so an update never installs under a conversation the idle sweep would leave alone. A host is busy for `turnCompleteSent` false, the held-call bits and `liveTasks` (the CLI's own background tasks, rebuilt from the journal: MAN-687) |
+| `lastTurnRecord(hostId, readBudget)` | `claude-compaction-restore.ts` | A local host's last finished turn off its journal: when its newest `result` landed, that result's `modelUsage`, and the turn's last budget through `readBudget` (the Claude runtime passes `mainThreadRequestOf`, below). The Claude runtime reports it to the compaction when it adopts a host whose turn was complete, so the idle deadline the restart dropped is armed again |
+| `mainThreadRequestOf(message)` | `claude-runtime.provider.js`, `claude-compaction-restore.ts`; `warden/src/last-turn.mjs` imports it from `host-registry.js` | THE ONE RULE for which assistant message is a turn's request, and its context size: an assistant message of the main thread (no `parent_tool_use_id`) with a `message.usage` object, not from the CLI's `<synthetic>` stand-in for an API error, whose four usage counts (input, both cache counts, output) total more than zero. Answers `{ used, model }`, or null for any other message. A live stream's message, a local journal's line and a node's listed request all go through it, so the three cannot read a request differently |
 | `listColocatedNodeHosts()`, `refreshColocatedNodeHosts()` | the claude-activity module, through the providers barrel | The hosts a co-located node's warden holds, read beside `listLiveHosts()`; the refresh asks each linked warden when the reading is taken |
 | `retireStaleIdleHosts(hosts, installed, retire = retireHost)`, `watchInstalledCliVersionChanges()` | none outside the directory today | The version sweep and its subscription (§"The idle host an install leaves behind"), called by `readopt.ts` and `node-readopt.ts`. Exported for a `.verify` probe, which cannot get the subscription any other way — it never holds the keepalive claim |
 | `sessionHostLivenessSnapshot()` | the websocket module's chat gateway, through the providers barrel | The `session_host_liveness` snapshot frame — every chat with a live host — that a socket is sent once the keepalive hosts are re-adopted (§"Which chats have a live host"). The push that keeps a page current after it is `host-liveness.ts`'s own and not exported |
-| `KeepaliveHandle`, `KeepaliveReattach` | `claude-runtime.provider.js` | The two types those calls traffic in. `KeepaliveReattach` = `{ hostId, turnCompleteSent, heldForBackgroundWork, profile, cliVersion, deferredTools, node }`; `node` is the warden that holds the host, `null` for a host on this machine's own keepalive |
+| `KeepaliveHandle`, `KeepaliveReattach` | `claude-runtime.provider.js` | The two types those calls traffic in. `KeepaliveReattach` = `{ hostId, turnCompleteSent, heldForBackgroundWork, profile, cliVersion, deferredTools, releasedCalls?, liveTasks?, idleCheck?, lastTurn?, node }`; `node` is the warden that holds the host, `null` for a host on this machine's own keepalive; `liveTasks` is `null` for a node host whose warden lists none (unknown, never `[]`); `lastTurn` (`CerberusNodeHostLastTurn`) is a node host's last turn as its warden listed it, absent for a local host |
 
 ## Past `index.ts`
 | File | Exports | Imported by |
 |---|---|---|
-| `host-registry.js` | `createHostRegistry({ tmuxSocketName, keepaliveSession, sessionsDir })` → `{ sessionsDir, hostSocketPath, hostJournalPath, hostMetaPath, tmuxCommand, isTmuxSessionAlive, isServerUp, liveSessionNames, readHostMeta, listHostIds, listLiveHosts, lastTurnFinishedAt, lastReportedCliVersion, removeHostJournal, retireHost(hostId, onEnded?), retireOlderHosts(hosts, retire = retireHost), sweepDeadHosts, spawnHostSession(hostId, cwd), connectToHost(hostId, timeoutMs) }` — `spawnHostSession` is ONE tmux command line, `has-session -t <keepalive> ; new-session …`: with no keepalive server it throws (`error.code === 'HOST_SERVER_DOWN'`) instead of letting `new-session` start a server inside the caller's process group, so a caller's own `isServerUp` check only says so early; `HOST_SCRIPT` (this directory's `host.js`) | `hosts.ts`; `warden/src/sessions.mjs` by relative path (MAN-692) |
+| `host-registry.js` | `mainThreadRequestOf(message)` (the barrel's, above; `warden/src/last-turn.mjs` imports it from here) and `createHostRegistry({ tmuxSocketName, keepaliveSession, sessionsDir })` → `{ sessionsDir, hostSocketPath, hostJournalPath, hostMetaPath, tmuxCommand, isTmuxSessionAlive, isServerUp, liveSessionNames, readHostMeta, listHostIds, listLiveHosts, lastTurnFinishedAt, lastTurnRecord(hostId, readBudget), lastReportedCliVersion, removeHostJournal, retireHost(hostId, onEnded?), retireOlderHosts(hosts, retire = retireHost), sweepDeadHosts, spawnHostSession(hostId, cwd), connectToHost(hostId, timeoutMs) }` — `spawnHostSession` is ONE tmux command line, `has-session -t <keepalive> ; new-session …`: with no keepalive server it throws (`error.code === 'HOST_SERVER_DOWN'`) instead of letting `new-session` start a server inside the caller's process group, so a caller's own `isServerUp` check only says so early; `HOST_SCRIPT` (this directory's `host.js`) | `hosts.ts`; `warden/src/sessions.mjs` and `warden/src/last-turn.mjs` (`mainThreadRequestOf` only) by relative path (MAN-692) |
 | `hosts.ts` | `registry` and every registry member under its own name and TypeScript type (`isServerUp` is `isKeepaliveServerUp`), `TMUX_SOCKET_NAME`, `KEEPALIVE_SESSION`, `sessionsDir`, `HostMeta`, `LiveHost`, `TmuxResult` | `spawner.ts` (`registry.spawnHostSession`, `registry.connectToHost`), `readopt.ts`, `readopt-host.ts`, `idle-version-sweep.ts`, `node-readopt.ts`, `colocated-hosts.ts` (the type), `index.ts` (`listLiveHosts`, `LiveHost`) |
-| `host-frames.ts` | `deliverHostFrame(facade, frame, hostId)` → `true` on the host's `exit`; `hostTransport(send)` → the facade's `write` / `endInput` / `kill` / `note`; `plainEnv(env)` | `spawner.ts` (`bindSocket`), `node-transport.ts` |
+| `host-live-tasks.js` | `createLiveTaskReader({ hostJournalPath, journalLineNewestFirst })` → `{ liveTasks(hostId), forget(hostId) }`: the ids of the CLI's background tasks a host's journal shows running, memoized per host at the end of the last whole line read (plain JavaScript like the registry it serves, MAN-692) | `host-registry.js` (`listLiveHosts`) |
+| `host-frames.ts` | `deliverHostFrame(facade, frame, hostId)` → `true` on the host's `exit`; `hostTransport(send)` → the facade's `write` / `endInput` / `kill` / `note` (its bits: `turnCompleteSent`, `heldForBackgroundWork`, `deferredTools?`, `idleCheck?` — an `IdleCheck` is stored, `null` clears it, absent leaves it); `plainEnv(env)`; `writeReleaseBack(facade, hostId, reattach, node?)` (the `note` that tells a re-attached host which finished background calls to drop; type `HostRelease`) | `spawner.ts` (`bindSocket`, `placeInHost`), `node-transport.ts` |
 | `node-transport.ts` | `placeInNodeHost(facade, options, ctx)` → `Promise<void>`, settled at the host's first frame and rejected with the refusal sentence; `waitingHostIds()`; `gateFreshNodeHosts(gate)` | `spawner.ts` (`armNodeSpawn`), `node-readopt.ts` |
 | `node-readopt.ts` | `watchNodeLinks(deps)`, `releaseNodeReadoptionWait()`, `whenNodeSessionsReadopted()` | `readopt.ts`, `index.ts` |
 | `host-liveness.ts` | `trackHostLiveness(facade, appSessionId, hostId)`; `sessionHostLivenessSnapshot()` | `spawner.ts` (`bindSocket`), `node-transport.ts` (`onHostFrame`); `index.ts` (the snapshot) |
@@ -57,7 +60,7 @@ The two registry instances:
 
 The session host reaches the relay only as `nodeSessions` from `@/modules/cerberus/index.js` (MAN-7901); the cerberus module imports nothing from providers.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/session-host/host-frames.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/session-host/host-registry.js, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/session-host/hosts.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/session-host/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/session-host/node-transport.ts
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/session-host/host-frames.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/session-host/host-live-tasks.js, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/session-host/host-registry.js, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/session-host/hosts.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/session-host/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/session-host/node-transport.ts
 
 ## MAN-684 — Where things live
 section: README/002 Where things live
@@ -127,7 +130,7 @@ The warden is the host's client on its machine: it holds the unix socket and rel
 | `session.detach` | center → warden | `{ chan }` | `socket.end()`. Never `end_input`; nothing is answered |
 | `session.closed` | warden → center | `{ chan, reason }` | The open failed; the host's socket closed with no `exit`; or a host line was too big for one frame (past 8 MiB less 16 KiB of envelope: the host is detached, the link stands). `reason` is a sentence for a person, and a standing link's `closed` ends the turn at once with it (MAN-7905). Never follows an `exit` |
 | `sessions.list` | center → warden | `{}` | Asks which hosts run there |
-| `sessions.listed` | warden → center | `{ re, hosts: CerberusNodeHost[] }` | `re` is the request envelope's `id`; a `CerberusNodeHost` is a `LiveHost` plus `lastTurnFinishedAt: number\|null` |
+| `sessions.listed` | warden → center | `{ re, hosts: CerberusNodeHost[] }` | `re` is the request envelope's `id`; a `CerberusNodeHost` is a `LiveHost` plus `lastTurnFinishedAt: number\|null` and `lastTurn` (`CerberusNodeHostLastTurn\|null`: the newest `result`'s time and `modelUsage`, and the turn's request as `mainThreadRequestOf` chose it, cut down to the fields it reads — `warden/src/last-turn.mjs`; absent from a warden before 0.12.0) |
 | `session.retire` | center → warden | `{ hostId }` | `retireHost(hostId, onEnded)`; nothing is answered at once |
 | `sessions.changed` | warden → center | `{ hostId }` | Said once when that retire is over (the host's `exit` and its files gone, the host already gone, or the registry gave up waiting): center lists the node again, so a host that took long to leave stops being counted |
 
@@ -207,15 +210,53 @@ section: README/005 The meta file
 
 ```json
 { "hostId": "…", "appSessionId": "…", "userId": null, "cwd": "…", "startedAt": 0, "pid": 0,
-  "turnCompleteSent": false, "heldForBackgroundWork": false, "deferredTools": [], "profile": {},
-  "deliveredSeq": 0, "pendingResults": [], "pendingControl": [], "exited": null }
+  "turnCompleteSent": false, "heldForBackgroundWork": false, "deferredTools": [], "idleCheck": null,
+  "profile": {}, "deliveredSeq": 0, "pendingResults": [], "pendingControl": [], "exited": null }
 ```
+
+`idleCheck` is `{ at, tries }` or null: the compaction's record of how many times its idle check has started a
+compaction for the host's last turn end (MAN-8316, "Bounded across a restart"). It is written the way
+`deferredTools` is, by the API's `note` frame (the host is the only writer of this file): a number pair is
+stored, `null` clears it (every `result` the runtime handles sends one), and a note without the key leaves it.
 
 `exited` becomes `{code, signal, at}` when the CLI ends. The two bits are the provider's own
 (`turnCompleteSent` decides whether the next `result` emits `complete`; `heldForBackgroundWork`
 decides whether the CLI is held after it) — persisted rather than re-derived, because re-deriving
 them from the journal's content would be a second copy of the loop's result/phantom/background
 decisions. A re-adopted run initializes both from here.
+
+Two reads are made against the journal, not the meta (a third, `lastTurnRecord`, is the compaction's: MAN-683).
+The first is the background-call ledger: `listLiveHosts` drops from `deferredTools` every
+id the host's journal holds a `system/task_notification` frame for — the CLI's own word that the
+work that call launched ended, and the frame the live loop releases a call on — and, when that
+empties a list the meta carried, reads `heldForBackgroundWork` false. A meta written by a loop
+whose ledger missed a notification (one that arrived before its turn's `result`, so the list the
+meta persisted still named a call that had ended) is cleared by that evidence and by nothing else: a call with no
+frame stays held, and so does a meta that carries only the bit. Memoized per host on the journal's
+size and the ids asked about, so a poll of a quiet host costs one `stat`. The listing does not
+write the meta (the host is its one writer): it names the calls it dropped in `LiveHost.releasedCalls`
+and logs once per call per process: `[keepalive] host <id>: N held background call(s) already
+reported finished in its journal — released (<ids>)`. A host that sits idle sends no `result` and so
+no `note` of its own, so the boot re-adoption that attaches to it tells it (`spawner.ts`
+`placeInHost`: a `note` with `ack: false`, the shorter list and the bits `listLiveHosts` read; no
+cursor moves) and logs `[keepalive] host <id>: wrote the release of N finished background call(s)
+back to its meta`. The next boot reads a meta that no longer names them and says nothing. Every
+consumer of `LiveHost` — the boot re-adoption, the idle version sweep, the claude-activity reading —
+sees the released list. A node's warden lists the same `releasedCalls` (from warden 0.12.0; an older one lists
+none, which center reads as `[]`), and the node placement tells the host through the one helper both placements
+call (`host-frames.ts`, `writeReleaseBack`: the same `note`, sent behind the `hello` the open carries), logging
+`[keepalive] host <id> on node <node>: wrote the release of N finished background call(s) back to its meta`.
+
+The second is the CLI's own background tasks: `liveTasks` on each `LiveHost` is the set the live loop would hold
+had it seen every frame — the newest `background_tasks_changed` (the CLI's own REPLACE) as the base, then each
+`task_started` and `task_notification` after it, the reducer `claude-runtime.provider.js` keeps `backgroundTasks`
+with (`host-live-tasks.js`). A restart forgets that set (its frames went to the process that died), and every kind
+of task the CLI lists — a backgrounded subagent, a monitor, a shell job — then read idle, which the call ledger
+above cannot cure for the kinds it never names. Re-adoption hands the ids to the process
+(`KeepaliveReattach.liveTasks`), which starts its set from them, and `busyReason` counts them (MAN-691). The first
+read of a host walks its journal newest first to the base; later reads apply only what was appended (a quiet host
+costs one `stat`). A task whose notification never comes stays held until the next `background_tasks_changed`, as it
+would in the live loop. A node's warden carries the same list from 0.12.0; an older one lists none, which center reads as unknown (`liveTasks: null`) and answers by not taking that chat over.
 
 `profile` is what the API launched the CLI with, and its `cliVersion` is **null when the meta is
 written** — the meta is written at spawn, before the CLI has said anything. What the CLI later said
@@ -360,7 +401,11 @@ boot the run registry is empty — per-process memory, and this step runs before
 then the only witness, and it carries the two bits the runtime's own idle closer reads
 (`claude-runtime.provider.js`): `turnCompleteSent` false, meaning a turn was accepted and has not
 reported, and `heldForBackgroundWork` (or the non-empty `deferredTools` it is derived from), meaning
-the result did not wait for work still running. A socket retirement interrupts FIRST and then ends
+the result did not wait for work still running — and, read off the host's JOURNAL because no meta
+names them, `liveTasks`: the CLI's own background tasks (a backgrounded subagent, a monitor, a shell
+job) with a `task_started` and no `task_notification` after it (`host-live-tasks.js`, MAN-683). The
+call ledger names only some kinds of task, so without that third witness a host running a subagent
+read idle and was retired with it. A socket retirement interrupts FIRST and then ends
 the CLI's stdin: the EOF, not the interrupt, is what takes the background work still running in that
 CLI down, and the exit frame that follows deletes the journal — so both bits are the difference
 between ending a process and destroying an answer. A Stop, by contrast, ends only the turn: a process
@@ -370,22 +415,23 @@ kept for either reason logs one line, `[keepalive] keeping host <hostId> on cli 
 near-miss is visible; the sweep is otherwise unchanged, and a host that is genuinely idle is still
 retired the moment the reading moves.
 
-## MAN-692 — Why four files here are plain JavaScript
+## MAN-692 — Why five files here are plain JavaScript
 section: README/010 Why four files here are plain JavaScript
 
-Four files here are plain JavaScript — the one exception to `$backend-module-standards`' "use TypeScript for every file inside `server/modules/`" (D-9). Everything else here is ordinary TypeScript running inside the API.
+Five files here are plain JavaScript — the one exception to `$backend-module-standards`' "use TypeScript for every file inside `server/modules/`" (D-9). Everything else here is ordinary TypeScript running inside the API.
 
 | File | Why it is plain | Runs in |
 |---|---|---|
 | `host.js`, `host-conn.js`, `host-journal.js` | exec'd by bare `node` from a tmux server that has no `tsx` loader; loading `tsx` per host would cost roughly 200 ms and 30 MB per session for nothing | one process per CLI, the host |
+| `host-live-tasks.js` | node builtins only, imported by `host-registry.js` alone: the reader of a host's journal for the CLI's running background tasks, kept apart so the registry stays under the file ceiling; it runs wherever the registry does | the API; the warden |
 | `host-registry.js` | node builtins only, no `@/` import: the node-side half of the host — where a host's files live, which hosts are alive, how one is started (`spawnHostSession`), reached (`connectToHost`) and retired — so a process that is not the API runs the same code by relative path. The API (`hosts.ts`) and the Cerberus warden (`warden/src/sessions.mjs`, the registry's second runner) each make their own instance with `createHostRegistry` | the API; the warden |
 
-- Emit: dev runs the source; production runs `dist-server/`, where `allowJs` plus the `**/*.js` include in `server/tsconfig.json` emit all four.
-- `checkJs` is off, so `npm run typecheck` proves nothing about the three host files. `host-registry.js` opts in with `// @ts-check` as its first line: a typo in its bodies fails the typecheck, and the annotated re-exports in `hosts.ts` fail it when the JSDoc types stop matching `HostMeta` and `LiveHost`.
-- An edit takes effect on the next process that loads the file: for the three host files, the next host that starts, never one already running; for `host-registry.js`, the API's next handover and the warden's next release (`warden/build.mjs` stages all four at their repo paths, MAN-7826).
-- Saving one of the four still hands the API over — the supervisor watches the `server/` tree, not an import graph — and that handover changes nothing for a live host.
+- Emit: dev runs the source; production runs `dist-server/`, where `allowJs` plus the `**/*.js` include in `server/tsconfig.json` emit all five.
+- `checkJs` is off, so `npm run typecheck` proves nothing about the three host files. `host-registry.js` and `host-live-tasks.js` opt in with `// @ts-check` as their first line: a typo in their bodies fails the typecheck, and the annotated re-exports in `hosts.ts` fail it when the JSDoc types stop matching `HostMeta` and `LiveHost`.
+- An edit takes effect on the next process that loads the file: for the three host files, the next host that starts, never one already running; for `host-registry.js`, the API's next handover and the warden's next release (`warden/build.mjs` stages all five at their repo paths, MAN-7826).
+- Saving one of the five still hands the API over — the supervisor watches the `server/` tree, not an import graph — and that handover changes nothing for a live host.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/session-host/host-conn.js, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/session-host/host-journal.js, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/session-host/host.js, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/session-host/host-registry.js, /home/lyphe/.claude/claudecodeui_lyphe/server/tsconfig.json
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/session-host/host-conn.js, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/session-host/host-journal.js, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/session-host/host.js, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/session-host/host-live-tasks.js, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/session-host/host-registry.js, /home/lyphe/.claude/claudecodeui_lyphe/server/tsconfig.json
 
 ## MAN-7905 — The node transport
 section: README/0105 The node transport
@@ -402,7 +448,7 @@ A project assigned to a Cerberus node (`projects.node`, set by `PUT /api/project
 `placeInNodeHost`, in order:
 
 1. Refuses, fresh and re-attach alike, with "<node> is no longer this machine — move this project back to this server from its card on the Cerberus tab" unless `nodeSessions.isColocated(node)` (a store that cannot be read refuses too, with a sentence of its own). why: the assignment checked co-location once (MAN-7920), and a node can move machines after; the CLI runs this machine's command and environment, in a folder that is a path on this machine's disk. Then refuses, throwing "<node>'s warden is not connected — this project's sessions run on <node>", unless `nodeSessions.isLinked(node)`. A fresh turn (no `reattach`) with no working folder is refused with "This turn has no working folder to start in on <node>". A fresh turn is also refused with the sentence the gate answers, when one stands: `gateFreshNodeHosts(gate)` is set once by the keepalive claim holder's node re-adoption, and a process without it has none (§"Node hosts come back — re-adoption at link-up", "A message in the window"). A re-adoption's own attach is never gated.
-2. Fresh turn: `hostId = <appSessionId>-<base36 time>` (D-8) and `open { op: 'spawn', hostId, cwd, frame: { t: 'spawn', command, args, cwd, env, appSessionId, userId, profile } }`. Re-adoption: `open { op: 'attach', hostId, cwd: null, frame: { t: 'hello', fromSeq: 'acked' } }`. Client frames written before the channel answers ride the same channel; the warden holds them until its socket to the host connects.
+2. Fresh turn: `hostId = <appSessionId>-<base36 time>` (D-8) and `open { op: 'spawn', hostId, cwd, frame: { t: 'spawn', command, args, cwd, env, appSessionId, userId, profile } }`. Re-adoption: `open { op: 'attach', hostId, cwd: null, frame: { t: 'hello', fromSeq: 'acked' } }`, and, when the listing says calls were released, the `note` that writes the release back to the host's meta (`writeReleaseBack`) rides behind it. Client frames written before the channel answers ride the same channel; the warden holds them until its socket to the host connects.
 3. Every `out` frame with `seq > 0` moves the resume cursor (`resumeFrom`). The first frame of any kind settles the placement; none within 15 s ends the turn with "<node>'s warden did not start the session within 15 s". A `closed` before the first frame fails the placement as the spawn error: `closed('link lost')` reads "The link to <node>'s warden was lost before the session started", any other reason is the warden's own sentence. why: the SDK's first stdin may have been lost with the link, so a re-open could hang. A FRESH placement refused this way, or by the 15 s, has already put its `spawn` on the wire, so it also asks the node to retire the host (`nodeSessions.retireHost(node, hostId)`) and lists the node again (`noteNodeHostsChanged`); a refused re-attach keeps its host, which still belongs to a live session. why: detaching the channel leaves the CLI running, the person is told the turn failed, and the next link-up would re-adopt the orphan as a live run. When the refusal IS the link going away (`closed('link lost')`) the retire cannot go: `refused-hosts.ts` remembers the host by node (`retireRefusedHost`), sends the retire at the node's next link-up BEFORE the re-adoption asks for its list (`sendPendingRetires`, and its own `onLinkUp` listener in a process that runs no re-adoption), and the re-adoption reads that list WITHOUT the refused hosts (`withoutRefusedHosts`), because a retired host stays listed until its CLI has exited and a replacement link's retire goes out just before its link-up's list. A host is forgotten once a list no longer names it.
 4. `closed` does nothing when the facade is settled or the API is exiting (D-10, MAN-688). `closed('link lost')` — the relay's word that the link went — starts a 60 s grace: the facade stays unsettled and client frames are buffered; when `nodeSessions.onLinkUp(node)` fires the channel re-opens `hello { fromSeq: <last out seq delivered> }`, a number, because this facade's SDK already consumed everything up to it (MAN-686); a re-adoption that has heard no `out` yet (only `live`) re-opens at `"acked"` instead, since `0` would replay the host's whole journal into an SDK that read none of it. Past 60 s: the error `<node>'s warden was not reachable again within 60 s`, then `settleExit(null, 'SIGHUP')`. Any other `closed` is the warden speaking on a standing link, so it ends the turn at once: the warden's own sentence is emitted as the process error (the chat shows it, not a bare SIGHUP) then `settleExit(null, 'SIGHUP')` after a host had spoken, and the same sentence as the spawn error before.
 5. `waitingHostIds()` answers the hosts a grace is holding, for the node re-adoption (§"Node hosts come back") to skip.
@@ -421,7 +467,7 @@ A node's hosts live in its warden's tmux server, not in this machine's keepalive
 1. `sendPendingRetires(node)` (`refused-hosts.ts`: the retire of a refused fresh placement's host that the link could not carry, MAN-7905), then `nodeSessions.listHosts(node)` (10 s bound); the answer is read WITHOUT the refused hosts (`withoutRefusedHosts`) and the node is listed again when any was left out, so an orphan is never adopted as a live run. A failure is one logged line and nothing is adopted until the node's next link-up; the running-sessions hold keeps waiting for it (below).
 2. `retireOlderHosts(hosts, id => nodeSessions.retireHost(node, id))` — the newest host per app session wins, as at the local boot.
 3. `retireStaleIdleHosts(keepers, installed, sameRetire)` — an idle host on a build behind the installed one is retired rather than handed back. Each retirement of 2 and 3 also tells `noteNodeHostsChanged(node)`, because the list of 1 still names the host just retired and the node card's "N sessions" is that list (measured 2026-10-07: the handover boot's version sweep retired eis1's only host at 08:57:33 and the overview still read `sessions: 1` at 09:08). A host that takes longer to leave than that settle (a CLI mid-tool-call, SIGTERM only after 5 s) is listed again when its warden says `sessions.changed`: `watchNodeLinks` subscribes `noteNodeHostsChanged` to `nodeSessions.onHostsChanged`.
-4. `readoptHost(host, deps, node)` for each keeper not in `waitingHostIds()`. The ids are read before the list is asked and again after: a facade whose turn lost the link re-attaches by itself on this very link-up, at the exact seq its SDK last read, and a second adoption of its host would race it. `reattach.node` carries the node, so the provider rejoins the CLI where it lives (`placeInNodeHost`, `attach`, `hello { fromSeq: "acked" }`, MAN-686) and `beforeRun` completes the run at once when the host's turn had already reported. A host with no session row left is retired through the warden (`session.retire`), and the node is listed again.
+4. `readoptHost(host, deps, node)` for each keeper not in `waitingHostIds()`. The ids are read before the list is asked and again after: a facade whose turn lost the link re-attaches by itself on this very link-up, at the exact seq its SDK last read, and a second adoption of its host would race it. `reattach.node` carries the node, so the provider rejoins the CLI where it lives (`placeInNodeHost`, `attach`, `hello { fromSeq: "acked" }`, MAN-686) and `beforeRun` completes the run at once when the host's turn had already reported. The pass hands a node host back with everything a local host's re-adoption carries (`readNodeHost`, `node-host-reading.ts`, keeps each field the warden lists and reads one a warden predates as its empty value): `releasedCalls` (the calls the host's journal shows finished, written back to the host's meta behind the `hello` by `writeReleaseBack`, `host-frames.ts`, the one helper the local placement calls too), `liveTasks` (`null` from a warden that predates it: the chat is then not taken over), `idleCheck`, and `lastTurn` (the host's last finished turn, read by the warden with the registry's own `lastTurnRecord`, for the compaction's idle deadline). A node chat is therefore released of its stuck marks and its idle deadline restored exactly as a local chat's are. A host with no session row left is retired through the warden (`session.retire`), and the node is listed again.
 5. One line: `[keepalive] node <node>: re-adopted N host(s)`.
 
 A node that is not co-located is not adopted: its CLIs are not on this machine and its projects cannot be assigned. A link-up that arrives while an earlier one is still working yields the older run to the newer, which lists afresh. A pass that finds the process exiting (D-10) adopts nothing and attaches nothing at `"acked"`: its successor does.
@@ -635,3 +681,29 @@ Evidence in `<dir>`: `steps.txt`, `step1-card-assigned.png`, `step5-node-card-<1
 - The page restores the last workspace tab, so after the card the chat's link opens onto the Cerberus tab: `openScratchChatOnHaiku` clicks the `Chat` tab (MAN-7452).
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/cerberus-eis-proof.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/node-card.mjs
+
+## MAN-8336 — Node compaction probe — .verify/cerberus-node-compaction.mjs
+
+A Haiku chat in the probe project (`.verify/lib/probe-project.mjs`, under `/tmp`) assigned to `eis1`, taken over by the house's compaction on the real dev server and the real warden. Proves that a node chat is compacted like a local one and lives on, on the node (MAN-8067 "what takes a chat over").
+
+```
+node .verify/cerberus-node-compaction.mjs --evidence <dir>
+```
+
+Needs `eis1` enrolled and co-located, and the compaction switch reading on (the probe never touches it). The verb keeps the last ~20,000 tokens of a conversation verbatim and refuses a chat that fits in them (`exit 2: nothing to compact yet`), so after the first turn ("The secret word is marmalade") the chat is asked for two 250-item lists on Haiku before Compact is pressed in the usage panel (typing `/compact` and Enter would pick a built-in from the open slash palette). Each line prints as `KEY value`; `results.json`, the server's `[compaction]` lines, the new host's meta, the CLI's argv and the answer land in `<dir>`.
+
+| Key | True when |
+|---|---|
+| `assigned` | `PUT /api/projects/<id>/node` answered 204 |
+| `host_before` | the chat's host is in the warden's tmux server and not in this machine's keepalive |
+| `decision_lines` | the server's `[compaction]` lines for the chat, the last being `trigger=manual compacted onto <id>` |
+| `compacted_onto` | the provider session id the chat moved to |
+| `host_after` | a NEW host id for the chat, in the warden's home |
+| `meta_after` | that host's meta: model `haiku`, the chat's permission mode, `compactionTakenOver: true` |
+| `cli_settings` | the CLI's own argv carries `--settings {"idleCompaction":false}` |
+| `recalled`, `answer_after` | the answer after the compaction, read from the NEW session's transcript after the question's own line (the seed copies assistant text, so a whole-folder read would find old lists), names the word |
+| `node_restored`, `chat_deleted` | cleanup ran: the project is back on its original node, the chat's hosts are killed by name, the chat is deleted |
+
+`cleanup()` is idempotent and runs from `finally` and from `SIGINT`/`SIGTERM`/`SIGHUP`; the console is opened with Playwright's own signal handlers off, as in `cerberus-node-chat.mjs`. `SIGKILL` runs nothing: the shared probe project stays assigned to `eis1` until `PUT /api/projects/<id>/node { "node": null }` gives it back.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/cerberus-node-compaction.mjs
