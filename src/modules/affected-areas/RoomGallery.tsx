@@ -1,7 +1,7 @@
 import type { TFunction } from 'i18next';
 import { useTranslation } from 'react-i18next';
 
-import { panoReadState, roomWords, spansFloors } from '@/modules/affected-areas/utils/tourModel';
+import { listedAreas, panoReadState, roomWords, spansFloors } from '@/modules/affected-areas/utils/tourModel';
 import type { PanoEntry } from '@/shared/affected-areas-types';
 import type { GalleryItem } from '@/shared/types';
 import { Gallery } from '@/shared/ui';
@@ -23,15 +23,19 @@ type RoomGalleryProps = {
 const GALLERY_MAX = 24;
 
 /**
- * The tile's badge, the pano's state in two words: "3 areas" (or "None found") once all six faces are read, "Partly
- * read" while some are, "Not read" before any is. Areas are the ones standing once marks exist, else every one the
- * reader marked: the same count the pano screen's face strip carries.
+ * The tile's badge, the pano's state in two words: "3 areas" once all six faces are read and some stand, "2 found"
+ * when the reader found some and none stands yet (no mark and no line set), "None found" when it found none, "Partly
+ * read" while some faces are, "Not read" before any is. Areas are the ones standing: the same count the pano screen's
+ * face strip carries.
  */
 function tileBadge(pano: PanoEntry, t: TFunction): string {
   const state = panoReadState(pano);
   if (state !== 'read') return t(`affectedAreas.tour.tile.${state}`);
-  const areas = pano.views.reduce((sum, view) => sum + (view.read?.standingCount ?? view.read?.regionsCount ?? 0), 0);
-  return areas === 0 ? t('affectedAreas.tour.tile.none') : t('affectedAreas.tour.tile.areas', { count: areas });
+  const listed = pano.views.flatMap((view) => (view.read === null ? [] : [listedAreas(view.read)]));
+  const areas = listed.reduce((sum, view) => sum + view.standing, 0);
+  const found = listed.reduce((sum, view) => sum + view.found, 0);
+  if (areas > 0) return t('affectedAreas.tour.tile.areas', { count: areas });
+  return found > 0 ? t('affectedAreas.tour.tile.found', { count: found }) : t('affectedAreas.tour.tile.none');
 }
 
 /**

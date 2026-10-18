@@ -2348,6 +2348,7 @@
         "areas_one": "{{count}} area",
         "areas_other": "{{count}} areas",
         "none": "None found",
+        "found": "{{count}} found",
         "partly": "Partly read",
         "unread": "Not read"
       },

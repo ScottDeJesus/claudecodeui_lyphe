@@ -15,18 +15,23 @@ import { TablesScreen } from '@/modules/affected-areas/TablesScreen';
 import { TourPicker } from '@/modules/affected-areas/TourPicker';
 import { TourScreen } from '@/modules/affected-areas/TourScreen';
 import { ToursSwitch } from '@/modules/affected-areas/ToursSwitch';
-import { FACES, tourName, tourUnread } from '@/modules/affected-areas/utils/tourModel';
+import { FACES, listedAreas, tourName, tourUnread } from '@/modules/affected-areas/utils/tourModel';
 import type { Face, PanoEntry, Region } from '@/shared/affected-areas-types';
 import type { RegionLayer, ToursScreenKey } from '@/shared/types';
 
 /** A screen arriving: Verve's page entrance, as the Cerberus tab's own views enter. It plays each time one opens. */
 const SCREEN_ENTER = 'motion-safe:animate-[vv-pagein_.45s_theme(transitionTimingFunction.enter)_both]';
 
-/** The first face, in the strip's order, whose read found an area; Ahead when none did or the pano is not listed. */
+/**
+ * The first face, in the strip's order, whose read found an area, standing or proposed; Ahead when none did or the
+ * pano is not listed.
+ */
 function firstFaceWithAreas(entry: PanoEntry | undefined): Face {
   return FACES.find((face) => {
     const read = entry?.views.find((view) => view.face === face)?.read;
-    return read?.status === 'read' && (read.standingCount ?? read.regionsCount) > 0;
+    if (read?.status !== 'read') return false;
+    const { standing, found } = listedAreas(read);
+    return standing > 0 || found > 0;
   }) ?? 'ahead';
 }
 

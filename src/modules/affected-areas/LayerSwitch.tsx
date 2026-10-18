@@ -13,8 +13,9 @@ type LayerSwitchProps = {
  * STANDING · ALL — what the pano's photo draws. All, the default, is every area the reader marked and every one drawn
  * by hand: the operator is judging what the model proposed, and hiding the unsure ones would hide the ones that most
  * need his eye. Standing is what the system currently believes: only the areas whose wire `standing` flag is true, so
- * an area marked not a change, and one below its kind's threshold unmarked, leave the photo. The flag is the engine's
- * one function; the screen filters by it and never works it out.
+ * an area marked not a change, an unmarked one below the line the operator set for its kind, and an unmarked one of a
+ * kind with no line set, leave the photo. The flag is the engine's one function; the screen filters by it and never
+ * works it out.
  *
  * The list beside the photo keeps every area either way, so a set-aside one can still be chosen and judged.
  *

@@ -1,6 +1,6 @@
 import type { TFunction } from 'i18next';
 
-import type { Codebook, Face, PanoEntry, Region, TourSummary, ViewDetail, ViewEntry } from '@/shared/affected-areas-types';
+import type { Codebook, Face, PanoEntry, ReadState, Region, TourSummary, ViewDetail, ViewEntry } from '@/shared/affected-areas-types';
 import { regionState } from '@/modules/affected-areas/utils/regionLook';
 import { formatRelativeTime, formatShortDate } from '@/shared/utils';
 
@@ -61,14 +61,15 @@ export function tourName(tour: TourSummary, t: TFunction): string {
  * not cut · 26 areas found · last read 2h ago", or "45 panos · none cut yet"; "12 panos in 5 rooms" when `withRooms`
  * (the tour screen, which has the room to). The views are counted against those cut, as the operator worded it, and
  * the panos never cut are named beside them, so a tour whose cut views are all read never reads as done. A pano is cut
- * whole, six views at once (`viewsTotal` counts whole cuts only). Areas are the ones standing once marks exist, else
- * every one the reader marked. Read by the picker's rows and the tour screen's header.
+ * whole, six views at once (`viewsTotal` counts whole cuts only). Areas are the ones standing; while none stands (no
+ * mark and no line set yet), every one the reader found, so a tour the reader marked never reads as empty. Read by the
+ * picker's rows and the tour screen's header.
  */
 export function tourFacts(tour: TourSummary, t: TFunction, withRooms: boolean): string {
   const captured = formatShortDate(tour.capturedAt);
   const panos = t('affectedAreas.tour.panos', { count: tour.panoCount });
   const uncut = Math.max(0, tour.panoCount - Math.round(tour.viewsTotal / FACES.length));
-  const areas = tour.regionsStanding ?? tour.regionsTotal;
+  const areas = tour.regionsStanding ? tour.regionsStanding : tour.regionsTotal;
   return [
     captured === null ? null : t('affectedAreas.tour.captured', { date: captured }),
     withRooms ? t('affectedAreas.tour.inRooms', { panos, rooms: t('affectedAreas.tour.rooms', { count: tour.roomCount }) }) : panos,
@@ -134,6 +135,17 @@ export function countedKind(region: Region): string {
 }
 
 /**
+ * A read's areas as the tour's listing counts them, before any pano has answered with its regions: `standing` is the
+ * engine's count of the ones that stand (its own `standingCount`, else every one the read found when the listing
+ * carries none), `found` is what the shown read itself found, standing or not. While nothing stands and the read found
+ * some, they are proposed, not absent: the gallery's tile, the face the pano opens on and the caption all read it
+ * here. Read by `faceCounts`, `RoomGallery` and `AffectedAreasView`.
+ */
+export function listedAreas(read: ReadState): { standing: number; found: number } {
+  return { standing: read.standingCount ?? read.regionsCount, found: read.regionsCount };
+}
+
+/**
  * A face's counts; undefined while the face is unread. Once the pano has answered, the three are counted off its
  * regions through `regionState`, so together they are every outline drawn:
  * - `setAside`: areas the system does not believe, `unsure` (below a line the operator set for the kind) and
@@ -141,8 +153,8 @@ export function countedKind(region: Region): string {
  * - `proposed`: unmarked areas of a kind with no line set (`proposed` with `standing === false`), which stand only
  *   when the operator marks them;
  * - `areas`: the rest, as the engine's own count holds them (standing, or not yet judged).
- * Before the pano answers, the tour's listing gives the areas alone (the engine's `standingCount`). Read by the pano
- * screen's face strip and caption.
+ * Before the pano answers, the tour's listing gives the counts (`listedAreas`): the engine's standing ones, and what
+ * the read found as proposed while none stands. Read by the pano screen's face strip and caption.
  */
 export function faceCounts(
   view: ViewEntry | ViewDetail | undefined,
@@ -155,5 +167,6 @@ export function faceCounts(
     const proposed = states.filter(({ state, standing }) => state === 'proposed' && standing === false).length;
     return { areas: view.regions.length - setAside - proposed, setAside, proposed };
   }
-  return { areas: read.standingCount ?? read.regionsCount, setAside: 0, proposed: 0 };
+  const { standing, found } = listedAreas(read);
+  return { areas: standing, setAside: 0, proposed: standing === 0 ? found : 0 };
 }
