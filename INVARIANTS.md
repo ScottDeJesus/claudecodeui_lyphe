@@ -10125,34 +10125,6 @@ probe-key: be1b37f55a36ab3354dd33564c06a8dd7ff5db6f
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/
 
-## INV-8666 — probe — LOW — MAN-3036's `section_path` still reads "(5,753 LOC)" beside a title of "(6,036 LOC)"
-
-LOW — MAN-3036's `section_path` still reads "(5,753 LOC)" beside a title of "(6,036 LOC)"
-
-```probe
-cd /opt/shadow-connector && docstore get MAN-3036 | python3 -c "import sys,json;r=json.load(sys.stdin)['row'];print(r['title'],'|',r['section_path'])"
-expect: "Module inventory (6,036 LOC) | README/012 Module inventory (5,753 LOC)" while stale; both totals equal once healed
-```
-
-measured 2026-10-17 by chain chain-tour-affected-areas--rooms--docs-20261017-151147-c858, finding L2, LOW
-probe-key: f3aaea73e17e1d9fc10767d72cc6fdb7ef065b81
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/
-
-## INV-8667 — probe — LOW — the three files that APPLY the marked areas surface none of the rows that describe them
-
-LOW — the three files that APPLY the marked areas surface none of the rows that describe them
-
-```probe
-cd /opt/shadow-connector && for f in marked_areas room_list orchestrator contents __init__; do printf "%s: " $f; docstore govern core/preliminary_estimator/$f.py --text --limit 60 2>/dev/null | grep -o "^MAN-3035\|^INV-2337\|^MAN-8574" | sort | tr '\n' ' '; echo; done
-expect: "orchestrator: ", "contents: ", "__init__: " empty, "marked_areas: MAN-8574", "room_list: INV-2337 MAN-8574" while ungoverned; each line non-empty once the governs sets are widened
-```
-
-measured 2026-10-17 by chain chain-tour-affected-areas--rooms--docs-20261017-151147-c858, finding L3, LOW
-probe-key: 61e44d3b46a5862d5d8a6fa448b580b1c62e73ce
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/
-
 ## INV-8669 — probe — LOW — MAN-3035 states that `water_remediation.txt` carries no `{room_list}` but not what that means: a Water narrative never sees the marked areas
 
 LOW — MAN-3035 states that `water_remediation.txt` carries no `{room_list}` but not what that means: a Water narrative never sees the marked areas
@@ -10701,26 +10673,6 @@ probe-key: eacd925bc66394ab536578b32a985b720893911f
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/affected-areas-marking-boxes.mjs
 
-## INV-8769 — probe — (LOW) — `api.ts` still describes two slow presses and a 90 s view cut
-
-(LOW) — `api.ts` still describes two slow presses and a 90 s view cut
-
-```probe
-D=$(mktemp -d /tmp/athena-probe.XXXXXX)
-cat > "$D/p.sh" <<'EOF'
-cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
-grep -n "The two slow presses" src/shared/api.ts || echo none
-printf 'cutViews in api.ts: '; grep -c "cutViews" src/shared/api.ts
-EOF
-bash "$D/p.sh"
-expect: today "942:  // The two slow presses …" and 0; cured: "none"
-```
-
-measured 2026-10-18 by chain chain-tour-affected-areas--judgment--drawing-20261018-044450-f4c1, finding L1, LOW
-probe-key: 1ee0a109e4b051dab31a32aa4d7e41e973f0e556
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/affected-areas-marking-boxes.mjs
-
 ## INV-8770 — probe — (LOW) — MAN-8582's words row names `failed_queue` and not the new `gone_queue`
 
 (LOW) — MAN-8582's words row names `failed_queue` and not the new `gone_queue`
@@ -10810,3 +10762,92 @@ measured 2026-10-18 by chain chain-tour-affected-areas--judgment--join-20261018-
 probe-key: ac6b0f9ce4c9535ca4a117fa7661a2b65b6388fd
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/affected-areas-rooms.mjs
+
+## INV-8793 — probe — INV-2337 says `_download_panoramas` copies every key but `url`; it also drops `mime_type`
+
+INV-2337 says `_download_panoramas` copies every key but `url`; it also drops `mime_type`
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+cd /opt/shadow-connector || exit 1
+venv/bin/python -I - <<'PY'
+import sys, asyncio; sys.path.insert(0, "/opt/shadow-connector")
+from core.estimator import extract_docusketch as E
+async def fake(url): return b"x"
+E._download_image = fake
+r = asyncio.run(E._download_panoramas([{"url": "u", "room_name": "A", "mime_type": "image/jpeg", "floor": 1, "ceiling_height_ft": 8, "is_affected": False, "pano_id": "p"}]))
+print("info keys:", sorted(r[0][2]), "| mime_type in info:", "mime_type" in r[0][2])
+PY
+printf 'INV-2337 lines saying it copies every key but url: '; ~/.claude/scripts/docstore get INV-2337 --text | grep -c "copies every one but .url."
+EOF
+bash "$D/p.sh"
+expect: "info keys: ['ceiling_height_ft', 'floor', 'is_affected', 'pano_id', 'room_name'] | mime_type in info: False" then "INV-2337 lines saying it copies every key but url: 1"   (cured: 0, the row naming `mime_type` as the tuple's second element)
+```
+
+measured 2026-10-18 by chain chain-tour-affected-areas--judgment--docs-20261018-075948-ef11, finding L1, LOW
+probe-key: 40e4b4aaf32c59cc202036d7d9ab05f2a25710da
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/
+
+## INV-8794 — probe — INV-8544's seam-E figures are not the reader's
+
+INV-8544's seam-E figures are not the reader's
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+cd /opt/shadow-connector || exit 1
+cat > "$1/e.py" <<'PY'
+import asyncio, sys, logging
+sys.path.insert(0, '/opt/shadow-connector'); logging.disable(logging.CRITICAL)
+from dotenv import load_dotenv; load_dotenv('/opt/shadow-connector/.env')
+from core import db
+from core.affected_areas.context import build
+async def main():
+    rows = await db.fetch("select distinct t.tour_id from docusketch_tours t join drying_reports dr on dr.job_id=t.job_id join drying_report_moisture_readings m on m.drying_report_id=dr.id where m.material_removed")
+    tours = removed = flags = 0
+    for r in rows:
+        c = await build(r['tour_id']); tours += 1
+        n = sum(1 for rf in c.rooms.values() if rf.drying and any(m.removed for m in rf.drying.materials))
+        removed += n > 0; flags += n
+    print('fresh: tours with a flag', tours, '| tours showing a removed material', removed, '| room-flags', flags)
+asyncio.run(main())
+PY
+venv/bin/python -I "$1/e.py"
+printf 'INV-8544 says: '; ~/.claude/scripts/docstore get INV-8544 --text | grep -o -E "over the [0-9]+ tours whose job carries a flag: [0-9]+ show a removed material, [0-9]+ room-flags"
+EOF
+bash "$D/p.sh" "$D"
+expect: "fresh: tours with a flag 179 | tours showing a removed material 122 | room-flags 321" then "INV-8544 says: over the 179 tours whose job carries a flag: 126 show a removed material, 326 room-flags"   (cured: the two lines agree, or the row carries no count the reader can move)
+```
+
+measured 2026-10-18 by chain chain-tour-affected-areas--judgment--docs-20261018-075948-ef11, finding L2, LOW
+probe-key: 4a3e83b618d7407f0b5cc8034130de14e34f7518
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/
+
+## INV-8795 — probe — the report's "every file has a row saying what landed" is false for two files seams edited
+
+the report's "every file has a row saying what landed" is false for two files seams edited
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+cd /opt/shadow-connector || exit 1
+S=~/.claude/scripts/docstore
+for f in cerberus/codex_review.html core/preliminary_estimator/line_item_generator.py; do
+  printf '%s: rows governing it that name the landed change: ' "$f"
+  for t in $($S govern "$f" --touch write --limit 200 --text | cut -d' ' -f1 | grep -E '^(MAN|INV)-[0-9]+$'); do
+    $S get "$t" --text | grep -q -E 'qty fixed|satisfied_by|PHOTO_REASON|READING_MEASURE' && printf '%s ' "$t"
+  done
+  echo
+done
+EOF
+bash "$D/p.sh"
+expect: both lines end after the colon (empty) while the gap stands; cured: MAN-8534 on the first line, MAN-8574 on the second
+```
+
+measured 2026-10-18 by chain chain-tour-affected-areas--judgment--docs-20261018-075948-ef11, finding L3, LOW
+probe-key: 514e72fcd79a91ee4c5418316f984f6a81e9ce95
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/
