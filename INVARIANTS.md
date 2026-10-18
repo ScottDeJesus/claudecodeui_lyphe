@@ -10689,3 +10689,72 @@ measured 2026-10-18 by chain chain-tour-affected-areas--judgment--lines-20261017
 probe-key: 3ba6d9ad07c48ce33fed8a061fa56c5925c7ff3b
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/
+
+## INV-8740 — probe — LOW — a gate stop audits `views_refused=0`, where MAN-8552 says the field "counts views a refusal left unbought"
+
+LOW — a gate stop audits `views_refused=0`, where MAN-8552 says the field "counts views a refusal left unbought"
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+cd /opt/shadow-connector || exit 1
+cat > "$1/p.py" <<'PY'
+import asyncio, logging, os, sys
+os.chdir("/opt/shadow-connector"); sys.path.insert(0, "/opt/shadow-connector")
+from dotenv import load_dotenv; load_dotenv("/opt/shadow-connector/.env")
+logging.disable(logging.CRITICAL)
+from core.affected_areas import read
+from core.affected_areas.seat import spend
+TOUR = "6ac817e90b77ac54f54ceb90"
+async def row(summary, elapsed): print(f"gate stop: audit row status={summary.status} reason={summary.reason} views_refused={summary.views_refused}")
+read._record_run = row                      # the poller_events write becomes a print
+async def spent(): return 2000
+spend.fleet_calls_today = spent             # the fleet's day is spent: the gate refuses before any cut
+async def main():
+    await read.read_tour(TOUR, trigger="event")
+    print(f"the tour plan holds {(await read.plan_tour(TOUR)).views_to_read} unread views")
+asyncio.run(main())
+PY
+venv/bin/python -I "$1/p.py"
+EOF
+bash "$D/p.sh" "$D" 2>&1 | tail -3
+case "$D" in /tmp/athena-probe.??????) cd /tmp && rm -r "$D";; esac
+expect: "gate stop: audit row status=skipped reason=budget views_refused=0" then "the tour plan holds 450 unread views" (cured: views_refused above 0, or MAN-8552 says a pre-cut stop counts none)
+```
+
+measured 2026-10-18 by chain chain-tour-affected-areas--judgment--switches-20261018-024458-b31f, finding L1, LOW
+probe-key: 35cabcc584d459c64fe39fe6eeeb491d0e1259b9
+
+governs: /opt/shadow-connector/core/affected_areas/read.py, /opt/shadow-connector/core/affected_areas/seat/gate.py, /opt/shadow-connector/core/restorly_ai.py
+
+## INV-8741 — probe — LOW — the backfill CLI ends the whole batch on `context_degraded`, which `read.py` itself calls the tour's, not the run's
+
+LOW — the backfill CLI ends the whole batch on `context_degraded`, which `read.py` itself calls the tour's, not the run's
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+cd /opt/shadow-connector || exit 1
+cat > "$1/p.py" <<'PY'
+import asyncio, logging, os, sys, types
+os.chdir("/opt/shadow-connector"); sys.path.insert(0, "/opt/shadow-connector"); sys.path.insert(0, "/opt/shadow-connector/scripts")
+from dotenv import load_dotenv; load_dotenv("/opt/shadow-connector/.env")
+logging.disable(logging.CRITICAL)
+from core.affected_areas import read
+async def stopped(tour, *, trigger):        # what read_tour answers when one tour's pano context is degraded
+    return types.SimpleNamespace(status="skipped", panos=1, views_read=0, views_cached=0, views_failed=0, views_refused=6, reason="context_degraded")
+read.read_tour = stopped
+import affected_areas_backfill as B
+print("backfill goes on to the next tour after one tour's context_degraded stop:", asyncio.run(B._run("6ac817e90b77ac54f54ceb90")))
+PY
+venv/bin/python -I "$1/p.py"
+EOF
+bash "$D/p.sh" "$D" 2>&1 | tail -2
+case "$D" in /tmp/athena-probe.??????) cd /tmp && rm -r "$D";; esac
+expect: "backfill goes on to the next tour after one tour's context_degraded stop: False" (cured: True, or the script's _run docstring and read.py's _STOPS comment agree that the batch stops)
+```
+
+measured 2026-10-18 by chain chain-tour-affected-areas--judgment--switches-20261018-024458-b31f, finding L2, LOW
+probe-key: 21145de4c05b837e3028c5c999d24cb70037bc41
+
+governs: /opt/shadow-connector/core/affected_areas/read.py, /opt/shadow-connector/core/affected_areas/seat/gate.py, /opt/shadow-connector/core/restorly_ai.py
