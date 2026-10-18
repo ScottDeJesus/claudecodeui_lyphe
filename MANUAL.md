@@ -3384,9 +3384,9 @@ A step reads only what the steps above it produce. why: the shown face's photo i
 ## What the numbers mean
 | where | counts |
 |---|---|
-| face tab, caption "3 areas · 2 set aside · 1 proposed · read 3h ago" | `faceCounts` in `utils/tourModel.ts` (read by `FaceStrip.tsx` and `PanoScreen.tsx`), each region read through `regionState`: once the pano answered, set aside = `unsure` + `not_a_change` regions, proposed = unmarked regions of a kind with no line set (`proposed` with `standing === false`), areas = the rest; the tab counts areas. Before it answers, `listedAreas`: areas = `standingCount ?? regionsCount`, set aside hidden, and proposed = `regionsCount` while none stands |
+| face tab, caption "3 areas · 2 set aside · 1 proposed · read 3h ago" | `faceCounts` in `utils/tourModel.ts` (read by `FaceStrip.tsx` and `PanoScreen.tsx`), each region read through `regionState`: once the pano answered, set aside = `unsure` + `not_a_change` regions, proposed = unmarked regions of a kind with no line set (`proposed` with `standing === false`), areas = the rest; the tab counts areas. Before it answers, `listedAreas`: areas = `standingCount ?? regionsCount`, set aside and proposed hidden (the listing carries no state per region, so it cannot tell a proposed area from one set aside and names neither) |
 | region list "Marked on this view", badges, outlines | every region of the face, set aside and proposed included; areas + set aside + proposed = outlines drawn |
-| gallery tile badge | the standing areas summed over a pano's views (`listedAreas`): "3 areas"; "2 found" (`regionsCount` summed) while none stands and the reader found some; "None found" when it found none. The pano opens on the first face whose read found an area, standing or not |
+| gallery tile badge | the standing areas summed over a pano's views (`listedAreas`): "3 areas"; "2 found" (`regionsCount` summed) while none stands and the reader found some, whether nobody judged them or the operator set them all aside (the listing cannot tell); "None found" when it found none. The pano opens on the first face whose read found an area, standing or not |
 | tour line "26 areas found" | `regionsStanding`, or `regionsTotal` while none stands: a tour the reader marked never reads as empty |
 | tour line "42 of 42 cut views read · 5 panos not cut" | views read of views cut; `uncut = panoCount − round(viewsTotal / 6)`; "none cut yet" when `viewsTotal === 0` |
 | `tourReadState` | against six views per pano (`panoCount × 6`), never against views cut: a tour with an uncut pano is `partly` |
@@ -3484,7 +3484,7 @@ Two wire fields, both on `RoomEntry`: `docusketchAffected` (`boolean`, DocuSketc
 
 ## Why a list of rooms beside a gallery of panos
 - why: the units differ. A verdict is per room (`(room_key, floor)`, MAN-8573) and a `RoomEntry` is one per room key; a gallery tile is one pano and a room has several (100 newest tours: 2,156 panos in 632 room keys, MAN-8543).
-- A tile's badge counts the areas on its pano's views (`standingCount ?? regionsCount`); older damage counts there and never affects, so a badge cannot say whether the room is.
+- A tile's badge counts the areas that stand on its pano's views ("3 areas"), or says "2 found" while the reader found some and none stands yet, or "None found" (`listedAreas`, MAN-8576); older damage counts there and never affects, so a badge cannot say whether the room is.
 - The gallery draws at most 24 tiles then "+N" (`RoomGallery` `GALLERY_MAX`), so an affected room's pano can sit behind "+N"; the list has every room.
 
 ## Layout
@@ -3573,7 +3573,7 @@ The operator's marks on the Tours view: Confirm, Rename to… and Not a change o
 ## The two queues (`MarkScreen`'s `mode`, opens on `unsure`; the engine orders them: MAN-8562, MAN-8572)
 | mode | label | the engine serves | what its marks are for | the screen says |
 |---|---|---|---|---|
-| `unsure` | Unsure first | unmarked model regions outside the random slice, nearest their kind's line first | finding each kind's line fast; the Tables count them as Near the line and no share takes them in (MAN-8563) | `affectedAreas.mark.unsureHint` |
+| `unsure` | Unsure first | unmarked model regions outside the random slice, nearest their kind's line first (to 0.5 where none is set: the distance orders the queue and decides nothing, MAN-8562) | finding each kind's line fast; the Tables count them as Near the line and no share takes them in (MAN-8563) | `affectedAreas.mark.unsureHint` |
 | `random` | Random slice | unmarked held-out regions in one fixed order | measuring the reader; they feed Judged, Right, Wrong kind, Not a change and so Precision and Coverage | `affectedAreas.mark.randomHint` |
 
 - Both modes draw one facts line under the reader's words (`MarkQueue.tsx` `facts`): "{n}% sure", "threshold {n}%" (or "No line set" where the kind has none: `region.threshold` null), the basis ("seen in the photo") and, when `region.holdout` is true, "held out to measure the reader". The engine serves no held-out area in `unsure`.

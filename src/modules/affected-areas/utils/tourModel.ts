@@ -138,8 +138,9 @@ export function countedKind(region: Region): string {
  * A read's areas as the tour's listing counts them, before any pano has answered with its regions: `standing` is the
  * engine's count of the ones that stand (its own `standingCount`, else every one the read found when the listing
  * carries none), `found` is what the shown read itself found, standing or not. While nothing stands and the read found
- * some, they are proposed, not absent: the gallery's tile, the face the pano opens on and the caption all read it
- * here. Read by `faceCounts`, `RoomGallery` and `AffectedAreasView`.
+ * some, they are found and not absent: the gallery's tile and the face the pano opens on read it so. The listing
+ * carries no state per region, so it cannot say whether the found ones are proposed or were set aside; the pano
+ * screen says it once the pano answers (`faceCounts`). Read by `faceCounts`, `RoomGallery` and `AffectedAreasView`.
  */
 export function listedAreas(read: ReadState): { standing: number; found: number } {
   return { standing: read.standingCount ?? read.regionsCount, found: read.regionsCount };
@@ -153,8 +154,9 @@ export function listedAreas(read: ReadState): { standing: number; found: number 
  * - `proposed`: unmarked areas of a kind with no line set (`proposed` with `standing === false`), which stand only
  *   when the operator marks them;
  * - `areas`: the rest, as the engine's own count holds them (standing, or not yet judged).
- * Before the pano answers, the tour's listing gives the counts (`listedAreas`): the engine's standing ones, and what
- * the read found as proposed while none stands. Read by the pano screen's face strip and caption.
+ * Before the pano answers, the tour's listing gives the areas alone (`listedAreas`: the engine's standing ones): it
+ * cannot tell a proposed area from one set aside, so it calls none of them either. Read by the pano screen's face
+ * strip and caption.
  */
 export function faceCounts(
   view: ViewEntry | ViewDetail | undefined,
@@ -167,6 +169,5 @@ export function faceCounts(
     const proposed = states.filter(({ state, standing }) => state === 'proposed' && standing === false).length;
     return { areas: view.regions.length - setAside - proposed, setAside, proposed };
   }
-  const { standing, found } = listedAreas(read);
-  return { areas: standing, setAside: 0, proposed: standing === 0 ? found : 0 };
+  return { areas: listedAreas(read).standing, setAside: 0, proposed: 0 };
 }

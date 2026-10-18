@@ -10660,3 +10660,66 @@ measured 2026-10-17 by chain chain-tour-affected-areas--marking--docs-20261017-2
 probe-key: d5b3d89f4508ca9ad11f99c9e4f3e19a14e72baa
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/
+
+## INV-8733 — probe — MAN-8573 (judgment MANUAL §rooms, lines 238 and 253) names a file the tree no longer has, and now contradicts INV-8635.
+
+MAN-8573 (judgment MANUAL §rooms, lines 238 and 253) names a file the tree no longer has, and now contradicts INV-8635.
+
+```probe
+cd /opt/shadow-connector && echo "MAN-8573 names marked_areas: $(docstore get MAN-8573 --text | grep -c 'marked_areas')"; ls core/preliminary_estimator/marked_areas.py 2>&1 | tail -n 1; echo "INV-8635 names photo_areas: $(docstore get INV-8635 --text | grep -c 'photo_areas')"
+expect: MAN-8573 names marked_areas: 2, then "No such file or directory", then INV-8635 names photo_areas: 1 while stale (the first count 0 once healed)
+```
+
+measured 2026-10-18 by chain chain-tour-affected-areas--judgment--lines-20261017-234250-2ce4, finding L1, LOW
+probe-key: 5d0fd31310b175c3dafd1f1fbaf0a7ca65909962
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/
+
+## INV-8734 — probe — before the pano answers, `faceCounts` (listing branch) calls every area of a pano that has none standing "proposed", including areas the operator set aside; the tile and the tour line read "N found" for the same pano.
+
+before the pano answers, `faceCounts` (listing branch) calls every area of a pano that has none standing "proposed", including areas the operator set aside; the tile and the tour line read "N found" for the same pano.
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'INNER'
+D="$1"; SRC=/home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/utils
+cp "$SRC/tourModel.ts" "$SRC/regionLook.ts" "$D/"
+sed -i "s#'@/modules/affected-areas/utils/regionLook'#'./regionLook.ts'#; s#'@/shared/utils'#'./stubutils.ts'#" "$D/tourModel.ts"
+sed -i "s#from '@/shared/types'#from './stubutils.ts'#" "$D/regionLook.ts"
+cat > "$D/stubutils.ts" <<'EOF'
+export const formatRelativeTime = (x: any) => 'ago';
+export const formatShortDate = (x: any) => (x === null ? null : 'Oct 12');
+export type Tone = any;
+EOF
+cat > "$D/run.mts" <<'EOF'
+import { faceCounts } from './tourModel.ts';
+const away = (id: string) => ({ regionId: id, source: 'model', mark: { verdict: 'not_a_change', newClass: null }, standing: false, threshold: null }) as any;
+const read = { status: 'read', regionsCount: 2, standingCount: 0 };
+console.log('pano listing, both areas marked not-a-change:', JSON.stringify(faceCounts({ read } as any)));
+console.log('pano answered, same two areas              :', JSON.stringify(faceCounts({ read, regions: [away('a'), away('b')] } as any)));
+EOF
+node "$D/run.mts" 2>&1 | head -5
+INNER
+bash "$D/p.sh" "$D"
+case "$D" in /tmp/athena-probe.*) cd /tmp && rm -r "$D";; esac
+expect: the listing line {"areas":0,"setAside":0,"proposed":2} and the answered line {"areas":0,"setAside":2,"proposed":0} while the listing cannot tell the two apart
+```
+
+measured 2026-10-18 by chain chain-tour-affected-areas--judgment--lines-20261017-234250-2ce4, finding L2, LOW
+probe-key: ab9ae2bf6636232439977e37a278f13eafee898f
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/
+
+## INV-8735 — probe — MAN-8578 still describes the tile badge as a bare `standingCount ?? regionsCount` count.
+
+MAN-8578 still describes the tile badge as a bare `standingCount ?? regionsCount` count.
+
+```probe
+cd /opt/shadow-connector && docstore get MAN-8578 --text | grep -cF "A tile's badge counts the areas on its pano's views (\`standingCount ?? regionsCount\`)"; grep -c "tile.found" /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/RoomGallery.tsx
+expect: 1 then 1 while MAN-8578 is stale (the first 0 once its sentence names the found branch)
+```
+
+measured 2026-10-18 by chain chain-tour-affected-areas--judgment--lines-20261017-234250-2ce4, finding L3, LOW
+probe-key: 3ba6d9ad07c48ce33fed8a061fa56c5925c7ff3b
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/

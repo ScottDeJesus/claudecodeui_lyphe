@@ -2481,7 +2481,7 @@
       "modeLabel": "Which areas to mark",
       "unsure": "Unsure first",
       "random": "Random slice",
-      "unsureHint": "The fast way to find each kind's threshold: the areas closest to their line come first.",
+      "unsureHint": "The fast way to find each kind's threshold: the areas closest to their line (to the middle, where none is set yet) come first.",
       "randomHint": "The honest measure: areas drawn at random, so the tables can say how often the reader is right.",
       "kindLabel": "Kind to mark",
       "allKinds": "All kinds",
