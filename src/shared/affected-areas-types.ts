@@ -123,8 +123,6 @@ export type RoomEntry = {
   drying: DryingEntry | null;
   /** Marks. */
   regionsStanding: number | null;
-  /** The same value as `photosAffected`, until the Tours view reads that one; the join deletes this field. */
-  markedAreasAffected: boolean | null;
   /** Photos. The room's verdict from the tour's photos, for this room: one entry per (`roomKey`, `floor`), so an
    *  upstairs loss never marks the downstairs bathroom. `regionsStanding` counts older damage too. */
   photosAffected: boolean | null;

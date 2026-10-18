@@ -10337,9 +10337,9 @@ probe-key: 58ab8943b27ec1be62b9c8d97d1521213ca98c18
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/
 
-## INV-8691 — probe — LOW — The intent's one required search does not print the Tables row (repeats INV-8680)
+## INV-8691 — probe — LOW — The intent's one required search does not print the Tables row
 
-LOW — The intent's one required search does not print the Tables row (repeats INV-8680)
+LOW — The intent's one required search does not print the Tables row
 
 ```probe
 D=$(mktemp -d /tmp/athena-probe.XXXXXX)
