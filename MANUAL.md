@@ -444,6 +444,8 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/mcp/McpServers.tsx, 
 ## Lightbox — rules
 
 - Zoom runs fit (1×) to 8×. It is a CSS transform on the content, so an svg redraws sharp at every level. No `will-change: transform`: it pins the raster and blurs an svg.
+- A transform scales a child's strokes and boxes with the picture, and `vector-effect: non-scaling-stroke` does not undo that (measured 2026-10-17: a 2px edge reads 4.5px at 225%). The content element therefore carries the zoom as the custom property `--lightbox-scale` (a bare number, 1 at fit; unset outside the Lightbox, so a reader writes `var(--lightbox-scale, 1)`). A child that wants marks at screen size divides by it: `RegionImage`'s outlines, dashes and badges do (`verve/media.css`), so a region's edge stays one weight at every zoom.
+- The overlay swallows only its own close after a drag (`wasDrag`); a child's `onClick` runs first. A pan that starts and ends on one pressable child (a `RegionImage` outline given `onSelect`) still fires that child's click (read from `Lightbox.tsx` and `useZoomPan.ts`, 2026-10-17; not run). Give a child inside the Lightbox no handler its pan would trip.
 - The viewer is a native modal `<dialog>`, portalled to the host window's `<body>` and opened by `showModal()` in a layout effect, in that document's TOP LAYER. No fixed layer (the PRD editor's `z-[200]`, Settings' `z-[9999]`, a later one) can cover it, and it carries no z-index. Anything that must sit above it has to be top-layer itself.
 - `showModal()` makes the page inert, focuses the close button and keeps Tab inside. Focus returns to the opener on close. The dialog's `cancel` is prevented: Esc is heard from the host window's capture phase, so closing never stops a run.
 - A `ResizeObserver` on the stage and the content re-clamps the pan on a window resize or a phone turning. It is built by the host window's constructor (`resizeObserverIn`, MAN-7451) and rebuilt on a move.
@@ -3178,3 +3180,309 @@ Once per run: the live server's own `needsYou` is in `needsYouOrder`; the five a
 - Plain light card's raw key measures 3.34:1 (the house's faint ink); the gate accepts it because it demands no more than the plain card gives.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/cerberus-needs-you-severity.mjs
+
+## MAN-8558 — Affected-areas client wire — src/shared/affected-areas-types.ts and api.affectedAreas
+
+The browser's typed view of `/api/affected-areas` (the Tours tab): one wire-type file and one `api` block. The one home of every shape is shadow-connector's `core/affected_areas/wire.py` (INV-8564); the routes are MAN-8540.
+
+## Files
+| file | holds |
+|---|---|
+| `src/shared/affected-areas-types.ts` | 39 exported types: every `wire.py` model, its 11 nested ones and the four envelopes `TourList`, `ViewsResult`, `UnderstandingMarkResult`, `Refusal`; plus the unions `Face`, `Basis`, `Verdict`, `MarkQueue`. `Point` and `Box` are file-private (`number[]`). Imports nothing from `server/`. |
+| `src/shared/api.ts` | `api.affectedAreas`, 14 verbs, beside `api.cerberus`; a type-only import from the mirror |
+| `.oxlintrc.json` | `src/shared/affected-areas-types.ts` in the `frontend-shared-file` list (INV-5890) |
+
+## Verbs
+Every answer is the wire shape bare, the type named in a `// →` comment above the verb. Ids go through `encodeURIComponent`.
+
+| verb | route | answer |
+|---|---|---|
+| `tours({ q?, limit? })` | `GET /tours` | `TourList` |
+| `tour(tourId)` | `GET /tours/:tourId` | `TourDetail` |
+| `pano(tourId, panoId)` | `GET /tours/:tourId/panos/:panoId` | `PanoDetail` |
+| `cutViews(tourId, panoId)` | `POST …/panos/:panoId/views` | `ViewsResult`; `timeoutMs` 90 000 |
+| `readPano(tourId, panoId, ReadRequest)` | `POST …/panos/:panoId/read` | `ReadResult`; `timeoutMs` 120 000 |
+| `planTour(tourId)` | `POST /tours/:tourId/read` | `TourPlan` |
+| `image(sha, options?)` | `GET /images/:sha` | JPEG bytes: the caller reads `.blob()`; `options.signal` aborts |
+| `codebook()` | `GET /codebook` | `Codebook` |
+| `mark(regionId, MarkRequest)` | `POST /regions/:regionId/marks` | `Region` (comment only) |
+| `missed(sha, MissedRequest)` | `POST /images/:sha/regions` | `Region` (comment only) |
+| `markUnderstanding(readId, UnderstandingMarkRequest)` | `POST /reads/:readId/marks` | `UnderstandingMarkResult` |
+| `queue({ mode, cls?, limit? })` | `GET /queue?mode&class&limit` | `Queue`; `mode` is required, typed `Queue['mode']` |
+| `proving({ model?, contract? })` | `GET /proving` | `Proving` |
+| `setThreshold(cls, ThresholdRequest)` | `PUT /thresholds/:cls` | `ProvingClass` (comment only) |
+
+## Failure bodies (read `.error` AND `.detail`)
+| body | from |
+|---|---|
+| `{ error: string }` | the lane: 503 `no_secret` / `unreachable`, 502 `unreadable`, 422 malformed id or query value, 404 path not forwarded |
+| `{ detail: string }` or `{ detail: [...] }` | shadow-connector's reader routes, passed through: 404 `no such tour`, FastAPI's list-shaped 422 |
+| `{ error, detail }` (`Refusal`) | shadow-connector's marks routes |
+
+## Rules an editor must not break
+- A shape changes in `wire.py` first; the mirror moves in the same change. why: a field renamed on one side is a screen that stops reading.
+- Field names are the wire's camelCase; `class` is a key (`wire.py`'s `cls` alias). Dates are ISO text, ids text, a point `[x, y]` and a box `[x0, y0, x1, y1]`, both in 0..1 of one view.
+- A response field is never optional. A field a later plan fills (`read`, `understanding`, `regions`, `mark`, `standing`, `threshold`, `holdout`, `regionsStanding`, `markedAreasAffected`, `marksCount`, `standingCount`, …) is `T | null`: `null` is "not judged", never "judged and found nothing".
+- A request field `wire.py` defaults is optional (`newClass?: string | null`).
+- `ViewDetail` is `ViewEntry & {…}`, as `wire.py` inherits it.
+- A new verb names its answer type in a `// → Type` comment, as this file's other blocks do.
+
+## Not yet measured
+- `mark`, `missed` and `setThreshold` answer `Region` / `ProvingClass` by reading of the marks design: `wire.py` names only `UnderstandingMarkResult`. Correct the comments when the marks routes land.
+- `Queue`, `Proving` and their nested types have met no real body: `/queue` and `/proving` answered 404 on 2026-10-17.
+- Field sets checked against `model_json_schema(by_alias=True)` per model on 2026-10-17: 39 of 39 match, nullability and `Literal` values included.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/affected-areas-types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts
+
+## MAN-8559 — The affected-areas lane — /api/affected-areas forwarded to shadow-connector
+
+`server/modules/affected-areas/` is the one hop between the browser and shadow-connector's internal-caller gate (R-CAP-11, `X-Internal-Secret` required even from loopback). The browser never holds the secret. Mounted in `server/index.ts` at `/api/affected-areas` behind `authenticateToken`. The engine's side of the same surface: MAN-8540.
+
+| File | Holds |
+|---|---|
+| `affected-areas.module.ts` | `createAffectedAreasModule()`; the ONLY reader of the environment |
+| `affected-areas.routes.ts` | `createAffectedAreasRouter({ forward })`: the allowlist, id/query/body checks, status mapping |
+| `affected-areas.service.ts` | `createAffectedAreasService({ baseUrl, envFile })` → `forward(LaneRequest): Promise<LaneAnswer>`; the secret read; the one `fetch` |
+| `index.ts` | barrel the entrypoint imports |
+
+`LaneRequest`, `LaneAnswer`, `AffectedAreasService` are exported from the service file (Jev-lane precedent), not `server/shared/types.ts` (2,483 lines).
+
+## Configuration
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `SHADOW_CONNECTOR_URL` | `http://127.0.0.1:8001` | engine origin |
+| `SHADOW_CONNECTOR_ENV_FILE` | `/opt/shadow-connector/.env` | file holding `EIS_INTERNAL_SECRET=` |
+
+## Allowlist (14 rows in `ALLOWLIST`)
+
+A method+path not in the table is the lane's own 404 `{ error: 'not a route of the affected-areas lane' }`; it never reaches :8001. The table is the marking plan's whole contract: a row whose engine route is unbuilt answers the engine's own 404 through the lane.
+
+| Method path | Timeout | Reply | Body | Query (forwarded keys only) |
+|---|---|---|---|---|
+| `GET /tours` | 20 s | json | none | `q` ≤ 80 code points, `limit` 1–100 |
+| `GET /tours/:tour` | 20 s | json | none | — |
+| `POST /tours/:tour/panos/:pano/views` | 90 s | json | none | — |
+| `GET /tours/:tour/panos/:pano` | 20 s | json | none | — |
+| `POST /tours/:tour/panos/:pano/read` | 120 s | json | object | — |
+| `POST /tours/:tour/read` | 20 s | json | none | — |
+| `GET /images/:sha` | 20 s | bytes (`image/jpeg`) | none | — |
+| `GET /codebook` | 20 s | json | none | — |
+| `POST /regions/:region/marks` | 20 s | json | object | — |
+| `POST /images/:sha/regions` | 20 s | json | object | — |
+| `POST /reads/:read/marks` | 20 s | json | object | — |
+| `GET /queue` | 20 s | json | none | `mode` unsure\|random, `class`, `limit` 1–50 |
+| `GET /proving` | 20 s | json | none | `model`, `contract`: one token `[\w.:-]{1,80}` |
+| `PUT /thresholds/:class` | 20 s | json | object | — |
+
+## Checks before forwarding (a failure is the lane's 422 `{ error }`, nothing sent)
+
+| Input | Rule |
+|---|---|
+| `:tour`, `:pano` | `^[0-9a-f]{24}$` lowercase |
+| `:sha` | `^[0-9a-f]{64}$` lowercase |
+| `:region`, `:read` | uuid, either case |
+| `:class` | `^[a-z_]{2,40}$` |
+| query key not in the row | dropped, not forwarded |
+| query value that is an array/dict (`?q=a&q=b`) | 422 |
+| body on a `body: object` row | JSON object; array/null/scalar → 422 |
+| malformed percent-escape in the path (`%ZZ`) | 422 `the path holds a malformed percent-escape` (error handler at the end of the router) |
+
+The lane's own 422 is `{ error }`; the engine's is `{ detail: [...] }`: a client reads both.
+
+## Status mapping
+
+| Case | Answer |
+|---|---|
+| upstream answered JSON | its status and body, untouched (404 `no such tour`, 403 wrong secret, 422, refusals) |
+| network error / timeout | 503 `{ error }` (`unreachable`) |
+| non-JSON from a json route; 2xx image that is not `image/jpeg`; 3xx with no JSON | 502 `{ error }` (`unreadable`) |
+| secret missing, empty, padded, non-ASCII, unclosed quote | 503 `no_secret` (`CloudCLI could not read shadow-connector's internal secret`); nothing sent |
+| a thrown error the service cannot name | `next(error)` → the app's handler |
+
+Image 2xx: `Content-Type: image/jpeg`, `Cache-Control: private, max-age=31536000, immutable`; a non-2xx image answer passes through as its JSON.
+
+## The secret read (`parseSecret`, `currentSecret`)
+
+1. `fs.stat(envFile)` on EVERY call; re-parse only when `mtimeMs` or `size` changes. A rotation lands on the next request: no restart, no watcher.
+2. Last `EIS_INTERNAL_SECRET=` line wins; `export ` prefix, CRLF, and an unquoted trailing ` # comment` are handled as dotenv does.
+3. Quoted value: whatever stands between the quotes, verbatim; only whitespace or a `# comment` may follow the closing quote. A quote that never closes, or other text after it → `no_secret`. A secret that really begins with `"` or `'` must be quoted.
+4. Usable = printable ASCII, no whitespace at either end (`USABLE_SECRET`): the gate compares bytes and an HTTP stack trims header edges.
+5. A missing file logs one `[affected-areas] no usable internal secret in <file>: <cause>` line per distinct cause; never the line parsed.
+6. The secret is held in the browser nowhere and in CloudCLI's own environment nowhere: read from the engine's file per call, never written to `process.env`, this server's `.env`, a log or a cache (INV-8633). why: a copy drifts on rotation, and the agent sessions this server spawns inherit its environment.
+
+## Headers sent
+
+| Header | Value |
+|---|---|
+| `X-Internal-Secret` | the secret |
+| `Accept` | `application/json`, or `image/jpeg` for a bytes route |
+| `Content-Type` | `application/json` when a body is sent |
+| `X-Acting-User` | signed-in username, non-printable → `?`, trimmed, ≤ 64 chars; absent when none. Display only: the engine derives `origin` itself (R-CAP-21) |
+
+`fetch` runs `redirect: 'manual'` so the secret header never follows a `Location`; timeout is `AbortSignal.timeout(timeoutMs)`.
+
+## Probes (2026-10-17)
+
+- `GET /api/affected-areas/tours?limit=3` → 200, three tours; `GET …/images/<sha>` → 200 JPEG whose `sha256sum` equals the id.
+- `GET /nope`, `DELETE /tours`, `POST /codebook` → 404 with no `shadow-connector` journal line; 422 cases (bad id, `limit=0|101`, 81-char `q`, `mode=bogus`) likewise never reach the journal.
+- An empty env file → 503 `no_secret`, 0 engine requests; writing the secret into it → next request 200, no restart.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/affected-areas/affected-areas.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/affected-areas/affected-areas.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/affected-areas/affected-areas.service.ts
+
+## MAN-8575 — The Tours view — src/modules/affected-areas: where state lives, what the counts mean, the reads and the presses
+
+The Tours view: a DocuSketch tour's affected areas drawn on the single photo. Three screens, one at a time: `TourPicker` → `TourScreen` → `PanoScreen`. Data is `api.affectedAreas` (wire MAN-8558, lane MAN-8559, routes MAN-8540). Drawn with the library's `RegionImage` and `Gallery` (MAN-8579).
+
+## State of the module
+| fact | value |
+|---|---|
+| phase | live: the Cerberus tab's fourth view, reading the lane; run whole against the live engine 2026-10-17 (`.verify/affected-areas-view.mjs`, `.verify/affected-areas-walk.mjs`) |
+| mounted | `CerberusPanel` imports the lazy `AffectedAreasView` through this module's barrel and draws it after History in the strip, only once center's overview has answered (`overview !== null`, as every view): mounted on the first show of the Tours tab (`toursShown`), `hidden` after, kept mounted while the Cerberus workspace tab stands (leaving that tab for Chat unmounts the panel and the view with it, and the tour, pano and face are lost then). why: the tour, pano, face and scroll survive a visit to Fleet (MAN-7891); the views share ONE scroller, so `CerberusPanel` keeps Tours's offset itself (`toursScrollRef`, written as Tours is left, restored as it returns) |
+| words | `affectedAreas.*` and `cerberus.tours.{tab,tabHint}` in `src/modules/i18n/locales/en/common.json` |
+| shared types | `AffectedAreasRead<T>` (`{ value, trouble, retry }`), `PanoPress`, `TourReaderProgress`, `AffectedAreasTrouble` in `src/shared/types.ts` |
+
+## Files
+| file | holds |
+|---|---|
+| `AffectedAreasView.tsx` | the root: the ONLY file that calls the hooks and holds the handlers; picks the screen by `tourId` / `panoId` |
+| `hooks/useLaneRead.ts` | one JSON read of the lane kept for its key: `{ value, trouble, retry }` plus `reload` (quiet, keeps the value) and `replace(value, forKey)` (writes an answer that came by another road under the key it is GIVEN, and drops every read begun before it); reads when the key is set or `retry`/`reload` is called, never on a timer |
+| `hooks/useTours.ts` · `useTour.ts` · `useCodebook.ts` | the picker's list (30 newest, the search text cut at 80 characters, read once typing has rested 300 ms, and only while the view is shown; `reload` when the picker comes back) · the open tour · the codebook |
+| `hooks/usePano.ts` | the open pano, the dry run beside it (what a read would buy), and `pressRead(force)`: one armed press at a time per pano (kept in `inFlight`, so a press still out shows as busy when the person leaves the pano and comes back), its answer replaces the pano and the plan at once, under the key the press was made for and outranking any read begun before it, unless the person has gone to another pano. A pano the tour lists with no views is not read (its GET is a 404 until it is cut): its dry run cuts it, and until then the screen is handed it with no views; a cut that brings no answer is that pano's trouble, drawn as the header and a banner with Try again |
+| `hooks/useTourReader.ts` | Read the rest: the unread panos in capture order, one armed press each, after the last one answered, passing a pano whose views cannot be cut; `{ walk, start, stop }` |
+| `hooks/useImageUrl.ts` | `useImageUrls(shas)` (the gallery's tiles) and `useImageUrl(sha)` (the shown face): bytes fetched with the token, object URLs revoked on unmount and on a change, aborted on a change, null on failure |
+| `hooks/useViewShown.ts` | `isInLayout(element)` (asked before a read starts), `useViewShown(ref)` (whether the view is in layout, as state) and `useWhenShown(shown, fn)` (a word when it comes back) |
+| `utils/laneTrouble.ts` | a non-2xx answer or a thrown fetch as an `AffectedAreasTrouble` |
+| `ViewBoundary.tsx` | the lazy view's surround, exported by the barrel with the view: a waiting ring while its chunk loads, and a Tours-only warn banner (Reload the page) when it cannot load or crashes, so the failure never replaces the whole Cerberus tab |
+| `TourPicker.tsx` | search field, recent tours with a read-state badge |
+| `TourScreen.tsx` | tour header with the walk (Read the rest), then `ContextCard`, then `TourRooms`, then `RoomGallery` |
+| `TourRooms.tsx` | the tour's rooms in DocuSketch's walk order: name, floor, and who calls each affected, in words (MAN-8578) |
+| `PanoScreen.tsx` | header + `ReadControl`, six face tabs, `RegionImage` beside `RegionList`, caption, Enlarge (`Lightbox`), `UnderstandingCard`, `RoomDrying` |
+| `ReadControl.tsx` | the read presses (Read this pano / Read again / Read the rest), refusals in words, the walk's meter and Stop |
+| `LaneTrouble.tsx` | one warn banner with Try again for a read that brought no answer |
+| `ContextCard.tsx` · `UnderstandingCard.tsx` · `RoomDrying.tsx` · `RoomGallery.tsx` · `RegionList.tsx` | what the reader is told · what it understood · the room's drying numbers · the pano tiles (`Gallery`, max 24 then "+N") · the face's regions |
+| `utils/regionLook.ts` | `REGION_LOOK` and `regionState(region)` |
+| `utils/tourModel.ts` | `FACES`, `panoReadState`, `tourReadState`, `tourUnread`, `tourFacts`, `tourName`, `roomWords`, `spansFloors`, `spoken`, `listWords`, `capitalized`: pure, no fetch, no state |
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/
+
+## MAN-8576 — The Tours view — src/modules/affected-areas: where state lives, what the counts mean, the reads and the presses — Root order (`AffectedAreasView.tsx`)
+section: The Tours view — src/modules/affected-areas: where state lives, what the counts mean, the reads and the presses/001 Root order (`AffectedAreasView.tsx`)
+
+1. state (`query`, `tourId`, `panoId`, `face`, `selectedRegionId`, `enlarged`)
+2. reads (`useTours`, `useTour`, `usePano`, `useCodebook`), each `{ value, trouble, retry }`; `useTour` adds `reload`, `usePano` adds `press`, `pressRead`, `reload`
+3. derivations (`summary`, `entry`, `room`, `unread = tourUnread(...)`)
+4. photos, walk, handlers (`useImageUrl` ×2, `useTourReader`, `on*`)
+
+A step reads only what the steps above it produce. why: the shown face's photo is read off `entry` with no reordering.
+
+## What the numbers mean
+| where | counts |
+|---|---|
+| face tab, caption "3 areas · 2 set aside · read 3h ago" | `faceCounts` in `PanoScreen.tsx`: once the pano answered, set aside = regions with `standing === false`, areas = the rest; before it answers, areas = `standingCount ?? regionsCount` and set aside is hidden |
+| region list "Marked on this view", badges, outlines | every region of the face, set aside included; areas + set aside = outlines drawn |
+| gallery tile badge, tour line areas | `standingCount ?? regionsCount`, summed over a pano's views |
+| tour line "42 of 42 cut views read · 5 panos not cut" | views read of views cut; `uncut = panoCount − round(viewsTotal / 6)`; "none cut yet" when `viewsTotal === 0` |
+| `tourReadState` | against six views per pano (`panoCount × 6`), never against views cut: a tour with an uncut pano is `partly` |
+| `tourUnread` | panos with a face not read, and their unread views (six for a pano never cut); the press names both before it spends |
+| room list title "Rooms" | no count, on purpose: the header's "in 5 rooms" is `roomCount` (`docusketch_tours.rooms`, DocuSketch's own count), while the list has one row per room key, and `canonical_key` folds names ("Office2 / Office1" is one row). The two differed on 14 of the 60 newest tours (El Camino College: 39 against 35, measured 2026-10-17) |
+
+## Read presses
+- The press is synchronous per pano: `POST …/panos/:pano/read` answers when the pano's six views are read (7–10 s, longer behind the tour's lock) with `pano` filled, so nothing is polled (`core/affected_areas/routes/read.py`). The browser waits up to 120 s (`api.affectedAreas.readPano`). A client that gives up does not cancel the purchase: the next press finds the reads cached.
+- `armed: false` is the dry run (`planned`, buys nothing); `armed: true` buys; `force: true` re-reads views that already have a read under this contract.
+- The engine reads one pano per press. A whole tour is the viewer's walk: Read the rest sends one armed press per unread pano, in capture order, the next only after the last one answered.
+
+| press | offered when | sends |
+|---|---|---|
+| Read this pano | the dry run is not back, was refused, or has `viewsToRead > 0` | `{ armed: true, force: false }` |
+| Read again | `againReason` in `ReadControl.tsx` is non-null: (1) a view's `read.contextChanged === true`, the job's details having changed since that face was read; (2) a view with `read.status === 'read'` has a `read.contractVersion` other than the codebook's `contractVersion`. Condition 2 is off until the codebook has answered | `{ armed: true, force: true }` |
+| Read the rest | `unreadPanos > 0`, or a walk is running | `useTourReader.start` |
+
+- A refusal is drawn before the presses it refuses. While one no retry clears stands (`budget`, `flag_off`, `restorly_ai_off`, `gemini_off`, `no_key`), the presses drop to outline.
+- A walk and a press stopped by the same wall show one banner.
+- A pano that did not answer draws its header and banner alone: no press, no face. A lane fault the press repeats is said once.
+- `usePano` sets `press.trouble` when a dry run or press gets no answer. why: "Working out…" must not hang.
+- A pano never cut is cut by its dry run (`readPano` armed false); the screen says "Cutting this pano into its six views…".
+- The walk is the viewer's: one armed `readPano` per pano; `useTourReader` must expose a stop (`onStopRest`, ends after the pano in hand).
+- Every press and Show all is 44 px tall below `md` (`max-md:h-11`).
+- Reads happen on open and on a press: a tour or pano opening, a search that has rested, Try again, Back to the picker (it reads the list again quietly, since a press or a walk changed how far each tour is read), a press and the answer of one. No timer reads anything but the search's 300 ms rest. why: Cerberus's History polls every 30 s and so mounts only while shown; Tours stays mounted, so it must cost nothing hidden.
+- Nothing starts while the view is hidden. The walk asks `isInLayout` before each press and stops after the pano in hand when the view is away; the search's rest timer runs only while `useViewShown` says the view is shown, so text typed just before leaving is read on the return; an answer that arrives hidden is held (`heldRef`) and the list, the tour and the pano are read once when the view comes back. why: a walk spends, and no one is watching its meter or Stop.
+- The walk stops at a refusal (`status: 'refused'`, or a lane fault) with the reason as `lastRefusal`, except a refusal of that pano alone (`PER_PANO_REFUSALS` in `useTourReader.ts`: `views_refused`, a photo the engine cannot cut), which it passes and counts in `skipped`; a part read (`partial`) goes on to the next pano. why: the engine's own walker stops only at `_STOPS` (`budget`, `flag_off` and the four systemic reasons, `core/affected_areas/read.py`), the refusals every later pano would meet too. A walk that passed panos says so when it ends (`affectedAreas.read.skipped`), and a passed pano stays unread, so each later Read the rest tries it again (a refusal in 270 ms).
+- The press's answer is the progress: the plan after a press is counted off the answer's pano (`planAfter`), not asked of the lane again. An answer that lands after the person went to another pano writes nothing of the pano on screen (`openKeyRef`; `patchedUnlessElsewhere`): the single press record and the single pano slot belong to the pano open now. A walk's answer for the open pano reads the pano AND its dry run again (`reload`), so the plan line and Read this pano follow the faces.
+- A pano the tour lists with no views is never GET: the lane answers 404 "no kept views" until it is cut, which reads as "no longer on its tour". `usePano` hands the screen that pano with no views while the dry run cuts it (the "Cutting this pano…" line and the uncut sentence), the dry run's pano replaces it, and a cut tells the root to read the tour again so its listing and gallery tile follow. A dry run that is refused (`views_refused`) leaves it uncut with the refusal said in `ReadControl`.
+- A reading of the client in dev shows each read of an open twice: `React.StrictMode` runs mount effects twice there. A build reads once.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/
+
+## MAN-8577 — The Tours view — src/modules/affected-areas: where state lives, what the counts mean, the reads and the presses — Rules an editor must not break
+section: The Tours view — src/modules/affected-areas: where state lives, what the counts mean, the reads and the presses/002 Rules an editor must not break
+
+- Screens draw what they are handed; the hooks are called from `AffectedAreasView.tsx` only, and `fetch` and `api` calls live in `hooks/` alone.
+- Tone is by judgment, never by kind: a region is painted by where it stands (`regionState` in `utils/regionLook.ts`), not by its codebook kind. why: the tone set stays five (MAN-739 rule 4) and the codebook has fourteen kinds. The kind is words (the list's label, the badge's accessible name).
+- Null is "not judged": `regionState` reads a null `mark` or `standing` as `proposed`, never as unsure or rejected.
+
+`REGION_LOOK` (`RegionState`, five). `regionState` takes the first row that matches, top to bottom:
+| state | when | tone | edge | wash | word (`affectedAreas.look.*`) |
+|---|---|---|---|---|---|
+| `human` | `source === 'human'`, whatever mark it later carries | positive | dashed | full | `human` "Drawn by hand" |
+| `not_a_change` | `mark.verdict === 'not_a_change'` | neutral | dashed | none | `notAChange` "Not a change" |
+| `confirmed` | `mark.verdict` is `confirm` or `rename` | positive | solid | full | `confirmed` "Confirmed" |
+| `unsure` | `mark === null && standing === false` | info | dashed | light | `unsure` "Unsure" |
+| `proposed` | anything else, a null `mark` or `standing` included | info | solid | full | `proposed` "Proposed" |
+
+Info is the reader's word and positive the operator's; a dashed edge is anything the reader's word alone does not carry. `PanoScreen` turns each region into a `RegionShape` with `tone`, `edge` and `wash` (drawn by `RegionImage`, MAN-8579); `RegionList` shows the word.
+- A room is affected on two authorities, both named (MAN-3035): `docusketchAffected` and `markedAreasAffected === true`, never `regionsStanding`, which counts older damage. The words and the tone are MAN-8578.
+- Names, never ids, in any line a person reads (INV-76); a tour with no job or address reads "Tour with no job or address".
+- A bare `YYYY-MM-DD` (date of loss) goes through `formatShortDate`, which reads it as that local day.
+- `index.ts` exports the lazy view and `ViewBoundary` (its surround) only; siblings import each other by path, never through the barrel. `ViewBoundary` is not lazy: it must be there to catch the failure of the chunk it surrounds.
+- `useLaneRead.replace(value, forKey)` takes the key its answer is for, never the render's own: a press made while the tour still listed the pano uncut has a null key in its render. It outranks every read begun before it (`replacedRef`). why: without both, a pano GET answering with the pre-press detail landed over the press's pano and left the faces unread.
+- A refusal of one pano alone is passed by the walk, not a stop: `PER_PANO_REFUSALS` in `useTourReader.ts` holds only `views_refused`, as the engine's walker does (MAN-8576).
+- An object URL is revoked with the record that names it (`useImageUrls` clears its record in the effect's cleanup). why: a list that comes back (the tour screen after a pano) would find its own old key and hand `<img>` revoked URLs: eight `ERR_FILE_NOT_FOUND` errors in the viewer run of 2026-10-17.
+
+## Measured 2026-10-17 (live engine, :5183)
+- `.verify/affected-areas-view.mjs`: Cerberus → Tours → CLARENCE TSE → Dinning Room → each face at 1280 and 390 px: the polygons on the photo equal the engine's regions per face, the badges read 1..n and are the list's rows and the engine's ordinals, a region chosen on the photo is the row's and back, Enlarge keeps every outline on the photo (0.00 px off), nothing is read while the pano idles or Fleet shows, and Read this pano on one unread pano answers 200 `read`, 6 views, and the face strip counts the engine's areas at once.
+- `.verify/affected-areas-walk.mjs`: Stop after this pano ends the walk after the pano in hand; a view hidden mid-walk sends no second press and reads nothing until it returns, then reads the tour once; the walk goes pano to pano on each answer, in capture order.
+- `.verify/affected-areas-rooms.mjs --tour <24-hex tourId> [--evidence <dir>]` (the tour must be linked to a job, else exit 2): Cerberus → Tours → the tour → the Rooms card at 1280 then 390 px, once in a light and once in a dark `openConsole({ dark })` context (no stored setting written). `WIDTHS[0]` stays 1280: `openCerberusTab` finds "More views" only on the wide layout. Holds against `GET /api/affected-areas/tours/{tour}`: one row per wire room in its order, with name and floor; the words from `docusketchAffected` and `markedAreasAffected` alone (written out in the script, not read from the component); warn tone and dot on the rows with words only; no fetch/XHR path of its own for rooms; no sideways scroll, measured on the Rooms card (`scrollWidth - clientWidth`; the card clips its overflow, so the page-level number is 0 whatever the rows do); no authenticated console error. Writes `rooms-<theme>-<width>.png`, `rooms-card-<theme>-<width>.png` and `rooms.json` (keys `<theme>-<width>`) under `.verify/shots/affected-areas-rooms/`.
+- 2026-10-17, run end to end at the review: tour `6acd745c36f92c16415b6f97` (three affected rooms, Kitchen and Entry floor 1, Hvac Closet floor 2; `docusketchAffected` false, `markedAreasAffected` true) passes 26 of 26 checks, exit 0, light and dark, 1280 and 390 px. At 390 px one column, overflow `{"page":0,"rooms":0}`, warn tone and dot on exactly the three rows with words; at 1280 three columns.
+- `.verify/affected-areas-view.mjs` presses nothing unless `--press` is given (one armed press, counted; it needs a cut, unread pano, which each press uses up), and `.verify/affected-areas-walk.mjs` runs nothing unless `--cases` names what to buy (A and B six reads each, C twelve; each pano read is read for good).
+- Open: Read the rest has not met a refusal (a spent budget) on the live engine; a refusal is drawn from `ReadControl`'s own words.
+- Open: the tour screen fetches the photo of every cut pano (a 45-pano tour: 45 requests) though the gallery draws 24 tiles until "+N" opens. The cure needs the Gallery's overflow-open signal (`Gallery` is the shared kit's): a follow-up.
+- Open: "Affected per DocuSketch" and "Affected per DocuSketch and marked areas" have not been seen on a live tour: `docusketchAffected` is false on all 125 tours sampled (5 read, 120 unread).
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/
+
+## MAN-8578 — TourRooms.tsx — the tour's room list: affected rooms and the authority that calls each (DocuSketch, marked areas), beside the pano gallery
+
+`src/modules/affected-areas/TourRooms.tsx` is the Rooms card of `TourScreen`, between `ContextCard` and the pano gallery. Props: `rooms: RoomEntry[]` = `TourDetail.rooms` (wire MAN-8558): one row per room key, in DocuSketch's walk order. A row is not a control; it opens nothing.
+
+## A row
+| part | source |
+|---|---|
+| name | `roomWords(room.roomName, null, false, t)`; "Unnamed room" when null; never the key (INV-76) |
+| floor | "Floor 2" from `room.floor`; nothing when null (a room whose panos disagree on it) |
+| authority words | `authorityWords(room, t)` below; none when nobody calls the room affected |
+| dot | `bg-tone-dot` under `data-tone="warn"` on every affected row, whichever authority spoke; the dot's column is kept on the other rows so the names align |
+
+## Authority words (`affectedAreas.rooms.*` in `common.json`)
+Two wire fields, both on `RoomEntry`: `docusketchAffected` (`boolean`, DocuSketch's sketch flag) and `markedAreasAffected` (`boolean | null`, the marked areas' verdict, MAN-8573; null = not judged).
+| `docusketchAffected` | `markedAreasAffected` | words | key |
+|---|---|---|---|
+| true | not true | Affected per DocuSketch | `affectedDocusketch` |
+| false | true | Affected per marked areas | `affectedMarked` |
+| true | true | Affected per DocuSketch and marked areas | `affectedBoth` |
+| false | false or null | (none) | |
+- Never `regionsStanding`: it counts older damage, which never makes a room affected.
+- The sketch stays an authority and the marked areas are a second; the words name which spoke (MAN-3035).
+- Empty list: "DocuSketch named no rooms on this tour". Title "Rooms", inside the card, with no count (MAN-8576 §"What the numbers mean").
+
+## Why a list of rooms beside a gallery of panos
+- why: the units differ. A verdict is per room (`(room_key, floor)`, MAN-8573) and a `RoomEntry` is one per room key; a gallery tile is one pano and a room has several (100 newest tours: 2,156 panos in 632 room keys, MAN-8543).
+- A tile's badge counts the areas on its pano's views (`standingCount ?? regionsCount`); older damage counts there and never affects, so a badge cannot say whether the room is.
+- The gallery draws at most 24 tiles then "+N" (`RoomGallery` `GALLERY_MAX`), so an affected room's pano can sit behind "+N"; the list has every room.
+
+## Layout
+- Rows tile into 260 px columns (`repeat(auto-fill,minmax(260px,1fr))`): one on a phone, two at 1024, three at 1280, four from about 1440.
+- 40-room commercial tour: 497 px tall at 1440, 684 px at 1280, about 1,731 px in one column. Median tour: 5 rooms.
+- Check: `.verify/affected-areas-rooms.mjs` (MAN-8577 §"Measured 2026-10-17").
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/TourRooms.tsx

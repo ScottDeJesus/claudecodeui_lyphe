@@ -358,10 +358,16 @@ export function formatRelativeTime(iso: string | null | undefined): string {
  * not a time. The roadmap's one spelling of a day, so a step phrase (`useStepPhrase`), the milestone
  * banner (`CelebrationLayer`), a feature's dates (`FeatureFacts`) and a reached milestone's panel
  * (`panel/MilestonePanel`) all name it alike, in the browser's own locale.
+ *
+ * A bare calendar date (`2026-09-11`, the affected-areas module's date of loss) is that day wherever the
+ * reader is: `Date.parse` reads it as UTC midnight, which west of Greenwich is the evening before.
  */
 export function formatShortDate(stamp: string | null | undefined): string | null {
   if (!stamp) return null;
-  const milliseconds = Date.parse(stamp);
+  const calendarDay = /^(\d{4})-(\d{2})-(\d{2})$/.exec(stamp);
+  const milliseconds = calendarDay
+    ? new Date(Number(calendarDay[1]), Number(calendarDay[2]) - 1, Number(calendarDay[3])).getTime()
+    : Date.parse(stamp);
   if (Number.isNaN(milliseconds)) return null;
   const day = new Date(milliseconds);
   const thisYear = day.getFullYear() === new Date().getFullYear();

@@ -5,6 +5,7 @@ import {
 } from '@/shared/authToken';
 import type { AuthTraceEvent, CerberusEnrollInput, CerberusLabelInput, CerberusMuteInput, CerberusPromoteInput, DeepseekRange, DispatcherAsk, DispatcherEpicsWord, DispatcherModelChoice, DispatcherQueueMove, DispatcherWipChoice, DispatcherWipLimit, FileLinePatch, JevRange, NoteInput, NtfySettingsInput, SimpleListItemRef, SimpleListPosition, SubagentTranscriptResult } from '@/shared/types';
 import type { AgentLaunchDefaultsChange, AgentLaunchRowChange } from '@/shared/agent-launch-types';
+import type { MarkRequest, MissedRequest, Queue, ReadRequest, ThresholdRequest, UnderstandingMarkRequest } from '@/shared/affected-areas-types';
 import type { CerberusCatalogEntryInput } from '@/shared/cerberus-types';
 import type { ClaudeUpdateApplyRequest } from '@/shared/claude-update-types';
 import type { RoadmapWriteBody } from '@/shared/roadmap-types';
@@ -928,6 +929,56 @@ export const api = {
     diagnosis: (id: string, options: ApiRequestOptions = {}) => get(`/api/cerberus/diagnoses/${encodeURIComponent(id)}`, options),
     runProposal: (id: string) => post(`/api/cerberus/diagnoses/${encodeURIComponent(id)}/run`, {}),
     promote: (id: string, input: CerberusPromoteInput) => post(`/api/cerberus/diagnoses/${encodeURIComponent(id)}/promote`, input),
+  },
+
+  // The affected-areas lane (the Tours tab; wire shapes in `@/shared/affected-areas-types`): DocuSketch tours,
+  // what the reader saw in each pano, and the operator's marks, forwarded to shadow-connector by CloudCLI. Every
+  // answer is its wire shape BARE. A failure arrives in one of three bodies, so read `.error` AND `.detail`, never one:
+  // `{ error: string }` from the lane itself (503 `no_secret` / `unreachable`, 502 `unreadable`, 422 a malformed id or
+  // query value, 404 a path the lane does not forward); `{ detail: string }` or `{ detail: [...] }` from shadow-connector's
+  // reader routes, passed through (404 `no such tour`, FastAPI's list-shaped 422); `{ error, detail }` (`Refusal`) from
+  // its marks routes. The answer type of each verb is named beside it. Ids are encoded here, so a caller passes them as
+  // it holds them.
+  // The two slow presses outlast the default deadline by design: cutting a pano's six views takes up to 90 s and a
+  // read of them 120 s (the lane's own deadlines), and the answer that says `refused` is the one the screen shows.
+  affectedAreas: {
+    // → TourList
+    tours: ({ q, limit }: { q?: string; limit?: number } = {}) => get(`/api/affected-areas/tours${query({ q, limit })}`),
+    // → TourDetail
+    tour: (tourId: string) => get(`/api/affected-areas/tours/${encodeURIComponent(tourId)}`),
+    // → PanoDetail
+    pano: (tourId: string, panoId: string) =>
+      get(`/api/affected-areas/tours/${encodeURIComponent(tourId)}/panos/${encodeURIComponent(panoId)}`),
+    // → ViewsResult
+    cutViews: (tourId: string, panoId: string) =>
+      post(`/api/affected-areas/tours/${encodeURIComponent(tourId)}/panos/${encodeURIComponent(panoId)}/views`, {}, { timeoutMs: 90_000 }),
+    // → ReadResult
+    readPano: (tourId: string, panoId: string, body: ReadRequest) =>
+      post(`/api/affected-areas/tours/${encodeURIComponent(tourId)}/panos/${encodeURIComponent(panoId)}/read`, body, { timeoutMs: 120_000 }),
+    // → TourPlan
+    planTour: (tourId: string) => post(`/api/affected-areas/tours/${encodeURIComponent(tourId)}/read`, {}),
+    // The bytes of one view's JPEG, not JSON: the caller reads `.blob()`. `options.signal` lets it abort a fetch
+    // whose view has since changed.
+    image: (sha: string, options: ApiRequestOptions = {}) => get(`/api/affected-areas/images/${encodeURIComponent(sha)}`, options),
+    // → Codebook
+    codebook: () => get('/api/affected-areas/codebook'),
+    // The marks writes (`mark`, `missed`, `markUnderstanding`, `setThreshold`) are the marks plan's. wire.py names the
+    // answer of `markUnderstanding` alone; the others answer the shape the contract already holds for what they wrote.
+    // → Region (the one judged, its `mark` filled)
+    mark: (regionId: string, body: MarkRequest) => post(`/api/affected-areas/regions/${encodeURIComponent(regionId)}/marks`, body),
+    // → Region (the new human one)
+    missed: (sha: string, body: MissedRequest) => post(`/api/affected-areas/images/${encodeURIComponent(sha)}/regions`, body),
+    // → UnderstandingMarkResult
+    markUnderstanding: (readId: string, body: UnderstandingMarkRequest) =>
+      post(`/api/affected-areas/reads/${encodeURIComponent(readId)}/marks`, body),
+    // → Queue
+    queue: ({ mode, cls, limit }: { mode: Queue['mode']; cls?: string; limit?: number }) =>
+      get(`/api/affected-areas/queue${query({ mode, class: cls, limit })}`),
+    // → Proving
+    proving: ({ model, contract }: { model?: string; contract?: string } = {}) =>
+      get(`/api/affected-areas/proving${query({ model, contract })}`),
+    // → ProvingClass (the class as it now stands, its line moved)
+    setThreshold: (cls: string, body: ThresholdRequest) => put(`/api/affected-areas/thresholds/${encodeURIComponent(cls)}`, body),
   },
 
   // The dispatcher lane (docs/MANUAL.md (dispatcher)): the plans in the dispatcher's own store, and the

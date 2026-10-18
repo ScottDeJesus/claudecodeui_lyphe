@@ -1643,6 +1643,10 @@
     "zoomOut": "Zoom out",
     "fit": "Fit to screen"
   },
+  "media": {
+    "photo": "Photo",
+    "showMore": "Show {{remaining}} more"
+  },
   "timeline": {
     "noDetail": "No further detail on file."
   },
@@ -2253,11 +2257,244 @@
       "liftsAt": "Lifts on its own at {{time}}",
       "liftsTomorrow": "Lifts on its own at {{time}} tomorrow"
     },
+    "tours": {
+      "tab": "Tours",
+      "tabHint": "Affected areas on DocuSketch tours"
+    },
     "errors": {
       "unreachable": "Cerberus can't be reached",
       "retry": "Try again",
       "lastAnswer": "Showing the last answer it gave.",
       "writeFailed": "Cerberus didn't take that"
+    }
+  },
+  "affectedAreas": {
+    "faces": {
+      "ahead": "Ahead",
+      "right": "Right",
+      "behind": "Behind",
+      "left": "Left",
+      "ceiling": "Ceiling",
+      "floor": "Floor"
+    },
+    "look": {
+      "proposed": "Proposed",
+      "confirmed": "Confirmed",
+      "human": "Drawn by hand",
+      "unsure": "Unsure",
+      "notAChange": "Not a change"
+    },
+    "list": "{{rest}} and {{last}}",
+    "view": {
+      "loading": "Loading Tours…",
+      "failed": "Tours could not be shown",
+      "failedDetail": "The rest of Cerberus is not affected. Reloading the page usually brings Tours back.",
+      "reload": "Reload the page"
+    },
+    "trouble": {
+      "no_secret": "CloudCLI could not read shadow-connector's internal secret",
+      "no_secretDetail": "Nothing here can be read until shadow-connector's env file holds EIS_INTERNAL_SECRET.",
+      "unreachable": "shadow-connector can't be reached",
+      "unreachableDetail": "It did not answer in time. It may be restarting.",
+      "unreadable": "shadow-connector sent an answer CloudCLI can't read",
+      "unreadableDetail": "It may be part way through an update.",
+      "gone_tours": "The tours could not be read",
+      "gone_tour": "This tour is no longer on DocuSketch",
+      "gone_pano": "This pano is no longer on its tour",
+      "failed_tours": "The tours could not be read",
+      "failed_tour": "This tour could not be read",
+      "failed_pano": "This pano could not be read",
+      "retry": "Try again"
+    },
+    "picker": {
+      "search": "Search by customer, claim or address",
+      "recent": "Recent tours",
+      "matching": "Tours matching “{{query}}”",
+      "reading": "Reading tours…",
+      "empty": "No tours yet",
+      "emptyMessage": "A DocuSketch tour shows here once shadow-connector has seen it.",
+      "noMatch": "No tour matches “{{query}}”",
+      "noMatchMessage": "Search by the customer's name, the claim number or the street.",
+      "noJob": "No job linked"
+    },
+    "tour": {
+      "back": "All tours",
+      "unnamed": "Tour with no job or address",
+      "captured": "Captured {{date}}",
+      "panos_one": "{{count}} pano",
+      "panos_other": "{{count}} panos",
+      "rooms_one": "{{count}} room",
+      "rooms_other": "{{count}} rooms",
+      "inRooms": "{{panos}} in {{rooms}}",
+      "views": "{{read}} of {{cut}} cut views read",
+      "noneCut": "none cut yet",
+      "uncut_one": "{{count}} pano not cut",
+      "uncut_other": "{{count}} panos not cut",
+      "areas_one": "{{count}} area found",
+      "areas_other": "{{count}} areas found",
+      "lastRead": "last read {{when}}",
+      "state": {
+        "read": "Read",
+        "partly": "Partly read",
+        "unread": "Not read"
+      },
+      "reading": "Reading the tour…",
+      "panosTitle": "Panos",
+      "galleryLabel": "Panos of {{tour}}",
+      "tile": {
+        "areas_one": "{{count}} area",
+        "areas_other": "{{count}} areas",
+        "none": "None found",
+        "partly": "Partly read",
+        "unread": "Not read"
+      },
+      "roomOnFloor": "F{{floor}} · {{room}}",
+      "unnamedRoom": "Unnamed room"
+    },
+    "context": {
+      "title": "What the reader is told",
+      "loss": "{{type}} loss",
+      "category": "category {{n}}",
+      "class": "class {{n}}",
+      "cause": "Stated cause: {{cause}}",
+      "noAccount": "The insured's account isn't on file.",
+      "showAll": "Show all",
+      "dateOfLoss": "Date of loss",
+      "toTour": "To the tour",
+      "toTourDays_one": "{{count}} day",
+      "toTourDays_other": "{{count}} days",
+      "built": "Built",
+      "carrier": "Carrier",
+      "property": "Property",
+      "from": "From {{sources}}.",
+      "source": {
+        "docusketch": "DocuSketch",
+        "job": "the job",
+        "xactanalysis": "XactAnalysis",
+        "drying": "drying reports"
+      },
+      "unlinked": "This tour isn't linked to a job, so the reader is told only what DocuSketch knows: the rooms and when each was captured.",
+      "nothing": "The job carries no loss details yet."
+    },
+    "rooms": {
+      "title": "Rooms",
+      "floor": "Floor {{floor}}",
+      "affectedDocusketch": "Affected per DocuSketch",
+      "affectedMarked": "Affected per marked areas",
+      "affectedBoth": "Affected per DocuSketch and marked areas",
+      "empty": "DocuSketch named no rooms on this tour"
+    },
+    "pano": {
+      "back": "Back to {{tour}}",
+      "floor": "Floor {{floor}}",
+      "captured": "captured {{when}}",
+      "facesLabel": "Faces of this pano",
+      "reading": "Reading the pano…",
+      "uncut": "This pano hasn't been cut into views yet",
+      "uncutMessage": "Opening it cuts its six views; they show here once the cut is done.",
+      "photo": "{{face}} view of {{room}}",
+      "faceAreas_one": "{{count}} area",
+      "faceAreas_other": "{{count}} areas",
+      "setAside": "{{count}} set aside",
+      "faceUnread": "Not read yet",
+      "faceRead": "read {{when}}",
+      "enlarge": "Enlarge",
+      "unread": "{{face}} hasn't been read yet",
+      "unreadMessage": "Read this pano, above, and the reader looks at it with the pano's other unread views.",
+      "nothing": "Nothing found on this view",
+      "nothingMessage": "The reader looked and marked no change here.",
+      "markedTitle": "Marked on this view",
+      "listLabel": "Marked on the {{face}} view"
+    },
+    "region": {
+      "sure": "{{percent}}% sure",
+      "basis": {
+        "seen": "seen in the photo",
+        "metered": "from a meter reading",
+        "ruled": "by a rule"
+      }
+    },
+    "understanding": {
+      "title": "What the reader understands",
+      "surfaces": "Surfaces",
+      "fixtures": "Fixtures",
+      "source": "Source of the loss",
+      "sourceSeen": "Seen: {{what}}",
+      "sourceSeenBare": "Seen",
+      "sourceNone": "None seen",
+      "contents": "Contents",
+      "construction": "Construction",
+      "couldNotSee": "Could not see",
+      "readBy": "Read by {{model}} under contract {{contract}}, {{when}}."
+    },
+    "drying": {
+      "title": "Drying in this room",
+      "material": "{{material}} read {{first}}, goal {{goal}} — {{verdict}}.",
+      "materialNoGoal": "{{material}} read {{first}}.",
+      "removed": "{{material}} removed.",
+      "wet": "wet",
+      "dry": "dry",
+      "affected": "Affected {{areas}}.",
+      "affectedArea": "{{surface}} {{sf}} SF",
+      "surface": {
+        "floor": "floor",
+        "wall": "wall",
+        "ceiling": "ceiling"
+      },
+      "above18": "Water rose above 18 inches.",
+      "report": "From the drying report of {{date}}.",
+      "none": "No drying report names this room."
+    },
+    "read": {
+      "planning": "Working out what a read would cost…",
+      "cutting": "Cutting this pano into its six views…",
+      "planFaces": "{{faces}} not read yet · {{cached}} of {{count}} read",
+      "viewCount_one": "{{count}} view",
+      "viewCount_other": "{{count}} views",
+      "plan_one": "{{count}} view · {{cached}} already read",
+      "plan_other": "{{count}} views · {{cached}} already read",
+      "planNone_one": "{{count}} view · none read yet",
+      "planNone_other": "{{count}} views · none read yet",
+      "planAll_one": "{{count}} view · all read",
+      "planAll_other": "{{count}} views · all read",
+      "readPano": "Read this pano",
+      "readingPano": "Reading this pano…",
+      "readingViews_one": "Reading {{count}} view. It takes about ten seconds.",
+      "readingViews_other": "Reading {{count}} views. It takes about ten seconds.",
+      "readAgain": "Read again",
+      "readingAgain": "Reading again…",
+      "againContext": "The job's details changed since this pano was read.",
+      "againContract": "Read under contract {{old}}; the reader now reads under {{current}}.",
+      "readRest": "Read the rest of this tour",
+      "readingRest": "Reading the rest…",
+      "stopRest": "Stop after this pano",
+      "rest": "{{panos}} · {{views}} not read yet",
+      "restOfTour": "Rest of this tour: {{panos}} · {{views}} not read yet",
+      "allRead": "Every pano of this tour is read.",
+      "walking": "Reading {{index}} of {{total}}",
+      "walkingShare": "{{percent}}%",
+      "stopped": "Stopped at {{index}} of {{total}}. {{reason}}.",
+      "skipped_one": "{{count}} pano could not be cut into views and was passed over.",
+      "skipped_other": "{{count}} panos could not be cut into views and were passed over.",
+      "cached": "Nothing new to read: every view was already read.",
+      "partial": "{{failed}} of {{count}} views could not be read. {{reason}}.",
+      "refused": {
+        "budget": "Today's reading budget is spent",
+        "budgetFleet": "Today's reading budget is spent: {{used}} of {{cap}} reads",
+        "budgetTour": "This tour's reading budget for today is spent: {{used}} of {{cap}} reads",
+        "flag_off": "Reading is switched off in shadow-connector",
+        "restorly_ai_off": "Restorly's AI switch is off",
+        "gemini_off": "The house's Gemini switch is off",
+        "no_key": "shadow-connector has no Gemini key",
+        "permanent": "The reader's model turned every view down; it may have been retired",
+        "views_refused": "This pano's photo could not be cut into views",
+        "unreachable": "shadow-connector can't be reached",
+        "no_secret": "CloudCLI could not read shadow-connector's internal secret",
+        "unreadable": "shadow-connector sent an answer CloudCLI can't read",
+        "gone": "This pano is no longer on its tour",
+        "failed": "The read could not be sent",
+        "other": "Reading was refused ({{reason}})"
+      }
     }
   },
   "applications": {

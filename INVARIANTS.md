@@ -10036,3 +10036,367 @@ measured 2026-10-16 by chain chain-trailing-old-message-20261016-182307-9d20, fi
 probe-key: a4738a37326b696e2545993f2a47495e6c5433e4
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-sessions.provider.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/services/session-conversations-search.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/claude-transcript-rows.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/local-commands.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/trailing-message-kit.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/trailing-old-message-before.sh, /home/lyphe/.claude/claudecodeui_lyphe/.verify/trailing-old-message-proof.mjs
+
+## INV-8633 — The affected-areas lane reads the secret from shadow-connector's env file at call time and copies it nowhere; the allowlist is the only door
+
+Rules for `server/modules/affected-areas/` (manual: MAN-8559):
+
+1. `EIS_INTERNAL_SECRET` is never written to `process.env`, this server's `.env`, a log line or an error message. why: a copy drifts on rotation, and the agent sessions this server spawns inherit its environment.
+2. `describeFailure` uses only an error's NAME and its cause's CODE, never its message. why: a transport error can quote the request, and the request carries the secret.
+3. Only `affected-areas.module.ts` reads `SHADOW_CONNECTOR_URL` / `SHADOW_CONNECTOR_ENV_FILE`. why: a scratch engine or an empty env file is proven by setting the variable before `createAffectedAreasModule()`.
+4. A new engine route reaches the browser only as a row of `ALLOWLIST` with its id rules, query rules and body kind. why: an unlisted path is the lane's own 404 and a bad id a 422 before any byte leaves; the lane never forwards a caller-invented path or query key.
+5. The lane never reshapes an upstream body: status and JSON pass through whole; only lane faults carry `{ error }`.
+6. `fetch` keeps `redirect: 'manual'`. why: the secret header must not follow a `Location`.
+
+Trap: a unit that exports `EIS_INTERNAL_SECRET` in its own environment overrides `.env` for the engine (`main.py` calls `load_dotenv()` with its default `override=False`, so the process environment wins) but not for the lane, which reads only the file: the two then disagree and every forward is the engine's 403. Read from the code 2026-10-17; not reproduced.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/affected-areas/affected-areas.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/affected-areas/affected-areas.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/affected-areas/affected-areas.service.ts
+
+## INV-8634 — probe — (LOW) — the `affectedAreas` block comment's account of failure bodies leaves out two bodies the lane really sends
+
+(LOW) — the `affectedAreas` block comment's account of failure bodies leaves out two bodies the lane really sends
+
+```probe
+D=$(mktemp -d /tmp/athena-p1.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+D="$(cd "$(dirname "$0")" && pwd)"
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+cat > "$D/p.mts" <<'MTS'
+import { execFileSync } from 'node:child_process';
+import { loginToken } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/whole-check-kit.mjs';
+const tok = loginToken();
+for (const p of ['/tours/zzz', '/nope', '/tours/ffffffffffffffffffffffff']) {
+  const r = execFileSync('curl', ['-s', '-m', '30', '-w', ' -> %{http_code}', '-H', 'Authorization: Bearer ' + tok, 'http://127.0.0.1:3011/api/affected-areas' + p], { encoding: 'utf8' });
+  console.log(p.padEnd(34), r);
+}
+MTS
+TSX_TSCONFIG_PATH=tsconfig.json node --import tsx "$D/p.mts"
+EOF
+bash "$D/p.sh"
+cd /tmp && case "$D" in /tmp/athena-p1.*) rm -r "$D";; esac
+grep -n -E "a refusal is|marks routes' .Refusal" /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts || echo "comment-gone"
+expect: three lines — `422 {"error":"tour must be 24 …"}`, `404 {"error":"not a route of the affected-areas lane"}`, `404 {"detail":"no such tour"}` — beside the api.ts comment that names only 503/502 and the marks `Refusal`; cured when the grep prints `comment-gone` or the comment names the 422/404 `{error}` and the reader routes' `{detail}` bodies
+```
+
+measured 2026-10-17 by chain chain-tour-affected-areas--viewer--types-20261017-113212-78fd, finding L1, LOW
+probe-key: f1f48aa7db5ca1f0db67d7e975b6ac81a0a7dc79
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/affected-areas-types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts
+
+## INV-8644 — probe — LOW — The gallery tag is 3.55:1 over a white photo, and neither the sheet nor the report says so
+
+LOW — The gallery tag is 3.55:1 over a white photo, and neither the sheet nor the report says so
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX)
+cat > "$D/p.mjs" <<'EOF'
+import { open } from '/home/lyphe/.claude/state/pipeline-reviews/tour-affected-areas--viewer--library/athena-kit.mjs';
+const { page, browser } = await open();
+try {
+  await page.evaluate(() => { const k = document.createElement('canvas'); k.width = k.height = 100; const g = k.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, 100, 100); window.__white = k.toDataURL('image/png'); });
+  await page.evaluate(() => { const m = window.__mountReact, ui = window.__ui; return m.mount('t', m.h('div', { style: { width: 240 } }, m.h(ui.Gallery, { items: [{ id: 'x', src: window.__white, tag: 'Ceiling' }], label: 'L' }))); });
+  await page.waitForTimeout(1000);
+  const at = await page.evaluate(() => { const r = document.querySelector('#t .vv-gallery__tag').getBoundingClientRect(); return [r.left + 2, r.top + r.height / 2]; });
+  const png = await page.screenshot({ clip: { x: Math.round(at[0]), y: Math.round(at[1]), width: 1, height: 1 } });
+  const px = await page.evaluate(async (d) => { const im = new Image(); im.src = d; await im.decode(); const c = document.createElement('canvas'); c.width = c.height = 1; const g = c.getContext('2d'); g.drawImage(im, 0, 0); return [...g.getImageData(0, 0, 1, 1).data].slice(0, 3); }, 'data:image/png;base64,' + png.toString('base64'));
+  const lum = (a) => { const f = (v) => { v /= 255; return v <= .03928 ? v / 12.92 : ((v + .055) / 1.055) ** 2.4; }; return .2126 * f(a[0]) + .7152 * f(a[1]) + .0722 * f(a[2]); };
+  console.log('white tag ink over its scrim on an all-white photo: scrim pixel', JSON.stringify(px), '-> contrast', (1.05 / (lum(px) + .05)).toFixed(2) + ':1 (AA small text is 4.5:1)');
+} finally { await browser.close(); }
+EOF
+node "$D/p.mjs"
+expect: today contrast 3.55:1; cured (a darker scrim) 4.5:1 or more
+```
+
+measured 2026-10-17 by chain chain-tour-affected-areas--viewer--library-20261017-115408-9359, finding L5, LOW
+probe-key: 2890e8a5da79b7b74745bd594f6024f790079fdb
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/common.json, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Gallery.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/PhotoFill.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/RegionImage.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/verve/media.css
+
+## INV-8662 — probe — . The script's "nothing scrolls sideways" check measures the Context card, so it cannot see the room list overflow (`affected-areas-rooms.mjs:140`)
+
+. The script's "nothing scrolls sideways" check measures the Context card, so it cannot see the room list overflow (`affected-areas-rooms.mjs:140`)
+
+```probe
+D=$(mktemp -d /tmp/aa-sideways.XXXXXX)
+grep -n 'role="region"\]\[aria-labelledby\]' /home/lyphe/.claude/claudecodeui_lyphe/.verify/affected-areas-rooms.mjs || echo "selector line: none"
+cat > "$D/p.mjs" <<'EOF'
+import { openConsole, resize } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/console.mjs';
+import { openCerberusTab } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/node-card.mjs';
+const session = await openConsole({ viewport: { width: 1280, height: 900 } });
+const { page } = session;
+try {
+  await openCerberusTab(page);
+  await page.getByRole('tab', { name: 'Tours', exact: true }).click();
+  const panel = page.locator('[role="tabpanel"][aria-label="Tours"]');
+  const search = panel.getByRole('searchbox', { name: 'Search by customer, claim or address' });
+  await search.waitFor({ timeout: 20000 });
+  await search.fill('Mimi Winer');
+  const rows = panel.locator('ul button', { hasText: 'Mimi Winer' });
+  await rows.first().waitFor({ timeout: 20000 });
+  await page.waitForTimeout(900);
+  await rows.first().click();
+  const region = page.getByRole('region', { name: 'Rooms' });
+  await region.waitFor({ timeout: 20000 });
+  await resize(page, { width: 390, height: 844 });
+  await region.locator('ul > li').first().evaluate((li) => { li.style.minWidth = '900px'; });
+  await page.waitForTimeout(300);
+  const script = await page.evaluate(() => { const c = document.querySelector('[role="region"][aria-labelledby]'); return { page: document.documentElement.scrollWidth - window.innerWidth, card: c === null ? 0 : c.scrollWidth - c.clientWidth, cardTitle: c?.querySelector('h3')?.textContent ?? null }; });
+  const rooms = await region.evaluate((el) => el.scrollWidth - el.clientWidth);
+  console.log('script measure:', JSON.stringify(script), '| rooms region overflow:', rooms);
+} catch (error) { console.log('probe error:', String(error).slice(0, 200)); }
+finally { await session.browser.close(); }
+EOF
+( cd /home/lyphe/.claude/claudecodeui_lyphe && timeout 200 node "$D/p.mjs" )
+expect: script measure {"page":0,"card":0,"cardTitle":"What the reader is told"} while the rooms region overflow is 544 (the check reads the Context card; cured when the title it reads is "Rooms" or the script's number moves with the injection)
+```
+
+measured 2026-10-17 by chain chain-tour-affected-areas--rooms--fill-20261017-144953-e97f, finding M1, MEDIUM
+probe-key: d7a7b786c580cad4642fdf30546df2091da2f924
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/affected-areas-rooms.mjs
+
+## INV-8663 — probe — . The script photographs and measures the light theme only
+
+. The script photographs and measures the light theme only
+
+```probe
+grep -c "dark" /home/lyphe/.claude/claudecodeui_lyphe/.verify/affected-areas-rooms.mjs || echo none
+expect: 0 (cured when the script runs a dark pass)
+```
+
+measured 2026-10-17 by chain chain-tour-affected-areas--rooms--fill-20261017-144953-e97f, finding L1, LOW
+probe-key: 5a6c71947ea10f92b0fa71ce171ba38d0e7b5d9c
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/affected-areas-rooms.mjs
+
+## INV-8664 — probe — MEDIUM — INV-2337 says a changed fold "leaves a room unmatched with no error"; a changed `fold_rooms` signature raises into every estimate, marks or none
+
+MEDIUM — INV-2337 says a changed fold "leaves a room unmatched with no error"; a changed `fold_rooms` signature raises into every estimate, marks or none
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.py" <<'EOF'
+import sys
+sys.path.insert(0, "/opt/shadow-connector")
+import core.preliminary_estimator.marked_areas as M
+import core.preliminary_estimator.room_list as R
+def fold_rooms_v2(entries, *, strict):          # the fold with a changed signature
+    raise AssertionError("unreachable")
+M.fold_rooms = fold_rooms_v2
+pano = (b"", "image/jpeg", {"room_name": "Kitchen", "floor": 1, "ceiling_height_ft": 8.0, "is_affected": False})
+try:
+    out = R.with_marked_areas(R.group_by_room([pano]), frozenset())          # a tour with NOTHING standing
+    print("changed fold signature, no marks: returned", len(out), "group(s)")
+except Exception as exc:
+    print("changed fold signature, no marks: RAISED", type(exc).__name__)
+EOF
+cat > "$D/p.sh" <<'EOF'
+cd /opt/shadow-connector && venv/bin/python -I "$1/p.py" 2>&1 | tail -2
+docstore get INV-2337 --text | grep -c "or a changed fold, leaves a room unmatched with no error"
+EOF
+bash "$D/p.sh" "$D"
+expect: "changed fold signature, no marks: RAISED TypeError" and 1 while the row says a changed fold leaves a room unmatched; a row that says only the engine is guarded prints the same RAISED line and 0
+```
+
+measured 2026-10-17 by chain chain-tour-affected-areas--rooms--docs-20261017-151147-c858, finding M1, MEDIUM
+probe-key: c5007ed117da8f11884ee4f185e6aa76ae881a06
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/
+
+## INV-8665 — probe — LOW — MAN-8573's "19 of 60 recent tours … 8 of those" drops the population that makes it true
+
+LOW — MAN-8573's "19 of 60 recent tours … 8 of those" drops the population that makes it true
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.py" <<'EOF'
+import asyncio, logging, sys
+sys.path.insert(0, "/opt/shadow-connector")
+logging.disable(logging.CRITICAL)
+from core import db
+from extractors.docusketch.panoramas import fetch_tour
+from core.field_monitoring_engine.room_matcher import canonical_key
+async def measure(where):
+    rows = await db.fetch(f"select tour_id from docusketch_tours {where} order by created_by_user desc nulls last limit 60")
+    multi = rep = 0
+    for r in rows:
+        got = await fetch_tour(r["tour_id"])
+        if not got: continue
+        panos = got[1]
+        if len({p.floor for p in panos if p.floor is not None}) > 1:
+            multi += 1
+            kf = {}
+            for p in panos:
+                if p.floor is not None and p.room: kf.setdefault(canonical_key(p.room), set()).add(p.floor)
+            rep += any(len(v) > 1 for v in kf.values())
+    return multi, rep
+async def main():
+    print("newest 60 tours:", await measure(""), "| newest 60 with panorama_count >= 12:", await measure("where panorama_count >= 12"))
+    print("MAN-8573 says:", [l for l in open("/opt/shadow-connector/core/affected_areas/judgment/MANUAL.md") if "recent tours" in l][0][:120].strip())
+asyncio.run(main())
+EOF
+cat > "$D/p.sh" <<'EOF'
+cd /opt/shadow-connector && venv/bin/python -I "$1/p.py" 2>&1 | tail -3
+EOF
+bash "$D/p.sh" "$D"
+expect: "newest 60 tours: (14, 7) | newest 60 with panorama_count >= 12: (19, 8)" and a row line that says "19 of 60 recent tours" without "12+ panos" while the qualifier is missing (the tallies drift as tours arrive; the point is that the unfiltered sample does not give 19)
+```
+
+measured 2026-10-17 by chain chain-tour-affected-areas--rooms--docs-20261017-151147-c858, finding L1, LOW
+probe-key: be1b37f55a36ab3354dd33564c06a8dd7ff5db6f
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/
+
+## INV-8666 — probe — LOW — MAN-3036's `section_path` still reads "(5,753 LOC)" beside a title of "(6,036 LOC)"
+
+LOW — MAN-3036's `section_path` still reads "(5,753 LOC)" beside a title of "(6,036 LOC)"
+
+```probe
+cd /opt/shadow-connector && docstore get MAN-3036 | python3 -c "import sys,json;r=json.load(sys.stdin)['row'];print(r['title'],'|',r['section_path'])"
+expect: "Module inventory (6,036 LOC) | README/012 Module inventory (5,753 LOC)" while stale; both totals equal once healed
+```
+
+measured 2026-10-17 by chain chain-tour-affected-areas--rooms--docs-20261017-151147-c858, finding L2, LOW
+probe-key: f3aaea73e17e1d9fc10767d72cc6fdb7ef065b81
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/
+
+## INV-8667 — probe — LOW — the three files that APPLY the marked areas surface none of the rows that describe them
+
+LOW — the three files that APPLY the marked areas surface none of the rows that describe them
+
+```probe
+cd /opt/shadow-connector && for f in marked_areas room_list orchestrator contents __init__; do printf "%s: " $f; docstore govern core/preliminary_estimator/$f.py --text --limit 60 2>/dev/null | grep -o "^MAN-3035\|^INV-2337\|^MAN-8574" | sort | tr '\n' ' '; echo; done
+expect: "orchestrator: ", "contents: ", "__init__: " empty, "marked_areas: MAN-8574", "room_list: INV-2337 MAN-8574" while ungoverned; each line non-empty once the governs sets are widened
+```
+
+measured 2026-10-17 by chain chain-tour-affected-areas--rooms--docs-20261017-151147-c858, finding L3, LOW
+probe-key: 61e44d3b46a5862d5d8a6fa448b580b1c62e73ce
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/
+
+## INV-8668 — probe — LOW — MAN-8577 still says the rooms check "has not been run end to end; its dark pass has never executed"
+
+LOW — MAN-8577 still says the rooms check "has not been run end to end; its dark pass has never executed"
+
+```probe
+cd /opt/shadow-connector && docstore get MAN-8577 --text | grep -c "has not been run end to end"
+expect: 1 while the stale status stands; 0 once the row records the run (`cd /home/lyphe/.claude/claudecodeui_lyphe && node .verify/affected-areas-rooms.mjs --tour 6acd745c36f92c16415b6f97 --evidence "$(mktemp -d /tmp/aa-rooms.XXXXXX)"` printed "26 PASS, 0 FAIL" and exit 0 at the review)
+```
+
+measured 2026-10-17 by chain chain-tour-affected-areas--rooms--docs-20261017-151147-c858, finding L4, LOW
+probe-key: 910a2af6245c453903f98e95f2f68639e0fe48aa
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/
+
+## INV-8669 — probe — LOW — MAN-3035 states that `water_remediation.txt` carries no `{room_list}` but not what that means: a Water narrative never sees the marked areas
+
+LOW — MAN-3035 states that `water_remediation.txt` carries no `{room_list}` but not what that means: a Water narrative never sees the marked areas
+
+```probe
+cd /opt/shadow-connector && grep -c "{room_list}" core/preliminary_estimator/prompts/water_remediation.txt core/preliminary_estimator/prompts/room_discovery.txt; docstore get MAN-3035 --text | grep -c "Water"
+expect: "water_remediation.txt:0", "room_discovery.txt:1" and a "Water" count of 0 for MAN-3035 while the row is silent about the Water narrative
+```
+
+measured 2026-10-17 by chain chain-tour-affected-areas--rooms--docs-20261017-151147-c858, finding L5, LOW
+probe-key: 3cb83b06247521d690c82ed1ae10ba6b77ad6115
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/
+
+## INV-8670 — probe — LOW — "the one home of the repeat-shot rule" in MAN-3037 and INV-2337 is unscoped; `_pano_seed` strips ` #N` by its own regex
+
+LOW — "the one home of the repeat-shot rule" in MAN-3037 and INV-2337 is unscoped; `_pano_seed` strips ` #N` by its own regex
+
+```probe
+cd /opt/shadow-connector && grep -n "_SHOT_SUFFIX" extractors/docusketch/panoramas.py core/sketch_forge/_pano_seed.py | head -4; docstore get MAN-3037 --text | grep -c "the one home of the repeat-shot rule"
+expect: two `_SHOT_SUFFIX…` definitions (panoramas.py:67 and _pano_seed.py:54) and a count of 1 while MAN-3037 says "the one home" unscoped
+```
+
+measured 2026-10-17 by chain chain-tour-affected-areas--rooms--docs-20261017-151147-c858, finding L6, LOW
+probe-key: 02fcf21b7c1ab10735441ae3b9a45d241ecaa80c
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/
+
+## INV-8671 — probe — LOW — two of the five seam runs the brief asked for are not in the report, and the required search does not print two of its three subjects
+
+LOW — two of the five seam runs the brief asked for are not in the report, and the required search does not print two of its three subjects
+
+```probe
+cd /opt/shadow-connector && docstore search "affected rooms marked areas preliminary estimator authority" --text | cut -c1-60
+expect: two lines (MAN-8574, MAN-8573) while the Architecture row and the Tours-view room-list row are not findable by the brief's own words; four once MAN-3035 and MAN-8578 carry them in their titles
+```
+
+measured 2026-10-17 by chain chain-tour-affected-areas--rooms--docs-20261017-151147-c858, finding L7, LOW
+probe-key: a67a6cb79a3c89a42d0addefb4d99d5900d04af5
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/
+
+## INV-8672 — probe — (MEDIUM) — A Read this pano pressed while a never-cut pano is still being cut leaves the faces unread after the read lands
+
+(MEDIUM) — A Read this pano pressed while a never-cut pano is still being cut leaves the faces unread after the read lands
+
+```probe
+cd /home/lyphe/.claude/claudecodeui_lyphe && node /home/lyphe/.claude/state/pipeline-reviews/tour-affected-areas--viewer--fill/athena-probes/uncut-press.mjs 150
+expect: the "t+8 s (answered)" line reads "6 views · all read" with "Not read yet" and captions "Ahead,Right,Behind,Left,Ceiling,Floor" with no counts (cured: captions "Ahead,Right1,Behind3,Left1,Ceiling1,Floor1", the same as `… uncut-press.mjs 3500`); if Israel Serrano has no never-cut pano left it prints that and exits
+```
+
+measured 2026-10-17 by chain chain-tour-affected-areas--viewer--fill-20261017-140745-860f, finding M1, MEDIUM
+probe-key: 9a6c57fd7923a05cfd12596bf0554d027bcb40ae
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/hooks/useImageUrl.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/hooks/useLaneRead.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/hooks/usePano.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/utils/laneTrouble.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/CerberusPanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/common.json, /home/lyphe/.claude/claudecodeui_lyphe/.verify/affected-areas-view.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/affected-areas-walk.mjs
+
+## INV-8673 — probe — (LOW) — still open (builder-acknowledged): the tour screen fetches every cut pano's photo, not the 24 it draws
+
+(LOW) — still open (builder-acknowledged): the tour screen fetches every cut pano's photo, not the 24 it draws
+
+```probe
+cd /home/lyphe/.claude/claudecodeui_lyphe && node /home/lyphe/.claude/state/pipeline-reviews/tour-affected-areas--viewer--fill/athena-probes/tile-overfetch.mjs
+expect: "image requests after the tour opens: 30 | unique shas: 30 | tiles drawn: 24" (cured: ≤ 24)
+```
+
+measured 2026-10-17 by chain chain-tour-affected-areas--viewer--fill-20261017-140745-860f, finding L1, LOW
+probe-key: a7177ed89906e14a4ad694f7ee445c78b126b296
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/hooks/useImageUrl.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/hooks/useLaneRead.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/hooks/usePano.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/utils/laneTrouble.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/CerberusPanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/common.json, /home/lyphe/.claude/claudecodeui_lyphe/.verify/affected-areas-view.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/affected-areas-walk.mjs
+
+## INV-8674 — probe — (LOW) — Read the rest stops at a pano the engine cannot cut, though the engine's own walker goes past it
+
+(LOW) — Read the rest stops at a pano the engine cannot cut, though the engine's own walker goes past it
+
+```probe
+cd /home/lyphe/.claude/claudecodeui_lyphe && node /home/lyphe/.claude/state/pipeline-reviews/tour-affected-areas--viewer--fill/athena-probes/walk-skip-refused.mjs
+expect: "walk of 5 unread panos; presses sent: 2" and "Stopped at 2 of 5." (cured: 5 presses, the refused pano said in words)
+```
+
+measured 2026-10-17 by chain chain-tour-affected-areas--viewer--fill-20261017-140745-860f, finding L2, LOW
+probe-key: 4d00c3f04300f04476c3c0ff5dc5b4e10d89dc93
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/hooks/useImageUrl.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/hooks/useLaneRead.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/hooks/usePano.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/utils/laneTrouble.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/CerberusPanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/common.json, /home/lyphe/.claude/claudecodeui_lyphe/.verify/affected-areas-view.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/affected-areas-walk.mjs
+
+## INV-8675 — probe — (LOW) — A never-cut pano whose cut failed to answer has no Try again
+
+(LOW) — A never-cut pano whose cut failed to answer has no Try again
+
+```probe
+cd /home/lyphe/.claude/claudecodeui_lyphe && node /home/lyphe/.claude/state/pipeline-reviews/tour-affected-areas--viewer--fill/athena-probes/uncut-503.mjs
+expect: "alerts":["shadow-connector can't be reached"] and "buttons":["Israel Serrano","Read this pano","Read the rest of this tour"] with no Try again (cured: a Try again button); if Israel Serrano has no never-cut pano left it prints that
+```
+
+measured 2026-10-17 by chain chain-tour-affected-areas--viewer--fill-20261017-140745-860f, finding L3, LOW
+probe-key: 3ea2d1ac777ea3fde8a56e570c07c5ed9a6b6555
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/hooks/useImageUrl.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/hooks/useLaneRead.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/hooks/usePano.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/utils/laneTrouble.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/CerberusPanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/common.json, /home/lyphe/.claude/claudecodeui_lyphe/.verify/affected-areas-view.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/affected-areas-walk.mjs
+
+## INV-8676 — probe — (LOW) — An in-flight press is forgotten when another pano is opened and the first one comes back
+
+(LOW) — An in-flight press is forgotten when another pano is opened and the first one comes back
+
+```probe
+cd /home/lyphe/.claude/claudecodeui_lyphe && node /home/lyphe/.claude/state/pipeline-reviews/tour-affected-areas--viewer--fill/athena-probes/inflight.mjs
+expect: line "back on A, A still in flight" reads btn ["Read this pano"], busy 0, armedSoFar 1 (cured: ["Reading this pano…"], busy 1)
+```
+
+measured 2026-10-17 by chain chain-tour-affected-areas--viewer--fill-20261017-140745-860f, finding L4, LOW
+probe-key: 5aae3c8d51a81dfcf76a3b9748aec062a3a61077
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/hooks/useImageUrl.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/hooks/useLaneRead.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/hooks/usePano.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/utils/laneTrouble.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/CerberusPanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/common.json, /home/lyphe/.claude/claudecodeui_lyphe/.verify/affected-areas-view.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/affected-areas-walk.mjs

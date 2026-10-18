@@ -73,6 +73,7 @@ import { createDispatchSoulsModule } from './modules/dispatch-souls/index.js';
 import { createHealModule } from './modules/heal/index.js';
 import { createAgentLaunchModule } from './modules/agent-launch/index.js';
 import { createJevModule } from './modules/jev/index.js';
+import { createAffectedAreasModule } from './modules/affected-areas/index.js';
 import { createDispatcherModule } from './modules/dispatcher/index.js';
 import { createRoadmapModule } from './modules/roadmap/index.js';
 import { createUniverseModule } from './modules/universe/index.js';
@@ -344,6 +345,12 @@ app.use('/api/agent-launch', authenticateToken, createAgentLaunchModule().router
 // Jev's spend, consumers and live feed — protected, the operator's usage record
 const jev = createJevModule();
 app.use('/api/jev', authenticateToken, jev.router);
+
+// Tour affected areas — shadow-connector's `/api/affected-areas`, forwarded over loopback (protected).
+// That surface is internal-caller gated (R-CAP-11) even from loopback; this lane is the one hop that
+// holds its secret, read from shadow-connector's own env file at call time, so the browser never does.
+const affectedAreas = createAffectedAreasModule();
+app.use('/api/affected-areas', authenticateToken, affectedAreas.router);
 
 // The launcher souls a session started by hand — the poll behind the `soul_launch_state` frame that
 // pins each one in its own chat's rows (protected). Built out here for the same

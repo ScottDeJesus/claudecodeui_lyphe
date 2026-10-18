@@ -1046,11 +1046,11 @@ which is what earns a component in this house. Every screen composes them; none 
   steal the clicks of whatever that application draws flush against its edge. It carries
   `SPLIT_MIN_RATIO` and `SPLIT_MAX_RATIO` (0.15 and 0.85) and moves by
   0.02 per arrow key.
-- **`usePointerDrag.ts`** — the one drag mechanism all of them, and the sortable lists' carry (`src/shared/ui/sortable/`, MAN-7577), run on. It lives with the kit rather
+- **`usePointerDrag.ts`** — the one drag mechanism all of them, the sortable lists' carry (`src/shared/ui/sortable/`, MAN-7577) and `RegionImage`'s drawn box (`RegionDrawLayer`, MAN-8579), run on. It lives with the kit rather
   than in `src/shared/hooks/`, and is not exported from the barrel: the frontend standard sends a
   hook used by multiple FEATURE modules to `src/shared/hooks/`, and this one has none — what binds
   it here is direction, since it writes class names whose only meaning is in the kit's own
-  stylesheet and its `PointerDragKind` (`'fab' | 'split' | 'resize' | 'sort'`) names the kit's gestures. The options `accept`, `captureOnStart`, `holdMs` and `onStart`, and the `cancelled` flag of the `onEnd` payload, serve the sortable carry (MAN-7577); the other three consumers leave them unset.
+  stylesheet and its `PointerDragKind` (`'fab' | 'split' | 'resize' | 'sort' | 'draw'`) names the kit's gestures. The options `accept`, `captureOnStart`, `holdMs` and `onStart`, and the `cancelled` flag of the `onEnd` payload, serve the sortable carry (MAN-7577); the other consumers leave them unset, `draw` reading `cancelled` alone (a drag the browser took away reports no box).
 - **`ResizeGrip.tsx`** — a button the caller stands at one corner of
   a panel, dragged to size it; its one caller outside the kit is chat-host's `ChatHostPanel` (MAN-7491). It
   paints and never places. Props: `label` (aria-label), `corner` (`'top-left' | 'top-right' |

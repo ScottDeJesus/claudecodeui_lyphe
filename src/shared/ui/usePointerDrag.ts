@@ -3,8 +3,8 @@ import { type PointerEvent as ReactPointerEvent, useCallback, useEffect, useRef 
 import { beginPan, paneToPan } from '@/shared/ui/sortable/touchPan';
 import type { Pan } from '@/shared/ui/sortable/touchPan';
 
-/** The four gestures this hook serves, and the two body classes a drag of any one sets. */
-export type PointerDragKind = 'fab' | 'split' | 'resize' | 'sort';
+/** The five gestures this hook serves, and the two body classes a drag of any one sets. */
+export type PointerDragKind = 'fab' | 'split' | 'resize' | 'sort' | 'draw';
 
 /** Where a drag is, and how far it has come: absolute client coordinates plus the delta from the press. */
 export type PointerDragPoint = { x: number; y: number; dx: number; dy: number };
@@ -44,9 +44,10 @@ type Gesture = {
 
 /**
  * The kit's one pointer-drag mechanism: what `DockableFab`'s drag, `SplitPane`'s seam, `ResizeGrip`'s
- * corner and the sortable lists' carry (`sortable/useSortable.ts`) all run on.
+ * corner, the sortable lists' carry (`sortable/useSortable.ts`) and `RegionImage`'s drawn box
+ * (`RegionDrawLayer`) all run on.
  *
- * It lives here, beside its only four consumers, and it is deliberately NOT in the barrel: what
+ * It lives here, beside its only five consumers, and it is deliberately NOT in the barrel: what
  * `src/shared/ui/index.ts` re-exports is components, and it is not one. It is also deliberately not in
  * `src/shared/hooks/`: this repo's frontend standard sends a hook that multiple FEATURE modules use
  * there, and this one has none. What binds it to the kit is direction — it writes `vv-dragging` and

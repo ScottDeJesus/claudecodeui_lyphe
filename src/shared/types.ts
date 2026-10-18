@@ -3,6 +3,7 @@ import type { TFunction } from 'i18next';
 import type { ComponentType, HTMLAttributes, ReactNode } from 'react';
 import type { NavigateFunction } from 'react-router-dom';
 
+import type { ReadResult } from '@/shared/affected-areas-types';
 import type { AppEntry } from '@/shared/app-types';
 import type { CerberusNodeView, CerberusServiceView, CerberusStatus } from '@/shared/cerberus-types';
 
@@ -349,6 +350,62 @@ export type ConfirmDialogAction = {
   onSelect: () => void;
   busy?: boolean;
   disabled?: boolean;
+};
+
+// ---------------------------
+
+//----------------- VERVE MEDIA (PHOTOS, REGIONS, GALLERY) ------------
+
+/**
+ * One region the kit's `RegionImage` draws over a photo, already translated into looks: the caller
+ * turns its own record (a read's region and the operator's mark on it) into this, so the piece knows
+ * nothing of any domain. `polygon` is the outline as `[x, y]` points and `box` is `[x0, y0, x1, y1]`,
+ * both in 0..1 of the image and drawn as stored — no pixel conversion exists anywhere to get wrong.
+ * `ordinal` is the number on the badge and `label` the region's name; the two meet in the
+ * `aria-label` "{ordinal}. {label}" and the label is never drawn on the photo, because the number on the
+ * photo is how the reader finds the row in the list beside it. `tone` lands as `data-tone`, `edge`
+ * and `wash` choose the outline's dash and how much of the tone floods the inside.
+ */
+export type RegionShape = {
+  id: string;
+  ordinal: number;
+  polygon: number[][];
+  box: number[];
+  tone: Tone;
+  edge: 'solid' | 'dashed';
+  wash: 'full' | 'light' | 'none';
+  label: string;
+};
+
+/**
+ * One tile of the kit's `Gallery`. `tag` is the word every tile carries (a room's name), `src` the photo
+ * or `null` for the neutral tile Verve draws where a photo is missing, and `badge` an optional short mark
+ * the caller wants beside it (a count, a state), shown as given.
+ */
+export type GalleryItem = {
+  id: string;
+  src: string | null;
+  tag: string;
+  badge?: string | null;
+};
+
+// ---------------------------
+
+//----------------- VERVE DATA TABLE ------------
+
+/**
+ * One column of the kit's `DataTable`: the caller says what its head reads, how a row fills its cell, and —
+ * only if the column should sort — what a row is sorted BY. `key` names the column to `onSort` and to the
+ * `sort` the caller holds. `sortValue` is what makes a column sortable: the table orders its rows by it
+ * (numbers numerically, text by locale, `null` always last) and draws the sort arrows on that head; a column
+ * without one is plain. `align: 'end'` sets a number's column flush right, head and cells together.
+ */
+export type DataTableColumn<Row> = {
+  key: string;
+  label: string;
+  align?: 'start' | 'end';
+  sortValue?: (row: Row) => number | string | null;
+  render: (row: Row) => ReactNode;
 };
 
 // ---------------------------
@@ -2558,10 +2615,56 @@ export type CerberusEnrollRefusal =
 // What the Cerberus tab's root (`src/modules/cerberus/CerberusPanel.tsx`) holds between presses.
 
 /**
- * The Cerberus tab's views, in the order its strip offers them: Fleet, Catalog, then History. The root's
+ * The Cerberus tab's views, in the order its strip offers them: Fleet, Catalog, History, then Tours. The root's
  * view table gives each its name and its hint.
  */
-export type CerberusView = 'fleet' | 'catalog' | 'history';
+export type CerberusView = 'fleet' | 'catalog' | 'history' | 'tours';
+
+// ---------------------------
+
+//----------------- AFFECTED AREAS: THE TOURS VIEW ------------
+// What the affected-areas module's hooks hand its view root, and the root hands its screens
+// (`src/modules/affected-areas/`). The wire's own shapes are `@/shared/affected-areas-types`.
+
+/**
+ * Why a read or a press of the affected-areas lane brought no answer, as the Tours view says it:
+ * `no_secret` (the lane could not read shadow-connector's internal secret, 503), `unreachable` (no answer
+ * in time, 503), `unreadable` (an answer that is not JSON, 502), `gone` (no such tour or pano, 404) and
+ * `failed` (any other refusal). Set by the module's hooks from the lane's body and drawn by its screens
+ * as one banner with Try again.
+ */
+export type AffectedAreasTrouble = 'no_secret' | 'unreachable' | 'unreadable' | 'gone' | 'failed';
+
+/**
+ * One read of the affected-areas lane as a Tours screen draws it: `value` is the answer, null until one
+ * arrives; `trouble` is why the last read brought none, null while reading and once answered; `retry`
+ * reads again. Both null is loading. Returned by the module's read hooks (`useTours`, `useTour`,
+ * `usePano`, `useCodebook`) and handed by the view root to its screens.
+ */
+export type AffectedAreasRead<T> = { value: T | null; trouble: AffectedAreasTrouble | null; retry: () => void };
+
+/**
+ * The open pano's read press as `ReadControl` draws it: `plan` is the dry run's answer (what a read would
+ * buy), null while it is out; `pressing` is the press that is out, Read this pano (`read`) or Read again
+ * (`again`); `last` is the last press's answer, whose refusal or partial read is said in words; `trouble`
+ * is the lane's fault when a press brought no answer at all. Held by `usePano` beside the pano it presses.
+ */
+export type PanoPress = {
+  plan: ReadResult | null;
+  pressing: 'read' | 'again' | null;
+  last: ReadResult | null;
+  trouble: AffectedAreasTrouble | null;
+};
+
+/**
+ * The walk of a tour's unread panos (`useTourReader`): one armed read at a time, in capture order.
+ * `index` is the pano being read, 1-based, of `total`; `lastRefusal` is the reason code the walk stopped
+ * at (shadow-connector's, such as `budget`, or the lane's, such as `unreachable`), null while it runs and
+ * once it ends clean; `skipped` counts the panos it passed over because their views could not be cut
+ * (`views_refused`, a refusal of that pano alone, which the engine's own walker goes past too). Drawn by
+ * `ReadControl` on the tour screen and the pano screen alike.
+ */
+export type TourReaderProgress = { running: boolean; index: number; total: number; lastRefusal: string | null; skipped: number };
 
 // ---------------------------
 

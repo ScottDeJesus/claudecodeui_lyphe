@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef } from 'react';
-import type { MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent, ReactNode } from 'react';
+import type { CSSProperties, MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent, ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { Maximize2, Minus, Plus, X } from 'lucide-react';
@@ -34,6 +34,11 @@ const CONTROL_CLASS = 'rounded-full p-2 text-white transition-colors hover:bg-wh
  * Zoom: wheel and trackpad pinch about the pointer, two-finger pinch, double-click / double-tap for
  * fit ↔ 2×, `+` / `−` / fit buttons and the `+` `−` `0` keys. Pan: drag. The content is scaled with a
  * CSS transform, so a vector child (an inline SVG) stays sharp at every level.
+ *
+ * A transform scales a child's strokes and boxes with the picture, and `vector-effect: non-scaling-stroke` does not
+ * undo that (measured: a 2px edge reads 4.5px at 225%). So the content element carries the factor as the custom
+ * property `--lightbox-scale` (a plain number, 1 at fit), and a child that wants its marks at screen size divides
+ * by it — `RegionImage`'s outlines and badges do, so a region's edge is one weight at every zoom.
  *
  * It is a native modal `<dialog>` opened with `showModal()`, which puts it in the browser's TOP
  * LAYER: no fixed layer of the app (the PRD editor's `z-[200]`, Settings' `z-[9999]`, or one added
@@ -147,7 +152,8 @@ export function Lightbox({ label, children, onClose }: LightboxProps) {
             // once or the content trails the pointer. No `will-change: transform`: it pins the
             // raster at the first scale and an SVG would blur when zoomed.
             transition: animated ? 'transform 180ms ease-out' : 'none',
-          }}
+            '--lightbox-scale': scale,
+          } as CSSProperties}
           className={scale > 1 ? 'cursor-grab active:cursor-grabbing' : undefined}
         >
           {children}
