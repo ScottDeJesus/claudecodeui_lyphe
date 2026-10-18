@@ -112,7 +112,7 @@ export type DryingEntry = {
   materials: MaterialEntry[];
 };
 
-/** One room of a tour, with the panos taken in it. A nameless pano is a room with no name (key `unknown||`). */
+/** One room of a tour: a `roomKey` on a `floor`, with the panos taken in it. A nameless pano is a room with no name (key `unknown||`). */
 export type RoomEntry = {
   roomKey: string;
   roomName: string | null;
@@ -124,9 +124,10 @@ export type RoomEntry = {
   drying: DryingEntry | null;
   /** Marks. */
   regionsStanding: number | null;
-  /** Marks. The marked areas call this room affected on some floor; `regionsStanding` counts older damage too. */
+  /** The same value as `photosAffected`, until the Tours view reads that one; the join deletes this field. */
   markedAreasAffected: boolean | null;
-  /** Photos. The room's verdict from the tour's photos: what the Tours view reads in place of `markedAreasAffected`. */
+  /** Photos. The room's verdict from the tour's photos, for this room: one entry per (`roomKey`, `floor`), so an
+   *  upstairs loss never marks the downstairs bathroom. `regionsStanding` counts older damage too. */
   photosAffected: boolean | null;
 };
 
