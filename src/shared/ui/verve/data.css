@@ -81,11 +81,24 @@
  * breaking the page. The head is `--canvas`, 12px, upper-case, tracked; the sorted head reads in `--ink`, the
  * rest in `--ink-faint`; a row is 14px with a `--surface2` hairline under it. The first cell is the row's name
  * (ink, 500) and the rest are figures (muted, tabular), as Verve draws it. */
+/* Positioned, so the frame is the containing block of anything placed absolutely inside a cell (a screen reader's
+ * `sr-only` words, chiefly): unpositioned, such a span is placed against the page instead, escapes the sideways scroll,
+ * and a cell scrolled out of the frame widens the whole page (measured on the proving table at 390 px: 54 px). */
+/* MORE TO THE RIGHT. While columns lie past the frame's right edge a shade stands at that edge, and it is gone once the
+ * table is scrolled to its end: the shade is fixed to the frame (`scroll`), and a strip of the frame's own ground at
+ * the far end of the content (`local`) slides over it as the end arrives, and covers it from the start when nothing
+ * overflows. On a screen with overlay scrollbars it is the only sign that the table goes on (at 1280 the proving table
+ * shows 885 of about 1,170 px). Backgrounds, so no script, the border and the radius whole, and every figure painted
+ * over it; an opaque ground (the head, the held column, a washed or opened row) covers it where it lies. */
 .vv-datatable {
+  position: relative;
   overflow-x: auto;
   border: 1px solid var(--border);
   border-radius: 12px;
-  background: var(--surface);
+  background:
+    linear-gradient(var(--surface), var(--surface)) right / 24px 100% no-repeat local,
+    linear-gradient(to left, var(--border-strong), transparent) right / 24px 100% no-repeat scroll,
+    var(--surface);
 }
 .vv-datatable table { width: 100%; border-collapse: collapse; font-family: var(--font-body); }
 
@@ -161,6 +174,32 @@
 .vv-datatable__row--open { background: var(--accent-soft); }
 /* The house ring, drawn inside the row: the frame clips an outline that sits outside it. */
 .vv-datatable__row:focus-visible { outline-offset: -2px; }
+
+/* THE NAME COLUMN HOLDS STILL. The first column is the row's name, and it stays at the frame's edge while the table
+ * scrolls sideways under it, so a figure scrolled into view keeps the row it belongs to (the proving table shows 885 of
+ * about 1,170 px at 1280 wide, 356 on a phone). A departure from Verve's drawing, whose four-column table never scrolls.
+ * A sticky cell needs a ground of its own, or the figures show sliding beneath it: the head's, the cell's, and the row's
+ * wash where the row is washed. A collapsed border does not travel with it, so its lines are shadows (its edge on the
+ * right, the row's line under it) and its own border is left clear. It stands above the cells it covers, and so above
+ * a focused row's ring: the ring's three sides that fall on it are drawn on it. The opened row's panel is `__panel`,
+ * not `__cell`, and stays where it is. */
+.vv-datatable__head:first-child,
+.vv-datatable__cell:first-child {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  border-bottom-color: transparent;
+}
+.vv-datatable__head:first-child { background: var(--canvas); box-shadow: inset -1px 0 0 var(--border), inset 0 -1px 0 var(--border); }
+.vv-datatable__cell:first-child { background: var(--surface); box-shadow: inset -1px 0 0 var(--border), inset 0 -1px 0 var(--surface2); }
+.vv-datatable tbody tr:last-child > .vv-datatable__cell:first-child { box-shadow: inset -1px 0 0 var(--border); }
+@media (hover: hover) {
+  .vv-datatable__row--pressable:hover > .vv-datatable__cell:first-child { background: var(--accent-soft); }
+}
+.vv-datatable__row--open > .vv-datatable__cell:first-child { background: var(--accent-soft); }
+.vv-datatable__row:focus-visible > .vv-datatable__cell:first-child {
+  box-shadow: inset -1px 0 0 var(--border), inset 2px 0 0 var(--accent), inset 0 2px 0 var(--accent), inset 0 -2px 0 var(--accent);
+}
 
 .vv-datatable__panel {
   padding: 14px 16px;

@@ -3227,9 +3227,9 @@ Every answer is the wire shape bare, the type named in a `// →` comment above 
 - `ViewDetail` is `ViewEntry & {…}`, as `wire.py` inherits it.
 - A new verb names its answer type in a `// → Type` comment, as this file's other blocks do.
 
-## Not yet measured
-- `mark`, `missed` and `setThreshold` answer `Region` / `ProvingClass` by reading of the marks design: `wire.py` names only `UnderstandingMarkResult`. Correct the comments when the marks routes land.
-- `Queue`, `Proving` and their nested types have met no real body: `/queue` and `/proving` answered 404 on 2026-10-17.
+## Measured on the live engine
+- 2026-10-17, `.verify/affected-areas-marking.mjs` (66 of 66): `mark` and `missed` answered 200 with a `Region` whose `mark` and `standing` equal the same region from `GET …/panos/{pano}`; `setThreshold` answered 200 with the `ProvingClass` that `GET /proving` then held (`threshold`, `isDefault`, `thresholdSetAt`); `markUnderstanding` answered 200 with the `UnderstandingMarkResult`. `wire.py` names only that last answer: the other three are read from the routes' bodies, not from a model.
+- 2026-10-17: `GET /queue` answered 200 with the keys `mode`, `items`, `remaining` (an item: `tourId`, `panoId`, `roomName`, `jobLabel`, `view`, `region`); `GET /proving` answered 200 with `model`, `contractVersion`, `contractHash`, `understanding`, `classes` (a class: the twelve fields of `ProvingClass`). Each is the typed key set.
 - Field sets checked against `model_json_schema(by_alias=True)` per model on 2026-10-17: 39 of 39 match, nullability and `Literal` values included.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/affected-areas-types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts
@@ -3256,7 +3256,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/affected-areas-types.
 
 ## Allowlist (14 rows in `ALLOWLIST`)
 
-A method+path not in the table is the lane's own 404 `{ error: 'not a route of the affected-areas lane' }`; it never reaches :8001. The table is the marking plan's whole contract: a row whose engine route is unbuilt answers the engine's own 404 through the lane.
+A method+path not in the table is the lane's own 404 `{ error: 'not a route of the affected-areas lane' }`; it never reaches :8001. The table is the lane's whole contract.
 
 | Method path | Timeout | Reply | Body | Query (forwarded keys only) |
 |---|---|---|---|---|
@@ -3332,7 +3332,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/affected-areas/af
 
 ## MAN-8575 — The Tours view — src/modules/affected-areas: where state lives, what the counts mean, the reads and the presses
 
-The Tours view: a DocuSketch tour's affected areas drawn on the single photo. Three screens, one at a time: `TourPicker` → `TourScreen` → `PanoScreen`. Data is `api.affectedAreas` (wire MAN-8558, lane MAN-8559, routes MAN-8540). Drawn with the library's `RegionImage` and `Gallery` (MAN-8579).
+The Tours view: a DocuSketch tour's affected areas drawn on the single photo. Three screens, one at a time: `TourPicker` → `TourScreen` → `PanoScreen`. Data is `api.affectedAreas` (wire MAN-8558, lane MAN-8559, routes MAN-8540). Drawn with the library's `RegionImage` and `Gallery` (MAN-8579). A switch at the view's top (`ToursSwitch`: Tours · Mark · Tables) chooses the surface: Tours is that walk; the Tables screen (`TablesScreen`, how right the reader is per kind) is beside it, not a step of it: MAN-8581; the marks (the mark bar, Missed one, the Mark screen, the understanding mark) judge what the walk draws: MAN-8582, rules MAN-8583.
 
 ## State of the module
 | fact | value |
@@ -3340,29 +3340,34 @@ The Tours view: a DocuSketch tour's affected areas drawn on the single photo. Th
 | phase | live: the Cerberus tab's fourth view, reading the lane; run whole against the live engine 2026-10-17 (`.verify/affected-areas-view.mjs`, `.verify/affected-areas-walk.mjs`) |
 | mounted | `CerberusPanel` imports the lazy `AffectedAreasView` through this module's barrel and draws it after History in the strip, only once center's overview has answered (`overview !== null`, as every view): mounted on the first show of the Tours tab (`toursShown`), `hidden` after, kept mounted while the Cerberus workspace tab stands (leaving that tab for Chat unmounts the panel and the view with it, and the tour, pano and face are lost then). why: the tour, pano, face and scroll survive a visit to Fleet (MAN-7891); the views share ONE scroller, so `CerberusPanel` keeps Tours's offset itself (`toursScrollRef`, written as Tours is left, restored as it returns) |
 | words | `affectedAreas.*` and `cerberus.tours.{tab,tabHint}` in `src/modules/i18n/locales/en/common.json` |
-| shared types | `AffectedAreasRead<T>` (`{ value, trouble, retry }`), `PanoPress`, `TourReaderProgress`, `AffectedAreasTrouble` in `src/shared/types.ts` |
+| shared types | `AffectedAreasRead<T>` (`{ value, trouble, retry }`), `PanoPress`, `TourReaderProgress`, `AffectedAreasTrouble` in `src/shared/types.ts`; the marks' `ToursScreenKey`, `RegionLayer`, `MarkWalk`, `MissedStage`: MAN-8582 |
+| shared constants | `AFFECTED_AREAS_LANE_FAULTS` (`no_secret`, `unreachable`, `unreadable`: the faults of the lane whatever was asked, each said in `affectedAreas.trouble.<fault>`) in `src/shared/constants.ts`; read by `LaneTrouble`, `ThresholdControl`, `MarkRefusal`. `MARK_NOTE_MAX` (500) beside it: MAN-8582 |
 
 ## Files
 | file | holds |
 |---|---|
-| `AffectedAreasView.tsx` | the root: the ONLY file that calls the hooks and holds the handlers; picks the screen by `tourId` / `panoId` |
+| `AffectedAreasView.tsx` | the root: calls every hook of the Tours screens and holds their handlers; picks the Tours screen by `tourId` / `panoId` and the surface by the switch (`activeScreen`; Mark and Tables mount on their first show, stay mounted, `hidden` while another shows). `MarkScreen` and `TablesScreen` read and press for themselves (MAN-8577) |
 | `hooks/useLaneRead.ts` | one JSON read of the lane kept for its key: `{ value, trouble, retry }` plus `reload` (quiet, keeps the value) and `replace(value, forKey)` (writes an answer that came by another road under the key it is GIVEN, and drops every read begun before it); reads when the key is set or `retry`/`reload` is called, never on a timer |
 | `hooks/useTours.ts` · `useTour.ts` · `useCodebook.ts` | the picker's list (30 newest, the search text cut at 80 characters, read once typing has rested 300 ms, and only while the view is shown; `reload` when the picker comes back) · the open tour · the codebook |
 | `hooks/usePano.ts` | the open pano, the dry run beside it (what a read would buy), and `pressRead(force)`: one armed press at a time per pano (kept in `inFlight`, so a press still out shows as busy when the person leaves the pano and comes back), its answer replaces the pano and the plan at once, under the key the press was made for and outranking any read begun before it, unless the person has gone to another pano. A pano the tour lists with no views is not read (its GET is a 404 until it is cut): its dry run cuts it, and until then the screen is handed it with no views; a cut that brings no answer is that pano's trouble, drawn as the header and a banner with Try again |
 | `hooks/useTourReader.ts` | Read the rest: the unread panos in capture order, one armed press each, after the last one answered, passing a pano whose views cannot be cut; `{ walk, start, stop }` |
 | `hooks/useImageUrl.ts` | `useImageUrls(shas)` (the gallery's tiles) and `useImageUrl(sha)` (the shown face): bytes fetched with the token, object URLs revoked on unmount and on a change, aborted on a change, null on failure |
 | `hooks/useViewShown.ts` | `isInLayout(element)` (asked before a read starts), `useViewShown(ref)` (whether the view is in layout, as state) and `useWhenShown(shown, fn)` (a word when it comes back) |
+| `hooks/useMarkedRegions.ts` · `useQueue.ts` · `useProving.ts` | the pano's regions with the operator's answers laid over the read · the Mark screen's walk through a queue · the Tables' read and the kind a Set threshold answered: MAN-8582, MAN-8581 |
 | `utils/laneTrouble.ts` | a non-2xx answer or a thrown fetch as an `AffectedAreasTrouble` |
 | `ViewBoundary.tsx` | the lazy view's surround, exported by the barrel with the view: a waiting ring while its chunk loads, and a Tours-only warn banner (Reload the page) when it cannot load or crashes, so the failure never replaces the whole Cerberus tab |
 | `TourPicker.tsx` | search field, recent tours with a read-state badge |
 | `TourScreen.tsx` | tour header with the walk (Read the rest), then `ContextCard`, then `TourRooms`, then `RoomGallery` |
 | `TourRooms.tsx` | the tour's rooms in DocuSketch's walk order: name, floor, and who calls each affected, in words (MAN-8578) |
-| `PanoScreen.tsx` | header + `ReadControl`, six face tabs, `RegionImage` beside `RegionList`, caption, Enlarge (`Lightbox`), `UnderstandingCard`, `RoomDrying` |
+| `PanoScreen.tsx` | header + `ReadControl`, `FaceStrip`, the face (`MissedDraw`: the `RegionImage` photo with `LayerSwitch` over it and the chosen area's `MarkBar` under it, MAN-8582) beside `RegionList`, caption, Enlarge (`Lightbox`), `UnderstandingCard`, `RoomDrying` |
+| `FaceStrip.tsx` · `ReadingList.tsx` | the six face tabs, each counting its areas (scrolling the chosen one into the strip's own box) · the waiting surface of the list of areas |
 | `ReadControl.tsx` | the read presses (Read this pano / Read again / Read the rest), refusals in words, the walk's meter and Stop |
-| `LaneTrouble.tsx` | one warn banner with Try again for a read that brought no answer |
+| `LaneTrouble.tsx` | one warn banner with Try again for a read that brought no answer; `subject`: `tours` · `tour` · `pano` · `tables` · `queue` names what failed to read (`queue`: the Mark screen's) |
 | `ContextCard.tsx` · `UnderstandingCard.tsx` · `RoomDrying.tsx` · `RoomGallery.tsx` · `RegionList.tsx` | what the reader is told · what it understood · the room's drying numbers · the pano tiles (`Gallery`, max 24 then "+N") · the face's regions |
 | `utils/regionLook.ts` | `REGION_LOOK` and `regionState(region)` |
-| `utils/tourModel.ts` | `FACES`, `panoReadState`, `tourReadState`, `tourUnread`, `tourFacts`, `tourName`, `roomWords`, `spansFloors`, `spoken`, `listWords`, `capitalized`: pure, no fetch, no state |
+| `utils/tourModel.ts` | `FACES`, `panoReadState`, `tourReadState`, `tourUnread`, `tourFacts`, `tourName`, `roomWords`, `spansFloors`, `spoken`, `listWords`, `capitalized`, `faceCounts(view)`, `kindName(cls, codebook)`, `countedKind(region)`: pure, no fetch, no state |
+| `MarkBar.tsx` · `MarkPresses.tsx` · `MarkPress.tsx` · `NoteDialog.tsx` · `MissedDraw.tsx` · `FacePhoto.tsx` · `LayerSwitch.tsx` · `ToursSwitch.tsx` · `MarkScreen.tsx` · `MarkQueue.tsx` · `UnderstandingMark.tsx` · `UnderstandingVerdict.tsx` | the marks: MAN-8582 |
+| `TablesScreen.tsx` · `ProvingTable.tsx` · `ProvingDetail.tsx` · `ThresholdControl.tsx` · `utils/provingModel.ts` | the Tables screen, its opened row, its threshold control, how its figures read: MAN-8581 |
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/
 
@@ -3379,7 +3384,7 @@ A step reads only what the steps above it produce. why: the shown face's photo i
 ## What the numbers mean
 | where | counts |
 |---|---|
-| face tab, caption "3 areas · 2 set aside · read 3h ago" | `faceCounts` in `PanoScreen.tsx`: once the pano answered, set aside = regions with `standing === false`, areas = the rest; before it answers, areas = `standingCount ?? regionsCount` and set aside is hidden |
+| face tab, caption "3 areas · 2 set aside · read 3h ago" | `faceCounts` in `utils/tourModel.ts` (read by `FaceStrip.tsx` and `PanoScreen.tsx`): once the pano answered, set aside = regions with `standing === false`, areas = the rest; before it answers, areas = `standingCount ?? regionsCount` and set aside is hidden |
 | region list "Marked on this view", badges, outlines | every region of the face, set aside included; areas + set aside = outlines drawn |
 | gallery tile badge, tour line areas | `standingCount ?? regionsCount`, summed over a pano's views |
 | tour line "42 of 42 cut views read · 5 panos not cut" | views read of views cut; `uncut = panoCount − round(viewsTotal / 6)`; "none cut yet" when `viewsTotal === 0` |
@@ -3417,15 +3422,16 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/
 ## MAN-8577 — The Tours view — src/modules/affected-areas: where state lives, what the counts mean, the reads and the presses — Rules an editor must not break
 section: The Tours view — src/modules/affected-areas: where state lives, what the counts mean, the reads and the presses/002 Rules an editor must not break
 
-- Screens draw what they are handed; the hooks are called from `AffectedAreasView.tsx` only, and `fetch` and `api` calls live in `hooks/` alone.
+- Screens draw what they are handed; the Tours screens' hooks are called from `AffectedAreasView.tsx` only, and `fetch` and `api` calls live in `hooks/` alone. Exceptions: `TablesScreen.tsx` reads its own table (`useProving`) and sends its own Set threshold press (MAN-8581); `MarkScreen.tsx` reads its own queue (`useQueue`) and the photo of its area (`useImageUrl`); and the presses of the marks (`MarkBar`, `MissedDraw`, `UnderstandingMark`) send their own writes through `answerOfWrite` (`utils/laneTrouble.ts`), each keeping its press, refusal and note in its own state (MAN-8582). why: a press is one call whose answer is the redraw, and its state (out, refused, noted) belongs to the press, not to the hub.
+- A mark's answer is laid over the pano, never fetched for: `useMarkedRegions(pano.value)` keeps the engine's answers beside the read and gives the pano with each answered region in place (the answer outranks a read of the same region that carries no mark or an older one, so a quiet reload landing late never redraws a judged area unjudged). The pano is read again only on a person's press: the switch coming back to Tours (`pano.reload()`), a read, Back.
 - Tone is by judgment, never by kind: a region is painted by where it stands (`regionState` in `utils/regionLook.ts`), not by its codebook kind. why: the tone set stays five (MAN-739 rule 4) and the codebook has fourteen kinds. The kind is words (the list's label, the badge's accessible name).
 - Null is "not judged": `regionState` reads a null `mark` or `standing` as `proposed`, never as unsure or rejected.
 
 `REGION_LOOK` (`RegionState`, five). `regionState` takes the first row that matches, top to bottom:
 | state | when | tone | edge | wash | word (`affectedAreas.look.*`) |
 |---|---|---|---|---|---|
-| `human` | `source === 'human'`, whatever mark it later carries | positive | dashed | full | `human` "Drawn by hand" |
-| `not_a_change` | `mark.verdict === 'not_a_change'` | neutral | dashed | none | `notAChange` "Not a change" |
+| `not_a_change` | `mark.verdict === 'not_a_change'`: a reader's area set aside, or a drawn one taken back (the one mark the engine takes on a drawn area) | neutral | dashed | none | `notAChange` "Not a change" |
+| `human` | `source === 'human'`, standing (any other mark) | positive | dashed | full | `human` "Drawn by hand" |
 | `confirmed` | `mark.verdict` is `confirm` or `rename` | positive | solid | full | `confirmed` "Confirmed" |
 | `unsure` | `mark === null && standing === false` | info | dashed | light | `unsure` "Unsure" |
 | `proposed` | anything else, a null `mark` or `standing` included | info | solid | full | `proposed` "Proposed" |
@@ -3443,7 +3449,7 @@ Info is the reader's word and positive the operator's; a dashed edge is anything
 - `.verify/affected-areas-view.mjs`: Cerberus → Tours → CLARENCE TSE → Dinning Room → each face at 1280 and 390 px: the polygons on the photo equal the engine's regions per face, the badges read 1..n and are the list's rows and the engine's ordinals, a region chosen on the photo is the row's and back, Enlarge keeps every outline on the photo (0.00 px off), nothing is read while the pano idles or Fleet shows, and Read this pano on one unread pano answers 200 `read`, 6 views, and the face strip counts the engine's areas at once.
 - `.verify/affected-areas-walk.mjs`: Stop after this pano ends the walk after the pano in hand; a view hidden mid-walk sends no second press and reads nothing until it returns, then reads the tour once; the walk goes pano to pano on each answer, in capture order.
 - `.verify/affected-areas-rooms.mjs --tour <24-hex tourId> [--evidence <dir>]` (the tour must be linked to a job, else exit 2): Cerberus → Tours → the tour → the Rooms card at 1280 then 390 px, once in a light and once in a dark `openConsole({ dark })` context (no stored setting written). `WIDTHS[0]` stays 1280: `openCerberusTab` finds "More views" only on the wide layout. Holds against `GET /api/affected-areas/tours/{tour}`: one row per wire room in its order, with name and floor; the words from `docusketchAffected` and `markedAreasAffected` alone (written out in the script, not read from the component); warn tone and dot on the rows with words only; no fetch/XHR path of its own for rooms; no sideways scroll, measured on the Rooms card (`scrollWidth - clientWidth`; the card clips its overflow, so the page-level number is 0 whatever the rows do); no authenticated console error. Writes `rooms-<theme>-<width>.png`, `rooms-card-<theme>-<width>.png` and `rooms.json` (keys `<theme>-<width>`) under `.verify/shots/affected-areas-rooms/`.
-- 2026-10-17, run end to end at the review: tour `6acd745c36f92c16415b6f97` (three affected rooms, Kitchen and Entry floor 1, Hvac Closet floor 2; `docusketchAffected` false, `markedAreasAffected` true) passes 26 of 26 checks, exit 0, light and dark, 1280 and 390 px. At 390 px one column, overflow `{"page":0,"rooms":0}`, warn tone and dot on exactly the three rows with words; at 1280 three columns.
+- 2026-10-17, `.verify/affected-areas-rooms.mjs` on tour `6acd745c36f92c16415b6f97` (three affected rooms, Kitchen and Entry floor 1, Hvac Closet floor 2; `docusketchAffected` false, `markedAreasAffected` true) passes 26 of 26 checks, exit 0, light and dark, 1280 and 390 px. At 390 px one column, overflow `{"page":0,"rooms":0}`, warn tone and dot on exactly the three rows with words; at 1280 three columns.
 - `.verify/affected-areas-view.mjs` presses nothing unless `--press` is given (one armed press, counted; it needs a cut, unread pano, which each press uses up), and `.verify/affected-areas-walk.mjs` runs nothing unless `--cases` names what to buy (A and B six reads each, C twelve; each pano read is read for good).
 - Open: Read the rest has not met a refusal (a spent budget) on the live engine; a refusal is drawn from `ReadControl`'s own words.
 - Open: the tour screen fetches the photo of every cut pano (a 45-pano tour: 45 requests) though the gallery draws 24 tiles until "+N" opens. The cure needs the Gallery's overflow-open signal (`Gallery` is the shared kit's): a follow-up.
@@ -3486,3 +3492,153 @@ Two wire fields, both on `RoomEntry`: `docusketchAffected` (`boolean`, DocuSketc
 - Check: `.verify/affected-areas-rooms.mjs` (MAN-8577 §"Measured 2026-10-17").
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/TourRooms.tsx
+
+## MAN-8581 — The Tables screen of the affected areas Tours view (Tours · Mark · Tables) — src/modules/affected-areas: the proving DataTable of how right the reader is per kind, its sort, thin kinds and the Set threshold press
+
+The Tables screen: `GET /proving` (the pinned model on the current contract) as one sortable row per codebook kind, each with its line (threshold) and a press that sets it. `TablesScreen` → `ProvingTable` → `ProvingDetail` → `ThresholdControl`. The Tours view's state, reads and rules: MAN-8575. The engine's lines: MAN-8569. The table's props and paint: MAN-8580.
+
+## State
+| fact | value |
+|---|---|
+| phase | live: the view root's Tours · Mark · Tables switch (`AffectedAreasView.tsx`) mounts Tables on its first show and keeps it mounted, `hidden` while another shows; `shown` (Tables on view, and the view itself) re-reads the table quietly each time it turns true again. Run whole against the live engine: `.verify/affected-areas-marking.mjs` |
+| `TablesScreen.tsx` | the screen's state and presses: `useProving(shown)`, `sort`, `expanded`, `heldFrom`, `line`, `pressing`, `refusal`, `onSort`, `onExpand`, `onStep`, `onSetThreshold` |
+| wire | `api.affectedAreas.proving({ model?, contract? })` → `GET /api/affected-areas/proving` → `Proving`; `api.affectedAreas.setThreshold(cls, { threshold })` → `PUT /api/affected-areas/thresholds/{cls}` → the `ProvingClass` as it now stands (`src/shared/api.ts`; types in `src/shared/affected-areas-types.ts`) |
+| words | `affectedAreas.tables.*`; a failed read says `affectedAreas.trouble.gone_tables` / `failed_tables` through `LaneTrouble subject="tables"` |
+| hook | `hooks/useProving.ts`: `useProving(shown)` reads `GET /proving` through `useLaneRead` (`{ value, trouble, retry }`) and reads again quietly when `shown` turns true again; `replaceClass(kind)` puts the `ProvingClass` a Set threshold answered in place of its row (into the tables as they stand when the answer lands) |
+
+## Files
+| file | holds |
+|---|---|
+| `TablesScreen.tsx` | the screen's data and state; passes `ProvingTable` its props: `proving`, `sort`, `onSort`, `expanded`, `onExpand`, `heldFrom`, `line`, `pressing`, `refusal`, `onStep`, `onSetThreshold` |
+| `ProvingTable.tsx` | head ("How right the reader is", model · contract), the understanding line, the states, the `DataTable`, the column legend |
+| `ProvingDetail.tsx` | the opened row: `ThresholdControl`, the sweep, renamed-to, latest notes; exports `Share` |
+| `ThresholdControl.tsx` | the house `Stepper` and Set threshold; draws the press, sends nothing |
+| `utils/provingModel.ts` | `tooFew(count)`, `isThin(kind)`, `lineWords(line, t)`, `sameLine(a, b)`, `thresholdWords(kind, t)`: how a figure reads, never its value |
+
+## Table
+- Columns in order: Kind (with its line: "Threshold 65% · set Oct 15" or "Threshold 50% · default"), Precision, Coverage, Missed, Judged, Right, Wrong kind, Not a change, Near the line. Precision and Coverage are at the kind's line. ~1,170 px of table (every line at its default; a set line's words widen the Kind column) in an 885 px frame at 1280, 356 on a phone (MAN-8580): it scrolls sideways at every size, so the order decides what shows first.
+- Opens sorted by precision, lowest first (`FIRST_SORT`). A new column opens on the end that needs the operator: precision and coverage lowest first, counts highest first, kind A to Z; the same column flips. A dash sorts as nothing: last in both directions (`DataTable`, MAN-8580).
+- States: read out (real heads over six `vv-skeleton` rows); lane fault (`LaneTrouble` with Try again; a failed re-read draws it above the table it kept); no kind judged on the random slice (info banner over a table whose lines can still be set); the kinds.
+- The understanding line is counts ("18 of 22 judged right"), never a rate.
+- What each count is (the engine's, MAN-8563): Judged, Right, Wrong kind and Not a change are the kind's regions on the random slice, judged confirm, rename and not a change; Near the line is marks made in Unsure first; Missed is areas drawn that the reader missed. Near the line and Missed enter no share. The legend under the table says each (`affectedAreas.tables.legend.*`).
+
+## Rules an editor must not break
+- The screen computes no figure. Every number is `GET /proving`'s; `provingModel.ts` decides only how it reads. why: a rate the screen computed would be a number the engine never stood behind.
+- Thin: `isThin(kind)` is `kind.randomSlice.n < 10` (`FEWEST_FOR_A_PERCENT`). `tooFew(count)` is the same test for any share, over the count it was divided by: Precision over `nAt` (a sweep point's `n`), Coverage over `randomSlice.right`. A share over fewer than ten, or null, draws "—" with `sr-only` "too few judged" (`Share`). A judged kind's Precision can be a dash when its line sits high. The engine returns a share from one judgment up; the viewer decides. A thin kind's line stays settable, with a line saying to set it on his own judgment.
+- `TablesScreen` sends Set threshold, not `ThresholdControl`. why: the control's states (moved, pressing, refused) draw from props, and the answer replaces its row where the table is held. The screen reads for itself (`useProving`) and sends through `answerOfWrite` (`utils/laneTrouble.ts`): the hook-owner rule is MAN-8577's. A step moves the line 0.05 (`Math.round(x * 20) / 20`, kept within 0 and 1); a press that would change nothing (the line in force, set by the operator) is refused by the control and again in the handler.
+- Set threshold is never `disabled`: when it would change nothing it carries `aria-disabled` and the house `Button` refuses the press. why: `disabled` drops keyboard focus to the top of the app after a successful set. It is offered when the line is a default (`kind.isDefault`: setting it records the operator's choice) or the stepper has moved (`!sameLine(value, kind.threshold)`).
+- Lines are compared with `sameLine` (within 1e-6), never `===`. Steps are 0.05 within 0..1 and rounded (`Math.round(x * 20) / 20`). A line is said in percent ("65%", `lineWords`), the unit a region's confidence is said in.
+- `heldFrom`: the rows as they stood when the open row opened. `ProvingTable` sorts by them (`sortedBy`) so Set threshold's answer redraws its row where it stands. Opening a row with none held holds the current rows; opening another keeps them; closing lets them go. A head pressed while a row is open re-takes the held rows as they stand now (`heldFrom` = `proving.value.classes`) and re-sorts; with no row open it sets `heldFrom` null.
+- A refusal is drawn above the button it refused (`ThresholdControl`, `role="alert"`): the engine's `not_a_person`, `bad_class`, `bad_threshold` (`affectedAreas.tables.refused.<code>`); a lane fault of `AFFECTED_AREAS_LANE_FAULTS` (`src/shared/constants.ts`) in the Tours view's words (`affectedAreas.trouble.<fault>`); `failed` or `gone` as `refused.failed`; anything else as `refused.other`.
+- The opened row is `ProvingDetail`: two columns from 840 px of container, one below. Its width is `calc(100cqi-34px)` and `sticky left-4`, against the container `ProvingTable` makes of the table's wrapper. why: the row spans every column, wider than the frame on a phone. The 34 px are the frame's two 1 px borders and the panel's 16 px padding each side: change either and the panel is wrong.
+- The sweep lists the engine's lines (0.3 to 0.9 in 0.1 steps) with the line in force marked "In force" and the stepper's moved line "If set"; either one falling between priced lines takes a figure-less row. A kind never judged on the slice shows one line in place of the sweep.
+
+## Open
+- The house `Stepper` is ~35 px tall on touch where Verve asks 44; five screens share it (Set threshold itself is 44 below `md`, `max-md:h-11`).
+- `ProvingDetail` keeps a local `kindName(cls)` over the table's kinds; `kindName(cls, codebook)` is in `utils/tourModel.ts`: one of them should go, and the table carries no codebook.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/hooks/useProving.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/ProvingDetail.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/ProvingTable.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/TablesScreen.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/ThresholdControl.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/utils/provingModel.ts
+
+## MAN-8582 — The marking pieces — src/modules/affected-areas: the mark bar, Missed one, the Mark screen and the understanding mark
+
+The operator's marks on the Tours view: Confirm, Rename to… and Not a change on an area, Missed one (a drawn area), the Mark screen (a queue the engine orders), and Right / Wrong on a read's understanding. Engine side: MAN-8560. The Tours view's state, reads and rules: MAN-8575. What an editor must not break here: MAN-8583. `RegionImage` props and paint: MAN-8579.
+
+## State
+| fact | value |
+|---|---|
+| phase | live: every press is a row and the answer is the redraw. Run whole against the live engine, every mark through the real lane, its rows deleted by id after: `.verify/affected-areas-marking.mjs` (`openConsole()` on :5183) |
+| shell / drawn | a shell (`MarkBar`, `MissedDraw`, `UnderstandingMark`, `MarkScreen`) holds the state and sends the press; its drawn piece (`MarkPresses`, `FacePhoto`, `UnderstandingVerdict`, `MarkQueue`) takes every state as props. Same convention as the Tables (MAN-8581) |
+| wire | `api.affectedAreas.mark(regionId, MarkRequest)` → `Region`; `.missed(sha, MissedRequest)` → `Region`; `.markUnderstanding(readId, UnderstandingMarkRequest)` → `UnderstandingMarkResult`; `.queue({ mode, cls, limit })` → `Queue` (`src/shared/api.ts`; types in `src/shared/affected-areas-types.ts`). The `queue` sent with a mark is `MarkQueue`: `unsure` · `random` · `browse` |
+| words | `affectedAreas.{screens,layer,groups,mark,missed,understanding}.*`, `affectedAreas.trouble.failed_queue`; refusals `affectedAreas.mark.refused.<code>`: the nine engine reasons (`not_a_person`, `no_region`, `no_read`, `no_image`, `bad_verdict`, `bad_class`, `same_class`, `bad_box`, `note_too_long`), `failed`, `other` |
+| shared | types `ToursScreenKey` (`tours` · `mark` · `tables`), `RegionLayer` (`standing` · `all`), `MarkWalk`, `MissedStage` in `src/shared/types.ts`; `MARK_NOTE_MAX` (500, the engine's `MAX_NOTE`) and `AFFECTED_AREAS_LANE_FAULTS` in `src/shared/constants.ts`; `kindName(cls, codebook)` and `countedKind(region)` in `utils/tourModel.ts` |
+| hooks | `hooks/useMarkedRegions.ts`, `hooks/useQueue.ts` (and `hooks/useProving.ts`, MAN-8581); the writes go through `answerOfWrite` in `utils/laneTrouble.ts`, which answers the engine's `Region` / `UnderstandingMarkResult` / `ProvingClass`, or the one reason it was not kept (the body's refusal code, the lane's fault, or `failed`) |
+
+## Files
+| file | holds |
+|---|---|
+| `MarkBar.tsx` | shell: the press out, its refusal, the note and its dialog; props `region`, `codebook`, `queue` (the type `MarkQueue` in `affected-areas-types.ts`: `unsure` · `random` · `browse`), `onMarked(region)`; used by `PanoScreen` (`queue` `browse`) and `MarkQueue.tsx` (`queue` its mode); keyed by `region.regionId` |
+| `MarkPresses.tsx` | drawn: Confirm · Rename to… (a `Menu` of the codebook's kinds, the area's own left out) · Not a change · Add a note; handles `data-mark-bar`, `data-mark-press` = `keep` · `confirm` · `rename` · `not_a_change` · `note` |
+| `MarkPress.tsx` | `JudgmentPress` (a `Button` in a region-look tone), `KeyCap` (Y, R, N, S), `MarkRefusal` (warn banner, `role="alert"`, `data-mark-refusal`) |
+| `NoteDialog.tsx` | the note in a `DialogFrame`, at most `MARK_NOTE_MAX`; Keep the note holds it for the next press and sends nothing; mounted only while open |
+| `MissedDraw.tsx` | shell: Missed one's stage, note, refusal; replaces `PanoScreen`'s photo div |
+| `FacePhoto.tsx` | drawn: the face block (tool row, `RegionImage`, the chosen area's `bar`, the new-area form); handles `data-missed-step`, `data-missed-press` = `start` · `cancel` · `kind` · `note` · `save`, `data-missed-form` |
+| `LayerSwitch.tsx` | Standing · All `SegmentedControl`, handed to `MissedDraw` as `tools` |
+| `ToursSwitch.tsx` | Tours · Mark · Tables `SegmentedControl` at the top of `AffectedAreasView` |
+| `MarkScreen.tsx` | shell: the queue's `mode` and `kind`, `walk` = `useQueue(mode, kind, shown)` (`MarkWalk`), the photo's `useImageUrl`, keys, Skip (waits while a mark is out) |
+| `MarkQueue.tsx` | drawn: mode switch, kind `Select`, one area (question, place, count left, photo with `focusId`, the reader's words, `MarkBar`, Skip); states reading · lane fault · spent · an area whose pano has not answered; handles `data-mark-screen`, `data-mark-mode`, `data-mark-left`, `data-mark-press="skip"` |
+| `UnderstandingMark.tsx` | shell: the verdict out, refusal, this visit's answer, the Wrong field |
+| `UnderstandingVerdict.tsx` | drawn: "Is this account right?" with Right and Wrong; handles `data-understanding-mark`, `data-understanding-press` = `right` · `wrong` · `send-wrong` |
+
+## The two queues (`MarkScreen`'s `mode`, opens on `unsure`; the engine orders them: MAN-8562, MAN-8572)
+| mode | label | the engine serves | what its marks are for | the screen says |
+|---|---|---|---|---|
+| `unsure` | Unsure first | unmarked model regions outside the random slice, nearest their kind's line first | finding each kind's line fast; the Tables count them as Near the line and no share takes them in (MAN-8563) | `affectedAreas.mark.unsureHint` |
+| `random` | Random slice | unmarked held-out regions in one fixed order | measuring the reader; they feed Judged, Right, Wrong kind, Not a change and so Precision and Coverage | `affectedAreas.mark.randomHint` |
+
+- Both modes draw one facts line under the reader's words (`MarkQueue.tsx` `facts`): "{n}% sure", "threshold {n}%", the basis ("seen in the photo") and, when `region.holdout` is true, "held out to measure the reader". The engine serves no held-out area in `unsure`.
+- One area at a time: the question "Is this {the reader's kind}?", where it is, "{n} left", its photo, the reader's words, `MarkBar`, Skip.
+- The mode and the kind are the operator's choice; the screen never changes either. A new choice starts the walk over.
+- A queue with nothing in it says "Nothing left to mark" and why, by kind (`emptyKind`) or by mode (`emptyUnsure`, `emptyRandom`).
+- Every mark sent from the screen carries the mode as its `queue` (`unsure` · `random`); the pano screen's carry `browse`.
+
+## How each is wired
+| piece | file | does |
+|---|---|---|
+| `useMarkedRegions(pano.value)` | `AffectedAreasView.tsx`, `hooks/useMarkedRegions.ts` | holds the operator's answers by pano beside the read: a mark's answer replaces its region where it stands, `onMissed` appends the drawn one to its view, never a refetch; `PanoScreen` draws the laid-over pano. An answer outranks a read of the same region that carries no mark or an older one (compared by `markId` and `markedAt`); a read that carries the same mark takes over, with its current `standing` and line. `onMarked` / `onMissed` write under the pano the answer is FOR |
+| Back to the tour | `AffectedAreasView.tsx` | calls `tour.reload()` quietly: a judgment moves the tour's tile counts, its rooms' "Affected per marked areas" and the face a pano opens on. The pano is not refetched |
+| the switch | `AffectedAreasView.tsx` | `ToursSwitch` outside the keyed entrance; Mark and Tables mount on first show (`openedScreens`) and stay mounted, `hidden` while another shows. A surface shown again reads again, quietly, on that press: Tours the open pano (`pano.reload()`), else the open tour, else the list; Mark and Tables when their `shown` turns true (`useWhenShown`) |
+| the layer | `AffectedAreasView.tsx` (`layer`, All at first and on each pano opened), `PanoScreen.tsx` | `LayerSwitch` as `MissedDraw`'s `tools`. On Standing the photo keeps the regions whose wire `standing` is not false, and the chosen area whatever its flag; the list and the caption keep every area |
+| Missed one · the bar | `PanoScreen.tsx` | `MissedDraw` in place of the photo div when the pano has answered and the face has a view (`key={view.sha256}`; `nextOrdinal` = highest ordinal of ALL the view's regions + 1); `MarkBar` on the chosen region as its `bar` (`queue` `browse`) |
+| kind names | `PanoScreen.tsx`, `RegionList.tsx` | outline and list name a row by `countedKind(region)`, so a rename redraws them |
+| list scroll | `RegionList.tsx` | in the stacked layout (the nearest container under 720 px) the row scroll is skipped: the face block brings photo and presses into view |
+| the understanding | `UnderstandingCard.tsx` | `<UnderstandingMark key={read.readId} read={read} />` for a read with a `readId` |
+| the queue | `MarkScreen.tsx`, `hooks/useQueue.ts` | `useQueue(mode, kind, shown)`: a batch of 20 from `api.affectedAreas.queue`, read again under a new key on a mode or kind change and when its last area is passed, quietly when `shown` turns true again; `next(answered)` after a press (a mark hands over its region, a skip null); `left` = the batch's `remaining` less the areas of that batch judged here, and an area it holds an answer for is passed over (a late batch never offers a marked area again), as is an area skipped in this queue (until the mode or kind changes; all skipped starts the walk over); neighbours from `panoFor(item.tourId/item.panoId)`, the view found by `sha256`, a neighbour judged on this screen drawn as answered |
+| the keys | `MarkScreen.tsx` | Y, N and R click `[data-mark-screen] [data-mark-press=…]`, S skips; on the host window only while `shown`, and never while a field has the focus or a dialog, menu or list is up |
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/AffectedAreasView.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/FacePhoto.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/hooks/useMarkedRegions.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/hooks/useQueue.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/LayerSwitch.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/MarkBar.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/MarkPresses.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/MarkPress.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/MarkQueue.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/MarkScreen.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/MissedDraw.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/NoteDialog.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/PanoScreen.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/RegionList.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/ToursSwitch.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/UnderstandingCard.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/UnderstandingMark.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/UnderstandingVerdict.tsx
+
+## MAN-8583 — The marking pieces — rules an editor must not break: presses, the counted kind, notes, Missed one, scroll, and what was measured
+
+The pieces, their markers and the wire: MAN-8582. Engine verdicts and refusals: MAN-8560. Hook-owner and tone rules of the Tours view: MAN-8577.
+
+## Rules
+- Nothing is marked for the operator: no confirm-all, and a confidence never turns an area green. One press is one `api.affectedAreas.mark`; the answer `Region` is the redraw.
+- A press is tinted by the look the area takes when pressed (`REGION_LOOK`; `JudgmentPress` with `data-tone`; no `Button` variant, since every variant carries a hover colour). Confirm = confirmed fill, Rename to… = confirmed outline (`RENAME_FACE`), Not a change = set-aside grey.
+- One mark out at a time: while `out` is non-null every press refuses a second. A busy press keeps its focus (`busy`, never `disabled`).
+- The kind an area counts as is `countedKind(region)`, never `region.class`: the wire's `class` stays the reader's after a rename (shadow-connector's `effective_class`). Every line that names an area's kind reads it; the Mark screen's question names the reader's own `region.class`.
+- A renamed area leads with Keep {kind} (a rename to the kind it counts as; the engine refuses only the reader's own kind) and its Confirm reads Put back {the reader's kind}. why: without Keep a note could ride only a press that undoes the rename.
+- An area drawn by hand (`source === 'human'`) offers Not a change alone and no note; once taken back it offers no press. `confirm` and `rename` on it are `bad_verdict` (MAN-8560).
+- A note rides only on a press and is spent when a mark is answered; `NoteDialog` sends nothing. `MarkBar` is keyed by the area so a kept note never rides to the next.
+- Y, N, R and S click the presses' own `data-mark-press` elements: the same press a pointer makes. The keys are the Mark screen's alone. why: on the pano screen a key would fire while a note is typed.
+- Missed one: `MissedDraw` replaces the photo; `bar` is hidden, never unmounted, while a box is drawn or held. why: no press of another area may stand beside the box, and the bar returns as it was. The library ignores a box under 2% of the photo on a side (`RegionDrawLayer` `MIN_DRAWN_SIDE`) and reports nothing; `FacePhoto` says the floor in a line under the photo for the whole drawing step (`affectedAreas.missed.floor`). The floor keeps every box above the engine's 1e-4 floor. Save waits for a kind; a refused Save returns to `drawn` with box and kind kept.
+- `FacePhoto` owns the scroll on a choice: it brings its block into view a frame after an area is chosen (`blockRef`, `scrollIntoView({ block: 'nearest' })`); `MarkPresses` never scrolls itself. why: on a phone photo and presses fit one screen, and the list scrolls its own row in the same commit.
+- `LayerSwitch` filters on the wire's `standing`, never re-derived. On Standing the chosen area stays drawn whatever its flag, so an area chosen in the list is never judged unseen. The list keeps every area either way.
+- The understanding mark is said for this visit only: the pano's read carries no understanding mark. A queue item carries no neighbours: `useQueue` reads its pano to dim them, and draws a neighbour judged on this screen as the engine answered it unless the pano read carries the same mark or a newer one (`answerOutranks`, shared with `useMarkedRegions`).
+- A skipped area is not marked, so the engine serves it again, first of all: it has no way to start the queue past it (`limit` is at most 50 against `remaining` over 50), so skipping past a whole batch is not possible until `GET /queue` takes an offset. The screen remembers its skips by region id (`skipped`, reset on a mode or kind change) and passes over them when the next batch lands, so Mark shown again after Tables comes up where it was left; when every area in hand was skipped the walk starts over on them, since "Nothing left to mark" would be false. `left` is the batch's `remaining` less the areas of that batch judged here (`answers`), never less the skips.
+- The queue passes over an area it holds an answer for: a batch read that began before a mark and lands after it still serves the marked area, and it is not offered again. A mark answered after the operator has skipped past its area is kept and counted and leaves the screen where it is (`onScreenRef`).
+- A skip waits while a mark is out (`MarkScreen.onSkip` reads the bar's `aria-busy` presses): a skip on the last area of a batch would read the next batch before the engine has the mark, which would serve the marked area again with its presses on.
+- A drawn area's answer is laid over the saved copy of it too (`laidOver` applies `answered` to the `drawn` copies): until the pano is read again that copy is the only one the screen has, and the one press the bar offers on it, Not a change, would otherwise redraw nothing and be offered again.
+- The keys read `[data-mark-screen] [data-mark-press=…]` on the host window and wait while a field has the focus or a `[role="dialog"]`, `[role="menu"]` or `[role="listbox"]` is in the document.
+- `Menu` draws no group headings: the kinds stand in the codebook's order, which is its groups' order (Damage, Work already done, The source, Older damage); the Mark screen's kind `Select` shows each group as a hint (`affectedAreas.groups.<group>`). Headings need a library change.
+- Words name kinds and places, never ids (INV-76).
+
+## Measured 2026-10-17 (the presses and the Mark screen, light and dark, 1280×800 and 390×844, on the live :5183 app)
+- Presses: 36 px at a desk, 44 px on the phone. At 1280×800 the Mark screen fits above the fold: the Tours view starts ~180 px down the panel, so photo and answer split the width evenly.
+- `FacePhoto` block: 620 of the phone scroller's 799 px with the caption, measured before the scroll moved into it; the move itself is not re-measured.
+- Verve's tone pairs on the presses: 4.48:1 Confirm, 4.46:1 Not a change (light), under AA's 4.5:1; ghost Add a note 2.81:1 (MAN-742). A palette call.
+- Not shot dark: the pano with its presses and the Tables (the Mark screen was).
+
+## Measured 2026-10-17 (the live :5183 client over the live engine, `.verify/affected-areas-marking.mjs`, 66 of 66 checks, run on the code with the skip memory and the skip guard)
+- Every mark goes through the real lane as the signed-in operator (`marked_by` the operator's name, `origin` `internal`); each is deleted by id afterwards, before and after counts equal (marks 0, human regions 0, thresholds 0, regions 72).
+- Confirm, Rename, Not a change, Missed one and the understanding Wrong each answer 200 and the answer is the engine's own read of the region (`mark.markId`, verdict, `standing`) on `GET …/panos/{pano}`; each is one request, the photo element is the same one after it.
+- Standing hides exactly the regions whose wire `standing` is false (2 of 3 drawn; the list keeps 3). The Mark screen shows each item's confidence and threshold (Unsure first) or the held-out flag (Random slice) as `GET /queue` sent them; S skips with no row, Y and N by key mark from the queue they were made in, and "N left" falls by one to the engine's `remaining`. Skipped through 19 of a batch's 20 areas, the next batch is read once, no row is written, and the screen comes up on the first area it has not skipped (the engine serves the skipped ones first): "51 left" is its `remaining`.
+- The Tables' counts equal `GET /proving` for all fourteen kinds; Set threshold moved Containment to 100% and the answer, the row and `GET /proving` agree; back on the pano the area of that kind went from standing to not standing.
+- Three real engine refusals, bent in flight (`bad_class`, `note_too_long`, `bad_box`), are said in words and write nothing; the browser logs each 422 as a console error of its own, and nothing else is logged.
+- 390 px: no sideways page scroll on the pano with its presses nor on the Mark screen.
+
+## Open
+- `.verify/affected-areas-marking.mjs` takes back a reader's area and never a drawn one, and walks no stale batch (one read before a mark and landing after it).
+- The wrap-around when every area in hand was skipped and the skip guard (`markIsOut`) are read, not run: the probe skips with no mark out and never skips a whole queue.
+- `MarkQueue`'s `shapeOf` and `PanoScreen`'s shapes map derive the same `RegionShape` (tone, edge, wash, the counted kind's name): one of them should go.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/AffectedAreasView.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/FacePhoto.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/LayerSwitch.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/MarkBar.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/MarkPresses.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/MarkPress.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/MarkQueue.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/MarkScreen.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/MissedDraw.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/NoteDialog.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/PanoScreen.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/RegionList.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/UnderstandingCard.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/UnderstandingMark.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/UnderstandingVerdict.tsx

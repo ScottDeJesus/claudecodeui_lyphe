@@ -3,7 +3,7 @@ import type { TFunction } from 'i18next';
 import type { ComponentType, HTMLAttributes, ReactNode } from 'react';
 import type { NavigateFunction } from 'react-router-dom';
 
-import type { ReadResult } from '@/shared/affected-areas-types';
+import type { QueueItem, ReadResult, Region } from '@/shared/affected-areas-types';
 import type { AppEntry } from '@/shared/app-types';
 import type { CerberusNodeView, CerberusServiceView, CerberusStatus } from '@/shared/cerberus-types';
 
@@ -2665,6 +2665,51 @@ export type PanoPress = {
  * `ReadControl` on the tour screen and the pano screen alike.
  */
 export type TourReaderProgress = { running: boolean; index: number; total: number; lastRefusal: string | null; skipped: number };
+
+/**
+ * The Tours view's three screens, in the order its sub-switch offers them: the tours (picker, tour, pano), the Mark
+ * screen walking a queue, and the proving tables. Held by the view root (`AffectedAreasView`) and drawn by
+ * `ToursSwitch`; each screen keeps its place while another shows.
+ */
+export type ToursScreenKey = 'tours' | 'mark' | 'tables';
+
+/**
+ * What the pano's photo draws (`LayerSwitch`): `all`, every region the reader marked and every one drawn by hand —
+ * the default, because the operator is judging what the model proposed — or `standing`, only the regions whose wire
+ * `standing` flag is true: what the system currently believes. The flag is the engine's; the screen never re-derives it.
+ */
+export type RegionLayer = 'standing' | 'all';
+
+/**
+ * The Mark screen's walk through one queue the engine orders (`useQueue(mode, cls)` over `GET /queue`):
+ * - `item`: the area on screen; null while the first batch is read, after a trouble, and once the queue is spent;
+ * - `regions`: every region of that area's view, so the others draw dimmed around it; the item's region alone until
+ *   its pano answers (a queue item carries its own region and none of its neighbours);
+ * - `left`: how many areas the engine still holds unjudged in this queue; null until the first batch answers;
+ * - `trouble`: why the last read brought no answer; null while reading and once answered;
+ * - `next`: moves on after a press, reading the next batch when this one is spent: a mark hands over the region the
+ *   engine answered with, which counts off `left` and draws as judged among its neighbours; a skip hands over null and
+ *   writes nothing; `retry` reads again.
+ * Returned by the module's `useQueue`, pressed by `MarkScreen` and drawn by `MarkQueue`.
+ */
+export type MarkWalk = {
+  item: QueueItem | null;
+  regions: Region[];
+  left: number | null;
+  trouble: AffectedAreasTrouble | null;
+  next: (answered: Region | null) => void;
+  retry: () => void;
+};
+
+/**
+ * Where Missed one stands on the pano's face (`MissedDraw`): `idle`; `drawing`, the photo taking a box; `drawn`, a
+ * box held (in 0..1 of the view) and waiting for its kind, an optional note and Save; `saving`, the new area out. The
+ * box and the chosen kind ride from `drawn` to `saving` and back, so a refused Save keeps what the operator drew.
+ */
+export type MissedStage =
+  | { step: 'idle' }
+  | { step: 'drawing' }
+  | { step: 'drawn' | 'saving'; box: [number, number, number, number]; kind: string | null };
 
 // ---------------------------
 

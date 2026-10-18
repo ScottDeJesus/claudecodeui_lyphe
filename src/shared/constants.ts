@@ -14,7 +14,7 @@ import {
 import type { ComponentType } from 'react';
 
 import type { RoadmapEpicWord, RoadmapFeatureWord, RoadmapMilestoneWord } from '@/shared/roadmap-types';
-import type { FileStatusCode, LLMProvider, McpProvider, McpScope, McpTransport, RoadmapDotState, SettingsMainTab } from '@/shared/types';
+import type { AffectedAreasTrouble, FileStatusCode, LLMProvider, McpProvider, McpScope, McpTransport, RoadmapDotState, SettingsMainTab } from '@/shared/types';
 import type { UserPreferenceKey } from '@/shared/userSettings';
 
 /** The four buckets the git changes view sorts working-tree files into. */
@@ -479,3 +479,28 @@ export const FOCUSABLE_SELECTOR = 'a[href], button:not([disabled]), input:not([d
  * list), so a card and a chat row lift on the same hold.
  */
 export const TOUCH_HOLD_MS = 400;
+
+// ---------------------------
+
+//----------------- AFFECTED AREAS MARKS ------------
+
+/**
+ * The longest note a mark may carry, in characters: shadow-connector's `MAX_NOTE`
+ * (`core/affected_areas/judgment/marks.py`), which refuses a longer one as `note_too_long`. Used by the
+ * affected-areas module's `NoteDialog` and `UnderstandingVerdict` as their fields' `maxLength`, and by
+ * `MarkRefusal` to say the cap, so a note typed here is never one the engine turns back.
+ */
+export const MARK_NOTE_MAX = 500;
+
+// ---------------------------
+
+//----------------- AFFECTED AREAS LANE ------------
+
+/**
+ * The three ways the affected-areas lane fails whatever was asked of it: CloudCLI could not read shadow-connector's
+ * secret, shadow-connector did not answer in time, or it answered what CloudCLI cannot read. Each is said in the Tours
+ * view's own words (`affectedAreas.trouble.<fault>`) rather than as a refusal of the press. Read by the affected-areas
+ * module's `LaneTrouble` (a read that brought no answer), `ThresholdControl` (a Set threshold that brought none) and
+ * `MarkRefusal` (a mark, missed area or understanding press that brought none).
+ */
+export const AFFECTED_AREAS_LANE_FAULTS: readonly AffectedAreasTrouble[] = ['no_secret', 'unreachable', 'unreadable'];

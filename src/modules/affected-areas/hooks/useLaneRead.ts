@@ -18,7 +18,7 @@ type Settled<T> = { key: string; value: T | null; trouble: AffectedAreasTrouble 
  * a pano the tour had not yet listed as cut, answers after the key was set), and it outranks every read that began
  * before it: those are dropped on arrival, so a stale read can never land over a newer answer.
  *
- * Used by the affected-areas module's `useTours`, `useTour`, `useCodebook` and `usePano`.
+ * Used by the affected-areas module's `useTours`, `useTour`, `useCodebook`, `usePano`, `useQueue` and `useProving`.
  */
 export function useLaneRead<T>(key: string | null, fetchFor: (key: string) => Promise<Response>): AffectedAreasRead<T> & {
   reload: () => void;

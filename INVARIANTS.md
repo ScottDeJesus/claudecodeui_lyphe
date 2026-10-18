@@ -10275,20 +10275,6 @@ probe-key: 61e44d3b46a5862d5d8a6fa448b580b1c62e73ce
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/
 
-## INV-8668 — probe — LOW — MAN-8577 still says the rooms check "has not been run end to end; its dark pass has never executed"
-
-LOW — MAN-8577 still says the rooms check "has not been run end to end; its dark pass has never executed"
-
-```probe
-cd /opt/shadow-connector && docstore get MAN-8577 --text | grep -c "has not been run end to end"
-expect: 1 while the stale status stands; 0 once the row records the run (`cd /home/lyphe/.claude/claudecodeui_lyphe && node .verify/affected-areas-rooms.mjs --tour 6acd745c36f92c16415b6f97 --evidence "$(mktemp -d /tmp/aa-rooms.XXXXXX)"` printed "26 PASS, 0 FAIL" and exit 0 at the review)
-```
-
-measured 2026-10-17 by chain chain-tour-affected-areas--rooms--docs-20261017-151147-c858, finding L4, LOW
-probe-key: 910a2af6245c453903f98e95f2f68639e0fe48aa
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/
-
 ## INV-8669 — probe — LOW — MAN-3035 states that `water_remediation.txt` carries no `{room_list}` but not what that means: a Water narrative never sees the marked areas
 
 LOW — MAN-3035 states that `water_remediation.txt` carries no `{room_list}` but not what that means: a Water narrative never sees the marked areas
@@ -10400,3 +10386,277 @@ measured 2026-10-17 by chain chain-tour-affected-areas--viewer--fill-20261017-14
 probe-key: 5aae3c8d51a81dfcf76a3b9748aec062a3a61077
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/hooks/useImageUrl.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/hooks/useLaneRead.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/hooks/usePano.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/utils/laneTrouble.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/CerberusPanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/common.json, /home/lyphe/.claude/claudecodeui_lyphe/.verify/affected-areas-view.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/affected-areas-walk.mjs
+
+## INV-8687 — probe — LOW — Skip on the last area of a batch while its mark is out reads a batch that serves the marked area again, offered with its presses on; a second press writes a second row
+
+LOW — Skip on the last area of a batch while its mark is out reads a batch that serves the marked area again, offered with its presses on; a second press writes a second row
+
+```probe
+D=$(mktemp -d /tmp/athena-p.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+cd "$HOME/.claude/state/pipeline-reviews/tour-affected-areas--marking--fill/athena-probes" && timeout 200 node p10-onlyone.mjs 2>&1 | grep -E 'RESULT|CLEANUP|PROBE ERROR'
+EOF
+bash "$D/p.sh"
+expect: while it stands `RESULT queue of one: left 1 | after Y then S the next batch head is the area just marked = true | its Confirm is offered in the window = true … | pressed Y on it | mark POSTs sent for it = 2 | rows for it = 2`; cured: Confirm offered = false (or the skip refused), `mark POSTs sent for it = 1 | rows for it = 1`. Both end with `CLEANUP … EQUAL`; if the Water stain unsure queue no longer holds exactly one area the probe prints what it saw instead.
+```
+
+measured 2026-10-17 by chain chain-tour-affected-areas--marking--fill-20261017-200005-ba7f, finding L8, LOW
+probe-key: 5b421fcf604f06bcb83fc47bcf981801d718f3be
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/hooks/useMarkedRegions.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/hooks/useProving.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/hooks/useQueue.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/MarkScreen.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/affected-areas-marking.mjs
+
+## INV-8688 — probe — LOW (open from round 1, disclosed) — Skip has no memory, and the Mark screen does not keep its item across the switch
+
+LOW (open from round 1, disclosed) — Skip has no memory, and the Mark screen does not keep its item across the switch
+
+```probe
+D=$(mktemp -d /tmp/athena-p.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+cd "$HOME/.claude/state/pipeline-reviews/tour-affected-areas--marking--fill/athena-probes" && for p in p5-skipwall p7-place; do timeout 170 node $p.mjs 2>&1 | grep -E 'RESULT|PROBE ERROR'; done
+EOF
+bash "$D/p.sh"
+expect: while it stands `distinct items over 21 skips = 20 | after the 20th skip the screen shows the first item again = true` and `back on Mark the item is item 1 (place lost)`; cured: more than 20 distinct (or a word that the batch is skipped) and `item 3 (place kept)`.
+```
+
+measured 2026-10-17 by chain chain-tour-affected-areas--marking--fill-20261017-200005-ba7f, finding L4, LOW
+probe-key: bf41fb1b343d7fb9786fe2efaf2dad44201d8634
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/hooks/useMarkedRegions.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/hooks/useProving.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/hooks/useQueue.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/MarkScreen.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/affected-areas-marking.mjs
+
+## INV-8689 — probe — MEDIUM — An editor of any of four new library files is shown three cured probe rows, not the manual that governs the file
+
+MEDIUM — An editor of any of four new library files is shown three cured probe rows, not the manual that governs the file
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX)
+cat > "$D/p.sh" <<'EOF'
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+for f in SegmentedControl.tsx DataTable.tsx RegionDrawLayer.tsx verve/data.css; do
+  printf '%-22s ' "$f"; docstore govern "/home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/$f" --touch write --limit 3 --text | cut -d' ' -f1 | tr '\n' ' '; echo
+done
+EOF
+bash "$D/p.sh"
+expect: today each line prints "INV-8681 INV-8682 INV-8683"; cured: MAN-8580 (MAN-8579 for RegionDrawLayer.tsx) appears within the three tokens printed
+```
+
+measured 2026-10-17 by chain chain-tour-affected-areas--marking--docs-20261017-212539-905c, finding M1, MEDIUM
+probe-key: 313b69f31bb5d48c2e033a7be6c11e2aa1c3ebae
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/
+
+## INV-8690 — probe — MEDIUM — MAN-8558's "Not yet measured" says `/queue` and `/proving` answered 404 and orders a correction this plan was to make
+
+MEDIUM — MAN-8558's "Not yet measured" says `/queue` and `/proving` answered 404 and orders a correction this plan was to make
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX)
+cat > "$D/p.sh" <<'EOF'
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/q.mjs" <<'EOS'
+import { curlJson, loginToken } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/whole-check-kit.mjs';
+const t = loginToken();
+console.log('live: /queue', curlJson('GET', '/api/affected-areas/queue?mode=unsure&limit=1', undefined, t).status, '/proving', curlJson('GET', '/api/affected-areas/proving', undefined, t).status);
+EOS
+node "$D/q.mjs"
+printf 'MAN-8558 stale lines: '; docstore get MAN-8558 --text | sed -n '/## Not yet measured/,$p' | grep -c -E "answered 404|Correct the comments when the marks routes land"
+EOF
+bash "$D/p.sh"
+expect: today "live: /queue 200 /proving 200" and "MAN-8558 stale lines: 2"; cured: the section says what was measured (dated), or is gone, and the count is 0
+```
+
+measured 2026-10-17 by chain chain-tour-affected-areas--marking--docs-20261017-212539-905c, finding M2, MEDIUM
+probe-key: 58ab8943b27ec1be62b9c8d97d1521213ca98c18
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/
+
+## INV-8691 — probe — LOW — The intent's one required search does not print the Tables row (repeats INV-8680)
+
+LOW — The intent's one required search does not print the Tables row (repeats INV-8680)
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX)
+cat > "$D/p.sh" <<'EOF'
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+printf 'intent search : '; docstore search "affected areas marking mark screen tables SegmentedControl DataTable" --text | cut -d' ' -f1 | tr '\n' ' '; echo
+EOF
+bash "$D/p.sh"
+expect: today "intent search : MAN-8580 MAN-8582 MAN-8574"; cured: MAN-8581 is printed and no row of another package (MAN-8574) is
+```
+
+measured 2026-10-17 by chain chain-tour-affected-areas--marking--docs-20261017-212539-905c, finding L1, LOW
+probe-key: 2e792927f2b8fe5ce5970d65f4f97f50a4fc00a1
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/
+
+## INV-8692 — probe — LOW — The package the intent names does not exist; the rows sit in `cloudcli:.` and the report does not say why
+
+LOW — The package the intent names does not exist; the rows sit in `cloudcli:.` and the report does not say why
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX)
+cat > "$D/p.sh" <<'EOF'
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+printf 'package            : '; docstore list cloudcli:src/modules/affected-areas --text 2>&1 | cut -c1-40 | head -1
+printf 'rows in cloudcli:. : '; docstore list cloudcli:. --text | grep -c -E '^(MAN-8581|MAN-8582|MAN-8583) '
+EOF
+bash "$D/p.sh"
+expect: today "no package cloudcli:src/modules/affected" and 3; cured: the package lists the rows (and the second count is 0), or the report says the rows stay in cloudcli:. and why
+```
+
+measured 2026-10-17 by chain chain-tour-affected-areas--marking--docs-20261017-212539-905c, finding L2, LOW
+probe-key: 3ae8ff3ee16afc49ec8edc2c24b7c8f79f109f1e
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/
+
+## INV-8693 — probe — LOW — MAN-8582/8583 state rules for files they do not govern
+
+LOW — MAN-8582/8583 state rules for files they do not govern
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX)
+cat > "$D/p.sh" <<'EOF'
+printf 'PanoScreen.tsx shows : '; docstore govern /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/PanoScreen.tsx --touch write --limit 40 --text | cut -d' ' -f1 | tr '\n' ' '; echo
+EOF
+bash "$D/p.sh"
+expect: today "PanoScreen.tsx shows : MAN-8575"; cured: MAN-8582 or MAN-8583 is among the tokens printed
+```
+
+measured 2026-10-17 by chain chain-tour-affected-areas--marking--docs-20261017-212539-905c, finding L3, LOW
+probe-key: 4282175df918793d83267ea6fe2e9f1545204388
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/
+
+## INV-8694 — probe — LOW — MAN-8582 says less than the screen does in two places
+
+LOW — MAN-8582 says less than the screen does in two places
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX)
+cat > "$D/p.sh" <<'EOF'
+cd /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas || exit 1
+printf 'MarkQueue facts block names the mode: '; sed -n '/const facts = \[/,/\.join/p' MarkQueue.tsx | grep -c "mode"
+printf 'MAN-8582 random row mentions the confidence line: '; docstore get MAN-8582 --text | grep -F '| `random` |' | grep -c "% sure"
+printf 'MAN-8582 MarkBar line carries MarkQueue (type and component): '; docstore get MAN-8582 --text | grep '^| `MarkBar.tsx`' | grep -o '`MarkQueue`' | wc -l
+printf 'MarkQueue is both (type, component): '; grep -c "export type MarkQueue" /home/lyphe/.claude/claudecodeui_lyphe/src/shared/affected-areas-types.ts; grep -c "export function MarkQueue" MarkQueue.tsx
+EOF
+bash "$D/p.sh"
+expect: today 0 (facts block has no mode), 0 (random row silent), 2, then 1 and 1; cured: the second is 1 or the row says both modes show it, and the MarkBar line tells the type from the component
+```
+
+measured 2026-10-17 by chain chain-tour-affected-areas--marking--docs-20261017-212539-905c, finding L4, LOW
+probe-key: 2a9c0a4b425d43c4a463fd3d0e01811f86a73542
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/
+
+## INV-8695 — probe — LOW — MAN-8583 says the library ignores a small box "with no word"; the screen says one
+
+LOW — MAN-8583 says the library ignores a small box "with no word"; the screen says one
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX)
+cat > "$D/p.sh" <<'EOF'
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+printf 'MAN-8583 "with no word": '; docstore get MAN-8583 --text | grep -c "with no word"
+printf 'FacePhoto draws missed.floor: '; grep -c "affectedAreas.missed.floor" src/modules/affected-areas/FacePhoto.tsx
+printf 'MAN-8583 names missed.floor: '; docstore get MAN-8583 --text | grep -c "missed.floor"
+EOF
+bash "$D/p.sh"
+expect: today 1, 1, 0; cured: the row says the screen speaks (missed.floor) and the third count is 1
+```
+
+measured 2026-10-17 by chain chain-tour-affected-areas--marking--docs-20261017-212539-905c, finding L5, LOW
+probe-key: 6498027f456d8a487ea2c7e3a0ad11417f2b3026
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/
+
+## INV-8696 — probe — LOW — Two lines narrate the review instead of stating a fact
+
+LOW — Two lines narrate the review instead of stating a fact
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX)
+cat > "$D/p.sh" <<'EOF'
+for t in MAN-8583 MAN-8577; do printf '%s: ' $t; docstore get $t --text | grep -c -E "the review's own probes|run end to end at the review"; done
+EOF
+bash "$D/p.sh"
+expect: today MAN-8583: 1 and MAN-8577: 1; cured: 0 for both
+```
+
+measured 2026-10-17 by chain chain-tour-affected-areas--marking--docs-20261017-212539-905c, finding L6, LOW
+probe-key: 6e704d3884496d92ade2c6896bbe469b59fc3389
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/
+
+## INV-8697 — probe — LOW — "1,183 px" is a measurement of one corpus, stated as the table's width
+
+LOW — "1,183 px" is a measurement of one corpus, stated as the table's width
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX)
+cat > "$D/p.sh" <<'EOF'
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/q.mjs" <<'EOS'
+import { openConsole } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/console.mjs';
+import { openCerberusTab } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/node-card.mjs';
+const { page, browser } = await openConsole({ viewport: { width: 1280, height: 900 } });
+try {
+  await openCerberusTab(page);
+  await page.getByRole('tab', { name: 'Tours', exact: true }).click();
+  await page.getByRole('radiogroup', { name: 'What Tours shows' }).getByRole('radio', { name: 'Tables', exact: true }).click();
+  await page.locator('table[aria-label^="Each kind"] tbody tr').first().waitFor({ timeout: 30000 });
+  await new Promise((r) => setTimeout(r, 600));
+  const w = await page.evaluate(() => { const f = document.querySelector('.vv-datatable'); return [f.clientWidth, f.scrollWidth]; });
+  console.log('live frame shows', w[0], 'of', w[1], 'px');
+} finally { await browser.close(); }
+EOS
+(cd /home/lyphe/.claude/claudecodeui_lyphe && timeout 100 node "$D/q.mjs")
+printf 'rows say 1,183 (MAN-8580, MAN-8581): '; for t in MAN-8580 MAN-8581; do docstore get $t --text | grep -c "1,183"; done | tr '\n' ' '; echo
+EOF
+bash "$D/p.sh"
+expect: today "live frame shows 885 of 1169 px" and "rows say 1,183 (MAN-8580, MAN-8581): 1 1" (corpus-dependent: the width follows the lines set); cured: the rows name what the figure was measured with, or the live width and the rows agree
+```
+
+measured 2026-10-17 by chain chain-tour-affected-areas--marking--docs-20261017-212539-905c, finding L7, LOW
+probe-key: cdf71bac1fe2ac9e8487ccdf2fa460c333543a66
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/
+
+## INV-8698 — probe — LOW — `SegmentedControl`'s `count` has no site, and the row never says so
+
+LOW — `SegmentedControl`'s `count` has no site, and the row never says so
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX)
+cat > "$D/p.sh" <<'EOF'
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+printf 'callers passing count: '; grep -n "count:" src/modules/affected-areas/ToursSwitch.tsx src/modules/affected-areas/LayerSwitch.tsx src/modules/affected-areas/MarkQueue.tsx | grep -vc "walk.left"
+printf 'MAN-8580 says no caller passes count: '; docstore get MAN-8580 --text | grep -c -i -E "no caller passes .?count|nobody passes .?count"
+EOF
+bash "$D/p.sh"
+expect: today 0 and 0; cured: the second is 1 (the row says no caller passes `count` today), or the first is non-zero and the row's site column names that caller
+```
+
+measured 2026-10-17 by chain chain-tour-affected-areas--marking--docs-20261017-212539-905c, finding L8, LOW
+probe-key: e214705f08e46ac68956e239ecbfeadf86156da8
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/
+
+## INV-8699 — probe — LOW — Two code comments still say what the healed rows no longer say
+
+LOW — Two code comments still say what the healed rows no longer say
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX)
+cat > "$D/p.sh" <<'EOF'
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+printf 'proving.py "none calls this yet": '; grep -c "none calls this yet" /opt/shadow-connector/core/affected_areas/judgment/proving.py
+printf 'routes.ts "a route not yet built": '; grep -c "a route not yet built answers its own 404" server/modules/affected-areas/affected-areas.routes.ts
+EOF
+bash "$D/p.sh"
+expect: today 1 and 1; cured: 0 and 0
+```
+
+measured 2026-10-17 by chain chain-tour-affected-areas--marking--docs-20261017-212539-905c, finding L9, LOW
+probe-key: d5b3d89f4508ca9ad11f99c9e4f3e19a14e72baa
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/

@@ -1,48 +1,5 @@
 <!-- docstore export; edit rows with docstore write, never this file -->
 
-## INV-8677 — probe — MEDIUM — An editor of any file MAN-8579 governs is shown three cured probe rows, not the manual
-
-MEDIUM — An editor of any file MAN-8579 governs is shown three cured probe rows, not the manual
-
-```probe
-D=$(mktemp -d /tmp/athena-probe.XXXXXX)
-cat > "$D/p.sh" <<'EOF'
-cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
-for f in RegionImage.tsx Gallery.tsx PhotoFill.tsx verve/media.css; do
-  printf '%-16s ' "$f"; docstore govern "/home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/$f" --touch write --limit 3 --text | cut -d' ' -f1 | tr '\n' ' '; echo
-done
-EOF
-bash "$D/p.sh"
-expect: today each line prints "INV-8639 INV-8640 INV-8641" (no MAN-8579); cured: MAN-8579 appears within the three tokens printed
-```
-
-measured 2026-10-17 by chain chain-tour-affected-areas--viewer--docs-20261017-161343-c51e, finding M1, MEDIUM
-probe-key: 8a63f671c6a605be6cb5958428793cdb1af8f208
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/verve/
-
-## INV-8678 — probe — LOW — MAN-740's rule 6 table keeps two line counts that no longer match their files
-
-LOW — MAN-740's rule 6 table keeps two line counts that no longer match their files
-
-```probe
-D=$(mktemp -d /tmp/athena-probe.XXXXXX)
-cat > "$D/p.sh" <<'EOF'
-cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
-for s in controls feedback; do
-  printf '%s.css: file has %s lines; MAN-740 table says ' "$s" "$(wc -l < src/shared/ui/verve/$s.css)"
-  docstore get MAN-740 --text | grep -E "\`$s.css\` \| [0-9a-z]+ \|" | cut -d'|' -f5 | tr -d ' ' | head -1
-done
-EOF
-bash "$D/p.sh"
-expect: today "controls.css: file has 510 lines; MAN-740 table says 496" and "feedback.css: file has 440 lines; … says 438"; cured: each pair equal
-```
-
-measured 2026-10-17 by chain chain-tour-affected-areas--viewer--docs-20261017-161343-c51e, finding L1, LOW
-probe-key: e90b0866116471aab1d5b6ed9af8c6d886b03358
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/verve/
-
 ## INV-8679 — probe — LOW — MAN-8579 describes three `Gallery` props more broadly than the code behaves
 
 LOW — MAN-8579 describes three `Gallery` props more broadly than the code behaves

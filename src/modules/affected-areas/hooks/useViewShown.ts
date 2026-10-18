@@ -41,7 +41,8 @@ export function useViewShown(ref: RefObject<HTMLElement | null>): boolean {
  * A word each time `shown` turns true again, for a read that was held back while the view was away. A view that never
  * went away is never told.
  *
- * Used by the affected-areas module's view root.
+ * Used by the affected-areas module's view root, and by `useQueue` and `useProving`, which read again when their screen
+ * is shown again.
  */
 export function useWhenShown(shown: boolean, onShown: () => void): void {
   // The root's latest `onShown`, which the effect below calls after a render that may be long past the one that wrote it.

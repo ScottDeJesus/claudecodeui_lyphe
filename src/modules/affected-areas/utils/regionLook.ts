@@ -7,7 +7,7 @@ import type { Tone } from '@/shared/types';
  * - `confirmed`: the operator confirmed it, or renamed its kind.
  * - `human`: the operator drew it by hand, a change the reader missed.
  * - `unsure`: unjudged and below its kind's threshold, so the system does not believe it yet.
- * - `not_a_change`: the operator marked it as no change at all.
+ * - `not_a_change`: the operator marked it as no change at all, or took back an area he drew.
  */
 type RegionState = 'proposed' | 'confirmed' | 'human' | 'unsure' | 'not_a_change';
 
@@ -35,15 +35,16 @@ export const REGION_LOOK: Record<RegionState, RegionLook> = {
 };
 
 /**
- * A region's state, read in this order: drawn by hand first (a hand-drawn region is the operator's own, whatever
- * mark it later carries); then the newest mark's verdict, `not_a_change`, or `confirm` / `rename`; then an unjudged
- * region the system does not believe (`standing === false`, no mark). Anything else is `proposed`, a null `mark` or
- * `standing` included: null is "not judged", never "judged and found wanting".
+ * A region's state, read in this order: the newest mark `not_a_change` first — a reader's area set aside, or one
+ * drawn by hand and taken back, the one mark the engine takes on a drawn area — then drawn by hand (the operator's
+ * own, standing); then `confirm` / `rename`; then an unjudged region the system does not believe (`standing ===
+ * false`, no mark). Anything else is `proposed`, a null `mark` or `standing` included: null is "not judged", never
+ * "judged and found wanting".
  */
 export function regionState(region: Region): RegionState {
-  if (region.source === 'human') return 'human';
   const verdict = region.mark?.verdict;
   if (verdict === 'not_a_change') return 'not_a_change';
+  if (region.source === 'human') return 'human';
   if (verdict === 'confirm' || verdict === 'rename') return 'confirmed';
   if (region.mark === null && region.standing === false) return 'unsure';
   return 'proposed';

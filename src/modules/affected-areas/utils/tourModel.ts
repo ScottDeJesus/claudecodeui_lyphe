@@ -1,6 +1,6 @@
 import type { TFunction } from 'i18next';
 
-import type { Face, PanoEntry, TourSummary } from '@/shared/affected-areas-types';
+import type { Codebook, Face, PanoEntry, Region, TourSummary, ViewDetail, ViewEntry } from '@/shared/affected-areas-types';
 import { formatRelativeTime, formatShortDate } from '@/shared/utils';
 
 /*
@@ -112,4 +112,39 @@ export function listWords(items: string[], t: TFunction): string {
 /** The same words opening a sentence: "Engineered wood". */
 export function capitalized(words: string): string {
   return words.charAt(0).toUpperCase() + words.slice(1);
+}
+
+/**
+ * A kind as a person reads it: the codebook's label ("Material removed"), or its key spoken ("Removed material") until
+ * the codebook answers — never the key itself (INV-76). Read by the marking pieces: `MarkPresses`, `MarkBar`,
+ * `FacePhoto` and `MarkQueue`.
+ */
+export function kindName(cls: string, codebook: Codebook | null): string {
+  return codebook?.classes.find((kind) => kind.key === cls)?.label ?? capitalized(spoken(cls));
+}
+
+/**
+ * The kind an area counts as: the one the operator renamed it to when its newest mark is a rename, else the one the
+ * reader gave it. It is shadow-connector's `effective_class` read off the mark the wire carries, because the wire's
+ * `class` stays the reader's after a rename. Read by `MarkPresses` and `MarkBar`.
+ */
+export function countedKind(region: Region): string {
+  return region.mark?.verdict === 'rename' && region.mark.newClass !== null ? region.mark.newClass : region.class;
+}
+
+/**
+ * A face's areas and the regions set aside on it; undefined while the face is unread. Once the pano has answered, both
+ * are counted off its regions, so together they are every outline drawn: set aside is `standing === false` (unsure, or
+ * marked not a change) and the areas are the rest, as the engine's own count holds them. Before it answers, the
+ * tour's listing gives the areas alone (standing once marks exist, else every one the reader marked). Read by the
+ * pano screen's face strip and caption.
+ */
+export function faceCounts(view: ViewEntry | ViewDetail | undefined): { areas: number; setAside: number } | undefined {
+  const read = view?.read;
+  if (view === undefined || read?.status !== 'read') return undefined;
+  if ('regions' in view) {
+    const setAside = view.regions.filter((region) => region.standing === false).length;
+    return { areas: view.regions.length - setAside, setAside };
+  }
+  return { areas: read.standingCount ?? read.regionsCount, setAside: 0 };
 }

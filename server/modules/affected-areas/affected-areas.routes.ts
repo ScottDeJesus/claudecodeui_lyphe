@@ -58,8 +58,7 @@ type AllowedRoute = {
 
 /**
  * THE ALLOWLIST. A method-and-path pair that is not a row here never reaches shadow-connector: the lane
- * answers its own 404. The marking plan's rows stand before its routes do — the contract was written
- * whole — so a route not yet built answers its own 404 from shadow-connector, through the lane.
+ * answers its own 404.
  */
 const ALLOWLIST: AllowedRoute[] = [
   { method: 'get', route: '/tours', timeoutMs: LANE_TIMEOUT_MS, expect: 'json', body: 'none',
