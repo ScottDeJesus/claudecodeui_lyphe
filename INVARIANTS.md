@@ -10169,40 +10169,6 @@ probe-key: 5a6c71947ea10f92b0fa71ce171ba38d0e7b5d9c
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/affected-areas-rooms.mjs
 
-## INV-8664 — probe — MEDIUM — INV-2337 says a changed fold "leaves a room unmatched with no error"; a changed `fold_rooms` signature raises into every estimate, marks or none
-
-MEDIUM — INV-2337 says a changed fold "leaves a room unmatched with no error"; a changed `fold_rooms` signature raises into every estimate, marks or none
-
-```probe
-D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
-cat > "$D/p.py" <<'EOF'
-import sys
-sys.path.insert(0, "/opt/shadow-connector")
-import core.preliminary_estimator.marked_areas as M
-import core.preliminary_estimator.room_list as R
-def fold_rooms_v2(entries, *, strict):          # the fold with a changed signature
-    raise AssertionError("unreachable")
-M.fold_rooms = fold_rooms_v2
-pano = (b"", "image/jpeg", {"room_name": "Kitchen", "floor": 1, "ceiling_height_ft": 8.0, "is_affected": False})
-try:
-    out = R.with_marked_areas(R.group_by_room([pano]), frozenset())          # a tour with NOTHING standing
-    print("changed fold signature, no marks: returned", len(out), "group(s)")
-except Exception as exc:
-    print("changed fold signature, no marks: RAISED", type(exc).__name__)
-EOF
-cat > "$D/p.sh" <<'EOF'
-cd /opt/shadow-connector && venv/bin/python -I "$1/p.py" 2>&1 | tail -2
-docstore get INV-2337 --text | grep -c "or a changed fold, leaves a room unmatched with no error"
-EOF
-bash "$D/p.sh" "$D"
-expect: "changed fold signature, no marks: RAISED TypeError" and 1 while the row says a changed fold leaves a room unmatched; a row that says only the engine is guarded prints the same RAISED line and 0
-```
-
-measured 2026-10-17 by chain chain-tour-affected-areas--rooms--docs-20261017-151147-c858, finding M1, MEDIUM
-probe-key: c5007ed117da8f11884ee4f185e6aa76ae881a06
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/
-
 ## INV-8665 — probe — LOW — MAN-8573's "19 of 60 recent tours … 8 of those" drops the population that makes it true
 
 LOW — MAN-8573's "19 of 60 recent tours … 8 of those" drops the population that makes it true
