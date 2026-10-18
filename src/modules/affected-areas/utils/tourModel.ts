@@ -1,6 +1,7 @@
 import type { TFunction } from 'i18next';
 
 import type { Codebook, Face, PanoEntry, Region, TourSummary, ViewDetail, ViewEntry } from '@/shared/affected-areas-types';
+import { regionState } from '@/modules/affected-areas/utils/regionLook';
 import { formatRelativeTime, formatShortDate } from '@/shared/utils';
 
 /*
@@ -133,18 +134,26 @@ export function countedKind(region: Region): string {
 }
 
 /**
- * A face's areas and the regions set aside on it; undefined while the face is unread. Once the pano has answered, both
- * are counted off its regions, so together they are every outline drawn: set aside is `standing === false` (unsure, or
- * marked not a change) and the areas are the rest, as the engine's own count holds them. Before it answers, the
- * tour's listing gives the areas alone (standing once marks exist, else every one the reader marked). Read by the
- * pano screen's face strip and caption.
+ * A face's counts; undefined while the face is unread. Once the pano has answered, the three are counted off its
+ * regions through `regionState`, so together they are every outline drawn:
+ * - `setAside`: areas the system does not believe, `unsure` (below a line the operator set for the kind) and
+ *   `not_a_change` (marked away, or a drawing taken back);
+ * - `proposed`: unmarked areas of a kind with no line set (`proposed` with `standing === false`), which stand only
+ *   when the operator marks them;
+ * - `areas`: the rest, as the engine's own count holds them (standing, or not yet judged).
+ * Before the pano answers, the tour's listing gives the areas alone (the engine's `standingCount`). Read by the pano
+ * screen's face strip and caption.
  */
-export function faceCounts(view: ViewEntry | ViewDetail | undefined): { areas: number; setAside: number } | undefined {
+export function faceCounts(
+  view: ViewEntry | ViewDetail | undefined,
+): { areas: number; setAside: number; proposed: number } | undefined {
   const read = view?.read;
   if (view === undefined || read?.status !== 'read') return undefined;
   if ('regions' in view) {
-    const setAside = view.regions.filter((region) => region.standing === false).length;
-    return { areas: view.regions.length - setAside, setAside };
+    const states = view.regions.map((region) => ({ state: regionState(region), standing: region.standing }));
+    const setAside = states.filter(({ state }) => state === 'unsure' || state === 'not_a_change').length;
+    const proposed = states.filter(({ state, standing }) => state === 'proposed' && standing === false).length;
+    return { areas: view.regions.length - setAside - proposed, setAside, proposed };
   }
-  return { areas: read.standingCount ?? read.regionsCount, setAside: 0 };
+  return { areas: read.standingCount ?? read.regionsCount, setAside: 0, proposed: 0 };
 }

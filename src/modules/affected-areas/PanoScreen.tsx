@@ -128,6 +128,7 @@ export function PanoScreen({
     : [
         t('affectedAreas.pano.faceAreas', { count: counts.areas }),
         counts.setAside > 0 ? t('affectedAreas.pano.setAside', { count: counts.setAside }) : null,
+        counts.proposed > 0 ? t('affectedAreas.pano.proposed', { count: counts.proposed }) : null,
         t('affectedAreas.pano.faceRead', { when: formatRelativeTime(view?.read?.readAt) }),
       ].filter((part) => part !== null).join(' · ');
   const ratio = view !== undefined && view.height > 0 ? view.width / view.height : 1;

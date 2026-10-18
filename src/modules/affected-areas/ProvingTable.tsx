@@ -43,7 +43,8 @@ function countColumn(key: string, label: string, count: (kind: ProvingClass) => 
 /**
  * One share column, at the kind's line: the engine's share, or a dash when it stands on fewer than ten judgments, `over`
  * being the count it was divided by. A dash sorts as nothing at all, so it sinks below every share in both directions,
- * never to the top of an ascending sort.
+ * never to the top of an ascending sort. A kind with no line set shows the share previewed at the engine's default,
+ * and says "at 0.50" under it.
  */
 function shareColumn(
   key: string, label: string, share: (kind: ProvingClass) => number | null, over: (kind: ProvingClass) => number, sortedBy: SortedBy,
@@ -51,7 +52,7 @@ function shareColumn(
   return {
     key, label, align: 'end',
     sortValue: (kind) => (tooFew(over(sortedBy(kind))) ? null : share(sortedBy(kind))),
-    render: (kind) => <Share share={share(kind)} over={over(kind)} />,
+    render: (kind) => <Share share={share(kind)} over={over(kind)} previewedAt={kind.isDefault ? kind.threshold : undefined} />,
   };
 }
 
@@ -99,8 +100,9 @@ function Legend() {
  *
  * Top to bottom: the head, How right the reader is, naming the model and contract it measures ("gemini-3.8-flash ·
  * aa.v1"); the understanding's line, in counts; then the kinds, one row each, as the library's sortable `DataTable`:
- * the kind with its line ("Threshold 65% · set Oct 15" or "Threshold 50% · default"); then the decision, Precision
- * and Coverage at that line and Missed, what the reader missed that no line can catch; then Judged on the random slice
+ * the kind with its line ("Threshold 65% · set Oct 15", or "No threshold set: its areas stand only when you mark them");
+ * then the decision, Precision and Coverage at that line (previewed "at 0.50" where none is set) and Missed, what the
+ * reader missed that no line can catch; then Judged on the random slice
  * and what the judgments were (Right, Wrong kind, Not a change); then Near the line, effort that never enters a share.
  * Nine columns need about 1,200 px and the Cerberus panel gives the table some 890 at 1280 wide (a phone, 356), so the
  * table scrolls sideways in its frame, the kind's column standing still at its edge, and the order is what shows
@@ -135,7 +137,7 @@ export function ProvingTable({
         <span className="flex flex-col gap-0.5">
           {kind.label}
           {/* Words, not a figure column: proportional figures, not the cell's tabular ones. */}
-          <span className="whitespace-nowrap text-xs font-normal normal-nums text-muted-foreground">{thresholdWords(kind, t)}</span>
+          <span className="w-44 text-xs font-normal normal-nums text-muted-foreground">{thresholdWords(kind, t)}</span>
         </span>
       ),
     },

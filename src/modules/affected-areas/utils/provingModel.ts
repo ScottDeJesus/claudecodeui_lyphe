@@ -48,11 +48,19 @@ export function sameLine(a: number, b: number): boolean {
 }
 
 /**
- * The line in force in words: "Threshold 65% · set Oct 15", or "Threshold 50% · default" for a line nobody has set on
- * this model and contract (the engine's 0.5).
+ * The line in force in words: "Threshold 65% · set Oct 15", or, for a kind nobody has set a line for on this model and
+ * contract, "No threshold set: its areas stand only when you mark them". The engine's 0.5 is where the control starts
+ * and what the figures preview (`atDefaultWords`); it is no line, and stands for nothing.
  */
 export function thresholdWords(kind: ProvingClass, t: TFunction): string {
-  const value = lineWords(kind.threshold, t);
-  if (kind.isDefault) return t('affectedAreas.tables.thresholdDefault', { value });
-  return t('affectedAreas.tables.thresholdSet', { value, date: formatShortDate(kind.thresholdSetAt) ?? '—' });
+  if (kind.isDefault) return t('affectedAreas.tables.thresholdDefault');
+  return t('affectedAreas.tables.thresholdSet', { value: lineWords(kind.threshold, t), date: formatShortDate(kind.thresholdSetAt) ?? '—' });
+}
+
+/**
+ * What a figure computed at the engine's default line says of itself: "at 0.50", the line in the engine's own two
+ * decimals. A kind with a line set draws its figures bare; one without is previewed at the default, and says so.
+ */
+export function atDefaultWords(line: number, t: TFunction): string {
+  return t('affectedAreas.tables.atDefault', { line: line.toFixed(2) });
 }

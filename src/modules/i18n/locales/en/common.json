@@ -2399,6 +2399,7 @@
       "faceAreas_one": "{{count}} area",
       "faceAreas_other": "{{count}} areas",
       "setAside": "{{count}} set aside",
+      "proposed": "{{count}} proposed",
       "faceUnread": "Not read yet",
       "faceRead": "read {{when}}",
       "enlarge": "Enlarge",
@@ -2488,6 +2489,7 @@
       "left_other": "{{count}} left",
       "faceView": "{{face}} view",
       "threshold": "threshold {{percent}}%",
+      "noLine": "No line set",
       "heldOut": "held out to measure the reader",
       "skip": "Skip",
       "reading": "Reading the queue…",
@@ -2611,7 +2613,8 @@
         "nearLine": "Near the line"
       },
       "thresholdSet": "Threshold {{value}} · set {{date}}",
-      "thresholdDefault": "Threshold {{value}} · default",
+      "thresholdDefault": "No threshold set: its areas stand only when you mark them",
+      "atDefault": "at {{line}}",
       "setThreshold": "Set threshold",
       "percent": "{{percent}}%",
       "tooFew": "too few judged",
@@ -2642,10 +2645,10 @@
         "label": "Threshold for {{kind}}",
         "lower": "Lower the line",
         "raise": "Raise the line",
-        "default": "default",
+        "default": "not set",
         "setting": "Setting…",
         "thin": "Too few judged here to measure a line: set it on your own judgment.",
-        "standing": "At or above the line, an area the reader marked stands. Below it, it is set aside until you judge it."
+        "standing": "While no line is set, an area the reader marked stands only when you mark it. Once a line is set, an area at or above it stands, and one below it is set aside until you judge it."
       },
       "refused": {
         "not_a_person": "A line has to be set by a person",

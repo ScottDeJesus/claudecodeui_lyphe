@@ -109,7 +109,7 @@ export function MarkQueue({ codebook, mode, kind, walk, photo, onMode, onKind, o
     const shapes = [...neighbours, region].sort((a, b) => a.ordinal - b.ordinal).map((each) => shapeOf(each, codebook));
     const facts = [
       region.confidence === null ? null : t('affectedAreas.region.sure', { percent: Math.round(region.confidence * 100) }),
-      region.threshold === null ? null : t('affectedAreas.mark.threshold', { percent: Math.round(region.threshold * 100) }),
+      region.threshold === null ? t('affectedAreas.mark.noLine') : t('affectedAreas.mark.threshold', { percent: Math.round(region.threshold * 100) }),
       t(`affectedAreas.region.basis.${region.basis}`),
       region.holdout === true ? t('affectedAreas.mark.heldOut') : null,
     ].filter((part) => part !== null).join(' · ');

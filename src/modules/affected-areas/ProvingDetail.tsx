@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 
 import { ThresholdControl } from '@/modules/affected-areas/ThresholdControl';
 import { capitalized, spoken } from '@/modules/affected-areas/utils/tourModel';
-import { lineWords, sameLine, tooFew } from '@/modules/affected-areas/utils/provingModel';
+import { atDefaultWords, lineWords, sameLine, tooFew } from '@/modules/affected-areas/utils/provingModel';
 import type { ProvingClass, SweepPoint } from '@/shared/affected-areas-types';
 import type { DataTableColumn } from '@/shared/types';
 import { Badge, DataTable } from '@/shared/ui';
@@ -31,12 +31,23 @@ type SweepRow = { t: number; point: SweepPoint | null };
 /**
  * A share as the tables say it: "72%", or a dash said aloud as why, when it stands on fewer than ten judgments: `over`
  * is the count the engine divided by (`tooFew`). A share the engine could not give stands on none, and is a dash too.
+ * `previewedAt` is the default line the share was computed at, for a kind whose line nobody set: the share then says
+ * "at 0.50" under it, so a preview is never read as the result of a line in force. A dash has no figure to qualify.
  *
  * Used by the affected-areas module's `ProvingTable` (Precision and Coverage) and by this file's sweep.
  */
-export function Share({ share, over }: { share: number | null; over: number }) {
+export function Share({ share, over, previewedAt }: { share: number | null; over: number; previewedAt?: number }) {
   const { t } = useTranslation();
-  if (share !== null && !tooFew(over)) return <>{t('affectedAreas.tables.percent', { percent: Math.round(share * 100) })}</>;
+  if (share !== null && !tooFew(over)) {
+    const percent = t('affectedAreas.tables.percent', { percent: Math.round(share * 100) });
+    if (previewedAt === undefined) return <>{percent}</>;
+    return (
+      <span className="flex flex-col items-end">
+        {percent}
+        <span className="whitespace-nowrap text-xs font-normal text-muted-foreground">{atDefaultWords(previewedAt, t)}</span>
+      </span>
+    );
+  }
   return (
     <>
       <span aria-hidden="true">—</span>
@@ -50,7 +61,8 @@ export function Share({ share, over }: { share: number | null; over: number }) {
  * then the sweep: at each line the engine prices, 30% to 90%, the precision and coverage there, with the count of
  * judged regions at or above the line under the line itself, where a phone still shows it. A share over fewer than ten
  * is a dash, as in the row: a precision over that line's count, a coverage over the kind's confirmed. The line in force
- * is marked "In force" and the stepper's line, once moved, "If set"; either one that falls between the priced lines (or
+ * is marked "In force" (a kind with no line set has none: its rows are what each line would give, and the table's
+ * figures for it are said "at 0.50") and the stepper's line, once moved, "If set"; either one that falls between the priced lines (or
  * outside them) takes a row of its own in its place, with no figures, because the engine priced none: the sweep always
  * shows where the operator stands. A kind never judged on the slice says so in one line in place of seven empty rows.
  * Then the kinds the operator renamed it to, by name with how often, and his latest notes on it, each left out while it
@@ -89,7 +101,7 @@ export function ProvingDetail({ kind, kinds, line, pressing, refusal, onStep, on
           {row.point !== null && (
             <span className="whitespace-nowrap text-xs font-normal text-muted-foreground">{t('affectedAreas.tables.detail.atOrAbove', { count: row.point.n })}</span>
           )}
-          {sameLine(row.t, kind.threshold) && <Badge as="span" tone="neutral" className="whitespace-nowrap">{t('affectedAreas.tables.detail.inForce')}</Badge>}
+          {!kind.isDefault && sameLine(row.t, kind.threshold) && <Badge as="span" tone="neutral" className="whitespace-nowrap">{t('affectedAreas.tables.detail.inForce')}</Badge>}
           {chosen !== null && sameLine(row.t, chosen) && <Badge as="span" tone="info" className="whitespace-nowrap">{t('affectedAreas.tables.detail.ifSet')}</Badge>}
         </span>
       ),

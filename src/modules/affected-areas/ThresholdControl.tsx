@@ -35,11 +35,12 @@ function refusalWords(refusal: string, t: TFunction): string {
 /**
  * A KIND'S LINE, MOVED AND SET: the house `Stepper` from 0% to 100% in steps of five points (0.05 on the wire), starting
  * at the line in force, and Set threshold beside it. The line is said in percent, the unit a region's confidence is said
- * in ("72% sure"). The stepper says "default" while it stands at a line nobody set. A refusal is said above the press it
- * refuses, and the press waits while it is out, with the stepper held still.
+ * in ("72% sure"). The stepper starts at the engine's default and says "not set" while it stands at a line nobody set:
+ * the default only starts the control and previews the figures, and no area stands on it. A refusal is said above the
+ * press it refuses, and the press waits while it is out, with the stepper held still.
  *
  * Set threshold is offered when it would change something: a moved line, or a default line set where it stands, which
- * makes it the operator's own ("set Oct 17" in place of "default"). When it would change nothing it refuses the press
+ * makes it the operator's own ("set Oct 17" in place of "No threshold set"). When it would change nothing it refuses the press
  * (`aria-disabled`, the house `Button`'s own refusal) and is never `disabled`: the answer to a press is what makes the
  * set line the line in force, and a real `disabled` would blur the button under the finger that pressed it, sending
  * the keyboard back to the top of the app. It stays offered on a thin kind, with a word on why: the numbers cannot

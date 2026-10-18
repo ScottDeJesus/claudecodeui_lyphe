@@ -3365,7 +3365,7 @@ The Tours view: a DocuSketch tour's affected areas drawn on the single photo. Th
 | `LaneTrouble.tsx` | one warn banner with Try again for a read that brought no answer; `subject`: `tours` · `tour` · `pano` · `tables` · `queue` names what failed to read (`queue`: the Mark screen's) |
 | `ContextCard.tsx` · `UnderstandingCard.tsx` · `RoomDrying.tsx` · `RoomGallery.tsx` · `RegionList.tsx` | what the reader is told · what it understood · the room's drying numbers · the pano tiles (`Gallery`, max 24 then "+N") · the face's regions |
 | `utils/regionLook.ts` | `REGION_LOOK` and `regionState(region)` |
-| `utils/tourModel.ts` | `FACES`, `panoReadState`, `tourReadState`, `tourUnread`, `tourFacts`, `tourName`, `roomWords`, `spansFloors`, `spoken`, `listWords`, `capitalized`, `faceCounts(view)`, `kindName(cls, codebook)`, `countedKind(region)`: pure, no fetch, no state |
+| `utils/tourModel.ts` | `FACES`, `panoReadState`, `tourReadState`, `tourUnread`, `tourFacts`, `tourName`, `roomWords`, `spansFloors`, `spoken`, `listWords`, `capitalized`, `faceCounts(view)` (a face's `areas`, `setAside` and `proposed`, each counted through `regionState`: set aside is unsure plus not-a-change, proposed is an unmarked area of a kind with no line set), `kindName(cls, codebook)`, `countedKind(region)`: pure, no fetch, no state |
 | `MarkBar.tsx` · `MarkPresses.tsx` · `MarkPress.tsx` · `NoteDialog.tsx` · `MissedDraw.tsx` · `FacePhoto.tsx` · `LayerSwitch.tsx` · `ToursSwitch.tsx` · `MarkScreen.tsx` · `MarkQueue.tsx` · `UnderstandingMark.tsx` · `UnderstandingVerdict.tsx` | the marks: MAN-8582 |
 | `TablesScreen.tsx` · `ProvingTable.tsx` · `ProvingDetail.tsx` · `ThresholdControl.tsx` · `utils/provingModel.ts` | the Tables screen, its opened row, its threshold control, how its figures read: MAN-8581 |
 
@@ -3425,7 +3425,7 @@ section: The Tours view — src/modules/affected-areas: where state lives, what 
 - Screens draw what they are handed; the Tours screens' hooks are called from `AffectedAreasView.tsx` only, and `fetch` and `api` calls live in `hooks/` alone. Exceptions: `TablesScreen.tsx` reads its own table (`useProving`) and sends its own Set threshold press (MAN-8581); `MarkScreen.tsx` reads its own queue (`useQueue`) and the photo of its area (`useImageUrl`); and the presses of the marks (`MarkBar`, `MissedDraw`, `UnderstandingMark`) send their own writes through `answerOfWrite` (`utils/laneTrouble.ts`), each keeping its press, refusal and note in its own state (MAN-8582). why: a press is one call whose answer is the redraw, and its state (out, refused, noted) belongs to the press, not to the hub.
 - A mark's answer is laid over the pano, never fetched for: `useMarkedRegions(pano.value)` keeps the engine's answers beside the read and gives the pano with each answered region in place (the answer outranks a read of the same region that carries no mark or an older one, so a quiet reload landing late never redraws a judged area unjudged). The pano is read again only on a person's press: the switch coming back to Tours (`pano.reload()`), a read, Back.
 - Tone is by judgment, never by kind: a region is painted by where it stands (`regionState` in `utils/regionLook.ts`), not by its codebook kind. why: the tone set stays five (MAN-739 rule 4) and the codebook has fourteen kinds. The kind is words (the list's label, the badge's accessible name).
-- Null is "not judged": `regionState` reads a null `mark` or `standing` as `proposed`, never as unsure or rejected.
+- Null is "not judged": `regionState` reads a null `mark` or `standing` as `proposed`, never as unsure or rejected. So does a `threshold` of null: a kind with no line set has nothing to be "below", and its unmarked areas read `proposed` while `standing` is false (they stand only when marked, INV-8635).
 
 `REGION_LOOK` (`RegionState`, five). `regionState` takes the first row that matches, top to bottom:
 | state | when | tone | edge | wash | word (`affectedAreas.look.*`) |
@@ -3433,8 +3433,8 @@ section: The Tours view — src/modules/affected-areas: where state lives, what 
 | `not_a_change` | `mark.verdict === 'not_a_change'`: a reader's area set aside, or a drawn one taken back (the one mark the engine takes on a drawn area) | neutral | dashed | none | `notAChange` "Not a change" |
 | `human` | `source === 'human'`, standing (any other mark) | positive | dashed | full | `human` "Drawn by hand" |
 | `confirmed` | `mark.verdict` is `confirm` or `rename` | positive | solid | full | `confirmed` "Confirmed" |
-| `unsure` | `mark === null && standing === false` | info | dashed | light | `unsure` "Unsure" |
-| `proposed` | anything else, a null `mark` or `standing` included | info | solid | full | `proposed` "Proposed" |
+| `unsure` | `mark === null && standing === false && threshold !== null`: below a line the operator set for the kind | info | dashed | light | `unsure` "Unsure" |
+| `proposed` | anything else, a null `mark`, `standing` or `threshold` included | info | solid | full | `proposed` "Proposed" |
 
 Info is the reader's word and positive the operator's; a dashed edge is anything the reader's word alone does not carry. `PanoScreen` turns each region into a `RegionShape` with `tone`, `edge` and `wash` (drawn by `RegionImage`, MAN-8579); `RegionList` shows the word.
 - A room is affected on two authorities, both named (MAN-3035): `docusketchAffected` and `markedAreasAffected === true`, never `regionsStanding`, which counts older damage. The words and the tone are MAN-8578.
@@ -3516,7 +3516,7 @@ The Tables screen: `GET /proving` (the pinned model on the current contract) as 
 | `utils/provingModel.ts` | `tooFew(count)`, `isThin(kind)`, `lineWords(line, t)`, `sameLine(a, b)`, `thresholdWords(kind, t)`: how a figure reads, never its value |
 
 ## Table
-- Columns in order: Kind (with its line: "Threshold 65% · set Oct 15" or "Threshold 50% · default"), Precision, Coverage, Missed, Judged, Right, Wrong kind, Not a change, Near the line. Precision and Coverage are at the kind's line. ~1,170 px of table (every line at its default; a set line's words widen the Kind column) in an 885 px frame at 1280, 356 on a phone (MAN-8580): it scrolls sideways at every size, so the order decides what shows first.
+- Columns in order: Kind (with its line: "Threshold 65% · set Oct 15", or "No threshold set: its areas stand only when you mark them"), Precision, Coverage, Missed, Judged, Right, Wrong kind, Not a change, Near the line. Precision and Coverage are at the kind's line; a kind with no line set shows them previewed at the engine's default, each said "at 0.50" under the figure (`Share`'s `previewedAt`, `affectedAreas.tables.atDefault`), and its sweep marks no row "In force". The control starts at that default, its stepper noted "not set", and its sentence says what stands while no line is set. ~1,170 px of table (every line at its default; a set line's words widen the Kind column) in an 885 px frame at 1280, 356 on a phone (MAN-8580): it scrolls sideways at every size, so the order decides what shows first.
 - Opens sorted by precision, lowest first (`FIRST_SORT`). A new column opens on the end that needs the operator: precision and coverage lowest first, counts highest first, kind A to Z; the same column flips. A dash sorts as nothing: last in both directions (`DataTable`, MAN-8580).
 - States: read out (real heads over six `vv-skeleton` rows); lane fault (`LaneTrouble` with Try again; a failed re-read draws it above the table it kept); no kind judged on the random slice (info banner over a table whose lines can still be set); the kinds.
 - The understanding line is counts ("18 of 22 judged right"), never a rate.
@@ -3575,7 +3575,7 @@ The operator's marks on the Tours view: Confirm, Rename to… and Not a change o
 | `unsure` | Unsure first | unmarked model regions outside the random slice, nearest their kind's line first | finding each kind's line fast; the Tables count them as Near the line and no share takes them in (MAN-8563) | `affectedAreas.mark.unsureHint` |
 | `random` | Random slice | unmarked held-out regions in one fixed order | measuring the reader; they feed Judged, Right, Wrong kind, Not a change and so Precision and Coverage | `affectedAreas.mark.randomHint` |
 
-- Both modes draw one facts line under the reader's words (`MarkQueue.tsx` `facts`): "{n}% sure", "threshold {n}%", the basis ("seen in the photo") and, when `region.holdout` is true, "held out to measure the reader". The engine serves no held-out area in `unsure`.
+- Both modes draw one facts line under the reader's words (`MarkQueue.tsx` `facts`): "{n}% sure", "threshold {n}%" (or "No line set" where the kind has none: `region.threshold` null), the basis ("seen in the photo") and, when `region.holdout` is true, "held out to measure the reader". The engine serves no held-out area in `unsure`.
 - One area at a time: the question "Is this {the reader's kind}?", where it is, "{n} left", its photo, the reader's words, `MarkBar`, Skip.
 - The mode and the kind are the operator's choice; the screen never changes either. A new choice starts the walk over.
 - A queue with nothing in it says "Nothing left to mark" and why, by kind (`emptyKind`) or by mode (`emptyUnsure`, `emptyRandom`).
