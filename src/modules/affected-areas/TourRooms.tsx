@@ -13,17 +13,17 @@ type TourRoomsProps = {
 };
 
 /**
- * Who calls a room affected, in words: DocuSketch's sketch, the marked areas, both, or nobody (null). The sketch
- * stays an authority and the marked areas are a second, so a room says which of them speaks (MAN-3035).
+ * Who calls a room affected, in words: DocuSketch's sketch, the tour's photos, both, or nobody (null). The sketch
+ * stays an authority and the photos are a second, so a room says which of them speaks (MAN-3035).
  *
- * The marked areas speak through `markedAreasAffected` alone, never `regionsStanding`: that count takes in older
- * damage, which never makes a room affected. A null there is "not judged", so it calls nothing affected.
+ * The photos speak through `photosAffected` alone, never `regionsStanding`: that count takes in older damage,
+ * which never makes a room affected. A null there is "not judged", so it calls nothing affected.
  */
 function authorityWords(room: RoomEntry, t: TFunction): string | null {
-  const marked = room.markedAreasAffected === true;
-  if (room.docusketchAffected && marked) return t('affectedAreas.rooms.affectedBoth');
+  const photos = room.photosAffected === true;
+  if (room.docusketchAffected && photos) return t('affectedAreas.rooms.affectedBoth');
   if (room.docusketchAffected) return t('affectedAreas.rooms.affectedDocusketch');
-  if (marked) return t('affectedAreas.rooms.affectedMarked');
+  if (photos) return t('affectedAreas.rooms.affectedPhotos');
   return null;
 }
 
@@ -33,7 +33,7 @@ function authorityWords(room: RoomEntry, t: TFunction): string | null {
  *
  * Each row reads as the room's name (never its key, INV-76; "Unnamed room" for a nameless one), its floor ("Floor 2",
  * nothing when the room's panos disagree on it), and under them who calls it affected: "Affected per DocuSketch",
- * "Affected per marked areas", or "Affected per DocuSketch and marked areas". A room nobody calls affected carries
+ * "Affected per the photos", or "Affected per DocuSketch and the photos". A room nobody calls affected carries
  * no words.
  *
  * The words are the signal. The dot that leads an affected row is there so the eye finds the affected rooms in a long

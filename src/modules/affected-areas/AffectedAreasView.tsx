@@ -180,7 +180,7 @@ export function AffectedAreasView() {
     setSelectedRegionId(null);
     setEnlarged(false);
     showTop();
-    // Back is a press, and a judgment on the pano moved its tile's area count, its room's "Affected per marked areas" and
+    // Back is a press, and a judgment on the pano moved its tile's area count, its room's "Affected per the photos" and
     // the face a pano opens on: the tour is read again, quietly, as Back to the picker reads the list. One GET per Back;
     // the pano is not read again (`usePano` reads by tour and pano, which a tour reload does not change).
     tour.reload();

@@ -3222,7 +3222,7 @@ Every answer is the wire shape bare, the type named in a `// →` comment above 
 ## Rules an editor must not break
 - A shape changes in `wire.py` first; the mirror moves in the same change. why: a field renamed on one side is a screen that stops reading.
 - Field names are the wire's camelCase; `class` is a key (`wire.py`'s `cls` alias). Dates are ISO text, ids text, a point `[x, y]` and a box `[x0, y0, x1, y1]`, both in 0..1 of one view.
-- A response field is never optional. A field a later plan fills (`read`, `understanding`, `regions`, `mark`, `standing`, `threshold`, `holdout`, `regionsStanding`, `markedAreasAffected`, `marksCount`, `standingCount`, …) is `T | null`: `null` is "not judged", never "judged and found nothing".
+- A response field is never optional. A field a later plan fills (`read`, `understanding`, `regions`, `mark`, `standing`, `threshold`, `holdout`, `regionsStanding`, `markedAreasAffected`, `marksCount`, `standingCount`, `photosAffected`, `understandingMark`, `current`, `effectiveClass`, `tourName`, …) is `T | null`: `null` is "not judged", never "judged and found nothing".
 - A request field `wire.py` defaults is optional (`newClass?: string | null`).
 - `ViewDetail` is `ViewEntry & {…}`, as `wire.py` inherits it.
 - A new verb names its answer type in a `// → Type` comment, as this file's other blocks do.

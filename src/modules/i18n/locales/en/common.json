@@ -2383,8 +2383,8 @@
       "title": "Rooms",
       "floor": "Floor {{floor}}",
       "affectedDocusketch": "Affected per DocuSketch",
-      "affectedMarked": "Affected per marked areas",
-      "affectedBoth": "Affected per DocuSketch and marked areas",
+      "affectedPhotos": "Affected per the photos",
+      "affectedBoth": "Affected per DocuSketch and the photos",
       "empty": "DocuSketch named no rooms on this tour"
     },
     "pano": {
