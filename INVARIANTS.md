@@ -10891,3 +10891,38 @@ measured 2026-10-19 by chain chain-blue-tape-kind-20261019-064120-52a9, finding 
 probe-key: 106e3e097ad7f20bb85b428d40f7a030c8f6760f
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/ProvingTable.tsx, /opt/shadow-connector/core/affected_areas/routes/read.py, /opt/shadow-connector/core/affected_areas/seat/codebook.py, /opt/shadow-connector/core/affected_areas/seat/contract.py, /opt/shadow-connector/core/affected_areas/seat/__init__.py
+
+## INV-8852 — probe — (LOW). The report's "nothing else buys a read" is true now and omits that the bump makes 156 old views buyable by the next press or event
+
+(LOW). The report's "nothing else buys a read" is true now and omits that the bump makes 156 old views buyable by the next press or event
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.py" <<'PY'
+import asyncio, os, sys
+sys.path.insert(0, "/opt/shadow-connector")
+import asyncpg
+from dotenv import load_dotenv
+load_dotenv("/opt/shadow-connector/.env")
+async def main():
+    c = await asyncpg.connect(host=os.getenv("PG_HOST","192.168.1.95"), port=int(os.getenv("PG_PORT","5433")),
+        database=os.getenv("PG_DB","postgres"), user=os.getenv("PG_USER","postgres"), password=os.getenv("PG_PASS"))
+    cur = await c.fetchval("select contract_version from affected_area_reads order by created_at desc limit 1")
+    rows = await c.fetch("""select i.tour_id, count(distinct i.image_sha256) views
+        from affected_area_reads r join affected_area_images i on i.image_sha256=r.image_sha256
+        where not exists (select 1 from affected_area_reads n where n.image_sha256=r.image_sha256 and n.contract_version=$1)
+        group by 1 order by 2 desc""", cur)
+    print("newest read's contract:", cur, "| views read only under an older contract, by tour:", [(r["tour_id"][:8], r["views"]) for r in rows], "| total:", sum(r["views"] for r in rows))
+    await c.close()
+asyncio.run(main())
+PY
+cd /opt/shadow-connector && venv/bin/python -I "$D/p.py"
+case "$D" in /tmp/athena-probe.*) cd /tmp && rm -r "$D";; esac
+echo "[probe exit $?]"
+expect: aa.v3 and total 156 across 5 tours while those tours are not re-read; the total falls as tours are pressed
+```
+
+measured 2026-10-19 by chain chain-doubtful-areas-20261019-082056-6ef4, finding L1, LOW
+probe-key: b7de67ccfd48038ab0e7e7110c84abec8045990f
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/ProvingTable.tsx, /opt/shadow-connector/core/affected_areas/seat/contract.py, /opt/shadow-connector/core/affected_areas/seat/__init__.py

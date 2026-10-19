@@ -99,7 +99,7 @@ function Legend() {
  * THE PROVING TABLE, DRAWN: what `TablesScreen` holds, as the operator reads it.
  *
  * Top to bottom: the head, How right the reader is, naming the model and contract it measures ("gemini-3.8-flash ·
- * aa.v2"); the understanding's line, in counts; then the kinds, one row each, as the library's sortable `DataTable`:
+ * aa.v3"); the understanding's line, in counts; then the kinds, one row each, as the library's sortable `DataTable`:
  * the kind with its line ("Threshold 65% · set Oct 15", or "No threshold set: its areas stand only when you mark them");
  * then the decision, Precision and Coverage at that line (previewed "at 0.50" where none is set) and Missed, what the
  * reader missed that no line can catch; then Judged on the random slice
