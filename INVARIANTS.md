@@ -505,20 +505,6 @@ probe-key: 23ea081ceceda910eba3ca8b789d58243841957a
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/transcript/ChatMessageImages.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/markdown-preview/MermaidDiagram.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Lightbox.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/useZoomPan.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lightbox-zoom.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/pwa-notch-close-controls.mjs
 
-## INV-5774 — probe — stale pointers to where the close button's offsets live
-
-stale pointers to where the close button's offsets live
-
-```probe
-cd /home/lyphe/.claude/claudecodeui_lyphe && grep -n "ChatMessageImages" src/index.css
-expect: no output (today: line 175)
-```
-
-measured 2026-09-29 by chain chain-diagram-lightbox-20260929-082654-343c, finding L4, LOW
-probe-key: 8ecaf9ba35204a4b07920b5a179cde9efc4c64ba
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/transcript/ChatMessageImages.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/markdown-preview/MermaidDiagram.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Lightbox.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/useZoomPan.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lightbox-zoom.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/pwa-notch-close-controls.mjs
-
 ## INV-5775 — probe — the builder's gate does not reproduce green on the phone phases
 
 the builder's gate does not reproduce green on the phone phases
@@ -575,20 +561,6 @@ probe-key: 2b6e674875c6788262734d2592c59f84e955b85f
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/plugins/PluginSettingsTab.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/SettingRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/settings-rows-measure.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/settings-rows-walk.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-settings-rows.mjs
 
-## INV-5779 — probe — the probe's fixtures do not cover three shapes the intent names
-
-the probe's fixtures do not cover three shapes the intent names
-
-```probe
-cd /home/lyphe/.claude/claudecodeui_lyphe && grep -c "command:\|Cancel\|844" .verify/probe-settings-rows.mjs .verify/lib/settings-rows-walk.mjs .verify/lib/settings-rows-measure.mjs
-expect: 0 for each of the three files (a stdio MCP fixture with a `command:`, a confirm-uninstall step that presses `Cancel` and a 844-wide landscape leg would each add a match)
-```
-
-measured 2026-09-29 by chain chain-settings-mobile-round2-20260929-081949-f36c, finding L3, LOW
-probe-key: 494170834dc325482ac2573275fac7e1f9a3bd48
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/plugins/PluginSettingsTab.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/SettingRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/settings-rows-measure.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/settings-rows-walk.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-settings-rows.mjs
-
 ## INV-5790 — probe — The standing proof cannot see a lead cut by an ellipsis or by a clipping ancestor
 
 The standing proof cannot see a lead cut by an ellipsis or by a clipping ancestor
@@ -600,34 +572,6 @@ expect: exit 1 and a FAIL on the judged card's "opens whole" line, its lead pain
 
 measured 2026-09-29 by chain chain-card-description-full-20260929-105755-1234, finding M1, MEDIUM
 probe-key: 3cbc33de2fe16b8b75d50c03ee129c05f614d28a
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/ArcDeck.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/LaneCardHead.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/PlanCard.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-card-description.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-dispatch-arc-word.mjs
-
-## INV-5791 — probe — MANUAL.md still says the standing proof's rule is the old clamp, and the builder's report says no leftover exists
-
-MANUAL.md still says the standing proof's rule is the old clamp, and the builder's report says no leftover exists
-
-```probe
-cd /home/lyphe/.claude/claudecodeui_lyphe && grep -n 'computes `-webkit-line-clamp: 2` and paints one or two lines' docs/MANUAL.md | cut -c1-60
-expect: no output (today: line 3014 prints)
-```
-
-measured 2026-09-29 by chain chain-card-description-full-20260929-105755-1234, finding M2, MEDIUM
-probe-key: 47d8307d23c46999a1685bc02b4eb4829502d29e
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/ArcDeck.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/LaneCardHead.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/PlanCard.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-card-description.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-dispatch-arc-word.mjs
-
-## INV-5792 — probe — The standing proof's shots are capped at 480px, so the head of a long description is cut in the one picture a human checks
-
-The standing proof's shots are capped at 480px, so the head of a long description is cut in the one picture a human checks
-
-```probe
-cd /home/lyphe/.claude/claudecodeui_lyphe && node .verify/probe-card-description.mjs --tag capcheck > /dev/null; python3 -c "import struct;d=open('.verify/shots/card-description-capcheck-390-dark-arc.png','rb').read(24);print(struct.unpack('>II',d[16:24]))"
-expect: a height above 496, the whole 525px arc head at 390 (today: (348, 496), cut at the 480px cap)
-```
-
-measured 2026-09-29 by chain chain-card-description-full-20260929-105755-1234, finding L1, LOW
-probe-key: a26a3eb60633ae8b179cacbd33b3e64e29752446
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/ArcDeck.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/LaneCardHead.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/PlanCard.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-card-description.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-dispatch-arc-word.mjs
 
@@ -644,20 +588,6 @@ measured 2026-09-29 by chain chain-card-description-full-20260929-105755-1234, f
 probe-key: f77ce2f9cabcc4086a663f85bfa98a8bea965f0f
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/ArcDeck.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/LaneCardHead.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/PlanCard.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-card-description.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-dispatch-arc-word.mjs
-
-## INV-5796 — probe — three lines still describe the old prompt shape
-
-three lines still describe the old prompt shape
-
-```probe
-cd ~/.claude/claudecodeui_lyphe && grep -c "census word for word" server/shared/types.ts; grep -c "single newlines only" src/modules/chat/tools/ContentRenderers/QuestionText.tsx
-expect: 1 and 1 — both still describe the old shape (0 once healed)
-```
-
-measured 2026-09-29 by chain chain-lock-prompt-glance-20260929-110148-17f8, finding L2, LOW
-probe-key: a2e8cb06d0adeaa9543eea5c39d72cc3ce71ed19
-
-governs: /home/lyphe/.claude/hooks/dispatcher/lock_glance.py, /home/lyphe/.claude/hooks/dispatcher/lock.py, /home/lyphe/.claude/skills/feature/SKILL.md
 
 ## INV-5797 — probe — "read ONCE for the text and the token" is not what runs; the two can part under a concurrent write
 

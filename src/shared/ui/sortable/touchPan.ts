@@ -56,21 +56,33 @@ const MOVED_BY_OTHER_PX = 1.5;
 /** One moment of a finger: where it was, and when (an event's own `timeStamp`, so a busy main thread does not blur it). */
 type Sample = { y: number; time: number };
 
+/** A scroller between a press and its handle: the element, and whether it can scroll vertically now (the browser's whole). */
+export type InnerScroller = { node: Element; vertical: boolean };
+
 /**
- * Whether a press on `target` landed inside a scroller of `handle`'s own: an element between the two (the target included, the
- * handle not) whose `overflow-x` or `overflow-y` is `auto` or `scroll`, such as a deck's plan strip or a phase track. THE BROWSER
- * PANS INSIDE ANY SCROLLER, whatever the handle's `touch-action` says, so that touch is the browser's: a lift there would be taken
- * away at the first move on a phone that dispatches every touch uncancelable, and a pan by hand would scroll the pane a second time
- * beside the browser's own. Read from the computed style, not from whether it overflows now, as the browser reads it. A press
- * outside the handle answers false (`paneToPan` refuses it).
+ * The scroller of `handle`'s own a press on `target` landed in — an element between the two (the target included, the handle
+ * not) whose `overflow-x` or `overflow-y` is `auto` or `scroll` — or `null` when the press landed on the card itself. A deck's
+ * plan strip, a phase track: `vertical` is `false`, and only a sideways swipe is that scroller's. An element that can scroll
+ * vertically now is `vertical: true`: the browser scrolls it, and a page pan beside it would fight it.
+ *
+ * WHY A VERTICAL SWIPE IS NOT LEFT TO THE BROWSER. It used to be: this walk answered "the browser pans inside any scroller,
+ * whatever the handle's `touch-action` says", and `usePointerDrag` returned. That bet holds in headless Chromium and not on the
+ * operator's Fold (2026-10-19): a vertical swipe that began on a feature inside a deck's strip scrolled nothing, whether the device
+ * resolved the ancestor's `touch-action: none` through the strip or latched the gesture to a strip that cannot move that way. Both
+ * leave the early return with nothing to do. So the axis is decided by `usePointerDrag`: a sideways swipe is released to the
+ * browser (the strip's own), and a vertical one is panned by the page. A strip holding one card is a scroller here all the same:
+ * the browser may latch to it, and a hold on it must never lift the card.
+ *
+ * A press outside the handle answers `null` (`paneToPan` refuses it).
  */
-export function inOwnScroller(handle: Element, target: EventTarget | null): boolean {
-  if (!(target instanceof Element) || !handle.contains(target)) return false;
+export function innerScrollerOf(handle: Element, target: EventTarget | null): InnerScroller | null {
+  if (!(target instanceof Element) || !handle.contains(target)) return null;
   for (let node: Element | null = target; node !== null && node !== handle; node = node.parentElement) {
     const { overflowX, overflowY } = getComputedStyle(node);
-    if (/(auto|scroll)/.test(overflowX) || /(auto|scroll)/.test(overflowY)) return true;
+    if (!/(auto|scroll)/.test(overflowX) && !/(auto|scroll)/.test(overflowY)) continue;
+    return { node, vertical: /(auto|scroll)/.test(overflowY) && node.scrollHeight > node.clientHeight + 1 };
   }
-  return false;
+  return null;
 }
 
 /**
@@ -78,7 +90,8 @@ export function inOwnScroller(handle: Element, target: EventTarget | null): bool
  * press landed outside the handle (a portal's, bubbled through React), or the handle is not `touch-action: none` (a hybrid
  * laptop's finger, where the browser pans as ever and a second scroll would double it). A page that scrolls as a whole is the pane
  * when no ancestor does.
- * A press inside a scroller of the handle's own never comes here: `usePointerDrag` leaves it to the browser (`inOwnScroller`).
+ * A press inside a scroller of the handle's own comes here too: `usePointerDrag` decides its axis (`innerScrollerOf`), releasing
+ * a sideways swipe to the browser and panning a vertical one.
  */
 export function paneToPan(handle: Element, target: EventTarget | null): HTMLElement | null {
   if (!(target instanceof Node) || !handle.contains(target)) return null;

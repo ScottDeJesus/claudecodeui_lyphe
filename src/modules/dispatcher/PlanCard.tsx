@@ -97,7 +97,7 @@ function queueClause(hold: string): string {
  * words, beside `waits on …`. A frame without the key (an older dispatcher) draws no line.
  *
  * `WAITING · <clause>` IS THE QUEUE'S, IN THE SAME ROW AND THE SAME WORDS' RULE (`plan.queue_hold`): the
- * clause the queue's gate returned — `paused`, `at most N epics at once`, `<epic> goes first` — for a
+ * clause the queue's gate returned — `Pause all is on`, `at most N epics at once`, `<epic> goes first` — for a
  * feature whose epic's turn has not come. The gate asks the queue first, so the dispatcher sends this one
  * and nulls `wip_hold` while it is set: the card says the first clause the gate asks, as the gate does.
  *
