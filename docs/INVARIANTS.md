@@ -279,7 +279,7 @@ expect: `row hits: 1` and `…useQueueLineSort.ts:NN:      return moveEpic(carri
 measured 2026-10-15 by chain chain-epic-queue--docs-cloudcli-20261015-015416-7a64, finding M1, MEDIUM
 probe-key: 3fc8d670f108173120f2f6e6058891d3a14c2168
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/docs/
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/cardOrderEntries.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/cardOrder.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/runner-tab/hooks/useQueueLineSort.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/usePointerDrag.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/order-lane.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-card-order.mjs
 
 ## INV-8342 — probe — MEDIUM — MAN-5638 and MAN-5636 give the wrong refusal line for an unknown epic name, and MAN-5636 counts the verbs wrong
 
@@ -301,7 +301,7 @@ expect: `names both doors': 1`, `any of the four verbs': 1`, `queue -> no arc at
 measured 2026-10-15 by chain chain-epic-queue--docs-cloudcli-20261015-015416-7a64, finding M2, MEDIUM
 probe-key: 96851bfab7f6cf6c087d9b51d8ce7eaf69c341a3
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/docs/
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts
 
 ## INV-8343 — probe — LOW — MAN-8431 names a standing proof whose `ALL CHECKS PASS` does not print today; the failing check expects a revert the app never makes
 
@@ -321,4 +321,4 @@ expect: `exit 1` and two `[FAIL] 1920-…-gutter: …the pin dropped that write 
 measured 2026-10-15 by chain chain-epic-queue--docs-cloudcli-20261015-015416-7a64, finding L1, LOW
 probe-key: 468d81300e74aad24711ab83df7acd7fd3cf051b
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/docs/
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/runner-tab/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/runner-tab/RunnerPanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/runner-tab/RunnerWidgetBody.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/epic-queue-scaffold.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/queue-lane.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-epic-queue.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-runner-widget-list.mjs

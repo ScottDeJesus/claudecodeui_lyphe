@@ -2199,7 +2199,7 @@ expect: the first line is `refused page-roadmap-pr: the hub answered 400: invali
 measured 2026-10-03 by chain chain-roadmap--mirror--docs-20261003-170800-0dca, finding M1, MEDIUM
 probe-key: a9ee10e6e793fba7abbb699de4dd5a34fbdd356d
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/
+governs: /home/lyphe/.claude/hooks/dispatcher/roadmap_mirror_blocks.py, /home/lyphe/.claude/hooks/dispatcher/roadmap_mirror_orphans.py, /home/lyphe/.claude/hooks/dispatcher/roadmap_mirror.py, /home/lyphe/.claude/hooks/dispatcher/roadmap_mirror_wire.py
 
 ## INV-6560 — probe — "`dry_run` counts what a write would do" is false for a refusal
 
@@ -2213,7 +2213,7 @@ expect: `dry:` prints `created 1 · … · refused 0` and `real:` prints `create
 measured 2026-10-03 by chain chain-roadmap--mirror--docs-20261003-170800-0dca, finding L1, LOW
 probe-key: cb7e0e9611342c8c5d7f045bda1449c03583655f
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/
+governs: /home/lyphe/.claude/hooks/dispatcher/roadmap_mirror_blocks.py, /home/lyphe/.claude/hooks/dispatcher/roadmap_mirror_orphans.py, /home/lyphe/.claude/hooks/dispatcher/roadmap_mirror.py, /home/lyphe/.claude/hooks/dispatcher/roadmap_mirror_wire.py
 
 ## INV-6561 — probe — "No page is ever deleted" does not carry its why, and the consequence the phase itself hit is not in the row
 
@@ -2233,7 +2233,7 @@ expect: `bullet:` prints the line; the defect stands while `why on the bullet: F
 measured 2026-10-03 by chain chain-roadmap--mirror--docs-20261003-170800-0dca, finding L2, LOW
 probe-key: d72b3b33953d8cd742f3fa1eb16221773bf2dce4
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/
+governs: /home/lyphe/.claude/hooks/dispatcher/roadmap_mirror_blocks.py, /home/lyphe/.claude/hooks/dispatcher/roadmap_mirror_orphans.py, /home/lyphe/.claude/hooks/dispatcher/roadmap_mirror.py, /home/lyphe/.claude/hooks/dispatcher/roadmap_mirror_wire.py
 
 ## INV-6562 — probe — INV-6394's new bullet sits under a heading, a lede and a when/do row that say "prompt"
 
@@ -2247,7 +2247,7 @@ expect: lines 5 (the lede that says "prompt"), 28 (the heading that says "prompt
 measured 2026-10-03 by chain chain-roadmap--mirror--docs-20261003-170800-0dca, finding L3, LOW
 probe-key: 45690ac0df834e60c26f0bc4352f93c71c803c56
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notifications/services/notification-copy.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/operatorWords.ts, /home/lyphe/.claude/hooks/dispatcher/lock_glance.py, /home/lyphe/.claude/hooks/dispatcher/lock.py, /home/lyphe/.claude/hooks/dispatcher/report_roadmap_words.py, /home/lyphe/.claude/hooks/dispatcher/roadmap_mirror_blocks.py, /home/lyphe/.claude/hooks/intent_lock.py
 
 ## INV-6563 — probe — MAN-7624 governs a third path the intent does not name
 
@@ -2261,7 +2261,7 @@ expect: prints `3` and the two `.py` paths plus `/home/lyphe/.claude/state/dispa
 measured 2026-10-03 by chain chain-roadmap--mirror--docs-20261003-170800-0dca, finding L4, LOW
 probe-key: 31d1ed41dc86d1d1e39110f466ccc43ef130be61
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/
+governs: /home/lyphe/.claude/hooks/dispatcher/roadmap_mirror_blocks.py, /home/lyphe/.claude/hooks/dispatcher/roadmap_mirror_orphans.py, /home/lyphe/.claude/hooks/dispatcher/roadmap_mirror.py, /home/lyphe/.claude/hooks/dispatcher/roadmap_mirror_wire.py
 
 ## INV-6574 — probe — the module's "said once per distinct message" bound does not hold for the failure it is most likely to meet as the store grows: a document past the 1 MiB ceiling is reported as a prefix of itself, and that prefix carries `generated_at`, so every tick is a new line and a new Set entry
 
@@ -8331,7 +8331,7 @@ expect: `rows … : 5` and `lines saying 'Empty today': 1` while the row is wron
 measured 2026-10-09 by chain chain-compaction-handover--docs-20261009-165748-35f0, finding L1, LOW
 probe-key: 3b2ca4e099ad72cf02279383bb42ce324930dd53
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/migrations.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/session-compactions.db.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/schema.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts
 
 ## INV-7573 — probe — a comment in the runtime says `full` counts "to within ~300"; the row it sits under, and 9 of 9 measurements, say otherwise
 
@@ -9901,7 +9901,7 @@ expect: `0` for all three while the defect stands; cured when each prints 1
 measured 2026-10-16 by chain chain-toolset-skeleton--docs-20261016-092338-5af2, finding L2, LOW
 probe-key: 17be1484daa8bef0412d51d93e7a170876d36963
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/chat-process.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-runtime.provider.js, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-toolset-seams.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/toolsets/toolsets.registry.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/toolsets/toolsets.service.ts
 
 ## INV-8476 — probe — INV-8471 says "the FULL map, every call" and leaves out the base-name landmine
 
@@ -9916,7 +9916,7 @@ expect: `INV-8471 says FULL map: 1 | names base server: 0 | code calls with a re
 measured 2026-10-16 by chain chain-toolset-skeleton--docs-20261016-092338-5af2, finding L3, LOW
 probe-key: 8630d7e8083fad6623cb74b878dd30d01f924a5c
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/chat-process.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-runtime.provider.js, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-toolset-seams.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/toolsets/toolsets.registry.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/toolsets/toolsets.service.ts
 
 ## INV-8477 — probe — Two refusal texts the rows state do not match what the code prints
 
@@ -9955,7 +9955,7 @@ expect: while the defect stands: `…an sse server needs a url`, then `MAN-8498 
 measured 2026-10-16 by chain chain-toolset-skeleton--docs-20261016-092338-5af2, finding L4, LOW
 probe-key: 260b5ea30b0024e181f0d4d58a9a3c5db11acbea
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.gitignore, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/migrations.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/session-user-state.db.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/schema.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/toolsets/toolsets.registry.ts
 
 ## INV-8478 — probe — Two measured facts dropped from the retired MAN-8491 without a stated reason
 
@@ -9970,7 +9970,7 @@ expect: `retired MAN-8491 had: shell-snapshots+well under a second+ | MAN-8501 h
 measured 2026-10-16 by chain chain-toolset-skeleton--docs-20261016-092338-5af2, finding L5, LOW
 probe-key: d11c501bcd2456dd0b141441eca51f4e4c61f776
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/
+governs: /home/lyphe/.claude/claudecodeui_lyphe/bin/toolset.mjs, /home/lyphe/.claude/claudecodeui_lyphe/deploy/systemd/cloudcli-server-dev.service, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/toolsets/toolsets.command-link.ts
 
 ## INV-8499 — usage-hold-account probes — a scratch chain that names its own HEAL_LEDGER_PATH launches a Chiron judge on the default model
 
@@ -10123,7 +10123,7 @@ expect: "newest 60 tours: (14, 7) | newest 60 with panorama_count >= 12: (19, 8)
 measured 2026-10-17 by chain chain-tour-affected-areas--rooms--docs-20261017-151147-c858, finding L1, LOW
 probe-key: be1b37f55a36ab3354dd33564c06a8dd7ff5db6f
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/
+governs: /opt/shadow-connector/core/affected_areas/judgment/rooms.py
 
 ## INV-8669 — probe — LOW — MAN-3035 states that `water_remediation.txt` carries no `{room_list}` but not what that means: a Water narrative never sees the marked areas
 
@@ -10137,7 +10137,7 @@ expect: "water_remediation.txt:0", "room_discovery.txt:1" and a "Water" count of
 measured 2026-10-17 by chain chain-tour-affected-areas--rooms--docs-20261017-151147-c858, finding L5, LOW
 probe-key: 3cb83b06247521d690c82ed1ae10ba6b77ad6115
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/
+governs: /opt/shadow-connector/core/estimator/fire_smoke_breakdown.py
 
 ## INV-8670 — probe — LOW — "the one home of the repeat-shot rule" in MAN-3037 and INV-2337 is unscoped; `_pano_seed` strips ` #N` by its own regex
 
@@ -10151,7 +10151,7 @@ expect: two `_SHOT_SUFFIX…` definitions (panoramas.py:67 and _pano_seed.py:54)
 measured 2026-10-17 by chain chain-tour-affected-areas--rooms--docs-20261017-151147-c858, finding L6, LOW
 probe-key: 02fcf21b7c1ab10735441ae3b9a45d241ecaa80c
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/
+governs: /opt/shadow-connector/cerberus/preliminary_editor_v2_SHIP_HISTORY.md, /opt/shadow-connector/core/estimator/extract_docusketch.py, /opt/shadow-connector/core/estimator/fire_smoke_breakdown.py, /opt/shadow-connector/core/estimator/SHIP_HISTORY.md, /opt/shadow-connector/core/preliminary_estimator/photo_areas.py, /opt/shadow-connector/core/preliminary_estimator/room_list.py, /opt/shadow-connector/extractors/docusketch/docusketch.md, /opt/shadow-connector/extractors/docusketch/panoramas.py, /opt/shadow-connector/installation_guides/preliminary_estimator_schema.sql, /opt/shadow-connector/installation_guides/preliminary_estimator_v2_schema.sql, /opt/shadow-connector/plans/predictive-estimator.md, /opt/shadow-connector/plans/preliminary-editor-v2.md, /opt/shadow-connector/scripts/migrate_preliminary_estimates.py
 
 ## INV-8671 — probe — LOW — two of the five seam runs the brief asked for are not in the report, and the required search does not print two of its three subjects
 
@@ -10250,7 +10250,7 @@ expect: today "live: /queue 200 /proving 200" and "MAN-8558 stale lines: 2"; cur
 measured 2026-10-17 by chain chain-tour-affected-areas--marking--docs-20261017-212539-905c, finding M2, MEDIUM
 probe-key: 58ab8943b27ec1be62b9c8d97d1521213ca98c18
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/affected-areas-types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts
 
 ## INV-8691 — probe — LOW — The intent's one required search does not print the Tables row
 
@@ -10289,7 +10289,7 @@ expect: today "no package cloudcli:src/modules/affected" and 3; cured: the packa
 measured 2026-10-17 by chain chain-tour-affected-areas--marking--docs-20261017-212539-905c, finding L2, LOW
 probe-key: 3ae8ff3ee16afc49ec8edc2c24b7c8f79f109f1e
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/AffectedAreasView.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/FacePhoto.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/hooks/useMarkedRegions.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/hooks/useProving.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/hooks/useQueue.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/LayerSwitch.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/MarkBar.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/MarkPresses.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/MarkPress.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/MarkQueue.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/MarkScreen.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/MissedDraw.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/NoteDialog.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/PanoScreen.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/ProvingDetail.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/ProvingTable.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/RegionList.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/TablesScreen.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/ThresholdControl.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/ToursSwitch.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/UnderstandingCard.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/UnderstandingMark.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/UnderstandingVerdict.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/utils/provingModel.ts
 
 ## INV-8693 — probe — LOW — MAN-8582/8583 state rules for files they do not govern
 
@@ -10307,7 +10307,7 @@ expect: today "PanoScreen.tsx shows : MAN-8575"; cured: MAN-8582 or MAN-8583 is 
 measured 2026-10-17 by chain chain-tour-affected-areas--marking--docs-20261017-212539-905c, finding L3, LOW
 probe-key: 4282175df918793d83267ea6fe2e9f1545204388
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/AffectedAreasView.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/FacePhoto.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/hooks/useMarkedRegions.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/hooks/useQueue.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/LayerSwitch.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/MarkBar.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/MarkPresses.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/MarkPress.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/MarkQueue.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/MarkScreen.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/MissedDraw.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/NoteDialog.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/PanoScreen.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/RegionList.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/ToursSwitch.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/UnderstandingCard.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/UnderstandingMark.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/UnderstandingVerdict.tsx
 
 ## INV-8694 — probe — LOW — MAN-8582 says less than the screen does in two places
 
@@ -10329,7 +10329,7 @@ expect: today 0 (facts block has no mode), 0 (random row silent), 2, then 1 and 
 measured 2026-10-17 by chain chain-tour-affected-areas--marking--docs-20261017-212539-905c, finding L4, LOW
 probe-key: 2a9c0a4b425d43c4a463fd3d0e01811f86a73542
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/AffectedAreasView.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/FacePhoto.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/hooks/useMarkedRegions.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/hooks/useQueue.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/LayerSwitch.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/MarkBar.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/MarkPresses.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/MarkPress.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/MarkQueue.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/MarkScreen.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/MissedDraw.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/NoteDialog.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/PanoScreen.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/RegionList.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/ToursSwitch.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/UnderstandingCard.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/UnderstandingMark.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/UnderstandingVerdict.tsx
 
 ## INV-8695 — probe — LOW — MAN-8583 says the library ignores a small box "with no word"; the screen says one
 
@@ -10350,7 +10350,7 @@ expect: today 1, 1, 0; cured: the row says the screen speaks (missed.floor) and 
 measured 2026-10-17 by chain chain-tour-affected-areas--marking--docs-20261017-212539-905c, finding L5, LOW
 probe-key: 6498027f456d8a487ea2c7e3a0ad11417f2b3026
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/AffectedAreasView.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/FacePhoto.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/LayerSwitch.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/MarkBar.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/MarkPresses.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/MarkPress.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/MarkQueue.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/MarkScreen.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/MissedDraw.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/NoteDialog.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/PanoScreen.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/RegionList.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/UnderstandingCard.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/UnderstandingMark.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/UnderstandingVerdict.tsx
 
 ## INV-8696 — probe — LOW — Two lines narrate the review instead of stating a fact
 
@@ -10368,7 +10368,7 @@ expect: today MAN-8583: 1 and MAN-8577: 1; cured: 0 for both
 measured 2026-10-17 by chain chain-tour-affected-areas--marking--docs-20261017-212539-905c, finding L6, LOW
 probe-key: 6e704d3884496d92ade2c6896bbe469b59fc3389
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/AffectedAreasView.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/FacePhoto.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/LayerSwitch.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/MarkBar.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/MarkPresses.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/MarkPress.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/MarkQueue.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/MarkScreen.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/MissedDraw.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/NoteDialog.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/PanoScreen.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/RegionList.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/UnderstandingCard.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/UnderstandingMark.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/UnderstandingVerdict.tsx
 
 ## INV-8697 — probe — LOW — "1,183 px" is a measurement of one corpus, stated as the table's width
 
@@ -10402,7 +10402,7 @@ expect: today "live frame shows 885 of 1169 px" and "rows say 1,183 (MAN-8580, M
 measured 2026-10-17 by chain chain-tour-affected-areas--marking--docs-20261017-212539-905c, finding L7, LOW
 probe-key: cdf71bac1fe2ac9e8487ccdf2fa460c333543a66
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/hooks/useProving.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/ProvingDetail.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/ProvingTable.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/TablesScreen.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/ThresholdControl.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/utils/provingModel.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/DataTable.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/SegmentedControl.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/verve/data.css
 
 ## INV-8698 — probe — LOW — `SegmentedControl`'s `count` has no site, and the row never says so
 
@@ -10422,7 +10422,7 @@ expect: today 0 and 0; cured: the second is 1 (the row says no caller passes `co
 measured 2026-10-17 by chain chain-tour-affected-areas--marking--docs-20261017-212539-905c, finding L8, LOW
 probe-key: e214705f08e46ac68956e239ecbfeadf86156da8
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/DataTable.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/SegmentedControl.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/verve/data.css
 
 ## INV-8734 — probe — before the pano answers, `faceCounts` (listing branch) calls every area of a pano that has none standing "proposed", including areas the operator set aside; the tile and the tour line read "N found" for the same pano.
 
@@ -10788,7 +10788,7 @@ expect: "info keys: ['ceiling_height_ft', 'floor', 'is_affected', 'pano_id', 'ro
 measured 2026-10-18 by chain chain-tour-affected-areas--judgment--docs-20261018-075948-ef11, finding L1, LOW
 probe-key: 40e4b4aaf32c59cc202036d7d9ab05f2a25710da
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/
+governs: /opt/shadow-connector/core/estimator/extract_docusketch.py, /opt/shadow-connector/core/preliminary_estimator/photo_areas.py, /opt/shadow-connector/core/preliminary_estimator/room_list.py, /opt/shadow-connector/extractors/docusketch/panoramas.py
 
 ## INV-8794 — probe — INV-8544's seam-E figures are not the reader's
 
@@ -10824,7 +10824,7 @@ expect: "fresh: tours with a flag 179 | tours showing a removed material 122 | r
 measured 2026-10-18 by chain chain-tour-affected-areas--judgment--docs-20261018-075948-ef11, finding L2, LOW
 probe-key: 4a3e83b618d7407f0b5cc8034130de14e34f7518
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/
+governs: /opt/shadow-connector/core/affected_areas/context/rooms.py, /opt/shadow-connector/core/affected_areas/context/sources.py
 
 ## INV-8795 — probe — the report's "every file has a row saying what landed" is false for two files seams edited
 

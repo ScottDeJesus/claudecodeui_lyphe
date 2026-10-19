@@ -30,4 +30,4 @@ expect: today "no onSelect" prints {"tiles":"D D D","ring":false}, "onSelect" pr
 measured 2026-10-17 by chain chain-tour-affected-areas--viewer--docs-20261017-161343-c51e, finding L2, LOW
 probe-key: 561cc9c48776d39e0d11f22e3298513176d56476
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/verve/
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Gallery.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/PhotoFill.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/RegionDrawLayer.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/RegionImage.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/verve/media.css
