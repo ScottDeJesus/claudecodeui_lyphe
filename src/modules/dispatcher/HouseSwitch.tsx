@@ -1,14 +1,14 @@
 import { useTranslation } from 'react-i18next';
 
-import { useDeepSeekFlashSwitch } from '@/shared/hooks/useDeepSeekFlashSwitch';
+import { useDeepSeekFeaturesSwitch } from '@/shared/hooks/useDeepSeekFlashSwitch';
 import { Button, ClaudeCodeMark, LLMProviderLogo } from '@/shared/ui';
 
 /**
- * CLAUDE · DEEPSEEK — the HOUSE switch, drawn in the master controller. It is the very switch Settings and the
- * chat box draw (`~/.claude/state/deepseek_flash.flag`, read by `deepseek.switch_on()`), through the same hook
- * (`useDeepSeekFlashSwitch`), so a flip here is a flip there — and it also picks what builds started from
- * chat run on. An epic or a feature with no model word of its own follows it (operator, 2026-10-15: "Same
- * switch"); one with its own word, set in its fold, does not.
+ * CLAUDE · DEEPSEEK — the FEATURES switch, drawn in the master controller: the dispatcher's own switch
+ * (`~/.claude/state/deepseek_features.flag`, read by `deepseek.features_on()`), through
+ * `useDeepSeekFeaturesSwitch`. It is apart from the chat's switch (operator, 2026-10-19: "If I toggle one it
+ * should not effect the other"): a flip here moves the features and epics with no model word of their own,
+ * and never what builds started from chat run on. One with its own word, set in its fold, does not follow it.
  *
  * TWO OPTIONS, BOTH WITH THEIR WORDS, in one bordered group: this is the one place the choice is named, so
  * neither side gives its word up the way a card's icon-only option does. The pressed side is the position the
@@ -24,7 +24,7 @@ import { Button, ClaudeCodeMark, LLMProviderLogo } from '@/shared/ui';
  */
 export function HouseSwitch() {
   const { t } = useTranslation();
-  const { enabled, unreadable, saving, setEnabled, refresh } = useDeepSeekFlashSwitch();
+  const { enabled, unreadable, saving, setEnabled, refresh } = useDeepSeekFeaturesSwitch();
   const position = enabled === null ? 'unknown' : enabled ? 'deepseek' : 'claude';
 
   const press = (side: 'claude' | 'deepseek') => {

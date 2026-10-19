@@ -17,7 +17,7 @@ type RegionLook = { tone: Tone; edge: 'solid' | 'dashed'; wash: 'full' | 'light'
 
 /**
  * TONE IS BY JUDGMENT, NEVER BY KIND. Verve's tones are five and a sixth is refused (MAN-739 rule 4), and the
- * codebook has fourteen kinds: a colour per kind would need colours that mean nothing a tone means. So a region
+ * codebook has many kinds: a colour per kind would need colours that mean nothing a tone means. So a region
  * is painted by where it stands, and its kind is words (the list's label, the badge's accessible name).
  *
  * Blue is the reader's word and green the operator's; a dashed edge is anything the reader's word alone does not

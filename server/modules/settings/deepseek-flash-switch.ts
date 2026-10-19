@@ -115,3 +115,21 @@ export async function readDeepseekFlashSwitch(): Promise<boolean> {
 export async function writeDeepseekFlashSwitch(enabled: boolean): Promise<void> {
   return writeFlagFile(SWITCH_PATH, enabled);
 }
+
+/**
+ * THE FEATURES SWITCH: the dispatcher's own DeepSeek/Claude switch, a file apart from the chat's
+ * (operator, 2026-10-19: "If I toggle one it should not effect the other"). The dispatcher reads it
+ * (`deepseek.features_on`) for every feature and epic with no model word of its own; `SWITCH_PATH`
+ * keeps deciding inline builds and every other caller.
+ */
+const FEATURES_SWITCH_PATH = path.join(os.homedir(), '.claude', 'state', 'deepseek_features.flag');
+
+/** The features switch, read. In flight's master controller draws it. */
+export async function readDeepseekFeaturesSwitch(): Promise<boolean> {
+  return readFlagFile(FEATURES_SWITCH_PATH);
+}
+
+/** The features switch, written. One caller: the settings route behind `PUT /deepseek-features`. */
+export async function writeDeepseekFeaturesSwitch(enabled: boolean): Promise<void> {
+  return writeFlagFile(FEATURES_SWITCH_PATH, enabled);
+}

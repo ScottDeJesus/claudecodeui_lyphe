@@ -45,6 +45,10 @@ export function createSettingsRouter(
   // Host-wide, not per-user: the switch steers one plan-runner daemon, so no `userId` is read.
   router.get('/deepseek-flash', respond(() => service.getDeepseekFlash()));
   router.put('/deepseek-flash', respond((req) => service.setDeepseekFlash(req.body?.enabled)));
+  // The dispatcher's own DeepSeek switch, host-wide for the same reason: the features and epics with no
+  // model word of their own ride it, apart from the chat's switch above.
+  router.get('/deepseek-features', respond(() => service.getDeepseekFeatures()));
+  router.put('/deepseek-features', respond((req) => service.setDeepseekFeatures(req.body?.enabled)));
   // The dispatcher's WIP defaults, host-wide for the same reason and read the same way: they steer
   // the dispatcher on this host, so no `userId` is read. Both limits ride on the PUT body, as words
   // (`'<N>'` or `'all'`), because the file holds both lines and is written whole.

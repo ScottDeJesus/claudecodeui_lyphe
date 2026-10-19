@@ -650,6 +650,8 @@ export const api = {
     // is the same answer for anyone signed in and both calls return the state read back off disk.
     deepseekFlash: () => get('/api/settings/deepseek-flash'),
     saveDeepseekFlash: (enabled: boolean) => put('/api/settings/deepseek-flash', { enabled }),
+    deepseekFeatures: () => get('/api/settings/deepseek-features'),
+    saveDeepseekFeatures: (enabled: boolean) => put('/api/settings/deepseek-features', { enabled }),
 
     // The dispatcher's WIP defaults — how many of an epic's features are in progress at once and how
     // many tasks each of them runs at once, for every epic with no word of its own. Same host-wide

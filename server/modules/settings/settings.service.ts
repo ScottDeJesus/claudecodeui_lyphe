@@ -65,6 +65,15 @@ type SettingsDependencies = {
     write(enabled: boolean): Promise<void>;
   };
   /**
+   * The dispatcher's own DeepSeek switch (features and epics), a file apart from `deepseekFlash`
+   * (operator, 2026-10-19: "If I toggle one it should not effect the other"), machine-wide for the
+   * same reason.
+   */
+  deepseekFeatures: {
+    read(): Promise<boolean>;
+    write(enabled: boolean): Promise<void>;
+  };
+  /**
    * The house Jev switches, in the same shape and for the same reason: flag files that steer hooks
    * and scripts running on this host, so they are machine-wide rather than a row any signed-in
    * operator owns. Each scope is its own file with its own blast radius — see `jev-switches.ts`.
@@ -222,6 +231,22 @@ export function createSettingsService(dependencies: SettingsDependencies) {
       // THE FLIP IS THE EVENT: the dispatcher is handed it at once, so a phase it was holding for
       // want of a lane is taken up now rather than at the next session event. Fire-and-forget, and
       // the kick swallows its own failures — the answer owed to the caller is the file's.
+      void kickDispatcher();
+      return state;
+    },
+    async getDeepseekFeatures() {
+      return { enabled: await dependencies.deepseekFeatures.read() };
+    },
+    async setDeepseekFeatures(enabledInput: unknown) {
+      if (typeof enabledInput !== 'boolean') {
+        throw new AppError('enabled must be a boolean', {
+          code: 'INVALID_DEEPSEEK_FEATURES_STATE',
+          statusCode: 400,
+        });
+      }
+      await dependencies.deepseekFeatures.write(enabledInput);
+      // Read back rather than echo, and kick the dispatcher, for the reasons `setDeepseekFlash` gives.
+      const state = { enabled: await dependencies.deepseekFeatures.read() };
       void kickDispatcher();
       return state;
     },

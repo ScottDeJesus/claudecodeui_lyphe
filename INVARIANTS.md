@@ -10789,3 +10789,105 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/
 - A body carrying its own `## Rules` / `## Requirements` heading is a whole-file restore: `compose` accepts it only onto a blank shelf and refuses it on a shelf with content. Do not relax that refusal. Landing table: MAN-8621.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/memory-intake/memory-assert.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/memory-intake/memory-caps.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/memory-intake/memory-compose.ts
+
+## INV-8841 — probe — MAN-8549's corpus sentence does not reproduce as stated, and its characterisation of the remainder is wrong
+
+MAN-8549's corpus sentence does not reproduce as stated, and its characterisation of the remainder is wrong
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.py" <<'PY'
+import asyncio, json, os, re, sys
+sys.path.insert(0, "/opt/shadow-connector")
+import asyncpg
+from dotenv import load_dotenv
+load_dotenv("/opt/shadow-connector/.env")
+TAPE = re.compile(r"tape", re.I)
+def walk(v):
+    if isinstance(v, str): yield v
+    elif isinstance(v, dict):
+        for x in v.values(): yield from walk(x)
+    elif isinstance(v, list):
+        for x in v: yield from walk(x)
+async def main():
+    c = await asyncpg.connect(host=os.getenv("PG_HOST","192.168.1.95"), port=int(os.getenv("PG_PORT","5433")),
+                              database=os.getenv("PG_DB","postgres"), user=os.getenv("PG_USER","postgres"),
+                              password=os.getenv("PG_PASS"))
+    rows = await c.fetch("select image_sha256, response from affected_area_reads where contract_version='aa.v1' order by id")
+    views=set(); occ=0; strings=[]
+    for r in rows:
+        ss=[s for s in walk(json.loads(r["response"]))]
+        n=sum(len(TAPE.findall(s)) for s in ss)
+        if n: views.add(r["image_sha256"]); occ+=n
+        strings += [s for s in ss if TAPE.search(s)]
+    print("distinct views:", len(views), "| occurrences:", occ)
+    for label, rx in (("literal protection", r"\b(plastic|sheeting|containment|protection|seal(?:ed|ing)?|poly)\b"),
+                      ("protect stem", r"\b(plastic|sheeting|containment|protect\w*|seal\w*|poly)\b")):
+        co=0; cl=0
+        for s in strings:
+            for sent in re.split(r"(?<=[.!?])\s+", s):
+                h=len(TAPE.findall(sent))
+                if h and re.search(rx, sent, re.I): co+=h; cl+=1
+        print(f"{label:20} closure occurrences={co} clauses={cl}")
+    rest=[]
+    for s in strings:
+        for sent in re.split(r"(?<=[.!?])\s+", s):
+            if TAPE.search(sent) and not re.search(r"\b(plastic|sheeting|containment|protection|seal(?:ed|ing)?|poly)\b", sent, re.I):
+                t=" ".join(sent.split())
+                if t not in rest: rest.append(t)
+    print("distinct non-closure sentences:", len(rest))
+    for t in rest: print(" -", t)
+    await c.close()
+asyncio.run(main())
+PY
+cd /opt/shadow-connector && venv/bin/python -I "$D/p.py"
+case "$D" in /tmp/athena-probe.*) cd /tmp && rm -r "$D";; esac
+expect: "distinct views: 34 | occurrences: 91"; "literal protection closure occurrences=58 clauses=48"; "protect stem closure occurrences=60 clauses=50"; the non-closure list dominated by blue-tape moisture markers — so "50 occurrences" is a clause count and "mostly caution/danger and old repairs" is not supported
+```
+
+measured 2026-10-19 by chain chain-blue-tape-kind-20261019-064120-52a9, finding L1, LOW
+probe-key: 9a7d3b6a9c99e2a38c9c58aa3587bf4eb5c69d8e
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/ProvingTable.tsx, /opt/shadow-connector/core/affected_areas/routes/read.py, /opt/shadow-connector/core/affected_areas/seat/codebook.py, /opt/shadow-connector/core/affected_areas/seat/contract.py, /opt/shadow-connector/core/affected_areas/seat/__init__.py
+
+## INV-8842 — probe — the first tape_marked read outlines the tape strip alone on 2 of its 3 regions
+
+the first tape_marked read outlines the tape strip alone on 2 of its 3 regions
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.py" <<'PY'
+import asyncio, json, os, sys
+sys.path.insert(0, "/opt/shadow-connector")
+import asyncpg
+from dotenv import load_dotenv
+load_dotenv("/opt/shadow-connector/.env")
+async def main():
+    c = await asyncpg.connect(host=os.getenv("PG_HOST","192.168.1.95"), port=int(os.getenv("PG_PORT","5433")),
+                              database=os.getenv("PG_DB","postgres"), user=os.getenv("PG_USER","postgres"),
+                              password=os.getenv("PG_PASS"))
+    rows = await c.fetch("""
+        select i.face, rg.confidence, rg.area_frac, rg.polygon, rg.evidence
+        from affected_area_regions rg
+        join affected_area_reads r on r.id = rg.read_id
+        join affected_area_images i on i.image_sha256 = rg.image_sha256
+        where i.pano_id = '6ad29b4e12f14e4d72c81907' and rg.class = 'tape_marked' and r.contract_version='aa.v2'
+        order by rg.ordinal""")
+    for x in rows:
+        poly = json.loads(x["polygon"]) if isinstance(x["polygon"], str) else x["polygon"]
+        xs=[p[0] for p in poly]; ys=[p[1] for p in poly]
+        print(f'face={x["face"]} conf={x["confidence"]} area_frac={x["area_frac"]} '
+              f'bbox={max(xs)-min(xs):.3f}x{max(ys)-min(ys):.3f} evidence={x["evidence"]!r}')
+    print("tape_marked regions:", len(rows))
+    await c.close()
+asyncio.run(main())
+PY
+cd /opt/shadow-connector && venv/bin/python -I "$D/p.py"
+case "$D" in /tmp/athena-probe.*) cd /tmp && rm -r "$D";; esac
+expect: three tape_marked regions at 0.95; two report bbox 0.036x0.212 and 0.048x0.238 (area_frac 0.001624, 0.001213) with evidence naming the tape line/strip itself — the tape strip, not the marked area
+```
+
+measured 2026-10-19 by chain chain-blue-tape-kind-20261019-064120-52a9, finding L2, LOW
+probe-key: 106e3e097ad7f20bb85b428d40f7a030c8f6760f
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/ProvingTable.tsx, /opt/shadow-connector/core/affected_areas/routes/read.py, /opt/shadow-connector/core/affected_areas/seat/codebook.py, /opt/shadow-connector/core/affected_areas/seat/contract.py, /opt/shadow-connector/core/affected_areas/seat/__init__.py

@@ -7068,6 +7068,8 @@ either side; a phase already in flight keeps the provider its builder opened. Th
 fallbacks and its cost accounting: `~/.claude/hooks/plan_runner/deepseek.py`, surfaced in
 MAN-838, with its invariants at INV-34.
 
+**The dispatcher has its own switch.** Since 2026-10-19 (operator: "If I toggle one it should not effect the other") the dispatcher's feature and epic walks with no model word of their own read `~/.claude/state/deepseek_features.flag` (`deepseek.features_on`), written by this same module (`readDeepseekFeaturesSwitch` / `writeDeepseekFeaturesSwitch`) behind `GET`/`PUT /api/settings/deepseek-features`, and drawn by In flight's master controller (`useDeepSeekFeaturesSwitch`, MAN-8442). This file, the chat's, keeps deciding inline builds and every other caller; a flip of either never moves the other.
+
 The same switch also steers a hand-launched soul through `plan-runner soul`, and THAT is
 where the operator sees it take effect: each such soul draws a pin in the chat it was launched from,
 wearing the mark of the endpoint that was actually billed ([docs/MANUAL.md (dispatch-souls)](MANUAL.md)).
@@ -13709,7 +13711,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/settings/main-ses
 |---|---|---|
 | **Epics at once** | the kit's `Select`, `1` … `5` — NO All (operator: "I didn't ask for an all setting") | `dispatcher epics <N>` through `POST /api/dispatcher/epics` (`useBoardVerbs`) |
 | **Features at once**, **Tasks at once** | `Select`s over the WIP ladder `1 … 6, All` (and any wider count in play, `wipLadderWords(wipLadderTop(…))`), the DEFAULTS every epic with no word of its own follows (`route.wip`) | `PUT /api/settings/wip` after a re-read of the file (`useWipDefaultsVerbs`, MAN-629) |
-| **Runs on** | `HouseSwitch`: Claude · DeepSeek, the HOUSE switch — the very `deepseek_flash.flag` Settings and the chat box draw, through `useDeepSeekFlashSwitch`; it also picks what builds started from chat run on. Epics and features with no model word of their own follow it | `PUT /api/settings/deepseek-flash` (the hook) |
+| **Runs on** | `HouseSwitch`: Claude · DeepSeek, the FEATURES switch — the dispatcher's own `deepseek_features.flag`, through `useDeepSeekFeaturesSwitch`, apart from the chat's `deepseek_flash.flag` that Settings and the chat box draw (operator, 2026-10-19: "If I toggle one it should not effect the other"). Epics and features with no model word of their own follow it; builds started from chat never do | `PUT /api/settings/deepseek-features` (the hook) |
 | **Start · N** | drawn ONLY while `route.waiting` > 0 (`first_start.held`, MAN-8441): lets every plan the operator held back with a Stop go at once (an approval puts a plan in the queue, so nothing else waits; a hidden plan is never one — Show is its press, MAN-8492); the queue's order and the dial then decide what runs | `dispatcher start` through `POST /api/dispatcher/start` |
 | **Pause all** / **Resume all** | the dial's pause, `secondary` / the `default` fill while paused. The dial stamps the moment it went on; a feature card the pause holds draws its own Start, and a Start pressed under the pause runs that ONE plan (`line_gate` step 2, MAN-6794) — the operator's way of picking a single plan out of a paused house. A planner outing has no Start and waits for Resume all (MAN-8421) | `dispatcher epics pause|resume` |
 | the readout | `<running> of <limit> running`, or `Paused · tasks out finish` in the foreground's ink (never amber: a pause is his own press, MAN-577) | — |

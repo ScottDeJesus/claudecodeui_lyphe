@@ -10,7 +10,12 @@ import {
   notifyUserIfEnabled,
 } from '@/modules/notifications/index.js';
 
-import { readDeepseekFlashSwitch, writeDeepseekFlashSwitch } from './deepseek-flash-switch.js';
+import {
+  readDeepseekFeaturesSwitch,
+  readDeepseekFlashSwitch,
+  writeDeepseekFeaturesSwitch,
+  writeDeepseekFlashSwitch,
+} from './deepseek-flash-switch.js';
 import { readJevSwitches, writeJevMasterSwitch, writeJevScopeSwitch } from './jev-switches.js';
 import { createSettingsRouter } from './settings.routes.js';
 import { createSettingsService } from './settings.service.js';
@@ -48,6 +53,10 @@ const settingsService = createSettingsService({
   deepseekFlash: {
     read: () => readDeepseekFlashSwitch(),
     write: (enabled) => writeDeepseekFlashSwitch(enabled),
+  },
+  deepseekFeatures: {
+    read: () => readDeepseekFeaturesSwitch(),
+    write: (enabled) => writeDeepseekFeaturesSwitch(enabled),
   },
   jev: {
     read: () => readJevSwitches(),
