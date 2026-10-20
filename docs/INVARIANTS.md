@@ -35,6 +35,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Collapsible.tsx, /
 - why: in place, the menu is clipped by the first `overflow:hidden` ancestor and painted inside the first ancestor that makes a stacking context; a `backdrop-filter` header scopes the menu's `z-50` to its own layer, so the transcript paints over it.
 - opt-out mount: `src/modules/mcp/McpServers.tsx` only — Settings' `fixed z-[9999]` panel draws a `z-[70]` portalled menu UNDER its own content.
 - a new mount inside an overlay whose layer is above `70` passes `portal={false}`; so does a menu that must scroll with its trigger (the portal path closes on the page's first scroll). A scroll inside the menu's own list does not close it: the capture listener skips a scroll whose target the menu contains (2026-10-06, for the cerberus node card's capped "Run a project here", which closed the moment it was scrolled).
+- in place, the panel is held inside the window's width by `useEdgeShift` (`src/shared/ui/useEdgeShift.ts`, the hook the kit's `Menu` uses too) as an inline `translate`; the portal path clamps itself. See the kit-Menu rule that governs it.
 - portal rungs: above fullscreen-card (`45`), Dialog (`50`) and the FAB (`60`); under Settings (`9999`), modals (`10000`) and the toast stack (`10001`).
 - `align` is honoured on the portal path (both edges clamped); one mount passes it: `align="left"`, the cerberus node card's "Run a project here" (`src/modules/cerberus/fleet/NodeProjects.tsx`).
 - proof: `node .verify/export-menu-layer.mjs <label>` — 4 sites × dark/light, exit 0 on `ALL PASS`. 2026-09-25: 94 ok / 0 FAIL; 70 ok / 20 FAIL with the old default. 2026-10-06: 94 ok / 0 FAIL again, once the download step hit-tests an item INSIDE the open menu (`[role="menu"] [role="menuitem"]`): the page now carries `role="menuitem"` rows outside any menu ("Chat Ctrl+.", "Apps"), and the document's first one had read as 4 FAILs.
@@ -49,7 +50,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/mcp/McpServers.tsx, 
 - 2026-09-25, composer: rect `250×251` against the `260×261` layout box; a flip sized from it left the last item over the trigger's top 4px.
 - a `ResizeObserver` never fires for it: the layout box never changes, only the transform.
 - size and place from `offsetWidth` / `offsetHeight`, which no transform touches. `placePortalledMenu` in `src/shared/ui/ActionMenu.tsx` does, once per open, in a `useLayoutEffect`.
-- a viewport resize closes the menu (`closeOnViewportChange`), so nothing re-places it.
+- a viewport resize closes the portalled menu (`closeOnViewportChange`), so nothing re-places it. An in-place `.vv-action-menu` (and the kit `Menu`'s `.vv-menu__panel`, the same entrance) has no such close: `useEdgeShift` re-measures it on the host window's `resize`, correcting the `scale(.96)` from `offsetWidth` and shifting with the individual `translate` property, never `transform` (which this animation owns).
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/ActionMenu.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/export-menu-layer.mjs
 
@@ -322,3 +323,18 @@ measured 2026-10-15 by chain chain-epic-queue--docs-cloudcli-20261015-015416-7a6
 probe-key: 468d81300e74aad24711ab83df7acd7fd3cf051b
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/runner-tab/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/runner-tab/RunnerPanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/runner-tab/RunnerWidgetBody.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/epic-queue-scaffold.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/queue-lane.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-epic-queue.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-runner-widget-list.mjs
+
+## INV-8867 — The kit Menu stays inside the window's width and a finger outside dismisses it on lift
+
+The kit `Menu` (`src/shared/ui/Menu.tsx`) keeps its panel inside the window's width, and a finger outside it dismisses on LIFT, not on landing.
+
+- who: `MarkPresses` (Rename to…), `FacePhoto` (Missed one's kind menu) and `TabsMore` (the Tabs overflow). Found on the Mark screen at 390: the 248 px Rename panel hung from a trigger at x=152 and ran 10 px off the window; a swipe beside the 842 px panel scrolled the pane and CLOSED it.
+- width: `useEdgeShift(panelRef, open, hostWindow)` (`src/shared/ui/useEdgeShift.ts`) returns a whole-pixel nudge the panel wears as `style.translate`, 8 px clear of both edges. Used by `Menu` and by `ActionMenu` in place (`portal={false}`; the portal path clamps itself).
+  - `translate`, NOT `transform`: both panels enter on `vv-pop` (`animation-fill-mode: both`), which owns `transform` for the panel's whole life and beats an inline one. The old `ActionMenu` correction used `transform: translateX`; the box never moved, so "measure minus the shift applied" flipped between two answers and React threw "Maximum update depth exceeded" (2026-10-20, in-place menu opened near the left edge of a 390 window).
+  - the measure reads the rect (with the shift already applied taken off) and corrects the entrance's `scale(.96)` from `offsetWidth` (INV-4357). It runs after every commit and on the host window's `resize`.
+  - a shift changes only past half a pixel (`Math.abs(wanted - applied) > 0.5`) and is rounded: a rect reads 12.3999 on one pass and 12.4 on the next, and an exact `!==` re-rendered on that noise forever. Do not "simplify" it back to equality.
+- dismissal: a `pointerdown` outside closes at once for a mouse, but for `touch` and `pen` it waits for that pointer's `pointerup` (close) or `pointercancel` (the browser took the touch to scroll: stay open). A menu taller than the screen can only be read to its foot by scrolling the page, and every scroll begins as a `pointerdown` outside the panel. The wait is dropped in the effect's cleanup (MAN-7451).
+- look-alikes left alone: `Select` (its panel is fixed to the trigger and capped to the room on screen, so there is nothing to scroll the page for), `useComposerMenuAnchor` (re-anchors on scroll), `ActionMenu`'s `mousedown` dismissal (touch scrolling synthesizes no `mousedown`). Not confirmed, not touched: `AccountFooterRow`'s `pointerdown` close.
+- proof: `node .verify/menu-viewport-and-swipe.mjs` — real `MarkPresses` over the live codebook at 390 × 664 with a CDP finger: panel inside the window; a swipe scrolls the pane and leaves the menu open; a tap or a mouse press outside closes it; a row tap sends its kind; the in-place `ActionMenu` near the left edge fits; no shift at 1280 or for a right-aligned menu that already fits. Before the change: panel 152–400, menu closed by the swipe, `ActionMenu` threw.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/ActionMenu.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Menu.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/useEdgeShift.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/menu-viewport-and-swipe.mjs

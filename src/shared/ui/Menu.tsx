@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 
 import { useHostWindow } from '@/shared/context/HostWindowContext';
 import { OWNS_ESCAPE } from '@/shared/ui/overlayEscape';
+import { useEdgeShift } from '@/shared/ui/useEdgeShift';
 import { cn } from '@/shared/utils';
 
 type MenuItem = {
@@ -42,6 +43,15 @@ type MenuProps = {
  * Escape closes it without moving the pointer, handing focus back to the trigger rather than
  * dropping it on <body> when the panel unmounts underneath it. There is deliberately NO focus
  * trap and no arrow-key roving — every item is a tab stop, and no site asks for more.
+ *
+ * THE PANEL STAYS INSIDE THE WINDOW'S WIDTH (`useEdgeShift`): it hangs from a trigger that can stand anywhere
+ * in a row, and the Mark screen's 248 px Rename panel ran 10 px off a 390 window from a trigger at x=152.
+ *
+ * A FINGER DISMISSES ON LIFT, NOT ON LANDING. A panel with a long list (the Rename menu: 14 kinds, 842 px) is taller
+ * than a phone, so the page has to scroll to reach its foot, and a scroll begins as a `pointerdown` outside the
+ * panel. The browser tells a scroll from a tap afterwards — `pointerup` for a tap, `pointercancel` for a scroll,
+ * measured at 390 × 664 with CDP touch — so a touch (or pen) outside waits for it. A mouse has no such ambiguity
+ * and still closes on the press.
  */
 export function Menu({ trigger, triggerLabel, items, onSelect, width, align = 'left' }: MenuProps) {
   const hostWindow = useHostWindow();
@@ -50,12 +60,34 @@ export function Menu({ trigger, triggerLabel, items, onSelect, width, align = 'l
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
+  const panelRef = useRef<HTMLUListElement>(null);
+  const edgeShift = useEdgeShift(panelRef, open, hostWindow);
 
   useEffect(() => {
     if (!open) return;
 
+    // The finger now down outside the panel, waiting to be told whether it is a tap or a scroll.
+    let stopWaitingForLift = () => {};
     const closeOnOutsidePointer = (event: PointerEvent) => {
-      if (rootRef.current && !rootRef.current.contains(event.target as Node)) setOpen(false);
+      if (!rootRef.current || rootRef.current.contains(event.target as Node)) return;
+      if (event.pointerType !== 'touch' && event.pointerType !== 'pen') {
+        setOpen(false);
+        return;
+      }
+      stopWaitingForLift();
+      const { pointerId } = event;
+      const closeOnTap = (lift: PointerEvent) => {
+        if (lift.pointerId !== pointerId) return;
+        stopWaitingForLift();
+        if (lift.type === 'pointerup') setOpen(false);
+      };
+      hostWindow.document.addEventListener('pointerup', closeOnTap);
+      hostWindow.document.addEventListener('pointercancel', closeOnTap);
+      stopWaitingForLift = () => {
+        hostWindow.document.removeEventListener('pointerup', closeOnTap);
+        hostWindow.document.removeEventListener('pointercancel', closeOnTap);
+        stopWaitingForLift = () => {};
+      };
     };
     const closeOnEscape = (event: KeyboardEvent) => {
       if (event.key !== 'Escape') return;
@@ -69,6 +101,8 @@ export function Menu({ trigger, triggerLabel, items, onSelect, width, align = 'l
     hostDocument.addEventListener('pointerdown', closeOnOutsidePointer);
     hostDocument.addEventListener('keydown', closeOnEscape);
     return () => {
+      // A half-held gesture must not outlive its window (MAN-7451): the pointer state goes with the listeners.
+      stopWaitingForLift();
       hostDocument.removeEventListener('pointerdown', closeOnOutsidePointer);
       hostDocument.removeEventListener('keydown', closeOnEscape);
     };
@@ -97,6 +131,7 @@ export function Menu({ trigger, triggerLabel, items, onSelect, width, align = 'l
 
       {open && (
         <ul
+          ref={panelRef}
           className={cn('vv-menu__panel', `vv-menu__panel--${align}`)}
           role="menu"
           // The panel owns Escape while it is up — see `shared/ui/overlayEscape`.
@@ -105,7 +140,7 @@ export function Menu({ trigger, triggerLabel, items, onSelect, width, align = 'l
           // gives the panel a 200px floor for the callers that pass no width, and a floor beats
           // an inline width. A prop ignored across a third of its range is worse than no prop
           // at all (doctrine §8).
-          style={width ? { width, minWidth: width } : undefined}
+          style={{ ...(width ? { width, minWidth: width } : null), translate: edgeShift ? `${edgeShift}px` : undefined }}
         >
           {items.map((item) => (
             <li

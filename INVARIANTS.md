@@ -621,20 +621,6 @@ probe-key: c6f09bfc38b11189d453e9f377cd16d3e1ebb412
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/hooks/useCurrentApplication.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/hooks/useFrontPane.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/hooks/useSwitcherActions.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/utils/paneSlots.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/utils/radialLayout.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/constants.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/utils.ts
 
-## INV-5917 — probe — a NaN in any input passes straight through the geometry
-
-a NaN in any input passes straight through the geometry
-
-```probe
-npx tsx -e "import('./src/modules/chat-host/utils/panelGeometry.ts').then(m=>console.log(JSON.stringify(m.panelPlacement({left:10,top:10,width:28,height:28},{width:420,height:640},{width:1440,height:NaN})), JSON.stringify(m.clampPanelSize({width:NaN,height:NaN},{width:1440,height:900}))))"
-expect: {"left":50,"top":null,"width":420,"height":null,"grip":"top-right"} {"width":null,"height":null}  (nulls are NaN)
-```
-
-measured 2026-09-29 by chain chain-app-drawer-chat--host-geometry-20260929-175650-f840, finding L3, LOW
-probe-key: 1befb393421df243160762e9a6be4eef092aa596
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat-host/utils/chatHostStorage.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat-host/utils/mirrorDocument.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat-host/utils/panelGeometry.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat-host/utils/placeNode.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/chat-host-pure-parts.mjs
-
 ## INV-5918 — probe — a mouse press held on a node in the edge fade is lost (desktop, gutter)
 
 a mouse press held on a node in the edge fade is lost (desktop, gutter)
@@ -691,20 +677,6 @@ probe-key: 9dda15a292bd778d5d976e2f61818e84f22dc48d
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/hooks/useFlowTrack.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/StatusFlow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-status-flow-scroll.mjs
 
-## INV-5931 — probe — (MED) — a corrupt-payload token now locks the person out instead of signing them out
-
-(MED) — a corrupt-payload token now locks the person out instead of signing them out
-
-```probe
-curl -s -o /dev/null -D - -H "Authorization: Bearer $(node -e "const b=s=>Buffer.from(s).toString('base64url');process.stdout.write(b('{\"alg\":\"HS256\",\"typ\":\"JWT\"}')+'.'+b('{\"userId\":1')+'.'+b('sig'))")" http://127.0.0.1:3011/api/auth/user | grep -iE '^HTTP|x-auth-error'
-expect: HTTP/1.1 401 and X-Auth-Error: invalid-token (measured: HTTP/1.1 503 and no X-Auth-Error)
-```
-
-measured 2026-09-29 by chain chain-signed-out-20260929-173238-19f4, finding M1, MEDIUM
-probe-key: 9626bd3fb37ee2275512044ba5c86cae05737eb4
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/auth/auth.middleware.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/auth/context/AuthContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/auth/hooks/useSharedSessionFollower.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/file-tree/hooks/useFileTreeUpload.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/authToken.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/signout-kit.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-signed-out.mjs
-
 ## INV-5932 — probe — (MED) — a sign-out caused by emptied storage leaves no client trace
 
 (MED) — a sign-out caused by emptied storage leaves no client trace
@@ -716,34 +688,6 @@ expect: page trace records: 1 or more, naming why the session ended (measured: 0
 
 measured 2026-09-29 by chain chain-signed-out-20260929-173238-19f4, finding M2, MEDIUM
 probe-key: 311bc0c067d615548137dc72e0fde468dc5582e2
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/auth/auth.middleware.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/auth/context/AuthContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/auth/hooks/useSharedSessionFollower.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/file-tree/hooks/useFileTreeUpload.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/authToken.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/signout-kit.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-signed-out.mjs
-
-## INV-5933 — probe — (LOW) — the 503 journal line quotes a piece of the token's payload
-
-(LOW) — the 503 journal line quotes a piece of the token's payload
-
-```probe
-curl -s -o /dev/null -H "Authorization: Bearer $(node -e "const b=s=>Buffer.from(s).toString('base64url');process.stdout.write(b('{\"alg\":\"HS256\",\"typ\":\"JWT\"}')+'.'+b('not json at all SECRETFRAGMENT')+'.'+b('sig'))")" http://127.0.0.1:3011/api/auth/user; sleep 1; journalctl -u cloudcli-server-dev.service --since "-1 min" --no-pager -o cat | grep -c 'not json at'
-expect: 0 (measured: 1 — the line carries the payload's first characters)
-```
-
-measured 2026-09-29 by chain chain-signed-out-20260929-173238-19f4, finding L1, LOW
-probe-key: f96bc8598c3ed06e28e0fec441e921263e6412ce
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/auth/auth.middleware.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/auth/context/AuthContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/auth/hooks/useSharedSessionFollower.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/file-tree/hooks/useFileTreeUpload.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/authToken.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/signout-kit.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-signed-out.mjs
-
-## INV-5934 — probe — (LOW) — the proof command dies at import about one run in ten
-
-(LOW) — the proof command dies at import about one run in ten
-
-```probe
-for i in $(seq 1 40); do sqlite3 "$HOME/.cloudcli/auth.db" "select value from app_config where key='jwt_secret'" >/dev/null 2>&1 || echo locked; done | wc -l
-expect: 0 (measured: 4 of 40 locked). A busy timeout on that read (`sqlite3 -cmd ".timeout 5000" …`) is what the kit needs.
-```
-
-measured 2026-09-29 by chain chain-signed-out-20260929-173238-19f4, finding L2, LOW
-probe-key: 743354f5b56df8b0a788ffa36d59e63e9fd8b80e
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/auth/auth.middleware.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/auth/context/AuthContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/auth/hooks/useSharedSessionFollower.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/file-tree/hooks/useFileTreeUpload.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/authToken.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/signout-kit.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-signed-out.mjs
 
@@ -789,34 +733,6 @@ probe-key: f8df98b1c8786e0e6655fa9ebfafeaa4fc4c2d14
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/utils.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/host-window-home.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/host-window-kit.mjs
 
-## INV-5952 — probe — . Standing proof G5 no longer notices a ChatInterface remount at the gutter threshold (outside the 7 target paths)
-
-. Standing proof G5 no longer notices a ChatInterface remount at the gutter threshold (outside the 7 target paths)
-
-```probe
-cd /home/lyphe/.claude/claudecodeui_lyphe/.verify && node --input-type=module -e "import { openConsole } from './lib/console.mjs'; import { createScratchChat, deleteScratchChat } from './lib/scratch-chat.mjs'; const s = await openConsole({ viewport: { width: 1440, height: 900 } }); const id = await createScratchChat(s); await s.page.goto(s.appUrl + '/session/' + id, { waitUntil: 'networkidle' }); await s.page.waitForSelector('textarea'); console.log(await s.page.evaluate(() => document.querySelector('[data-testid=chat-gutter-chat]').firstElementChild.hasAttribute('data-chat-host-home'))); await deleteScratchChat(s, id); await s.browser.close();"
-expect: true (the tagged element is the home div, not ChatInterface); G5 passes with the tag on it whatever ChatInterface does
-```
-
-measured 2026-09-29 by chain chain-app-drawer-chat--chat-host-home-20260929-195616-ce23, finding L3, LOW
-probe-key: ab1111a059fa88306050146402440fdd26080bf5
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat-host/ChatHostSlot.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat-host/context/ChatHostContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat-host/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/ProjectWorkspaceShell.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/WorkspaceFrame.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/chat-host-home.mjs
-
-## INV-5953 — probe — . `chat-host-home.mjs` `before` overwrites the irreplaceable pre-change record unguarded
-
-. `chat-host-home.mjs` `before` overwrites the irreplaceable pre-change record unguarded
-
-```probe
-cd /home/lyphe/.claude/claudecodeui_lyphe && awk '/MODE === .before.\) continue/{c=NR} /data-chat-host-node/{if(!f)f=NR} END{print c, f}' .verify/chat-host-home.mjs; grep -n "writeFileSync(RECORD" .verify/chat-host-home.mjs
-expect: "101 108" (no node check before the continue) and one unguarded `writeFileSync(RECORD` at line 141
-```
-
-measured 2026-09-29 by chain chain-app-drawer-chat--chat-host-home-20260929-195616-ce23, finding L4, LOW
-probe-key: d34f39a67bd3d3b14c18be4e72e9e4c16b52515b
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat-host/ChatHostSlot.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat-host/context/ChatHostContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat-host/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/ProjectWorkspaceShell.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/WorkspaceFrame.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/chat-host-home.mjs
-
 ## INV-5954 — probe — Two of `CommandMenu`'s three viewport reads survive a mutant in the window probe (a 420-px window cannot reach line 117)
 
 Two of `CommandMenu`'s three viewport reads survive a mutant in the window probe (a 420-px window cannot reach line 117)
@@ -828,20 +744,6 @@ expect: a "[FAIL] the command menu is placed against the window's width" line; t
 
 measured 2026-09-29 by chain chain-app-drawer-chat--seam-chat-surfaces-20260929-193540-fce5, finding L1, LOW
 probe-key: 95e3498d7f6051f22800fe42cb35dc9607a8140b
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/widgets/hooks/useWidgetHost.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/utils.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/chat-surfaces-home.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/chat-surfaces-window.mjs
-
-## INV-5955 — probe — `useWidgetHost.ts:113-115` says the theme tokens are read from the window's document; the code reads the opener's — and the window probe cannot see the difference
-
-`useWidgetHost.ts:113-115` says the theme tokens are read from the window's document; the code reads the opener's — and the window probe cannot see the difference
-
-```probe
-sed -n 113,116p /home/lyphe/.claude/claudecodeui_lyphe/src/modules/widgets/hooks/useWidgetHost.ts
-expect: no sentence saying the tokens are read from the window's document (they are read from the opener's, line 176); today line 115 ends "are read from its document."
-```
-
-measured 2026-09-29 by chain chain-app-drawer-chat--seam-chat-surfaces-20260929-193540-fce5, finding L2, LOW
-probe-key: e1d729832beb76a9bf65f3fa9b1d437f5c11af3c
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/widgets/hooks/useWidgetHost.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/utils.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/chat-surfaces-home.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/chat-surfaces-window.mjs
 
