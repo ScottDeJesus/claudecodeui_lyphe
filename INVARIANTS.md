@@ -30,34 +30,6 @@ probe-key: b6189d25952c05f1aab5f0bd48a6718426e64a7e
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/claude-updates/runner-command.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/claude-updates/update-job.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/claude-updates/update-runner.ts
 
-## INV-5663 — probe — A Hide lives only in the page's memory until its PATCH lands
-
-A Hide lives only in the page's memory until its PATCH lands
-
-```probe
-node /home/lyphe/.claude/state/pipeline-reviews/arc-dismiss/athena-probes/arc-hide-5xx-reload.mjs
-expect: the "after reload + 8 s" line reads `decks 0` and `server hides` holding every restorly lane plan (today: `decks 1 … server hides []`); needs restorly on the lane (until 2026-09-29T19:02Z) — else set the arc to one the lane carries
-```
-
-measured 2026-09-28 by chain chain-arc-dismiss-20260928-151015-a6a2, finding M1, MEDIUM
-probe-key: 116798434903a6b93c1992fd480b7b74d505ddf2
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/.oxlintrc.json, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/user-preferences.db.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/hiddenPlans.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/hooks/useDispatcherPlans.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/useCardFold.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/preferenceEntryPatch.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/userSettings.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-dismiss-done.mjs
-
-## INV-5664 — probe — A hide already sent is erased locally by a sign-in read that lands after it; the new comment and INV-4406 claim otherwise
-
-A hide already sent is erased locally by a sign-in read that lands after it; the new comment and INV-4406 claim otherwise
-
-```probe
-node /home/lyphe/.claude/state/pipeline-reviews/arc-dismiss/athena-probes/arc-hide-races.mjs s5
-expect: the "S5b in-flight" line reads `decks after hydrate: 0` (today: `decks after hydrate: 1` with the server holding all 4 hides); the "S5a queued" line reads `decks after hydrate: 0`
-```
-
-measured 2026-09-28 by chain chain-arc-dismiss-20260928-151015-a6a2, finding L1, LOW
-probe-key: ea048678796afbab7cea4179c18634f8dc9cd949
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/.oxlintrc.json, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/user-preferences.db.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/hiddenPlans.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/hooks/useDispatcherPlans.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/useCardFold.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/preferenceEntryPatch.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/userSettings.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-dismiss-done.mjs
-
 ## INV-5665 — probe — PROVE IT fails, and the leftover 500 hits the operator's path; the builder's stated cause is wrong and the real one is not established
 
 PROVE IT fails, and the leftover 500 hits the operator's path; the builder's stated cause is wrong and the real one is not established
@@ -90,20 +62,6 @@ expect: the "S9 round trip" line reads `[HOLD] … returns the deck with 4 of it
 
 measured 2026-09-28 by chain chain-done-cards-leave-20260928-160626-ad80, finding M1, MEDIUM
 probe-key: 8734efe63225eeacfb3de1416303af86f7100857
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/ArcDeck.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/DeletePlanDialog.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/hiddenPlans.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/hooks/useDispatcherPlans.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/putAwayFocus.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/common.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/hooks/useWorkspaceTabGates.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/useCardFold.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-arc-nest.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-arc-strip-return.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-dismiss-done.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-runner-widget-list.mjs
-
-## INV-5673 — probe — Dismiss is dead on a slow browser clock (S13)
-
-Dismiss is dead on a slow browser clock (S13)
-
-```probe
-node /home/lyphe/.claude/state/pipeline-reviews/done-cards-leave/athena-probes/athena-dcl.mjs s13
-expect: `[HOLD] S13: after Dismiss with a 6 h slow clock the judgment card is gone (count 0)` (today: `[BREAK] … (count 1)`)
-```
-
-measured 2026-09-28 by chain chain-done-cards-leave-20260928-160626-ad80, finding L1, LOW
-probe-key: 33eb8d9e775793acfaafad16da9708e35571eed4
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/ArcDeck.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/DeletePlanDialog.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/hiddenPlans.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/hooks/useDispatcherPlans.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/putAwayFocus.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/common.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/hooks/useWorkspaceTabGates.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/useCardFold.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-arc-nest.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-arc-strip-return.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-dismiss-done.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-runner-widget-list.mjs
 
@@ -572,20 +530,6 @@ expect: exit 1 and a FAIL on the judged card's "opens whole" line, its lead pain
 
 measured 2026-09-29 by chain chain-card-description-full-20260929-105755-1234, finding M1, MEDIUM
 probe-key: 3cbc33de2fe16b8b75d50c03ee129c05f614d28a
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/ArcDeck.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/LaneCardHead.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/PlanCard.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-card-description.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-dispatch-arc-word.mjs
-
-## INV-5793 — probe — PlanCard's fold rationale still promises a compact head, and a folded card is no longer one
-
-PlanCard's fold rationale still promises a compact head, and a folded card is no longer one
-
-```probe
-node /home/lyphe/.claude/state/pipeline-reviews/card-description-full/athena-probes/fold.mjs | grep -E "^390"
-expect: either the fold's rationale no longer says "at a glance", or every folded loose card at 390 reads under ~250px (today: folded 151 / 470 / 206 / 338, arc 539)
-```
-
-measured 2026-09-29 by chain chain-card-description-full-20260929-105755-1234, finding L2, LOW
-probe-key: f77ce2f9cabcc4086a663f85bfa98a8bea965f0f
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/ArcDeck.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/LaneCardHead.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/PlanCard.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-card-description.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-dispatch-arc-word.mjs
 
@@ -1680,48 +1624,6 @@ probe-key: 5ab6902890cacb730a984a344dc7b77ec75aa07b
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/session-user-state.db.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/simple-list-ladder.db.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/services/session-user-state.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/session-user-state.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-sidebar-state-api.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-simple-reorder.mjs
 
-## INV-6317 — probe — MEDIUM — a reorder re-inserts the *neighbours'* DOM nodes, so a moved deck's strip shows plan 1 under a counter that says "Card 2 of 2", and a moved card's census scroll is lost
-
-MEDIUM — a reorder re-inserts the *neighbours'* DOM nodes, so a moved deck's strip shows plan 1 under a counter that says "Card 2 of 2", and a moved card's census scroll is lost
-
-```probe
-node /home/lyphe/.claude/state/pipeline-reviews/card-order-drag/athena-probes/a5.mjs
-expect: the "right after" line reads "scrollLeft":1049 with "planShownInStrip":"probe-order--arc-two" under "label":"Card 2 of 2" (today: "scrollLeft":0 … "planShownInStrip":"probe-order--arc-one", and the "4 s later" line is unchanged)
-```
-
-measured 2026-10-01 by chain chain-card-order-drag-20261001-152353-c269, finding M1, MEDIUM
-probe-key: d5bd7fb89caf7ac8ab9fa9f37163fffb4454e386
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/cardOrder.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/sortable/motion.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/sortable/useSortable.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/usePointerDrag.ts
-
-## INV-6318 — probe — LOW — a cancelled touch commits the drop
-
-LOW — a cancelled touch commits the drop
-
-```probe
-node /home/lyphe/.claude/state/pipeline-reviews/card-order-drag/athena-probes/a6.mjs
-expect: the "after touchCancel" line reads the wall as it began, `p6 p5 p4 p3 p2 p1`, and `local cardOrder []` (today: `p4 p6 p5 p3 p2 p1` and `[{"name":"probe-order--p4","rank":1790755561000}]`)
-```
-
-measured 2026-10-01 by chain chain-card-order-drag-20261001-152353-c269, finding L1, LOW
-probe-key: 7b6392f0467e28adba17f74ad914d539f0a68ecd
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/cardOrder.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/sortable/motion.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/sortable/useSortable.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/usePointerDrag.ts
-
-## INV-6319 — probe — LOW — grabbing a card again inside its 200 ms settle slide strips the new carry's marks
-
-LOW — grabbing a card again inside its 200 ms settle slide strips the new carry's marks
-
-```probe
-node /home/lyphe/.claude/state/pipeline-reviews/card-order-drag/athena-probes/r1.mjs
-expect: the "400 ms later, still holding" line keeps `position: relative; z-index: 30; will-change: transform; background-color: …; border-radius: …` (today: `transform: translate(13.3333px, 13.3333px);` alone)
-```
-
-measured 2026-10-01 by chain chain-card-order-drag-20261001-152353-c269, finding L2, LOW
-probe-key: 86f054f104378a3860ee59ad1c06ea9e087d7735
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/cardOrder.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/sortable/motion.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/sortable/useSortable.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/usePointerDrag.ts
-
 ## INV-6320 — probe — LOW — the tied-rank branch of `ranksForMove` moves cards the operator did not touch, against the other kind
 
 LOW — the tied-rank branch of `ranksForMove` moves cards the operator did not touch, against the other kind
@@ -1733,20 +1635,6 @@ expect: "widget column after" keeps c-wall before d-deck (today: `a-wall b-deck 
 
 measured 2026-10-01 by chain chain-card-order-drag-20261001-152353-c269, finding L3, LOW
 probe-key: 44e21d54a9185ed78094e1ebb08b12ce9801a104
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/cardOrder.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/sortable/motion.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/sortable/useSortable.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/usePointerDrag.ts
-
-## INV-6321 — probe — LOW — a second finger lifts the wrong card
-
-LOW — a second finger lifts the wrong card
-
-```probe
-node /home/lyphe/.claude/state/pipeline-reviews/card-order-drag/athena-probes/t2.mjs
-expect: "lifted after the hold" names the card under finger 1, `["p5"]`, or nothing (today: `["p4"]`)
-```
-
-measured 2026-10-01 by chain chain-card-order-drag-20261001-152353-c269, finding L4, LOW
-probe-key: 64c83ba4015088ad80ae19fccecb474581aa4359
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/cardOrder.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/sortable/motion.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/sortable/useSortable.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/usePointerDrag.ts
 
@@ -1822,20 +1710,6 @@ probe-key: 64905667859c70b3b1fe440f60d1fe69f8225173
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/utils.ts, /home/lyphe/.claude/hooks/dispatcher/model.py, /home/lyphe/.claude/hooks/dispatcher/store_arcs.py, /home/lyphe/.claude/hooks/dispatcher/width.py
 
-## INV-6331 — probe — a keyboard reader cannot reach a page's options: focus never follows the strip, and Tab always enters page 1
-
-a keyboard reader cannot reach a page's options: focus never follows the strip, and Tab always enters page 1
-
-```probe
-node /home/lyphe/.claude/state/pipeline-reviews/round-questions-strip/probe-kb-focus.mjs
-expect: `(1) after one Tab from the strip: focus is "Option A1" on page 0; the strip now shows page [0]` and `(2) next Tab: focus "Option B1" on page 0; the strip now shows page [0]` (page numbers 0-based)
-```
-
-measured 2026-10-01 by chain chain-round-questions-strip-20261001-185557-37ce, finding M1, MEDIUM
-probe-key: 8cb50b01d1d0c126e77e0d66379ab2583f0f21b1
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/DeckStrip.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/hooks/useSnapStrip.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/RoundAnswer.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/SnapStrip.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/deck-strip.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/round-strip.mjs
-
 ## INV-6332 — probe — `Other…` pressed with its page ending at the fold: the field it focused ends up below the fold
 
 `Other…` pressed with its page ending at the fold: the field it focused ends up below the fold
@@ -1847,20 +1721,6 @@ expect: `field focused: true; field fully on screen: false; field inside the str
 
 measured 2026-10-01 by chain chain-round-questions-strip-20261001-185557-37ce, finding L2, LOW
 probe-key: a5bee074e70adb8020be57e8b30dd91d330a442e
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/DeckStrip.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/hooks/useSnapStrip.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/RoundAnswer.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/SnapStrip.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/deck-strip.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/round-strip.mjs
-
-## INV-6333 — probe — a second tap on the same spot after a pick answers the NEXT question, unread
-
-a second tap on the same spot after a pick answers the NEXT question, unread
-
-```probe
-node /home/lyphe/.claude/state/pipeline-reviews/round-questions-strip/attack3.mjs
-expect: `[tap again after 300ms] radios chosen: ["Beta","Epsilon"]; marks=✓ ✓ 3; inView=[2]`
-```
-
-measured 2026-10-01 by chain chain-round-questions-strip-20261001-185557-37ce, finding L3, LOW
-probe-key: 9c331f8473e0061d9935cf9e2eca03f5d0ae6362
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/DeckStrip.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/hooks/useSnapStrip.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/RoundAnswer.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/SnapStrip.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/deck-strip.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/round-strip.mjs
 
