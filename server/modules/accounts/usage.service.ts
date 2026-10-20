@@ -4,6 +4,8 @@ import path from 'node:path';
 
 import type { ClaudeUsage, ClaudeUsageWindow } from '@/shared/types.js';
 
+import { liveAccountDigest } from './account-digest.js';
+import { note } from './pacer-door.js';
 import { isRecord, markRolled, parseWindows } from './usage-windows.js';
 
 /**
@@ -25,8 +27,8 @@ import { isRecord, markRolled, parseWindows } from './usage-windows.js';
  *      server.
  *   2. NEVER LOGGED. No line here takes the token. It is handed to `fetchUsage` and to nothing else,
  *      and it is never kept in module state.
- *   3. NEVER PERSISTED. Nothing here writes a file, a database or `state/`. The whole meter is two
- *      in-memory readings that die with the process.
+ *   3. NEVER PERSISTED. Nothing here writes a file, a database or `state/`: the token is never
+ *      persisted, and every good reading is filed by `pacer-door.ts` and outlives this process.
  *   4. NEVER IN AN ERROR. Every failure collapses to a FIXED reason vocabulary and a status int, so
  *      no exception text, request object or credential can ride out on an error path. That is
  *      stronger than scrubbing a message after the fact: there is nothing here to scrub.
@@ -298,6 +300,10 @@ function toWire(reading: Reading): ClaudeUsage {
 async function measure(): Promise<{ reading: Reading; stamp: number | null; good: LastGood | null }> {
   const now = Date.now();
   const { token, stamp } = readCredentials();
+  // WHICH LOGIN these figures will belong to, read beside the token and before the fetch. The
+  // credential stamp is the witness for the pair: a whole-box swap moves it, so a swap that lands
+  // while the request is out leaves a different stamp to compare below.
+  const digest = liveAccountDigest();
   if (token === null) return { reading: degraded('credentials', 0, now, stamp), stamp, good: null };
 
   const { status, payload } = await fetchUsage(token);
@@ -323,6 +329,12 @@ async function measure(): Promise<{ reading: Reading; stamp: number | null; good
       good: null,
     };
   }
+  // ⚠ EVERY GOOD READING IS FILED WITH THE PACER, under the login it came from — but only while
+  // that login held still for the whole fetch. The stamp is read again: a swap during the request
+  // means these percentages might be either account's, and an unknown stamp is no evidence at all.
+  // `note` is fire-and-forget (a child with its own timeout); nothing on this path awaits it.
+  const after = readCredentials().stamp;
+  if (stamp !== null && after === stamp) note(digest, windows, now);
   return {
     reading: { windows, degraded: false, reason: '', status: 200, staleSince: null, checkedAt: now },
     stamp,

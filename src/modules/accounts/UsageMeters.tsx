@@ -1,6 +1,7 @@
 import { Meter } from '@/shared/ui';
+import { useUsagePaceFake } from '@/modules/accounts/pace-fake';
 import { resetInstant, windowPercent, windowTone } from '@/modules/accounts/utils/usageWindows';
-import type { ClaudeUsage, ClaudeUsageWindow } from '@/shared/types';
+import type { ClaudeUsage, ClaudeUsagePace, ClaudeUsageWindow } from '@/shared/types';
 
 /** The line that closes the block, because a blank bar has to be readable as "unknown" and not as "you have used nothing". */
 const CLOSING_LINE =
@@ -130,6 +131,16 @@ function UsageNote({ children }: { children: string }) {
   return <p className="text-xs leading-relaxed text-ink-faint">{children}</p>;
 }
 
+const NO_PACE = { tickAt: null, markAt: null, caption: null } as const;
+
+/** The pacer's two annotations for ONE usage window, and the caption the 5-hour meter carries. Everything but the 5-hour and weekly windows — and every meter on a reading with no pace — gets none, so today's block is what it was. */
+function paceForWindow(key: string, pace: ClaudeUsagePace | null): { tickAt: number | null; markAt: number | null; caption: string | null } {
+  if (!pace) return NO_PACE;
+  if (key === 'five_hour') return { tickAt: pace.ceiling5, markAt: pace.projected5, caption: pace.words.trim() || null };
+  if (key === 'seven_day') return { tickAt: pace.ceiling7, markAt: pace.projected7, caption: null };
+  return NO_PACE;
+}
+
 /**
  * The usage block of the account panel (D7).
  * Used by the accounts module's AccountPopover, which is the only screen that shows usage;
@@ -138,18 +149,25 @@ function UsageNote({ children }: { children: string }) {
  *
  * There is deliberately no flexible-spend bar: the provider reports no such window, and a third
  * bar reading "—" would invent a limit nobody set.
+ *
+ * THE PACER'S PICTURE SITS ON THE BARS, in three pieces and one sentence: a ceiling tick and a
+ * projected-end mark on the 5-hour and weekly meters (`usage.pace`), and the pacer's own words as
+ * one caption under the 5-hour meter. The figures arrive as percents from the usage route, which
+ * converts them once, so the meter does no arithmetic. An absent pace draws none of it.
  */
 export function UsageMeters({ usage }: { usage: ClaudeUsage | null }) {
+  // FILL: usage.pace — usage.pace
+  const pace = useUsagePaceFake();
   return (
     <div className="flex flex-col gap-3">
       <div className="text-[11px] uppercase tracking-[0.14em] text-ink-faint">Usage on this account</div>
-      {renderReading(usage)}
+      {renderReading(usage, pace)}
       <UsageNote>{CLOSING_LINE}</UsageNote>
     </div>
   );
 }
 
-function renderReading(usage: ClaudeUsage | null) {
+function renderReading(usage: ClaudeUsage | null, pace: ClaudeUsagePace | null) {
   // Nothing has been asked yet. An em-dash, not a spinner: the first reading normally lands
   // before the panel is ever opened, and a bar animating in from zero would say "none used".
   if (!usage) return <UsageNote>—</UsageNote>;
@@ -189,17 +207,27 @@ function renderReading(usage: ClaudeUsage | null) {
           // Rounded once, here, and read by the figure, the tone, the bar and aria alike.
           const percent = windowPercent(usageWindow);
           const tone = windowTone(usageWindow, percent);
+          const paceMarks = paceForWindow(usageWindow.key, pace);
           return (
             // A rolled window is dimmed on its own: its percent is real but its window has
             // already ended, so it reads as history beside the bars that are still running.
             <div key={usageWindow.key} className={usageWindow.rolled ? 'opacity-60' : undefined}>
+              {/* FILL: usage.pace — tickAt={usage.pace?.ceiling5|ceiling7}, markAt={usage.pace?.projected5|projected7},
+                  and the 5-hour caption under the bar all read the pace above; an absent pace passes null. */}
               <Meter
                 percent={percent}
                 tone={tone}
                 label={windowLabel(usageWindow)}
                 value={windowValue(percent, Boolean(usageWindow.rolled))}
                 sub={heavyLine(tone, resetsLine(usageWindow.resetsAt))}
+                tickAt={paceMarks.tickAt}
+                markAt={paceMarks.markAt}
               />
+              {paceMarks.caption && (
+                <p data-usage-pace-caption="" className="mt-1 text-xs leading-relaxed text-ink-faint">
+                  {paceMarks.caption}
+                </p>
+              )}
             </div>
           );
         })}

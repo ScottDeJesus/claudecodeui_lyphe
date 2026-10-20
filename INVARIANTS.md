@@ -10590,3 +10590,64 @@ measured 2026-10-19 by chain chain-doubtful-areas-20261019-082056-6ef4, finding 
 probe-key: b7de67ccfd48038ab0e7e7110c84abec8045990f
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/ProvingTable.tsx, /opt/shadow-connector/core/affected_areas/seat/contract.py, /opt/shadow-connector/core/affected_areas/seat/__init__.py
+
+## INV-8893 — probe — LOW — the gate's chat "pane did not move during the carry" check passes with the freeze undone
+
+LOW — the gate's chat "pane did not move during the carry" check passes with the freeze undone
+
+```probe
+bash /home/lyphe/.claude/state/pipeline-reviews/native-scroll-drag-lists/athena-probes/run.sh vacuous.mjs
+echo "[probe exit $?]"
+expect: `pane unfrozen by the page   : [pane overflow at rest auto → at the hold auto → …] the leg's "pane did not move during the carry" check PASSED` then `VACUOUS: the check passes with the freeze undone` while the defect stands; the unfrozen line reads FAILED and the last line `SOUND: …` once the chat leg starts mid-list with the finger moving up
+```
+
+measured 2026-10-20 by chain chain-native-scroll-drag-lists-20261020-061555-de67, finding L1, LOW
+probe-key: 77e2414782a444f19108a2ef66e8f405c49a0d3d
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/index.css, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/hooks/useSimpleChatDrag.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/sortable/touchCarry.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/usePointerDrag.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/native-scroll-legs.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/native-scroll-surfaces.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/phone-uncancelable.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/simple-list-scratch.mjs
+
+## INV-8894 — probe — LOW — the freeze walks up from the pressed node, so a node replaced before the lift leaves the pane free
+
+LOW — the freeze walks up from the pressed node, so a node replaced before the lift leaves the pane free
+
+```probe
+bash /home/lyphe/.claude/state/pipeline-reviews/native-scroll-drag-lists/athena-probes/run.sh detached.mjs
+echo "[probe exit $?]"
+expect: line 1 `pressed node left alone … pane overflow at the lift=hidden; scrollTop 150 → 150 → 150 (pane held)`; line 2 `pressed node replaced at 150 ms: lifted=1 pane overflow at the lift=auto; scrollTop 150 → 235 → 55 (PANE MOVES under the carry)` while the defect stands; `hidden … pane held` on both once the freeze is rooted at the handle too
+```
+
+measured 2026-10-20 by chain chain-native-scroll-drag-lists-20261020-061555-de67, finding L2, LOW
+probe-key: 23079e744445beaa0d3a5f9569bc94e5de820023
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/index.css, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/hooks/useSimpleChatDrag.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/sortable/touchCarry.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/usePointerDrag.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/native-scroll-legs.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/native-scroll-surfaces.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/phone-uncancelable.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/simple-list-scratch.mjs
+
+## INV-8895 — probe — LOW — on a touch screen with classic scrollbars the lift widens the rows for the whole carry
+
+LOW — on a touch screen with classic scrollbars the lift widens the rows for the whole carry
+
+```probe
+bash /home/lyphe/.claude/state/pipeline-reviews/native-scroll-drag-lists/athena-probes/run.sh gutter.mjs
+echo "[probe exit $?]"
+expect: `row width at rest 258px (scrollbar 10px) → at the lift 268px (scrollbar 0px): the rows shift by 10px for the carry` while the defect stands; `hold their width` once the gutter is kept
+```
+
+measured 2026-10-20 by chain chain-native-scroll-drag-lists-20261020-061555-de67, finding L3, LOW
+probe-key: 4dd1211538d59332f41749d858a0130ed9c63a93
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/index.css, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/hooks/useSimpleChatDrag.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/sortable/touchCarry.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/usePointerDrag.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/native-scroll-legs.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/native-scroll-surfaces.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/phone-uncancelable.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/simple-list-scratch.mjs
+
+## INV-8896 — probe — LOW — the retired one-motion gate still asserts the mechanism this change deleted
+
+LOW — the retired one-motion gate still asserts the mechanism this change deleted
+
+```probe
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+grep -c -E 'touchPan|scrollsPane|data-touch-pan' .verify/lib/one-motion-reads.mjs .verify/lib/one-motion-others.mjs .verify/lib/one-motion-legs.mjs
+echo "[probe exit $?]"
+expect: reads 1, others 4, legs 2 while the retired gate stands; all 0 once its pan legs are removed or the gate is deleted
+```
+
+measured 2026-10-20 by chain chain-native-scroll-drag-lists-20261020-061555-de67, finding L4, LOW
+probe-key: 914a2b5b6529c95514796fbabbba9417a7a07868
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/index.css, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/hooks/useSimpleChatDrag.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/sortable/touchCarry.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/usePointerDrag.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/native-scroll-legs.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/native-scroll-surfaces.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/phone-uncancelable.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/simple-list-scratch.mjs

@@ -18,11 +18,13 @@ import { usePointerDrag } from '@/shared/ui/usePointerDrag';
  * run by the kit's one pointer-drag mechanism (`usePointerDrag`, kind `sort`), the same one the
  * sortable lists lift on. A mouse carries once it has moved past the threshold. A finger carries once
  * it has held still on a row for `TOUCH_HOLD_MS`, anywhere on the row that is not a control; one that
- * moves first is scrolling the list, and the row lifts nothing: THE PAGE SCROLLS THE PANE FOR IT, because
- * a row is `touch-action: none` from the first touch (`scrollsPane`, below) and the browser has no pan to
- * take. A swipe that starts on a control inside a row scrolls the pane too, and a hold on one lifts
- * nothing. A lifted row held at the pane's top or
- * bottom edge scrolls the pane toward it (`useCarryEdgeScroll`), so it can reach rows off screen.
+ * moves first is scrolling the list, and the row lifts nothing: THE BROWSER SCROLLS FOR IT, its own pan
+ * and glide, because a row is never `touch-action: none`. A swipe that starts on a control inside a row
+ * scrolls the pane too, and a hold on one lifts nothing. A lifted row survives the browser's pan: the
+ * list's scrollers are held still for the carry and the finger is followed on its touch events when the
+ * browser takes the pointer away (`sortable/touchCarry.ts`, run by `usePointerDrag`). A lifted row held
+ * at the pane's top or bottom edge scrolls the pane toward it (`useCarryEdgeScroll`), so it can reach
+ * rows off screen.
  *
  * THE LIFTED ROW LEAVES ITS SLOT AND FOLLOWS THE POINTER, up and down, wearing Verve's lifted state: the
  * kit's own carry (`sortable/carried.ts`, the copy `useSortable` runs). A phone that cannot buzz has
@@ -125,9 +127,6 @@ export function useSimpleChatDrag({ items, onMove }: {
     kind: 'sort',
     threshold: DRAG_THRESHOLD_PX,
     holdMs: TOUCH_HOLD_MS,
-    // A swipe before the hold fires scrolls the pane by hand, controls included (`accept` refuses
-    // them the lift, not the pan): the rows are `touch-action: none` at rest (`handleProps`).
-    scrollsPane: true,
     // Hears only a press that may START the gesture (a second finger never reaches it), so the row
     // it names is the one the hold lifts.
     accept: (event) => {

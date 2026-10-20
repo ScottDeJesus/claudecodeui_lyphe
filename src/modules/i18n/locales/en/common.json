@@ -433,6 +433,12 @@
       "notRead": "The launch table could not be read again:"
     }
   },
+  "usage": {
+    "pace": {
+      "ceiling": "ceiling {{percent}}%",
+      "projected": "{{percent}}% projected"
+    }
+  },
   "deepseekUsage": {
     "title": "DeepSeek",
     "refresh": "Refresh",
@@ -1309,6 +1315,7 @@
     },
     "waitsOn": "waits on {{names}}",
     "queueHold": "Waiting · {{clause}}",
+    "paceHold": "Held by pace · {{clause}}",
     "wipHold": "Waiting for a WIP slot · {{clause}}",
     "dismissDone": "Dismiss done · {{count}}",
     "plannersOut": "planners {{out}} of {{lanes}} out",

@@ -1,3 +1,5 @@
+import { useTranslation } from 'react-i18next';
+
 import { cn } from '@/shared/utils';
 
 type MeterProps = {
@@ -19,6 +21,18 @@ type MeterProps = {
    * figure on a single baseline, no `sub`.
    */
   variant?: 'stacked' | 'inline';
+  /**
+   * The ceiling, in percent, as a tick on the track — drawn only when given, so every meter that
+   * is not a usage window's is exactly the bar it was. The raw figure is kept for the words and
+   * for a probe even where the tick itself is clamped to the track's end.
+   */
+  tickAt?: number | null;
+  /**
+   * The projected end, in percent, as a mark on the track — drawn only when given, on the same rule.
+   * A projected end past the ceiling, or past 100, is drawn AS IT IS: its mark sits at the track's
+   * end and the words still say the real figure.
+   */
+  markAt?: number | null;
 };
 
 /**
@@ -30,18 +44,63 @@ type MeterProps = {
  * The fill scales with `transform`, never `width`, so the bar animates without laying the
  * row out again on every frame. An unknown percent draws no fill at all and shows an
  * em-dash — a bar at zero would claim something the app does not know.
+ *
+ * TWO ANNOTATIONS ON THE TRACK, and only when a caller gives them: the ceiling tick (a full-height
+ * hairline) and the projected end's mark (a short notch standing proud of the bar). Both are the
+ * mode's own ink inside a 1px surface ring. The ink is what reads on the track and the plane; the
+ * ring is what keeps one of the two at 3:1 wherever a filled bar runs underneath — the ink over an
+ * amber fill in light, the ring over it in dark (MAN-578, MAN-579). They are NOT the meter's value
+ * and never change its bounds, its fill or its tone: a projection past the ceiling is a forecast,
+ * not a fault, and never wears amber (MAN-464, MAN-577).
+ * The words a reader on assistive tech hears carry both figures after the value, because the marks
+ * are paint and nothing else. A meter given neither is the same DOM and the same rendering as before
+ * they existed.
  */
-export function Meter({ percent, tone = 'accent', label, ariaLabel, value, sub, variant = 'stacked' }: MeterProps) {
+export function Meter({ percent, tone = 'accent', label, ariaLabel, value, sub, variant = 'stacked', tickAt, markAt }: MeterProps) {
+  const { t } = useTranslation();
   const known = percent !== null;
   const clamped = known ? Math.min(100, Math.max(0, percent)) : 0;
 
+  // The marks' positions are clamped to the track; their figures are not, and stay in the words.
+  const tick = tickAt == null ? null : Math.min(100, Math.max(0, tickAt));
+  const mark = markAt == null ? null : Math.min(100, Math.max(0, markAt));
+
   // One track, spelled once, so the two registers can never drift on how a fill is drawn or on
   // what an unknown percent looks like.
-  const track = (
+  const bareTrack = (
     <span className="vv-meter__track block">
       {known && <span className="vv-meter__fill block" style={{ transform: `scaleX(${clamped / 100})` }} />}
     </span>
   );
+  // The wrapper exists ONLY when a mark is asked for, so every other Meter's tree is untouched.
+  const track = tick === null && mark === null ? bareTrack : (
+    <span className="relative block">
+      {bareTrack}
+      {tick !== null && (
+        <span
+          aria-hidden="true"
+          data-meter-tick={String(tickAt)}
+          className="pointer-events-none absolute inset-y-0 w-0.5 -translate-x-1/2 bg-foreground ring-1 ring-card"
+          style={{ left: `${tick}%` }}
+        />
+      )}
+      {mark !== null && (
+        <span
+          aria-hidden="true"
+          data-meter-mark={String(markAt)}
+          className="pointer-events-none absolute top-1/2 h-2.5 w-[3px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-foreground ring-1 ring-card"
+          style={{ left: `${mark}%` }}
+        />
+      )}
+    </span>
+  );
+
+  // A mark is paint; its figure is put in the meter's words. The order is the reading order a
+  // sighted reader takes off the bar: the value, the ceiling, then where the work is heading.
+  const markWords: string[] = [];
+  if (tickAt != null) markWords.push(t('usage.pace.ceiling', { percent: Math.round(tickAt), defaultValue: 'ceiling {{percent}}%' }));
+  if (markAt != null) markWords.push(t('usage.pace.projected', { percent: Math.round(markAt), defaultValue: '{{percent}}% projected' }));
+  const valueWords = known ? value : 'unknown';
 
   const aria = {
     role: 'meter' as const,
@@ -49,7 +108,7 @@ export function Meter({ percent, tone = 'accent', label, ariaLabel, value, sub, 
     'aria-valuemin': 0,
     'aria-valuemax': 100,
     ...(known ? { 'aria-valuenow': clamped } : {}),
-    'aria-valuetext': known ? value : 'unknown',
+    'aria-valuetext': markWords.length > 0 ? `${valueWords} · ${markWords.join(', ')}` : valueWords,
   };
 
   // `sub` is deliberately dropped in the inline register rather than wrapped under the bar: this

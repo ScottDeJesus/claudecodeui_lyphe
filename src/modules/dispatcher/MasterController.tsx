@@ -5,6 +5,8 @@ import { useBoardVerbs } from '@/modules/dispatcher/hooks/useBoardVerbs';
 import { useDispatcherPlans } from '@/modules/dispatcher/hooks/useDispatcherPlans';
 import { useWipDefaultsVerbs } from '@/modules/dispatcher/hooks/useWipDefaultsVerbs';
 import { LabeledPick } from '@/modules/dispatcher/LabeledPick';
+import { PaceLine } from '@/modules/dispatcher/PaceLine';
+import { useRoutePaceFake } from '@/modules/dispatcher/pace-fake';
 import { useDeepSeekFeaturesSwitch } from '@/shared/hooks/useDeepSeekFlashSwitch';
 import { Button } from '@/shared/ui';
 import type { DispatcherEpicsWord, DispatcherWipLimit } from '@/shared/types';
@@ -34,6 +36,8 @@ const WIP_LIMITS: readonly DispatcherWipLimit[] = ['features', 'tasks'];
  *   queue's order and the dial then decide what runs. A HIDDEN plan is never counted or reached — Show is its
  *   press. A feature's own Start (on its card) is the override that skips both.
  * - **Pause all** / **Resume all** and the running readout.
+ * - **The pacer's line** — the dispatcher's own sentence (`route.pace.words`) beside them, one unbreakable piece in
+ *   the same wrapping row: what the pacer is doing, in the gate's words, never the board's. No picture, no line.
  *
  * WHILE THE DEEPSEEK SWITCH IS ON the two WIP dropdowns show All and are dimmed, with one line under the
  * controls saying why: DeepSeek work runs with no feature or task limit unless an epic sets its own
@@ -68,6 +72,8 @@ const WIP_LIMITS: readonly DispatcherWipLimit[] = ['features', 'tasks'];
 export function MasterController({ className }: { className?: string }) {
   const { t } = useTranslation();
   const { route } = useDispatcherPlans();
+  // FILL: route.pace — route?.pace
+  const pace = useRoutePaceFake();
   const epics = route?.epics ?? null;
   const defaults = route?.wip;
   const waiting = route?.waiting ?? 0;
@@ -150,6 +156,7 @@ export function MasterController({ className }: { className?: string }) {
       >
         {epics.paused ? t('dispatcher.epics.paused') : t('dispatcher.epics.running', { running: epics.running, limit: epics.limit })}
       </span>
+      <PaceLine pace={pace} />
       {deepseek && (
         <p data-master-note="" className="m-0 basis-full text-xs text-muted-foreground">
           {t('dispatcher.master.noteDeepseek')}

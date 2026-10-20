@@ -126,7 +126,6 @@ export function SnapStrip({
         aria-label={stripLabel}
         style={stripHeight === null ? undefined : { height: stripHeight }}
         className="scrollbar-hide relative flex min-w-0 snap-x snap-mandatory items-start gap-3 overflow-x-auto overflow-y-hidden rounded-lg transition-[height] duration-200 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-        data-touch-pan-x
         onScroll={onScroll}
         onKeyDown={onKeyDown}
         onWheel={onReaderWheel}

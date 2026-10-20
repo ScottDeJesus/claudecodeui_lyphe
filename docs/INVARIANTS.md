@@ -329,12 +329,128 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/runner-tab/index.ts,
 The kit `Menu` (`src/shared/ui/Menu.tsx`) keeps its panel inside the window's width, and a finger outside it dismisses on LIFT, not on landing.
 
 - who: `MarkPresses` (Rename to…), `FacePhoto` (Missed one's kind menu) and `TabsMore` (the Tabs overflow). Found on the Mark screen at 390: the 248 px Rename panel hung from a trigger at x=152 and ran 10 px off the window; a swipe beside the 842 px panel scrolled the pane and CLOSED it.
-- width: `useEdgeShift(panelRef, open, hostWindow)` (`src/shared/ui/useEdgeShift.ts`) returns a whole-pixel nudge the panel wears as `style.translate`, 8 px clear of both edges. Used by `Menu` and by `ActionMenu` in place (`portal={false}`; the portal path clamps itself).
-  - `translate`, NOT `transform`: both panels enter on `vv-pop` (`animation-fill-mode: both`), which owns `transform` for the panel's whole life and beats an inline one. The old `ActionMenu` correction used `transform: translateX`; the box never moved, so "measure minus the shift applied" flipped between two answers and React threw "Maximum update depth exceeded" (2026-10-20, in-place menu opened near the left edge of a 390 window).
+- width: `useEdgeShift(panelRef, active, hostWindow)` (`src/shared/ui/useEdgeShift.ts`) returns a whole-pixel nudge the panel wears as `style.translate`, 8 px clear of both edges. Used by `Menu` (`active` = `open`) and by `ActionMenu` in place (`active` = `isOpen && !portal`; the portal path clamps itself).
+  - `translate`, NOT `transform`: both panels enter on `vv-pop` (`animation-fill-mode: both`), which owns `transform` for the panel's whole life and beats an inline one. A `transform: translateX` shift never moves the box, so "measure minus the shift applied" flips between two answers and React throws "Maximum update depth exceeded" (2026-10-20, in-place `ActionMenu` opened near the left edge of a 390 window).
   - the measure reads the rect (with the shift already applied taken off) and corrects the entrance's `scale(.96)` from `offsetWidth` (INV-4357). It runs after every commit and on the host window's `resize`.
   - a shift changes only past half a pixel (`Math.abs(wanted - applied) > 0.5`) and is rounded: a rect reads 12.3999 on one pass and 12.4 on the next, and an exact `!==` re-rendered on that noise forever. Do not "simplify" it back to equality.
 - dismissal: a `pointerdown` outside closes at once for a mouse, but for `touch` and `pen` it waits for that pointer's `pointerup` (close) or `pointercancel` (the browser took the touch to scroll: stay open). A menu taller than the screen can only be read to its foot by scrolling the page, and every scroll begins as a `pointerdown` outside the panel. The wait is dropped in the effect's cleanup (MAN-7451).
-- look-alikes left alone: `Select` (its panel is fixed to the trigger and capped to the room on screen, so there is nothing to scroll the page for), `useComposerMenuAnchor` (re-anchors on scroll), `ActionMenu`'s `mousedown` dismissal (touch scrolling synthesizes no `mousedown`). Not confirmed, not touched: `AccountFooterRow`'s `pointerdown` close.
+- look-alikes left alone: `Select` (its panel is fixed to the trigger and capped to the room on screen, so there is nothing to scroll the page for), `useComposerMenuAnchor` (re-anchors on scroll), `ActionMenu`'s `mousedown` dismissal (touch scrolling synthesizes no `mousedown`). Not confirmed, not touched: `AccountFooterRow`'s and `SidebarSessionPickerPopover`'s `pointerdown` close (each is the same shape and would need its own panel to outgrow a phone screen before it matters).
 - proof: `node .verify/menu-viewport-and-swipe.mjs` — real `MarkPresses` over the live codebook at 390 × 664 with a CDP finger: panel inside the window; a swipe scrolls the pane and leaves the menu open; a tap or a mouse press outside closes it; a row tap sends its kind; the in-place `ActionMenu` near the left edge fits; no shift at 1280 or for a right-aligned menu that already fits. Before the change: panel 152–400, menu closed by the swipe, `ActionMenu` threw.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/ActionMenu.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Menu.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/useEdgeShift.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/menu-viewport-and-swipe.mjs
+
+## INV-8881 — probe — LOW — a window whose reset lands within 500 ms after `checkedAt` is rounded onto `at`, and the real pacer drops the WHOLE note — the live weekly with it
+
+LOW — a window whose reset lands within 500 ms after `checkedAt` is rounded onto `at`, and the real pacer drops the WHOLE note — the live weekly with it
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) && cat > "$D/p.sh" <<'EOF'
+#!/bin/sh
+# A window whose reset is < 500 ms after checkedAt: Math.round puts the reset on `at`,
+# the real pacer refuses the whole object, and the live weekly is lost with it.
+set -u
+S=$(mktemp -d /tmp/athena-meter-probe.XXXXXX) || exit 1
+case "$S" in /tmp/athena-meter-probe.*) ;; *) echo "bad scratch dir" >&2; exit 1;; esac
+trap 'cd /tmp && rm -rf "$S"' EXIT
+mkdir -p "$S/home/.claude" || exit 1
+printf '%s' '{"claudeAiOauth":{"accessToken":"probe","expiresAt":1111111111}}' > "$S/home/.claude/.credentials.json"
+printf '%s' '{"oauthAccount":{"accountUuid":"probe-account-a"}}' > "$S/home/.claude.json"
+cat > "$S/capture.sh" <<'SH'
+#!/bin/sh
+{ printf 'ARGV %s\n' "$*"; cat; printf '\n'; } >> "$CAPTURE"
+SH
+chmod +x "$S/capture.sh"
+cat > "$S/d.mts" <<'TS'
+import { note } from '/home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/pacer-door.ts';
+const at = 1792502757000; // a Date.now() landing exactly on a second
+const five = { key: 'five_hour', label: '5-hour', percent: 5, resetsAt: new Date(at + 200).toISOString() };
+const week = { key: 'seven_day', label: 'weekly', percent: 7, resetsAt: new Date(at + 300_000_000).toISOString() };
+note('abcd1234', [five, week], at);
+setTimeout(() => {}, 1200);
+TS
+: > "$S/cap.txt"
+HOME="$S/home" CAPTURE="$S/cap.txt" PACER_BIN="$S/capture.sh" PLAN_RUNNER_PACER_HOME="$S/pacer" \
+  /home/lyphe/.claude/claudecodeui_lyphe/node_modules/.bin/tsx \
+  --tsconfig /home/lyphe/.claude/claudecodeui_lyphe/server/tsconfig.json "$S/d.mts" || exit 1
+if [ -s "$S/cap.txt" ]; then
+  grep -v '^ARGV' "$S/cap.txt"
+  grep -v '^ARGV' "$S/cap.txt" | PLAN_RUNNER_PACER_HOME="$S/pacer" /home/lyphe/.claude/scripts/pacer note --source meter
+  echo "pacer rc=$?"
+else
+  echo "SENT-NOTHING"
+fi
+EOF
+bash "$D/p.sh"; case "$D" in /tmp/athena-probe.*) cd /tmp && rm -rf "$D";; esac
+expect: the note carries `"five":null` with the live `week`, and the pacer answers `NOTED abcd1234 five=- week=7%` (today: `{"five":{"used":0.05,"resets_at":1792502757}}` is sent whole and the pacer answers `DROPPED: five resets_at outside the band`, `pacer rc=2`)
+```
+
+measured 2026-10-20 by chain chain-usage-pacer--meter-20261020-061414-1e4f, finding L1, LOW
+probe-key: 3a2354aa2c91ab7c5c4b0160eb7a27724f24c231
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/account-digest.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/pacer-door.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/usage.service.ts
+
+## INV-8882 — probe — LOW — the TS digest is not the Python twin for a uuid padded with a control character (the two `trim` sets differ)
+
+LOW — the TS digest is not the Python twin for a uuid padded with a control character (the two `trim` sets differ)
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) && cat > "$D/p.sh" <<'EOF'
+#!/bin/sh
+# The TS digest is not the Python twin for a uuid padded with U+0085 (NEL):
+# Python's str.strip() removes it, JavaScript's String.trim() does not.
+set -u
+S=$(mktemp -d /tmp/athena-meter-probe.XXXXXX) || exit 1
+case "$S" in /tmp/athena-meter-probe.*) ;; *) echo "bad scratch dir" >&2; exit 1;; esac
+trap 'cd /tmp && rm -rf "$S"' EXIT
+mkdir -p "$S/home/.claude" || exit 1
+python3 -c 'import json,sys; json.dump({"oauthAccount":{"accountUuid":"probe-account-a\u0085"}}, open(sys.argv[1],"w"))' "$S/home/.claude.json"
+cat > "$S/d.mts" <<'TS'
+import { liveAccountDigest } from '/home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/account-digest.ts';
+console.log(liveAccountDigest());
+TS
+ts=$(HOME="$S/home" /home/lyphe/.claude/claudecodeui_lyphe/node_modules/.bin/tsx \
+  --tsconfig /home/lyphe/.claude/claudecodeui_lyphe/server/tsconfig.json "$S/d.mts")
+py=$(PLAN_RUNNER_CLAUDE_IDENTITY_PATH="$S/home/.claude.json" PYTHONPATH=/home/lyphe/.claude/hooks \
+  python3 -c 'from plan_runner import claude_account; print(claude_account.current())')
+echo "ts=$ts py=$py same=$([ "$ts" = "$py" ] && echo yes || echo NO)"
+EOF
+bash "$D/p.sh"; case "$D" in /tmp/athena-probe.*) cd /tmp && rm -rf "$D";; esac
+expect: `same=yes` (today: `ts=4fa5b975 py=5b0dd85d same=NO`; also measured: U+001C `ts=7f689287 py=5b0dd85d`, U+001F `ts=b160574f py=5b0dd85d`, U+FEFF `ts=5b0dd85d py=7c6411b0`)
+```
+
+measured 2026-10-20 by chain chain-usage-pacer--meter-20261020-061414-1e4f, finding L2, LOW
+probe-key: e5fc37c3eba8f335759ad31ad360e7aaec12292d
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/account-digest.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/pacer-door.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/usage.service.ts
+
+## INV-8883 — probe — LOW — `usage.service.ts`'s bound-3 comment still tells the reader the meter's readings die with the process
+
+LOW — `usage.service.ts`'s bound-3 comment still tells the reader the meter's readings die with the process
+
+```probe
+cd /home/lyphe/.claude/claudecodeui_lyphe && rg -n "in-memory readings that die with the process|EVERY GOOD READING IS FILED" server/modules/accounts/usage.service.ts || echo none
+expect: one line only — the filing comment at :332 (today: two, the bound-3 sentence at :31 and the filing comment at :332)
+```
+
+measured 2026-10-20 by chain chain-usage-pacer--meter-20261020-061414-1e4f, finding L3, LOW
+probe-key: 768f39754ae645d3c415e70e4eca9a02eb7f1657
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/account-digest.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/pacer-door.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/usage.service.ts
+
+## INV-8884 — Meter's tick and mark paint in `bg-foreground ring-1 ring-card` — no `bg-tone-*` clears 3:1 on both the track and the amber fill
+
+- **Trap:** `bg-tone-ink` / `bg-tone-dot` on `Meter`'s `tickAt` tick or `markAt` notch misses the 3:1 graphics floor in light mode (MAN-579). why: the backdrop is not always the track — the tick sits over the warning fill whenever usage is heavy, the mark whenever the projection reaches the bar's end, and the amber fill is the same in both modes while the tone inks flip.
+- **Measured 2026-10-20, composited colours (contrast on the track | on the amber fill):**
+
+| paint | track | amber fill |
+|---|---|---|
+| `neutral-ink` | 4.46 | 2.29 |
+| `info-ink`, light | 5.00 | 2.57 |
+| `info-ink`, dark | 8.30 | 1.21 |
+| `--ink` | 15.59 (light) | 1.94 (dark) |
+
+- **Pair that holds:** `bg-foreground ring-1 ring-card` — the mode's ink inside a 1px surface ring; one of the two is ≥3:1 on whatever is underneath. Light: ink core on track 15.59, on amber 8.02, on accent 5.9. Dark: core on track 13.38; ring on amber 7.4, on accent 7.76.
+- **Do:** keep that class pair on both marks. Shape carries the difference between them (full-height hairline vs short rounded notch), not colour.
+- **Don't:** put `bg-tone-*` or `data-tone` back on either mark.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Meter.tsx

@@ -12,6 +12,8 @@ import { CardDescription, LaneCardHead } from '@/modules/dispatcher/LaneCardHead
 import { PlanAsk } from '@/modules/dispatcher/PlanAsk';
 import { PlanControls } from '@/modules/dispatcher/PlanControls';
 import { PlanClock, PlanFace, PlanStatusBadge } from '@/modules/dispatcher/PlanFace';
+import { PaceHoldLine } from '@/modules/dispatcher/PaceLine';
+import { usePlanPaceFake } from '@/modules/dispatcher/pace-fake';
 import { PlannerBadge } from '@/modules/dispatcher/PlannerBadge';
 import { SpendPills } from '@/modules/dispatcher/SpendPills';
 import { WorkingPill } from '@/modules/dispatcher/WorkingPill';
@@ -101,6 +103,11 @@ function queueClause(hold: string): string {
  * feature whose epic's turn has not come. The gate asks the queue first, so the dispatcher sends this one
  * and nulls `wip_hold` while it is set: the card says the first clause the gate asks, as the gate does.
  *
+ * `HELD BY PACE` IS THE PACER'S, IN THE SAME ROW AND THE SAME WORDS' RULE (`plan.pace_hold`): the clause the
+ * pacer's gate returned — `no room on the 5-hour window — …`, or `<plan> <phase> goes first` — with the
+ * `pace:` lead stripped, because the card says "Held by pace" itself. The gate sends one of the three holds at
+ * a time; a frame without the key (an older dispatcher) draws no line.
+ *
  * A STALLED PLAN SAYS WHY (`plan.stalled`, the dispatcher's own cause word — `report_stall`): the head's
  * second row carries one line, `data-plan-stalled`, naming whether the dispatcher is down or the run
  * ended unrecorded, and that Resume starts things again. The card words the cause and decides none of it.
@@ -108,7 +115,7 @@ function queueClause(hold: string): string {
  * `data-dispatcher-card`, `data-plan-name`, `data-plan-status` and `data-collapsed` are the browser
  * harness's handles, on the ROOT so a probe scopes every reading and every press to ONE plan — the
  * live plan walking beside a probe must never be pressed. `data-card-description` marks the lead's
- * description line, the arc deck's too, and `data-plan-queue-hold` and `data-plan-wip-hold` the two lines above.
+ * description line, the arc deck's too, and `data-plan-queue-hold`, `data-plan-pace-hold` and `data-plan-wip-hold` the three lines above.
  *
  * Used by `RunnerPanel` and `RunnerWidgetBody` (runner-tab), for the plans no arc holds, and by
  * `DispatchArcDeck`, for each plan of an arc.
@@ -144,6 +151,8 @@ export function PlanCard({
   // question, and the dialog is mounted only while it is asked.
   const [deleting, setDeleting] = useState(false);
   const { planners } = useDispatcherPlans();
+  // FILL: pace_hold — plan.pace_hold
+  const paceHold = usePlanPaceFake();
   const menuItems: ActionMenuItem[] = planDroppable(plan, planners)
     ? [{ key: 'delete', label: t('dispatcher.delete.menu'), icon: Trash2, isDanger: true, onSelect: () => setDeleting(true) }]
     : [];
@@ -175,7 +184,7 @@ export function PlanCard({
                 {/* WHO IS OUT ON THIS PLAN and what it waits on, under its description: the word says
                     what the PLAN is (`designing`), the badge who is doing something about it; the wait is
                     a fact about THIS plan ("before this, that"). Neither draws anything when absent. */}
-                {(plan.planner || waitsOn.length > 0 || plan.queue_hold || plan.wip_hold || plan.stalled) && (
+                {(plan.planner || waitsOn.length > 0 || plan.queue_hold || paceHold || plan.wip_hold || plan.stalled) && (
                   <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
                     {plan.planner && <PlannerBadge planner={plan.planner} />}
                     {waitsOn.length > 0 && (
@@ -190,6 +199,8 @@ export function PlanCard({
                         {t('dispatcher.queueHold', { clause: queueClause(plan.queue_hold) })}
                       </span>
                     )}
+                    {/* FILL: pace_hold — the pacer's clause in the same row, between the queue's and the WIP one */}
+                    {paceHold && <PaceHoldLine hold={paceHold} />}
                     {plan.wip_hold && (
                       <span data-plan-wip-hold className="min-w-0 break-words text-xs text-muted-foreground">
                         {t('dispatcher.wipHold', { clause: wipClause(plan.wip_hold) })}

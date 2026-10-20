@@ -282,26 +282,6 @@ body.vv-dragging iframe { pointer-events: none; }
   [data-hold-lift] :is(input, textarea, [contenteditable]:not([contenteditable='false'])) { -webkit-user-select: text; user-select: text; }
   [data-hold-lift] :is(a, img) { -webkit-user-drag: none; }
 }
-/* A handle whose list scrolls its pane by hand (`usePointerDrag` with `scrollsPane` hands it `data-touch-pan`) is told
- * the browser has no pan to take from it, from the first touch. A phone may dispatch every touch sequence as uncancelable
- * (measured: `cancelable=false` from the `touchstart`), and then a lifted row cannot be held still by cancelling the pan
- * — `touch-action` is the one lever the browser reads BEFORE the touch. The swipe that starts on the handle, or on a
- * control inside it, is scrolled by `sortable/touchPan.ts` instead. Keyed on a coarse pointer being PRESENT
- * (`any-pointer`), not on it being the primary one: a touch laptop reports a fine, hovering primary pointer and still has
- * a finger, and `touch-action` does nothing to a mouse. A device with no touch screen is untouched. A marker of its own,
- * never `data-hold-lift`: it is `scrollsPane`'s, and a hold-lift handle without that option keeps the browser's own scrolling.
- * A scroller inside the handle (a deck's plan strip) is handled by axis: a sideways swipe belongs to it and the browser pans
- * it, and a vertical swipe is panned by the page (`usePointerDrag`), so a device that will not carry the gesture out of the
- * strip still scrolls the pane. */
-@media (any-pointer: coarse) {
-  [data-touch-pan] { touch-action: none; }
-  /* A sideways strip inside a hand-panned handle (`data-touch-pan-x`: a deck's plan strip, a phase track) keeps its
-   * horizontal swipe and gives the vertical one to the pane. `touch-action` is read at the touch's start, so the strip
-   * says `pan-x` AT REST: the browser pans the strip sideways and never latches a vertical gesture to a scroller that
-   * cannot move that way (which would cancel the pointer before the page could pan), and `usePointerDrag` pans the pane
-   * by hand. Pinch-zoom stays: the strip is often the only thing under two fingers. */
-  [data-touch-pan] [data-touch-pan-x] { touch-action: pan-x pinch-zoom; }
-}
 /* The item in a hand (sortable/carried.ts marks it `data-carried`, and writes its place, ground and corners
  * inline) is lifted OFF its list: `--shadow-lift`, the elevation Verve gives a lane card in the hand
  * (board.css `--lifted`), and the hairline a Verve card is edged with (`--border-strong`) — the shadow alone is

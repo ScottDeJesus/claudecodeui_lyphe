@@ -109,7 +109,6 @@ export function StatusFlow({
       role="toolbar"
       aria-label={ariaLabel}
       className="scrollbar-thin relative -mx-2.5 -my-1.5 flex min-w-0 overflow-x-auto overflow-y-hidden py-2.5 pl-2.5"
-      data-touch-pan-x
       style={{ maskImage: FADE_MASK, WebkitMaskImage: FADE_MASK }}
       {...trackProps}
       data-status-flow
