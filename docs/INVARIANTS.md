@@ -425,3 +425,129 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/account-
 - **Don't:** put `bg-tone-*` or `data-tone` back on either mark.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Meter.tsx
+
+## INV-8920 — probe — both shared-type mirrors still teach the retired dial's limit
+
+both shared-type mirrors still teach the retired dial's limit
+
+```probe
+D=$(mktemp -d /tmp/athena-probe-types.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+H=/home/lyphe/.claude/claudecodeui_lyphe
+grep -Fc '`1` to `5`, `pause` or `resume`' "$H/src/shared/types.ts" "$H/server/shared/types.ts"
+grep -Fc 'holds no slot in the queue' "$H/src/shared/types.ts" "$H/server/shared/types.ts"
+X=$(mktemp -d /tmp/athena-probe-dial.XXXXXX) || exit 1
+printf 'paused no\n' > "$X/epics.flag"
+DISPATCHER_EPICS_FLAG_PATH="$X/epics.flag" ~/.claude/scripts/dispatcher epics 2
+case "$X" in /tmp/athena-probe-dial.??????) rm -rf "$X";; esac
+EOF
+bash "$D/p.sh"
+case "$D" in /tmp/athena-probe-types.??????) rm -rf "$D";; esac
+```
+
+measured 2026-10-20 by chain chain-usage-pacer--epics-20261020-101849-b564, finding L1, LOW
+probe-key: fd187308ff602c565c327fe105af2cf075b17c2e
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/hooks/useBoardVerbs.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/MasterController.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/common.json, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/hooks/dispatcher/store_hidden.py
+
+## INV-8921 — probe — the MANUAL still calls `hold` a ten-step head in its section line
+
+the MANUAL still calls `hold` a ten-step head in its section line
+
+```probe
+D=$(mktemp -d /tmp/athena-probe-ten.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+grep -n 'ten steps' ~/.claude/hooks/dispatcher/MANUAL.md || echo none
+echo "nine-step lines: $(grep -c 'nine steps' ~/.claude/hooks/dispatcher/MANUAL.md)"
+EOF
+bash "$D/p.sh"
+case "$D" in /tmp/athena-probe-ten.??????) rm -rf "$D";; esac
+```
+
+measured 2026-10-20 by chain chain-usage-pacer--epics-20261020-101849-b564, finding L2, LOW
+probe-key: bfe284da9a4941b00faa915fd4cde1e092e451bd
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/hooks/useBoardVerbs.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/MasterController.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/common.json, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/hooks/dispatcher/store_hidden.py
+
+## INV-8922 — probe — the queue's place-word list omits `out of line` in two rows
+
+the queue's place-word list omits `out of line` in two rows
+
+```probe
+D=$(mktemp -d /tmp/athena-probe-qrow.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+python3 - <<'PY'
+import os, re, sys
+sys.path.insert(0, os.path.expanduser("~/.claude/hooks"))
+from dispatcher import line_gate
+from dispatcher.cmd.epic_line import _TURN_WORDS
+print("code: HIDDEN prints", repr(_TURN_WORDS[line_gate.HIDDEN]))
+path = os.path.expanduser("~/.claude/hooks/dispatcher/MANUAL.md")
+for number, line in enumerate(open(path, encoding="utf-8").read().splitlines(), 1):
+    if "its turn" in line and "arc word" in line:
+        found = re.search(r"its turn.*?arc word>", line)
+        print(f"MANUAL:{number}:", found.group(0) if found else line.strip()[:100])
+PY
+docstore get MAN-8425 --text | python3 -c 'import sys; [print("MAN-8425:", line.strip()) for line in sys.stdin if "its turn" in line]'
+EOF
+bash "$D/p.sh"
+case "$D" in /tmp/athena-probe-qrow.??????) rm -rf "$D";; esac
+```
+
+measured 2026-10-20 by chain chain-usage-pacer--epics-20261020-101849-b564, finding L3, LOW
+probe-key: e64d78d02793efbb1c38c7768eb1a99d716bf40d
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/hooks/useBoardVerbs.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/MasterController.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/common.json, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/hooks/dispatcher/store_hidden.py
+
+## INV-8923 — probe — three pinned probes on this ground call the retired two-half `Dial` and crash when run
+
+three pinned probes on this ground call the retired two-half `Dial` and crash when run
+
+```probe
+D=$(mktemp -d /tmp/athena-probe-pinned.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+python3 - "$1" "$2" <<'PY'
+import os, re, sys
+home, work = sys.argv[1], sys.argv[2]
+text = open(os.path.join(home, ".claude/hooks/dispatcher/INVARIANTS.md"), encoding="utf-8").read()
+found = sorted(set(re.findall(r'(?:epic_dial\.)?Dial\("[^"]*", False\)', text)))
+print("retired two-half constructor forms pinned:", len(found), found)
+os.environ["DISPATCHER_EPICS_FLAG_PATH"] = os.path.join(work, "epics.flag")
+sys.path.insert(0, os.path.join(home, ".claude/hooks"))
+from dispatcher import epic_dial
+from dispatcher.epic_dial import Dial
+for expr in found:
+    try:
+        epic_dial.write(eval(expr))
+        print(expr, "-> accepted")
+    except ValueError as exc:
+        print(expr, "->", exc)
+PY
+EOF
+bash "$D/p.sh" "$HOME" "$D"
+case "$D" in /tmp/athena-probe-pinned.??????) rm -rf "$D";; esac
+```
+
+measured 2026-10-20 by chain chain-usage-pacer--epics-20261020-101849-b564, finding L4, LOW
+probe-key: 82624d91965b9f76a9c365424d80e39d764f9867
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/hooks/useBoardVerbs.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/MasterController.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/common.json, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/hooks/dispatcher/store_hidden.py
+
+## INV-8925 — probe — the rewritten hide gate's header still says `no slot — hidden`
+
+the rewritten hide gate's header still says `no slot — hidden`
+
+```probe
+D=$(mktemp -d /tmp/athena-probe-hdsc.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+grep -n 'no slot — hidden' ~/.claude/claudecodeui_lyphe/.verify/hide-holds-scratch.py || echo none
+grep -n 'out of line — hidden' ~/.claude/claudecodeui_lyphe/.verify/hide-holds-scratch.py | head -2
+EOF
+bash "$D/p.sh"
+case "$D" in /tmp/athena-probe-hdsc.??????) rm -rf "$D";; esac
+```
+
+measured 2026-10-20 by chain chain-usage-pacer--epics-20261020-101849-b564, finding L6, LOW
+probe-key: f3b8a853678527784572ff44946b6320b497715f
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/hooks/useBoardVerbs.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/MasterController.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/common.json, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/hooks/dispatcher/store_hidden.py

@@ -2926,7 +2926,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/chat-idle-restore.mjs, /
 | In flight, read after an 800 ms settle | decks in the served order; each deck's note `<position> · <turn word>`; dial readout `<running> running`; no sideways overflow |
 
 ## fails when
-- The live dial is not a limit of 1 to 5 with `paused no`: `route.epics reads a limit of 1 to 5, not paused` is the check, and `Epics at once reads the served limit` compares the header's dropdown with it.
+- The live box is paused, or `route.epics` carries a key beyond `paused` and `running`: `route.epics is exactly paused and running, and the live box is not paused` is the check; the header's readout is then compared with the served census.
 - The live queue is empty.
 - `dispatcher queue`'s line shape changes (`listedQueue` parses `N. <name>.arc — <its turn|waiting|paused> — `).
 
