@@ -6,8 +6,8 @@ export { DispatcherFeed } from '@/modules/dispatcher/DispatcherFeed';
 // `Hidden` list; the tab strip and the Roadmap tab's In flight switch read the `count` and `waiting`
 // that mark them.
 export { useDispatcherPlans } from '@/modules/dispatcher/hooks/useDispatcherPlans';
-// Both hands, one hook: the plan card's verbs and the arc header's four — stop, resume,
-// the arc's model word and an epic's WIP limits — relayed to the dispatcher's own binary and answered with its own
+// Both hands, one hook: the plan card's verbs and the arc header's three — stop, resume,
+// the arc's model word — relayed to the dispatcher's own binary and answered with its own
 // sentence. `scope` is the whole of what differs: which door a press goes through. A caller presses
 // one and re-draws from the next frame; nothing is guessed here. `drop` is the one verb a card
 // guards with a dialog, because it is the one no press undoes.
@@ -44,7 +44,7 @@ export { DispatchArcDecks } from '@/modules/dispatcher/ArcDeck';
 // the header of the Roadmap tab's In flight face and the chat gutter's widget, and by neither when the
 // frame states none.
 export { PlannerLanesReadout } from '@/modules/dispatcher/PlannerLanesReadout';
-// The master controller — Epics at once, the two WIP defaults, the Claude · DeepSeek house switch, the board's one
+// The master controller — Epics at once, the Claude · DeepSeek house switch, the board's one
 // Start and Pause all — drawn from the frame's own route by the header of the Roadmap tab's In flight face and at the
 // top of the chat gutter's Runs widget (one component, two mounts), and not at all when the frame states no dial.
 export { MasterController } from '@/modules/dispatcher/MasterController';

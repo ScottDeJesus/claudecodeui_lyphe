@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { alreadyArmed, useArmAcceptVerbs, type ArmAcceptArcVerbs, type ArmAcceptPlanVerbs } from '@/modules/dispatcher/hooks/useArmAcceptVerbs';
 import { useVerbSend } from '@/modules/dispatcher/hooks/useVerbSend';
 import { api } from '@/shared/api';
-import type { DispatcherAsk, DispatcherModelChoice, DispatcherVerb, DispatcherWipChoice, DispatcherWipLimit } from '@/shared/types';
+import type { DispatcherAsk, DispatcherModelChoice, DispatcherVerb } from '@/shared/types';
 
 /** The two doors a press can be relayed through: one plan's, or one dispatch arc's. */
 export type DispatcherVerbScope = 'plan' | 'arc';
@@ -39,7 +39,7 @@ export type DispatcherPlanVerbs = ArmAcceptPlanVerbs & {
 
 /**
  * What an arc header may press — the three verbs the dispatcher's own arc door opens on that a deck
- * draws, and the epic's own `wip`. `park`, `unpark`, `drop` and `schedule` are the plan card's own and no
+ * draws. `park`, `unpark`, `drop` and `schedule` are the plan card's own and no
  * arc deck draws them (the deck has no Schedule start), so no arc callback exists for them rather than
  * one that would have no route to reach.
  */
@@ -48,14 +48,12 @@ export type DispatcherArcVerbs = ArmAcceptArcVerbs & {
   resume(): Promise<void>;
   /** `default` hands the epic's model back to the top; a word is its own override and goes to every plan of it. */
   setModel(choice: DispatcherModelChoice): Promise<void>;
-  /** One of the epic's two WIP limits set to a count, `all`, or `default` (follow the top again). */
-  setWip(limit: DispatcherWipLimit, choice: DispatcherWipChoice): Promise<void>;
   busy: DispatcherPress | null;
 };
 
 /**
- * Stop, Resume, Schedule, Park, Unpark, Model, Drop, Resume planner and Answer for one plan — or Stop, Resume,
- * Model and WIP for one dispatch ARC — and what to say about each.
+ * Stop, Resume, Schedule, Park, Unpark, Model, Drop, Resume planner and Answer for one plan — or Stop, Resume
+ * and Model for one dispatch ARC — and what to say about each.
  *
  * ONE HOOK, TWO DOORS, because the two are the same act on the same store through the same verbs:
  * `scope` decides which route a press is relayed through (`POST /api/dispatcher/plans/:name/…` or
@@ -105,9 +103,7 @@ export type DispatcherArcVerbs = ArmAcceptArcVerbs & {
  * of it in one transaction (`store.set_arc_model`), so a press takes the NEXT phase and never
  * disturbs one already out — which is also why the dispatcher never refuses it for the state a plan
  * or an arc is in, and why its answer is a sentence about the STORE (`MODEL <name> model=…`)
- * rather than about a walk. `wip` is its sibling on the arc alone (`WIP arc=<name> features=…`): it too
- * moves no walk, and the dispatcher kicks its own daemon when the word changed, since a wider limit can
- * free a feature the old one held.
+ * rather than about a walk.
  */
 export function useDispatcherVerbs(name: string, scope?: 'plan', resumeWord?: string): DispatcherPlanVerbs;
 export function useDispatcherVerbs(name: string, scope: 'arc', resumeWord?: string): DispatcherArcVerbs;
@@ -130,7 +126,6 @@ export function useDispatcherVerbs(
       if (verb === 'planner-resume') return t('dispatcher.plannerResume');
       if (verb === 'schedule') return t('runner.schedule.refused');
       if (verb === 'model') return t('runner.model.refused');
-      if (verb === 'wip') return t('dispatcher.wip.refused');
       if (verb === 'answer') return t('dispatcher.ask.word');
       if (verb === 'arm-accept' || verb === 'disarm-accept') return t('dispatcher.acceptWhenCutRefused');
       return resumeWord ?? t('runner.resume');
@@ -140,13 +135,12 @@ export function useDispatcherVerbs(
 
   /**
    * The word a SUCCESS is headed with when the dispatcher's body arrived empty. Every verb but
-   * `model`, `wip` and `answer` is headed by its own name either way (`Stop`, `Resume`, `Park`);
+   * `model` and `answer` is headed by its own name either way (`Stop`, `Resume`, `Park`);
    * a word press that worked is not headed "Model not set", which is what its refusal word says.
    */
   const doneWord = useCallback(
     (verb: DispatcherPress): string => {
       if (verb === 'model') return t('runner.toast.model');
-      if (verb === 'wip') return t('dispatcher.wip.done');
       if (verb === 'answer') return t('dispatcher.ask.word');
       return word(verb);
     },
@@ -197,14 +191,6 @@ export function useDispatcherVerbs(
     [name, scope, send],
   );
 
-  // The epic's own press: one of its two WIP limits. No plan route exists for it, so a plan card has none.
-  const setWip = useCallback(
-    async (limit: DispatcherWipLimit, choice: DispatcherWipChoice) => {
-      await send('wip', () => api.dispatcher.arcWip(name, limit, choice));
-    },
-    [name, send],
-  );
-
   // The plan card's own five, which no arc header draws and no arc route exists for.
   const park = useCallback(async () => { await send('park', () => api.dispatcher.park(name)); }, [name, send]);
   const unpark = useCallback(async () => { await send('unpark', () => api.dispatcher.unpark(name)); }, [name, send]);
@@ -226,6 +212,6 @@ export function useDispatcherVerbs(
   // "Accept when cut" and its Cancel: this hook's `send` carries them (`useArmAcceptVerbs`), both doors.
   const armVerbs = useArmAcceptVerbs(name, scope, send);
 
-  if (scope === 'arc') return { stop, resume, setModel, setWip, ...armVerbs, busy };
+  if (scope === 'arc') return { stop, resume, setModel, ...armVerbs, busy };
   return { stop, resume, schedule, park, unpark, drop, plannerResume, setModel, answer, ...armVerbs, busy };
 }

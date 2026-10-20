@@ -53,8 +53,7 @@ const BASE_PLAN: DispatcherPlan = {
   planner: null,
   model: 'claude',
   model_own: null,
-  posture: 'claude route · WIP: 2 tasks at a time',
-  wip_hold: null,
+  posture: 'claude route',
   queue_hold: null,
   created_at: '2026-10-20T12:00:00Z',
   updated_at: '2026-10-20T15:00:00Z',
@@ -80,11 +79,10 @@ const BASE_PLAN: DispatcherPlan = {
   events: [],
 };
 
-/** A card held by the pacer, by the queue, by its epic's WIP, and one held by nothing — one of each, whole. */
-export const HELD_CARD_FAKES: Record<'pace' | 'queue' | 'wip' | 'clear', DispatcherPlan> = {
+/** A card held by the pacer, by the queue, and one held by nothing — one of each, whole. */
+export const HELD_CARD_FAKES: Record<'pace' | 'queue' | 'clear', DispatcherPlan> = {
   pace: { ...BASE_PLAN, name: 'held-by-pace', pace_hold: 'pace: no room on the 5-hour window — 93% used, 97% projected by 4:10 pm, ceiling 95%' },
   queue: { ...BASE_PLAN, name: 'held-by-queue', queue_hold: 'queue: at most 1 epics at once' },
-  wip: { ...BASE_PLAN, name: 'held-by-wip', wip_hold: 'WIP: at most 2 features of this epic in progress' },
   clear: { ...BASE_PLAN, name: 'held-by-nothing' },
 };
 

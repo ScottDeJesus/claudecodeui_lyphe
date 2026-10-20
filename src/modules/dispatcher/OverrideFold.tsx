@@ -5,16 +5,16 @@ import { CardFoldBody, Collapsible, CollapsibleTrigger, FoldChevron } from '@/sh
 
 /**
  * THE FOLD EVERY CARD'S OWN CONTROLS LIVE IN. The master controller at the top of In flight is the one place
- * the house is steered from; what a card carries of its own — an epic's feature and task limits and its model,
- * a feature's model — is an OVERRIDE of that, and it sits folded away under the card's verbs, CLOSED BY
+ * the house is steered from; what a card carries of its own — an epic's model, a feature's model — is an
+ * OVERRIDE of that, and it sits folded away under the card's verbs, CLOSED BY
  * DEFAULT, composed from the kit's fold (`Collapsible` and `CardFoldBody`, the same fold the cards' own
  * heads draw; never a hand-built disclosure).
  *
  * THE FOLDED LINE NAMES EVERY OVERRIDE THE FOLD HOLDS and nothing more when it holds none: `overrides` is the
- * list of words the caller read off the card (`Features 3 · Tasks All · DeepSeek`), drawn after the label; an
+ * list of words the caller read off the card (`DeepSeek`, `Default`), drawn after the label; an
  * empty list draws the label alone. A glance at a closed card therefore says whether anything under it
  * departs from the top, without opening it. Inside, every dropdown's first option follows the top and any other
- * option is an override (`EpicWipControl`, `ModelPick`).
+ * option is an override (`ModelPick`).
  *
  * The whole line presses it, and its chevron is the card fold's own glyph (`FoldChevron`), turned by the
  * trigger's `data-state` so there is no state of this component's own to disagree with the fold's. The closed body is

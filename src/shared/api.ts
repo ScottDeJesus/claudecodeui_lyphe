@@ -3,7 +3,7 @@ import {
   getStoredAuthToken,
   storeAuthToken,
 } from '@/shared/authToken';
-import type { AuthTraceEvent, CerberusEnrollInput, CerberusLabelInput, CerberusMuteInput, CerberusPromoteInput, DeepseekRange, DispatcherAsk, DispatcherEpicsWord, DispatcherModelChoice, DispatcherQueueMove, DispatcherWipChoice, DispatcherWipLimit, FileLinePatch, JevRange, NoteInput, NtfySettingsInput, SimpleListItemRef, SimpleListPosition, SubagentTranscriptResult } from '@/shared/types';
+import type { AuthTraceEvent, CerberusEnrollInput, CerberusLabelInput, CerberusMuteInput, CerberusPromoteInput, DeepseekRange, DispatcherAsk, DispatcherEpicsWord, DispatcherModelChoice, DispatcherQueueMove, FileLinePatch, JevRange, NoteInput, NtfySettingsInput, SimpleListItemRef, SimpleListPosition, SubagentTranscriptResult } from '@/shared/types';
 import type { AgentLaunchDefaultsChange, AgentLaunchRowChange } from '@/shared/agent-launch-types';
 import type { MarkRequest, MissedRequest, Queue, ReadRequest, ThresholdRequest, UnderstandingMarkRequest } from '@/shared/affected-areas-types';
 import type { CerberusCatalogEntryInput } from '@/shared/cerberus-types';
@@ -653,14 +653,6 @@ export const api = {
     deepseekFeatures: () => get('/api/settings/deepseek-features'),
     saveDeepseekFeatures: (enabled: boolean) => put('/api/settings/deepseek-features', { enabled }),
 
-    // The dispatcher's WIP defaults — how many of an epic's features are in progress at once and how
-    // many tasks each of them runs at once, for every epic with no word of its own. Same host-wide
-    // shape as the switch above, for the same reason, and the same answer read back off disk: each
-    // limit is a word, `'<N>'` for a whole number from 1 or `'all'` for no limit. One file holds both,
-    // so a write carries both.
-    wipDefaults: () => get('/api/settings/wip'),
-    saveWipDefaults: (state: { features: string; tasks: string }) => put('/api/settings/wip', state),
-
     // The dispatcher's planner-lane dial — how many planners (designs, cuts, judgments) may be out at
     // once. A fifth flag file on this host, in the same host-wide shape and with the same read-back
     // answer: `lanes` is the whole number the file holds, at least 1, with no "all" above it.
@@ -1018,7 +1010,7 @@ export const api = {
     // control relays it; nothing is optimistic, and the next `dispatcher_state` frame reads the
     // word back. Restarts nothing — the word is read when a chain is LAUNCHED.
     model: (name: string, model: DispatcherModelChoice) => post(`/api/dispatcher/plans/${encodeURIComponent(name)}/model`, { model }),
-    // The DISPATCH ARC deck's four presses (`dispatcher model|stop|resume|wip <arc> …`), each
+    // The DISPATCH ARC deck's three presses (`dispatcher model|stop|resume <arc> …`), each
     // relayed to the arc's own door. Separate routes from the plan's because an arc is addressed by
     // its own door (`.arc`), never through a plan's.
     //
@@ -1029,11 +1021,6 @@ export const api = {
     arcModel: (name: string, model: DispatcherModelChoice) => post(`/api/dispatcher/arcs/${encodeURIComponent(name)}/model`, { model }),
     arcStop: (name: string) => post(`/api/dispatcher/arcs/${encodeURIComponent(name)}/stop`, {}),
     arcResume: (name: string) => post(`/api/dispatcher/arcs/${encodeURIComponent(name)}/resume`, {}),
-    // One of the epic's two WIP limits (`dispatcher wip <arc> <limit> <word>`) — a count, `all`, or
-    // `default` to follow the top again. The epic deck's fold relays it; nothing is optimistic,
-    // and the next `dispatcher_state` frame reads the word back. An epic's verb alone: no plan route.
-    arcWip: (name: string, limit: DispatcherWipLimit, word: DispatcherWipChoice) =>
-      post(`/api/dispatcher/arcs/${encodeURIComponent(name)}/wip`, { limit, word }),
     // An epic moved in the queue In flight runs top down (`dispatcher queue <arc> --before <arc> | --last`):
     // a drop on the queue's decks, named by a neighbour — `{ before }` or `{ last: true }` — never by an
     // index. A 409 carries the dispatcher's own refusal (an epic whose turn has ended is no longer in the

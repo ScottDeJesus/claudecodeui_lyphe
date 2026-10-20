@@ -41,8 +41,8 @@ import { effectiveModelWord } from '@/shared/utils';
  *   the queue's order and the epic limits to decide what runs, while this one lets THIS feature go right away —
  *   past the queue's order, the epics-at-once limit and its epic's feature limit (`release.own_press`).
  *   PAUSE ALL HOLDS A START ONLY WHEN THE PRESS CAME BEFORE IT WENT ON (`epic_dial.Dial.since`): a Start
- *   pressed while Pause all is on goes right away, one plan out of a paused house, and its own tasks still run
- *   as many at a time as its task WIP allows. There is no `Start at …`: the hour a feature never walked was
+ *   pressed while Pause all is on goes right away, one plan out of a paused house, and its own tasks still run.
+ *   There is no `Start at …`: the hour a feature never walked was
  *   armed for is gone from the card.
  * - `scheduled` → the same, reading the armed hour: `Resume`/`Start` and `Cancel` (the schedule
  *   control). The hour itself is the card's own clock (`PlanFace.PlanClock`), said once.
@@ -75,10 +75,8 @@ import { effectiveModelWord } from '@/shared/utils';
  * word to each of its features (`store.set_arc_model`), so a feature carrying the very word its epic says overrides
  * nothing. The arc's deck carries the ARC's word and hands it down, and this is where one plan speaks for itself again.
  *
- * A FEATURE CARRIES NO CONCURRENCY CONTROL: how many features of an epic are in progress, and how
- * many tasks each runs at once, are the EPIC's WIP (`EpicWipControl`, in the epic deck's fold). When
- * the epic's feature limit is what a feature is waiting on, the card says so in its head
- * (`PlanCard`'s `data-plan-wip-hold` line) — that is a fact, not a press.
+ * A FEATURE CARRIES NO CONCURRENCY CONTROL: what runs is the pacer's and the queue's to decide, and the
+ * card names neither as a press.
  *
  * A STALLED PLANNER IS DRAWN BESIDE ALL OF THEM, whatever the plan's status (`plan.planner.stalled`):
  * Resume planner, the press that puts the outing that ended short back to work. Which door it goes

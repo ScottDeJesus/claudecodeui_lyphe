@@ -2246,82 +2246,6 @@ probe-key: cf2235f7cd2664d7ac664e22e6cd013fe402b6b2
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts
 
-## INV-6775 — probe — `wip_hold.py` leaves a real daemon on its scratch copy, and that daemon launches real souls for the operator's real plans
-
-`wip_hold.py` leaves a real daemon on its scratch copy, and that daemon launches real souls for the operator's real plans
-
-```probe
-bash <<'SH'
-export XDG_RUNTIME_DIR=/run/user/$(id -u)
-D=$(mktemp -d /tmp/athena-wipprobe.XXXXXX) || exit 1
-mkdir -p "$D/home/.claude/state/dispatcher" || exit 1
-ln -s "$HOME/.claude/scripts" "$D/home/.claude/scripts"; ln -s "$HOME/.claude/hooks" "$D/home/.claude/hooks"
-DISPATCHER_HOME="$D/home/.claude/state/dispatcher" "$HOME/.claude/scripts/dispatcher" status --json >/dev/null 2>&1
-before=$(pgrep -f "python3 -u -m dispatcher daemon" | sort)
-HOME="$D/home" python3 "$HOME/.claude/scripts/runner_fixtures/wip_hold.py" 2>&1 | grep -E "^PASS every|^FAIL"
-n=0
-for p in $(comm -13 <(echo "$before") <(pgrep -f "python3 -u -m dispatcher daemon" | sort)); do
-  h=$(tr '\0' '\n' < /proc/$p/environ 2>/dev/null | sed -n 's/^DISPATCHER_HOME=//p')
-  case "$h" in /tmp/wip-hold-*) n=$((n+1)); echo "daemon alive on the scratch home: pid=$p home=$h home-dir-exists=$([ -d "$h" ] && echo yes || echo no)"
-    [ -d "$h" ] || systemctl --user stop "$(sed -n 's#.*/\(dispatcher-[^/]*\.service\)$#\1#p' /proc/$p/cgroup)";; esac
-done
-echo "daemons left on a wip_hold scratch home: $n"
-case "$D" in /tmp/athena-wipprobe.*) rm -rf "$D";; esac
-SH
-echo "[probe exit $?]"
-expect: `PASS every reading` then `daemons left on a wip_hold scratch home: 1` with `home-dir-exists=no` — the defect stands while the count is above 0; cured when it prints 0
-```
-
-measured 2026-10-04 by chain chain-wip-2a-board-20261004-131759-e3d6, finding B1, BLOCKING
-probe-key: 634be2b8694fa43cd6554024add5f2a73629d113
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/settings/dispatcher-kick.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/EpicWipControl.tsx, /home/lyphe/.claude/hooks/dispatcher/wake.py, /home/lyphe/.claude/scripts/runner_fixtures/wip_hold.py
-
-## INV-6798 — probe — (LOW) — `wip-defaults.ts` and the dispatcher's `read_flag` disagree on a U+FEFF inside the file, and MAN-629 says they agree "clause for clause"
-
-(LOW) — `wip-defaults.ts` and the dispatcher's `read_flag` disagree on a U+FEFF inside the file, and MAN-629 says they agree "clause for clause"
-
-```probe
-cd /home/lyphe/.claude/claudecodeui_lyphe && D=$(mktemp -d /tmp/athena-bom.XXXXXX) || exit 1; printf 'features 5\n\xef\xbb\xbftasks 3\n' > "$D/wip.flag"; echo "dispatcher reads: $(DISPATCHER_WIP_FLAG_PATH=$D/wip.flag PYTHONPATH=$HOME/.claude/hooks python3 -c 'from dispatcher import wip; print(wip.defaults())')"; echo "CloudCLI row reads: $(DISPATCHER_WIP_FLAG_PATH=$D/wip.flag TSX_TSCONFIG_PATH=server/tsconfig.json node --import tsx -e "const {readWipDefaults}=await import('./server/modules/settings/wip-defaults.ts'); console.log(JSON.stringify(await readWipDefaults()))")"; case "$D" in /tmp/athena-bom.*) rm -r "$D";; esac
-echo "[probe exit $?]"
-expect: `dispatcher reads: {'features': '5', 'tasks': '2'}` and `CloudCLI row reads: {"features":"5","tasks":"3"}` while the defect stands; cured when the two lines agree
-```
-
-measured 2026-10-04 by chain chain-wip-2b-settings-20261004-142546-89c5, finding L1, LOW
-probe-key: abc85d0cb1158931d214bef81eb18a6416580cf7
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/settings/wip-defaults.ts
-
-## INV-6799 — probe — (LOW) — the standing proof cannot tell whether the gate honours an epic's own task WIP
-
-(LOW) — the standing proof cannot tell whether the gate honours an epic's own task WIP
-
-```probe
-bash /home/lyphe/.claude/state/pipeline-reviews/wip-2b-settings/athena-probes/epic-gate-blind.sh
-echo "[probe exit $?]"
-expect: `mutation applied: True`, then `PASS every reading` / `wip_tasks exit: 0` and `PASS every reading` / `wip_hold exit: 0` while the defect stands; cured when `wip_tasks` prints a `FAIL` reading and `wip_tasks exit: 1`
-```
-
-measured 2026-10-04 by chain chain-wip-2b-settings-20261004-142546-89c5, finding L2, LOW
-probe-key: f565b145c6b92093daa868908464db77bb44e75c
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/settings/wip-defaults.ts
-
-## INV-6801 — probe — (LOW) — one `status --json` document reads `wip.flag` about 85 times, so a press mid-document gives plans a caption their own `route` contradicts
-
-(LOW) — one `status --json` document reads `wip.flag` about 85 times, so a press mid-document gives plans a caption their own `route` contradicts
-
-```probe
-python3 /home/lyphe/.claude/state/pipeline-reviews/wip-2b-settings/athena-probes/torn-snapshot.py
-echo "[probe exit $?]"
-expect: `plan a → claude route · WIP: 2 tasks at a time`, `plan b` and `plan c` at 5, and `document states one task default: False` while the defect stands; cured when it prints `True`
-```
-
-measured 2026-10-04 by chain chain-wip-2b-settings-20261004-142546-89c5, finding L4, LOW
-probe-key: dc101b5e3845f6c7c957fe5499a06b0aab1de076
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/settings/wip-defaults.ts
-
 ## INV-6809 — probe — LOW — the purge grep looks for `swarm` only, so the other deleted name, `ceiling`, still stands in two places
 
 LOW — the purge grep looks for `swarm` only, so the other deleted name, `ceiling`, still stands in two places
@@ -2384,21 +2308,6 @@ expect: `FAIL  route has no \`swarm\`` and `script exit with that FAIL printed: 
 
 measured 2026-10-04 by chain chain-wip-3-retire-swarm-20261004-160207-cd7a, finding L4, LOW
 probe-key: 0ad01e788ea50828c6b9b80249d8ffc426e5a3a2
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/cardOrder.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/dispatcherState.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/order-lane.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-card-order.mjs, /home/lyphe/.claude/hooks/dispatcher/report.py
-
-## INV-6813 — probe — LOW — the card-order comments still say "a concurrency press bumps `updated_at`"; the only press left writes `arcs.updated_at`, not a plan's
-
-LOW — the card-order comments still say "a concurrency press bumps `updated_at`"; the only press left writes `arcs.updated_at`, not a plan's
-
-```probe
-grep -n "updated_at" /home/lyphe/.claude/hooks/dispatcher/store_wip.py | cut -c1-110; grep -n "concurrency press" /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/cardOrder.ts /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/dispatcherState.ts | cut -c1-140
-echo "[probe exit $?]"
-expect: the first grep prints one line, `UPDATE arcs SET … updated_at` — no plan row — and the second prints the two comments; cured when the comments state what a WIP press really bumps (the arc's row) or drop the claim
-```
-
-measured 2026-10-04 by chain chain-wip-3-retire-swarm-20261004-160207-cd7a, finding L5, LOW
-probe-key: 47b265e5b853f29d350f749556473399757b3d96
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/cardOrder.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/dispatcherState.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/order-lane.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-card-order.mjs, /home/lyphe/.claude/hooks/dispatcher/report.py
 
@@ -8563,82 +8472,20 @@ probe-key: 8f8a9727fa6574fca1521fbe96f7305ac007520e
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/epic-queue-live.mjs
 
-## INV-8353 — probe — HIGH — every dropdown inside a fold has its list clipped by the fold body: the override controls cannot be used with a pointer
+## INV-8354 — probe — MEDIUM — four docstore rows still state or write All for the epic dial, or call a retired function; the intent names them
 
-HIGH — every dropdown inside a fold has its list clipped by the fold body: the override controls cannot be used with a pointer
-
-```probe
-D=$(mktemp -d /tmp/athena-probe-clip.XXXXXX) || exit 1
-cat > "$D/p.mjs" <<'EOF'
-// READ-ONLY: every non-GET to /api is aborted; a dropdown is opened and closed with Escape, never chosen.
-import pw from '/opt/shadow-connector/node_modules/playwright/index.js';
-import { DEV_USER } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/console.mjs';
-import { pinPreferences } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/prefs-pin.mjs';
-import { answerThirdParties } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/wip-stub.mjs';
-const API = 'http://127.0.0.1:3011', APP = 'http://127.0.0.1:5183';
-const call = async (token, path, init = {}) => (await fetch(API + path, { ...init, headers: { 'content-type': 'application/json', ...(token ? { authorization: `Bearer ${token}` } : {}) } })).json();
-const token = (await call(null, '/api/auth/login', { method: 'POST', body: JSON.stringify(DEV_USER) })).token;
-const project = (await call(token, '/api/projects')).find((p) => String(p.fullPath ?? p.path ?? '').endsWith('claudecodeui_lyphe'));
-const chat = (await call(token, `/api/projects/${encodeURIComponent(project.projectId)}/sessions?limit=8`)).sessions.at(-1).id;
-const browser = await pw.chromium.launch();
-const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, colorScheme: 'light', locale: 'en-US', serviceWorkers: 'block' });
-await ctx.addInitScript(([v]) => { localStorage.setItem('auth-token', v); localStorage.setItem('activeTab', 'runner'); }, [token]);
-await pinPreferences(ctx, { theme: 'light' }, { writes: 'drop' }); await answerThirdParties(ctx);
-await ctx.route(/\/api\//, (r) => (['GET', 'HEAD'].includes(r.request().method()) || /\/api\/(auth\/refresh|commands\/list)/.test(r.request().url()) ? r.fallback() : r.abort()));
-const page = await ctx.newPage();
-await page.goto(`${APP}/session/${chat}`, { waitUntil: 'domcontentloaded' });
-await page.waitForSelector('[data-master-controller]', { timeout: 30000 }); await page.waitForTimeout(1200);
-const read = () => page.evaluate(() => { const lb = document.querySelector('[role="listbox"]'); if (!lb) return 'no listbox';
-  const o = [...lb.querySelectorAll('[role="option"]')]; const ok = o.filter((x) => { const b = x.getBoundingClientRect(); const e = document.elementFromPoint(b.left + b.width / 2, b.top + b.height / 2); return e && (x === e || x.contains(e)); });
-  return `${ok.length} of ${o.length} options can be clicked`; });
-const header = page.locator('[data-master-wip-features] button[aria-haspopup="listbox"]'); await header.click(); await page.waitForTimeout(300);
-console.log('header  "Features at once":', await read()); await page.keyboard.press('Escape');
-const fold = page.locator('[data-dispatch-arc] [data-override-fold="dispatch-arc"]').first(); await fold.locator('button').first().click(); await page.waitForTimeout(600);
-await fold.locator('button[aria-haspopup="listbox"]').first().click(); await page.waitForTimeout(300);
-console.log('epic fold "Features at once":', await read()); await page.keyboard.press('Escape');
-await browser.close();
-EOF
-printf 'cd /tmp && timeout 120 node "$1/p.mjs"\n' > "$D/p.sh"
-bash "$D/p.sh" "$D"
-cd /tmp; case "$D" in /tmp/athena-probe-clip.??????) rm -r "$D";; esac
-echo "[probe exit $?]"
-expect: `header "Features at once": 7 of 7 options can be clicked`, then `epic fold "Features at once": 0 of 8 options can be clicked` while the defect stands; `8 of 8` once cured
-```
-
-measured 2026-10-15 by chain chain-in-flight-master-controller-20261015-073906-ff48, finding H1, HIGH
-probe-key: 0ef624d3be9c54b6e3f97a3b66a1b903e911e4e9
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/ArcControls.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/EpicWipControl.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/PlanControls.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/ScheduleControl.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/master-controller-folds.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/master-controller-live.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/master-controller-scratch.py, /home/lyphe/.claude/hooks/dispatcher/line_gate.py, /home/lyphe/.claude/hooks/dispatcher/model.py, /home/lyphe/.claude/hooks/dispatcher/release.py, /home/lyphe/.claude/hooks/plan_runner/run_model.py
-
-## INV-8354 — probe — MEDIUM — five docstore rows still state or write All for the epic dial, or call a retired function; the intent names them
-
-MEDIUM — five docstore rows still state or write All for the epic dial, or call a retired function; the intent names them
+MEDIUM — four docstore rows still state or write All for the epic dial, or call a retired function; the intent names them
 
 ```probe
-cd /home/lyphe/.claude && for t in INV-6329 INV-8330 INV-8332 INV-8316 MAN-8432; do printf '%s ' "$t"; docstore get "$t" --text | grep -c -E "model\.clean|Dial\(\"all\"|Dial\('all'|Dial\(limit='all'|limit all|dial reads All"; done
+cd /home/lyphe/.claude && for t in INV-6329 INV-8330 INV-8316 MAN-8432; do printf '%s ' "$t"; docstore get "$t" --text | grep -c -E "model\.clean|Dial\(\"all\"|Dial\('all'|Dial\(limit='all'|limit all|dial reads All"; done
 echo "[probe exit $?]"
-expect: `1` after each of the five tokens while they are stale; `0` for each once corrected
+expect: `1` after each of the four tokens while they are stale; `0` for each once corrected
 ```
 
 measured 2026-10-15 by chain chain-in-flight-master-controller-20261015-073906-ff48, finding M1, MEDIUM
 probe-key: cb98f12deb6ca252bb8e01a0042e3c5733a9db80
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/ArcControls.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/EpicWipControl.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/PlanControls.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/ScheduleControl.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/master-controller-folds.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/master-controller-live.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/master-controller-scratch.py, /home/lyphe/.claude/hooks/dispatcher/line_gate.py, /home/lyphe/.claude/hooks/dispatcher/model.py, /home/lyphe/.claude/hooks/dispatcher/release.py, /home/lyphe/.claude/hooks/plan_runner/run_model.py
-
-## INV-8355 — probe — MEDIUM — the standing Settings-rows proof pins the WIP row the build removed, and fails
-
-MEDIUM — the standing Settings-rows proof pins the WIP row the build removed, and fails
-
-```probe
-cd /home/lyphe/.claude/claudecodeui_lyphe && grep -n "WIP_LABEL" .verify/probe-settings-rows.mjs .verify/lib/settings-rows-walk.mjs | cut -c1-110 || echo none
-echo "[probe exit $?]"; grep -n "WIP defaults row" docs/MANUAL.md | cut -c1-100 || echo none
-expect: four `WIP_LABEL` lines and two `WIP defaults row` lines while it stands; `none` for both once the proof stops expecting the row and the two lines are corrected
-```
-
-measured 2026-10-15 by chain chain-in-flight-master-controller-20261015-073906-ff48, finding M2, MEDIUM
-probe-key: c3fb403bf51267c516202bf83aa681d6076d3bfb
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/ArcControls.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/EpicWipControl.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/PlanControls.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/ScheduleControl.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/master-controller-folds.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/master-controller-live.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/master-controller-scratch.py, /home/lyphe/.claude/hooks/dispatcher/line_gate.py, /home/lyphe/.claude/hooks/dispatcher/model.py, /home/lyphe/.claude/hooks/dispatcher/release.py, /home/lyphe/.claude/hooks/plan_runner/run_model.py
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/ArcControls.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/PlanControls.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/ScheduleControl.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/master-controller-folds.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/master-controller-live.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/master-controller-scratch.py, /home/lyphe/.claude/hooks/dispatcher/line_gate.py, /home/lyphe/.claude/hooks/dispatcher/model.py, /home/lyphe/.claude/hooks/dispatcher/release.py, /home/lyphe/.claude/hooks/plan_runner/run_model.py
 
 ## INV-8356 — probe — LOW — two Starts at once do not "start each plan once and kick once": `held` is read outside the write
 
@@ -8692,7 +8539,7 @@ expect: `STARTED 2 plan(s)` from BOTH presses, `kicks: 2`, `resumed events: 4 fo
 measured 2026-10-15 by chain chain-in-flight-master-controller-20261015-073906-ff48, finding L1, LOW
 probe-key: 6138ae320e212c5162a3c0ac634c48df77dd461d
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/ArcControls.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/EpicWipControl.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/PlanControls.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/ScheduleControl.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/master-controller-folds.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/master-controller-live.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/master-controller-scratch.py, /home/lyphe/.claude/hooks/dispatcher/line_gate.py, /home/lyphe/.claude/hooks/dispatcher/model.py, /home/lyphe/.claude/hooks/dispatcher/release.py, /home/lyphe/.claude/hooks/plan_runner/run_model.py
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/ArcControls.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/PlanControls.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/ScheduleControl.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/master-controller-folds.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/master-controller-live.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/master-controller-scratch.py, /home/lyphe/.claude/hooks/dispatcher/line_gate.py, /home/lyphe/.claude/hooks/dispatcher/model.py, /home/lyphe/.claude/hooks/dispatcher/release.py, /home/lyphe/.claude/hooks/plan_runner/run_model.py
 
 ## INV-8357 — probe — LOW — `model.effective` is dead code beside the rule that replaced it
 
@@ -8707,14 +8554,14 @@ expect: `def effective in model.py: 1` and `callers of effective(): 0` while it 
 measured 2026-10-15 by chain chain-in-flight-master-controller-20261015-073906-ff48, finding L2, LOW
 probe-key: a6d793827f5888c4b744e263bb0b364ddc365f81
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/ArcControls.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/EpicWipControl.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/PlanControls.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/ScheduleControl.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/master-controller-folds.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/master-controller-live.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/master-controller-scratch.py, /home/lyphe/.claude/hooks/dispatcher/line_gate.py, /home/lyphe/.claude/hooks/dispatcher/model.py, /home/lyphe/.claude/hooks/dispatcher/release.py, /home/lyphe/.claude/hooks/plan_runner/run_model.py
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/ArcControls.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/PlanControls.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/ScheduleControl.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/master-controller-folds.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/master-controller-live.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/master-controller-scratch.py, /home/lyphe/.claude/hooks/dispatcher/line_gate.py, /home/lyphe/.claude/hooks/dispatcher/model.py, /home/lyphe/.claude/hooks/dispatcher/release.py, /home/lyphe/.claude/hooks/plan_runner/run_model.py
 
 ## INV-8358 — probe — LOW — comments, type docs and rows still state what the build removed
 
 LOW — comments, type docs and rows still state what the build removed
 
 ```probe
-cd /home/lyphe/.claude && { grep -c "a dial at All" claudecodeui_lyphe/server/shared/types.ts claudecodeui_lyphe/src/shared/types.ts; grep -c "a queued plan's Start at a time" claudecodeui_lyphe/server/shared/types.ts claudecodeui_lyphe/src/shared/types.ts; grep -c "arc's Start\|Start lets the stopped\|header's \`Schedule start\`" hooks/dispatcher/arc_verbs.py hooks/dispatcher/cmd/run.py hooks/dispatcher/cmd/schedule.py hooks/dispatcher/judgment_accept.py; grep -c "default = follow Settings" hooks/dispatcher/cmd/wip.py; docstore get MAN-6796 | python3 -c "import sys,json; print(json.load(sys.stdin)['row']['section_path'][:90])"; echo "MAN-7774: $(docstore get MAN-7774 --text | grep -c 'what its Start and its')"; }
+cd /home/lyphe/.claude && { grep -c "a dial at All" claudecodeui_lyphe/server/shared/types.ts claudecodeui_lyphe/src/shared/types.ts; grep -c "a queued plan's Start at a time" claudecodeui_lyphe/server/shared/types.ts claudecodeui_lyphe/src/shared/types.ts; grep -c "arc's Start\|Start lets the stopped\|header's \`Schedule start\`" hooks/dispatcher/arc_verbs.py hooks/dispatcher/cmd/run.py hooks/dispatcher/cmd/schedule.py hooks/dispatcher/judgment_accept.py; docstore get MAN-6796 | python3 -c "import sys,json; print(json.load(sys.stdin)['row']['section_path'][:90])"; echo "MAN-7774: $(docstore get MAN-7774 --text | grep -c 'what its Start and its')"; }
 echo "[probe exit $?]"
 expect: every count `1` (or more) and MAN-6796's path naming `RunModelControl` while it stands; all `0` and the path corrected once healed
 ```
@@ -8722,7 +8569,7 @@ expect: every count `1` (or more) and MAN-6796's path naming `RunModelControl` w
 measured 2026-10-15 by chain chain-in-flight-master-controller-20261015-073906-ff48, finding L3, LOW
 probe-key: 36eafe5a038bf5f5bb8fde98d4ebeffd15f55d80
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/ArcControls.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/EpicWipControl.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/PlanControls.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/ScheduleControl.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/master-controller-folds.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/master-controller-live.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/master-controller-scratch.py, /home/lyphe/.claude/hooks/dispatcher/line_gate.py, /home/lyphe/.claude/hooks/dispatcher/model.py, /home/lyphe/.claude/hooks/dispatcher/release.py, /home/lyphe/.claude/hooks/plan_runner/run_model.py
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/ArcControls.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/PlanControls.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/ScheduleControl.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/master-controller-folds.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/master-controller-live.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/master-controller-scratch.py, /home/lyphe/.claude/hooks/dispatcher/line_gate.py, /home/lyphe/.claude/hooks/dispatcher/model.py, /home/lyphe/.claude/hooks/dispatcher/release.py, /home/lyphe/.claude/hooks/plan_runner/run_model.py
 
 ## INV-8359 — probe — LOW — at his text scale a header list leaves the viewport 5 px before the builder's "under about 340 px"
 
@@ -8752,7 +8599,7 @@ for (const [width, scale] of [[360, 1.072], [344, 1], [344, 1.072]]) {
   await page.waitForSelector('[data-master-controller]', { timeout: 30000 });
   await page.evaluate((s) => { document.documentElement.style.fontSize = `${16 * s}px`; }, scale); await page.waitForTimeout(900);
   const out = [];
-  for (const h of ['data-master-epics', 'data-master-wip-features', 'data-master-wip-tasks']) {
+  for (const h of ['data-master-epics']) {
     await page.locator(`[${h}] button[aria-haspopup="listbox"]`).click(); await page.waitForTimeout(300);
     out.push(`${h.replace('data-master-', '')}: ${await page.evaluate(() => { const r = document.querySelector('[role="listbox"]').getBoundingClientRect(); return `${Math.round(r.left)}..${Math.round(r.right)}`; })}`);
     await page.keyboard.press('Escape'); await page.waitForTimeout(200);
@@ -8766,13 +8613,13 @@ printf 'cd /tmp && timeout 150 node "$1/p.mjs"\n' > "$D/p.sh"
 bash "$D/p.sh" "$D"
 cd /tmp; case "$D" in /tmp/athena-probe-narrow.??????) rm -r "$D";; esac
 echo "[probe exit $?]"
-expect: the third line's `wip-features` span ends at 349 for a 344 viewport while it stands (the first line's ends at 349 for 360: fine); every span inside `0..<width>` once cured
+expect: every line's span inside `0..<width>` — the 344 px line at text ×1.072 is the narrowest; a span outside it means the list is clipped
 ```
 
 measured 2026-10-15 by chain chain-in-flight-master-controller-20261015-073906-ff48, finding L4, LOW
 probe-key: 92c34bda5fd69485ede6e4b9d762f71d8c27fd7f
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/ArcControls.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/EpicWipControl.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/PlanControls.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/ScheduleControl.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/master-controller-folds.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/master-controller-live.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/master-controller-scratch.py, /home/lyphe/.claude/hooks/dispatcher/line_gate.py, /home/lyphe/.claude/hooks/dispatcher/model.py, /home/lyphe/.claude/hooks/dispatcher/release.py, /home/lyphe/.claude/hooks/plan_runner/run_model.py
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/ArcControls.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/PlanControls.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/ScheduleControl.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/master-controller-folds.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/master-controller-live.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/master-controller-scratch.py, /home/lyphe/.claude/hooks/dispatcher/line_gate.py, /home/lyphe/.claude/hooks/dispatcher/model.py, /home/lyphe/.claude/hooks/dispatcher/release.py, /home/lyphe/.claude/hooks/plan_runner/run_model.py
 
 ## INV-8360 — probe — MEDIUM — the gate's last check, "the live box is as found", fails whenever the dispatcher writes one event during the run
 
@@ -8883,8 +8730,8 @@ await page.waitForSelector(CARD, { timeout: 30000 });
 if ((await page.locator(CARD).getAttribute("data-open")) !== "true") await page.locator(`${CARD} [data-testid=gutter-widget-header]`).click();
 await waitUntil(async () => page.$(`${W} [data-master-controller]`), 20000); await page.waitForTimeout(1200);
 const SCROLLER = () => { const w = document.querySelector("[data-runner-widget]"); return [...document.querySelectorAll("[data-testid=gutter-widget][data-widget=runner] *")].find((n) => /(auto|scroll)/.test(getComputedStyle(n).overflowY) && n.contains(w)); };
-const trig = page.locator(`${W} [data-master-wip-features] button[aria-haspopup=listbox]`);
-const read = () => page.evaluate(() => { const b = document.querySelector("[data-runner-widget] [data-master-wip-features] button[aria-haspopup=listbox]"); return `expanded=${b.getAttribute("aria-expanded")} disabled=${b.disabled} listboxes=${document.querySelectorAll("[role=listbox]").length}`; });
+const trig = page.locator(`${W} [data-master-epics] button[aria-haspopup=listbox]`);
+const read = () => page.evaluate(() => { const b = document.querySelector("[data-runner-widget] [data-master-epics] button[aria-haspopup=listbox]"); return `expanded=${b.getAttribute("aria-expanded")} disabled=${b.disabled} listboxes=${document.querySelectorAll("[role=listbox]").length}`; });
 await trig.click(); await page.waitForTimeout(400);
 console.log("list open:                       ", await read());
 SWITCH = true; await page.evaluate(() => window.dispatchEvent(new Event("focus"))); await page.waitForTimeout(800);

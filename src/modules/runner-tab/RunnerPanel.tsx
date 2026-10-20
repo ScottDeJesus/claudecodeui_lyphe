@@ -229,7 +229,7 @@ export function RunnerPanel({ revealPlan = null, onRevealed }: RunnerPanelProps)
             {t('dispatcher.dismissDone', { count: done.count })}
           </Button>
         )}
-        {/* THE MASTER CONTROLLER, the header's second row: Epics at once, the two WIP defaults, the
+        {/* THE MASTER CONTROLLER, the header's second row: Epics at once, the
             Claude · DeepSeek house switch, the board's one Start (only while a plan waits for it),
             Pause all and the running readout — drawn only when the frame states a dial. Whole controls
             wrap onto further lines when a phone-wide header has no room. */}

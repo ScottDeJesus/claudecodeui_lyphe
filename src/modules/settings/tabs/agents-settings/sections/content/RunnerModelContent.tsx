@@ -14,9 +14,7 @@ import RunnerPlannerLanesRow from '@/modules/settings/tabs/agents-settings/secti
 /**
  * Rendered by AgentCategoryContentSection under Claude's "account" panel: which model the plan
  * runner's hands — the builder, his fix-pass and Athena — actually dispatch on, how many planners run at
- * once, and whether the heal reflex may launch a heal at all. (The WIP defaults every epic starts from
- * are not here: they are two dropdowns of the master controller in the Roadmap tab's In flight header,
- * beside the same DeepSeek switch.)
+ * once, and whether the heal reflex may launch a heal at all.
  *
  * It sits beside the Claude connection rather than in a tab of its own because that is the
  * question it answers: this account's souls, or DeepSeek's. Every switch it writes is a file the

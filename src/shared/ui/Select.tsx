@@ -112,7 +112,7 @@ export function Select({ options, value, onChange, placeholder = 'Choose…', ar
   const [open, setOpen] = useState(false);
   // A picker that turns disabled with its list open closes it. The panel is only hidden while `disabled`, and the
   // flag left standing would bring the list back, with no press, the moment the picker is enabled again (the master
-  // controller's WIP dropdowns, whose switch is re-read on window focus). Set while rendering, which React re-runs at
+  // controller's epics dropdown, disabled while a press is out). Set while rendering, which React re-runs at
   // once, so the stale `open` is never committed.
   if (disabled && open) setOpen(false);
   const rootRef = useRef<HTMLDivElement>(null);

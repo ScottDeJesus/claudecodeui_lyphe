@@ -1,6 +1,6 @@
-import type { DispatcherArc, DispatcherArcQueue, DispatcherArcStatus, DispatcherArcWip, DispatcherWipSetting } from '@/shared/types.js';
+import type { DispatcherArc, DispatcherArcQueue, DispatcherArcStatus } from '@/shared/types.js';
 
-import { countOrNullSince, countSince, each, field, flagSince, isCount, isRecord, isText, isTextOrNull, isWholeFrom, modelSince, names, need, oneOf, textSince, wipWord } from './dispatcher-state.transport.js';
+import { countOrNullSince, countSince, each, field, flagSince, isCount, isRecord, isText, isTextOrNull, isWholeFrom, modelSince, names, need, oneOf, textSince } from './dispatcher-state.transport.js';
 import { plannerSince } from './dispatcher-planner.reader.js';
 
 /**
@@ -21,38 +21,6 @@ import { plannerSince } from './dispatcher-planner.reader.js';
 
 /** The ten words an arc's derived status may be (`store_arcs.arc_word`'s one precedence). Anything else is a build this lane cannot draw. */
 export const ARC_STATUSES: readonly DispatcherArcStatus[] = ['empty', 'complete', 'hidden', 'judging', 'stalled', 'live', 'scheduled', 'paused', 'queued', 'designing'];
-
-/**
- * One limit of an arc's `wip` block: the epic's own word (`null` while it follows its default), the
- * word in force, and the default it falls back to (`default`: Settings' word for Claude work, `all`
- * for DeepSeek's — `wip.report`). `default` is absent from a build older than it, where Settings'
- * word is the default.
- */
-function wipSettingOf(raw: unknown, where: string): DispatcherWipSetting {
-  const setting = need(raw, isRecord, where);
-  const own = field(setting, 'own');
-  const fallback = setting.default;
-  return {
-    own: own === null ? null : wipWord(own, `${where}.own`),
-    effective: wipWord(field(setting, 'effective'), `${where}.effective`),
-    ...(fallback === undefined ? {} : { default: wipWord(fallback, `${where}.default`) }),
-  };
-}
-
-/**
- * An arc's two WIP limits (`report_arcs.arc_dict.wip`), or `null` for a build OLDER than the field —
- * the control and the line that read it then draw nothing and the board stands, which is the
- * tolerance `modelSince` and its siblings give every field added after a build shipped. A key that IS
- * there and does not read is refused by name, with the arc it came from.
- */
-function wipOf(value: unknown, name: string): DispatcherArcWip | null {
-  if (value === undefined) return null;
-  const wip = need(value, isRecord, `arc.wip of ${name}`);
-  return {
-    features: wipSettingOf(field(wip, 'features'), `arc.wip.features of ${name}`),
-    tasks: wipSettingOf(field(wip, 'tasks'), `arc.wip.tasks of ${name}`),
-  };
-}
 
 /** The four words an epic's turn may be (`line_gate.places`). Anything else is a build this lane cannot draw. */
 const QUEUE_TURNS: readonly DispatcherArcQueue['turn'][] = ['now', 'waiting', 'paused', 'hidden'];
@@ -91,9 +59,6 @@ export function arcOf(raw: unknown): DispatcherArc {
     // for a build older than the field.
     model: modelSince(field(arc, 'model'), 'arc.model'),
     status: oneOf(field(arc, 'status'), ARC_STATUSES, `status of ${name}`),
-    // The epic's two WIP limits, each as its own word and the word in force — what the epic's WIP
-    // control draws and presses back (`dispatcher wip`), carried as the document states them.
-    wip: wipOf(field(arc, 'wip'), name),
     // THE ARC'S OWN VERBS, read off its plans' status words by `report_arcs` and drawn by the deck
     // here: `walking` is what Pause is drawn for, `midwalk` and `stalled` what Resume is, and `stopped`
     // the whole set a terminal's `resume <arc>` reaches (the plans held for their first Start are among

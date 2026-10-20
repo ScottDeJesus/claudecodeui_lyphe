@@ -40,16 +40,16 @@ export function PaceLine({ pace }: { pace?: DispatcherPace | null }) {
 }
 
 /**
- * THE HELD CARD'S PACE LINE, in the row where `queue_hold` and `wip_hold` draw — the dispatcher's
+ * THE HELD CARD'S PACE LINE, in the row where `queue_hold` draws — the dispatcher's
  * clause in the dispatcher's words, on the same rule as the queue's: the card says "Held by pace"
  * itself, so the `pace:` lead is stripped and never read twice.
  *
- * The gate sends one of the three holds at a time, so the card draws whichever one arrived; a hold
+ * The gate sends one of the two holds at a time, so the card draws whichever one arrived; a hold
  * that is absent (an older dispatcher), empty, or only a lead draws nothing at all.
  *
  * Handles: `data-plan-pace-hold` on the line.
  *
- * Used by `PlanCard` (runner-tab), after its queue line and before its WIP line.
+ * Used by `PlanCard` (runner-tab), after its queue line.
  */
 export function PaceHoldLine({ hold }: { hold?: string | null }) {
   const { t } = useTranslation();

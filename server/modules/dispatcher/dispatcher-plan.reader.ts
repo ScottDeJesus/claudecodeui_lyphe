@@ -184,16 +184,12 @@ export function planOf(raw: unknown): DocumentPlan {
     // null while it follows its epic and the switch: the override a card's fold names.
     model: modelSince(field(plan, 'model'), 'plan.model'),
     model_own: modelSince(field(plan, 'model_own'), `plan.model_own of ${name}`),
-    // The plan's width phrase (`width.word` of its effective model word and its task-WIP word), read
-    // tolerantly like `arc`: a build older than the field writes none.
+    // The plan's posture phrase (`width.word`), read tolerantly like `arc`: a build older than the
+    // field writes none.
     posture: textSince(field(plan, 'posture'), 'plan.posture'),
-    // Why this feature waits for an epic slot — the gate's own FEATURE-WIP clause for its first ready
-    // phase (`width.feature_hold`), or `null`. Read tolerantly like `posture`: a build older than the
-    // field writes none, and the card then draws no line.
-    wip_hold: textSince(field(plan, 'wip_hold'), 'plan.wip_hold'),
     // Why this plan waits for its EPIC'S turn — the gate's own queue clause for its first ready phase
-    // (`line_gate.hold`, asked before the feature clause), or `null`. Read tolerantly like `wip_hold`
-    // beside it: a build older than the field writes none, and the card then draws no line.
+    // (`line_gate.hold`), or `null`. Read tolerantly like `posture`: a build older than the field
+    // writes none, and the card then draws no line.
     queue_hold: textSince(field(plan, 'queue_hold'), 'plan.queue_hold'),
     created_at: need(field(plan, 'created_at'), isText, 'plan.created_at'),
     updated_at: need(field(plan, 'updated_at'), isText, 'plan.updated_at'),

@@ -1316,7 +1316,6 @@
     "waitsOn": "waits on {{names}}",
     "queueHold": "Waiting · {{clause}}",
     "paceHold": "Held by pace · {{clause}}",
-    "wipHold": "Waiting for a WIP slot · {{clause}}",
     "dismissDone": "Dismiss done · {{count}}",
     "plannersOut": "planners {{out}} of {{lanes}} out",
     "dismiss": "Dismiss feature",
@@ -1373,13 +1372,6 @@
         "epic": "Follow epic · {{value}}"
       }
     },
-    "wip": {
-      "all": "All",
-      "featuresHint": "How many features of this epic are in progress at once. Follow the top, or give this epic its own number.",
-      "tasksHint": "How many tasks each feature of this epic runs at once. Follow the top, or give this epic its own number.",
-      "refused": "WIP not set",
-      "done": "WIP set — the next take-up reads it"
-    },
     "master": {
       "label": "Run controls",
       "switchLabel": "Runs on",
@@ -1387,19 +1379,7 @@
       "switchUnreadable": "The switch could not be read — press a side to ask again.",
       "startTitle_one": "Let the {{count}} feature waiting for its Start go. The queue’s order and Epics at once decide what runs first; a feature’s own Start skips both.",
       "startTitle_other": "Let the {{count}} features waiting for their Start go. The queue’s order and Epics at once decide what runs first; a feature’s own Start skips both.",
-      "startRefused": "Nothing started",
-      "noteDeepseek": "DeepSeek work runs with no feature or task limit unless an epic sets its own.",
-      "wip": {
-        "features": "Features at once",
-        "tasks": "Tasks at once",
-        "featuresShort": "Features",
-        "tasksShort": "Tasks",
-        "featuresHint": "How many features of an epic are in progress at once, for every epic that sets none of its own.",
-        "tasksHint": "How many tasks each feature runs at once, for every epic that sets none of its own."
-      },
-      "wipRefused": "WIP not set",
-      "wipUnreadable": "The defaults could not be read, so nothing was written.",
-      "wipDone": "{{limit}}: {{word}}"
+      "startRefused": "Nothing started"
     },
     "epics": {
       "label": "Epics at once",

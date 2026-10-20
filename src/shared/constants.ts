@@ -274,20 +274,6 @@ export const MARKDOWN_CARDS_CLASS = 'chat-md-cards';
 
 // ---------------------------
 
-//----------------- WIP LADDER ------------
-
-/**
- * The count the WIP ladder lists up to before `All`: `1, 2, … 6, All`. Six is the widest count the
- * operator has ever chosen. It is only the FLOOR of the ladder's top rung — a wider count in play
- * raises it (`wipLadderTop`), so a limit already set above six stays on the list that shows it.
- *
- * Used by `wipLadderTop` in `utils.ts`, which the dispatcher module's master controller and epic fold
- * list their dropdowns from.
- */
-export const WIP_LADDER_TOP = 6;
-
-// ---------------------------
-
 //----------------- DISPATCHER LANE WALL ------------
 
 /**

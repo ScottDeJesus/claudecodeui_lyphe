@@ -38,7 +38,7 @@ type LabeledPickProps = {
  * `Select`'s name replaces what its button shows and the value would otherwise never be announced.
  * The group carries the handle the browser harness reads (`handle`, valued with the chosen word).
  *
- * Used by `MasterController` (the three header dropdowns), `EpicWipControl` and `ModelPick` (a fold's).
+ * Used by `MasterController` (the header dropdown) and `ModelPick` (a fold's).
  */
 export function LabeledPick({ label, hint, options, value, onChoose, disabled = false, width, handle }: LabeledPickProps) {
   const labelId = useId();

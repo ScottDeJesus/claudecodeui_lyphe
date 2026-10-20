@@ -163,35 +163,6 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/phaseWord
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-card-ask.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-runner-landing.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-runner-widget-list.mjs
 
-## INV-6506 — probe — The standing proof for `width.reason` cannot tell the per-plan rule from the old board-wide one
-
-The standing proof for `width.reason` cannot tell the per-plan rule from the old board-wide one
-
-```probe
-S=$(mktemp -d /tmp/athena-mut-XXXXXX) || exit 1
-case "$S" in /tmp/athena-mut-*) ;; *) echo "refusing $S"; exit 1;; esac
-mkdir -p "$S/.claude/scripts" || exit 1
-tar -C ~/.claude --exclude=.venv --exclude=__pycache__ -cf - hooks | tar -C "$S/.claude" -xf - || exit 1
-cp -r ~/.claude/scripts/runner_fixtures "$S/.claude/scripts/" || exit 1
-python3 - "$S/.claude/hooks/dispatcher/width.py" <<'PY'
-import re, sys
-p = sys.argv[1]; s = open(p).read()
-new, n = re.subn(r'    mine = \[other for other in busy_phases\(conn\) if .*\]\n', '    mine = busy_phases(conn)\n', s)
-print("mutation applied:", n == 1)
-open(p, "w").write(new)
-PY
-HOME="$S" timeout 120 python3 "$S/.claude/scripts/runner_fixtures/wip_tasks.py" 2>&1 | cut -c1-110 | tail -5
-echo "fixture exit: ${PIPESTATUS[0]}"
-case "$S" in /tmp/athena-mut-*) rm -r "$S";; esac
-echo "[probe exit $?]"
-expect: `mutation applied: True`, then a `FAIL` reading line and `fixture exit: 1` once the fixture holds a cross-plan reading — the fixture's cross-plan reading (`tasks 2, one feature full — ANOTHER is still taken up`) tells the per-plan rule from the board-wide one
-```
-
-measured 2026-10-03 by chain chain-swarm-per-plan-20261003-135930-38a4, finding M1, MEDIUM
-probe-key: 25810ac941c45dac1daf3446b719f82b9747be50
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/agents-settings/sections/content/RunnerModelContent.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/hooks/dispatcher/planner_lanes.py, /home/lyphe/.claude/hooks/dispatcher/planner_rule.py, /home/lyphe/.claude/hooks/dispatcher/rule.py, /home/lyphe/.claude/hooks/dispatcher/width.py
-
 ## INV-6571 — probe — . An epic whose status turns `complete` without a new completion is never announced — and the comment and doc say it is
 
 . An epic whose status turns `complete` without a new completion is never announced — and the comment and doc say it is

@@ -1,7 +1,6 @@
 import { clsx, type ClassValue } from 'clsx';
 import { extendTailwindMerge, validators } from 'tailwind-merge';
 
-import { WIP_LADDER_TOP } from '@/shared/constants';
 import type { RoadmapFeatureWord, RoadmapPicture } from '@/shared/roadmap-types';
 import type { DispatcherModelWord, Project, ProjectSession, SlashCommand } from '@/shared/types';
 
@@ -498,40 +497,6 @@ export function firstLine(text: unknown): string {
 }
 
 // ---------------------------
-
-//----------------- THE WIP LADDER ------------
-
-/**
- * The top counted rung of the WIP ladder (`1, 2, … top, All`): `WIP_LADDER_TOP`, or the widest count
- * already in play — the header's default, the epic's own — whichever is larger. So a limit above six that
- * is already set stays a rung of the list that shows it, and the list never offers a count wider than one
- * the server already handed us (and so never one its reader refuses). `null` is `All` (no limit) and widens
- * nothing. Used by the dispatcher module's master controller and epic fold, which hand its answer to
- * `wipLadderWords`.
- */
-export function wipLadderTop(...inPlay: Array<number | null>): number {
-  return Math.max(WIP_LADDER_TOP, ...inPlay.filter((lanes): lanes is number => lanes !== null));
-}
-
-/**
- * Every word of the one WIP ladder, in the order a dropdown lists them: `['1', … String(top), 'all']`.
- * The words are the dispatcher's own grammar (`wip.py`) — a count is its digits, no limit is `all` — so a
- * chosen option is sent as it stands. Used by the dispatcher module's master controller (the two
- * defaults) and epic fold (an epic's two limits), so the two list one ladder from one copy of the rules.
- */
-export function wipLadderWords(top: number): string[] {
-  return [...Array.from({ length: top }, (_, index) => String(index + 1)), 'all'];
-}
-
-/**
- * How many one WIP word allows, as the dispatcher reads it: `all` is no limit, which is `null` and is
- * drawn as All, and a count is itself. The word is the dispatcher's own (`wip.py`), `'3'` or `'all'`,
- * as `status --json` and `GET /api/settings/wip` carry it. Used by the dispatcher module's master
- * controller and epic fold.
- */
-export function wipCountOfWord(word: string): number | null {
-  return word === 'all' ? null : Number(word);
-}
 
 // ---------------------------
 

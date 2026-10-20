@@ -49,11 +49,6 @@ export function createSettingsRouter(
   // model word of their own ride it, apart from the chat's switch above.
   router.get('/deepseek-features', respond(() => service.getDeepseekFeatures()));
   router.put('/deepseek-features', respond((req) => service.setDeepseekFeatures(req.body?.enabled)));
-  // The dispatcher's WIP defaults, host-wide for the same reason and read the same way: they steer
-  // the dispatcher on this host, so no `userId` is read. Both limits ride on the PUT body, as words
-  // (`'<N>'` or `'all'`), because the file holds both lines and is written whole.
-  router.get('/wip', respond(() => service.getWipDefaults()));
-  router.put('/wip', respond((req) => service.setWipDefaults(req.body?.features, req.body?.tasks)));
   // The dispatcher's park-at-peak switch, host-wide like the two above and read the same way: it
   // steers the dispatcher on this host, so no `userId` is read. One word on the PUT body, because
   // the file holds one line — `off`, or `on`.
