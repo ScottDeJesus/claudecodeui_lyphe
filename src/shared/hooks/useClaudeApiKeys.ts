@@ -6,7 +6,8 @@ import type { ClaudeApiCardView, ClaudeApiKeySave, ClaudeApiPicture, ClaudeApiUn
 /**
  * THE CLAUDE API KEYS CARD'S READ AND ITS THREE ACTS — the door's picture
  * (`~/.claude/claudecodeui_lyphe`'s Settings API relays `claude-api status --json`), the slot a
- * write is in flight on, a refused save's own words, and `save`/`remove`/`refresh`.
+ * write is in flight on, and `save`/`remove`/`refresh`. A refused save's words are the pressing
+ * surface's own state, never the module's: they die with the surface and are not redrawn on a remount.
  *
  * THE PICTURE IS NOT A CLIENT PREFERENCE. It is two files and a ledger in another process's
  * world, and a key's standing moves while Settings is closed: a wall lands at the next launch, a
@@ -20,31 +21,41 @@ import type { ClaudeApiCardView, ClaudeApiKeySave, ClaudeApiPicture, ClaudeApiUn
  * ONE QUESTION AT A TIME, ONE CLOCK. A read issued before a write and landing after it would draw
  * the store the write had already left, so every write retires the reads that predate it through
  * one module-level epoch, exactly as the park-at-peak switch's hook does. A save that lands is
- * answered by the fresh picture the server read back, never by what was sent.
+ * answered by the fresh picture the server read back, never by what was sent. A page return fires
+ * `focus` and `visibilitychange` together — one 600 ms window merges the pair, and no timer is kept.
  *
  * Used by `ClaudeApiKeysContent`.
  */
 
-type KeysState = Pick<ClaudeApiCardView, 'picture' | 'savingSlot' | 'refusal'>;
+type KeysState = Pick<ClaudeApiCardView, 'picture' | 'savingSlot'>;
+/** One row's error line: the door's words or the failure sentence, and its slot. */
+type RefusalLine = NonNullable<ClaudeApiCardView['refusal']>;
+type SaveOutcome = { saved: boolean; refusal: RefusalLine | null };
 
-/** Every surface showing the keys right now; one composes this hook today, and a second is told
- * the same answer rather than keeping a copy that can disagree. */
+/** A write that never got an answer, and a press that raced another write, each say so in words. */
+const FAILED_WORDS = 'The save failed before the door answered, so whether the key was stored is unknown. The field was kept and the store was re-read.';
+const DROPPED_WORDS = 'Another key write is already on the wire, so this press was not sent. Try again when it finishes.';
+/** `focus` and `visibilitychange` are one return to the page; inside this window they are one ask. */
+const PAGE_ASK_WINDOW_MS = 600;
+
+/** Every surface showing the keys right now; a second is told the same answer, not a copy. */
 const readers = new Set<(state: KeysState) => void>();
 
 /** The last state delivered, drawn at once by a surface that mounts while a question is out. */
-let known: KeysState = { picture: null, savingSlot: null, refusal: null };
+let known: KeysState = { picture: null, savingSlot: null };
 
-/** How many authoritative states have been established — the one order answers about the store
- * arrive in. Bumped as a write is ISSUED and again when a read's answer is published. */
+/** How many authoritative states have been established: bumped as a write is ISSUED and when a
+ * read's answer is published. */
 let epoch = 0;
 
-/** A read is out. One for every surface: two questions to one store cannot say anything the first
- * will not, and their arrival order would decide what is drawn. */
+/** A read is out; two questions to one store cannot say anything the first will not. */
 let inFlight = false;
 /** Another ask arrived while that read was out; the newer one, asked for real once it lands. */
 let waiting = false;
 /** A write is crossing the wire — module-wide for the reason `epoch` is. */
 let writing = false;
+/** When the page last asked on its own (a return to the tab), to merge the pair it fires. */
+let lastPageAsk = 0;
 
 /** Hand the state to every surface on screen. */
 function publish(next: KeysState): void {
@@ -110,9 +121,8 @@ async function readPicture(): Promise<ClaudeApiPicture | ClaudeApiUnreadable> {
   }
 }
 
-/** The door's own sentence out of a 422's envelope, or the sentence that says there was none. */
-async function refusalWords(response: Response): Promise<string> {
-  const fallback = 'The claude-api door refused this save.';
+/** The door's own sentence out of an error envelope, or the sentence the caller named. */
+async function refusalWords(response: Response, fallback = 'The claude-api door refused this save.'): Promise<string> {
   try {
     const body: unknown = await response.json();
     if (body !== null && typeof body === 'object') {
@@ -146,11 +156,11 @@ async function ask(): Promise<void> {
   inFlight = false;
 }
 
-/** Mark a write as issued: the slot busy, the last refusal retired, older reads dead. */
+/** Mark a write as issued: the slot busy, older reads dead. */
 function beginWrite(slot: number): void {
   writing = true;
   epoch += 1;
-  publish({ ...known, savingSlot: slot, refusal: null });
+  publish({ ...known, savingSlot: slot });
 }
 
 /** A write is over; the rows stop drawing busy. */
@@ -159,14 +169,14 @@ function endWrite(): void {
   publish({ ...known, savingSlot: null });
 }
 
-/** Save one slot. True only on SAVED; a 422 leaves the door's words under that row's field. */
-async function saveKey(slot: number, body: ClaudeApiKeySave): Promise<boolean> {
-  // Dropped rather than queued, module-wide: the store is one store, and the card draws one slot
-  // busy. A second press while the first is out would race it.
-  if (writing) return false;
+/** Save one slot. True only on SAVED; a failure hands back the line to draw under that row's field. */
+async function saveKey(slot: number, body: ClaudeApiKeySave): Promise<SaveOutcome> {
+  // Dropped rather than queued, module-wide: the store is one store, and the card disables every
+  // row's press while a write is out — the guard's sentence is for a press that still races it.
+  if (writing) return { saved: false, refusal: { slot, words: DROPPED_WORDS } };
   beginWrite(slot);
 
-  let saved = false;
+  let outcome: SaveOutcome = { saved: false, refusal: null };
   try {
     const response = await api.settings.saveClaudeApiKey(slot, body);
     if (response.ok) {
@@ -175,26 +185,28 @@ async function saveKey(slot: number, body: ClaudeApiKeySave): Promise<boolean> {
       const fresh = await pictureOf(response);
       if (fresh !== null) {
         announce(fresh);
-        saved = true;
+        outcome = { saved: true, refusal: null };
       } else {
         announce(await readPicture());
       }
     } else if (response.status === 422) {
       // The door refused before it wrote anything: its sentence goes under the field, and the
       // picture the card already holds is still what the store says.
-      publish({ ...known, refusal: { slot, words: await refusalWords(response) } });
+      outcome = { saved: false, refusal: { slot, words: await refusalWords(response) } };
     } else {
-      // A write that failed may still have landed (the door writes the slot before it lifts the
-      // walls), so the answer is a re-read, never the side the card asked for.
+      // A failed write may still have landed (the door writes the slot before it lifts the walls),
+      // so the answer is a re-read — and the press says it failed, or a redraw reads as ignored.
+      outcome = { saved: false, refusal: { slot, words: await refusalWords(response, FAILED_WORDS) } };
       announce(await readPicture());
     }
   } catch (error) {
     console.error('Error saving a Claude API key:', error);
+    outcome = { saved: false, refusal: { slot, words: FAILED_WORDS } };
     announce(await readPicture());
   }
 
   endWrite();
-  return saved;
+  return outcome;
 }
 
 /** Remove one slot and answer the fresh picture; a failed removal re-reads the store. */
@@ -223,6 +235,8 @@ export function useClaudeApiKeys(): ClaudeApiCardView {
   // The door's state as the server last answered it: `null` is a read on the wire, and
   // `{unreadable:true}` is a read that failed. Never "not set" — that is a picture with `set:false`.
   const [state, setState] = useState<KeysState>(known);
+  // This surface's refusal line: it dies with the surface and with the next press.
+  const [refusal, setRefusal] = useState<RefusalLine | null>(null);
 
   useEffect(() => {
     let live = true;
@@ -235,12 +249,18 @@ export function useClaudeApiKeys(): ClaudeApiCardView {
     reader(known);
     void ask();
 
-    // Coming back to the page is the one moment a key's standing can have moved under a card that
-    // is already mounted: the operator enters a key from their phone, or a wall lands overnight.
-    // Skipped while a write is in flight — that write's own answer is already on its way.
-    // `visibilitychange` is listened for beside `focus` because iOS Safari fires no reliable
-    // blur/focus on an app switch.
-    const onFocus = () => { if (!writing) void ask(); };
+    // Coming back is the one moment a key's standing can move under a mounted card; skipped while a
+    // write is in flight, whose own answer is already on its way. `visibilitychange` sits beside
+    // `focus` because iOS Safari fires no reliable blur/focus on an app switch — one return, merged.
+    const onFocus = () => {
+      if (writing) return;
+      // The second read of a focus/visibility burst answers nothing the first cannot, and the
+      // timestamp is not a timer: nothing fires because time passed, only because the page returned.
+      const now = Date.now();
+      if (now - lastPageAsk < PAGE_ASK_WINDOW_MS) return;
+      lastPageAsk = now;
+      void ask();
+    };
     const onVisibilityChange = () => {
       if (document.visibilityState !== 'visible') return;
       onFocus();
@@ -263,11 +283,18 @@ export function useClaudeApiKeys(): ClaudeApiCardView {
     await ask();
   }, []);
 
-  const save = useCallback(async (slot: number, body: ClaudeApiKeySave) => saveKey(slot, body), []);
+  const save = useCallback(async (slot: number, body: ClaudeApiKeySave): Promise<boolean> => {
+    // A new press retires the last sentence, whatever this one answers.
+    setRefusal(null);
+    const outcome = await saveKey(slot, body);
+    if (outcome.refusal !== null) setRefusal(outcome.refusal);
+    return outcome.saved;
+  }, []);
 
   const remove = useCallback(async (slot: number) => {
+    setRefusal(null);
     await removeKey(slot);
   }, []);
 
-  return { ...state, save, remove, refresh };
+  return { ...state, refusal, save, remove, refresh };
 }

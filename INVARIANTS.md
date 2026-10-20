@@ -10594,10 +10594,10 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispat
 
 ## INV-8936 — The Claude API keys card — what an editor of the card must not break
 
-Reference: MAN-8695 (files, FILL seams, read contract).
+Reference: MAN-8695 (files, the read contract and the strings).
 1. **Unreadable draws no form.** `unknown` is a state, not an empty slot: fields over unseen settings let a reader overwrite a credit or label. The row says `Unknown` in words; the retry lives on the card header only.
 2. **`unreadable` is never "not set".** `standingOf(null, true, t)` and the `Unknown` badge say so in words.
-3. **`rides.why` is the door's data.** The card never paraphrases or reformats it (INV-76: no id, no digest in it). Dates in the card's own lines and in `why` can differ in zone: the cure is one shared day/clock formatter when the payer phase authors the sentence.
+3. **`rides.why` is the door's data.** The card never paraphrases or reformats it, and never prefixes a payer sentence of its own (INV-8937; INV-76: no id, no digest in it). Dates in the card's own lines (the reader's zone) and in `why` (the door's) can differ in zone.
 4. **Cycle money is two-decimal always.** `usd()` = `$${moneyText(amount, 1)}`; scale `1` is pinned, never derived from the amount or the credit (scale `0` falls into `moneyText`'s four-decimal branch and draws a fresh key as `$0.0000`). Any later card figure that is a cycle total uses it; the sub-cent branch is for per-launch cost text.
 5. **The standing line's separator is a real space.** `{' '}` between base and clause, then the interpunct (neutral) or the tone dot (toned). A margin-only gap leaves `$200.00out of credit` in the text layer. The dot is `aria-hidden` decoration; a state is never carried by the dot alone.
 6. **Remove's ink is `data-tone="danger"` + `text-tone-ink`.** `text-destructive` is `--danger` in both modes and reads 2.88:1 on the dark card; the ink pairing swaps in `--danger-ink` (6.83:1).
@@ -10606,19 +10606,20 @@ Reference: MAN-8695 (files, FILL seams, read contract).
 9. **The key field is controlled by the card** (`drafts[slot]`), `type="password"`, `autoComplete="off"`, `spellCheck={false}`. It is emptied on SAVED and on nothing else; nothing reads a key back.
 10. **Helper ids.** `aria-describedby` points at `${id}-helper` (the id `Field` renders) on the key field while no refusal shows, the name field and the renewal-day field. A refusal reaches assistive tech through `Field`'s `role="alert"`, which has no id.
 11. **The type block is byte-identical in both mirrors.** `ClaudeApiWall`, `ClaudeApiKeyPicture`, `ClaudeApiPicture`, `ClaudeApiUnreadable` with their two comments: 2298 bytes, 32 lines in `src/shared/types.ts` and `server/shared/types.ts`. A change to one lands in the other in the same edit.
+12. **Every control on a key row takes `blocked`.** `ClaudeApiKeysContent` passes `blocked={savingSlot !== null}`; `Save`/`Replace` and `Remove` carry `aria-disabled` (the `Button`'s refusing path; focus stays) and `submit` returns early while `blocked`. A new button or submit path refuses the same way.
+13. **A refusal is the mounting hook's state, never the module's.** Every save returns `SaveOutcome` `{saved, refusal}`; `KeysState` is `picture` + `savingSlot` only. A refusal published into module `known` redraws on a remount a sentence about a press nobody made on that screen.
+14. **A page return is one ask, merged by timestamp.** `focus` + `visibilitychange` inside `PAGE_ASK_WINDOW_MS` (600, `lastPageAsk`) are one read; never a debounce timer.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/agents-settings/sections/content/ClaudeApiKeyRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/agents-settings/sections/content/ClaudeApiKeysContent.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/agents-settings/sections/content/claude-api-standing.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/agents-settings/sections/content/ClaudeApiKeyRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/agents-settings/sections/content/ClaudeApiKeysContent.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/agents-settings/sections/content/claude-api-standing.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/useClaudeApiKeys.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts
 
-## INV-8937 — The Claude API keys card prefixes a payer sentence to a `rides.why` that already opens with one
+## INV-8937 — The Claude API keys card draws `rides.why` alone — the door's sentence already names the payer
 
 Reference: MAN-8695.
-- `ClaudeApiKeysContent.tsx` draws `agents.claudeApi.rides` = `Plan runs ride {{payer}}. {{why}}` for `rides.slot` 0, 1 and 2.
-- The live door's `rides.why` already opens `Plan runs ride …` (2026-10-20, `claude-api status --json`: slot 0, `Plan runs ride the Claude subscription.`; a key's: `Plan runs ride Claude API key <n> as the backup: …`, `hooks/plan_runner/claude_api/payer.py`, MAN-8625).
-- Read against the live picture, the first line says it twice: `Plan runs ride your Claude subscription. Plan runs ride the Claude subscription.`
-- The fake's `why` strings (`Your subscription has room, so every launch rides it.`) are not the door's, so every scaffold photograph hides it.
-- Cure at `card-fill`, when the card meets the live picture: draw `rides.why` alone as the first line for every `rides.slot`; the payer word stays on the badge.
+- `ClaudeApiKeysContent.tsx` draws the door's `rides.why` ALONE as the card's first line, for every `rides.slot` (0, 1, 2 and null); the payer word stays on the badge. When `why` is empty the card draws `agents.claudeApi.ridesNone` and composes no payer sentence of its own.
+- `rides.why` already opens with the payer ("Plan runs ride …", `hooks/plan_runner/claude_api/payer.py`, MAN-8625). Prefixing a payer sentence says it twice: `Plan runs ride your Claude subscription. Plan runs ride the Claude subscription.` (live door, 2026-10-20).
+- The card never paraphrases `why` (INV-76: no id, no digest in it).
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/agents-settings/sections/content/claude-api-fake.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/agents-settings/sections/content/ClaudeApiKeysContent.tsx
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/agents-settings/sections/content/ClaudeApiKeysContent.tsx
 
 ## INV-8941 — probe — The relayed picture is not redacted, and both the module comment and MAN-8701 say it is
 
@@ -10775,3 +10776,213 @@ measured 2026-10-20 by chain chain-claude-api-backup--settings-api-20261020-1225
 probe-key: 27db3d10115792474295403c80ba25edc8c0bac0
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/settings/claude-api-keys.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/settings/settings.routes.ts
+
+## INV-8946 — probe — the second slot's Save is silently dropped while the first slot's write is on the wire
+
+the second slot's Save is silently dropped while the first slot's write is on the wire
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.mjs" <<'JS'
+import { openConsole, openSettings } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/console.mjs';
+const base = { rides: { slot: 0, why: 'Plan runs ride the Claude subscription.' }, subscription: { wall: null },
+  keys: [1, 2].map((slot) => ({ slot, set: false, label: `Key ${slot}`, credit_usd: 200, renews_day: null,
+    saved_at: null, cycle_ends_at: null, spent_usd: 0, left_usd: null, window: { open: false, opens_at: null }, wall: null })),
+  pace_usd_per_hour: 0, unpriced: [], checked_at: 1 };
+const saved = (slot) => { const p = structuredClone(base); p.keys[slot - 1] = { ...p.keys[slot - 1], set: true, label: 'Probe', saved_at: '2026-10-20T20:00:00Z', left_usd: 200 }; return p; };
+const s = await openConsole({ viewport: { width: 1440, height: 900 } });
+const page = s.page; const puts = []; let putCount = 0;
+page.on('request', (r) => { if (r.method() === 'PUT') puts.push(r.url().split('/').pop()); });
+const tab = (n) => page.getByRole('tab', { name: n, exact: true }).first();
+const card = () => page.locator('div.rounded-xl.border').filter({ hasText: 'Claude API keys' }).first();
+await openSettings(page, 'Agents');
+await page.route('**/api/settings/claude-api', (r) => (r.request().method() === 'GET' ? r.fulfill({ json: base }) : r.continue()));
+await page.route('**/api/settings/claude-api/*', async (r) => {
+  if (r.request().method() !== 'PUT') return r.continue();
+  putCount += 1; const slot = Number(r.request().url().split('/').pop());
+  if (putCount === 1) await new Promise((x) => setTimeout(x, 4000));
+  return r.fulfill({ json: saved(slot) });
+});
+await tab('Account').click(); await page.waitForTimeout(1200);
+await page.locator('#claude-api-key-1').fill('sk-ant-api03-ATHENADROPONE0000000000');
+await page.locator('form:has(#claude-api-key-1) button[type=submit]').click();
+await page.waitForTimeout(400);
+await page.locator('#claude-api-key-2').fill('sk-ant-api03-ATHENADROPTWO0000000000');
+const btn2 = page.locator('form:has(#claude-api-key-2) button[type=submit]');
+const disabled = await btn2.isDisabled().catch(() => false);
+let pressed = false;
+if (!disabled) { await btn2.click(); pressed = true; }
+await page.waitForTimeout(6500);
+console.log('slot2 button disabled while slot1 saves:', disabled);
+console.log('slot2 pressed:', pressed);
+console.log('PUT slots seen:', JSON.stringify(puts));
+console.log('card badges:', JSON.stringify(await card().getByText(/^(Not set|Saved .*)$/).allInnerTexts()));
+console.log('slot2 field kept:', JSON.stringify(await page.locator('#claude-api-key-2').inputValue()));
+console.log('slot2 alerts:', await page.locator('form:has(#claude-api-key-2) [role=alert]').count());
+await s.browser.close();
+JS
+node "$D/p.mjs"
+case "$D" in /tmp/athena-probe.*) rm -rf "$D";; esac
+```
+
+measured 2026-10-20 by chain chain-claude-api-backup--card-fill-20261020-125408-3e4e, finding M1, MEDIUM
+probe-key: 32a531ebfcac847115d782b890266cb2e7e9892b
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/settings.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/agents-settings/sections/AgentCategoryContentSection.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/agents-settings/sections/content/ClaudeApiKeysContent.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/useClaudeApiKeys.ts
+
+## INV-8947 — probe — INV-8937 still governs the deleted fake and still instructs the cure that has landed
+
+INV-8937 still governs the deleted fake and still instructs the cure that has landed
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+f=src/modules/settings/tabs/agents-settings/sections/content/claude-api-fake.ts
+printf 'fake file: %s\n' "$(test -e "$f" && echo present || echo gone)"
+out=$(docstore check | jq -c '.findings[] | select(.token=="INV-8937")')
+printf 'check row: %s\n' "${out:-none}"
+printf 'stale cure line: %s\n' "$(docstore get INV-8937 --text 2>/dev/null | grep -c 'Cure at `card-fill`')"
+EOF
+bash "$D/p.sh"
+case "$D" in /tmp/athena-probe.*) rm -rf "$D";; esac
+```
+
+measured 2026-10-20 by chain chain-claude-api-backup--card-fill-20261020-125408-3e4e, finding M2, MEDIUM
+probe-key: 5994f7cce7fe18b6dba3fa53b4e6203cf7bdaf83
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/settings.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/agents-settings/sections/AgentCategoryContentSection.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/agents-settings/sections/content/ClaudeApiKeysContent.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/useClaudeApiKeys.ts
+
+## INV-8948 — probe — a 502 whose write failed draws no failure sentence at all
+
+a 502 whose write failed draws no failure sentence at all
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.mjs" <<'JS'
+import { openConsole, openSettings } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/console.mjs';
+const base = { rides: { slot: 0, why: 'Plan runs ride the Claude subscription.' }, subscription: { wall: null },
+  keys: [1, 2].map((slot) => ({ slot, set: false, label: `Key ${slot}`, credit_usd: 200, renews_day: null,
+    saved_at: null, cycle_ends_at: null, spent_usd: 0, left_usd: null, window: { open: false, opens_at: null }, wall: null })),
+  pace_usd_per_hour: 0, unpriced: [], checked_at: 1 };
+const landed = structuredClone(base); landed.keys[0] = { ...landed.keys[0], set: true, label: 'Landed', saved_at: '2026-10-20T20:00:00Z', left_usd: 200 };
+const s = await openConsole({ viewport: { width: 1440, height: 900 } });
+const page = s.page;
+const tab = (n) => page.getByRole('tab', { name: n, exact: true }).first();
+const card = () => page.locator('div.rounded-xl.border').filter({ hasText: 'Claude API keys' }).first();
+await openSettings(page, 'Agents');
+let land = false;
+await page.route('**/api/settings/claude-api', (r) => (r.request().method() === 'GET' ? r.fulfill({ json: land ? landed : base }) : r.continue()));
+await page.route('**/api/settings/claude-api/*', (r) => {
+  if (r.request().method() !== 'PUT') return r.continue();
+  land = true;
+  return r.fulfill({ status: 502, json: { success: false, error: { code: 'CLAUDE_API_DOOR_FAILED', message: 'claude-api set: WallsStand' } } });
+});
+await tab('Account').click(); await page.waitForTimeout(1200);
+await page.locator('#claude-api-key-1').fill('sk-ant-api03-ATHENA502PROBE00000000000');
+await page.locator('form:has(#claude-api-key-1) button[type=submit]').click();
+await page.waitForTimeout(2500);
+const text = await card().innerText();
+console.log('failure words in card:', /WallsStand|did not answer|could not be saved|failed/i.test(text) ? 'yes' : 'no');
+console.log('alerts in card:', await card().locator('[role=alert]').count());
+console.log('field1 kept:', JSON.stringify(await page.locator('#claude-api-key-1').inputValue()));
+await s.browser.close();
+JS
+node "$D/p.mjs"
+case "$D" in /tmp/athena-probe.*) rm -rf "$D";; esac
+```
+
+measured 2026-10-20 by chain chain-claude-api-backup--card-fill-20261020-125408-3e4e, finding L1, LOW
+probe-key: ecc6e82156e0f1c71c7a87766ba89f41016ee89f
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/settings.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/agents-settings/sections/AgentCategoryContentSection.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/agents-settings/sections/content/ClaudeApiKeysContent.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/useClaudeApiKeys.ts
+
+## INV-8949 — probe — a refusal outlives its form and is redrawn under an empty field
+
+a refusal outlives its form and is redrawn under an empty field
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.mjs" <<'JS'
+import { openConsole, openSettings } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/console.mjs';
+const base = { rides: { slot: 0, why: 'Plan runs ride the Claude subscription.' }, subscription: { wall: null },
+  keys: [1, 2].map((slot) => ({ slot, set: false, label: `Key ${slot}`, credit_usd: 200, renews_day: null,
+    saved_at: null, cycle_ends_at: null, spent_usd: 0, left_usd: null, window: { open: false, opens_at: null }, wall: null })),
+  pace_usd_per_hour: 0, unpriced: [], checked_at: 1 };
+const WORDS = 'key 1: an admin key (sk-ant-admin...) cannot pay for plan runs; save a standard API key (sk-ant-api...)';
+const s = await openConsole({ viewport: { width: 1440, height: 900 } });
+const page = s.page;
+const tab = (n) => page.getByRole('tab', { name: n, exact: true }).first();
+const card = () => page.locator('div.rounded-xl.border').filter({ hasText: 'Claude API keys' }).first();
+await openSettings(page, 'Agents');
+await page.route('**/api/settings/claude-api', (r) => (r.request().method() === 'GET' ? r.fulfill({ json: base }) : r.continue()));
+await page.route('**/api/settings/claude-api/*', (r) => (r.request().method() === 'PUT'
+  ? r.fulfill({ status: 422, json: { success: false, error: { code: 'CLAUDE_API_KEY_REFUSED', message: WORDS } } })
+  : r.continue()));
+await tab('Account').click(); await page.waitForTimeout(1200);
+await page.locator('#claude-api-key-1').fill('sk-ant-admin01-ATHENAADMINPROBE00000000');
+await page.locator('form:has(#claude-api-key-1) button[type=submit]').click();
+await page.waitForTimeout(1200);
+console.log('refusal under the field:', await card().getByText(/an admin key/).count(), '| field kept:', JSON.stringify(await page.locator('#claude-api-key-1').inputValue()));
+await tab('Permissions').click(); await page.waitForTimeout(400);
+await tab('Account').click(); await page.waitForTimeout(1400);
+console.log('refusal after a remount:', await card().getByText(/an admin key/).count(), '| field now:', JSON.stringify(await page.locator('#claude-api-key-1').inputValue()), '| alerts:', await card().locator('[role=alert]').count());
+await s.browser.close();
+JS
+node "$D/p.mjs"
+case "$D" in /tmp/athena-probe.*) rm -rf "$D";; esac
+```
+
+measured 2026-10-20 by chain chain-claude-api-backup--card-fill-20261020-125408-3e4e, finding L2, LOW
+probe-key: f385ded19d01457e93249fba721eceab48ef5038
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/settings.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/agents-settings/sections/AgentCategoryContentSection.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/agents-settings/sections/content/ClaudeApiKeysContent.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/useClaudeApiKeys.ts
+
+## INV-8950 — probe — one return to the page costs two reads
+
+one return to the page costs two reads
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.mjs" <<'JS'
+import { openConsole, openSettings } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/console.mjs';
+const s = await openConsole({ viewport: { width: 1440, height: 900 } });
+const page = s.page; const at = [];
+page.on('request', (r) => { if (r.method() === 'GET' && r.url().endsWith('/api/settings/claude-api')) at.push(Date.now()); });
+await openSettings(page, 'Agents');
+await page.getByRole('tab', { name: 'Account', exact: true }).first().click();
+await page.waitForTimeout(4000);
+const mark = at.length; const t0 = Date.now();
+await page.evaluate(() => { for (let i = 0; i < 6; i += 1) window.dispatchEvent(new Event('focus')); document.dispatchEvent(new Event('visibilitychange')); });
+await page.waitForTimeout(2500);
+console.log('GET offsets after one focus+visibility burst (ms):', JSON.stringify(at.slice(mark).map((t) => t - t0)));
+await s.browser.close();
+JS
+node "$D/p.mjs"
+case "$D" in /tmp/athena-probe.*) rm -rf "$D";; esac
+```
+
+measured 2026-10-20 by chain chain-claude-api-backup--card-fill-20261020-125408-3e4e, finding L3, LOW
+probe-key: 0e1ce97ce0e3b1ec820c758a5b6117322a7a6702
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/settings.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/agents-settings/sections/AgentCategoryContentSection.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/agents-settings/sections/content/ClaudeApiKeysContent.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/useClaudeApiKeys.ts
+
+## INV-8951 — probe — MAN-8695 still points at the deleted fake and the removed markers
+
+MAN-8695 still points at the deleted fake and the removed markers
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+out=$(docstore get MAN-8695 --text | grep -c 'claude-api-fake')
+printf 'MAN-8695 mentions the deleted fake: %s\n' "$out"
+printf 'fake file: %s\n' "$(test -e /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/agents-settings/sections/content/claude-api-fake.ts && echo present || echo gone)"
+EOF
+bash "$D/p.sh"
+case "$D" in /tmp/athena-probe.*) rm -rf "$D";; esac
+```
+
+measured 2026-10-20 by chain chain-claude-api-backup--card-fill-20261020-125408-3e4e, finding L4, LOW
+probe-key: 5b62b51d9bcd33723f4315b100e9054927f3ba7c
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/settings.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/agents-settings/sections/AgentCategoryContentSection.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/agents-settings/sections/content/ClaudeApiKeysContent.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/useClaudeApiKeys.ts

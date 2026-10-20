@@ -15,6 +15,8 @@ type ClaudeApiKeyRowProps = {
   unknown: boolean;
   /** A write for this slot is in flight. */
   saving: boolean;
+  /** Any slot's write is in flight: this row's presses are refused, never silently dropped. */
+  blocked: boolean;
   /** The door's own words for a refused save of this slot, or null. */
   refusal: string | null;
   /** What the reader has typed into this slot's key field; the key never comes back from the door. */
@@ -48,6 +50,7 @@ export default function ClaudeApiKeyRow({
   picture,
   unknown,
   saving,
+  blocked,
   refusal,
   draft,
   onDraftChange,
@@ -84,6 +87,9 @@ export default function ClaudeApiKeyRow({
   // clearing. The key travels only when the reader typed one, and it travels in this body alone.
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    // The buttons refuse the press while any write is out; Enter in a field still submits the form,
+    // and this is the same refusal for it.
+    if (blocked) return;
     const data = new FormData(event.currentTarget);
     const body: ClaudeApiKeySave = {};
 
@@ -226,7 +232,7 @@ export default function ClaudeApiKeyRow({
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            <Button type="submit" size="sm" variant={picture?.set ? 'outline' : 'tonal'} busy={saving}>
+            <Button type="submit" size="sm" variant={picture?.set ? 'outline' : 'tonal'} busy={saving} aria-disabled={blocked || undefined}>
               {submitWord}
             </Button>
             {picture?.set && (
@@ -240,6 +246,7 @@ export default function ClaudeApiKeyRow({
                 data-tone="danger"
                 className="text-tone-ink"
                 busy={saving}
+                aria-disabled={blocked || undefined}
                 onClick={() => onRemove(slot)}
               >
                 {t('agents.claudeApi.remove', { defaultValue: 'Remove' })}

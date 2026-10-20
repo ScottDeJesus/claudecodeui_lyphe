@@ -3752,21 +3752,21 @@ Settings → Agents → Claude: the card that shows who pays for plan runs and h
 | file | role |
 |---|---|
 | `content/ClaudeApiKeysContent.tsx` | the card: header row (title, payer `Badge`, the door's `rides.why` + purpose sentence, retry press), then one `ClaudeApiKeyRow` per slot 1, 2 in slot order |
-| `content/ClaudeApiKeyRow.tsx` | one slot: label + `Saved <date>`/`Not set`/`Unknown` badge, the standing line, one form (key, name, monthly credit, renewal day) with `Save`/`Replace` and `Remove` |
+| `content/ClaudeApiKeyRow.tsx` | one slot: label + `Saved <date>`/`Not set`/`Unknown` badge, the standing line, one form (key, name, monthly credit, renewal day) with `Save`/`Replace` and `Remove`, both refusing the press while any slot's write is out |
 | `content/claude-api-standing.ts` | pure: `standingOf(picture, unknown, t)` → `{tone, base, clause}`, `formatDay`, `usd` |
-| `src/shared/hooks/useClaudeApiKeys.ts` | the read and the three acts: `GET /api/settings/claude-api`, `PUT`/`DELETE …/:slot`; one module-level epoch, one read at a time, a re-read after a failed write, a re-ask on focus and visibilitychange, no timer |
+| `src/shared/hooks/useClaudeApiKeys.ts` | the read and the three acts: `GET /api/settings/claude-api`, `PUT`/`DELETE …/:slot`; one module-level epoch, one read at a time, a re-read after a failed write, a re-ask on focus and visibilitychange (one page return is one read), no timer |
 | `src/shared/api.ts` | `settings.claudeApi()`, `settings.saveClaudeApiKey(slot, body)`, `settings.removeClaudeApiKey(slot)` |
 | `AgentCategoryContentSection.tsx` | mounts `<ClaudeApiKeysContent />` directly after `<RunnerModelContent />` |
 | `src/modules/i18n/locales/en/settings.json` | `agents.claudeApi`, 38 leaf keys, between `runnerModel` and `runnerHealModel`; every `t()` call in the four files carries a `defaultValue`; other locales fall back |
 
-`claude-api-fake.ts` — the scaffold's 15 fixture states — is deleted, and the four `FILL:` markers are gone: the read is `useClaudeApiKeys()`, `onSave` calls its `save` and empties the slot's draft only on a true answer, `onRemove`/`onRetry` call `remove`/`refresh`, and the mount marker is the component itself.
+The read is `useClaudeApiKeys()`; `onSave` calls its `save` and empties the slot's draft only on a true answer; `onRemove`/`onRetry` call `remove`/`refresh`; the card mounts as the component itself.
 
 ## The read contract — `ClaudeApiCardView` (`src/shared/types.ts`)
 | field | meaning |
 |---|---|
 | `picture` | `ClaudeApiPicture` · `{unreadable: true}` (read failed) · `null` (read on the wire) |
 | `savingSlot` | slot a write is in flight on, or `null` |
-| `refusal` | `{slot, words}`: the door's own sentence for a refused save, drawn under that slot's key field |
+| `refusal` | `{slot, words}`: the door's own sentence for a refused save, or the failure sentence for a write that never got an answer, drawn under that slot's key field; it is the pressing surface's own state, not carried across a remount |
 | `save(slot, body)` | `Promise<boolean>`, `true` only on SAVED |
 | `remove(slot)`, `refresh()` | `Promise<void>`; `refresh` is the retry |
 - `ClaudeApiKeySave` = `{key?, label?, creditUsd?, renewsDay?}`: an omitted field keeps the slot's stored value; `renewsDay: null` clears the day; `key` is present only when the reader typed one. Its target is `PUT /api/settings/claude-api/:slot` (live, MAN-8701), body never logged or echoed.
@@ -3782,10 +3782,12 @@ Settings → Agents → Claude: the card that shows who pays for plan runs and h
 | standing line order | wall (`refused` danger · `credit` · `spend` · `rate`, warn; `usage` draws the door's `detail`) → window open (`spending down until <cycle end>`, info) → no renewal day → `window opens <date>` / `window not open yet` |
 Dates draw in the reader's locale and zone (`toLocaleDateString`), so an epoch at UTC midnight can read as the previous local day.
 
-## Rules the fill holds
-- **SAVED empties the field, and nothing else.** A 422 keeps the typed key so it can be corrected and draws the door's words under the field (the `Field` error slot, `role="alert"`); a failed write keeps it and re-reads the store.
+## Rules the card holds
+- **SAVED empties the field, and nothing else.** A 422 keeps the typed key so it can be corrected and draws the door's words under the field (the `Field` error slot, `role="alert"`); any other failed write keeps it too, draws the door's message or a failure sentence, and re-reads the store.
+- **One write at a time, visibly.** While any slot's write is on the wire, every row's `Save`/`Replace` and `Remove` refuses the press (`aria-disabled`; the button keeps focus) and an Enter submit in a field is refused too, so a second press is never silently dropped. A Save that still races the guard answers a sentence under its field; a Remove that does is dropped. Editor's rules: INV-8936, INV-8937.
+- **A refusal belongs to the surface that pressed Save.** It is the mounting card's own state: leaving and returning does not redraw a sentence about a press nobody made on that screen, and the next press retires it.
 - **Unreadable is never "not set".** A failed GET — a non-2xx, a body that is not the picture, a thrown call — answers `{unreadable: true}`, which the card draws as unknown in words with no form (INV-8936).
-- **No timer, and no on-demand arithmetic.** The picture moves while Settings is closed (a wall lands, a window opens), so the hook asks again on `focus` and `visibilitychange`; nothing polls and no figure is computed from the picture's parts.
+- **No timer, and no on-demand arithmetic.** The picture moves while Settings is closed (a wall lands, a window opens), so the hook asks again on `focus` and `visibilitychange`; the pair one return fires is one ask (a 600 ms window), nothing polls and no figure is computed from the picture's parts.
 - **One epoch.** A read issued before a write and answered after it is dropped; a save's fresh picture is the server's read-back, never an echo of what was sent.
 - **A write that failed may have landed** (the door writes the slot before it lifts the walls), so every failure answers a re-read, not the side the card asked for.
 - **The key is one-way.** It travels in the PUT body only, into the door's stdin; the picture, the GET, a refusal and an error carry none. The card names a key by slot and label, never by id or digest (INV-76).

@@ -135,6 +135,7 @@ export default function ClaudeApiKeysContent() {
             picture={key}
             unknown={unreadable}
             saving={savingSlot === slot}
+            blocked={savingSlot !== null}
             refusal={rowRefusal}
             draft={drafts[slot] ?? ''}
             onDraftChange={(next) => setDrafts((current) => ({ ...current, [slot]: next }))}
