@@ -9073,62 +9073,6 @@ probe-key: e2b4820ffa01388a3f5c7ef7dc25286fa874110f
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/composer/ComposerModelMenu.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/composer/ComposerToolsetSection.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useSessionToolsets.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts
 
-## INV-8459 — probe — MEDIUM — Show while the hidden epic's task is still in flight leaves two epics running at a dial of 1, and its next task launches
-
-MEDIUM — Show while the hidden epic's task is still in flight leaves two epics running at a dial of 1, and its next task launches
-
-```probe
-bash /home/lyphe/.claude/state/pipeline-reviews/approve-queues-hide-holds/athena-probes/show_in_flight.sh
-expect: `epics running after the Show: 2 (limit 1)` and `ex-a p2 launched while ey-a holds the slot: True` while it stands; cured, `1 (limit 1)` and `False`
-```
-
-measured 2026-10-16 by chain chain-approve-queues-hide-holds-20261016-063302-f463, finding M1, MEDIUM
-probe-key: 69a9fadc3905f5f4e9ae6550d488277326bd5f8d
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/hide-holds-board.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/hide-holds-scratch.py, /home/lyphe/.claude/hooks/dispatcher/cmd/hide.py, /home/lyphe/.claude/hooks/dispatcher/epic_line.py, /home/lyphe/.claude/hooks/dispatcher/line_gate.py, /home/lyphe/.claude/hooks/dispatcher/store_hidden.py, /home/lyphe/.claude/hooks/intent_lock.py, /home/lyphe/.claude/scripts/runner_fixtures/dispatch_arc_start.py
-
-## INV-8460 — probe — MEDIUM — a feature Queued into an epic that was hidden whole wakes it "started": two epics at a dial of 1
-
-MEDIUM — a feature Queued into an epic that was hidden whole wakes it "started": two epics at a dial of 1
-
-```probe
-bash /home/lyphe/.claude/state/pipeline-reviews/approve-queues-hide-holds/athena-probes/join_hidden.sh
-expect: `epics running: 2 (limit 1)` and `ex-b launched while ey-a holds the slot: True` while it stands; cured, `1 (limit 1)` and `False`
-```
-
-measured 2026-10-16 by chain chain-approve-queues-hide-holds-20261016-063302-f463, finding M2, MEDIUM
-probe-key: ba7ca6336ecee2ecda1187636aed0d376f2f9dc4
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/hide-holds-board.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/hide-holds-scratch.py, /home/lyphe/.claude/hooks/dispatcher/cmd/hide.py, /home/lyphe/.claude/hooks/dispatcher/epic_line.py, /home/lyphe/.claude/hooks/dispatcher/line_gate.py, /home/lyphe/.claude/hooks/dispatcher/store_hidden.py, /home/lyphe/.claude/hooks/intent_lock.py, /home/lyphe/.claude/scripts/runner_fixtures/dispatch_arc_start.py
-
-## INV-8461 — probe — MEDIUM — six docstore rows that restate what this build changed were not rewritten
-
-MEDIUM — six docstore rows that restate what this build changed were not rewritten
-
-```probe
-bash /home/lyphe/.claude/state/pipeline-reviews/approve-queues-hide-holds/athena-probes/stale_rows.sh
-expect: six lines, each printing `1` while the row still carries the old text; cured, each prints `0`
-```
-
-measured 2026-10-16 by chain chain-approve-queues-hide-holds-20261016-063302-f463, finding M3, MEDIUM
-probe-key: e01ed061fb8c1c60259934083c59be6198c115e1
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/hide-holds-board.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/hide-holds-scratch.py, /home/lyphe/.claude/hooks/dispatcher/cmd/hide.py, /home/lyphe/.claude/hooks/dispatcher/epic_line.py, /home/lyphe/.claude/hooks/dispatcher/line_gate.py, /home/lyphe/.claude/hooks/dispatcher/store_hidden.py, /home/lyphe/.claude/hooks/intent_lock.py, /home/lyphe/.claude/scripts/runner_fixtures/dispatch_arc_start.py
-
-## INV-8462 — probe — LOW — a HIDDEN plan of a started epic that waits on another epic's plan still pulls it past the epic limit
-
-LOW — a HIDDEN plan of a started epic that waits on another epic's plan still pulls it past the epic limit
-
-```probe
-bash /home/lyphe/.claude/state/pipeline-reviews/approve-queues-hide-holds/athena-probes/hidden_pulls.sh
-expect: `epics running: 2 (limit 1)` and `et-a launched past the limit for a plan that is hidden: True` while it stands; cured, `1` and `False`
-```
-
-measured 2026-10-16 by chain chain-approve-queues-hide-holds-20261016-063302-f463, finding L1, LOW
-probe-key: 189f46f1ada597eb0f524512da468fd05667b604
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/hide-holds-board.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/hide-holds-scratch.py, /home/lyphe/.claude/hooks/dispatcher/cmd/hide.py, /home/lyphe/.claude/hooks/dispatcher/epic_line.py, /home/lyphe/.claude/hooks/dispatcher/line_gate.py, /home/lyphe/.claude/hooks/dispatcher/store_hidden.py, /home/lyphe/.claude/hooks/intent_lock.py, /home/lyphe/.claude/scripts/runner_fixtures/dispatch_arc_start.py
-
 ## INV-8463 — probe — LOW — an epic deck of finished plans and one parked plan cannot be put away from its corner
 
 LOW — an epic deck of finished plans and one parked plan cannot be put away from its corner
