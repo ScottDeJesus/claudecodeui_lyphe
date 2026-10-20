@@ -2,10 +2,10 @@ import { KeyRound } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { useClaudeApiKeys } from '@/shared/hooks/useClaudeApiKeys';
 import type { ClaudeApiCardView, ClaudeApiKeySave, Tone } from '@/shared/types';
 import { Badge, Button, SettingRow } from '@/shared/ui';
 import ClaudeApiKeyRow from '@/modules/settings/tabs/agents-settings/sections/content/ClaudeApiKeyRow';
-import { claudeApiFixtureView } from '@/modules/settings/tabs/agents-settings/sections/content/claude-api-fake';
 
 /**
  * THE CLAUDE API KEYS CARD — Claude's account panel, directly after the DeepSeek row's card, in
@@ -15,7 +15,8 @@ import { claudeApiFixtureView } from '@/modules/settings/tabs/agents-settings/se
  *
  * WHO PAYS IS THE FIRST LINE. `rides.why` is the door's own sentence and is drawn as data, in every
  * state that can carry it — including the sentence that still holds while a key spends down, that
- * new work waits for the subscription's room until key-carry lands. The card never paraphrases it.
+ * new work waits for the subscription's room until key-carry lands. The card never paraphrases it,
+ * and never prefixes a payer sentence of its own: the door's sentence already opens with one.
  *
  * EVERY STATE IS A HOLE DRAWN. Asking and unreadable each keep the reader on this card with the
  * words that say which one it is and the press that asks again; unreadable is "unknown", never
@@ -26,29 +27,31 @@ import { claudeApiFixtureView } from '@/modules/settings/tabs/agents-settings/se
  * password field is the only place a key is ever typed — the card's own state holds it just long
  * enough for the save body, and the read never returns it.
  *
- * THIS IS THE SCAFFOLD. The read is `claudeApiFixtureView()`, a fake beside this file whose every
- * state is a whole `ClaudeApiPicture`; the four marked lines below are the only behaviour card-fill
- * writes. The composition outside those markers is filled around, byte for byte.
+ * THE READ IS THE HOOK'S. `useClaudeApiKeys` asks GET /api/settings/claude-api and re-asks whenever
+ * the page regains focus, because a key's standing moves while Settings is closed; a save or a
+ * removal answers the fresh picture. The card keeps only the drafts.
  */
 export default function ClaudeApiKeysContent() {
   const { t } = useTranslation('settings');
 
-  // FILL: picture — card-fill's `useClaudeApiKeys()` replaces this fake read: GET /api/settings/claude-api
-  // answers the door's picture (`null` while the read is on the wire, `{unreadable:true}` when it will not
+  // The door's picture (`null` while the read is on the wire, `{unreadable:true}` when it will not
   // answer), the slot a write is in flight on, and the door's own words for a refused save.
-  const view: ClaudeApiCardView = claudeApiFixtureView();
+  const view: ClaudeApiCardView = useClaudeApiKeys();
   const { picture, savingSlot, refusal } = view;
 
   // A key typed into a row lives here until a save answers SAVED; the row's field is controlled by the
   // card so the filled `onSave` can empty exactly the slot that saved, and nothing on a refusal.
   const [drafts, setDrafts] = useState<Record<number, string>>({});
 
-  // FILL: onSave — `view.save(slot, body)`; on a true answer (SAVED) this slot's draft is emptied.
-  const onSave = (_slot: number, _body: ClaudeApiKeySave): void => {};
-  // FILL: onRemove — `void view.remove(slot)`.
-  const onRemove = (_slot: number): void => {};
-  // FILL: onRetry — `void view.refresh()`.
-  const onRetry = (): void => {};
+  // SAVED is the only answer that empties a field: a refusal keeps what was typed so the reader can
+  // correct it, and a failed write keeps it too.
+  const onSave = (slot: number, body: ClaudeApiKeySave): void => {
+    void view.save(slot, body).then((saved) => {
+      if (saved) setDrafts((current) => ({ ...current, [slot]: '' }));
+    });
+  };
+  const onRemove = (slot: number): void => { void view.remove(slot); };
+  const onRetry = (): void => { void view.refresh(); };
 
   const asking = picture === null;
   const unreadable = picture !== null && 'unreadable' in picture;
@@ -75,18 +78,9 @@ export default function ClaudeApiKeysContent() {
           ? 'positive'
           : 'info';
 
-  // The same payer, said in full, for the sentence that leads the card.
-  const ridingKey = rides !== null && (rides.slot === 1 || rides.slot === 2)
-    ? read?.keys.find((key) => key.slot === rides.slot) ?? null
-    : null;
-  const payerLine = rides !== null && rides.slot === 0
-    ? t('agents.claudeApi.payerSubscriptionLong', { defaultValue: 'your Claude subscription' })
-    : rides !== null && (rides.slot === 1 || rides.slot === 2)
-      ? ridingKey?.label
-        ? t('agents.claudeApi.payerKeyLabelled', { defaultValue: 'API key {{slot}} ({{label}})', slot: rides.slot, label: ridingKey.label })
-        : t('agents.claudeApi.payerKey', { defaultValue: 'API key {{slot}}', slot: rides.slot })
-      : '';
-
+  // The first line is the door's `rides.why`, alone, for every payer: it already opens with the
+  // payer in the door's own words ("Plan runs ride …"), so a payer sentence of the card's own would
+  // say it twice, which the live picture did (INV-8937). The badge keeps the short word.
   const description = asking
     ? t('status.loading', { ns: 'common', defaultValue: 'Loading...' })
     : unreadable
@@ -96,16 +90,10 @@ export default function ClaudeApiKeysContent() {
       : (
         <>
           <span className="block">
-            {rides === null || rides.slot === null
-              ? rides?.why
-                ? rides.why
-                : t('agents.claudeApi.ridesNone', {
-                    defaultValue: 'No payer can carry a plan run, so plan runs try your subscription.',
-                  })
-              : t('agents.claudeApi.rides', {
-                  defaultValue: 'Plan runs ride {{payer}}. {{why}}',
-                  payer: payerLine,
-                  why: rides.why,
+            {rides?.why
+              ? rides.why
+              : t('agents.claudeApi.ridesNone', {
+                  defaultValue: 'No payer can carry a plan run, so plan runs try your subscription.',
                 })}
           </span>
           <span className="mt-1 block">

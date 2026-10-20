@@ -29,9 +29,10 @@ const DOOR_TIMEOUT_MS = 10_000;
 const DOOR_MAX_BUFFER = 1024 * 1024;
 
 /**
- * Anything shaped like a Claude API key of any kind (api, admin, oat), blanked from the words this
- * module relays. The door already holds to that rule (`keys.redact`); this is the second seam, so
- * a stand-in door that echoed its stdin could still put no key in an answer or an error.
+ * Anything shaped like a Claude API key of any kind (api, admin, oat), blanked from every string
+ * this module relays. The door holds to that rule itself, but the server's answer is a second seam:
+ * a stand-in door that echoed its stdin, or a hand-edited store, can put no key in a picture, a
+ * refusal or an error this module returns.
  */
 const KEY_SHAPE = /sk-ant-[A-Za-z0-9_-]{8,}/g;
 
@@ -66,6 +67,24 @@ function redact(text: string): string {
 }
 
 /**
+ * The picture with every string in it passed through `redact` — labels, wall details, the reason
+ * who rides, the models a key paid for. The door is one seam; the answer this server gives is the
+ * other, and a picture is an answer: nothing key-shaped reaches the card even when the door it was
+ * read from was a stand-in, or the store behind it was edited by hand.
+ */
+function redactPicture(picture: ClaudeApiPicture): ClaudeApiPicture {
+  const walk = (value: unknown): unknown => {
+    if (typeof value === 'string') return redact(value);
+    if (Array.isArray(value)) return value.map(walk);
+    if (typeof value === 'object' && value !== null) {
+      return Object.fromEntries(Object.entries(value).map(([name, entry]) => [name, walk(entry)]));
+    }
+    return value;
+  };
+  return walk(picture) as ClaudeApiPicture;
+}
+
+/**
  * Whether a parsed status answer is the picture this server promises to relay. A door that
  * answered malformed JSON, or JSON of another shape, is a read FAILURE, not a picture half drawn.
  */
@@ -91,7 +110,8 @@ function isPicture(value: unknown): value is ClaudeApiPicture {
  * A read answers `{ unreadable: true }` on EVERY failure — no verb, a non-zero exit, the bound, a
  * body that is not the picture — because the card draws "unknown" in words and must never draw
  * "not set" for settings it could not see (INV-8936). A read creates nothing and writes nothing;
- * the door's own read of a missing store answers an empty store.
+ * the door's own read of a missing store answers an empty store. A picture that IS the picture is
+ * relayed through `redactPicture`, so no key-shaped string leaves this server.
  *
  * Used by `settings.routes.ts` (`GET /claude-api`) and by both writes below, which answer the fresh
  * picture rather than echoing the body.
@@ -103,7 +123,7 @@ export async function readClaudeApi(): Promise<ClaudeApiPicture | ClaudeApiUnrea
       maxBuffer: DOOR_MAX_BUFFER,
     });
     const picture: unknown = JSON.parse(stdout);
-    return isPicture(picture) ? picture : { unreadable: true };
+    return isPicture(picture) ? redactPicture(picture) : { unreadable: true };
   } catch {
     return { unreadable: true };
   }
@@ -136,7 +156,7 @@ function runDoor(args: string[], stdin: string | null): Promise<DoorAnswer> {
       finish({ code: null, stdout, stderr, timedOut: true });
     }, DOOR_TIMEOUT_MS);
 
-    // The stdio above guarantees both pipes; the typings do not narrow them, as `browser-use` notes.
+    // The stdio above guarantees both pipes, but the typings still give each as `… | null`.
     child.stdout?.setEncoding('utf8');
     child.stderr?.setEncoding('utf8');
     child.stdout?.on('data', (chunk: string) => { stdout += chunk; });
@@ -168,9 +188,11 @@ function doorFailure(answer: DoorAnswer): string {
  * walls could not be lifted is such a failure by class (`WallsStand`), never a SAVED.
  *
  * THE WRITE IS THE EVENT: a save clears that key's walls, and the dispatcher's release asks whether
- * another payer now carries a plan (`account_release.py`), so a SAVED or REMOVED answer ends with
- * `void kickDispatcher()`, exactly as the switches beside it do. A refused write wrote nothing and
- * kicks nothing.
+ * another payer now carries a plan (`account_release.py`), so every attempted write ends with
+ * `void kickDispatcher()`, exactly as the switches beside it do. That includes a FAILED write: the
+ * door writes the key and settings BEFORE it lifts the walls, so a failed lift (`WallsStand`, exit 1)
+ * has already landed the save and may have freed a plan. Only a REFUSED answer — which wrote
+ * nothing — kicks nothing.
  */
 async function writeDoor(args: string[], stdin: string | null): Promise<ClaudeApiPicture | ClaudeApiUnreadable> {
   const answer = await runDoor(args, stdin);
@@ -186,6 +208,7 @@ async function writeDoor(args: string[], stdin: string | null): Promise<ClaudeAp
       statusCode: 422,
     });
   }
+  void kickDispatcher();
   throw new AppError(doorFailure(answer), {
     code: 'CLAUDE_API_DOOR_FAILED',
     statusCode: 502,

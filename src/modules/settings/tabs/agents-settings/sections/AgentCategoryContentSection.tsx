@@ -3,6 +3,7 @@ import { McpServers } from '@/modules/mcp';
 import { ProviderSkills } from '@/modules/skills';
 import AccountContent from '@/modules/settings/tabs/agents-settings/sections/content/AccountContent';
 import AgentChainsContent from '@/modules/settings/tabs/agents-settings/sections/content/AgentChainsContent';
+import ClaudeApiKeysContent from '@/modules/settings/tabs/agents-settings/sections/content/ClaudeApiKeysContent';
 import EditModeContent from '@/modules/settings/tabs/agents-settings/sections/content/EditModeContent';
 import JevContent from '@/modules/settings/tabs/agents-settings/sections/content/JevContent';
 import PermissionsContent from '@/modules/settings/tabs/agents-settings/sections/content/PermissionsContent';
@@ -59,7 +60,10 @@ export default function AgentCategoryContentSection({
               effort every soul launches at — and the switches below decide how those souls are run. */}
           <AgentChainsContent />
           <RunnerModelContent />
-          {/* FILL: claude-api-card — <ClaudeApiKeysContent />, directly after the DeepSeek row's card */}
+          {/* The keys card directly under the model card: the model switch says who runs, and this
+              says which wallet pays when the subscription cannot — and kicks the dispatcher so a
+              held plan can be carried at once. */}
+          <ClaudeApiKeysContent />
           {/* Under the model switch, not beside it: this is the narrower question of what may leave
               the machine to answer one, and it reaches hooks rather than the runner's hands. */}
           <JevContent />

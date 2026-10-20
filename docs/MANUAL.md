@@ -7313,12 +7313,13 @@ Accept walks now." With no position the row says so in words — Loading while t
 `unreadable` sentence the DeepSeek row carries once it failed — and the control slot holds Try again in
 place of the toggle.
 
-**THE KICK. Every switch write a daemon can be holding work for ends with `dispatcher kick`; the Dactyls switch (MAN-8059) is the one that does not — nothing queues on it.** `setDeepseekFlash`,
+**THE KICK. Every switch write a daemon can be holding work for ends with `dispatcher kick`; the Dactyls switch (MAN-8059) is the one that does not — nothing queues on it.** `setDeepseekFlash`, `setDeepseekFeatures`,
 `setParkAtPeak`, `setPlannerLanes` and the Claude API keys' two writes (MAN-8701, `claude-api-keys.ts`)
 each hand the flip to the dispatcher once the file has settled
 (`server/modules/settings/dispatcher-kick.ts`: `dispatcher kick` spawned with a ten-second bound and
-never awaited). The keys' writes kick for the same event one layer over: a SAVED save or a REMOVED
-remove lifts that payer's walls, and the release asks whether another payer now carries the plan
+never awaited). The keys' writes kick for the same event one layer over — every attempted write, a failed one
+included, because the door lands the save before it lifts its walls: a save or a remove lifts that
+payer's walls, and the release asks whether another payer now carries the plan
 (`account_release.py`). The flip IS the event — a daemon holding a phase for want of a lane, or an hour to arm,
 acts on it now rather than at the next session event. The kick's own answer is one line in the server's
 journal per flip (`dispatcher kick: woke daemon`); a kick that could not be run, or that hung past its
@@ -10648,7 +10649,7 @@ Agent Chains opens from one row in Settings → Agents → Claude → Account, i
 ## the row
 | fact | value |
 |---|---|
-| home | `AgentChainsContent.tsx`, first in the house-wide stack `AgentCategoryContentSection.tsx` renders under Claude → Account, above `RunnerModelContent` |
+| home | `AgentChainsContent.tsx`, first in the house-wide stack `AgentCategoryContentSection.tsx` renders under Claude → Account: Agent Chains, then `RunnerModelContent`, then `ClaudeApiKeysContent` (MAN-8695), then `JevContent` |
 | shape | one `SettingsCard` holding one `SettingRow`: label "Agent chains", button "Edit Agent Chains" |
 | trigger | the button is the kit `DialogTrigger asChild`; that is what returns focus to it on close |
 | strings | `agents.agentChains.{label,description,button,loadFailed,reload}` in `en/settings.json`; each call carries a `defaultValue`; other locales fall back to English |

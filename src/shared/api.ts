@@ -3,7 +3,7 @@ import {
   getStoredAuthToken,
   storeAuthToken,
 } from '@/shared/authToken';
-import type { AuthTraceEvent, CerberusEnrollInput, CerberusLabelInput, CerberusMuteInput, CerberusPromoteInput, DeepseekRange, DispatcherAsk, DispatcherEpicsWord, DispatcherModelChoice, DispatcherQueueMove, FileLinePatch, JevRange, NoteInput, NtfySettingsInput, SimpleListItemRef, SimpleListPosition, SubagentTranscriptResult } from '@/shared/types';
+import type { AuthTraceEvent, CerberusEnrollInput, CerberusLabelInput, CerberusMuteInput, CerberusPromoteInput, ClaudeApiKeySave, DeepseekRange, DispatcherAsk, DispatcherEpicsWord, DispatcherModelChoice, DispatcherQueueMove, FileLinePatch, JevRange, NoteInput, NtfySettingsInput, SimpleListItemRef, SimpleListPosition, SubagentTranscriptResult } from '@/shared/types';
 import type { AgentLaunchDefaultsChange, AgentLaunchRowChange } from '@/shared/agent-launch-types';
 import type { MarkRequest, MissedRequest, Queue, ReadRequest, ThresholdRequest, UnderstandingMarkRequest } from '@/shared/affected-areas-types';
 import type { CerberusCatalogEntryInput } from '@/shared/cerberus-types';
@@ -667,6 +667,17 @@ export const api = {
     parkAtPeakSwitch: () => get('/api/settings/park-at-peak'),
     saveParkAtPeakSwitch: (state: { enabled: boolean }) =>
       put('/api/settings/park-at-peak', state),
+
+    // The Claude API keys' own door — a store on this host, host-wide like the switches above and
+    // no per-user preference. The GET answers the door's picture (`claude-api status --json`):
+    // which payer rides and why, both slots, the pace — never a key. The PUT takes ONE slot's save
+    // (`key` only when the reader typed one) and answers a fresh picture; its 422 is the door's own
+    // refusal sentence. The DELETE clears a slot and answers the same. THE BODY IS NEVER LOGGED,
+    // ECHOED OR PUT IN AN ERROR: it carries a key, and a key reaches the door's stdin only.
+    claudeApi: () => get('/api/settings/claude-api'),
+    saveClaudeApiKey: (slot: number, body: ClaudeApiKeySave) =>
+      put(`/api/settings/claude-api/${slot}`, body),
+    removeClaudeApiKey: (slot: number) => del(`/api/settings/claude-api/${slot}`),
 
     // The plan runner's Dactyls switch — the fifth flag file in this shape: whether Hephaestus on
     // Claude hands his code edits to one-file children. The GET answers the position read off the file

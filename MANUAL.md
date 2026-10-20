@@ -3744,31 +3744,22 @@ why the turn-back in `carryLeg`: a chat list at the top of the pane cannot pan u
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/native-scroll-legs.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/native-scroll-surfaces.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/phone-uncancelable.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/native-scroll-drag.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/native-scroll-drag-scratch.sh
 
-## MAN-8695 — The Claude API keys card — files, FILL seams, the read contract and the strings
+## MAN-8695 — The Claude API keys card — files, the read contract and the strings
 
-Settings → Agents → Claude: the card that shows who pays for plan runs and holds the two Anthropic API key slots. It draws the door's picture (`~/.claude/scripts/claude-api status --json`, MAN-8625); it does no arithmetic of its own. Mounted today by nobody: the scaffold is composed and photographed, the live app draws nothing until phase `card-fill`.
+Settings → Agents → Claude: the card that shows who pays for plan runs and holds the two Anthropic API key slots. It draws the door's picture (`~/.claude/scripts/claude-api status --json`, MAN-8625) through Settings' own routes (MAN-8701) and does no arithmetic of its own. Mounted by `AgentCategoryContentSection.tsx` directly after `<RunnerModelContent />`, and live from the day it landed: with no key entered, the door names the subscription and every launch rides what it rode before.
 
 ## Files — `src/modules/settings/tabs/agents-settings/sections/`
 | file | role |
 |---|---|
-| `content/ClaudeApiKeysContent.tsx` | the card: header row (title, payer `Badge`, `rides.why` + purpose sentence, retry press), then one `ClaudeApiKeyRow` per slot 1, 2 in slot order |
+| `content/ClaudeApiKeysContent.tsx` | the card: header row (title, payer `Badge`, the door's `rides.why` + purpose sentence, retry press), then one `ClaudeApiKeyRow` per slot 1, 2 in slot order |
 | `content/ClaudeApiKeyRow.tsx` | one slot: label + `Saved <date>`/`Not set`/`Unknown` badge, the standing line, one form (key, name, monthly credit, renewal day) with `Save`/`Replace` and `Remove` |
 | `content/claude-api-standing.ts` | pure: `standingOf(picture, unknown, t)` → `{tone, base, clause}`, `formatDay`, `usd` |
-| `content/claude-api-fake.ts` | scaffold stand-in: 15 whole-picture states in `CLAUDE_API_FIXTURE_STATES`, `showClaudeApiFixture(state)`, `claudeApiFixtureView()`. Only `ClaudeApiKeysContent` imports it. `card-fill` deletes it |
-| `AgentCategoryContentSection.tsx` | one comment marker, after `<RunnerModelContent />` |
-| `src/modules/i18n/locales/en/settings.json` | `agents.claudeApi`, 41 leaf keys, between `runnerModel` and `runnerHealModel`; every `t()` call in the four files carries a `defaultValue` |
+| `src/shared/hooks/useClaudeApiKeys.ts` | the read and the three acts: `GET /api/settings/claude-api`, `PUT`/`DELETE …/:slot`; one module-level epoch, one read at a time, a re-read after a failed write, a re-ask on focus and visibilitychange, no timer |
+| `src/shared/api.ts` | `settings.claudeApi()`, `settings.saveClaudeApiKey(slot, body)`, `settings.removeClaudeApiKey(slot)` |
+| `AgentCategoryContentSection.tsx` | mounts `<ClaudeApiKeysContent />` directly after `<RunnerModelContent />` |
+| `src/modules/i18n/locales/en/settings.json` | `agents.claudeApi`, 38 leaf keys, between `runnerModel` and `runnerHealModel`; every `t()` call in the four files carries a `defaultValue`; other locales fall back |
 
-The 15 states: `asking unreadable noKey key1Set bothSet window subscriptionWalled key1OutOfCredit spendLimit rateLimited refused everyPayerWalled saveInFlight saveRefused noRenewalDay`.
-
-## FILL seams — the only behaviour `card-fill` writes
-| where | marker | becomes |
-|---|---|---|
-| `ClaudeApiKeysContent.tsx` | `FILL: picture` | `useClaudeApiKeys()` in place of `claudeApiFixtureView()`; the import of `claude-api-fake` goes |
-| `ClaudeApiKeysContent.tsx` | `FILL: onSave` | `view.save(slot, body)`; on `true` (SAVED) empty that slot's `drafts[slot]` and nothing else |
-| `ClaudeApiKeysContent.tsx` | `FILL: onRemove` | `void view.remove(slot)` |
-| `ClaudeApiKeysContent.tsx` | `FILL: onRetry` | `void view.refresh()` |
-| `AgentCategoryContentSection.tsx` | `FILL: claude-api-card` | `<ClaudeApiKeysContent />` directly after `<RunnerModelContent />` |
-Everything else (drafts state, row composition, form assembly, translation keys) survives the fill unchanged.
+`claude-api-fake.ts` — the scaffold's 15 fixture states — is deleted, and the four `FILL:` markers are gone: the read is `useClaudeApiKeys()`, `onSave` calls its `save` and empties the slot's draft only on a true answer, `onRemove`/`onRetry` call `remove`/`refresh`, and the mount marker is the component itself.
 
 ## The read contract — `ClaudeApiCardView` (`src/shared/types.ts`)
 | field | meaning |
@@ -3778,8 +3769,8 @@ Everything else (drafts state, row composition, form assembly, translation keys)
 | `refusal` | `{slot, words}`: the door's own sentence for a refused save, drawn under that slot's key field |
 | `save(slot, body)` | `Promise<boolean>`, `true` only on SAVED |
 | `remove(slot)`, `refresh()` | `Promise<void>`; `refresh` is the retry |
-- `ClaudeApiKeySave` = `{key?, label?, creditUsd?, renewsDay?}`: an omitted field keeps the slot's stored value; `renewsDay: null` clears the day; `key` is present only when the reader typed one. Its documented target is `PUT /api/settings/claude-api/:slot`, body never logged or echoed.
-- The unreadable sentence promises a re-ask "whenever this page regains focus": the hook owes that.
+- `ClaudeApiKeySave` = `{key?, label?, creditUsd?, renewsDay?}`: an omitted field keeps the slot's stored value; `renewsDay: null` clears the day; `key` is present only when the reader typed one. Its target is `PUT /api/settings/claude-api/:slot` (live, MAN-8701), body never logged or echoed.
+- The unreadable sentence promises a re-ask "whenever this page regains focus": the hook's `focus`/`visibilitychange` listeners are that promise.
 - Type mirrors: `ClaudeApiWall`, `ClaudeApiKeyPicture`, `ClaudeApiPicture`, `ClaudeApiUnreadable` (4 declarations + 2 comments, 2298 bytes, 32 lines) stand byte-identical in `src/shared/types.ts` and `server/shared/types.ts`. `ClaudeApiKeySave` and `ClaudeApiCardView` are the client mirror's only.
 
 ## What each state draws
@@ -3787,8 +3778,16 @@ Everything else (drafts state, row composition, form assembly, translation keys)
 |---|---|
 | `asking` | `Asking…` badge, `Loading...`, retry press, no slot rows |
 | `unreadable` | `Unknown` badge, the unreadable sentence, retry press; both slots `Unknown`, standing `Unknown — …not the same as not set`, no form |
-| read | payer badge: `Subscription` (positive) · `API key <n>` (info) · `Walled` (warn, every payer walled); first line = `agents.claudeApi.rides` = `Plan runs ride <payer>. <rides.why>` when `rides.slot` is 0, 1 or 2, `rides.why` alone when `null` (`ridesNone` when `why` is empty); then the purpose sentence |
+| read | payer badge: `Subscription` (positive) · `API key <n>` (info) · `Walled` (warn, every payer walled); FIRST LINE = `rides.why` alone for every `rides.slot`, 0, 1, 2 and `null` (`ridesNone` when `why` is empty), because the door's sentence already opens "Plan runs ride …" and a payer sentence of the card's own said it twice (INV-8937); then the purpose sentence |
 | standing line order | wall (`refused` danger · `credit` · `spend` · `rate`, warn; `usage` draws the door's `detail`) → window open (`spending down until <cycle end>`, info) → no renewal day → `window opens <date>` / `window not open yet` |
 Dates draw in the reader's locale and zone (`toLocaleDateString`), so an epoch at UTC midnight can read as the previous local day.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/settings.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/agents-settings/sections/AgentCategoryContentSection.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/agents-settings/sections/content/claude-api-fake.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/agents-settings/sections/content/ClaudeApiKeyRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/agents-settings/sections/content/ClaudeApiKeysContent.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/agents-settings/sections/content/claude-api-standing.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts
+## Rules the fill holds
+- **SAVED empties the field, and nothing else.** A 422 keeps the typed key so it can be corrected and draws the door's words under the field (the `Field` error slot, `role="alert"`); a failed write keeps it and re-reads the store.
+- **Unreadable is never "not set".** A failed GET — a non-2xx, a body that is not the picture, a thrown call — answers `{unreadable: true}`, which the card draws as unknown in words with no form (INV-8936).
+- **No timer, and no on-demand arithmetic.** The picture moves while Settings is closed (a wall lands, a window opens), so the hook asks again on `focus` and `visibilitychange`; nothing polls and no figure is computed from the picture's parts.
+- **One epoch.** A read issued before a write and answered after it is dropped; a save's fresh picture is the server's read-back, never an echo of what was sent.
+- **A write that failed may have landed** (the door writes the slot before it lifts the walls), so every failure answers a re-read, not the side the card asked for.
+- **The key is one-way.** It travels in the PUT body only, into the door's stdin; the picture, the GET, a refusal and an error carry none. The card names a key by slot and label, never by id or digest (INV-76).
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/settings.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/agents-settings/sections/AgentCategoryContentSection.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/agents-settings/sections/content/ClaudeApiKeyRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/agents-settings/sections/content/ClaudeApiKeysContent.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/agents-settings/sections/content/claude-api-standing.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/useClaudeApiKeys.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts

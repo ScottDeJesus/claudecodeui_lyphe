@@ -10619,3 +10619,159 @@ Reference: MAN-8695.
 - Cure at `card-fill`, when the card meets the live picture: draw `rides.why` alone as the first line for every `rides.slot`; the payer word stays on the badge.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/agents-settings/sections/content/claude-api-fake.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/agents-settings/sections/content/ClaudeApiKeysContent.tsx
+
+## INV-8941 — probe — The relayed picture is not redacted, and both the module comment and MAN-8701 say it is
+
+The relayed picture is not redacted, and both the module comment and MAN-8701 say it is
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+set -u
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+export PROBE_PORT=7899
+. scripts/apps-probe-env.sh
+stop_probe_server
+export PLAN_RUNNER_CLAUDE_API_KEYS="$D/keys.json" PLAN_RUNNER_CLAUDE_API_HOME="$D/home" DISPATCHER_HOME="$D/state/dispatcher"
+mkdir -p "$DISPATCHER_HOME" "$D/home" || exit 1
+export SCRATCHD="$D"
+cat > "$D/door" <<'EDOOR'
+#!/bin/bash
+case "$1" in
+  set) IFS= read -r line; printf '%s' "$line" > "$SCRATCHD/echoed-key"; printf 'SAVED key %s\n' "$2"; exit 0;;
+  status) k=$(cat "$SCRATCHD/echoed-key" 2>/dev/null || true)
+    printf '{"rides":{"slot":1,"why":"x"},"subscription":{"wall":null},"keys":[{"slot":1,"set":true,"label":"%s","credit_usd":200,"renews_day":null,"saved_at":null,"cycle_ends_at":null,"spent_usd":0,"left_usd":null,"window":{"open":false,"opens_at":null},"wall":null}],"pace_usd_per_hour":0,"unpriced":[],"checked_at":1}\n' "$k"; exit 0;;
+esac
+exit 1
+EDOOR
+chmod +x "$D/door"
+printf '#!/bin/bash\nprintf "no work\\n"\n' > "$D/kick.sh"; chmod +x "$D/kick.sh"
+CLAUDE_API_BIN="$D/door" DISPATCHER_BIN="$D/kick.sh" boot_probe_server || exit 1
+TOKEN=$(mint_token) || exit 1
+API="http://127.0.0.1:$PROBE_PORT/api/settings/claude-api"
+K='sk-ant-api03-ATHENAPROBEREDACT000000000'
+put=$(curl -s -m 20 -o "$D/put.json" -w '%{http_code}' -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' -X PUT --data-binary "{\"key\":\"$K\",\"label\":\"probe\"}" "$API/1")
+get=$(curl -s -m 20 -o "$D/get.json" -w '%{http_code}' -H "Authorization: Bearer $TOKEN" "$API")
+echo "PUT: $put   GET: $get"
+echo "full key in PUT answer: $(grep -c "$K" "$D/put.json" || true)"
+echo "full key in GET answer: $(grep -c "$K" "$D/get.json" || true)"
+stop_probe_server
+case "$D" in /tmp/athena-probe.*) rm -rf -- "$D";; esac
+EOF
+bash "$D/p.sh"
+expect: PUT: 200 GET: 200, "full key in PUT answer: 1", "full key in GET answer: 1"; cured: 0 and 0 (the label drawn as [key]).
+```
+
+measured 2026-10-20 by chain chain-claude-api-backup--settings-api-20261020-122510-4939, finding L1, LOW
+probe-key: 0a4c4029b6179d29800fb7460d5f7fc4d7dba94b
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/settings/claude-api-keys.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/settings/settings.routes.ts
+
+## INV-8942 — probe — A `WallsStand` save has already landed on disk, and MAN-8701 says a failed write wrote nothing and kicks nothing
+
+A `WallsStand` save has already landed on disk, and MAN-8701 says a failed write wrote nothing and kicks nothing
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+set -u
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+export PROBE_PORT=7899
+. scripts/apps-probe-env.sh
+stop_probe_server
+export PLAN_RUNNER_CLAUDE_API_KEYS="$D/keys.json" PLAN_RUNNER_CLAUDE_API_HOME="$D/home" DISPATCHER_HOME="$D/state/dispatcher"
+mkdir -p "$DISPATCHER_HOME" "$D/home" || exit 1
+printf '%s\n' 'sk-ant-api03-ATHENAPROBEWALLS0000000000' | ~/.claude/scripts/claude-api set 1 --key-stdin --label before >/dev/null || exit 1
+export KICK_LOG="$D/kick.log"; : > "$KICK_LOG"
+cat > "$D/kick.sh" <<'EK'
+#!/bin/bash
+[ "${1:-}" = kick ] && printf 'kick\n' >> "$KICK_LOG"
+printf 'no work\n'
+EK
+chmod +x "$D/kick.sh"
+printf '{}\n' > "$D/home/walls.json"
+mkdir "$D/home/walls.json.lock" || exit 1
+DISPATCHER_BIN="$D/kick.sh" boot_probe_server || exit 1
+TOKEN=$(mint_token) || exit 1
+API="http://127.0.0.1:$PROBE_PORT/api/settings/claude-api"
+echo "label on disk before: [$(jq -r '."1".label' "$D/home/slots.json")]"
+code=$(curl -s -m 20 -o "$D/answer.json" -w '%{http_code}' -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' -X PUT --data-binary '{"label":"after-wallsstand"}' "$API/1")
+echo "WallsStand save answer: $code $(jq -c '.error' "$D/answer.json")"
+echo "label on disk after the 502: [$(jq -r '."1".label' "$D/home/slots.json")]"
+sleep 3
+echo "kick invocations for that write: $(wc -l < "$KICK_LOG")"
+rmdir "$D/home/walls.json.lock"
+stop_probe_server
+case "$D" in /tmp/athena-probe.*) rm -rf -- "$D";; esac
+EOF
+bash "$D/p.sh"
+expect: answer 502 `claude-api set: WallsStand`, label on disk `after-wallsstand`, kick invocations 0; cured: the row no longer claims the write wrote nothing (or the write rolls back / kicks).
+```
+
+measured 2026-10-20 by chain chain-claude-api-backup--settings-api-20261020-122510-4939, finding L2, LOW
+probe-key: 8d8f779bc5e14165738bd5d69294237d14ad55bc
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/settings/claude-api-keys.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/settings/settings.routes.ts
+
+## INV-8943 — probe — The new `settings` package is registered with no summary
+
+The new `settings` package is registered with no summary
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+out=$(docstore check | jq -c '.findings[] | select(.package=="cloudcli:server/modules/settings")')
+printf 'check row: %s\n' "${out:-none}"
+grep -n '^cloudcli:server/modules/settings ' ATLAS.md || echo 'atlas line: none'
+EOF
+bash "$D/p.sh"
+expect: `check row: {"class":"no-summary",…,"package":"cloudcli:server/modules/settings",…}` and `9:cloudcli:server/modules/settings [store] (INV 0)`; cured: `check row: none` and the line carries a summary.
+```
+
+measured 2026-10-20 by chain chain-claude-api-backup--settings-api-20261020-122510-4939, finding L3, LOW
+probe-key: 5a047c9f6e7143a30ad6aca03b764cffcf05259d
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/settings/claude-api-keys.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/settings/settings.routes.ts
+
+## INV-8944 — probe — Dangling reference: "as `browser-use` notes"
+
+Dangling reference: "as `browser-use` notes"
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+grep -n 'browser-use. notes' server/modules/settings/claude-api-keys.ts || echo 'comment gone'
+grep -rin 'typings\|narrow\|stdio' server/modules/browser-use/ | grep -i 'note' || echo 'browser-use note: none'
+EOF
+bash "$D/p.sh"
+expect: the comment line prints and `browser-use note: none`; cured: the comment is reworded or gone.
+```
+
+measured 2026-10-20 by chain chain-claude-api-backup--settings-api-20261020-122510-4939, finding L4, LOW
+probe-key: 6393a3f751c4b946b8e55d0ad7950b084367d3cc
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/settings/claude-api-keys.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/settings/settings.routes.ts
+
+## INV-8945 — probe — MAN-1497's kick census (edited by this build) omits `setDeepseekFeatures`
+
+MAN-1497's kick census (edited by this build) omits `setDeepseekFeatures`
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+grep -n 'void kickDispatcher()' server/modules/settings/settings.service.ts
+docstore get MAN-1497 | jq -r '.row.body' | sed -n '47,49p'
+EOF
+bash "$D/p.sh"
+expect: call sites 233, 249, 268, 315; the row's sentence names three switches plus the keys and not `setDeepseekFeatures`; cured: the row names it.
+```
+
+measured 2026-10-20 by chain chain-claude-api-backup--settings-api-20261020-122510-4939, finding L5, LOW
+probe-key: 27db3d10115792474295403c80ba25edc8c0bac0
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/settings/claude-api-keys.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/settings/settings.routes.ts
