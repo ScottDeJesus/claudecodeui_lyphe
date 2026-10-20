@@ -13738,7 +13738,11 @@ Each key below is read from the dispatcher's own document or from the usage rout
   same credential stamp; `pending()`, `degraded()` and a `shape` answer carry `pace: null`, and
   `toWire` omits the key — a failure draws nothing, never a stale picture.
 - Units: `DispatcherPaceWindow` figures are FRACTIONS 0..1; `ClaudeUsagePace` figures are PERCENTS,
-  converted once by `paceOf`, rounded to whole points. The meter does no arithmetic.
+  converted once by `paceOf`, rounded to whole points. The meter does no arithmetic. A figure the
+  pacer could not read is `null` — a probe's `projected` until its account's cost is measured —
+  and `paceSince` accepts it: demanding a count froze the lane on the first probe after a 5-hour
+  roll (measured 2026-10-20 — every document read threw `no route.pace.five.projected`, and the
+  board kept a pre-roll picture). A null figure draws no mark, and the meter says only what it has.
 - `DispatcherPace`, `DispatcherPlan.pace_hold`, `DispatcherRoute.pace` and `ClaudeUsage.pace` are
   optional keys in both type mirrors.
 

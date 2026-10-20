@@ -19,15 +19,19 @@ import { field, isCount, isCountOrNull, isFlag, isRecord, isText, need } from '.
  * that needs percents (the account panel's meters) converts at the usage route, never here.
  */
 
-/** One window of the picture, `null` when the pacer could not read it. `resets_at` is epoch seconds,
- *  or `null` on a reading that carries no reset. */
+/** One window of the picture, `null` when the pacer could not read it. Every figure is a fraction or
+ *  `null` when THAT figure could not be read — the probe's `projected` is null until the account's
+ *  cost is measured (`project.Window`: "An unread figure is None"), and a reader that demanded a
+ *  count froze the whole lane on the first probe (measured 2026-10-20: the 5-hour window rolled and
+ *  every read threw `no route.pace.five.projected`, leaving a pre-roll document on the board).
+ *  `resets_at` is epoch seconds, or `null` on a reading that carries no reset. */
 function windowOf(raw: unknown, where: string): DispatcherPace['five'] {
   if (raw === null) return null;
   const window = need(raw, isRecord, where);
   return {
-    used: need(field(window, 'used'), isCount, `${where}.used`),
-    projected: need(field(window, 'projected'), isCount, `${where}.projected`),
-    ceiling: need(field(window, 'ceiling'), isCount, `${where}.ceiling`),
+    used: need(field(window, 'used'), isCountOrNull, `${where}.used`),
+    projected: need(field(window, 'projected'), isCountOrNull, `${where}.projected`),
+    ceiling: need(field(window, 'ceiling'), isCountOrNull, `${where}.ceiling`),
     resets_at: need(field(window, 'resets_at'), isCountOrNull, `${where}.resets_at`),
   };
 }
