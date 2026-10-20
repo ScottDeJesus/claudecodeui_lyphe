@@ -191,6 +191,11 @@ export function planOf(raw: unknown): DocumentPlan {
     // (`line_gate.hold`), or `null`. Read tolerantly like `posture`: a build older than the field
     // writes none, and the card then draws no line.
     queue_hold: textSince(field(plan, 'queue_hold'), 'plan.queue_hold'),
+    // The PACER's clause for the same first ready phase (`report.plan_dict.pace_hold`,
+    // `pace_report.hold`), with its `pace:` lead — drawn in the same row as the queue's hold, of
+    // which the gate sends one at a time. ABSENT reads `""` (a dispatcher build older than the key,
+    // which held nothing on the window), so the card's `plan.pace_hold ?? ''` is the whole read.
+    pace_hold: textSince(field(plan, 'pace_hold'), `plan.pace_hold of ${name}`) ?? '',
     created_at: need(field(plan, 'created_at'), isText, 'plan.created_at'),
     updated_at: need(field(plan, 'updated_at'), isText, 'plan.updated_at'),
     completed_at: need(field(plan, 'completed_at'), isTextOrNull, 'plan.completed_at'),

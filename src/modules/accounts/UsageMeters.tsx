@@ -1,5 +1,4 @@
 import { Meter } from '@/shared/ui';
-import { useUsagePaceFake } from '@/modules/accounts/pace-fake';
 import { resetInstant, windowPercent, windowTone } from '@/modules/accounts/utils/usageWindows';
 import type { ClaudeUsage, ClaudeUsagePace, ClaudeUsageWindow } from '@/shared/types';
 
@@ -156,8 +155,9 @@ function paceForWindow(key: string, pace: ClaudeUsagePace | null): { tickAt: num
  * converts them once, so the meter does no arithmetic. An absent pace draws none of it.
  */
 export function UsageMeters({ usage }: { usage: ClaudeUsage | null }) {
-  // FILL: usage.pace — usage.pace
-  const pace = useUsagePaceFake();
+  // The pacer's projection as the usage route attached it, in percent; an unreachable answer has no
+  // key of its own, and an absent one draws the meters exactly as they were before it existed.
+  const pace = usage !== null && usage.reachable ? usage.pace ?? null : null;
   return (
     <div className="flex flex-col gap-3">
       <div className="text-[11px] uppercase tracking-[0.14em] text-ink-faint">Usage on this account</div>
@@ -212,8 +212,6 @@ function renderReading(usage: ClaudeUsage | null, pace: ClaudeUsagePace | null) 
             // A rolled window is dimmed on its own: its percent is real but its window has
             // already ended, so it reads as history beside the bars that are still running.
             <div key={usageWindow.key} className={usageWindow.rolled ? 'opacity-60' : undefined}>
-              {/* FILL: usage.pace — tickAt={usage.pace?.ceiling5|ceiling7}, markAt={usage.pace?.projected5|projected7},
-                  and the 5-hour caption under the bar all read the pace above; an absent pace passes null. */}
               <Meter
                 percent={percent}
                 tone={tone}

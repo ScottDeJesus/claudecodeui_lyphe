@@ -39,7 +39,7 @@ import { effectiveModelWord } from '@/shared/utils';
  * - `queued` → Start (it IS `resume`: the plan is approved and paused and has never walked). THIS START IS THE
  *   OVERRIDE: the master controller's one Start, at the top of In flight, lets every waiting plan go and leaves
  *   the queue's order and the epic limits to decide what runs, while this one lets THIS feature go right away —
- *   past the queue's order, the epics-at-once limit and its epic's feature limit (`release.own_press`).
+ *   past the queue's order and its epic's feature limit (`release.own_press`).
  *   PAUSE ALL HOLDS A START ONLY WHEN THE PRESS CAME BEFORE IT WENT ON (`epic_dial.Dial.since`): a Start
  *   pressed while Pause all is on goes right away, one plan out of a paused house, and its own tasks still run.
  *   There is no `Start at …`: the hour a feature never walked was

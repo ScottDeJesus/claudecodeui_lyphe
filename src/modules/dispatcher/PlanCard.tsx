@@ -13,7 +13,6 @@ import { PlanAsk } from '@/modules/dispatcher/PlanAsk';
 import { PlanControls } from '@/modules/dispatcher/PlanControls';
 import { PlanClock, PlanFace, PlanStatusBadge } from '@/modules/dispatcher/PlanFace';
 import { PaceHoldLine } from '@/modules/dispatcher/PaceLine';
-import { usePlanPaceFake } from '@/modules/dispatcher/pace-fake';
 import { PlannerBadge } from '@/modules/dispatcher/PlannerBadge';
 import { SpendPills } from '@/modules/dispatcher/SpendPills';
 import { WorkingPill } from '@/modules/dispatcher/WorkingPill';
@@ -89,7 +88,7 @@ function queueClause(hold: string): string {
  * cannot know which plans are its arc's without the group it was handed.
  *
  * `WAITING · <clause>` IS THE QUEUE'S, IN THE SAME ROW AND THE SAME WORDS' RULE (`plan.queue_hold`): the
- * clause the queue's gate returned — `Pause all is on`, `at most N epics at once`, `<epic> goes first` — for a
+ * clause the queue's gate returned — `Pause all is on` or `<epic> goes first` — for a
  * feature whose epic's turn has not come. The gate asks the queue first, so the dispatcher sends this one
  * and no later clause: the card says the first clause the gate asks, as the gate does.
  *
@@ -141,8 +140,9 @@ export function PlanCard({
   // question, and the dialog is mounted only while it is asked.
   const [deleting, setDeleting] = useState(false);
   const { planners } = useDispatcherPlans();
-  // FILL: pace_hold — plan.pace_hold
-  const paceHold = usePlanPaceFake();
+  // The pacer's clause for this plan (`plan.pace_hold`, `pace_report.hold`): the gate sends it in
+  // the same row as `queue_hold`, one at a time. Absent on a dispatcher older than the key reads.
+  const paceHold = plan.pace_hold ?? '';
   const menuItems: ActionMenuItem[] = planDroppable(plan, planners)
     ? [{ key: 'delete', label: t('dispatcher.delete.menu'), icon: Trash2, isDanger: true, onSelect: () => setDeleting(true) }]
     : [];
@@ -188,7 +188,6 @@ export function PlanCard({
                         {t('dispatcher.queueHold', { clause: queueClause(plan.queue_hold) })}
                       </span>
                     )}
-                    {/* FILL: pace_hold — the pacer's clause in the same row, after the queue's */}
                     {paceHold && <PaceHoldLine hold={paceHold} />}
                     {plan.stalled && (
                       <span data-plan-stalled={plan.stalled} className="min-w-0 break-words text-xs text-foreground">

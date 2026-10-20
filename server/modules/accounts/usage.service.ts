@@ -2,10 +2,10 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
-import type { ClaudeUsage, ClaudeUsageWindow } from '@/shared/types.js';
+import type { ClaudeUsage, ClaudeUsagePace, ClaudeUsageWindow } from '@/shared/types.js';
 
 import { liveAccountDigest } from './account-digest.js';
-import { note } from './pacer-door.js';
+import { note, paceOf, status as pacerStatus } from './pacer-door.js';
 import { isRecord, markRolled, parseWindows } from './usage-windows.js';
 
 /**
@@ -103,6 +103,10 @@ type Reading = {
   status: number;
   staleSince: number | null;
   checkedAt: number;
+  /** The pacer's projection of the same account at the same instant, in percent, or `null` when the
+   *  read call failed. Cached WITH the reading, so a served answer draws the picture its own figures
+   *  were read beside. */
+  pace: ClaudeUsagePace | null;
 };
 
 /** The last reading that came back whole, with the credential stamp it belongs to. */
@@ -238,7 +242,7 @@ function ttlFor(reading: Reading | null): number {
  *  word because borrowing `network` announced a fault that was not happening, which trains the reader
  *  to ignore the one that is. */
 function pending(now: number): Reading {
-  return { windows: [], degraded: false, reason: 'pending', status: 0, staleSince: null, checkedAt: now };
+  return { windows: [], degraded: false, reason: 'pending', status: 0, staleSince: null, checkedAt: now, pace: null };
 }
 
 /** The last good numbers plus WHY they are old — the honest state, never a blank. ⚠ The last good
@@ -254,6 +258,10 @@ function degraded(reason: UsageReason, status: number, now: number, stamp: numbe
     status,
     staleSince: same ? good.at : null,
     checkedAt: now,
+    // A degraded answer is a FAILURE's answer: the pacer's picture is not read on this path, and
+    // pairing last time's marks with a projection nobody refreshed would be a second staleness the
+    // "as of" line does not admit.
+    pace: null,
   };
 }
 
@@ -286,6 +294,9 @@ function toWire(reading: Reading): ClaudeUsage {
     reason: reading.reason,
     staleSince: reading.staleSince === null ? null : Math.floor(reading.staleSince / 1000),
     checkedAt: Math.floor(reading.checkedAt / 1000),
+    // ABSENT, never `null`, on a reading with no picture: a missing key is "not drawn", which is
+    // exactly what an older server's client and a pacer fault both need.
+    ...(reading.pace === null ? {} : { pace: reading.pace }),
   };
 }
 
@@ -324,7 +335,7 @@ async function measure(): Promise<{ reading: Reading; stamp: number | null; good
     // Rule 2: REACHED but unreadable. Not degraded — the meter asked and got an answer, it just has
     // nothing to draw — and the last good reading is left alone rather than erased.
     return {
-      reading: { windows: [], degraded: false, reason: 'shape', status, staleSince: null, checkedAt: now },
+      reading: { windows: [], degraded: false, reason: 'shape', status, staleSince: null, checkedAt: now, pace: null },
       stamp,
       good: null,
     };
@@ -335,8 +346,13 @@ async function measure(): Promise<{ reading: Reading; stamp: number | null; good
   // `note` is fire-and-forget (a child with its own timeout); nothing on this path awaits it.
   const after = readCredentials().stamp;
   if (stamp !== null && after === stamp) note(digest, windows, now);
+  // THE PACER'S PICTURE OF THIS LOGIN, drawn at the instant its figures were read: `digest` is the
+  // account read beside the token before the fetch, and `status` names it explicitly, so the marks
+  // on the bars can belong to no other account. A failure here answers null and the reading travels
+  // without a pace — the meters then draw exactly what they drew before the picture existed.
+  const pace = paceOf(await pacerStatus(digest));
   return {
-    reading: { windows, degraded: false, reason: '', status: 200, staleSince: null, checkedAt: now },
+    reading: { windows, degraded: false, reason: '', status: 200, staleSince: null, checkedAt: now, pace },
     stamp,
     good: { windows, at: now, stamp },
   };

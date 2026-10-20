@@ -7,7 +7,7 @@ import { cn } from '@/shared/utils';
 export type PickOption = { value: string; label: string };
 
 type LabeledPickProps = {
-  /** The visible name, drawn above the picker: `Features at once`. */
+  /** The visible name, drawn above the picker: `Runs on`. */
   label: string;
   /** What the name says on hover — the one sentence that tells what the pick does. */
   hint?: string;
@@ -34,7 +34,7 @@ type LabeledPickProps = {
  * always whole inside the viewport, above the trigger when the room below is short and held in from the screen's edges.
  * The listbox is therefore NOT inside the group's DOM: a probe finds it by its role.
  *
- * The select's accessible name carries the chosen words after the label (`Features at once: 2`), because a
+ * The select's accessible name carries the chosen words after the label (`Runs on: Claude`), because a
  * `Select`'s name replaces what its button shows and the value would otherwise never be announced.
  * The group carries the handle the browser harness reads (`handle`, valued with the chosen word).
  *

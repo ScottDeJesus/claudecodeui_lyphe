@@ -2,13 +2,14 @@ import { execFile } from 'node:child_process';
 import os from 'node:os';
 import path from 'node:path';
 
-import type { ClaudeUsageWindow } from '@/shared/types.js';
+import type { ClaudeUsagePace, ClaudeUsageWindow } from '@/shared/types.js';
 
-import { isFiniteNumber, resetEpoch } from './usage-windows.js';
+import { isFiniteNumber, isRecord, resetEpoch } from './usage-windows.js';
 
 /**
- * The WRITE half of the pacer's door: CloudCLI's usage meter handing every good reading it takes to
- * the house's record (`~/.claude/scripts/pacer note --source meter`).
+ * Both halves of the pacer's door: CloudCLI's usage meter handing every good reading it takes to
+ * the house's record (`~/.claude/scripts/pacer note --source meter`), and the same meter reading
+ * the pacer's projection back out of it (`status --json --account <digest>`) to draw on its bars.
  *
  * WHY THE METER FILES. The Claude children's own `rate_limit_event` stream covers the times the
  * house is working; the meter covers the times it is idle with the app open — including the instant
@@ -32,12 +33,18 @@ import { isFiniteNumber, resetEpoch } from './usage-windows.js';
  * to it; the next poll reads again.
  *
  * `status()` — the read call, which draws the projection — is the drawing side's half of this door;
- * `note()` is the meter's.
+ * `note()` is the meter's. It asks for ONE named account and answers `null` on any failure, so the
+ * projection on the meters is always the picture of the login the reading came from and never the
+ * account some other command happens to consider in use.
  */
 
 /** The door's ceiling. The command writes one stdout line and exits; ten seconds is a fault, not a
  *  slow answer, and a stray child must not outlive the poll that started it. */
 const NOTE_TIMEOUT_MS = 10_000;
+
+/** The read call's ceiling. `status` is a local SQLite read and a table lookup, not a network poll:
+ *  five seconds is a pacer fault, and the poll answers without a picture rather than without a reading. */
+const STATUS_TIMEOUT_MS = 5_000;
 
 /** The binary: the probe seam, else the house's wrapper (`scripts/pacer`, in `scripts/launch-table`'s
  *  shape). Read on every call rather than at module load, so a probe redirects the door it gets. */
@@ -47,6 +54,20 @@ function pacerBin(): string {
 
 /** One window as the door takes it: a fraction 0..1 and its reset in epoch SECONDS. */
 type DoorWindow = { used: number; resets_at: number };
+
+/** One window of `pacer status --json`, as far as this file reads it: fractions 0..1. */
+type StatusWindow = { used?: unknown; projected?: unknown; ceiling?: unknown };
+
+/** The reading behind the picture: the moment it was taken, or `null` when there is none. */
+type StatusReading = { at?: unknown };
+
+/** The status verb's answer, as far as this file reads it (`door_status.as_json`). */
+export type PacerStatus = {
+  reading?: StatusReading | null;
+  five?: StatusWindow | null;
+  week?: StatusWindow | null;
+  words?: unknown;
+};
 
 /** The door's stdin object, field for field. */
 type NoteBody = {
@@ -120,4 +141,84 @@ export function note(digest: string, windows: ClaudeUsageWindow[], checkedAt: nu
   } catch {
     // A reading dropped, never a poll lost.
   }
+}
+
+/**
+ * Ask the pacer for one account's picture: `pacer status --json --account <digest>`.
+ *
+ * Consumers: `usage.service.ts`'s `measure`, once a reading has come back whole, so the projection
+ * on the meters belongs to the same login and the same instant as the percentages under it.
+ * `--account` is ALWAYS passed: the verb's default is the account in use, which after a swap or a
+ * `claude /login` may not be the login this reading was taken from, and the meters must never draw
+ * one account's projection under another's numbers.
+ *
+ * IT ANSWERS `null` ON ANY FAILURE — an empty digest (no login to ask about, so no account is
+ * named rather than the wrong one), a missing binary, a door that exits non-zero or overruns its
+ * five seconds, a body that is not a JSON object. The caller attaches no `pace` then, and the
+ * meters draw exactly as they did before the pacer's picture existed. Never raises.
+ */
+export function status(digest: string): Promise<PacerStatus | null> {
+  const account = digest.trim();
+  if (!account) return Promise.resolve(null);
+  return new Promise((resolve) => {
+    try {
+      execFile(
+        pacerBin(),
+        ['status', '--json', '--account', account],
+        { timeout: STATUS_TIMEOUT_MS },
+        (error, stdout) => {
+          if (error) {
+            resolve(null);
+            return;
+          }
+          try {
+            const parsed: unknown = JSON.parse(stdout);
+            resolve(isRecord(parsed) ? (parsed as PacerStatus) : null);
+          } catch {
+            resolve(null); // a body this file cannot read is no picture at all
+          }
+        },
+      );
+    } catch {
+      resolve(null); // the same synchronous spawn failure `note` guards
+    }
+  });
+}
+
+/** One figure of the status JSON — a FRACTION 0..1 — as the percent the usage route sends. */
+function percentOf(value: unknown): number | null {
+  return isFiniteNumber(value) ? Math.round(value * 100) : null;
+}
+
+/**
+ * The status verb's answer → `ClaudeUsage.pace`, the ONE place the pacer's fractions become the
+ * wire's percents. Consumers: `usage.service.ts`'s `measure`.
+ *
+ * All seven figures are nullable because the pacer can see one window and not the other; `words`
+ * is the pacer's own sentence and is required, so a body without one is no picture (null) rather
+ * than a captionless set of marks. A null status — any failure of `status()` — is null here, and
+ * the key is left off the reading entirely.
+ *
+ * A PACER FAULT IS NOT A PICTURE, and it is not a failure of `status()` either: a home that cannot
+ * be opened still makes `pacer status` exit 0 with `probe: true`, a `why` naming the fault, every
+ * window null and its diagnostic sentence in `words` ("pace: the 5-hour window is unknown"). A real
+ * picture — fresh, stale or rolled — always carries the moment of the reading it was built from, so
+ * a body whose `reading.at` is null draws nothing and the key is left off. The caption this file
+ * would otherwise attach would describe a pacer that could not read, not this account's projection.
+ */
+export function paceOf(status: PacerStatus | null): ClaudeUsagePace | null {
+  if (status === null || typeof status.words !== 'string') return null;
+  const reading = status.reading ?? null;
+  if (reading === null || !isFiniteNumber(reading.at)) return null;
+  const five = status.five ?? null;
+  const week = status.week ?? null;
+  return {
+    used5: percentOf(five?.used),
+    projected5: percentOf(five?.projected),
+    ceiling5: percentOf(five?.ceiling),
+    used7: percentOf(week?.used),
+    projected7: percentOf(week?.projected),
+    ceiling7: percentOf(week?.ceiling),
+    words: status.words,
+  };
 }

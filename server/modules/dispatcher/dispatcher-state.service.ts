@@ -3,6 +3,7 @@ import type { DispatcherArc, DispatcherDaemon, DispatcherPlan, DispatcherPlanner
 
 import { arcsOf } from './dispatcher-arc.reader.js';
 import { epicsOf } from './dispatcher-epics.reader.js';
+import { paceSince } from './dispatcher-pace.reader.js';
 import { planOf, type DocumentPlan } from './dispatcher-plan.reader.js';
 import { plannersOf } from './dispatcher-planner.reader.js';
 import { each, field, isCount, isCountOrNull, isFlag, isRecord, isText, isTextOrNull, need, oneOf, readDispatcherDocument } from './dispatcher-state.transport.js';
@@ -111,16 +112,18 @@ function routeOf(raw: unknown): DispatcherRoute {
   const route = need(raw, isRecord, 'route');
   const planners = plannerLanesOf(field(route, 'planners'));
   const waiting = waitingOf(field(route, 'waiting'));
+  const pace = paceSince(field(route, 'pace'));
   return {
     provider: oneOf(field(route, 'provider'), PROVIDERS, 'route.provider'),
     word: need(field(route, 'word'), isText, 'route.word'),
     park_at_peak: need(field(route, 'park_at_peak'), isFlag, 'route.park_at_peak'),
     peak_until: need(field(route, 'peak_until'), isTextOrNull, 'route.peak_until'),
-    // `planners` and `waiting` are each left off the object entirely when the build sent none, so the
-    // client's `planners?.` and `waiting` read them as absent. (`epics`, below, is always a key:
-    // `null` is its absence.)
+    // `planners`, `waiting` and `pace` are each left off the object entirely when the build sent
+    // none, so the client's `planners?.`, `waiting` and `pace` read them as absent. (`epics`, below,
+    // is always a key: `null` is its absence.)
     ...(planners === undefined ? {} : { planners }),
     ...(waiting === undefined ? {} : { waiting }),
+    ...(pace === undefined ? {} : { pace }),
     // The epic dial's census, `null` for a build older than the key (`epicsOf`). Always present as a
     // key, unlike the two above, because the type states `null` — the client reads `epics?.` either way.
     epics: epicsOf(field(route, 'epics')),

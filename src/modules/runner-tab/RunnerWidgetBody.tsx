@@ -78,10 +78,10 @@ function openedBy(plan: DispatcherPlan, sessionId: string | null): boolean {
  * memory, two homes.
  *
  * THE MASTER CONTROLLER HEADS THE WIDGET, under the planner readout (operator, 2026-10-15: "those changes need to
- * be reflected in the widget too"): `MasterController`, the very component the tab's header draws — Epics at once,
- * Features at once, Tasks at once, the Claude · DeepSeek switch, one Start while a plan waits, Pause all — so a press
- * here is the press there and both homes redraw from the one frame. It has no compact form: its controls wrap between
- * whole pieces at the gutter's narrowest (300px), and its dropdowns are drawn on `body`, so this widget's scroller never
+ * be reflected in the widget too"): `MasterController`, the very component the tab's header draws — the Claude ·
+ * DeepSeek switch, one Start while a plan waits, Pause all — so a press here is the press there and both homes
+ * redraw from the one frame. It has no compact form: its controls wrap between whole pieces at the gutter's
+ * narrowest (300px), so this widget's scroller never
  * clips them. The cards below carry the same override folds as the tab's, through `PlanCard` and `DispatchArcDecks`.
  *
  * `Dismiss done · N` heads the list (every drawn plan that is done, off the board in one write — the

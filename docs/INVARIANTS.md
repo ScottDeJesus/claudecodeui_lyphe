@@ -267,7 +267,7 @@ echo "queue -> $(timeout 30 ~/.claude/scripts/dispatcher queue athena-no-such-ep
 echo "stop  -> $(timeout 30 ~/.claude/scripts/dispatcher stop athena-no-such-epic-x 2>&1 | head -1)"
 EOF
 bash "$D/p.sh"; cd /tmp; case "$D" in /tmp/athena-probe-m2.*) rm -r "$D";; esac
-expect: `names both doors': 1`, `any of the four verbs': 1`, `queue -> no arc athena-no-such-epic-x`, `stop  -> no plan or arc athena-no-such-epic-x` while the defect stands (an unknown name is refused before any write); cured, the two row counts are 0 and the rows name `no arc <name>` for `wip` and `queue` and `no plan or arc <name>` for the six others
+expect: `names both doors': 1`, `any of the four verbs': 1`, `queue -> no arc athena-no-such-epic-x`, `stop  -> no plan or arc athena-no-such-epic-x` while the defect stands (an unknown name is refused before any write); cured, the two row counts are 0 and the rows name `no arc <name>` for `queue` and `no plan or arc <name>` for the six others
 ```
 
 measured 2026-10-15 by chain chain-epic-queue--docs-cloudcli-20261015-015416-7a64, finding M2, MEDIUM

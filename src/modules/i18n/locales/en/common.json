@@ -1377,16 +1377,14 @@
       "switchLabel": "Runs on",
       "switchHint": "The house switch — the same one Settings and the chat box draw. Epics and features with no choice of their own follow it, and builds started from chat run on it.",
       "switchUnreadable": "The switch could not be read — press a side to ask again.",
-      "startTitle_one": "Let the {{count}} feature waiting for its Start go. The queue’s order and Epics at once decide what runs first; a feature’s own Start skips both.",
-      "startTitle_other": "Let the {{count}} features waiting for their Start go. The queue’s order and Epics at once decide what runs first; a feature’s own Start skips both.",
+      "startTitle_one": "Let the {{count}} feature waiting for its Start go. The queue’s order and Pause all decide what runs first; a feature’s own Start skips both.",
+      "startTitle_other": "Let the {{count}} features waiting for their Start go. The queue’s order and Pause all decide what runs first; a feature’s own Start skips both.",
       "startRefused": "Nothing started"
     },
     "epics": {
-      "label": "Epics at once",
-      "hint": "How many epics run at once, top down. An epic that has started runs till completed.",
       "pause": "Pause all",
       "resume": "Resume all",
-      "running": "{{running}} of {{limit}} running",
+      "count": "{{running}} running",
       "paused": "Paused · tasks out finish",
       "done": "Epics",
       "refused": "Epics not changed"

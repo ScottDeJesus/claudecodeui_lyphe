@@ -57,10 +57,10 @@ function queueArgs(body: unknown): string[] | null {
 }
 
 /** The seven words the epic dial takes (`hooks/dispatcher/epic_dial.py:WORDS`): a limit of `1` to `5`, and the pause. The only `word` values the epics route relays. */
-const EPIC_WORDS: readonly string[] = ['1', '2', '3', '4', '5', 'pause', 'resume'];
+const EPIC_WORDS: readonly string[] = ['pause', 'resume'];
 
-/** The 400 sentence the epics route answers with when the body names none of the seven. */
-const EPICS_BODY_ERROR = 'word must be one of 1, 2, 3, 4, 5, pause or resume';
+/** The 400 sentence the epics route answers with when the body names neither word. */
+const EPICS_BODY_ERROR = 'word must be one of pause or resume';
 
 /** The 400 sentence the start route answers with when a body names anything: the board's Start takes none. */
 const START_BODY_ERROR = 'the board\'s Start takes no body';
@@ -153,7 +153,7 @@ function statusForVerb(result: DispatcherVerbResult): number {
 }
 
 /**
- * The dispatcher lane's twenty-four routes: three reads of the plan list, ten presses on a plan, seven on
+ * The dispatcher lane's twenty-three routes: three reads of the plan list, ten presses on a plan, six on
  * an arc, four on the board. Auth is the mount's `authenticateToken`, in `server/index.ts`.
  *
  * These handlers validate and translate, and do nothing else: nothing is read here, no process is
@@ -367,7 +367,7 @@ export function createDispatcherRouter(dependencies: DispatcherRouterDependencie
   // An epic moved in the queue (`dispatcher queue <arc> --before <arc> | --last | --at N`): In flight's drag.
   router.post('/arcs/:name/queue', arcRelay('queue', queueArgs, QUEUE_BODY_ERROR));
 
-  // The epic dial's one word (`dispatcher epics <1|2|3|4|5|pause|resume>`): a BOARD verb, so it names
+  // The epic dial's one word (`dispatcher epics <pause|resume>`): a BOARD verb, so it names
   // no plan and no arc and the name the relay is handed is empty (`runDispatcherVerb` leaves it out of the argv).
   // THE BODY IS EXACTLY `{ "word": … }`, as the queue's is exactly one move: a body carrying another key is
   // not one this route knows, and is a 400 like any other.

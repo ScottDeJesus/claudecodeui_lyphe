@@ -44,9 +44,9 @@ export { DispatchArcDecks } from '@/modules/dispatcher/ArcDeck';
 // the header of the Roadmap tab's In flight face and the chat gutter's widget, and by neither when the
 // frame states none.
 export { PlannerLanesReadout } from '@/modules/dispatcher/PlannerLanesReadout';
-// The master controller — Epics at once, the Claude · DeepSeek house switch, the board's one
-// Start and Pause all — drawn from the frame's own route by the header of the Roadmap tab's In flight face and at the
-// top of the chat gutter's Runs widget (one component, two mounts), and not at all when the frame states no dial.
+// The master controller — the Claude · DeepSeek house switch, the board's one Start and Pause all
+// — drawn from the frame's own route by the header of the Roadmap tab's In flight face and at the
+// top of the chat gutter's Runs widget (one component, two mounts), and not at all when the frame states no census.
 export { MasterController } from '@/modules/dispatcher/MasterController';
 // The presses that put a card away: one plan's corner and an arc deck's (`usePutAway`), and `Dismiss done · N`.
 // A done card's is Dismiss, an entry in the operator's own list; an unfinished card's is Hide, the dispatcher's.
