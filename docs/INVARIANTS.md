@@ -551,3 +551,43 @@ measured 2026-10-20 by chain chain-usage-pacer--epics-20261020-101849-b564, find
 probe-key: f3b8a853678527784572ff44946b6320b497715f
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/hooks/useBoardVerbs.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/MasterController.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/common.json, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/hooks/dispatcher/store_hidden.py
+
+## INV-8940 — probe — the new `paidText` comment promises the figure alone for “a word this app does not know”; the code names the word
+
+the new `paidText` comment promises the figure alone for “a word this app does not know”; the code names the word
+
+```probe
+D=$(mktemp -d /tmp/athena-probe-unknown.XXXXXX) || exit 1
+trap 'case "$D" in /tmp/athena-probe-unknown.*) rm -rf "$D";; esac' EXIT
+cat > "$D/p.sh" <<'EOF'
+#!/bin/bash
+set -euo pipefail
+D=$(dirname "$0")
+cat > "$D/p.mjs" <<'JS'
+import { chromium } from '/home/lyphe/.claude/claudecodeui_lyphe/node_modules/playwright/index.mjs';
+const browser = await chromium.launch();
+const page = await (await browser.newContext()).newPage();
+await page.goto('http://127.0.0.1:5183', { waitUntil: 'domcontentloaded' });
+const out = await page.evaluate(async () => {
+  const { default: i18n } = await import('/src/modules/i18n/config.ts');
+  const { spendText } = await import('/src/shared/spend.ts');
+  const t = i18n.t.bind(i18n);
+  return {
+    named: spendText(t, 4.49, null, null, null, 'OpenAI'),
+    unnamed: spendText(t, 4.49, null, null, null, ''),
+  };
+});
+console.log('named  :', JSON.stringify(out.named));
+console.log('unnamed:', JSON.stringify(out.unnamed));
+await browser.close();
+JS
+node "$D/p.mjs"
+EOF
+bash "$D/p.sh"
+expect: named  : "$4.49 OpenAI"   — the word is NAMED; the comment promises the figure alone for it unnamed: "$4.49"          — the figure alone where no vendor is named (a cured tree still prints both lines: if the code learns to suppress an unknown word, `named` reads "$4.49")
+```
+
+measured 2026-10-20 by chain chain-claude-api-backup--pills-20261020-115801-ec70, finding L1, LOW
+probe-key: 0bb4a5a7f216ed627a1ee9c314d1dfa022262bf4
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/SpendPills.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/spend.ts

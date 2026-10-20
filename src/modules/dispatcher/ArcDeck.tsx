@@ -248,7 +248,7 @@ export function DispatchArcDeck({
           spend={spend.paid !== null || spend.tokens !== null || arc.runtime_s > 0 || agentsOut
             ? (
               <div data-arc-spend className="min-w-0">
-                <SpendPills parts={spend} countKey={`darc:${arc.name}`}>
+                <SpendPills parts={spend} vendor={arc.paid_vendor} countKey={`darc:${arc.name}`}>
                   {(arc.runtime_s > 0 || agentsOut) && <WorkingPill seconds={arc.runtime_s} running={agentsOut} subject="epic" />}
                 </SpendPills>
               </div>

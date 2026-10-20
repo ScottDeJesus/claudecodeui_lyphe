@@ -98,6 +98,11 @@ function stageOf(raw: unknown): DispatcherStage {
     output_path: need(field(stage, 'output_path'), isTextOrNull, 'stage.output_path'),
     verdict: need(field(stage, 'verdict'), isTextOrNull, 'stage.verdict'),
     cost_usd: need(field(stage, 'cost_usd'), isCount, 'stage.cost_usd'),
+    // The vendor those dollars were billed by — `DeepSeek`, `Claude API`, or `""` for a mix of the two
+    // or a record the runner has swept — read off the same paid rows the figure sums
+    // (`report_vendor.py`). Tolerant: a build older than the field writes none, and the figure then
+    // stands alone rather than wearing a name nobody measured.
+    paid_vendor: textSince(field(stage, 'paid_vendor'), 'stage.paid_vendor'),
     // The stage's tokens, read at the dispatcher's own report time off the launch's `result.json`
     // (`report._usage_of` — the store holds no token column and is not getting one). Absent from a
     // build older than the fields, which is what `countSince` is for. `tokens_cache_read` is `null`
@@ -132,6 +137,7 @@ function phaseOf(raw: unknown): DispatcherPhase {
     stalled: stallSince(field(phase, 'stalled'), 'phase.stalled'),
     rounds: need(field(phase, 'rounds'), isCount, 'phase.rounds'),
     cost_usd: need(field(phase, 'cost_usd'), isCount, 'phase.cost_usd'),
+    paid_vendor: textSince(field(phase, 'paid_vendor'), 'phase.paid_vendor'),
     tokens: countSince(field(phase, 'tokens'), 'phase.tokens'),
     tokens_in: countSince(field(phase, 'tokens_in'), 'phase.tokens_in'),
     tokens_out: countSince(field(phase, 'tokens_out'), 'phase.tokens_out'),
@@ -223,6 +229,7 @@ export function planOf(raw: unknown): DocumentPlan {
     waits_on: names(field(plan, 'waits_on'), 'plan.waits_on'),
     schedule: scheduleOf(field(plan, 'schedule')),
     cost_usd: need(field(plan, 'cost_usd'), isCount, 'plan.cost_usd'),
+    paid_vendor: textSince(field(plan, 'paid_vendor'), `plan.paid_vendor of ${name}`),
     // PAID dollars at `cost_usd`; the plan's tokens beside it, summed by `report.plan_dict` off the
     // phases' launches. A plan that rode the operator's Claude subscription is 0.00 there and these
     // three are the whole of what it spent — which is what the card draws instead of a `$`.

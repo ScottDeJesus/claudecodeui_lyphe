@@ -95,8 +95,10 @@ function providerOf(spec: unknown, result: unknown, ended: boolean): 'deepseek' 
  * (`plan_runner/costs.py:result_cost` returns the PAID share alone) and records its TOKENS instead.
  * Receipts written before that rule carry the figure anyway — one on disk today says
  * `provider: claude`, `cost_usd: 5.467351`, `tokens_in: 12386281` — so the word the receipt itself
- * carries is what settles an old one: named Claude, the dollars are suppressed outright rather than
- * shown as `$0.00`, and the tokens beside it are the whole of the spend.
+ * carries is what settles an old one: named the subscription (`claude`), the dollars are suppressed
+ * outright rather than shown as `$0.00`, and the tokens beside it are the whole of the spend. A
+ * receipt that names the API BILL (`anthropic`) is the third payer — a Claude child a key paid for —
+ * and its figure IS money: it is read as it stands.
  *
  * A receipt that names NOTHING is the stub the launcher or the reaper writes for a wrapper that was
  * killed outright; it says nothing about the endpoint, so it overrules nothing it stored.
@@ -119,13 +121,20 @@ function receiptCostUsd(result: unknown, ended: boolean): number | null {
  *
  * `provider` is the launch's resolved word ({@link providerOf}), so a receipt that names nothing
  * falls back to the pin the launcher wrote — never to showing a vendor's tokens as Claude's.
+ *
+ * A RECEIPT THAT NAMES THE API BILL (`anthropic`) IS A VENDOR'S TOO, though its pin mark is Claude
+ * (`providerOf` answers `claude`, which is right — it is Claude, paid by a key): its `$` is a real
+ * bill and its tokens are the key vendor's own business, so they are withheld as DeepSeek's are.
  */
 function receiptTokens(
   result: unknown,
   ended: boolean,
   provider: 'deepseek' | 'claude',
 ): { tokens: number | null; tokens_in: number | null; tokens_out: number | null } {
-  if (!ended || provider !== 'claude') return { tokens: null, tokens_in: null, tokens_out: null };
+  const word = readString(field(result, 'provider'));
+  if (!ended || provider !== 'claude' || word === 'anthropic') {
+    return { tokens: null, tokens_in: null, tokens_out: null };
+  }
   return {
     tokens: readNumberOrNull(field(result, 'tokens')),
     tokens_in: readNumberOrNull(field(result, 'tokens_in')),

@@ -2915,7 +2915,7 @@ what a launch MEANS.
 | File | What this lane takes from it |
 |---|---|
 | `spec.json` | `started_at`, `role`, `agent`, `brief_path`, and `provider` — the switch's reading at launch time — and `launched_by` (the Claude CLI session id that launched it): carried on every snapshot, `null` when absent, and the stamp the open chat anchors the launch by (MAN-7583) and the purple dot reads (`running-launchers.service.ts`, MAN-6228) — and `dispatcher` (`{plan, phase}`, the launcher's mark that the launch is the dispatcher's own epic work, `solo/dispatch_mark.py`), which together with `role` and the chain index below sets `dispatcher_work` on the snapshot and keeps the launch off the purple dot (`dispatcher-work.service.ts`). **No spec, or no `started_at`, and the directory is not a launch**: it draws nothing rather than a phantom. |
-| `result.json` | Its ABSENCE is how "still out" is spelled. Present: `status`, `ended_at`, `duration_s`, `cost_usd` (PAID dollars — read as 0 where `provider` names Claude, `receiptCostUsd`, INV-4299), `tokens`, `tokens_in`, `tokens_out` (A SPEND FIGURE IS DOLLARS **OR** TOKENS, BY WHO WAS USED: ALL THREE are `null` where a vendor billed the soul — DeepSeek's tokens are its own business — and `null` for one written before the split, which the pin reads as the total alone; `receiptTokens`), `cause`, `provider`, `provider_blocked` — and `session_id`, the Claude session the transcript read follows, once the soul has ended. |
+| `result.json` | Its ABSENCE is how "still out" is spelled. Present: `status`, `ended_at`, `duration_s`, `cost_usd` (PAID dollars — read as 0 where `provider` names Claude, `receiptCostUsd`, INV-4299), `tokens`, `tokens_in`, `tokens_out` (A SPEND FIGURE IS DOLLARS **OR** TOKENS, BY WHO WAS USED: ALL THREE are `null` where a vendor billed the soul — DeepSeek's tokens are its own business, and so are the tokens of a receipt whose `provider` is `anthropic` (a Claude child an API key paid for: its `cost_usd` is read as it stands, its pin mark stays Claude's) — and `null` for one written before the split, which the pin reads as the total alone; `receiptTokens`), `cause`, `provider`, `provider_blocked` — and `session_id`, the Claude session the transcript read follows, once the soul has ended. |
 | `child.log` | The transcript read ONLY: its first `session_id`, when `result.json` has none yet, is handed to the providers module (`readClaudeTranscriptBySessionId`), which `GET /api/dispatch-souls/launches/:launchId/transcript` serves to the chat's Subagents widget. Nothing else in it is parsed. |
 | `launcher.pid` / `child.pid` | Liveness, proved through `/proc/<pid>/cmdline` against a needle (`soul-run`, `claude`) — a pid is reused, so the number alone proves nothing. |
 | `brief.md` (via `spec.json`'s `brief_path`) | ONE line: the task, for the pin's second row. |
@@ -3451,8 +3451,12 @@ section: dispatcher/010 The plan card/009 The spend pills.
 
 **The spend pills.** Every spend figure on the card is a row of `SpendPills` (`src/modules/dispatcher/SpendPills.tsx`,
 handles `data-spend-pills` and `data-spend-pill="paid|in|out|tokens"`) over ONE decision, `spendParts`
-(`src/shared/spend.ts`, INV-4299): A SPEND FIGURE IS DOLLARS **OR** TOKENS, BY WHO WAS USED. The paid pill is the DeepSeek
-mark and `$4.47` (`moneyText`), titled `$4.47 billed by DeepSeek`; the token half is `20.6M in` (↓) and `206k out` (↑) where
+(`src/shared/spend.ts`, INV-4299): A SPEND FIGURE IS DOLLARS **OR** TOKENS, BY WHO WAS USED. The paid pill is `$4.47` (`moneyText`) behind ITS VENDOR'S mark and titled by it —
+`$4.47 billed by DeepSeek` under the whale, `$4.21 billed by Claude API` under Claude's mark, and a plain
+`CircleDollarSign` with `$4.49 billed` for a mix (the dispatcher's `""`). `SpendPills` takes the word as its required
+`vendor` prop and each caller passes its own — a plan's, a phase's and a stage's `paid_vendor`, an arc's; `SoulLaunchPinRow`
+passes `DeepSeek` for a DeepSeek-painted pin and `""` for a Claude one (its figure is tokens alone), and `HealCardList` passes `DeepSeek` (a heal's dollars are DeepSeek's by construction). There is no constant to fall back to: a wrong vendor on a figure is a
+false bill; the token half is `20.6M in` (↓) and `206k out` (↑) where
 the record's split IS its total, else one `⛁ 216M tokens` pill; a half that does not exist draws no pill (never `$0.00`),
 and a record with neither draws nothing. The `in` pill ends in its CACHE SHARE, `3.9M in (97% cache)` (`cachePercent`: cache
 read / `tokens_in`, INV-4299), a stated suffix in the pill's own ink at normal weight (`data-spend-cache=<N>`) titled with the
@@ -7310,9 +7314,12 @@ Accept walks now." With no position the row says so in words — Loading while t
 place of the toggle.
 
 **THE KICK. Every switch write a daemon can be holding work for ends with `dispatcher kick`; the Dactyls switch (MAN-8059) is the one that does not — nothing queues on it.** `setDeepseekFlash`,
-`setParkAtPeak` and `setPlannerLanes` each hand the flip to the dispatcher once the file has settled
+`setParkAtPeak`, `setPlannerLanes` and the Claude API keys' two writes (MAN-8701, `claude-api-keys.ts`)
+each hand the flip to the dispatcher once the file has settled
 (`server/modules/settings/dispatcher-kick.ts`: `dispatcher kick` spawned with a ten-second bound and
-never awaited). The flip IS the event — a daemon holding a phase for want of a lane, or an hour to arm,
+never awaited). The keys' writes kick for the same event one layer over: a SAVED save or a REMOVED
+remove lifts that payer's walls, and the release asks whether another payer now carries the plan
+(`account_release.py`). The flip IS the event — a daemon holding a phase for want of a lane, or an hour to arm,
 acts on it now rather than at the next session event. The kick's own answer is one line in the server's
 journal per flip (`dispatcher kick: woke daemon`); a kick that could not be run, or that hung past its
 bound, is swallowed and said once per distinct message, because a toggle must answer with the position
@@ -10279,6 +10286,13 @@ key for key. The emitted document is the source of the shape.
   the one number: epoch MILLISECONDS, as every state frame's `at`.
 - `goal: string | null` — `store_write.open_plan` writes a plan with no goal, so an opened,
   undesigned plan reads `"goal": null`.
+- `paid_vendor: string | null` — on `DispatcherStage`, `DispatcherPhase`, `DispatcherPlanner`,
+  `DispatcherPlan` and `DispatcherArc`, beside `cost_usd`: the vendor those paid dollars were billed
+  by (`DeepSeek`, `Claude API`, or `""` for a mix or a swept record), read off the SAME paid rows their
+  dollars sum (`hooks/dispatcher/report_vendor.py`, INV-4299; nothing stored, INV-172). Read through
+  `textSince` in `dispatcher-plan.reader.ts`, `dispatcher-arc.reader.ts` and
+  `dispatcher-planner.reader.ts`, so a build older than the key reads `null`; `SpendPills` and
+  `spendText` label the figure by it (MAN-6789).
 - `DispatcherPlan.state` is a `string`, the store's own word: `designing`, `designed`, `questions`,
   `loaded`, `parked`.
 - `DispatcherPlan.launched` is `boolean` — `report.launched(events)`, has a walk EVER been launched

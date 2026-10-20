@@ -59,6 +59,7 @@ export default function AgentCategoryContentSection({
               effort every soul launches at — and the switches below decide how those souls are run. */}
           <AgentChainsContent />
           <RunnerModelContent />
+          {/* FILL: claude-api-card — <ClaudeApiKeysContent />, directly after the DeepSeek row's card */}
           {/* Under the model switch, not beside it: this is the narrower question of what may leave
               the machine to answer one, and it reaches hooks rather than the runner's hands. */}
           <JevContent />

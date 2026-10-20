@@ -10570,3 +10570,52 @@ measured 2026-10-20 by chain chain-usage-pacer--wip-ui-20261020-092337-aaa3, fin
 probe-key: 82c1eb57dce3e0914bdb548a8b5bbe217ae6500b
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher-arc.reader.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher-plan.reader.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher-state.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher-state.transport.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher-verb.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/settings/park-at-peak-switch.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/settings/planner-lanes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/settings/settings.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/settings/settings.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/document-fields.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/utils.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/ArcControls.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/hooks/useDispatcherVerbs.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/LabeledPick.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/MasterController.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/OverrideFold.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/pace-fake.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/PaceLine.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/PlanCard.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/PlanControls.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/PlanFace.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/workingTime.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/common.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/runner-tab/RunnerPanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/agents-settings/sections/content/RunnerModelContent.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/agents-settings/sections/content/RunnerPlannerLanesRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/constants.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Select.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/utils.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/order-lane.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/queue-lane.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/master-controller-folds.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/master-controller-live.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/master-controller-widget.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-card-order.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-epic-queue.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/session-picker-scaffold.mjs
+
+## INV-8928 — probe — (LOW) — both type mirrors still say `width.reason` asks three clauses; this phase's teardown left two
+
+(LOW) — both type mirrors still say `width.reason` asks three clauses; this phase's teardown left two
+
+```probe
+D=$(mktemp -d /tmp/athena-probe-threeasks.XXXXXX) || exit 1
+export D
+cat > "$D/p.sh" <<'INNER'
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+printf 'stale lines: '; grep -h -o 'the first of the three `width.reason` asks' server/shared/types.ts src/shared/types.ts | wc -l
+printf 'clauses: '; grep -c 'TWO CLAUSES, IN THIS ORDER' /home/lyphe/.claude/hooks/dispatcher/width.py
+INNER
+bash "$D/p.sh"
+expect: `stale lines: 2` beside `clauses: 1` — both mirrors still say three asks while the gate's code names two (measured today; cured, `stale lines: 0`).
+```
+
+measured 2026-10-20 by chain chain-usage-pacer--whole-20261020-105717-7799, finding L1, LOW
+probe-key: 8b04ce45dc555fce1f9dfc6b39b6f267f6ec1c91
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher-pace.reader.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/pacer-fill-live.mjs, /home/lyphe/.claude/hooks/dispatcher/pace.py, /home/lyphe/.claude/scripts/heal_cycle_pace.py, /home/lyphe/.claude/scripts/prune_sweep_pace.py
+
+## INV-8936 — The Claude API keys card — what an editor of the card must not break
+
+Reference: MAN-8695 (files, FILL seams, read contract).
+1. **Unreadable draws no form.** `unknown` is a state, not an empty slot: fields over unseen settings let a reader overwrite a credit or label. The row says `Unknown` in words; the retry lives on the card header only.
+2. **`unreadable` is never "not set".** `standingOf(null, true, t)` and the `Unknown` badge say so in words.
+3. **`rides.why` is the door's data.** The card never paraphrases or reformats it (INV-76: no id, no digest in it). Dates in the card's own lines and in `why` can differ in zone: the cure is one shared day/clock formatter when the payer phase authors the sentence.
+4. **Cycle money is two-decimal always.** `usd()` = `$${moneyText(amount, 1)}`; scale `1` is pinned, never derived from the amount or the credit (scale `0` falls into `moneyText`'s four-decimal branch and draws a fresh key as `$0.0000`). Any later card figure that is a cycle total uses it; the sub-cent branch is for per-launch cost text.
+5. **The standing line's separator is a real space.** `{' '}` between base and clause, then the interpunct (neutral) or the tone dot (toned). A margin-only gap leaves `$200.00out of credit` in the text layer. The dot is `aria-hidden` decoration; a state is never carried by the dot alone.
+6. **Remove's ink is `data-tone="danger"` + `text-tone-ink`.** `text-destructive` is `--danger` in both modes and reads 2.88:1 on the dark card; the ink pairing swaps in `--danger-ink` (6.83:1).
+7. **The credit input is `step="any"`.** The door stores a float and validates only `>= 0`; a whole-number step makes the browser refuse the save of a stored `150.5`. The renewal day stays `step={1}` (the door types it int, 1–31).
+8. **One submit, `renewsDay` always sent.** A cleared renewal field sends `renewsDay: null` and clears the day. `key` travels only when typed; `label` and `creditUsd` only when non-empty and valid.
+9. **The key field is controlled by the card** (`drafts[slot]`), `type="password"`, `autoComplete="off"`, `spellCheck={false}`. It is emptied on SAVED and on nothing else; nothing reads a key back.
+10. **Helper ids.** `aria-describedby` points at `${id}-helper` (the id `Field` renders) on the key field while no refusal shows, the name field and the renewal-day field. A refusal reaches assistive tech through `Field`'s `role="alert"`, which has no id.
+11. **The type block is byte-identical in both mirrors.** `ClaudeApiWall`, `ClaudeApiKeyPicture`, `ClaudeApiPicture`, `ClaudeApiUnreadable` with their two comments: 2298 bytes, 32 lines in `src/shared/types.ts` and `server/shared/types.ts`. A change to one lands in the other in the same edit.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/agents-settings/sections/content/ClaudeApiKeyRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/agents-settings/sections/content/ClaudeApiKeysContent.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/agents-settings/sections/content/claude-api-standing.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts
+
+## INV-8937 — The Claude API keys card prefixes a payer sentence to a `rides.why` that already opens with one
+
+Reference: MAN-8695.
+- `ClaudeApiKeysContent.tsx` draws `agents.claudeApi.rides` = `Plan runs ride {{payer}}. {{why}}` for `rides.slot` 0, 1 and 2.
+- The live door's `rides.why` already opens `Plan runs ride …` (2026-10-20, `claude-api status --json`: slot 0, `Plan runs ride the Claude subscription.`; a key's: `Plan runs ride Claude API key <n> as the backup: …`, `hooks/plan_runner/claude_api/payer.py`, MAN-8625).
+- Read against the live picture, the first line says it twice: `Plan runs ride your Claude subscription. Plan runs ride the Claude subscription.`
+- The fake's `why` strings (`Your subscription has room, so every launch rides it.`) are not the door's, so every scaffold photograph hides it.
+- Cure at `card-fill`, when the card meets the live picture: draw `rides.why` alone as the first line for every `rides.slot`; the payer word stays on the badge.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/agents-settings/sections/content/claude-api-fake.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/agents-settings/sections/content/ClaudeApiKeysContent.tsx

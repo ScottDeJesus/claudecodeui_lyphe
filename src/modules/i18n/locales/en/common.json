@@ -849,6 +849,7 @@
     },
     "ended": "ended {{elapsed}} ago",
     "paid": "${{usd}} {{vendor}}",
+    "paidAlone": "${{usd}}",
     "usage": "{{in}} in · {{out}} out",
     "tokens": "⛁ {{n}} tok",
     "soulBlocked": "DeepSeek refused or never answered — nothing ran on Claude",
@@ -1272,6 +1273,7 @@
     "pill": {
       "paid": "${{usd}}",
       "paidTitle": "${{usd}} billed by {{vendor}}",
+      "paidTitleAlone": "${{usd}} billed",
       "in": "{{n}} in",
       "cache": "({{pct}}% cache)",
       "cacheTitle": "{{hit}} of the {{n}} tokens in were read from the prompt cache",

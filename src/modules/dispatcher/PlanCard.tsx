@@ -201,6 +201,7 @@ export function PlanCard({
             spend={(
               <SpendPills
                 parts={spendParts(plan.cost_usd, plan.tokens_in, plan.tokens_out, plan.tokens, plan.tokens_cache_read)}
+                vendor={plan.paid_vendor}
                 countKey={`plan:${plan.name}`}
               >
                 {/* HOW LONG AGENTS HAVE WORKED ON IT, one more pill of the books' row — ticking only while

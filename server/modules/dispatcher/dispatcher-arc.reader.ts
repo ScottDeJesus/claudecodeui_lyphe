@@ -95,6 +95,9 @@ export function arcOf(raw: unknown): DispatcherArc {
     // (INV-4299) — dollars OR tokens, by who was used. They are carried here so the header never has
     // to add up the cards itself, which would count the past of a feature the epic took in late.
     cost_usd: need(field(arc, 'cost_usd'), isCount, 'arc.cost_usd'),
+    // The vendor those dollars were billed by, merged over the same plan cut the figures sum
+    // (`report_vendor.merge`): `DeepSeek`, `Claude API`, or `""` for a mix. Tolerant, like the plan's.
+    paid_vendor: textSince(field(arc, 'paid_vendor'), `arc.paid_vendor of ${name}`),
     tokens: countSince(field(arc, 'tokens'), 'arc.tokens'),
     tokens_in: countSince(field(arc, 'tokens_in'), 'arc.tokens_in'),
     tokens_out: countSince(field(arc, 'tokens_out'), 'arc.tokens_out'),

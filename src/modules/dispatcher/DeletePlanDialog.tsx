@@ -51,7 +51,7 @@ export function DeletePlanDialog({ plan, onClose }: { plan: DispatcherPlan; onCl
   useEffect(() => {
     if (!droppable && !dropping) onClose();
   }, [droppable, dropping, onClose]);
-  const spend = spendText(t, plan.cost_usd, plan.tokens_in, plan.tokens_out, plan.tokens);
+  const spend = spendText(t, plan.cost_usd, plan.tokens_in, plan.tokens_out, plan.tokens, plan.paid_vendor);
   // The sentence's grammar is the COPY's: one variant for each part a plan may lack (no design on a
   // plan that was only opened, no spend on one that never ran). Its joins never come from a
   // formatter, which conjoins in the READER's language: while a locale has not translated these
