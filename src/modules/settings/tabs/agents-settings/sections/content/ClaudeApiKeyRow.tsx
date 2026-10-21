@@ -157,7 +157,7 @@ export default function ClaudeApiKeyRow({
             label={t('agents.claudeApi.keyField', { defaultValue: 'API key' })}
             htmlFor={keyId}
             helper={refusal === null
-              ? t('agents.claudeApi.keyHelper', { defaultValue: 'Starts with sk-ant-api. It is sent once and never shown again.' })
+              ? t('agents.claudeApi.keyHelper', { defaultValue: 'Starts with sk-ant-api or sk-ant-usr. It is sent once and never shown again.' })
               : undefined}
             error={refusal ?? undefined}
           >
@@ -171,7 +171,7 @@ export default function ClaudeApiKeyRow({
               value={draft}
               invalid={refusal !== null}
               onChange={(event) => onDraftChange(event.target.value)}
-              placeholder={t('agents.claudeApi.keyPlaceholder', { defaultValue: 'sk-ant-api…' })}
+              placeholder={t('agents.claudeApi.keyPlaceholder', { defaultValue: 'sk-ant-…' })}
             />
           </Field>
 
