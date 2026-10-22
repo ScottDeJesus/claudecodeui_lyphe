@@ -170,10 +170,13 @@ export function requirementFacts(requirement: PageRequirement, t: TFunction): st
   if (threshold !== null) {
     facts.push(t('cerberus.bulletins.requirement.threshold', { value: threshold.value.toLocaleString(), unit: threshold.unit, measure: vocabWords(threshold.measure) }));
   }
+  // A list the page names none for is empty on the wire (`requirement_body` sends `[]`, never `null`): it reaches every job
+  // of its kind, so it says nothing, and a requirement that names none at all says "Every job".
+  const named = (list: string[] | null): list is string[] => list !== null && list.length > 0;
   const reach = [
-    scope.services === null ? null : t('cerberus.bulletins.requirement.services', { list: scope.services.map(vocabWords).join(', ') }),
-    scope.loss_types === null ? null : t('cerberus.bulletins.requirement.lossTypes', { list: scope.loss_types.map(vocabWords).join(', ') }),
-    scope.property_types === null ? null : t('cerberus.bulletins.requirement.propertyTypes', { list: scope.property_types.map(vocabWords).join(', ') }),
+    named(scope.services) ? t('cerberus.bulletins.requirement.services', { list: scope.services.map(vocabWords).join(', ') }) : null,
+    named(scope.loss_types) ? t('cerberus.bulletins.requirement.lossTypes', { list: scope.loss_types.map(vocabWords).join(', ') }) : null,
+    named(scope.property_types) ? t('cerberus.bulletins.requirement.propertyTypes', { list: scope.property_types.map(vocabWords).join(', ') }) : null,
   ].filter((line): line is string => line !== null);
   facts.push(...(reach.length > 0 ? reach : [t('cerberus.bulletins.requirement.everyJob')]));
   return facts;

@@ -173,7 +173,10 @@ export type RequirementWindow = {
   anchor: string | null;
 };
 
-/** The jobs a requirement applies to. A list that is `null` means every one of its kind. */
+/**
+ * The jobs a requirement applies to. A list the page names none for means every one of its kind: shadow-connector's
+ * `requirement_body` sends it empty (`[]`), and the type allows `null` for the same meaning.
+ */
 export type RequirementScope = {
   services: string[] | null;
   loss_types: string[] | null;

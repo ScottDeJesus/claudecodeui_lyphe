@@ -209,15 +209,18 @@ export function CerberusPanel({ projectChoices }: CerberusPanelProps) {
               </div>
             )}
             <div className={cn('flex flex-wrap items-center justify-between gap-3 pt-5', GUTTER)}>
-              <Tabs
-                tabs={VIEWS.map((entry) => ({ id: entry.id, label: t(entry.labelKey) }))}
-                active={view}
-                onChange={(id) => {
-                  const next = VIEWS.find((entry) => entry.id === id);
-                  if (next) onView(next.id);
-                }}
-                ariaLabel={t('tabs.cerberus')}
-              />
+              {/* The tray is as wide as its five words (429 px); on a phone it scrolls in its own box rather than pan the whole tab. */}
+              <div className="scrollbar-hide min-w-0 max-w-full overflow-x-auto">
+                <Tabs
+                  tabs={VIEWS.map((entry) => ({ id: entry.id, label: t(entry.labelKey) }))}
+                  active={view}
+                  onChange={(id) => {
+                    const next = VIEWS.find((entry) => entry.id === id);
+                    if (next) onView(next.id);
+                  }}
+                  ariaLabel={t('tabs.cerberus')}
+                />
+              </div>
               <p className="text-[12.5px] text-muted-foreground">{t(shown.hintKey)}</p>
             </div>
 
