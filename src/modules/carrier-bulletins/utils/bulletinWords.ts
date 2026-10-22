@@ -157,15 +157,22 @@ export function stampWords(stamp: ReadingStamp, t: TFunction): string {
 export function requirementFacts(requirement: PageRequirement, t: TFunction): string[] {
   const facts = [`${vocabWords(requirement.kind)}${DOT}${vocabWords(requirement.subject)}`];
   const { window, threshold, scope } = requirement;
+  // The wire's window holds two things (`view_reading._window`): a deadline (`hours`, `basis`, `anchor`) and a requirement's
+  // cadence. A cadence-only window is `{ "cadence": "daily" }` with no deadline key at all, so each is read where it is
+  // present and the deadline line is skipped when there is no `basis` (15 live requirements have just a cadence).
   if (window !== null) {
-    let span = t('cerberus.bulletins.requirement.windowOpen', { basis: vocabWords(window.basis) });
-    if (window.hours !== null && window.hours < 1) span = t('cerberus.bulletins.requirement.minutes', { count: Math.round(window.hours * 60) });
-    else if (window.hours !== null) {
-      span = window.basis === 'business'
-        ? t('cerberus.bulletins.requirement.businessHours', { count: window.hours })
-        : t('cerberus.bulletins.requirement.hours', { count: window.hours });
+    const { basis, hours = null, anchor = null, cadence } = window;
+    if (basis !== undefined) {
+      let span = t('cerberus.bulletins.requirement.windowOpen', { basis: vocabWords(basis) });
+      if (hours !== null && hours < 1) span = t('cerberus.bulletins.requirement.minutes', { count: Math.round(hours * 60) });
+      else if (hours !== null) {
+        span = basis === 'business'
+          ? t('cerberus.bulletins.requirement.businessHours', { count: hours })
+          : t('cerberus.bulletins.requirement.hours', { count: hours });
+      }
+      facts.push(anchor === null ? span : t('cerberus.bulletins.requirement.from', { span, anchor: vocabWords(anchor) }));
     }
-    facts.push(window.anchor === null ? span : t('cerberus.bulletins.requirement.from', { span, anchor: vocabWords(window.anchor) }));
+    if (cadence !== undefined) facts.push(t('cerberus.bulletins.requirement.cadence', { cadence: vocabWords(cadence) }));
   }
   if (threshold !== null) {
     facts.push(t('cerberus.bulletins.requirement.threshold', { value: threshold.value.toLocaleString(), unit: threshold.unit, measure: vocabWords(threshold.measure) }));

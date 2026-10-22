@@ -34,9 +34,10 @@ function readAgain(read: { trouble: AffectedAreasTrouble | null; retry: () => vo
  * settled. You change a rule only by answering the printed question list, or on the Approval Rules page." No press here
  * writes anything: they move between the screens, enlarge a page, and read again.
  *
- * IT READS ON OPEN AND ON A PRESS, never on a timer and never while the tab shows another view. The Cerberus tab keeps it
- * mounted (hidden) after its first show, as it keeps Tours, so the carrier, the page and the scroll a person left survive a
- * visit to Fleet; hidden, it reads nothing.
+ * IT READS ON OPEN AND ON A PRESS, never on a timer. The Cerberus tab keeps it mounted (hidden) after its first show, as it
+ * keeps Tours, so the carrier, the page and the scroll a person left survive a visit to Fleet; once mounted, hidden, it
+ * reads nothing. The one read it makes hidden is its opening one, when its chunk lands after the person has already gone
+ * back to Fleet: it mounts inside a hidden panel and reads the overview once (Tours does the same).
  *
  * The root is the view's data hub: its four reads and its presses are wired here, and the screens draw what they are
  * handed. Words are `cerberus.bulletins.*`; endpoints are `api.carrierBulletins`; wire shapes `@/shared/carrier-bulletins-types`.
@@ -58,7 +59,7 @@ export function BulletinsView() {
   const [enlarged, setEnlarged] = useState(false);
 
   // ── The reads: on open and on a press, never on a timer. Nothing here reads of its own accord (no answer arrives
-  // from outside, as a Tours press's or a walk's does), so a view the tab has hidden has nothing to hold back. ──
+  // from outside, as a Tours press's or a walk's does), so a mounted view the tab has hidden has nothing to hold back. ──
   const overview = useOverview();
   const pages = useBulletinPages(bulletinId);
   const reading = usePageReading(bulletinId, page);
@@ -110,13 +111,14 @@ export function BulletinsView() {
   const onShrink = () => setEnlarged(false);
 
   // The carrier as the overview listed it: its pages and its page draw their header from it at once, while their reads are out.
-  const row = overview.value?.find((entry) => entry.bulletin_id === bulletinId) ?? null;
+  const overviewRows = overview.value?.rows ?? null;
+  const row = overviewRows?.find((entry) => entry.bulletin_id === bulletinId) ?? null;
 
   let screen;
   if (bulletinId === null) {
     // No carrier open: the overview, with what needs the operator first. Its read's loading, its fault and an empty answer
     // are the screen's own states.
-    screen = <OverviewScreen rows={overview.value} trouble={overview.trouble} onOpenCarrier={onOpenCarrier} onRefresh={onRefresh} />;
+    screen = <OverviewScreen rows={overviewRows} leftOut={overview.value?.left_out ?? []} trouble={overview.trouble} onOpenCarrier={onOpenCarrier} onRefresh={onRefresh} />;
   } else if (page === null) {
     // A carrier open, no page: its pages under their parts. The header stands at once from the overview's row; the pages
     // wait under their own surface, and the lane's fault is said under the header.

@@ -1042,7 +1042,7 @@ The Cerberus tab's root and header, live: the root reads the one overview throug
 | `src/modules/cerberus/CerberusHeader.tsx` | `CerberusHeader({ overview, stale, wardens, onEnroll, onUpdateWardens })` and `ClockPill`: eyebrow, headline, summary, clock pill, the update button, Enroll a node |
 | `src/modules/cerberus/hooks/useClock.ts` | `useClock(tickMs = 1000)`: the browser's clock as epoch ms, read again each tick on the host window |
 | `src/modules/cerberus/hooks/useCountTo.ts` | `useCountTo(target)`: the passing count as drawn |
-| `src/shared/types.ts` | `CerberusView = 'fleet' | 'catalog' | 'history' | 'tours'` |
+| `src/shared/types.ts` | `CerberusView = 'fleet' | 'catalog' | 'history' | 'tours' | 'bulletins'` |
 
 `index.ts` exports `CerberusPanel` as a `lazy` import (its own chunk, loaded on the tab's first open); `WorkspaceMain` renders it with its `projectChoices`, which it only does once the workspace's projects have been read.
 

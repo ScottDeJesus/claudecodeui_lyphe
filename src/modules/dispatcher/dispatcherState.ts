@@ -222,8 +222,12 @@ export function waitsOnSiblings(plan: DispatcherPlan, members: DispatcherPlan[])
 }
 
 /**
- * Whether `dispatcher drop` would take this plan, read off the document. It checks `cmd/drop.py`'s two
- * gates. First, nothing of the plan walks: no phase is `busy`, which is the chain layer's own answer.
+ * Whether `dispatcher drop` would take this plan, read off the document. It mirrors `cmd/drop.py`'s two
+ * gates AS THEY WERE BEFORE THE WITHDRAW: the verb now takes a plan whose OWN planner row is still
+ * waiting in the queue (queued, unclaimed — `planner_waiting.verdict`), which this reads as live, so
+ * the card does not offer a Delete the verb would honour for a plan whose design is waiting. The HTTP
+ * route does withdraw; teaching this the rule needs the document to carry the claim. First, nothing of
+ * the plan walks: no phase is `busy`, which is the chain layer's own answer.
  * Second, no planner row for the plan or its arc is live: that is `store.live_for`, mirrored over the
  * lane's `planners` (`queued`/`out`, `target` or `plan` naming either). `plan.planner` cannot answer
  * the second gate. `report_planners.of_plan` gives a plan's OWN row first, an ending included, so a

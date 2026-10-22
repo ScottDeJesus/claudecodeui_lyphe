@@ -104,6 +104,26 @@ export type OverviewRow = {
   not_placed: number;
 };
 
+/**
+ * A carrier the overview left out. GET /overview answers a bare array, so a carrier whose current file could not be
+ * planned has no row in it; the engine names each such carrier in the response header `X-Left-Out`, a JSON array of
+ * these, which the lane passes on. `reason` is the engine's words with ids taken out. Both members are `''` for a
+ * header that is there and cannot be read, which still says a carrier is missing.
+ */
+export type LeftOutCarrier = {
+  carrier: string;
+  reason: string;
+};
+
+/**
+ * The overview as the view holds it: the rows of the body and the carriers the header says are missing from them. One
+ * answer, so the screen cannot draw the rows without knowing what they leave out. Not a wire body: `useOverview` builds it.
+ */
+export type OverviewAnswer = {
+  rows: OverviewRow[];
+  left_out: LeftOutCarrier[];
+};
+
 // ---------------------------
 
 //----------------- A BULLETIN'S PAGES ------------
@@ -163,14 +183,18 @@ export type RequirementThreshold = {
 };
 
 /**
- * A requirement's deadline: `hours` counted on `basis` (`calendar`, `business`, …) from `anchor`, the event it
- * starts at. `hours` is `null` only for a deadline that counts none ("by the end of the next business day");
- * `anchor` is `null` when the page gives no start.
+ * A requirement's window, which holds two things (shadow-connector's `view_reading._window` puts them in one object).
+ * A deadline: `hours` counted on `basis` (`calendar`, `business`, …) from `anchor`, the event it starts at; `hours` is
+ * `null` only for a deadline that counts none ("by the end of the next business day"), `anchor` is `null` when the page
+ * gives no start. And a cadence: how often (`daily`, `weekly`, `monthly`). A requirement that recurs and has no deadline
+ * comes over as `{ cadence: 'daily' }` alone, with no deadline key, so every member is optional: a screen reads the
+ * deadline only where `basis` is present.
  */
 export type RequirementWindow = {
-  hours: number | null;
-  basis: string;
-  anchor: string | null;
+  hours?: number | null;
+  basis?: string;
+  anchor?: string | null;
+  cadence?: string;
 };
 
 /**

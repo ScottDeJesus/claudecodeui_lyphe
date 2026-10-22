@@ -11694,3 +11694,93 @@ measured 2026-10-22 by chain chain-bulletins-read-by-claude--relay-20261022-0952
 probe-key: f0bf3cac0de8086c7847e20ea4216170a1db7b88
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/affected-areas/affected-areas.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/carrier-bulletins/carrier-bulletins.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/carrier-bulletins/carrier-bulletins.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/carrier-bulletins/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/shadow-connector-lane-router.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/shadow-connector-lane.ts
+
+## INV-9443 — probe — MEDIUM — the card's Delete is never drawn for a plan whose design is waiting, so "the card's Delete relays this verb, so it withdraws too, with no app change" is false
+
+MEDIUM — the card's Delete is never drawn for a plan whose design is waiting, so "the card's Delete relays this verb, so it withdraws too, with no app change" is false
+
+```probe
+bash /home/lyphe/.claude/state/pipeline-reviews/queued-design-amend-withdraw/athena-probes/card.sh
+echo "[probe exit $?]"
+expect: `card draws Delete with its design queued: true` (today: false; the no-outing line prints true either way)
+```
+
+measured 2026-10-22 by chain chain-queued-design-amend-withdraw-20261022-142729-ba02, finding M1, MEDIUM
+probe-key: 539be1f68ee680e5b51ad25df18fd80ae1962dfd
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/dispatcherState.ts, /home/lyphe/.claude/hooks/dispatcher/planner_claim.py, /home/lyphe/.claude/hooks/dispatcher/planner_waiting.py, /home/lyphe/.claude/hooks/dispatcher/store.py, /home/lyphe/.claude/skills/feature/SKILL.md
+
+## INV-9444 — probe — MEDIUM — `tell <plan>` can amend the ARC's waiting `tell`, and the appended words name no plan
+
+MEDIUM — `tell <plan>` can amend the ARC's waiting `tell`, and the appended words name no plan
+
+```probe
+bash /home/lyphe/.claude/state/pipeline-reviews/queued-design-amend-withdraw/athena-probes/arc_addressee.sh
+echo "[probe exit $?]"
+expect: `a queued brief names the plan ax--p: True` (today: False; the door prints AMENDED tell ax--p over the arc's row)
+```
+
+measured 2026-10-22 by chain chain-queued-design-amend-withdraw-20261022-142729-ba02, finding M2, MEDIUM
+probe-key: d3e8fd1e1c7242c96d1d153fc0d8a7c45797dbf4
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/dispatcherState.ts, /home/lyphe/.claude/hooks/dispatcher/planner_claim.py, /home/lyphe/.claude/hooks/dispatcher/planner_waiting.py, /home/lyphe/.claude/hooks/dispatcher/store.py, /home/lyphe/.claude/skills/feature/SKILL.md
+
+## INV-9445 — probe — LOW — an amend skips the Rework's disarm, so an armed Accept-when-cut stands over a design a tell is about to change
+
+LOW — an amend skips the Rework's disarm, so an armed Accept-when-cut stands over a design a tell is about to change
+
+```probe
+bash /home/lyphe/.claude/state/pipeline-reviews/queued-design-amend-withdraw/athena-probes/armed_amend.sh
+echo "[probe exit $?]"
+expect: `Accept still armed after the second tell: False` (today: True)
+```
+
+measured 2026-10-22 by chain chain-queued-design-amend-withdraw-20261022-142729-ba02, finding L1, LOW
+probe-key: db35e1860cc9a42bfb49a131c15baa02104185cf
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/dispatcherState.ts, /home/lyphe/.claude/hooks/dispatcher/planner_claim.py, /home/lyphe/.claude/hooks/dispatcher/planner_waiting.py, /home/lyphe/.claude/hooks/dispatcher/store.py, /home/lyphe/.claude/skills/feature/SKILL.md
+
+## INV-9446 — probe — LOW — when the claim file cannot be written, a `tell` in the fork window prints AMENDED over a body the fork never reads (a `drop` there would delete the row under a forked child)
+
+LOW — when the claim file cannot be written, a `tell` in the fork window prints AMENDED over a body the fork never reads (a `drop` there would delete the row under a forked child)
+
+```probe
+bash /home/lyphe/.claude/state/pipeline-reviews/queued-design-amend-withdraw/athena-probes/claim_unwritable.sh
+echo "[probe exit $?]"
+expect: the door does not print AMENDED while no claim stands (today: `claim file during the fork window: []`, AMENDED, `the forked outing read the body: False`)
+```
+
+measured 2026-10-22 by chain chain-queued-design-amend-withdraw-20261022-142729-ba02, finding L2, LOW
+probe-key: 66717b08870e4a1875036280772c03300db8cd8c
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/dispatcherState.ts, /home/lyphe/.claude/hooks/dispatcher/planner_claim.py, /home/lyphe/.claude/hooks/dispatcher/planner_waiting.py, /home/lyphe/.claude/hooks/dispatcher/store.py, /home/lyphe/.claude/skills/feature/SKILL.md
+
+## INV-9447 — probe — LOW — three statements the change made false stay in the docs
+
+LOW — three statements the change made false stay in the docs
+
+```probe
+bash /home/lyphe/.claude/state/pipeline-reviews/queued-design-amend-withdraw/athena-probes/docs.sh
+echo "[probe exit $?]"
+expect: no stale lines (today: 3 lines, MANUAL:96, MANUAL:121, dispatcherState.ts:225)
+```
+
+measured 2026-10-22 by chain chain-queued-design-amend-withdraw-20261022-142729-ba02, finding L3, LOW
+probe-key: 0e08bed802a9a12261d0c8f9b2f41aadc173706b
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/dispatcherState.ts, /home/lyphe/.claude/hooks/dispatcher/planner_claim.py, /home/lyphe/.claude/hooks/dispatcher/planner_waiting.py, /home/lyphe/.claude/hooks/dispatcher/store.py, /home/lyphe/.claude/skills/feature/SKILL.md
+
+## INV-9448 — probe — LOW — the skill says a waiting design is "withdrawn by `dispatcher drop <name>`", but the feature leaves the roadmap with it
+
+LOW — the skill says a waiting design is "withdrawn by `dispatcher drop <name>`", but the feature leaves the roadmap with it
+
+```probe
+bash /home/lyphe/.claude/state/pipeline-reviews/queued-design-amend-withdraw/athena-probes/drop_roadmap.sh
+echo "[probe exit $?]"
+expect: `f still on the roadmap after the drop: 0` and the skill line names the feature leaving (today: skill count 0)
+```
+
+measured 2026-10-22 by chain chain-queued-design-amend-withdraw-20261022-142729-ba02, finding L4, LOW
+probe-key: d9abf2728342deb01dd53c852b32c2d3c38fe1ae
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/dispatcherState.ts, /home/lyphe/.claude/hooks/dispatcher/planner_claim.py, /home/lyphe/.claude/hooks/dispatcher/planner_waiting.py, /home/lyphe/.claude/hooks/dispatcher/store.py, /home/lyphe/.claude/skills/feature/SKILL.md

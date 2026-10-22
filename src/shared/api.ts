@@ -991,7 +991,8 @@ export const api = {
   // passed through from shadow-connector (404: no such bulletin or page). The answer of each verb is named beside it.
   // Ids are encoded here, so a caller passes them as it holds them.
   carrierBulletins: {
-    // → OverviewRow[] (every carrier with a current file)
+    // → OverviewRow[] (every carrier with a current file). The response header `X-Left-Out`, a JSON array of
+    // LeftOutCarrier, names a carrier whose file could not be planned and so has no row; `useOverview` reads it.
     overview: (options: ApiRequestOptions = {}) => get('/api/carrier-bulletins/overview', options),
     // → BulletinPage[] (one bulletin's pages, in page order)
     pages: (bulletinId: string, options: ApiRequestOptions = {}) =>

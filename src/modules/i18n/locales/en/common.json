@@ -2292,6 +2292,10 @@
         "reading": "Reading the carriers' bulletins…",
         "empty": "No carrier has a bulletin on file",
         "emptyMessage": "A carrier shows here once a pull stores its current bulletin.",
+        "leftOut_one": "{{count}} carrier is left out of this list",
+        "leftOut_other": "{{count}} carriers are left out of this list",
+        "leftOutDetail_one": "shadow-connector could not plan its current file, so it has no row here and nothing below says whether it is read.",
+        "leftOutDetail_other": "shadow-connector could not plan their current files, so they have no row here and nothing below says whether they are read.",
         "groups": {
           "needs": "Needs you",
           "notSettled": "Not settled yet",
@@ -2402,6 +2406,7 @@
         "hours_one": "{{count}} hour",
         "hours_other": "{{count}} hours",
         "from": "{{span}}, counted from {{anchor}}",
+        "cadence": "Recurs {{cadence}}",
         "threshold": "Threshold {{value}} {{unit}} ({{measure}})",
         "services": "Services: {{list}}",
         "lossTypes": "Loss types: {{list}}",
