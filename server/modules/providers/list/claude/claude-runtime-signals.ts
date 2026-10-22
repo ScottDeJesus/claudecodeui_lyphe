@@ -7,10 +7,13 @@
  *
  * Two memories, different in lifetime. Per run (`SignalState`): the last `api_retry`, and
  * whether this run has already said "sign in again". Per account (`claude-limit-memory`): one
- * record per rate-limit window, because limits are account-wide — a second session must not
- * re-announce what the first one did — kept on disk, because the server process that said it is
- * replaced on every save, and a window's reset timer has to outlive the run that armed it.
+ * record per rate-limit window, because limits are account-wide — a second session on the SAME
+ * account must not re-announce what the first one did — kept on disk, because the server process
+ * that said it is replaced on every save, and a window's reset timer has to outlive the run that
+ * armed it. The account is the one this process was LAUNCHED on (`context.account`/`accountSlug`),
+ * never the live login: after a switch the chat keeps riding its own account.
  */
+import { noteChatWindows } from '@/modules/providers/list/claude/claude-chat-readings.js';
 import { accountLimitMemory, saveLimitMemory, windowMemory, type LimitMemory } from '@/modules/providers/list/claude/claude-limit-memory.js';
 
 
@@ -29,8 +32,23 @@ export type SignalState = {
   loginNotified: boolean;
 };
 
-/** Where a signal goes, and the app session it belongs to. */
-type SignalContext = { sessionId: string | null; emit: (signal: RuntimeSignal) => void };
+/**
+ * Where a signal goes, the app session it belongs to, and the account the process was launched on.
+ * `account` is the door's digest (null when the door gave no answer) and `accountSlug` its name in
+ * every sentence a person reads; both are null for a re-adopted host whose record holds none.
+ */
+type SignalContext = {
+  sessionId: string | null;
+  account: string | null;
+  accountSlug: string | null;
+  emit: (signal: RuntimeSignal) => void;
+};
+
+/** The key a limit's memory is kept under: the account's slug when the launch knew one, else its
+ *  digest, else 'unknown' — a limit belongs to the account the process started on. */
+function limitAccountOf(context: SignalContext): string {
+  return context.accountSlug || context.account || 'unknown';
+}
 
 /** Past a day out, the reset is left to the next `allowed` event rather than a held timer. */
 const RESET_TIMER_CAP_MS = 24 * 60 * 60 * 1000;
@@ -88,12 +106,20 @@ function warningReading(info: Record<string, unknown>): { pct: number; bucket: n
   return { pct, bucket: pct >= HIGH_WARNING_PCT ? HIGH_WARNING_PCT : LOW_WARNING_PCT };
 }
 
-/** Severity answers one question: does this stop the work? */
+/**
+ * One limit notice. Severity answers one question: does this stop the work?
+ *
+ * THE KEY NAMES THE ACCOUNT. The orchestrator dedupes on `dedupeKey` alone for twenty seconds, so
+ * two chats on two accounts crossing the same window at the same moment are two notices, never a
+ * repeat — the notice layer must not silence what the per-account memory just stopped silencing.
+ * `accountSlug`, when the launch profile knew one, is carried for the copy, which names it.
+ */
 function emitLimit(context: SignalContext, code: string, rateLimitType: string, meta: Record<string, unknown>, keyPart: string): void {
   context.emit({
-    kind: 'limit', code, meta: { rateLimitType, ...meta },
+    kind: 'limit', code,
+    meta: { rateLimitType, ...meta, ...(context.accountSlug ? { accountSlug: context.accountSlug } : {}) },
     severity: HARD_LIMIT_CODES.has(code) ? 'error' : 'warning',
-    dedupeKey: `claude:${code}:${rateLimitType}:${keyPart}`,
+    dedupeKey: `claude:${code}:${limitAccountOf(context)}:${rateLimitType}:${keyPart}`,
   });
 }
 
@@ -146,8 +172,12 @@ function handleRateLimitEvent(message: Record<string, unknown>, context: SignalC
   const rateLimitType = readText(info.rateLimitType) ?? 'unknown';
   const status = readText(info.status);
   const resetsAt = readNumber(info.resetsAt);
-  const memory = windowMemory(rateLimitType);
-  const account = accountLimitMemory();
+  const accountKey = limitAccountOf(context);
+  const memory = windowMemory(rateLimitType, accountKey);
+  const account = accountLimitMemory(accountKey);
+  // The event's windows are a reading of the account this process runs on, filed beside the notices
+  // they drive. The sibling drops an event whose windows have not moved since that account's last note.
+  noteChatWindows(context.account, info.unifiedWindows);
 
   // A limit belongs to the ACCOUNT, so what has already been said about a window is remembered for
   // the window itself — not for the run that happened to read it. Clearing the steps on any
@@ -257,7 +287,7 @@ function handleAssistantError(error: string, state: SignalState, context: Signal
   if (error === 'billing_error') {
     // The same flag the `overageDisabledReason` road sets: one emptied wallet, one push, whichever
     // road reports it and however many sessions hit it.
-    const account = accountLimitMemory();
+    const account = accountLimitMemory(limitAccountOf(context));
     if (!account.creditsExhaustedAnnounced) {
       account.creditsExhaustedAnnounced = true;
       saveLimitMemory();

@@ -5,8 +5,7 @@ import type { DispatcherVerb, DispatcherVerbResult } from '@/shared/types.js';
  * Relaying the dispatcher's own sixteen verbs: `stop`, `resume`, `schedule` (a stopped plan's Resume
  * at a time), `park` (a designed plan set aside), `unpark` (handed
  * back to be cut), `model` (a plan's or an arc's own DeepSeek / Claude word, or `default` to follow the
- * top), `wip` (an epic's own
- * feature or task WIP limit), `drop` (a plan removed, with everything the store holds of it — refused while a phase
+ * top), `drop` (a plan removed, with everything the store holds of it — refused while a phase
  * of it walks or while a planner outing for the plan or its arc is live, the two gates of
  * `hooks/dispatcher/cmd/drop.py`) and `planner-resume` (a plan's stalled planner outing put back to
  * work — which door it goes back through is the dispatcher's own reading of its store, so it takes
@@ -18,6 +17,8 @@ import type { DispatcherVerb, DispatcherVerbResult } from '@/shared/types.js';
  * epic's open plans, paused and held out of the queue until shown — a walk in flight stops once its task
  * in flight finishes) and `unhide` (Show: each hidden plan takes its turn in the queue). Hide and Show take
  * plan or epic names, any number of them, and are BOARD verbs for the relay: the names are the argv.
+ * `override` is the card's lift of the usage pacer's hold for one plan (`--by app:card`, and `--off` for its
+ * undo), the pacer's gate and no other.
  *
  * FIVE OF THE SIXTEEN NAME AN ARC AS READILY AS A PLAN — `stop`, `resume`, `model`, and the
  * `arm-accept` / `disarm-accept` pair (every designed, or every armed, plan of it), each
@@ -29,8 +30,8 @@ import type { DispatcherVerb, DispatcherVerbResult } from '@/shared/types.js';
  * draws it for the mid-walk and the stalled alone). One
  * transaction and one kick, and the order the plans then walk in is the daemon's own (`rule.eligible`
  * keeps it). `park`, `unpark` and `drop` are the plan card's own and no arc header
- * draws them; `wip` is the arc's alone, and takes the limit and the word after the arc's name, as `queue`
- * does its move. `epics` and `start` are the BOARD's: they name no plan and no arc, so they are relayed
+ * draws them; `queue` is the arc's alone, and takes its move after the arc's name.
+ * `epics` and `start` are the BOARD's: they name no plan and no arc, so they are relayed
  * with an empty name and the argv is exactly `["epics", word]` or `["start"]`.
  *
  * This server never touches a plan. It does not hold the dispatcher's lock, does not signal its
@@ -52,10 +53,10 @@ export type DispatcherVerbDependencies = DispatcherCommandDependencies;
 /**
  * Runs one verb against one name — a plan's, or an arc's for the five the arc's door also opens on — or,
  * for a board verb (`epics`, `start`, `hide`, `unhide`), against NONE: the empty name `""` is left out of the argv, and the answer
- * still carries `plan: ""`. `verbArgs` follow the name — `schedule`'s hour, `model`'s word, `wip`'s limit and
- * word, `queue`'s move and `epics`' word, and for `hide` / `unhide` the plan and epic names themselves, each already
+ * still carries `plan: ""`. `verbArgs` follow the name — `schedule`'s hour, `model`'s word,
+ * `queue`'s move and `epics`' word, and for `hide` / `unhide` the plan and epic names themselves, each already
  * checked by the route against the shapes the dispatcher accepts, and `planner-resume`'s `--by app:card`,
- * which the route spells itself; `stop`, `resume`, `park`, `unpark` and `drop` take none.
+ * which the route spells itself (so does `override`'s `--by app:card`, with `--off` for the undo); `stop`, `resume`, `park`, `unpark` and `drop` take none.
  */
 export async function runDispatcherVerb(
   verb: DispatcherVerb,

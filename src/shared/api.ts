@@ -3,7 +3,7 @@ import {
   getStoredAuthToken,
   storeAuthToken,
 } from '@/shared/authToken';
-import type { AuthTraceEvent, CerberusEnrollInput, CerberusLabelInput, CerberusMuteInput, CerberusPromoteInput, DeepseekRange, DispatcherAsk, DispatcherEpicsWord, DispatcherModelChoice, DispatcherQueueMove, DispatcherWipChoice, DispatcherWipLimit, FileLinePatch, JevRange, NoteInput, NtfySettingsInput, SimpleListItemRef, SimpleListPosition, SubagentTranscriptResult } from '@/shared/types';
+import type { AuthTraceEvent, CerberusEnrollInput, CerberusLabelInput, CerberusMuteInput, CerberusPromoteInput, ClaudeApiKeySave, DeepseekRange, DispatcherAsk, DispatcherEpicsWord, DispatcherModelChoice, DispatcherQueueMove, FileLinePatch, JevRange, NoteInput, NtfySettingsInput, SimpleListItemRef, SimpleListPosition, SubagentTranscriptResult } from '@/shared/types';
 import type { AgentLaunchDefaultsChange, AgentLaunchRowChange } from '@/shared/agent-launch-types';
 import type { MarkRequest, MissedRequest, Queue, ReadRequest, ThresholdRequest, UnderstandingMarkRequest } from '@/shared/affected-areas-types';
 import type { CerberusCatalogEntryInput } from '@/shared/cerberus-types';
@@ -657,14 +657,8 @@ export const api = {
     // is the same answer for anyone signed in and both calls return the state read back off disk.
     deepseekFlash: () => get('/api/settings/deepseek-flash'),
     saveDeepseekFlash: (enabled: boolean) => put('/api/settings/deepseek-flash', { enabled }),
-
-    // The dispatcher's WIP defaults — how many of an epic's features are in progress at once and how
-    // many tasks each of them runs at once, for every epic with no word of its own. Same host-wide
-    // shape as the switch above, for the same reason, and the same answer read back off disk: each
-    // limit is a word, `'<N>'` for a whole number from 1 or `'all'` for no limit. One file holds both,
-    // so a write carries both.
-    wipDefaults: () => get('/api/settings/wip'),
-    saveWipDefaults: (state: { features: string; tasks: string }) => put('/api/settings/wip', state),
+    deepseekFeatures: () => get('/api/settings/deepseek-features'),
+    saveDeepseekFeatures: (enabled: boolean) => put('/api/settings/deepseek-features', { enabled }),
 
     // The dispatcher's planner-lane dial — how many planners (designs, cuts, judgments) may be out at
     // once. A fifth flag file on this host, in the same host-wide shape and with the same read-back
@@ -680,6 +674,17 @@ export const api = {
     parkAtPeakSwitch: () => get('/api/settings/park-at-peak'),
     saveParkAtPeakSwitch: (state: { enabled: boolean }) =>
       put('/api/settings/park-at-peak', state),
+
+    // The Claude API keys' own door — a store on this host, host-wide like the switches above and
+    // no per-user preference. The GET answers the door's picture (`claude-api status --json`):
+    // which payer rides and why, both slots, the pace — never a key. The PUT takes ONE slot's save
+    // (`key` only when the reader typed one) and answers a fresh picture; its 422 is the door's own
+    // refusal sentence. The DELETE clears a slot and answers the same. THE BODY IS NEVER LOGGED,
+    // ECHOED OR PUT IN AN ERROR: it carries a key, and a key reaches the door's stdin only.
+    claudeApi: () => get('/api/settings/claude-api'),
+    saveClaudeApiKey: (slot: number, body: ClaudeApiKeySave) =>
+      put(`/api/settings/claude-api/${slot}`, body),
+    removeClaudeApiKey: (slot: number) => del(`/api/settings/claude-api/${slot}`),
 
     // The plan runner's Dactyls switch — the fifth flag file in this shape: whether Hephaestus on
     // Claude hands his code edits to one-file children. The GET answers the position read off the file
@@ -831,18 +836,21 @@ export const api = {
     setAutoInstall: (enabled: boolean) => put('/api/claude-updates/auto-install', { enabled }),
   },
 
-  // The Claude account switcher and its usage meter, served by the server's own accounts module.
-  // Both reads answer 200 whatever the state — the calm `{reachable:false, reason}` picture when
-  // nothing can be computed — so a caller reads the BODY rather than the status. Both writes carry
-  // the service's OWN status and body through, which is why they are read from the raw response and
-  // never through `readApiJson`.
+  // The Claude account lane and its usage meter, served by the server's own accounts module.
+  // Both reads answer 200 whatever the state — the calm `{reachable:false, reason}` when nothing
+  // can be computed — so a caller reads the BODY rather than the status. Every write carries the
+  // service's OWN status and body through, which is why they are read from the raw response and
+  // never through `readApiJson`; a door write's refusal is a 422 whose `error` is the door's own words.
   accounts: {
     // `picture`, not `accounts`: the group is already named for the lane, and the panel calls this
-    // body a picture everywhere it appears.
+    // body a picture everywhere it appears. The body is the door's own picture under `reachable`.
     picture: () => get('/api/accounts'),
     usage: () => get('/api/usage'),
-    switchAccount: (slug: string) => post('/api/accounts/switch', { slug }),
-    capture: () => post('/api/accounts/capture', {}),
+    // The door's three writes: choose the account in use, turn the automatic switch on or off, and
+    // remove an account with its token. Each answers the door's line on 200 or its refusal on 422.
+    use: (slug: string) => post('/api/accounts/use', { slug }),
+    auto: (on: boolean) => post('/api/accounts/auto', { on }),
+    remove: (slug: string) => post('/api/accounts/remove', { slug }),
   },
 
   // The memory-intake lane (docs/MANUAL.md (memory-intake)): what a session PROPOSES and a person reviews.
@@ -946,8 +954,8 @@ export const api = {
   // reader routes, passed through (404 `no such tour`, FastAPI's list-shaped 422); `{ error, detail }` (`Refusal`) from
   // its marks routes. The answer type of each verb is named beside it. Ids are encoded here, so a caller passes them as
   // it holds them.
-  // The two slow presses outlast the default deadline by design: cutting a pano's six views takes up to 90 s and a
-  // read of them 120 s (the lane's own deadlines), and the answer that says `refused` is the one the screen shows.
+  // The slow press, `readPano`, outlasts the default deadline by design: a read of a pano's views takes up to 120 s (the
+  // lane's own deadline), and the answer that says `refused` is the one the screen shows.
   affectedAreas: {
     // → TourList
     tours: ({ q, limit }: { q?: string; limit?: number } = {}) => get(`/api/affected-areas/tours${query({ q, limit })}`),
@@ -956,14 +964,9 @@ export const api = {
     // → PanoDetail
     pano: (tourId: string, panoId: string) =>
       get(`/api/affected-areas/tours/${encodeURIComponent(tourId)}/panos/${encodeURIComponent(panoId)}`),
-    // → ViewsResult
-    cutViews: (tourId: string, panoId: string) =>
-      post(`/api/affected-areas/tours/${encodeURIComponent(tourId)}/panos/${encodeURIComponent(panoId)}/views`, {}, { timeoutMs: 90_000 }),
     // → ReadResult
     readPano: (tourId: string, panoId: string, body: ReadRequest) =>
       post(`/api/affected-areas/tours/${encodeURIComponent(tourId)}/panos/${encodeURIComponent(panoId)}/read`, body, { timeoutMs: 120_000 }),
-    // → TourPlan
-    planTour: (tourId: string) => post(`/api/affected-areas/tours/${encodeURIComponent(tourId)}/read`, {}),
     // The bytes of one view's JPEG, not JSON: the caller reads `.blob()`. `options.signal` lets it abort a fetch
     // whose view has since changed.
     image: (sha: string, options: ApiRequestOptions = {}) => get(`/api/affected-areas/images/${encodeURIComponent(sha)}`, options),
@@ -978,14 +981,35 @@ export const api = {
     // → UnderstandingMarkResult
     markUnderstanding: (readId: string, body: UnderstandingMarkRequest) =>
       post(`/api/affected-areas/reads/${encodeURIComponent(readId)}/marks`, body),
-    // → Queue
-    queue: ({ mode, cls, limit }: { mode: Queue['mode']; cls?: string; limit?: number }) =>
-      get(`/api/affected-areas/queue${query({ mode, class: cls, limit })}`),
+    // → Queue. `skip` is the region ids a walk has passed over, at most 50: they leave the items and stay in `remaining`.
+    queue: ({ mode, cls, limit, skip }: { mode: Queue['mode']; cls?: string; limit?: number; skip?: string[] }) =>
+      get(`/api/affected-areas/queue${query({ mode, class: cls, limit, skip: skip?.join(',') })}`),
     // → Proving
     proving: ({ model, contract }: { model?: string; contract?: string } = {}) =>
       get(`/api/affected-areas/proving${query({ model, contract })}`),
     // → ProvingClass (the class as it now stands, its line moved)
     setThreshold: (cls: string, body: ThresholdRequest) => put(`/api/affected-areas/thresholds/${encodeURIComponent(cls)}`, body),
+  },
+
+  // The carrier-bulletins lane (the Bulletins view of the Cerberus tab; wire shapes in `@/shared/carrier-bulletins-types`):
+  // what Claude read in each carrier's SERVPRO bulletin and what the house settled it into, forwarded to shadow-connector
+  // by CloudCLI. READ-ONLY: every verb is a GET, and no verb here writes a rule. Every JSON answer is its wire shape BARE,
+  // in snake_case. A failure arrives as `affectedAreas`' do: `{ error: string }` from the lane, `{ detail: string }`
+  // passed through from shadow-connector (404: no such bulletin or page). The answer of each verb is named beside it.
+  // Ids are encoded here, so a caller passes them as it holds them.
+  carrierBulletins: {
+    // → OverviewRow[] (every carrier with a current file)
+    overview: (options: ApiRequestOptions = {}) => get('/api/carrier-bulletins/overview', options),
+    // → BulletinPage[] (one bulletin's pages, in page order)
+    pages: (bulletinId: string, options: ApiRequestOptions = {}) =>
+      get(`/api/carrier-bulletins/bulletins/${encodeURIComponent(bulletinId)}/pages`, options),
+    // → PageReading (what Claude read on one page)
+    page: (bulletinId: string, page: number, options: ApiRequestOptions = {}) =>
+      get(`/api/carrier-bulletins/bulletins/${encodeURIComponent(bulletinId)}/pages/${encodeURIComponent(page)}`, options),
+    // The bytes of one page's PNG, not JSON: the caller reads `.blob()`. `sha` is the file's `file_sha256`. `options.signal`
+    // lets it abort a fetch whose page has since changed.
+    image: (sha: string, page: number, options: ApiRequestOptions = {}) =>
+      get(`/api/carrier-bulletins/files/${encodeURIComponent(sha)}/pages/${encodeURIComponent(page)}/image`, options),
   },
 
   // The dispatcher lane (docs/MANUAL.md (dispatcher)): the plans in the dispatcher's own store, and the
@@ -1011,6 +1035,11 @@ export const api = {
     // dispatcher reads which door from its own store — `cut`, `judge`, or a `tell` of `continue` — and
     // answers with that door's own sentence (`QUEUED cut <plan> — …`), or `REFUSED planner-resume …` as a 409.
     plannerResume: (name: string) => post(`/api/dispatcher/plans/${encodeURIComponent(name)}/planner-resume`, {}),
+    // The operator's lift of the usage pacer's hold for ONE plan (`dispatcher override <plan> --by app:card`):
+    // `OVERRIDDEN <plan> — …`, or the dispatcher's REFUSED line (a finished plan, one already past the pacer)
+    // as a 409. `overrideOff` puts the hold back (`… --off`). The pacer's gate only — no model word moves.
+    override: (name: string) => post(`/api/dispatcher/plans/${encodeURIComponent(name)}/override`, {}),
+    overrideOff: (name: string) => post(`/api/dispatcher/plans/${encodeURIComponent(name)}/override-off`, {}),
     // "Accept when cut" on a DESIGNED plan (`dispatcher arm-accept <plan> --by app:card --design <stamp>`): the
     // stamp is the plan's `design_loaded_at` as the card drew it, so a press on a design that has since moved is
     // refused by the dispatcher. `disarmAccept` is its Cancel. The arc pair presses/cancels every designed (armed)
@@ -1028,7 +1057,7 @@ export const api = {
     // control relays it; nothing is optimistic, and the next `dispatcher_state` frame reads the
     // word back. Restarts nothing — the word is read when a chain is LAUNCHED.
     model: (name: string, model: DispatcherModelChoice) => post(`/api/dispatcher/plans/${encodeURIComponent(name)}/model`, { model }),
-    // The DISPATCH ARC deck's four presses (`dispatcher model|stop|resume|wip <arc> …`), each
+    // The DISPATCH ARC deck's three presses (`dispatcher model|stop|resume <arc> …`), each
     // relayed to the arc's own door. Separate routes from the plan's because an arc is addressed by
     // its own door (`.arc`), never through a plan's.
     //
@@ -1039,11 +1068,6 @@ export const api = {
     arcModel: (name: string, model: DispatcherModelChoice) => post(`/api/dispatcher/arcs/${encodeURIComponent(name)}/model`, { model }),
     arcStop: (name: string) => post(`/api/dispatcher/arcs/${encodeURIComponent(name)}/stop`, {}),
     arcResume: (name: string) => post(`/api/dispatcher/arcs/${encodeURIComponent(name)}/resume`, {}),
-    // One of the epic's two WIP limits (`dispatcher wip <arc> <limit> <word>`) — a count, `all`, or
-    // `default` to follow the top again. The epic deck's fold relays it; nothing is optimistic,
-    // and the next `dispatcher_state` frame reads the word back. An epic's verb alone: no plan route.
-    arcWip: (name: string, limit: DispatcherWipLimit, word: DispatcherWipChoice) =>
-      post(`/api/dispatcher/arcs/${encodeURIComponent(name)}/wip`, { limit, word }),
     // An epic moved in the queue In flight runs top down (`dispatcher queue <arc> --before <arc> | --last`):
     // a drop on the queue's decks, named by a neighbour — `{ before }` or `{ last: true }` — never by an
     // index. A 409 carries the dispatcher's own refusal (an epic whose turn has ended is no longer in the
@@ -1333,7 +1357,7 @@ export const api = {
   cliVersion: () => get('/api/cli-version'),
 
   // The money left on this host's DeepSeek account (docs/MANUAL.md (deepseek-balance)). A different account
-  // from the Claude slots the switcher holds, and a different origin: the server reads it from the
+  // from the Claude accounts the door holds, and a different origin: the server reads it from the
   // vendor with the key it holds, so the key never reaches this side. Answers 200 always, for the
   // same reason `accounts.usage` does — no reading is a reading in words, never an error wall.
   deepseek: {

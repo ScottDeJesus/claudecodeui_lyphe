@@ -1,7 +1,7 @@
 import type { TFunction } from 'i18next';
 import { useTranslation } from 'react-i18next';
 
-import { panoReadState, roomWords, spansFloors } from '@/modules/affected-areas/utils/tourModel';
+import { GALLERY_MAX, listedAreas, panoReadState, roomWords, spansFloors } from '@/modules/affected-areas/utils/tourModel';
 import type { PanoEntry } from '@/shared/affected-areas-types';
 import type { GalleryItem } from '@/shared/types';
 import { Gallery } from '@/shared/ui';
@@ -14,24 +14,24 @@ type RoomGalleryProps = {
   /** The gallery's accessible name: whose panos these are. */
   label: string;
   onOpenPano: (panoId: string) => void;
+  /** Told once, when the "+N" tile opens the rest: until then only the first `GALLERY_MAX` panos need a photo. */
+  onOverflowOpen: () => void;
 };
 
 /**
- * The most tiles drawn before the last one collapses the rest into "+N": three rows at a desk, eight on a phone.
- * A forty-five pano tour opens on twenty-three and the count, and one press opens the rest in place.
- */
-const GALLERY_MAX = 24;
-
-/**
- * The tile's badge, the pano's state in two words: "3 areas" (or "None found") once all six faces are read, "Partly
- * read" while some are, "Not read" before any is. Areas are the ones standing once marks exist, else every one the
- * reader marked: the same count the pano screen's face strip carries.
+ * The tile's badge, the pano's state in two words: "3 areas" once all six faces are read and some stand, "2 found"
+ * when the reader found some and none stands yet (no mark and no line set), "None found" when it found none, "Partly
+ * read" while some faces are, "Not read" before any is. Areas are the ones standing: the same count the pano screen's
+ * face strip carries.
  */
 function tileBadge(pano: PanoEntry, t: TFunction): string {
   const state = panoReadState(pano);
   if (state !== 'read') return t(`affectedAreas.tour.tile.${state}`);
-  const areas = pano.views.reduce((sum, view) => sum + (view.read?.standingCount ?? view.read?.regionsCount ?? 0), 0);
-  return areas === 0 ? t('affectedAreas.tour.tile.none') : t('affectedAreas.tour.tile.areas', { count: areas });
+  const listed = pano.views.flatMap((view) => (view.read === null ? [] : [listedAreas(view.read)]));
+  const areas = listed.reduce((sum, view) => sum + view.standing, 0);
+  const found = listed.reduce((sum, view) => sum + view.found, 0);
+  if (areas > 0) return t('affectedAreas.tour.tile.areas', { count: areas });
+  return found > 0 ? t('affectedAreas.tour.tile.found', { count: found }) : t('affectedAreas.tour.tile.none');
 }
 
 /**
@@ -42,7 +42,7 @@ function tileBadge(pano: PanoEntry, t: TFunction): string {
  * Used by the affected-areas module's `TourScreen`, which keys it by tour: the gallery's open overflow belongs to
  * one tour's set.
  */
-export function RoomGallery({ panos, photos, label, onOpenPano }: RoomGalleryProps) {
+export function RoomGallery({ panos, photos, label, onOpenPano, onOverflowOpen }: RoomGalleryProps) {
   const { t } = useTranslation();
   const withFloor = spansFloors(panos);
   const items: GalleryItem[] = panos.map((pano) => {
@@ -54,5 +54,5 @@ export function RoomGallery({ panos, photos, label, onOpenPano }: RoomGalleryPro
       badge: tileBadge(pano, t),
     };
   });
-  return <Gallery items={items} max={GALLERY_MAX} label={label} onSelect={onOpenPano} />;
+  return <Gallery items={items} max={GALLERY_MAX} label={label} onSelect={onOpenPano} onOverflowOpen={onOverflowOpen} />;
 }

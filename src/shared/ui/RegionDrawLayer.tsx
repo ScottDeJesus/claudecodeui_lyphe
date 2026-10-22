@@ -12,13 +12,6 @@ type RegionDrawLayerProps = {
   onCancel: () => void;
 };
 
-/**
- * The shortest side a drawn box may have, in 0..1 of the image. A drag shorter than this on either side is a
- * slip of the hand, not a box: it is dropped without a word. 0.02 squared is 4e-4, clear of the 1e-4 of the
- * view the engine refuses below (`bad_box`), so a box that clears this floor is never turned back for its size.
- */
-const MIN_DRAWN_SIDE = 0.02;
-
 /** The point a client position falls on, in 0..1 of the layer and held inside it; null for a layer with no size. */
 function toUnitPoint(layer: HTMLElement, clientX: number, clientY: number): [number, number] | null {
   const rect = layer.getBoundingClientRect();
@@ -52,7 +45,9 @@ function boxOfDrag(layer: HTMLElement, point: PointerDragPoint): DrawnBox | null
  * Escape calls `onCancel`, unless a dialog or a menu in front holds the key (`otherOverlayHoldsEscape`), and it ENDS
  * the drag in progress: the box vanishes at once and the release that follows reports nothing, whether or not the
  * caller then leaves drawing mode — a caller that only clears a box and keeps drawing must not also be handed it.
- * A drag the browser takes away (`pointercancel`) and a drag below `MIN_DRAWN_SIDE` report nothing.
+ * A drag the browser takes away (`pointercancel`), a press that never moved and a drag with no width or no height
+ * report nothing; every other box is reported, however small or thin, because the floor on a box's area is the
+ * caller's (the engine's, mirrored as `MIN_REGION_AREA`).
  */
 export function RegionDrawLayer({ onDrawn, onCancel }: RegionDrawLayerProps) {
   const layerRef = useRef<HTMLDivElement | null>(null);
@@ -82,7 +77,9 @@ export function RegionDrawLayer({ onDrawn, onCancel }: RegionDrawLayerProps) {
       setLiveBox(null);
       if (wasCalledOff || point.cancelled || !point.moved || !layerRef.current) return;
       const box = boxOfDrag(layerRef.current, point);
-      if (box === null || box[2] - box[0] < MIN_DRAWN_SIDE || box[3] - box[1] < MIN_DRAWN_SIDE) return;
+      // A drag along one axis encloses nothing: a zero width or a zero height is no box. Any other box is reported, however
+      // thin — a tide line is long and a few pixels tall — and the caller holds the area floor.
+      if (box === null || box[2] <= box[0] || box[3] <= box[1]) return;
       onDrawn(box);
     },
   });

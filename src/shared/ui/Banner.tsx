@@ -14,8 +14,7 @@ type BannerProps = {
  * A full-width line the app uses to say something about the surface it sits on.
  *
  * Used by the chat module (Phase 6) for the tool-permission prompt and by the accounts module
- * (Phase 13) for the drift notice, whose "Save it" is the `action`, and for a write the store
- * refused, and by the cerberus module for "Cerberus can't be reached" with its Try again, for
+ * for a write the door refused, and by the cerberus module for "Cerberus can't be reached" with its Try again, for
  * the Enroll dialog's refused ask and expired token, and for a node card's refused project move —
  * every caller needs a toned strip carrying a sentence and at most one or two buttons, and none
  * should spell a second one.

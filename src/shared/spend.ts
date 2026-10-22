@@ -11,6 +11,8 @@ import type { SpendParts } from '@/shared/types';
  * other, never both at once:
  *
  *   `$0.28 DeepSeek`                      a soul, stage or phase DeepSeek billed — NO tokens
+ *   `$4.21 Claude API`                    a key-paid Claude child's bill — NO tokens
+ *   `$4.49`                               an aggregate whose paid rows name two vendors
  *   `10.3k in · 80 out`                   a record on the subscription — no `$`, never `$0.00`
  *   `$0.32 DeepSeek · 12.4M in · 80k out` an AGGREGATE that used both hands, its token half
  *                                         counting the CLAUDE records only, never a vendor's
@@ -22,8 +24,13 @@ import type { SpendParts } from '@/shared/types';
  * THE HALF IS SETTLED UPSTREAM, NOT HERE. Every figure this module renders is already the right
  * half when it arrives: the server reads a plan's or a soul's CLAUDE half and zeroes a vendor's
  * tokens (`server/modules/dispatch-souls/soul-launch.service.ts`), and the CLI does the same in
- * `plan_runner/costs.py`. So this file needs no provider parameter — it formats, and the
- * either/or falls out of the two figures being one or the other.
+ * `plan_runner/costs.py`. The either/or falls out of the two figures being one or the other.
+ *
+ * THE LABEL IS THE CALLER'S. A `$` is always labelled by the vendor its own rows name — the
+ * dispatcher sends that word as `paid_vendor` beside every `cost_usd` (`report_vendor.py`),
+ * `costs.vendor_word` writes it into the text face, and each surface that knows its figures are one
+ * vendor's passes that word itself. This module holds no vendor constant: `paidText` and
+ * `spendText` take the word, and a `""`/`null` draws the figure alone (`$4.49`), never a guess.
  *
  * ONE DECISION, TWO DRAWINGS. Which halves a record has is decided ONCE, by {@link spendParts}, and
  * drawn two ways from that one answer: as pills by the dispatcher's `SpendPills` (every phase row and
@@ -47,17 +54,6 @@ import type { SpendParts } from '@/shared/types';
  * NOTHING HERE IS TRANSLATED-BY-HAND: the numbers are formatted here, the words come from the
  * caller's `t` (namespace `common`), so the strip and the tab say the same thing in one language.
  */
-
-/**
- * The vendor a `$` figure is labelled by.
- *
- * A product name, not copy, which is why it is a constant and not a translation key: the CLI labels
- * the same figure the same way (`plan_runner/costs.py:PAID_VENDOR`). A vendor is drawn in TWO
- * places, and a second paying API would become a parameter of both, never a second constant: the
- * sentence's {@link paidText}, and the dispatcher's paid pill (`SpendPills`), whose title names this
- * constant and whose mark spells the provider itself (`LLMProviderLogo provider="deepseek"`).
- */
-export const PAID_VENDOR = 'DeepSeek';
 
 /**
  * Byte-for-byte `hooks/plan_runner/costs.py`'s `humanize`: "94.9M", "1M", "12.5k".
@@ -179,9 +175,19 @@ export function cachePercent(cacheRead: number | null, tokensIn: number): number
   return Math.max(cacheRead < tokensIn ? Math.min(share, 99) : share, 1);
 }
 
-/** The paid half as words, `$0.28 DeepSeek`, or `''` when {@link spendParts} found no bill. */
-function paidText(t: TFunction, paid: SpendParts['paid']): string {
-  return paid === null ? '' : t('runner.paid', { usd: moneyText(paid), vendor: PAID_VENDOR });
+/**
+ * The paid half as words, `$0.28 DeepSeek`, `$4.21 Claude API`, or the figure alone (`$4.49`) when
+ * the caller names no vendor — a mix. Any non-empty word is NAMED, whatever it is: the producer
+ * (`costs.vendor_word`) answers `""` for a word it does not know, so an unknown vendor reaches here
+ * as an unnamed figure, and a caller that hands one over is stating it on purpose. `''` when
+ * {@link spendParts} found no bill.
+ */
+function paidText(t: TFunction, paid: SpendParts['paid'], vendor: string | null): string {
+  if (paid === null) return '';
+  const usd = moneyText(paid);
+  return vendor
+    ? t('runner.paid', { usd, vendor })
+    : t('runner.paidAlone', { usd, defaultValue: '${{usd}}' });
 }
 
 /** The token half as words, `1.2M in · 48k out` or `⛁ 216M tok`, or `''` when there is none. */
@@ -204,7 +210,8 @@ export function spendText(
   tokensIn: number | null | undefined,
   tokensOut: number | null | undefined,
   total: number | null | undefined,
+  vendor: string | null,
 ): string {
   const parts = spendParts(usd, tokensIn, tokensOut, total);
-  return [paidText(t, parts.paid), usageText(t, parts.tokens)].filter(Boolean).join(' · ');
+  return [paidText(t, parts.paid, vendor), usageText(t, parts.tokens)].filter(Boolean).join(' · ');
 }

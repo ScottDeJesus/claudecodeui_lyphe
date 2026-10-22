@@ -2,7 +2,7 @@ import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
-import { useReloginCapture } from '@/modules/accounts';
+import { announceAccountsChanged } from '@/modules/accounts';
 import { ProviderLoginModal } from '@/modules/provider-auth';
 import { Button } from '@/shared/ui';
 import SettingsSidebar from '@/modules/settings/SettingsSidebar';
@@ -19,7 +19,7 @@ import { ClaudeUpdatesSettingsTab } from '@/modules/claude-updates';
 import AboutTab from '@/modules/settings/tabs/AboutTab';
 import { useSettingsController } from '@/modules/settings/hooks/useSettingsController';
 import { useWebPush } from '@/modules/settings/hooks/useWebPush';
-import type { AgentProvider, AgentSettingsProject } from '@/shared/types';
+import type { AgentSettingsProject } from '@/shared/types';
 
 type SettingsProps = {
   isOpen: boolean;
@@ -71,33 +71,16 @@ function Settings({ isOpen, onClose, projects = [], initialTab = 'agents' }: Set
     initialTab
   });
 
-  // Claude's sign-in replaces the live login the account switcher holds, so the Re-login here ends the
-  // way the switcher's own does: the login is saved before the window opens, and filed when it closes
-  // if it changed. Another provider's login, and the design authorization, never arm it, so closing
-  // their windows writes nothing. See `useReloginCapture`.
-  const { begin: beginRelogin, finish: finishRelogin, busy: reloginBusy } = useReloginCapture();
-
-  // While the pre-save (or the close-time capture) runs, a press on any other Login or Authenticate does
-  // nothing: it would open its window, and `begin` resolving would then open the account login over it —
-  // the design terminal silently swapped for a different command. The window opens a moment later from
-  // the press that started the work.
-  const openProviderLogin = useCallback(async (provider: AgentProvider) => {
-    if (reloginBusy) return;
-    if (provider === 'claude' && !(await beginRelogin())) return;
-    openLoginForProvider(provider);
-  }, [beginRelogin, openLoginForProvider, reloginBusy]);
-
-  const openDesignLoginWhenIdle = useCallback(() => {
-    if (!reloginBusy) openDesignLogin();
-  }, [openDesignLogin, reloginBusy]);
-
-  // Both reads of the login happen at this one moment: `closeLoginModal` re-reads the provider's auth
-  // status for the "Logged in as" line, and `finishRelogin` reads the live login to file it in the
-  // switcher. Neither waits on the login command's exit, which `claude /login` never reaches.
+  // Re-login signs the box's own login in again. There is nothing to save before the window opens
+  // and nothing to file when it closes: the token switch owns the account, and a new live identity
+  // lands in the panel as a "Set up" row. Closing the Claude account window tells the panel to read
+  // itself again, so that identity shows without waiting for its minute tick. Another provider's
+  // login and the design authorization announce nothing — neither changes an account this app reads.
   const closeProviderLogin = useCallback(() => {
+    const signedIn = loginFlow === 'account' && loginProvider === 'claude';
     closeLoginModal();
-    void finishRelogin();
-  }, [closeLoginModal, finishRelogin]);
+    if (signedIn) announceAccountsChanged();
+  }, [closeLoginModal, loginFlow, loginProvider]);
 
   const {
     permission: pushPermission,
@@ -220,8 +203,8 @@ function Settings({ isOpen, onClose, projects = [], initialTab = 'agents' }: Set
               {activeTab === 'agents' && (
                 <AgentsSettingsTab
                   providerAuthStatus={providerAuthStatus}
-                  onProviderLogin={(provider) => { void openProviderLogin(provider); }}
-                  onProviderDesignLogin={openDesignLoginWhenIdle}
+                  onProviderLogin={openLoginForProvider}
+                  onProviderDesignLogin={openDesignLogin}
                   claudePermissions={claudePermissions}
                   onClaudePermissionsChange={setClaudePermissions}
                   cursorPermissions={cursorPermissions}

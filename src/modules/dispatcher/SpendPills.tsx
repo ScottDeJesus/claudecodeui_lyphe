@@ -1,10 +1,10 @@
-import { ArrowDown, ArrowUp } from 'lucide-react';
+import { ArrowDown, ArrowUp, CircleDollarSign } from 'lucide-react';
 import type { TFunction } from 'i18next';
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { useCountUp } from '@/modules/dispatcher/hooks/useCountUp';
-import { cachePercent, humanizeTokens, moneyText, PAID_VENDOR } from '@/shared/spend';
+import { cachePercent, humanizeTokens, moneyText } from '@/shared/spend';
 import { Badge, LLMProviderLogo } from '@/shared/ui';
 import type { SpendParts } from '@/shared/types';
 
@@ -89,8 +89,20 @@ function cacheWords(t: TFunction, cacheRead: number | null, tokensIn: number): {
 }
 
 /**
+ * The mark the paid pill wears, by the vendor its dollars were billed by: Claude's own for
+ * `Claude API`, DeepSeek's whale for `DeepSeek`, and a plain dollar sign for a mix (the dispatcher's
+ * `""`) or a word this build does not know. The mark follows the label for the same reason the
+ * title does: a logo is a claim about who sent the bill, and the rows are the only ones that know.
+ */
+function PaidMark({ vendor, className }: { vendor: string | null; className: string }) {
+  if (vendor === 'Claude API') return <LLMProviderLogo provider="claude" className={className} />;
+  if (vendor === 'DeepSeek') return <LLMProviderLogo provider="deepseek" className={className} />;
+  return <CircleDollarSign className={className} aria-hidden="true" />;
+}
+
+/**
  * A spend figure as a row of pills — the halves `spendParts` decided, each drawn only where it
- * exists: the paid dollars behind the vendor's mark, then the CLAUDE tokens, as `in` and `out` where
+ * exists: the paid dollars behind their vendor's mark and words, then the CLAUDE tokens, as `in` and `out` where
  * the record's split is whole and as one `tokens` total where it is not, the `in` pill carrying the
  * share of those tokens served from cache (`2.6M in (94% cache)`, `cachePercent`) wherever the record
  * states it and nothing where it does not — never a `0%` nobody measured. A DOLLARS-OR-TOKENS record
@@ -114,10 +126,16 @@ function cacheWords(t: TFunction, cacheRead: number | null, tokensIn: number): {
  * (`WorkingPill`) — so the books wrap as one line of pills and not two. A row with a child and no spend
  * is still drawn; one with neither draws nothing.
  *
+ * `vendor` is the word the paid dollars are labelled by — the dispatcher's `paid_vendor`, read off
+ * the same paid rows the figure sums (`report_vendor.py`). The pill's title names it
+ * (`$4.21 billed by Claude API`) and its mark follows it; a `""`/`null` vendor is an aggregate whose
+ * rows name two vendors, and it draws the figure alone with a plain dollar sign (`$4.49`). There is
+ * no constant to fall back to: a wrong vendor on a figure is a false bill.
+ *
  * Used by `PlanPhaseRow` (each phase and each stage line), `PlanCard` (the card's total) and
  * `DispatchArcDeck` (the arc's books).
  */
-export function SpendPills({ parts, countKey, children }: { parts: SpendParts; countKey?: string; children?: ReactNode }) {
+export function SpendPills({ parts, vendor, countKey, children }: { parts: SpendParts; vendor: string | null; countKey?: string; children?: ReactNode }) {
   const { t } = useTranslation();
   const { paid, tokens } = parts;
   if (paid === null && tokens === null && !children) return null;
@@ -134,11 +152,13 @@ export function SpendPills({ parts, countKey, children }: { parts: SpendParts; c
       {paid !== null && (
         <Pill
           half="paid"
-          mark={<LLMProviderLogo provider="deepseek" className={icon} />}
+          mark={<PaidMark vendor={vendor} className={icon} />}
           value={paid}
           words={(value) => t('dispatcher.pill.paid', { usd: moneyText(value, paid) })}
           countKey={countKey}
-          title={t('dispatcher.pill.paidTitle', { usd: moneyText(paid), vendor: PAID_VENDOR })}
+          title={vendor
+            ? t('dispatcher.pill.paidTitle', { usd: moneyText(paid), vendor })
+            : t('dispatcher.pill.paidTitleAlone', { usd: moneyText(paid), defaultValue: '${{usd}} billed' })}
         />
       )}
       {tokens?.kind === 'split' && (

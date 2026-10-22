@@ -2,8 +2,10 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
-import type { ClaudeUsage, ClaudeUsageWindow } from '@/shared/types.js';
+import type { ClaudeUsage, ClaudeUsagePace, ClaudeUsageWindow } from '@/shared/types.js';
 
+import { liveAccountDigest } from './account-digest.js';
+import { note, paceOf, status as pacerStatus } from './pacer-door.js';
 import { isRecord, markRolled, parseWindows } from './usage-windows.js';
 
 /**
@@ -16,17 +18,18 @@ import { isRecord, markRolled, parseWindows } from './usage-windows.js';
  * on purpose, and it is why the split exists: this half owns the token, so nothing that only reads
  * a payload may reach one.
  *
- * THE TOKEN SEAM — one deliberate divergence from the account store's rule, and the five bounds that
- * keep it checkable. `account-store.service.ts` never parses a token: it copies credential BYTES file
- * to file and reads only `expiresAt`. This module has to HOLD one, because the endpoint wants a
- * Bearer header. The divergence is confined to this file and bounded:
+ * THE TOKEN SEAM — one deliberate divergence from the house's secret rule, and the five bounds that
+ * keep it checkable. A sign-in token has one home (`claude_account/tokens.py`, reached only through
+ * `token_for`) and never leaves it; this meter is the exception, because the endpoint wants a Bearer
+ * header and the meter reads the credential file the `claude` CLI itself wrote. The divergence is
+ * confined to this file and bounded:
  *
  *   1. ONE READER. `readCredentials` is the only token read in this module, and the only one in the
  *      server.
  *   2. NEVER LOGGED. No line here takes the token. It is handed to `fetchUsage` and to nothing else,
  *      and it is never kept in module state.
- *   3. NEVER PERSISTED. Nothing here writes a file, a database or `state/`. The whole meter is two
- *      in-memory readings that die with the process.
+ *   3. NEVER PERSISTED. Nothing here writes a file, a database or `state/`: the token is never
+ *      persisted, and every good reading is filed by `pacer-door.ts` and outlives this process.
  *   4. NEVER IN AN ERROR. Every failure collapses to a FIXED reason vocabulary and a status int, so
  *      no exception text, request object or credential can ride out on an error path. That is
  *      stronger than scrubbing a message after the fact: there is nothing here to scrub.
@@ -35,10 +38,13 @@ import { isRecord, markRolled, parseWindows } from './usage-windows.js';
  *      a hostile or hijacked upstream could re-send the whole credential to another host. The hop
  *      answers nothing here, and the reading degrades to `upstream`.
  *
- * AN EXPIRED TOKEN, A 401 OR A DEAD NETWORK KEEPS THE LAST GOOD NUMBER ON SCREEN, with
- * `degraded:true` and `staleSince` saying how old it is — "64 %, as of twenty minutes ago" beats a
- * blank gauge. The last good reading is SURRENDERED when the credential stamp moves, because a stale
- * number under another account's name is the one thing worse than an empty gauge.
+ * AN EXPIRED TOKEN IS NEVER SENT. `expiresAt` is a clock this file can read without an answer from
+ * anybody, so a stamp already behind us degrades to `credentials` with no fetch at all: the endpoint
+ * would answer a 401, and `auth` reads as a refusal when the truth is an expiry. A 401 or a dead
+ * network KEEPS THE LAST GOOD NUMBER ON SCREEN, with `degraded:true` and `staleSince` saying how old
+ * it is — "64 %, as of twenty minutes ago" beats a blank gauge. The last good reading is SURRENDERED
+ * when the credential stamp moves, because a stale number under another account's name is the one
+ * thing worse than an empty gauge.
  *
  * NOTHING HERE FAILS. Every path answers a `ClaudeUsage` with `reachable: true`: there is no upstream
  * here to be unreachable, only a reading that is older than we would like.
@@ -96,11 +102,18 @@ type UsageReason =
  */
 type Reading = {
   windows: ClaudeUsageWindow[];
+  /** The login these figures belong to — `liveAccountDigest()`, read beside the token, `''` when it
+   *  cannot be told — so the answer can say whose numbers they are. */
+  account: string;
   degraded: boolean;
   reason: UsageReason;
   status: number;
   staleSince: number | null;
   checkedAt: number;
+  /** The pacer's projection of the same account at the same instant, in percent, or `null` when the
+   *  read call failed. Cached WITH the reading, so a served answer draws the picture its own figures
+   *  were read beside. */
+  pace: ClaudeUsagePace | null;
 };
 
 /** The last reading that came back whole, with the credential stamp it belongs to. */
@@ -109,8 +122,8 @@ type LastGood = { windows: ClaudeUsageWindow[]; at: number; stamp: number | null
 /** A reading in the cache, and WHEN it was taken — the other half of the TTL question. */
 type Cached = { at: number; reading: Reading; stamp: number | null };
 
-/** Where the live login's credential bytes live. Deliberately NOT environment-redirectable, unlike
- *  the account store's slots: a variable that moved this path could meter an account nobody named. */
+/** Where the live login's credential bytes live. Deliberately NOT environment-redirectable:
+ *  a variable that moved this path could meter an account nobody named. */
 function credentialsPath(): string {
   return path.join(os.homedir(), '.claude', '.credentials.json');
 }
@@ -124,9 +137,9 @@ function credentialsPath(): string {
  * cannot disagree with itself — this is the single `JSON.parse` in the module, and nothing but this
  * function ever sees the file.
  *
- * `expiresAt` is the SAME field the account store reads and documents as a freshness clock rather
- * than a credential — the cache key, and not a secret. It is what makes a swap honest: each account's
- * file carries its own expiry, so a swap always moves it and both caches miss. An unreadable file is
+ * `expiresAt` is read as a freshness clock rather than a credential — the cache key, and not a
+ * secret. It is what makes a new login honest: the live file carries its own expiry, so signing in
+ * again moves it and the cache misses. An unreadable file is
  * not an error — it is "no login", which is one fact to a gauge.
  */
 function readCredentials(): { token: string | null; stamp: number | null } {
@@ -235,23 +248,28 @@ function ttlFor(reading: Reading | null): number {
 /** A poll is in flight and its answer is not ours to show — *reading*, not *broken*. ⚠ It has its own
  *  word because borrowing `network` announced a fault that was not happening, which trains the reader
  *  to ignore the one that is. */
-function pending(now: number): Reading {
-  return { windows: [], degraded: false, reason: 'pending', status: 0, staleSince: null, checkedAt: now };
+function pending(now: number, account: string): Reading {
+  return { windows: [], account, degraded: false, reason: 'pending', status: 0, staleSince: null, checkedAt: now, pace: null };
 }
 
 /** The last good numbers plus WHY they are old — the honest state, never a blank. ⚠ The last good
  *  reading is surrendered when the STAMP moved: those percentages belonged to whoever was at the helm
  *  then, and a stale number under the wrong account's name is worse than an empty gauge. */
-function degraded(reason: UsageReason, status: number, now: number, stamp: number | null): Reading {
+function degraded(reason: UsageReason, status: number, now: number, stamp: number | null, account: string): Reading {
   const good = lastGood; // ONE read of the snapshot
   const same = good !== null && stamp !== null && good.stamp === stamp;
   return {
     windows: same ? [...good.windows] : [],
+    account,
     degraded: true,
     reason,
     status,
     staleSince: same ? good.at : null,
     checkedAt: now,
+    // A degraded answer is a FAILURE's answer: the pacer's picture is not read on this path, and
+    // pairing last time's marks with a projection nobody refreshed would be a second staleness the
+    // "as of" line does not admit.
+    pace: null,
   };
 }
 
@@ -280,10 +298,16 @@ function toWire(reading: Reading): ClaudeUsage {
   return {
     reachable: true,
     windows: reading.windows,
+    // WHICH ACCOUNT these figures were read from, so the panel can tell whether they belong to the
+    // account in use. `''` is "could not be told", never a guess.
+    account: reading.account,
     degraded: reading.degraded,
     reason: reading.reason,
     staleSince: reading.staleSince === null ? null : Math.floor(reading.staleSince / 1000),
     checkedAt: Math.floor(reading.checkedAt / 1000),
+    // ABSENT, never `null`, on a reading with no picture: a missing key is "not drawn", which is
+    // exactly what an older server's client and a pacer fault both need.
+    ...(reading.pace === null ? {} : { pace: reading.pace }),
   };
 }
 
@@ -298,7 +322,17 @@ function toWire(reading: Reading): ClaudeUsage {
 async function measure(): Promise<{ reading: Reading; stamp: number | null; good: LastGood | null }> {
   const now = Date.now();
   const { token, stamp } = readCredentials();
-  if (token === null) return { reading: degraded('credentials', 0, now, stamp), stamp, good: null };
+  // WHICH LOGIN these figures will belong to, read beside the token and before the fetch. The
+  // credential stamp is the witness for the pair: a whole-box swap moves it, so a swap that lands
+  // while the request is out leaves a different stamp to compare below.
+  const digest = liveAccountDigest();
+  // ⚠ A STAMP ALREADY BEHIND US IS NOT SENT. `expiresAt` is epoch MILLISECONDS, the same clock as
+  // `now`; the endpoint would answer 401 and the reading would say `auth` — a refusal — when the
+  // truth is an expiry. No request leaves this process with a dead token.
+  const expired = stamp !== null && stamp <= now;
+  if (token === null || expired) {
+    return { reading: degraded('credentials', 0, now, stamp, digest), stamp, good: null };
+  }
 
   const { status, payload } = await fetchUsage(token);
   if (status !== 200) {
@@ -310,7 +344,7 @@ async function measure(): Promise<{ reading: Reading; stamp: number | null; good
           : status === 429
             ? 'throttled'
             : 'upstream';
-    return { reading: degraded(reason, status, now, stamp), stamp, good: null };
+    return { reading: degraded(reason, status, now, stamp, digest), stamp, good: null };
   }
 
   const windows = parseWindows(payload);
@@ -318,13 +352,30 @@ async function measure(): Promise<{ reading: Reading; stamp: number | null; good
     // Rule 2: REACHED but unreadable. Not degraded — the meter asked and got an answer, it just has
     // nothing to draw — and the last good reading is left alone rather than erased.
     return {
-      reading: { windows: [], degraded: false, reason: 'shape', status, staleSince: null, checkedAt: now },
+      reading: {
+        windows: [], account: digest, degraded: false, reason: 'shape', status,
+        staleSince: null, checkedAt: now, pace: null,
+      },
       stamp,
       good: null,
     };
   }
+  // ⚠ EVERY GOOD READING IS FILED WITH THE PACER, under the login it came from — but only while
+  // that login held still for the whole fetch. The stamp is read again: a swap during the request
+  // means these percentages might be either account's, and an unknown stamp is no evidence at all.
+  // `note` is fire-and-forget (a child with its own timeout); nothing on this path awaits it.
+  const after = readCredentials().stamp;
+  if (stamp !== null && after === stamp) note(digest, windows, now, 'meter');
+  // THE PACER'S PICTURE OF THIS LOGIN, drawn at the instant its figures were read: `digest` is the
+  // account read beside the token before the fetch, and `status` names it explicitly, so the marks
+  // on the bars can belong to no other account. A failure here answers null and the reading travels
+  // without a pace — the meters then draw exactly what they drew before the picture existed.
+  const pace = paceOf(await pacerStatus(digest));
   return {
-    reading: { windows, degraded: false, reason: '', status: 200, staleSince: null, checkedAt: now },
+    reading: {
+      windows, account: digest, degraded: false, reason: '', status: 200,
+      staleSince: null, checkedAt: now, pace,
+    },
     stamp,
     good: { windows, at: now, stamp },
   };
@@ -355,7 +406,12 @@ export async function readUsage(): Promise<ClaudeUsage> {
   // a MOVED stamp is the likely path, not an exotic one — hence `pending`, never the old numbers
   // under a new name.
   if (polling && now - pollingSince < POLL_STUCK_MS) {
-    return toWire(served(sameCredential && cached ? cached.reading : pending(now), now));
+    // A pending answer names the login ASKED NOW, never a cache entry's: a moved stamp means the
+    // old entry belongs to another account.
+    return toWire(served(
+      sameCredential && cached ? cached.reading : pending(now, liveAccountDigest()),
+      now,
+    ));
   }
 
   polling = true;
@@ -368,7 +424,7 @@ export async function readUsage(): Promise<ClaudeUsage> {
   } catch {
     // A belt. `measure`'s legs are already total, so this is unreachable by construction — but the
     // route is forbidden to fail, and a fuel gauge is not worth a traceback.
-    outcome = { reading: degraded('network', 0, now, stamp), stamp, good: null };
+    outcome = { reading: degraded('network', 0, now, stamp, liveAccountDigest()), stamp, good: null };
   }
 
   if (generation === mine) {

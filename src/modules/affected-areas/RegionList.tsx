@@ -18,6 +18,21 @@ type RegionListProps = {
   onSelect: (regionId: string) => void;
 };
 
+/** The panel width, in px, from which `PanoScreen` draws the face beside its list (its `COLUMNS`); under it the blocks stack. */
+const SIDE_BY_SIDE_FROM = 720;
+
+/**
+ * Whether the list stands in the stacked layout: its container, the nearest ancestor that is one (`PanoScreen`'s
+ * `@container` query reads the same box), is under the width where the face moves beside the list.
+ */
+function isStacked(list: HTMLElement): boolean {
+  const view = list.ownerDocument.defaultView;
+  for (let box = list.parentElement; box !== null && view !== null; box = box.parentElement) {
+    if (view.getComputedStyle(box).containerType.includes('inline-size')) return box.clientWidth < SIDE_BY_SIDE_FROM;
+  }
+  return false;
+}
+
 /** "Proposed · 95% sure · seen in the photo": where the region stands, how sure the reader was, and on what ground. */
 function regionMeta(region: Region, t: TFunction): string {
   return [
@@ -46,9 +61,13 @@ export function RegionList({ regions, selectedId, kindLabel, label, onSelect }: 
   // The list's box: the chosen row is found in it and brought into view.
   const listRef = useRef<HTMLUListElement>(null);
   // A region chosen on the photo may stand far down a long list: its row is brought into view. `nearest` moves the panel
-  // no further than needed and not at all when the row is already in view, so a row pressed in the list stays put.
+  // no further than needed and not at all when the row is already in view, so a row pressed in the list stays put. In the
+  // stacked layout the row stands below the photo and its presses, and scrolling to it would take both off the screen: the
+  // face block (`FacePhoto`) brings the photo and its presses into view instead, and the bar names the area, so the row is left.
   useEffect(() => {
-    listRef.current?.querySelector('[aria-current]')?.scrollIntoView({ block: 'nearest' });
+    const list = listRef.current;
+    if (list === null || isStacked(list)) return;
+    list.querySelector('[aria-current]')?.scrollIntoView({ block: 'nearest' });
   }, [selectedId]);
 
   return (
@@ -73,7 +92,8 @@ export function RegionList({ regions, selectedId, kindLabel, label, onSelect }: 
                   {region.ordinal}
                 </Badge>
                 <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-                  <span className="text-sm font-medium text-foreground">{kindLabel(region.class)}</span>
+                  {/* The kind the area counts as, so a rename redraws the list as it redraws the bar. */}
+                  <span className="text-sm font-medium text-foreground">{kindLabel(region.effectiveClass ?? region.class)}</span>
                   {region.label !== null && <span className="text-[13px] text-foreground [overflow-wrap:anywhere]">{region.label}</span>}
                   {region.evidence !== null && region.evidence !== '' && (
                     <span className="text-[12.5px] text-muted-foreground [overflow-wrap:anywhere]">“{region.evidence}”</span>

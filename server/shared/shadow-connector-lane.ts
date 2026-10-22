@@ -1,14 +1,19 @@
 import fs from 'node:fs/promises';
 
 /**
- * Relaying shadow-connector's `/api/affected-areas` surface.
+ * Relaying a request to shadow-connector's internal-caller-gated surface — the one forwarder every
+ * lane to shadow-connector goes through. Consumers: the `affected-areas` module (the Tours lane,
+ * `/api/affected-areas`) and the `carrier-bulletins` module (the bulletins lane,
+ * `/api/carrier-bulletins`, the second lane to shadow-connector). Each module owns its allowlist and
+ * its status mapping; this file owns the transport and the secret behind it, so there is one copy of
+ * both.
  *
- * This server keeps no view of a tour, a pano or a region, and never opens shadow-connector's disk or
- * database: it makes the HTTP call and carries the answer back, so the lane keeps working the day this
- * server leaves the host the engine runs on.
+ * This server keeps no view of what shadow-connector answers and never opens its disk or database: it
+ * makes the HTTP call and carries the answer back, so a lane keeps working the day this server leaves
+ * the host the engine runs on.
  *
  * The surface is internal-caller gated (R-CAP-11) — it demands `X-Internal-Secret` even from loopback —
- * and the browser never holds that value. This service is the one place it is read, and the read has
+ * and the browser never holds that value. This file is the one place it is read, and the read has
  * three rules that all come from the same reason, which is that a copy is a second home:
  *
  *  - It is read from shadow-connector's own env file, at CALL time. It is never copied into this
@@ -51,7 +56,10 @@ const USABLE_SECRET = /^[\x21-\x7e](?:[\x20-\x7e]*[\x21-\x7e])?$/;
 /** Everything outside printable ASCII, for the acting user's header. */
 const NOT_PRINTABLE_ASCII = /[^\x20-\x7e]/g;
 
-/** One forwarded call. Consumer: `affected-areas.routes.ts`, which builds it from a validated request. */
+/**
+ * One forwarded call. Consumers: the routes of the `affected-areas` and `carrier-bulletins` modules,
+ * each of which builds it from a request it has validated against its own allowlist.
+ */
 export type LaneRequest = {
   method: 'GET' | 'POST' | 'PUT';
   /** Absolute upstream path, already validated by the route that built it. */
@@ -66,7 +74,8 @@ export type LaneRequest = {
 };
 
 /**
- * What a forwarded call came back as: the engine's own answer, or why the lane has none. Consumer: `affected-areas.routes.ts`.
+ * What a forwarded call came back as: the engine's own answer, or why the lane has none. Consumers: the
+ * routes of the `affected-areas` and `carrier-bulletins` modules, which turn it into a response.
  *
  * Why a question went unanswered by the lane itself:
  *
@@ -79,16 +88,24 @@ export type LaneAnswer =
   | { ok: true; status: number; kind: 'bytes'; body: Buffer; contentType: string }
   | { ok: false; reason: 'unreachable' | 'unreadable' | 'no_secret'; message: string };
 
-/** What the module hands the service. Consumer: `affected-areas.module.ts`, the one place the env is read. */
-export type AffectedAreasServiceDependencies = {
+/**
+ * What a module hands `createShadowConnectorLane`. Consumers: `affected-areas.module.ts` and the
+ * `carrier-bulletins` module, each the one place its own lane reads the environment.
+ */
+export type ShadowConnectorLaneDependencies = {
   /** shadow-connector's origin, e.g. `http://127.0.0.1:8001`. */
   baseUrl: string;
   /** The env file that holds `EIS_INTERNAL_SECRET=`, shadow-connector's own. */
   envFile: string;
+  /** The one word that names the lane in its log warning, e.g. `affected-areas`: `[<label>] no usable internal secret …`. */
+  label: string;
 };
 
-/** The lane's one verb. Consumers: `affected-areas.module.ts` (builds it) and `affected-areas.routes.ts` (calls it). */
-export type AffectedAreasService = {
+/**
+ * The lane's one verb. Consumers: the `affected-areas` and `carrier-bulletins` modules (each builds
+ * one) and their routes (each calls `forward`).
+ */
+export type ShadowConnectorLane = {
   forward(request: LaneRequest): Promise<LaneAnswer>;
 };
 
@@ -139,11 +156,16 @@ function describeFailure(error: unknown, timeoutMs: number): string {
   return `CloudCLI could not reach shadow-connector${typeof code === 'string' ? ` (${code})` : ''}`;
 }
 
-/** Builds the forwarder. Consumer: `affected-areas.module.ts`, so the env is read in one place and passed down. */
-export function createAffectedAreasService({
+/**
+ * Builds a forwarder. Consumers: `affected-areas.module.ts` and the `carrier-bulletins` module, so each
+ * lane's environment is read in its own module and passed down, and each lane holds its own parse of the
+ * file and its own last-reported cause (one log line per distinct cause, per lane).
+ */
+export function createShadowConnectorLane({
   baseUrl,
   envFile,
-}: AffectedAreasServiceDependencies): AffectedAreasService {
+  label,
+}: ShadowConnectorLaneDependencies): ShadowConnectorLane {
   const origin = baseUrl.replace(/\/+$/, '');
 
   // The parse of the file as last seen, keyed by what `fs.stat` said of it: re-parsing on every call
@@ -156,7 +178,7 @@ export function createAffectedAreasService({
     if (cause === lastReportedCause) return;
     lastReportedCause = cause;
     // The path and the cause only — never the line, and never anything parsed from it.
-    console.warn(`[affected-areas] no usable internal secret in ${envFile}: ${cause}`);
+    console.warn(`[${label}] no usable internal secret in ${envFile}: ${cause}`);
   }
 
   async function currentSecret(): Promise<string | null> {

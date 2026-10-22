@@ -18,7 +18,14 @@ import { effectiveModelWord } from '@/shared/utils';
  * The plan card's `ActionBar`: the verbs that apply to a plan, chosen by its status, then its fold of overrides.
  * A verb is drawn where the dispatcher would take it, never drawn disabled where it would refuse.
  *
- * - `live` → Stop. A pause; Resume is its undo, so no dialog guards it.
+ * - `live` → Stop, and Start beside it while PAUSE ALL holds the plan (`route.epics.paused` and the
+ *   dispatcher's own `plan.queue_hold`): the press that picks this one plan out of a paused house. It
+ *   sends the same `resume` verb the queued Start does — `store.set_paused(False)` writes the
+ *   no-detail `resumed` event even over a plan that is not paused, which is `release.own_press_at` at
+ *   or after the moment Pause all went on (`line_gate` step 2) — and the next frame's `queue_hold` is
+ *   null, so Start goes away by itself. The clause's TEXT is never matched: the dial reading and the
+ *   hold's presence decide. A live plan the queue does not hold draws Stop alone: Stop is a pause, and
+ *   Resume is its undo, so no dialog guards it.
  * - `stalled` → Resume, and Stop beside it. The plan is released and its running work has ended with
  *   nothing to record it (`report_stall`): Resume is the press that starts things again — it wakes the
  *   dispatcher, or starts one, and its first pass settles what ended and takes the walk up — so it is
@@ -26,13 +33,17 @@ import { effectiveModelWord } from '@/shared/utils';
  *   it than wake it must be able to. Never Stop alone: a card that offers only Pause over work that
  *   is not there is the card that said the epic was moving.
  * - `paused` → Resume and `Resume at …`: a plan STOPPED mid-walk is the one an hour makes sense in
- *   front of, because the timer's press is the very Resume the button beside it sends.
+ *   front of, because the timer's press is the very Resume the button beside it sends. Resume runs
+ *   under Pause all too: pressed under it, its own press is at or after the pause's moment (`line_gate`
+ *   step 2), and the plan is let through while every plan not pressed stays held.
  * - `queued` → Start (it IS `resume`: the plan is approved and paused and has never walked). THIS START IS THE
  *   OVERRIDE: the master controller's one Start, at the top of In flight, lets every waiting plan go and leaves
  *   the queue's order and the epic limits to decide what runs, while this one lets THIS feature go right away —
- *   past the queue's order, the epics-at-once limit and its epic's feature limit (`release.own_press`). Pause all
- *   still holds it, and its own tasks still run as many at a time as its task WIP allows. There is no
- *   `Start at …`: the hour a feature never walked was armed for is gone from the card.
+ *   past the queue's order and its epic's feature limit (`release.own_press`).
+ *   PAUSE ALL HOLDS A START ONLY WHEN THE PRESS CAME BEFORE IT WENT ON (`epic_dial.Dial.since`): a Start
+ *   pressed while Pause all is on goes right away, one plan out of a paused house, and its own tasks still run.
+ *   There is no `Start at …`: the hour a feature never walked was
+ *   armed for is gone from the card.
  * - `scheduled` → the same, reading the armed hour: `Resume`/`Start` and `Cancel` (the schedule
  *   control). The hour itself is the card's own clock (`PlanFace.PlanClock`), said once.
  * - `hidden` → Show. The operator hid the plan, and a hide is the dispatcher's: the plan is paused and held out of the
@@ -64,10 +75,8 @@ import { effectiveModelWord } from '@/shared/utils';
  * word to each of its features (`store.set_arc_model`), so a feature carrying the very word its epic says overrides
  * nothing. The arc's deck carries the ARC's word and hands it down, and this is where one plan speaks for itself again.
  *
- * A FEATURE CARRIES NO CONCURRENCY CONTROL: how many features of an epic are in progress, and how
- * many tasks each runs at once, are the EPIC's WIP (`EpicWipControl`, in the epic deck's fold). When
- * the epic's feature limit is what a feature is waiting on, the card says so in its head
- * (`PlanCard`'s `data-plan-wip-hold` line) — that is a fact, not a press.
+ * A FEATURE CARRIES NO CONCURRENCY CONTROL: what runs is the pacer's and the queue's to decide, and the
+ * card names neither as a press.
  *
  * A STALLED PLANNER IS DRAWN BESIDE ALL OF THEM, whatever the plan's status (`plan.planner.stalled`):
  * Resume planner, the press that puts the outing that ended short back to work. Which door it goes
@@ -89,6 +98,9 @@ export function PlanControls({ plan }: { plan: DispatcherPlan }) {
   // reads `queued`).
   const stops = plan.status === 'paused' || (plan.status === 'scheduled' && plan.launched);
   const starts = plan.status === 'queued' || (plan.status === 'scheduled' && !plan.launched);
+  // A LIVE plan the queue holds while Pause all is on: the dispatcher's own reading (the board's dial and
+  // this plan's clause), never the clause's words. Start is the press that picks this plan out of the pause.
+  const startUnderPause = plan.status === 'live' && route?.epics?.paused === true && plan.queue_hold !== null;
   const { stop, resume, schedule, park, unpark, plannerResume, setModel, armAccept, disarmAccept, busy } = useDispatcherVerbs(plan.name, 'plan',
     starts ? t('runner.start') : t('runner.resume'));
   const held = busy !== null;
@@ -97,10 +109,19 @@ export function PlanControls({ plan }: { plan: DispatcherPlan }) {
 
   let verbs: ReactNode = null;
   if (plan.status === 'live') {
+    // Start is the pause's own exception (`release.own_press_at` at or after the dial's moment): the same
+    // `resume` verb the queued Start sends, drawn only while the dispatcher says the queue holds this plan.
     verbs = (
-      <Button variant="secondary" size="sm" className="h-8" disabled={held} onClick={() => void stop()} data-dispatcher-stop>
-        {t('runner.stop')}
-      </Button>
+      <>
+        {startUnderPause && (
+          <Button size="sm" className="h-8" disabled={held} onClick={() => void resume()} data-dispatcher-start>
+            {t('runner.start')}
+          </Button>
+        )}
+        <Button variant="secondary" size="sm" className="h-8" disabled={held} onClick={() => void stop()} data-dispatcher-stop>
+          {t('runner.stop')}
+        </Button>
+      </>
     );
   } else if (plan.status === 'stalled') {
     verbs = (

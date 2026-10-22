@@ -1,5 +1,6 @@
 import { query } from '@anthropic-ai/claude-agent-sdk';
 
+import { launchAccountEnv } from '@/modules/providers/index.js';
 import { userFacingEnv } from '@/shared/child-env.js';
 import { resolveClaudeCodeExecutablePath } from '@/shared/claude-cli-path.js';
 import type { CerberusDiagnosisSubmission } from '@/shared/cerberus-types.js';
@@ -78,6 +79,9 @@ export async function unsupportedClauses(
   signal.addEventListener('abort', followDiagnosis, { once: true });
   try {
     const executable = resolveClaudeCodeExecutablePath(process.env.CLAUDE_CLI_PATH);
+    // The audit is a Claude launch too: it starts on the account the house chose. It cannot throw
+    // (a door that cannot answer yields no environment), so the audit's own bound is unaffected.
+    const account = await launchAccountEnv();
     const evidence = submission.evidence.length > 0 ? submission.evidence.map((line) => `- ${line}`).join('\n') : '(none)';
     const conversation = query({
       prompt: `GIVEN FACTS:\n${given === '' ? '(none)' : given}\n\nSUMMARY:\n${submission.summary}\n\nEVIDENCE:\n${evidence}`,
@@ -91,7 +95,7 @@ export async function unsupportedClauses(
         cwd: diagnosisWorkingDirectory(),
         maxTurns: 1,
         abortController,
-        env: userFacingEnv(),
+        env: { ...userFacingEnv(), ...account.env },
         ...(executable ? { pathToClaudeCodeExecutable: executable } : {}),
       },
     });

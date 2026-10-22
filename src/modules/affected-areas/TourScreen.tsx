@@ -7,7 +7,7 @@ import { LaneTrouble } from '@/modules/affected-areas/LaneTrouble';
 import { ReadControl } from '@/modules/affected-areas/ReadControl';
 import { RoomGallery } from '@/modules/affected-areas/RoomGallery';
 import { TourRooms } from '@/modules/affected-areas/TourRooms';
-import { tourFacts, tourName } from '@/modules/affected-areas/utils/tourModel';
+import { addressBesideName, tourFacts, tourName } from '@/modules/affected-areas/utils/tourModel';
 import type { TourDetail, TourSummary } from '@/shared/affected-areas-types';
 import type { AffectedAreasTrouble, TourReaderProgress } from '@/shared/types';
 import { Button } from '@/shared/ui';
@@ -20,13 +20,15 @@ type TourScreenProps = {
   trouble: AffectedAreasTrouble | null;
   /** Each tile's photo, by the sha of its pano's Ahead view. */
   photos: Record<string, string | null>;
-  /** Panos with a face not yet read: what Read the rest would read. */
+  /** Panos with a view that needs a read (none yet, or one that is not current): what Read the rest would read. */
   unreadPanos: number;
   /** Those panos' unread views: what Read the rest would spend. */
   unreadViews: number;
   walk: TourReaderProgress;
   onBack: () => void;
   onOpenPano: (panoId: string) => void;
+  /** The gallery's "+N" opened the rest of the panos: their photos may be fetched now. */
+  onOverflowOpen: () => void;
   onReadRest: () => void;
   onStopRest: () => void;
   onRetry: () => void;
@@ -53,7 +55,7 @@ function ReadingBody() {
  *
  * Read top to bottom: All tours (the way back), the job's name, its address, and one line of what the tour holds
  * and how far it is read, with the walk beside them where the pano screen keeps its press (what it would spend —
- * "45 panos · 270 views not read yet" — and Read the rest of this tour, or "Reading 3 of 45" with Stop after this
+ * "45 panos · 270 views need a read" — and Read the rest of this tour, or "Reading 3 of 45" with Stop after this
  * pano while it runs); then `ContextCard`; then `TourRooms`, each room and who calls it affected; then "PANOS · 12"
  * and `RoomGallery`, whose tiles open a pano.
  *
@@ -63,7 +65,7 @@ function ReadingBody() {
  * Used by the affected-areas module's view root.
  */
 export function TourScreen({
-  summary, detail, trouble, photos, unreadPanos, unreadViews, walk, onBack, onOpenPano, onReadRest, onStopRest, onRetry,
+  summary, detail, trouble, photos, unreadPanos, unreadViews, walk, onBack, onOpenPano, onOverflowOpen, onReadRest, onStopRest, onRetry,
 }: TourScreenProps) {
   const { t } = useTranslation();
   const panosHeadingId = useId();
@@ -85,8 +87,8 @@ export function TourScreen({
           ) : (
             <>
               <h2 className="text-[20px] font-bold leading-tight tracking-[-0.01em] text-foreground [overflow-wrap:anywhere]">{tourName(tour, t)}</h2>
-              {tour.jobLabel !== null && tour.address !== null && (
-                <p className="text-[13.5px] text-muted-foreground [overflow-wrap:anywhere]">{tour.address}</p>
+              {addressBesideName(tour) !== null && (
+                <p className="text-[13.5px] text-muted-foreground [overflow-wrap:anywhere]">{addressBesideName(tour)}</p>
               )}
               <p className="text-[12.5px] text-muted-foreground">{tourFacts(tour, t, true)}</p>
             </>
@@ -117,6 +119,7 @@ export function TourScreen({
               photos={photos}
               label={t('affectedAreas.tour.galleryLabel', { tour: tourName(detail.tour, t) })}
               onOpenPano={onOpenPano}
+              onOverflowOpen={onOverflowOpen}
             />
           </section>
         </>

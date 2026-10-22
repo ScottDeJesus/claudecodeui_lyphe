@@ -6,6 +6,7 @@ import { useHostWindow } from '@/shared/context/HostWindowContext';
 import { cn } from '@/shared/utils';
 import { Button } from '@/shared/ui/Button';
 import { OWNS_ESCAPE } from '@/shared/ui/overlayEscape';
+import { useEdgeShift } from '@/shared/ui/useEdgeShift';
 
 type ButtonVariant = 'default' | 'destructive' | 'outline' | 'secondary' | 'ghost' | 'link';
 type ButtonSize = 'default' | 'sm' | 'lg' | 'icon';
@@ -85,11 +86,11 @@ export function ActionMenu({
   const hostWindow = useHostWindow();
   const [isOpen, setIsOpen] = React.useState(false);
   const [portalPosition, setPortalPosition] = React.useState<{ top: number; left: number } | null>(null);
-  /** Horizontal correction that pulls a non-portal menu back inside the viewport. */
-  const [edgeShift, setEdgeShift] = React.useState(0);
   const rootRef = React.useRef<HTMLDivElement | null>(null);
   const triggerRef = React.useRef<HTMLButtonElement | null>(null);
   const menuRef = React.useRef<HTMLDivElement | null>(null);
+  // Horizontal correction that pulls a non-portal menu back inside the viewport; the portal path clamps itself.
+  const edgeShift = useEdgeShift(menuRef, isOpen && !portal, hostWindow);
   // Whether closing should move focus back to the trigger. Set for keyboard
   // (Escape) and item selection, but left false for outside pointer clicks so
   // focus is not stolen from wherever the user clicked.
@@ -285,27 +286,9 @@ export function ActionMenu({
   // `portal={false}` renders the menu in place, absolutely positioned against its trigger, so
   // `right-0` walks it off the LEFT edge whenever the trigger sits near it — measured on a 390px
   // phone, the transcript's export menu opened from x=75 and ran to -185. The portal branch above
-  // already clamps; this gives the same guarantee to the in-place branch that cannot, as a
-  // constant horizontal nudge. That branch has one caller — `McpServers`, on the note above its
-  // trigger — and is kept for it and for a menu that must scroll with its trigger.
-  //
-  // A constant is enough and a re-measure is not: the shift corrects a HORIZONTAL overflow, and
-  // vertical scrolling moves the menu with its trigger without changing that. Measuring with the
-  // current shift subtracted keeps the effect from feeding on its own output and oscillating.
-  React.useLayoutEffect(() => {
-    if (!isOpen || portal || !menuRef.current) {
-      setEdgeShift(0);
-      return;
-    }
-    const box = menuRef.current.getBoundingClientRect();
-    const left = box.left - edgeShift;
-    const right = box.right - edgeShift;
-    const margin = 8;
-    let next = 0;
-    if (right > hostWindow.innerWidth - margin) next = hostWindow.innerWidth - margin - right;
-    if (left + next < margin) next = margin - left;
-    if (next !== edgeShift) setEdgeShift(next);
-  }, [isOpen, portal, edgeShift, items.length, hostWindow]);
+  // already clamps; `useEdgeShift` (the same hook the kit's `Menu` uses) gives the in-place branch
+  // the same guarantee as a horizontal nudge. That branch has one caller — `McpServers`, on the
+  // note above its trigger — and is kept for it and for a menu that must scroll with its trigger.
 
   const menu = isOpen && (!portal || portalPosition) && (
     <div
@@ -325,7 +308,7 @@ export function ActionMenu({
       )}
       style={portal && portalPosition
         ? portalPosition
-        : edgeShift !== 0 ? { transform: `translateX(${edgeShift}px)` } : undefined}
+        : edgeShift !== 0 ? { translate: `${edgeShift}px` } : undefined}
     >
       {header}
       {items.map((item) => {

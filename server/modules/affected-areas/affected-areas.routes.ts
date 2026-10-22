@@ -1,6 +1,6 @@
 import express from 'express';
 
-import type { AffectedAreasService, LaneAnswer } from './affected-areas.service.js';
+import type { LaneAnswer, ShadowConnectorLane } from '@/shared/shadow-connector-lane.js';
 
 /** The prefix this lane serves, and the one shadow-connector serves the same surface under. */
 const UPSTREAM_PREFIX = '/api/affected-areas';
@@ -30,17 +30,26 @@ const oneOf = (...allowed: string[]): Rule => ({
   expects: `one of ${allowed.join(', ')}`,
 });
 
-/** The ids a path may carry. The hex ids are lowercase only, as shadow-connector's own `routes/ids.py` holds them; a uuid is accepted in either case. */
+/** The ids a path may carry. Every id is lowercase only, as shadow-connector's own `routes/ids.py` holds them: the hex ids and the uuids. */
 const PATH_RULES: Record<string, Rule> = {
   tour: pattern(/^[0-9a-f]{24}$/, '24 lowercase hex characters'),
   pano: pattern(/^[0-9a-f]{24}$/, '24 lowercase hex characters'),
   sha: pattern(/^[0-9a-f]{64}$/, '64 lowercase hex characters'),
-  region: pattern(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i, 'a uuid'),
-  read: pattern(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i, 'a uuid'),
+  region: pattern(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/, 'a lowercase uuid'),
+  read: pattern(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/, 'a lowercase uuid'),
   class: pattern(/^[a-z_]{2,40}$/, '2 to 40 lowercase letters or underscores'),
 };
 
 const CLASS_RULE = PATH_RULES.class;
+
+/** The most regions one `GET /queue` may pass over: shadow-connector's `routes/ids.py` `MAX_SKIP`, which answers more with a 422. */
+const MAX_SKIP = 50;
+const LOWER_UUID = '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}';
+/** `skip`: up to `MAX_SKIP` lowercase uuids, comma-joined and none blank, as the engine's `SKIP_PATTERN` holds them; an empty value is no skip. */
+const SKIP_RULE = pattern(
+  new RegExp(`^(${LOWER_UUID}(,${LOWER_UUID}){0,${MAX_SKIP - 1}})?$`),
+  `at most ${MAX_SKIP} lowercase uuids, comma-joined`,
+);
 // A model name, a codebook version or a contract hash: one token, not a sentence.
 const TOKEN_RULE = pattern(/^[\w.:-]{1,80}$/, 'one token of at most 80 characters');
 
@@ -58,8 +67,7 @@ type AllowedRoute = {
 
 /**
  * THE ALLOWLIST. A method-and-path pair that is not a row here never reaches shadow-connector: the lane
- * answers its own 404. The marking plan's rows stand before its routes do — the contract was written
- * whole — so a route not yet built answers its own 404 from shadow-connector, through the lane.
+ * answers its own 404.
  */
 const ALLOWLIST: AllowedRoute[] = [
   { method: 'get', route: '/tours', timeoutMs: LANE_TIMEOUT_MS, expect: 'json', body: 'none',
@@ -76,7 +84,7 @@ const ALLOWLIST: AllowedRoute[] = [
   { method: 'post', route: '/images/:sha/regions', timeoutMs: LANE_TIMEOUT_MS, expect: 'json', body: 'object' },
   { method: 'post', route: '/reads/:read/marks', timeoutMs: LANE_TIMEOUT_MS, expect: 'json', body: 'object' },
   { method: 'get', route: '/queue', timeoutMs: LANE_TIMEOUT_MS, expect: 'json', body: 'none',
-    query: { mode: oneOf('unsure', 'random'), class: CLASS_RULE, limit: wholeNumber(1, 50) } },
+    query: { mode: oneOf('unsure', 'random'), class: CLASS_RULE, limit: wholeNumber(1, 50), skip: SKIP_RULE } },
   { method: 'get', route: '/proving', timeoutMs: LANE_TIMEOUT_MS, expect: 'json', body: 'none',
     query: { model: TOKEN_RULE, contract: TOKEN_RULE } },
   { method: 'put', route: '/thresholds/:class', timeoutMs: LANE_TIMEOUT_MS, expect: 'json', body: 'object' },
@@ -163,12 +171,12 @@ function emit(response: express.Response, answer: LaneAnswer): void {
  *
  * These handlers validate and translate, and do nothing else: no secret is read here, no socket is
  * opened here, and no route hands shadow-connector an id it did not first hold to its shape. The
- * service owns the one transport, and the secret behind it.
+ * shared forwarder (`@/shared/shadow-connector-lane`) owns the one transport, and the secret behind it.
  *
- * Consumer: `affected-areas.module.ts`, which hands in the service's `forward`.
+ * Consumer: `affected-areas.module.ts`, which hands in the forwarder's `forward`.
  */
 export function createAffectedAreasRouter(
-  dependencies: Pick<AffectedAreasService, 'forward'>,
+  dependencies: Pick<ShadowConnectorLane, 'forward'>,
 ): express.Router {
   const router = express.Router();
 

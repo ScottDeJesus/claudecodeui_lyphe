@@ -1,6 +1,6 @@
 import type { DispatcherPlanner } from '@/shared/types.js';
 
-import { each, field, isCount, isFlag, isRecord, isText, isTextOrNull, need, oneOf } from './dispatcher-state.transport.js';
+import { each, field, isCount, isFlag, isRecord, isText, isTextOrNull, need, oneOf, textSince } from './dispatcher-state.transport.js';
 
 /**
  * One planner outing of the dispatcher's document, read field by field into the type the badges draw.
@@ -63,6 +63,9 @@ export function plannerOf(raw: unknown): DispatcherPlanner {
     // (INV-172), exactly as a stage's are.
     tokens: need(field(planner, 'tokens'), isCount, 'planner.tokens'),
     cost_usd: need(field(planner, 'cost_usd'), isCount, 'planner.cost_usd'),
+    // The vendor those dollars were billed by, off the launch's own bill word: `Claude API` for a
+    // key-paid outing, `DeepSeek` for the vendor, `""` for a subscription ride. Tolerant.
+    paid_vendor: textSince(field(planner, 'paid_vendor'), 'planner.paid_vendor'),
   };
 }
 

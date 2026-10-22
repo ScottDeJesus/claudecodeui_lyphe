@@ -73,7 +73,8 @@ function sortMark(sorted: 'asc' | 'desc' | null): string {
  * With `renderExpanded` and `onExpand`, a row opens under itself: the whole row is the press (a control inside a
  * cell keeps its own), it takes a tab stop and answers Enter and Space, and carries `aria-expanded`. One row is
  * open at a time because `expanded` is one key — pressing the open row closes it. A wide table scrolls sideways
- * inside its frame rather than breaking the page it sits in.
+ * inside its frame rather than breaking the page it sits in, its first column (the row's name) holding still at the
+ * frame's edge, so a figure scrolled into view keeps its row (`verve/data.css`).
  */
 export function DataTable<Row>({ rows, columns, rowKey, label, sort, onSort, expanded = null, onExpand, renderExpanded }: DataTableProps<Row>) {
   const shown = sortRows(rows, columns, sort);

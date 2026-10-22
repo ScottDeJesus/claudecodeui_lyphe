@@ -35,6 +35,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Collapsible.tsx, /
 - why: in place, the menu is clipped by the first `overflow:hidden` ancestor and painted inside the first ancestor that makes a stacking context; a `backdrop-filter` header scopes the menu's `z-50` to its own layer, so the transcript paints over it.
 - opt-out mount: `src/modules/mcp/McpServers.tsx` only — Settings' `fixed z-[9999]` panel draws a `z-[70]` portalled menu UNDER its own content.
 - a new mount inside an overlay whose layer is above `70` passes `portal={false}`; so does a menu that must scroll with its trigger (the portal path closes on the page's first scroll). A scroll inside the menu's own list does not close it: the capture listener skips a scroll whose target the menu contains (2026-10-06, for the cerberus node card's capped "Run a project here", which closed the moment it was scrolled).
+- in place, the panel is held inside the window's width by `useEdgeShift` (`src/shared/ui/useEdgeShift.ts`, the hook the kit's `Menu` uses too) as an inline `translate`; the portal path clamps itself. See the kit-Menu rule that governs it.
 - portal rungs: above fullscreen-card (`45`), Dialog (`50`) and the FAB (`60`); under Settings (`9999`), modals (`10000`) and the toast stack (`10001`).
 - `align` is honoured on the portal path (both edges clamped); one mount passes it: `align="left"`, the cerberus node card's "Run a project here" (`src/modules/cerberus/fleet/NodeProjects.tsx`).
 - proof: `node .verify/export-menu-layer.mjs <label>` — 4 sites × dark/light, exit 0 on `ALL PASS`. 2026-09-25: 94 ok / 0 FAIL; 70 ok / 20 FAIL with the old default. 2026-10-06: 94 ok / 0 FAIL again, once the download step hit-tests an item INSIDE the open menu (`[role="menu"] [role="menuitem"]`): the page now carries `role="menuitem"` rows outside any menu ("Chat Ctrl+.", "Apps"), and the document's first one had read as 4 FAILs.
@@ -49,7 +50,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/mcp/McpServers.tsx, 
 - 2026-09-25, composer: rect `250×251` against the `260×261` layout box; a flip sized from it left the last item over the trigger's top 4px.
 - a `ResizeObserver` never fires for it: the layout box never changes, only the transform.
 - size and place from `offsetWidth` / `offsetHeight`, which no transform touches. `placePortalledMenu` in `src/shared/ui/ActionMenu.tsx` does, once per open, in a `useLayoutEffect`.
-- a viewport resize closes the menu (`closeOnViewportChange`), so nothing re-places it.
+- a viewport resize closes the portalled menu (`closeOnViewportChange`), so nothing re-places it. An in-place `.vv-action-menu` (and the kit `Menu`'s `.vv-menu__panel`, the same entrance) has no such close: `useEdgeShift` re-measures it on the host window's `resize`, correcting the `scale(.96)` from `offsetWidth` and shifting with the individual `translate` property, never `transform` (which this animation owns).
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/ActionMenu.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/export-menu-layer.mjs
 
@@ -162,35 +163,6 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/phaseWord
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-card-ask.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-runner-landing.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-runner-widget-list.mjs
 
-## INV-6506 — probe — The standing proof for `width.reason` cannot tell the per-plan rule from the old board-wide one
-
-The standing proof for `width.reason` cannot tell the per-plan rule from the old board-wide one
-
-```probe
-S=$(mktemp -d /tmp/athena-mut-XXXXXX) || exit 1
-case "$S" in /tmp/athena-mut-*) ;; *) echo "refusing $S"; exit 1;; esac
-mkdir -p "$S/.claude/scripts" || exit 1
-tar -C ~/.claude --exclude=.venv --exclude=__pycache__ -cf - hooks | tar -C "$S/.claude" -xf - || exit 1
-cp -r ~/.claude/scripts/runner_fixtures "$S/.claude/scripts/" || exit 1
-python3 - "$S/.claude/hooks/dispatcher/width.py" <<'PY'
-import re, sys
-p = sys.argv[1]; s = open(p).read()
-new, n = re.subn(r'    mine = \[other for other in busy_phases\(conn\) if .*\]\n', '    mine = busy_phases(conn)\n', s)
-print("mutation applied:", n == 1)
-open(p, "w").write(new)
-PY
-HOME="$S" timeout 120 python3 "$S/.claude/scripts/runner_fixtures/wip_tasks.py" 2>&1 | cut -c1-110 | tail -5
-echo "fixture exit: ${PIPESTATUS[0]}"
-case "$S" in /tmp/athena-mut-*) rm -r "$S";; esac
-echo "[probe exit $?]"
-expect: `mutation applied: True`, then a `FAIL` reading line and `fixture exit: 1` once the fixture holds a cross-plan reading — the fixture's cross-plan reading (`tasks 2, one feature full — ANOTHER is still taken up`) tells the per-plan rule from the board-wide one
-```
-
-measured 2026-10-03 by chain chain-swarm-per-plan-20261003-135930-38a4, finding M1, MEDIUM
-probe-key: 25810ac941c45dac1daf3446b719f82b9747be50
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/agents-settings/sections/content/RunnerModelContent.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/hooks/dispatcher/planner_lanes.py, /home/lyphe/.claude/hooks/dispatcher/planner_rule.py, /home/lyphe/.claude/hooks/dispatcher/rule.py, /home/lyphe/.claude/hooks/dispatcher/width.py
-
 ## INV-6571 — probe — . An epic whose status turns `complete` without a new completion is never announced — and the comment and doc say it is
 
 . An epic whose status turns `complete` without a new completion is never announced — and the comment and doc say it is
@@ -279,7 +251,7 @@ expect: `row hits: 1` and `…useQueueLineSort.ts:NN:      return moveEpic(carri
 measured 2026-10-15 by chain chain-epic-queue--docs-cloudcli-20261015-015416-7a64, finding M1, MEDIUM
 probe-key: 3fc8d670f108173120f2f6e6058891d3a14c2168
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/docs/
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/cardOrderEntries.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/cardOrder.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/runner-tab/hooks/useQueueLineSort.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/usePointerDrag.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/order-lane.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-card-order.mjs
 
 ## INV-8342 — probe — MEDIUM — MAN-5638 and MAN-5636 give the wrong refusal line for an unknown epic name, and MAN-5636 counts the verbs wrong
 
@@ -295,13 +267,13 @@ echo "queue -> $(timeout 30 ~/.claude/scripts/dispatcher queue athena-no-such-ep
 echo "stop  -> $(timeout 30 ~/.claude/scripts/dispatcher stop athena-no-such-epic-x 2>&1 | head -1)"
 EOF
 bash "$D/p.sh"; cd /tmp; case "$D" in /tmp/athena-probe-m2.*) rm -r "$D";; esac
-expect: `names both doors': 1`, `any of the four verbs': 1`, `queue -> no arc athena-no-such-epic-x`, `stop  -> no plan or arc athena-no-such-epic-x` while the defect stands (an unknown name is refused before any write); cured, the two row counts are 0 and the rows name `no arc <name>` for `wip` and `queue` and `no plan or arc <name>` for the six others
+expect: `names both doors': 1`, `any of the four verbs': 1`, `queue -> no arc athena-no-such-epic-x`, `stop  -> no plan or arc athena-no-such-epic-x` while the defect stands (an unknown name is refused before any write); cured, the two row counts are 0 and the rows name `no arc <name>` for `queue` and `no plan or arc <name>` for the six others
 ```
 
 measured 2026-10-15 by chain chain-epic-queue--docs-cloudcli-20261015-015416-7a64, finding M2, MEDIUM
 probe-key: 96851bfab7f6cf6c087d9b51d8ce7eaf69c341a3
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/docs/
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts
 
 ## INV-8343 — probe — LOW — MAN-8431 names a standing proof whose `ALL CHECKS PASS` does not print today; the failing check expects a revert the app never makes
 
@@ -321,199 +293,301 @@ expect: `exit 1` and two `[FAIL] 1920-…-gutter: …the pin dropped that write 
 measured 2026-10-15 by chain chain-epic-queue--docs-cloudcli-20261015-015416-7a64, finding L1, LOW
 probe-key: 468d81300e74aad24711ab83df7acd7fd3cf051b
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/docs/
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/runner-tab/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/runner-tab/RunnerPanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/runner-tab/RunnerWidgetBody.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/epic-queue-scaffold.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/queue-lane.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-epic-queue.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-runner-widget-list.mjs
 
-## INV-8681 — probe — LOW — Escape mid-drag calls `onCancel` but does not end the drag: a caller that stays in drawing mode still gets `onDrawn` on release
+## INV-8867 — The kit Menu stays inside the window's width and a finger outside dismisses it on lift
 
-LOW — Escape mid-drag calls `onCancel` but does not end the drag: a caller that stays in drawing mode still gets `onDrawn` on release
+The kit `Menu` (`src/shared/ui/Menu.tsx`) keeps its panel inside the window's width, and a finger outside it dismisses on LIFT, not on landing.
 
-```probe
-D=$(mktemp -d /tmp/athena-probe.XXXXXX)
-cat > "$D/p.mjs" <<'EOF'
-import { open } from '/home/lyphe/.claude/state/pipeline-reviews/tour-affected-areas--viewer--library/athena-kit.mjs';
-const { page, browser } = await open();
-try {
-  await page.evaluate(() => {
-    const m = window.__mountReact, ui = window.__ui, { h, React } = m; window.__log = [];
-    // a caller that stays in drawing mode after a cancel (it only notes the cancel)
-    const P = () => h('div', { id: 'w', style: { width: 600 } }, h(ui.RegionImage, { src: window.__grey, alt: 'x', width: 400, height: 400, regions: [], drawing: { onDrawn: (b) => window.__log.push('drawn'), onCancel: () => window.__log.push('cancel') } }));
-    return m.mount('t', h(P), 'position:fixed;inset:0;padding:24px;background:var(--canvas)');
-  });
-  const r = await page.locator('#w > div').first().boundingBox();
-  await page.mouse.move(r.x + r.width * .25, r.y + r.height * .25); await page.mouse.down();
-  await page.mouse.move(r.x + r.width * .6, r.y + r.height * .6, { steps: 8 });
-  await page.keyboard.press('Escape'); await page.mouse.up(); await page.waitForTimeout(100);
-  console.log('after Escape mid-drag then release, the caller saw:', JSON.stringify(await page.evaluate(() => window.__log)));
-} finally { await browser.close(); }
-EOF
-node "$D/p.mjs"
-expect: today `["cancel","drawn"]`; cured `["cancel"]`
-```
+- who: `MarkPresses` (Rename to…), `FacePhoto` (Missed one's kind menu) and `TabsMore` (the Tabs overflow). Found on the Mark screen at 390: the 248 px Rename panel hung from a trigger at x=152 and ran 10 px off the window; a swipe beside the 842 px panel scrolled the pane and CLOSED it.
+- width: `useEdgeShift(panelRef, active, hostWindow)` (`src/shared/ui/useEdgeShift.ts`) returns a whole-pixel nudge the panel wears as `style.translate`, 8 px clear of both edges. Used by `Menu` (`active` = `open`) and by `ActionMenu` in place (`active` = `isOpen && !portal`; the portal path clamps itself).
+  - `translate`, NOT `transform`: both panels enter on `vv-pop` (`animation-fill-mode: both`), which owns `transform` for the panel's whole life and beats an inline one. A `transform: translateX` shift never moves the box, so "measure minus the shift applied" flips between two answers and React throws "Maximum update depth exceeded" (2026-10-20, in-place `ActionMenu` opened near the left edge of a 390 window).
+  - the measure reads the rect (with the shift already applied taken off) and corrects the entrance's `scale(.96)` from `offsetWidth` (INV-4357). It runs after every commit and on the host window's `resize`.
+  - a shift changes only past half a pixel (`Math.abs(wanted - applied) > 0.5`) and is rounded: a rect reads 12.3999 on one pass and 12.4 on the next, and an exact `!==` re-rendered on that noise forever. Do not "simplify" it back to equality.
+- dismissal: a `pointerdown` outside closes at once for a mouse, but for `touch` and `pen` it waits for that pointer's `pointerup` (close) or `pointercancel` (the browser took the touch to scroll: stay open). A menu taller than the screen can only be read to its foot by scrolling the page, and every scroll begins as a `pointerdown` outside the panel. The wait is dropped in the effect's cleanup (MAN-7451).
+- look-alikes left alone: `Select` (its panel is fixed to the trigger and capped to the room on screen, so there is nothing to scroll the page for), `useComposerMenuAnchor` (re-anchors on scroll), `ActionMenu`'s `mousedown` dismissal (touch scrolling synthesizes no `mousedown`). Not confirmed, not touched: `AccountFooterRow`'s and `SidebarSessionPickerPopover`'s `pointerdown` close (each is the same shape and would need its own panel to outgrow a phone screen before it matters).
+- proof: `node .verify/menu-viewport-and-swipe.mjs` — real `MarkPresses` over the live codebook at 390 × 664 with a CDP finger: panel inside the window; a swipe scrolls the pane and leaves the menu open; a tap or a mouse press outside closes it; a row tap sends its kind; the in-place `ActionMenu` near the left edge fits; no shift at 1280 or for a right-aligned menu that already fits. Before the change: panel 152–400, menu closed by the swipe, `ActionMenu` threw.
 
-measured 2026-10-17 by chain chain-tour-affected-areas--marking--library-20261017-163819-f3a2, finding L1, LOW
-probe-key: f5264a8b44176923423d610fbb24abd11956a04a
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/ActionMenu.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Menu.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/useEdgeShift.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/menu-viewport-and-swipe.mjs
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/DataTable.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/RegionDrawLayer.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/SegmentedControl.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/verve/data.css
+## INV-8881 — probe — LOW — a window whose reset lands within 500 ms after `checkedAt` is rounded onto `at`, and the real pacer drops the WHOLE note — the live weekly with it
 
-## INV-8682 — probe — LOW — `SegmentedControl` takes modified arrows, and a one-option group calls `onChange` with its own value
-
-LOW — `SegmentedControl` takes modified arrows, and a one-option group calls `onChange` with its own value
+LOW — a window whose reset lands within 500 ms after `checkedAt` is rounded onto `at`, and the real pacer drops the WHOLE note — the live weekly with it
 
 ```probe
-D=$(mktemp -d /tmp/athena-probe.XXXXXX)
-cat > "$D/p.mjs" <<'EOF'
-import { open } from '/home/lyphe/.claude/state/pipeline-reviews/tour-affected-areas--viewer--library/athena-kit.mjs';
-const { page, browser } = await open();
-try {
-  const run = (opts, value, init) => page.evaluate(({ opts, value }) => {
-    const m = window.__mountReact, ui = window.__ui, { h } = m; window.__log = [];
-    m.unmount('t').catch?.(() => {});
-    return m.mount('t', h(ui.SegmentedControl, { options: opts, value, onChange: (v) => window.__log.push(v), label: 'L' }), 'position:fixed;inset:0;padding:24px;background:var(--canvas)').then(() => 1);
-  }, { opts, value });
-  await run([{ value: 'a', label: 'A' }, { value: 'b', label: 'B' }], 'a');
-  await page.locator('[role=radio]').first().focus();
-  const alt = await page.evaluate(() => { const ev = new KeyboardEvent('keydown', { key: 'ArrowRight', altKey: true, bubbles: true, cancelable: true }); document.activeElement.dispatchEvent(ev); return { defaultPrevented: ev.defaultPrevented, changes: window.__log.slice() }; });
-  console.log('Alt+ArrowRight (a modified arrow is the browser\'s):', JSON.stringify(alt));
-  await page.evaluate(() => window.__mountReact.unmount('t'));
-  await run([{ value: 'only', label: 'Only' }], 'only');
-  await page.locator('[role=radio]').focus(); await page.keyboard.press('ArrowRight');
-  console.log('one option, ArrowRight, onChange calls:', JSON.stringify(await page.evaluate(() => window.__log)));
-} finally { await browser.close(); }
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) && cat > "$D/p.sh" <<'EOF'
+#!/bin/sh
+# A window whose reset is < 500 ms after checkedAt: Math.round puts the reset on `at`,
+# the real pacer refuses the whole object, and the live weekly is lost with it.
+set -u
+S=$(mktemp -d /tmp/athena-meter-probe.XXXXXX) || exit 1
+case "$S" in /tmp/athena-meter-probe.*) ;; *) echo "bad scratch dir" >&2; exit 1;; esac
+trap 'cd /tmp && rm -rf "$S"' EXIT
+mkdir -p "$S/home/.claude" || exit 1
+printf '%s' '{"claudeAiOauth":{"accessToken":"probe","expiresAt":1111111111}}' > "$S/home/.claude/.credentials.json"
+printf '%s' '{"oauthAccount":{"accountUuid":"probe-account-a"}}' > "$S/home/.claude.json"
+cat > "$S/capture.sh" <<'SH'
+#!/bin/sh
+{ printf 'ARGV %s\n' "$*"; cat; printf '\n'; } >> "$CAPTURE"
+SH
+chmod +x "$S/capture.sh"
+cat > "$S/d.mts" <<'TS'
+import { note } from '/home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/pacer-door.ts';
+const at = 1792502757000; // a Date.now() landing exactly on a second
+const five = { key: 'five_hour', label: '5-hour', percent: 5, resetsAt: new Date(at + 200).toISOString() };
+const week = { key: 'seven_day', label: 'weekly', percent: 7, resetsAt: new Date(at + 300_000_000).toISOString() };
+note('abcd1234', [five, week], at);
+setTimeout(() => {}, 1200);
+TS
+: > "$S/cap.txt"
+HOME="$S/home" CAPTURE="$S/cap.txt" PACER_BIN="$S/capture.sh" PLAN_RUNNER_PACER_HOME="$S/pacer" \
+  /home/lyphe/.claude/claudecodeui_lyphe/node_modules/.bin/tsx \
+  --tsconfig /home/lyphe/.claude/claudecodeui_lyphe/server/tsconfig.json "$S/d.mts" || exit 1
+if [ -s "$S/cap.txt" ]; then
+  grep -v '^ARGV' "$S/cap.txt"
+  grep -v '^ARGV' "$S/cap.txt" | PLAN_RUNNER_PACER_HOME="$S/pacer" /home/lyphe/.claude/scripts/pacer note --source meter
+  echo "pacer rc=$?"
+else
+  echo "SENT-NOTHING"
+fi
 EOF
-node "$D/p.mjs"
-expect: today `defaultPrevented:true, changes:["b"]` and one-option `["only"]`; cured `defaultPrevented:false, changes:[]` and `[]`
+bash "$D/p.sh"; case "$D" in /tmp/athena-probe.*) cd /tmp && rm -rf "$D";; esac
+expect: the note carries `"five":null` with the live `week`, and the pacer answers `NOTED abcd1234 five=- week=7%` (today: `{"five":{"used":0.05,"resets_at":1792502757}}` is sent whole and the pacer answers `DROPPED: five resets_at outside the band`, `pacer rc=2`)
 ```
 
-measured 2026-10-17 by chain chain-tour-affected-areas--marking--library-20261017-163819-f3a2, finding L2, LOW
-probe-key: a150a09baf4b8dee85b4789ce583fcff51248182
+measured 2026-10-20 by chain chain-usage-pacer--meter-20261020-061414-1e4f, finding L1, LOW
+probe-key: 3a2354aa2c91ab7c5c4b0160eb7a27724f24c231
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/DataTable.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/RegionDrawLayer.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/SegmentedControl.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/verve/data.css
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/account-digest.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/pacer-door.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/usage.service.ts
 
-## INV-8683 — probe — LOW — The keyboard ring on a sortable head is clipped by the table's frame on its top and left edges
+## INV-8882 — probe — LOW — the TS digest is not the Python twin for a uuid padded with a control character (the two `trim` sets differ)
 
-LOW — The keyboard ring on a sortable head is clipped by the table's frame on its top and left edges
+LOW — the TS digest is not the Python twin for a uuid padded with a control character (the two `trim` sets differ)
 
 ```probe
-D=$(mktemp -d /tmp/athena-probe.XXXXXX)
-cat > "$D/p.mjs" <<'EOF'
-import { open } from '/home/lyphe/.claude/state/pipeline-reviews/tour-affected-areas--viewer--library/athena-kit.mjs';
-const { page, browser } = await open();
-try {
-  await page.evaluate(() => {
-    const m = window.__mountReact, ui = window.__ui, { h } = m;
-    const cols = [{ key: 'a', label: 'Alpha', sortValue: (r) => r.a, render: (r) => r.a }, { key: 'b', label: 'Beta', sortValue: (r) => r.b, render: (r) => r.b }];
-    return m.mount('t', h('div', { style: { width: 400 } }, h(ui.DataTable, { rows: [{ id: '1', a: 'x', b: 1 }], columns: cols, rowKey: (r) => r.id, label: 'T', onSort: () => {} })), 'position:fixed;inset:0;padding:40px;background:var(--canvas)');
-  });
-  await page.locator('thead button').first().focus(); await page.keyboard.press('Shift+Tab'); await page.keyboard.press('Tab');
-  const b = await page.locator('thead button').first().boundingBox();
-  const px = async (x, y) => { const png = await page.screenshot({ clip: { x: Math.round(x), y: Math.round(y), width: 1, height: 1 } }); return page.evaluate(async (d) => { const im = new Image(); im.src = d; await im.decode(); const c = document.createElement('canvas'); c.width = c.height = 1; const g = c.getContext('2d'); g.drawImage(im, 0, 0); return [...g.getImageData(0, 0, 1, 1).data].slice(0, 3); }, 'data:image/png;base64,' + png.toString('base64')); };
-  const ring = (p) => Math.abs(p[0] - 47) < 25 && Math.abs(p[1] - 168) < 25 && Math.abs(p[2] - 118) < 25;
-  const cx = b.x + b.width / 2, cy = b.y + b.height / 2;
-  const any = async (pts) => { for (const p of pts) if (ring(await px(p[0], p[1]))) return true; return false; };
-  const top = await any([-4, -3, -2, -1].map((d) => [cx, b.y + d]));
-  const left = await any([-4, -3, -2, -1].map((d) => [b.x + d, cy]));
-  const bottom = await any([0, 1, 2, 3].map((d) => [cx, b.y + b.height + d]));
-  console.log('focus ring seen outside the first sortable head (top, left, bottom):', JSON.stringify({ top, left, bottom }));
-} finally { await browser.close(); }
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) && cat > "$D/p.sh" <<'EOF'
+#!/bin/sh
+# The TS digest is not the Python twin for a uuid padded with U+0085 (NEL):
+# Python's str.strip() removes it, JavaScript's String.trim() does not.
+set -u
+S=$(mktemp -d /tmp/athena-meter-probe.XXXXXX) || exit 1
+case "$S" in /tmp/athena-meter-probe.*) ;; *) echo "bad scratch dir" >&2; exit 1;; esac
+trap 'cd /tmp && rm -rf "$S"' EXIT
+mkdir -p "$S/home/.claude" || exit 1
+python3 -c 'import json,sys; json.dump({"oauthAccount":{"accountUuid":"probe-account-a\u0085"}}, open(sys.argv[1],"w"))' "$S/home/.claude.json"
+cat > "$S/d.mts" <<'TS'
+import { liveAccountDigest } from '/home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/account-digest.ts';
+console.log(liveAccountDigest());
+TS
+ts=$(HOME="$S/home" /home/lyphe/.claude/claudecodeui_lyphe/node_modules/.bin/tsx \
+  --tsconfig /home/lyphe/.claude/claudecodeui_lyphe/server/tsconfig.json "$S/d.mts")
+py=$(PLAN_RUNNER_CLAUDE_IDENTITY_PATH="$S/home/.claude.json" PYTHONPATH=/home/lyphe/.claude/hooks \
+  python3 -c 'from plan_runner import claude_account; print(claude_account.current())')
+echo "ts=$ts py=$py same=$([ "$ts" = "$py" ] && echo yes || echo NO)"
 EOF
-node "$D/p.mjs"
-expect: today `{"top":false,"left":false,"bottom":true}`; cured `top:true, left:true, bottom:true`
+bash "$D/p.sh"; case "$D" in /tmp/athena-probe.*) cd /tmp && rm -rf "$D";; esac
+expect: `same=yes` (today: `ts=4fa5b975 py=5b0dd85d same=NO`; also measured: U+001C `ts=7f689287 py=5b0dd85d`, U+001F `ts=b160574f py=5b0dd85d`, U+FEFF `ts=5b0dd85d py=7c6411b0`)
 ```
 
-measured 2026-10-17 by chain chain-tour-affected-areas--marking--library-20261017-163819-f3a2, finding L3, LOW
-probe-key: 3a51a4d93a567e2972d90d2f439eb40293acc946
+measured 2026-10-20 by chain chain-usage-pacer--meter-20261020-061414-1e4f, finding L2, LOW
+probe-key: e5fc37c3eba8f335759ad31ad360e7aaec12292d
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/DataTable.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/RegionDrawLayer.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/SegmentedControl.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/verve/data.css
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/account-digest.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/pacer-door.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/usage.service.ts
 
-## INV-8684 — probe — LOW — Pressing a sort head moves the columns: the ↕ and ▲/▼ marks have different widths
+## INV-8883 — probe — LOW — `usage.service.ts`'s bound-3 comment still tells the reader the meter's readings die with the process
 
-LOW — Pressing a sort head moves the columns: the ↕ and ▲/▼ marks have different widths
+LOW — `usage.service.ts`'s bound-3 comment still tells the reader the meter's readings die with the process
 
 ```probe
-D=$(mktemp -d /tmp/athena-probe.XXXXXX)
-cat > "$D/p.mjs" <<'EOF'
-import { open } from '/home/lyphe/.claude/state/pipeline-reviews/tour-affected-areas--viewer--library/athena-kit.mjs';
-const { page, browser } = await open();
-try {
-  await page.evaluate(() => {
-    const m = window.__mountReact, ui = window.__ui, { h, React } = m;
-    const cols = [{ key: 'name', label: 'Name', sortValue: (r) => r.name, render: (r) => r.name }, { key: 'tasks', label: 'Tasks', align: 'end', sortValue: (r) => r.tasks, render: (r) => r.tasks }, { key: 'note', label: 'Note', render: (r) => r.note }];
-    const rows = [{ id: 'a', name: 'b', tasks: 10, note: 'x' }, { id: 'b', name: 'a', tasks: 9, note: 'y' }];
-    function P() { const [s, setS] = React.useState(undefined); return h('div', { style: { width: 1000 } }, h(ui.DataTable, { rows, columns: cols, rowKey: (r) => r.id, label: 'T', sort: s, onSort: (c) => setS({ column: c, direction: 'asc' }) })); }
-    return m.mount('t', h(P), 'position:fixed;inset:0;padding:24px;background:var(--canvas)');
-  });
-  const w = () => page.evaluate(() => [...document.querySelectorAll('thead th')].map((t) => t.getBoundingClientRect().width));
-  const none = await w(); await page.locator('thead button').nth(1).click(); const tasks = await w(); await page.locator('thead button').nth(0).click(); const name = await w();
-  const shift = (a, b) => Math.max(...a.map((v, i) => Math.abs(v - b[i]))).toFixed(1);
-  console.log('largest head-width change when a head is first sorted (px), none->tasks:', shift(none, tasks), ' tasks->name:', shift(tasks, name));
-} finally { await browser.close(); }
-EOF
-node "$D/p.mjs"
-expect: today `none->tasks: 8.7  tasks->name: 13.8`; cured both ≤ 1
+cd /home/lyphe/.claude/claudecodeui_lyphe && rg -n "in-memory readings that die with the process|EVERY GOOD READING IS FILED" server/modules/accounts/usage.service.ts || echo none
+expect: one line only — the filing comment at :332 (today: two, the bound-3 sentence at :31 and the filing comment at :332)
 ```
 
-measured 2026-10-17 by chain chain-tour-affected-areas--marking--library-20261017-163819-f3a2, finding L4, LOW
-probe-key: 852000cbb88a8e76b9b7da4f8ff4cba9b65fd2db
+measured 2026-10-20 by chain chain-usage-pacer--meter-20261020-061414-1e4f, finding L3, LOW
+probe-key: 768f39754ae645d3c415e70e4eca9a02eb7f1657
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/DataTable.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/RegionDrawLayer.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/SegmentedControl.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/verve/data.css
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/account-digest.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/pacer-door.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/usage.service.ts
 
-## INV-8685 — probe — LOW — Three light-theme pairs are under AA and neither `data.css`'s header nor MAN-8580 says so
+## INV-8884 — Meter's tick and mark paint in `bg-foreground ring-1 ring-card` — no `bg-tone-*` clears 3:1 on both the track and the amber fill
 
-LOW — Three light-theme pairs are under AA and neither `data.css`'s header nor MAN-8580 says so
+- **Trap:** `bg-tone-ink` / `bg-tone-dot` on `Meter`'s `tickAt` tick or `markAt` notch misses the 3:1 graphics floor in light mode (MAN-579). why: the backdrop is not always the track — the tick sits over the warning fill whenever usage is heavy, the mark whenever the projection reaches the bar's end, and the amber fill is the same in both modes while the tone inks flip.
+- **Measured 2026-10-20, composited colours (contrast on the track | on the amber fill):**
+
+| paint | track | amber fill |
+|---|---|---|
+| `neutral-ink` | 4.46 | 2.29 |
+| `info-ink`, light | 5.00 | 2.57 |
+| `info-ink`, dark | 8.30 | 1.21 |
+| `--ink` | 15.59 (light) | 1.94 (dark) |
+
+- **Pair that holds:** `bg-foreground ring-1 ring-card` — the mode's ink inside a 1px surface ring; one of the two is ≥3:1 on whatever is underneath. Light: ink core on track 15.59, on amber 8.02, on accent 5.9. Dark: core on track 13.38; ring on amber 7.4, on accent 7.76.
+- **Do:** keep that class pair on both marks. Shape carries the difference between them (full-height hairline vs short rounded notch), not colour.
+- **Don't:** put `bg-tone-*` or `data-tone` back on either mark.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Meter.tsx
+
+## INV-8920 — probe — both shared-type mirrors still teach the retired dial's limit
+
+both shared-type mirrors still teach the retired dial's limit
 
 ```probe
-D=$(mktemp -d /tmp/athena-probe.XXXXXX)
-cat > "$D/p.mjs" <<'EOF'
-import { open } from '/home/lyphe/.claude/state/pipeline-reviews/tour-affected-areas--viewer--library/athena-kit.mjs';
-import fs from 'node:fs';
-const { page, browser } = await open();
-try {
-  await page.evaluate(() => {
-    const m = window.__mountReact, ui = window.__ui, { h } = m;
-    const cols = [{ key: 'a', label: 'Alpha', sortValue: (r) => r.a, render: (r) => r.a }];
-    return m.mount('t', h('div', null, h(ui.SegmentedControl, { options: [{ value: 'a', label: 'A' }, { value: 'b', label: 'B' }], value: 'a', onChange: () => {}, label: 'L' }), h(ui.DataTable, { rows: [{ id: '1', a: 'x' }], columns: cols, rowKey: (r) => r.id, label: 'T', onSort: () => {} })), 'position:fixed;inset:0;padding:24px;background:var(--canvas)');
-  });
-  const c = await page.evaluate(() => { const cs = (e) => getComputedStyle(e); return { head: [cs(document.querySelector('thead th')).color, cs(document.querySelector('thead th')).backgroundColor], label: [cs(document.querySelectorAll('[role=radio]')[1]).color, cs(document.querySelector('[role=radiogroup]')).backgroundColor] }; });
-  const rgb = (s) => s.match(/\d+/g).slice(0, 3).map(Number);
-  const lin = (v) => { v /= 255; return v <= .03928 ? v / 12.92 : ((v + .055) / 1.055) ** 2.4; };
-  const L = (a) => .2126 * lin(a[0]) + .7152 * lin(a[1]) + .0722 * lin(a[2]);
-  const cr = (a, b) => { const x = L(a), y = L(b); return ((Math.max(x, y) + .05) / (Math.min(x, y) + .05)).toFixed(2); };
-  const css = fs.readFileSync('/home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/verve/data.css', 'utf8');
-  console.log('light: unsorted sortable head', cr(rgb(c.head[0]), rgb(c.head[1])) + ':1, unchosen option label', cr(rgb(c.label[0]), rgb(c.label[1])) + ':1; data.css header names a contrast number:', /\d\.\d+:1|AA/.test(css.split('*/')[0]));
-} finally { await browser.close(); }
+D=$(mktemp -d /tmp/athena-probe-types.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+H=/home/lyphe/.claude/claudecodeui_lyphe
+grep -Fc '`1` to `5`, `pause` or `resume`' "$H/src/shared/types.ts" "$H/server/shared/types.ts"
+grep -Fc 'holds no slot in the queue' "$H/src/shared/types.ts" "$H/server/shared/types.ts"
+X=$(mktemp -d /tmp/athena-probe-dial.XXXXXX) || exit 1
+printf 'paused no\n' > "$X/epics.flag"
+DISPATCHER_EPICS_FLAG_PATH="$X/epics.flag" ~/.claude/scripts/dispatcher epics 2
+case "$X" in /tmp/athena-probe-dial.??????) rm -rf "$X";; esac
 EOF
-node "$D/p.mjs"
-expect: today `3.12:1`, `4.46:1`, header names a contrast number `false`; cured both ≥ 4.5 or the header names the number (`true`)
+bash "$D/p.sh"
+case "$D" in /tmp/athena-probe-types.??????) rm -rf "$D";; esac
 ```
 
-measured 2026-10-17 by chain chain-tour-affected-areas--marking--library-20261017-163819-f3a2, finding L5, LOW
-probe-key: cb218058d637d82a76d79db7046760653392277b
+measured 2026-10-20 by chain chain-usage-pacer--epics-20261020-101849-b564, finding L1, LOW
+probe-key: fd187308ff602c565c327fe105af2cf075b17c2e
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/DataTable.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/RegionDrawLayer.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/SegmentedControl.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/verve/data.css
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/hooks/useBoardVerbs.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/MasterController.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/common.json, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/hooks/dispatcher/store_hidden.py
 
-## INV-8686 — probe — LOW — Heads with `sortValue` and no `onSort` still draw the ↕ "this sorts" mark
+## INV-8921 — probe — the MANUAL still calls `hold` a ten-step head in its section line
 
-LOW — Heads with `sortValue` and no `onSort` still draw the ↕ "this sorts" mark
+the MANUAL still calls `hold` a ten-step head in its section line
 
 ```probe
-D=$(mktemp -d /tmp/athena-probe.XXXXXX)
-cat > "$D/p.mjs" <<'EOF'
-import { open } from '/home/lyphe/.claude/state/pipeline-reviews/tour-affected-areas--viewer--library/athena-kit.mjs';
-const { page, browser } = await open();
-try {
-  await page.evaluate(() => {
-    const m = window.__mountReact, ui = window.__ui, { h } = m;
-    const cols = [{ key: 'a', label: 'Alpha', sortValue: (r) => r.a, render: (r) => r.a }, { key: 'b', label: 'Beta', sortValue: (r) => r.b, render: (r) => r.b }];
-    return m.mount('t', h(ui.DataTable, { rows: [{ id: '1', a: 'x', b: 1 }], columns: cols, rowKey: (r) => r.id, label: 'T' }), 'position:fixed;inset:0;padding:24px;background:var(--canvas)');
-  });
-  console.log('no onSort: head buttons', await page.locator('thead button').count(), '· sort arrows drawn (a mark that says "this sorts")', await page.locator('.vv-datatable__arrow').count());
-} finally { await browser.close(); }
+D=$(mktemp -d /tmp/athena-probe-ten.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+grep -n 'ten steps' ~/.claude/hooks/dispatcher/MANUAL.md || echo none
+echo "nine-step lines: $(grep -c 'nine steps' ~/.claude/hooks/dispatcher/MANUAL.md)"
 EOF
-node "$D/p.mjs"
-expect: today `head buttons 0 · sort arrows drawn 2`; cured arrows `0` (or only on a head that holds `aria-sort`)
+bash "$D/p.sh"
+case "$D" in /tmp/athena-probe-ten.??????) rm -rf "$D";; esac
 ```
 
-measured 2026-10-17 by chain chain-tour-affected-areas--marking--library-20261017-163819-f3a2, finding L6, LOW
-probe-key: 4254c2b0b6d2e95b42a5c152bf3792b17cea06eb
+measured 2026-10-20 by chain chain-usage-pacer--epics-20261020-101849-b564, finding L2, LOW
+probe-key: bfe284da9a4941b00faa915fd4cde1e092e451bd
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/DataTable.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/RegionDrawLayer.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/SegmentedControl.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/verve/data.css
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/hooks/useBoardVerbs.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/MasterController.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/common.json, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/hooks/dispatcher/store_hidden.py
+
+## INV-8922 — probe — the queue's place-word list omits `out of line` in two rows
+
+the queue's place-word list omits `out of line` in two rows
+
+```probe
+D=$(mktemp -d /tmp/athena-probe-qrow.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+python3 - <<'PY'
+import os, re, sys
+sys.path.insert(0, os.path.expanduser("~/.claude/hooks"))
+from dispatcher import line_gate
+from dispatcher.cmd.epic_line import _TURN_WORDS
+print("code: HIDDEN prints", repr(_TURN_WORDS[line_gate.HIDDEN]))
+path = os.path.expanduser("~/.claude/hooks/dispatcher/MANUAL.md")
+for number, line in enumerate(open(path, encoding="utf-8").read().splitlines(), 1):
+    if "its turn" in line and "arc word" in line:
+        found = re.search(r"its turn.*?arc word>", line)
+        print(f"MANUAL:{number}:", found.group(0) if found else line.strip()[:100])
+PY
+docstore get MAN-8425 --text | python3 -c 'import sys; [print("MAN-8425:", line.strip()) for line in sys.stdin if "its turn" in line]'
+EOF
+bash "$D/p.sh"
+case "$D" in /tmp/athena-probe-qrow.??????) rm -rf "$D";; esac
+```
+
+measured 2026-10-20 by chain chain-usage-pacer--epics-20261020-101849-b564, finding L3, LOW
+probe-key: e64d78d02793efbb1c38c7768eb1a99d716bf40d
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/hooks/useBoardVerbs.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/MasterController.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/common.json, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/hooks/dispatcher/store_hidden.py
+
+## INV-8923 — probe — three pinned probes on this ground call the retired two-half `Dial` and crash when run
+
+three pinned probes on this ground call the retired two-half `Dial` and crash when run
+
+```probe
+D=$(mktemp -d /tmp/athena-probe-pinned.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+python3 - "$1" "$2" <<'PY'
+import os, re, sys
+home, work = sys.argv[1], sys.argv[2]
+text = open(os.path.join(home, ".claude/hooks/dispatcher/INVARIANTS.md"), encoding="utf-8").read()
+found = sorted(set(re.findall(r'(?:epic_dial\.)?Dial\("[^"]*", False\)', text)))
+print("retired two-half constructor forms pinned:", len(found), found)
+os.environ["DISPATCHER_EPICS_FLAG_PATH"] = os.path.join(work, "epics.flag")
+sys.path.insert(0, os.path.join(home, ".claude/hooks"))
+from dispatcher import epic_dial
+from dispatcher.epic_dial import Dial
+for expr in found:
+    try:
+        epic_dial.write(eval(expr))
+        print(expr, "-> accepted")
+    except ValueError as exc:
+        print(expr, "->", exc)
+PY
+EOF
+bash "$D/p.sh" "$HOME" "$D"
+case "$D" in /tmp/athena-probe-pinned.??????) rm -rf "$D";; esac
+```
+
+measured 2026-10-20 by chain chain-usage-pacer--epics-20261020-101849-b564, finding L4, LOW
+probe-key: 82624d91965b9f76a9c365424d80e39d764f9867
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/hooks/useBoardVerbs.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/MasterController.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/common.json, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/hooks/dispatcher/store_hidden.py
+
+## INV-8925 — probe — the rewritten hide gate's header still says `no slot — hidden`
+
+the rewritten hide gate's header still says `no slot — hidden`
+
+```probe
+D=$(mktemp -d /tmp/athena-probe-hdsc.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+grep -n 'no slot — hidden' ~/.claude/claudecodeui_lyphe/.verify/hide-holds-scratch.py || echo none
+grep -n 'out of line — hidden' ~/.claude/claudecodeui_lyphe/.verify/hide-holds-scratch.py | head -2
+EOF
+bash "$D/p.sh"
+case "$D" in /tmp/athena-probe-hdsc.??????) rm -rf "$D";; esac
+```
+
+measured 2026-10-20 by chain chain-usage-pacer--epics-20261020-101849-b564, finding L6, LOW
+probe-key: f3b8a853678527784572ff44946b6320b497715f
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/hooks/useBoardVerbs.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/MasterController.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/common.json, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/hooks/dispatcher/store_hidden.py
+
+## INV-8940 — probe — the new `paidText` comment promises the figure alone for “a word this app does not know”; the code names the word
+
+the new `paidText` comment promises the figure alone for “a word this app does not know”; the code names the word
+
+```probe
+D=$(mktemp -d /tmp/athena-probe-unknown.XXXXXX) || exit 1
+trap 'case "$D" in /tmp/athena-probe-unknown.*) rm -rf "$D";; esac' EXIT
+cat > "$D/p.sh" <<'EOF'
+#!/bin/bash
+set -euo pipefail
+D=$(dirname "$0")
+cat > "$D/p.mjs" <<'JS'
+import { chromium } from '/home/lyphe/.claude/claudecodeui_lyphe/node_modules/playwright/index.mjs';
+const browser = await chromium.launch();
+const page = await (await browser.newContext()).newPage();
+await page.goto('http://127.0.0.1:5183', { waitUntil: 'domcontentloaded' });
+const out = await page.evaluate(async () => {
+  const { default: i18n } = await import('/src/modules/i18n/config.ts');
+  const { spendText } = await import('/src/shared/spend.ts');
+  const t = i18n.t.bind(i18n);
+  return {
+    named: spendText(t, 4.49, null, null, null, 'OpenAI'),
+    unnamed: spendText(t, 4.49, null, null, null, ''),
+  };
+});
+console.log('named  :', JSON.stringify(out.named));
+console.log('unnamed:', JSON.stringify(out.unnamed));
+await browser.close();
+JS
+node "$D/p.mjs"
+EOF
+bash "$D/p.sh"
+expect: named  : "$4.49 OpenAI"   — the word is NAMED; the comment promises the figure alone for it unnamed: "$4.49"          — the figure alone where no vendor is named (a cured tree still prints both lines: if the code learns to suppress an unknown word, `named` reads "$4.49")
+```
+
+measured 2026-10-20 by chain chain-claude-api-backup--pills-20261020-115801-ec70, finding L1, LOW
+probe-key: 0bb4a5a7f216ed627a1ee9c314d1dfa022262bf4
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/SpendPills.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/spend.ts

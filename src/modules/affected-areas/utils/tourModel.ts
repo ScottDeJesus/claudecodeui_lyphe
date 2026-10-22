@@ -1,6 +1,7 @@
 import type { TFunction } from 'i18next';
 
-import type { Face, PanoEntry, TourSummary } from '@/shared/affected-areas-types';
+import type { Codebook, Face, PanoEntry, ReadState, TourSummary, ViewDetail, ViewEntry } from '@/shared/affected-areas-types';
+import { regionState } from '@/modules/affected-areas/utils/regionLook';
 import { formatRelativeTime, formatShortDate } from '@/shared/utils';
 
 /*
@@ -11,6 +12,14 @@ import { formatRelativeTime, formatShortDate } from '@/shared/utils';
 
 /** A pano's six faces, in the order the face strip offers them. The reader cuts every pano into these six. */
 export const FACES: readonly Face[] = ['ahead', 'right', 'behind', 'left', 'ceiling', 'floor'];
+
+/**
+ * The most tiles the tour screen's gallery draws before its last one collapses the rest into "+N": three rows at a desk,
+ * eight on a phone. A forty-five pano tour opens on twenty-three and the count, and one press opens the rest in place.
+ * The collapsed last tile shows the photo of the first pano it hides, so `GALLERY_MAX` photos are drawn: no more than
+ * these are fetched until the overflow opens (`useTilePhotos`).
+ */
+export const GALLERY_MAX = 24;
 
 /** How far something is read: nothing yet, some of it, or all of it. */
 type ReadExtent = 'unread' | 'partly' | 'read';
@@ -36,23 +45,40 @@ export function tourReadState(tour: TourSummary): ReadExtent {
 }
 
 /**
- * What Read the rest would still read on a tour: its panos with a face not read yet (a pano never cut included) and
- * those panos' unread views, six for a pano never cut. The press says both before it spends — "45 panos · 270 views
- * not read yet" — because a walk of a whole tour buys every one of them. Read by the view root.
+ * Whether a view needs a read: it has none, or its read is not `current`, which is the engine's answer to "is this read
+ * under the contract and model the reader reads under now" (`ReadState.current`, null on a view never read). The browser
+ * compares no contract or model itself. Read by `tourUnread`, the walk's queue (`useTourReader`) and `ReadControl`'s
+ * Read again.
+ */
+export function needsRead(view: ViewEntry): boolean {
+  return view.read?.status !== 'read' || view.read.current !== true;
+}
+
+/**
+ * What Read the rest would still read on a tour: its panos with a view that needs a read (`needsRead`: none yet, or one
+ * made under an older contract or model; a pano never cut included) and those views, six for a pano never cut. The press
+ * says both before it spends — "45 panos · 270 views need a read" — because a walk of a whole tour buys every one of
+ * them. Read by the view root.
  */
 export function tourUnread(panos: PanoEntry[]): { panos: number; views: number } {
   const unread = panos
-    .map((pano) => FACES.length - pano.views.filter((view) => view.read?.status === 'read').length)
+    .map((pano) => FACES.length - pano.views.filter((view) => !needsRead(view)).length)
     .filter((views) => views > 0);
   return { panos: unread.length, views: unread.reduce((sum, views) => sum + views, 0) };
 }
 
 /**
- * The tour's name as a person reads it: the job's, else its address, else a sentence saying it has neither.
- * Never its id (INV-76). Read by the picker's rows, the tour screen's title and the pano screen's way back.
+ * The tour's name as a person reads it: the job's, else DocuSketch's own name for the tour (a pre-job tour is named
+ * there), else its address, else a sentence saying it has none of them. Never its id (INV-76). Read by the picker's
+ * rows, the tour screen's title and the pano screen's way back.
  */
 export function tourName(tour: TourSummary, t: TFunction): string {
-  return tour.jobLabel ?? tour.address ?? t('affectedAreas.tour.unnamed');
+  return tour.jobLabel ?? tour.tourName ?? tour.address ?? t('affectedAreas.tour.unnamed');
+}
+
+/** The address as a line of its own: whenever the name above it is not already the address (`tourName`), else null. */
+export function addressBesideName(tour: TourSummary): string | null {
+  return tour.jobLabel !== null || tour.tourName !== null ? tour.address : null;
 }
 
 /**
@@ -60,14 +86,15 @@ export function tourName(tour: TourSummary, t: TFunction): string {
  * not cut · 26 areas found · last read 2h ago", or "45 panos · none cut yet"; "12 panos in 5 rooms" when `withRooms`
  * (the tour screen, which has the room to). The views are counted against those cut, as the operator worded it, and
  * the panos never cut are named beside them, so a tour whose cut views are all read never reads as done. A pano is cut
- * whole, six views at once (`viewsTotal` counts whole cuts only). Areas are the ones standing once marks exist, else
- * every one the reader marked. Read by the picker's rows and the tour screen's header.
+ * whole, six views at once (`viewsTotal` counts whole cuts only). Areas are the ones standing; while none stands (no
+ * mark and no line set yet), every one the reader found, so a tour the reader marked never reads as empty. Read by the
+ * picker's rows and the tour screen's header.
  */
 export function tourFacts(tour: TourSummary, t: TFunction, withRooms: boolean): string {
   const captured = formatShortDate(tour.capturedAt);
   const panos = t('affectedAreas.tour.panos', { count: tour.panoCount });
   const uncut = Math.max(0, tour.panoCount - Math.round(tour.viewsTotal / FACES.length));
-  const areas = tour.regionsStanding ?? tour.regionsTotal;
+  const areas = tour.regionsStanding ? tour.regionsStanding : tour.regionsTotal;
   return [
     captured === null ? null : t('affectedAreas.tour.captured', { date: captured }),
     withRooms ? t('affectedAreas.tour.inRooms', { panos, rooms: t('affectedAreas.tour.rooms', { count: tour.roomCount }) }) : panos,
@@ -112,4 +139,52 @@ export function listWords(items: string[], t: TFunction): string {
 /** The same words opening a sentence: "Engineered wood". */
 export function capitalized(words: string): string {
   return words.charAt(0).toUpperCase() + words.slice(1);
+}
+
+/**
+ * A kind as a person reads it: the codebook's label ("Material removed"), or its key spoken ("Removed material") until
+ * the codebook answers — never the key itself (INV-76). Read by the marking pieces: `MarkPresses`, `MarkBar`,
+ * `FacePhoto` and `MarkQueue`.
+ */
+export function kindName(cls: string, codebook: Codebook | null): string {
+  return codebook?.classes.find((kind) => kind.key === cls)?.label ?? capitalized(spoken(cls));
+}
+
+
+/**
+ * A read's areas as the tour's listing counts them, before any pano has answered with its regions: `standing` is the
+ * engine's count of the ones that stand (its own `standingCount`, else every one the read found when the listing
+ * carries none), `found` is what the shown read itself found, standing or not. While nothing stands and the read found
+ * some, they are found and not absent: the gallery's tile and the face the pano opens on read it so. The listing
+ * carries no state per region, so it cannot say whether the found ones are proposed or were set aside; the pano
+ * screen says it once the pano answers (`faceCounts`). Read by `faceCounts`, `RoomGallery` and `AffectedAreasView`.
+ */
+export function listedAreas(read: ReadState): { standing: number; found: number } {
+  return { standing: read.standingCount ?? read.regionsCount, found: read.regionsCount };
+}
+
+/**
+ * A face's counts; undefined while the face is unread. Once the pano has answered, the three are counted off its
+ * regions through `regionState`, so together they are every outline drawn:
+ * - `setAside`: areas the system does not believe, `unsure` (below a line the operator set for the kind) and
+ *   `not_a_change` (marked away, or a drawing taken back);
+ * - `proposed`: unmarked areas of a kind with no line set (`proposed` with `standing === false`), which stand only
+ *   when the operator marks them;
+ * - `areas`: the rest, as the engine's own count holds them (standing, or not yet judged).
+ * Before the pano answers, the tour's listing gives the areas alone (`listedAreas`: the engine's standing ones): it
+ * cannot tell a proposed area from one set aside, so it calls none of them either. Read by the pano screen's face
+ * strip and caption.
+ */
+export function faceCounts(
+  view: ViewEntry | ViewDetail | undefined,
+): { areas: number; setAside: number; proposed: number } | undefined {
+  const read = view?.read;
+  if (view === undefined || read?.status !== 'read') return undefined;
+  if ('regions' in view) {
+    const states = view.regions.map((region) => ({ state: regionState(region), standing: region.standing }));
+    const setAside = states.filter(({ state }) => state === 'unsure' || state === 'not_a_change').length;
+    const proposed = states.filter(({ state, standing }) => state === 'proposed' && standing === false).length;
+    return { areas: view.regions.length - setAside - proposed, setAside, proposed };
+  }
+  return { areas: listedAreas(read).standing, setAside: 0, proposed: 0 };
 }

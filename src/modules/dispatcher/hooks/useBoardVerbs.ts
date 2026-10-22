@@ -11,13 +11,12 @@ type BoardVerb = 'epics' | 'start';
 /**
  * The BOARD's two presses — verbs that name no plan and no arc, so neither has a hook of a plan's or an arc's:
  *
- * - `setDial` (`dispatcher epics <word>`, relayed through `POST /api/dispatcher/epics`): a limit of `1` to
- *   `5`, or `pause` / `resume` — Epics at once, and Pause all.
+ * - `setDial` (`dispatcher epics <word>`, relayed through `POST /api/dispatcher/epics`): `pause` or
+ *   `resume` — Pause all.
  * - `start` (`dispatcher start`, `POST /api/dispatcher/start`): every plan held for its first Start let go at
- *   once. The queue's order and the dial then decide what runs, so at a limit of 1 the top epic runs and the
- *   next waits till it finishes.
+ *   once. The queue's order and Pause all then decide what runs: each epic starts in turn.
  *
- * The toast is the dispatcher's own first line (`EPICS limit=2 paused=no`, `STARTED 3 plan(s)`) in the
+ * The toast is the dispatcher's own first line (`EPICS paused=no`, `STARTED 3 plan(s)`) in the
  * operator's words (`operatorWords`, through `useVerbSend`), headed `Epics` or `Start` when the dispatcher said
  * nothing, and `Epics not changed` / `Nothing started` over a refusal.
  *

@@ -282,17 +282,6 @@ body.vv-dragging iframe { pointer-events: none; }
   [data-hold-lift] :is(input, textarea, [contenteditable]:not([contenteditable='false'])) { -webkit-user-select: text; user-select: text; }
   [data-hold-lift] :is(a, img) { -webkit-user-drag: none; }
 }
-/* A handle whose list scrolls its pane by hand (`usePointerDrag` with `scrollsPane` hands it `data-touch-pan`) is told
- * the browser has no pan to take from it, from the first touch. A phone may dispatch every touch sequence as uncancelable
- * (measured: `cancelable=false` from the `touchstart`), and then a lifted row cannot be held still by cancelling the pan
- * — `touch-action` is the one lever the browser reads BEFORE the touch. The swipe that starts on the handle, or on a
- * control inside it, is scrolled by `sortable/touchPan.ts` instead. Keyed on a coarse pointer being PRESENT
- * (`any-pointer`), not on it being the primary one: a touch laptop reports a fine, hovering primary pointer and still has
- * a finger, and `touch-action` does nothing to a mouse. A device with no touch screen is untouched. A marker of its own,
- * never `data-hold-lift`: the runner, roadmap and dispatcher lists wear that one and keep their native scrolling. */
-@media (any-pointer: coarse) {
-  [data-touch-pan] { touch-action: none; }
-}
 /* The item in a hand (sortable/carried.ts marks it `data-carried`, and writes its place, ground and corners
  * inline) is lifted OFF its list: `--shadow-lift`, the elevation Verve gives a lane card in the hand
  * (board.css `--lifted`), and the hairline a Verve card is edged with (`--border-strong`) — the shadow alone is

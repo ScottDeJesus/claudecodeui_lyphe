@@ -76,9 +76,8 @@ export function PlanClock({ plan }: { plan: DispatcherPlan }) {
  * under the track with its stages open — the receipt — and pressed again closes it.
  *
  * THE PLAN'S POSTURE RIDES THE CAPTION (`plan.posture`, `width.word`): DeepSeek or Claude — its own
- * model word's route — and its task WIP, how many of its tasks run at once, as the gate acts on it:
- * `claude route · WIP: 2 tasks at a time`. Two plans on one screen can walk under different postures,
- * and a plan that sits still under `1 task at a time` is explained by its own.
+ * model word's route, as the gate acts on it: `claude route`. Two plans on one screen can walk
+ * under different postures.
  *
  * THE EVENT LOG IS THE CARD'S FEED, folded by default: the last thirty events, newest first —
  * time, kind, phase, detail. It is where a relaunch or a held take-up is read in the dispatcher's
@@ -110,9 +109,8 @@ export function PlanFace({ plan }: { plan: DispatcherPlan }) {
   const caption = [
     progress.total > 0 ? t('dispatcher.flow.caption', { done: progress.done, total: progress.total }) : '',
     t('dispatcher.rounds', { count: plan.rounds }),
-    // THIS plan's width (`report.plan_dict`'s `posture`): its own route and the task WIP the gate holds
-    // it to, in the operator's words. The box's phrase stands in only against a dispatcher build older
-    // than the field.
+    // THIS plan's width (`report.plan_dict`'s `posture`): its own route, in the operator's words. The
+    // box's phrase stands in only against a dispatcher build older than the field.
     operatorWords(plan.posture ?? route?.word ?? ''),
   ].filter(Boolean).join(' · ');
   const receipt = plan.phases.find((phase) => phase.key === selected) ?? null;

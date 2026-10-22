@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { alreadyArmed, useArmAcceptVerbs, type ArmAcceptArcVerbs, type ArmAcceptPlanVerbs } from '@/modules/dispatcher/hooks/useArmAcceptVerbs';
 import { useVerbSend } from '@/modules/dispatcher/hooks/useVerbSend';
 import { api } from '@/shared/api';
-import type { DispatcherAsk, DispatcherModelChoice, DispatcherVerb, DispatcherWipChoice, DispatcherWipLimit } from '@/shared/types';
+import type { DispatcherAsk, DispatcherModelChoice, DispatcherVerb } from '@/shared/types';
 
 /** The two doors a press can be relayed through: one plan's, or one dispatch arc's. */
 export type DispatcherVerbScope = 'plan' | 'arc';
@@ -13,9 +13,11 @@ export type DispatcherVerbScope = 'plan' | 'arc';
  * The verb a press is relaying: the dispatcher's own verbs, plus the card's `answer`. The answer is
  * a door of its own (`POST /api/dispatcher/answer`, never one of the verb routes), and the union
  * stays LOCAL to this hook — `DispatcherVerb` remains exactly the set the server spawns, so no
- * route or service is ever read against a word the dispatcher's binary does not know.
+ * route or service is ever read against a word the dispatcher's binary does not know. `override-off` is
+ * the card's Turn off: the same dispatcher verb as `override` through its own route, named apart so a
+ * refusal of Turn off is headed in Turn off's word.
  */
-type DispatcherPress = DispatcherVerb | 'answer';
+type DispatcherPress = DispatcherVerb | 'answer' | 'override-off';
 
 /** What a plan card may press. */
 export type DispatcherPlanVerbs = ArmAcceptPlanVerbs & {
@@ -27,6 +29,9 @@ export type DispatcherPlanVerbs = ArmAcceptPlanVerbs & {
   drop(): Promise<void>;
   /** The plan's stalled planner outing put back to work — the dispatcher picks the door (`cut`, `judge`, or a `tell` of `continue`). */
   plannerResume(): Promise<void>;
+  /** The operator's lift of the pacer's hold for this plan, and its undo: the pacer's gate and nothing else. */
+  override(): Promise<void>;
+  overrideOff(): Promise<void>;
   setModel(choice: DispatcherModelChoice): Promise<void>;
   /**
    * The operator's word on the prompt this plan's card is drawing: the chosen label (or typed
@@ -39,7 +44,7 @@ export type DispatcherPlanVerbs = ArmAcceptPlanVerbs & {
 
 /**
  * What an arc header may press — the three verbs the dispatcher's own arc door opens on that a deck
- * draws, and the epic's own `wip`. `park`, `unpark`, `drop` and `schedule` are the plan card's own and no
+ * draws. `park`, `unpark`, `drop` and `schedule` are the plan card's own and no
  * arc deck draws them (the deck has no Schedule start), so no arc callback exists for them rather than
  * one that would have no route to reach.
  */
@@ -48,14 +53,12 @@ export type DispatcherArcVerbs = ArmAcceptArcVerbs & {
   resume(): Promise<void>;
   /** `default` hands the epic's model back to the top; a word is its own override and goes to every plan of it. */
   setModel(choice: DispatcherModelChoice): Promise<void>;
-  /** One of the epic's two WIP limits set to a count, `all`, or `default` (follow the top again). */
-  setWip(limit: DispatcherWipLimit, choice: DispatcherWipChoice): Promise<void>;
   busy: DispatcherPress | null;
 };
 
 /**
- * Stop, Resume, Schedule, Park, Unpark, Model, Drop, Resume planner and Answer for one plan — or Stop, Resume,
- * Model and WIP for one dispatch ARC — and what to say about each.
+ * Stop, Resume, Schedule, Park, Unpark, Model, Drop, Resume planner, Override (and its undo) and Answer for one plan — or Stop, Resume
+ * and Model for one dispatch ARC — and what to say about each.
  *
  * ONE HOOK, TWO DOORS, because the two are the same act on the same store through the same verbs:
  * `scope` decides which route a press is relayed through (`POST /api/dispatcher/plans/:name/…` or
@@ -105,9 +108,7 @@ export type DispatcherArcVerbs = ArmAcceptArcVerbs & {
  * of it in one transaction (`store.set_arc_model`), so a press takes the NEXT phase and never
  * disturbs one already out — which is also why the dispatcher never refuses it for the state a plan
  * or an arc is in, and why its answer is a sentence about the STORE (`MODEL <name> model=…`)
- * rather than about a walk. `wip` is its sibling on the arc alone (`WIP arc=<name> features=…`): it too
- * moves no walk, and the dispatcher kicks its own daemon when the word changed, since a wider limit can
- * free a feature the old one held.
+ * rather than about a walk.
  */
 export function useDispatcherVerbs(name: string, scope?: 'plan', resumeWord?: string): DispatcherPlanVerbs;
 export function useDispatcherVerbs(name: string, scope: 'arc', resumeWord?: string): DispatcherArcVerbs;
@@ -128,9 +129,10 @@ export function useDispatcherVerbs(
       if (verb === 'unpark') return t('dispatcher.unpark');
       if (verb === 'drop') return t('dispatcher.delete.word');
       if (verb === 'planner-resume') return t('dispatcher.plannerResume');
+      if (verb === 'override') return t('dispatcher.override.press');
+      if (verb === 'override-off') return t('dispatcher.override.off');
       if (verb === 'schedule') return t('runner.schedule.refused');
       if (verb === 'model') return t('runner.model.refused');
-      if (verb === 'wip') return t('dispatcher.wip.refused');
       if (verb === 'answer') return t('dispatcher.ask.word');
       if (verb === 'arm-accept' || verb === 'disarm-accept') return t('dispatcher.acceptWhenCutRefused');
       return resumeWord ?? t('runner.resume');
@@ -140,13 +142,12 @@ export function useDispatcherVerbs(
 
   /**
    * The word a SUCCESS is headed with when the dispatcher's body arrived empty. Every verb but
-   * `model`, `wip` and `answer` is headed by its own name either way (`Stop`, `Resume`, `Park`);
+   * `model` and `answer` is headed by its own name either way (`Stop`, `Resume`, `Park`);
    * a word press that worked is not headed "Model not set", which is what its refusal word says.
    */
   const doneWord = useCallback(
     (verb: DispatcherPress): string => {
       if (verb === 'model') return t('runner.toast.model');
-      if (verb === 'wip') return t('dispatcher.wip.done');
       if (verb === 'answer') return t('dispatcher.ask.word');
       return word(verb);
     },
@@ -197,15 +198,7 @@ export function useDispatcherVerbs(
     [name, scope, send],
   );
 
-  // The epic's own press: one of its two WIP limits. No plan route exists for it, so a plan card has none.
-  const setWip = useCallback(
-    async (limit: DispatcherWipLimit, choice: DispatcherWipChoice) => {
-      await send('wip', () => api.dispatcher.arcWip(name, limit, choice));
-    },
-    [name, send],
-  );
-
-  // The plan card's own five, which no arc header draws and no arc route exists for.
+  // The plan card's own verbs, which no arc header draws and no arc route exists for.
   const park = useCallback(async () => { await send('park', () => api.dispatcher.park(name)); }, [name, send]);
   const unpark = useCallback(async () => { await send('unpark', () => api.dispatcher.unpark(name)); }, [name, send]);
   const drop = useCallback(async () => { await send('drop', () => api.dispatcher.drop(name)); }, [name, send]);
@@ -213,6 +206,9 @@ export function useDispatcherVerbs(
     async () => { await send('planner-resume', () => api.dispatcher.plannerResume(name)); },
     [name, send],
   );
+  // The pacer's hold lifted for this plan, and put back: two doors of one dispatcher verb, so one `busy`.
+  const override = useCallback(async () => { await send('override', () => api.dispatcher.override(name)); }, [name, send]);
+  const overrideOff = useCallback(async () => { await send('override-off', () => api.dispatcher.overrideOff(name)); }, [name, send]);
 
   // The card's own press: the operator's word on the prompt it is drawing, relayed to the lane's
   // answer door rather than a verb route — and handed on, because the card draws its answered
@@ -226,6 +222,6 @@ export function useDispatcherVerbs(
   // "Accept when cut" and its Cancel: this hook's `send` carries them (`useArmAcceptVerbs`), both doors.
   const armVerbs = useArmAcceptVerbs(name, scope, send);
 
-  if (scope === 'arc') return { stop, resume, setModel, setWip, ...armVerbs, busy };
-  return { stop, resume, schedule, park, unpark, drop, plannerResume, setModel, answer, ...armVerbs, busy };
+  if (scope === 'arc') return { stop, resume, setModel, ...armVerbs, busy };
+  return { stop, resume, schedule, park, unpark, drop, plannerResume, override, overrideOff, setModel, answer, ...armVerbs, busy };
 }

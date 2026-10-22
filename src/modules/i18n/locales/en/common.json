@@ -433,6 +433,12 @@
       "notRead": "The launch table could not be read again:"
     }
   },
+  "usage": {
+    "pace": {
+      "ceiling": "ceiling {{percent}}%",
+      "projected": "{{percent}}% projected"
+    }
+  },
   "deepseekUsage": {
     "title": "DeepSeek",
     "refresh": "Refresh",
@@ -843,6 +849,7 @@
     },
     "ended": "ended {{elapsed}} ago",
     "paid": "${{usd}} {{vendor}}",
+    "paidAlone": "${{usd}}",
     "usage": "{{in}} in · {{out}} out",
     "tokens": "⛁ {{n}} tok",
     "soulBlocked": "DeepSeek refused or never answered — nothing ran on Claude",
@@ -1266,6 +1273,7 @@
     "pill": {
       "paid": "${{usd}}",
       "paidTitle": "${{usd}} billed by {{vendor}}",
+      "paidTitleAlone": "${{usd}} billed",
       "in": "{{n}} in",
       "cache": "({{pct}}% cache)",
       "cacheTitle": "{{hit}} of the {{n}} tokens in were read from the prompt cache",
@@ -1283,6 +1291,13 @@
     "park": "Park",
     "unpark": "Unpark",
     "plannerResume": "Resume planner",
+    "override": {
+      "press": "Override",
+      "pressTitle": "Start this feature even when the usage limit says wait. Nothing else changes — not its model, not the queue.",
+      "on": "Override on · starts even when the usage limit says wait",
+      "off": "Turn off",
+      "offTitle": "Hold this feature for the usage limit again"
+    },
     "acceptWhenCut": "Accept when cut",
     "acceptWhenCutArmed": "Accepted · starts when cut",
     "acceptWhenCutCancel": "Cancel",
@@ -1309,7 +1324,7 @@
     },
     "waitsOn": "waits on {{names}}",
     "queueHold": "Waiting · {{clause}}",
-    "wipHold": "Waiting for a WIP slot · {{clause}}",
+    "paceHold": "Held by pace · {{clause}}",
     "dismissDone": "Dismiss done · {{count}}",
     "plannersOut": "planners {{out}} of {{lanes}} out",
     "dismiss": "Dismiss feature",
@@ -1366,40 +1381,19 @@
         "epic": "Follow epic · {{value}}"
       }
     },
-    "wip": {
-      "all": "All",
-      "featuresHint": "How many features of this epic are in progress at once. Follow the top, or give this epic its own number.",
-      "tasksHint": "How many tasks each feature of this epic runs at once. Follow the top, or give this epic its own number.",
-      "refused": "WIP not set",
-      "done": "WIP set — the next take-up reads it"
-    },
     "master": {
       "label": "Run controls",
       "switchLabel": "Runs on",
       "switchHint": "The house switch — the same one Settings and the chat box draw. Epics and features with no choice of their own follow it, and builds started from chat run on it.",
       "switchUnreadable": "The switch could not be read — press a side to ask again.",
-      "startTitle_one": "Let the {{count}} feature waiting for its Start go. The queue’s order and Epics at once decide what runs first; a feature’s own Start skips both.",
-      "startTitle_other": "Let the {{count}} features waiting for their Start go. The queue’s order and Epics at once decide what runs first; a feature’s own Start skips both.",
-      "startRefused": "Nothing started",
-      "noteDeepseek": "DeepSeek work runs with no feature or task limit unless an epic sets its own.",
-      "wip": {
-        "features": "Features at once",
-        "tasks": "Tasks at once",
-        "featuresShort": "Features",
-        "tasksShort": "Tasks",
-        "featuresHint": "How many features of an epic are in progress at once, for every epic that sets none of its own.",
-        "tasksHint": "How many tasks each feature runs at once, for every epic that sets none of its own."
-      },
-      "wipRefused": "WIP not set",
-      "wipUnreadable": "The defaults could not be read, so nothing was written.",
-      "wipDone": "{{limit}}: {{word}}"
+      "startTitle_one": "Let the {{count}} feature waiting for its Start go. The queue’s order and Pause all decide what runs first; a feature’s own Start skips both.",
+      "startTitle_other": "Let the {{count}} features waiting for their Start go. The queue’s order and Pause all decide what runs first; a feature’s own Start skips both.",
+      "startRefused": "Nothing started"
     },
     "epics": {
-      "label": "Epics at once",
-      "hint": "How many epics run at once, top down. An epic that has started runs till completed.",
       "pause": "Pause all",
       "resume": "Resume all",
-      "running": "{{running}} of {{limit}} running",
+      "count": "{{running}} running",
       "paused": "Paused · tasks out finish",
       "done": "Epics",
       "refused": "Epics not changed"
@@ -2263,6 +2257,244 @@
       "tab": "Tours",
       "tabHint": "Affected areas on DocuSketch tours"
     },
+    "bulletins": {
+      "tab": "Bulletins",
+      "tabHint": "What Claude read in each carrier's SERVPRO bulletin",
+      "refresh": "Refresh",
+      "trouble": {
+        "retry": "Try again",
+        "no_secret": "CloudCLI could not read shadow-connector's internal secret",
+        "no_secretDetail": "Nothing here can be read until shadow-connector's env file holds EIS_INTERNAL_SECRET.",
+        "unreachable": "shadow-connector can't be reached",
+        "unreachableDetail": "It did not answer in time. It may be restarting.",
+        "unreadable": "shadow-connector sent an answer CloudCLI can't read",
+        "unreadableDetail": "It may be part way through an update.",
+        "gone": "This could not be found",
+        "gone_overview": "The bulletins could not be found",
+        "gone_pages": "This bulletin is not on file any more",
+        "gone_page": "This page is not in the bulletin",
+        "goneDetail": "Go back and open it again from the list.",
+        "goneDetail_overview": "shadow-connector may be part way through an update.",
+        "goneDetail_pages": "A newer file may have taken its place. Go back to All carriers and open the carrier again.",
+        "goneDetail_page": "Go back to the carrier's pages and open it again.",
+        "failed": "This could not be read",
+        "failed_overview": "The bulletins could not be read",
+        "failed_pages": "This carrier's pages could not be read",
+        "failed_page": "This page could not be read",
+        "failedDetail": "Try again in a moment. If it keeps failing, shadow-connector's log says why."
+      },
+      "overview": {
+        "title": "Carrier bulletins",
+        "reading": "Reading the carriers' bulletins…",
+        "empty": "No carrier has a bulletin on file",
+        "emptyMessage": "A carrier shows here once a pull stores its current bulletin.",
+        "groups": {
+          "needs": "Needs you",
+          "notSettled": "Not settled yet",
+          "settled": "Settled"
+        },
+        "headline": {
+          "needsLead_one": "One carrier",
+          "needsLead_other": "{{count}} carriers",
+          "needsAccent_one": "needs you",
+          "needsAccent_other": "need you",
+          "notSettledLead_one": "One carrier is",
+          "notSettledLead_other": "{{count}} carriers are",
+          "notSettledAccent": "not settled yet",
+          "settledLead": "Every file is",
+          "settledAccent": "read and settled"
+        },
+        "summary": {
+          "carriers_one": "{{count}} carrier",
+          "carriers_other": "{{count}} carriers",
+          "pages_one": "{{count}} page",
+          "pages_other": "{{count}} pages",
+          "needs_one": "{{count}} needs you",
+          "needs_other": "{{count}} need you",
+          "notSettled": "{{count}} not settled yet",
+          "settled": "{{count}} settled"
+        }
+      },
+      "standing": {
+        "waiting_one": "{{count}} page waiting",
+        "waiting_other": "{{count}} pages waiting",
+        "stopped": "Reading stopped",
+        "partly": "Not settled yet",
+        "unread": "Not read yet",
+        "settled": "Settled"
+      },
+      "file": {
+        "numbered": "Bulletin {{number}} · stored {{stored}}",
+        "noNumber": "No bulletin number · stored {{stored}}"
+      },
+      "split": {
+        "pages_one": "{{count}} page",
+        "pages_other": "{{count}} pages",
+        "waiting": "{{count}} waiting",
+        "noneRead": "none read yet",
+        "unread": "{{count}} not read",
+        "read": "{{count}} read, not settled",
+        "settled": "{{count}} settled",
+        "carried": "{{count}} carried from an earlier file"
+      },
+      "rules": {
+        "live_one": "{{count}} requirement live",
+        "live_other": "{{count}} requirements live",
+        "noneLive": "No requirement live",
+        "questions_one": "{{count}} open question",
+        "questions_other": "{{count}} open questions",
+        "notPlaced_one": "{{count}} duty not placed",
+        "notPlaced_other": "{{count}} duties not placed"
+      },
+      "pull": {
+        "none": "No pull on record",
+        "at": "Pulled {{when}}: {{outcome}}",
+        "outcome": {
+          "unchanged": "no change",
+          "new_bulletin": "a new file",
+          "superseded": "a new revision",
+          "completed": "by hand",
+          "no_bulletin": "no bulletin found",
+          "failed": "failed"
+        }
+      },
+      "cost": {
+        "calls_one": "{{count}} call",
+        "calls_other": "{{count}} calls",
+        "tokens": "{{tokens}} tokens"
+      },
+      "reading": {
+        "never": "Never read",
+        "ok": "Read {{when}}",
+        "okNoCall": "Settled {{when}} with no call",
+        "dry_run": "Read {{when}} without settling",
+        "failed": "Reading stopped {{when}}",
+        "running": "Reading since {{when}}",
+        "other": "Read {{when}}, {{status}}"
+      },
+      "verdictCount": {
+        "unsettled": "{{count}} unsettled",
+        "corrected": "{{count}} corrected",
+        "not_on_page": "{{count}} not on the page",
+        "duplicate_one": "{{count}} duplicate",
+        "duplicate_other": "{{count}} duplicates",
+        "confirmed": "{{count}} confirmed"
+      },
+      "pageWhen": {
+        "tried": "Tried, no answer",
+        "carried": "Read {{read}}, carried from the {{date}} file",
+        "read": "Read {{when}}"
+      },
+      "stamp": {
+        "here": "Read {{when}} on this file",
+        "carried": "Carried from the {{date}} file, read {{read}}"
+      },
+      "requirement": {
+        "windowOpen": "A {{basis}} deadline",
+        "minutes_one": "{{count}} minute",
+        "minutes_other": "{{count}} minutes",
+        "businessHours_one": "{{count}} business hour",
+        "businessHours_other": "{{count}} business hours",
+        "hours_one": "{{count}} hour",
+        "hours_other": "{{count}} hours",
+        "from": "{{span}}, counted from {{anchor}}",
+        "threshold": "Threshold {{value}} {{unit}} ({{measure}})",
+        "services": "Services: {{list}}",
+        "lossTypes": "Loss types: {{list}}",
+        "propertyTypes": "Property types: {{list}}",
+        "everyJob": "Every job",
+        "settled": "In the rules:",
+        "notSettled": "Not in the rules yet: it is written into them when {{carrier}} settles.",
+        "question": "Open question",
+        "questionHow": "The strict reading runs until you answer it in the printed question list:"
+      },
+      "carrier": {
+        "back": "All carriers",
+        "reading": "Reading the carrier's pages…",
+        "onePage": "Page {{page}}",
+        "pageRange": "Pages {{from}}–{{to}} · {{count}} pages",
+        "openPage": "Open page {{page}}",
+        "waiting_one": "Page {{pages}} is waiting",
+        "waiting_other": "Pages {{pages}} are waiting",
+        "waitingDetail_one": "Claude tried it and has no answer, so {{carrier}} cannot settle. Open it to see why. A manual pull of {{carrier}} reads it again:",
+        "waitingDetail_other": "Claude tried them and has no answer, so {{carrier}} cannot settle. Open each to see why. A manual pull of {{carrier}} reads them again:",
+        "neverRead": "Claude hasn't read this file yet",
+        "neverReadDetail": "It is read on {{carrier}}'s next pull. A manual pull reads it now:",
+        "noPart": "Pages",
+        "all": {
+          "settled": "all settled",
+          "read": "all read, not settled",
+          "unread": "none read yet",
+          "waiting": "all waiting"
+        },
+        "stopped": "Claude's last reading stopped before this file settled",
+        "stoppedDetail_one": "{{count}} page is not read yet. The next pull reads it; a manual pull of {{carrier}} reads it now:",
+        "stoppedDetail_other": "{{count}} pages are not read yet. The next pull reads them; a manual pull of {{carrier}} reads them now:",
+        "stoppedSettle": "Its pages are read but not settled. The next pull settles it; a manual pull of {{carrier}} settles it now:"
+      },
+      "pageRow": {
+        "page": "Page {{page}}",
+        "requirements_one": "{{count}} requirement",
+        "requirements_other": "{{count}} requirements",
+        "noRequirement": "No requirement"
+      },
+      "pageState": {
+        "settled": "Settled",
+        "read": "Read, not settled",
+        "unread": "Not read",
+        "waiting": "Waiting"
+      },
+      "page": {
+        "back": "Back to {{carrier}}'s pages",
+        "title": "Page {{page}}",
+        "titleOf": "Page {{page}} of {{count}}",
+        "beginsAfter": "begins here, after",
+        "goTo": "Page {{page}}",
+        "imageAlt": "Page {{page}} of {{carrier}}'s bulletin",
+        "imageAltPage": "Page {{page}} of the bulletin",
+        "tile": "Page {{page}}",
+        "caption": "Page {{page}} of the file stored {{stored}}",
+        "captionPage": "Page {{page}} as stored",
+        "enlarge": "Enlarge",
+        "reading": "Reading the page…",
+        "requirementsTitle": "What this page requires",
+        "nothing": "Claude found no requirement on this page",
+        "nothingMessage": "It read the page whole. Nothing on it runs.",
+        "judgedTitle": "Rules judged on this page",
+        "unread": "Claude hasn't read this page yet",
+        "unreadMessage": "It is read on {{carrier}}'s next pull. A manual pull reads it now:"
+      },
+      "verdict": {
+        "confirmed": "Confirmed",
+        "corrected": "Corrected",
+        "duplicate": "Duplicate",
+        "not_on_page": "Not on this page",
+        "unsettled": "Unsettled"
+      },
+      "judged": {
+        "fromRevision": "From revision",
+        "refused": "Claude said “{{said}}”; the house's checks refused it, so it stands unsettled.",
+        "noEntry": "Claude gave no usable answer for this rule, so it stands unsettled.",
+        "why": "Why:",
+        "sameAs": "Same as:"
+      },
+      "notPlaced": {
+        "title": "Duties not placed",
+        "why": "No key of the house's rule vocabulary names these duties, so they never run. They are kept here so they are seen.",
+        "asks": "What it asks:"
+      },
+      "failure": {
+        "title": "Entries the house's checks refused",
+        "added": "A requirement Claude added",
+        "said": "Claude said “{{said}}”.",
+        "noEntry": "Claude gave no usable answer."
+      },
+      "waiting": {
+        "failed": "Claude could not read this page",
+        "refused": "The house's checks refused Claude's answer",
+        "how": "Tried {{when}}. It waits in this file until the file or the instructions change, and no automatic pull tries it again. A manual pull of {{carrier}} reads it again, then settles the carrier:"
+      }
+    },
     "errors": {
       "unreachable": "Cerberus can't be reached",
       "retry": "Try again",
@@ -2306,6 +2538,10 @@
       "failed_tours": "The tours could not be read",
       "failed_tour": "This tour could not be read",
       "failed_pano": "This pano could not be read",
+      "gone_tables": "The tables could not be read",
+      "failed_tables": "The tables could not be read",
+      "gone_queue": "The queue could not be read",
+      "failed_queue": "The queue could not be read",
       "retry": "Try again"
     },
     "picker": {
@@ -2347,6 +2583,7 @@
         "areas_one": "{{count}} area",
         "areas_other": "{{count}} areas",
         "none": "None found",
+        "found": "{{count}} found",
         "partly": "Partly read",
         "unread": "Not read"
       },
@@ -2367,7 +2604,6 @@
       "toTourDays_other": "{{count}} days",
       "built": "Built",
       "carrier": "Carrier",
-      "property": "Property",
       "from": "From {{sources}}.",
       "source": {
         "docusketch": "DocuSketch",
@@ -2375,15 +2611,15 @@
         "xactanalysis": "XactAnalysis",
         "drying": "drying reports"
       },
-      "unlinked": "This tour isn't linked to a job, so the reader is told only what DocuSketch knows: the rooms and when each was captured.",
+      "docusketchOnly": "No job claims this tour, so these facts come from DocuSketch alone.",
       "nothing": "The job carries no loss details yet."
     },
     "rooms": {
       "title": "Rooms",
       "floor": "Floor {{floor}}",
       "affectedDocusketch": "Affected per DocuSketch",
-      "affectedMarked": "Affected per marked areas",
-      "affectedBoth": "Affected per DocuSketch and marked areas",
+      "affectedPhotos": "Affected per the photos",
+      "affectedBoth": "Affected per DocuSketch and the photos",
       "empty": "DocuSketch named no rooms on this tour"
     },
     "pano": {
@@ -2398,6 +2634,7 @@
       "faceAreas_one": "{{count}} area",
       "faceAreas_other": "{{count}} areas",
       "setAside": "{{count}} set aside",
+      "proposed": "{{count}} proposed",
       "faceUnread": "Not read yet",
       "faceRead": "read {{when}}",
       "enlarge": "Enlarge",
@@ -2427,7 +2664,98 @@
       "contents": "Contents",
       "construction": "Construction",
       "couldNotSee": "Could not see",
-      "readBy": "Read by {{model}} under contract {{contract}}, {{when}}."
+      "readBy": "Read by {{model}} under contract {{contract}}, {{when}}.",
+      "question": "Is this account right?",
+      "right": "Right",
+      "wrong": "Wrong",
+      "wrongLabel": "What was wrong",
+      "wrongPlaceholder": "What did it get wrong?",
+      "markWrong": "Mark it wrong",
+      "markedRight": "You marked this account right {{when}}.",
+      "markedWrong": "You marked this account wrong {{when}}.",
+      "markedNote": "“{{note}}”"
+    },
+    "screens": {
+      "label": "What Tours shows",
+      "tours": "Tours",
+      "mark": "Mark",
+      "tables": "Tables"
+    },
+    "layer": {
+      "label": "What the photo shows",
+      "standing": "Standing",
+      "all": "All"
+    },
+    "groups": {
+      "damage": "Damage",
+      "work": "Work already done",
+      "source": "The source",
+      "pre_existing": "Older damage"
+    },
+    "mark": {
+      "confirm": "Confirm",
+      "rename": "Rename to…",
+      "notAChange": "Not a change",
+      "addNote": "Add a note",
+      "editNote": "Edit the note",
+      "keep": "Keep {{kind}}",
+      "putBack": "Put back {{kind}}",
+      "barLabel": "Mark area {{area}}",
+      "renamedFrom": "renamed from {{kind}}",
+      "drawnByHand": "You drew this area. Not a change takes it back.",
+      "takenBack": "You took this area back.",
+      "sending": "Sending your mark…",
+      "noteHeld": "Your note goes with the next press: “{{note}}”",
+      "noteTitle": "A note on",
+      "noteLabel": "Note",
+      "notePlaceholder": "What did you see?",
+      "noteHelp": "Sent with your next press on this area.",
+      "noteCount": "{{used}} of {{max}}",
+      "keepNote": "Keep the note",
+      "modeLabel": "Which areas to mark",
+      "unsure": "Unsure first",
+      "random": "Random slice",
+      "unsureHint": "The fast way to find each kind's threshold: the areas closest to their line (to the middle, where none is set yet) come first.",
+      "randomHint": "The honest measure: areas drawn at random, so the tables can say how often the reader is right.",
+      "kindLabel": "Kind to mark",
+      "allKinds": "All kinds",
+      "question": "Is this {{kind}}?",
+      "left_one": "{{count}} left",
+      "left_other": "{{count}} left",
+      "faceView": "{{face}} view",
+      "threshold": "threshold {{percent}}%",
+      "noLine": "No line set",
+      "heldOut": "held out to measure the reader",
+      "skip": "Skip",
+      "reading": "Reading the queue…",
+      "emptyTitle": "Nothing left to mark",
+      "emptyUnsure": "Every area outside the random slice has a mark. New reads bring more.",
+      "emptyRandom": "Every area in the random slice has a mark. New reads add to it.",
+      "emptyKind": "No {{kind}} area is waiting in this queue.",
+      "refused": {
+        "not_a_person": "A mark has to come from a person",
+        "no_region": "That area is no longer there",
+        "no_read": "That read is no longer there",
+        "no_image": "That view is no longer there",
+        "bad_verdict": "An area you drew can only be taken back with Not a change",
+        "bad_class": "That kind is not in the codebook",
+        "same_class": "That is already its kind: press Confirm instead",
+        "bad_box": "That box is too small to be an area: drag a bigger one",
+        "note_too_long": "A note can be at most {{max}} characters",
+        "failed": "The mark could not be sent",
+        "other": "The mark was refused ({{reason}})"
+      }
+    },
+    "missed": {
+      "missedOne": "Missed one",
+      "hint": "Drag a box around what it missed",
+      "floor": "A box smaller than about 10 by 10 pixels is too small to be an area.",
+      "newArea": "New area {{number}}",
+      "newAreaTitle": "New area",
+      "chooseKind": "Choose its kind",
+      "noteSubject": "new area {{number}}",
+      "noteHeld": "Your note goes with it: “{{note}}”",
+      "saving": "Saving the new area…"
     },
     "drying": {
       "title": "Drying in this room",
@@ -2444,6 +2772,8 @@
         "ceiling": "ceiling"
       },
       "above18": "Water rose above 18 inches.",
+      "demoBefore": "Demo had begun before the tour",
+      "noDemoBefore": "No demo recorded before the tour",
       "report": "From the drying report of {{date}}.",
       "none": "No drying report names this room."
     },
@@ -2451,8 +2781,8 @@
       "planning": "Working out what a read would cost…",
       "cutting": "Cutting this pano into its six views…",
       "planFaces": "{{faces}} not read yet · {{cached}} of {{count}} read",
-      "viewCount_one": "{{count}} view",
-      "viewCount_other": "{{count}} views",
+      "viewsNeedRead_one": "{{count}} view needs a read",
+      "viewsNeedRead_other": "{{count}} views need a read",
       "plan_one": "{{count}} view · {{cached}} already read",
       "plan_other": "{{count}} views · {{cached}} already read",
       "planNone_one": "{{count}} view · none read yet",
@@ -2466,12 +2796,12 @@
       "readAgain": "Read again",
       "readingAgain": "Reading again…",
       "againContext": "The job's details changed since this pano was read.",
-      "againContract": "Read under contract {{old}}; the reader now reads under {{current}}.",
+      "againCurrent": "Read under an older contract or model; the reader now reads under {{contract}} on {{model}}.",
       "readRest": "Read the rest of this tour",
       "readingRest": "Reading the rest…",
       "stopRest": "Stop after this pano",
-      "rest": "{{panos}} · {{views}} not read yet",
-      "restOfTour": "Rest of this tour: {{panos}} · {{views}} not read yet",
+      "rest": "{{panos}} · {{views}}",
+      "restOfTour": "Rest of this tour: {{panos}} · {{views}}",
       "allRead": "Every pano of this tour is read.",
       "walking": "Reading {{index}} of {{total}}",
       "walkingShare": "{{percent}}%",
@@ -2485,17 +2815,84 @@
         "budgetFleet": "Today's reading budget is spent: {{used}} of {{cap}} reads",
         "budgetTour": "This tour's reading budget for today is spent: {{used}} of {{cap}} reads",
         "flag_off": "Reading is switched off in shadow-connector",
-        "restorly_ai_off": "Restorly's AI switch is off",
         "gemini_off": "The house's Gemini switch is off",
         "no_key": "shadow-connector has no Gemini key",
         "permanent": "The reader's model turned every view down; it may have been retired",
         "views_refused": "This pano's photo could not be cut into views",
+        "context_degraded": "Part of this job's context could not be read, so nothing is read until it can be",
         "unreachable": "shadow-connector can't be reached",
         "no_secret": "CloudCLI could not read shadow-connector's internal secret",
         "unreadable": "shadow-connector sent an answer CloudCLI can't read",
         "gone": "This pano is no longer on its tour",
         "failed": "The read could not be sent",
         "other": "Reading was refused ({{reason}})"
+      }
+    },
+    "tables": {
+      "title": "How right the reader is",
+      "measures": "{{model}} · {{contract}}",
+      "understanding": "What the reader understands:",
+      "understandingTally": "{{right}} of {{count}} judged right",
+      "understandingNone": "none judged yet",
+      "reading": "Reading the tables…",
+      "label": "Each kind the reader marks, measured on the random slice",
+      "sliceEmpty": "Nothing judged on the random slice yet",
+      "sliceEmptyDetail": "Precision and coverage come from areas drawn at random and then judged. Open Mark, above, choose Random slice, and each kind fills in here as you judge.",
+      "column": {
+        "kind": "Kind",
+        "precision": "Precision",
+        "coverage": "Coverage",
+        "judged": "Judged",
+        "right": "Right",
+        "wrongKind": "Wrong kind",
+        "notAChange": "Not a change",
+        "missed": "Missed",
+        "nearLine": "Near the line"
+      },
+      "thresholdSet": "Threshold {{value}} · set {{date}}",
+      "thresholdDefault": "No threshold set: its areas stand only when you mark them",
+      "atDefault": "at {{line}}",
+      "setThreshold": "Set threshold",
+      "percent": "{{percent}}%",
+      "tooFew": "too few judged",
+      "legend": {
+        "precision": "Of the areas at or above the line, the share you confirmed.",
+        "coverage": "Of the areas you confirmed, the share at or above the line.",
+        "judged": "Areas drawn at random and judged: the random slice. Right, wrong kind and not a change are what you said of them.",
+        "missed": "Areas you drew that the reader missed.",
+        "nearLine": "Areas you judged in Unsure first. Neither these nor Missed enter a percentage.",
+        "dash": "A dash",
+        "dashMeaning": "Too few behind it for a percentage: fewer than ten judged at or above the line, for precision; fewer than ten confirmed, for coverage."
+      },
+      "detail": {
+        "sweep": "What each line would give",
+        "sweepLabel": "What each line would give for {{kind}}",
+        "line": "Line",
+        "atOrAbove": "{{count}} at or above",
+        "inForce": "In force",
+        "ifSet": "If set",
+        "noneJudged": "Nothing of this kind judged on the random slice yet.",
+        "renamedTo": "Renamed to",
+        "renamedTimes_one": "{{count}} time",
+        "renamedTimes_other": "{{count}} times",
+        "notes": "Latest notes"
+      },
+      "control": {
+        "title": "Threshold",
+        "label": "Threshold for {{kind}}",
+        "lower": "Lower the line",
+        "raise": "Raise the line",
+        "default": "not set",
+        "setting": "Setting…",
+        "thin": "Too few judged here to measure a line: set it on your own judgment.",
+        "standing": "While no line is set, an area the reader marked stands only when you mark it. Once a line is set, an area at or above it stands, and one below it is set aside until you judge it."
+      },
+      "refused": {
+        "not_a_person": "A line has to be set by a person",
+        "bad_class": "That kind is no longer in the codebook",
+        "bad_threshold": "A line has to be between 0% and 100%",
+        "failed": "The line could not be set",
+        "other": "Setting the line was refused ({{reason}})"
       }
     }
   },

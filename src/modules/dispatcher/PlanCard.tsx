@@ -9,6 +9,7 @@ import { putAwayVerb } from '@/modules/dispatcher/hiddenPlans';
 import { useDispatcherPlans } from '@/modules/dispatcher/hooks/useDispatcherPlans';
 import { useRiseOnce } from '@/modules/dispatcher/hooks/useFirstSight';
 import { CardDescription, LaneCardHead } from '@/modules/dispatcher/LaneCardHead';
+import { PaceOverride } from '@/modules/dispatcher/PaceOverride';
 import { PlanAsk } from '@/modules/dispatcher/PlanAsk';
 import { PlanControls } from '@/modules/dispatcher/PlanControls';
 import { PlanClock, PlanFace, PlanStatusBadge } from '@/modules/dispatcher/PlanFace';
@@ -22,11 +23,6 @@ import { Card, CardContent, CardFoldBody, CardHeader, Collapsible } from '@/shar
 import type { ActionMenuItem } from '@/shared/ui';
 import type { DispatcherPlan } from '@/shared/types';
 import { cn } from '@/shared/utils';
-
-/** The clause of a `wip_hold` sentence without its `WIP:` lead — the card says "Waiting for a WIP slot" itself, so the lead would read twice. */
-function wipClause(hold: string): string {
-  return hold.replace(/^WIP:\s*/, '');
-}
 
 /** The clause of a `queue_hold` sentence without its `queue:` lead — the card says "Waiting" itself, and the queue is the screen it stands on. */
 function queueClause(hold: string): string {
@@ -42,7 +38,7 @@ function queueClause(hold: string): string {
  *   and `done/total` phases on row one; the plan's description (`cardDescription`: its design's
  *   `delivers` line, else its goal's where that yields nothing) folded to one line until pressed, when
  *   it opens whole (`CardDescription`) — then who is out on the plan (`PlannerBadge`), what of its
- *   arc it waits on and, while the queue or its epic's feature limit holds it, its epic's turn or the WIP slot it waits for, on row two; the plan's total as pills
+ *   arc it waits on and, while the queue holds it, its epic's turn, on row two; the plan's total as pills
  *   (`SpendPills`, counting at first sight), the last of them how long agents have worked on it
  *   (`WorkingPill`), on row three; Dismiss or Hide, and the fold, in the corner.
  * - THE BAR (`PlanControls` → `ActionBar`): the verbs the plan's status allows and its model switch.
@@ -91,15 +87,15 @@ function queueClause(hold: string): string {
  * (`waitsOnSiblings`), empty for a plan of no arc. It is passed IN rather than read here: the card
  * cannot know which plans are its arc's without the group it was handed.
  *
- * `WAITING FOR A WIP SLOT` IS THE DISPATCHER'S OWN SENTENCE, NEVER THE CARD'S (`plan.wip_hold`): the
- * FEATURE-WIP clause the gate returned for this plan's first ready phase, so a feature that is eligible
- * and standing still because its epic already has its limit in progress says why, in the gate's own
- * words, beside `waits on …`. A frame without the key (an older dispatcher) draws no line.
- *
  * `WAITING · <clause>` IS THE QUEUE'S, IN THE SAME ROW AND THE SAME WORDS' RULE (`plan.queue_hold`): the
- * clause the queue's gate returned — `paused`, `at most N epics at once`, `<epic> goes first` — for a
+ * clause the queue's gate returned — `Pause all is on` or `<epic> goes first` — for a
  * feature whose epic's turn has not come. The gate asks the queue first, so the dispatcher sends this one
- * and nulls `wip_hold` while it is set: the card says the first clause the gate asks, as the gate does.
+ * and no later clause: the card says the first clause the gate asks, as the gate does.
+ *
+ * `HELD BY PACE` IS THE PACER'S, IN THE SAME ROW AND THE SAME WORDS' RULE (`plan.pace_hold`): the clause the
+ * pacer's gate returned — `no room on the 5-hour window — …`, or `<plan> <phase> goes first` — with the
+ * `pace:` lead stripped, because the card says "Held by pace" itself. The gate sends one of the two holds at
+ * a time; a frame without the key (an older dispatcher) draws no line.
  *
  * A STALLED PLAN SAYS WHY (`plan.stalled`, the dispatcher's own cause word — `report_stall`): the head's
  * second row carries one line, `data-plan-stalled`, naming whether the dispatcher is down or the run
@@ -108,7 +104,7 @@ function queueClause(hold: string): string {
  * `data-dispatcher-card`, `data-plan-name`, `data-plan-status` and `data-collapsed` are the browser
  * harness's handles, on the ROOT so a probe scopes every reading and every press to ONE plan — the
  * live plan walking beside a probe must never be pressed. `data-card-description` marks the lead's
- * description line, the arc deck's too, and `data-plan-queue-hold` and `data-plan-wip-hold` the two lines above.
+ * description line, the arc deck's too, and `data-plan-queue-hold` and `data-plan-pace-hold` the two lines above.
  *
  * Used by `RunnerPanel` and `RunnerWidgetBody` (runner-tab), for the plans no arc holds, and by
  * `DispatchArcDeck`, for each plan of an arc.
@@ -144,6 +140,10 @@ export function PlanCard({
   // question, and the dialog is mounted only while it is asked.
   const [deleting, setDeleting] = useState(false);
   const { planners } = useDispatcherPlans();
+  // The pacer's clause for this plan (`plan.pace_hold`, `pace_report.hold`, else that of a queued planner
+  // outing aimed at it or its epic): the gate sends it in the same row as `queue_hold`, one at a time. Absent on a dispatcher
+  // older than the key reads.
+  const paceHold = plan.pace_hold ?? '';
   const menuItems: ActionMenuItem[] = planDroppable(plan, planners)
     ? [{ key: 'delete', label: t('dispatcher.delete.menu'), icon: Trash2, isDanger: true, onSelect: () => setDeleting(true) }]
     : [];
@@ -175,7 +175,7 @@ export function PlanCard({
                 {/* WHO IS OUT ON THIS PLAN and what it waits on, under its description: the word says
                     what the PLAN is (`designing`), the badge who is doing something about it; the wait is
                     a fact about THIS plan ("before this, that"). Neither draws anything when absent. */}
-                {(plan.planner || waitsOn.length > 0 || plan.queue_hold || plan.wip_hold || plan.stalled) && (
+                {(plan.planner || waitsOn.length > 0 || plan.queue_hold || paceHold || plan.overridden || plan.stalled) && (
                   <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
                     {plan.planner && <PlannerBadge planner={plan.planner} />}
                     {waitsOn.length > 0 && (
@@ -183,17 +183,16 @@ export function PlanCard({
                         {t('dispatcher.waitsOn', { names: waitsOn.join(', ') })}
                       </span>
                     )}
-                    {/* The queue's clause before the WIP one, the order the gate asks them in; the
-                        dispatcher sends one or the other, never both (`queue_hold` nulls `wip_hold`). */}
+                    {/* The queue's clause, the first the gate asks. */}
                     {plan.queue_hold && (
                       <span data-plan-queue-hold className="min-w-0 break-words text-xs text-muted-foreground">
                         {t('dispatcher.queueHold', { clause: queueClause(plan.queue_hold) })}
                       </span>
                     )}
-                    {plan.wip_hold && (
-                      <span data-plan-wip-hold className="min-w-0 break-words text-xs text-muted-foreground">
-                        {t('dispatcher.wipHold', { clause: wipClause(plan.wip_hold) })}
-                      </span>
+                    {/* The pacer's clause with its Override, or the Override standing with its Turn off: the
+                        press lifts the pacer alone, so a queue hold draws none (`PaceOverride`). */}
+                    {(paceHold || plan.overridden) && (
+                      <PaceOverride name={plan.name} hold={paceHold} overridden={plan.overridden} />
                     )}
                     {plan.stalled && (
                       <span data-plan-stalled={plan.stalled} className="min-w-0 break-words text-xs text-foreground">
@@ -207,6 +206,7 @@ export function PlanCard({
             spend={(
               <SpendPills
                 parts={spendParts(plan.cost_usd, plan.tokens_in, plan.tokens_out, plan.tokens, plan.tokens_cache_read)}
+                vendor={plan.paid_vendor}
                 countKey={`plan:${plan.name}`}
               >
                 {/* HOW LONG AGENTS HAVE WORKED ON IT, one more pill of the books' row — ticking only while

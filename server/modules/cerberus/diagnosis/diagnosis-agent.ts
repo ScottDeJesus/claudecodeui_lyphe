@@ -5,6 +5,7 @@ import path from 'node:path';
 import { createSdkMcpServer, query, type SdkMcpToolDefinition } from '@anthropic-ai/claude-agent-sdk';
 
 import { cerberusResultsDb } from '@/modules/database/index.js';
+import { launchAccountEnv } from '@/modules/providers/index.js';
 import { userFacingEnv } from '@/shared/child-env.js';
 import { resolveClaudeCodeExecutablePath } from '@/shared/claude-cli-path.js';
 import type { CerberusCheckView, CerberusDiagnosisSubmission } from '@/shared/cerberus-types.js';
@@ -181,6 +182,9 @@ export async function runDiagnosisAgent(input: {
   const followCaller = (): void => abortController.abort(signal.reason);
   signal.addEventListener('abort', followCaller, { once: true });
 
+  // A diagnosis is a Claude launch like any other: it starts on the account the house chose. Read
+  // after the listener is attached, so no await stands between the caller's signal and its follower.
+  const account = await launchAccountEnv();
   const conversation = query({
     prompt: `Diagnose the check "${check.label ?? check.key}" (${check.key}) on ${node}. Call submit_diagnosis when you have your answer.`,
     options: {
@@ -195,7 +199,7 @@ export async function runDiagnosisAgent(input: {
       cwd,
       maxTurns: DIAGNOSIS_MAX_TURNS,
       abortController,
-      env: userFacingEnv(),
+      env: { ...userFacingEnv(), ...account.env },
       ...(executable ? { pathToClaudeCodeExecutable: executable } : {}),
     },
   });

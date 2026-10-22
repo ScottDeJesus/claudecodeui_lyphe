@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { GalleryItem } from '@/shared/types';
@@ -11,6 +11,12 @@ type GalleryProps = {
   onSelect?: (id: string) => void;
   /** The most tiles drawn. Past it the final tile collapses the rest into "+N"; omit it to draw every item. */
   max?: number;
+  /**
+   * Called once, after the commit that shows the whole set: the overflow tile was pressed, or a selection the collapse
+   * would hide opened it. A caller that loads each tile's photo uses it to load only the drawn ones until then. Never
+   * called for a set that never collapses, and not again once open (the set stays open).
+   */
+  onOverflowOpen?: () => void;
   /** The list's accessible name (the tiles carry their tags; nothing names the group but this). */
   label: string;
 };
@@ -26,13 +32,21 @@ type GalleryProps = {
  * Either way the set STAYS open: a later press on a visible tile moves the selection and the grid does not
  * snap back under the pointer.
  */
-export function Gallery({ items, selectedId = null, onSelect, max, label }: GalleryProps) {
+export function Gallery({ items, selectedId = null, onSelect, max, onOverflowOpen, label }: GalleryProps) {
   const { t } = useTranslation('common');
   // Whether the whole set is open: the reader pressed the overflow tile, or a selection the collapse would hide
   // forced it. The gallery owns it because the tile must lead somewhere with no help from the caller, who may know
   // nothing of the collapse, and because it is latched — derived from the selection alone, a press on a visible tile
   // after a forced opening would collapse the grid again. A caller that shows a different set gives the gallery a new `key`.
   const [opened, setOpened] = useState(false);
+  // The caller is told once, from an effect and not from the press: the forced opening below happens while rendering, where
+  // another component's state may not be set, and both openings then take the same road.
+  const toldRef = useRef(false);
+  useEffect(() => {
+    if (!opened || toldRef.current) return;
+    toldRef.current = true;
+    onOverflowOpen?.();
+  }, [opened, onOverflowOpen]);
 
   const slots = max === undefined ? items.length : Math.max(1, Math.floor(max));
   const selectedIndex = items.findIndex((item) => item.id === selectedId);

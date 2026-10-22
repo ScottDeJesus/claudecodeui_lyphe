@@ -12,7 +12,6 @@ import { readHealCycle, writeHealCycle } from './heal-cycle-switch.js';
 import { readHealCap, readHealMaster, writeHealCap, writeHealMaster } from './heal-switch.js';
 import { getParkAtPeakState, setParkAtPeakState } from './park-at-peak-switch.js';
 import { getPlannerLanesState, setPlannerLanesState } from './planner-lanes.js';
-import { readWipDefaults, setWipDefaultsState } from './wip-defaults.js';
 
 /**
  * Every field a `PUT /jev` body may name — the master plus each scope in the table — for the two
@@ -61,6 +60,15 @@ type SettingsDependencies = {
    * this server sees and sets the same switch.
    */
   deepseekFlash: {
+    read(): Promise<boolean>;
+    write(enabled: boolean): Promise<void>;
+  };
+  /**
+   * The dispatcher's own DeepSeek switch (features and epics), a file apart from `deepseekFlash`
+   * (operator, 2026-10-19: "If I toggle one it should not effect the other"), machine-wide for the
+   * same reason.
+   */
+  deepseekFeatures: {
     read(): Promise<boolean>;
     write(enabled: boolean): Promise<void>;
   };
@@ -225,20 +233,19 @@ export function createSettingsService(dependencies: SettingsDependencies) {
       void kickDispatcher();
       return state;
     },
-    /**
-     * The dispatcher's WIP defaults: how many of an epic's features are in progress at once, and how
-     * many tasks each of them runs at once, for every epic with no word of its own. Both bodies live in
-     * `wip-defaults.ts`, beside the file's own reader and writer, for the reason the planner-lane pair
-     * below does; what belongs here is the line that hands a press to the dispatcher.
-     */
-    async getWipDefaults() {
-      return readWipDefaults();
+    async getDeepseekFeatures() {
+      return { enabled: await dependencies.deepseekFeatures.read() };
     },
-    async setWipDefaults(featuresInput: unknown, tasksInput: unknown) {
-      const state = await setWipDefaultsState(featuresInput, tasksInput);
-      // The press is the event: a wider default frees phases the gate was holding, and they are taken
-      // up on the kick rather than at the next session event. A refused input has thrown by now and
-      // nothing was written, so no kick rides on a press that never moved the file.
+    async setDeepseekFeatures(enabledInput: unknown) {
+      if (typeof enabledInput !== 'boolean') {
+        throw new AppError('enabled must be a boolean', {
+          code: 'INVALID_DEEPSEEK_FEATURES_STATE',
+          statusCode: 400,
+        });
+      }
+      await dependencies.deepseekFeatures.write(enabledInput);
+      // Read back rather than echo, and kick the dispatcher, for the reasons `setDeepseekFlash` gives.
+      const state = { enabled: await dependencies.deepseekFeatures.read() };
       void kickDispatcher();
       return state;
     },

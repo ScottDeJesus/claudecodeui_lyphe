@@ -212,7 +212,7 @@ boot_probe_server() {
   mkdir -p "${prefix}state" "${prefix}att" "${prefix}sessions" "${prefix}spill"
   CLOUDCLI_LOCAL_SERVER_MARKER="${prefix}marker.json" CLOUDCLI_SESSIONS_DIR="${prefix}sessions" \
   SERVER_PORT="${SUNSET_API##*:}" DATABASE_PATH="${prefix}probe.db" KANBAN_METIS_STATE_ROOT="${prefix}state" \
-  KANBAN_ATTACHMENTS_ROOT="${prefix}att" CLOUDCLI_ACCOUNTS_ROOT="${prefix}accounts" \
+  KANBAN_ATTACHMENTS_ROOT="${prefix}att" \
   CLOUDCLI_SPILL_ROOT="${prefix}spill" CLOUDCLI_RATE_LIMIT_PATH="${prefix}ratelimit.json" \
   CERBERUS_DB_PATH="${prefix}cerberus.db" CERBERUS_KEY_PATH="${prefix}cerberus.key" \
   CERBERUS_LISTEN="$SUNSET_GATEWAY" \

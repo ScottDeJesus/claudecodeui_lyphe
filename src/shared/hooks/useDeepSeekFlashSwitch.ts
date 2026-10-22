@@ -19,149 +19,6 @@ type DeepSeekFlashSwitch = {
 };
 
 /**
- * The switch's position as the server reads it off disk, or `null` when it could not be read.
- *
- * A transport call that RETURNS the value rather than setting state: every caller here needs the
- * same read, and a component-scoped setter shared between an effect and an event handler is the
- * shape that reads as a synchronous setState-in-effect. Null is "could not ask", which is never
- * the same as OFF — the caller keeps whatever it last knew.
- */
-async function readSwitch(): Promise<boolean | null> {
-  try {
-    const response = await api.settings.deepseekFlash();
-    const body = (await response.json()) as DeepSeekFlashResponse;
-    // An error ANSWER is not a position. The API's own envelope for a restart, a proxy's 502 or an
-    // expired token's 401 is `{success:false,error:{…}}`, which `.json()` parses happily — and
-    // `Boolean(undefined)` is `false`, a switch drawn OFF for a switch that is on, with nothing
-    // thrown so the unknown state is never reached. A body without a real boolean is therefore
-    // "could not ask", exactly what a thrown call returns: the position is retracted and the Retry
-    // press is the way back. Same rule as the Jev hook's `positionOf`, which refuses any body that
-    // is not the three-boolean contract.
-    if (!response.ok || typeof body.enabled !== 'boolean') return null;
-    return body.enabled;
-  } catch (error) {
-    console.error('Error loading the DeepSeek runner switch:', error);
-    return null;
-  }
-}
-
-/** The write, returning the position the server read back off the file, or `null` if it failed. */
-async function writeSwitch(next: boolean): Promise<boolean | null> {
-  try {
-    const response = await api.settings.saveDeepseekFlash(next);
-    const body = (await response.json()) as DeepSeekFlashResponse;
-    // A refused write is not a position either, and this is the direction that PERSISTS the invented
-    // side: read as `false`, a 500 on the PUT would publish OFF and the chip's next press would send
-    // `{"enabled":true}` back as though the row had read the file. Null here is what reaches
-    // `forgetPosition` and the unknown state both surfaces already render.
-    if (!response.ok || typeof body.enabled !== 'boolean') return null;
-    return body.enabled;
-  } catch (error) {
-    console.error('Error saving the DeepSeek runner switch:', error);
-    return null;
-  }
-}
-
-/**
- * Every surface showing the switch right now, each entry a way of being told a position. A flip made
- * on one tells the others, so an open Settings page and the composer cannot show two different
- * positions — and it is a handful of lines rather than a store, because the file on disk is the only
- * truth and this carries nothing but the last answer from it. Readers in a SECOND tab are out of its
- * reach; the focus re-read below is what closes that gap.
- */
-const readers = new Set<(position: boolean | null, forget?: boolean) => void>();
-
-/**
- * The last position the server gave back — the newest thing anyone here knows.
- *
- * A reader that MOUNTS takes it at once, and it is drawn before the answer it is asking for can
- * arrive. That is not a shortcut around the ask: it is the same position the surfaces already on
- * screen are showing, and a surface opening while a question is already out would otherwise sit
- * unknown for the whole length of that question — the one cost of letting one request serve every
- * reader, and a real one when the thing that is slow is the request.
- */
-let known: boolean | null = null;
-
-/**
- * How many authoritative positions have been established: one as a write is issued, one when its
- * answer is published.
- *
- * MODULE level, and that is the whole of it. The flag is ONE file, so the order of answers about it
- * is ONE order, and a counter kept per hook instance cannot see what another surface established.
- * That was a live defect, not a tidiness question: the composer's focus re-read is issued, the
- * operator flips the switch on the Settings row, the write answers and is announced to the composer
- * — and the composer's read, already on the wire carrying the position from BEFORE the flip, landed
- * after it, passed its own instance's gate (its serial was still the newest that instance had asked
- * for, its queue empty) and put the chip back on. Measured before this: the chip read ON for seven
- * consecutive samples while the file read `off`. One clock for every reader, read by the surface
- * that asks and by the surface that writes alike.
- */
-let epoch = 0;
-
-/** A question is out to the server. */
-let inFlight = false;
-/**
- * Another ask arrived while that question was out.
- *
- * That question is NOT dropped. It is the newer one, and the answer already on its way cannot be
- * newer than it — so it is remembered, and asked for real the moment the one in flight lands.
- * Dropping it is precisely how a slow answer gets to decide: the mount read is the oldest question
- * and the last to be answered, and with nothing left to ask, its stale answer is final.
- */
-let waiting = false;
-/**
- * A write is crossing the wire. Module-wide for the reason `epoch` is: the file is one file, and a
- * surface that re-reads while another surface writes asks a question whose answer is already on its
- * way back. Held around the write and nothing else.
- */
-let writing = false;
-
-/** Hand a position to every surface on screen. */
-function deliver(position: boolean | null) {
-  // `null` is "could not ask", which does not un-know the last position the server gave: it is the
-  // reader that forgets, and now there is one of them instead of a copy each.
-  if (position !== null) known = position;
-  for (const reader of readers) reader(position);
-}
-
-/**
- * Publish the position the server gave back — a write's answer, or the read that stood in for a
- * failed write — to every reader, and retire every question asked before it existed.
- *
- * The retirement is what makes the ordering hold ACROSS surfaces rather than only within whichever
- * one happened to write: from here on, an answer to a question put before this moment is older than
- * the position on screen, whatever it says, and drawing it is the revert this clock exists to stop.
- */
-function announce(enabled: boolean) {
-  epoch += 1;
-  // A question still queued behind an in-flight read was asked before this answer existed, and this
-  // answer is the thing it was asking for. Retired here, so the loop below does not spend a request
-  // re-asking a question nobody is waiting on any more.
-  waiting = false;
-  deliver(enabled);
-}
-
-/**
- * Tell every surface the position is UNKNOWN, and mean it — the position each one is holding was
- * never read off the file.
- *
- * The one case that produces it: a write whose answer never arrived, whose stand-in read never
- * arrived either. What is on screen then is the OPTIMISTIC value the press drew before the write was
- * issued, and `deliver(null)` is not enough to retract it — that means "could not ask", which every
- * reader answers by keeping the last position it knew (correct for a failed read over an established
- * position, a lie here). So it is dropped rather than kept: the file may hold either side, and a row
- * drawing one of them is the "switch drawn off for a switch that is on" failure. Unread, not off —
- * the reader is told, and the retry press is the way back.
- */
-function forgetPosition() {
-  epoch += 1;
-  waiting = false;
-  // Nobody here knows anything any more, so a surface mounting now must ask rather than draw this.
-  known = null;
-  for (const reader of readers) reader(null, true);
-}
-
-/**
  * How long to wait before asking a second time. A read is a request to a server that has already
  * answered this same question on the write path, so a single failure is far more often a lost
  * packet than a missing file — and the cost of not retrying is a control with no position, which
@@ -170,91 +27,253 @@ function forgetPosition() {
 const READ_RETRY_MS = 1200;
 
 /**
- * Ask the server where the switch is, and hand the answer to every surface.
- *
- * ONE read at a time for the whole tab rather than one per instance: two surfaces asking the same
- * question of the same file is a second request that cannot say anything the first will not, and it
- * is what put two answers in flight whose arrival order decided the position. Here there is never
- * more than one question out, so an answer cannot overtake a newer one — there is no newer one out
- * yet to overtake, and a question asked meanwhile is answered after it, in order.
+ * One switch's state and the functions that move it. Each switch gets its own, so the two share
+ * nothing: a flip of one never moves the other.
  */
-async function ask(): Promise<void> {
-  if (inFlight) {
-    waiting = true;
-    return;
+function createSwitch(
+  load: () => Promise<Response>,
+  save: (next: boolean) => Promise<Response>,
+  name: string,
+) {
+  /**
+   * The switch's position as the server reads it off disk, or `null` when it could not be read.
+   *
+   * A transport call that RETURNS the value rather than setting state: every caller here needs the
+   * same read, and a component-scoped setter shared between an effect and an event handler is the
+   * shape that reads as a synchronous setState-in-effect. Null is "could not ask", which is never
+   * the same as OFF — the caller keeps whatever it last knew.
+   */
+  async function readSwitch(): Promise<boolean | null> {
+    try {
+      const response = await load();
+      const body = (await response.json()) as DeepSeekFlashResponse;
+      // An error ANSWER is not a position. The API's own envelope for a restart, a proxy's 502 or an
+      // expired token's 401 is `{success:false,error:{…}}`, which `.json()` parses happily — and
+      // `Boolean(undefined)` is `false`, a switch drawn OFF for a switch that is on, with nothing
+      // thrown so the unknown state is never reached. A body without a real boolean is therefore
+      // "could not ask", exactly what a thrown call returns: the position is retracted and the Retry
+      // press is the way back. Same rule as the Jev hook's `positionOf`, which refuses any body that
+      // is not the three-boolean contract.
+      if (!response.ok || typeof body.enabled !== 'boolean') return null;
+      return body.enabled;
+    } catch (error) {
+      console.error(`Error loading the DeepSeek ${name} switch:`, error);
+      return null;
+    }
   }
 
-  inFlight = true;
-  // A loop rather than the function calling itself: every question asked while one was out is
-  // answered here, in order, each with a request of its own.
-  do {
-    waiting = false;
-    // The clock as it stood when this question was put. An answer is worth drawing only if nothing
-    // authoritative has been established since — a write issued while this was on the wire, or an
-    // answer published while it was, both mean the position has already moved past this.
-    const at = epoch;
+  /** The write, returning the position the server read back off the file, or `null` if it failed. */
+  async function writeSwitch(next: boolean): Promise<boolean | null> {
+    try {
+      const response = await save(next);
+      const body = (await response.json()) as DeepSeekFlashResponse;
+      // A refused write is not a position either, and this is the direction that PERSISTS the invented
+      // side: read as `false`, a 500 on the PUT would publish OFF and the chip's next press would send
+      // `{"enabled":true}` back as though the row had read the file. Null here is what reaches
+      // `forgetPosition` and the unknown state both surfaces already render.
+      if (!response.ok || typeof body.enabled !== 'boolean') return null;
+      return body.enabled;
+    } catch (error) {
+      console.error(`Error saving the DeepSeek ${name} switch:`, error);
+      return null;
+    }
+  }
 
-    let position = await readSwitch();
-    if (position === null) {
-      // One retry. A read is a request to a server that has already answered this same question on
-      // the write path, so a single failure is far more often a lost packet than a missing file, and
-      // the cost of not retrying is a control with no position, which cannot be used.
-      await new Promise((resolve) => setTimeout(resolve, READ_RETRY_MS));
-      position = await readSwitch();
+  /**
+   * Every surface showing the switch right now, each entry a way of being told a position. A flip made
+   * on one tells the others, so an open Settings page and the composer cannot show two different
+   * positions — and it is a handful of lines rather than a store, because the file on disk is the only
+   * truth and this carries nothing but the last answer from it. Readers in a SECOND tab are out of its
+   * reach; the focus re-read below is what closes that gap.
+   */
+  const readers = new Set<(position: boolean | null, forget?: boolean) => void>();
+
+  /**
+   * The last position the server gave back — the newest thing anyone here knows.
+   *
+   * A reader that MOUNTS takes it at once, and it is drawn before the answer it is asking for can
+   * arrive. That is not a shortcut around the ask: it is the same position the surfaces already on
+   * screen are showing, and a surface opening while a question is already out would otherwise sit
+   * unknown for the whole length of that question — the one cost of letting one request serve every
+   * reader, and a real one when the thing that is slow is the request.
+   */
+  let known: boolean | null = null;
+
+  /**
+   * How many authoritative positions have been established: one as a write is issued, one when its
+   * answer is published.
+   *
+   * MODULE level, and that is the whole of it. The flag is ONE file per switch, so the order of answers
+   * about it is ONE order per switch, and a counter kept per hook instance cannot see what another
+   * surface established. That was a live defect, not a tidiness question: the composer's focus re-read
+   * is issued, the operator flips the switch on the Settings row, the write answers and is announced to
+   * the composer — and the composer's read, already on the wire carrying the position from BEFORE the
+   * flip, landed after it, passed its own instance's gate (its serial was still the newest that instance
+   * had asked for, its queue empty) and put the chip back on. Measured before this: the chip read ON for
+   * seven consecutive samples while the file read `off`. One clock for every reader, read by the surface
+   * that asks and by the surface that writes alike.
+   */
+  let epoch = 0;
+
+  /** A question is out to the server. */
+  let inFlight = false;
+  /**
+   * Another ask arrived while that question was out.
+   *
+   * That question is NOT dropped. It is the newer one, and the answer already on its way cannot be
+   * newer than it — so it is remembered, and asked for real the moment the one in flight lands.
+   * Dropping it is precisely how a slow answer gets to decide: the mount read is the oldest question
+   * and the last to be answered, and with nothing left to ask, its stale answer is final.
+   */
+  let waiting = false;
+  /**
+   * A write is crossing the wire. Module-wide for the reason `epoch` is: the file is one file per switch,
+   * and a surface that re-reads while another surface writes asks a question whose answer is already on
+   * its way back. Held around the write and nothing else.
+   */
+  let writing = false;
+
+  /** Hand a position to every surface on screen. */
+  function deliver(position: boolean | null) {
+    // `null` is "could not ask", which does not un-know the last position the server gave: it is the
+    // reader that forgets, and now there is one of them instead of a copy each.
+    if (position !== null) known = position;
+    for (const reader of readers) reader(position);
+  }
+
+  /**
+   * Publish the position the server gave back — a write's answer, or the read that stood in for a
+   * failed write — to every reader, and retire every question asked before it existed.
+   *
+   * The retirement is what makes the ordering hold ACROSS surfaces rather than only within whichever
+   * one happened to write: from here on, an answer to a question put before this moment is older than
+   * the position on screen, whatever it says, and drawing it is the revert this clock exists to stop.
+   */
+  function announce(enabled: boolean) {
+    epoch += 1;
+    // A question still queued behind an in-flight read was asked before this answer existed, and this
+    // answer is the thing it was asking for. Retired here, so the loop below does not spend a request
+    // re-asking a question nobody is waiting on any more.
+    waiting = false;
+    deliver(enabled);
+  }
+
+  /**
+   * Tell every surface the position is UNKNOWN, and mean it — the position each one is holding was
+   * never read off the file.
+   *
+   * The one case that produces it: a write whose answer never arrived, whose stand-in read never
+   * arrived either. What is on screen then is the OPTIMISTIC value the press drew before the write was
+   * issued, and `deliver(null)` is not enough to retract it — that means "could not ask", which every
+   * reader answers by keeping the last position it knew (correct for a failed read over an established
+   * position, a lie here). So it is dropped rather than kept: the file may hold either side, and a row
+   * drawing one of them is the "switch drawn off for a switch that is on" failure. Unread, not off —
+   * the reader is told, and the retry press is the way back.
+   */
+  function forgetPosition() {
+    epoch += 1;
+    waiting = false;
+    // Nobody here knows anything any more, so a surface mounting now must ask rather than draw this.
+    known = null;
+    for (const reader of readers) reader(null, true);
+  }
+
+  /**
+   * Ask the server where the switch is, and hand the answer to every surface.
+   *
+   * ONE read at a time for the whole tab, per switch, rather than one per instance: two surfaces asking
+   * the same question of the same file is a second request that cannot say anything the first will not,
+   * and it is what put two answers in flight whose arrival order decided the position. Here there is
+   * never more than one question out, so an answer cannot overtake a newer one — there is no newer one
+   * out yet to overtake, and a question asked meanwhile is answered after it, in order.
+   */
+  async function ask(): Promise<void> {
+    if (inFlight) {
+      waiting = true;
+      return;
     }
 
-    // Silence is the answer here, and it is the fix: a question put before the switch moved has no
-    // business drawing the side it was on. An answer also holds back while a newer question is
-    // already queued — that one will be asked for real in a moment and its answer is the one that
-    // stands, so drawing this one first would be the same lie, only shorter.
-    if (at === epoch && !waiting) deliver(position);
-  } while (waiting);
+    inFlight = true;
+    // A loop rather than the function calling itself: every question asked while one was out is
+    // answered here, in order, each with a request of its own.
+    do {
+      waiting = false;
+      // The clock as it stood when this question was put. An answer is worth drawing only if nothing
+      // authoritative has been established since — a write issued while this was on the wire, or an
+      // answer published while it was, both mean the position has already moved past this.
+      const at = epoch;
 
-  inFlight = false;
+      let position = await readSwitch();
+      if (position === null) {
+        // One retry. A read is a request to a server that has already answered this same question on
+        // the write path, so a single failure is far more often a lost packet than a missing file, and
+        // the cost of not retrying is a control with no position, which cannot be used.
+        await new Promise((resolve) => setTimeout(resolve, READ_RETRY_MS));
+        position = await readSwitch();
+      }
+
+      // Silence is the answer here, and it is the fix: a question put before the switch moved has no
+      // business drawing the side it was on. An answer also holds back while a newer question is
+      // already queued — that one will be asked for real in a moment and its answer is the one that
+      // stands, so drawing this one first would be the same lie, only shorter.
+      if (at === epoch && !waiting) deliver(position);
+    } while (waiting);
+
+    inFlight = false;
+  }
+
+  /**
+   * Flip the switch, and publish the position the server read back off the file.
+   *
+   * Nothing here touches a component: the position reaches every surface, the writer's included,
+   * through `announce`, so there is one delivery path and no second setState able to disagree with it.
+   */
+  async function write(next: boolean): Promise<void> {
+    // Dropped rather than queued, module-wide because the file is one file per switch: two flips racing
+    // onto it would leave whichever answer lands last to decide, and the loser's optimistic position to
+    // be corrected by it.
+    if (writing) return;
+    writing = true;
+    // Every read issued before this point is older than the write about to land, and is retired —
+    // otherwise a read still in flight could arrive after the write's answer and undo it. Done as the
+    // write is ISSUED, not only when it answers, so a read landing mid-write cannot draw the side the
+    // file is in the middle of leaving.
+    epoch += 1;
+
+    const settled = await writeSwitch(next);
+    // Re-READ on failure, never `!next`. Inverting is a guess about a file this process does not own:
+    // the switch is host-wide, so a failed write can perfectly well land on a file another operator
+    // just set to `next` anyway, and the control would then contradict disk until it remounted. Asking
+    // is the only way to know — and when that question goes unanswered too, the positions on screen
+    // are RETRACTED rather than kept (`forgetPosition`): there is nothing left here that was ever read
+    // off the file, and the one thing these controls must never do is draw a side they invented.
+    const truth = settled !== null ? settled : await readSwitch();
+    if (truth !== null) announce(truth);
+    else forgetPosition();
+
+    writing = false;
+  }
+
+  return { ask, write, readers, known: () => known, writing: () => writing };
 }
 
-/**
- * Flip the switch, and publish the position the server read back off the file.
- *
- * Nothing here touches a component: the position reaches every surface, the writer's included,
- * through `announce`, so there is one delivery path and no second setState able to disagree with it.
- */
-async function write(next: boolean): Promise<void> {
-  // Dropped rather than queued, module-wide because the file is one file: two flips racing onto it
-  // would leave whichever answer lands last to decide, and the loser's optimistic position to be
-  // corrected by it.
-  if (writing) return;
-  writing = true;
-  // Every read issued before this point is older than the write about to land, and is retired —
-  // otherwise a read still in flight could arrive after the write's answer and undo it. Done as the
-  // write is ISSUED, not only when it answers, so a read landing mid-write cannot draw the side the
-  // file is in the middle of leaving.
-  epoch += 1;
+const chatSwitch = createSwitch(
+  () => api.settings.deepseekFlash(),
+  (next) => api.settings.saveDeepseekFlash(next),
+  'chat',
+);
 
-  const settled = await writeSwitch(next);
-  // Re-READ on failure, never `!next`. Inverting is a guess about a file this process does not own:
-  // the switch is host-wide, so a failed write can perfectly well land on a file another operator
-  // just set to `next` anyway, and the control would then contradict disk until it remounted. Asking
-  // is the only way to know — and when that question goes unanswered too, the positions on screen
-  // are RETRACTED rather than kept (`forgetPosition`): there is nothing left here that was ever read
-  // off the file, and the one thing these controls must never do is draw a side they invented.
-  const truth = settled !== null ? settled : await readSwitch();
-  if (truth !== null) announce(truth);
-  else forgetPosition();
-
-  writing = false;
-}
+const featuresSwitch = createSwitch(
+  () => api.settings.deepseekFeatures(),
+  (next) => api.settings.saveDeepseekFeatures(next),
+  'features',
+);
 
 /**
- * The one reader and writer of the DeepSeek Flash switch in `src/`. The settings row
- * (`RunnerModelContent`) and the composer's chip both compose it, so either surface can flip it,
- * both show the same answer, and the fetch/save/re-read/error logic exists once.
- *
- * The position is NOT a client preference and so is not `readUserPreference`: it is a file on this
- * host that the plan runner's own process re-reads at every spawn, which is why every read here is
- * a request to the server rather than a value the browser already holds.
+ * The hook over one switch's store: the React state this surface draws, and the store's shared
+ * position and guards that every surface on that switch must agree with.
  */
-export function useDeepSeekFlashSwitch(): DeepSeekFlashSwitch {
+function useSwitch(store: ReturnType<typeof createSwitch>): DeepSeekFlashSwitch {
   // The switch lives on disk in another process's world; until it answers there is no honest
   // position to draw, and `null` is what keeps the control from flickering through a wrong one.
   const [enabled, setPosition] = useState<boolean | null>(null);
@@ -262,7 +281,7 @@ export function useDeepSeekFlashSwitch(): DeepSeekFlashSwitch {
   // than drawing the one it does not have. Cleared by the first read that answers.
   const [unreadable, setUnreadable] = useState(false);
   // Held only while a write is in flight, so this surface refuses its own repeated press. The guard
-  // that actually stops a second write is the module's `writing`; this is what the button draws.
+  // that actually stops a second write is the store's `writing`; this is what the button draws.
   const [saving, setSaving] = useState(false);
 
   // Mount only: the file belongs to another process, so the position has to be ASKED for, and a
@@ -288,17 +307,18 @@ export function useDeepSeekFlashSwitch(): DeepSeekFlashSwitch {
       setUnreadable(false);
       setPosition(position);
     };
-    readers.add(reader);
+    store.readers.add(reader);
     // Drawn at once, before the ask below can be answered — see `known`.
+    const known = store.known();
     if (known !== null) reader(known);
-    void ask();
+    void store.ask();
 
     // Coming back to the page is the one moment the position can have moved under a surface that is
     // already mounted and would otherwise never ask again — the operator flips it from their phone
     // and the desktop window, which has been open the whole time, must not go on showing the old
     // side. Skipped while a write is in flight: that write's own answer is already on its way, and a
     // read racing it could land first and be corrected by nothing.
-    const onFocus = () => { if (!writing) void ask(); };
+    const onFocus = () => { if (!store.writing()) void store.ask(); };
     // `focus` alone is not this moment on a phone: iOS Safari fires no reliable window blur/focus on
     // an app switch, which is the very case the re-read exists for. `visibilitychange` is the event
     // that fires there, so both are listened for.
@@ -314,28 +334,53 @@ export function useDeepSeekFlashSwitch(): DeepSeekFlashSwitch {
       // Dropped, so an answer arriving after this surface is gone cannot land on the run that
       // replaced it. The ask itself is deliberately NOT cancelled: the question was put to the
       // server, and `ask` still owes its answer to every reader still on screen.
-      readers.delete(reader);
+      store.readers.delete(reader);
       window.removeEventListener('focus', onFocus);
       document.removeEventListener('visibilitychange', onVisibilityChange);
     };
-  }, []);
+  }, [store]);
 
   // Asking again is the only press a chip with no position can honour, and the only thing that
   // ends an unreadable state short of a remount.
   const refresh = useCallback(async () => {
-    await ask();
-  }, []);
+    await store.ask();
+  }, [store]);
 
   const setEnabled = useCallback(async (next: boolean) => {
-    if (writing) return;
+    if (store.writing()) return;
     setSaving(true);
     // Optimistic, then corrected: the server answers with what it read back off the file, so a write
     // that lands differently than asked still ends with the control telling the truth.
     setPosition(next);
     setUnreadable(false);
-    await write(next);
+    await store.write(next);
     setSaving(false);
-  }, []);
+  }, [store]);
 
   return { enabled, unreadable, saving, setEnabled, refresh };
+}
+
+/**
+ * The readers and writers of the two DeepSeek switches in `src/`: one store per switch, one hook over
+ * each, so the fetch/save/re-read/error logic exists once and the two share no state at all.
+ *
+ * The chat's switch (`useDeepSeekFlashSwitch`, `api.settings.deepseekFlash`) is drawn by the settings
+ * row (`RunnerModelContent`) and the composer's chip, and decides inline builds; both surfaces compose
+ * it, so either surface can flip it and both show the same answer. The features switch
+ * (`useDeepSeekFeaturesSwitch`, `api.settings.deepseekFeatures`) is drawn by In flight's master
+ * controller (`HouseSwitch`, `MasterController`) and decides the dispatcher's features and epics with
+ * no word of their own. They are separate files on this host, and a flip of one never moves the other
+ * (operator, 2026-10-19: "If I toggle one it should not effect the other").
+ *
+ * The position is NOT a client preference and so is not `readUserPreference`: it is a file on this
+ * host that the plan runner's own process re-reads at every spawn, which is why every read here is
+ * a request to the server rather than a value the browser already holds.
+ */
+export function useDeepSeekFlashSwitch(): DeepSeekFlashSwitch {
+  return useSwitch(chatSwitch);
+}
+
+/** The features switch: the same hook over its own store. See `useDeepSeekFlashSwitch`. */
+export function useDeepSeekFeaturesSwitch(): DeepSeekFlashSwitch {
+  return useSwitch(featuresSwitch);
 }

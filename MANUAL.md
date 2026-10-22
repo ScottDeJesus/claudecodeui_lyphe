@@ -412,7 +412,7 @@ The measurers live in `.verify/lib/settings-rows-measure.mjs` (run inside the pa
 | Measures | text-column width; control over a label/description/icon line box (overlap); control past the row or pane edge (overflow); the column's ink past its own edge (spill); ANY text past its own column, in a row or not (overrun — the MCP URL); a switch-only row or a status pill below its text at a phone width (dropped); a pill set into a label's line below the words it follows; a control cut by the box that hides it (cut — its box leaves an `overflow: hidden` ancestor's or the pane's; a scroller passes): the plugin install form's button behind its input, the uninstall banner's Remove |
 | Provider strip | measured on the Agents tab at every walk and once more at 768 × 1.2×: no provider button clipped by an `overflow: hidden` ancestor, none truncated, the last one reachable when the strip scrolls |
 | Tab resize | opens Settings at 1440, picks a tab, crosses to 700, reads the tab and whether the pane node survived; then the same from a second tab back to 1440; then a phone turned to landscape and back (390×844 ↔ 844×390), the tab picked in portrait |
-| Stubs | the WIP defaults answered `all` and `all` (the row's widest state, both steppers reading `All`); TaskMaster installed; two installed plugins (the box has none; one with a 52-character name) — each answered locally, and the walk presses the first card's uninstall to draw its confirm banner, then Cancel; the box's user-scope MCP list gets a long-URL server and a long-stdio server (long command, args, env, cwd) added (a GET, answered from the real reply); every non-GET to preferences and settings is answered locally |
+| Stubs | TaskMaster installed; two installed plugins (the box has none; one with a 52-character name) — each answered locally, and the walk presses the first card's uninstall to draw its confirm banner, then Cancel; the box's user-scope MCP list gets a long-URL server and a long-stdio server (long command, args, env, cwd) added (a GET, answered from the real reply); every non-GET to preferences and settings is answered locally |
 | Verdict | last line `settings-rows=pass` (exit 0) or `settings-rows=fail` (exit 1); usage error exits 2 |
 | Baseline 2026-09-29, round 2 | before: plugin cards' text column 122–135px at 320 and the repo slug running out of it; MCP URLs 14–382px past their column at 320–390, 6px at 1440; the Connected badge below its text at 320; OpenCode clipped at 768 × 1.2; the open tab reset to Agents on every crossing of 768. After: 0 overlaps, 0 overflows, 0 overruns, 0 dropped switches or badges at 320/360/390 × 1.0/1.072, the plugin cards' column 246px at 320, the strip scrolls with every provider reachable, tab and pane kept across both crossings |
 | Not covered | the heal stepper value wrapping to two lines at 360 (no overlap) |
@@ -661,7 +661,8 @@ The kit's overlays and two shared hooks bind to `useHostWindow()` (MAN-7443), ne
 | `Sheet` | `src/shared/ui/Sheet.tsx` | portal target `hostWindow.document.body`; Escape/Tab `keydown` on `hostWindow` capture; focus trap and `activeElement`; autofocus and focus-return frames (`hostWindow.requestAnimationFrame`); no body scroll lock |
 | `Tooltip` | `src/shared/ui/Tooltip.tsx` | portal; show-delay timer; position frame; `resize`/`scroll`; outside-press on the host document |
 | `ActionMenu` | `src/shared/ui/ActionMenu.tsx` | portal; viewport clamp reads `hostWindow.innerWidth`/`innerHeight`; `resize`/`scroll`; Escape and outside press on the host document |
-| `Menu`, `Select` | `src/shared/ui/Menu.tsx`, `Select.tsx` | Escape and outside press on the host document |
+| `Menu`, `Select` | `src/shared/ui/Menu.tsx`, `Select.tsx` | Escape and outside press on the host document; `Menu`'s touch wait for `pointerup`/`pointercancel` is dropped with its listeners in the effect's cleanup |
+| `useEdgeShift` | `src/shared/ui/useEdgeShift.ts` | `hostWindow.innerWidth`; `resize` on `hostWindow` (`Menu`, in-place `ActionMenu`) |
 | `Lightbox` | `src/shared/ui/Lightbox.tsx` | portal to the host body; `keydown` capture on `hostWindow`; focus return |
 | `useZoomPan` | `src/shared/ui/useZoomPan.ts` | `pointermove`/`pointerup`/`pointercancel`/`blur` on `hostWindow`; stage+content `ResizeObserver` via `resizeObserverIn`; wheel listener re-binds on a move |
 | `Tabs` | `src/shared/ui/Tabs.tsx` | indicator `ResizeObserver` via `resizeObserverIn` |
@@ -1347,7 +1348,7 @@ Needs :5183 (client) and :8005 (the framed application). `ONLY=1440-light` (`<wi
 - The 420px column (states, dense list) runs at 1440 only.
 - Covers: the live tab carries no picker; trigger fit, 36px height, ellipsis; panel placement, z 70, `OWNS_ESCAPE`, 8px margins, 360px cap; New chat first; the open row's four signs; the four marks; row heights 32/38/44; heading and project-line ink ≥ 4.5:1; sticky heading and pinned New chat under scroll; the empty project scrolled into view; Escape (already marked at document capture), keyboard walk, outside press, blur, Show more keeps open, a pick, New chat; a press in the framed application closes the panel; no console errors.
 - Shots `.verify/shots/session-picker-{panel,window}-<state>-<width>-<theme>.png`; `<state>`: `trigger-long`, `flat-open`, `projects-open`, `projects-empty-project`; window at 1440 only: `loading`, `error`, `empty`, `bare`, `new`, `noproject`, `dense-scrolled`.
-- Measured 2026-09-30 on :5183: 274 checks pass, exit 0.
+- Measured 2026-10-20 on :5183 (`ONLY=1440-light`): RED before any check — `mountHost` times out and `WindowHost` throws `Cannot read properties of undefined (reading 'get')`; cause not found. Last green: 2026-09-30, 274 checks pass, exit 0.
 - `.verify/` is gitignored; force-add to commit.
 
 ## Proof, live — `node .verify/header-picker.mjs`
@@ -1707,7 +1708,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/hooks/useSim
 - Why pointer events, not the browser's drag-and-drop: DnD never fires from a touch screen and this list is used on a phone.
 - Size: 244 LOC (`wc -l`, 2026-10-10). `chatTargetAt` / `folderTargetAt` and the DOM readers under them live in `src/modules/sidebar/utils/simpleChatDropTarget.ts` (153 LOC), which reads every row and block as laid out (`layoutRectOf`, transform taken off), because the carried row is drawn under the pointer by a transform.
 - 2026-10-09: the press-to-carry runs on the kit's `usePointerDrag` (kind `sort`), the mechanism the sortable lists lift on. A finger carries after holding still for `TOUCH_HOLD_MS` (400 ms, `src/shared/constants.ts`, shared with `useSortable`) anywhere on a row or header that is not a control; one that moves first is scrolling the list and lifts nothing. A mouse carries after 5 px, as before. Operator: "Can we fix drag and drop on mobile to be hold then drag on the chat please".
-- 2026-10-10, hold and drag in one motion: on a touch screen the rows are `touch-action: none` from the first touch (the `data-touch-pan` marker, `surfaces.css`), and a swipe that starts on a row, or on a control inside one, scrolls the pane by the page's own hand (`usePointerDrag`'s `scrollsPane`, `sortable/touchPan.ts`: MAN-8136). why: the operator's Galaxy Z Fold 8 dispatches every touch sequence uncancelable (`touchmove cancelable=false`), so the pane's `touchmove` canceller held nothing: the browser panned and sent `pointercancel` at the first move past the slop after the lift, and the row faded and went back. `touch-action` is the one lever the browser reads before the touch. Why the dispatch is uncancelable there is not established (the browser's policy, the device, or a busy dev build); the cure does not depend on it. Operator: "Hold and drag, one motion".
+- 2026-10-20, a swipe on a row is the browser's own scroll, and a lifted row survives the browser's pan: the rows are never `touch-action: none`, so a swipe that starts on a row, or on a control inside one, is the phone's own scroll and glide (nothing on the page's main thread moves the pane). At the hold's lift `usePointerDrag` holds every scroller around the press still (`overflow: hidden`, `sortable/touchCarry.ts`: MAN-8136) so the browser's pan has nothing to move, and a `pointercancel` that arrives mid-carry does not end the carry: it follows the same finger on its touch events. why: the operator's Galaxy Z Fold 8 dispatches every touch sequence uncancelable (`touchmove cancelable=false`), so no `preventDefault` can stop the browser's pan, and the pan takes the pointer away (`pointercancel`) at the first move past the slop after the lift, which used to put the row back. Operator: "Hold and drag, one motion" (2026-10-10), "The scrolling stops and is not fluid as normal scrolling" (2026-10-20). Gate: MAN-8687 (`.verify/native-scroll-drag-scratch.sh`, Chromium at 390×844 with real touch dispatched uncancelable, on this list and on an epic deck).
 
 ## Signature
 `useSimpleChatDrag({ items, onMove })`
@@ -1721,8 +1722,8 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/hooks/useSim
 | --- | --- |
 | `dragging` | `SimpleListItemRef \| null`: the carried row, set once the carry lifts (a mouse past the threshold, a finger after the hold) |
 | `dropTarget` | `SimpleListDropTarget \| null`: where the pointer says it would land; re-rendered only when the target changes |
-| `dragProps` | one `SimpleListDragProps` object (`src/shared/types.ts`: `onPointerDown`, `onClickCapture`, `onDragStart` and the kit's `data-hold-lift` and `data-touch-pan` markers), the same for every row; spread on every chat row and folder header (assigns to `SidebarSimpleListItems`' `dragProps`). The row a press lands on is read off the row's own `data-session-id` / `data-folder-id` |
-| `listRef` | ref object for the list's root (`SidebarSimpleList` puts it on `simple-chat-list`): where the pointer's capture goes at the lift, and nothing else. The list registers no `touchmove` canceller: its rows are `touch-action: none` from the first touch on any device that has a coarse pointer at all (`@media (any-pointer: coarse)`, so a touch laptop whose primary pointer is a mouse is covered too), so the browser has no pan to take. A device with no touch screen has no finger to hold still |
+| `dragProps` | one `SimpleListDragProps` object (`src/shared/types.ts`: `onPointerDown`, `onClickCapture`, `onDragStart` and the kit's `data-hold-lift` marker), the same for every row; spread on every chat row and folder header (assigns to `SidebarSimpleListItems`' `dragProps`). The row a press lands on is read off the row's own `data-session-id` / `data-folder-id` |
+| `listRef` | ref object for the list's root (`SidebarSimpleList` puts it on `simple-chat-list`): where the pointer's capture goes at the lift, and nothing else. The list registers no `touchmove` canceller: a lifted row survives the browser's pan instead (`usePointerDrag` with `sortable/touchCarry.ts`: the scrollers around the press are held still for the carry, and the finger is followed on its touch events when the browser takes the pointer away). A device with no touch screen has no finger to hold still |
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/hooks/useSimpleChatDrag.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/sortable/touchLift.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-simple-drag.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/simple-list-hold-to-drag-live.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/simple-list-hold-to-drag.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/simple-list-hold-to-drag-scratch.sh
 
@@ -1732,17 +1733,17 @@ section: The simple list's carry — `useSimpleChatDrag` and the pointer's readi
 | Rule | Is |
 | --- | --- |
 | threshold | mouse and pen: `DRAG_THRESHOLD_PX = 5`, less travel is a click |
-| hold | touch: `TOUCH_HOLD_MS` (400 ms) held still lifts the row; a finger that drifts past the kit's slop first is scrolling: from that move on the page scrolls the pane by hand (`scrollsPane`; see the pan row), and nothing lifts. The kit's `tickLift()` pulses 20 ms where the device can (Android's own long-press buzz; an iPhone and a phone on silent get none). The `contextmenu` and `selectstart` a long-press raises are cancelled while a hold is pending or lifted, and `surfaces.css` keeps the platform's callout and selection off every handle from the first touch (`data-hold-lift`, touch screens only) — an iPhone sends no `contextmenu` to cancel |
-| press guards | primary button only (the kit); in `accept`: a press that landed outside the row's own DOM is refused (React bubbles a press from a portal — the row's open action menu — through the tree to the row), and so is a press inside `button, input, [data-no-drag]`, which stays that control's: it never lifts, but a swipe that starts on it still scrolls the pane (the kit takes a refused press as a pan on a list that scrolls by hand). The three status marks in the chat row (`simple-chat-awaiting-input`, `-running`, `-subagents-running`) carry `data-no-drag`: each sits in a `Tooltip` that opens on a 350 ms touch hold, and the 400 ms carry must not lift the row under it |
+| hold | touch: `TOUCH_HOLD_MS` (400 ms) held still lifts the row; a finger that drifts past the kit's slop first is scrolling: the gesture lets go, the browser scrolls the pane (see the pan row), and nothing lifts. The kit's `tickLift()` pulses 20 ms where the device can (Android's own long-press buzz; an iPhone and a phone on silent get none). The `contextmenu` and `selectstart` a long-press raises are cancelled while a hold is pending or lifted, and `surfaces.css` keeps the platform's callout and selection off every handle from the first touch (`data-hold-lift`, touch screens only) — an iPhone sends no `contextmenu` to cancel |
+| press guards | primary button only (the kit); in `accept`: a press that landed outside the row's own DOM is refused (React bubbles a press from a portal — the row's open action menu — through the tree to the row), and so is a press inside `button, input, [data-no-drag]`, which stays that control's: it never lifts, and a swipe that starts on it is the browser's own scroll. The three status marks in the chat row (`simple-chat-awaiting-input`, `-running`, `-subagents-running`) carry `data-no-drag`: each sits in a `Tooltip` that opens on a 350 ms touch hold, and the 400 ms carry must not lift the row under it |
 | one press | a press while another gesture runs is ignored by the kit, so a second finger never changes which row is lifted |
 | lifted row | the kit's carry (`shared/ui/sortable/carried.ts`, the copy `useSortable` runs): at the lift the pressed chat's row, or a folder's whole block, is taken up (`takeUp`: `data-carried`, above its neighbours, backed with an opaque ground) and follows the pointer up and down (`placeUnder` with a null x: on the list's rail), on every move and when the pane scrolls. Its slot stays as the gap. Verve draws `data-carried` as `--shadow-lift` plus a `--border-strong` hairline. At release the list is committed in one `flushSync` and the row slides from where it was drawn to its place (`putDown`; nothing slides under `prefers-reduced-motion`); a cancel or Escape slides it back |
 | carry start | the text selection is cleared (`removeAllRanges`); `body` wears `vv-dragging vv-drag-sort` for the carry, which also keeps iframes from swallowing it |
 | capture | the pointer is captured on the LIST's root at the lift (`captureOnStart`; the root arrives through `listRef`), never at the press, so a tap still reaches the row's link and fold toggle, and never on the row, because `:hover` follows the capture and a captured row would keep its hover wash for the whole carry |
 | edge scroll | `useCarryEdgeScroll` (`hooks/useCarryEdgeScroll.ts`): from the lift, every animation frame while the pointer rests in the pane's top or bottom 56 px zone, the pane (`scrollerOf` the list root) scrolls a step toward that edge and the target is read again under the still pointer. Step and zone are the kit's own `edgeStep`, `edgeHoldAt` (`shared/ui/sortable/motion.ts`), the ones `useSortable` runs on; a carry that began in a zone does not run toward it until the pointer has left it. A page that scrolls as a whole has no pane to run. A pane scrolled by any means (a wheel) re-places the row and re-reads the target, and the row is re-placed every frame. The lifted row is PAINTED INSIDE THE LIST'S OWN BOX (`placeLifted`): it never leaves its slot, so a row painted below the list's end would extend the pane's scrollable overflow with every pixel scrolled and the loop would never end. Ended at release, at Escape and on unmount |
-| release | `pointerup` ends the gesture and commits |
-| abandon | `Escape` (a keydown listener present while a row is carried) puts the row back at once and commits nothing; `pointercancel` after a lift commits nothing |
+| release | `pointerup` ends the gesture and commits; after a mid-carry `pointercancel`, `touchend` does |
+| abandon | `Escape` (a keydown listener present while a row is carried) puts the row back at once and commits nothing; `touchcancel` after a lift commits nothing (a `pointercancel` alone does not end the carry) |
 | click | a carry's release is followed by a swallowed click (`onClickCapture`: `preventDefault` + `stopPropagation`); a keyboard click (`detail === 0`) passes; the next `pointerdown` disarms the swallow before its guards run |
-| pan | touch, a swipe that crosses the slop before the hold fires (anywhere on a row or header, controls included): the kit's `sortable/touchPan.ts` scrolls the list's pane (`scrollerOf` the row) one to one with the finger from the move that crossed the slop, delta-driven and clamped at the pane's own ends, so a finger dragged past an end and turned back scrolls back at once. At the lift the finger's speed over the last 100 ms carries on and brakes at a constant 2800 px/s² (so a flick of 500, 1000, 2000 and 4000 px/s travels about 45, 179, 714 and 2857 px; Android's own fling, worked from its published constants, 58, 194, 647 and 2157; headless Chromium's, measured, 47, 189, 758 and 3030; at most 8 px/ms to start) and stops at an end. `GLIDE_DECELERATION` in `touchPan.ts` is the one constant to retune. A new touch anywhere stops the glide, and the click it would end in is spent; so is the tail click of a pan. The rows are `touch-action: none` at rest (`data-touch-pan`, wherever a coarse pointer is present: `@media (any-pointer: coarse)`), so the browser takes nothing; a device with no touch screen is unchanged. The pane's end is its own `scrollHeight`, which is the list's end because the carried row is painted inside the list's box (`placeLifted`) |
+| pan | touch, a swipe that crosses the slop before the hold fires (anywhere on a row or header, controls included): the browser's own scroll and glide. The rows are never `touch-action: none`; the gesture lets go and the pane moves on the compositor, not by script. Once a row has LIFTED (`usePointerDrag`, `sortable/touchCarry.ts`): `holdScrollersStill` sets `overflow: hidden` on every scroller from the pressed element and the handle up (the pane the list lives in, and any around it; one that shows a classic scrollbar keeps its gutter), after `onStart` has read the pane, so the browser's pan has nothing to move; the root is already clipped with `overscroll-behavior-y: contain` (`index.css`), so no pull-to-refresh shows. The edge scroll still moves the held pane by script. When the browser takes the pointer away anyway (`pointercancel` mid-carry) the carry does not end: `followTouch` follows the same finger on `touchmove`, `touchend` (a drop) and `touchcancel` (a cancel) — passive, bound on the pressed element, matched by touch identifier; nothing calls `preventDefault` on a touch event. The scrollers come back on every exit: drop, cancel, `touchcancel`, unmount. The edge scroll's end is the pane's own `scrollHeight`, which is the list's end because the carried row is painted inside the list's box (`placeLifted`) |
 | native drag | `onDragStart` is `preventDefault`ed |
 
 ## Commit
@@ -1823,9 +1824,8 @@ section: The simple list's carry — `useSimpleChatDrag` and the pointer's readi
 - `simple-list-hold-reliable.mjs` (`lib/carry-read.mjs` reads the page, `lib/sortable-fixture.mjs` mounts the real `useSortable`; artifacts under `.verify/artifacts/simple-list-hold-reliable/`): phone and desktop, light and dark — the lift shows at the hold (`data-carried`, an elevation), mid-carry the item stands under the pointer and away from its slot, is unfaded and opaque, and its box paints its own backing with nothing of the rows beneath showing through; the landing mark is a painted pixel of a screenshot where the carried item is drawn over it; drop, cancel (CDP `touchCancel`), hold-still, Escape and the rename box; nothing left on the page (no `data-carried`, no inline marks, no `vv-dragging`); WebKit at rest (`-webkit-user-select: none` computed on the row, link and folder header of a touch-emulated phone; the served rule carries `-webkit-touch-callout: none`, which a Linux WebKit drops at parse time and cannot compute); desktop selection equal to the `before` record; the kit's sortable list on the real hook drops the same card the same way before and after. 2026-10-10 on the scratch stack: 91 checks pass (run before `placeLifted`'s clamp and `onFrame`; neither gate has run since).
 - Measured 2026-10-10, Chromium with real CDP touch: every hold from 0.45 s to 2.5 s lands the drop, with no `pointercancel`, `contextmenu` or `selectstart`, before and after. Headless Chromium does not emulate the platform's long press (a held plain link raises no `contextmenu`, no selection begins), so Android's 400 ms touch-and-hold, its 20 ms buzz, an iPhone's link callout and a fling's uncancelable touches are NOT reproduced by any run here.
 - Edge scroll: the carried row is painted inside the list's own box (`useSimpleChatDrag` `placeLifted`). The row never leaves its slot, so a row painted below the list's end extends the pane's scrollable overflow with every pixel it scrolls, and the edge loop (`useCarryEdgeScroll`) finds no end. `useCarryEdgeScroll` also reports a scroll of the pane by any means (a wheel) and calls `onFrame` every frame, so the row stays under a resting pointer. 2026-10-10, 3 s with the finger at the pane's bottom edge: the list stops at its grown limit (386 → 392); before the clamp it ran to ~1500 and snapped back at release.
-- Not proven: any real phone. `probe-card-order.mjs` is stale against the current app (its project selector matches no row and the sidebar no longer has a Runner tab), on the pre-change client alike.
+- Not proven: any real phone. `probe-card-order.mjs` is stale against the current app (2026-10-10: its project selector `PROJECT_ROW` matched no row, on the pre-change client alike; its tab selector `RUNNER_TAB` reads the `Roadmap` tab since 2026-10-20, unrun since).
 - `.verify/simple-list-hold-to-drag-live.mjs` is the read-only look at the live list (no press, no touch, nothing written): it reads that the drawn list carries no `data-drag-handle` and no `.touch-none`, that rows exist, and that the page logs no error.
-- 2026-10-10, hold and drag in one motion: `STAGE=before|after|all SUNSET_SLOT=8 bash .verify/simple-list-one-motion-scratch.sh` runs `.verify/simple-list-one-motion.mjs` on that stack — Chromium with real CDP touch at 390 px and at 690 px (a Fold's inner screen, `FOLD_SCENARIO` in `lib/simple-list-scratch.mjs`), each twice: the touch dispatched UNCANCELABLE (`lib/phone-uncancelable.mjs`: an init script wraps `EventTarget.prototype.addEventListener` so every `touchstart`/`touchmove` listener is passive; Chrome then refuses the page any cancel once the pan starts, as on the operator's Fold — the headless `touchstart` itself still reports `cancelable=true`, where the phone reported `false`) and blocking (headless default). Legs in `lib/one-motion-legs.mjs` and `lib/one-motion-others.mjs`, reads in `lib/one-motion-reads.mjs`. BEFORE (git HEAD), uncancelable: a 0.5 s hold and drag lifts, then a `pointercancel` arrives at the first move past the slop, the row goes back and nothing drops; blocking passes, which is why every earlier gate passed. The flick legs lift at once and check the glide against `speed²/2a` (`GLIDE_DECELERATION`, mirrored in `lib/one-motion-legs.mjs`), not a bare floor; `touchLaptopLeg` runs a finger on a 1280 px page whose primary pointer is a mouse (`any-pointer: coarse`, `pointer: fine`) and expects the rows `touch-action: none` and the drop to land. 2026-10-10 on the scratch stack: 281 checks pass, run before the constant-deceleration glide, the speed-based flick check and `touchLaptopLeg` existed; none of those three has run. Not measured: a real phone, the glide's distance against the phone's own.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/hooks/useSimpleChatDrag.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/utils/simpleChatDropTarget.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/sortable/carried.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/carry-read.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/simple-list-scratch.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/simple-list-stack.sh, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/sortable-fixture.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/touch-input.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/simple-list-hold-reliable.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/simple-list-hold-reliable-scratch.sh, /home/lyphe/.claude/claudecodeui_lyphe/.verify/simple-list-hold-reliable-trace.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/simple-list-hold-to-drag-live.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/simple-list-hold-to-drag.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/simple-list-hold-to-drag-scratch.sh
 
@@ -2353,7 +2353,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Timeline.tsx
 - The listbox is NOT inside the trigger's group in the DOM: a probe finds the open list by its role (`[role="listbox"]`; one is open at a time), and proves it whole by hit-testing the centre of every option (`.verify/master-controller-widget.mjs`).
 
 ## `disabled` (the master controller, MAN-8442)
-- `disabled?: boolean` (default false): the trigger is a real `disabled` button (`.vv-select__trigger:disabled` — dimmed to 0.6, `not-allowed`, no hover border) and the panel never opens; a picker that turns disabled with its list open closes it (so the list does not come back on its own when the picker is enabled again). A picker that shows a value the reader cannot change now — the master controller's WIP dropdowns while the DeepSeek switch is on.
+- `disabled?: boolean` (default false): the trigger is a real `disabled` button (`.vv-select__trigger:disabled` — dimmed to 0.6, `not-allowed`, no hover border) and the panel never opens; a picker that turns disabled with its list open closes it (so the list does not come back on its own when the picker is enabled again). A picker that shows a value the reader cannot change now — the master controller's Epics at once dropdown while a press is out.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Select.tsx
 
@@ -2926,7 +2926,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/chat-idle-restore.mjs, /
 | In flight, read after an 800 ms settle | decks in the served order; each deck's note `<position> · <turn word>`; dial readout `<running> running`; no sideways overflow |
 
 ## fails when
-- The live dial is not a limit of 1 to 5 with `paused no`: `route.epics reads a limit of 1 to 5, not paused` is the check, and `Epics at once reads the served limit` compares the header's dropdown with it.
+- The live box is paused, or `route.epics` carries a key beyond `paused` and `running`: `route.epics is exactly paused and running, and the live box is not paused` is the check; the header's readout is then compared with the served census.
 - The live queue is empty.
 - `dispatcher queue`'s line shape changes (`listedQueue` parses `N. <name>.arc — <its turn|waiting|paused> — `).
 
@@ -3189,26 +3189,24 @@ The browser's typed view of `/api/affected-areas` (the Tours tab): one wire-type
 | file | holds |
 |---|---|
 | `src/shared/affected-areas-types.ts` | 39 exported types: every `wire.py` model, its 11 nested ones and the four envelopes `TourList`, `ViewsResult`, `UnderstandingMarkResult`, `Refusal`; plus the unions `Face`, `Basis`, `Verdict`, `MarkQueue`. `Point` and `Box` are file-private (`number[]`). Imports nothing from `server/`. |
-| `src/shared/api.ts` | `api.affectedAreas`, 14 verbs, beside `api.cerberus`; a type-only import from the mirror |
+| `src/shared/api.ts` | `api.affectedAreas`, 12 verbs, beside `api.cerberus`; a type-only import from the mirror. The same file holds `api.carrierBulletins` (the Bulletins view's four GET verbs and their own mirror, `carrier-bulletins-types.ts`): MAN-8865 |
 | `.oxlintrc.json` | `src/shared/affected-areas-types.ts` in the `frontend-shared-file` list (INV-5890) |
 
 ## Verbs
-Every answer is the wire shape bare, the type named in a `// →` comment above the verb. Ids go through `encodeURIComponent`.
+Every answer is the wire shape bare, the type named in a `// →` comment above the verb. Ids go through `encodeURIComponent`. The lane also forwards the cut of a pano's views and the plan of a whole tour (MAN-8559); no screen calls them, so `api` holds no verb for either, and `ViewsResult` and `TourPlan` stay as the wire's mirror of their answers.
 
 | verb | route | answer |
 |---|---|---|
 | `tours({ q?, limit? })` | `GET /tours` | `TourList` |
 | `tour(tourId)` | `GET /tours/:tourId` | `TourDetail` |
 | `pano(tourId, panoId)` | `GET /tours/:tourId/panos/:panoId` | `PanoDetail` |
-| `cutViews(tourId, panoId)` | `POST …/panos/:panoId/views` | `ViewsResult`; `timeoutMs` 90 000 |
 | `readPano(tourId, panoId, ReadRequest)` | `POST …/panos/:panoId/read` | `ReadResult`; `timeoutMs` 120 000 |
-| `planTour(tourId)` | `POST /tours/:tourId/read` | `TourPlan` |
 | `image(sha, options?)` | `GET /images/:sha` | JPEG bytes: the caller reads `.blob()`; `options.signal` aborts |
 | `codebook()` | `GET /codebook` | `Codebook` |
 | `mark(regionId, MarkRequest)` | `POST /regions/:regionId/marks` | `Region` (comment only) |
 | `missed(sha, MissedRequest)` | `POST /images/:sha/regions` | `Region` (comment only) |
 | `markUnderstanding(readId, UnderstandingMarkRequest)` | `POST /reads/:readId/marks` | `UnderstandingMarkResult` |
-| `queue({ mode, cls?, limit? })` | `GET /queue?mode&class&limit` | `Queue`; `mode` is required, typed `Queue['mode']` |
+| `queue({ mode, cls?, limit?, skip? })` | `GET /queue?mode&class&limit&skip` (`skip` is the ids comma-joined; at most 50, lowercase uuids: MAN-8559) | `Queue`; `mode` is required, typed `Queue['mode']` |
 | `proving({ model?, contract? })` | `GET /proving` | `Proving` |
 | `setThreshold(cls, ThresholdRequest)` | `PUT /thresholds/:cls` | `ProvingClass` (comment only) |
 
@@ -3222,15 +3220,15 @@ Every answer is the wire shape bare, the type named in a `// →` comment above 
 ## Rules an editor must not break
 - A shape changes in `wire.py` first; the mirror moves in the same change. why: a field renamed on one side is a screen that stops reading.
 - Field names are the wire's camelCase; `class` is a key (`wire.py`'s `cls` alias). Dates are ISO text, ids text, a point `[x, y]` and a box `[x0, y0, x1, y1]`, both in 0..1 of one view.
-- A response field is never optional. A field a later plan fills (`read`, `understanding`, `regions`, `mark`, `standing`, `threshold`, `holdout`, `regionsStanding`, `markedAreasAffected`, `marksCount`, `standingCount`, …) is `T | null`: `null` is "not judged", never "judged and found nothing".
+- A response field is never optional. A field a later plan fills (`read`, `understanding`, `regions`, `mark`, `standing`, `threshold`, `holdout`, `regionsStanding`, `marksCount`, `standingCount`, `photosAffected`, `understandingMark`, `current`, `effectiveClass`, `tourName`, …) is `T | null`: `null` is "not judged", never "judged and found nothing".
 - A request field `wire.py` defaults is optional (`newClass?: string | null`).
 - `ViewDetail` is `ViewEntry & {…}`, as `wire.py` inherits it.
 - A new verb names its answer type in a `// → Type` comment, as this file's other blocks do.
 
-## Not yet measured
-- `mark`, `missed` and `setThreshold` answer `Region` / `ProvingClass` by reading of the marks design: `wire.py` names only `UnderstandingMarkResult`. Correct the comments when the marks routes land.
-- `Queue`, `Proving` and their nested types have met no real body: `/queue` and `/proving` answered 404 on 2026-10-17.
-- Field sets checked against `model_json_schema(by_alias=True)` per model on 2026-10-17: 39 of 39 match, nullability and `Literal` values included.
+## Measured on the live engine
+- 2026-10-17, `.verify/affected-areas-marking.mjs` (66 of 66): `mark` and `missed` answered 200 with a `Region` whose `mark` and `standing` equal the same region from `GET …/panos/{pano}`; `setThreshold` answered 200 with the `ProvingClass` that `GET /proving` then held (`threshold`, `isDefault`, `thresholdSetAt`); `markUnderstanding` answered 200 with the `UnderstandingMarkResult`. `wire.py` names only that last answer: the other three are read from the routes' bodies, not from a model.
+- 2026-10-17: `GET /queue` answered 200 with the keys `mode`, `items`, `remaining` (an item: `tourId`, `panoId`, `roomName`, `jobLabel`, `view`, `region`); `GET /proving` answered 200 with `model`, `contractVersion`, `contractHash`, `understanding`, `classes` (a class: the twelve fields of `ProvingClass`). Each is the typed key set.
+- 2026-10-18: the file's property names, read by the TypeScript compiler, against `model_json_schema(by_alias=True)` per model: 39 of 39 equal. The five fields the fix added (`photosAffected`, `understandingMark`, `current`, `effectiveClass`, `tourName`) are each `T | null` here as `T | None` there; no model class was added.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/affected-areas-types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts
 
@@ -3242,10 +3240,9 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/affected-areas-types.
 |---|---|
 | `affected-areas.module.ts` | `createAffectedAreasModule()`; the ONLY reader of the environment |
 | `affected-areas.routes.ts` | `createAffectedAreasRouter({ forward })`: the allowlist, id/query/body checks, status mapping |
-| `affected-areas.service.ts` | `createAffectedAreasService({ baseUrl, envFile })` → `forward(LaneRequest): Promise<LaneAnswer>`; the secret read; the one `fetch` |
 | `index.ts` | barrel the entrypoint imports |
 
-`LaneRequest`, `LaneAnswer`, `AffectedAreasService` are exported from the service file (Jev-lane precedent), not `server/shared/types.ts` (2,483 lines).
+The forwarder is not in this module: `createShadowConnectorLane({ baseUrl, envFile, label })` → `forward(LaneRequest): Promise<LaneAnswer>`, the secret read and the one `fetch`, live in `server/shared/shadow-connector-lane.ts` (MAN-8863), so the secret has one home and a second lane to shadow-connector, `/api/carrier-bulletins` (next phase), reuses it rather than copying it. This module builds it with `label: 'affected-areas'`, so its log warning reads `[affected-areas] no usable internal secret in <file>: <cause>`, and its routes import `LaneAnswer` and `ShadowConnectorLane` from `@/shared/shadow-connector-lane.js`. The moved forwarder answered byte-identically (tour list and image, same sha256 before and after, 2026-10-21).
 
 ## Configuration
 
@@ -3256,7 +3253,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/affected-areas-types.
 
 ## Allowlist (14 rows in `ALLOWLIST`)
 
-A method+path not in the table is the lane's own 404 `{ error: 'not a route of the affected-areas lane' }`; it never reaches :8001. The table is the marking plan's whole contract: a row whose engine route is unbuilt answers the engine's own 404 through the lane.
+A method+path not in the table is the lane's own 404 `{ error: 'not a route of the affected-areas lane' }`; it never reaches :8001. The table is the lane's whole contract.
 
 | Method path | Timeout | Reply | Body | Query (forwarded keys only) |
 |---|---|---|---|---|
@@ -3271,7 +3268,7 @@ A method+path not in the table is the lane's own 404 `{ error: 'not a route of t
 | `POST /regions/:region/marks` | 20 s | json | object | — |
 | `POST /images/:sha/regions` | 20 s | json | object | — |
 | `POST /reads/:read/marks` | 20 s | json | object | — |
-| `GET /queue` | 20 s | json | none | `mode` unsure\|random, `class`, `limit` 1–50 |
+| `GET /queue` | 20 s | json | none | `mode` unsure\|random, `class`, `limit` 1–50, `skip` at most 50 lowercase uuids, comma-joined (a bad one is the lane's 422 before anything is forwarded) |
 | `GET /proving` | 20 s | json | none | `model`, `contract`: one token `[\w.:-]{1,80}` |
 | `PUT /thresholds/:class` | 20 s | json | object | — |
 
@@ -3281,7 +3278,7 @@ A method+path not in the table is the lane's own 404 `{ error: 'not a route of t
 |---|---|
 | `:tour`, `:pano` | `^[0-9a-f]{24}$` lowercase |
 | `:sha` | `^[0-9a-f]{64}$` lowercase |
-| `:region`, `:read` | uuid, either case |
+| `:region`, `:read` | `^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$` lowercase, as `routes/ids.py` holds them |
 | `:class` | `^[a-z_]{2,40}$` |
 | query key not in the row | dropped, not forwarded |
 | query value that is an array/dict (`?q=a&q=b`) | 422 |
@@ -3298,17 +3295,17 @@ The lane's own 422 is `{ error }`; the engine's is `{ detail: [...] }`: a client
 | network error / timeout | 503 `{ error }` (`unreachable`) |
 | non-JSON from a json route; 2xx image that is not `image/jpeg`; 3xx with no JSON | 502 `{ error }` (`unreadable`) |
 | secret missing, empty, padded, non-ASCII, unclosed quote | 503 `no_secret` (`CloudCLI could not read shadow-connector's internal secret`); nothing sent |
-| a thrown error the service cannot name | `next(error)` → the app's handler |
+| a thrown error the forwarder cannot name | `next(error)` → the app's handler |
 
 Image 2xx: `Content-Type: image/jpeg`, `Cache-Control: private, max-age=31536000, immutable`; a non-2xx image answer passes through as its JSON.
 
-## The secret read (`parseSecret`, `currentSecret`)
+## The secret read (`parseSecret`, `currentSecret` in `server/shared/shadow-connector-lane.ts`)
 
 1. `fs.stat(envFile)` on EVERY call; re-parse only when `mtimeMs` or `size` changes. A rotation lands on the next request: no restart, no watcher.
 2. Last `EIS_INTERNAL_SECRET=` line wins; `export ` prefix, CRLF, and an unquoted trailing ` # comment` are handled as dotenv does.
 3. Quoted value: whatever stands between the quotes, verbatim; only whitespace or a `# comment` may follow the closing quote. A quote that never closes, or other text after it → `no_secret`. A secret that really begins with `"` or `'` must be quoted.
 4. Usable = printable ASCII, no whitespace at either end (`USABLE_SECRET`): the gate compares bytes and an HTTP stack trims header edges.
-5. A missing file logs one `[affected-areas] no usable internal secret in <file>: <cause>` line per distinct cause; never the line parsed.
+5. A missing file logs one `[<label>] no usable internal secret in <file>: <cause>` line per distinct cause (`<label>` is `affected-areas` for this lane); never the line parsed.
 6. The secret is held in the browser nowhere and in CloudCLI's own environment nowhere: read from the engine's file per call, never written to `process.env`, this server's `.env`, a log or a cache (INV-8633). why: a copy drifts on rotation, and the agent sessions this server spawns inherit its environment.
 
 ## Headers sent
@@ -3328,11 +3325,11 @@ Image 2xx: `Content-Type: image/jpeg`, `Cache-Control: private, max-age=31536000
 - `GET /nope`, `DELETE /tours`, `POST /codebook` → 404 with no `shadow-connector` journal line; 422 cases (bad id, `limit=0|101`, 81-char `q`, `mode=bogus`) likewise never reach the journal.
 - An empty env file → 503 `no_secret`, 0 engine requests; writing the secret into it → next request 200, no restart.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/affected-areas/affected-areas.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/affected-areas/affected-areas.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/affected-areas/affected-areas.service.ts
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/affected-areas/affected-areas.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/affected-areas/affected-areas.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/affected-areas/index.ts
 
 ## MAN-8575 — The Tours view — src/modules/affected-areas: where state lives, what the counts mean, the reads and the presses
 
-The Tours view: a DocuSketch tour's affected areas drawn on the single photo. Three screens, one at a time: `TourPicker` → `TourScreen` → `PanoScreen`. Data is `api.affectedAreas` (wire MAN-8558, lane MAN-8559, routes MAN-8540). Drawn with the library's `RegionImage` and `Gallery` (MAN-8579).
+The Tours view: a DocuSketch tour's affected areas drawn on the single photo. Three screens, one at a time: `TourPicker` → `TourScreen` → `PanoScreen`. Data is `api.affectedAreas` (wire MAN-8558, lane MAN-8559, routes MAN-8540). Drawn with the library's `RegionImage` and `Gallery` (MAN-8579). A switch at the view's top (`ToursSwitch`: Tours · Mark · Tables) chooses the surface: Tours is that walk; the Tables screen (`TablesScreen`, how right the reader is per kind) is beside it, not a step of it: MAN-8581; the marks (the mark bar, Missed one, the Mark screen, the understanding mark) judge what the walk draws: MAN-8582, rules MAN-8583.
 
 ## State of the module
 | fact | value |
@@ -3340,29 +3337,35 @@ The Tours view: a DocuSketch tour's affected areas drawn on the single photo. Th
 | phase | live: the Cerberus tab's fourth view, reading the lane; run whole against the live engine 2026-10-17 (`.verify/affected-areas-view.mjs`, `.verify/affected-areas-walk.mjs`) |
 | mounted | `CerberusPanel` imports the lazy `AffectedAreasView` through this module's barrel and draws it after History in the strip, only once center's overview has answered (`overview !== null`, as every view): mounted on the first show of the Tours tab (`toursShown`), `hidden` after, kept mounted while the Cerberus workspace tab stands (leaving that tab for Chat unmounts the panel and the view with it, and the tour, pano and face are lost then). why: the tour, pano, face and scroll survive a visit to Fleet (MAN-7891); the views share ONE scroller, so `CerberusPanel` keeps Tours's offset itself (`toursScrollRef`, written as Tours is left, restored as it returns) |
 | words | `affectedAreas.*` and `cerberus.tours.{tab,tabHint}` in `src/modules/i18n/locales/en/common.json` |
-| shared types | `AffectedAreasRead<T>` (`{ value, trouble, retry }`), `PanoPress`, `TourReaderProgress`, `AffectedAreasTrouble` in `src/shared/types.ts` |
+| shared types | `AffectedAreasRead<T>` (`{ value, trouble, retry }`), `PanoPress`, `TourReaderProgress`, `AffectedAreasTrouble` in `src/shared/types.ts`; the marks' `ToursScreenKey`, `RegionLayer`, `MarkWalk`, `MissedStage`: MAN-8582 |
+| shared constants | `AFFECTED_AREAS_LANE_FAULTS` (`no_secret`, `unreachable`, `unreadable`: the faults of the lane whatever was asked, each said in `affectedAreas.trouble.<fault>`) in `src/shared/constants.ts`; read by `LaneTrouble`, `ThresholdControl`, `MarkRefusal`. `MARK_NOTE_MAX` (500) beside it: MAN-8582 |
 
 ## Files
 | file | holds |
 |---|---|
-| `AffectedAreasView.tsx` | the root: the ONLY file that calls the hooks and holds the handlers; picks the screen by `tourId` / `panoId` |
+| `AffectedAreasView.tsx` | the root: calls every hook of the Tours screens and holds their handlers; picks the Tours screen by `tourId` / `panoId` and the surface by the switch (`activeScreen`; Mark and Tables mount on their first show, stay mounted, `hidden` while another shows). `MarkScreen` and `TablesScreen` read and press for themselves (MAN-8577) |
 | `hooks/useLaneRead.ts` | one JSON read of the lane kept for its key: `{ value, trouble, retry }` plus `reload` (quiet, keeps the value) and `replace(value, forKey)` (writes an answer that came by another road under the key it is GIVEN, and drops every read begun before it); reads when the key is set or `retry`/`reload` is called, never on a timer |
 | `hooks/useTours.ts` · `useTour.ts` · `useCodebook.ts` | the picker's list (30 newest, the search text cut at 80 characters, read once typing has rested 300 ms, and only while the view is shown; `reload` when the picker comes back) · the open tour · the codebook |
 | `hooks/usePano.ts` | the open pano, the dry run beside it (what a read would buy), and `pressRead(force)`: one armed press at a time per pano (kept in `inFlight`, so a press still out shows as busy when the person leaves the pano and comes back), its answer replaces the pano and the plan at once, under the key the press was made for and outranking any read begun before it, unless the person has gone to another pano. A pano the tour lists with no views is not read (its GET is a 404 until it is cut): its dry run cuts it, and until then the screen is handed it with no views; a cut that brings no answer is that pano's trouble, drawn as the header and a banner with Try again |
 | `hooks/useTourReader.ts` | Read the rest: the unread panos in capture order, one armed press each, after the last one answered, passing a pano whose views cannot be cut; `{ walk, start, stop }` |
-| `hooks/useImageUrl.ts` | `useImageUrls(shas)` (the gallery's tiles) and `useImageUrl(sha)` (the shown face): bytes fetched with the token, object URLs revoked on unmount and on a change, aborted on a change, null on failure |
+| `hooks/useImageUrl.ts` | `useImageUrls(shas)` (a list of tiles) and `useImageUrl(sha)` (the shown face): bytes fetched with the token, object URLs revoked on unmount and on a change, aborted on a change, null on failure |
+| `hooks/useTilePhotos.ts` | the tour screen's gallery photos: `useImageUrls` for the first `GALLERY_MAX` (24, `utils/tourModel.ts`) panos' Ahead views, and a second `useImageUrls` for the rest once the gallery's `onOverflowOpen` fires, so a 45-pano tour fetches 24 photos until "+N" is pressed, then the other 21 and none again. Nothing is fetched off the tour screen, and leaving it forgets the opened state (the gallery comes back collapsed) |
 | `hooks/useViewShown.ts` | `isInLayout(element)` (asked before a read starts), `useViewShown(ref)` (whether the view is in layout, as state) and `useWhenShown(shown, fn)` (a word when it comes back) |
+| `hooks/useMarkedRegions.ts` · `useQueue.ts` · `useProving.ts` | the pano's regions with the operator's answers laid over the read · the Mark screen's walk through a queue · the Tables' read and the kind a Set threshold answered: MAN-8582, MAN-8581 |
 | `utils/laneTrouble.ts` | a non-2xx answer or a thrown fetch as an `AffectedAreasTrouble` |
 | `ViewBoundary.tsx` | the lazy view's surround, exported by the barrel with the view: a waiting ring while its chunk loads, and a Tours-only warn banner (Reload the page) when it cannot load or crashes, so the failure never replaces the whole Cerberus tab |
 | `TourPicker.tsx` | search field, recent tours with a read-state badge |
 | `TourScreen.tsx` | tour header with the walk (Read the rest), then `ContextCard`, then `TourRooms`, then `RoomGallery` |
 | `TourRooms.tsx` | the tour's rooms in DocuSketch's walk order: name, floor, and who calls each affected, in words (MAN-8578) |
-| `PanoScreen.tsx` | header + `ReadControl`, six face tabs, `RegionImage` beside `RegionList`, caption, Enlarge (`Lightbox`), `UnderstandingCard`, `RoomDrying` |
+| `PanoScreen.tsx` | header + `ReadControl`, `FaceStrip`, the face (`MissedDraw`: the `RegionImage` photo with `LayerSwitch` over it and the chosen area's `MarkBar` under it, MAN-8582) beside `RegionList`, caption, Enlarge (`Lightbox`), `UnderstandingCard`, `RoomDrying` |
+| `FaceStrip.tsx` · `ReadingList.tsx` | the six face tabs, each counting its areas (scrolling the chosen one into the strip's own box) · the waiting surface of the list of areas |
 | `ReadControl.tsx` | the read presses (Read this pano / Read again / Read the rest), refusals in words, the walk's meter and Stop |
-| `LaneTrouble.tsx` | one warn banner with Try again for a read that brought no answer |
-| `ContextCard.tsx` · `UnderstandingCard.tsx` · `RoomDrying.tsx` · `RoomGallery.tsx` · `RegionList.tsx` | what the reader is told · what it understood · the room's drying numbers · the pano tiles (`Gallery`, max 24 then "+N") · the face's regions |
+| `LaneTrouble.tsx` | one warn banner with Try again for a read that brought no answer; `subject`: `tours` · `tour` · `pano` · `tables` · `queue` names what failed to read (`queue`: the Mark screen's) |
+| `ContextCard.tsx` · `UnderstandingCard.tsx` · `RoomDrying.tsx` · `RoomGallery.tsx` · `RegionList.tsx` | what the reader is told (the same facts for every tour; an unlinked tour adds one line saying they come from DocuSketch alone, and a card with no facts shows that line alone) · what it understood · the room's drying numbers and its demo line (`demoBeforeTour`: "Demo had begun before the tour", "No demo recorded before the tour", nothing when null) · the pano tiles (`Gallery`, max 24 then "+N") · the face's regions |
 | `utils/regionLook.ts` | `REGION_LOOK` and `regionState(region)` |
-| `utils/tourModel.ts` | `FACES`, `panoReadState`, `tourReadState`, `tourUnread`, `tourFacts`, `tourName`, `roomWords`, `spansFloors`, `spoken`, `listWords`, `capitalized`: pure, no fetch, no state |
+| `utils/tourModel.ts` | `FACES`, `panoReadState`, `tourReadState`, `needsRead`, `tourUnread`, `tourFacts`, `tourName`, `addressBesideName`, `roomWords`, `spansFloors`, `spoken`, `listWords`, `capitalized`, `faceCounts(view)` (a face's `areas`, `setAside` and `proposed`, each counted through `regionState`: set aside is unsure plus not-a-change, proposed is an unmarked area of a kind with no line set), `kindName(cls, codebook)`: pure, no fetch, no state |
+| `MarkBar.tsx` · `MarkPresses.tsx` · `MarkPress.tsx` · `NoteDialog.tsx` · `MissedDraw.tsx` · `FacePhoto.tsx` · `LayerSwitch.tsx` · `ToursSwitch.tsx` · `MarkScreen.tsx` · `MarkQueue.tsx` · `UnderstandingMark.tsx` · `UnderstandingVerdict.tsx` | the marks: MAN-8582 |
+| `TablesScreen.tsx` · `ProvingTable.tsx` · `ProvingDetail.tsx` · `ThresholdControl.tsx` · `utils/provingModel.ts` | the Tables screen, its opened row, its threshold control, how its figures read: MAN-8581 |
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/
 
@@ -3372,19 +3375,20 @@ section: The Tours view — src/modules/affected-areas: where state lives, what 
 1. state (`query`, `tourId`, `panoId`, `face`, `selectedRegionId`, `enlarged`)
 2. reads (`useTours`, `useTour`, `usePano`, `useCodebook`), each `{ value, trouble, retry }`; `useTour` adds `reload`, `usePano` adds `press`, `pressRead`, `reload`
 3. derivations (`summary`, `entry`, `room`, `unread = tourUnread(...)`)
-4. photos, walk, handlers (`useImageUrl` ×2, `useTourReader`, `on*`)
+4. photos, walk, handlers (`useImageUrl`, `useTilePhotos`, `useTourReader`, `on*`)
 
 A step reads only what the steps above it produce. why: the shown face's photo is read off `entry` with no reordering.
 
 ## What the numbers mean
 | where | counts |
 |---|---|
-| face tab, caption "3 areas · 2 set aside · read 3h ago" | `faceCounts` in `PanoScreen.tsx`: once the pano answered, set aside = regions with `standing === false`, areas = the rest; before it answers, areas = `standingCount ?? regionsCount` and set aside is hidden |
-| region list "Marked on this view", badges, outlines | every region of the face, set aside included; areas + set aside = outlines drawn |
-| gallery tile badge, tour line areas | `standingCount ?? regionsCount`, summed over a pano's views |
+| face tab, caption "3 areas · 2 set aside · 1 proposed · read 3h ago" | `faceCounts` in `utils/tourModel.ts` (read by `FaceStrip.tsx` and `PanoScreen.tsx`), each region read through `regionState`: once the pano answered, set aside = `unsure` + `not_a_change` regions, proposed = unmarked regions of a kind with no line set (`proposed` with `standing === false`), areas = the rest; the tab counts areas. Before it answers, `listedAreas`: areas = `standingCount ?? regionsCount`, set aside and proposed hidden (the listing carries no state per region, so it cannot tell a proposed area from one set aside and names neither) |
+| region list "Marked on this view", badges, outlines | every region of the face, set aside and proposed included; areas + set aside + proposed = outlines drawn |
+| gallery tile badge | the standing areas summed over a pano's views (`listedAreas`): "3 areas"; "2 found" (`regionsCount` summed) while none stands and the reader found some, whether nobody judged them or the operator set them all aside (the listing cannot tell); "None found" when it found none. The pano opens on the first face whose read found an area, standing or not |
+| tour line "26 areas found" | `regionsStanding`, or `regionsTotal` while none stands: a tour the reader marked never reads as empty |
 | tour line "42 of 42 cut views read · 5 panos not cut" | views read of views cut; `uncut = panoCount − round(viewsTotal / 6)`; "none cut yet" when `viewsTotal === 0` |
 | `tourReadState` | against six views per pano (`panoCount × 6`), never against views cut: a tour with an uncut pano is `partly` |
-| `tourUnread` | panos with a face not read, and their unread views (six for a pano never cut); the press names both before it spends |
+| `tourUnread` | panos with a view that needs a read (`needsRead`: none yet, or a read whose `ReadState.current` is not true), and those views (six for a pano never cut); the press says them as "5 panos · 30 views need a read" (`affectedAreas.read.rest`, `viewsNeedRead`) before it spends. The tour line's "N of M cut views read" is a different count (reads under ANY contract, `viewsRead`), so a stale read counts in it and in "need a read" both |
 | room list title "Rooms" | no count, on purpose: the header's "in 5 rooms" is `roomCount` (`docusketch_tours.rooms`, DocuSketch's own count), while the list has one row per room key, and `canonical_key` folds names ("Office2 / Office1" is one row). The two differed on 14 of the 60 newest tours (El Camino College: 39 against 35, measured 2026-10-17) |
 
 ## Read presses
@@ -3395,10 +3399,10 @@ A step reads only what the steps above it produce. why: the shown face's photo i
 | press | offered when | sends |
 |---|---|---|
 | Read this pano | the dry run is not back, was refused, or has `viewsToRead > 0` | `{ armed: true, force: false }` |
-| Read again | `againReason` in `ReadControl.tsx` is non-null: (1) a view's `read.contextChanged === true`, the job's details having changed since that face was read; (2) a view with `read.status === 'read'` has a `read.contractVersion` other than the codebook's `contractVersion`. Condition 2 is off until the codebook has answered | `{ armed: true, force: true }` |
+| Read again | `againReason` in `ReadControl.tsx` is non-null: (1) a view's `read.contextChanged === true`, the job's details having changed since that face was read; (2) a view with `read.status === 'read'` needs a read (`needsRead`: its `read.current` is not true, so it was read under an older contract or model than the reader reads under now; the engine decides it and the browser compares nothing), said as `affectedAreas.read.againCurrent` with the codebook's `contractVersion` and `model`. `useTourReader.unreadInCaptureOrder` and `tourUnread` use the same `needsRead`. Condition 2 is off until the codebook has answered | `{ armed: true, force: true }` |
 | Read the rest | `unreadPanos > 0`, or a walk is running | `useTourReader.start` |
 
-- A refusal is drawn before the presses it refuses. While one no retry clears stands (`budget`, `flag_off`, `restorly_ai_off`, `gemini_off`, `no_key`), the presses drop to outline.
+- A refusal is drawn before the presses it refuses. While one no retry clears stands (`budget`, `flag_off`, `gemini_off`, `no_key`), the presses drop to outline.
 - A walk and a press stopped by the same wall show one banner.
 - A pano that did not answer draws its header and banner alone: no press, no face. A lane fault the press repeats is said once.
 - `usePano` sets `press.trouble` when a dry run or press gets no answer. why: "Working out…" must not hang.
@@ -3407,7 +3411,7 @@ A step reads only what the steps above it produce. why: the shown face's photo i
 - Every press and Show all is 44 px tall below `md` (`max-md:h-11`).
 - Reads happen on open and on a press: a tour or pano opening, a search that has rested, Try again, Back to the picker (it reads the list again quietly, since a press or a walk changed how far each tour is read), a press and the answer of one. No timer reads anything but the search's 300 ms rest. why: Cerberus's History polls every 30 s and so mounts only while shown; Tours stays mounted, so it must cost nothing hidden.
 - Nothing starts while the view is hidden. The walk asks `isInLayout` before each press and stops after the pano in hand when the view is away; the search's rest timer runs only while `useViewShown` says the view is shown, so text typed just before leaving is read on the return; an answer that arrives hidden is held (`heldRef`) and the list, the tour and the pano are read once when the view comes back. why: a walk spends, and no one is watching its meter or Stop.
-- The walk stops at a refusal (`status: 'refused'`, or a lane fault) with the reason as `lastRefusal`, except a refusal of that pano alone (`PER_PANO_REFUSALS` in `useTourReader.ts`: `views_refused`, a photo the engine cannot cut), which it passes and counts in `skipped`; a part read (`partial`) goes on to the next pano. why: the engine's own walker stops only at `_STOPS` (`budget`, `flag_off` and the four systemic reasons, `core/affected_areas/read.py`), the refusals every later pano would meet too. A walk that passed panos says so when it ends (`affectedAreas.read.skipped`), and a passed pano stays unread, so each later Read the rest tries it again (a refusal in 270 ms).
+- The walk stops at a refusal (`status: 'refused'`, or a lane fault) with the reason as `lastRefusal`, except a refusal of that pano alone (`PER_PANO_REFUSALS` in `useTourReader.ts`: `views_refused`, a photo the engine cannot cut), which it passes and counts in `skipped`; a part read (`partial`) goes on to the next pano. why: the engine's own walker stops only at `_STOPS` (`budget`, `flag_off`, `context_degraded` and the three systemic reasons, `core/affected_areas/read.py`), the refusals every later pano would meet too. A walk that passed panos says so when it ends (`affectedAreas.read.skipped`), and a passed pano stays unread, so each later Read the rest tries it again (a refusal in 270 ms).
 - The press's answer is the progress: the plan after a press is counted off the answer's pano (`planAfter`), not asked of the lane again. An answer that lands after the person went to another pano writes nothing of the pano on screen (`openKeyRef`; `patchedUnlessElsewhere`): the single press record and the single pano slot belong to the pano open now. A walk's answer for the open pano reads the pano AND its dry run again (`reload`), so the plan line and Read this pano follow the faces.
 - A pano the tour lists with no views is never GET: the lane answers 404 "no kept views" until it is cut, which reads as "no longer on its tour". `usePano` hands the screen that pano with no views while the dry run cuts it (the "Cutting this pano…" line and the uncut sentence), the dry run's pano replaces it, and a cut tells the root to read the tour again so its listing and gallery tile follow. A dry run that is refused (`views_refused`) leaves it uncut with the refusal said in `ReadControl`.
 - A reading of the client in dev shows each read of an open twice: `React.StrictMode` runs mount effects twice there. A build reads once.
@@ -3417,22 +3421,23 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/
 ## MAN-8577 — The Tours view — src/modules/affected-areas: where state lives, what the counts mean, the reads and the presses — Rules an editor must not break
 section: The Tours view — src/modules/affected-areas: where state lives, what the counts mean, the reads and the presses/002 Rules an editor must not break
 
-- Screens draw what they are handed; the hooks are called from `AffectedAreasView.tsx` only, and `fetch` and `api` calls live in `hooks/` alone.
+- Screens draw what they are handed; the Tours screens' hooks are called from `AffectedAreasView.tsx` only, and `fetch` and `api` calls live in `hooks/` alone. Exceptions: `TablesScreen.tsx` reads its own table (`useProving`) and sends its own Set threshold press (MAN-8581); `MarkScreen.tsx` reads its own queue (`useQueue`) and the photo of its area (`useImageUrl`); and the presses of the marks (`MarkBar`, `MissedDraw`, `UnderstandingMark`) send their own writes through `answerOfWrite` (`utils/laneTrouble.ts`), each keeping its press, refusal and note in its own state (MAN-8582). why: a press is one call whose answer is the redraw, and its state (out, refused, noted) belongs to the press, not to the hub.
+- A mark's answer is laid over the pano, never fetched for: `useMarkedRegions(pano.value)` keeps the engine's answers beside the read and gives the pano with each answered region in place (the answer outranks a read of the same region that carries no mark or an older one, so a quiet reload landing late never redraws a judged area unjudged). The pano is read again only on a person's press: the switch coming back to Tours (`pano.reload()`), a read, Back.
 - Tone is by judgment, never by kind: a region is painted by where it stands (`regionState` in `utils/regionLook.ts`), not by its codebook kind. why: the tone set stays five (MAN-739 rule 4) and the codebook has fourteen kinds. The kind is words (the list's label, the badge's accessible name).
-- Null is "not judged": `regionState` reads a null `mark` or `standing` as `proposed`, never as unsure or rejected.
+- Null is "not judged": `regionState` reads a null `mark` or `standing` as `proposed`, never as unsure or rejected. So does a `threshold` of null: a kind with no line set has nothing to be "below", and its unmarked areas read `proposed` while `standing` is false (they stand only when marked, INV-8635).
 
 `REGION_LOOK` (`RegionState`, five). `regionState` takes the first row that matches, top to bottom:
 | state | when | tone | edge | wash | word (`affectedAreas.look.*`) |
 |---|---|---|---|---|---|
-| `human` | `source === 'human'`, whatever mark it later carries | positive | dashed | full | `human` "Drawn by hand" |
-| `not_a_change` | `mark.verdict === 'not_a_change'` | neutral | dashed | none | `notAChange` "Not a change" |
+| `not_a_change` | `mark.verdict === 'not_a_change'`: a reader's area set aside, or a drawn one taken back (the one mark the engine takes on a drawn area) | neutral | dashed | none | `notAChange` "Not a change" |
+| `human` | `source === 'human'`, standing (any other mark) | positive | dashed | full | `human` "Drawn by hand" |
 | `confirmed` | `mark.verdict` is `confirm` or `rename` | positive | solid | full | `confirmed` "Confirmed" |
-| `unsure` | `mark === null && standing === false` | info | dashed | light | `unsure` "Unsure" |
-| `proposed` | anything else, a null `mark` or `standing` included | info | solid | full | `proposed` "Proposed" |
+| `unsure` | `mark === null && standing === false && threshold !== null`: below a line the operator set for the kind | info | dashed | light | `unsure` "Unsure" |
+| `proposed` | anything else, a null `mark`, `standing` or `threshold` included | info | solid | full | `proposed` "Proposed" |
 
 Info is the reader's word and positive the operator's; a dashed edge is anything the reader's word alone does not carry. `PanoScreen` turns each region into a `RegionShape` with `tone`, `edge` and `wash` (drawn by `RegionImage`, MAN-8579); `RegionList` shows the word.
-- A room is affected on two authorities, both named (MAN-3035): `docusketchAffected` and `markedAreasAffected === true`, never `regionsStanding`, which counts older damage. The words and the tone are MAN-8578.
-- Names, never ids, in any line a person reads (INV-76); a tour with no job or address reads "Tour with no job or address".
+- A room is affected on two authorities, both named (MAN-3035): `docusketchAffected` and `photosAffected === true`, never `regionsStanding`, which counts older damage. A `RoomEntry` is one per `(roomKey, floor)`. The words and the tone are MAN-8578.
+- Names, never ids, in any line a person reads (INV-76); a tour is named by its job's label, else DocuSketch's own name for it (`tourName`: a pre-job tour), else its address, else "Tour with no job or address"; the address stands as a line of its own whenever the name above it is not the address (`addressBesideName`).
 - A bare `YYYY-MM-DD` (date of loss) goes through `formatShortDate`, which reads it as that local day.
 - `index.ts` exports the lazy view and `ViewBoundary` (its surround) only; siblings import each other by path, never through the barrel. `ViewBoundary` is not lazy: it must be there to catch the failure of the chunk it surrounds.
 - `useLaneRead.replace(value, forKey)` takes the key its answer is for, never the render's own: a press made while the tour still listed the pano uncut has a null key in its render. It outranks every read begun before it (`replacedRef`). why: without both, a pano GET answering with the pre-press detail landed over the press's pano and left the faces unread.
@@ -3442,42 +3447,43 @@ Info is the reader's word and positive the operator's; a dashed edge is anything
 ## Measured 2026-10-17 (live engine, :5183)
 - `.verify/affected-areas-view.mjs`: Cerberus → Tours → CLARENCE TSE → Dinning Room → each face at 1280 and 390 px: the polygons on the photo equal the engine's regions per face, the badges read 1..n and are the list's rows and the engine's ordinals, a region chosen on the photo is the row's and back, Enlarge keeps every outline on the photo (0.00 px off), nothing is read while the pano idles or Fleet shows, and Read this pano on one unread pano answers 200 `read`, 6 views, and the face strip counts the engine's areas at once.
 - `.verify/affected-areas-walk.mjs`: Stop after this pano ends the walk after the pano in hand; a view hidden mid-walk sends no second press and reads nothing until it returns, then reads the tour once; the walk goes pano to pano on each answer, in capture order.
-- `.verify/affected-areas-rooms.mjs --tour <24-hex tourId> [--evidence <dir>]` (the tour must be linked to a job, else exit 2): Cerberus → Tours → the tour → the Rooms card at 1280 then 390 px, once in a light and once in a dark `openConsole({ dark })` context (no stored setting written). `WIDTHS[0]` stays 1280: `openCerberusTab` finds "More views" only on the wide layout. Holds against `GET /api/affected-areas/tours/{tour}`: one row per wire room in its order, with name and floor; the words from `docusketchAffected` and `markedAreasAffected` alone (written out in the script, not read from the component); warn tone and dot on the rows with words only; no fetch/XHR path of its own for rooms; no sideways scroll, measured on the Rooms card (`scrollWidth - clientWidth`; the card clips its overflow, so the page-level number is 0 whatever the rows do); no authenticated console error. Writes `rooms-<theme>-<width>.png`, `rooms-card-<theme>-<width>.png` and `rooms.json` (keys `<theme>-<width>`) under `.verify/shots/affected-areas-rooms/`.
-- 2026-10-17, run end to end at the review: tour `6acd745c36f92c16415b6f97` (three affected rooms, Kitchen and Entry floor 1, Hvac Closet floor 2; `docusketchAffected` false, `markedAreasAffected` true) passes 26 of 26 checks, exit 0, light and dark, 1280 and 390 px. At 390 px one column, overflow `{"page":0,"rooms":0}`, warn tone and dot on exactly the three rows with words; at 1280 three columns.
+- `.verify/affected-areas-rooms.mjs --tour <24-hex tourId> [--expect-affected] [--evidence <dir>]` (the tour must be linked to a job, else exit 2): Cerberus → Tours → the tour → the Rooms card at 1280 then 390 px, once in a light and once in a dark `openConsole({ dark })` context. The app keeps the theme server-side against the dev user, so each pass switches the stored theme (`ensureTheme`, `lib/console.mjs`) and a run leaves it on dark. `--expect-affected` FAILs the run unless at least one row on the screens reads "Affected …"; without it, a run that showed none ends on a `NOTE` line and still exits 0. `WIDTHS[0]` stays 1280: `openCerberusTab` finds "More views" only on the wide layout. Holds against `GET /api/affected-areas/tours/{tour}`: one row per wire room in its order, with name and floor; the words from `docusketchAffected` and `photosAffected` alone (written out in the script, not read from the component); warn tone and dot on the rows with words only; no fetch/XHR path of its own for rooms; no sideways scroll, measured on the Rooms card (`scrollWidth - clientWidth`; the card clips its overflow, so the page-level number is 0 whatever the rows do); no authenticated console error. Writes `rooms-<theme>-<width>.png`, `rooms-card-<theme>-<width>.png` and `rooms.json` (keys `<theme>-<width>`) under `.verify/shots/affected-areas-rooms/`.
+- 2026-10-18, `.verify/affected-areas-rooms.mjs --tour 6ace5eb736f92c16415baa7e` with one demonstration confirm on its Garage drying-equipment region (deleted by its mark id after; the ledger counted back to 0 marks, 0 thresholds, 0 drawn areas): 26 PASS, 0 FAIL, exit 0, light and dark, 1280 and 390 px. One row, Garage, Floor 1, "Affected per the photos" (`docusketchAffected` false, `photosAffected` true, `regionsStanding` 1); at 390 px overflow `{"page":0,"rooms":0}`, warn tone and dot on that row.
+- `.verify/affected-areas-tours-told.mjs [--evidence <dir>]` (reads the live lane first and exits 2 when it holds no unlinked tour with a loss type or none without facts; buys and writes nothing; its one stub is the rewritten pano GET below): at 1280 and 390 px, no picker row reads "Tour with no job or address" and every pre-job tour (8 on 2026-10-18) is in the picker by its DocuSketch name, with "No job linked"; an unlinked tour with a loss type draws it ("Water loss", from its own `context.lossType`) and the DocuSketch-alone line, no Property and no "isn't linked", its address beside its name; a factless unlinked tour draws the DocuSketch-alone line only; a room whose `demoBeforeTour` is false says "No demo recorded before the tour", true "Demo had begun before the tour". `openTour` throws unless the client asked the lane for the pressed tour's id (a label can belong to two tours). At 1280 only: the pano GET is rewritten so its first view reads `current: false` and no view `contextChanged` (every shown read on file is current today), and the pano offers Read again with `affectedAreas.read.againCurrent` naming the codebook's `contractVersion` and `model`. 2026-10-18: 27 PASS, 0 FAIL, exit 0.
 - `.verify/affected-areas-view.mjs` presses nothing unless `--press` is given (one armed press, counted; it needs a cut, unread pano, which each press uses up), and `.verify/affected-areas-walk.mjs` runs nothing unless `--cases` names what to buy (A and B six reads each, C twelve; each pano read is read for good).
 - Open: Read the rest has not met a refusal (a spent budget) on the live engine; a refusal is drawn from `ReadControl`'s own words.
-- Open: the tour screen fetches the photo of every cut pano (a 45-pano tour: 45 requests) though the gallery draws 24 tiles until "+N" opens. The cure needs the Gallery's overflow-open signal (`Gallery` is the shared kit's): a follow-up.
-- Open: "Affected per DocuSketch" and "Affected per DocuSketch and marked areas" have not been seen on a live tour: `docusketchAffected` is false on all 125 tours sampled (5 read, 120 unread).
+- 2026-10-18, `.verify/affected-areas-gallery-fetch.mjs` (the 45-pano ESTHER VILLA tour; the live engine answers its GET, and the panos with no view cut are given a stand-in Ahead view, because cutting is paid and no live tour has 24 cut panos): 8 of 8 checks pass. Opening fetches 24 distinct photos and none of the other 21; "+N" fetches the 21 and none of the 24 again; a pano opened and left collapses the gallery and asks for none of the 21.
+- Open: "Affected per DocuSketch" and "Affected per DocuSketch and the photos" have not been seen on a live tour: `docusketchAffected` is false on all 210 stored views of the 9 tours cut (2026-10-18).
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/
 
-## MAN-8578 — TourRooms.tsx — the tour's room list: affected rooms and the authority that calls each (DocuSketch, marked areas), beside the pano gallery
+## MAN-8578 — TourRooms.tsx — the tour's room list: affected rooms and the authority that calls each (DocuSketch, the tour's photos), beside the pano gallery
 
-`src/modules/affected-areas/TourRooms.tsx` is the Rooms card of `TourScreen`, between `ContextCard` and the pano gallery. Props: `rooms: RoomEntry[]` = `TourDetail.rooms` (wire MAN-8558): one row per room key, in DocuSketch's walk order. A row is not a control; it opens nothing.
+`src/modules/affected-areas/TourRooms.tsx` is the Rooms card of `TourScreen`, between `ContextCard` and the pano gallery. Props: `rooms: RoomEntry[]` = `TourDetail.rooms` (wire MAN-8558): one row per room, a `(roomKey, floor)` pair (React key `roomKey:floor`), in DocuSketch's walk order. A row is not a control; it opens nothing.
 
 ## A row
 | part | source |
 |---|---|
 | name | `roomWords(room.roomName, null, false, t)`; "Unnamed room" when null; never the key (INV-76) |
-| floor | "Floor 2" from `room.floor`; nothing when null (a room whose panos disagree on it) |
+| floor | "Floor 2" from `room.floor`; nothing when null (DocuSketch gave the room no floor) |
 | authority words | `authorityWords(room, t)` below; none when nobody calls the room affected |
 | dot | `bg-tone-dot` under `data-tone="warn"` on every affected row, whichever authority spoke; the dot's column is kept on the other rows so the names align |
 
 ## Authority words (`affectedAreas.rooms.*` in `common.json`)
-Two wire fields, both on `RoomEntry`: `docusketchAffected` (`boolean`, DocuSketch's sketch flag) and `markedAreasAffected` (`boolean | null`, the marked areas' verdict, MAN-8573; null = not judged).
-| `docusketchAffected` | `markedAreasAffected` | words | key |
+Two wire fields, both on `RoomEntry`: `docusketchAffected` (`boolean`, DocuSketch's sketch flag) and `photosAffected` (`boolean | null`, the verdict from the tour's photos for THIS room, MAN-8573; null = not judged).
+| `docusketchAffected` | `photosAffected` | words | key |
 |---|---|---|---|
 | true | not true | Affected per DocuSketch | `affectedDocusketch` |
-| false | true | Affected per marked areas | `affectedMarked` |
-| true | true | Affected per DocuSketch and marked areas | `affectedBoth` |
+| false | true | Affected per the photos | `affectedPhotos` |
+| true | true | Affected per DocuSketch and the photos | `affectedBoth` |
 | false | false or null | (none) | |
 - Never `regionsStanding`: it counts older damage, which never makes a room affected.
-- The sketch stays an authority and the marked areas are a second; the words name which spoke (MAN-3035).
+- The sketch stays an authority and the photos are a second; the words name which spoke (MAN-3035).
 - Empty list: "DocuSketch named no rooms on this tour". Title "Rooms", inside the card, with no count (MAN-8576 §"What the numbers mean").
 
 ## Why a list of rooms beside a gallery of panos
-- why: the units differ. A verdict is per room (`(room_key, floor)`, MAN-8573) and a `RoomEntry` is one per room key; a gallery tile is one pano and a room has several (100 newest tours: 2,156 panos in 632 room keys, MAN-8543).
-- A tile's badge counts the areas on its pano's views (`standingCount ?? regionsCount`); older damage counts there and never affects, so a badge cannot say whether the room is.
+- why: the units differ. A verdict is per room (`(room_key, floor)`, MAN-8573) and a `RoomEntry` is one per pair; a gallery tile is one pano and a room has several (100 newest tours: 2,156 panos in 632 room keys, MAN-8543).
+- A tile's badge counts the areas that stand on its pano's views ("3 areas"), or says "2 found" while the reader found some and none stands yet, or "None found" (`listedAreas`, MAN-8576); older damage counts there and never affects, so a badge cannot say whether the room is.
 - The gallery draws at most 24 tiles then "+N" (`RoomGallery` `GALLERY_MAX`), so an affected room's pano can sit behind "+N"; the list has every room.
 
 ## Layout
@@ -3486,3 +3492,524 @@ Two wire fields, both on `RoomEntry`: `docusketchAffected` (`boolean`, DocuSketc
 - Check: `.verify/affected-areas-rooms.mjs` (MAN-8577 §"Measured 2026-10-17").
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/TourRooms.tsx
+
+## MAN-8581 — The Tables screen of the affected areas Tours view (Tours · Mark · Tables) — src/modules/affected-areas: the proving DataTable of how right the reader is per kind, its sort, thin kinds and the Set threshold press
+
+The Tables screen: `GET /proving` (the pinned model on the current contract) as one sortable row per codebook kind, each with its line (threshold) and a press that sets it. `TablesScreen` → `ProvingTable` → `ProvingDetail` → `ThresholdControl`. The Tours view's state, reads and rules: MAN-8575. The engine's lines: MAN-8569. The table's props and paint: MAN-8580.
+
+## State
+| fact | value |
+|---|---|
+| phase | live: the view root's Tours · Mark · Tables switch (`AffectedAreasView.tsx`) mounts Tables on its first show and keeps it mounted, `hidden` while another shows; `shown` (Tables on view, and the view itself) re-reads the table quietly each time it turns true again. Run whole against the live engine: `.verify/affected-areas-marking.mjs` |
+| `TablesScreen.tsx` | the screen's state and presses: `useProving(shown)`, `sort`, `expanded`, `heldFrom`, `line`, `pressing`, `refusal`, `onSort`, `onExpand`, `onStep`, `onSetThreshold` |
+| wire | `api.affectedAreas.proving({ model?, contract? })` → `GET /api/affected-areas/proving` → `Proving`; `api.affectedAreas.setThreshold(cls, { threshold })` → `PUT /api/affected-areas/thresholds/{cls}` → the `ProvingClass` as it now stands (`src/shared/api.ts`; types in `src/shared/affected-areas-types.ts`) |
+| words | `affectedAreas.tables.*`; a failed read says `affectedAreas.trouble.gone_tables` / `failed_tables` through `LaneTrouble subject="tables"` |
+| hook | `hooks/useProving.ts`: `useProving(shown)` reads `GET /proving` through `useLaneRead` (`{ value, trouble, retry }`) and reads again quietly when `shown` turns true again; `replaceClass(kind)` puts the `ProvingClass` a Set threshold answered in place of its row (into the tables as they stand when the answer lands) |
+
+## Files
+| file | holds |
+|---|---|
+| `TablesScreen.tsx` | the screen's data and state; passes `ProvingTable` its props: `proving`, `sort`, `onSort`, `expanded`, `onExpand`, `heldFrom`, `line`, `pressing`, `refusal`, `onStep`, `onSetThreshold` |
+| `ProvingTable.tsx` | head ("How right the reader is", model · contract), the understanding line, the states, the `DataTable`, the column legend |
+| `ProvingDetail.tsx` | the opened row: `ThresholdControl`, the sweep, renamed-to, latest notes; exports `Share` |
+| `ThresholdControl.tsx` | the house `Stepper` and Set threshold; draws the press, sends nothing |
+| `utils/provingModel.ts` | `tooFew(count)`, `isThin(kind)`, `lineWords(line, t)`, `sameLine(a, b)`, `thresholdWords(kind, t)`: how a figure reads, never its value |
+
+## Table
+- Columns in order: Kind (with its line: "Threshold 65% · set Oct 15", or "No threshold set: its areas stand only when you mark them"), Precision, Coverage, Missed, Judged, Right, Wrong kind, Not a change, Near the line. Precision and Coverage are at the kind's line; a kind with no line set shows them previewed at the engine's default, each said "at 0.50" under the figure (`Share`'s `previewedAt`, `affectedAreas.tables.atDefault`), and its sweep marks no row "In force". The control starts at that default, its stepper noted "not set", and its sentence says what stands while no line is set. ~1,212 px of table (measured at 1280: the Kind column holds its sentence in a fixed `w-44` wrapping span, so no line's words widen it, and every row is 96 px) in an 885 px frame at 1280, 356 on a phone (MAN-8580): it scrolls sideways at every size, so the order decides what shows first.
+- Opens sorted by precision, lowest first (`FIRST_SORT`). A new column opens on the end that needs the operator: precision and coverage lowest first, counts highest first, kind A to Z; the same column flips. A dash sorts as nothing: last in both directions (`DataTable`, MAN-8580).
+- States: read out (real heads over six `vv-skeleton` rows); lane fault (`LaneTrouble` with Try again; a failed re-read draws it above the table it kept); no kind judged on the random slice (info banner over a table whose lines can still be set); the kinds.
+- The understanding line is counts ("18 of 22 judged right"), never a rate.
+- What each count is (the engine's, MAN-8563): Judged, Right, Wrong kind and Not a change are the kind's regions on the random slice, judged confirm, rename and not a change; Near the line is marks made in Unsure first; Missed is areas drawn that the reader missed. Near the line and Missed enter no share. The legend under the table says each (`affectedAreas.tables.legend.*`).
+
+## Rules an editor must not break
+- The screen computes no figure. Every number is `GET /proving`'s; `provingModel.ts` decides only how it reads. why: a rate the screen computed would be a number the engine never stood behind.
+- Thin: `isThin(kind)` is `kind.randomSlice.n < 10` (`FEWEST_FOR_A_PERCENT`). `tooFew(count)` is the same test for any share, over the count it was divided by: Precision over `nAt` (a sweep point's `n`), Coverage over `randomSlice.right`. A share over fewer than ten, or null, draws "—" with `sr-only` "too few judged" (`Share`). A judged kind's Precision can be a dash when its line sits high. The engine returns a share from one judgment up; the viewer decides. A thin kind's line stays settable, with a line saying to set it on his own judgment.
+- `TablesScreen` sends Set threshold, not `ThresholdControl`. why: the control's states (moved, pressing, refused) draw from props, and the answer replaces its row where the table is held. The screen reads for itself (`useProving`) and sends through `answerOfWrite` (`utils/laneTrouble.ts`): the hook-owner rule is MAN-8577's. A step moves the line 0.05 (`Math.round(x * 20) / 20`, kept within 0 and 1); a press that would change nothing (the line in force, set by the operator) is refused by the control and again in the handler.
+- Set threshold is never `disabled`: when it would change nothing it carries `aria-disabled` and the house `Button` refuses the press. why: `disabled` drops keyboard focus to the top of the app after a successful set. It is offered when the line is a default (`kind.isDefault`: setting it records the operator's choice) or the stepper has moved (`!sameLine(value, kind.threshold)`).
+- Lines are compared with `sameLine` (within 1e-6), never `===`. Steps are 0.05 within 0..1 and rounded (`Math.round(x * 20) / 20`). A line is said in percent ("65%", `lineWords`), the unit a region's confidence is said in.
+- `heldFrom`: the rows as they stood when the open row opened. `ProvingTable` sorts by them (`sortedBy`) so Set threshold's answer redraws its row where it stands. Opening a row with none held holds the current rows; opening another keeps them; closing lets them go. A head pressed while a row is open re-takes the held rows as they stand now (`heldFrom` = `proving.value.classes`) and re-sorts; with no row open it sets `heldFrom` null.
+- A refusal is drawn above the button it refused (`ThresholdControl`, `role="alert"`): the engine's `not_a_person`, `bad_class`, `bad_threshold` (`affectedAreas.tables.refused.<code>`); a lane fault of `AFFECTED_AREAS_LANE_FAULTS` (`src/shared/constants.ts`) in the Tours view's words (`affectedAreas.trouble.<fault>`); `failed` or `gone` as `refused.failed`; anything else as `refused.other`.
+- The opened row is `ProvingDetail`: two columns from 840 px of container, one below. Its width is `calc(100cqi-34px)` and `sticky left-4`, against the container `ProvingTable` makes of the table's wrapper. why: the row spans every column, wider than the frame on a phone. The 34 px are the frame's two 1 px borders and the panel's 16 px padding each side: change either and the panel is wrong.
+- The sweep lists the engine's lines (0.3 to 0.9 in 0.1 steps) with the line in force marked "In force" and the stepper's moved line "If set"; either one falling between priced lines takes a figure-less row. A kind never judged on the slice shows one line in place of the sweep.
+
+## Open
+- The house `Stepper` is ~35 px tall on touch where Verve asks 44; five screens share it (Set threshold itself is 44 below `md`, `max-md:h-11`).
+- `ProvingDetail` keeps a local `kindName(cls)` over the table's kinds; `kindName(cls, codebook)` is in `utils/tourModel.ts`: one of them should go, and the table carries no codebook.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/hooks/useProving.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/ProvingDetail.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/ProvingTable.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/TablesScreen.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/ThresholdControl.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/utils/provingModel.ts
+
+## MAN-8582 — The marking pieces — src/modules/affected-areas: the mark bar, Missed one, the Mark screen and the understanding mark
+
+The operator's marks on the Tours view: Confirm, Rename to… and Not a change on an area, Missed one (a drawn area), the Mark screen (a queue the engine orders), and Right / Wrong on a read's understanding. Engine side: MAN-8560. The Tours view's state, reads and rules: MAN-8575. What an editor must not break here: MAN-8583. `RegionImage` props and paint: MAN-8579.
+
+## State
+| fact | value |
+|---|---|
+| phase | live: every press is a row and the answer is the redraw. Run whole against the live engine, every mark through the real lane, its rows deleted by id after (`openConsole()` on :5183): `.verify/affected-areas-judgments-seen.mjs` runs today (the understanding mark on the wire and on the card after a reload, a batch of 20 skips, the walk starting over, a drawn area's served badge; its step 6 was extended after the last run and is unrun: MAN-8583 §"Open"). `.verify/affected-areas-marking.mjs` drives the other presses (Confirm, Rename, Not a change, Missed one, the Tables line) but exits 2 at target selection: it wants an unmarked area that already stands, and none does while no line is set |
+| shell / drawn | a shell (`MarkBar`, `MissedDraw`, `UnderstandingMark`, `MarkScreen`) holds the state and sends the press; its drawn piece (`MarkPresses`, `FacePhoto`, `UnderstandingVerdict`, `MarkQueue`) takes every state as props. Same convention as the Tables (MAN-8581) |
+| wire | `api.affectedAreas.mark(regionId, MarkRequest)` → `Region`; `.missed(sha, MissedRequest)` → `Region`; `.markUnderstanding(readId, UnderstandingMarkRequest)` → `UnderstandingMarkResult`; `.queue({ mode, cls, limit, skip })` → `Queue` (`src/shared/api.ts`; types in `src/shared/affected-areas-types.ts`). The `queue` sent with a mark is `MarkQueue`: `unsure` · `random` · `browse` |
+| words | `affectedAreas.{screens,layer,groups,mark,missed,understanding}.*`, `affectedAreas.trouble.{gone,failed}_queue`; refusals `affectedAreas.mark.refused.<code>`: the nine engine reasons (`not_a_person`, `no_region`, `no_read`, `no_image`, `bad_verdict`, `bad_class`, `same_class`, `bad_box`, `note_too_long`), `failed`, `other` |
+| shared | types `ToursScreenKey` (`tours` · `mark` · `tables`), `RegionLayer` (`standing` · `all`), `MarkWalk`, `MissedStage` in `src/shared/types.ts`; `MARK_NOTE_MAX` (500, the engine's `MAX_NOTE`), `MIN_REGION_AREA` (1e-4, the engine's `seat/normalize.MIN_AREA_FRAC`: the floor `MissedDraw` holds a drawn box to) and `AFFECTED_AREAS_LANE_FAULTS` in `src/shared/constants.ts`; `kindName(cls, codebook)` in `utils/tourModel.ts` (the kind an area counts as is the engine's `region.effectiveClass`, `region.class` only for a Region it left unjudged) |
+| hooks | `hooks/useMarkedRegions.ts`, `hooks/useQueue.ts` (and `hooks/useProving.ts`, MAN-8581); the writes go through `answerOfWrite` in `utils/laneTrouble.ts`, which answers the engine's `Region` / `UnderstandingMarkResult` / `ProvingClass`, or the one reason it was not kept (the body's refusal code, the lane's fault, or `failed`) |
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/AffectedAreasView.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/FacePhoto.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/hooks/useMarkedRegions.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/hooks/useQueue.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/LayerSwitch.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/MarkBar.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/MarkPresses.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/MarkPress.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/MarkQueue.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/MarkScreen.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/MissedDraw.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/NoteDialog.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/PanoScreen.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/RegionList.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/ToursSwitch.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/UnderstandingCard.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/UnderstandingMark.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/UnderstandingVerdict.tsx
+
+## MAN-8601 — The marking pieces — src/modules/affected-areas: the mark bar, Missed one, the — Files
+section: The marking pieces — src/modules/affected-areas: the mark bar, Missed one, the Mark screen and the understanding mark/001 Files
+
+| file | holds |
+|---|---|
+| `MarkBar.tsx` | shell: the press out, its refusal, the note and its dialog; props `region`, `codebook`, `queue` (the type `MarkQueue` in `affected-areas-types.ts`: `unsure` · `random` · `browse`), `onMarked(region)`; used by `PanoScreen` (`queue` `browse`) and `MarkQueue.tsx` (`queue` its mode); keyed by `region.regionId` |
+| `MarkPresses.tsx` | drawn: Confirm · Rename to… (a `Menu` of the codebook's kinds, the area's own left out) · Not a change · Add a note; handles `data-mark-bar`, `data-mark-press` = `keep` · `confirm` · `rename` · `not_a_change` · `note` |
+| `MarkPress.tsx` | `JudgmentPress` (a `Button` in a region-look tone), `KeyCap` (Y, R, N, S), `MarkRefusal` (warn banner, `role="alert"`, `data-mark-refusal`) |
+| `NoteDialog.tsx` | the note in a `DialogFrame`, at most `MARK_NOTE_MAX`; Keep the note holds it for the next press and sends nothing; mounted only while open |
+| `MissedDraw.tsx` | shell: Missed one's stage, note, refusal; replaces `PanoScreen`'s photo div |
+| `FacePhoto.tsx` | drawn: the face block (tool row, `RegionImage`, the chosen area's `bar`, the new-area form); handles `data-missed-step`, `data-missed-press` = `start` · `cancel` · `kind` · `note` · `save`, `data-missed-form` |
+| `LayerSwitch.tsx` | Standing · All `SegmentedControl`, handed to `MissedDraw` as `tools` |
+| `ToursSwitch.tsx` | Tours · Mark · Tables `SegmentedControl` at the top of `AffectedAreasView` |
+| `MarkScreen.tsx` | shell: the queue's `mode` and `kind`, `walk` = `useQueue(mode, kind, shown)` (`MarkWalk`), the photo's `useImageUrl`, keys, Skip (waits while a mark is out) |
+| `MarkQueue.tsx` | drawn: mode switch, kind `Select`, one area (question, place, count left, photo with `focusId`, the reader's words, `MarkBar`, Skip); states reading · lane fault · spent · an area whose pano has not answered; handles `data-mark-screen`, `data-mark-mode`, `data-mark-left`, `data-mark-press="skip"` |
+| `UnderstandingMark.tsx` | shell: the verdict out, refusal, the last press's answer, the Wrong field; the card draws `standingMark(answer, read.understandingMark)`: the read's newest mark from the wire, or this press's answer while it is the later |
+| `UnderstandingVerdict.tsx` | drawn: "Is this account right?" with Right and Wrong; handles `data-understanding-mark`, `data-understanding-press` = `right` · `wrong` · `send-wrong` |
+
+## The two queues (`MarkScreen`'s `mode`, opens on `unsure`; the engine orders them: MAN-8562, MAN-8572)
+| mode | label | the engine serves | what its marks are for | the screen says |
+|---|---|---|---|---|
+| `unsure` | Unsure first | unmarked model regions outside the random slice, nearest their kind's line first (to 0.5 where none is set: the distance orders the queue and decides nothing, MAN-8562) | finding each kind's line fast; the Tables count them as Near the line and no share takes them in (MAN-8563) | `affectedAreas.mark.unsureHint` |
+| `random` | Random slice | unmarked held-out regions in one fixed order | measuring the reader; they feed Judged, Right, Wrong kind, Not a change and so Precision and Coverage | `affectedAreas.mark.randomHint` |
+
+- Both modes draw one facts line under the reader's words (`MarkQueue.tsx` `facts`): "{n}% sure", "threshold {n}%" (or "No line set" where the kind has none: `region.threshold` null), the basis ("seen in the photo") and, when `region.holdout` is true, "held out to measure the reader". The engine serves no held-out area in `unsure`.
+- One area at a time: the question "Is this {the reader's kind}?", where it is, "{n} left", its photo, the reader's words, `MarkBar`, Skip.
+- The mode and the kind are the operator's choice; the screen never changes either. A new choice starts the walk over.
+- A queue with nothing in it says "Nothing left to mark" and why, by kind (`emptyKind`) or by mode (`emptyUnsure`, `emptyRandom`).
+- Every mark sent from the screen carries the mode as its `queue` (`unsure` · `random`); the pano screen's carry `browse`.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/AffectedAreasView.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/FacePhoto.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/hooks/useMarkedRegions.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/hooks/useQueue.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/LayerSwitch.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/MarkBar.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/MarkPresses.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/MarkPress.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/MarkQueue.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/MarkScreen.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/MissedDraw.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/NoteDialog.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/PanoScreen.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/RegionList.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/ToursSwitch.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/UnderstandingCard.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/UnderstandingMark.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/UnderstandingVerdict.tsx
+
+## MAN-8602 — The marking pieces — src/modules/affected-areas: the mark bar, Missed one, the — How each is wired
+section: The marking pieces — src/modules/affected-areas: the mark bar, Missed one, the Mark screen and the understanding mark/002 How each is wired
+
+| piece | file | does |
+|---|---|---|
+| `useMarkedRegions(pano.value)` | `AffectedAreasView.tsx`, `hooks/useMarkedRegions.ts` | holds the operator's answers by pano beside the read: a mark's answer replaces its region where it stands, `onMissed` appends the drawn one to its view, never a refetch; `PanoScreen` draws the laid-over pano. An answer outranks a read of the same region that carries no mark or an older one (compared by `markId` and `markedAt`); a read that carries the same mark takes over, with its current `standing` and line. `onMarked` / `onMissed` write under the pano the answer is FOR |
+| Back to the tour | `AffectedAreasView.tsx` | calls `tour.reload()` quietly: a judgment moves the tour's tile counts, its rooms' "Affected per the photos" and the face a pano opens on. The pano is not refetched |
+| the switch | `AffectedAreasView.tsx` | `ToursSwitch` outside the keyed entrance; Mark and Tables mount on first show (`openedScreens`) and stay mounted, `hidden` while another shows. A surface shown again reads again, quietly, on that press: Tours the open pano (`pano.reload()`), else the open tour, else the list; Mark and Tables when their `shown` turns true (`useWhenShown`) |
+| the layer | `AffectedAreasView.tsx` (`layer`, All at first and on each pano opened), `PanoScreen.tsx` | `LayerSwitch` as `MissedDraw`'s `tools`. On Standing the photo keeps the regions whose wire `standing` is not false, and the chosen area whatever its flag; the list and the caption keep every area |
+| Missed one · the bar | `PanoScreen.tsx` | `MissedDraw` in place of the photo div when the pano has answered and the face has a view (`key={view.sha256}`; `nextOrdinal` = highest ordinal of ALL the view's regions + 1); `MarkBar` on the chosen region as its `bar` (`queue` `browse`) |
+| kind names | `PanoScreen.tsx`, `RegionList.tsx` | outline and list name a row by `region.effectiveClass ?? region.class`, so a rename redraws them |
+| list scroll | `RegionList.tsx` | in the stacked layout (the nearest container under 720 px) the row scroll is skipped: the face block brings photo and presses into view |
+| the understanding | `UnderstandingCard.tsx` | `<UnderstandingMark key={read.readId} read={read} />` for a read with a `readId` |
+| the queue | `MarkScreen.tsx`, `hooks/useQueue.ts` | `useQueue(mode, kind, shown)`: a batch of 20 from `api.affectedAreas.queue`, read again under a new key on a mode or kind change and when its last area is passed, quietly when `shown` turns true again; `next(answered)` after a press (a mark hands over its region, a skip null); the walk's newest 50 skipped region ids ride the read as `skip` (fixed when a batch is spent and part of its key), so the batch after 20 skips is the next 20; an engine answer with no item and `remaining` above zero means every area left was skipped, and the walk forgets its skips and reads again with none; `left` = the batch's `remaining` less the areas of that batch judged here, and an area it holds an answer for is passed over (a late batch never offers a marked area again), as is an area skipped in this queue (kept for the mode and kind it was skipped in; all skipped starts the walk over); neighbours from `panoFor(item.tourId/item.panoId)`, the view found by `sha256`, a neighbour judged on this screen drawn as answered |
+| the keys | `MarkScreen.tsx` | Y, N and R click `[data-mark-screen] [data-mark-press=…]`, S skips; on the host window only while `shown`, and never while a field has the focus or a dialog, menu or list is up |
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/AffectedAreasView.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/FacePhoto.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/hooks/useMarkedRegions.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/hooks/useQueue.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/LayerSwitch.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/MarkBar.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/MarkPresses.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/MarkPress.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/MarkQueue.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/MarkScreen.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/MissedDraw.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/NoteDialog.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/PanoScreen.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/RegionList.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/ToursSwitch.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/UnderstandingCard.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/UnderstandingMark.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/UnderstandingVerdict.tsx
+
+## MAN-8583 — The marking pieces — rules an editor must not break: presses, the counted kind, notes, Missed one, scroll, and what was measured
+
+The pieces, their markers and the wire: MAN-8582. Engine verdicts and refusals: MAN-8560. Hook-owner and tone rules of the Tours view: MAN-8577.
+
+## Rules
+- Nothing is marked for the operator: no confirm-all, and a confidence never turns an area green. One press is one `api.affectedAreas.mark`; the answer `Region` is the redraw.
+- A press is tinted by the look the area takes when pressed (`REGION_LOOK`; `JudgmentPress` with `data-tone`; no `Button` variant, since every variant carries a hover colour). Confirm = confirmed fill, Rename to… = confirmed outline (`RENAME_FACE`), Not a change = set-aside grey.
+- One mark out at a time: while `out` is non-null every press refuses a second. A busy press keeps its focus (`busy`, never `disabled`).
+- The kind an area counts as is `region.effectiveClass ?? region.class`, never `region.class` alone: the wire's `class` stays the reader's after a rename, and `effectiveClass` is shadow-connector's `standing.effective_class`, computed once in the engine (the fallback is only for a Region the engine left unjudged; the browser derives it from no mark). Every line that names an area's kind reads it; the Mark screen's question names the reader's own `region.class`.
+- A renamed area leads with Keep {kind} (a rename to the kind it counts as; the engine refuses only the reader's own kind) and its Confirm reads Put back {the reader's kind}. why: without Keep a note could ride only a press that undoes the rename.
+- An area drawn by hand (`source === 'human'`) offers Not a change alone and no note; once taken back it offers no press. `confirm` and `rename` on it are `bad_verdict` (MAN-8560).
+- A note rides only on a press and is spent when a mark is answered; `NoteDialog` sends nothing. `MarkBar` is keyed by the area so a kept note never rides to the next.
+- Y, N, R and S click the presses' own `data-mark-press` elements: the same press a pointer makes. The keys are the Mark screen's alone. why: on the pano screen a key would fire while a note is typed.
+- Missed one: `MissedDraw` replaces the photo; `bar` is hidden, never unmounted, while a box is drawn or held. why: no press of another area may stand beside the box, and the bar returns as it was. The floor on a drawn box is the engine's area floor (`MIN_REGION_AREA` = 1e-4, `seat/normalize.MIN_AREA_FRAC`; the engine stays the authority, `bad_box`): the library reports every box that has a width and a height, and `MissedDraw` turns one under the floor back before sending, in the engine's own sentence (`affectedAreas.mark.refused.bad_box`) — at its release, which leaves Missed one drawing (the photo takes the next drag at once) and puts the sentence in the floor line's place until the next release; no box under the floor reaches the kind, the note or Save, so no request leaves for it. The corners are rounded to 6 places and the area to 8 before the compare, as the engine does, so a box of exactly the floor is kept. `FacePhoto` says the floor in a line under the photo while Missed one is drawing (`affectedAreas.missed.floor`: about 10 by 10 pixels), unless a refusal stands in its place. Save waits for a kind; a refused Save returns to `drawn` with box and kind kept.
+- `FacePhoto` owns the scroll on a choice: it brings its block into view a frame after an area is chosen (`blockRef`, `scrollIntoView({ block: 'nearest' })`); `MarkPresses` never scrolls itself. why: on a phone photo and presses fit one screen, and the list scrolls its own row in the same commit.
+- `LayerSwitch` filters on the wire's `standing`, never re-derived. On Standing the chosen area stays drawn whatever its flag, so an area chosen in the list is never judged unseen. The list keeps every area either way.
+- The understanding mark is the read's newest, from the wire (`ReadState.understandingMark`), and is said after any reload; a press's answer replaces it at once (`standingMark`: the later of the two, the wire's when they are the same mark). A queue item carries no neighbours: `useQueue` reads its pano to dim them, and draws a neighbour judged on this screen as the engine answered it unless the pano read carries the same mark or a newer one (`answerOutranks`, shared with `useMarkedRegions`).
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/AffectedAreasView.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/FacePhoto.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/LayerSwitch.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/MarkBar.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/MarkPresses.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/MarkPress.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/MarkQueue.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/MarkScreen.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/MissedDraw.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/NoteDialog.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/PanoScreen.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/RegionList.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/UnderstandingCard.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/UnderstandingMark.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/UnderstandingVerdict.tsx
+
+## MAN-8603 — The marking pieces — rules an editor must not break: presses, the counted kind — A skipped area is not marked, so it stays in the queue and in `remaining`. The screen remembers its
+section: The marking pieces — rules an editor must not break: presses, the counted kind, notes, Missed one, scroll, and what was measured/001 A skipped area is not marked, so it stays in the queue and in `remaining`. The screen remembers its
+
+- A skipped area is not marked, so it stays in the queue and in `remaining`. The screen remembers its skips by region id (`skipped`, oldest first, kept for the mode and kind they were made in: another queue starts with none, a skip made there replaces them, and coming back before one is made finds them); the newest 50 ride the next read as `GET /queue?skip=` (the engine's bound), so the engine leaves them out and the batch after 20 skips is the next 20. The skips sent are fixed when a batch is spent, as part of the read's key, so a skip inside a batch never reads again; those made in the batch on screen, and any older than the newest 50, are passed over locally, so Mark shown again after Tables comes up where it was left. When the engine answers no item and a `remaining` above zero, every area left was skipped: the walk forgets its skips and reads again with none (the render-time guard in `useQueue`), since "Nothing left to mark" would be false; the same holds in the batch in hand when it holds only areas skipped before the newest 50. `left` is the batch's `remaining` less the areas of that batch judged here (`answers`), never less the skips.
+- The queue passes over an area it holds an answer for: a batch read that began before a mark and lands after it still serves the marked area, and it is not offered again. A mark answered after the operator has skipped past its area is kept and counted and leaves the screen where it is (`onScreenRef`).
+- A skip waits while a mark is out (`MarkScreen.onSkip` reads the bar's `aria-busy` presses): a skip on the last area of a batch would read the next batch before the engine has the mark, which would serve the marked area again with its presses on.
+- A drawn area's answer is laid over the saved copy of it too (`laidOver` applies `answered` to the `drawn` copies): until the pano is read again that copy is the only one the screen has, and the one press the bar offers on it, Not a change, would otherwise redraw nothing and be offered again.
+- The keys read `[data-mark-screen] [data-mark-press=…]` on the host window and wait while a field has the focus or a `[role="dialog"]`, `[role="menu"]` or `[role="listbox"]` is in the document.
+- `Menu` draws no group headings: the kinds stand in the codebook's order, which is its groups' order, and each row carries its group's word as its `description` (`affectedAreas.groups.<group>`: Damage, Work already done, The source, Older damage) — in Rename to… (13 kinds, its own left out) and in Missed one's kind menu (all 14). The Mark screen's kind `Select` shows the same word as a hint. A row of two lines is about 60 px, so the menu is 780–840 px tall: it hangs under its trigger and scrolls with the page, its last row reachable at 390 and at 1280 px.
+- Words name kinds and places, never ids (INV-76).
+
+## Measured 2026-10-17 (the presses and the Mark screen, light and dark, 1280×800 and 390×844, on the live :5183 app)
+- Presses: 36 px at a desk, 44 px on the phone. At 1280×800 the Mark screen fits above the fold: the Tours view starts ~180 px down the panel, so photo and answer split the width evenly.
+- `FacePhoto` block: 620 of the phone scroller's 799 px with the caption, measured before the scroll moved into it; the move itself is not re-measured.
+- Verve's tone pairs on the presses: 4.48:1 Confirm, 4.46:1 Not a change (light), under AA's 4.5:1; ghost Add a note 2.81:1 (MAN-742). A palette call.
+- Not shot dark: the pano with its presses and the Tables (the Mark screen was).
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/AffectedAreasView.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/FacePhoto.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/LayerSwitch.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/MarkBar.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/MarkPresses.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/MarkPress.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/MarkQueue.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/MarkScreen.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/MissedDraw.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/NoteDialog.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/PanoScreen.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/RegionList.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/UnderstandingCard.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/UnderstandingMark.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/UnderstandingVerdict.tsx
+
+## MAN-8604 — The marking pieces — rules an editor must not break: presses, the counted kind — Measured 2026-10-17 (the live :5183 client over the live engine, `.verify/affected-areas-marking.mjs
+section: The marking pieces — rules an editor must not break: presses, the counted kind, notes, Missed one, scroll, and what was measured/002 Measured 2026-10-17 (the live :5183 client over the live engine, `.verify/affected-areas-marking.mjs
+
+## Measured 2026-10-17 (the live :5183 client over the live engine, `.verify/affected-areas-marking.mjs`, 66 of 66 checks, run on the code with the skip memory and the skip guard)
+- Every mark goes through the real lane as the signed-in operator (`marked_by` the operator's name, `origin` `internal`); each is deleted by id afterwards, before and after counts equal (marks 0, human regions 0, thresholds 0, regions 72).
+- Confirm, Rename, Not a change, Missed one and the understanding Wrong each answer 200 and the answer is the engine's own read of the region (`mark.markId`, verdict, `standing`) on `GET …/panos/{pano}`; each is one request, the photo element is the same one after it.
+- Standing hides exactly the regions whose wire `standing` is false (2 of 3 drawn; the list keeps 3). The Mark screen shows each item's confidence and threshold (Unsure first) or the held-out flag (Random slice) as `GET /queue` sent them; S skips with no row, Y and N by key mark from the queue they were made in, and "N left" falls by one to the engine's `remaining`.
+- The Tables' counts equal `GET /proving` for all fourteen kinds; Set threshold moved Containment to 100% and the answer, the row and `GET /proving` agree; back on the pano the area of that kind went from standing to not standing.
+- Three real engine refusals, bent in flight (`bad_class`, `note_too_long`, `bad_box`), are said in words and write nothing; the browser logs each 422 as a console error of its own, and nothing else is logged.
+- 390 px: no sideways page scroll on the pano with its presses nor on the Mark screen.
+
+## Measured 2026-10-18 (the live :5183 client over the live engine, `.verify/affected-areas-judgments-seen.mjs`, 15 of 15 checks; steps 1–5 and 7 as they now stand, step 6 before it told the served badge from the stored one)
+- Understanding mark: the pano GET reads `understandingMark` null, then the Wrong mark with its note, then the newer Right; the tour GET carries the same mark; the card says wrong with its note after a full reload, at 1280 and 390 px.
+- Skip: `GET /queue?mode=unsure&limit=3&skip=<first three ids>` serves items 4 to 6 of the unskipped queue. A batch of 20 skips on the Mark screen writes no row, sends those 20 as `skip` and the screen comes up on the engine's first area for it.
+- Bad `skip` (51 ids, upper-case, not a uuid, a trailing comma): 422 on the engine and on the lane, before any query.
+- Start over: a kind with two areas, both skipped, reads `no skip → skip(2) → no skip`; the screen is on "2 left" again.
+- A drawn area on a view read twice is served the shown read's region count plus one (`2` on a view with 1 area). Rolled-back probe on a view whose newer read held more regions: stored `model 1, human 2, model 2`, served `model 1, human 3, model 2`.
+- The pano, tour and both queue answers equal the pre-change snapshots apart from the new fields (`understandingMark`, `effectiveClass`).
+- Cleanup: every mark and drawn area deleted by the id its POST answered, psql by those ids 0 rows, ledger back at 0 marks, 0 drawn areas, 0 thresholds.
+
+## Measured 2026-10-18 (the live :5183 client over the live engine, `.verify/affected-areas-marking-boxes.mjs`, 31 of 31 checks at 1280 and 390 px, one session per width)
+- A 0.5 × 0.015 box (75 times the floor) is held with no sentence, sent, and kept: the engine answered 200 with a human area, `areaFrac` 0.0075; it is deleted by the id its POST answered, psql by that id and by its mark's id answers no row, drawn areas 0 before and after.
+- A 0.005 × 0.005 box (area 2.5e-5) was held on the photo with "That box is too small to be an area: drag a bigger one", and no request left; Athena then found the photo took no further drag in that stage. A release under the floor now leaves Missed one drawing and puts the sentence in the floor line's place, and the script's step 2 asserts that and a real next drag; that step has not run since it was rewritten.
+- Rename to… lists 13 kinds and Missed one's menu 14, in codebook order, each row with its group's word; the last row scrolls into view and a press at its centre lands on it (the 390 px Rename menu's last row ends flush with the screen's bottom edge).
+
+## Open
+- `.verify/affected-areas-marking.mjs` takes back a reader's area and never a drawn one, walks no stale batch (one read before a mark and landing after it), and exits 2 at target selection while no line is set: its target selection and Tables section need rewriting for "a line moved over an area makes it stand".
+- `.verify/affected-areas-judgments-seen.mjs` step 6 (two areas drawn on a view read twice, the first deleted by id: the second served count + 1 while the ledger stores count + 2; the array in badge order; the take-back's answer under the served badge) passes `node --check` and has not run. The file is ~360 lines in seven steps.
+- The skip guard (`markIsOut`) is read, not run: no probe skips with a mark out.
+- `MarkQueue`'s `shapeOf` and `PanoScreen`'s shapes map derive the same `RegionShape` (tone, edge, wash, the name of the kind it counts as): one of them should go.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/AffectedAreasView.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/FacePhoto.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/LayerSwitch.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/MarkBar.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/MarkPresses.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/MarkPress.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/MarkQueue.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/MarkScreen.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/MissedDraw.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/NoteDialog.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/PanoScreen.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/RegionList.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/UnderstandingCard.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/UnderstandingMark.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/UnderstandingVerdict.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/affected-areas-marking-boxes.mjs
+
+## MAN-8621 — memory-assert — how a rules / requirements card lands on its shelf
+
+`memory-compose.ts::compose`, `section` branch. Targets: `rules` → `~/.claude/RULES.md`, anchor `## Rules`; `requirements` → `~/.claude/REQUIREMENTS.md`, anchor `## Requirements`. Both are `mustExist`: a missing file refuses before `compose` runs. "Blank" is `current.trim() === ''`. "Carries the anchor" is a line of the body that trims to the anchor.
+
+| shelf | body | result |
+|---|---|---|
+| blank | carries the anchor | body is the whole file plus one trailing `\n` — a restore, title and note included |
+| blank | does not | `<title>\n\n<anchor>\n\n<body>\n` — the title (`# RULES.md` / `# REQUIREMENTS.md`) and the heading are minted here, so the session-start shape check (`hooks/shelf_health.py`) finds the shelf healthy; a heading-carrying restore is written exactly as given and judged as written |
+| content, anchor present | does not | body lands at the END of the anchor's section: before the next `## ` heading, else at file end |
+| content, anchor present | carries it | refused: "already has content … only an empty shelf takes it … queue them without the heading line" |
+| content, anchor absent | any | refused: "has no “<anchor>” section to add this under … will not invent one" (checked before the row above) |
+
+- why blank is writable: no session can add a line to a shelf (`hooks/enforce_shelf_channel.py`), so a wiped shelf has no heading to land under and the queue is the only door that refills it.
+- why content refuses a heading-carrying body: its title, note and second heading would land INSIDE the section, and every later entry above them.
+- Caps run on the composed result against `''` for a blank file. `rules` / `requirements` hold 60 lines / 2,000 chars (MAN-604): a restore past them refuses and the file stays blank.
+- Refusal remedy for the total-size reason: blank shelf → "the file is empty, so there is no entry to trim — shorten this body."; shelf with content → "trim an entry before adding another."
+- Landing mode: the `rules`, `requirements` and `claude` steps carry `readOnly` (`memory-plan.ts`), and `memory-assert.ts::atomicWrite` sets the temp file to 0444 BEFORE the rename — the shelf never exists writable at its real path, so a stray `> RULES.md` fails with "Permission denied". The rename needs only the directory's write bit, so the door passes over the 0444 file it replaces. Memory notes and the project `MEMORY.md` keep a plain write's mode. `hooks/shelf_health.py` re-applies 0444 at every main session start (`SHELF_MODE` there, `SHELF_FILE_MODE` here: one number in two languages).
+- Restore a wiped shelf: queue its full text as ONE `rules` / `requirements` card, before any other entry, with no line reworded. `commands/remember.md` §2 gives the same instruction to the proposing session.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/memory-intake/memory-assert.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/memory-intake/memory-caps.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/memory-intake/memory-compose.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/memory-intake/memory-plan.ts, /home/lyphe/.claude/commands/remember.md
+
+## MAN-8687 — The native-scroll gate — `.verify/native-scroll-drag.mjs`: a swipe on a row or card is the browser's own scroll, and hold-and-drag still carries
+
+Proves a swipe that starts on a chat row or an epic-deck card is the phone's own scroll and glide, and a hold of 0.5 s then a drag still carries the item through the browser's `pointercancel`. Mechanism: MAN-7525 (chat list), MAN-8136 (`sortable/touchCarry.ts`), MAN-8138 (`usePointerDrag`).
+
+## Run
+`STAGE=before|after|all SUNSET_SLOT=<n> bash .verify/native-scroll-drag-scratch.sh [evidence dir]` (several minutes; slot default 8, evidence default `.verify/artifacts/native-scroll-drag/`).
+| piece | is |
+| --- | --- |
+| stack | `.verify/lib/simple-list-stack.sh`: a scratch API on a copy of the database |
+| `before` client | the files in the runner's `NATIVE_SCROLL_BEFORE_FILES` served as git HEAD holds them (`lib/vite-scratch-before.config.mjs` serves a file the change deleted from its HEAD text); a file the change added is not listed |
+| `after` client | chat list: the scratch client; deck: the dev client (`DEV_CLIENT`, default `http://127.0.0.1:5183`) |
+| `native-scroll-drag.mjs --label before\|after --chat-app <url> --deck-app <url> [--out <dir>]` | `before` only records and exits 0; `after` exits 1 on any failed check; `refuseLiveApp` refuses the operator's app as `--chat-app` |
+
+## Phone model — `lib/phone-uncancelable.mjs`
+- `UNCANCELABLE_TOUCH`: init script that wraps `EventTarget.prototype.addEventListener` so every `touchstart` / `touchmove` listener is passive; Chromium then dispatches those touches uncancelable, as the operator's Galaxy Z Fold 8 does. why: headless Chromium dispatches touches blocking, so every earlier gate passed a hold the phone fails.
+- `TOUCH_RECORDER` (`window.__touchTrace`), `resetTouchTrace(page)`, `readTouchTrace(page)`, `traceLines(trace)`: the timeline of touch and pointer events with each one's `cancelable`.
+- The finger is `openFinger` (`lib/touch-input.mjs`, CDP `Input.dispatchTouchEvent`), 390×844.
+- `PROOF_COUNTERS` (`lib/native-scroll-legs.mjs`): counts the PAGE's `scrollTop=` / `scroll` / `scrollBy` / `scrollTo` and every `preventDefault` on a touch event. The browser's own scrolling never passes through it.
+
+## Surfaces — `lib/native-scroll-surfaces.mjs`
+| surface | runs on |
+| --- | --- |
+| `chatSurface(env)` | the sidebar's simple list on the scratch stack; a carry writes its order to the copy |
+| `deckSurface(env)` | the In flight tab's epic deck on the card-order lane (`lib/order-lane.mjs`) on the dev client; every dispatcher write stubbed, preferences pinned: nothing is stored |
+A surface supplies `open(scenario, theme)`, `flickFrom`, `carryPlan`, `edgePlan`, `mousePlan`, `outcome`, `shot`; the deck adds `strips` (`[data-arc-strip]` plan strip, `[data-status-flow]` phase track) and `stripPoint`.
+
+## Legs — `lib/native-scroll-legs.mjs`, in order per surface
+| leg | asserts |
+| --- | --- |
+| `scrollLeg` flick | a swipe from a row or card moves the pane under the finger, the pane glides on after the lift, the page writes no scroll position, nothing lifts, no touch event is prevented |
+| `carryLeg` hold + drag | the hold lifts; `pointercancel` arrives after the lift (400 ms); the item still follows the finger; the pane's `scrollTop` is unchanged at the checkpoint, after the finger turns back toward the press point, and at the drop; it drops at the new place; nothing is left (no `data-carried`, no `vv-dragging`, the pane's `overflow` and the count of inline `overflow` styles as at rest); zero `preventDefault` on touch events |
+| `edgeLeg` | a lifted item in the pane's bottom zone: the pane is `overflow: hidden`, still scrolls toward the edge by the carry's own script, and is restored afterwards |
+| `stripLeg` (deck) | a vertical swipe from inside the plan strip or the phase track scrolls the pane, a sideways one the strip; neither lifts; the page writes no scroll position |
+| `mouseLeg` | a desktop mouse carry lifts, follows the pointer, drops at the new place, leaves nothing |
+| `restLeg` (`after` only) | a resting shot at desktop and phone, dark and light |
+Then: no console or page error on either surface except the seeded chats' `token-usage` 404.
+why the turn-back in `carryLeg`: a chat list at the top of the pane cannot pan under a downward finger, so the first reading could pass with the freeze undone; a finger turning back up can.
+
+## Measured
+- 2026-10-20, before the turn-back reading existed: `after` 38 of 38 checks pass; the HEAD client fails 10: on both surfaces no glide, 6 page scroll writes per flick, no `pointercancel` mid-carry, the pane not held at the edge leg; on the deck, the page's scroll writes inside the plan strip and the phase track. Pane `scrollTop` across the carry: chat 0, 0, 0; deck 154, 154, 154. Glide after the lift: chat 223 → 386, deck 223 → 430 over 250–300 ms. `pointercancel` at 603 ms (chat), 583 ms (deck). The turn-back reading has not run.
+- Not reproduced: any real phone, Android's long-press buzz, an iPhone's callout. The Fold itself has never run this gate.
+- `.verify/` is git-ignored: the gate is local to this checkout.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/native-scroll-legs.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/native-scroll-surfaces.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/phone-uncancelable.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/native-scroll-drag.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/native-scroll-drag-scratch.sh
+
+## MAN-8695 — The Claude API keys card — files, the read contract and the strings
+
+Settings → Agents → Claude: the card that shows who pays for plan runs and holds the two Anthropic API key slots. It draws the door's picture (`~/.claude/scripts/claude-api status --json`, MAN-8625) through Settings' own routes (MAN-8701) and does no arithmetic of its own. Mounted by `AgentCategoryContentSection.tsx` directly after `<RunnerModelContent />`, and live from the day it landed: with no key entered, the door names the subscription and every launch rides what it rode before.
+
+## Files — `src/modules/settings/tabs/agents-settings/sections/`
+| file | role |
+|---|---|
+| `content/ClaudeApiKeysContent.tsx` | the card: header row (title, payer `Badge`, the door's `rides.why` + purpose sentence, retry press), then one `ClaudeApiKeyRow` per slot 1, 2 in slot order |
+| `content/ClaudeApiKeyRow.tsx` | one slot: label + `Saved <date>`/`Not set`/`Unknown` badge, the standing line, one form (key, name, monthly credit, renewal day) with `Save`/`Replace` and `Remove`, both refusing the press while any slot's write is out |
+| `content/claude-api-standing.ts` | pure: `standingOf(picture, unknown, t)` → `{tone, base, clause}`, `formatDay`, `usd` |
+| `src/shared/hooks/useClaudeApiKeys.ts` | the read and the three acts: `GET /api/settings/claude-api`, `PUT`/`DELETE …/:slot`; one module-level epoch, one read at a time, a re-read after a failed write, a re-ask on focus and visibilitychange (one page return is one read), no timer |
+| `src/shared/api.ts` | `settings.claudeApi()`, `settings.saveClaudeApiKey(slot, body)`, `settings.removeClaudeApiKey(slot)` |
+| `AgentCategoryContentSection.tsx` | mounts `<ClaudeApiKeysContent />` directly after `<RunnerModelContent />` |
+| `src/modules/i18n/locales/en/settings.json` | `agents.claudeApi`, 38 leaf keys, between `runnerModel` and `runnerHealModel`; every `t()` call in the four files carries a `defaultValue`; other locales fall back |
+
+The read is `useClaudeApiKeys()`; `onSave` calls its `save` and empties the slot's draft only on a true answer; `onRemove`/`onRetry` call `remove`/`refresh`; the card mounts as the component itself.
+
+## The read contract — `ClaudeApiCardView` (`src/shared/types.ts`)
+| field | meaning |
+|---|---|
+| `picture` | `ClaudeApiPicture` · `{unreadable: true}` (read failed) · `null` (read on the wire) |
+| `savingSlot` | slot a write is in flight on, or `null` |
+| `refusal` | `{slot, words}`: the door's own sentence for a refused save, or the failure sentence for a write that never got an answer, drawn under that slot's key field; it is the pressing surface's own state, not carried across a remount |
+| `save(slot, body)` | `Promise<boolean>`, `true` only on SAVED |
+| `remove(slot)`, `refresh()` | `Promise<void>`; `refresh` is the retry |
+- `ClaudeApiKeySave` = `{key?, label?, creditUsd?, renewsDay?}`: an omitted field keeps the slot's stored value; `renewsDay: null` clears the day; `key` is present only when the reader typed one. Its target is `PUT /api/settings/claude-api/:slot` (live, MAN-8701), body never logged or echoed.
+- The unreadable sentence promises a re-ask "whenever this page regains focus": the hook's `focus`/`visibilitychange` listeners are that promise.
+- Type mirrors: `ClaudeApiWall`, `ClaudeApiKeyPicture`, `ClaudeApiPicture`, `ClaudeApiUnreadable` (4 declarations + 2 comments, 2298 bytes, 32 lines) stand byte-identical in `src/shared/types.ts` and `server/shared/types.ts`. `ClaudeApiKeySave` and `ClaudeApiCardView` are the client mirror's only.
+
+## What each state draws
+| state | draws |
+|---|---|
+| `asking` | `Asking…` badge, `Loading...`, retry press, no slot rows |
+| `unreadable` | `Unknown` badge, the unreadable sentence, retry press; both slots `Unknown`, standing `Unknown — …not the same as not set`, no form |
+| read | payer badge: `Subscription` (positive) · `API key <n>` (info) · `Walled` (warn, every payer walled); FIRST LINE = `rides.why` alone for every `rides.slot`, 0, 1, 2 and `null` (`ridesNone` when `why` is empty), because the door's sentence already opens "Plan runs ride …" and a payer sentence of the card's own said it twice (INV-8937); then the purpose sentence |
+| standing line order | wall (`refused` danger · `credit` · `spend` · `rate`, warn; `usage` draws the door's `detail`) → window open (`spending down until <cycle end>`, info) → no renewal day → `window opens <date>` / `window not open yet` |
+Dates draw in the reader's locale and zone (`toLocaleDateString`), so an epoch at UTC midnight can read as the previous local day.
+
+## Rules the card holds
+- **SAVED empties the field, and nothing else.** A 422 keeps the typed key so it can be corrected and draws the door's words under the field (the `Field` error slot, `role="alert"`); any other failed write keeps it too, draws the door's message or a failure sentence, and re-reads the store.
+- **One write at a time, visibly.** While any slot's write is on the wire, every row's `Save`/`Replace` and `Remove` refuses the press (`aria-disabled`; the button keeps focus) and an Enter submit in a field is refused too, so a second press is never silently dropped. A Save that still races the guard answers a sentence under its field; a Remove that does is dropped. Editor's rules: INV-8936, INV-8937.
+- **A refusal belongs to the surface that pressed Save.** It is the mounting card's own state: leaving and returning does not redraw a sentence about a press nobody made on that screen, and the next press retires it.
+- **Unreadable is never "not set".** A failed GET — a non-2xx, a body that is not the picture, a thrown call — answers `{unreadable: true}`, which the card draws as unknown in words with no form (INV-8936).
+- **No timer, and no on-demand arithmetic.** The picture moves while Settings is closed (a wall lands, a window opens), so the hook asks again on `focus` and `visibilitychange`; the pair one return fires is one ask (a 600 ms window), nothing polls and no figure is computed from the picture's parts.
+- **One epoch.** A read issued before a write and answered after it is dropped; a save's fresh picture is the server's read-back, never an echo of what was sent.
+- **A write that failed may have landed** (the door writes the slot before it lifts the walls), so every failure answers a re-read, not the side the card asked for.
+- **The key is one-way.** It travels in the PUT body only, into the door's stdin; the picture, the GET, a refusal and an error carry none. The card names a key by slot and label, never by id or digest (INV-76).
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/settings.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/agents-settings/sections/AgentCategoryContentSection.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/agents-settings/sections/content/ClaudeApiKeyRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/agents-settings/sections/content/ClaudeApiKeysContent.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/agents-settings/sections/content/claude-api-standing.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/useClaudeApiKeys.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts
+
+## MAN-8849 — The accounts module's launch reads — account-door.ts (the credential) and chosen-account.ts (the choice)
+
+The two reads the rest of the server makes of the house's Claude account store. Python side: the door MAN-8842, the records MAN-8840, the token MAN-8841. Consumer: MAN-8848.
+
+## Barrel — `server/modules/accounts/index.ts`
+| export | from | answers |
+|---|---|---|
+| `launchCredential` | `account-door.ts` | the account in use and its token, for a CLI start |
+| `chosenAccount` | `chosen-account.ts` | the house's choice now, or `null` |
+| `liveAccountEmail` | `account-identity.service.ts` (`identity`) | the live login's email, `oauthAccount.emailAddress` of `~/.claude.json`; the only credential-adjacent read the server keeps besides the meter, and it opens no credential file |
+| `notePacerReading` | `pacer-door.ts` (`note`) | files one window reading with the pacer: `(digest, windows, checkedAt, 'meter' \| 'chat')`; consumers `usage.service.ts` (`'meter'`) and `claude-chat-readings.ts` (`'chat'`, MAN-8859) |
+| `createAccountsModule` | `accounts.module.ts` | the composition root |
+
+## `launchCredential()` — `account-door.ts`
+- Returns `Promise<ClaudeAccountCredential>` (`server/shared/types.ts`): `{ account: string|null, slug: string|null, token: string|null }`. Never rejects.
+- Runs `$CLAUDE_ACCOUNT_BIN` (default `~/.claude/scripts/claude-account`) `credential --fd 3`. The door puts `{"account","slug","token": <bool>}` on stdout and the token plus a newline on fd 3.
+- fd 3 is a real FIFO: `mkfifo -m 600` in a `mkdtemp` 0700 directory under `os.tmpdir()`; the read end opened `O_NONBLOCK`, the write end handed to the child as `stdio[3]` and closed in the parent at once; the directory removed whatever the answer.
+- The read end is drained synchronously, once, on the child's `close`; at exit every byte is in the pipe buffer, so the drain sees all of it and then end-of-file.
+- Every failure answers `{ account: null, slug: null, token: null }` and the launch rides the live login: FIFO not creatable, spawn error, non-zero exit, 10 s bound (`SIGKILL`), stdout not the promised shape (`token` not a boolean, `account`/`slug` neither string nor null).
+- The only relayed string is the door's stderr on a non-zero exit, logged `[claude-account] credential: <text>` with `sk-ant-[A-Za-z0-9_-]{8,}` replaced by `[key]`. Stdout is parsed and never printed.
+
+- `account-door.ts` also carries the panel's door faces — `accountsPicture`, `useAccount`, `setAuto`, `removeAccount`, with the relay in `account-door-relay.ts`: MAN-8858.
+
+## `chosenAccount()` — `chosen-account.ts`
+- Returns `{ digest, slug } | null`, read on every call from `<home>/chosen.json`; never cached, never called on a timer.
+- `<home>` follows the Python store's `record.home()`: `$PLAN_RUNNER_CLAUDE_ACCOUNT_HOME` (made absolute, `~` expanded) when set; else the parent of a set `$DISPATCHER_HOME`, plus `/claude_account`; else `~/.claude/state/claude_account`.
+- `null` on any fault: file absent, unreadable, half-written, or not the two fields with an 8-hex `digest`.
+
+## Proof — `.verify/account-chat-launch.sh`
+- One `mktemp -d` scratch home on `:7898`, two made-up accounts saved through `tokens.save` / `store.set_token` / `store.choose`; the five seams (`DISPATCHER_HOME`, `PLAN_RUNNER_CLAUDE_ACCOUNT_HOME`, `PLAN_RUNNER_CLAUDE_ACCOUNT_TOKENS`, `PLAN_RUNNER_CLAUDE_IDENTITY_PATH`, `CLAUDE_LAUNCHES_PATH`) are read back from `/proc/<pid>/environ`; the real door runs against them (`CLAUDE_ACCOUNT_BIN` unset).
+- `.verify/account-chat-launch.mjs` drives one turn on a chat, creating or attaching.
+- Measured 2026-10-21: turn 1 answers `Failed to authenticate. API Error: 401 OAuth access token is invalid.` (the made-up token rode); after `store.choose` of the other account the same chat's next message logs the replacement and the launch record gains a `respawn: account probe-alpha → probe-beta` line; the token appears in 0 lines of the server log, the sessions directory and the launch record.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/account-door.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/chosen-account.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/account-chat-launch.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/account-chat-launch.sh
+
+## MAN-8858 — The account door's panel faces — the picture and the three writes (account-door-relay.ts, accounts.routes.ts)
+
+Reference: door verbs MAN-8842, the picture's shape MAN-8843, the types' mirror rule INV-9252, the launch reads in the same barrel MAN-8849, the panel MAN-460.
+
+## Files — `server/modules/accounts/`
+| file | owns |
+|---|---|
+| `account-door-relay.ts` | `accountsPicture()`, `writeDoor(args)`, `AccountDoorRefusal`, `doorBin()`, `redact()`, `DOOR_TIMEOUT_MS` |
+| `account-door.ts` | re-exports `AccountDoorRefusal` and `accountsPicture`; `useAccount(slug)`, `setAuto(on)`, `removeAccount(slug)` (each → the door's line); the credential read (MAN-8849) |
+| `accounts.routes.ts` | the routes below and `GET /api/usage`; the whole account route surface is these five |
+
+## Routes — mounted at `/api` behind `authenticateToken`
+| route | body | 200 | refused |
+|---|---|---|---|
+| `GET /api/accounts` | — | the door's picture at the top level: `{reachable:true, accounts, candidates, auto, held, chosen, last_switch}`, or `{reachable:false, reason}` | never a 5xx |
+| `POST /api/accounts/use` | `{slug: string}` | `{line}` = `USING <slug>…` | 422 `{error}` |
+| `POST /api/accounts/auto` | `{on: boolean}` | `{line}` = `AUTO on` / `AUTO off` | 422 `{error}` |
+| `POST /api/accounts/remove` | `{slug: string}` | `{line}` = `REMOVED <slug>` | 422 `{error}` |
+
+## The picture on `GET /api/accounts`
+- `claude-account status --json` relayed whole (`ClaudeAccountsPicture`, MAN-8843) at the top level, tagged `reachable:true` (`accountsBody`). No `door` member exists on the wire.
+- A door that cannot answer is `{reachable:false, reason}` inside a 200; the route's belt answers the same shape with `reason:"unreachable"`.
+- `reason`: `timeout` (bound hit), `bad-response` (stdout is not JSON, or lacks `accounts`/`candidates` arrays, `auto`/`held` booleans, `chosen`/`last_switch` null-or-object), `unreachable` (anything else: missing binary, non-zero exit).
+- Every string of the picture, a line, a refusal and a 502 sentence passes `redact` (`sk-ant-[A-Za-z0-9_-]{8,}` → `[key]`).
+
+## The writes
+- A malformed body is refused before the door is asked: `{}` → 422 `{error:"slug is required"}`; `{"on":"yes"}` → 422 `{error:"on must be true or false"}`.
+- 422 `{error}` = door exit 2 with a stdout line beginning `REFUSED`; the protocol word is stripped, the sentence is the door's (a `use` of an unknown or tokenless slug, a `remove` of an unknown slug). Caught by class (`AccountDoorRefusal`): a new refusal sentence in the door needs no change here.
+- Any other failure of a write is a 502 `AppError` `CLAUDE_ACCOUNT_DOOR_FAILED` carrying the door's one stderr line (redacted), else `the claude-account door did not answer` / `… in time`. A write that did not land never answers as a read does.
+- The routes send no kick: the door's `use` and `remove` kick the dispatcher themselves (INV-187).
+
+## Rules an editor must not break
+| edit | breaks | why |
+|---|---|---|
+| Hand a free-form value to a door write without `--` before it (`['use','--',slug]`, `['remove','--',slug]`) | `use --help` answers usage text with exit 0 and relays as a 200 for a write that never happened; `--state` answers a usage error as a 502 | the door is argparse; `--` makes the slug a positional |
+| Refuse a leading `-` in a slug at the route | an account named `-foo` can no longer be chosen from the panel | the door's `_slot_name` accepts it; the separator is the cure |
+| Make a door refusal the panel shows as 422 anything but exit 2 plus a `REFUSED …` stdout line | it relays as a 502 with the class name | the relay classifies on that shape only |
+| Drop `killSignal: 'SIGKILL'` from either `execFile` | a door or `CLAUDE_ACCOUNT_BIN` wrapper that traps SIGTERM holds the status-chip poll for its whole life | `killed` stays true on SIGKILL, so the read still answers `timeout` |
+| Let `accountsPicture()` reject | the status-chip poll answers a 5xx | the route's `.catch` is a belt over a read that is total by construction |
+
+## Measured
+- 2026-10-21, live dev API `:3011`: `GET /api/accounts` → 200, top-level keys `accounts, auto, candidates, chosen, held, last_switch, reachable`, no `door`, 2 accounts.
+- 2026-10-21, probe server `:7898` on a scratch home: `use` tokenless → 422 `beta: no checked sign-in token — set it up first`; `use` checked → 200 `{"line":"USING alpha"}`, GET shows alpha `in_use:true, chosen:true`; `auto` → `AUTO off` / `AUTO on`; `remove` → `REMOVED beta`, GET drops it.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/account-door-relay.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/account-door.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/accounts.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/accounts.routes.ts
+
+## MAN-8863 — The shadow-connector lane forwarder — createShadowConnectorLane, the one read of EIS_INTERNAL_SECRET (server/shared)
+
+`server/shared/shadow-connector-lane.ts` is the one forwarder every CloudCLI lane to shadow-connector goes through, and the one place `EIS_INTERNAL_SECRET` is read. shadow-connector's `/api/*` surfaces are internal-caller gated (R-CAP-11: `X-Internal-Secret` required even from loopback); this server authenticates the operator, so the secret stays on this side and the browser never holds it. Exported from `server/shared/index.ts`.
+
+Consumers (each owns its allowlist, id rules and status mapping; none owns a transport):
+
+| module | lane | label |
+|---|---|---|
+| `server/modules/affected-areas/` (MAN-8559) | `/api/affected-areas`, the Tours lane | `affected-areas` |
+| `server/modules/carrier-bulletins/` (`/api/carrier-bulletins`; NOT BUILT YET — the next phase, the relay, adds it) | the bulletins lane | `carrier-bulletins` |
+
+| export | does |
+|---|---|
+| `createShadowConnectorLane({ baseUrl, envFile, label })` | builds a forwarder; the module that calls it is the ONLY reader of `SHADOW_CONNECTOR_URL` / `SHADOW_CONNECTOR_ENV_FILE` for its lane, and passes the values down |
+| `ShadowConnectorLane` | `{ forward(LaneRequest): Promise<LaneAnswer> }`; a router takes `Pick<ShadowConnectorLane, 'forward'>` |
+| `ShadowConnectorLaneDependencies` | `{ baseUrl, envFile, label }`; `label` is the one word the log warning leads with |
+| `LaneRequest` | `{ method: GET\|POST\|PUT, path, query?, body?, actingUser, timeoutMs, expect: json\|bytes }`; the route has already validated every part |
+| `LaneAnswer` | `{ ok: true, status, kind: json, body }`, `{ ok: true, status, kind: bytes, body: Buffer, contentType }`, or `{ ok: false, reason: unreachable\|unreadable\|no_secret, message }` |
+
+Rules (they bind the file; INV-8633 holds them for both lanes)
+1. The secret is read from shadow-connector's env file at CALL time: `fs.stat` on every call, re-parse only when `mtimeMs` or `size` changed, so a rotation lands on the next request with no restart and no watcher. It is never written to `process.env`, this server's `.env`, a log line, an error message or a cache.
+2. Nothing is forwarded without it: a missing, empty, padded, non-ASCII or unclosed-quote secret answers `no_secret` (`CloudCLI could not read shadow-connector's internal secret`) and sends no request.
+3. Nothing throws. A lane fault is a RESULT; an upstream answer (404, 422, a refusal) is a RESULT carried whole.
+4. `fetch` runs `redirect: 'manual'`, so the secret header never follows a `Location`.
+5. `describeFailure` uses only an error's NAME and its cause's CODE, never its message: a transport error can quote the request, and the request carries the secret.
+6. `X-Acting-User` is display only (the engine derives `origin` itself, R-CAP-21): non-printable characters become `?`, trimmed, at most 64 characters, absent when none.
+
+Traps
+| trap | fact |
+|---|---|
+| state is per forwarder | each `createShadowConnectorLane` call holds its own parse of the env file and its own last-reported cause: two lanes log one line per distinct cause EACH, and each warning leads with its own `[<label>]`. A lane built without a distinct label is indistinguishable in the journal |
+| the label is the log's only lane word | the Tours warning reads `[affected-areas] no usable internal secret in <file>: <cause>`; everything else the forwarder logs or answers is identical for every lane |
+| a new top-level `server/shared/*.ts` file | joins `.oxlintrc.json`'s `backend-shared-utils` list (INV-6548); `shadow-connector-lane.ts` is listed |
+| measured 2026-10-21 | with a missing env file, an empty one and an unreachable engine, `forward` answers `no_secret`, `no_secret` and `unreachable` (`CloudCLI could not reach shadow-connector`), and a repeated cause logs one warning, not two; `GET /api/affected-areas/tours?limit=3` and `GET /api/affected-areas/images/<sha>` through the dev API (:3011) answer 200 with the same body sha256 as before the forwarder moved here |
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/shared/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/shadow-connector-lane.ts
+
+## MAN-8865 — Carrier-bulletins client wire — src/shared/carrier-bulletins-types.ts and api.carrierBulletins
+
+The browser's typed view of `/api/carrier-bulletins` (the Bulletins view of the Cerberus tab): one wire-type file and one `api` block, built on the Tours precedent (MAN-8558). The one home of every body is shadow-connector's `extractors/servpro_bulletins/verify/views.py`, the read model the report and the surface both print.
+
+## Files
+| file | holds |
+|---|---|
+| `src/shared/carrier-bulletins-types.ts` | 19 exported types: the three bodies `OverviewRow`, `BulletinPage`, `PageReading`; their nested ones (`LastPull`, `LastReading`, `VerdictCounts`, `ReadingStamp`, `RequirementThreshold`, `RequirementWindow`, `RequirementScope`, `SettledRule`, `PageRequirement`, `JudgedRule`, `NotPlaced`, `PageFailure`, `PageWaiting`); and the unions `PageState`, `VerdictWord` and `SaidWord`. Imports nothing from `server/`. |
+| `src/shared/api.ts` | `api.carrierBulletins`, 4 GET verbs, beside `api.affectedAreas`; no import from the mirror (each answer is named in a `// →` comment) |
+| `.oxlintrc.json` | `src/shared/carrier-bulletins-types.ts` in the `frontend-shared-file` list (INV-5890) |
+
+## Verbs
+Every verb is a GET: the view is read-only, and the lane's allowlist holds GET routes only. Ids and the page number go through `encodeURIComponent`.
+
+| verb | route | answer |
+|---|---|---|
+| `overview(options?)` | `GET /overview` | `OverviewRow[]` |
+| `pages(bulletinId, options?)` | `GET /bulletins/:bulletinId/pages` | `BulletinPage[]` |
+| `page(bulletinId, page, options?)` | `GET /bulletins/:bulletinId/pages/:page` | `PageReading` |
+| `image(sha, page, options?)` | `GET /files/:sha/pages/:page/image` | PNG bytes: the caller reads `.blob()`; `options.signal` aborts |
+
+## Rules an editor must not break
+- A body changes in `views.py` first; the mirror moves in the same change. why: a key renamed on one side is a screen that stops reading.
+- Keys are the wire's snake_case (`bulletin_id`, `last_reading`, `requirements_live`), never camelCase. Dates are ISO text, ids text, page numbers count from 1.
+- A body field is never optional. `null` is the plain absence the field's comment names: `last_pull` no pull on record, `last_reading` never read, `reading` a page with no answer, `waiting` a page that does not wait, `rule` a requirement on a page read and not yet settled. A part heading is never `null`: `''` is a page in no part.
+- `PageState` is whole.plan_file's four words (`settled`, `read`, `unread`, `waiting`); `VerdictWord` is the check's five (`confirmed`, `corrected`, `duplicate`, `not_on_page`, `unsettled`). `said` (on `JudgedRule` and `PageFailure`) is a `SaidWord`: a `VerdictWord`, or `(no entry)` where the model gave nothing usable for a rule (`read.unsettled_entry` stores that word on an answer refused whole, a rule the model left out and a rule that cites no page). `JudgedRule.verdict` is the stored `VerdictWord`; it differs from `said` when the house's checks refused the answer.
+- No `interface` declarations. A new verb names its answer in a `// → Type` comment.
+
+## Value shapes the design left open
+The design writes the keys of each body and not the inside of four of them. They are typed from the page check's own answer, and each stands until a live answer says otherwise: `threshold` is `{ value, unit, measure }` and `window` is `{ hours, basis, anchor }` (`verify/contract.py`'s `Threshold` and `Window`, `hours` null for a deadline that counts none); `scope` is `{ services, loss_types, property_types }`, each `string[] | null` with null meaning every one (`verify/contract.py`'s `Requirement`; `verify/requirement.py` only normalizes the lists to compare them); a `failures` element is `{ words, said, quote, failures }` (the printable fields of `read.Entry`). `SettledRule.state`, `PageRequirement.kind` and `.subject` are plain `string`, because the design names no closed set for them.
+
+## Measured
+- 2026-10-21: the TypeScript compiler's property names of `OverviewRow`, `BulletinPage` and `PageReading` and every nested type, against the keys of the design's THE SURFACE interface parsed out of `bulletins-read-by-claude.design.toml`: every key matched at every level the design writes keys (16, 7 and 9 at the top; `last_pull` 2, `last_reading` 6, `verdicts` 5, `reading` 6, `requirements` 8, `rule` 3, `judged` 7, `not_placed` 2, `waiting` 3). The four keys above are the only places the type has structure where the design has a bare key.
+- 2026-10-21: `api.carrierBulletins` run as bundled code against a recording `fetch`: the four verbs requested exactly the four routes above, all GET and no body, an id `a/b c?d` went out as `a%2Fb%20c%3Fd`, and `image` carried the caller's abort signal.
+- `views.py` and the surface had not landed at that time: no body was compared with a live answer.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/carrier-bulletins-types.ts
+
+## MAN-8880 — The Bulletins view — src/modules/carrier-bulletins: three screens over a fake, the FILL markers, what the fill inherits
+
+The Bulletins view: what Claude read of each carrier's SERVPRO program bulletin and what the house settled it into. Read-only. Built to be the fifth view of the Cerberus tab's strip, after Tours. Wire: MAN-8865. Slots in the tab: MAN-7867. Plans: `~/.claude/plans/bulletins-read-by-claude.design.toml`, `bulletins-read-by-claude.phases.toml`. Every body's server home: shadow-connector `extractors/servpro_bulletins/verify/views.py`.
+
+## State of the module
+| fact | value |
+|---|---|
+| phase | scaffold: three screens drawn over `FAKE_READS`; no fetch, no hook; the root holds three `useState`s and one ref |
+| mounted | no. `index.ts` exports the lazy `BulletinsView`; `CerberusPanel` does not import it until the fill replaces its two `FILL:` markers (`bulletins-row`, `bulletins-panel`) |
+| fake | `carrier-bulletins-fake.ts` (`FAKE_READS`, `unwired`): 13 overview rows, typed by the wire mirror. Real: the 12 current files' numbers, stored times, page counts, hashes, live rules, open questions; State Farm's, AAA of Southern California's and The Hartford's printed part headings; the check's verdicts; State Farm p13 and AAA of Southern California p15 in their own words; p13 rendered once as a data URL. Composed: page splits, calls, tokens, duties not placed, refused entries, question wording, the two waiting pages, Nationwide's reading in progress, Allstate's stopped one (32 of 49 pages read). American Family's file is not stored: its 12 pages are a stand-in. The fill deletes the file |
+| words | `cerberus.bulletins.*` in `src/modules/i18n/locales/en/common.json`, including `cerberus.bulletins.tab` and `.tabHint` (the strip's two words) |
+| shared types | wire: `src/shared/carrier-bulletins-types.ts`. Lane fault: `AffectedAreasTrouble` from `src/shared/types.ts` (one forwarder, `server/shared/shadow-connector-lane.ts`, serves both lanes) |
+| proof | 2026-10-21: six states, light and dark, 1280×800 and 390×844: 108 of 108 checks, no console errors, on the builder's final code. The fix-pass changed the files after that: client `tsc` and `oxlint` exit 0, no proof run |
+
+## Screens
+One at a time, held at the root as `bulletinId` (null = overview) and `page` (null = the carrier's pages); each plays `vv-pagein` when it opens.
+| screen | files | draws |
+|---|---|---|
+| Overview | `OverviewScreen.tsx`, `CarrierRow.tsx` | headline "N carriers *need you*" (accent `warn`) or "Every file is *read and settled*", in the plain bold heading (the tab owns the one serif headline); carriers in groups `needs` · `notSettled` · `settled` (`carrierGroups`); per row: file, page split, live requirements, open questions, duties not placed, last pull, last reading |
+| Carrier's pages | `CarrierPages.tsx`, `PageRow.tsx` | pages under the parts the bulletin prints (`partGroups`); a part whose pages share one state says it once beside the range and its rows drop the badge (`PageRow` `showState`); call-outs: waiting pages (why + `pullCommand`), a stopped reading (`warn`: pages not read, the next pull reads them, `pullCommand`), a file never read (`pullCommand`) |
+| Page | `PageScreen.tsx`, `PageImage.tsx`, `ReadingColumn.tsx`, `RequirementList.tsx`, `JudgedList.tsx`, `SetAside.tsx`, `QuotedWords.tsx` | image beside the reading at container width ≥ 720 px, else a thumbnail above it; Enlarge opens the house `Lightbox`; reading in order: requirements (quote, settled rule, open question + `QUESTIONS_COMMAND` as text), judged rules (unsettled first, confirmed last; a quote shows only when it adds words the rule lacks), duties not placed, refused entries, where the answer came from |
+Shared: `BulletinsTrouble.tsx` (warn banner + Try again, `subject` `overview` · `pages` · `page`), `RefreshButton.tsx`, `StateBadge.tsx`, `CommandLine.tsx`.
+Pure: `utils/bulletinModel.ts` (standing, groups, `PAGE_STATE_LOOK`, `VERDICT_LOOK`, `VERDICT_ORDER`, `partGroups`, `partOfPage`, `pageStateOf`, `neighbours`), `utils/bulletinWords.ts` (every sentence built from a row; `QUESTIONS_COMMAND`, `pullCommand`, `verdictParts`).
+
+## `carrierStanding` — evaluated in this order
+| standing | when | group | tone |
+|---|---|---|---|
+| `waiting` | `waiting > 0` | needs | `warn` |
+| `settled` | `pages > 0 && settled === pages` (a later failed run does not unsettle it) | settled | `positive` |
+| `stopped` | `last_reading.status === 'failed'` | needs | `warn` |
+| `unread` | `settled + read === 0` | notSettled | `neutral` |
+| `partly` | otherwise | notSettled | `info` |
+
+## FILL markers — what the fill replaces
+`grep -rn "FILL:" src/modules/carrier-bulletins src/modules/cerberus`. The fill replaces each marker and the one line under it.
+| marker (`BulletinsView.tsx`) | the fill |
+|---|---|
+| `fake` | removes the `carrier-bulletins-fake` import; the file is deleted |
+| `useOverview` · `useBulletinPages(bulletinId)` · `usePageReading(bulletinId, page)` | read on open and on Refresh; the root draws their `value` (null until the answer lands) and `trouble` (`AffectedAreasTrouble \| null`) |
+| `usePageImage(sha, page)` | `string \| null`: the PNG fetched with the token as an object URL, revoked on change and unmount |
+| `onOpenCarrier` · `onOpenPage` · `onBack` · `onRefresh` · `onEnlarge` · `onShrink` | each line is `unwired(setX, …)`, a no-op naming the setters the real handler drives; `onShrink` (Lightbox close) is its own handler; `onRefresh` is also every banner's Try again |
+| `CerberusPanel.tsx` `bulletins-row`, `bulletins-panel` | MAN-7867 |
+
+## What the fill inherits
+- `topRef` (on the root div) brings the top into view on `onOpenCarrier` / `onOpenPage` and tells the reads whether the view is shown. If the fill reuses Tours' `useViewShown`, the module standards move it to `src/shared/hooks/`.
+- A failed read shows only its banner, on all three screens: a hook that keeps its old value after a failed refresh is never drawn under it.
+- `Back` reads again what it returns to, quietly; `onRefresh` keeps the screen until the new answer lands.
+- The fill's photographs include Allstate's stopped state (never photographed) and the view inside the panel under the tab's header and strip.
+
+## Rules an editor must not break
+- Read-only: no press writes. A rule changes only by answering `QUESTIONS_COMMAND` (`venv/bin/python scripts/carrier_rules_questions.py`) or on the Approval Rules page (operator, 2026-10-21). why: the view shows what Claude read; it is not the editor.
+- Every word from a bulletin (quote, rule, heading, carrier, reason) is its own text node: never through `t()`, never `dangerouslySetInnerHTML` (none in the module). Sentences are `cerberus.bulletins.*` keys, English only.
+- Tone reaches paint only as `data-tone` plus a tone name, with a glyph and a word beside it (MAN-739, MAN-578); act is `warn`, never `danger`.
+- Reads on open and on a press, never on a timer, never while the tab shows another view.
+- The page image keeps a letter-page box and `contain`s the picture. why: the wire gives no page size.
+- Other modules reach it only through `index.ts` (`BulletinsView`, `lazy`); files inside import siblings by path.
+
+## Open
+- `AffectedAreasTrouble` is the lane-neutral fault type under a Tours name; renaming it touches live Tours files.
+- `PageReading` has no `width` / `height`; a landscape page draws inside the letter box until it does.
+- On a fault screen the header's Refresh and the banner's Try again do the same read.
+- Not proven: the other 14 states at 390 px and in dark on the final code; `npm run build`; the server half of `npm run typecheck`.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/carrier-bulletins/

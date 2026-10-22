@@ -12,7 +12,7 @@ function outingOut(planners: readonly DispatcherPlanner[], name: string): boolea
  * Whether an agent is out on this plan RIGHT NOW: a walk with a soul out or its walker alive on one of
  * its phases (`phase.busy`, the chain layer's own answer and the one the dispatcher's open intervals are
  * made from), or a planner outing of its own that is `out`. This is what lets its working time tick
- * between frames, and nothing else does: a plan that is `live` and waiting — on its epic's WIP slot, on
+ * between frames, and nothing else does: a plan that is `live` and waiting — on its epic's turn, on
  * another feature — has no agent out, and a clock running there would be saying it works.
  *
  * An outing counts only where the plan is its own subject; the epic's design or cut is the epic's time

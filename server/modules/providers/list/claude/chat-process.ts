@@ -33,6 +33,7 @@ import type { SDKUserMessage } from '@anthropic-ai/claude-agent-sdk';
 import { isBehindInstalled } from '@/shared/version-order.js';
 
 import { compactionTakenOverOf } from './claude-compaction-seams.js';
+import { accountRespawn } from './claude-launch-account.js';
 
 /** Two hours of silence since the last message closes an idle process (the operator's ruling). */
 export const DEFAULT_IDLE_CLOSE_MS = 2 * 60 * 60 * 1000;
@@ -204,6 +205,17 @@ export type LaunchProfile = {
    * the one comparison this field exists for would then answer "same" every time.
    */
   cliVersion: string | null;
+  /**
+   * The digest of the account this process was STARTED on, and its slug — the door's answer at the
+   * spawn. `null` for a process the door gave no answer on, and for a re-adopted host whose meta
+   * holds none: "not heard", which never replaces a process. On a message's own profile
+   * (`launchProfileOf`) it is instead the account the house has CHOSEN now (`chosen-account.ts`), and
+   * a pair of known accounts that differs is a launch argument that changed: the process is retired
+   * and the conversation resumes on the new account at the message that found it.
+   */
+  account: string | null;
+  /** The account's name in every sentence a person reads; kept beside `account` so a respawn's words need no lookup. */
+  accountSlug: string | null;
 };
 
 type SdkOptionsShape = {
@@ -224,7 +236,9 @@ export function launchProfileOf(
   unknown = false,
   cliVersion: string | null = null,
   mcpSignIn: Record<string, string> | null = null,
-  toolsets: string | null = null
+  toolsets: string | null = null,
+  account: string | null = null,
+  accountSlug: string | null = null
 ): LaunchProfile {
   const permissionMode = sdkOptions.permissionMode ?? 'default';
   return {
@@ -242,7 +256,9 @@ export function launchProfileOf(
     toolsets,
     allowedTools: [...(sdkOptions.allowedTools ?? [])],
     disallowedTools: [...(sdkOptions.disallowedTools ?? [])],
-    cliVersion: typeof cliVersion === 'string' ? cliVersion : null
+    cliVersion: typeof cliVersion === 'string' ? cliVersion : null,
+    account: typeof account === 'string' ? account : null,
+    accountSlug: typeof accountSlug === 'string' ? accountSlug : null
   };
 }
 
@@ -298,6 +314,12 @@ export function planLiveChanges(
     && live.cliVersion !== next.cliVersion && isBehindInstalled(live.cliVersion, next.cliVersion)) {
     return { respawn: `cli ${live.cliVersion} → ${next.cliVersion}`, changes: null };
   }
+  // The account is one more launch argument: a process runs on the token it was started with, so a
+  // message whose chosen account differs retires it and resumes the conversation on the new one. Both
+  // sides must have spoken — a process the door gave no answer on, or a chosen record that is absent
+  // or unreadable, is a "not heard", and never a reason to replace a healthy process.
+  const accountChange = accountRespawn(live, next);
+  if (accountChange) return { respawn: accountChange, changes: null };
   if (live.unknown) {
     // Re-adopted: nothing to diff against, so apply every live setter once. A bypass request
     // on a process that was not launched with it fails at the SDK and falls back to a respawn.

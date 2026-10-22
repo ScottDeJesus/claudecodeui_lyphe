@@ -8,15 +8,15 @@
  * the warning and re-sent it on the next session's reading ("Weekly limit at 76%" at 20:36, 20:48
  * and 20:53). On disk, the memory outlives the process that wrote it.
  *
- * Keyed by the live login's email, because the switcher can move the whole CLI to another account:
- * that account's windows are its own, and a warning already sent for one must not silence the other.
+ * Keyed by the account the CHAT PROCESS WAS LAUNCHED ON — its launch profile's slug when that knows
+ * one, else its digest, else 'unknown' — never by the live login's email: after a switch the box's
+ * login is not the account an open chat rides, and a limit belongs to the account that met it. A
+ * warning already sent for one account must not silence another's.
  * Timers are not kept — `claude-runtime-signals` re-arms a pending reset from the stored window.
  */
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-
-import { liveAccountEmail } from '@/modules/accounts/index.js';
 
 /** One rate-limit window's memory: everything already said about it. */
 export type LimitMemory = {
@@ -106,20 +106,24 @@ export function saveLimitMemory(): void {
   }
 }
 
-/** The account's memory. An unknown login is still one account, named as such. */
-export function accountLimitMemory(): AccountMemory {
+/**
+ * The account's memory, keyed by the caller's account name. Consumers: `claude-runtime-signals.ts`,
+ * which passes the launch profile's slug when it knows one, else its digest, else 'unknown'. An
+ * unknown account is still one account, named as such.
+ */
+export function accountLimitMemory(account: string): AccountMemory {
   load();
-  const account = liveAccountEmail() ?? 'unknown';
-  let memory = accounts.get(account);
+  const key = account || 'unknown';
+  let memory = accounts.get(key);
   if (!memory) {
     memory = { windows: new Map(), creditsExhaustedAnnounced: false };
-    accounts.set(account, memory);
+    accounts.set(key, memory);
   }
   return memory;
 }
 
-export function windowMemory(rateLimitType: string): LimitMemory {
-  const { windows } = accountLimitMemory();
+export function windowMemory(rateLimitType: string, account: string): LimitMemory {
+  const { windows } = accountLimitMemory(account);
   let memory = windows.get(rateLimitType);
   if (!memory) {
     memory = { announcedResetsAt: null, resetTimer: null, warnedBuckets: new Set<number>(), warnedWindowResetsAt: null, warnedAt: 0, overageAnnounced: false };

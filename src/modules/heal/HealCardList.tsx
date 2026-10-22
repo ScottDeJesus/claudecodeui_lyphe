@@ -134,11 +134,12 @@ function HealCardView({ heal, onOpenChain }: { heal: HealCard; onOpenChain: (hea
               `cost_usd` is the DeepSeek share of what the chain spent — what the daily cap counts — and the
               `tokens*` beside it are the chain's CLAUDE half alone, so a heal that only ever paid the vendor
               draws its `$` and no tokens and one that rode the subscription draws its tokens and no `$`
-              (`spendText`, the sentence drawn from the one decision every card uses, `spendParts`). WHICH NUMBER THE `$` IS depends on when the
+              (`spendText`, the sentence drawn from the one decision every card uses, `spendParts`). The heal's
+              dollars are DeepSeek's by construction, so this row names `DeepSeek` itself. WHICH NUMBER THE `$` IS depends on when the
               heal ended — the title says whose it is, because the rows on screen from before the 2026-09-23
               recipe change carry their chains' whole bills. An empty cell when the worker recorded neither. */}
           <span className="ml-auto font-mono text-muted-foreground" title={costTitle(heal, t)}>
-            {spendText(t, heal.cost_usd, heal.tokens_in, heal.tokens_out, heal.tokens)}
+            {spendText(t, heal.cost_usd, heal.tokens_in, heal.tokens_out, heal.tokens, 'DeepSeek')}
           </span>
         </div>
         <div className="flex min-w-0 flex-wrap items-center gap-1.5 text-xs">

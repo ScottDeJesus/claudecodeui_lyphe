@@ -9,14 +9,14 @@ import type { Carry, NewKeysJoin } from '@/shared/ui/sortable/carryState';
 import { useDropHold } from '@/shared/ui/sortable/dropHold';
 import { edgeHoldAt, edgeStep, restoreScrollOffsets, scrollerOf, scrollOffsetsWithin, slideFrom } from '@/shared/ui/sortable/motion';
 import { layoutRectOf, moveKey, slotAt } from '@/shared/ui/sortable/slotAt';
-import { tickLift, useHoldPane } from '@/shared/ui/sortable/touchLift';
+import { tickLift } from '@/shared/ui/sortable/touchLift';
 import { usePointerDrag } from '@/shared/ui/usePointerDrag';
 import type { HoldLiftProps, PointerDragPoint } from '@/shared/ui/usePointerDrag';
 
 /** How far the pointer, or the pane under it, must travel after one reorder before the next may happen. */
 const REORDER_TRAVEL_PX = 8;
 
-/** What a list's owner spreads on one item's root element. The attribute marks the item for `isFreePress`, so a list nested inside an item never arms the list around it; the hold marker keeps a phone's own long-press off the item (`usePointerDrag`). */
+/** What a list's owner spreads on one item's root element. The attribute marks the item for `isFreePress`, so a list nested inside an item never arms the list around it; the hold-lift marker keeps a phone's own long-press off the item (`usePointerDrag`). */
 type SortableItemProps = HoldLiftProps & {
   ref: (element: HTMLElement | null) => void;
   onPointerDown: (event: ReactPointerEvent<HTMLElement>) => void;
@@ -46,8 +46,11 @@ export type SortableList = {
  * WHERE A CARRY BEGINS (`isFreePress`): a free press — never on a control, a field, or a track swiped
  * sideways. A mouse carries once it moves past the threshold (the text selection it could have begun is
  * cleared). A finger carries after holding still for `TOUCH_HOLD_MS`; one that moves first is
- * scrolling. Once lifted, the pane must not scroll under the finger: the list carries the kit's
- * `touchmove` canceller (`useHoldPane`, `touchLift.ts`), set for the list's whole life.
+ * scrolling, and THE BROWSER SCROLLS FOR IT, its own pan and glide, as it does for the sidebar's chat
+ * list: an item is never `touch-action: none`. A lifted item survives the browser's pan instead — the
+ * scrollers around it are held still for the carry and the finger is followed on its touch events when
+ * the browser takes the pointer away (`touchCarry.ts`, run by `usePointerDrag`). A press on a track that
+ * scrolls sideways is not a free press, and a sideways swipe there scrolls the track.
  *
  * THE CLICK THAT ENDS A CARRY IS SWALLOWED. NEAR THE PANE'S TOP OR BOTTOM EDGE the pane scrolls itself
  * (`edgeStep`), the item stays under the pointer and the slot is re-read as the list moves beneath it.
@@ -268,13 +271,9 @@ export function useSortable({ keys, onReorder, newKeys = 'front' }: {
     if (swallowClick.current !== null) window.removeEventListener('click', swallowClick.current, true);
   }, []);
 
-  // The pane held still while an item is in the hand (`touchLift.ts`).
-  const holdPane = useHoldPane(() => carry.current !== null);
-
   const attachList = useCallback((element: HTMLElement | null) => {
     listElement.current = element;
-    holdPane(element);
-  }, [holdPane]);
+  }, []);
 
   const itemProps = useCallback((key: string): SortableItemProps => ({
     ref: (element) => {

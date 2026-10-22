@@ -98,6 +98,11 @@ function stageOf(raw: unknown): DispatcherStage {
     output_path: need(field(stage, 'output_path'), isTextOrNull, 'stage.output_path'),
     verdict: need(field(stage, 'verdict'), isTextOrNull, 'stage.verdict'),
     cost_usd: need(field(stage, 'cost_usd'), isCount, 'stage.cost_usd'),
+    // The vendor those dollars were billed by — `DeepSeek`, `Claude API`, or `""` for a mix of the two
+    // or a record the runner has swept — read off the same paid rows the figure sums
+    // (`report_vendor.py`). Tolerant: a build older than the field writes none, and the figure then
+    // stands alone rather than wearing a name nobody measured.
+    paid_vendor: textSince(field(stage, 'paid_vendor'), 'stage.paid_vendor'),
     // The stage's tokens, read at the dispatcher's own report time off the launch's `result.json`
     // (`report._usage_of` — the store holds no token column and is not getting one). Absent from a
     // build older than the fields, which is what `countSince` is for. `tokens_cache_read` is `null`
@@ -132,6 +137,7 @@ function phaseOf(raw: unknown): DispatcherPhase {
     stalled: stallSince(field(phase, 'stalled'), 'phase.stalled'),
     rounds: need(field(phase, 'rounds'), isCount, 'phase.rounds'),
     cost_usd: need(field(phase, 'cost_usd'), isCount, 'phase.cost_usd'),
+    paid_vendor: textSince(field(phase, 'paid_vendor'), 'phase.paid_vendor'),
     tokens: countSince(field(phase, 'tokens'), 'phase.tokens'),
     tokens_in: countSince(field(phase, 'tokens_in'), 'phase.tokens_in'),
     tokens_out: countSince(field(phase, 'tokens_out'), 'phase.tokens_out'),
@@ -184,17 +190,24 @@ export function planOf(raw: unknown): DocumentPlan {
     // null while it follows its epic and the switch: the override a card's fold names.
     model: modelSince(field(plan, 'model'), 'plan.model'),
     model_own: modelSince(field(plan, 'model_own'), `plan.model_own of ${name}`),
-    // The plan's width phrase (`width.word` of its effective model word and its task-WIP word), read
-    // tolerantly like `arc`: a build older than the field writes none.
+    // The plan's posture phrase (`width.word`), read tolerantly like `arc`: a build older than the
+    // field writes none.
     posture: textSince(field(plan, 'posture'), 'plan.posture'),
-    // Why this feature waits for an epic slot — the gate's own FEATURE-WIP clause for its first ready
-    // phase (`width.feature_hold`), or `null`. Read tolerantly like `posture`: a build older than the
-    // field writes none, and the card then draws no line.
-    wip_hold: textSince(field(plan, 'wip_hold'), 'plan.wip_hold'),
     // Why this plan waits for its EPIC'S turn — the gate's own queue clause for its first ready phase
-    // (`line_gate.hold`, asked before the feature clause), or `null`. Read tolerantly like `wip_hold`
-    // beside it: a build older than the field writes none, and the card then draws no line.
+    // (`line_gate.hold`), or `null`. Read tolerantly like `posture`: a build older than the field
+    // writes none, and the card then draws no line.
     queue_hold: textSince(field(plan, 'queue_hold'), 'plan.queue_hold'),
+    // The PACER's clause for the same first ready phase (`report.plan_dict.pace_hold`,
+    // `pace_report.hold`) — else, with no phase held, for a queued planner outing aimed at the plan or
+    // its epic (`pace_report.planner_hold`) — with its `pace:` lead, drawn in the same row as the queue's hold, of
+    // which the gate sends one at a time. ABSENT reads `""` (a dispatcher build older than the key,
+    // which held nothing on the window), so the card's `plan.pace_hold ?? ''` is the whole read.
+    pace_hold: textSince(field(plan, 'pace_hold'), `plan.pace_hold of ${name}`) ?? '',
+    // Whether the operator has let this plan start past the pacer (`report.plan_dict.overridden`,
+    // `dispatcher override`). The dispatcher's own reading of its log, never derived here. ABSENT reads
+    // `false` (`flagSince`): a build older than the key has no override to show, and the card then
+    // draws only what the pace hold alone says.
+    overridden: flagSince(field(plan, 'overridden'), `plan.overridden of ${name}`),
     created_at: need(field(plan, 'created_at'), isText, 'plan.created_at'),
     updated_at: need(field(plan, 'updated_at'), isText, 'plan.updated_at'),
     completed_at: need(field(plan, 'completed_at'), isTextOrNull, 'plan.completed_at'),
@@ -222,6 +235,7 @@ export function planOf(raw: unknown): DocumentPlan {
     waits_on: names(field(plan, 'waits_on'), 'plan.waits_on'),
     schedule: scheduleOf(field(plan, 'schedule')),
     cost_usd: need(field(plan, 'cost_usd'), isCount, 'plan.cost_usd'),
+    paid_vendor: textSince(field(plan, 'paid_vendor'), `plan.paid_vendor of ${name}`),
     // PAID dollars at `cost_usd`; the plan's tokens beside it, summed by `report.plan_dict` off the
     // phases' launches. A plan that rode the operator's Claude subscription is 0.00 there and these
     // three are the whole of what it spent — which is what the card draws instead of a `$`.

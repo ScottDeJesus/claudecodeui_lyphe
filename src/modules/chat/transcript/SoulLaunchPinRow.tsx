@@ -48,9 +48,20 @@ type SoulLaunchPinRowProps = {
  * The two halves are settled on the record the lane serves — the tokens are `null` throughout on a
  * vendor's receipt (`soul-launch.service.ts:receiptTokens`) — so this row draws whichever half the
  * soul actually spent, and `''` while the launch is still out.
+ *
+ * THE VENDOR IS THE PIN'S OWN. A pin is its chat's own launch — the dispatcher files its launches out
+ * of a chat's lists (`dispatcher-work.service.ts`) — and a chat's own launches ride no API key, so a
+ * DeepSeek-painted pin names `DeepSeek` and a Claude one names no vendor (its figure is tokens alone).
  */
 function costLabel(launch: SoulLaunchSnapshot, t: TFunction): string {
-  return spendText(t, launch.cost_usd, launch.tokens_in, launch.tokens_out, launch.tokens);
+  return spendText(
+    t,
+    launch.cost_usd,
+    launch.tokens_in,
+    launch.tokens_out,
+    launch.tokens,
+    launch.provider === 'deepseek' ? 'DeepSeek' : '',
+  );
 }
 
 export const SoulLaunchPinRow = memo(({ launch, onDismiss, onOpen, openLabel }: SoulLaunchPinRowProps) => {

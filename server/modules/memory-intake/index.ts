@@ -16,6 +16,6 @@ export {
   validateMemoryArgs,
 } from './memory.service.js';
 export type { MemoryCandidateInput, MemoryIntakeService, MemoryTarget } from './memory.service.js';
-// The refusal class and the writer, re-exported from their own home in `memory-assert.ts`: a caller
+// The refusal class and the writer, re-exported through `memory-assert.ts` (the lane's write half): a caller
 // that needs to recognise a refusal catches the class this barrel hands it, never a copy.
 export { MemoryRefusal, assertIntoTarget } from './memory-assert.js';

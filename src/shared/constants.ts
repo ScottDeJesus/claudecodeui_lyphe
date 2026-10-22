@@ -14,7 +14,7 @@ import {
 import type { ComponentType } from 'react';
 
 import type { RoadmapEpicWord, RoadmapFeatureWord, RoadmapMilestoneWord } from '@/shared/roadmap-types';
-import type { FileStatusCode, LLMProvider, McpProvider, McpScope, McpTransport, RoadmapDotState, SettingsMainTab } from '@/shared/types';
+import type { AffectedAreasTrouble, FileStatusCode, LLMProvider, McpProvider, McpScope, McpTransport, RoadmapDotState, SettingsMainTab } from '@/shared/types';
 import type { UserPreferenceKey } from '@/shared/userSettings';
 
 /** The four buckets the git changes view sorts working-tree files into. */
@@ -274,20 +274,6 @@ export const MARKDOWN_CARDS_CLASS = 'chat-md-cards';
 
 // ---------------------------
 
-//----------------- WIP LADDER ------------
-
-/**
- * The count the WIP ladder lists up to before `All`: `1, 2, … 6, All`. Six is the widest count the
- * operator has ever chosen. It is only the FLOOR of the ladder's top rung — a wider count in play
- * raises it (`wipLadderTop`), so a limit already set above six stays on the list that shows it.
- *
- * Used by `wipLadderTop` in `utils.ts`, which the dispatcher module's master controller and epic fold
- * list their dropdowns from.
- */
-export const WIP_LADDER_TOP = 6;
-
-// ---------------------------
-
 //----------------- DISPATCHER LANE WALL ------------
 
 /**
@@ -479,3 +465,36 @@ export const FOCUSABLE_SELECTOR = 'a[href], button:not([disabled]), input:not([d
  * list), so a card and a chat row lift on the same hold.
  */
 export const TOUCH_HOLD_MS = 400;
+
+// ---------------------------
+
+//----------------- AFFECTED AREAS MARKS ------------
+
+/**
+ * The longest note a mark may carry, in characters: shadow-connector's `MAX_NOTE`
+ * (`core/affected_areas/judgment/marks.py`), which refuses a longer one as `note_too_long`. Used by the
+ * affected-areas module's `NoteDialog` and `UnderstandingVerdict` as their fields' `maxLength`, and by
+ * `MarkRefusal` to say the cap, so a note typed here is never one the engine turns back.
+ */
+export const MARK_NOTE_MAX = 500;
+
+/**
+ * The smallest area a drawn box may cover, as a share of the photo (0..1 squared): shadow-connector's
+ * `seat/normalize.MIN_AREA_FRAC`, below which the engine refuses a Missed one box as `bad_box` (about 10 by 10 pixels of a
+ * 1024 px view). The engine stays the authority; this mirror is how the affected-areas module's `MissedDraw` turns a box
+ * back before sending it, in the engine's own sentence, and how the photo's box drag stays free of any floor of its own.
+ */
+export const MIN_REGION_AREA = 1e-4;
+
+// ---------------------------
+
+//----------------- AFFECTED AREAS LANE ------------
+
+/**
+ * The three ways the affected-areas lane fails whatever was asked of it: CloudCLI could not read shadow-connector's
+ * secret, shadow-connector did not answer in time, or it answered what CloudCLI cannot read. Each is said in the Tours
+ * view's own words (`affectedAreas.trouble.<fault>`) rather than as a refusal of the press. Read by the affected-areas
+ * module's `LaneTrouble` (a read that brought no answer), `ThresholdControl` (a Set threshold that brought none) and
+ * `MarkRefusal` (a mark, missed area or understanding press that brought none).
+ */
+export const AFFECTED_AREAS_LANE_FAULTS: readonly AffectedAreasTrouble[] = ['no_secret', 'unreachable', 'unreadable'];

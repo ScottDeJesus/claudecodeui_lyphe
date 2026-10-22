@@ -48,6 +48,8 @@ import { readInstalledCliVersion } from '@/modules/cli-version/index.js';
 import { userFacingEnv } from '@/shared/child-env.js';
 import { resolveClaudeCodeExecutablePath } from '@/shared/claude-cli-path.js';
 
+import { launchAccountEnv } from './claude-launch-account.js';
+
 /** The CLI is started on Haiku: the read sends nothing, and if a future CLI ever did, it would be Haiku's usage. */
 const CATALOG_READ_MODEL = 'claude-haiku-4-5-20251001';
 
@@ -132,6 +134,8 @@ async function readRecordsFromCli(ask: EngineCatalogSpec<unknown>['read']): Prom
 
   // The same executable the chat runtime spawns (mapCliOptionsToSDK), so the list is that CLI's.
   const executable = resolveClaudeCodeExecutablePath(process.env.CLAUDE_CLI_PATH);
+  // The same account a chat starts on: the catalog's CLI is a Claude launch like any other.
+  const account = await launchAccountEnv();
   const instance = query({
     prompt: idlePrompt,
     options: {
@@ -142,7 +146,7 @@ async function readRecordsFromCli(ask: EngineCatalogSpec<unknown>['read']): Prom
       settingSources: [],
       // Any folder that always exists will do, since no settings source is loaded from it.
       cwd: os.tmpdir(),
-      env: userFacingEnv(),
+      env: { ...userFacingEnv(), ...account.env },
       ...(executable ? { pathToClaudeCodeExecutable: executable } : {}),
     },
   });

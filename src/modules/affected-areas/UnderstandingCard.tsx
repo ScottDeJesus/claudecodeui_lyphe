@@ -1,6 +1,7 @@
 import { useId } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { UnderstandingMark } from '@/modules/affected-areas/UnderstandingMark';
 import { capitalized, spoken } from '@/modules/affected-areas/utils/tourModel';
 import type { ReadState, Understanding } from '@/shared/affected-areas-types';
 import { Card } from '@/shared/ui';
@@ -20,7 +21,7 @@ type UnderstandingCardProps = {
  * empty face. A term the reader said nothing on is left out. Its foot names the model, the contract and when.
  *
  * Materials and fixtures are codebook keys and are spoken as they are ("engineered wood"); everything else is the
- * reader's own words.
+ * reader's own words. Its last block asks whether the account is right (`UnderstandingMark`), for a read that has an id.
  *
  * Used by the affected-areas module's `PanoScreen`, under the face, for a face that is read.
  */
@@ -66,6 +67,8 @@ export function UnderstandingCard({ understanding, read }: UnderstandingCardProp
           {t('affectedAreas.understanding.readBy', { model: read.model, contract: read.contractVersion ?? '—', when: formatRelativeTime(read.readAt) })}
         </p>
       )}
+      {/* Keyed by the read: an answer, a refusal or a Wrong note typed for one face's account never rides to another face's. */}
+      {read !== null && read.readId !== null && <UnderstandingMark key={read.readId} read={read} />}
     </Card>
   );
 }

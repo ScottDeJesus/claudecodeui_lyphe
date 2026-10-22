@@ -1,12 +1,11 @@
 import express from 'express';
 
-import type { DispatcherOffpeak, DispatcherVerb, DispatcherVerbResult, DispatcherWipChoice, DispatcherWipLimit } from '@/shared/types.js';
+import type { DispatcherOffpeak, DispatcherVerb, DispatcherVerbResult } from '@/shared/types.js';
 import {
   dispatcherModelChoiceError,
   dispatcherScheduleWhenError,
   readDispatcherModelChoice,
   readDispatcherScheduleWhen,
-  readDispatcherWipWord,
 } from '@/shared/utils.js';
 
 import type { DispatcherPicture } from './dispatcher-state.service.js';
@@ -34,33 +33,6 @@ const PLAN_NAME = /^[a-z0-9][a-z0-9-]{0,99}$/;
  */
 const ARC_NAME = /^[a-z0-9][a-z0-9-]{0,99}(\.arc)?$/;
 
-/** The two limits an epic carries, in the dispatcher's own spelling (`hooks/dispatcher/wip.py:KINDS`) — the only `limit` words the WIP route relays. */
-const WIP_LIMITS: readonly DispatcherWipLimit[] = ['features', 'tasks'];
-
-/** The 400 sentence the WIP route answers with when the body names no limit and word the dispatcher takes. */
-const WIP_BODY_ERROR = 'limit must be features or tasks, and word a whole number from 1 to 9007199254740991, all, or default';
-
-/**
- * The argv words of an epic's WIP press — `[limit, word]` after the arc's name — or `null` for a body
- * the dispatcher's `wip` verb would refuse.
- *
- * BOTH WORDS ARE OURS ONCE THEY ARE HERE, and checked BEFORE ANY PROCESS STARTS: the limit against the
- * dispatcher's two, the word against its grammar (`readDispatcherWipWord`: a canonical count to
- * 9007199254740991, or `all`) plus the door's own `default`. The count is bounded because the word
- * travels back to the screen in `status --json`, and a count its reader refuses would freeze the whole
- * Runner board's picture (INV-5693) — the bound is enforced where the word enters, not discovered
- * where it is read. What reaches an argv array is a spelling this server wrote, never a string the
- * request chose.
- */
-function wipArgs(body: unknown): string[] | null {
-  const { limit, word } = (body ?? {}) as { limit?: unknown; word?: unknown };
-  const checkedLimit = WIP_LIMITS.find((entry) => entry === limit);
-  const checkedWord: DispatcherWipChoice | null = word === 'default'
-    ? 'default'
-    : (readDispatcherWipWord(word) as DispatcherWipChoice | null);
-  return checkedLimit === undefined || checkedWord === null ? null : [checkedLimit, checkedWord];
-}
-
 /** The 400 sentence the queue route answers with when the body is not exactly one of the three moves the dispatcher's `queue` verb takes. */
 const QUEUE_BODY_ERROR = 'body must be exactly one of { "before": <epic name> }, { "last": true } or { "at": <whole number from 1 to 9999> }';
 
@@ -85,10 +57,10 @@ function queueArgs(body: unknown): string[] | null {
 }
 
 /** The seven words the epic dial takes (`hooks/dispatcher/epic_dial.py:WORDS`): a limit of `1` to `5`, and the pause. The only `word` values the epics route relays. */
-const EPIC_WORDS: readonly string[] = ['1', '2', '3', '4', '5', 'pause', 'resume'];
+const EPIC_WORDS: readonly string[] = ['pause', 'resume'];
 
-/** The 400 sentence the epics route answers with when the body names none of the seven. */
-const EPICS_BODY_ERROR = 'word must be one of 1, 2, 3, 4, 5, pause or resume';
+/** The 400 sentence the epics route answers with when the body names neither word. */
+const EPICS_BODY_ERROR = 'word must be one of pause or resume';
 
 /** The 400 sentence the start route answers with when a body names anything: the board's Start takes none. */
 const START_BODY_ERROR = 'the board\'s Start takes no body';
@@ -181,14 +153,14 @@ function statusForVerb(result: DispatcherVerbResult): number {
 }
 
 /**
- * The dispatcher lane's twenty-four routes: three reads of the plan list, ten presses on a plan, seven on
+ * The dispatcher lane's twenty-five routes: three reads of the plan list, twelve presses on a plan, six on
  * an arc, four on the board. Auth is the mount's `authenticateToken`, in `server/index.ts`.
  *
  * These handlers validate and translate, and do nothing else: nothing is read here, no process is
  * started here, and no route names a path from the request — the binary and the store are the
  * module's, fixed at composition, and a request can only ever choose a plan or an arc by name, a
  * word from the closed set of sixteen verbs, and — where the verb takes one — a word from the three
- * model words, the WIP grammar, the queue's three moves or the epic dial's seven words.
+ * model words, the queue's three moves or the epic dial's seven words.
  *
  * A READ THAT FINDS NO PICTURE IS TOLD SO (`NOT_READ_YET` above), and the read waits a bound for one
  * first: the two together are what keep a handover from being drawn as an empty plan list.
@@ -199,8 +171,8 @@ function statusForVerb(result: DispatcherVerbResult): number {
  * rather than one param because the NAME CLASSES differ (`PLAN_NAME` against `ARC_NAME` below) — a
  * fence that would be lost the moment one route accepted either adornment. `schedule` is a PLAN'S alone
  * here (the card's `Resume at …`): the deck's `Schedule start` is gone, though the terminal's
- * `dispatcher schedule <arc>` stays. `wip` and `queue` are an ARC'S ALONE: a feature carries no WIP word
- * and holds no place in a queue of epics, so neither has a plan route. `epics` `start`, `hide` and
+ * `dispatcher schedule <arc>` stays. `queue` is the ARC'S ALONE: a feature holds no place in a queue of
+ * epics, so it has no plan route. `epics` `start`, `hide` and
  * `unhide` are the BOARD'S: the dial and the one Start name no plan and no arc, and Hide and Show carry any
  * number of plan and epic names in their body (one route each, because one press may carry the whole
  * Hidden list), so they are the routes with no `:name`, and their answers carry `plan: ""`.
@@ -309,6 +281,16 @@ export function createDispatcherRouter(dependencies: DispatcherRouterDependencie
   // stalled is the dispatcher's own refusal (`REFUSED planner-resume …`, a 409). `--by app:card` is the
   // press's actor, written to the plan's log the way an Accept's is; the word is ours, never the request's.
   router.post('/plans/:name/planner-resume', relay('planner-resume', () => ['--by', 'app:card']));
+  // The operator's lift of the usage pacer's hold for THIS plan (`dispatcher override <plan> --by app:card`) —
+  // the card's `Override` — and its undo (`… --off --by app:card`, `Turn off`). It lifts the pacer and nothing
+  // else: the plan's model word, its epic's and the house switch are untouched, and every soul rides the
+  // route that switch gives it. THE DISPATCHER REFUSES THE LIFT INSIDE A CLAUDE SESSION, and this lane's
+  // child environment carries none (`laneEnv`), so the card's press is the operator's own. The two words
+  // are ours (`--by app:card` names the press's door in the plan's log); no body and no argument travel.
+  // A refusal (`REFUSED override …`: a finished plan, one the roadmap still holds, one already past the
+  // pacer, or `--off` on a plan that carries none) is a 409 whose body is that sentence, untouched.
+  router.post('/plans/:name/override', relay('override', () => ['--by', 'app:card']));
+  router.post('/plans/:name/override-off', relay('override', () => ['--off', '--by', 'app:card']));
   // A DESIGNED plan Accepted ahead of its cut (`dispatcher arm-accept <name> --by app:card --design <stamp>`) —
   // the card's `Accept when cut`: the daemon approves the first cut of that exact design and walks it. The
   // stamp the card drew travels in the body and is checked before any spawn (`armAcceptArgs`); the dispatcher
@@ -332,7 +314,7 @@ export function createDispatcherRouter(dependencies: DispatcherRouterDependencie
   }));
 
   /**
-   * The ARC's seven verbs — `model`, `stop`, `resume`, `arm-accept`, `disarm-accept`, `wip` and `queue` —
+   * The ARC's six verbs — `model`, `stop`, `resume`, `arm-accept`, `disarm-accept` and `queue` —
    * relayed to the arc's own door.
    *
    * AN ARC IS ADDRESSED BY ITS OWN NAME, and the dispatcher is what resolves it. Each of the five
@@ -351,12 +333,7 @@ export function createDispatcherRouter(dependencies: DispatcherRouterDependencie
    * The next frame redraws the arc's header and its plans together — nothing here is optimistic, and nothing
    * is copied by this server.
    *
-   * `wip` IS THE ARC'S ALONE: `dispatcher wip <arc> features|tasks <N|all|default>` sets one of the
-   * epic's two limits (or hands it back to Settings' default), never refused for the epic's state —
-   * the limit is read at the rule's next take-up (`width.reason`), and the dispatcher kicks its own
-   * daemon when the word changed, so a wider limit frees a held feature without another press.
-   *
-   * `queue` IS THE ARC'S ALONE TOO: `dispatcher queue <arc> --before <arc> | --last | --at N` moves the
+   * `queue` IS THE ARC'S ALONE: `dispatcher queue <arc> --before <arc> | --last | --at N` moves the
    * epic in the order In flight runs them top down, and the dispatcher refuses an epic that is not in
    * the queue (`REFUSED queue …`, a 409 carrying that sentence). The body is one of three moves,
    * checked here before any process starts (`queueArgs`); the order itself is the dispatcher's store's.
@@ -397,12 +374,10 @@ export function createDispatcherRouter(dependencies: DispatcherRouterDependencie
   // own current design, so no stamp travels — the card never read the members' designs one by one.
   router.post('/arcs/:name/arm-accept', arcRelay('arm-accept', () => ['--by', 'app:card']));
   router.post('/arcs/:name/disarm-accept', arcRelay('disarm-accept'));
-  // One of the epic's two WIP limits (`dispatcher wip <arc> <limit> <word>`): the epic card's WIP control.
-  router.post('/arcs/:name/wip', arcRelay('wip', wipArgs, WIP_BODY_ERROR));
   // An epic moved in the queue (`dispatcher queue <arc> --before <arc> | --last | --at N`): In flight's drag.
   router.post('/arcs/:name/queue', arcRelay('queue', queueArgs, QUEUE_BODY_ERROR));
 
-  // The epic dial's one word (`dispatcher epics <1|2|3|4|5|pause|resume>`): a BOARD verb, so it names
+  // The epic dial's one word (`dispatcher epics <pause|resume>`): a BOARD verb, so it names
   // no plan and no arc and the name the relay is handed is empty (`runDispatcherVerb` leaves it out of the argv).
   // THE BODY IS EXACTLY `{ "word": … }`, as the queue's is exactly one move: a body carrying another key is
   // not one this route knows, and is a 400 like any other.

@@ -1,7 +1,7 @@
 import type { TFunction } from 'i18next';
 import { useTranslation } from 'react-i18next';
 
-import { FACES, listWords } from '@/modules/affected-areas/utils/tourModel';
+import { FACES, listWords, needsRead } from '@/modules/affected-areas/utils/tourModel';
 import type { Budget, ReadResult, ViewEntry } from '@/shared/affected-areas-types';
 import type { PanoPress, TourReaderProgress } from '@/shared/types';
 import { Banner, Button, Meter } from '@/shared/ui';
@@ -12,13 +12,13 @@ type ReadControlProps = {
     press: PanoPress;
     /** The pano's views: whose reads Read again answers, and which faces are still unread. */
     views: ViewEntry[];
-    /** The contract the codebook reads under now; null until the codebook answers, which offers no contract reason. */
-    contract: string | null;
+    /** The contract and model the reader reads under now (the codebook's); null until the codebook answers, which offers no reason that names them. */
+    today: { contract: string; model: string } | null;
     onRead: () => void;
     onReadAgain: () => void;
   } | null;
   walk: TourReaderProgress;
-  /** Panos of the tour with a face not yet read: what Read the rest would read. Zero takes the press away. */
+  /** Panos of the tour with a view that needs a read (none yet, or one that is not current): what Read the rest would read. Zero takes the press away. */
   unreadPanos: number;
   /** Those panos' unread views, six for a pano never cut: what Read the rest would spend, said before it does. */
   unreadViews: number;
@@ -29,12 +29,12 @@ type ReadControlProps = {
 
 /** The reason codes with words of their own; any other code is said as it is, inside a sentence. */
 const KNOWN_REFUSALS = [
-  'budget', 'flag_off', 'restorly_ai_off', 'gemini_off', 'no_key', 'permanent', 'views_refused',
+  'budget', 'flag_off', 'gemini_off', 'no_key', 'permanent', 'views_refused', 'context_degraded',
   'unreachable', 'no_secret', 'unreadable', 'gone', 'failed',
 ];
 
 /** Refusals no retry clears today — a spent budget, or a switch or a key a person has to set — so while one stands, the press it refused stops being the loudest control. */
-const LASTING_REFUSALS = ['budget', 'flag_off', 'restorly_ai_off', 'gemini_off', 'no_key'];
+const LASTING_REFUSALS = ['budget', 'flag_off', 'gemini_off', 'no_key'];
 
 /** The module's words are English only, so its counts are set as English sets them: "2,000". */
 const COUNT = new Intl.NumberFormat('en');
@@ -60,12 +60,13 @@ function refusalWords(reason: string, t: TFunction, budget?: Budget): string {
 
 /**
  * Why Read again is offered, or null: the job's context changed since a face was read (the reader would be told
- * something new), or a face was read under a contract older than the codebook's.
+ * something new), or a face has a read that is not current (`needsRead` with a read on it: made under an older contract
+ * or model than the reader reads under now).
  */
-function againReason(views: ViewEntry[], contract: string | null, t: TFunction): string | null {
+function againReason(views: ViewEntry[], today: { contract: string; model: string } | null, t: TFunction): string | null {
   if (views.some((view) => view.read?.contextChanged === true)) return t('affectedAreas.read.againContext');
-  const older = views.find((view) => view.read?.status === 'read' && contract !== null && view.read.contractVersion !== contract);
-  return older?.read ? t('affectedAreas.read.againContract', { old: older.read.contractVersion, current: contract }) : null;
+  const older = views.some((view) => view.read?.status === 'read' && needsRead(view));
+  return older && today !== null ? t('affectedAreas.read.againCurrent', today) : null;
 }
 
 /**
@@ -99,14 +100,14 @@ function Wall({ words }: { words: string }) {
  * On the pano screen, top to bottom: what a read of the pano would buy ("Floor not read yet · 5 of 6 read", from the
  * dry run; "Working out what a read would cost…" while it is out, "Cutting this pano into its six views…" for a pano
  * never cut, since the dry run is what cuts it), what the rest of the tour would buy ("Rest of this tour: 5 panos ·
- * 30 views not read yet"), why Read again is offered when it is; then each wall in words, BEFORE the presses it
+ * 30 views need a read"; a view needs one when it has none or its read is not current), why Read again is offered when it is; then each wall in words, BEFORE the presses it
  * refuses — the lane's fault, a dry run refused, the last press refused or part read, where the walk stopped, a walk
  * and a press stopped by the same wall said once; then the presses — Read this pano while any view is left to buy,
- * Read again (forced) when the context changed or an older contract read it, Read the rest of this tour while any
+ * Read again (forced) when the context changed or an older contract or model read it, Read the rest of this tour while any
  * pano is left. While a wall no retry clears today stands (a spent budget, a switch, a missing key), the presses drop
  * to outline. A press that is out holds both pano presses busy and says how long it takes.
  *
- * On the tour screen the walk alone: "45 panos · 270 views not read yet" and Read the rest; while it runs, "Reading
+ * On the tour screen the walk alone: "45 panos · 270 views need a read" and Read the rest; while it runs, "Reading
  * 3 of 45" over a meter with Stop after this pano beside it; where it stopped, why; and how many panos it passed over
  * because their views could not be cut.
  *
@@ -118,11 +119,11 @@ export function ReadControl({ pano, walk, unreadPanos, unreadViews, onReadRest, 
   const press = pano?.press ?? null;
   const plan = press?.plan ?? null;
   const planRefusal = plan?.status === 'refused' ? plan.reason ?? 'views_refused' : null;
-  const again = pano === null ? null : againReason(pano.views, pano.contract, t);
+  const again = pano === null ? null : againReason(pano.views, pano.today, t);
   const left = plan === null || planRefusal !== null || plan.viewsToRead > 0;
   const rest = t(pano === null ? 'affectedAreas.read.rest' : 'affectedAreas.read.restOfTour', {
     panos: t('affectedAreas.tour.panos', { count: unreadPanos }),
-    views: t('affectedAreas.read.viewCount', { count: unreadViews }),
+    views: t('affectedAreas.read.viewsNeedRead', { count: unreadViews }),
   });
   // The last press's answer once it is back, and the wall it met; the walk's wall once it has stopped. One wall met
   // by both is said once, in the walk's sentence with the press's numbers.

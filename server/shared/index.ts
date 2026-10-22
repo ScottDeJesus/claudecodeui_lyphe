@@ -8,3 +8,9 @@ export type { AnyRecord, ProviderRuntimeContext, ProviderRuntimeWriter } from '.
 export { readDispatcherJson, runDispatcherCommand } from './dispatcher-command.js';
 export type { DispatcherCommandDependencies, DispatcherCommandResult } from './dispatcher-command.js';
 export { each, field, isCount, isCountOrNull, isFlag, isList, isRecord, isText, isTextOrNull, need, oneOf } from './document-fields.js';
+
+// The one forwarder to shadow-connector's internal-caller-gated surface, and the one place its secret is
+// read — consumed by the affected-areas module (the Tours lane) and the carrier-bulletins module (the
+// bulletins lane), each of which owns its allowlist and builds its own forwarder with its own label.
+export { createShadowConnectorLane } from './shadow-connector-lane.js';
+export type { LaneAnswer, LaneRequest, ShadowConnectorLane, ShadowConnectorLaneDependencies } from './shadow-connector-lane.js';

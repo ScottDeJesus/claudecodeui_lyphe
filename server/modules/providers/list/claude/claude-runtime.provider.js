@@ -43,8 +43,10 @@ import {
 import { createCompleteMessage, createNormalizedMessage } from '@/shared/utils.js';
 import { capToolResult } from '@/shared/message-unification.js';
 import { userFacingEnv } from '@/shared/child-env.js';
+import { chosenAccount } from '@/modules/accounts/index.js';
 
 import { armKeepaliveSpawn, keepaliveReadopt, mainThreadRequestOf } from './session-host/index.js';
+import { launchAccountEnv, recordLaunch } from './claude-launch-account.js';
 import { noteTerminalCommands } from './claude-command-catalog.js';
 import {
   createIdleCloser,
@@ -811,9 +813,12 @@ async function queryClaudeSDK(command, options = {}, ws, context) {
       // the turn to end and then read its (empty) value as "did not join" — and spawn a second
       // process after every joined turn. Measured 2026-09-11 on the reuse probe.
       const joined = await joinProcess(live, command, options, ws, context);
-      if (joined) {
+      if (joined?.turnEnded) {
         return joined.turnEnded;
       }
+      // A process retired for a changed launch argument is replaced NOW, on the new value; its reason
+      // rides to the spawn so the launch record says why this start happened.
+      return spawnProcess(command, options, ws, context, joined?.launchWhy ?? 'new');
     }
   }
   return spawnProcess(command, options, ws, context);
@@ -854,8 +859,13 @@ async function resolveSdkOptions(options, context) {
 /**
  * Pushes the message into the running process and returns `{ turnEnded }` — the turn's own
  * promise, wrapped so the caller's `await` does not unwrap it — or retires that process and
- * returns null when the message carries a launch argument it cannot take (the caller then
- * spawns afresh).
+ * answers `{ launchWhy }` when the message carries a launch argument it cannot take (the caller
+ * then spawns afresh, and its launch record says why). Null when the push itself found the process
+ * gone; the caller respawns as a new start.
+ *
+ * A JOIN NEVER ASKS THE DOOR for an account: the next profile's account is the house's CHOSEN one
+ * (`chosenAccount`), read from the store's own non-secret record on every message. The running
+ * process keeps the environment it was started with.
  */
 async function joinProcess(live, command, options, ws, context) {
   const { sessionId } = options;
@@ -866,12 +876,14 @@ async function joinProcess(live, command, options, ws, context) {
   const installedCliVersion = typeof live.profile?.cliVersion === 'string'
     ? await installedCliVersionForLaunch()
     : null;
-  const next = launchProfileOf(resolved.sdkOptions, resolved.mcpUnreadable, false, installedCliVersion, resolved.mcpSignIn, resolved.toolsets.digest);
+  const chosen = chosenAccount();
+  const next = launchProfileOf(resolved.sdkOptions, resolved.mcpUnreadable, false, installedCliVersion,
+    resolved.mcpSignIn, resolved.toolsets.digest, chosen?.digest ?? null, chosen?.slug ?? null);
   const plan = planLiveChanges(live.profile, next, { resumeFromScratch: options.resumeFromScratch === true });
   if (plan.respawn) {
     console.log(`[Claude SDK] Replacing the process for session ${sessionId}: ${plan.respawn}`);
     await live.retire();
-    return null;
+    return { launchWhy: `respawn: ${plan.respawn}` };
   }
   try {
     await live.applyChanges(plan.changes, next);
@@ -917,8 +929,12 @@ const SPAWN_WAIT_MS = 10_000;
 /**
  * Spawns the conversation's process and runs its message loop for the life of that process.
  * Returns when the FIRST turn ends; the loop carries on, serving every turn pushed in later.
+ *
+ * `launchWhy` is the launch record's word for this start: `'new'` for a chat's first process (or
+ * one the push path respawns after finding it gone), `'respawn: <reason>'` for a process retired at
+ * a message because a launch argument changed.
  */
-async function spawnProcess(command, options, initialWs, context) {
+async function spawnProcess(command, options, initialWs, context, launchWhy = 'new') {
   const { sessionId } = options;
   // Rebound on every turn that joins: the run's writer, and the name notifications carry.
   let ws = initialWs;
@@ -1295,6 +1311,11 @@ async function spawnProcess(command, options, initialWs, context) {
     try {
       const resolved = await resolveSdkOptions(options, context);
       sdkOptions = resolved.sdkOptions;
+      // The account in use and the environment its sign-in token rides, read ONCE here — the spawn —
+      // and never for a re-adoption, whose CLI already runs with the environment it was started on.
+      // With no token the environment is empty and this launch rides the live login exactly as before.
+      const launch = reattach ? null : await launchAccountEnv();
+      if (launch) sdkOptions.env = { ...sdkOptions.env, ...launch.env };
       // The one door every CLI start on THIS machine goes through (a send, an edited send, a
       // compaction's restart, a respawn after a retirement), so the one place a vanished project
       // folder is caught. Skipped for a re-adoption (its CLI is already running) and for a node's
@@ -1312,7 +1333,8 @@ async function spawnProcess(command, options, initialWs, context) {
         ? (reattach.profile
             ? { ...reattach.profile, unknown: false, cliVersion: reportedCliVersion }
             : launchProfileOf(sdkOptions, resolved.mcpUnreadable, true, reportedCliVersion, resolved.mcpSignIn))
-        : launchProfileOf(sdkOptions, resolved.mcpUnreadable, false, null, resolved.mcpSignIn);
+        : launchProfileOf(sdkOptions, resolved.mcpUnreadable, false, null, resolved.mcpSignIn, null,
+            launch?.account ?? null, launch?.slug ?? null);
       // What tool sets the process HOLDS: none yet for a fresh one (its first sync, below, records them), and
       // unknown for a re-adopted one whatever its host recorded — the host knew only the spawn-time profile.
       profile.toolsets = reattach ? null : '';
@@ -1320,6 +1342,16 @@ async function spawnProcess(command, options, initialWs, context) {
       // Known the moment the run is adopted, so the report (and the banner beside the
       // transcript) never reads a live host as "not heard yet" until its next turn.
       if (reportedCliVersion && typeof ws.setCliVersion === 'function') ws.setCliVersion(reportedCliVersion);
+      // One line per chat CLI start: which account it rode, and why it started (a chat's first process,
+      // or a process retired at a message for a changed launch argument). Never fails a turn.
+      if (!reattach) {
+        recordLaunch({
+          session: sessionId ?? null,
+          account: launch?.account ?? null,
+          slug: launch?.slug ?? null,
+          why: launchWhy
+        });
+      }
       keepalive = armKeepaliveSpawn(sdkOptions, {
         appSessionId: sessionId ?? null,
         userId: ws?.userId ?? null,
@@ -1609,6 +1641,11 @@ async function spawnProcess(command, options, initialWs, context) {
         // `error_during_execution`, and a crash alarm is the last thing that turn deserves.
         if (!abortedInstances.has(queryInstance) && !supersededInstances.has(queryInstance)) detectRuntimeSignals(message, signalState, {
           sessionId: sessionId || capturedSessionId || null,
+          // The account this process was STARTED on, off its launch profile (a re-adoption's own
+          // recorded profile, or null when its meta holds none). Limit memory and the readings a
+          // `rate_limit_event` files belong to THIS account, never to the box's current login.
+          account: profile?.account ?? null,
+          accountSlug: profile?.accountSlug ?? null,
           emit: (signal) => notifyUserIfEnabled({
             userId: runUserId,
             event: createNotificationEvent({ provider: 'claude', sessionId: sessionId || capturedSessionId || null, requiresUserAction: false, ...signal })

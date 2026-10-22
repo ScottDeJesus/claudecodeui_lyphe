@@ -105,7 +105,8 @@ function overLongLines(text: string, cap: number): { count: number; overflow: nu
  * memory index MEMORY.md") — every reason names it, so a refusal can never be about a file nobody
  * was writing to.
  *
- * `current` is the file as it stands (the empty string for one that does not exist yet), and every
+ * `current` is the file as it stands (the empty string for one that does not exist yet or holds only
+ * blank space — the caller passes `''` for both, and the total-size reason below reads it so), and every
  * dimension keeps the borrowed ratchet: a breach counts only when the edit makes that dimension
  * WORSE than the file already is. That is what lets an over-budget file be edited back DOWN — an
  * absolute check would deadlock the very edits that would fix it.
@@ -140,10 +141,13 @@ export function capRefusals(caps: Caps | null, display: string, next: string, cu
   }
 
   if (caps.maxTotalChars !== undefined && next.length > caps.maxTotalChars && next.length > current.length) {
+    // An empty file has no entry to trim: the only remedy is a shorter body.
+    const remedy = current === ''
+      ? 'the file is empty, so there is no entry to trim — shorten this body.'
+      : 'trim an entry before adding another.';
     reasons.push(
       `${display} would grow to ${next.length} characters, past its ${caps.maxTotalChars}-character `
-        + `budget. The whole file is read into every session, so its total size is the cost — trim `
-        + `an entry before adding another.`
+        + `budget. The whole file is read into every session, so its total size is the cost — ${remedy}`
     );
   }
 

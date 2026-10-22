@@ -6,16 +6,15 @@ import { Button, SettingRow, Stepper } from '@/shared/ui';
 
 /**
  * HOW MANY PLANNERS RUN AT ONCE — the dispatcher's own dial, `~/.claude/state/planners.flag`. It answers
- * the question the master controller's WIP dropdowns (In flight's header) answer for features and tasks,
- * about a different worker: how many PLANNERS (designs, cuts, judgments) are out at once. They are
- * separate files and neither bounds the other.
+ * a question of its own, about a different worker: how many PLANNERS (designs, cuts, judgments) are out
+ * at once. Its file is separate from every other dial, and neither bounds the other.
  *
  * Its own file, as `RunnerParkAtPeakRow` is: `RunnerModelContent` is past what it should hold, and a
  * row whose read, write and re-read are its own hook has nothing to share with the rows around it
  * except their grammar — the unknown state in words, the retry in the control's slot.
  *
  * THE STEPPER HAS A FLOOR AND NO TOP. One planner is the least a lane can be, and a width is a number
- * the operator chose: there is no "All" to reach, unlike the WIP ladder's, because a
+ * the operator chose: there is no "All" to reach, because a
  * planner is a billed Claude child and "as many as are queued" is not a width anyone asked for. Both
  * presses are live at every count.
  *

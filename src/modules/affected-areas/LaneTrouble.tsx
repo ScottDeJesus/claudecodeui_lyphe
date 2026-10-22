@@ -1,17 +1,15 @@
 import { useTranslation } from 'react-i18next';
 
+import { AFFECTED_AREAS_LANE_FAULTS } from '@/shared/constants';
 import type { AffectedAreasTrouble } from '@/shared/types';
 import { Banner, Button } from '@/shared/ui';
 
 type LaneTroubleProps = {
   trouble: AffectedAreasTrouble;
-  /** What the read was of, which names a missing or failed one: the list, a tour, or a pano. */
-  subject: 'tours' | 'tour' | 'pano';
+  /** What the read was of, which names a missing or failed one: the list, a tour, a pano, the proving tables, or the Mark screen's queue. */
+  subject: 'tours' | 'tour' | 'pano' | 'tables' | 'queue';
   onRetry: () => void;
 };
-
-/** The three faults that are the lane's or shadow-connector's whatever was asked; each carries a second line. */
-const LANE_FAULTS: readonly AffectedAreasTrouble[] = ['no_secret', 'unreachable', 'unreadable'];
 
 /**
  * "shadow-connector can't be reached" with Try again: what a Tours screen draws where its read brought no
@@ -23,11 +21,12 @@ const LANE_FAULTS: readonly AffectedAreasTrouble[] = ['no_secret', 'unreachable'
  *
  * Warn, not danger: nothing was refused by a person. The wrapper is an alert, heard when it mounts.
  *
- * Used by the affected-areas module's `TourPicker`, `TourScreen` and `PanoScreen`.
+ * Used by the affected-areas module's `TourPicker`, `TourScreen`, `PanoScreen`, `ProvingTable` and `MarkQueue`.
  */
 export function LaneTrouble({ trouble, subject, onRetry }: LaneTroubleProps) {
   const { t } = useTranslation();
-  const lane = LANE_FAULTS.includes(trouble);
+  // The lane's own faults carry a second line; the rest are named by what was being read.
+  const lane = AFFECTED_AREAS_LANE_FAULTS.includes(trouble);
   return (
     <div role="alert">
       <Banner

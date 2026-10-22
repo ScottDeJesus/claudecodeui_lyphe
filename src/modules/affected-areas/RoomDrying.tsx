@@ -51,11 +51,18 @@ function affectedLine(drying: DryingEntry, t: TFunction): string | null {
   return areas.length === 0 ? null : t('affectedAreas.drying.affected', { areas: listWords(areas, t) });
 }
 
+/** "Demo had begun before the tour" or "No demo recorded before the tour", from the room's `demoBeforeTour`; null when the job has no readings to say. False means no removal is recorded, not that none happened. */
+function demoLine(room: RoomEntry | null, t: TFunction): string | null {
+  if (room === null || room.demoBeforeTour === null) return null;
+  return t(room.demoBeforeTour ? 'affectedAreas.drying.demoBefore' : 'affectedAreas.drying.noDemoBefore');
+}
+
 /**
  * DRYING IN THIS ROOM: the room's numbers from the latest real drying report that names it, said in words rather
  * than tabled — "Drywall read 99%, goal 16% — wet." per material, each with a dot in its tone (warn when it read wet,
  * positive when it read dry), then "Affected wall 44 SF.", whether water rose above 18 inches, and which report.
- * A room no report names says so.
+ * A room no report names says so. Under it, one line on demo: "Demo had begun before the tour" or "No demo recorded before
+ * the tour" (what the reader is told of the room, `demoBeforeTour`), and no line when the job has no readings to say.
  *
  * The reading is the report's FIRST one: what the material read when drying began, which is what the photo is read
  * against. Used by the affected-areas module's `PanoScreen`, under the face's list.
@@ -66,6 +73,7 @@ export function RoomDrying({ room }: RoomDryingProps) {
   const drying = room?.drying ?? null;
   const lines = drying === null ? [] : drying.materials.map((material) => materialLine(material, t)).filter((line) => line !== null);
   const affected = drying === null ? null : affectedLine(drying, t);
+  const demo = demoLine(room, t);
 
   return (
     <Card role="region" aria-labelledby={headingId} className="flex min-w-0 flex-col gap-2.5 px-[18px] py-4">
@@ -89,6 +97,7 @@ export function RoomDrying({ room }: RoomDryingProps) {
           <p className="text-xs text-muted-foreground">{t('affectedAreas.drying.report', { date: formatShortDate(drying.reportDate) ?? drying.reportDate })}</p>
         </>
       )}
+      {demo !== null && <p className="text-[13.5px] text-foreground">{demo}</p>}
     </Card>
   );
 }

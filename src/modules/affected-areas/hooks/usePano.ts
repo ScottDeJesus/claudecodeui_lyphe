@@ -13,8 +13,11 @@ import type { AffectedAreasRead, AffectedAreasTrouble, PanoPress } from '@/share
  */
 type PressRecord = Omit<PanoPress, 'pressing'> & { key: string; cut: PanoDetail | null };
 
-/** The pano's read, by `tourId/panoId`: module-level so `useLaneRead` sees the same function every render. */
-const panoFor = (key: string) => {
+/**
+ * The pano's read, by `tourId/panoId`: module-level so `useLaneRead` sees the same function every render.
+ * Read by this file and by `useQueue`, which reads the pano an area of the Mark screen's queue stands on.
+ */
+export const panoFor = (key: string) => {
   const [tourId, panoId] = key.split('/');
   return api.affectedAreas.pano(tourId, panoId);
 };
