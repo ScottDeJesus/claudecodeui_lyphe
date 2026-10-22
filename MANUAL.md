@@ -3948,3 +3948,68 @@ The design writes the keys of each body and not the inside of four of them. They
 - `views.py` and the surface had not landed at that time: no body was compared with a live answer.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/carrier-bulletins-types.ts
+
+## MAN-8880 — The Bulletins view — src/modules/carrier-bulletins: three screens over a fake, the FILL markers, what the fill inherits
+
+The Bulletins view: what Claude read of each carrier's SERVPRO program bulletin and what the house settled it into. Read-only. Built to be the fifth view of the Cerberus tab's strip, after Tours. Wire: MAN-8865. Slots in the tab: MAN-7867. Plans: `~/.claude/plans/bulletins-read-by-claude.design.toml`, `bulletins-read-by-claude.phases.toml`. Every body's server home: shadow-connector `extractors/servpro_bulletins/verify/views.py`.
+
+## State of the module
+| fact | value |
+|---|---|
+| phase | scaffold: three screens drawn over `FAKE_READS`; no fetch, no hook; the root holds three `useState`s and one ref |
+| mounted | no. `index.ts` exports the lazy `BulletinsView`; `CerberusPanel` does not import it until the fill replaces its two `FILL:` markers (`bulletins-row`, `bulletins-panel`) |
+| fake | `carrier-bulletins-fake.ts` (`FAKE_READS`, `unwired`): 13 overview rows, typed by the wire mirror. Real: the 12 current files' numbers, stored times, page counts, hashes, live rules, open questions; State Farm's, AAA of Southern California's and The Hartford's printed part headings; the check's verdicts; State Farm p13 and AAA of Southern California p15 in their own words; p13 rendered once as a data URL. Composed: page splits, calls, tokens, duties not placed, refused entries, question wording, the two waiting pages, Nationwide's reading in progress, Allstate's stopped one (32 of 49 pages read). American Family's file is not stored: its 12 pages are a stand-in. The fill deletes the file |
+| words | `cerberus.bulletins.*` in `src/modules/i18n/locales/en/common.json`, including `cerberus.bulletins.tab` and `.tabHint` (the strip's two words) |
+| shared types | wire: `src/shared/carrier-bulletins-types.ts`. Lane fault: `AffectedAreasTrouble` from `src/shared/types.ts` (one forwarder, `server/shared/shadow-connector-lane.ts`, serves both lanes) |
+| proof | 2026-10-21: six states, light and dark, 1280×800 and 390×844: 108 of 108 checks, no console errors, on the builder's final code. The fix-pass changed the files after that: client `tsc` and `oxlint` exit 0, no proof run |
+
+## Screens
+One at a time, held at the root as `bulletinId` (null = overview) and `page` (null = the carrier's pages); each plays `vv-pagein` when it opens.
+| screen | files | draws |
+|---|---|---|
+| Overview | `OverviewScreen.tsx`, `CarrierRow.tsx` | headline "N carriers *need you*" (accent `warn`) or "Every file is *read and settled*", in the plain bold heading (the tab owns the one serif headline); carriers in groups `needs` · `notSettled` · `settled` (`carrierGroups`); per row: file, page split, live requirements, open questions, duties not placed, last pull, last reading |
+| Carrier's pages | `CarrierPages.tsx`, `PageRow.tsx` | pages under the parts the bulletin prints (`partGroups`); a part whose pages share one state says it once beside the range and its rows drop the badge (`PageRow` `showState`); call-outs: waiting pages (why + `pullCommand`), a stopped reading (`warn`: pages not read, the next pull reads them, `pullCommand`), a file never read (`pullCommand`) |
+| Page | `PageScreen.tsx`, `PageImage.tsx`, `ReadingColumn.tsx`, `RequirementList.tsx`, `JudgedList.tsx`, `SetAside.tsx`, `QuotedWords.tsx` | image beside the reading at container width ≥ 720 px, else a thumbnail above it; Enlarge opens the house `Lightbox`; reading in order: requirements (quote, settled rule, open question + `QUESTIONS_COMMAND` as text), judged rules (unsettled first, confirmed last; a quote shows only when it adds words the rule lacks), duties not placed, refused entries, where the answer came from |
+Shared: `BulletinsTrouble.tsx` (warn banner + Try again, `subject` `overview` · `pages` · `page`), `RefreshButton.tsx`, `StateBadge.tsx`, `CommandLine.tsx`.
+Pure: `utils/bulletinModel.ts` (standing, groups, `PAGE_STATE_LOOK`, `VERDICT_LOOK`, `VERDICT_ORDER`, `partGroups`, `partOfPage`, `pageStateOf`, `neighbours`), `utils/bulletinWords.ts` (every sentence built from a row; `QUESTIONS_COMMAND`, `pullCommand`, `verdictParts`).
+
+## `carrierStanding` — evaluated in this order
+| standing | when | group | tone |
+|---|---|---|---|
+| `waiting` | `waiting > 0` | needs | `warn` |
+| `settled` | `pages > 0 && settled === pages` (a later failed run does not unsettle it) | settled | `positive` |
+| `stopped` | `last_reading.status === 'failed'` | needs | `warn` |
+| `unread` | `settled + read === 0` | notSettled | `neutral` |
+| `partly` | otherwise | notSettled | `info` |
+
+## FILL markers — what the fill replaces
+`grep -rn "FILL:" src/modules/carrier-bulletins src/modules/cerberus`. The fill replaces each marker and the one line under it.
+| marker (`BulletinsView.tsx`) | the fill |
+|---|---|
+| `fake` | removes the `carrier-bulletins-fake` import; the file is deleted |
+| `useOverview` · `useBulletinPages(bulletinId)` · `usePageReading(bulletinId, page)` | read on open and on Refresh; the root draws their `value` (null until the answer lands) and `trouble` (`AffectedAreasTrouble \| null`) |
+| `usePageImage(sha, page)` | `string \| null`: the PNG fetched with the token as an object URL, revoked on change and unmount |
+| `onOpenCarrier` · `onOpenPage` · `onBack` · `onRefresh` · `onEnlarge` · `onShrink` | each line is `unwired(setX, …)`, a no-op naming the setters the real handler drives; `onShrink` (Lightbox close) is its own handler; `onRefresh` is also every banner's Try again |
+| `CerberusPanel.tsx` `bulletins-row`, `bulletins-panel` | MAN-7867 |
+
+## What the fill inherits
+- `topRef` (on the root div) brings the top into view on `onOpenCarrier` / `onOpenPage` and tells the reads whether the view is shown. If the fill reuses Tours' `useViewShown`, the module standards move it to `src/shared/hooks/`.
+- A failed read shows only its banner, on all three screens: a hook that keeps its old value after a failed refresh is never drawn under it.
+- `Back` reads again what it returns to, quietly; `onRefresh` keeps the screen until the new answer lands.
+- The fill's photographs include Allstate's stopped state (never photographed) and the view inside the panel under the tab's header and strip.
+
+## Rules an editor must not break
+- Read-only: no press writes. A rule changes only by answering `QUESTIONS_COMMAND` (`venv/bin/python scripts/carrier_rules_questions.py`) or on the Approval Rules page (operator, 2026-10-21). why: the view shows what Claude read; it is not the editor.
+- Every word from a bulletin (quote, rule, heading, carrier, reason) is its own text node: never through `t()`, never `dangerouslySetInnerHTML` (none in the module). Sentences are `cerberus.bulletins.*` keys, English only.
+- Tone reaches paint only as `data-tone` plus a tone name, with a glyph and a word beside it (MAN-739, MAN-578); act is `warn`, never `danger`.
+- Reads on open and on a press, never on a timer, never while the tab shows another view.
+- The page image keeps a letter-page box and `contain`s the picture. why: the wire gives no page size.
+- Other modules reach it only through `index.ts` (`BulletinsView`, `lazy`); files inside import siblings by path.
+
+## Open
+- `AffectedAreasTrouble` is the lane-neutral fault type under a Tours name; renaming it touches live Tours files.
+- `PageReading` has no `width` / `height`; a landscape page draws inside the letter box until it does.
+- On a fault screen the header's Refresh and the banner's Try again do the same read.
+- Not proven: the other 14 states at 390 px and in dark on the final code; `npm run build`; the server half of `npm run typecheck`.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/carrier-bulletins/

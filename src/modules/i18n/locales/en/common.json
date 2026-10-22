@@ -2351,7 +2351,7 @@
           "unchanged": "no change",
           "new_bulletin": "a new file",
           "superseded": "a new revision",
-          "completed": "pulled by hand",
+          "completed": "by hand",
           "no_bulletin": "no bulletin found",
           "failed": "failed"
         }
@@ -2364,6 +2364,7 @@
       "reading": {
         "never": "Never read",
         "ok": "Read {{when}}",
+        "okNoCall": "Settled {{when}} with no call",
         "dry_run": "Read {{when}} without settling",
         "failed": "Reading stopped {{when}}",
         "running": "Reading since {{when}}",
@@ -2379,9 +2380,8 @@
       },
       "pageWhen": {
         "tried": "Tried, no answer",
-        "carried": "Carried from the {{date}} file",
-        "read": "Read {{when}}",
-        "unread": "Not read yet"
+        "carried": "Read {{read}}, carried from the {{date}} file",
+        "read": "Read {{when}}"
       },
       "stamp": {
         "here": "Read {{when}} on this file",
@@ -2418,7 +2418,17 @@
         "waitingDetail_other": "Claude tried them and has no answer, so {{carrier}} cannot settle. Open each to see why. A manual pull of {{carrier}} reads them again:",
         "neverRead": "Claude hasn't read this file yet",
         "neverReadDetail": "It is read on {{carrier}}'s next pull. A manual pull reads it now:",
-        "noPart": "Pages"
+        "noPart": "Pages",
+        "all": {
+          "settled": "all settled",
+          "read": "all read, not settled",
+          "unread": "none read yet",
+          "waiting": "all waiting"
+        },
+        "stopped": "Claude's last reading stopped before this file settled",
+        "stoppedDetail_one": "{{count}} page is not read yet. The next pull reads it; a manual pull of {{carrier}} reads it now:",
+        "stoppedDetail_other": "{{count}} pages are not read yet. The next pull reads them; a manual pull of {{carrier}} reads them now:",
+        "stoppedSettle": "Its pages are read but not settled. The next pull settles it; a manual pull of {{carrier}} settles it now:"
       },
       "pageRow": {
         "page": "Page {{page}}",

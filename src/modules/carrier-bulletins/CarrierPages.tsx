@@ -25,15 +25,24 @@ type CarrierPagesProps = {
   onRefresh: () => void;
 };
 
-/** A part's pages in figures: "Pages 11–51 · 41 pages · 1 waiting", the waiting and unread ones counted where there are any. */
+/** Whether every page of a part stands the same, so its heading says the state once and its rows carry none (one page excepted). */
+function sameState(pages: BulletinPage[]): boolean {
+  return pages.length > 1 && pages.every((page) => page.state === pages[0].state);
+}
+
+/**
+ * A part's pages in figures: "Pages 11–51 · 41 pages · all settled" when every page stands the same, else the waiting and
+ * unread ones counted where there are any ("Pages 1–32 · 32 pages · 1 waiting").
+ */
 function partRange(pages: BulletinPage[], t: TFunction): string {
   const first = pages[0].page;
   const last = pages[pages.length - 1].page;
   const parts = [pages.length === 1 ? t('cerberus.bulletins.carrier.onePage', { page: first }) : t('cerberus.bulletins.carrier.pageRange', { from: first, to: last, count: pages.length })];
+  if (sameState(pages)) return [...parts, t(`cerberus.bulletins.carrier.all.${pages[0].state}`)].join(' · ');
   const waiting = pages.filter((page) => page.state === 'waiting').length;
   const unread = pages.filter((page) => page.state === 'unread').length;
   if (waiting > 0) parts.push(t('cerberus.bulletins.split.waiting', { count: waiting }));
-  if (unread > 0 && unread < pages.length) parts.push(t('cerberus.bulletins.split.unread', { count: unread }));
+  if (unread > 0) parts.push(t('cerberus.bulletins.split.unread', { count: unread }));
   return parts.join(' · ');
 }
 
@@ -56,23 +65,31 @@ function ReadingPages() {
  *
  * Read top to bottom: All carriers (the way back), the carrier's name, its file (bulletin number, the day it was stored),
  * its standing with how its pages split, and Refresh at the right; then what needs the operator, when anything does — the
- * waiting pages, with why the carrier cannot settle, the first one to open and the manual pull that reads them again, or,
- * for a file Claude has not read at all, when it will be read and the pull that reads it now; then each part — the main
- * program, then each exhibit, headed by the bulletin's own words with its page range — as a card of `PageRow`s.
+ * waiting pages, with why the carrier cannot settle, the first one to open and the manual pull that reads them again; or a
+ * reading that stopped before the file settled, with how many pages are not read and the pull that reads them now; or, for
+ * a file Claude has not read at all, when it will be read and the pull that reads it now; then each part — the main
+ * program, then each exhibit, headed by the bulletin's own words with its page range — as a card of `PageRow`s. A part
+ * whose pages all stand the same says so once beside its range ("all settled"), and its rows carry no state of their own.
  *
  * Every part heading is the bulletin's words, drawn as a text node (R-CERB-25). A file with no outline (one page, or one
  * Claude read without its parts) is one card headed "Pages".
  *
  * States: the header at once from the overview's row (a skeleton when the view has none), the pages read (a part-shaped
- * waiting surface), the lane's fault (the header and the banner), a file never read, waiting pages, and the parts.
+ * waiting surface), the lane's fault (the header and the banner alone, as the overview and the page draw theirs), a file
+ * never read, a reading stopped, waiting pages, and the parts.
  *
  * Used by the carrier-bulletins module's view root.
  */
 export function CarrierPages({ row, pages, trouble, onBack, onOpenPage, onRefresh }: CarrierPagesProps) {
   const { t } = useTranslation();
   const baseId = useId();
-  const waiting = pages?.filter((page) => page.state === 'waiting') ?? [];
-  const neverRead = pages !== null && pages.length > 0 && pages.every((page) => page.state === 'unread');
+  // A failed read draws its banner alone, as the overview and the page do: pages held from an earlier read could still show
+  // a calm "Settled" under it, and a monitor that cannot see must not look calm.
+  const shown = trouble === null ? pages : null;
+  const waiting = shown?.filter((page) => page.state === 'waiting') ?? [];
+  // A reading that stopped before the file settled is the overview's Needs you; it is said here with what follows from it.
+  const stopped = trouble === null && row !== null && carrierStanding(row) === 'stopped';
+  const neverRead = !stopped && shown !== null && shown.length > 0 && shown.every((page) => page.state === 'unread');
 
   return (
     <div className="flex min-w-0 flex-col gap-5">
@@ -102,7 +119,7 @@ export function CarrierPages({ row, pages, trouble, onBack, onOpenPage, onRefres
       </header>
 
       {trouble !== null && <BulletinsTrouble trouble={trouble} subject="pages" onRetry={onRefresh} />}
-      {pages === null && trouble === null && <ReadingPages />}
+      {trouble === null && pages === null && <ReadingPages />}
 
       {/* What needs the operator stands above the parts: a waiting page holds the whole carrier's settlement. */}
       {waiting.length > 0 && row !== null && (
@@ -121,6 +138,17 @@ export function CarrierPages({ row, pages, trouble, onBack, onOpenPage, onRefres
           <div className="mt-1.5"><CommandLine command={pullCommand(row.carrier)} /></div>
         </Banner>
       )}
+      {stopped && row !== null && (
+        <Banner tone="warn">
+          <p className="text-sm font-medium">{t('cerberus.bulletins.carrier.stopped')}</p>
+          <p className="mt-0.5 text-xs">
+            {row.unread > 0
+              ? t('cerberus.bulletins.carrier.stoppedDetail', { count: row.unread, carrier: row.carrier })
+              : t('cerberus.bulletins.carrier.stoppedSettle', { carrier: row.carrier })}
+          </p>
+          <div className="mt-1.5"><CommandLine command={pullCommand(row.carrier)} /></div>
+        </Banner>
+      )}
       {neverRead && row !== null && (
         <Banner tone="neutral">
           <p className="text-sm font-medium">{t('cerberus.bulletins.carrier.neverRead')}</p>
@@ -129,7 +157,7 @@ export function CarrierPages({ row, pages, trouble, onBack, onOpenPage, onRefres
         </Banner>
       )}
 
-      {pages !== null && partGroups(pages).map((part, index) => (
+      {shown !== null && partGroups(shown).map((part, index) => (
         <section key={part.pages[0].page} aria-labelledby={`${baseId}-${index}`} className="flex min-w-0 flex-col gap-2">
           <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-0.5">
             <h3 id={`${baseId}-${index}`} className="min-w-0 text-[15px] font-semibold text-foreground [overflow-wrap:anywhere]">
@@ -139,7 +167,7 @@ export function CarrierPages({ row, pages, trouble, onBack, onOpenPage, onRefres
           </div>
           <Card className="overflow-hidden">
             <ul aria-labelledby={`${baseId}-${index}`} className="m-0 list-none divide-y divide-border p-0">
-              {part.pages.map((page) => <PageRow key={page.page} page={page} onOpen={onOpenPage} />)}
+              {part.pages.map((page) => <PageRow key={page.page} page={page} showState={!sameState(part.pages)} onOpen={onOpenPage} />)}
             </ul>
           </Card>
         </section>

@@ -11,14 +11,26 @@ type JudgedListProps = {
   judged: JudgedRule[];
 };
 
+/** Words as compared for "does the rule already say the page's words": case, curly apostrophes and runs of space set aside. */
+function plain(words: string): string {
+  return words.toLowerCase().replace(/[‘’]/g, "'").replace(/\s+/g, ' ').trim();
+}
+
+/** Whether a rule's quote adds anything to its words. A confirmed rule quoted word for word would say itself twice. */
+function quoteAdds(rule: JudgedRule): rule is JudgedRule & { quote: string } {
+  return rule.quote !== null && !plain(rule.words).includes(plain(rule.quote));
+}
+
 /**
  * RULES JUDGED ON THIS PAGE: every rule the house held before this reading that cites the page, with Claude's verdict.
  *
  * Listed by need — unsettled, corrected, not on the page, duplicate, confirmed — so what changed or stays open reads
  * first and the twenty rules a busy page can hold end on the calm ones; the reading's own order is kept within a verdict.
  * Each row: the rule's words with its verdict as a badge, the revision it came from, why Claude judged it so, the rule a
- * duplicate repeats ("Same as …"), and the page's words it rests on. Where the house's checks refused Claude's answer the
- * stored verdict is `unsettled`, and the row says what Claude said and that it was refused.
+ * duplicate repeats ("Same as …"), and the page's words it rests on — unless the rule's own words already hold them, as a
+ * confirmed rule's often do, which would put the same sentence on the screen twice (the dense page's ten confirmed rules
+ * did, 1,500 px of it). Where the house's checks refused Claude's answer the stored verdict is `unsettled`, and the row
+ * says what Claude said and that it was refused.
  *
  * Every rule's words, reason, quote and revision are text nodes (R-CERB-25). Names, never ids: a duplicate points at the
  * other rule by its words.
@@ -48,7 +60,7 @@ export function JudgedList({ judged }: JudgedListProps) {
                   <StateBadge tone={VERDICT_LOOK[rule.verdict].tone} icon={VERDICT_LOOK[rule.verdict].icon} words={t(`cerberus.bulletins.verdict.${rule.verdict}`)} />
                 </div>
                 {rule.from_revision !== null && (
-                  <p className="text-[12px] text-ink-faint">
+                  <p className="text-[12px] text-muted-foreground">
                     {t('cerberus.bulletins.judged.fromRevision')} {rule.from_revision}
                   </p>
                 )}
@@ -61,7 +73,7 @@ export function JudgedList({ judged }: JudgedListProps) {
                 )}
                 {rule.reason !== null && <Labeled label={t('cerberus.bulletins.judged.why')} words={rule.reason} />}
                 {rule.duplicate_of_words !== null && <Labeled label={t('cerberus.bulletins.judged.sameAs')} words={rule.duplicate_of_words} />}
-                {rule.quote !== null && <PageQuote words={rule.quote} />}
+                {quoteAdds(rule) && <PageQuote words={rule.quote} />}
               </li>
             );
           })}

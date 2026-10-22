@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 
 // FILL: fake — this import leaves with carrier-bulletins-fake.ts, which the fill deletes: the four reads and the six presses below take its place.
 import { FAKE_READS, unwired } from '@/modules/carrier-bulletins/carrier-bulletins-fake';
@@ -31,6 +31,9 @@ const SCREEN_ENTER = 'motion-safe:animate-[vv-pagein_.45s_theme(transitionTiming
  * Used by the cerberus module's `CerberusPanel`, through this module's barrel, as the fifth view of its strip.
  */
 export function BulletinsView() {
+  // The view's top: what the presses bring into view when a carrier or a page opens (each screen remounts, and the panel
+  // keeps its scroll), and what tells the reads whether the view is shown at all — as Tours' root `topRef` does both.
+  const topRef = useRef<HTMLDivElement>(null);
   // The open carrier, by its current file's bulletin; null shows the overview. Held at the root of a view the tab keeps
   // mounted, so the carrier a person left is the one they come back to.
   const [bulletinId, setBulletinId] = useState<string | null>(null);
@@ -52,9 +55,9 @@ export function BulletinsView() {
   const image = FAKE_READS.image(reading.value?.file_sha256 ?? null, page);
 
   // ── The presses. None writes: they move between the screens, enlarge a page, and read again. ──
-  // FILL: onOpenCarrier — opens a carrier's pages: setBulletinId(bulletinId), setPage(null), setEnlarged(false), and the view's top brought into view.
+  // FILL: onOpenCarrier — opens a carrier's pages: setBulletinId(bulletinId), setPage(null), setEnlarged(false), and the view's top (topRef) brought into view.
   const onOpenCarrier: (bulletinId: string) => void = unwired(setBulletinId, setPage, setEnlarged);
-  // FILL: onOpenPage — opens a page of the open carrier, from its list, its waiting call-out, or Previous and Next: setPage(page), setEnlarged(false), the top in view.
+  // FILL: onOpenPage — opens a page of the open carrier, from its list, its waiting call-out, or Previous and Next: setPage(page), setEnlarged(false), the top (topRef) in view.
   const onOpenPage: (page: number) => void = unwired(setPage, setEnlarged);
   // FILL: onBack — one screen back: from a page to its carrier's pages (setPage(null)), from a carrier to the overview (setBulletinId(null)); the Lightbox shut. Back reads again what it returns to, quietly.
   const onBack: () => void = unwired(setBulletinId, setPage, setEnlarged);
@@ -99,7 +102,7 @@ export function BulletinsView() {
   }
 
   return (
-    <div className="flex min-w-0 max-w-[1180px] flex-col px-[clamp(16px,4cqi,32px)] pb-7 pt-5">
+    <div ref={topRef} className="flex min-w-0 max-w-[1180px] flex-col px-[clamp(16px,4cqi,32px)] pb-7 pt-5">
       {/* Keyed by the screen, so each screen a person opens plays its entrance afresh. */}
       <div key={bulletinId === null ? 'overview' : `${bulletinId}:${page ?? 'pages'}`} className={SCREEN_ENTER}>
         {screen}

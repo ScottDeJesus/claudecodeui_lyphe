@@ -43,8 +43,9 @@ function ReadingRows() {
 /**
  * THE OVERVIEW: every carrier's current file, what needs the operator first.
  *
- * Read top to bottom: the answer as a headline in the tab's own idiom ("2 carriers *need you*", its accent in the tone
- * for act; "Every file *read and settled*" calm), the count under it, and Refresh at the right; then the carriers in up
+ * Read top to bottom: the answer as a headline ("2 carriers need you", its last words in the tone for act; "Every file is
+ * read and settled" calm) in the sans heading the other two screens use — the tab's own serif headline stands right above
+ * the view's strip, and one serif headline is the tab's — the count under it, and Refresh at the right; then the carriers in up
  * to three groups — Needs you (a page waiting, a reading stopped), Not settled yet (read in part, or not read at all),
  * Settled — each a card of `CarrierRow`s, need first, then by name. A group with no carrier is left out.
  *
@@ -86,16 +87,16 @@ export function OverviewScreen({ rows, trouble, onOpenCarrier, onRefresh }: Over
       <header className="flex flex-wrap items-end justify-between gap-x-8 gap-y-3">
         <div className="flex min-w-0 flex-[1_1_260px] flex-col gap-1">
           {lead === null ? (
-            <h2 className="font-serif text-[length:clamp(22px,5.5cqi,26px)] font-normal leading-[1.15] text-foreground">
+            <h2 className="text-[20px] font-bold leading-tight tracking-[-0.01em] text-foreground">
               {t('cerberus.bulletins.overview.title')}
             </h2>
           ) : (
             <>
-              <h2 className="font-serif text-[length:clamp(22px,5.5cqi,26px)] font-normal leading-[1.15] text-foreground">
+              <h2 className="text-[20px] font-bold leading-tight tracking-[-0.01em] text-foreground">
                 {t(`cerberus.bulletins.overview.headline.${lead.group}Lead`, { count: lead.rows.length })}{' '}
-                <em data-tone={GROUP_TONE[lead.group]} className="italic text-tone-ink">
+                <span data-tone={GROUP_TONE[lead.group]} className="text-tone-ink">
                   {t(`cerberus.bulletins.overview.headline.${lead.group}Accent`, { count: lead.rows.length })}
-                </em>
+                </span>
               </h2>
               <p className="text-[13.5px] text-muted-foreground">
                 {[

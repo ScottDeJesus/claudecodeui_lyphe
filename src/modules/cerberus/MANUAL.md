@@ -18,6 +18,7 @@ The Cerberus tab: the fleet's health on the house row. One provider reads `GET /
 | the check sheet | MAN-7878 | `sheet/CheckSheet.tsx`, `CheckRows.tsx`, `SelectedCheck.tsx`, `CheckLabelEditor.tsx` |
 | History | MAN-7877 (feed MAN-7888, lookup card MAN-7889, banner MAN-7890) | `history/*.tsx`, `hooks/useActivityFeed.ts`, `UnreachableBanner.tsx` |
 | Tours, the strip's fourth view, after History: the code is the module `src/modules/affected-areas` (`cloudcli:src/modules/affected-areas`), which the root imports through its barrel; drawn once center's overview has answered, mounted on its first show and kept `hidden` after | MAN-8575 (row map and numbers MAN-8576, rules MAN-8577); the root's side MAN-7891 | `CerberusPanel.tsx` (`VIEWS`, `toursShown`), `src/modules/affected-areas/*` |
+| the Bulletins view, the strip's fifth view once filled: the code is the module `src/modules/carrier-bulletins` (`cloudcli:.`), scaffolded over a fake and not yet mounted; its wire is MAN-8865 | MAN-8880 | `src/modules/carrier-bulletins/*`, the two `FILL: bulletins-*` markers in `CerberusPanel.tsx` |
 | the Mute and Enroll dialogs | MAN-7884 (Mute MAN-7892, Enroll MAN-7893, install step MAN-7894) | `modals/*.tsx`, `hooks/useEnrollmentStatus.ts`, `utils/enrollAsk.ts` |
 | the slots later plans fill, and the `FILL:` markers a scaffolded screen leaves for its fill | MAN-7867 | `SLOT:` and `FILL:` comments, `VIEWS` in `CerberusPanel.tsx` |
 | the fixes screen, live: Catalog view, a Needs-you card's fix, Fix output, the sheet's fixes, the run reads | MAN-7906 | `catalog/CatalogView.tsx`, `fleet/NeedFix.tsx`, `sheet/FixOutput.tsx`, `sheet/CheckFixes.tsx`, `hooks/useRunOutput.ts`, `hooks/useRunLastLine.ts`, `hooks/useCatalogRead.ts` |
@@ -81,7 +82,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/command-palette/Comm
 
 ## MAN-7867 — Cerberus — the slots later plans fill: every `SLOT:` and `FILL:` comment, the `VIEWS` table and `activityEvents`
 
-Where a plan plugs into the tab (the fixes plan's places are filled and live: MAN-7906, and so are the updates plan's: MAN-7934, the diagnosis plan's: MAN-7932, and the tours plan's: MAN-8575). No `SLOT:` and no `FILL:` comment stands in `src/modules/cerberus`; the one slot left is the table row below. A plan whose screen is scaffolded and not yet filled marks its places `FILL:` (`grep -rn "FILL:" src/modules/cerberus`): each names what its fill mounts there, and the fill replaces it. Row map: MAN-7868.
+Where a plan plugs into the tab (the fixes plan's places are filled and live: MAN-7906, and so are the updates plan's: MAN-7934, the diagnosis plan's: MAN-7932, and the tours plan's: MAN-8575). No `SLOT:` comment stands in `src/modules/cerberus`; the rings-key row below is the one slot left. A plan whose screen is scaffolded and not yet filled marks its places `FILL:` (`grep -rn "FILL:" src/modules/cerberus`): each names what its fill mounts there, and the fill replaces it. Two stand, both the Bulletins scaffold's (MAN-8880). Row map: MAN-7868.
 
 ## Rules
 - A slot is a comment (or a table row) and draws nothing: no placeholder, no empty container, no flag.
@@ -92,6 +93,8 @@ Where a plan plugs into the tab (the fixes plan's places are filled and live: MA
 | slot | file | what goes there | plan |
 |---|---|---|---|
 | rings key | `fleet/RingMarks.tsx`, `KEY` | the `fixing` row ("Fix running or updating", `cerberus.fix.fleet.legend`, the info dot) is live, and an `updating` node draws it too; `enrolling` shares it, with no mark of its own yet | enrolling |
+| `FILL: bulletins-row` | `CerberusPanel.tsx`, `VIEWS`, after the Tours row | `{ id: 'bulletins', labelKey: 'cerberus.bulletins.tab', hintKey: 'cerberus.bulletins.tabHint' }` (both words are in `common.json`); `CerberusView` in `src/shared/types.ts` gains `'bulletins'` | bulletins fill |
+| `FILL: bulletins-panel` | `CerberusPanel.tsx`, after the Tours block | `BulletinsView` (lazy, from `@/modules/carrier-bulletins`) mounted on its first show inside the view boundary, `hidden` after | bulletins fill |
 
 ## Other places a plan adds a case
 | place | what a plan adds |

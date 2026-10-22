@@ -87,8 +87,7 @@ export function PageScreen({
               <span className="font-medium text-foreground">{part.heading}</span>
               {part.closes !== null && (
                 <>
-                  <span className="text-ink-faint"> · {t('cerberus.bulletins.page.beginsAfter')} </span>
-                  {part.closes}
+                  {' · '}{t('cerberus.bulletins.page.beginsAfter')}{' '}{part.closes}
                 </>
               )}
             </p>

@@ -14,8 +14,9 @@ import type { AffectedAreasTrouble } from '@/shared/types';
  *
  * COMPOSED, because the v5 walk has not run: each file's split into settled, carried and waiting pages, each reading's
  * calls and tokens (one call a page read and one for the outline), the duties not placed, the failed entries, the open
- * questions' words, the two waiting pages and Nationwide's reading in progress. American Family's file is not stored yet: its number is the one discovery
- * printed (AFICS 4124-F) and its twelve pages are a stand-in.
+ * questions' words, the two waiting pages, Nationwide's reading in progress and Allstate's stopped one (32 pages read, 17
+ * not; its parts are left out, its headings not read for the fake). American Family's file is not stored yet: its number
+ * is the one discovery printed (AFICS 4124-F) and its twelve pages are a stand-in.
  */
 
 /** A handler the fill wires: it does nothing here, and names the state setters the fill's handler drives. */
@@ -94,6 +95,7 @@ const HARTFORD_PAGES = pagesOf(48, [[1, 'The Hartford Insurance Company – Resi
 (page) => (page === 31 ? 'waiting' : 'read'), [2], {});
 const PAGES: Record<string, BulletinPage[]> = {
   [id(2)]: AAA_PAGES, [id(11)]: SF_PAGES, [id(12)]: HARTFORD_PAGES,
+  [id(3)]: pagesOf(49, [], (page) => (page <= 32 ? 'read' : 'unread'), Array.from({ length: 32 }, (_, index) => index + 1), {}),
   [id(4)]: pagesOf(12, [], () => 'unread', [], {}), [id(6)]: pagesOf(1, [], () => 'waiting', [], {}),
 };
 

@@ -101,7 +101,7 @@ type PagePart = { heading: string; closes: string | null };
  * holds the joiner itself. `before` is null for the first page, which never carries the part before; undefined when the
  * pages before are not known, which splits at the first joiner.
  */
-export function splitPart(part: string, before: string | null | undefined): PagePart {
+function splitPart(part: string, before: string | null | undefined): PagePart {
   if (before === null || part === before) return { heading: part, closes: null };
   if (before !== undefined && part.startsWith(`${before}${PART_JOIN}`)) {
     return { heading: part.slice(before.length + PART_JOIN.length), closes: before };

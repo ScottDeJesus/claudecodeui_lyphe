@@ -9,6 +9,7 @@ import type {
   PageRequirement,
   ReadingStamp,
   VerdictCounts,
+  VerdictWord,
 } from '@/shared/carrier-bulletins-types';
 import { formatRelativeTime, formatShortDate } from '@/shared/utils';
 
@@ -38,7 +39,7 @@ export function pullCommand(carrier: string): string {
 }
 
 /** A key of the rule vocabulary as words: `site_inspected` reads "site inspected". */
-export function vocabWords(key: string): string {
+function vocabWords(key: string): string {
   return key.replace(/_/g, ' ');
 }
 
@@ -89,38 +90,52 @@ export function pullWords(pull: LastPull | null, t: TFunction): string {
   return t('cerberus.bulletins.pull.at', { when: formatShortDate(pull.at) ?? '—', outcome: detail === '' ? outcome : `${outcome} — ${detail}` });
 }
 
-/** A reading's cost: "claude-sonnet-5-5 · 23 calls · 808K tokens", each part left out when the run never counted it. */
+/**
+ * A reading's cost: "claude-sonnet-5-5 · 23 calls · 808K tokens", each part left out when the run never counted it. A run
+ * that made no call costs nothing and names no model, so it says none of the three — never "0 calls".
+ */
 function costWords(model: string | null, calls: number | null, input: number | null, output: number | null, t: TFunction): string[] {
+  if (calls === 0) return [];
   const parts: string[] = [];
+  const tokens = (input ?? 0) + (output ?? 0);
   if (model !== null) parts.push(model);
   if (calls !== null) parts.push(t('cerberus.bulletins.cost.calls', { count: calls }));
-  if (input !== null || output !== null) parts.push(t('cerberus.bulletins.cost.tokens', { tokens: COMPACT.format((input ?? 0) + (output ?? 0)) }));
+  if (tokens > 0) parts.push(t('cerberus.bulletins.cost.tokens', { tokens: COMPACT.format(tokens) }));
   return parts;
 }
 
-/** The carrier's last reading, how it ended and what it cost: "Read 3h ago · claude-sonnet-5-5 · 23 calls · 808K tokens", or "Never read". */
+/**
+ * The carrier's last reading, how it ended and what it cost: "Read 3h ago · claude-sonnet-5-5 · 23 calls · 808K tokens",
+ * "Settled 5h ago with no call" for a run that found every page answered from an earlier file, or "Never read".
+ */
 export function readingWords(reading: LastReading | null, t: TFunction): string {
   if (reading === null) return t('cerberus.bulletins.reading.never');
   const when = formatRelativeTime(reading.at);
-  const status = ['ok', 'dry_run', 'failed', 'running'].includes(reading.status) ? reading.status : 'other';
+  const known = ['ok', 'dry_run', 'failed', 'running'].includes(reading.status) ? reading.status : 'other';
+  const status = known === 'ok' && reading.calls === 0 ? 'okNoCall' : known;
   const lead = t(`cerberus.bulletins.reading.${status}`, { when, status: reading.status });
   return [lead, ...costWords(reading.model, reading.calls, reading.input_tokens, reading.output_tokens, t)].join(DOT);
 }
 
-/** A page's verdicts in need order, the ones it has: "1 unsettled · 1 corrected · 6 duplicates · 2 confirmed". */
-export function verdictWords(counts: VerdictCounts, t: TFunction): string {
+/**
+ * A page's verdicts in need order, the ones it has, each with its words: "1 unsettled", "1 corrected", "6 duplicates", "2
+ * confirmed". Parts, not one line, so a row can paint the unsettled count in the tone for act.
+ */
+export function verdictParts(counts: VerdictCounts, t: TFunction): { verdict: VerdictWord; words: string }[] {
   return VERDICT_ORDER
     .filter((verdict) => counts[verdict] > 0)
-    .map((verdict) => t(`cerberus.bulletins.verdictCount.${verdict}`, { count: counts[verdict] }))
-    .join(DOT);
+    .map((verdict) => ({ verdict, words: t(`cerberus.bulletins.verdictCount.${verdict}`, { count: counts[verdict] }) }));
 }
 
-/** Where a page's answer came from, in its row: "Carried from the Jun 3 file", "Read 2h ago", "Tried, no answer" or "Not read yet". */
+/**
+ * When a page's answer was read, in its row: "Read 2h ago", or "Read Oct 21, carried from the Jun 3 file" for an answer read
+ * on an earlier file; "Tried, no answer" for a waiting page. A page not read says nothing here: its badge already does.
+ */
 export function pageWhenWords(page: BulletinPage, t: TFunction): string {
   if (page.state === 'waiting') return t('cerberus.bulletins.pageWhen.tried');
-  if (page.read_from !== null) return t('cerberus.bulletins.pageWhen.carried', { date: formatShortDate(page.read_from) ?? '—' });
-  if (page.read_at !== null) return t('cerberus.bulletins.pageWhen.read', { when: formatRelativeTime(page.read_at) });
-  return t('cerberus.bulletins.pageWhen.unread');
+  if (page.read_at === null) return '';
+  if (page.read_from !== null) return t('cerberus.bulletins.pageWhen.carried', { read: formatShortDate(page.read_at) ?? '—', date: formatShortDate(page.read_from) ?? '—' });
+  return t('cerberus.bulletins.pageWhen.read', { when: formatRelativeTime(page.read_at) });
 }
 
 /**
