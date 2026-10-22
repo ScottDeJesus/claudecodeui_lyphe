@@ -1644,6 +1644,12 @@
   "timeline": {
     "noDetail": "No further detail on file."
   },
+  "viewBoundary": {
+    "loading": "Loading {{view}}…",
+    "failed": "{{view}} could not be shown",
+    "failedDetail": "The rest of Cerberus is not affected. Reloading the page usually brings {{view}} back.",
+    "reload": "Reload the page"
+  },
   "shapes": {
     "diagramFailed": "This diagram could not be drawn — showing its source.",
     "diagram": "Diagram",
@@ -2517,12 +2523,6 @@
       "notAChange": "Not a change"
     },
     "list": "{{rest}} and {{last}}",
-    "view": {
-      "loading": "Loading Tours…",
-      "failed": "Tours could not be shown",
-      "failedDetail": "The rest of Cerberus is not affected. Reloading the page usually brings Tours back.",
-      "reload": "Reload the page"
-    },
     "trouble": {
       "no_secret": "CloudCLI could not read shadow-connector's internal secret",
       "no_secretDetail": "Nothing here can be read until shadow-connector's env file holds EIS_INTERNAL_SECRET.",

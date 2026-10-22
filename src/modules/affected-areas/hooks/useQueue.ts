@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 
-import { useLaneRead } from '@/modules/affected-areas/hooks/useLaneRead';
 import { answerOutranks } from '@/modules/affected-areas/hooks/useMarkedRegions';
 import { panoFor } from '@/modules/affected-areas/hooks/usePano';
 import { useWhenShown } from '@/modules/affected-areas/hooks/useViewShown';
 import type { PanoDetail, Queue, QueueItem, Region } from '@/shared/affected-areas-types';
 import { api } from '@/shared/api';
+import { useLaneRead } from '@/shared/hooks/useLaneRead';
 import type { MarkWalk } from '@/shared/types';
 
 /** How many areas one read of the queue brings: the engine's default, and few enough that one batch is read in a breath. */

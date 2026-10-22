@@ -183,4 +183,7 @@ export { Timeline } from '@/shared/ui/Timeline';
 export { Toast } from '@/shared/ui/Toast';
 export { ToastStack } from '@/shared/ui/ToastStack';
 export { Tooltip } from '@/shared/ui/Tooltip';
+// The waiting ring and the failure banner around a lazy view: the Cerberus tab's `KeptView` surrounds the Tours view and
+// the Bulletins view with it, so a chunk that cannot load stays that view's message, never the whole tab's.
+export { ViewBoundary } from '@/shared/ui/ViewBoundary';
 export { ConfirmDialog } from '@/shared/ui/ConfirmDialog';

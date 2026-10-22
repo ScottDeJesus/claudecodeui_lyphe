@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 
-import { useLaneRead } from '@/modules/affected-areas/hooks/useLaneRead';
-import { troubleOfFailure, troubleOfResponse } from '@/modules/affected-areas/utils/laneTrouble';
 import type { PanoDetail, PanoEntry, ReadResult } from '@/shared/affected-areas-types';
 import { api } from '@/shared/api';
+import { useLaneRead } from '@/shared/hooks/useLaneRead';
 import type { AffectedAreasRead, AffectedAreasTrouble, PanoPress } from '@/shared/types';
+import { troubleOfFailure, troubleOfResponse } from '@/shared/utils';
 
 /**
  * What the pano's press knows, kept for the pano it was made for (`key`): its `PanoPress` but for `pressing` (which

@@ -2688,10 +2688,10 @@ export type CerberusEnrollRefusal =
 // What the Cerberus tab's root (`src/modules/cerberus/CerberusPanel.tsx`) holds between presses.
 
 /**
- * The Cerberus tab's views, in the order its strip offers them: Fleet, Catalog, History, then Tours. The root's
- * view table gives each its name and its hint.
+ * The Cerberus tab's views, in the order its strip offers them: Fleet, Catalog, History, Tours, then Bulletins. The
+ * root's view table gives each its name and its hint.
  */
-export type CerberusView = 'fleet' | 'catalog' | 'history' | 'tours';
+export type CerberusView = 'fleet' | 'catalog' | 'history' | 'tours' | 'bulletins';
 
 // ---------------------------
 

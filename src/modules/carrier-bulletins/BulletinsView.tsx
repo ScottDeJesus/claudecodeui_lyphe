@@ -1,13 +1,26 @@
 import { useRef, useState } from 'react';
 
-// FILL: fake — this import leaves with carrier-bulletins-fake.ts, which the fill deletes: the four reads and the six presses below take its place.
-import { FAKE_READS, unwired } from '@/modules/carrier-bulletins/carrier-bulletins-fake';
 import { CarrierPages } from '@/modules/carrier-bulletins/CarrierPages';
+import { useBulletinPages } from '@/modules/carrier-bulletins/hooks/useBulletinPages';
+import { useOverview } from '@/modules/carrier-bulletins/hooks/useOverview';
+import { usePageImage } from '@/modules/carrier-bulletins/hooks/usePageImage';
+import { usePageReading } from '@/modules/carrier-bulletins/hooks/usePageReading';
 import { OverviewScreen } from '@/modules/carrier-bulletins/OverviewScreen';
 import { PageScreen } from '@/modules/carrier-bulletins/PageScreen';
+import type { AffectedAreasTrouble } from '@/shared/types';
 
 /** A screen arriving: Verve's page entrance, as the Cerberus tab's own views enter. It plays each time one opens. */
 const SCREEN_ENTER = 'motion-safe:animate-[vv-pagein_.45s_theme(transitionTimingFunction.enter)_both]';
+
+/**
+ * One read of the lane, as `onRefresh` and `onBack` press it: a read that failed is read again as Try again (its banner
+ * leaves and the screen waits for the new answer, so a second failure mounts the banner afresh and it is heard again);
+ * any other is read again quietly, the screen standing as it is until the new answer lands.
+ */
+function readAgain(read: { trouble: AffectedAreasTrouble | null; retry: () => void; reload: () => void }) {
+  if (read.trouble === null) read.reload();
+  else read.retry();
+}
 
 /**
  * THE BULLETINS VIEW: what Claude read of each carrier's SERVPRO program bulletin, and what the house settled it into. The
@@ -28,11 +41,11 @@ const SCREEN_ENTER = 'motion-safe:animate-[vv-pagein_.45s_theme(transitionTiming
  * The root is the view's data hub: its four reads and its presses are wired here, and the screens draw what they are
  * handed. Words are `cerberus.bulletins.*`; endpoints are `api.carrierBulletins`; wire shapes `@/shared/carrier-bulletins-types`.
  *
- * Used by the cerberus module's `CerberusPanel`, through this module's barrel, as the fifth view of its strip.
+ * Used by the cerberus module's `CerberusPanel`, through this module's barrel and its `KeptView`, as the fifth view of its strip.
  */
 export function BulletinsView() {
-  // The view's top: what the presses bring into view when a carrier or a page opens (each screen remounts, and the panel
-  // keeps its scroll), and what tells the reads whether the view is shown at all — as Tours' root `topRef` does both.
+  // The view's top: what the presses bring into view when a carrier or a page opens, since each screen remounts under the
+  // panel's one scroller, which keeps the offset the last screen left.
   const topRef = useRef<HTMLDivElement>(null);
   // The open carrier, by its current file's bulletin; null shows the overview. Held at the root of a view the tab keeps
   // mounted, so the carrier a person left is the one they come back to.
@@ -44,29 +57,57 @@ export function BulletinsView() {
   // back to it, and every page a person opens starts with it shut.
   const [enlarged, setEnlarged] = useState(false);
 
-  // ── The reads: on open and on Refresh, never on a timer and never while the view is hidden. ──
-  // FILL: useOverview — useOverview(): every carrier's current file, read when the view opens and on Refresh; { value, trouble, retry }.
-  const overview = FAKE_READS.overview;
-  // FILL: useBulletinPages — useBulletinPages(bulletinId): the open carrier's pages in page order, read when the carrier opens and on Refresh; nothing while bulletinId is null.
-  const pages = FAKE_READS.pages(bulletinId);
-  // FILL: usePageReading — usePageReading(bulletinId, page): what Claude read on the open page, read when the page opens and on Refresh; nothing while page is null.
-  const reading = FAKE_READS.reading(bulletinId, page);
-  // FILL: usePageImage — usePageImage(reading.value?.file_sha256 ?? null, page): the page's PNG fetched with the token as an object URL, revoked on change and unmount; null while it loads, when it failed, or with no page open.
-  const image = FAKE_READS.image(reading.value?.file_sha256 ?? null, page);
+  // ── The reads: on open and on a press, never on a timer. Nothing here reads of its own accord (no answer arrives
+  // from outside, as a Tours press's or a walk's does), so a view the tab has hidden has nothing to hold back. ──
+  const overview = useOverview();
+  const pages = useBulletinPages(bulletinId);
+  const reading = usePageReading(bulletinId, page);
+  // The page's PNG waits on the reading, which names the exact file the page is of.
+  const image = usePageImage(reading.value?.file_sha256 ?? null, page);
 
   // ── The presses. None writes: they move between the screens, enlarge a page, and read again. ──
-  // FILL: onOpenCarrier — opens a carrier's pages: setBulletinId(bulletinId), setPage(null), setEnlarged(false), and the view's top (topRef) brought into view.
-  const onOpenCarrier: (bulletinId: string) => void = unwired(setBulletinId, setPage, setEnlarged);
-  // FILL: onOpenPage — opens a page of the open carrier, from its list, its waiting call-out, or Previous and Next: setPage(page), setEnlarged(false), the top (topRef) in view.
-  const onOpenPage: (page: number) => void = unwired(setPage, setEnlarged);
-  // FILL: onBack — one screen back: from a page to its carrier's pages (setPage(null)), from a carrier to the overview (setBulletinId(null)); the Lightbox shut. Back reads again what it returns to, quietly.
-  const onBack: () => void = unwired(setBulletinId, setPage, setEnlarged);
-  // FILL: onRefresh — reads again what the shown screen draws (the overview; a carrier's pages and its overview row; a page's reading and its pages), keeping the screen as it is until the new answer lands. Also every banner's Try again.
-  const onRefresh: () => void = unwired();
-  // FILL: onEnlarge — opens the page's image in the house Lightbox: setEnlarged(true).
-  const onEnlarge: () => void = unwired(setEnlarged);
-  // FILL: onShrink — the Lightbox's close, from its Escape, its ✕ and its backdrop: setEnlarged(false).
-  const onShrink: () => void = unwired(setEnlarged);
+  // Brings the view's top into view when the panel was scrolled past it, and leaves a panel already showing it alone.
+  const showTop = () => {
+    const top = topRef.current;
+    if (top !== null && top.getBoundingClientRect().top < 0) top.scrollIntoView({ block: 'start' });
+  };
+  const onOpenCarrier = (openedBulletinId: string) => {
+    setBulletinId(openedBulletinId);
+    setPage(null);
+    setEnlarged(false);
+    showTop();
+  };
+  const onOpenPage = (openedPage: number) => {
+    setPage(openedPage);
+    setEnlarged(false);
+    showTop();
+  };
+  // One screen back, reading again what it returns to, quietly: a carrier's pages and its overview row, or the overview.
+  const onBack = () => {
+    setEnlarged(false);
+    if (page !== null) {
+      setPage(null);
+      pages.reload();
+    } else {
+      setBulletinId(null);
+    }
+    overview.reload();
+  };
+  // Reads again what the shown screen draws, keeping the screen as it is until the new answer lands. Also every banner's Try again.
+  const onRefresh = () => {
+    if (bulletinId === null) {
+      readAgain(overview);
+    } else if (page === null) {
+      readAgain(pages);
+      readAgain(overview);
+    } else {
+      readAgain(reading);
+      readAgain(pages);
+    }
+  };
+  const onEnlarge = () => setEnlarged(true);
+  // The Lightbox's close, from its Escape, its ✕ and its backdrop.
+  const onShrink = () => setEnlarged(false);
 
   // The carrier as the overview listed it: its pages and its page draw their header from it at once, while their reads are out.
   const row = overview.value?.find((entry) => entry.bulletin_id === bulletinId) ?? null;
