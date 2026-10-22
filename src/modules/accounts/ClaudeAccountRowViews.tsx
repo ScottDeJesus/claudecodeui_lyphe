@@ -8,10 +8,12 @@ import { formatRelativeTime, formatShortDate } from '@/shared/utils';
 /** A reading older than this says when it was taken; below it, the figures read as current. */
 const READING_STALE_MS = 3 * 60_000;
 
-/** The two windows each row states, in points (the door's fractions ×100), in the door's own order. */
+/** The two windows each row states, in points (the door's fractions ×100); an unmeasured window is an em-dash, never 0%. */
 function figuresInPoints(reading: ClaudeAccountRow['reading']): string {
   if (reading === null) return '5h — · wk —';
-  return `5h ${Math.round(reading.five * 100)}% · wk ${Math.round(reading.week * 100)}%`;
+  const five = reading.five === null ? '—' : `${Math.round(reading.five * 100)}%`;
+  const week = reading.week === null ? '—' : `${Math.round(reading.week * 100)}%`;
+  return `5h ${five} · wk ${week}`;
 }
 
 /** How old a row's figures are, in words — only once they are old enough that "current" would be a lie. */

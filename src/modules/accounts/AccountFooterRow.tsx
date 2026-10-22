@@ -103,6 +103,8 @@ export function AccountFooterRow({ collapsed = false, onExpand }: AccountFooterR
     if (!open || loginOpen || setup !== null) return undefined;
 
     const closeOnOutsidePointer = (event: PointerEvent) => {
+      // An open menu is the panel's own surface: ActionMenu portals it to `body`, so its press must land.
+      if ((event.target as Element | null)?.closest('[role="menu"]')) return;
       if (rootRef.current && !rootRef.current.contains(event.target as Node)) closePanel();
     };
     const closeOnEscape = (event: KeyboardEvent) => {

@@ -2306,7 +2306,8 @@ export type ClaudeAccounts =
  * One account in the door's picture, relayed unchanged from `claude-account status --json`.
  * `slug` is the account's name in every sentence a person reads; `digest` stays in data. Times are
  * epoch SECONDS. `reading.five` and `reading.week` are fractions 0..1 — window POINTS once multiplied
- * by 100, never dollars (INV-4299) — and `reading.at` is when that reading was filed. `token` is the
+ * by 100, never dollars (INV-4299) — or null for a window the pacer could not measure, which draws
+ * as unknown and never as zero; `reading.at` is when that reading was filed. `token` is the
  * stored sign-in token's state; `wall.kind: "refused"` is a token Claude would not accept. `why` is
  * the door's own sentence and is rendered as it arrives.
  */
@@ -2319,7 +2320,7 @@ export type ClaudeAccountRow = {
   live: boolean;
   in_use: boolean;
   wall: { kind: 'usage' | 'credit' | 'spend' | 'rate' | 'refused'; until: number | null } | null;
-  reading: { five: number; five_resets: number | null; week: number; week_resets: number | null; at: number; source: string } | null;
+  reading: { five: number | null; five_resets: number | null; week: number | null; week_resets: number | null; at: number; source: string } | null;
   pace: { five: { projected: number; ceiling: number } | null; week: { projected: number; ceiling: number } | null } | null;
   room: boolean;
   why: string;

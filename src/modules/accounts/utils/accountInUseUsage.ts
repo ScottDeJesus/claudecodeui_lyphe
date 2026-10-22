@@ -23,14 +23,22 @@ const PICTURE_READING_STALE_MS = 3 * 60_000;
 const FIVE_HOUR = { key: 'five_hour', label: 'Current 5-hour window' } as const;
 const WEEKLY = { key: 'seven_day', label: 'This week' } as const;
 
-/** A fraction 0..1 as the wire's whole percent — the same rounding `usage.service.ts` applies. */
-function points(fraction: number): number {
-  return Math.round(fraction * 100);
+/**
+ * A fraction 0..1 as the wire's whole percent — the same rounding `usage.service.ts` applies.
+ * `null` is a window the pacer could not measure, and stays `null`: the meters draw an em-dash,
+ * never a false `0% used` (the pacer files one-window readings).
+ */
+function points(fraction: number | null): number | null {
+  return fraction === null ? null : Math.round(fraction * 100);
 }
 
-/** Epoch SECONDS → the ISO-8601 stamp `ClaudeUsageWindow.resetsAt` carries; `null` stays `null`. */
-function resetStamp(seconds: number | null): string | null {
-  return seconds === null ? null : new Date(seconds * 1000).toISOString();
+/**
+ * Epoch SECONDS → the ISO-8601 stamp `ClaudeUsageWindow.resetsAt` carries; no readable stamp
+ * (null, absent, or not a finite number) stays `null` — `new Date(undefined)` throws in render.
+ */
+function resetStamp(seconds: number | null | undefined): string | null {
+  if (typeof seconds !== 'number' || !Number.isFinite(seconds)) return null;
+  return new Date(seconds * 1000).toISOString();
 }
 
 /** A window nobody has measured reads as an em-dash over an empty track, never as zero used. */
