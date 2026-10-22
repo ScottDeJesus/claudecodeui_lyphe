@@ -204,7 +204,10 @@ export function createShadowConnectorLane({
 
     const headers: Record<string, string> = {
       [SECRET_HEADER]: secret,
-      Accept: request.expect === 'bytes' ? 'image/jpeg' : 'application/json',
+      // `image/*`, not one type: the Tours lane's images are JPEGs and the bulletins lane's are PNGs, and a
+      // route that names the type it wants would refuse the other lane's. Which type a lane accepts is the
+      // lane's to enforce on the answer (its router checks the Content-Type), not this transport's.
+      Accept: request.expect === 'bytes' ? 'image/*' : 'application/json',
     };
     const actingUser = sanitiseActingUser(request.actingUser);
     if (actingUser !== null) headers[ACTING_USER_HEADER] = actingUser;

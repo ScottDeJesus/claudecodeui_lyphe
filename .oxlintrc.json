@@ -88,7 +88,8 @@
           "server/shared/dispatcher-command.ts",
           "server/shared/document-fields.ts",
           "server/shared/cerberus-types.ts",
-          "server/shared/shadow-connector-lane.ts"
+          "server/shared/shadow-connector-lane.ts",
+          "server/shared/shadow-connector-lane-router.ts"
         ],
         "mode": "file"
       },

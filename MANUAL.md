@@ -3234,15 +3234,15 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/affected-areas-types.
 
 ## MAN-8559 — The affected-areas lane — /api/affected-areas forwarded to shadow-connector
 
-`server/modules/affected-areas/` is the one hop between the browser and shadow-connector's internal-caller gate (R-CAP-11, `X-Internal-Secret` required even from loopback). The browser never holds the secret. Mounted in `server/index.ts` at `/api/affected-areas` behind `authenticateToken`. The engine's side of the same surface: MAN-8540.
+`server/modules/affected-areas/` is the one hop between the browser and shadow-connector's internal-caller gate (R-CAP-11, `X-Internal-Secret` required even from loopback). The browser never holds the secret. Mounted in `server/index.ts` at `/api/affected-areas` behind `authenticateToken`. The engine's side of the same surface: MAN-8540. Its sibling lane, `/api/carrier-bulletins`, is MAN-8909.
 
 | File | Holds |
 |---|---|
-| `affected-areas.module.ts` | `createAffectedAreasModule()`; the ONLY reader of the environment |
-| `affected-areas.routes.ts` | `createAffectedAreasRouter({ forward })`: the allowlist, id/query/body checks, status mapping |
+| `affected-areas.module.ts` | `createAffectedAreasModule()`; the ONLY reader of the environment for this lane |
+| `affected-areas.routes.ts` | `createAffectedAreasRouter({ forward })`: the lane's table, its id shapes and its image type (`image/jpeg`); it hands them to the shared router |
 | `index.ts` | barrel the entrypoint imports |
 
-The forwarder is not in this module: `createShadowConnectorLane({ baseUrl, envFile, label })` → `forward(LaneRequest): Promise<LaneAnswer>`, the secret read and the one `fetch`, live in `server/shared/shadow-connector-lane.ts` (MAN-8863), so the secret has one home and a second lane to shadow-connector, `/api/carrier-bulletins` (next phase), reuses it rather than copying it. This module builds it with `label: 'affected-areas'`, so its log warning reads `[affected-areas] no usable internal secret in <file>: <cause>`, and its routes import `LaneAnswer` and `ShadowConnectorLane` from `@/shared/shadow-connector-lane.js`. The moved forwarder answered byte-identically (tour list and image, same sha256 before and after, 2026-10-21).
+Two shared files stand behind it, and neither is in this module: the forwarder (`createShadowConnectorLane({ baseUrl, envFile, label })` → `forward(LaneRequest): Promise<LaneAnswer>`, the secret read and the one `fetch`, `server/shared/shadow-connector-lane.ts`, MAN-8863) and the router (`createLaneRouter`, which checks, forwards and answers from a table, `server/shared/shadow-connector-lane-router.ts`, MAN-8908). The secret has one home, and the checks, the 404 and 422 tails and the status mapping have one copy, shared with the bulletins lane. This module builds the forwarder with `label: 'affected-areas'`, so its log warning reads `[affected-areas] no usable internal secret in <file>: <cause>`.
 
 ## Configuration
 
@@ -3272,58 +3272,24 @@ A method+path not in the table is the lane's own 404 `{ error: 'not a route of t
 | `GET /proving` | 20 s | json | none | `model`, `contract`: one token `[\w.:-]{1,80}` |
 | `PUT /thresholds/:class` | 20 s | json | object | — |
 
-## Checks before forwarding (a failure is the lane's 422 `{ error }`, nothing sent)
+## Id shapes (the lane's `PATH_RULES`; how a failure is answered is MAN-8908)
 
 | Input | Rule |
 |---|---|
 | `:tour`, `:pano` | `^[0-9a-f]{24}$` lowercase |
-| `:sha` | `^[0-9a-f]{64}$` lowercase |
-| `:region`, `:read` | `^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$` lowercase, as `routes/ids.py` holds them |
+| `:sha` | 64 lowercase hex (`SHA256_RULE`) |
+| `:region`, `:read` | a lowercase uuid (`LOWERCASE_UUID_RULE`), as `routes/ids.py` holds them |
 | `:class` | `^[a-z_]{2,40}$` |
-| query key not in the row | dropped, not forwarded |
-| query value that is an array/dict (`?q=a&q=b`) | 422 |
-| body on a `body: object` row | JSON object; array/null/scalar → 422 |
-| malformed percent-escape in the path (`%ZZ`) | 422 `the path holds a malformed percent-escape` (error handler at the end of the router) |
+| `limit` | a whole number (`wholeNumber`, private to this file) |
 
-The lane's own 422 is `{ error }`; the engine's is `{ detail: [...] }`: a client reads both.
+The lane's own 422 is `{ error }`; the engine's is `{ detail: [...] }`: a client reads both. Status mapping, the body-must-be-an-object check and the malformed-escape 422 are the shared router's (MAN-8908 rules 2–4): an upstream answer keeps its status and body; unreachable 503, unreadable 502, no secret 503. Image 2xx: `Content-Type: image/jpeg` (anything else is 502 `shadow-connector did not answer with a JPEG`), `Cache-Control: private, max-age=31536000, immutable`; a non-2xx image answer passes through as its JSON.
 
-## Status mapping
+## The secret read and the headers sent
+Both belong to the forwarder: MAN-8863 (the read: `parseSecret`, `currentSecret`, a rotation lands on the next request) and INV-8633 (the rules). The one fact to carry here: a bytes route is asked for with `Accept: image/*` since 2026-10-22 (it was `image/jpeg`), and this lane still insists on a JPEG in the answer.
 
-| Case | Answer |
-|---|---|
-| upstream answered JSON | its status and body, untouched (404 `no such tour`, 403 wrong secret, 422, refusals) |
-| network error / timeout | 503 `{ error }` (`unreachable`) |
-| non-JSON from a json route; 2xx image that is not `image/jpeg`; 3xx with no JSON | 502 `{ error }` (`unreadable`) |
-| secret missing, empty, padded, non-ASCII, unclosed quote | 503 `no_secret` (`CloudCLI could not read shadow-connector's internal secret`); nothing sent |
-| a thrown error the forwarder cannot name | `next(error)` → the app's handler |
-
-Image 2xx: `Content-Type: image/jpeg`, `Cache-Control: private, max-age=31536000, immutable`; a non-2xx image answer passes through as its JSON.
-
-## The secret read (`parseSecret`, `currentSecret` in `server/shared/shadow-connector-lane.ts`)
-
-1. `fs.stat(envFile)` on EVERY call; re-parse only when `mtimeMs` or `size` changes. A rotation lands on the next request: no restart, no watcher.
-2. Last `EIS_INTERNAL_SECRET=` line wins; `export ` prefix, CRLF, and an unquoted trailing ` # comment` are handled as dotenv does.
-3. Quoted value: whatever stands between the quotes, verbatim; only whitespace or a `# comment` may follow the closing quote. A quote that never closes, or other text after it → `no_secret`. A secret that really begins with `"` or `'` must be quoted.
-4. Usable = printable ASCII, no whitespace at either end (`USABLE_SECRET`): the gate compares bytes and an HTTP stack trims header edges.
-5. A missing file logs one `[<label>] no usable internal secret in <file>: <cause>` line per distinct cause (`<label>` is `affected-areas` for this lane); never the line parsed.
-6. The secret is held in the browser nowhere and in CloudCLI's own environment nowhere: read from the engine's file per call, never written to `process.env`, this server's `.env`, a log or a cache (INV-8633). why: a copy drifts on rotation, and the agent sessions this server spawns inherit its environment.
-
-## Headers sent
-
-| Header | Value |
-|---|---|
-| `X-Internal-Secret` | the secret |
-| `Accept` | `application/json`, or `image/jpeg` for a bytes route |
-| `Content-Type` | `application/json` when a body is sent |
-| `X-Acting-User` | signed-in username, non-printable → `?`, trimmed, ≤ 64 chars; absent when none. Display only: the engine derives `origin` itself (R-CAP-21) |
-
-`fetch` runs `redirect: 'manual'` so the secret header never follows a `Location`; timeout is `AbortSignal.timeout(timeoutMs)`.
-
-## Probes (2026-10-17)
-
-- `GET /api/affected-areas/tours?limit=3` → 200, three tours; `GET …/images/<sha>` → 200 JPEG whose `sha256sum` equals the id.
-- `GET /nope`, `DELETE /tours`, `POST /codebook` → 404 with no `shadow-connector` journal line; 422 cases (bad id, `limit=0|101`, 81-char `q`, `mode=bogus`) likewise never reach the journal.
-- An empty env file → 503 `no_secret`, 0 engine requests; writing the secret into it → next request 200, no restart.
+## Probes
+- 2026-10-17: `GET /api/affected-areas/tours?limit=3` → 200, three tours; `GET …/images/<sha>` → 200 JPEG whose `sha256sum` equals the id. `GET /nope`, `DELETE /tours`, `POST /codebook` → 404 with no `shadow-connector` journal line; 422 cases (bad id, `limit=0|101`, 81-char `q`, `mode=bogus`) likewise never reach the journal. An empty env file → 503 `no_secret`, 0 engine requests; writing the secret into it → next request 200, no restart.
+- 2026-10-22, the loop moved to the shared router and `Accept` changed to `image/*`: a tour read, an image, a bad image id, `limit=0`, a path outside the table, `%ZZ` and an unknown tour answered with the same status, body and headers before and after (the image's `sha256sum` `dd729923…` equals its id both times); the one difference was the engine's own `builtAt` stamp in the tour read.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/affected-areas/affected-areas.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/affected-areas/affected-areas.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/affected-areas/index.ts
 
@@ -3876,14 +3842,14 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/account-
 
 ## MAN-8863 — The shadow-connector lane forwarder — createShadowConnectorLane, the one read of EIS_INTERNAL_SECRET (server/shared)
 
-`server/shared/shadow-connector-lane.ts` is the one forwarder every CloudCLI lane to shadow-connector goes through, and the one place `EIS_INTERNAL_SECRET` is read. shadow-connector's `/api/*` surfaces are internal-caller gated (R-CAP-11: `X-Internal-Secret` required even from loopback); this server authenticates the operator, so the secret stays on this side and the browser never holds it. Exported from `server/shared/index.ts`.
+`server/shared/shadow-connector-lane.ts` is the one forwarder every CloudCLI lane to shadow-connector goes through, and the one place `EIS_INTERNAL_SECRET` is read. shadow-connector's `/api/*` surfaces are internal-caller gated (R-CAP-11: `X-Internal-Secret` required even from loopback); this server authenticates the operator, so the secret stays on this side and the browser never holds it. Exported from `server/shared/index.ts`. The routes of a lane are `server/shared/shadow-connector-lane-router.ts` (MAN-8908), which calls this file's `forward`.
 
-Consumers (each owns its allowlist, id rules and status mapping; none owns a transport):
+Consumers (each owns its allowlist, id rules and image type; none owns a transport):
 
 | module | lane | label |
 |---|---|---|
 | `server/modules/affected-areas/` (MAN-8559) | `/api/affected-areas`, the Tours lane | `affected-areas` |
-| `server/modules/carrier-bulletins/` (`/api/carrier-bulletins`; NOT BUILT YET — the next phase, the relay, adds it) | the bulletins lane | `carrier-bulletins` |
+| `server/modules/carrier-bulletins/` (MAN-8909) | `/api/carrier-bulletins`, the bulletins lane | `carrier-bulletins` |
 
 | export | does |
 |---|---|
@@ -3891,7 +3857,17 @@ Consumers (each owns its allowlist, id rules and status mapping; none owns a tra
 | `ShadowConnectorLane` | `{ forward(LaneRequest): Promise<LaneAnswer> }`; a router takes `Pick<ShadowConnectorLane, 'forward'>` |
 | `ShadowConnectorLaneDependencies` | `{ baseUrl, envFile, label }`; `label` is the one word the log warning leads with |
 | `LaneRequest` | `{ method: GET\|POST\|PUT, path, query?, body?, actingUser, timeoutMs, expect: json\|bytes }`; the route has already validated every part |
-| `LaneAnswer` | `{ ok: true, status, kind: json, body }`, `{ ok: true, status, kind: bytes, body: Buffer, contentType }`, or `{ ok: false, reason: unreachable\|unreadable\|no_secret, message }` |
+| `LaneAnswer` | `{ ok: true, status, kind: json, body }`, `{ ok: true, status, kind: bytes, body: Buffer, contentType }`, or `{ ok: false, reason: unreachable\|unreadable\|no_secret, message }`. It carries no response headers |
+
+## Headers sent
+| Header | Value |
+|---|---|
+| `X-Internal-Secret` | the secret |
+| `Accept` | `application/json`, or `image/*` for a bytes route |
+| `Content-Type` | `application/json` when a body is sent |
+| `X-Acting-User` | signed-in username, non-printable → `?`, trimmed, ≤ 64 chars; absent when none. Display only: the engine derives `origin` itself (R-CAP-21) |
+
+A bytes route asks for `image/*` and not one type because the Tours lane's images are JPEGs and the bulletins lane's are PNGs; the forwarder does not know which, so it asks for any image, and each lane's router enforces its own type on the answer's Content-Type. Changed from `image/jpeg` on 2026-10-22 (the engine answers a PNG whatever `Accept` says, so this made the request truthful and changed no answer: a Tours image was byte-identical before and after).
 
 Rules (they bind the file; INV-8633 holds them for both lanes)
 1. The secret is read from shadow-connector's env file at CALL time: `fs.stat` on every call, re-parse only when `mtimeMs` or `size` changed, so a rotation lands on the next request with no restart and no watcher. It is never written to `process.env`, this server's `.env`, a log line, an error message or a cache.
@@ -3905,8 +3881,9 @@ Traps
 | trap | fact |
 |---|---|
 | state is per forwarder | each `createShadowConnectorLane` call holds its own parse of the env file and its own last-reported cause: two lanes log one line per distinct cause EACH, and each warning leads with its own `[<label>]`. A lane built without a distinct label is indistinguishable in the journal |
-| the label is the log's only lane word | the Tours warning reads `[affected-areas] no usable internal secret in <file>: <cause>`; everything else the forwarder logs or answers is identical for every lane |
-| a new top-level `server/shared/*.ts` file | joins `.oxlintrc.json`'s `backend-shared-utils` list (INV-6548); `shadow-connector-lane.ts` is listed |
+| the label is the log's only lane word | the Tours warning reads `[affected-areas] no usable internal secret in <file>: <cause>`, the bulletins warning `[carrier-bulletins] …`; everything else the forwarder logs or answers is identical for every lane |
+| response headers are not carried | a header the engine sets on an answer (the bulletins overview's `X-Left-Out`, MAN-8906) is dropped here; carrying one takes an allowlist on `LaneRequest` and a field on `LaneAnswer` |
+| a new top-level `server/shared/*.ts` file | joins `.oxlintrc.json`'s `backend-shared-utils` list (INV-6548); `shadow-connector-lane.ts` and `shadow-connector-lane-router.ts` are listed |
 | measured 2026-10-21 | with a missing env file, an empty one and an unreachable engine, `forward` answers `no_secret`, `no_secret` and `unreachable` (`CloudCLI could not reach shadow-connector`), and a repeated cause logs one warning, not two; `GET /api/affected-areas/tours?limit=3` and `GET /api/affected-areas/images/<sha>` through the dev API (:3011) answer 200 with the same body sha256 as before the forwarder moved here |
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/shared/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/shadow-connector-lane.ts
@@ -4013,3 +3990,105 @@ Pure: `utils/bulletinModel.ts` (standing, groups, `PAGE_STATE_LOOK`, `VERDICT_LO
 - Not proven: the other 14 states at 390 px and in dark on the final code; `npm run build`; the server half of `npm run typecheck`.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/carrier-bulletins/
+
+## MAN-8908 — The lane router — createLaneRouter, the allowlist both lanes to shadow-connector share (server/shared)
+
+`server/shared/shadow-connector-lane-router.ts` is the allowlist router both lanes to shadow-connector hand their tables to: `createLaneRouter(definition)` returns an Express router that checks, forwards and answers. The forwarder beside it (`shadow-connector-lane.ts`, MAN-8863) owns the transport and the secret; this file owns what the two lanes' routes would otherwise each write the same way, so the rules below hold for both and cannot drift. Exported from `server/shared/index.ts`; listed in `.oxlintrc.json`'s `backend-shared-utils` pattern (INV-6548).
+
+Consumers (each declares a table and its id shapes; neither writes a handler):
+
+| module | lane | `lane` | image |
+|---|---|---|---|
+| `server/modules/affected-areas/` (MAN-8559) | `/api/affected-areas` | `affected-areas` | `image/jpeg` |
+| `server/modules/carrier-bulletins/` | `/api/carrier-bulletins` | `carrier-bulletins` | `image/png` |
+
+| export | does |
+|---|---|
+| `createLaneRouter({ lane, upstreamPrefix, pathRules, allowlist, forward, image })` | one handler per allowlist row (check, fill the path, forward, answer), then the lane's own 404, then the malformed-escape 422 |
+| `LaneRoute` | one row: `{ method, route, timeoutMs, expect: json\|bytes, query?, body: object\|none }`; `route` is in Express's form, `:name` is filled from the checked id |
+| `LaneRule` / `patternRule(regex, expects)` | a check on one id or query value; `expects` is the half of the 422 sentence after the field's name |
+| `LOWERCASE_UUID_SOURCE`, `LOWERCASE_UUID_RULE`, `SHA256_RULE` | the id shapes the two lanes share: a lowercase hyphenated uuid, 64 lowercase hex |
+
+Rules (they bind the file; a lane that needs different behaviour changes the definition, not a copy of the loop):
+1. A method-and-path pair that is not a row never reaches shadow-connector: the lane answers its own 404 `{ error: 'not a route of the <lane> lane' }`, and the request is not handed to the app's catch-all. why: the table is the lane's whole contract.
+2. Every path id and every allowlisted query value is held to its rule BEFORE a byte leaves; a `:name` with no rule in `pathRules` is refused, never forwarded. A failure is the lane's 422 `{ error: '<name> must be <expects>' }`. A query value that is an array or a dictionary (`?q=a&q=b`) is not a value. A query key not in the row is dropped, not forwarded. A `body: 'object'` row needs a JSON object (array, null and scalar are a 422).
+3. A malformed percent-escape in the path (`%ZZ`) throws in Express before any handler runs; the router's last middleware turns it into a 422 and forwards nothing.
+4. An upstream answer keeps its status and its JSON untouched. Only the lane's own faults carry a body of the lane's making, `{ error }`, and their statuses are fixed: `unreachable` 503, `unreadable` 502, `no_secret` 503. why: turning a fault into a 200 with an empty body would replace the one useful thing in the answer, that nothing was read, with silence a screen shows as data.
+5. A `bytes` route is relayed only on a 2xx, under the lane's one `image.contentType` and `Cache-Control: private, max-age=31536000, immutable` (the id is the sha256 of the bytes, so it never changes). A 2xx whose Content-Type is not that type is `unreadable` (502 `shadow-connector did not answer with <image.noun>`). A non-2xx image answer is the engine's JSON, passed through (the forwarder reads bytes only on success).
+6. The acting user is read from `request.user.username` (the mount's `authenticateToken` set it) and sent as `X-Acting-User`, display only.
+7. Routes here validate and translate and do nothing else: no secret read, no socket, no cache, no model call.
+
+Traps
+| trap | fact |
+|---|---|
+| a page number is a pattern, not a number | the bulletins lane's `page` is `^[1-9]\d{0,2}$`, the engine's own spelling: `3`, `03` and `+3` would be three URLs for one page image, cached for a year under its URL. The Tours lane's `limit` is a bounded number (`wholeNumber`, private to its routes) because nothing is cached under it |
+| the 404 sentence names the lane | `lane` is the only word of it that differs; a new lane picks a distinct one so the journal and a screen can tell whose 404 it was |
+| a new lane | adds a module with a table and a mount in `server/index.ts`, builds its forwarder with its own `label` (MAN-8863), and needs no change here unless it relays something other than JSON and one image type |
+
+Moved here from the Tours routes on 2026-10-22 as a pure move: the Tours lane's bodies, statuses and headers for a tour read, an image, a bad id, a bad limit, a path outside the table, a malformed escape and an unknown tour were identical before and after (image sha256 `dd729923…` = its id), except the engine's own `builtAt` stamp.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/shared/shadow-connector-lane-router.ts
+
+## MAN-8909 — The carrier-bulletins lane — /api/carrier-bulletins forwarded to shadow-connector
+
+`server/modules/carrier-bulletins/` is the second lane between the browser and shadow-connector's internal-caller gate (R-CAP-11: `X-Internal-Secret` required even from loopback), built on the Tours lane's pattern (MAN-8559). It relays the four GET routes of `/api/carrier-bulletins` — what Claude read of the SERVPRO bulletins and how the house settled it (the engine's side: MAN-8906, INV-9382) — and nothing else. Mounted in `server/index.ts` at `/api/carrier-bulletins` behind `authenticateToken`, beside the Tours lane. The browser never holds the secret; the Cerberus tab's Bulletins view (client wire: MAN-8865) is its caller.
+
+**Why a lane.** The engine's surface demands the internal secret even from loopback, and a browser must not hold it. CloudCLI's server already authenticates the operator, so the lane is the one hop: it reads the secret from shadow-connector's own env file per call (the shared forwarder, MAN-8863) and forwards. The lane is read-only because the view is (the operator's ruling of 2026-10-21): a write verb would be a new row of the table and a new decision of the engine's surface, not an edit to a handler.
+
+| File | Holds |
+|---|---|
+| `carrier-bulletins.module.ts` | `createCarrierBulletinsModule()`; the ONLY reader of the environment for this lane |
+| `carrier-bulletins.routes.ts` | `createCarrierBulletinsRouter({ forward })`: the four-row table, the three id shapes, the image type; the shared router (MAN-8908) does the rest |
+| `index.ts` | barrel the entrypoint imports |
+
+## Configuration
+| Variable | Default | Meaning |
+|---|---|---|
+| `SHADOW_CONNECTOR_URL` | `http://127.0.0.1:8001` | engine origin |
+| `SHADOW_CONNECTOR_ENV_FILE` | `/opt/shadow-connector/.env` | file holding `EIS_INTERNAL_SECRET=` |
+
+The forwarder is built with `label: 'carrier-bulletins'`, so its log warning reads `[carrier-bulletins] no usable internal secret in <file>: <cause>`.
+
+## Allowlist (4 rows in `ALLOWLIST`, GET only)
+A method+path not in the table is the lane's own 404 `{ error: 'not a route of the carrier-bulletins lane' }`; it never reaches :8001. No row takes a query or a body: a query on a request is dropped, not forwarded.
+
+| Method path | Timeout | Reply |
+|---|---|---|
+| `GET /overview` | 60 s | json |
+| `GET /bulletins/:bulletin/pages` | 30 s | json |
+| `GET /bulletins/:bulletin/pages/:page` | 30 s | json |
+| `GET /files/:sha/pages/:page/image` | 30 s | bytes (`image/png`) |
+
+The overview has the longer timeout because it plans every carrier's current file, and a file nobody has opened is fingerprinted from its PDF on that first call.
+
+## Checks before forwarding (a failure is the lane's 422 `{ error }`, nothing sent)
+| Input | Rule |
+|---|---|
+| `:bulletin` | lowercase hyphenated uuid, `^[0-9a-f]{8}-…-[0-9a-f]{12}$` (`LOWERCASE_UUID_RULE`) |
+| `:sha` | 64 lowercase hex (`SHA256_RULE`) |
+| `:page` | `^[1-9]\d{0,2}$`: 1 to 999, no sign, no leading zero, no blank |
+| malformed percent-escape in the path (`%ZZ`) | 422 `the path holds a malformed percent-escape` |
+
+`:page` is a pattern and not a number with bounds on purpose, as the engine's `ids.py` holds it: `3`, `03` and `+3` would be three URLs for one page image, and the image is cached for a year under its URL.
+
+## Status mapping and the image
+An upstream answer — the overview, a page list, a page reading, and the engine's 404 `{ detail }` (no such bulletin, replaced by a newer file, no such page) or its 502 `{ detail }` (the stored file could not be fetched, is not the file named, or could not be opened) — passes through with its status and JSON untouched. The lane's own faults are `{ error }`: unreachable 503, unreadable 502, no secret 503 (MAN-8908 rules 4 and 5).
+
+The image is relayed as bytes with `Content-Type: image/png` and `Cache-Control: private, max-age=31536000, immutable`, and only on a 2xx: it is keyed by the file's sha256 and the page, so the same URL always draws the same picture. A 2xx that is not a PNG is the lane's `unreadable` (502 `shadow-connector did not answer with a PNG`). The shared forwarder asks for a bytes answer with `Accept: image/*`, so the Tours lane's JPEGs and this lane's PNGs share one transport; each lane enforces its own type on the answer.
+
+## Rules an editor must not break
+1. **GET only.** No POST/PUT/DELETE row, no query or body forwarded. why: the engine's surface is read-only and decided as such (INV-9382); a write route re-opens that decision and the operator's ruling.
+2. **An id is checked before a byte leaves.** why: a malformed id is a 422 here and never a request, a journal line or an object key at the engine.
+3. **No model call, no timer, no cache.** The lane forwards per request; the view reads on open and on a press.
+4. **The secret is not read here.** It stays in the forwarder (INV-8633).
+
+## Probes (2026-10-22, through the dev API :3011 with the dev login)
+- `GET /api/carrier-bulletins/overview` → 200, 12 carriers, byte-equal to the engine's own answer at that moment; Hanover's pages → 200, 6 pages.
+- State Farm page 13 image → 200 `image/png`, `Cache-Control: private, max-age=31536000, immutable`, 239,612 B, `sha256sum` `8be40781…` equal to the same image fetched from :8001 with the secret.
+- 422 for a malformed or uppercase bulletin id, page `03` / `0` / `1000` / `1x`, a 63-hex sha, `%ZZ`; 404 for `/nope`, the mount root, `POST /overview`, `PUT` a page, `DELETE /overview` and a Tours path on this mount; 401 with no token. `journalctl -u shadow-connector --since <then>` showed 0 `carrier-bulletins` lines for all of them, and one line for a valid control call placed after.
+- One Tours image through the Tours lane before and after the `Accept` change: identical bytes (its sha256 equals its id).
+
+## Known limit
+The engine names a carrier whose current file cannot be planned in the overview's `X-Left-Out` response header (MAN-8906). **This lane does not carry response headers**: the forwarder's `LaneAnswer` holds status and body only, so such a carrier is absent from the list and the header is dropped on the way. Measured 2026-10-22: the engine sent no `X-Left-Out` (every carrier with a current file listed), and the view reads no header. Showing it takes a header allowlist on the forwarder and a read in the view; not done.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/carrier-bulletins/carrier-bulletins.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/carrier-bulletins/carrier-bulletins.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/carrier-bulletins/index.ts
