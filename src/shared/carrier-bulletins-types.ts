@@ -39,9 +39,17 @@ export type PageState = 'settled' | 'read' | 'unread' | 'waiting';
  * The five words a reading gives a rule it judged on a page (`verify/contract.py`'s `VerdictWord`):
  * `confirmed` the page states it, `corrected` it states it differently, `duplicate` another rule already
  * carries it, `not_on_page` the page does not state it, `unsettled` the page leaves it open or the
- * house's checks refused the answer. Read by `JudgedRule` and `PageFailure`.
+ * house's checks refused the answer. Read by `JudgedRule.verdict` and by `SaidWord`.
  */
 export type VerdictWord = 'confirmed' | 'corrected' | 'duplicate' | 'not_on_page' | 'unsettled';
+
+/**
+ * What the model said about a rule or a requirement: one of the five `VerdictWord`s, or `(no entry)` where it
+ * gave nothing usable for a rule the page asked about (`read.unsettled_entry`: an answer refused whole, a rule
+ * the model left out, a rule that cites no page). Read by `JudgedRule.said` and `PageFailure.said`: a screen
+ * that keys a label on it must handle the sixth value.
+ */
+export type SaidWord = VerdictWord | '(no entry)';
 
 // ---------------------------
 
@@ -196,7 +204,7 @@ export type PageRequirement = {
 
 /**
  * A rule the house held before this reading, judged on this page. `words` is the rule in words,
- * `from_revision` the bulletin revision it came from. `said` is the word the model gave and `verdict` the
+ * `from_revision` the bulletin revision it came from. `said` is what the model gave and `verdict` the
  * word the house stored: they differ when the house's checks refused the answer (stored `unsettled`).
  * `quote` is the page's words, `reason` the model's why, `duplicate_of_words` the rule a `duplicate` points at.
  */
@@ -204,7 +212,7 @@ export type JudgedRule = {
   words: string;
   from_revision: string | null;
   verdict: VerdictWord;
-  said: VerdictWord;
+  said: SaidWord;
   reason: string | null;
   quote: string | null;
   duplicate_of_words: string | null;
@@ -223,7 +231,7 @@ export type NotPlaced = {
  */
 export type PageFailure = {
   words: string | null;
-  said: VerdictWord;
+  said: SaidWord;
   quote: string | null;
   failures: string[];
 };

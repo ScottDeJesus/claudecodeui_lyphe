@@ -11425,3 +11425,82 @@ measured 2026-10-21 by chain chain-usage-limits--account-switch--old-switcher-20
 probe-key: bda706a7a70fa1a3de7d7b31e8c4820d226f6238
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/account-digest.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/account-door-relay.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/account-identity.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/accounts.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/accounts.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/account-store.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/usage.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-auth.provider.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/AccountFooterRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/AccountPopover.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/ClaudeAccountRows.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/claude-accounts-fake.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/hooks/useClaudeAccounts.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/UsageMeters.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/utils/accountInUseUsage.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/Settings.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Banner.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/panel-fill.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-14.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-19.mjs
+
+## INV-9302 — probe — MEDIUM — `said` is typed `VerdictWord` on `JudgedRule` and `PageFailure`, and the owner stores `"(no entry)"` there
+
+MEDIUM — `said` is typed `VerdictWord` on `JudgedRule` and `PageFailure`, and the owner stores `"(no entry)"` there
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+cd /opt/shadow-connector || exit 1
+venv/bin/python - <<'PY'
+import asyncio, datetime as dt, uuid
+from extractors.servpro_bulletins.verify.read import read_page, unsettled_entry
+from extractors.servpro_bulletins.verify.prompt import PageContext
+from extractors.servpro_bulletins.verify.candidates import Candidate
+async def ask(prompt, pdf, mime, **kw):
+    return "this is not json"
+now = dt.datetime.now(dt.timezone.utc)
+cand = Candidate(id=str(uuid.uuid4()), bulletin_id=str(uuid.uuid4()), page=3, subject="x", raw_rule_text="Contact within 24 hours.",
+                 fields=dict(requires_pre_approval=False, notification_window_hours=24, window_time_basis='calendar', threshold_value=None,
+                             threshold_unit=None, stage=None, deadline_type=None, loss_types=None, cadence_period=None, is_cadence=False),
+                 stamps={}, revised_at=now, is_current=True, bulletin_number="1", revision="A", created_at=now)
+res = asyncio.run(read_page(PageContext(carrier="Stub", bulletin="#1", total_pages=5, page=3, held=(3,)), b"%PDF", "Contact within 24 hours.", [cand], model="stub", ask=ask))
+print("refused:", bool(res.refused))
+for e in res.entries:
+    print("entry verdict=%r said=%r failures=%d" % (e.verdict, e.said, len(e.failures)))
+PY
+grep -n "said:" /home/lyphe/.claude/claudecodeui_lyphe/src/shared/carrier-bulletins-types.ts || echo "types: no said member"
+grep -n "no entry" /opt/shadow-connector/extractors/servpro_bulletins/verify/views.py 2>/dev/null || echo "views.py: absent or silent on the word"
+EOF
+bash "$D/p.sh"
+expect: while the defect stands: `refused: True`, `entry verdict='unsettled' said='(no entry)' failures=1`, two lines `said: VerdictWord;` (207 and 226), and `views.py: absent or silent on the word`; cured when the types' `said` members admit the word, or `views.py` is shown to map it and the header says so
+```
+
+measured 2026-10-21 by chain chain-bulletins-read-by-claude--wire-20261021-220823-7261, finding M1, MEDIUM
+probe-key: f43f6eaaefa657324cf3d15a85a9276f920d7b2a
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.oxlintrc.json, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/carrier-bulletins-types.ts
+
+## INV-9303 — probe — LOW — `MAN-8865` is not served on a touch of `api.ts`, and the row that is served does not name `carrierBulletins`
+
+LOW — `MAN-8865` is not served on a touch of `api.ts`, and the row that is served does not name `carrierBulletins`
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+cd /opt/shadow-connector || exit 1
+A=/home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts
+printf 'rows served for api.ts: '; docstore govern "$A" --limit 50 --text | grep -cE '^(MAN|INV)-'
+printf 'MAN-8865 among them: '; docstore govern "$A" --limit 50 --text | grep -c 'MAN-8865'
+printf 'MAN-8558 body names carrierBulletins: '; docstore get MAN-8558 --text | grep -c 'carrierBulletins'
+EOF
+bash "$D/p.sh"
+expect: `rows served for api.ts: 50`, `MAN-8865 among them: 0`, `MAN-8558 body names carrierBulletins: 0` while the defect stands; cured when either of the last two is at least 1
+```
+
+measured 2026-10-21 by chain chain-bulletins-read-by-claude--wire-20261021-220823-7261, finding L1, LOW
+probe-key: d7a814adeaba567c97e2cc0dea6376274023960d
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.oxlintrc.json, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/carrier-bulletins-types.ts
+
+## INV-9304 — probe — LOW — the row and the types header name different owners for `scope`
+
+LOW — the row and the types header name different owners for `scope`
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+cd /opt/shadow-connector || exit 1
+printf 'row names: '; docstore get MAN-8865 --text | grep -o 'scope[^.]*verify/[a-z_]*\.py' | head -1
+printf 'types header names: '; sed -n 16,17p /home/lyphe/.claude/claudecodeui_lyphe/src/shared/carrier-bulletins-types.ts | grep -o 'verify/[a-z_]*\.py' | head -1
+EOF
+bash "$D/p.sh"
+expect: `row names: … verify/requirement.py` and `types header names: verify/contract.py` while the defect stands; cured when both name `verify/contract.py`
+```
+
+measured 2026-10-21 by chain chain-bulletins-read-by-claude--wire-20261021-220823-7261, finding L2, LOW
+probe-key: 1e460b63754d8400f356738036c2683d46266512
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.oxlintrc.json, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/carrier-bulletins-types.ts

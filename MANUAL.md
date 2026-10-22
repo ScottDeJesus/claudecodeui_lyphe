@@ -3189,7 +3189,7 @@ The browser's typed view of `/api/affected-areas` (the Tours tab): one wire-type
 | file | holds |
 |---|---|
 | `src/shared/affected-areas-types.ts` | 39 exported types: every `wire.py` model, its 11 nested ones and the four envelopes `TourList`, `ViewsResult`, `UnderstandingMarkResult`, `Refusal`; plus the unions `Face`, `Basis`, `Verdict`, `MarkQueue`. `Point` and `Box` are file-private (`number[]`). Imports nothing from `server/`. |
-| `src/shared/api.ts` | `api.affectedAreas`, 12 verbs, beside `api.cerberus`; a type-only import from the mirror |
+| `src/shared/api.ts` | `api.affectedAreas`, 12 verbs, beside `api.cerberus`; a type-only import from the mirror. The same file holds `api.carrierBulletins` (the Bulletins view's four GET verbs and their own mirror, `carrier-bulletins-types.ts`): MAN-8865 |
 | `.oxlintrc.json` | `src/shared/affected-areas-types.ts` in the `frontend-shared-file` list (INV-5890) |
 
 ## Verbs
@@ -3918,7 +3918,7 @@ The browser's typed view of `/api/carrier-bulletins` (the Bulletins view of the 
 ## Files
 | file | holds |
 |---|---|
-| `src/shared/carrier-bulletins-types.ts` | 18 exported types: the three bodies `OverviewRow`, `BulletinPage`, `PageReading`; their nested ones (`LastPull`, `LastReading`, `VerdictCounts`, `ReadingStamp`, `RequirementThreshold`, `RequirementWindow`, `RequirementScope`, `SettledRule`, `PageRequirement`, `JudgedRule`, `NotPlaced`, `PageFailure`, `PageWaiting`); and the unions `PageState` and `VerdictWord`. Imports nothing from `server/`. |
+| `src/shared/carrier-bulletins-types.ts` | 19 exported types: the three bodies `OverviewRow`, `BulletinPage`, `PageReading`; their nested ones (`LastPull`, `LastReading`, `VerdictCounts`, `ReadingStamp`, `RequirementThreshold`, `RequirementWindow`, `RequirementScope`, `SettledRule`, `PageRequirement`, `JudgedRule`, `NotPlaced`, `PageFailure`, `PageWaiting`); and the unions `PageState`, `VerdictWord` and `SaidWord`. Imports nothing from `server/`. |
 | `src/shared/api.ts` | `api.carrierBulletins`, 4 GET verbs, beside `api.affectedAreas`; no import from the mirror (each answer is named in a `// →` comment) |
 | `.oxlintrc.json` | `src/shared/carrier-bulletins-types.ts` in the `frontend-shared-file` list (INV-5890) |
 
@@ -3936,11 +3936,11 @@ Every verb is a GET: the view is read-only, and the lane's allowlist holds GET r
 - A body changes in `views.py` first; the mirror moves in the same change. why: a key renamed on one side is a screen that stops reading.
 - Keys are the wire's snake_case (`bulletin_id`, `last_reading`, `requirements_live`), never camelCase. Dates are ISO text, ids text, page numbers count from 1.
 - A body field is never optional. `null` is the plain absence the field's comment names: `last_pull` no pull on record, `last_reading` never read, `reading` a page with no answer, `waiting` a page that does not wait, `rule` a requirement on a page read and not yet settled. A part heading is never `null`: `''` is a page in no part.
-- `PageState` is whole.plan_file's four words (`settled`, `read`, `unread`, `waiting`); `VerdictWord` is the check's five (`confirmed`, `corrected`, `duplicate`, `not_on_page`, `unsettled`). `JudgedRule.said` is the model's word and `verdict` the stored one: they differ when the house's checks refused the answer.
+- `PageState` is whole.plan_file's four words (`settled`, `read`, `unread`, `waiting`); `VerdictWord` is the check's five (`confirmed`, `corrected`, `duplicate`, `not_on_page`, `unsettled`). `said` (on `JudgedRule` and `PageFailure`) is a `SaidWord`: a `VerdictWord`, or `(no entry)` where the model gave nothing usable for a rule (`read.unsettled_entry` stores that word on an answer refused whole, a rule the model left out and a rule that cites no page). `JudgedRule.verdict` is the stored `VerdictWord`; it differs from `said` when the house's checks refused the answer.
 - No `interface` declarations. A new verb names its answer in a `// → Type` comment.
 
 ## Value shapes the design left open
-The design writes the keys of each body and not the inside of four of them. They are typed from the page check's own answer, and each stands until a live answer says otherwise: `threshold` is `{ value, unit, measure }` and `window` is `{ hours, basis, anchor }` (`verify/contract.py`'s `Threshold` and `Window`, `hours` null for a deadline that counts none); `scope` is `{ services, loss_types, property_types }`, each `string[] | null` with null meaning every one (`verify/requirement.py`); a `failures` element is `{ words, said, quote, failures }` (the printable fields of `read.Entry`). `SettledRule.state`, `PageRequirement.kind` and `.subject` are plain `string`, because the design names no closed set for them.
+The design writes the keys of each body and not the inside of four of them. They are typed from the page check's own answer, and each stands until a live answer says otherwise: `threshold` is `{ value, unit, measure }` and `window` is `{ hours, basis, anchor }` (`verify/contract.py`'s `Threshold` and `Window`, `hours` null for a deadline that counts none); `scope` is `{ services, loss_types, property_types }`, each `string[] | null` with null meaning every one (`verify/contract.py`'s `Requirement`; `verify/requirement.py` only normalizes the lists to compare them); a `failures` element is `{ words, said, quote, failures }` (the printable fields of `read.Entry`). `SettledRule.state`, `PageRequirement.kind` and `.subject` are plain `string`, because the design names no closed set for them.
 
 ## Measured
 - 2026-10-21: the TypeScript compiler's property names of `OverviewRow`, `BulletinPage` and `PageReading` and every nested type, against the keys of the design's THE SURFACE interface parsed out of `bulletins-read-by-claude.design.toml`: every key matched at every level the design writes keys (16, 7 and 9 at the top; `last_pull` 2, `last_reading` 6, `verdicts` 5, `reading` 6, `requirements` 8, `rule` 3, `judged` 7, `not_placed` 2, `waiting` 3). The four keys above are the only places the type has structure where the design has a bare key.
