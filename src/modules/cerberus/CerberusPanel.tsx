@@ -41,6 +41,7 @@ const VIEWS: readonly { id: CerberusView; labelKey: string; hintKey: string }[] 
   { id: 'catalog', labelKey: 'cerberus.catalog.tab', hintKey: 'cerberus.catalog.tabHint' },
   { id: 'history', labelKey: 'cerberus.fleet.tabs.history', hintKey: 'cerberus.fleet.tabs.historyHint' },
   { id: 'tours', labelKey: 'cerberus.tours.tab', hintKey: 'cerberus.tours.tabHint' },
+  // FILL: bulletins-row — { id: 'bulletins', labelKey: 'cerberus.bulletins.tab', hintKey: 'cerberus.bulletins.tabHint' }, the fifth view after Tours; CerberusView gains 'bulletins'.
 ];
 
 /** A view arriving: Verve's page entrance at the prototype's .45 s. It plays again each time a view is shown. */
@@ -254,6 +255,7 @@ export function CerberusPanel({ projectChoices }: CerberusPanelProps) {
                 </ViewBoundary>
               </div>
             )}
+            {/* FILL: bulletins-panel — mounted on first show inside the view boundary, kept hidden after */}
           </>
         )}
       </ScrollArea>

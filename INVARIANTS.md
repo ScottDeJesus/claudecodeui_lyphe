@@ -11504,3 +11504,120 @@ measured 2026-10-21 by chain chain-bulletins-read-by-claude--wire-20261021-22082
 probe-key: 1e460b63754d8400f356738036c2683d46266512
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/.oxlintrc.json, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/carrier-bulletins-types.ts
+
+## INV-9307 — probe — MEDIUM: the door's text face prints each account's digest, though this phase's brief says digests stay in JSON and files
+
+MEDIUM: the door's text face prints each account's digest, though this phase's brief says digests stay in JSON and files
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.M1.XXXXXX) || exit 1
+export D
+cat > "$D/p.sh" <<'EOF'
+#!/bin/bash
+set -u
+mkdir -p "$D/state/dispatcher" "$D/store" || exit 1
+printf '{"oauthAccount":{"accountUuid":"11111111-aaaa-4aaa-8aaa-aaaaaaaaaaaa","emailAddress":"alpha@example.invalid"}}' > "$D/claude.json"
+export DISPATCHER_HOME="$D/state/dispatcher" PLAN_RUNNER_CLAUDE_ACCOUNT_HOME="$D/store" \
+       PLAN_RUNNER_CLAUDE_ACCOUNT_TOKENS="$D/store/tokens.json" \
+       PLAN_RUNNER_CLAUDE_IDENTITY_PATH="$D/claude.json" PYTHONPATH=/home/lyphe/.claude/hooks
+python3 -B -c "from plan_runner.claude_account import store; store.add('92f3b37e','alpha')" || exit 1
+TEXT=$(/home/lyphe/.claude/scripts/claude-account status)
+JSON=$(/home/lyphe/.claude/scripts/claude-account status --json)
+echo "text-face-digests=$(printf '%s' "$TEXT" | grep -oE '\b[0-9a-f]{8}\b' | wc -l)"
+echo "json-digests=$(printf '%s' "$JSON" | grep -oE '\b[0-9a-f]{8}\b' | wc -l)"
+echo "text-head=$(printf '%s' "$TEXT" | head -1)"
+EOF
+bash "$D/p.sh"
+cd /tmp; case "$D" in /tmp/athena-probe.M1.??????) rm -rf "$D" ;; *) echo "not its pattern: $D" ;; esac
+```
+
+measured 2026-10-21 by chain chain-usage-limits--account-switch--whole-20261021-221412-9c19, finding M1, MEDIUM
+probe-key: ebe5ba3d4e22c02a2780ac991700e5c82bbe4e44
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/console.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/whole-account-switch-panel.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/whole-account-switch-passes.py, /home/lyphe/.claude/claudecodeui_lyphe/.verify/whole-account-switch.sh, /home/lyphe/.claude/hooks/enforce_claude_api_secret.py, /home/lyphe/.claude/hooks/plan_runner/claude_account/route.py
+
+## INV-9308 — probe — LOW: the status reader's docstring says a string is no status, but a numeric string files a refused wall
+
+LOW: the status reader's docstring says a string is no status, but a numeric string files a refused wall
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.L1.XXXXXX) || exit 1
+export D
+cat > "$D/p.sh" <<'EOF'
+#!/bin/bash
+set -u
+mkdir -p "$D/state/dispatcher" "$D/store" || exit 1
+printf '{"oauthAccount":{"accountUuid":"11111111-aaaa-4aaa-8aaa-aaaaaaaaaaaa"}}' > "$D/claude.json"
+export DISPATCHER_HOME="$D/state/dispatcher" PLAN_RUNNER_CLAUDE_ACCOUNT_HOME="$D/store" \
+       PLAN_RUNNER_CLAUDE_ACCOUNT_TOKENS="$D/store/tokens.json" \
+       PLAN_RUNNER_CLAUDE_IDENTITY_PATH="$D/claude.json" PYTHONPATH=/home/lyphe/.claude/hooks
+python3 -B - <<'PY'
+from plan_runner.claude_account import route, store, tokens
+digest = '92f3b37e'
+store.add(digest, 'alpha')
+token = 'sk-ant-oat01-' + 'P' * 24
+store.set_token(digest, tokens.save(digest, token), checked=True)
+class Outcome:
+    def __init__(self, status, api_error_status=None):
+        self.status, self.api_error_status = status, api_error_status
+print('docstring-claims-a-string-is-no-status', 'a string' in (route._status.__doc__ or ''))
+for value in (401, '401', True):
+    got = route.refused(Outcome('api_error', value), digest, now=1000.0)
+    print(f'status {value!r} ->', 'none' if got is None else got.kind)
+PY
+EOF
+bash "$D/p.sh"
+cd /tmp; case "$D" in /tmp/athena-probe.L1.??????) rm -rf "$D" ;; *) echo "not its pattern: $D" ;; esac
+```
+
+measured 2026-10-21 by chain chain-usage-limits--account-switch--whole-20261021-221412-9c19, finding L1, LOW
+probe-key: cb8206a55904974704a30f22f392a2545bb1a216
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/console.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/whole-account-switch-panel.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/whole-account-switch-passes.py, /home/lyphe/.claude/claudecodeui_lyphe/.verify/whole-account-switch.sh, /home/lyphe/.claude/hooks/enforce_claude_api_secret.py, /home/lyphe/.claude/hooks/plan_runner/claude_account/route.py
+
+## INV-9309 — probe — LOW: the unreadable-token raise leaves the role out and a double space in, for an ordinary launch
+
+LOW: the unreadable-token raise leaves the role out and a double space in, for an ordinary launch
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.L2.XXXXXX) || exit 1
+export D
+cat > "$D/p.sh" <<'EOF'
+#!/bin/bash
+set -u
+mkdir -p "$D/state/dispatcher" "$D/store" "$D/liveconfig" || exit 1
+printf '{"oauthAccount":{"accountUuid":"11111111-aaaa-4aaa-8aaa-aaaaaaaaaaaa"}}' > "$D/claude.json"
+printf '{"probe":true}\n' > "$D/liveconfig/settings.json"
+export DISPATCHER_HOME="$D/state/dispatcher" PLAN_RUNNER_CLAUDE_ACCOUNT_HOME="$D/store" \
+       PLAN_RUNNER_CLAUDE_ACCOUNT_TOKENS="$D/store/tokens.json" \
+       PLAN_RUNNER_CLAUDE_IDENTITY_PATH="$D/claude.json" CLAUDE_CONFIG_DIR="$D/liveconfig" \
+       PYTHONPATH=/home/lyphe/.claude/hooks
+python3 -B - <<'PY'
+from plan_runner.claude_account import route, store, tokens
+digest = '92f3b37e'
+store.add(digest, 'alpha')
+token = 'sk-ant-oat01-' + 'P' * 24
+store.set_token(digest, tokens.save(digest, token), checked=True)
+tokens.remove(digest)
+class Spec:
+    provider = ''
+    payer = 0
+    account = digest
+    role = ''
+try:
+    route.route(Spec())
+    print('raise-text: NO RAISE')
+except Exception as exc:
+    text = str(exc)
+    print('raise-text:', text.replace(' ', '·'))
+    print('double-space:', '  ' in text, 'token-in-words:', token in text)
+PY
+EOF
+bash "$D/p.sh"
+cd /tmp; case "$D" in /tmp/athena-probe.L2.??????) rm -rf "$D" ;; *) echo "not its pattern: $D" ;; esac
+```
+
+measured 2026-10-21 by chain chain-usage-limits--account-switch--whole-20261021-221412-9c19, finding L2, LOW
+probe-key: cea89c710a67633226d57a865016753d0f04adef
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/console.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/whole-account-switch-panel.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/whole-account-switch-passes.py, /home/lyphe/.claude/claudecodeui_lyphe/.verify/whole-account-switch.sh, /home/lyphe/.claude/hooks/enforce_claude_api_secret.py, /home/lyphe/.claude/hooks/plan_runner/claude_account/route.py

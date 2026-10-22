@@ -2255,6 +2255,234 @@
       "tab": "Tours",
       "tabHint": "Affected areas on DocuSketch tours"
     },
+    "bulletins": {
+      "tab": "Bulletins",
+      "tabHint": "What Claude read in each carrier's SERVPRO bulletin",
+      "refresh": "Refresh",
+      "trouble": {
+        "retry": "Try again",
+        "no_secret": "CloudCLI could not read shadow-connector's internal secret",
+        "no_secretDetail": "Nothing here can be read until shadow-connector's env file holds EIS_INTERNAL_SECRET.",
+        "unreachable": "shadow-connector can't be reached",
+        "unreachableDetail": "It did not answer in time. It may be restarting.",
+        "unreadable": "shadow-connector sent an answer CloudCLI can't read",
+        "unreadableDetail": "It may be part way through an update.",
+        "gone": "This could not be found",
+        "gone_overview": "The bulletins could not be found",
+        "gone_pages": "This bulletin is not on file any more",
+        "gone_page": "This page is not in the bulletin",
+        "goneDetail": "Go back and open it again from the list.",
+        "goneDetail_overview": "shadow-connector may be part way through an update.",
+        "goneDetail_pages": "A newer file may have taken its place. Go back to All carriers and open the carrier again.",
+        "goneDetail_page": "Go back to the carrier's pages and open it again.",
+        "failed": "This could not be read",
+        "failed_overview": "The bulletins could not be read",
+        "failed_pages": "This carrier's pages could not be read",
+        "failed_page": "This page could not be read",
+        "failedDetail": "Try again in a moment. If it keeps failing, shadow-connector's log says why."
+      },
+      "overview": {
+        "title": "Carrier bulletins",
+        "reading": "Reading the carriers' bulletins…",
+        "empty": "No carrier has a bulletin on file",
+        "emptyMessage": "A carrier shows here once a pull stores its current bulletin.",
+        "groups": {
+          "needs": "Needs you",
+          "notSettled": "Not settled yet",
+          "settled": "Settled"
+        },
+        "headline": {
+          "needsLead_one": "One carrier",
+          "needsLead_other": "{{count}} carriers",
+          "needsAccent_one": "needs you",
+          "needsAccent_other": "need you",
+          "notSettledLead_one": "One carrier is",
+          "notSettledLead_other": "{{count}} carriers are",
+          "notSettledAccent": "not settled yet",
+          "settledLead": "Every file is",
+          "settledAccent": "read and settled"
+        },
+        "summary": {
+          "carriers_one": "{{count}} carrier",
+          "carriers_other": "{{count}} carriers",
+          "pages_one": "{{count}} page",
+          "pages_other": "{{count}} pages",
+          "needs_one": "{{count}} needs you",
+          "needs_other": "{{count}} need you",
+          "notSettled": "{{count}} not settled yet",
+          "settled": "{{count}} settled"
+        }
+      },
+      "standing": {
+        "waiting_one": "{{count}} page waiting",
+        "waiting_other": "{{count}} pages waiting",
+        "stopped": "Reading stopped",
+        "partly": "Not settled yet",
+        "unread": "Not read yet",
+        "settled": "Settled"
+      },
+      "file": {
+        "numbered": "Bulletin {{number}} · stored {{stored}}",
+        "noNumber": "No bulletin number · stored {{stored}}"
+      },
+      "split": {
+        "pages_one": "{{count}} page",
+        "pages_other": "{{count}} pages",
+        "waiting": "{{count}} waiting",
+        "noneRead": "none read yet",
+        "unread": "{{count}} not read",
+        "read": "{{count}} read, not settled",
+        "settled": "{{count}} settled",
+        "carried": "{{count}} carried from an earlier file"
+      },
+      "rules": {
+        "live_one": "{{count}} requirement live",
+        "live_other": "{{count}} requirements live",
+        "noneLive": "No requirement live",
+        "questions_one": "{{count}} open question",
+        "questions_other": "{{count}} open questions",
+        "notPlaced_one": "{{count}} duty not placed",
+        "notPlaced_other": "{{count}} duties not placed"
+      },
+      "pull": {
+        "none": "No pull on record",
+        "at": "Pulled {{when}}: {{outcome}}",
+        "outcome": {
+          "unchanged": "no change",
+          "new_bulletin": "a new file",
+          "superseded": "a new revision",
+          "completed": "pulled by hand",
+          "no_bulletin": "no bulletin found",
+          "failed": "failed"
+        }
+      },
+      "cost": {
+        "calls_one": "{{count}} call",
+        "calls_other": "{{count}} calls",
+        "tokens": "{{tokens}} tokens"
+      },
+      "reading": {
+        "never": "Never read",
+        "ok": "Read {{when}}",
+        "dry_run": "Read {{when}} without settling",
+        "failed": "Reading stopped {{when}}",
+        "running": "Reading since {{when}}",
+        "other": "Read {{when}}, {{status}}"
+      },
+      "verdictCount": {
+        "unsettled": "{{count}} unsettled",
+        "corrected": "{{count}} corrected",
+        "not_on_page": "{{count}} not on the page",
+        "duplicate_one": "{{count}} duplicate",
+        "duplicate_other": "{{count}} duplicates",
+        "confirmed": "{{count}} confirmed"
+      },
+      "pageWhen": {
+        "tried": "Tried, no answer",
+        "carried": "Carried from the {{date}} file",
+        "read": "Read {{when}}",
+        "unread": "Not read yet"
+      },
+      "stamp": {
+        "here": "Read {{when}} on this file",
+        "carried": "Carried from the {{date}} file, read {{read}}"
+      },
+      "requirement": {
+        "windowOpen": "A {{basis}} deadline",
+        "minutes_one": "{{count}} minute",
+        "minutes_other": "{{count}} minutes",
+        "businessHours_one": "{{count}} business hour",
+        "businessHours_other": "{{count}} business hours",
+        "hours_one": "{{count}} hour",
+        "hours_other": "{{count}} hours",
+        "from": "{{span}}, counted from {{anchor}}",
+        "threshold": "Threshold {{value}} {{unit}} ({{measure}})",
+        "services": "Services: {{list}}",
+        "lossTypes": "Loss types: {{list}}",
+        "propertyTypes": "Property types: {{list}}",
+        "everyJob": "Every job",
+        "settled": "In the rules:",
+        "notSettled": "Not in the rules yet: it is written into them when {{carrier}} settles.",
+        "question": "Open question",
+        "questionHow": "The strict reading runs until you answer it in the printed question list:"
+      },
+      "carrier": {
+        "back": "All carriers",
+        "reading": "Reading the carrier's pages…",
+        "onePage": "Page {{page}}",
+        "pageRange": "Pages {{from}}–{{to}} · {{count}} pages",
+        "openPage": "Open page {{page}}",
+        "waiting_one": "Page {{pages}} is waiting",
+        "waiting_other": "Pages {{pages}} are waiting",
+        "waitingDetail_one": "Claude tried it and has no answer, so {{carrier}} cannot settle. Open it to see why. A manual pull of {{carrier}} reads it again:",
+        "waitingDetail_other": "Claude tried them and has no answer, so {{carrier}} cannot settle. Open each to see why. A manual pull of {{carrier}} reads them again:",
+        "neverRead": "Claude hasn't read this file yet",
+        "neverReadDetail": "It is read on {{carrier}}'s next pull. A manual pull reads it now:",
+        "noPart": "Pages"
+      },
+      "pageRow": {
+        "page": "Page {{page}}",
+        "requirements_one": "{{count}} requirement",
+        "requirements_other": "{{count}} requirements",
+        "noRequirement": "No requirement"
+      },
+      "pageState": {
+        "settled": "Settled",
+        "read": "Read, not settled",
+        "unread": "Not read",
+        "waiting": "Waiting"
+      },
+      "page": {
+        "back": "Back to {{carrier}}'s pages",
+        "title": "Page {{page}}",
+        "titleOf": "Page {{page}} of {{count}}",
+        "beginsAfter": "begins here, after",
+        "goTo": "Page {{page}}",
+        "imageAlt": "Page {{page}} of {{carrier}}'s bulletin",
+        "imageAltPage": "Page {{page}} of the bulletin",
+        "tile": "Page {{page}}",
+        "caption": "Page {{page}} of the file stored {{stored}}",
+        "captionPage": "Page {{page}} as stored",
+        "enlarge": "Enlarge",
+        "reading": "Reading the page…",
+        "requirementsTitle": "What this page requires",
+        "nothing": "Claude found no requirement on this page",
+        "nothingMessage": "It read the page whole. Nothing on it runs.",
+        "judgedTitle": "Rules judged on this page",
+        "unread": "Claude hasn't read this page yet",
+        "unreadMessage": "It is read on {{carrier}}'s next pull. A manual pull reads it now:"
+      },
+      "verdict": {
+        "confirmed": "Confirmed",
+        "corrected": "Corrected",
+        "duplicate": "Duplicate",
+        "not_on_page": "Not on this page",
+        "unsettled": "Unsettled"
+      },
+      "judged": {
+        "fromRevision": "From revision",
+        "refused": "Claude said “{{said}}”; the house's checks refused it, so it stands unsettled.",
+        "noEntry": "Claude gave no usable answer for this rule, so it stands unsettled.",
+        "why": "Why:",
+        "sameAs": "Same as:"
+      },
+      "notPlaced": {
+        "title": "Duties not placed",
+        "why": "No key of the house's rule vocabulary names these duties, so they never run. They are kept here so they are seen.",
+        "asks": "What it asks:"
+      },
+      "failure": {
+        "title": "Entries the house's checks refused",
+        "added": "A requirement Claude added",
+        "said": "Claude said “{{said}}”.",
+        "noEntry": "Claude gave no usable answer."
+      },
+      "waiting": {
+        "failed": "Claude could not read this page",
+        "refused": "The house's checks refused Claude's answer",
+        "how": "Tried {{when}}. It waits in this file until the file or the instructions change, and no automatic pull tries it again. A manual pull of {{carrier}} reads it again and settles {{carrier}} after:"
+      }
+    },
     "errors": {
       "unreachable": "Cerberus can't be reached",
       "retry": "Try again",
