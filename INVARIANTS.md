@@ -11784,3 +11784,78 @@ measured 2026-10-22 by chain chain-queued-design-amend-withdraw-20261022-142729-
 probe-key: d9abf2728342deb01dd53c852b32c2d3c38fe1ae
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/dispatcherState.ts, /home/lyphe/.claude/hooks/dispatcher/planner_claim.py, /home/lyphe/.claude/hooks/dispatcher/planner_waiting.py, /home/lyphe/.claude/hooks/dispatcher/store.py, /home/lyphe/.claude/skills/feature/SKILL.md
+
+## INV-9451 — probe — . The standing proof cannot run on today's data, and its `RequirementWindow` verdict now false-FAILs on a healthy deadline-only or cadence-only page — the H1 cure made `cadence` a mirror member beside three optional ones, and the proof still compares for equality
+
+. The standing proof cannot run on today's data, and its `RequirementWindow` verdict now false-FAILs on a healthy deadline-only or cadence-only page — the H1 cure made `cadence` a mirror member beside three optional ones, and the proof still compares for equality
+
+```probe
+D=$(mktemp -d /tmp/athena-probe-rw2-XXXXXX) || exit 1
+cat > "$D/p.mjs" <<'JS'
+import fs from 'node:fs';
+import { curlJson, loginToken } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/whole-check-kit.mjs';
+const mirror = fs.readFileSync('/home/lyphe/.claude/claudecodeui_lyphe/src/shared/carrier-bulletins-types.ts', 'utf8');
+// the proof's own member regex and its own equality (.verify/bulletins-view.mjs `membersOf` / `sameList`)
+const body = mirror.match(/export type RequirementWindow = \{([\s\S]*?)\n\};/);
+const mirrored = body === null ? null : [...body[1].matchAll(/^ {2}(\w+)\??:/gm)].map((m) => m[1]).sort();
+console.log('RequirementWindow members as the proof reads them:', JSON.stringify(mirrored));
+const token = loginToken();
+const get = (r) => { for (let i = 0; i < 6; i++) { try { const a = curlJson('GET', `/api/carrier-bulletins${r}`, undefined, token); if (a.status === 200) return a.body; } catch (e) {} } return null; };
+const ov = get('/overview') ?? [];
+const sf = ov.find((r) => r.carrier === 'State Farm');
+const pagesOfSf = sf ? get(`/bulletins/${sf.bulletin_id}/pages`) ?? [] : [];
+const state = (n) => pagesOfSf.find((p) => p.page === n)?.state ?? 'none';
+console.log(`the proof's page pick: State Farm p13 is ${state(13)}, p22 is ${state(22)} (it exits 2 unless one is read or settled)`);
+let shown = 0;
+for (const r of ov) {
+  if (shown >= 3) break;
+  for (const p of (get(`/bulletins/${r.bulletin_id}/pages`) ?? []).filter((x) => x.state !== 'unread')) {
+    const ws = (get(`/bulletins/${r.bulletin_id}/pages/${p.page}`)?.requirements ?? []).map((q) => q.window).filter(Boolean);
+    if (ws.length === 0) continue;
+    const live = [...new Set(ws.flatMap((w) => Object.keys(w)))].sort();
+    console.log(`${r.carrier} p${p.page}: live ${JSON.stringify(live)} → "has exactly the members of RequirementWindow": ${JSON.stringify(live) === JSON.stringify(mirrored) ? 'PASS' : 'FAIL'}`);
+    if (++shown >= 3) break;
+  }
+}
+if (shown === 0) console.log('no live requirement window on any read page right now');
+JS
+(cd "$D" && timeout 200 node p.mjs)
+expect: while the defect stands, the mirror line reads ["anchor","basis","cadence","hours"] and every deadline-only page prints FAIL (and while State Farm's p13 and p22 are unread, the pick line says so); once the verdict compares optional members as a subset, no page that carries only known keys prints FAIL
+```
+
+measured 2026-10-22 by chain chain-bulletins-read-by-claude--fill-20261022-124505-62e0, finding M1, MEDIUM
+probe-key: 383215e821c4c890380f82df64a02fd15c8c755c
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/carrier-bulletins/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/bulletins-view.mjs
+
+## INV-9452 — probe — . Three rows are stale or contradict the cures
+
+. Three rows are stale or contradict the cures
+
+```probe
+cd /tmp || exit 1
+echo "MAN-8865 lines still stating window is {hours, basis, anchor}: $(docstore get MAN-8865 | python3 -c "import sys,json; print(sum(1 for l in json.load(sys.stdin)['row']['body'].split('\n') if '\`window\` is \`{ hours, basis, anchor }\`' in l))")"
+echo "MAN-8928 lines naming the left-out banner: $(docstore get MAN-8928 | python3 -c "import sys,json; print(sum(1 for l in json.load(sys.stdin)['row']['body'].split('\n') if 'left out' in l.lower() or 'X-Left-Out' in l))")"
+expect: while the rows are stale, "MAN-8865 lines still stating window is {hours, basis, anchor}: 1" and "MAN-8928 lines naming the left-out banner: 0"; healed, 0 and at least 1
+```
+
+measured 2026-10-22 by chain chain-bulletins-read-by-claude--fill-20261022-124505-62e0, finding L1, LOW
+probe-key: 6f098e7133465e04a89c24e274c2aebc9b9b00f9
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/carrier-bulletins/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/bulletins-view.mjs
+
+## INV-9453 — probe — . With every carrier left out, the overview says both "13 carriers are left out" and "No carrier has a bulletin on file"
+
+. With every carrier left out, the overview says both "13 carriers are left out" and "No carrier has a bulletin on file"
+
+```probe
+cd /home/lyphe/.claude/claudecodeui_lyphe/src/modules/carrier-bulletins || exit 1
+echo "empty-state branch: $(grep -n 'rows.length === 0' OverviewScreen.tsx | head -1 | cut -c1-90)"
+echo "empty-state words say \"none on file\" while leftOut is in scope: $(awk '/rows.length === 0/{f=1} f&&/emptyMessage/{print (/leftOut/ ? "guarded" : "not guarded"); exit}' OverviewScreen.tsx)"
+expect: while the gap stands, "not guarded"; once the empty branch says something true when carriers are left out, "guarded" (or the branch is no longer reached with leftOut non-empty)
+```
+
+measured 2026-10-22 by chain chain-bulletins-read-by-claude--fill-20261022-124505-62e0, finding L2, LOW
+probe-key: 1b5b2cadb17e992bc2916a5fc77e340789fa16ea
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/carrier-bulletins/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/bulletins-view.mjs

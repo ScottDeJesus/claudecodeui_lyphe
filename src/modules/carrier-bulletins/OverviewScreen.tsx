@@ -73,7 +73,9 @@ export function OverviewScreen({ rows, leftOut, trouble, onOpenCarrier, onRefres
   if (trouble !== null) body = <BulletinsTrouble trouble={trouble} subject="overview" onRetry={onRefresh} />;
   else if (rows === null) body = <ReadingRows />;
   else if (rows.length === 0) {
-    body = <EmptyState icon={FileText} title={t('cerberus.bulletins.overview.empty')} message={t('cerberus.bulletins.overview.emptyMessage')} />;
+    // "No carrier has a bulletin on file" is false when every carrier is left out (each has one the engine could not plan):
+    // the banner above says so, and nothing is drawn under it.
+    body = leftOut.length > 0 ? null : <EmptyState icon={FileText} title={t('cerberus.bulletins.overview.empty')} message={t('cerberus.bulletins.overview.emptyMessage')} />;
   } else {
     body = groups.map(({ group, rows: listed }) => (
       <section key={group} aria-labelledby={`${baseId}-${group}`} className="flex min-w-0 flex-col gap-2">
