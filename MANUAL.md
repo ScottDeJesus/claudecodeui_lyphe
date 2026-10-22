@@ -3301,7 +3301,7 @@ The Tours view: a DocuSketch tour's affected areas drawn on the single photo. Th
 | fact | value |
 |---|---|
 | phase | live: the Cerberus tab's fourth view, reading the lane; run whole against the live engine 2026-10-17 (`.verify/affected-areas-view.mjs`, `.verify/affected-areas-walk.mjs`) |
-| mounted | `CerberusPanel` imports the lazy `AffectedAreasView` through this module's barrel and draws it after History in the strip, only once center's overview has answered (`overview !== null`, as every view): mounted on the first show of the Tours tab (`toursShown`), `hidden` after, kept mounted while the Cerberus workspace tab stands (leaving that tab for Chat unmounts the panel and the view with it, and the tour, pano and face are lost then). why: the tour, pano, face and scroll survive a visit to Fleet (MAN-7891); the views share ONE scroller, so `CerberusPanel` keeps Tours's offset itself (`toursScrollRef`, written as Tours is left, restored as it returns) |
+| mounted | `CerberusPanel` imports the lazy `AffectedAreasView` through this module's barrel and draws it after History in the strip, only once center's overview has answered (`overview !== null`, as every view), inside a `KeptView` (MAN-8918): mounted on the first show of the Tours tab, `hidden` after, kept mounted while the Cerberus workspace tab stands (leaving that tab for Chat unmounts the panel and the view with it, and the tour, pano and face are lost then). why: the tour, pano, face and scroll survive a visit to Fleet (MAN-7891); the views share ONE scroller, so the panel's `useKeptViews` keeps Tours's offset (written as Tours is left, restored as it returns) |
 | words | `affectedAreas.*` and `cerberus.tours.{tab,tabHint}` in `src/modules/i18n/locales/en/common.json` |
 | shared types | `AffectedAreasRead<T>` (`{ value, trouble, retry }`), `PanoPress`, `TourReaderProgress`, `AffectedAreasTrouble` in `src/shared/types.ts`; the marks' `ToursScreenKey`, `RegionLayer`, `MarkWalk`, `MissedStage`: MAN-8582 |
 | shared constants | `AFFECTED_AREAS_LANE_FAULTS` (`no_secret`, `unreachable`, `unreadable`: the faults of the lane whatever was asked, each said in `affectedAreas.trouble.<fault>`) in `src/shared/constants.ts`; read by `LaneTrouble`, `ThresholdControl`, `MarkRefusal`. `MARK_NOTE_MAX` (500) beside it: MAN-8582 |
@@ -3310,7 +3310,7 @@ The Tours view: a DocuSketch tour's affected areas drawn on the single photo. Th
 | file | holds |
 |---|---|
 | `AffectedAreasView.tsx` | the root: calls every hook of the Tours screens and holds their handlers; picks the Tours screen by `tourId` / `panoId` and the surface by the switch (`activeScreen`; Mark and Tables mount on their first show, stay mounted, `hidden` while another shows). `MarkScreen` and `TablesScreen` read and press for themselves (MAN-8577) |
-| `hooks/useLaneRead.ts` | one JSON read of the lane kept for its key: `{ value, trouble, retry }` plus `reload` (quiet, keeps the value) and `replace(value, forKey)` (writes an answer that came by another road under the key it is GIVEN, and drops every read begun before it); reads when the key is set or `retry`/`reload` is called, never on a timer |
+| `@/shared/hooks/useLaneRead` | one JSON read of the lane kept for its key, shared with the Bulletins hooks (MAN-8917): `{ value, trouble, retry }` plus `reload` (quiet, keeps the value) and `replace(value, forKey)` (writes an answer that came by another road under the key it is GIVEN, and drops every read begun before it); reads when the key is set or `retry`/`reload` is called, never on a timer |
 | `hooks/useTours.ts` · `useTour.ts` · `useCodebook.ts` | the picker's list (30 newest, the search text cut at 80 characters, read once typing has rested 300 ms, and only while the view is shown; `reload` when the picker comes back) · the open tour · the codebook |
 | `hooks/usePano.ts` | the open pano, the dry run beside it (what a read would buy), and `pressRead(force)`: one armed press at a time per pano (kept in `inFlight`, so a press still out shows as busy when the person leaves the pano and comes back), its answer replaces the pano and the plan at once, under the key the press was made for and outranking any read begun before it, unless the person has gone to another pano. A pano the tour lists with no views is not read (its GET is a 404 until it is cut): its dry run cuts it, and until then the screen is handed it with no views; a cut that brings no answer is that pano's trouble, drawn as the header and a banner with Try again |
 | `hooks/useTourReader.ts` | Read the rest: the unread panos in capture order, one armed press each, after the last one answered, passing a pano whose views cannot be cut; `{ walk, start, stop }` |
@@ -3318,8 +3318,7 @@ The Tours view: a DocuSketch tour's affected areas drawn on the single photo. Th
 | `hooks/useTilePhotos.ts` | the tour screen's gallery photos: `useImageUrls` for the first `GALLERY_MAX` (24, `utils/tourModel.ts`) panos' Ahead views, and a second `useImageUrls` for the rest once the gallery's `onOverflowOpen` fires, so a 45-pano tour fetches 24 photos until "+N" is pressed, then the other 21 and none again. Nothing is fetched off the tour screen, and leaving it forgets the opened state (the gallery comes back collapsed) |
 | `hooks/useViewShown.ts` | `isInLayout(element)` (asked before a read starts), `useViewShown(ref)` (whether the view is in layout, as state) and `useWhenShown(shown, fn)` (a word when it comes back) |
 | `hooks/useMarkedRegions.ts` · `useQueue.ts` · `useProving.ts` | the pano's regions with the operator's answers laid over the read · the Mark screen's walk through a queue · the Tables' read and the kind a Set threshold answered: MAN-8582, MAN-8581 |
-| `utils/laneTrouble.ts` | a non-2xx answer or a thrown fetch as an `AffectedAreasTrouble` |
-| `ViewBoundary.tsx` | the lazy view's surround, exported by the barrel with the view: a waiting ring while its chunk loads, and a Tours-only warn banner (Reload the page) when it cannot load or crashes, so the failure never replaces the whole Cerberus tab |
+| `utils/laneTrouble.ts` | `answerOfWrite`: sends one write of the marks plan and says what came of it. A non-2xx answer or a thrown fetch becomes an `AffectedAreasTrouble` through `troubleOfResponse` / `troubleOfFailure` in `@/shared/utils`, which the reads of both lanes share (MAN-8917) |
 | `TourPicker.tsx` | search field, recent tours with a read-state badge |
 | `TourScreen.tsx` | tour header with the walk (Read the rest), then `ContextCard`, then `TourRooms`, then `RoomGallery` |
 | `TourRooms.tsx` | the tour's rooms in DocuSketch's walk order: name, floor, and who calls each affected, in words (MAN-8578) |
@@ -3405,7 +3404,7 @@ Info is the reader's word and positive the operator's; a dashed edge is anything
 - A room is affected on two authorities, both named (MAN-3035): `docusketchAffected` and `photosAffected === true`, never `regionsStanding`, which counts older damage. A `RoomEntry` is one per `(roomKey, floor)`. The words and the tone are MAN-8578.
 - Names, never ids, in any line a person reads (INV-76); a tour is named by its job's label, else DocuSketch's own name for it (`tourName`: a pre-job tour), else its address, else "Tour with no job or address"; the address stands as a line of its own whenever the name above it is not the address (`addressBesideName`).
 - A bare `YYYY-MM-DD` (date of loss) goes through `formatShortDate`, which reads it as that local day.
-- `index.ts` exports the lazy view and `ViewBoundary` (its surround) only; siblings import each other by path, never through the barrel. `ViewBoundary` is not lazy: it must be there to catch the failure of the chunk it surrounds.
+- `index.ts` exports the lazy view only; siblings import each other by path, never through the barrel. The lazy view's surround is the shared `ViewBoundary` (`src/shared/ui`, MAN-8917), which the Cerberus tab's `KeptView` draws around it.
 - `useLaneRead.replace(value, forKey)` takes the key its answer is for, never the render's own: a press made while the tour still listed the pano uncut has a null key in its render. It outranks every read begun before it (`replacedRef`). why: without both, a pano GET answering with the pre-press detail landed over the press's pano and left the faces unread.
 - A refusal of one pano alone is passed by the walk, not a stop: `PER_PANO_REFUSALS` in `useTourReader.ts` holds only `views_refused`, as the engine's walker does (MAN-8576).
 - An object URL is revoked with the record that names it (`useImageUrls` clears its record in the effect's cleanup). why: a list that comes back (the tour screen after a pano) would find its own old key and hand `<img>` revoked URLs: eight `ERR_FILE_NOT_FOUND` errors in the viewer run of 2026-10-17.
@@ -4106,3 +4105,26 @@ The reader of `X-Left-Out` is the Bulletins view, from the overview response (`r
 - One Tours image through the Tours lane before and after the `Accept` change: identical bytes (its sha256 equals its id).
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/carrier-bulletins/carrier-bulletins.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/carrier-bulletins/carrier-bulletins.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/carrier-bulletins/index.ts
+
+## MAN-8917 — Shared by the Tours and Bulletins views — ViewBoundary (src/shared/ui) and useLaneRead (src/shared/hooks): where they live, who uses them
+
+Two pieces the Tours view (`src/modules/affected-areas`, MAN-8575) and the Bulletins view (`src/modules/carrier-bulletins`, MAN-8880) both stand on, each moved to `src/shared` when its second feature module came, as the frontend module standard places a UI component or a hook two feature modules use. Both moves were pure: no behaviour changed, and Tours' words are the ones it said before.
+
+| piece | where | who uses it | what it is |
+|---|---|---|---|
+| `ViewBoundary` | `src/shared/ui/ViewBoundary.tsx`, exported by the `@/shared/ui` barrel | the Cerberus tab's `KeptView` (`src/modules/cerberus/KeptView.tsx`), around `AffectedAreasView` and `BulletinsView` | a lazy view's own surround: a waiting ring while its chunk loads and, when the chunk cannot load or the view crashes while drawing, one warn banner in place of that view alone, so the failure never climbs to the app's tab-level boundary and replaces the whole Cerberus tab |
+| `useLaneRead` | `src/shared/hooks/useLaneRead.ts` | the Tours hooks (`useTours`, `useTour`, `useCodebook`, `usePano`, `useQueue`, `useProving`) and the Bulletins hooks (`useOverview`, `useBulletinPages`, `usePageReading`) | one JSON read of a shadow-connector lane kept for its key: `{ value, trouble, retry }` plus `reload` (quiet, keeps the value) and `replace(value, forKey)` (writes an answer that came by another road under the key it is GIVEN, and drops every read begun before it); it reads when the key is set or `retry`/`reload` is called, never on a timer |
+
+`useLaneRead` turns a fault into an `AffectedAreasTrouble` through `troubleOfResponse` and `troubleOfFailure` in `src/shared/utils.ts` (group "A LANE READ THAT BROUGHT NO ANSWER"); the Tours presses' `answerOfWrite` (`src/modules/affected-areas/utils/laneTrouble.ts`) reads a fault through the same two.
+
+## `ViewBoundary` — the name and the words
+- `<ViewBoundary view={label}>`: `view` is the name of the view it surrounds, as its tab names it ("Tours", "Bulletins"). The words are `viewBoundary.*` in `common.json`, each taking `{{view}}`: `loading` "Loading {{view}}…", `failed` "{{view}} could not be shown", `failedDetail` "The rest of Cerberus is not affected. Reloading the page usually brings {{view}} back.", `reload` "Reload the page". For Tours they read as they did before the move, which `.verify/bulletins-view.mjs` shows with each chunk refused.
+- The banner offers a reload of the page, not a retry: a `lazy` import that failed stays failed until the page loads again, so a retry button would answer nothing.
+- It imports `Banner`, `Button` and `Spinner` by their own files, not through the `@/shared/ui` barrel that exports it.
+- It is not lazy: it must be there to catch the failure of the chunk it surrounds.
+
+## Rules
+- A fault that is a lane's (`no_secret`, `unreachable`, `unreadable`, `gone`, `failed`) is told by `troubleOfResponse` / `troubleOfFailure`; a module does not tell its own.
+- `useLaneRead`'s `fetchFor` must be the same function on every render (a module-level one): it is in the effect's dependencies, so a new one each render would read again each render. A null key reads nothing.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/useLaneRead.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/ViewBoundary.tsx
