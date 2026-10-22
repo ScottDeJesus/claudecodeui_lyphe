@@ -9,21 +9,20 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/docs/
 ## MAN-460 — The account switcher
 section: accounts/000
 
-The foot of the sidebar: which Claude account signs the next request, how much of its windows that
-account has spent, what is left on the DeepSeek account this host's builds spend, and the two writes
-that change the first of those. `src/modules/accounts/` is `AccountPopover` (with `UsageMeters`, its
-own `AccountRow`, and `DeepseekBalanceReadout`) under the one `AccountFooterRow` its barrel exports,
-with `hooks/useClaudeAccounts` holding the picture (`data`, and the door's own under `door`) and the
-writes (`switchTo`, `capture`, and the door's `chooseAccount` / `setAuto` / `removeAccount`),
+The foot of the sidebar: which Claude account signs the next request, how much of its windows that account has spent, what is left on the DeepSeek account this host's builds spend, and the three
+writes that change the first of those. `src/modules/accounts/` is `AccountPopover` (with `UsageMeters`,
+`ClaudeAccountRows`, and `DeepseekBalanceReadout`) under the one `AccountFooterRow` its barrel exports,
+with `hooks/useClaudeAccounts` holding the picture (`data`: the door's own, tagged `reachable`) and the
+writes (`chooseAccount` / `setAuto` / `removeAccount`),
 `hooks/useAccountSetup` holding the account the Set up window signs in, `hooks/useClaudeUsage`
 holding the readings, `hooks/useDeepseekBalance` holding the balance, `utils/accountInUseUsage`
 choosing which account the meters draw (MAN-8862), and `utils/accountInitials` drawing the
-two letters on the avatar. `ClaudeAccountRows` (MAN-8847) is the account section above the slot
-switcher. Everything but the balance comes from this app's own server, in
-`server/modules/accounts/`: `accounts.routes.ts` holds the routes (the slot switcher's four, and the door's
-picture under `door` on `GET /api/accounts` with `POST /api/accounts/use|auto|remove`, MAN-8858) and the calm 200,
-`usage.service.ts` the reading and its cache, `account-store.service.ts` the slots (under
-`CLOUDCLI_ACCOUNTS_ROOT`, default `~/.cloudcli/accounts`). `server/index.ts` mounts them at `/api`
+two letters on the avatar. `ClaudeAccountRows` (MAN-8847) is the account section. Everything but the
+balance comes from this app's own server, in `server/modules/accounts/`: `accounts.routes.ts` holds the
+routes (the door's picture at the top of `GET /api/accounts`, `GET /api/usage`, and
+`POST /api/accounts/use|auto|remove`, MAN-8858) and the calm 200, `usage.service.ts` the reading and its
+cache, `account-identity.service.ts` the live login's email (the one account read the server keeps
+besides the meter). `server/index.ts` mounts them at `/api`
 behind `authenticateToken`, applied by PREFIX — the comment at the mount says why a list of paths is
 not enough. What the client must do with what they answer is §"The rules that bite" below. The
 balance does not come from there, and its own server half is MAN-511.
@@ -49,7 +48,7 @@ section: accounts/001 The nine rules the server half keeps
 
 These are the lane's own rules — what the server may answer and what it may never claim. They came
 over with the routes when the lane moved in-house, and they are kept because the CLIENT is built on
-them: the panel's branches on `reachable`, on `unreadable` and on a window's `percent` were not
+them: the panel's branches on `reachable` and on a window's `percent` were not
 touched, so the answers may not change underneath it. What each answer looks like on screen is
 §"The rules that bite" below; the two sets are about different halves and neither restates the other.
 
@@ -57,23 +56,23 @@ touched, so the answers may not change underneath it. What each answer looks lik
    with a ONE-WORD reason — never a 5xx, never a 503. An outage used to be a remote that stopped
    answering; there is no remote now, so a read that cannot be computed still answers 200 and says
    so, and the panel draws its calm unknown rather than an error wall. A picture is whole or it is
-   none: `stateSummary()` answering `null` is the *unreadable* branch (`slots: []`, every label
-   `null`, `unreadable: true`), which is a different answer from `{ reachable: false }`.
-2. **A write's verdict is its own body.** A refusal answers `{ error: "<words>" }` with the store's
-   422, carrying the store's own plain English — the most useful thing an operator can be handed —
+   none: a door that cannot answer is `{ reachable: false, reason }` (MAN-8858).
+2. **A write's verdict is its own body.** A refusal answers `{ error: "<words>" }` with the door's
+   422, carrying the door's own plain English — the most useful thing an operator can be handed —
    and never the global handler's nested shape. A genuine fault on a WRITE goes to `next`: unlike
    the reads, a write that did not happen must not read as one that did.
-3. **Unknown is `null`, never `0`.** `percent`, `expiresAt`, `liveExpiresAt`, `staleSince` and
-   `resetsAt` stay null when there is none; a `0` is a reading and says so. Units differ and are not
-   converted: `expiresAt`/`liveExpiresAt` are epoch MILLISECONDS, `checkedAt`/`staleSince` epoch
-   SECONDS, `resetsAt` an ISO-8601 string.
+3. **Unknown is `null`, never `0`.** `percent`, `staleSince`, `resetsAt`, an account's `expires_at`
+   and its `reading.five` / `reading.week` stay null when there is none; a `0` is a reading and says
+   so. Units differ and are not converted: the door's times (`expires_at`, `reading.at`,
+   `last_switch.at`) and the meter's `checkedAt` / `staleSince` are epoch SECONDS, `resetsAt` an
+   ISO-8601 string, and `reading.five` / `reading.week` fractions 0..1.
 4. **`rolled: true` is not zero.** The percent is real but historical, its window since ended, and it
    survives intact — `markRolled` (`usage-windows.ts`) decides it from the window's own stamp, taking
    an offset-less stamp as UTC, the same rule the client's countdown applies.
 5. **`severity` is present only when the vendor flagged that window.** Its mere PRESENCE is the
    signal, and it may ESCALATE a meter's tone, never soften it.
-6. **Three answers are neither a picture nor a failure**, all arriving `reachable: true` with nobody's
-   word but the reading's: `unreadable: true` (the store would not read), `windows: []` with
+6. **Two answers are neither a picture nor a failure**, both arriving `reachable: true` with nobody's
+   word but the reading's: `windows: []` with
    `reason: 'pending'` (a poll in flight — reading, not broken), and `windows: []` with
    `degraded: true` (no figures under this account, but an older reading survives). `reason` is ours
    when `reachable` is false, and never a vendor's claim when it is true.
@@ -84,28 +83,22 @@ touched, so the answers may not change underneath it. What each answer looks lik
    following a redirect (`redirect: 'manual'`, so a 3xx is read and never chased — a
    redirect-following fetch copies its headers onto the next hop). An expired token, a 401 or a dead
    network keeps the last good number on screen with `degraded: true` and `staleSince`, and
-   SURRENDERS it the moment the credential stamp moves. The account store beside it takes the
-   opposite stance — the credential BYTES are copies, never readings.
-8. **The store's three rules, all load-bearing.** CAPTURE-FIRST: `install()` files the live pair
-   under the slug of the live file's OWN identity before a byte moves, so the login being replaced is
-   saved first. DRIFT IS A FULL-EMAIL COMPARE against the ACTIVE SLOT's stored identity and never one
-   re-derived from a slug, and unprovable drift reads FALSE — an alarm that fires on every poll is
-   worse than a missed one. THE CREDENTIAL BYTES ARE COPIES, NEVER READINGS: the pair is copied
-   file-to-file, and the one value ever read out of a credentials file is `claudeAiOauth.expiresAt`,
-   a freshness clock and not a secret. Every write is temp-file-then-rename (the server is one JS
-   thread, so the staging order is the lock), slots are `0700` and files `0600`, and
-   `CLOUDCLI_ACCOUNTS_ROOT` is read at CALL time so a probe gets the scratch root it set — while the
-   live pair is deliberately NOT redirectable, since a variable that moved it could swap a login
-   nobody named.
-9. **Nothing in this lane is callable by an agent.** The four routes sit behind `authenticateToken`
-   on the app's own mount, and no MCP verb, no dispatch path and no board tool reaches them: a
-   switch or a capture is a person pressing a row. The same fence over the memory lane's own two
-   verbs is MAN-606.
+   SURRENDERS it the moment the credential stamp moves.
+8. **The identity read opens no credential file.** `account-identity.service.ts` returns
+   `oauthAccount.emailAddress` from `~/.claude.json` and nothing else — cached against the file's stat
+   key, an absent or malformed file is `null` — and copies, swaps and writes nothing: the account in
+   use is the token switch's (`~/.claude/scripts/claude-account`). The meter's credentials path
+   (`usage.service.ts`) is deliberately NOT environment-redirectable, since a variable that moved it
+   could meter an account nobody named.
+9. **Nothing in this lane is callable by an agent.** The five routes (`GET /api/accounts`,
+   `GET /api/usage`, `POST /api/accounts/use|auto|remove`) sit behind `authenticateToken` on the
+   app's own mount, and no MCP verb, no dispatch path and no board tool reaches them: a choice is a
+   person pressing a row. The same fence over the memory lane's own two verbs is MAN-606.
 
 ## MAN-462 — What the footer row says
 section: accounts/002 What the footer row says
 
-The label is the account in use as the door marks it (`in_use`: the chosen account with a checked token, else the live login), as its slug; the saved slot's label stands in until the door's first picture lands or when the door cannot answer (MAN-8847). The avatar's initials come from the local part of that label and nothing else — everyone here
+The label is the account in use as the door marks it (`in_use`: the chosen account with a checked token, else the live login), as its slug; with no account marked (before the door's first picture lands, when the door cannot answer, or when the door marks none) the label is `—` (MAN-8847). The avatar's initials come from the local part of that label and nothing else — everyone here
 shares a domain, so a domain letter hides identity rather than carrying it. The label sits beside
 it, truncated, with the full label in a `title`. Under the label are the two windows worth a
 glance, as inline `Meter`s, drawn from the account in use's figures (`accountInUseUsage`, MAN-8862), never from another login's: the `five_hour` and `seven_day` windows, each labelled with its reset
@@ -127,15 +120,14 @@ there is no room for.
 section: accounts/003 What the panel says
 
 A `Card` with `role="dialog"`, anchored `bottom-full` above the row, capped at `70vh` and scrolling
-from a top edge the reader can see. Usage first, the DeepSeek balance under it, the switcher below
-both.
+from a top edge the reader can see. Usage first, the DeepSeek balance under it, the account section
+below both, `↻ Re-login` last.
 
 | The server answered | The panel draws |
 |---|---|
-| a picture with slots | the meters (the account in use's, MAN-8862), the balances, the account section (`ClaudeAccountRows`, MAN-8847), `Switch account · N`, the date line, one row per slot, `↻ Re-login` |
-| `unreadable: true` | the count reads `0` and no rows follow, under *The saved accounts could not be read — none can be listed.* — said in words, because an empty switcher otherwise reads as "you have no accounts" |
-| `reachable: false` | *The server could not read accounts or usage — both are unknown.* in place of the meters, the count as an em-dash, no rows and no `↻ Re-login` |
-| nothing yet | the meters draw an em-dash and the count reads `—`; the first reading normally lands before anyone opens the panel |
+| `reachable: true` | the meters (the account in use's, MAN-8862), the balances, the account section (`ClaudeAccountRows`, MAN-8847), `↻ Re-login` |
+| `reachable: false` | *The server could not read accounts or usage — both are unknown.* in place of the meters; the account section's own calm line *The server could not read the accounts — which ones can sign in is unknown.*; `↻ Re-login` stays |
+| nothing yet | the meters draw an em-dash and the account section renders nothing; the first reading normally lands before anyone opens the panel |
 
 The balance block renders in EVERY one of those rows, including `reachable: false` — it is drawn
 from a different origin, so it stands where the meters cannot. It is
@@ -152,29 +144,14 @@ It is deliberately NOT a `Meter`. Every other reading on this surface is a share
 so a bar over money would have to invent the ceiling it is measured against. It is a component of its
 own for exactly that reason: `UsageMeters` draws windows, and this is not one.
 
-Every non-active slot is one button carrying its slug — the whole row, since there is no second
-control on it to nest. The account in use is not a button at all: it carries a `✓` glyph, its own
-tint, and `in use now · N sessions running` (or `· none proven running`, which is a fact the row
-states and never a gate). The route always states `0` sessions — this server has no session registry
-to count (`LIVE_SESSIONS_UNKNOWN` in `accounts.routes.ts`) — so today the row always reads `none
-proven running`. Under every other row is `Saved copy expires`/`expired <local date>`, and `—` where
-the store never read one.
+The account section (rows, candidates, the automatic switch, the last switch, the closing sentence
+*Switching changes which account new chats and plan runs start on. …*) is MAN-8847; its closing
+sentence draws only with at least one account. Under it `↻ Re-login` is always drawn: it opens the
+provider's login window and nothing else (MAN-465), and a refused write's warn banner follows it.
+Codex is deliberately absent; these are the Claude accounts the door holds, and Codex stays in
+Settings → Agents.
 
-Under that, every row — active or not — carries its own weekly-quota reset line when one is
-configured: `Weekly · Fri 2:00 PM · 2d 21h 14m`. It is not read from anywhere — a docked slot's
-credentials are a snapshot whose access token has already expired, so there is no live quota to
-poll — it is computed from the operator's own `VITE_ACCOUNT_WEEKLY_RESETS`, comma-separated
-`<slot slug>=<Weekday>@<HH:MM>` entries (`work=Friday@14:00,home=Tuesday@00:00`), anchored as
-wall-clock time in `VITE_ACCOUNT_RESET_ZONE` (an IANA name; unset defaults to the reader's own
-zone). A slug with no entry draws no line at all (`src/modules/accounts/utils/weeklyReset.ts`).
-
-Two closing lines render only where there is something to switch between: the date line above the
-rows, and the reassurance below them — *Switching changes only which account signs the requests.
-Your projects, conversations and running work stay exactly as they are — open conversations keep
-their history and resume on the new account.* Codex is deliberately absent; these are the Claude
-slots the store holds, and Codex stays in Settings → Agents.
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/utils/weeklyReset.ts
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/AccountPopover.tsx
 
 ## MAN-464 — The usage meters
 section: accounts/004 The usage meters
@@ -228,63 +205,31 @@ argument (`'meter'` here); a chat's own `rate_limit_event` files through the sam
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/account-digest.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/pacer-door.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/usage.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/usage-windows.ts
 
-## MAN-465 — The two writes
+## MAN-465 — The writes — the door's acts and the sign-in windows
 section: accounts/005 The two writes
 
-**Switching.** A row press sends its slug and, on the server's yes, raises a positive toast: title
-`Switched to <label>`, message *Running conversations finish on the account they started with. New
-messages use \<label\>.* That is the honest sentence rather than the comfortable one — the swap is
-whole-box, and a session already running keeps the tokens it holds in memory. On the server's no,
-the panel shows a warn `Banner` carrying **the store's own words** whenever it sent any; only a
-`{reachable:false, reason}` is translated here (*The server did not answer in time.*, *The server
-answered with something this app could not read.*, *The server is not reachable.*).
+**The door's acts.** `Use`, the automatic switch and `Remove` on the account section (MAN-8847) are `chooseAccount`, `setAuto` and `removeAccount` in `useClaudeAccounts`, over `api.accounts.use|auto|remove` (MAN-8858), all through `doorWrite`. They share one single-writer guard and `busy`, clear the banner when they start, and re-read the picture when they land. A 422 shows the door's own `{error}` sentence in the warn banner; a non-JSON or failed answer reads `The server is not reachable.`; only a `{reachable:false, reason}` body is translated here (*The server did not answer in time.*, *The server answered with something this app could not read.*, *The server is not reachable.*). No toast is raised for them. The door's `use` and `remove` kick the dispatcher themselves (INV-187); the routes send none.
 
-**Capturing.** `↻ Re-login` is the panel's one sign-in door, and it is how another account is added: sign
-in with that account's email and it is saved as its own account and made active. It runs one flow,
-`useReloginCapture`, which reads the live login, saves it *before* the CLI can replace it, and opens `ProviderLoginModal` — drawn on
-`document.body`, so it covers the whole app on a desk (centred) and is the whole screen on a phone,
-never the side panel (the sidebar's root carries a `backdrop-filter`, which is what `position: fixed`
-would otherwise be laid out against). `claude /login` signs in and then stays in its prompt, so the
-window is closed with ✕ and the command's exit code never arrives; the flow reads the live login again,
-once, as the window closes, and captures it when it **changed** while the window was open — a different
-email, or a new token for the same one. The capture files the login under its own email's slot and marks
-that slot in use, so the switcher shows the account just signed in at once. A window closed without
-signing in captures nothing. A store that could not be read as the window opened or closed cannot prove a change, so nothing is
-captured and a warn toast says the sign-in was not compared. While the flow works, the panel's rows and buttons wait (its `busy`). Settings → Agents → Claude → Re-login runs the same flow, and tells the row to re-read.
-Each capture raises `Saved <label>` (or *Saved the login that is live now* when the reply named no slug)
-with the message *It is now the account in use.*: the capture is not a snapshot only, it also
-re-points the active account at whatever it just saved (`accounts.routes.ts`). A refusal from the
-re-login's captures is a warn toast with the store's own words (`Could not save <email>`), since the
-re-login has no panel to put a banner in; `Save it` below keeps the panel's banner.
+**Re-login.** `↻ Re-login` is the panel's one sign-in door, always drawn, and it opens `ProviderLoginModal` on the provider's `claude /login` — drawn on `document.body`, so it covers the whole app on a desk (centred) and is the whole screen on a phone, never the side panel (the sidebar's root carries a `backdrop-filter`, which is what `position: fixed` would otherwise be laid out against). It reads nothing before the window opens and files nothing when it closes: the token switch owns the account, and a sign-in changes none the door holds. `claude /login` stays in its prompt after signing in, so the window is closed with ✕ and the command's exit code never arrives; closing it calls `announceAccountsChanged()` and the row's one poller re-reads at once. A new live identity then appears as a `Set up` row (MAN-8847); a window closed without signing in changes nothing, and the re-read is harmless. Settings → Agents → Claude → Re-login opens the same window and announces the same way, for the Claude account flow only — another provider's login and the design authorization announce nothing.
 
-**The door's acts.** `Use`, the automatic switch and `Remove` on the account section (MAN-8847) are `chooseAccount`, `setAuto` and `removeAccount` in `useClaudeAccounts`, over `api.accounts.use|auto|remove` (MAN-8858). They share the switch's single-writer guard and `busy`, clear the banner when they start, and re-read the picture when they land. A 422 shows the door's own `{error}` sentence in the warn banner; a non-JSON or failed answer reads `The server is not reachable.` No toast is raised for them. **Set up** is not a write from this app: the row opens a `ProviderLoginModal` on `claude-account setup-token <slug>`, the door saves the token itself, and closing the window re-reads the picture.
+**Set up.** Not a write from this app: the row opens a `ProviderLoginModal` on `claude-account setup-token <slug>`, the door saves the token itself, and closing the window (`useAccountSetup.closeSetup`) re-reads the picture.
 
-**Drift.** When the picture reports the live login differs from its saved copy, a warn `Banner` names
-both — the one in use and the one *Save it* would adopt — and `Save it` is the same capture.
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/AccountFooterRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/hooks/useClaudeAccounts.ts
 
 ## MAN-466 — The rules that bite
 section: accounts/006 The rules that bite
 
-1. **The date on a row is the age of a saved copy, and never an alarm.** The account store calls
-   `expiresAt` "a freshness clock, not a secret" (`account-store.service.ts`, rule 3 of its header)
-   — the provider's expiry inside the COPY it holds, read from that slot's own file — and nothing in
-   the switcher raises a warning from it. A docked slot's stamp is normally in the past, and is in the FUTURE for
-   hours after a switch, because `install()` snapshots the OUTGOING login into its own slot before
-   copying the target over live. So there is no "sign in again" line and no inline sign-in button
-   here: an alarm that is always on is not an alarm. The panel states what the date IS, once, above
-   the rows — where it has to be, since every row below carries the phrase it disarms.
+1. **Unknown is an em-dash, never zero.** `percent: null`, an absent picture, a balance the server
+   could not read: each draws `—`. A `0` is a reading and says so. A bar at zero, a footer reading
+   `0%`, or a `$0.00` where nothing was measured, would claim something the app does not know — and
+   on the money line it would claim the account is empty.
 
-2. **Unknown is an em-dash, never zero.** `percent: null`, a missing `expiresAt`, an absent picture,
-   a balance the server could not read: each draws `—`. A `0` is a reading and says so. A bar at
-   zero, a footer reading `0%`, or a `$0.00` where nothing was measured, would claim something the
-   app does not know — and on the money line it would claim the account is empty.
-
-3. **Warn is a floor, never a ceiling.** `severity` is present only when the vendor flagged that
+2. **Warn is a floor, never a ceiling.** `severity` is present only when the vendor flagged that
    window, so its presence alone forces amber; the 80 % threshold can only add to it. The percent is
    rounded ONCE, and the figure, the tone, the fill and `aria-valuenow` all read that one integer —
    a raw 79.6 used to print "80% used" over a calm green bar.
 
-4. **Escape marks the event; it does not stop it.** The panel closes on a window-level CAPTURE
+3. **Escape marks the event; it does not stop it.** The panel closes on a window-level CAPTURE
    listener that calls `preventDefault()` and nothing else. `ChatInterface` aborts a running turn
    from a document-level capture listener gated on `defaultPrevented`, and window-capture runs
    first — so closing this panel mid-run no longer kills the run. `stopPropagation()` is
@@ -292,40 +237,30 @@ section: accounts/006 The rules that bite
    stopping the key at the earliest point took it away from the very thing the reader was looking
    at. The shared `Dialog` does stop it, because a modal has nothing in front of it.
 
-5. **A switch is unguarded by a dialog; a second write is not.** The soft gate is the fact on the
-   row — *in use now · none proven running*, the only count the server can state — rather than a
-   modal. What is refused is a write while
-   one is in flight, read from a ref rather than from `busy`, since a render value lands too late to
-   stop a second press in the same tick. The slot switch, the capture and the door's three acts
-(`chooseAccount`, `setAuto`, `removeAccount`, through `doorWrite`) share that one guard. The re-login flow (`useReloginCapture`) holds a ref of its
-   own over its reads and captures and lends its `busy` to the panel, so Re-login, the rows and Save it
-   all wait while it works.
+4. **A door write is unguarded by a dialog; a second write is not.** The soft gate is the fact on
+   the row — *✓ in use now*, and the `no room now —` caveat on a held account (MAN-8847) — rather
+   than a modal. What is refused is a write while one is in flight, read from a ref rather than from
+   `busy`, since a render value lands too late to stop a second press in the same tick. The door's
+   three acts (`chooseAccount`, `setAuto`, `removeAccount`, through `doorWrite`) share that one guard.
 
-6. **A capture is never free at the far end.** It rewrites both slot files and moves the active
-   mark, so the capture at the close of the login window is gated on the live login having CHANGED
-   while the window was open — a different email, or a new token for the same one — read once at
-   each end by `useReloginCapture`. `claude /login` stays at its prompt and never exits, so the
-   operator closes the window and the live login is the only evidence of a sign-in. A
-   window opened and closed without signing in leaves the store untouched. A store that cannot be
-   read at either end cannot prove a change, so nothing is captured and a warn toast says the
-   sign-in was not compared.
-
-7. **A refusal describes one attempt.** The inline banner clears when the next write starts and when
+5. **A refusal describes one attempt.** The inline banner clears when the next write starts and when
    the panel closes; one left standing would greet the next person who opens it.
 
-8. **The floors are 60 s, 180 s and five, and opening the panel is worth two readings.** The picture
+6. **The floors are 60 s, 180 s and five, and opening the panel is worth two readings.** The picture
    is re-read every minute, and usage and the balance every three, because both move slowly — usage
    comes through the server's own three-minute cache (`HEALTHY_TTL_MS` in `usage.service.ts`), and
    money moves on the scale of a build. `togglePanel` forces
    a fresh reading of BOTH on open — on open only, so a close costs nothing — so what a person looks
-   at is current without paying for it every minute. A change of the account in use reads usage once more (`AccountFooterRow`'s effect on `picture.active`): a switch, a re-login or a capture would otherwise leave the last account's figures under the new name until the next tick, and the server's cache misses on the swap, so that reading is the new account's own. The first account seen is the mount's reading already, so only a change reads. The balance is the one a person would otherwise
+   at is current without paying for it every minute. A change of the account in use reads usage once more (`AccountFooterRow`'s effect on `accountInUse(accounts)?.digest`): a choice would otherwise leave the last account's figures under the new name until the next tick, and the server's cache misses when the box's own login moves (`usage.service.ts`), so that reading is the new account's own. The first account seen is the mount's reading already, so only a change reads. The balance is the one a person would otherwise
    check twice by hand: a figure that only moves on a timer reads as stale the moment it is the
    number you opened the panel for. It also carries a five-second floor of its own
    (`useDeepseekBalance`), because the row is a button pressed while thinking and each press would
    otherwise spend a vendor call; a skipped read is not invisible, since the age line under the
 figure says when the figure was taken.
 
-9. **Neither dismissal fires while a sign-in window is up; a press in a menu is not outside.** The outside-pointer and Escape listeners in `AccountFooterRow` attach only while `open && !loginOpen && setup === null`. The Re-login window and the account's Set up window are drawn on `document.body`, outside the panel's root, so every press in them would read as outside and an Escape meant for the terminal would close the panel behind it. A third sign-in overlay extends that one condition. A `pointerdown` whose target is inside `[role="menu"]` is the panel's own surface — `ActionMenu` portals the row menu to `body`, so without the exemption `Remove` closes the panel before its press lands. Closing the Set up window announces `cloudcli:accounts-changed` (`announceAccountsChanged`), and the row's one poller re-reads at once.
+7. **Neither dismissal fires while a sign-in window is up; a press in a menu is not outside.** The outside-pointer and Escape listeners in `AccountFooterRow` attach only while `open && !loginOpen && setup === null`. The Re-login window and the account's Set up window are drawn on `document.body`, outside the panel's root, so every press in them would read as outside and an Escape meant for the terminal would close the panel behind it. A third sign-in overlay extends that one condition. A `pointerdown` whose target is inside `[role="menu"]` is the panel's own surface — `ActionMenu` portals the row menu to `body`, so without the exemption `Remove` closes the panel before its press lands. Closing either window announces `cloudcli:accounts-changed` (`announceAccountsChanged`), and the row's one poller re-reads at once.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/AccountFooterRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/AccountPopover.tsx
 
 ## MAN-467 — What is left standing
 section: accounts/007 What is left standing
@@ -345,10 +280,10 @@ section: accounts/007 What is left standing
   event. Measured, and the lesser of the two costs.
 - **The avatar hue is positional.** The footer always draws hue 0 and the panel indexes by row, so
   the same account can carry one colour in the footer and another in the list.
-- **The panel scrolls to its action.** Usage renders above the switcher by the plan's own step
+- **The panel scrolls to its action.** Usage renders above the account section by the plan's own step
   order, and the panel grows upward into the space above the row, so `↻ Re-login` sits at the foot of
-  a panel that scrolls. `relogin-window.mjs` (MAN-8057) opens it at 1440 × 900 and at 390 × 844, in
-  both themes, and photographs it scrolled to that foot; it asserts the button is there, not that it
+  a panel that scrolls. `panel-fill.mjs` (MAN-8847) opens it at 1440 × 900 and at 390 × 844, in
+  both themes, and photographs its top, its rows and its foot; it asserts the button is there, not that it
   is on screen without scrolling.
 - **Two live addresses draw the same `SD`.** A property of the addresses, not of the rule; the
   mitigations are the per-row hue and the full address in a `title` on every label.
@@ -367,59 +302,20 @@ section: accounts/007 What is left standing
 ## MAN-468 — Proving it
 section: accounts/008 Proving it
 
-`node .verify/relogin-window.mjs` is the one browser script this lane has. It measures the sign-in
-window and what closing it does — the scenarios, the stubs and the last run are MAN-8057. It answers
-every `/api/accounts*` request itself and the window's `/shell` socket locally, so the operator's
-live login is never touched.
+`node .verify/panel-fill.mjs` is the browser script this lane has: the wired panel and the closed row
+against the dev client, with `/api/accounts` and `/api/usage` answered by `page.route`, and the real
+Set up sign-in window. Its scenarios, stubs and last run are MAN-8847 §"Proving a state". No door
+write is ever sent, so the operator's live login and account choice are never touched; a gate for a
+write stubs it the way that script does.
 
-**No standing gate reads the rest of the screen.** The panel's rows and tick, the meters' figures
-(`percent: 0`, a null, a rolled window, a flagged one, a degraded reading), the four shapes of expiry,
-the drift banner, the collapsed rail's avatar, and Escape leaving a running turn alone (the abort
-gate, rule 4 of MAN-466) are each proved only by driving the dev client with `/api/accounts` and
-`/api/usage` answered by `page.route`. A gate for them never presses the Switch of another slot or
-*Save it* against the live store — either swaps the operator's whole live login mid-run — and stubs
-every accounts write the way `relogin-window.mjs` does.
-
-**The balance line has no gate either.** Its own procedure — the route with a real token, the unknown
+**The balance line has no gate.** Its own procedure — the route with a real token, the unknown
 exercised by BOOTING from a keyless `.env`, and the vendor-body table against a local fake — is
 MAN-522, and it is written out there rather than pinned as a script. Note also that opening this
 panel is an outbound vendor call from the server: a probe that needs the figure to be a known value
 answers `/api/deepseek/balance` with `page.route`, never api.deepseek.com, which no browser-context
 stub can reach. See MAN-670.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/relogin-window.mjs
-
-## MAN-8057 — Proving the re-login window
-section: accounts/009 Proving the re-login window
-
-`node .verify/relogin-window.mjs [before|after]` — headless Chromium against the dev client, signed in as the dev account `verve`.
-The label names the shots: `.verify/shots/relogin-<label>-<desktop|phone>-<panel|window|signed>-<dark|light>.png`
-(plus `relogin-<label>-desktop-settings-window-light.png`).
-
-| Fact | Value |
-| --- | --- |
-| Live login | untouched: every `/api/accounts*` request is answered by the script from state it holds; writes are recorded, never sent. Settings' read of Claude's auth status (`GET /api/providers/claude/auth/status`) is answered from the same held login, so the one live login has the two readers it has on the box |
-| Terminal | `/shell` socket answered locally; no `claude /login` process starts |
-| Viewports | desktop 1440×900, phone 390×844, each dark and light |
-| Last run | 2026-10-08: 82 checks pass, 0 console errors in all four scenarios, 0 stray or switch requests |
-| Not proven | a real `claude /login` changing the live email or token expiry; the onboarding window (first run only) |
-
-| Scenario | Gate |
-| --- | --- |
-| PANEL | the panel's only button besides the account rows is `↻ Re-login`, and its text says nothing about adding an account; shot scrolled to the panel's foot |
-| WINDOW | press Re-login: backdrop equals the viewport box; panel centred on desk, whole screen on phone |
-| CLOSED | ✕ without signing in: 0 captures sent, switcher stays on the old email |
-| SIGNED | different email signed in, then ✕: exactly 1 capture, row and panel show the new email in use |
-| SAME (desktop, light) | new token for the same account: 1 capture, switcher unchanged |
-| SETTINGS (desktop, light) | Settings → Agents → Claude → Re-login ends the same way. Its "Logged in as" line names the old email at open and after a window closed without signing in; with the window still open after a sign-in it has not moved; on ✕ it names the new email with Settings never reopened, from exactly one auth-status read. The design authorization writes nothing and re-reads nothing |
-| SERVER (desktop, light) | read-only, against the REAL server: its Claude auth status email equals the accounts picture's live label (the address is not printed); skipped when the live login is not a signed-in credentials file with a known identity |
-| Refusal | a refused capture raises the `Could not save <email>` warn toast |
-| Unreadable store at open | nothing captured at close |
-| Keys | a click inside the window and Escape leave the window open; the panel still works after it closes |
-
-The `before` run, taken ahead of the change, measured the window at 0,0 328×900 (desk) and 331×844 (phone): the sidebar's size.
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/relogin-window.mjs
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/panel-fill.mjs
 
 ## MAN-469 — The API tab
 section: api-tab/000
@@ -2693,7 +2589,7 @@ section: design-login/001 The two rows
 | `loginFlow` | `'account'` | `'design'` |
 | Grants | the CLI's own credential | `user:design:read` + `user:design:write` on claude.ai/design projects |
 | When the terminal's command exits | nothing reads it — `claude /login` stays at its prompt and never exits, so the window is closed with ✕ and an exit code never arrives | nothing |
-| When ✕ closes the window | `closeProviderLogin` runs two reads of the live login: `closeLoginModal` re-reads the provider's auth status (the account line below), and `useReloginCapture.finish` files the live login in the switcher if it changed (MAN-465) | nothing: no re-read, no capture |
+| When ✕ closes the window | `closeProviderLogin` calls `closeLoginModal`, which re-reads the provider's auth status (the account line below), and for the Claude account window only calls `announceAccountsChanged()` so the account panel re-reads the door's picture (MAN-465) | nothing: no re-read, no announce |
 
 `/design-login` is the slash command DesignSync tells the user to run in the interactive TUI.
 `claude design-login --json` is the VS Code extension's machine interface and answers in JSON lines;
@@ -2707,13 +2603,12 @@ exit, and never on a timer: with the window still open after a sign-in the line 
 account, and ✕ is what moves it, with Settings staying open. A window closed without signing in
 re-reads the same answer. The design authorization window re-reads nothing — it changes no credential
 this line reports. For Claude the email is `oauthAccount.emailAddress` in `~/.claude.json`, the
-account the switcher names, supplied by the accounts module's `liveAccountEmail`:
+live login the account panel names, supplied by the accounts module's `liveAccountEmail`:
 `~/.claude/.credentials.json` holds tokens only, so before that the server answered `email: null` and
 the line read "Authenticated" for every login. That source is used only when the credentials come from
 the default config dir (`~/.claude`); with `CLAUDE_CONFIG_DIR` pointing elsewhere the tokens belong to another login
 than `~/.claude.json`, so the line says "Authenticated" rather than a wrong name. A read that fails at
-the close (a 5xx, a dropped request) leaves the last answer on screen. While the pre-save of a Claude
-Re-login runs, a press on any other Login or Authenticate does nothing. Onboarding's provider step
+the close (a 5xx, a dropped request) leaves the last answer on screen. Onboarding's provider step
 re-reads on its window closing, and a failed read there is shown as the failure. There is no save
 banner on a login: the line is the result.
 
@@ -2726,7 +2621,7 @@ section: design-login/002 Where each part lives
 | `src/modules/settings/tabs/agents-settings/AgentsSettingsTab.tsx` | `onDesignLogin` set on `agentContextById.claude` only |
 | `src/shared/types.ts` | `AgentContext.onDesignLogin?` |
 | `src/modules/settings/hooks/useSettingsController.ts` | `loginFlow`, `openDesignLogin`, `openLoginForProvider` (sets `'account'`), `closeLoginModal` (resets the flow, and for an `'account'` flow re-reads that provider's auth status with `checkProviderAuthStatus(provider, { keepLastAnswerOnFailure: true })` — the account line's refresh) |
-| `src/modules/settings/Settings.tsx` | The modal's `customCommand` and `title`, read off `loginFlow`; `key={`${loginProvider \|\| 'claude'}:${loginFlow}`}`; `useReloginCapture` armed by a Claude account login only (`openProviderLogin`) and run when the window closes (`closeProviderLogin`) — the design flow never arms it, so closing it writes nothing. `openProviderLogin` and `openDesignLoginWhenIdle` return without opening anything while the hook's `busy` is true (the pre-save or close-time capture running) |
+| `src/modules/settings/Settings.tsx` | The modal's `customCommand` and `title`, read off `loginFlow`; `key={`${loginProvider \|\| 'claude'}:${loginFlow}`}`; `openLoginForProvider` and `openDesignLogin` are wired straight to the controller; `closeProviderLogin` closes the modal and, for a Claude account login only (`loginFlow === 'account' && loginProvider === 'claude'`), calls `announceAccountsChanged()` so the account panel re-reads — another provider's login and the design flow announce nothing |
 | `src/modules/provider-auth/ProviderLoginModal.tsx` | Optional `title`: `titleOverride ?? getProviderTitle(provider)`; the window itself, portalled to `document.body` for every caller. It reports `onClose` and nothing about the command's exit |
 | `server/modules/providers/list/claude/claude-auth.provider.ts` | The Claude half of the auth status: the email comes from `liveAccountEmail()` (the accounts module's barrel) when `.credentials.json` carries none and `configDirIsDefault()` holds (`CLAUDE_CONFIG_DIR` unset or resolving to `~/.claude`); otherwise `email` stays null |
 | `src/modules/provider-auth/hooks/useProviderAuthStatus.ts` | `checkProviderAuthStatus(provider, { keepLastAnswerOnFailure? })`: default shows "Checking…", then the answer, a failed read included; with the option it skips "Checking…" and keeps the last answer when the read did not answer. Only `closeLoginModal` passes it; `refreshProviderAuthStatuses` (Settings open, Onboarding close) does not |
@@ -7341,13 +7236,9 @@ payer's walls, and the release asks whether another payer now carries the plan
 acts on it now rather than at the next session event. The kick's own answer is one line in the server's
 journal per flip (`dispatcher kick: woke daemon`); a kick that could not be run, or that hung past its
 bound, is swallowed and said once per distinct message, because a toggle must answer with the position
-on disk whatever the dispatcher is doing. The kick has a second caller outside this module: the account
-switcher's `POST /api/accounts/switch` and `POST /api/accounts/capture` (`server/modules/accounts/accounts.routes.ts`)
-call `void kickDispatcher()` — reached through the settings barrel — once the swap and the active mark have landed. A usage-limit
+on disk whatever the dispatcher is doing. The accounts routes (`server/modules/accounts/accounts.routes.ts`) send no kick of their own: the door's `use` and `remove` kick the dispatcher themselves (INV-187). A usage-limit
 hold ends when the account that hit the limit leaves use (`hooks/dispatcher/account_release.py`, MAN-8514), every plan
-so held is paused and the daemon has usually exited, so the switch is the event. The route's answer and timing are unchanged
-(measured on a scratch HOME: 200 in 19 ms against a stand-in that takes 3 s, `.verify/usage-hold-account-kick.sh`), a
-refused switch (422) kicks nothing, and a `claude /login` made outside CloudCLI sends no kick — the next pass anything wakes releases the hold.
+so held is paused and the daemon has usually exited, so the switch is the event. A refused write (422) kicks nothing, and a `claude /login` made outside the door sends no kick — the next pass anything wakes releases the hold.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/accounts.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/settings/dispatcher-kick.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/settings/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/settings/park-at-peak-switch.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/settings/settings.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/settings/settings.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/agents-settings/sections/content/RunnerParkAtPeakRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/useParkAtPeakSwitch.ts, /home/lyphe/.claude/state/park_at_peak.flag
 
@@ -8042,7 +7933,7 @@ probe reads after any function has run.
   user, so the token is valid only against the probe server it was minted alongside. With no scratch
   database at the slot's path it says so and returns 1 — it creates nothing.
 - **`boot_probe_server`** boots a SECOND server on the slot's API port against the scratch database
-  and scratch roots — `KANBAN_METIS_STATE_ROOT`, `KANBAN_ATTACHMENTS_ROOT`, `CLOUDCLI_ACCOUNTS_ROOT`,
+  and scratch roots — `KANBAN_METIS_STATE_ROOT`, `KANBAN_ATTACHMENTS_ROOT`,
   `CLOUDCLI_SPILL_ROOT`, `CLOUDCLI_RATE_LIMIT_PATH`, `CLOUDCLI_SESSIONS_DIR`,
   `CLOUDCLI_LOCAL_SERVER_MARKER` and the three Cerberus roots — `CERBERUS_DB_PATH`
   (`<prefix>cerberus.db`), `CERBERUS_KEY_PATH` (`<prefix>cerberus.key`) and `CERBERUS_LISTEN`
@@ -8249,32 +8140,6 @@ real `/git` was said somewhere. The shots are `11-git-idle` (light and dark), `-
 `-banner-connection-lost`, `-adopted-second-window`, `-adopted-after-silence`,
 `-dismiss-held-by-the-server` and `-refused-checkpoint-elsewhere`. Its contract is at
 [docs/MANUAL.md (git-panel)](MANUAL.md).
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/deploy/dev-supervisor/README.md, /home/lyphe/.claude/claudecodeui_lyphe/node_modules/playwright/index.js, /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/supervised-boot.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/tsconfig.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/transcript/shapes/detect.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/transcript/shapes/InlineMarks.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/transcript/shapes/remarkShapeGroups.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/constants.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/all.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/artifacts/21-surface.json, /home/lyphe/.claude/claudecodeui_lyphe/.verify/artifacts/phase-11-press.json, /home/lyphe/.claude/claudecodeui_lyphe/.verify/artifacts/shapes-elements-baseline.html, /home/lyphe/.claude/claudecodeui_lyphe/.verify/artifacts/shapes-gallery-last-run.log, /home/lyphe/.claude/claudecodeui_lyphe/.verify/artifacts/verve-life-before/shapes-elements-baseline.html, /home/lyphe/.claude/claudecodeui_lyphe/.verify/artifacts/verve-life-retone.sed, /home/lyphe/.claude/claudecodeui_lyphe/.verify/handover/seam-probe.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/keepalive-cases-p3.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/keepalive-cases-p4.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/keepalive-host-case.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/keepalive-lib.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/keepalive-turn.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/color.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/console.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/runner-fixture.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/shapes-fixture.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/verve-life.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-32.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-33.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-34.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-files-api.py, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-files-editor.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-files-previews.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-markdown-cards.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-baseline.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-detect.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-fences.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-groups.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-inline.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-lists.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-prose.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-tables.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-sidebar-state-api.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-simple-icons-unread.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-simple-reorder.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/shots/cfep-editor-390-light.png, /home/lyphe/.claude/claudecodeui_lyphe/.verify/shots/cfep-preview-pdf-390-light.png, /home/lyphe/.claude/claudecodeui_lyphe/.verify/shots/phase-34-light.png, /home/lyphe/.claude/claudecodeui_lyphe/.verify/verve-life-compare.sh
-
-## MAN-7001 — The browser harness — Phase 12 opens no browser either, and it no longer runs green: it was written against the proxy this
-section: verification/004 The browser harness/004 Phase 12 opens no browser either, and it no longer runs green: it was written against the proxy this
-
-Phase 12 opens no browser either, and it no longer runs green: it was written against the proxy this
-lane has since replaced, so `phase-12.mjs` still names that proxy's retired URL prefix and imports the
-server module it lived in, both deleted with it, and it needs re-pointing at the accounts lane's own routes (`/api/accounts`, `/api/usage`,
-`/api/accounts/switch`, `/api/accounts/capture` — [docs/MANUAL.md (accounts)](MANUAL.md)) before it measures
-anything. As written, the lane is four HTTP contracts, so it signs in through the real login route
-and drives them with `fetch`. What the live
-picture cannot show — the null discipline, a rolled percent, a vendor `severity`, a lane that cannot
-answer — it measures under `tsx` against bodies copied from the lane's own handlers, a closed port and a
-socket that stalls mid-body. It never calls `capture` nor sends `switch` a real slug, since either
-moves the operator's live Claude login; the refused `__no_such_slug__` is how the store's own verdict
-is shown to travel through intact. Its 40 gates are the accounts lane's alone, and stayed 40 when the
-memory lane joined the router: what changed is the down path's snippet, which mounts the real
-module — BOTH lanes — because a probe left constructing it one
-argument short measures a server nobody ships. That snippet is also why its `tsx` runs name
-`server/tsconfig.json` through `TSX_TSCONFIG_PATH`: the repo root maps `@/` to `src/`, so without it
-the memory service's runtime import of `readObjectRecord` from `@/shared/utils.js` loads the frontend
-file instead. Nothing under `runTsx` here reaches the memory mapper, so no assertion in this file
-would catch that — deleting the env leaves all 40 green — which is the reason the line is commented
-where it sits rather than left to look like decoration. Its contract is at
-[docs/MANUAL.md (accounts)](MANUAL.md).
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/deploy/dev-supervisor/README.md, /home/lyphe/.claude/claudecodeui_lyphe/node_modules/playwright/index.js, /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/supervised-boot.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/tsconfig.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/transcript/shapes/detect.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/transcript/shapes/InlineMarks.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/transcript/shapes/remarkShapeGroups.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/constants.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/all.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/artifacts/21-surface.json, /home/lyphe/.claude/claudecodeui_lyphe/.verify/artifacts/phase-11-press.json, /home/lyphe/.claude/claudecodeui_lyphe/.verify/artifacts/shapes-elements-baseline.html, /home/lyphe/.claude/claudecodeui_lyphe/.verify/artifacts/shapes-gallery-last-run.log, /home/lyphe/.claude/claudecodeui_lyphe/.verify/artifacts/verve-life-before/shapes-elements-baseline.html, /home/lyphe/.claude/claudecodeui_lyphe/.verify/artifacts/verve-life-retone.sed, /home/lyphe/.claude/claudecodeui_lyphe/.verify/handover/seam-probe.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/keepalive-cases-p3.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/keepalive-cases-p4.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/keepalive-host-case.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/keepalive-lib.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/keepalive-turn.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/color.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/console.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/runner-fixture.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/shapes-fixture.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/verve-life.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-32.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-33.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-34.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-files-api.py, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-files-editor.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-files-previews.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-markdown-cards.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-baseline.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-detect.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-fences.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-groups.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-inline.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-lists.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-prose.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-tables.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-sidebar-state-api.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-simple-icons-unread.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-simple-reorder.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/shots/cfep-editor-390-light.png, /home/lyphe/.claude/claudecodeui_lyphe/.verify/shots/cfep-preview-pdf-390-light.png, /home/lyphe/.claude/claudecodeui_lyphe/.verify/shots/phase-34-light.png, /home/lyphe/.claude/claudecodeui_lyphe/.verify/verve-life-compare.sh
 
@@ -13678,7 +13543,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/settings/custom-c
 
 **Left on purpose.** `openTab(page, label)` is unchanged: it counts DOM nodes and returns false only for a tab the page does not have, and more than twenty callers assert "the X tab is on the bar" on it. **Below 768px the tab strip is inside the sidebar drawer** — in the DOM, hidden at x=-319 until the drawer is open (12 tabs visible at 768 and above, none at 767 and below) — so on a phone page with the drawer shut `openTab` waits its 30 s ("element is not visible"); it succeeds between `openSettings` and `closeSettings` only because `openSettings` left the drawer open. A phone probe opens the strip first, `openDrawer(page, '[role="tab"][aria-label="Git"]')`. Routing `openTab` itself through `openDrawer` under 768px is a change to a helper some 90 call sites share and is a follow-up of its own. A twin that also reaches a tab behind the strip's `More views` menu was not written — that menu is drawn at no width of the standing window (the 12 tabs are on the strip at 768 and above, and in the drawer below), so it would be dormant code; `node-card.mjs`'s `openCerberusTab` and `settings-rows-walk.mjs`'s `openHeal` hold the idiom if the menu returns. The sidebar's docked menu button (`DockableFab`, `vv-fab--docked`) sits over the hamburger while the drawer is open — by design — and `openDrawer` leaves the drawer open so that a second call finds the gear and presses nothing; the open drawer covers the page (a click on the composer is intercepted, a shot photographs the drawer), so `closeSettings` puts back a drawer `openSettings` opened (`restoreDrawer`; `Escape` does not close it, the click goes to the backdrop itself), and a script that opens it with `openDrawer`, or calls `openSettings` and never `closeSettings`, closes it with `closeDrawer`. `openDrawer` skips the hamburger when ANY visible button on the page matches its target (`button:has-text("Settings"):visible` for the gear): checked only on the new-session view and the open drawer, not on chat, Files, Git or Roadmap at a phone width. `PROJECT_ROW` still matches nothing under 768px (MAN-679): a phone probe selects its project at desktop width and resizes, as `openConsole` does.
 
-**Not done, named.** Seventeen probe files still carry their own hamburger press (`DRAWER_TOGGLE` or an inline `[aria-label="Open menu"]`) (`phase-0/5/18/20/26/27`, `probe-whole-folders`, `probe-simple-*`, `probe-workspace-tab-rows`, `relogin-window`, `git-last-pushed`, `chat-host-home`, `claude-updates-auto-install`, `settings-pwa-bleed`…) and thirty declare `RUNNER_TAB = '[role="tab"][aria-label="Runner"]'` — a tab the standing app no longer draws (it is the Roadmap tab's In flight face, MAN-679; the strip lists Chat … Cerberus and no Runner), so a wait on it times out. Both are a mechanical import swap or a retirement sweep of pinned probes, apart from this change. `console.mjs` stands at 522 lines (503 before) — a split candidate.
+**Not done, named.** Sixteen probe files still carry their own hamburger press (`DRAWER_TOGGLE` or an inline `[aria-label="Open menu"]`) (`phase-0/5/18/20/26/27`, `probe-whole-folders`, `probe-simple-*`, `probe-workspace-tab-rows`, `git-last-pushed`, `chat-host-home`, `claude-updates-auto-install`, `settings-pwa-bleed`…) and thirty declare `RUNNER_TAB = '[role="tab"][aria-label="Runner"]'` — a tab the standing app no longer draws (it is the Roadmap tab's In flight face, MAN-679; the strip lists Chat … Cerberus and no Runner), so a wait on it times out. Both are a mechanical import swap or a retirement sweep of pinned probes, apart from this change. `console.mjs` stands at 522 lines (503 before) — a split candidate.
 
 **To read the cure next time.** A Playwright timeout whose message ends in `PAGE WHEN THE WAIT GAVE UP:` came from a script that loaded `console.mjs`; a script that launched its own browser (an Athena `lib.mjs`, `/opt/eis-app`'s `newAuthedContext`) has no block and may call `explainTimeouts(page, () => errors)` itself. A phone leg that waits for the Settings gear and still times out is a page that drew neither the gear nor the hamburger — the block says what it drew.
 
@@ -13824,23 +13689,23 @@ Reference: door face MAN-8843 (`claude-account status --json`); the routes MAN-8
 | `ClaudeAccountRows.tsx` | `ClaudeAccountRows`: header, rows, candidates, auto switch, last switch, closing sentence |
 | `ClaudeAccountRowViews.tsx` | `AccountRowView` (one account the store holds), `CandidateRow` (one live identity the store lacks) |
 | `claude-accounts-fake.ts` | `claudeAccountFakes(nowMs)`: 18 whole-value states, one per `FakeClaudeAccountsState`; nothing in `src/` imports it |
-| `AccountPopover.tsx` | mounts `<ClaudeAccountRows picture={door} …/>` after the meters and balances, above `Switch account · N` |
+| `AccountPopover.tsx` | mounts `<ClaudeAccountRows picture={accounts} …/>` after the meters and balances, above `↻ Re-login`, the panel's one sign-in door |
 | `AccountFooterRow.tsx` | a second `ProviderLoginModal` beside the Re-login one, running `~/.claude/scripts/claude-account setup-token <slug>` under the title `Set up <slug>'s sign-in token`, mounted only while `setup !== null` |
 | `hooks/useAccountSetup.ts` | `{setup, openSetup, closeSetup}`; `setup` is `{slug} \| null`, one object so an open window always has a slug |
-| `hooks/useClaudeAccounts.ts` | `door` (`data.door` off the one poll), `chooseAccount`, `setAuto`, `removeAccount`, all through one `doorWrite` |
+| `hooks/useClaudeAccounts.ts` | `data` (the picture off the one poll), `chooseAccount`, `setAuto`, `removeAccount`, all through one `doorWrite` |
 
 ## Wiring
-- `GET /api/accounts` fills `ClaudeAccounts.door` (MAN-8858); `useClaudeAccounts` returns it as `door: ClaudeDoorPicture | null` (`src/shared/types.ts`: `ClaudeAccountsPicture \| {reachable:false; reason}`); null before the first answer and when the lane itself answered `{reachable:false}`.
-- `AccountFooterRow` hands `door` and `onUse` / `onSetAuto` / `onRemove` / `onSetup` to `AccountPopover`, which hands them to `ClaudeAccountRows` with its `busy` and its minute clock as `nowMs`.
-- The acts: `api.accounts.use(slug)` · `.auto(on)` · `.remove(slug)` → `POST /api/accounts/use|auto|remove`. `doorWrite` holds the single-writer guard `switchTo` and `capture` hold (`writingRef`), clears the banner on start, shows a 422's `{error}` verbatim in the panel's warn banner, and re-reads the picture when a write lands.
+- `GET /api/accounts` answers the door's picture at the top level (MAN-8858); `ClaudeAccounts` (`src/shared/types.ts`) is `({reachable:true} & ClaudeAccountsPicture) \| {reachable:false; reason}`; `useClaudeAccounts` returns it as `data: ClaudeAccounts | null`, null before the first answer. There is no `door` member on the wire or in the hook.
+- `AccountFooterRow` hands `accounts` (the hook's `data`) and `onUse` / `onSetAuto` / `onRemove` / `onSetup` to `AccountPopover`, which hands them to `ClaudeAccountRows` with its `busy` and its minute clock as `nowMs`.
+- The acts: `api.accounts.use(slug)` · `.auto(on)` · `.remove(slug)` → `POST /api/accounts/use|auto|remove`. `doorWrite` holds the single-writer guard (`writingRef`), clears the banner on start, shows a 422's `{error}` verbatim in the panel's warn banner, and re-reads the picture when a write lands.
 - `closeSetup` clears `setup` and calls `announceAccountsChanged()` (`cloudcli:accounts-changed`); the row's ONE poller re-reads at once. A second read loop is never started.
-- While the Set up window is open (`setup !== null`) the panel's outside-pointer and Escape dismissal is suspended, as for the Re-login window; a press in the row menu is not outside (MAN-466 rule 9).
-- The closed row and the rail avatar name `accountInUse(door)?.slug`, else `picture.activeLabel`, else `—`, and draw the two glance windows from `accountInUseUsage` (MAN-8862).
+- While the Set up window is open (`setup !== null`) the panel's outside-pointer and Escape dismissal is suspended, as for the Re-login window; a press in the row menu is not outside (MAN-466 rule 7).
+- The closed row and the rail avatar name `accountInUse(accounts)?.slug`, else `—`, and draw the two glance windows from `accountInUseUsage` (MAN-8862).
 
 ## `ClaudeAccountRows` props (all optional)
 | prop | meaning |
 |---|---|
-| `picture` | `ClaudeAccountsPicture` \| `{reachable:false; reason}` \| `null`; absent/`null` renders nothing; `reachable:false` renders one calm line, never a banner |
+| `picture` | `ClaudeAccounts \| null` (the tagged picture or `{reachable:false; reason}`); absent/`null` renders nothing; `reachable:false` renders one calm line, never a banner |
 | `busy` | disables every press |
 | `nowMs` | the caller's clock, epoch ms; omitted, the section ticks its own minute (`useMinuteTick`) |
 | `onUse(slug)` `onSetAuto(on)` `onRemove(slug)` `onSetup(slug)` | the four acts; each defaults to `NO_ACT` (the fakes' fixture), so a press with no handler does nothing |
@@ -13880,9 +13745,9 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/AccountFoot
 Reference: the meters' states MAN-464 (`UsageMeters` is unchanged); the door's picture MAN-8843 and its relay MAN-8858; the types INV-9252; the section over the same picture MAN-8847.
 
 ## Which account the meters draw
-`accountInUse(door)` = the `accounts` row the door marks `in_use` (the chosen account when it holds a checked token, else the live login). A picture the door could not answer (`{reachable:false}`), or none yet, has no account in use.
+`accountInUse(picture)` = the `accounts` row the door marks `in_use` (the chosen account when it holds a checked token, else the live login). A picture the door could not answer (`{reachable:false}`), or none yet, has no account in use.
 
-| `accountInUseUsage(usage, door, nowMs)` when | returns |
+| `accountInUseUsage(usage, picture, nowMs)` when | returns |
 |---|---|
 | no account in use (no picture, door unreachable) | `usage` untouched — what the panel drew before the file existed |
 | `usage` reachable, not `degraded`, and `usage.account === row.digest` | `usage` — a measurement taken now beats anything filed |

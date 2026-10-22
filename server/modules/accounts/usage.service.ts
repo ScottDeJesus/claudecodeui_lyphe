@@ -122,8 +122,8 @@ type LastGood = { windows: ClaudeUsageWindow[]; at: number; stamp: number | null
 /** A reading in the cache, and WHEN it was taken — the other half of the TTL question. */
 type Cached = { at: number; reading: Reading; stamp: number | null };
 
-/** Where the live login's credential bytes live. Deliberately NOT environment-redirectable, unlike
- *  the account store's slots: a variable that moved this path could meter an account nobody named. */
+/** Where the live login's credential bytes live. Deliberately NOT environment-redirectable:
+ *  a variable that moved this path could meter an account nobody named. */
 function credentialsPath(): string {
   return path.join(os.homedir(), '.claude', '.credentials.json');
 }
@@ -137,9 +137,9 @@ function credentialsPath(): string {
  * cannot disagree with itself — this is the single `JSON.parse` in the module, and nothing but this
  * function ever sees the file.
  *
- * `expiresAt` is the SAME field the account store reads and documents as a freshness clock rather
- * than a credential — the cache key, and not a secret. It is what makes a swap honest: each account's
- * file carries its own expiry, so a swap always moves it and both caches miss. An unreadable file is
+ * `expiresAt` is read as a freshness clock rather than a credential — the cache key, and not a
+ * secret. It is what makes a new login honest: the live file carries its own expiry, so signing in
+ * again moves it and the cache misses. An unreadable file is
  * not an error — it is "no login", which is one fact to a gauge.
  */
 function readCredentials(): { token: string | null; stamp: number | null } {

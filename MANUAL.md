@@ -3240,10 +3240,9 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/affected-areas-types.
 |---|---|
 | `affected-areas.module.ts` | `createAffectedAreasModule()`; the ONLY reader of the environment |
 | `affected-areas.routes.ts` | `createAffectedAreasRouter({ forward })`: the allowlist, id/query/body checks, status mapping |
-| `affected-areas.service.ts` | `createAffectedAreasService({ baseUrl, envFile })` → `forward(LaneRequest): Promise<LaneAnswer>`; the secret read; the one `fetch` |
 | `index.ts` | barrel the entrypoint imports |
 
-`LaneRequest`, `LaneAnswer`, `AffectedAreasService` are exported from the service file (Jev-lane precedent), not `server/shared/types.ts` (2,483 lines).
+The forwarder is not in this module: `createShadowConnectorLane({ baseUrl, envFile, label })` → `forward(LaneRequest): Promise<LaneAnswer>`, the secret read and the one `fetch`, live in `server/shared/shadow-connector-lane.ts` (MAN-8863), so the secret has one home and a second lane to shadow-connector, `/api/carrier-bulletins` (next phase), reuses it rather than copying it. This module builds it with `label: 'affected-areas'`, so its log warning reads `[affected-areas] no usable internal secret in <file>: <cause>`, and its routes import `LaneAnswer` and `ShadowConnectorLane` from `@/shared/shadow-connector-lane.js`. The moved forwarder answered byte-identically (tour list and image, same sha256 before and after, 2026-10-21).
 
 ## Configuration
 
@@ -3296,17 +3295,17 @@ The lane's own 422 is `{ error }`; the engine's is `{ detail: [...] }`: a client
 | network error / timeout | 503 `{ error }` (`unreachable`) |
 | non-JSON from a json route; 2xx image that is not `image/jpeg`; 3xx with no JSON | 502 `{ error }` (`unreadable`) |
 | secret missing, empty, padded, non-ASCII, unclosed quote | 503 `no_secret` (`CloudCLI could not read shadow-connector's internal secret`); nothing sent |
-| a thrown error the service cannot name | `next(error)` → the app's handler |
+| a thrown error the forwarder cannot name | `next(error)` → the app's handler |
 
 Image 2xx: `Content-Type: image/jpeg`, `Cache-Control: private, max-age=31536000, immutable`; a non-2xx image answer passes through as its JSON.
 
-## The secret read (`parseSecret`, `currentSecret`)
+## The secret read (`parseSecret`, `currentSecret` in `server/shared/shadow-connector-lane.ts`)
 
 1. `fs.stat(envFile)` on EVERY call; re-parse only when `mtimeMs` or `size` changes. A rotation lands on the next request: no restart, no watcher.
 2. Last `EIS_INTERNAL_SECRET=` line wins; `export ` prefix, CRLF, and an unquoted trailing ` # comment` are handled as dotenv does.
 3. Quoted value: whatever stands between the quotes, verbatim; only whitespace or a `# comment` may follow the closing quote. A quote that never closes, or other text after it → `no_secret`. A secret that really begins with `"` or `'` must be quoted.
 4. Usable = printable ASCII, no whitespace at either end (`USABLE_SECRET`): the gate compares bytes and an HTTP stack trims header edges.
-5. A missing file logs one `[affected-areas] no usable internal secret in <file>: <cause>` line per distinct cause; never the line parsed.
+5. A missing file logs one `[<label>] no usable internal secret in <file>: <cause>` line per distinct cause (`<label>` is `affected-areas` for this lane); never the line parsed.
 6. The secret is held in the browser nowhere and in CloudCLI's own environment nowhere: read from the engine's file per call, never written to `process.env`, this server's `.env`, a log or a cache (INV-8633). why: a copy drifts on rotation, and the agent sessions this server spawns inherit its environment.
 
 ## Headers sent
@@ -3326,7 +3325,7 @@ Image 2xx: `Content-Type: image/jpeg`, `Cache-Control: private, max-age=31536000
 - `GET /nope`, `DELETE /tours`, `POST /codebook` → 404 with no `shadow-connector` journal line; 422 cases (bad id, `limit=0|101`, 81-char `q`, `mode=bogus`) likewise never reach the journal.
 - An empty env file → 503 `no_secret`, 0 engine requests; writing the secret into it → next request 200, no restart.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/affected-areas/affected-areas.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/affected-areas/affected-areas.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/affected-areas/affected-areas.service.ts
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/affected-areas/affected-areas.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/affected-areas/affected-areas.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/affected-areas/index.ts
 
 ## MAN-8575 — The Tours view — src/modules/affected-areas: where state lives, what the counts mean, the reads and the presses
 
@@ -3803,7 +3802,7 @@ The two reads the rest of the server makes of the house's Claude account store. 
 |---|---|---|
 | `launchCredential` | `account-door.ts` | the account in use and its token, for a CLI start |
 | `chosenAccount` | `chosen-account.ts` | the house's choice now, or `null` |
-| `liveAccountEmail` | `account-store.service.ts` | the live login's email |
+| `liveAccountEmail` | `account-identity.service.ts` (`identity`) | the live login's email, `oauthAccount.emailAddress` of `~/.claude.json`; the only credential-adjacent read the server keeps besides the meter, and it opens no credential file |
 | `notePacerReading` | `pacer-door.ts` (`note`) | files one window reading with the pacer: `(digest, windows, checkedAt, 'meter' \| 'chat')`; consumers `usage.service.ts` (`'meter'`) and `claude-chat-readings.ts` (`'chat'`, MAN-8859) |
 | `createAccountsModule` | `accounts.module.ts` | the composition root |
 
@@ -3838,19 +3837,19 @@ Reference: door verbs MAN-8842, the picture's shape MAN-8843, the types' mirror 
 |---|---|
 | `account-door-relay.ts` | `accountsPicture()`, `writeDoor(args)`, `AccountDoorRefusal`, `doorBin()`, `redact()`, `DOOR_TIMEOUT_MS` |
 | `account-door.ts` | re-exports `AccountDoorRefusal` and `accountsPicture`; `useAccount(slug)`, `setAuto(on)`, `removeAccount(slug)` (each → the door's line); the credential read (MAN-8849) |
-| `accounts.routes.ts` | the routes below, beside the slot switcher's `/accounts/switch`, `/accounts/capture` and `GET /usage` |
+| `accounts.routes.ts` | the routes below and `GET /api/usage`; the whole account route surface is these five |
 
 ## Routes — mounted at `/api` behind `authenticateToken`
 | route | body | 200 | refused |
 |---|---|---|---|
-| `GET /api/accounts` | — | the slot summary plus `door` | never a 5xx |
+| `GET /api/accounts` | — | the door's picture at the top level: `{reachable:true, accounts, candidates, auto, held, chosen, last_switch}`, or `{reachable:false, reason}` | never a 5xx |
 | `POST /api/accounts/use` | `{slug: string}` | `{line}` = `USING <slug>…` | 422 `{error}` |
 | `POST /api/accounts/auto` | `{on: boolean}` | `{line}` = `AUTO on` / `AUTO off` | 422 `{error}` |
 | `POST /api/accounts/remove` | `{slug: string}` | `{line}` = `REMOVED <slug>` | 422 `{error}` |
 
-## `door` on `GET /api/accounts`
-- `claude-account status --json` relayed whole (`ClaudeAccountsPicture`, MAN-8843) in both picture branches, the unreadable-slots one included.
-- A door that cannot answer is `door: {reachable:false, reason}` inside a 200. `door` is absent only on the belt's own `{reachable:false}` answer.
+## The picture on `GET /api/accounts`
+- `claude-account status --json` relayed whole (`ClaudeAccountsPicture`, MAN-8843) at the top level, tagged `reachable:true` (`accountsBody`). No `door` member exists on the wire.
+- A door that cannot answer is `{reachable:false, reason}` inside a 200; the route's belt answers the same shape with `reason:"unreachable"`.
 - `reason`: `timeout` (bound hit), `bad-response` (stdout is not JSON, or lacks `accounts`/`candidates` arrays, `auto`/`held` booleans, `chosen`/`last_switch` null-or-object), `unreachable` (anything else: missing binary, non-zero exit).
 - Every string of the picture, a line, a refusal and a 502 sentence passes `redact` (`sk-ant-[A-Za-z0-9_-]{8,}` → `[key]`).
 
@@ -3864,13 +3863,88 @@ Reference: door verbs MAN-8842, the picture's shape MAN-8843, the types' mirror 
 | edit | breaks | why |
 |---|---|---|
 | Hand a free-form value to a door write without `--` before it (`['use','--',slug]`, `['remove','--',slug]`) | `use --help` answers usage text with exit 0 and relays as a 200 for a write that never happened; `--state` answers a usage error as a 502 | the door is argparse; `--` makes the slug a positional |
-| Refuse a leading `-` in a slug at the route | a slot named `-foo` can no longer be switched from the panel | the door's `_slot_name` accepts it; the separator is the cure |
+| Refuse a leading `-` in a slug at the route | an account named `-foo` can no longer be chosen from the panel | the door's `_slot_name` accepts it; the separator is the cure |
 | Make a door refusal the panel shows as 422 anything but exit 2 plus a `REFUSED …` stdout line | it relays as a 502 with the class name | the relay classifies on that shape only |
 | Drop `killSignal: 'SIGKILL'` from either `execFile` | a door or `CLAUDE_ACCOUNT_BIN` wrapper that traps SIGTERM holds the status-chip poll for its whole life | `killed` stays true on SIGKILL, so the read still answers `timeout` |
 | Let `accountsPicture()` reject | the status-chip poll answers a 5xx | the route's `.catch` is a belt over a read that is total by construction |
 
 ## Measured
-- 2026-10-21, live dev API: `GET /api/accounts` → `reachable:true`, 3 slots, `door` naming 2 accounts (`token:"none"`, `auto:true`).
+- 2026-10-21, live dev API `:3011`: `GET /api/accounts` → 200, top-level keys `accounts, auto, candidates, chosen, held, last_switch, reachable`, no `door`, 2 accounts.
 - 2026-10-21, probe server `:7898` on a scratch home: `use` tokenless → 422 `beta: no checked sign-in token — set it up first`; `use` checked → 200 `{"line":"USING alpha"}`, GET shows alpha `in_use:true, chosen:true`; `auto` → `AUTO off` / `AUTO on`; `remove` → `REMOVED beta`, GET drops it.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/account-door-relay.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/account-door.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/accounts.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/accounts.routes.ts
+
+## MAN-8863 — The shadow-connector lane forwarder — createShadowConnectorLane, the one read of EIS_INTERNAL_SECRET (server/shared)
+
+`server/shared/shadow-connector-lane.ts` is the one forwarder every CloudCLI lane to shadow-connector goes through, and the one place `EIS_INTERNAL_SECRET` is read. shadow-connector's `/api/*` surfaces are internal-caller gated (R-CAP-11: `X-Internal-Secret` required even from loopback); this server authenticates the operator, so the secret stays on this side and the browser never holds it. Exported from `server/shared/index.ts`.
+
+Consumers (each owns its allowlist, id rules and status mapping; none owns a transport):
+
+| module | lane | label |
+|---|---|---|
+| `server/modules/affected-areas/` (MAN-8559) | `/api/affected-areas`, the Tours lane | `affected-areas` |
+| `server/modules/carrier-bulletins/` (`/api/carrier-bulletins`; NOT BUILT YET — the next phase, the relay, adds it) | the bulletins lane | `carrier-bulletins` |
+
+| export | does |
+|---|---|
+| `createShadowConnectorLane({ baseUrl, envFile, label })` | builds a forwarder; the module that calls it is the ONLY reader of `SHADOW_CONNECTOR_URL` / `SHADOW_CONNECTOR_ENV_FILE` for its lane, and passes the values down |
+| `ShadowConnectorLane` | `{ forward(LaneRequest): Promise<LaneAnswer> }`; a router takes `Pick<ShadowConnectorLane, 'forward'>` |
+| `ShadowConnectorLaneDependencies` | `{ baseUrl, envFile, label }`; `label` is the one word the log warning leads with |
+| `LaneRequest` | `{ method: GET\|POST\|PUT, path, query?, body?, actingUser, timeoutMs, expect: json\|bytes }`; the route has already validated every part |
+| `LaneAnswer` | `{ ok: true, status, kind: json, body }`, `{ ok: true, status, kind: bytes, body: Buffer, contentType }`, or `{ ok: false, reason: unreachable\|unreadable\|no_secret, message }` |
+
+Rules (they bind the file; INV-8633 holds them for both lanes)
+1. The secret is read from shadow-connector's env file at CALL time: `fs.stat` on every call, re-parse only when `mtimeMs` or `size` changed, so a rotation lands on the next request with no restart and no watcher. It is never written to `process.env`, this server's `.env`, a log line, an error message or a cache.
+2. Nothing is forwarded without it: a missing, empty, padded, non-ASCII or unclosed-quote secret answers `no_secret` (`CloudCLI could not read shadow-connector's internal secret`) and sends no request.
+3. Nothing throws. A lane fault is a RESULT; an upstream answer (404, 422, a refusal) is a RESULT carried whole.
+4. `fetch` runs `redirect: 'manual'`, so the secret header never follows a `Location`.
+5. `describeFailure` uses only an error's NAME and its cause's CODE, never its message: a transport error can quote the request, and the request carries the secret.
+6. `X-Acting-User` is display only (the engine derives `origin` itself, R-CAP-21): non-printable characters become `?`, trimmed, at most 64 characters, absent when none.
+
+Traps
+| trap | fact |
+|---|---|
+| state is per forwarder | each `createShadowConnectorLane` call holds its own parse of the env file and its own last-reported cause: two lanes log one line per distinct cause EACH, and each warning leads with its own `[<label>]`. A lane built without a distinct label is indistinguishable in the journal |
+| the label is the log's only lane word | the Tours warning reads `[affected-areas] no usable internal secret in <file>: <cause>`; everything else the forwarder logs or answers is identical for every lane |
+| a new top-level `server/shared/*.ts` file | joins `.oxlintrc.json`'s `backend-shared-utils` list (INV-6548); `shadow-connector-lane.ts` is listed |
+| measured 2026-10-21 | with a missing env file, an empty one and an unreachable engine, `forward` answers `no_secret`, `no_secret` and `unreachable` (`CloudCLI could not reach shadow-connector`), and a repeated cause logs one warning, not two; `GET /api/affected-areas/tours?limit=3` and `GET /api/affected-areas/images/<sha>` through the dev API (:3011) answer 200 with the same body sha256 as before the forwarder moved here |
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/shared/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/shadow-connector-lane.ts
+
+## MAN-8865 — Carrier-bulletins client wire — src/shared/carrier-bulletins-types.ts and api.carrierBulletins
+
+The browser's typed view of `/api/carrier-bulletins` (the Bulletins view of the Cerberus tab): one wire-type file and one `api` block, built on the Tours precedent (MAN-8558). The one home of every body is shadow-connector's `extractors/servpro_bulletins/verify/views.py`, the read model the report and the surface both print.
+
+## Files
+| file | holds |
+|---|---|
+| `src/shared/carrier-bulletins-types.ts` | 18 exported types: the three bodies `OverviewRow`, `BulletinPage`, `PageReading`; their nested ones (`LastPull`, `LastReading`, `VerdictCounts`, `ReadingStamp`, `RequirementThreshold`, `RequirementWindow`, `RequirementScope`, `SettledRule`, `PageRequirement`, `JudgedRule`, `NotPlaced`, `PageFailure`, `PageWaiting`); and the unions `PageState` and `VerdictWord`. Imports nothing from `server/`. |
+| `src/shared/api.ts` | `api.carrierBulletins`, 4 GET verbs, beside `api.affectedAreas`; no import from the mirror (each answer is named in a `// →` comment) |
+| `.oxlintrc.json` | `src/shared/carrier-bulletins-types.ts` in the `frontend-shared-file` list (INV-5890) |
+
+## Verbs
+Every verb is a GET: the view is read-only, and the lane's allowlist holds GET routes only. Ids and the page number go through `encodeURIComponent`.
+
+| verb | route | answer |
+|---|---|---|
+| `overview(options?)` | `GET /overview` | `OverviewRow[]` |
+| `pages(bulletinId, options?)` | `GET /bulletins/:bulletinId/pages` | `BulletinPage[]` |
+| `page(bulletinId, page, options?)` | `GET /bulletins/:bulletinId/pages/:page` | `PageReading` |
+| `image(sha, page, options?)` | `GET /files/:sha/pages/:page/image` | PNG bytes: the caller reads `.blob()`; `options.signal` aborts |
+
+## Rules an editor must not break
+- A body changes in `views.py` first; the mirror moves in the same change. why: a key renamed on one side is a screen that stops reading.
+- Keys are the wire's snake_case (`bulletin_id`, `last_reading`, `requirements_live`), never camelCase. Dates are ISO text, ids text, page numbers count from 1.
+- A body field is never optional. `null` is the plain absence the field's comment names: `last_pull` no pull on record, `last_reading` never read, `reading` a page with no answer, `waiting` a page that does not wait, `rule` a requirement on a page read and not yet settled. A part heading is never `null`: `''` is a page in no part.
+- `PageState` is whole.plan_file's four words (`settled`, `read`, `unread`, `waiting`); `VerdictWord` is the check's five (`confirmed`, `corrected`, `duplicate`, `not_on_page`, `unsettled`). `JudgedRule.said` is the model's word and `verdict` the stored one: they differ when the house's checks refused the answer.
+- No `interface` declarations. A new verb names its answer in a `// → Type` comment.
+
+## Value shapes the design left open
+The design writes the keys of each body and not the inside of four of them. They are typed from the page check's own answer, and each stands until a live answer says otherwise: `threshold` is `{ value, unit, measure }` and `window` is `{ hours, basis, anchor }` (`verify/contract.py`'s `Threshold` and `Window`, `hours` null for a deadline that counts none); `scope` is `{ services, loss_types, property_types }`, each `string[] | null` with null meaning every one (`verify/requirement.py`); a `failures` element is `{ words, said, quote, failures }` (the printable fields of `read.Entry`). `SettledRule.state`, `PageRequirement.kind` and `.subject` are plain `string`, because the design names no closed set for them.
+
+## Measured
+- 2026-10-21: the TypeScript compiler's property names of `OverviewRow`, `BulletinPage` and `PageReading` and every nested type, against the keys of the design's THE SURFACE interface parsed out of `bulletins-read-by-claude.design.toml`: every key matched at every level the design writes keys (16, 7 and 9 at the top; `last_pull` 2, `last_reading` 6, `verdicts` 5, `reading` 6, `requirements` 8, `rule` 3, `judged` 7, `not_placed` 2, `waiting` 3). The four keys above are the only places the type has structure where the design has a bare key.
+- 2026-10-21: `api.carrierBulletins` run as bundled code against a recording `fetch`: the four verbs requested exactly the four routes above, all GET and no body, an id `a/b c?d` went out as `a%2Fb%20c%3Fd`, and `image` carried the caller's abort signal.
+- `views.py` and the surface had not landed at that time: no body was compared with a live answer.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/carrier-bulletins-types.ts

@@ -9,7 +9,7 @@ import { createAccountsRoutes } from './accounts.routes.js';
  * `/api/accounts/remove`.
  *
  * The module's other halves are the live identity read and the usage meter beside this file: the
- * store answers only who the box is signed in as, the meter is the only thing in the server that
+ * identity read answers only who the box is signed in as, the meter is the only thing in the server that
  * holds an access token, and both stay inside this directory. Building the router here rather than
  * in the entrypoint keeps the mount a single, named act — a URL prefix, a guard and a module, in
  * one place.

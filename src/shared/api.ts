@@ -984,6 +984,27 @@ export const api = {
     setThreshold: (cls: string, body: ThresholdRequest) => put(`/api/affected-areas/thresholds/${encodeURIComponent(cls)}`, body),
   },
 
+  // The carrier-bulletins lane (the Bulletins view of the Cerberus tab; wire shapes in `@/shared/carrier-bulletins-types`):
+  // what Claude read in each carrier's SERVPRO bulletin and what the house settled it into, forwarded to shadow-connector
+  // by CloudCLI. READ-ONLY: every verb is a GET, and no verb here writes a rule. Every JSON answer is its wire shape BARE,
+  // in snake_case. A failure arrives as `affectedAreas`' do: `{ error: string }` from the lane, `{ detail: string }`
+  // passed through from shadow-connector (404: no such bulletin or page). The answer of each verb is named beside it.
+  // Ids are encoded here, so a caller passes them as it holds them.
+  carrierBulletins: {
+    // → OverviewRow[] (every carrier with a current file)
+    overview: (options: ApiRequestOptions = {}) => get('/api/carrier-bulletins/overview', options),
+    // → BulletinPage[] (one bulletin's pages, in page order)
+    pages: (bulletinId: string, options: ApiRequestOptions = {}) =>
+      get(`/api/carrier-bulletins/bulletins/${encodeURIComponent(bulletinId)}/pages`, options),
+    // → PageReading (what Claude read on one page)
+    page: (bulletinId: string, page: number, options: ApiRequestOptions = {}) =>
+      get(`/api/carrier-bulletins/bulletins/${encodeURIComponent(bulletinId)}/pages/${encodeURIComponent(page)}`, options),
+    // The bytes of one page's PNG, not JSON: the caller reads `.blob()`. `sha` is the file's `file_sha256`. `options.signal`
+    // lets it abort a fetch whose page has since changed.
+    image: (sha: string, page: number, options: ApiRequestOptions = {}) =>
+      get(`/api/carrier-bulletins/files/${encodeURIComponent(sha)}/pages/${encodeURIComponent(page)}/image`, options),
+  },
+
   // The dispatcher lane (docs/MANUAL.md (dispatcher)): the plans in the dispatcher's own store, and the
   // verbs the plan cards, the arc header and In flight's queue press. The picture is `dispatcher status
   // --json` relayed whole, and the verbs are relayed to the dispatcher's own binary by argv, never by a shell.

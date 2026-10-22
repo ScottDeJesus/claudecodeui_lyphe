@@ -6961,51 +6961,6 @@ probe-key: 5062ae8aa28b65d79d0e9a44cb0e2feb63f59b58
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/settings/dactyls-switch.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/settings/settings.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/useDactylsSwitch.ts
 
-## INV-7371 — probe — MEDIUM — three manual rows still say the capture is gated on the login command's exit code
-
-MEDIUM — three manual rows still say the capture is gated on the login command's exit code
-
-```probe
-bash /home/lyphe/.claude/state/pipeline-reviews/relogin-window-and-switch/athena-probes/docs_stale.sh
-echo "[probe exit $?]"
-expect: `MAN-466 lines saying the capture is gated on the login command's exit code: 1` and `MAN-467 bullets about the exit-code gate / the exit-line scrape: 2` while the defect stands; both 0 when cured
-```
-
-measured 2026-10-08 by chain chain-relogin-window-and-switch-20261008-094412-9e3d, finding M1, MEDIUM
-probe-key: 3f7362edf0b8d2902058104a3633dd9ce86827ce
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/AccountFooterRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/AccountPopover.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/hooks/useClaudeAccounts.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/hooks/useReloginCapture.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/provider-auth/ProviderLoginModal.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/Settings.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/relogin-window.mjs
-
-## INV-7372 — probe — LOW — the re-login's pre-save and close-time captures bypass the single-writer guard the old capture had
-
-LOW — the re-login's pre-save and close-time captures bypass the single-writer guard the old capture had
-
-```probe
-node /home/lyphe/.claude/state/pipeline-reviews/relogin-window-and-switch/athena-probes/relogin_edges.mjs
-echo "[probe exit $?]"
-expect: first line `PRE-SAVE in flight — Re-login disabled: false | disabled buttons in the panel: 0`; second `captures sent: 2 | switches sent while it ran: 1` while the defect stands (cured: disabled true, captures 1, switches 0 or refused)
-```
-
-measured 2026-10-08 by chain chain-relogin-window-and-switch-20261008-094412-9e3d, finding L1, LOW
-probe-key: 40301d48ed82d95de810e2e6dc69169eac4f5ba6
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/AccountFooterRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/AccountPopover.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/hooks/useClaudeAccounts.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/hooks/useReloginCapture.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/provider-auth/ProviderLoginModal.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/Settings.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/relogin-window.mjs
-
-## INV-7373 — probe — LOW — an unreadable store at open or close means the sign-in is never filed, and nothing says so
-
-LOW — an unreadable store at open or close means the sign-in is never filed, and nothing says so
-
-```probe
-node /home/lyphe/.claude/state/pipeline-reviews/relogin-window-and-switch/athena-probes/relogin_edges.mjs
-echo "[probe exit $?]"
-expect: last line `CLOSE with the picture unreadable — captures sent: 0 | toast naming the new account or a failure: 0 | row reads: old.account@example.test` while the defect stands
-```
-
-measured 2026-10-08 by chain chain-relogin-window-and-switch-20261008-094412-9e3d, finding L2, LOW
-probe-key: 717c64bf84e24f5c8efab6cfc16e8c30beee44e7
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/AccountFooterRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/AccountPopover.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/hooks/useClaudeAccounts.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/hooks/useReloginCapture.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/provider-auth/ProviderLoginModal.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/Settings.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/relogin-window.mjs
-
 ## INV-7380 — probe — LOW — doc comments in `server/shared/types.ts` that the code contradicts
 
 LOW — doc comments in `server/shared/types.ts` that the code contradicts
@@ -7025,7 +6980,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts
 LOW — a comment still points at the button that is gone
 
 ```probe
-cd /home/lyphe/.claude/claudecodeui_lyphe && grep -n -i "second button\|to add one" src/modules/accounts/AccountPopover.tsx src/modules/accounts/AccountFooterRow.tsx src/modules/accounts/hooks/useReloginCapture.ts || echo none
+cd /home/lyphe/.claude/claudecodeui_lyphe && grep -n -i "second button\|to add one" src/modules/accounts/AccountPopover.tsx src/modules/accounts/AccountFooterRow.tsx || echo none
 echo "[probe exit $?]"
 expect: `src/modules/accounts/AccountPopover.tsx:221:` prints while the defect stands; `none` once the comment stops referring to a second button
 ```
@@ -7033,22 +6988,7 @@ expect: `src/modules/accounts/AccountPopover.tsx:221:` prints while the defect s
 measured 2026-10-08 by chain chain-remove-add-account-button-20261008-103333-20a8, finding L1, LOW
 probe-key: a5b8e01c128691f28b87f61510fb05747010377d
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/AccountFooterRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/AccountPopover.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/hooks/useReloginCapture.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/relogin-window.mjs
-
-## INV-7386 — probe — LOW — MAN-467 still says no run measures the panel at a phone width, or records its reach by `[NOTE]`
-
-LOW — MAN-467 still says no run measures the panel at a phone width, or records its reach by `[NOTE]`
-
-```probe
-cd /home/lyphe/.claude/claudecodeui_lyphe && printf 'MAN-467 lines claiming no run measures the mobile width: '; docstore get MAN-467 --text | grep -c "No run measures a shorter viewport"; printf 'MAN-8057 lines naming the phone viewport: '; docstore get MAN-8057 --text | grep -c "phone 390"
-echo "[probe exit $?]"
-expect: `MAN-467 lines claiming … : 1` and `MAN-8057 lines naming the phone viewport: 1` while the defect stands; the first reads 0 once the bullet says what the gate now measures
-```
-
-measured 2026-10-08 by chain chain-remove-add-account-button-20261008-103333-20a8, finding L2, LOW
-probe-key: 131931f1fe7308113e8e7c527616d80ab5b57f80
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/AccountFooterRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/AccountPopover.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/hooks/useReloginCapture.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/relogin-window.mjs
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/AccountFooterRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/AccountPopover.tsx
 
 ## INV-7416 — probe — a stray that ran and a stray the fence refused print the same report; nothing notices a fence that never ran
 
@@ -9348,10 +9288,10 @@ A scratch chain that sets `HEAL_LEDGER_PATH` files friction rows and opens the h
 
 - Measured 2026-10-16: 7 judges in 4 scratch dirs, 46k–81k tokens each.
 - `usage-hold-account-scratch.py` therefore sets `HEAL_REFLEX_DISABLE=1` and `QUIET_CHECKPOINT_DISABLE=1`, pops `HEAL_LEDGER_PATH`, and ends both modes with a reading that fails when any heal cycle or Chiron judge appears.
-- Any probe added to these files keeps all four.
+- Any probe added to this file keeps all four.
 - Proof commands and what they cover: MAN-8514.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/usage-hold-account-kick-entry.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/usage-hold-account-kick.sh, /home/lyphe/.claude/claudecodeui_lyphe/.verify/usage-hold-account-scratch.py
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/usage-hold-account-scratch.py
 
 ## INV-8514 — probe — MEDIUM — a message sent with an image is drawn twice, and stays twice until the page reloads (plain mode on)
 
@@ -9407,20 +9347,20 @@ probe-key: a4738a37326b696e2545993f2a47495e6c5433e4
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-sessions.provider.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/services/session-conversations-search.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/claude-transcript-rows.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/local-commands.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/trailing-message-kit.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/trailing-old-message-before.sh, /home/lyphe/.claude/claudecodeui_lyphe/.verify/trailing-old-message-proof.mjs
 
-## INV-8633 — The affected-areas lane reads the secret from shadow-connector's env file at call time and copies it nowhere; the allowlist is the only door
+## INV-8633 — The lanes to shadow-connector read the secret from its env file at call time and copy it nowhere; an allowlist is the only door
 
-Rules for `server/modules/affected-areas/` (manual: MAN-8559):
+Rules for `server/modules/affected-areas/` (manual: MAN-8559) and the forwarder it builds, `server/shared/shadow-connector-lane.ts` (manual: MAN-8863), which every lane to shadow-connector shares:
 
-1. `EIS_INTERNAL_SECRET` is never written to `process.env`, this server's `.env`, a log line or an error message. why: a copy drifts on rotation, and the agent sessions this server spawns inherit its environment.
+1. `EIS_INTERNAL_SECRET` is read in `server/shared/shadow-connector-lane.ts` and nowhere else, and is never written to `process.env`, this server's `.env`, a log line or an error message. why: a copy drifts on rotation, and the agent sessions this server spawns inherit its environment. A second lane imports the forwarder; it does not parse the env file itself.
 2. `describeFailure` uses only an error's NAME and its cause's CODE, never its message. why: a transport error can quote the request, and the request carries the secret.
-3. Only `affected-areas.module.ts` reads `SHADOW_CONNECTOR_URL` / `SHADOW_CONNECTOR_ENV_FILE`. why: a scratch engine or an empty env file is proven by setting the variable before `createAffectedAreasModule()`.
+3. Only `affected-areas.module.ts` reads `SHADOW_CONNECTOR_URL` / `SHADOW_CONNECTOR_ENV_FILE` for this lane, and passes the values to `createShadowConnectorLane` with its `label`. why: a scratch engine or an empty env file is proven by setting the variable before `createAffectedAreasModule()`.
 4. A new engine route reaches the browser only as a row of `ALLOWLIST` with its id rules, query rules and body kind. why: an unlisted path is the lane's own 404 and a bad id a 422 before any byte leaves; the lane never forwards a caller-invented path or query key.
 5. The lane never reshapes an upstream body: status and JSON pass through whole; only lane faults carry `{ error }`.
 6. `fetch` keeps `redirect: 'manual'`. why: the secret header must not follow a `Location`.
 
 Trap: a unit that exports `EIS_INTERNAL_SECRET` in its own environment overrides `.env` for the engine (`main.py` calls `load_dotenv()` with its default `override=False`, so the process environment wins) but not for the lane, which reads only the file: the two then disagree and every forward is the engine's 403. Read from the code 2026-10-17; not reproduced.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/affected-areas/affected-areas.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/affected-areas/affected-areas.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/affected-areas/affected-areas.service.ts
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/affected-areas/affected-areas.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/affected-areas/affected-areas.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/shadow-connector-lane.ts
 
 ## INV-8644 — probe — LOW — The gallery tag is 3.55:1 over a white photo, and neither the sheet nor the report says so
 
@@ -10990,10 +10930,9 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/sett
 ## INV-9252 — ClaudeAccountRow, ClaudeAccountSwitch, ClaudeAccountsPicture — identical in both shared/types.ts mirrors
 
 Reference: MAN-8847 (the section that reads them), MAN-8843 (the door face they describe).
-1. **Each of the three types is byte-identical in `src/shared/types.ts` and `server/shared/types.ts`**, comment and body. The `door?:` member on the `reachable: true` variant of `ClaudeAccounts` is the same line in both. A change to one lands in the other in the same edit. 2026-10-21: three block checksums equal across the mirrors.
-2. **They describe `claude-account status --json` as the door sends it.** Times are epoch SECONDS (`ClaudeAccountSlot.expiresAt` beside them is MILLISECONDS); `reading.five` / `.week` are fractions 0..1 or `null` (a window the pacer could not measure — the pacer files one-window readings), and `null` draws as unknown, never zero (MAN-8862); `token` is a state word (`none` | `saved` | `checking`), never a token or a digest of one; `why` is the rule's sentence (INV-76).
-3. **`door?:` is optional** while the old slot summary stands: absent means `ClaudeAccountRows` draws nothing. Required only when the old switcher is removed.
-4. **`ClaudeDoorPicture` is client-only** (`src/shared/types.ts`): `ClaudeAccountsPicture | {reachable:false; reason: string}`, the two shapes `ClaudeAccounts.door` has. It is not a mirrored type; the three above are.
+1. **Each of the three door-face types is byte-identical in `src/shared/types.ts` and `server/shared/types.ts`**, comment and body: `ClaudeAccountRow`, `ClaudeAccountSwitch`, `ClaudeAccountsPicture`. `ClaudeAccounts`, the lane's answer, is field-for-field identical beside them — `({ reachable: true } & ClaudeAccountsPicture) | { reachable: false; reason: string }` — and carries no `door` member. A change to one mirror lands in the other in the same edit. 2026-10-21: three block checksums equal across the mirrors.
+2. **They describe `claude-account status --json` as the door sends it.** Times are epoch SECONDS (`ClaudeUsage.checkedAt`/`staleSince` are seconds too; `resetsAt` is an ISO-8601 string); `reading.five` / `.week` are fractions 0..1 or `null` (a window the pacer could not measure — the pacer files one-window readings), and `null` draws as unknown, never zero (MAN-8862); `token` is a state word (`none` | `saved` | `checking`), never a token or a digest of one; `why` is the rule's sentence (INV-76).
+3. **`ClaudeAccounts` is the lane's answer, not the door's raw picture.** `reachable: true` means every field is the door's own, at the TOP LEVEL; `reachable: false` carries the calm reason. There is no `door` member, and no type re-wraps the picture in an envelope.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts
 
@@ -11324,8 +11263,8 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const nowS = () => Math.floor(Date.now() / 1000);
 const other = { slug: 'scottdejesus', digest: 'f9caa612', token: 'saved', expires_at: nowS() + 86400, chosen: false, live: true, in_use: false, wall: null,
   reading: { five: 0.81, five_resets: nowS() + 3600, week: 0.16, week_resets: nowS() + 86400, at: nowS() - 60, source: 'meter' }, pace: null, room: true, why: '' };
-const accountsWith = (row) => ({ reachable: true, active: 'sdjesus89', activeLabel: 'sdjesus89', slots: [], liveLabel: 'scottdejesus@gmail.com', liveExpiresAt: null, drift: false, liveSessions: 0, unreadable: false,
-  door: { accounts: [row, other], candidates: [], auto: true, held: false, chosen: '8b907ae7', last_switch: null } });
+const accountsWith = (row) => ({ reachable: true, accounts: [row, other], candidates: [], auto: true, held: false,
+  chosen: { slug: 'sdjesus89', digest: '8b907ae7', at: nowS() - 60, by: 'operator', why: '' }, last_switch: null });
 const usage = { reachable: true, account: 'f9caa612', degraded: false, reason: '', staleSince: null, checkedAt: nowS(), pace: null, windows: [] };
 async function run(row, label) {
   const s = await openConsole({ viewport: { width: 1440, height: 900 } });
@@ -11361,7 +11300,128 @@ case "$D" in /tmp/athena-probe.??????) rm -rf "$D";; esac
 expect: ABSENT-five {"footer":1,"panel":1,…,"row":"5h NaN% · wk 60%","meters":[["Current 5-hour window","NaN","NaN% used"],["This week","60","60% used"]],"pageErrors":[]}; ABSENT-at {"footer":1,"panel":0,"body":"CloudCLI hit an error | …","pageErrors":["Invalid time value"]}. Cured: ABSENT-five row "5h — · wk 60%" with no aria-valuenow on the 5-hour meter, and ABSENT-at panel 1 with row "5h 40% · wk 60%" and no pageerror.
 ```
 
-measured 2026-10-21 by chain chain-usage-limits--account-switch--panel-fill-20261021-193921-04ef, finding L1, LOW
+measured 2026-10-21 by chain chain-usage-limits--account-switch--panel-fill-20261021-193921-04ef, finding L1, LOW;
+re-pinned to the lane's top-level picture (no `door` envelope, `chosen` a record) 2026-10-21 by the
+old-switcher fix-pass, not re-measured (a LOW takes no proof run)
 probe-key: e9633bd2babd88258ddd1436d550a5be4b8b76ce
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/AccountFooterRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/AccountPopover.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/ClaudeAccountRows.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/ClaudeAccountRowViews.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/hooks/useAccountSetup.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/hooks/useClaudeAccounts.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/utils/accountInUseUsage.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/panel-fill.mjs
+
+## INV-9290 — probe — `healed means deleted` was not applied to the names of what this phase removed (LOW)
+
+`healed means deleted` was not applied to the names of what this phase removed (LOW)
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'SH'
+#!/usr/bin/env bash
+set -u
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+hits=$(grep -nE "slot summary under .door.|store answers only|account store's slots|the account store reads and documents|for the drift notice|The account store could not be read" \
+  server/modules/accounts/account-door-relay.ts server/modules/accounts/accounts.module.ts \
+  server/modules/accounts/usage.service.ts src/shared/ui/Banner.tsx src/modules/accounts/ClaudeAccountRows.tsx)
+printf '%s\n' "$hits"
+[ -n "$hits" ] && echo "stale: removed store / door / drift words on this ground" || echo "clean: no removed mechanism named"
+echo "— pointers to the deleted verify file:"
+grep -n "phase-12" .verify/phase-14.mjs .verify/phase-19.mjs || echo "none"
+SH
+bash "$D/p.sh"
+case "$D" in /tmp/athena-probe.??????) rm -rf "$D";; esac
+```
+
+measured 2026-10-21 by chain chain-usage-limits--account-switch--old-switcher-20261021-211135-37f2, finding L1, LOW
+probe-key: b0a33f825002044cc2f16dd32c6ac182a3f72f80
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/account-digest.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/account-door-relay.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/account-identity.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/accounts.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/accounts.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/account-store.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/usage.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-auth.provider.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/AccountFooterRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/AccountPopover.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/ClaudeAccountRows.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/claude-accounts-fake.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/hooks/useClaudeAccounts.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/UsageMeters.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/utils/accountInUseUsage.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/Settings.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Banner.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/panel-fill.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-14.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-19.mjs
+
+## INV-9291 — probe — INV-9252's body still teaches the deleted `door`/slot shape, and the builder's report does not name it for the sweep (LOW)
+
+INV-9252's body still teaches the deleted `door`/slot shape, and the builder's report does not name it for the sweep (LOW)
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'SH'
+#!/usr/bin/env bash
+set -u
+docstore get INV-9252 --text > "$1/inv.txt"
+grep -nE 'door\?:|ClaudeAccountSlot|ClaudeDoorPicture' "$1/inv.txt" || echo "row describes only the current types"
+SH
+bash "$D/p.sh" "$D"
+case "$D" in /tmp/athena-probe.??????) rm -rf "$D";; esac
+```
+
+measured 2026-10-21 by chain chain-usage-limits--account-switch--old-switcher-20261021-211135-37f2, finding L2, LOW
+probe-key: 32bf18ed906c667a65538dd7dd656af31bc92cc2
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/account-digest.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/account-door-relay.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/account-identity.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/accounts.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/accounts.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/account-store.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/usage.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-auth.provider.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/AccountFooterRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/AccountPopover.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/ClaudeAccountRows.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/claude-accounts-fake.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/hooks/useClaudeAccounts.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/UsageMeters.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/utils/accountInUseUsage.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/Settings.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Banner.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/panel-fill.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-14.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-19.mjs
+
+## INV-9292 — probe — INV-9289's pinned probe stubs the deleted envelope and now crashes on both of its own cases (LOW)
+
+INV-9289's pinned probe stubs the deleted envelope and now crashes on both of its own cases (LOW)
+
+```probe
+# ~90 s: the pinned probe opens two browser scenes, each waiting out a 30 s click timeout.
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'SH'
+#!/usr/bin/env bash
+set -u
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+pin=$(docstore get INV-9289 --text | sed -n '/^```probe/,/^```$/p')
+if printf '%s\n' "$pin" | grep -q 'reachable: true, active:'; then
+  echo "stale envelope: the pin stubs {reachable,active,slots,door:{…}}; the panel reads the picture at the top level"
+else
+  echo "current envelope: the pin stubs the picture at the top level"
+fi
+printf '%s\n' "$pin" | sed '1d;$d' > "$1/pin.sh"
+bash "$1/pin.sh" 2>&1 | tail -2
+SH
+bash "$D/p.sh" "$D"
+case "$D" in /tmp/athena-probe.??????) rm -rf "$D";; esac
+```
+
+measured 2026-10-21 by chain chain-usage-limits--account-switch--old-switcher-20261021-211135-37f2, finding L3, LOW
+probe-key: a8997485737f7eb65016bbc0299f2ed90ce3e162
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/account-digest.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/account-door-relay.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/account-identity.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/accounts.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/accounts.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/account-store.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/usage.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-auth.provider.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/AccountFooterRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/AccountPopover.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/ClaudeAccountRows.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/claude-accounts-fake.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/hooks/useClaudeAccounts.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/UsageMeters.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/utils/accountInUseUsage.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/Settings.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Banner.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/panel-fill.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-14.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-19.mjs
+
+## INV-9293 — probe — an unreadable `last_switch.at` still takes the whole app down (LOW; predates this phase, measured on this ground)
+
+an unreadable `last_switch.at` still takes the whole app down (LOW; predates this phase, measured on this ground)
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.mjs" <<'EOF'
+import { openConsole } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/console.mjs';
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const nowS = () => Math.floor(Date.now() / 1000);
+const row = (slug, digest) => ({ slug, digest, token: 'saved', expires_at: nowS() + 86400, chosen: false, live: false, in_use: slug === 'beta', wall: null,
+  reading: { five: 0.4, five_resets: nowS() + 3600, week: 0.6, week_resets: nowS() + 86400, at: nowS() - 60, source: 'meter' }, pace: null, room: true, why: '' });
+const picture = { reachable: true, accounts: [row('alpha', 'aaaa'), row('beta', 'bbbb')], candidates: [], auto: true, held: false,
+  chosen: { slug: 'alpha', digest: 'aaaa', at: nowS() - 30, by: 'auto', why: '' },
+  last_switch: { at: 'yesterday', from: 'aaaa', from_slug: 'alpha', to: 'bbbb', to_slug: 'beta', by: 'auto', why: 'the 5-hour window filled' } };
+const usage = { reachable: true, account: 'aaaa', degraded: false, reason: '', staleSince: null, checkedAt: nowS(), pace: null, windows: [] };
+const s = await openConsole({ viewport: { width: 1440, height: 900 } });
+const { page } = s;
+const pageErrors = [];
+page.on('pageerror', (e) => pageErrors.push(String(e.message || e).split('\n')[0]));
+await page.route(/\/api\/accounts(?:[/?#]|$)/, (r) => r.fulfill({ json: picture }));
+await page.route(/\/api\/usage(?:[?#]|$)/, (r) => r.fulfill({ json: usage }));
+await page.reload({ waitUntil: 'domcontentloaded' });
+await page.locator('button[data-account-row]').waitFor({ timeout: 20000 });
+await sleep(600);
+await page.locator('button[data-account-row]').click().catch(() => {});
+await sleep(1200);
+const body = (await page.locator('body').innerText()).replace(/\n+/g, ' | ').slice(0, 120);
+const panel = await page.locator('#account-panel').count();
+console.log(JSON.stringify({ panel, appError: body.includes('CloudCLI hit an error'), body, pageErrors }));
+await s.browser.close();
+EOF
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+node "$D/p.mjs"
+case "$D" in /tmp/athena-probe.??????) rm -rf "$D";; esac
+```
+
+measured 2026-10-21 by chain chain-usage-limits--account-switch--old-switcher-20261021-211135-37f2, finding L4, LOW
+probe-key: bda706a7a70fa1a3de7d7b31e8c4820d226f6238
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/account-digest.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/account-door-relay.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/account-identity.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/accounts.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/accounts.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/account-store.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/usage.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-auth.provider.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/AccountFooterRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/AccountPopover.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/ClaudeAccountRows.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/claude-accounts-fake.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/hooks/useClaudeAccounts.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/UsageMeters.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/utils/accountInUseUsage.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/Settings.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Banner.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/panel-fill.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-14.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-19.mjs

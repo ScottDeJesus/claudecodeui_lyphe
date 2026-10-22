@@ -1,6 +1,6 @@
 import express from 'express';
 
-import type { AffectedAreasService, LaneAnswer } from './affected-areas.service.js';
+import type { LaneAnswer, ShadowConnectorLane } from '@/shared/shadow-connector-lane.js';
 
 /** The prefix this lane serves, and the one shadow-connector serves the same surface under. */
 const UPSTREAM_PREFIX = '/api/affected-areas';
@@ -171,12 +171,12 @@ function emit(response: express.Response, answer: LaneAnswer): void {
  *
  * These handlers validate and translate, and do nothing else: no secret is read here, no socket is
  * opened here, and no route hands shadow-connector an id it did not first hold to its shape. The
- * service owns the one transport, and the secret behind it.
+ * shared forwarder (`@/shared/shadow-connector-lane`) owns the one transport, and the secret behind it.
  *
- * Consumer: `affected-areas.module.ts`, which hands in the service's `forward`.
+ * Consumer: `affected-areas.module.ts`, which hands in the forwarder's `forward`.
  */
 export function createAffectedAreasRouter(
-  dependencies: Pick<AffectedAreasService, 'forward'>,
+  dependencies: Pick<ShadowConnectorLane, 'forward'>,
 ): express.Router {
   const router = express.Router();
 

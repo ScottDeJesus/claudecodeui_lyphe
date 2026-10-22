@@ -14,16 +14,26 @@ const SWITCHING_IN_WORDS =
 
 /**
  * The door could not answer. One calm line and never a banner: nothing on this screen is wrong —
- * the server simply could not read the store, so which accounts can sign in is unknown.
+ * the server simply could not read the accounts, so which ones can sign in is unknown.
  */
-const DOOR_UNREACHABLE_LINE = 'The account store could not be read — which accounts can sign in is unknown.';
+const DOOR_UNREACHABLE_LINE = 'The server could not read the accounts — which ones can sign in is unknown.';
 
 /** The default for a caller that passes no act (the fakes' fixture): a press with no handler must do nothing at all. */
 const NO_ACT = () => undefined;
 
 /** The last switch as one sentence, naming the day only when it was not today. */
-function lastSwitchInWords(lastSwitch: ClaudeAccountSwitch, nowMs: number, why = lastSwitch.why.trim()): string {
+function lastSwitchInWords(
+  lastSwitch: ClaudeAccountSwitch,
+  nowMs: number,
+  why = typeof lastSwitch.why === 'string' ? lastSwitch.why.trim() : '',
+): string {
+  // `at` is wire input like every reading's stamp: a row relayed without a readable time has no
+  // clock to state, and `new Date(NaN).toISOString()` throws in render — taking the whole app down
+  // over one line. The switch is still a fact; say it without the time.
   const at = new Date(lastSwitch.at * 1000);
+  if (Number.isNaN(at.getTime())) {
+    return why ? `Switched to ${lastSwitch.to_slug} — ${why}` : `Switched to ${lastSwitch.to_slug}.`;
+  }
   const clock = at.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }).toLowerCase();
   const day = formatShortDate(at.toISOString());
   const sameDay = at.toDateString() === new Date(nowMs).toDateString();
@@ -36,7 +46,8 @@ function lastSwitchInWords(lastSwitch: ClaudeAccountSwitch, nowMs: number, why =
  * example of this line is exactly this: "sdjesus89's weekly reached its ceiling". The figures stay
  * in the title, where the row above also carries them.
  */
-function whyHeadline(why: string): string {
+function whyHeadline(why: string | null | undefined): string {
+  if (typeof why !== 'string' || !why) return '';
   return why.split(';')[0].split(' (')[0].trim();
 }
 

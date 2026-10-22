@@ -112,7 +112,7 @@ function isPicture(value: unknown): value is ClaudeAccountsPicture {
 
 /**
  * The panel's picture — `claude-account status --json`, relayed whole. Used by
- * `accounts.routes.ts` (`GET /api/accounts`), which carries it beside the slot summary under `door`.
+ * `accounts.routes.ts` (`GET /api/accounts`), which answers it under the lane's `reachable: true`.
  * A read creates nothing and writes nothing; the door's own read of a missing store answers an
  * empty picture.
  */

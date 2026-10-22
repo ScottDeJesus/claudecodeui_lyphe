@@ -24,9 +24,9 @@ const hasErrorCode = (error: unknown, code: string): boolean => (
 const claudeConfigDir = (): string => process.env.CLAUDE_CONFIG_DIR?.trim() || path.join(os.homedir(), '.claude');
 
 /**
- * The account switcher names the identity in `~/.claude.json` and assumes the default config dir. With
+ * The account door names the identity in `~/.claude.json` and assumes the default config dir. With
  * `CLAUDE_CONFIG_DIR` pointing elsewhere the tokens read here belong to another login than that file's,
- * so the switcher's email would be a confident wrong name — the status falls back to "Authenticated".
+ * so the door's email would be a confident wrong name — the status falls back to "Authenticated".
  */
 const configDirIsDefault = (): boolean => path.resolve(claudeConfigDir()) === path.join(os.homedir(), '.claude');
 
@@ -150,7 +150,7 @@ export class ClaudeProviderAuth implements IProviderAuth {
       if (accessToken) {
         const expiresAt = typeof oauth?.expiresAt === 'number' ? oauth.expiresAt : undefined;
         // The credentials file holds the tokens and no identity: the CLI keeps who is signed in under
-        // `oauthAccount` in `~/.claude.json`, which is the email the account switcher already names. Without
+        // `oauthAccount` in `~/.claude.json`, which is the email the account door already names. Without
         // it a signed-in account answered `email: null` — Settings printed "Authenticated" for every login,
         // so a re-login could never show the account it had just signed in as.
         const email = readOptionalString(creds.email)
