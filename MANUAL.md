@@ -3940,7 +3940,7 @@ The Bulletins view: what Claude read of each carrier's SERVPRO program bulletin 
 ## State of the module
 | fact | value |
 |---|---|
-| phase | live, reading the lane. Run whole against the live engine 2026-10-22 with `.verify/bulletins-view.mjs` (53 verdicts, no model call, no write) |
+| phase | live, reading the lane. Run whole against the live engine 2026-10-22 with `.verify/bulletins-view.mjs` (no model call, no write): 53 of 53 verdicts on the code before three later changes (the empty-scope labels, the strip's own scroller at 390 px, the no-ids check). Those three were measured apart (the strip: panel scroller 445 px in a 390 px box before, 390 in 390 after) or only compiled (the scope labels, the no-ids check); the run that would show them whole timed out in the harness's own page load at box load ~50. Re-run it when `/proc/loadavg` is under 12 |
 | mounted | `CerberusPanel` draws `<KeptView id="bulletins">` around the lazy `BulletinsView` (this module's barrel) after Tours, once center's overview has answered: mounted on its first show, `hidden` after, so the open carrier, page and scroll survive a visit to Fleet. Leaving the Cerberus workspace tab for Chat unmounts the panel and the view with it |
 | reads | four hooks in `hooks/`, each used by the view root alone: `useOverview`, `useBulletinPages`, `usePageReading` (each is `useLaneRead`, MAN-8917, over one `api.carrierBulletins` verb) and `usePageImage` |
 | words | `cerberus.bulletins.*` in `src/modules/i18n/locales/en/common.json`, including `cerberus.bulletins.tab` and `.tabHint` (the strip's two words); the surround's failure words are `viewBoundary.*` (MAN-8917) |
@@ -4008,7 +4008,7 @@ section: The Bulletins view — src/modules/carrier-bulletins: the three screens
 - `AffectedAreasTrouble` is the lane-neutral fault type under a Tours name; renaming it touches live Tours files.
 - `PageReading` has no `width` / `height`; a landscape page draws inside the letter box until it does.
 - On a fault screen the header's Refresh and the banner's Try again do the same read.
-- Not proven on the final code: dark mode, and the waiting and stopped states against live data (no carrier waits today; the walk's reading of AAA of Southern California is in progress).
+- Not proven whole on the final code: the empty-scope labels and the no-ids check (the probe has both; its last run did not reach them), dark mode, and the waiting and stopped states against live data (no carrier waits today; the walk's reading of AAA of Southern California is in progress).
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/carrier-bulletins/
 
