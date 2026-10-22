@@ -13,6 +13,9 @@ import type { LaneRoute, LaneRule } from '@/shared/shadow-connector-lane-router.
 /** The prefix this lane serves, and the one shadow-connector serves the same surface under. */
 const UPSTREAM_PREFIX = '/api/affected-areas';
 
+/** The three bytes every JPEG begins with (the start-of-image marker and the first marker's 0xFF): an image answer that does not is not a view. */
+const JPEG_SIGNATURE = Buffer.from('ffd8ff', 'hex');
+
 const LANE_TIMEOUT_MS = 20_000;
 const VIEWS_TIMEOUT_MS = 90_000;
 const READ_TIMEOUT_MS = 120_000;
@@ -92,6 +95,6 @@ export function createAffectedAreasRouter(
     pathRules: PATH_RULES,
     allowlist: ALLOWLIST,
     forward: dependencies.forward,
-    image: { contentType: 'image/jpeg', noun: 'a JPEG' },
+    image: { contentType: 'image/jpeg', noun: 'a JPEG', signature: JPEG_SIGNATURE },
   });
 }

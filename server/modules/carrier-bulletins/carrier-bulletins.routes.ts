@@ -17,6 +17,19 @@ const UPSTREAM_PREFIX = '/api/carrier-bulletins';
 const OVERVIEW_TIMEOUT_MS = 60_000;
 const READ_TIMEOUT_MS = 30_000;
 
+/** The eight bytes every PNG begins with: an image answer that does not is not a page, whatever its Content-Type says. */
+const PNG_SIGNATURE = Buffer.from('89504e470d0a1a0a', 'hex');
+
+/**
+ * The engine's response headers a JSON answer carries back to the browser (and no other):
+ *  - `x-left-out`: a JSON array of `{carrier, reason}` naming a carrier whose current file could not be
+ *    planned and so is missing from the overview's list. The body stays the bare array, so without this a
+ *    carrier would vanish from the overview with no mark on the wire. Absent when no carrier is left out.
+ *  - `cache-control`: the engine stamps `no-store` on every body and every error, because what Claude has
+ *    read changes with every pull; the lane's answers keep it rather than fall back to Express's ETag alone.
+ */
+const PASSED_HEADERS = ['x-left-out', 'cache-control'] as const;
+
 /**
  * A page is 1 to 999 with no sign, no leading zero and no blank — the engine's own spelling
  * (`api/carrier_bulletins/ids.py`). It is a pattern and not a number with bounds on purpose: `3`, `03` and
@@ -64,6 +77,7 @@ export function createCarrierBulletinsRouter(
     pathRules: PATH_RULES,
     allowlist: ALLOWLIST,
     forward: dependencies.forward,
-    image: { contentType: 'image/png', noun: 'a PNG' },
+    image: { contentType: 'image/png', noun: 'a PNG', signature: PNG_SIGNATURE },
+    passHeaders: PASSED_HEADERS,
   });
 }

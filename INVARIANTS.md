@@ -9355,7 +9355,7 @@ Rules for the two lanes to shadow-connector — `server/modules/affected-areas/`
 2. `describeFailure` uses only an error's NAME and its cause's CODE, never its message. why: a transport error can quote the request, and the request carries the secret.
 3. Only a lane's own module (`affected-areas.module.ts`, `carrier-bulletins.module.ts`) reads `SHADOW_CONNECTOR_URL` / `SHADOW_CONNECTOR_ENV_FILE` for its lane, and passes the values to `createShadowConnectorLane` with its own distinct `label`. why: a scratch engine or an empty env file is proven by setting the variable before `createAffectedAreasModule()` / `createCarrierBulletinsModule()`; a shared label would make two lanes' journal lines indistinguishable.
 4. A new engine route reaches the browser only as a row of its lane's `ALLOWLIST` with its id rules, query rules and body kind, answered by `createLaneRouter`. why: an unlisted path is the lane's own 404 and a bad id a 422 before any byte leaves; the lane never forwards a caller-invented path or query key. The bulletins lane's table is GET rows only, because its surface is read-only (INV-9382 in shadow-connector).
-5. The lane never reshapes an upstream body: status and JSON pass through whole; only lane faults carry `{ error }`.
+5. The lane never reshapes an upstream body: status and JSON pass through whole; only lane faults carry `{ error }`. An upstream response header travels only when the lane names it (`passHeaders`); the Tours lane names none, the bulletins lane `x-left-out` and `cache-control`. An image is relayed only if its bytes begin with the lane's format signature as well as carrying its Content-Type.
 6. `fetch` keeps `redirect: 'manual'`. why: the secret header must not follow a `Location`.
 7. A lane's routes do not copy the router's loop, its tails or its fault-to-status map: a lane that needs different behaviour changes `LaneRouterDefinition`. why: two copies of the checks drift, and a check that is weaker in one lane is an id the engine sees.
 
@@ -11622,3 +11622,75 @@ measured 2026-10-21 by chain chain-usage-limits--account-switch--whole-20261021-
 probe-key: cea89c710a67633226d57a865016753d0f04adef
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/console.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/whole-account-switch-panel.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/whole-account-switch-passes.py, /home/lyphe/.claude/claudecodeui_lyphe/.verify/whole-account-switch.sh, /home/lyphe/.claude/hooks/enforce_claude_api_secret.py, /home/lyphe/.claude/hooks/plan_runner/claude_account/route.py
+
+## INV-9404 — probe — MEDIUM — the lane drops every response header, so the engine's `X-Left-Out` never reaches the browser, and the requirement was deleted instead of met
+
+MEDIUM — the lane drops every response header, so the engine's `X-Left-Out` never reaches the browser, and the requirement was deleted instead of met
+
+```probe
+D=$(mktemp -d /tmp/athena-probe-lo.XXXXXX) || exit 1
+cat > "$D/p.mts" <<'EOF'
+import http from 'node:http'; import fs from 'node:fs'; import os from 'node:os'; import path from 'node:path'; import express from 'express';
+const eng = http.createServer((_q, r) => { r.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store, max-age=0', 'x-left-out': '[{"carrier":"State Farm","reason":"unplannable"}]' }); r.end('[{"carrier":"Hanover Insurance"}]'); });
+await new Promise<void>((res) => eng.listen(0, '127.0.0.1', res));
+const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'athena-lo-env-')); const env = path.join(tmp, 'env'); fs.writeFileSync(env, 'EIS_INTERNAL_SECRET=scratch-secret\n');
+process.env.SHADOW_CONNECTOR_URL = `http://127.0.0.1:${(eng.address() as any).port}`; process.env.SHADOW_CONNECTOR_ENV_FILE = env;
+const { createCarrierBulletinsModule } = await import('/home/lyphe/.claude/claudecodeui_lyphe/server/modules/carrier-bulletins/index.ts');
+const app = express(); app.use('/api/carrier-bulletins', createCarrierBulletinsModule().router);
+const lane = http.createServer(app); await new Promise<void>((res) => lane.listen(0, '127.0.0.1', res));
+const rs = await fetch(`http://127.0.0.1:${(lane.address() as any).port}/api/carrier-bulletins/overview`);
+console.log('lane answers', rs.status, '| x-left-out=' + rs.headers.get('x-left-out'), '| cache-control=' + rs.headers.get('cache-control'), '| body=' + (await rs.text()));
+process.exit(0);
+EOF
+cd /home/lyphe/.claude/claudecodeui_lyphe && TSX_TSCONFIG_PATH=server/tsconfig.json timeout 60 node --import tsx "$D/p.mts"
+expect: lane answers 200 | x-left-out=null | cache-control=null | body=[{"carrier":"Hanover Insurance"}]
+```
+
+measured 2026-10-22 by chain chain-bulletins-read-by-claude--relay-20261022-095239-89c8, finding M1, MEDIUM
+probe-key: 48e4e43024f75119b9a380d59beed15149ae8d4f
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/affected-areas/affected-areas.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/carrier-bulletins/carrier-bulletins.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/carrier-bulletins/carrier-bulletins.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/carrier-bulletins/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/shadow-connector-lane-router.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/shadow-connector-lane.ts
+
+## INV-9405 — probe — LOW — "a 2xx that is not a PNG is the lane's unreadable" is held by the Content-Type header alone
+
+LOW — "a 2xx that is not a PNG is the lane's unreadable" is held by the Content-Type header alone
+
+```probe
+D=$(mktemp -d /tmp/athena-probe-png.XXXXXX) || exit 1
+cat > "$D/p.mts" <<'EOF'
+import http from 'node:http'; import fs from 'node:fs'; import os from 'node:os'; import path from 'node:path'; import express from 'express';
+const eng = http.createServer((_q, r) => { r.writeHead(200, { 'content-type': 'image/png' }); r.end('<html>an error page, not a PNG</html>'); });
+await new Promise<void>((res) => eng.listen(0, '127.0.0.1', res));
+const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'athena-png-env-')); const env = path.join(tmp, 'env'); fs.writeFileSync(env, 'EIS_INTERNAL_SECRET=scratch-secret\n');
+process.env.SHADOW_CONNECTOR_URL = `http://127.0.0.1:${(eng.address() as any).port}`; process.env.SHADOW_CONNECTOR_ENV_FILE = env;
+const { createCarrierBulletinsModule } = await import('/home/lyphe/.claude/claudecodeui_lyphe/server/modules/carrier-bulletins/index.ts');
+const app = express(); app.use('/api/carrier-bulletins', createCarrierBulletinsModule().router);
+const lane = http.createServer(app); await new Promise<void>((res) => lane.listen(0, '127.0.0.1', res));
+const sha = 'a'.repeat(64);
+const rs = await fetch(`http://127.0.0.1:${(lane.address() as any).port}/api/carrier-bulletins/files/${sha}/pages/1/image`);
+const b = Buffer.from(await rs.arrayBuffer());
+console.log('lane answers', rs.status, '| content-type=' + rs.headers.get('content-type'), '| cache-control=' + rs.headers.get('cache-control'), '| PNG signature=' + (b.subarray(0, 8).toString('hex') === '89504e470d0a1a0a'), '| first bytes=' + JSON.stringify(b.subarray(0, 12).toString('latin1')));
+process.exit(0);
+EOF
+cd /home/lyphe/.claude/claudecodeui_lyphe && TSX_TSCONFIG_PATH=server/tsconfig.json timeout 60 node --import tsx "$D/p.mts"
+expect: lane answers 200 | content-type=image/png | cache-control=private, max-age=31536000, immutable | PNG signature=false | first bytes="<html>an err"   (cured: 502 and no cache-control)
+```
+
+measured 2026-10-22 by chain chain-bulletins-read-by-claude--relay-20261022-095239-89c8, finding L1, LOW
+probe-key: 34b30e90d6daa6cf7193349afd1df8abc6a3d5b0
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/affected-areas/affected-areas.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/carrier-bulletins/carrier-bulletins.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/carrier-bulletins/carrier-bulletins.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/carrier-bulletins/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/shadow-connector-lane-router.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/shadow-connector-lane.ts
+
+## INV-9406 — probe — LOW — rows lost: the move out of MAN-8559 dropped three facts that no row carries now
+
+LOW — rows lost: the move out of MAN-8559 dropped three facts that no row carries now
+
+```probe
+for t in MAN-8863 INV-8633 MAN-8908 MAN-8909 MAN-8559; do echo "$t begins-with-quote=$(docstore get $t --text | grep -c -i 'begins with') next(error)=$(docstore get $t --text | grep -c 'next(error)')"; done; docstore history MAN-8559 --limit 1 --diff --text | grep -c 'really begins with'
+expect: every row prints begins-with-quote=0 next(error)=0, and the last line prints 1 (the clause sits in the before-image of MAN-8559's 17:03 write)
+```
+
+measured 2026-10-22 by chain chain-bulletins-read-by-claude--relay-20261022-095239-89c8, finding L2, LOW
+probe-key: f0bf3cac0de8086c7847e20ea4216170a1db7b88
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/affected-areas/affected-areas.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/carrier-bulletins/carrier-bulletins.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/carrier-bulletins/carrier-bulletins.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/carrier-bulletins/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/shadow-connector-lane-router.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/shadow-connector-lane.ts

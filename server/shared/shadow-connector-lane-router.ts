@@ -82,10 +82,20 @@ export type LaneRouterDefinition = {
   /** The forwarder's `forward`. */
   forward: ShadowConnectorLane['forward'];
   /**
-   * The one image type this lane's `bytes` routes answer. A 2xx whose Content-Type is anything else is the
-   * lane's `unreadable`, and `noun` ('a JPEG', 'a PNG') is how the 502 sentence names what was expected.
+   * The one image type this lane's `bytes` routes answer. A 2xx whose Content-Type is anything else, or
+   * whose bytes do not begin with `signature` (the format's magic number: `89504e470d0a1a0a` for a PNG,
+   * `ffd8ff` for a JPEG), is the lane's `unreadable`: the Content-Type is the engine's word and the bytes
+   * are what would be cached for a year. `noun` ('a JPEG', 'a PNG') is how the 502 sentence names what was expected.
    */
-  image: { contentType: string; noun: string };
+  image: { contentType: string; noun: string; signature: Buffer };
+  /**
+   * Upstream response headers a JSON answer carries back to the browser, named in lower case (the
+   * forwarder's `LaneRequest.passHeaders`). Absent carries none, so a lane reads only what it names: the
+   * bulletins lane names `x-left-out` (a carrier the overview could not list) and `cache-control`
+   * (`no-store`: what Claude has read changes with every pull). Never the secret, never a `Set-Cookie`:
+   * name a header only when this lane's view reads it or its caching depends on it.
+   */
+  passHeaders?: readonly string[];
 };
 
 //----------------- HOW A FAULT BECOMES A STATUS ------------
@@ -146,8 +156,9 @@ function forwardedQuery(spec: LaneRoute, request: express.Request): Record<strin
 
 /**
  * One answer, written. An upstream answer keeps its status and its JSON untouched — the lane never
- * reshapes a body, so the browser reads exactly what the engine wrote. A 2xx image is relayed as bytes,
- * under the one type the lane expects and a year's cache (it is keyed by the sha256 of what it shows).
+ * reshapes a body, so the browser reads exactly what the engine wrote — and carries back the headers
+ * the lane named (`passHeaders`), none otherwise. A 2xx image is relayed as bytes, under the one type
+ * the lane expects and a year's cache (it is keyed by the sha256 of what it shows).
  */
 function emit(response: express.Response, answer: LaneAnswer, image: LaneRouterDefinition['image']): void {
   if (!answer.ok) {
@@ -155,11 +166,15 @@ function emit(response: express.Response, answer: LaneAnswer, image: LaneRouterD
     return;
   }
   if (answer.kind === 'json') {
-    response.status(answer.status).json(answer.body);
+    response.status(answer.status).set(answer.headers).json(answer.body);
     return;
   }
-  // An image route that answers 2xx with anything but the expected type is a server this lane has no word for.
-  if (!answer.contentType.toLowerCase().startsWith(image.contentType)) {
+  // An image route that answers 2xx with anything but the expected type, or with bytes that are not that
+  // format (an error page stamped `image/png`), is a server this lane has no word for: nothing is cached.
+  if (
+    !answer.contentType.toLowerCase().startsWith(image.contentType) ||
+    !answer.body.subarray(0, image.signature.length).equals(image.signature)
+  ) {
     response.status(STATUS_FOR_FAULT.unreadable).json({ error: `shadow-connector did not answer with ${image.noun}` });
     return;
   }
@@ -185,6 +200,7 @@ export function createLaneRouter({
   allowlist,
   forward,
   image,
+  passHeaders,
 }: LaneRouterDefinition): express.Router {
   const router = express.Router();
 
@@ -208,6 +224,7 @@ export function createLaneRouter({
             actingUser: actingUserOf(request),
             timeoutMs: spec.timeoutMs,
             expect: spec.expect,
+            passHeaders,
           }),
           image,
         );
