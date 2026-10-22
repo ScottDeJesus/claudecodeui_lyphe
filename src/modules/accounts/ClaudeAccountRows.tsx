@@ -17,7 +17,7 @@ const SWITCHING_IN_WORDS =
  */
 const DOOR_UNREACHABLE_LINE = 'The account store could not be read — which accounts can sign in is unknown.';
 
-/** Inert until phase panel-fill passes the four acts; a press with no handler must do nothing at all. */
+/** The default for a caller that passes no act (the fakes' fixture): a press with no handler must do nothing at all. */
 const NO_ACT = () => undefined;
 
 /** The last switch as one sentence, naming the day only when it was not today. */
@@ -60,8 +60,8 @@ type ClaudeAccountRowsProps = {
  * "Switch account" block; the fakes beside it (`claude-accounts-fake.ts`) draw every state without a
  * server, so a state is reviewable before the route that carries it exists.
  *
- * Given no picture it renders nothing, which is what keeps the panel exactly as it is until phase
- * panel-fill passes the door's picture and the four acts.
+ * Given no picture it renders nothing (the lane has not answered yet); a picture whose door could
+ * not answer draws that calm line instead.
  */
 export function ClaudeAccountRows(props: ClaudeAccountRowsProps) {
   // A clock handed in is the panel's own, so the section shares the popover's minute rather than
@@ -100,17 +100,11 @@ function AccountRowsBody({
     );
   }
 
-  // FILL: picture.accounts — one row per account the store holds, in slug order.
   const accounts = [...picture.accounts].sort((left, right) => left.slug.localeCompare(right.slug));
-  // FILL: picture.candidates — the live identities the store does not hold yet, each a Set up row.
   const candidates = [...picture.candidates].sort((left, right) => left.slug.localeCompare(right.slug));
-  // FILL: picture.auto — whether the rule may switch by itself when the account in use fills.
   const auto = picture.auto;
-  // FILL: picture.held — the chosen record waits for room; only the account in use says so.
   const held = picture.held;
-  // FILL: picture.chosen — the chosen record's why, shown under the account in use when the last choice was automatic.
   const chosen = picture.chosen;
-  // FILL: picture.last_switch — the last switch and its why, or nothing when there is none.
   const lastSwitch = picture.last_switch;
   // The in-use row already carries this sentence in full, so the record's visible line stops at the
   // headline that says what filled; the whole sentence — figures included — stays in the title. The
@@ -156,7 +150,6 @@ function AccountRowsBody({
           <span className="text-xs leading-relaxed text-muted-foreground">
             Switch automatically when the account in use fills
           </span>
-          {/* FILL: onSetAuto — turns the rule on or off; the door writes it and the panel re-reads. */}
           <Switch
             checked={auto}
             onChange={onSetAuto}

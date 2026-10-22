@@ -5,10 +5,11 @@ import type { JevBalance } from '@/modules/accounts/hooks/useJevBalance';
 import { JevBalanceReadout } from '@/modules/accounts/JevBalanceReadout';
 import { UsageMeters } from '@/modules/accounts/UsageMeters';
 import { accountInitials } from '@/modules/accounts/utils/accountInitials';
+import { accountInUseUsage } from '@/modules/accounts/utils/accountInUseUsage';
 import { useMinuteTick } from '@/modules/accounts/hooks/useMinuteTick';
 import { weeklyResetInWords } from '@/modules/accounts/utils/weeklyReset';
 import { Avatar, Banner, Button, Card } from '@/shared/ui';
-import type { ClaudeAccounts, ClaudeAccountSlot, ClaudeUsage, DeepseekBalance } from '@/shared/types';
+import type { ClaudeAccounts, ClaudeAccountSlot, ClaudeDoorPicture, ClaudeUsage, DeepseekBalance } from '@/shared/types';
 
 /** The line that closes the switcher, because "will this lose my work?" is the only question a switch actually raises. */
 const SWITCH_REASSURANCE =
@@ -98,6 +99,8 @@ function AccountRow({ slot, hue, busy, onSwitch, now }: AccountRowProps) {
 
 type AccountPopoverProps = {
   accounts: ClaudeAccounts | null;
+  /** The door's picture: the account store's own rows, readings and rule marks. Null before its first answer. */
+  door: ClaudeDoorPicture | null;
   usage: ClaudeUsage | null;
   /** The DeepSeek reading, held by the row. Not part of `usage`: a different account, from a route of its own. */
   balance: DeepseekBalance | null;
@@ -109,6 +112,12 @@ type AccountPopoverProps = {
   /** Opens the provider's login window — the panel's one sign-in door, for the same account or another. */
   onRelogin: () => void;
   onSaveLiveLogin: () => void;
+  /** The door's three acts, held by the row's `useClaudeAccounts`: use this account, turn the rule on or off, remove one. */
+  onUse: (slug: string) => void;
+  onSetAuto: (on: boolean) => void;
+  onRemove: (slug: string) => void;
+  /** Opens the Set up window on the door's `setup-token <slug>`. */
+  onSetup: (slug: string) => void;
 };
 
 /**
@@ -122,6 +131,7 @@ type AccountPopoverProps = {
  */
 export function AccountPopover({
   accounts,
+  door,
   usage,
   balance,
   jevBalance,
@@ -130,6 +140,10 @@ export function AccountPopover({
   onSwitch,
   onRelogin,
   onSaveLiveLogin,
+  onUse,
+  onSetAuto,
+  onRemove,
+  onSetup,
 }: AccountPopoverProps) {
   // Advances once a minute so the reset countdowns stay true while the panel is open. The
   // interval exists only for as long as this component does, and this component is mounted
@@ -140,6 +154,9 @@ export function AccountPopover({
   // Read off `picture` rather than kept as its own binding: narrowing has to survive into the
   // rows, where the active one reads `liveSessions` from the same object.
   const slotCount = picture?.slots.length ?? 0;
+  // The meters draw the account in use — the chosen account, else the live login — which is not
+  // always the login `/api/usage` measured. This is the one conversion; UsageMeters is unchanged.
+  const metersUsage = accountInUseUsage(usage, door, now);
 
   return (
     // The ceiling has to fit the space ABOVE the row this hangs from, not the viewport: the
@@ -152,7 +169,7 @@ export function AccountPopover({
       aria-label="Account and usage"
       className="absolute bottom-full left-0 right-0 z-50 mb-2 flex max-h-[70vh] flex-col gap-3 overflow-y-auto p-3"
     >
-      {unknown ? <p className="text-xs leading-relaxed text-muted-foreground">{UNREACHABLE_LINE}</p> : <UsageMeters usage={usage} />}
+      {unknown ? <p className="text-xs leading-relaxed text-muted-foreground">{UNREACHABLE_LINE}</p> : <UsageMeters usage={metersUsage} />}
 
       {/* OUTSIDE that branch on purpose. This reading comes from another vendor and another
           route, so a meter that cannot answer must not take it down with them — the two fail
@@ -162,11 +179,19 @@ export function AccountPopover({
       <DeepseekPeakHours now={now} />
       <JevBalanceReadout balance={jevBalance} />
 
-      {/* The new account section: the door's own picture, one row per account, the automatic switch
-          and the last switch. It renders nothing until it is handed a picture, so the panel reads
-          exactly as it does today until phase panel-fill passes it. */}
-      {/* FILL: the door's picture and the four acts */}
-      <ClaudeAccountRows />
+      {/* The account store's own section, above today's slot switcher: one row per account, the
+          automatic switch, the last switch, and the four acts the row's hooks hand it. It renders
+          nothing until the door's first picture lands — a lane that cannot answer is its own calm
+          line inside the section, never a blank space. */}
+      <ClaudeAccountRows
+        picture={door}
+        busy={busy}
+        nowMs={now}
+        onUse={onUse}
+        onSetAuto={onSetAuto}
+        onRemove={onRemove}
+        onSetup={onSetup}
+      />
 
       <div className="flex flex-col gap-1.5">
         <div className="text-[11px] uppercase tracking-[0.14em] text-ink-faint">

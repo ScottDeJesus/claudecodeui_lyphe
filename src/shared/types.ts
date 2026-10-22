@@ -2357,6 +2357,13 @@ export type ClaudeAccountsPicture = {
 };
 
 /**
+ * The door's answer as `GET /api/accounts` carries it under `door`: the whole picture, or the calm
+ * reason it could not be read. Named once so the hook that holds it, the section that draws it and
+ * the meters' fallback all speak of the same union — the same two shapes `ClaudeAccounts.door` has.
+ */
+export type ClaudeDoorPicture = ClaudeAccountsPicture | { reachable: false; reason: string };
+
+/**
  * One usage window as the meter measured it.
  * `percent: null` is "no reading" (em-dash, empty track); `0` is a REAL reading and says
  * "0% used". `rolled: true` keeps a real but HISTORICAL percent — show it dim and say "was",

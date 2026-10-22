@@ -109,7 +109,6 @@ export function AccountRowView({ account, hue, nowMs, busy, autoWhy, held, onUse
         <button
           type="button"
           disabled={busy}
-          // FILL: onSetup — opens the Set up window on `claude-account setup-token <slug>`.
           onClick={() => onSetup(account.slug)}
           aria-label={`Set up ${account.slug}`}
           title={`Set up ${account.slug}`}
@@ -131,7 +130,6 @@ export function AccountRowView({ account, hue, nowMs, busy, autoWhy, held, onUse
           type="button"
           disabled={busy}
           aria-label={noRoom ? `Use ${account.slug} anyway` : `Use ${account.slug}`}
-          // FILL: onUse — makes this account the one new chats and plan runs start on.
           onClick={() => onUse(account.slug)}
           className="flex min-w-0 flex-1 items-start gap-2.5 rounded-lg px-2 py-1.5 text-left transition-colors hover:bg-muted/60 disabled:opacity-60"
         >
@@ -158,7 +156,6 @@ export function AccountRowView({ account, hue, nowMs, busy, autoWhy, held, onUse
             key: 'remove',
             label: 'Remove',
             isDanger: true,
-            // FILL: onRemove — removes the account and its token; a chosen account is unchosen and the dispatcher kicked.
             onSelect: () => onRemove(account.slug),
           },
         ]}
@@ -181,7 +178,6 @@ export function CandidateRow({ slug, hue, busy, onSetup }: { slug: string; hue: 
         <button
           type="button"
           disabled={busy}
-          // FILL: onSetup — opens the Set up window on `claude-account setup-token <slug>`.
           onClick={() => onSetup(slug)}
           aria-label={`Set up ${slug}`}
           title={`Set up ${slug}`}

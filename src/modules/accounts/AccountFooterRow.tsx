@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { ACCOUNT_PANEL_ID, AccountPopover } from '@/modules/accounts/AccountPopover';
 import { DeepseekBalanceReadout } from '@/modules/accounts/DeepseekBalanceReadout';
+import { useAccountSetup } from '@/modules/accounts/hooks/useAccountSetup';
 import { useClaudeAccounts } from '@/modules/accounts/hooks/useClaudeAccounts';
 import { useClaudeUsage } from '@/modules/accounts/hooks/useClaudeUsage';
 import { useDeepseekBalance } from '@/modules/accounts/hooks/useDeepseekBalance';
@@ -9,6 +10,7 @@ import { useJevBalance } from '@/modules/accounts/hooks/useJevBalance';
 import { useReloginCapture } from '@/modules/accounts/hooks/useReloginCapture';
 import { JevBalanceReadout } from '@/modules/accounts/JevBalanceReadout';
 import { accountInitials } from '@/modules/accounts/utils/accountInitials';
+import { accountInUse, accountInUseUsage } from '@/modules/accounts/utils/accountInUseUsage';
 import { formatWindowCountdown, windowPercent, windowTone } from '@/modules/accounts/utils/usageWindows';
 import { ProviderLoginModal } from '@/modules/provider-auth';
 import { Avatar, Meter } from '@/shared/ui';
@@ -42,7 +44,8 @@ type AccountFooterRowProps = {
  * desktop and mobile blocks separately would double the read rate D7 caps.
  */
 export function AccountFooterRow({ collapsed = false, onExpand }: AccountFooterRowProps) {
-  const { data: accounts, switchTo, capture, busy, error, clearError } = useClaudeAccounts();
+  const { data: accounts, door, switchTo, capture, chooseAccount, setAuto, removeAccount, busy, error, clearError } =
+    useClaudeAccounts();
   const { data: usage, refresh: refreshUsage } = useClaudeUsage();
   // A different account from the one above, from a route of its own — held here so the row and
   // the panel share their ONE reading, and so neither is hidden when the account lane cannot answer.
@@ -58,9 +61,8 @@ export function AccountFooterRow({ collapsed = false, onExpand }: AccountFooterR
   // Whether the provider's own login is running in the embedded terminal. Held here rather
   // than in the panel because the panel closes and this must not close with it.
   const [loginOpen, setLoginOpen] = useState(false);
-  // The Set up window's account. One object, so an open window always has a slug and the command can
-  // never run `setup-token` without one. Inert until phase panel-fill moves it into a hook.
-  const [setup] = useState<{ slug: string } | null>(null);
+  // The account the Set up window signs in, and the acts that open and close it; closing re-reads the picture.
+  const { setup, openSetup, closeSetup } = useAccountSetup();
 
   // The glance labels count DOWN, so they cannot wait for the three-minute usage poll to be
   // redrawn — a "1m" would sit there for three. One tick a minute, and only while there is a
@@ -93,12 +95,12 @@ export function AccountFooterRow({ collapsed = false, onExpand }: AccountFooterR
   // the reader was looking at, closing this panel behind it instead. Marking the event says
   // "already handled" to anything that asks; it does not deny the key to anything that does not.
   //
-  // While the login window is up neither dismissal fires. The window is drawn on `document.body`,
-  // outside `rootRef`, so every pointer inside it would read as "outside" and close the panel behind it,
-  // and an Escape meant for the terminal would close the panel too. The panel stays as it was, and is
-  // still open, and still working, when the window closes.
+  // While a sign-in window is up — the re-login's or an account's Set up — neither dismissal fires.
+  // The window is drawn on `document.body`, outside `rootRef`, so every pointer inside it would read
+  // as "outside" and close the panel behind it, and an Escape meant for the terminal would close the
+  // panel too. The panel stays as it was, and is still open, and still working, when the window closes.
   useEffect(() => {
-    if (!open || loginOpen) return undefined;
+    if (!open || loginOpen || setup !== null) return undefined;
 
     const closeOnOutsidePointer = (event: PointerEvent) => {
       if (rootRef.current && !rootRef.current.contains(event.target as Node)) closePanel();
@@ -116,7 +118,7 @@ export function AccountFooterRow({ collapsed = false, onExpand }: AccountFooterR
       document.removeEventListener('pointerdown', closeOnOutsidePointer);
       window.removeEventListener('keydown', closeOnEscape, { capture: true });
     };
-  }, [open, loginOpen, closePanel]);
+  }, [open, loginOpen, setup, closePanel]);
 
   const picture = accounts?.reachable ? accounts : null;
 
@@ -132,13 +134,12 @@ export function AccountFooterRow({ collapsed = false, onExpand }: AccountFooterR
     seenSlugRef.current = activeSlug;
   }, [activeSlug, refreshUsage]);
 
-  // The two windows worth a glance, as bars. `weekly_scoped:*` plans are deliberately left out:
-  // the row has space for two, and the panel below carries every window the provider reports.
-  //
-  // A window is drawn only when it is actually in the reading — an absent one is not a bar at
-  // zero. `percent: null` DOES get a bar: the Meter draws an empty track and an em-dash for it,
-  // which is the one honest picture of "nobody has this number".
-  const windows = usage?.reachable ? usage.windows : [];
+  // The two windows worth a glance, as bars — the account in use's, converted exactly as the panel's
+  // meters convert it, so the two registers cannot disagree. `weekly_scoped:*` plans are left out:
+  // the row has space for two, and the panel carries every window. An absent window draws no bar;
+  // `percent: null` does — an empty track and an em-dash, the honest picture of "nobody has this number".
+  const metersUsage = accountInUseUsage(usage, door, nowTick);
+  const windows = metersUsage?.reachable ? metersUsage.windows : [];
   const glanceWindows = GLANCE_WINDOWS
     .map((glance) => {
       const found = windows.find((usageWindow) => usageWindow.key === glance.key);
@@ -146,9 +147,10 @@ export function AccountFooterRow({ collapsed = false, onExpand }: AccountFooterR
     })
     .filter((entry): entry is GlanceWindow & { usageWindow: ClaudeUsageWindow } => entry !== null);
 
-  // FILL: the account in use's slug — the door's picture names it (`in_use`); until panel-fill passes
-  // that picture, this row falls back to the saved slot's label.
-  const label = picture?.activeLabel ?? '—';
+  // The account in use's slug, as the door marks it (`in_use`). The saved slot's label is the fallback
+  // for the moment before the door's first picture lands, or for a box whose door cannot answer.
+  const inUseSlug = accountInUse(door)?.slug ?? picture?.activeLabel ?? null;
+  const label = inUseSlug ?? '—';
   const hasCountdown = glanceWindows.some(({ usageWindow }) => Boolean(usageWindow.resetsAt));
 
   useEffect(() => {
@@ -196,7 +198,7 @@ export function AccountFooterRow({ collapsed = false, onExpand }: AccountFooterR
         title={`Account ${label}`}
         className="group flex h-8 w-8 items-center justify-center rounded-lg transition-colors hover:bg-accent/80"
       >
-        <Avatar initials={accountInitials(picture?.activeLabel ?? null)} size={22} muted={!picture?.activeLabel} />
+        <Avatar initials={accountInitials(inUseSlug)} size={22} muted={!inUseSlug} />
       </button>
     );
   }
@@ -213,7 +215,7 @@ export function AccountFooterRow({ collapsed = false, onExpand }: AccountFooterR
         onClick={togglePanel}
         className="flex w-full items-center gap-2.5 rounded-xl bg-muted/40 px-3 py-2 text-left transition-colors hover:bg-muted/60 md:rounded-lg md:bg-transparent md:px-2.5 md:hover:bg-accent/60"
       >
-        <Avatar initials={accountInitials(picture?.activeLabel ?? null)} size={26} muted={!picture?.activeLabel} />
+        <Avatar initials={accountInitials(inUseSlug)} size={26} muted={!inUseSlug} />
         <span className="min-w-0 flex-1">
           <span className="block truncate text-[13px] font-medium text-foreground" title={label}>{label}</span>
           {glanceWindows.length > 0 ? (
@@ -260,6 +262,7 @@ export function AccountFooterRow({ collapsed = false, onExpand }: AccountFooterR
       {open && (
         <AccountPopover
           accounts={accounts}
+          door={door}
           usage={usage}
           balance={balance}
           jevBalance={jevBalance}
@@ -268,6 +271,10 @@ export function AccountFooterRow({ collapsed = false, onExpand }: AccountFooterR
           onSwitch={(slug) => { void switchTo(slug); }}
           onRelogin={() => { void handleRelogin(); }}
           onSaveLiveLogin={() => { void capture(); }}
+          onUse={(slug) => { void chooseAccount(slug); }}
+          onSetAuto={(on) => { void setAuto(on); }}
+          onRemove={(slug) => { void removeAccount(slug); }}
+          onSetup={openSetup}
         />
       )}
 
@@ -277,18 +284,14 @@ export function AccountFooterRow({ collapsed = false, onExpand }: AccountFooterR
         provider="claude"
       />
 
-      {/* The Set up window, beside the Re-login one: the same embedded terminal, running the account
-          CLI's `setup-token` for one account. It exists only while panel-fill names that account, so
-          a bare `setup-token` — a usage error — cannot be run from it. */}
-      {/* FILL: setupOpen — panel-fill names an account and the window mounts open; null renders nothing. */}
+      {/* The Set up window, beside the Re-login one: the same terminal running the account CLI's
+          `setup-token` for one account, mounted only while `useAccountSetup` names that account. */}
       {setup !== null && (
         <ProviderLoginModal
           isOpen
-          // FILL: setupSlug — the account the window signs in.
           customCommand={`~/.claude/scripts/claude-account setup-token ${setup.slug}`}
           title={`Set up ${setup.slug}'s sign-in token`}
-          // FILL: setupClose — closes the window and re-reads the panel.
-          onClose={() => undefined}
+          onClose={closeSetup}
           provider="claude"
         />
       )}
