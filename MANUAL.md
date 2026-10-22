@@ -3901,7 +3901,7 @@ The browser's typed view of `/api/carrier-bulletins` (the Bulletins view of the 
 ## Files
 | file | holds |
 |---|---|
-| `src/shared/carrier-bulletins-types.ts` | 19 exported types: the three bodies `OverviewRow`, `BulletinPage`, `PageReading`; their nested ones (`LastPull`, `LastReading`, `VerdictCounts`, `ReadingStamp`, `RequirementThreshold`, `RequirementWindow`, `RequirementScope`, `SettledRule`, `PageRequirement`, `JudgedRule`, `NotPlaced`, `PageFailure`, `PageWaiting`); and the unions `PageState`, `VerdictWord` and `SaidWord`. Imports nothing from `server/`. |
+| `src/shared/carrier-bulletins-types.ts` | 19 exported types: the three bodies `OverviewRow`, `BulletinPage`, `PageReading`; their nested ones (`LastPull`, `LastReading`, `VerdictCounts`, `ReadingStamp`, `RequirementThreshold`, `RequirementWindow`, `RequirementScope`, `SettledRule`, `PageRequirement`, `JudgedRule`, `NotPlaced`, `PageFailure`, `PageWaiting`); and the unions `PageState`, `VerdictWord` and `SaidWord`. Beyond the design's list it holds three members the live answers carry, which views.py's docstring names as such: `BulletinPage.waiting`, and `beside` on `PageRequirement` and `JudgedRule`. Imports nothing from `server/`. |
 | `src/shared/api.ts` | `api.carrierBulletins`, 4 GET verbs, beside `api.affectedAreas`; no import from the mirror (each answer is named in a `// →` comment) |
 | `.oxlintrc.json` | `src/shared/carrier-bulletins-types.ts` in the `frontend-shared-file` list (INV-5890) |
 
@@ -3928,23 +3928,46 @@ The design writes the keys of each body and not the inside of four of them. They
 ## Measured
 - 2026-10-21: the TypeScript compiler's property names of `OverviewRow`, `BulletinPage` and `PageReading` and every nested type, against the keys of the design's THE SURFACE interface parsed out of `bulletins-read-by-claude.design.toml`: every key matched at every level the design writes keys (16, 7 and 9 at the top; `last_pull` 2, `last_reading` 6, `verdicts` 5, `reading` 6, `requirements` 8, `rule` 3, `judged` 7, `not_placed` 2, `waiting` 3). The four keys above are the only places the type has structure where the design has a bare key.
 - 2026-10-21: `api.carrierBulletins` run as bundled code against a recording `fetch`: the four verbs requested exactly the four routes above, all GET and no body, an id `a/b c?d` went out as `a%2Fb%20c%3Fd`, and `image` carried the caller's abort signal.
+- 2026-10-22: each key of the three live answers (the overview, State Farm's pages, one page's reading) printed beside the members of the mirror by `.verify/bulletins-view.mjs`: equal at every level that held a live instance, once the three members above were added (the first run found them missing: the design's list was the mirror's only source). A requirement's scope lists arrive `[]` and never `null` (`requirement_body` coerces), so `[]` is the wire's "every one of its kind".
 - `views.py` and the surface had not landed at that time: no body was compared with a live answer.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/carrier-bulletins-types.ts
 
-## MAN-8880 — The Bulletins view — src/modules/carrier-bulletins: three screens over a fake, the FILL markers, what the fill inherits
+## MAN-8880 — The Bulletins view — src/modules/carrier-bulletins: the three screens, the four reads, the presses, the rules
 
-The Bulletins view: what Claude read of each carrier's SERVPRO program bulletin and what the house settled it into. Read-only. Built to be the fifth view of the Cerberus tab's strip, after Tours. Wire: MAN-8865. Slots in the tab: MAN-7867. Plans: `~/.claude/plans/bulletins-read-by-claude.design.toml`, `bulletins-read-by-claude.phases.toml`. Every body's server home: shadow-connector `extractors/servpro_bulletins/verify/views.py`.
+The Bulletins view: what Claude read of each carrier's SERVPRO program bulletin and what the house settled it into. Three screens, read-only, reading on open and on a press, every word from a bulletin a React text node, names and never ids. Live as the fifth view of the Cerberus tab's strip, after Tours, kept mounted by `KeptView` (MAN-8918). Wire: MAN-8865. Shared pieces: MAN-8917. The tab's side: MAN-7891. Plans: `~/.claude/plans/bulletins-read-by-claude.design.toml`, `bulletins-read-by-claude.phases.toml`. Every body's server home: shadow-connector `extractors/servpro_bulletins/verify/views.py`.
 
 ## State of the module
 | fact | value |
 |---|---|
-| phase | scaffold: three screens drawn over `FAKE_READS`; no fetch, no hook; the root holds three `useState`s and one ref |
-| mounted | no. `index.ts` exports the lazy `BulletinsView`; `CerberusPanel` does not import it until the fill replaces its two `FILL:` markers (`bulletins-row`, `bulletins-panel`) |
-| fake | `carrier-bulletins-fake.ts` (`FAKE_READS`, `unwired`): 13 overview rows, typed by the wire mirror. Real: the 12 current files' numbers, stored times, page counts, hashes, live rules, open questions; State Farm's, AAA of Southern California's and The Hartford's printed part headings; the check's verdicts; State Farm p13 and AAA of Southern California p15 in their own words; p13 rendered once as a data URL. Composed: page splits, calls, tokens, duties not placed, refused entries, question wording, the two waiting pages, Nationwide's reading in progress, Allstate's stopped one (32 of 49 pages read). American Family's file is not stored: its 12 pages are a stand-in. The fill deletes the file |
-| words | `cerberus.bulletins.*` in `src/modules/i18n/locales/en/common.json`, including `cerberus.bulletins.tab` and `.tabHint` (the strip's two words) |
-| shared types | wire: `src/shared/carrier-bulletins-types.ts`. Lane fault: `AffectedAreasTrouble` from `src/shared/types.ts` (one forwarder, `server/shared/shadow-connector-lane.ts`, serves both lanes) |
-| proof | 2026-10-21: six states, light and dark, 1280×800 and 390×844: 108 of 108 checks, no console errors, on the builder's final code. The fix-pass changed the files after that: client `tsc` and `oxlint` exit 0, no proof run |
+| phase | live, reading the lane. Run whole against the live engine 2026-10-22 with `.verify/bulletins-view.mjs` (53 verdicts, no model call, no write) |
+| mounted | `CerberusPanel` draws `<KeptView id="bulletins">` around the lazy `BulletinsView` (this module's barrel) after Tours, once center's overview has answered: mounted on its first show, `hidden` after, so the open carrier, page and scroll survive a visit to Fleet. Leaving the Cerberus workspace tab for Chat unmounts the panel and the view with it |
+| reads | four hooks in `hooks/`, each used by the view root alone: `useOverview`, `useBulletinPages`, `usePageReading` (each is `useLaneRead`, MAN-8917, over one `api.carrierBulletins` verb) and `usePageImage` |
+| words | `cerberus.bulletins.*` in `src/modules/i18n/locales/en/common.json`, including `cerberus.bulletins.tab` and `.tabHint` (the strip's two words); the surround's failure words are `viewBoundary.*` (MAN-8917) |
+| shared types | wire: `src/shared/carrier-bulletins-types.ts` (MAN-8865). Lane fault: `AffectedAreasTrouble` from `src/shared/types.ts` (one forwarder, `server/shared/shadow-connector-lane.ts`, serves both lanes) |
+| proof | 2026-10-22, 1280 and 390 px wide: State Farm's page 22 (the page the walk had read; page 13 when it has) drew its image beside its one requirement, the count on screen the count `GET /api/carrier-bulletins/bulletins/{id}/pages/22` holds; each key of the three live answers equals the members of the wire mirror (`OverviewRow`, `BulletinPage`, `PageReading` and every nested type that had a live instance); no request but a GET; no request while Bulletins was hidden or untouched; zero console errors |
+
+## The reads
+The root holds three states (`bulletinId`, `page`, `enlarged`) and reads through four hooks. A read happens on open and on a press, never on a timer, and nothing arrives from outside that would read while the view is hidden (no `useViewShown`: Tours needs one because a press's or a walk's answer can land while it is hidden; nothing does here).
+| hook | key | reads when | what it holds |
+|---|---|---|---|
+| `useOverview()` | `overview` | the view's first show; Refresh; Try again; Back from a carrier's pages | every carrier's current file: the overview, and the header the other two screens draw from at once |
+| `useBulletinPages(bulletinId)` | the bulletin id; null reads nothing | a carrier opens; Refresh; Back from a page | the carrier's pages in page order, with their parts and states; the page screen leans on it for its state and part while its reading is out, and for Previous and Next |
+| `usePageReading(bulletinId, page)` | `bulletinId:page`; null reads nothing | a page opens (Previous and Next too); Refresh | the page's reading, with the exact file it is of |
+| `usePageImage(sha, page)` | `sha:page` | the reading names the file, and the page changes | the page's PNG as an object URL: fetched with the token (`<img>` cannot send one), aborted when the page changes, revoked on change and on unmount, `null` while it loads, when it failed, and with no page open. Never read again by Refresh: the sha is the file's content, and the browser keeps the bytes a year |
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/carrier-bulletins/
+
+## MAN-8928 — The Bulletins view — src/modules/carrier-bulletins: the three screens, the four — The presses (all in `BulletinsView.tsx`)
+section: The Bulletins view — src/modules/carrier-bulletins: the three screens, the four reads, the presses, the rules/001 The presses (all in `BulletinsView.tsx`)
+
+| press | does |
+|---|---|
+| `onOpenCarrier(bulletinId)` | opens a carrier's pages: sets the carrier, no page, the Lightbox shut, and brings the view's top (`topRef`) into view when the panel was scrolled past it |
+| `onOpenPage(page)` | opens a page of the open carrier (from its list, its waiting call-out, or Previous and Next): the Lightbox shut, the top in view |
+| `onBack` | one screen back (a page to its carrier's pages, a carrier to the overview), the Lightbox shut, reading again what it returns to QUIETLY (`reload`: the screen stands until the new answer lands) |
+| `onRefresh` | reads again what the shown screen draws: the overview; a carrier's pages and its overview row; a page's reading and its pages. A read that has failed is read again as Try again (`retry`: its banner leaves, the screen waits, and a second failure mounts the banner afresh so it is heard again); any other quietly. It is also every banner's Try again |
+| `onEnlarge` / `onShrink` | open the page's image in the house `Lightbox` / shut it (Escape, the ✕ and the backdrop) |
 
 ## Screens
 One at a time, held at the root as `bulletinId` (null = overview) and `page` (null = the carrier's pages); each plays `vv-pagein` when it opens.
@@ -3965,35 +3988,27 @@ Pure: `utils/bulletinModel.ts` (standing, groups, `PAGE_STATE_LOOK`, `VERDICT_LO
 | `unread` | `settled + read === 0` | notSettled | `neutral` |
 | `partly` | otherwise | notSettled | `info` |
 
-## FILL markers — what the fill replaces
-`grep -rn "FILL:" src/modules/carrier-bulletins src/modules/cerberus`. The fill replaces each marker and the one line under it.
-| marker (`BulletinsView.tsx`) | the fill |
-|---|---|
-| `fake` | removes the `carrier-bulletins-fake` import; the file is deleted |
-| `useOverview` · `useBulletinPages(bulletinId)` · `usePageReading(bulletinId, page)` | read on open and on Refresh; the root draws their `value` (null until the answer lands) and `trouble` (`AffectedAreasTrouble \| null`) |
-| `usePageImage(sha, page)` | `string \| null`: the PNG fetched with the token as an object URL, revoked on change and unmount |
-| `onOpenCarrier` · `onOpenPage` · `onBack` · `onRefresh` · `onEnlarge` · `onShrink` | each line is `unwired(setX, …)`, a no-op naming the setters the real handler drives; `onShrink` (Lightbox close) is its own handler; `onRefresh` is also every banner's Try again |
-| `CerberusPanel.tsx` `bulletins-row`, `bulletins-panel` | MAN-7867 |
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/carrier-bulletins/
 
-## What the fill inherits
-- `topRef` (on the root div) brings the top into view on `onOpenCarrier` / `onOpenPage` and tells the reads whether the view is shown. If the fill reuses Tours' `useViewShown`, the module standards move it to `src/shared/hooks/`.
-- A failed read shows only its banner, on all three screens: a hook that keeps its old value after a failed refresh is never drawn under it.
-- `Back` reads again what it returns to, quietly; `onRefresh` keeps the screen until the new answer lands.
-- The fill's photographs include Allstate's stopped state (never photographed) and the view inside the panel under the tab's header and strip.
+## MAN-8929 — The Bulletins view — src/modules/carrier-bulletins: the three screens, the four — Rules an editor must not break
+section: The Bulletins view — src/modules/carrier-bulletins: the three screens, the four reads, the presses, the rules/002 Rules an editor must not break
 
-## Rules an editor must not break
-- Read-only: no press writes. A rule changes only by answering `QUESTIONS_COMMAND` (`venv/bin/python scripts/carrier_rules_questions.py`) or on the Approval Rules page (operator, 2026-10-21). why: the view shows what Claude read; it is not the editor.
-- Every word from a bulletin (quote, rule, heading, carrier, reason) is its own text node: never through `t()`, never `dangerouslySetInnerHTML` (none in the module). Sentences are `cerberus.bulletins.*` keys, English only.
+- Read-only: no press writes, and the lane's allowlist holds GET routes only. A rule changes only by answering `QUESTIONS_COMMAND` (`venv/bin/python scripts/carrier_rules_questions.py`) or on the Approval Rules page (operator, 2026-10-21). why: the view shows what Claude read; it is not the editor.
+- Every word from a bulletin (quote, rule, heading, carrier, reason, doubt) is its own text node: never through `t()`, never `dangerouslySetInnerHTML` (none in the module; R-CERB-25, vendor-authored strings are an XSS source). Sentences are `cerberus.bulletins.*` keys, English only.
+- Names, never ids: the screens draw carrier names, page numbers, the bulletin's printed number and the rules' own words. A bulletin id, a file's sha and a rule's id are keys the hooks use and nothing draws (INV-76).
 - Tone reaches paint only as `data-tone` plus a tone name, with a glyph and a word beside it (MAN-739, MAN-578); act is `warn`, never `danger`.
-- Reads on open and on a press, never on a timer, never while the tab shows another view.
+- Reads on open and on a press, never on a timer, never while the tab shows another view. A new read in this view is a hook over `useLaneRead` keyed by what it reads, read by a press; a read that arrives of its own accord needs the view-shown gate Tours has.
+- A failed read shows only its banner, on all three screens: `useLaneRead` keeps the old value beside a failed quiet read, and the screens never draw it under the banner.
+- A scope list a requirement names none for is EMPTY on the wire (`requirement_body` sends `[]`, never `null`) and means every one of its kind: `requirementFacts` draws no label for it, and "Every job" when none of the three is named.
 - The page image keeps a letter-page box and `contain`s the picture. why: the wire gives no page size.
 - Other modules reach it only through `index.ts` (`BulletinsView`, `lazy`); files inside import siblings by path.
 
 ## Open
+- The wire carries three members the screens do not draw: `BulletinPage.waiting` (why each waiting page waits, without a read per page: the carrier's call-out says only "Open it to see why") and `beside` on a requirement and on a judged rule (the entry was read from the pages beside this one, so its quote stands on a neighbouring page and not on this page's picture, which the page screen shows as if it did). The mirror holds all three; drawing them is a design decision.
 - `AffectedAreasTrouble` is the lane-neutral fault type under a Tours name; renaming it touches live Tours files.
 - `PageReading` has no `width` / `height`; a landscape page draws inside the letter box until it does.
 - On a fault screen the header's Refresh and the banner's Try again do the same read.
-- Not proven: the other 14 states at 390 px and in dark on the final code; `npm run build`; the server half of `npm run typecheck`.
+- Not proven on the final code: dark mode, and the waiting and stopped states against live data (no carrier waits today; the walk's reading of AAA of Southern California is in progress).
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/carrier-bulletins/
 

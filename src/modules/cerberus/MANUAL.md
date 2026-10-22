@@ -1055,7 +1055,7 @@ section: Cerberus — the tab root and header: `CerberusPanel`, `CerberusHeader`
 |---|---|---|
 | 1 | `CerberusHeader` | `overview !== null` |
 | 2 | `UnreachableBanner` with `detail` `cerberus.errors.lastAnswer`, keyed by `attempt` | `stale` |
-| 3 | strip: `Tabs` and the shown view's hint | `overview !== null` |
+| 3 | strip: `Tabs` in a box of its own that scrolls sideways (the five words make a 429 px tray, wider than a phone's panel: without the box the panel's whole scroller panned and clipped Bulletins), and the shown view's hint | `overview !== null` |
 | 4 | Fleet, `hidden` while another view shows | `overview !== null` |
 | 5 | Catalog (`CatalogView`), mounted only while shown | `overview !== null && view === 'catalog'` |
 | 6 | History (`HistoryView`), mounted only while shown | `overview !== null && view === 'history'` |
