@@ -30,7 +30,12 @@ type PageImageProps = {
  * at the screen's fit, to zoom and pan as a photo is. The picture is the server's own rendering of the stored PDF; the
  * view never draws the PDF itself.
  *
- * Used by the carrier-bulletins module's `PageScreen`, beside the reading once the panel is wide and above it on a phone.
+ * Wide (720 px of panel), the page fills its column beside the reading and keeps its place while the reading scrolls.
+ * Narrow, it stands above the reading as a thumbnail with its caption and Enlarge beside it: a letter page across a
+ * phone's width prints its text at about 5 px, unreadable without Enlarge, and would push the reading — what the operator
+ * came for — a whole screen down.
+ *
+ * Used by the carrier-bulletins module's `PageScreen`.
  */
 export function PageImage({ image, page, carrier, stored, enlarged, onEnlarge, onShrink }: PageImageProps) {
   const { t } = useTranslation();
@@ -38,7 +43,7 @@ export function PageImage({ image, page, carrier, stored, enlarged, onEnlarge, o
   const day = formatShortDate(stored);
 
   return (
-    <figure className="m-0 flex min-w-0 flex-col gap-2 [@container(min-width:720px)]:sticky [@container(min-width:720px)]:top-4">
+    <figure className="m-0 grid min-w-0 grid-cols-[minmax(0,8rem)_minmax(0,1fr)] items-end gap-3 [@container(min-width:720px)]:sticky [@container(min-width:720px)]:top-4 [@container(min-width:720px)]:flex [@container(min-width:720px)]:flex-col [@container(min-width:720px)]:items-stretch [@container(min-width:720px)]:gap-2">
       <div className="relative aspect-[17/22] w-full overflow-hidden ring-1 ring-border">
         {image === null ? (
           <div role="img" aria-label={alt} className="vv-gallery__fallback absolute inset-0 flex items-center justify-center">
@@ -48,11 +53,11 @@ export function PageImage({ image, page, carrier, stored, enlarged, onEnlarge, o
           <img src={image} alt={alt} draggable={false} className="absolute inset-0 size-full object-contain" />
         )}
       </div>
-      <figcaption className="flex items-center justify-between gap-3">
+      <figcaption className="flex min-w-0 flex-col items-start gap-1 [@container(min-width:720px)]:flex-row [@container(min-width:720px)]:items-center [@container(min-width:720px)]:justify-between [@container(min-width:720px)]:gap-3">
         <span className="min-w-0 text-[12.5px] text-muted-foreground">
           {day === null ? t('cerberus.bulletins.page.captionPage', { page }) : t('cerberus.bulletins.page.caption', { page, stored: day })}
         </span>
-        <Button variant="ghost" size="sm" className="flex-none max-md:h-11" disabled={image === null} onClick={onEnlarge}>
+        <Button variant="ghost" size="sm" className="-ml-3 flex-none max-md:h-11 [@container(min-width:720px)]:ml-0" disabled={image === null} onClick={onEnlarge}>
           <Maximize2 aria-hidden="true" />
           {t('cerberus.bulletins.page.enlarge')}
         </Button>

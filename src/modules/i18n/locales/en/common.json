@@ -2480,7 +2480,7 @@
       "waiting": {
         "failed": "Claude could not read this page",
         "refused": "The house's checks refused Claude's answer",
-        "how": "Tried {{when}}. It waits in this file until the file or the instructions change, and no automatic pull tries it again. A manual pull of {{carrier}} reads it again and settles {{carrier}} after:"
+        "how": "Tried {{when}}. It waits in this file until the file or the instructions change, and no automatic pull tries it again. A manual pull of {{carrier}} reads it again, then settles the carrier:"
       }
     },
     "errors": {

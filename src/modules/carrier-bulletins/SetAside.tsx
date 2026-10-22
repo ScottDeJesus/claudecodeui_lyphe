@@ -69,7 +69,7 @@ export function SetAside({ notPlaced, failures }: SetAsideProps) {
                   </p>
                   {failure.quote !== null && <PageQuote words={failure.quote} />}
                   <ul className="m-0 flex list-disc flex-col gap-1 pl-5 text-[12.5px] leading-relaxed text-warn-ink">
-                    {failure.failures.map((check) => <li key={check} className="[overflow-wrap:anywhere]">{check}</li>)}
+                    {failure.failures.map((check, at) => <li key={at} className="[overflow-wrap:anywhere]">{check}</li>)}
                   </ul>
                 </li>
               ))}
