@@ -3793,3 +3793,35 @@ Dates draw in the reader's locale and zone (`toLocaleDateString`), so an epoch a
 - **The key is one-way.** It travels in the PUT body only, into the door's stdin; the picture, the GET, a refusal and an error carry none. The card names a key by slot and label, never by id or digest (INV-76).
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/settings.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/agents-settings/sections/AgentCategoryContentSection.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/agents-settings/sections/content/ClaudeApiKeyRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/agents-settings/sections/content/ClaudeApiKeysContent.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/agents-settings/sections/content/claude-api-standing.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/useClaudeApiKeys.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts
+
+## MAN-8849 — The accounts module's launch reads — account-door.ts (the credential) and chosen-account.ts (the choice)
+
+The two reads the rest of the server makes of the house's Claude account store. Python side: the door MAN-8842, the records MAN-8840, the token MAN-8841. Consumer: MAN-8848.
+
+## Barrel — `server/modules/accounts/index.ts`
+| export | from | answers |
+|---|---|---|
+| `launchCredential` | `account-door.ts` | the account in use and its token, for a CLI start |
+| `chosenAccount` | `chosen-account.ts` | the house's choice now, or `null` |
+| `liveAccountEmail` | `account-store.service.ts` | the live login's email |
+| `createAccountsModule` | `accounts.module.ts` | the composition root |
+
+## `launchCredential()` — `account-door.ts`
+- Returns `Promise<ClaudeAccountCredential>` (`server/shared/types.ts`): `{ account: string|null, slug: string|null, token: string|null }`. Never rejects.
+- Runs `$CLAUDE_ACCOUNT_BIN` (default `~/.claude/scripts/claude-account`) `credential --fd 3`. The door puts `{"account","slug","token": <bool>}` on stdout and the token plus a newline on fd 3.
+- fd 3 is a real FIFO: `mkfifo -m 600` in a `mkdtemp` 0700 directory under `os.tmpdir()`; the read end opened `O_NONBLOCK`, the write end handed to the child as `stdio[3]` and closed in the parent at once; the directory removed whatever the answer.
+- The read end is drained synchronously, once, on the child's `close`; at exit every byte is in the pipe buffer, so the drain sees all of it and then end-of-file.
+- Every failure answers `{ account: null, slug: null, token: null }` and the launch rides the live login: FIFO not creatable, spawn error, non-zero exit, 10 s bound (`SIGKILL`), stdout not the promised shape (`token` not a boolean, `account`/`slug` neither string nor null).
+- The only relayed string is the door's stderr on a non-zero exit, logged `[claude-account] credential: <text>` with `sk-ant-[A-Za-z0-9_-]{8,}` replaced by `[key]`. Stdout is parsed and never printed.
+
+## `chosenAccount()` — `chosen-account.ts`
+- Returns `{ digest, slug } | null`, read on every call from `<home>/chosen.json`; never cached, never called on a timer.
+- `<home>` follows the Python store's `record.home()`: `$PLAN_RUNNER_CLAUDE_ACCOUNT_HOME` (made absolute, `~` expanded) when set; else the parent of a set `$DISPATCHER_HOME`, plus `/claude_account`; else `~/.claude/state/claude_account`.
+- `null` on any fault: file absent, unreadable, half-written, or not the two fields with an 8-hex `digest`.
+
+## Proof — `.verify/account-chat-launch.sh`
+- One `mktemp -d` scratch home on `:7898`, two made-up accounts saved through `tokens.save` / `store.set_token` / `store.choose`; the five seams (`DISPATCHER_HOME`, `PLAN_RUNNER_CLAUDE_ACCOUNT_HOME`, `PLAN_RUNNER_CLAUDE_ACCOUNT_TOKENS`, `PLAN_RUNNER_CLAUDE_IDENTITY_PATH`, `CLAUDE_LAUNCHES_PATH`) are read back from `/proc/<pid>/environ`; the real door runs against them (`CLAUDE_ACCOUNT_BIN` unset).
+- `.verify/account-chat-launch.mjs` drives one turn on a chat, creating or attaching.
+- Measured 2026-10-21: turn 1 answers `Failed to authenticate. API Error: 401 OAuth access token is invalid.` (the made-up token rode); after `store.choose` of the other account the same chat's next message logs the replacement and the launch record gains a `respawn: account probe-alpha → probe-beta` line; the token appears in 0 lines of the server log, the sessions directory and the launch record.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/account-door.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/chosen-account.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/account-chat-launch.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/account-chat-launch.sh

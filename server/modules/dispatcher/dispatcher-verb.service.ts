@@ -2,7 +2,7 @@ import { runDispatcherCommand, type DispatcherCommandDependencies } from '@/shar
 import type { DispatcherVerb, DispatcherVerbResult } from '@/shared/types.js';
 
 /**
- * Relaying the dispatcher's own fifteen verbs: `stop`, `resume`, `schedule` (a stopped plan's Resume
+ * Relaying the dispatcher's own sixteen verbs: `stop`, `resume`, `schedule` (a stopped plan's Resume
  * at a time), `park` (a designed plan set aside), `unpark` (handed
  * back to be cut), `model` (a plan's or an arc's own DeepSeek / Claude word, or `default` to follow the
  * top), `drop` (a plan removed, with everything the store holds of it — refused while a phase
@@ -17,8 +17,10 @@ import type { DispatcherVerb, DispatcherVerbResult } from '@/shared/types.js';
  * epic's open plans, paused and held out of the queue until shown — a walk in flight stops once its task
  * in flight finishes) and `unhide` (Show: each hidden plan takes its turn in the queue). Hide and Show take
  * plan or epic names, any number of them, and are BOARD verbs for the relay: the names are the argv.
+ * `override` is the card's lift of the usage pacer's hold for one plan (`--by app:card`, and `--off` for its
+ * undo), the pacer's gate and no other.
  *
- * FIVE OF THE FIFTEEN NAME AN ARC AS READILY AS A PLAN — `stop`, `resume`, `model`, and the
+ * FIVE OF THE SIXTEEN NAME AN ARC AS READILY AS A PLAN — `stop`, `resume`, `model`, and the
  * `arm-accept` / `disarm-accept` pair (every designed, or every armed, plan of it), each
  * resolved by the dispatcher's own door and by nothing on this side (`schedule <arc>` is the terminal's
  * alone: the deck has no Schedule start). An arc has no walk of its own:
@@ -54,7 +56,7 @@ export type DispatcherVerbDependencies = DispatcherCommandDependencies;
  * still carries `plan: ""`. `verbArgs` follow the name — `schedule`'s hour, `model`'s word,
  * `queue`'s move and `epics`' word, and for `hide` / `unhide` the plan and epic names themselves, each already
  * checked by the route against the shapes the dispatcher accepts, and `planner-resume`'s `--by app:card`,
- * which the route spells itself; `stop`, `resume`, `park`, `unpark` and `drop` take none.
+ * which the route spells itself (so does `override`'s `--by app:card`, with `--off` for the undo); `stop`, `resume`, `park`, `unpark` and `drop` take none.
  */
 export async function runDispatcherVerb(
   verb: DispatcherVerb,

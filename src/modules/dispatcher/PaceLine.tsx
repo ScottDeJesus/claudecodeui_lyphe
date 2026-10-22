@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { DispatcherPace } from '@/shared/types';
@@ -47,17 +48,22 @@ export function PaceLine({ pace }: { pace?: DispatcherPace | null }) {
  * The gate sends one of the two holds at a time, so the card draws whichever one arrived; a hold
  * that is absent (an older dispatcher), empty, or only a lead draws nothing at all.
  *
+ * `children` is the press that sits beside the clause (`PaceOverride`'s Override): the clause and its
+ * press are one unbreakable pair in the card's wrapping row, and a hold that draws nothing draws no press.
+ *
  * Handles: `data-plan-pace-hold` on the line.
  *
- * Used by `PlanCard` (runner-tab), after its queue line.
+ * Used by `PaceOverride` (this module), which `PlanCard` draws after its queue line.
  */
-export function PaceHoldLine({ hold }: { hold?: string | null }) {
+export function PaceHoldLine({ hold, children }: { hold?: string | null; children?: ReactNode }) {
   const { t } = useTranslation();
   const clause = (hold ?? '').replace(/^pace:\s*/, '').trim();
   if (!clause) return null;
-  return (
+  const line = (
     <span data-plan-pace-hold="" className="min-w-0 break-words text-xs text-muted-foreground">
       {t('dispatcher.paceHold', { clause, defaultValue: 'Held by pace · {{clause}}' })}
     </span>
   );
+  if (!children) return line;
+  return <span className="inline-flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">{line}{children}</span>;
 }

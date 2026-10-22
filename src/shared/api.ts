@@ -1004,6 +1004,11 @@ export const api = {
     // dispatcher reads which door from its own store — `cut`, `judge`, or a `tell` of `continue` — and
     // answers with that door's own sentence (`QUEUED cut <plan> — …`), or `REFUSED planner-resume …` as a 409.
     plannerResume: (name: string) => post(`/api/dispatcher/plans/${encodeURIComponent(name)}/planner-resume`, {}),
+    // The operator's lift of the usage pacer's hold for ONE plan (`dispatcher override <plan> --by app:card`):
+    // `OVERRIDDEN <plan> — …`, or the dispatcher's REFUSED line (a finished plan, one already past the pacer)
+    // as a 409. `overrideOff` puts the hold back (`… --off`). The pacer's gate only — no model word moves.
+    override: (name: string) => post(`/api/dispatcher/plans/${encodeURIComponent(name)}/override`, {}),
+    overrideOff: (name: string) => post(`/api/dispatcher/plans/${encodeURIComponent(name)}/override-off`, {}),
     // "Accept when cut" on a DESIGNED plan (`dispatcher arm-accept <plan> --by app:card --design <stamp>`): the
     // stamp is the plan's `design_loaded_at` as the card drew it, so a press on a design that has since moved is
     // refused by the dispatcher. `disarmAccept` is its Cancel. The arc pair presses/cancels every designed (armed)

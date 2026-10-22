@@ -10986,3 +10986,274 @@ measured 2026-10-20 by chain chain-claude-api-backup--card-fill-20261020-125408-
 probe-key: 5b62b51d9bcd33723f4315b100e9054927f3ba7c
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/settings.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/agents-settings/sections/AgentCategoryContentSection.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/agents-settings/sections/content/ClaudeApiKeysContent.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/useClaudeApiKeys.ts
+
+## INV-9252 — ClaudeAccountRow, ClaudeAccountSwitch, ClaudeAccountsPicture — identical in both shared/types.ts mirrors
+
+Reference: MAN-8847 (the section that reads them), MAN-8843 (the door face they describe).
+1. **Each of the three types is byte-identical in `src/shared/types.ts` and `server/shared/types.ts`**, comment and body. The `door?:` member on the `reachable: true` variant of `ClaudeAccounts` is the same line in both. A change to one lands in the other in the same edit. 2026-10-21: three block checksums equal across the mirrors.
+2. **They describe `claude-account status --json` as the door sends it.** Times are epoch SECONDS (`ClaudeAccountSlot.expiresAt` beside them is MILLISECONDS); `reading.five` / `.week` are fractions 0..1; `token` is a state word (`none` | `saved` | `checking`), never a token or a digest of one; `why` is the rule's sentence (INV-76).
+3. **`door?:` is optional** while the old slot summary stands: absent means `ClaudeAccountRows` draws nothing. Required only when the old switcher is removed.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts
+
+## INV-9253 — Account launch reads — edits that break them
+
+Behaviour: MAN-8849 (the two reads), MAN-8848 (the launch, the join, the record).
+
+| Edit | Breaks | Why |
+|---|---|---|
+| Hand the token to the door's child through `stdio: [.., 'pipe']`, or any non-FIFO descriptor | every launch rides the live login | Node puts a socketpair (`0o140777`) on an extra descriptor; the door refuses it (`REFUSED: --fd must name a pipe the caller opened`, exit 2) and the chat answers `account: null` — measured 2026-10-21 |
+| Read the FIFO through `createReadStream`, or before the child exits | the token is lost or the read dies | a stream on a non-blocking FIFO surfaces EAGAIN as a fatal read error and closes the fd; the drain is one synchronous read after `close` |
+| Put the token in a log line, a thrown error, a route body, a meta, a journal, argv, or the door's environment | the token leaves its one home | its only consumer is the env of the CLI it was read for; the one relayed string is the door's stderr, redacted |
+| Let a door fault throw or block | a chat fails because an account door failed | every fault answers all nulls inside the 10 s bound; the chat rides the live login |
+| Ask the door at a join (a message to a running process) | an extra door call, a token read, per message | only a spawn reads a credential; a running process keeps its spawn environment |
+| Cache `chosenAccount()` | an open conversation stays on the old account until the API restarts | a switch is a click or a rule pass; the file is two short fields |
+| Make `chosenAccount()` derive its home differently from the Python store (`record.home()`) | a stack with a moved store reads the operator's own choice | `$PLAN_RUNNER_CLAUDE_ACCOUNT_HOME`, else the parent of `$DISPATCHER_HOME` plus `/claude_account`, else `~/.claude/state/claude_account` |
+| Add a usable-account check to `chosenAccount()` | a second copy of the rule | the stale-choice removal lives once, in `auto._decide`, and runs before the fewer-than-two return (MAN-8843) |
+| Answer a respawn when either profile `account` is not a string | a hand-edited or missing `chosen.json`, or a re-adopted host with no account in its meta, replaces healthy processes in a loop | `null` is "not heard" |
+| Let `recordLaunch` throw or wait on the record | a launch fails on its evidence | the record is never a gate |
+| Drop `...account.env` from the catalog read, the diagnosing agent or its audit | those CLIs ride the live login while chats ride the chosen account | each is a Claude launch like any other |
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/account-door.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/chosen-account.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-launch-account.ts
+
+## INV-9256 — probe — a chosen record naming an account with no checked token respawns the chat on EVERY message, to the same place, forever while that state holds (MEASURED)
+
+a chosen record naming an account with no checked token respawns the chat on EVERY message, to the same place, forever while that state holds (MEASURED)
+
+```probe
+D=$(mktemp -d /tmp/achurn-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'P'
+set -u
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+export PROBE_PORT=7897
+. scripts/apps-probe-env.sh
+API="http://127.0.0.1:${PROBE_PORT}"
+if [ -n "$(ss -ltnH "sport = :$PROBE_PORT" 2>/dev/null)" ]; then echo "FAILED: :$PROBE_PORT busy" >&2; exit 1; fi
+D=$(mktemp -d /tmp/achurn.XXXXXX) || exit 1
+mkdir -p "$D/state/dispatcher" "$D/state/claude_account"
+export DISPATCHER_HOME="$D/state/dispatcher"
+export PLAN_RUNNER_CLAUDE_ACCOUNT_HOME="$D/state/claude_account"
+export PLAN_RUNNER_CLAUDE_ACCOUNT_TOKENS="$D/state/claude_account/tokens.json"
+export PLAN_RUNNER_CLAUDE_IDENTITY_PATH="$D/identity.json"
+export CLAUDE_LAUNCHES_PATH="$D/claude-launches.jsonl"
+printf '{"oauthAccount":{"accountUuid":"probe-identity-only","emailAddress":"probe-id@example.invalid"}}' > "$D/identity.json"
+unset ANTHROPIC_BASE_URL ANTHROPIC_AUTH_TOKEN ANTHROPIC_API_KEY
+CHAT=""; TOKEN=""
+cleanup() {
+  local status=$?
+  if [[ "$CHAT" =~ ^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$ ]] && curl -sf "$APPS_STATUS_URL" > /dev/null && [ -n "$TOKEN" ]; then
+    curl -s -o /dev/null -X DELETE -H "Authorization: Bearer $TOKEN" "$API/api/providers/sessions/$CHAT?force=true"
+  fi
+  local name
+  while IFS= read -r name; do case "$name" in "$CHAT"-*) tmux -L cloudcli-sessions kill-session -t "=$name" 2>/dev/null ;; esac; done < <(tmux -L cloudcli-sessions list-sessions -F '#{session_name}' 2>/dev/null)
+  stop_probe_server
+  cd /tmp || true
+  case "$D" in /tmp/achurn.??????) rm -rf "$D" ;; esac
+  echo "cleanup done (exit $status)"
+}
+trap cleanup EXIT
+# one account, checked and chosen, then its token cleared: the record now names a tokenless account
+PYTHONPATH=/home/lyphe/.claude/hooks python3 - <<'PY' || exit 1
+from plan_runner.claude_account import store, tokens
+store.add('bbbb0002', 'beta')
+store.set_token('bbbb0002', tokens.save('bbbb0002', 'sk-ant-oat01-bbbb0002bbbb0002bbbb0002'), checked=True)
+store.choose('bbbb0002', by='operator', why='probe: the churn')
+store.clear_token('bbbb0002')
+print("  chosen :", store.chosen())
+print("  current:", store.current(), "(the door's answer)")
+print("  usable :", store.usable())
+PY
+boot_probe_server || { echo "FAILED: server did not boot" >&2; exit 1; }
+TOKEN=$(mint_token) || { echo "FAILED: no token" >&2; exit 1; }
+node .verify/account-chat-launch.mjs --api "$API" --token "$TOKEN" --chat-file "$D/chat.txt" --message 'Reply with the single word ok.' > /dev/null || { echo "FAILED: first turn" >&2; exit 1; }
+CHAT=$(cat "$D/chat.txt")
+for n in 2 3; do
+  node .verify/account-chat-launch.mjs --api "$API" --token "$TOKEN" --chat "$CHAT" --chat-file "$D/chat.txt" --message 'Reply with the single word ok.' > /dev/null || { echo "FAILED: turn $n" >&2; exit 1; }
+done
+echo "-- Replacing lines:"
+grep -F "Replacing the process for session $CHAT:" "$APPS_LOG" | sed 's/^/  /'
+echo "-- launch rows for this chat:"
+python3 - "$CLAUDE_LAUNCHES_PATH" "$CHAT" <<'PY'
+import json, sys
+rows = [json.loads(l) for l in open(sys.argv[1]) if l.strip()]
+mine = [r for r in rows if r.get('session') == sys.argv[2]]
+for r in mine: print("  account=%s slug=%s why=%s" % (r['account'], r['slug'], r['why']))
+print("  respawn rows:", sum(1 for r in mine if str(r.get('why','')).startswith('respawn:')))
+PY
+P
+bash "$D/p.sh"
+expect: two identical `Replacing the process for session <chat>: account <identity-digest> → beta` lines from two consecutive messages, and every launch row's `account` is the same `<identity-digest>` before and after — the process never moves to beta
+```
+
+measured 2026-10-21 by chain chain-usage-limits--account-switch--chats-20261021-173459-f609, finding M1, MEDIUM
+probe-key: 8848902645f14494b8b0e0042ed0a8be2a1f673f
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/account-door.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/chosen-account.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/diagnosis/diagnosis-agent.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/diagnosis/diagnosis-audit.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/chat-process.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-engine-catalog.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-launch-account.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-runtime.provider.js, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/account-chat-launch.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/account-chat-launch.sh
+
+## INV-9257 — probe — one record, two readers: a stack that sets only `DISPATCHER_HOME` has the door riding the scratch store while the client decides respawns from the LIVE record (MEASURED)
+
+one record, two readers: a stack that sets only `DISPATCHER_HOME` has the door riding the scratch store while the client decides respawns from the LIVE record (MEASURED)
+
+```probe
+D=$(mktemp -d /tmp/aseam-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'P'
+set -u
+D=$(mktemp -d /tmp/aseam.XXXXXX) || exit 1
+mkdir -p "$D/state/dispatcher" "$D/state/claude_account" || exit 1
+printf '{"digest":"aaaaaaaa","slug":"scratch-seam"}' > "$D/state/claude_account/chosen.json"
+echo "-- the door's side (Python, <state_root>/claude_account):"
+env -u PLAN_RUNNER_CLAUDE_ACCOUNT_HOME DISPATCHER_HOME="$D/state/dispatcher" PYTHONPATH=/home/lyphe/.claude/hooks python3 -c 'from plan_runner.claude_account import store; print("  store.chosen() =", store.chosen())'
+cat > "$D/p.mts" <<'M'
+import { chosenAccount } from '@/modules/accounts/chosen-account.js';
+console.log("  chosenAccount() =", JSON.stringify(chosenAccount()));
+M
+echo "-- the client's side (chosen-account.ts):"
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+env -u PLAN_RUNNER_CLAUDE_ACCOUNT_HOME DISPATCHER_HOME="$D/state/dispatcher" npx tsx --tsconfig ./server/tsconfig.json "$D/p.mts"
+cd /tmp || true
+case "$D" in /tmp/aseam.??????) rm -rf "$D" ;; esac
+P
+bash "$D/p.sh"
+expect: the door prints Chosen(digest='aaaaaaaa', slug='scratch-seam', …) while the client prints null (or the live record's digest and slug when one exists) — one record, two readers, two files
+```
+
+measured 2026-10-21 by chain chain-usage-limits--account-switch--chats-20261021-173459-f609, finding L1, LOW
+probe-key: 16a5577b3803846c5d824a47bd408c050621cbb6
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/account-door.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/chosen-account.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/diagnosis/diagnosis-agent.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/diagnosis/diagnosis-audit.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/chat-process.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-engine-catalog.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-launch-account.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-runtime.provider.js, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/account-chat-launch.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/account-chat-launch.sh
+
+## INV-9263 — probe — HIGH — the proof pauses the operator's LIVE queue; the pause lives in a house-wide flag the scratch home does not redirect
+
+HIGH — the proof pauses the operator's LIVE queue; the pause lives in a house-wide flag the scratch home does not redirect
+
+```probe
+D=$(mktemp -d /tmp/athena-probe-epicflag.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'INNER'
+D=$(cd "$(dirname "$0")" && pwd)
+V=/home/lyphe/.claude/claudecodeui_lyphe/.verify
+echo "flag the proof's own env resolves for 'dispatcher epics pause' (DISPATCHER_HOME scratch, no override var): $(env -u DISPATCHER_EPICS_FLAG_PATH DISPATCHER_HOME=/tmp/heph-ovr-sim/dispatcher PYTHONPATH=/home/lyphe/.claude/hooks python3 -c 'from dispatcher import epic_dial; print(epic_dial.flag_path())')"
+echo "proof lines that run 'dispatcher epics ...': $(grep -c "dispatcher('epics'" $V/probe-pace-override.mjs) | proof files that point the dial at a scratch file: $(grep -l DISPATCHER_EPICS_FLAG_PATH $V/probe-pace-override.mjs $V/probe-pace-override.sh | wc -l)"
+printf 'paused yes\npaused_at 2026-10-22T00:00:00Z\n' > "$D/epics.flag"
+for v in pause resume; do env -u CLAUDE_CODE_SESSION_ID DISPATCHER_EPICS_FLAG_PATH="$D/epics.flag" DISPATCHER_HOME="$D/h" /home/lyphe/.claude/scripts/dispatcher epics $v 2>&1 | grep -v 'started no daemon'; done
+echo "a /tmp stand-in for an operator who already had Pause all on, after the proof's pause then resume: $(head -1 "$D/epics.flag")"
+INNER
+bash "$D/p.sh"; case "$D" in /tmp/athena-probe-epicflag.??????) rm -r "$D";; esac
+echo "[probe exit $?]"
+expect: while the defect stands — the first line ends /home/lyphe/.claude/state/epics.flag, `proof lines … : 2 | … scratch file: 0`, and the stand-in reads `paused no`; # cured — the .sh exports DISPATCHER_EPICS_FLAG_PATH under its scratch (count 1 or 2) and the first line names a /tmp path (a run that sets the var in the shell first).
+```
+
+measured 2026-10-21 by chain chain-plan-card-override-20261021-171051-2000, finding H1, HIGH
+probe-key: 479625b53c76dcb450b2cb853b3222c42f808d3c
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/hooks/useDispatcherVerbs.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-pace-override.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-pace-override.sh, /home/lyphe/.claude/hooks/dispatcher/pace_demand.py, /home/lyphe/.claude/hooks/dispatcher/pace_report.py
+
+## INV-9264 — probe — MEDIUM — an outing aimed at the plan's EPIC is held by the pacer, shown nowhere, and no door lifts it
+
+MEDIUM — an outing aimed at the plan's EPIC is held by the pacer, shown nowhere, and no door lifts it
+
+```probe
+D=$(mktemp -d /tmp/athena-probe-arccut.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'INNER'
+D=$(cd "$(dirname "$0")" && pwd)
+mkdir -p "$D/disp" "$D/pacer" || exit 1
+sqlite3 -readonly ~/.claude/state/dispatcher/dispatcher.db ".backup '$D/disp/dispatcher.db'" || exit 1
+sqlite3 -readonly ~/.claude/state/pacer/readings.sqlite ".backup '$D/pacer/readings.sqlite'" || exit 1
+cp ~/.claude/state/pacer/rates.json "$D/pacer/"
+export DISPATCHER_HOME="$D/disp" PLAN_RUNNER_PACER_HOME="$D/pacer" DISPATCHER_EPICS_FLAG_PATH="$D/epics.flag" PYTHONPATH=/home/lyphe/.claude/hooks
+printf 'paused no\n' > "$D/epics.flag"
+unset CLAUDE_CODE_SESSION_ID DISPATCHER_SESSION
+python3 - <<'PY'
+import time
+from plan_runner import claude_account
+from plan_runner.pacer import readings
+from dispatcher import planners, store
+now = time.time(); who = claude_account.current()
+readings.note(who, {"five": 0.30, "five_resets": (int(now // 3600) + 3) * 3600.0, "week": 0.995, "week_resets": (int(now // 86400) + 4) * 86400.0, "status": "allowed"}, source="athena", at=now)
+c = store.connect()
+arc = c.execute("select name from arcs order by id desc limit 1").fetchone()[0]
+with c: planners.queue_cut(c, arc, session=None, repo="/home/lyphe/.claude")
+open("arc.txt", "w").write(arc)
+PY
+ARC=$(cat arc.txt)
+~/.claude/scripts/dispatcher status --json 2>/dev/null > "$D/doc.json"
+echo "a cut aimed at the epic $ARC is queued; the pacer's picture says: held $(jq -r '.route.pace.held' "$D/doc.json")"
+jq -r --arg a "$ARC" '[.plans[] | select(.arc==$a)] | "plans of that epic: \(length) | showing a pace hold: \([.[]|select(.pace_hold!="")]|length) | showing the queued cut badge: \([.[]|select(.planner.verb=="cut" and .planner.state=="queued")]|length)"' "$D/doc.json"
+~/.claude/scripts/dispatcher override "$ARC" --by app:card 2>&1 | grep -v 'started no daemon'
+INNER
+cd "$D" && bash "$D/p.sh"; cd /tmp; case "$D" in /tmp/athena-probe-arccut.??????) rm -r "$D";; esac
+echo "[probe exit $?]"
+expect: `held 1` (or more), `showing a pace hold: 0 | showing the queued cut badge: 1`, and `no plan <arc>` while the gap stands; cured when the epic's plan(s) carry the clause and the press reaches the row
+```
+
+measured 2026-10-21 by chain chain-plan-card-override-20261021-171051-2000, finding M1, MEDIUM
+probe-key: cd6795e3adf079267c3d7e77181f20b3946c2453
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/hooks/useDispatcherVerbs.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-pace-override.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-pace-override.sh, /home/lyphe/.claude/hooks/dispatcher/pace_demand.py, /home/lyphe/.claude/hooks/dispatcher/pace_report.py
+
+## INV-9265 — probe — MEDIUM — the manuals now state three things this change made false, and carry no row for the new surface
+
+MEDIUM — the manuals now state three things this change made false, and carry no row for the new surface
+
+```probe
+cd /home/lyphe/.claude && echo "dispatcher MANUAL: planner_hold=$(grep -c 'planner_hold' hooks/dispatcher/MANUAL.md) overridden-key=$(grep -c 'plan_dict.overridden\|`overridden`' hooks/dispatcher/MANUAL.md) | stale pace_hold sentence=$(grep -c "for the plan's first ready phase, asked only while the plan is" hooks/dispatcher/MANUAL.md)"; echo "CloudCLI docs: override-off=$(grep -c 'override-off' claudecodeui_lyphe/docs/MANUAL.md) data-dispatcher-override=$(grep -c 'data-dispatcher-override' claudecodeui_lyphe/docs/MANUAL.md) PaceOverride=$(grep -c 'PaceOverride' claudecodeui_lyphe/docs/MANUAL.md) | 'NEVER A PRESS'=$(grep -c "THE PACER'S HOLD IS NEVER A PRESS" claudecodeui_lyphe/docs/MANUAL.md) | 'twenty-three routes'=$(grep -c 'twenty-three routes' claudecodeui_lyphe/docs/MANUAL.md)"
+echo "[probe exit $?]"
+expect: today `planner_hold=0 overridden-key=0 | stale pace_hold sentence=2` (two places state it) and `override-off=0 data-dispatcher-override=0 PaceOverride=0 | 'NEVER A PRESS'=1 | 'twenty-three routes'=1`; cured: the first three > 0 and the last three 0 (stale ones), the stale-sentence count reads 0
+```
+
+measured 2026-10-21 by chain chain-plan-card-override-20261021-171051-2000, finding M2, MEDIUM
+probe-key: bd0bbfc8200e40beee0dd68d62c64ec254450f88
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/hooks/useDispatcherVerbs.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-pace-override.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-pace-override.sh, /home/lyphe/.claude/hooks/dispatcher/pace_demand.py, /home/lyphe/.claude/hooks/dispatcher/pace_report.py
+
+## INV-9266 — probe — LOW — the press's toast speaks a terminal command beside a Turn off button, and a refused Turn off is headed "Override"
+
+LOW — the press's toast speaks a terminal command beside a Turn off button, and a refused Turn off is headed "Override"
+
+```probe
+D=$(mktemp -d /tmp/athena-probe-toast.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'INNER'
+D=$(cd "$(dirname "$0")" && pwd)
+export DISPATCHER_HOME="$D/h" PLAN_RUNNER_PACER_HOME="$D/pacer" DISPATCHER_EPICS_FLAG_PATH="$D/epics.flag" PYTHONPATH=/home/lyphe/.claude/hooks
+mkdir -p "$D/pacer" || exit 1
+unset CLAUDE_CODE_SESSION_ID DISPATCHER_SESSION
+python3 - <<'PY'
+from dispatcher import store, store_write
+R = '/tmp'; DS = {'repo': R, 'goal': 'g', 'delivers': 'd', 'architecture': 'a', 'interfaces': 'i', 'constraints': 'c', 'waits_on': [], 'decisions': [], 'questions': []}
+c = store.connect()
+with c:
+    store_write.open_plan(c, 'toastplan', repo=R, session='athena-probe'); store.put_design(c, 'toastplan', DS)
+PY
+echo "press -> $(~/.claude/scripts/dispatcher override toastplan --by app:card 2>&1 | grep -v 'started no daemon')"
+echo "off, then off again -> $(~/.claude/scripts/dispatcher override toastplan --off --by app:card 2>&1 | grep -v 'started no daemon'); $(~/.claude/scripts/dispatcher override toastplan --off --by app:card 2>&1 | grep -v 'started no daemon')"
+H=/home/lyphe/.claude/claudecodeui_lyphe
+echo "heading source for both doors: $(grep -n "verb === 'override'" $H/src/modules/dispatcher/hooks/useDispatcherVerbs.ts | cut -c1-110)"
+INNER
+bash "$D/p.sh"; cd /tmp; case "$D" in /tmp/athena-probe-toast.??????) rm -r "$D";; esac
+echo "[probe exit $?]"
+expect: the press line ends with `dispatcher override toastplan --off`` and one heading source line that returns the press word for every `override` — cured when the toast reads in the card's words and Turn off has its own heading
+```
+
+measured 2026-10-21 by chain chain-plan-card-override-20261021-171051-2000, finding L1, LOW
+probe-key: eb9714b5e6aa7e8e1ef749f0caab86c36993b30d
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/hooks/useDispatcherVerbs.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-pace-override.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-pace-override.sh, /home/lyphe/.claude/hooks/dispatcher/pace_demand.py, /home/lyphe/.claude/hooks/dispatcher/pace_report.py
+
+## INV-9267 — probe — LOW — `DispatcherPlan.overridden`'s doc (both mirrors) omits the one thing a reader of `pace_hold` needs: it is `""` while `overridden` is true
+
+LOW — `DispatcherPlan.overridden`'s doc (both mirrors) omits the one thing a reader of `pace_hold` needs: it is `""` while `overridden` is true
+
+```probe
+cd /home/lyphe/.claude/claudecodeui_lyphe && python3 -I - <<'PY'
+for path in ('server/shared/types.ts', 'src/shared/types.ts'):
+    s = open(path).read(); i = s.index('export type DispatcherPlan = '); line = s[i:s.index('\n', i)]
+    j = line.index('overridden: boolean'); k = line.rfind('/**', 0, j); doc = line[k:j]
+    print(path, '| doc says pace_hold is empty while overridden:', 'empty' in doc.lower() or '`""`' in doc)
+PY
+echo "[probe exit $?]"
+expect: `False` for both while the sentence is missing; `True` for both once the doc says it
+```
+
+measured 2026-10-21 by chain chain-plan-card-override-20261021-171051-2000, finding L2, LOW
+probe-key: dc4beed602d6d014784324f1d583f7f7b1647d30
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/hooks/useDispatcherVerbs.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-pace-override.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-pace-override.sh, /home/lyphe/.claude/hooks/dispatcher/pace_demand.py, /home/lyphe/.claude/hooks/dispatcher/pace_report.py

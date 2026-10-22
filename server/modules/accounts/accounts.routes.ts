@@ -2,8 +2,15 @@ import express from 'express';
 import type { NextFunction, Response } from 'express';
 
 import { kickDispatcher } from '@/modules/settings/index.js';
-import type { ClaudeAccounts } from '@/shared/types.js';
+import type { ClaudeAccounts, ClaudeAccountsPicture } from '@/shared/types.js';
 
+import {
+  AccountDoorRefusal,
+  accountsPicture,
+  removeAccount,
+  setAuto,
+  useAccount,
+} from './account-door.js';
 import {
   AccountRefusal,
   activeSlug,
@@ -15,10 +22,21 @@ import {
 import { readUsage } from './usage.service.js';
 
 /**
- * The account switcher's four routes, mounted at `/api` by `accounts.module.ts`. They answer the SAME
- * camelCase bodies the panel is built on, so no component changes: its branches on `reachable`, on
- * `unreadable` and on a window's `percent` hold as they are, and the route layer is free to move
- * without the client noticing.
+ * The account lane's routes, mounted at `/api` by `accounts.module.ts`: the slot switcher's four
+ * (until phase old-switcher removes them) and the door's picture and three writes beside them. They
+ * answer the SAME camelCase bodies the panel is built on, so no component changes: its branches on
+ * `reachable`, on `unreadable` and on a window's `percent` hold as they are, and the route layer is
+ * free to move without the client noticing.
+ *
+ * THE DOOR'S PICTURE RIDES BESIDE THE SLOT SUMMARY under `door` — `claude-account status --json`,
+ * relayed as `claude-api-keys.ts` relays the API keys' door, with every key-shaped string redacted.
+ * A door that cannot answer is still a 200: the calm `{ reachable: false, reason }` lives inside
+ * `door`, because this read is the status chip's poll and never an error wall.
+ *
+ * A REFUSED DOOR WRITE IS A VERDICT, not a fault: `use`, `auto` and `remove` answer the door's own
+ * line (200) or its own sentence (422 `{ error }`), and a malformed body is refused HERE before the
+ * door is asked anything. The door's `use` and `remove` kick the dispatcher themselves (INV-187), so
+ * these routes add no kick.
  *
  * THE `{ reachable }` ENVELOPE IS KEPT because the client is built on it. On a READ it is `true`
  * with the picture, or `false` with a one-word reason — never a 5xx, and never a 503. A read that
@@ -26,9 +44,10 @@ import { readUsage } from './usage.service.js';
  * than an error wall.
  *
  * ⚠ A READ NEVER FAILS. That is the whole contract: this is the poll that rides the status chip, and
- * a store that cannot be read is a FACT this module reports rather than a fault it raises. The one
- * `catch` below is a belt over code documented as total — it exists because "total by construction"
- * is a claim about today's store, and the panel must not go down if that claim stops holding.
+ * a store that cannot be read is a FACT this module reports rather than a fault it raises. The
+ * catches below are belts over code documented as total — they exist because "total by construction"
+ * is a claim about today's store and today's door, and the panel must not go down if either stops
+ * holding.
  *
  * `stateSummary()` answering `null` is the one account state with no picture in it: nothing captured
  * and no readable live login. That is the unreadable envelope (`slots: []`, every label `null`,
@@ -45,7 +64,7 @@ import { readUsage } from './usage.service.js';
  * A SWITCH AND A CAPTURE ANNOUNCE THEMSELVES TO THE DISPATCHER. A usage-limit hold belongs to the account
  * it was met on and ends when that account is no longer the one in use (`hooks/dispatcher/account_release.py`),
  * but every plan held on a limit is paused, so the daemon has usually exited and nothing else would tell
- * it the login changed. Both writes therefore end in `void kickDispatcher()` once the swap has landed
+ * it the login changed. Both of these writes therefore end in `void kickDispatcher()` once the swap has landed
  * and the active mark follows it: the daemon that wakes, or starts for the debt, reads the new identity
  * out of `~/.claude.json` itself. The kick never raises and is never awaited, so it can neither delay nor
  * fail the answer; a `claude /login` made outside this board sends none, and the next pass anything
@@ -64,11 +83,15 @@ function notComputed(): { reachable: false; reason: string } {
   return { reachable: false, reason: 'unreachable' };
 }
 
+/** The door's picture, or its calm reason — the shape `account-door-relay.ts` answers a read with. */
+type DoorPicture = ClaudeAccountsPicture | { reachable: false; reason: string };
+
 /**
  * The picture when the store has nothing to show — the unreadable envelope, field for field.
- * `liveSessions: 0` rides along because it is not a fact about the store either way.
+ * `liveSessions: 0` rides along because it is not a fact about the store either way. The door's
+ * picture is carried beside it: two different reads, and one being empty never withholds the other.
  */
-function unreadablePicture(): ClaudeAccounts {
+function unreadablePicture(door: DoorPicture): ClaudeAccounts {
   return {
     reachable: true,
     active: null,
@@ -79,6 +102,7 @@ function unreadablePicture(): ClaudeAccounts {
     drift: false,
     liveSessions: 0,
     unreadable: true,
+    door,
   };
 }
 
@@ -105,6 +129,12 @@ function requestedSlug(body: unknown): string | null {
   return typeof slug === 'string' && slug.trim() ? slug.trim() : null;
 }
 
+/** `on` is a boolean or the body is malformed — refused HERE, before the door is asked anything. */
+function requestedAuto(body: unknown): boolean | null {
+  const on = (body as { on?: unknown } | undefined)?.on;
+  return typeof on === 'boolean' ? on : null;
+}
+
 /**
  * Run one write and answer with its verdict.
  *
@@ -129,11 +159,40 @@ function sendWrite(
   }
 }
 
+/**
+ * Run one door write and answer its verdict.
+ *
+ * Two outcomes and no third for a refusal: the door's own line (200) or the door's own words (422),
+ * the shape the panel already reads out of `error`. `AccountDoorRefusal` is caught by CLASS, so a new
+ * refusal sentence in the door needs no change here; every other failure is a fault that belongs to
+ * `next`, because a write that did not land must not read as one that did.
+ */
+async function sendDoorWrite(
+  response: Response,
+  next: NextFunction,
+  runWrite: () => Promise<string>,
+): Promise<void> {
+  try {
+    const line = await runWrite();
+    response.status(200).json({ line });
+  } catch (error) {
+    if (error instanceof AccountDoorRefusal) {
+      response.status(422).json({ error: error.message });
+      return;
+    }
+    next(error);
+  }
+}
+
 /** Creates the lane's router for `accounts.module.ts`, which the server entrypoint mounts. */
 export function createAccountsRoutes(): express.Router {
   const router = express.Router();
 
-  router.get('/accounts', (_request, response) => {
+  router.get('/accounts', async (_request, response) => {
+    // The door's read is total by construction, so it stands outside the belt; a rejection here is
+    // still the calm reason rather than an unhandled one, because this poll must never 5xx.
+    const door = await accountsPicture()
+      .catch((): DoorPicture => ({ reachable: false, reason: 'unreachable' }));
     let picture: ClaudeAccounts;
     try {
       const summary = stateSummary(activeSlug());
@@ -141,8 +200,8 @@ export function createAccountsRoutes(): express.Router {
       // and minus `liveSessions`, which this route adds — so the two shapes cannot drift apart
       // without the compiler saying so.
       picture = summary === null
-        ? unreadablePicture()
-        : { reachable: true, ...summary, liveSessions: LIVE_SESSIONS_UNKNOWN, unreadable: false };
+        ? unreadablePicture(door)
+        : { reachable: true, ...summary, liveSessions: LIVE_SESSIONS_UNKNOWN, unreadable: false, door };
     } catch {
       picture = notComputed();
     }
@@ -187,6 +246,35 @@ export function createAccountsRoutes(): express.Router {
       void kickDispatcher();
       return { status: 201, body: { captured } };
     });
+  });
+
+  // The door's three writes. Each refuses a malformed body before the door is asked, so a bad
+  // request cannot move a credential file even as far as a validation read.
+  router.post('/accounts/use', async (request, response, next) => {
+    const slug = requestedSlug(request.body);
+    if (slug === null) {
+      response.status(422).json({ error: 'slug is required' });
+      return;
+    }
+    await sendDoorWrite(response, next, () => useAccount(slug));
+  });
+
+  router.post('/accounts/auto', async (request, response, next) => {
+    const on = requestedAuto(request.body);
+    if (on === null) {
+      response.status(422).json({ error: 'on must be true or false' });
+      return;
+    }
+    await sendDoorWrite(response, next, () => setAuto(on));
+  });
+
+  router.post('/accounts/remove', async (request, response, next) => {
+    const slug = requestedSlug(request.body);
+    if (slug === null) {
+      response.status(422).json({ error: 'slug is required' });
+      return;
+    }
+    await sendDoorWrite(response, next, () => removeAccount(slug));
   });
 
   return router;

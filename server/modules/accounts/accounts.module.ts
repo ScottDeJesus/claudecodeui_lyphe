@@ -4,8 +4,9 @@ import { createAccountsRoutes } from './accounts.routes.js';
 
 /**
  * Builds the accounts module's router for the server entrypoint, which mounts it at `/api` behind
- * `authenticateToken` — so the switcher answers at `/api/accounts`, `/api/usage`,
- * `/api/accounts/switch` and `/api/accounts/capture`.
+ * `authenticateToken` — so the lane answers at `/api/accounts`, `/api/usage`, the old switcher's
+ * `/api/accounts/switch` and `/api/accounts/capture` (until phase old-switcher removes them), and
+ * the door's `/api/accounts/use`, `/api/accounts/auto` and `/api/accounts/remove`.
  *
  * The module's two other halves are the slot store and the usage meter beside this file: the store
  * owns every credential byte on disk, the meter is the only thing in the server that holds an access

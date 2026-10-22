@@ -11,6 +11,10 @@ export { providerTokenUsageService } from './services/provider-token-usage.servi
 // advertises to every SDK client, for the chat palette's Claude Code group.
 export { readClaudeCommandCatalog } from './list/claude/claude-command-catalog.js';
 
+// launchAccountEnv: used by the Cerberus diagnosis agent and its summary audit, whose own CLI starts
+// ride the account the house chose exactly as a chat's process does.
+export { launchAccountEnv } from './list/claude/claude-launch-account.js';
+
 // diagnoseProjectFolder: used by the projects module's list to mark a project whose folder is gone,
 // with the same test the Claude run's pre-flight refuses a start by — one folder test, not two.
 export { diagnoseProjectFolder } from './list/claude/claude-project-folder.js';

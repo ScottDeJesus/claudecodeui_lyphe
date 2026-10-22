@@ -3175,7 +3175,7 @@ governs: /home/lyphe/.claude/hooks/skill_router.py, /home/lyphe/.claude/skills/h
 ## MAN-1498 — The dispatcher lane
 section: dispatcher/000
 
-A polled lane on this server: twenty-three routes under `/api/dispatcher` (twenty-two in `dispatcher.routes.ts`: three reads, ten presses on a plan, eight on an arc, one on the board; plus the card's `POST /answer`, MAN-7534), behind `authenticateToken` in `server/index.ts` (`createDispatcherModule()`, the mount, and its `start()`/`stop()` after `listen` and on shutdown), wired in `dispatcher.module.ts`, plus one websocket frame pushed to every open `/ws` socket whenever the picture changes — `kind:
+A polled lane on this server: twenty-five routes under `/api/dispatcher` (twenty-four in `dispatcher.routes.ts`: three reads, twelve presses on a plan, eight on an arc, one on the board; plus the card's `POST /answer`, MAN-7534), behind `authenticateToken` in `server/index.ts` (`createDispatcherModule()`, the mount, and its `start()`/`stop()` after `listen` and on shutdown), wired in `dispatcher.module.ts`, plus one websocket frame pushed to every open `/ws` socket whenever the picture changes — `kind:
 'dispatcher_state'` — and the notifications its endings earn (a feature in no epic pushes each ending; a feature of an epic pushes once per wave of trouble, and the epic's own finish pushes once — MAN-5639). A plan that lands owing the OPERATOR's word has its prompt put up on the plan's card (In flight face, Runs widget) and on his phone — the Accept prompt or the designer's questions, raised by this lane itself through `dispatcher ask <name>` and answered back through `dispatcher accept` and `dispatcher tell` (MAN-7400) — and still not a word of it is this lane's composition: the census, the options and the questions are the dispatcher's. A path under `/api` that no lane names answers 404 JSON (MAN-5437).
 
 The dispatcher is a separate program. It owns a SQLite store under `~/.claude/state/dispatcher`
@@ -3272,7 +3272,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.cl
 ## MAN-5636 — The dispatcher lane — The verbs. `POST /plans/:name/stop|resume|park|unpark|drop` (no body — `drop` takes the plan out of
 section: dispatcher/000/004 The verbs. `POST /plans/:name/stop|resume|park|unpark|drop` (no body — `drop` takes the plan out of
 
-**The verbs.** `POST /plans/:name/stop|resume|park|unpark|drop|planner-resume` (no body — `planner-resume` runs `dispatcher planner-resume <name> --by app:card`, the `--by` spelled by the route and never taken from the request: the dispatcher reads the plan's stalled planner off its own store and sends it back through `cut`, `judge` or `tell … continue`, and refuses with `REFUSED planner-resume …` when nothing of the plan ended short, MAN-7591; `drop` takes the plan out of the store with everything it holds of it, refused while a phase walks or a planner outing for the plan or its arc is live; the client presses it as `api.dispatcher.drop(name)`), `POST /plans/:name/model
+**The verbs.** `POST /plans/:name/stop|resume|park|unpark|drop|planner-resume` (no body — `planner-resume` runs `dispatcher planner-resume <name> --by app:card`, the `--by` spelled by the route and never taken from the request: the dispatcher reads the plan's stalled planner off its own store and sends it back through `cut`, `judge` or `tell … continue`, and refuses with `REFUSED planner-resume …` when nothing of the plan ended short, MAN-7591; `drop` takes the plan out of the store with everything it holds of it, refused while a phase walks or a planner outing for the plan or its arc is live; the client presses it as `api.dispatcher.drop(name)`), `POST /plans/:name/override` and `POST /plans/:name/override-off` (no body — `dispatcher override <name> --by app:card` and `dispatcher override <name> --off --by app:card`, the flags spelled by the route and never taken from the request: the operator's lift of the usage pacer's hold for ONE plan, MAN-8688. The dispatcher refuses the lift inside a Claude session and this lane's child environment carries none; a repeat press, a finished plan, or `--off` on a plan that carries none is a 409 carrying its `REFUSED override …` line; the client presses them as `api.dispatcher.override(name)` and `overrideOff(name)`), `POST /plans/:name/model
 { model }` and `POST /plans/:name/schedule { when }`, where `when` is checked by `readDispatcherScheduleWhen` (`server/shared/utils.ts`: the `offpeak|<iso with a zone>|none` grammar) and `model` by `readDispatcherModelChoice` (the closed three: `deepseek`, `claude`, `default` — which clears the word), so the argv word is always one this server wrote down. `runDispatcherVerb` (`dispatcher-verb.service.ts`, which adds `verb` and `plan` to the answer) relays them as argv through `runDispatcherCommand` (`server/shared/dispatcher-command.ts`: `dispatcher
 <verb> <name> [arg]`, `cwd` the home; the roadmap module's writes run through it too; a BOARD verb has no name, below) and NEVER throws: a numeric exit is a verdict carried whole
 (`ok` is exit 0). **The dispatcher refuses on STDOUT** — `REFUSED <verb> <name>: <reason>` exit 2, a not-found line exit 1 — `no plan <name>` from `drop` and `planner-resume` (`park` and `unpark` word it `REFUSED <verb> <name>: no plan <name>`), `no plan or arc <name>` from the six verbs an arc's own name also reaches (`model`, `stop`, `resume`, `schedule`, `arm-accept`, `disarm-accept`), `no arc <name>` from `queue` — so `stdout` is the field a reader reads first, and `stdout` is also where
@@ -3547,7 +3547,7 @@ epochOf(schedule.start_at)`), with `Resume at …` for a plan that walked and `C
 and is not said a second time beside the buttons; `hidden` → Show (`data-dispatcher-show`, `usePutAway(carriedNames).show`: `dispatcher unhide`, MAN-8492) alone — drawn only when news brought the card back, the `Hidden` list being the usual way; `parked` → Unpark; `idle` in state `designed` → `Accept when cut` AND Park (the way out of the designed Stop hold);
 `idle` in state `questions` → Park alone; `idle` in state `loaded` with a press still standing (`plan.accept_armed`: the cut has landed, the daemon has not yet approved it) → the armed word and Cancel, and no Park; `complete` and any other `idle` → no verb.
 
-THE PACER'S HOLD IS NEVER A PRESS, so it changes none of the verbs above: `plan.pace_hold` draws `Held by pace · <clause>` in the card's hold row — after `queue_hold`, because the gate asks the queue first and sends one of the two at a time (`data-plan-pace-hold`, MAN-6801, MAN-8692).
+THE PACER'S HOLD HAS ONE PRESS OF ITS OWN, and it is none of the verbs above (`PaceOverride.tsx`, the operator's `dispatcher override`, MAN-8688): `plan.pace_hold` draws `Held by pace · <clause>` in the card's hold row — after `queue_hold`, because the gate asks the queue first and sends one of the two at a time (`data-plan-pace-hold`, MAN-6801, MAN-8692) — with `Override` (`dispatcher.override.press`, the card's own `Button`, `data-dispatcher-override`) beside it. The clause is that of the plan's first ready phase, else of a queued design, tell or cut aimed at the plan or its epic, so every plan card of an epic whose cut the pacer holds draws it. The press is `POST /api/dispatcher/plans/:name/override` (`dispatcher override <plan> --by app:card`); the next frame reads `plan.overridden` and draws `Override on · starts even when the usage limit says wait` (`data-plan-override`) with `Turn off` (`data-dispatcher-override-off`, `POST …/override-off`) in place of the clause. It lifts the pacer and nothing else: a plan the QUEUE holds (an epic waiting its turn, Pause all) draws no Override, a plan with no hold and no override draws neither line, and the plan's model word, its epic's and the house switch are not this press's to touch. A success toasts the dispatcher's own sentence (for the card's press `OVERRIDDEN <plan> — starts past the pacer until it finishes or you turn it off`); a refusal is headed `Override`, and a refused Turn off `Turn off` (`override-off` is a press word local to `useDispatcherVerbs`, never a verb the server spawns).
 
 **ACCEPT WHEN CUT** (`AcceptWhenCut.tsx`, scope `plan`, MAN-8075): the operator's Accept given on a design he has read, ahead of its cut — the daemon approves the first cut of that exact design and walks it, and a Rework disarms it. Drawn before Park, where the dispatcher would take the press and never greyed out where it would refuse: `pressable` = state `designed`, no `accept_armed`, a `design_loaded_at`. Once pressed it reads `Accepted · starts when cut` (`dispatcher.acceptWhenCutArmed`) as a non-button span, its tooltip the door and hour (`acceptWhenCutArmedTitle`), with `Cancel` (`dispatcher.acceptWhenCutCancel`) beside it. The press posts `design_loaded_at` — the stamp of the design THIS card drew — so a press on a design that has since moved is refused by the dispatcher, never landed on the new one; `--by app:card` is the server's own word. Exit 3 (`already armed`: a double press, or the phone beside the card) is toasted as information, not a fault (`alreadyArmed` in `hooks/useArmAcceptVerbs.ts`, read by `useDispatcherVerbs`); a refusal is headed `dispatcher.acceptWhenCutRefused`. Handles: `data-dispatcher-arm-accept` (press), `data-dispatcher-arm-accepted` (armed word), `data-dispatcher-disarm-accept` (Cancel). A model cannot press it: the verb refuses inside a Claude session and the server strips that variable.
 A `complete` plan's bar draws nothing at all (no verb and no switch); putting its card away is Dismiss
@@ -3571,7 +3571,7 @@ as `resumeWord`, so a refusal names the verb the operator actually saw. `Schedul
 Every verb goes through `useDispatcherVerbs(name, 'plan', resumeWord)` under one `busy`; a refusal
 toasts the dispatcher's own first line, and a SUCCESS toasts the dispatcher's own sentence (the empty-
 body fallback is `runner.toast.model` for a model press, never its refusal word). Handles:
-`data-dispatcher-stop|resume|start|show|park|unpark|planner-resume|arm-accept|arm-accepted|disarm-accept`, `data-dispatcher-schedule` (`-set`, `-cancel`,
+`data-dispatcher-stop|resume|start|show|park|unpark|planner-resume|override|override-off|arm-accept|arm-accepted|disarm-accept`, `data-dispatcher-schedule` (`-set`, `-cancel`,
 and the armed hour as the group's own attribute VALUE — `''` while unarmed).
 The button words Stop, Resume, Start are `runner.*`; Park and Unpark are
 `dispatcher.park` / `dispatcher.unpark`, and a Delete's toast is headed `dispatcher.delete.word`.
@@ -10414,6 +10414,8 @@ section: The dispatcher types — the store's document, mirrored in two files/00
   `DispatcherPlan.pace_hold` (`string`, the gate's clause with its `pace:` lead), read by `planOf`
   through `textSince` — an ABSENT key and an explicit `null` both read `""` and draw no line (the
   two shapes are not distinguished), while any other non-text is refused by name.
+  `DispatcherPlan.overridden` (`boolean`, the operator's pacer override, MAN-8688) is read through
+  `flagSince`: an ABSENT key reads `false`, and `pace_hold` is `""` while it is `true`.
   `ClaudeUsage.pace` (`ClaudeUsagePace`, PERCENTS) is the usage route's copy, declared in both files
   outside the DISPATCHER block: attached from `pacer status --json` for the account whose login the
   reading came from, cached with the reading, and ABSENT on any failure. Drawn by MAN-8680.
@@ -13746,7 +13748,7 @@ Each key below is read from the dispatcher's own document or from the usage rout
 | surface | key | read by | computed by |
 |---|---|---|---|
 | master controller | `route.pace` | `paceSince` (`dispatcher-pace.reader.ts`) through `routeOf` (`dispatcher-state.service.ts`): ABSENT leaves the key off the route and draws no line; an explicit `null` reads `null`; a malformed picture is refused BY NAME | `pace_report.route` in `dispatcher status --json` (MAN-8692) |
-| plan card | `plan.pace_hold` | `planOf` (`dispatcher-plan.reader.ts`) through `textSince`: an ABSENT key (a dispatcher build older than it) and an explicit `null` both read `""` and draw no line; any other non-text is refused by name | `pace_report.hold` / `plan_dict` (MAN-8692) |
+| plan card | `plan.pace_hold` | `planOf` (`dispatcher-plan.reader.ts`) through `textSince`: an ABSENT key (a dispatcher build older than it) and an explicit `null` both read `""` and draw no line; any other non-text is refused by name | `pace_report.hold` / `pace_report.planner_hold` / `plan_dict` (MAN-8692) |
 | usage meters | `ClaudeUsage.pace` | `usage.service.ts` attaches it to the CACHED reading: `pacer-door.ts`'s `status(digest)` runs `pacer status --json --account <digest>` with a 5 s ceiling, `paceOf` converts the fractions to PERCENTS; on any failure — a timeout, a non-zero exit, unreadable JSON, a missing `words`, or a FAULT body with no `reading.at` (the pacer exits 0 with `probe: true` and a diagnostic `why` when its home will not open) — the key is ABSENT from `GET /api/usage` | `~/.claude/scripts/pacer status --json` for the account whose login the reading came from (`liveAccountDigest()`; a digest that cannot be read asks the pacer for NO account, never its default) |
 
 - The pace read rides the good-reading path of `measure()`, so it is cached WITH the reading under the
@@ -13765,7 +13767,7 @@ Each key below is read from the dispatcher's own document or from the usage rout
 | surface | component | reads | draws | handles |
 |---|---|---|---|---|
 | master controller | `PaceLine` (`PaceLine.tsx`), after the readout | `route.pace.words`, trimmed | the dispatcher's one sentence, muted ink, `flex-none max-w-full break-words pb-1.5`; an absent, `null` or wordless pace draws nothing | `data-pace-line`, `data-pace-held` (`held > 0`), `data-pace-probe` (`pace.probe`) |
-| plan card | `PaceHoldLine` (`PaceLine.tsx`), in the hold row after `queue_hold` | `plan.pace_hold`, `pace:` lead stripped | `dispatcher.paceHold` = `Held by pace · {{clause}}`; its presence opens the row when nothing else does | `data-plan-pace-hold` |
+| plan card | `PaceHoldLine` (`PaceLine.tsx`), in the hold row after `queue_hold`, with `PaceOverride`'s `Override` beside it (MAN-8688) | `plan.pace_hold`, `pace:` lead stripped | `dispatcher.paceHold` = `Held by pace · {{clause}}`; its presence opens the row when nothing else does | `data-plan-pace-hold`, `data-dispatcher-override` |
 | usage meters | `UsageMeters` → `paceForWindow(key, pace)` → `Meter` | `usage.pace` (`ClaudeUsagePace`) | 5-hour: tick at `ceiling5`, mark at `projected5`, caption `pace.words`. Weekly: tick `ceiling7`, mark `projected7`. Any other window, or an absent pace: none | `data-meter-tick`, `data-meter-mark`, `data-usage-pace-caption` |
 
 - A hold is muted ink, never amber (MAN-577).
@@ -13794,3 +13796,52 @@ readers' types; the server's own reads are shown live by the same probe (the key
 running dev API, not a fixture).
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/pacer-door.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/usage.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher-pace.reader.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/UsageMeters.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/PaceLine.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Meter.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/pacer-fill-live.mjs
+
+## MAN-8847 — The account section — ClaudeAccountRows over the door's picture
+
+Reference: door face MAN-8843 (`claude-account status --json`); the panel it sits in MAN-463; the panel's rules MAN-466; the types' mirror rule INV-9252.
+
+## Files — `src/modules/accounts/`
+| file | owns |
+|---|---|
+| `ClaudeAccountRows.tsx` | `ClaudeAccountRows`: header, rows, candidates, auto switch, last switch, closing sentence |
+| `ClaudeAccountRowViews.tsx` | `AccountRowView` (one account the store holds), `CandidateRow` (one live identity the store lacks) |
+| `claude-accounts-fake.ts` | `claudeAccountFakes(nowMs)`: 18 whole-value states, one per `FakeClaudeAccountsState`; nothing in `src/` imports it |
+| `AccountPopover.tsx` | mounts `<ClaudeAccountRows />` after the meters and balances, above `Switch account · N` |
+| `AccountFooterRow.tsx` | `setup` state + a `ProviderLoginModal` running `~/.claude/scripts/claude-account setup-token <slug>`, mounted only while `setup !== null` |
+
+## Wiring state
+- `AccountPopover` passes `<ClaudeAccountRows />` no props; every handler defaults to `NO_ACT`; `setup` in `AccountFooterRow` is never set; no route fills `ClaudeAccounts.door`. The panel draws as it did before the section.
+- Each unwired read or act carries a `// FILL:` comment: `grep -rn "FILL:" src/modules/accounts`.
+
+## `ClaudeAccountRows` props (all optional)
+| prop | meaning |
+|---|---|
+| `picture` | `ClaudeAccountsPicture` \| `{reachable:false; reason}` \| `null`; absent/`null` renders nothing; `reachable:false` renders one calm line, never a banner |
+| `busy` | disables every press |
+| `nowMs` | the caller's clock, epoch ms; omitted, the section ticks its own minute (`useMinuteTick`) |
+| `onUse(slug)` `onSetAuto(on)` `onRemove(slug)` `onSetup(slug)` | the four acts |
+
+## Rules an editor must not break
+1. **`why` is the door's sentence.** Drawn as it arrives (INV-76: slugs, never digests). The one edit: the no-room caveat drops a leading `<slug>'s ` / `<slug> ` (`withoutOwnName`) because the row already names the account; a `why` without that lead is untouched.
+2. **A refused token draws the wall and no date.** `wall.kind === "refused"` → `sign-in token refused — set it up again` (`data-tone="warn"`), no `valid until`. The door still relays `expires_at` for it; the suppression is in the view. `checking` keeps its date.
+3. **A full account with a checked token stays pressable.** A hand pick that is held is legal; the cue reads `Use anyway` and the caveat `no room now — …`. The in-use row never draws the caveat while `held`: it says `stays chosen until it has room again`.
+4. **`Use` needs `token === 'saved'`, not refused, not in use.** `none` or refused → `Set up`; `checking` → the word `checking`, no press.
+5. **Points, never dollars; unknown is `—`, never 0%.** `5h N% · wk N%` is the fraction ×100 rounded; `reading === null` → `5h — · wk —`; `as of <relative>` only past `READING_STALE_MS` (3 min).
+6. **The in-use row carries the record's why.** `chosen.by === "auto"` and `chosen.slug` the row's slug → `chosen.why` verbatim under the row.
+7. **The last-switch line is the why's headline.** `whyHeadline` cuts at the first `;` or ` (`; the whole sentence stays in the `title`; two-line clamp.
+8. **The auto switch's label and `aria` label are both `Switch automatically when the account in use fills`.** Off-state line follows it. The closing `SWITCHING_IN_WORDS` sentence draws only with at least one account.
+9. **`Remove` lives in the row's `ActionMenu`** (`isDanger`), with no confirm.
+10. **The Set up window mounts only with a slug.** A bare `setup-token` is a usage error.
+
+## Fakes — `claude-accounts-fake.ts`
+- Each state is the whole value the route will relay, never a prop-shaped sketch.
+- `picture()` derives each row's `chosen` from `chosen.digest`, and fills an empty `why` on a room row with `roomWords`.
+- A full row passes its own sentence built by `ceilingWords` / `roomWords` / `points`, which reproduce `room.py`'s `_ceiling_words` / `_room_words` / `_points` (fake ceiling 95%). A hand-typed sentence the door cannot send is a defect.
+- A new state is a new member of `FakeClaudeAccountsState` and a new key in the returned record.
+
+## Proving a state
+- Mount the section with a fake over the live Vite app's token layer (`.verify/lib/mountReact.mjs`); photograph each state at 1440×900, 390×844, 320×800, light and dark.
+- 2026-10-21: 19 states × 3 widths × 2 themes = 114 readings, 0 page errors, 0 horizontal overflow; frame 294 px inside 320.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/ClaudeAccountRows.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/ClaudeAccountRowViews.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/claude-accounts-fake.ts

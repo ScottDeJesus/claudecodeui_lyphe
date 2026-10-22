@@ -179,7 +179,7 @@ section: README/004 What Each Facet Does/001 The Claude model catalog
 
 The Claude picker's options, labels, descriptions and effort levels come from the installed CLI's own catalog. There is no list typed in beside the aliases, so a CLI release that moves an alias moves the picker with it.
 
-- **The read** (`list/claude/claude-engine-catalog.ts`, the one mechanism the model catalog and the command catalog share — MAN-8069; `claude-model-catalog.ts` is the model catalog's own spec: its question, its file, its picker). It starts an SDK `query` in streaming-input mode, with a prompt that yields nothing, and calls `supportedModels()`. The CLI answers with every model it can run, the alias each family answers to, its name for each, a description and the effort levels each accepts, and it does so without starting a turn. Measured 2026-09-28 on Claude Code 2.1.284: 633–901 ms, no API request, no transcript. The read runs on Haiku (`claude-haiku-4-5-20251001`), from `os.tmpdir()`, with the executable the chat runtime spawns, and with `settingSources: []`. With no settings source named, the SDK loads every one, the read's cwd included, and each read ran the user's SessionStart and SessionEnd hooks plus any `.claude/settings.json` another user left in world-writable `/tmp`. The catalog is byte-identical with no source loaded.
+- **The read** (`list/claude/claude-engine-catalog.ts`, the one mechanism the model catalog and the command catalog share — MAN-8069; `claude-model-catalog.ts` is the model catalog's own spec: its question, its file, its picker). It starts an SDK `query` in streaming-input mode, with a prompt that yields nothing, and calls `supportedModels()`. The CLI answers with every model it can run, the alias each family answers to, its name for each, a description and the effort levels each accepts, and it does so without starting a turn. Measured 2026-09-28 on Claude Code 2.1.284: 633–901 ms, no API request, no transcript. The read runs on Haiku (`claude-haiku-4-5-20251001`), from `os.tmpdir()`, with the executable the chat runtime spawns, on the chosen account (`env: { ...userFacingEnv(), ...account.env }`, MAN-8848), and with `settingSources: []`. With no settings source named, the SDK loads every one, the read's cwd included, and each read ran the user's SessionStart and SessionEnd hooks plus any `.claude/settings.json` another user left in world-writable `/tmp`. The catalog is byte-identical with no source loaded.
 - **When it runs.** Once per installed CLI version, keyed on `readInstalledCliVersion()`, the `cli-version` module's one cached reading; the catalog never runs a `--version` of its own. The answer is kept at `~/.cloudcli/claude-model-catalog.json` beside the version it was read on (`CLOUDCLI_CLAUDE_MODEL_CATALOG_PATH` redirects it), so the dev server's handovers load it instead of respawning the CLI. A reading with no version ("not heard") is served whatever is kept under a real version and never spawns the CLI or replaces that record; only a CLI never named by path, with nothing keyed, is read once per process. `getSupportedModels` also sits on the send path (effort validation), so a caller waits at most 3 s for a read in flight and is otherwise served what is already known.
 - **The open tab.** The picker asked for its list once, at mount, so a CLI update left an open tab on the old list until the page was reloaded (2026-10-08: the CLI served Haiku 5.5 and the catalog file named it within seconds, while a tab listed only Haiku 4.5). `src/modules/chat/hooks/useReloadModelsOnCliChange.ts` re-reads `GET /api/providers/<provider>/models` for every provider when `useCliVersion().installed` moves from one version string to another — the app's one reading of the installed CLI, so it adds no poll. The first reading (null to a string) is not a move, and a null is "not heard". The answer is laid over the previous catalog (`{ ...previous, ...next }`), so a provider whose answer is unusable (a JSON error body) keeps its last good list.
 - **When the read fails.** The server serves the last good catalog on disk, whatever version it came from. With none, it serves `CLAUDE_FALLBACK_MODELS`, whose rows are named by family alone ("Opus", "Sonnet") and state no generation. One `[Claude models]` log line says which. A failed version is asked again after 10 minutes.
@@ -749,7 +749,7 @@ A tool-set difference is never a respawn reason.
 | compaction taken over | `applyFlagSettings` (MAN-8055) |
 | **tool sets** | `setMcpServers`, through `createToolsetSync` |
 
-Respawn reasons (launch arguments): `resumeFromScratch`, a resume anchor, `cwd`, the installed CLI newer than the process's, the base `mcpServers` map, a bypass request, any change to the disallowed list, a SHRUNK allowed list.
+Respawn reasons (launch arguments): `resumeFromScratch`, a resume anchor, `cwd`, the installed CLI newer than the process's, the account (`LaunchProfile.account` against `chosenAccount()`; words `account <slug> → <slug>`; `null` on either side is not heard, never a respawn — MAN-8848), the base `mcpServers` map, a bypass request, any change to the disallowed list, a SHRUNK allowed list.
 
 ## Why a sync never retires a process
 
@@ -796,3 +796,45 @@ Runs are chained (one at a time, in ask order); each re-asks the hook when its t
 - Prompt order for a joining message while the first prompt is held: its sync queues behind the spawn's, so its `pushTurn` runs after the held prompt is released (by construction; unexercised live).
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/chat-process.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-runtime.provider.js, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-toolset-seams.ts
+
+## MAN-8848 — The Claude launch account — the spawn read, the join comparison, the launch record
+
+Every Claude CLI start in CloudCLI rides the account the house chose. The door's verb: MAN-8842. The two reads this launch makes (`launchCredential`, `chosenAccount`): MAN-8849; rules: INV-9253. The respawn rule's place in `planLiveChanges`: MAN-8502.
+
+## Starts that read the account
+| start | env built | read |
+|---|---|---|
+| chat CLI (`spawnProcess`, `claude-runtime.provider.js`) | `sdkOptions.env = { ...sdkOptions.env, ...launch.env }`, after `resolveSdkOptions` and `userFacingEnv()` | once per spawn; skipped for a re-adoption (`reattach`) |
+| model and command catalogs (`readRecordsFromCli`, `claude-engine-catalog.ts`) | `{ ...userFacingEnv(), ...account.env }` | per read |
+| diagnosing agent and its audit (`diagnosis-agent.ts`, `diagnosis-audit.ts`) | `{ ...userFacingEnv(), ...account.env }` | per run, after the abort listener is attached |
+
+## `claude-launch-account.ts`
+| export | answers |
+|---|---|
+| `launchAccountEnv()` | `{ env, account, slug }`; `env` is `{ CLAUDE_CODE_OAUTH_TOKEN: <token> }` when the door holds a token for the chosen account, else `{}`; never rejects: any failure is `{ env: {}, account: null, slug: null }`, the launch rides the live login |
+| `accountRespawn(live, next)` | `account <from> → <to>` (slugs; digest when a slug is missing) or `null`; `null` when either `account` is not a string (not heard) or the two are equal |
+| `recordLaunch({ session, account, slug, why })` | appends one line to the launch record; never throws, never gates a launch |
+
+## Profile fields — `LaunchProfile.account`, `.accountSlug`
+| profile | value |
+|---|---|
+| the process's (set at spawn) | the door's answer at the spawn; `null` when the door gave none, and for a re-adopted host whose meta holds none |
+| a message's (`launchProfileOf`, 6th and 7th arguments) | the account the house has chosen now (`chosenAccount()`); `null` when the record is absent or unreadable |
+
+## Join — an account change replaces the process
+1. `joinProcess` reads `chosenAccount()` on every message and builds `next` with it. A join never asks the door.
+2. `planLiveChanges` calls `accountRespawn(live, next)` after the CLI-version rule and before the re-adopted-process branch; a reason is `{ respawn, changes: null }`.
+3. `joinProcess` logs `[Claude SDK] Replacing the process for session <id>: account <slug> → <slug>`, retires the process and answers `{ launchWhy: 'respawn: account <slug> → <slug>' }`.
+4. `queryClaudeSDK` spawns afresh on `joined?.launchWhy ?? 'new'`; the spawn reads the door and rides the new token; the conversation resumes.
+5. A running process keeps the environment it was started with, so a changed choice reaches an open conversation only at its next message.
+
+## Launch record — `~/.cloudcli/claude-launches.jsonl`
+- One line per chat CLI start: `{ at, session, account, slug, why }`; `at` epoch seconds, `why` is `new` or `respawn: <reason>`; mode 0600.
+- Lines older than 30 days are dropped on the first append of each UTC day (the day read from the newest line's `at`); written through a temp file and a rename.
+- Evidence, never authority: every write failure is swallowed.
+- `CLAUDE_LAUNCHES_PATH` moves the file for a probe.
+
+## Proof
+`.verify/account-chat-launch.sh` — scratch home with two made-up accounts: the token rides the first turn (a 401 from the made-up token), `store.choose` of the other account replaces the process at the next message, the launch record carries both lines, and the token appears in no log, session file or launch record. `.verify/account-chat-launch.mjs` drives one turn on a chat.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/diagnosis/diagnosis-agent.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/diagnosis/diagnosis-audit.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-engine-catalog.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-launch-account.ts

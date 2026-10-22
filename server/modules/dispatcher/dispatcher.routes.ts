@@ -153,19 +153,19 @@ function statusForVerb(result: DispatcherVerbResult): number {
 }
 
 /**
- * The dispatcher lane's twenty-three routes: three reads of the plan list, ten presses on a plan, six on
+ * The dispatcher lane's twenty-five routes: three reads of the plan list, twelve presses on a plan, six on
  * an arc, four on the board. Auth is the mount's `authenticateToken`, in `server/index.ts`.
  *
  * These handlers validate and translate, and do nothing else: nothing is read here, no process is
  * started here, and no route names a path from the request — the binary and the store are the
  * module's, fixed at composition, and a request can only ever choose a plan or an arc by name, a
- * word from the closed set of fifteen verbs, and — where the verb takes one — a word from the three
+ * word from the closed set of sixteen verbs, and — where the verb takes one — a word from the three
  * model words, the queue's three moves or the epic dial's seven words.
  *
  * A READ THAT FINDS NO PICTURE IS TOLD SO (`NOT_READ_YET` above), and the read waits a bound for one
  * first: the two together are what keep a handover from being drawn as an empty plan list.
  *
- * FIVE OF THE FIFTEEN ARE RELAYED TWICE, once under `/plans/:name` and once under `/arcs/:name`, because
+ * FIVE OF THE SIXTEEN ARE RELAYED TWICE, once under `/plans/:name` and once under `/arcs/:name`, because
  * the dispatcher's own doors open on both: `model`, `stop`, `resume` and the `arm-accept` /
  * `disarm-accept` pair take an arc's name as readily as a plan's. The two spellings are two routes
  * rather than one param because the NAME CLASSES differ (`PLAN_NAME` against `ARC_NAME` below) — a
@@ -281,6 +281,16 @@ export function createDispatcherRouter(dependencies: DispatcherRouterDependencie
   // stalled is the dispatcher's own refusal (`REFUSED planner-resume …`, a 409). `--by app:card` is the
   // press's actor, written to the plan's log the way an Accept's is; the word is ours, never the request's.
   router.post('/plans/:name/planner-resume', relay('planner-resume', () => ['--by', 'app:card']));
+  // The operator's lift of the usage pacer's hold for THIS plan (`dispatcher override <plan> --by app:card`) —
+  // the card's `Override` — and its undo (`… --off --by app:card`, `Turn off`). It lifts the pacer and nothing
+  // else: the plan's model word, its epic's and the house switch are untouched, and every soul rides the
+  // route that switch gives it. THE DISPATCHER REFUSES THE LIFT INSIDE A CLAUDE SESSION, and this lane's
+  // child environment carries none (`laneEnv`), so the card's press is the operator's own. The two words
+  // are ours (`--by app:card` names the press's door in the plan's log); no body and no argument travel.
+  // A refusal (`REFUSED override …`: a finished plan, one the roadmap still holds, one already past the
+  // pacer, or `--off` on a plan that carries none) is a 409 whose body is that sentence, untouched.
+  router.post('/plans/:name/override', relay('override', () => ['--by', 'app:card']));
+  router.post('/plans/:name/override-off', relay('override', () => ['--off', '--by', 'app:card']));
   // A DESIGNED plan Accepted ahead of its cut (`dispatcher arm-accept <name> --by app:card --design <stamp>`) —
   // the card's `Accept when cut`: the daemon approves the first cut of that exact design and walks it. The
   // stamp the card drew travels in the body and is checked before any spawn (`armAcceptArgs`); the dispatcher

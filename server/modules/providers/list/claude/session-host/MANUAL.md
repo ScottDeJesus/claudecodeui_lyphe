@@ -96,7 +96,7 @@ Client → host:
 
 | Frame | Meaning |
 |---|---|
-| `{"t":"spawn","command","args","cwd","env","appSessionId","userId","profile"}` | First frame on a FRESH host: spawn the CLI with exactly these, write the meta, attach this client from seq 0. `env` is held in memory only — it never reaches the meta or the journal; `profile` (the launch profile) goes to the meta |
+| `{"t":"spawn","command","args","cwd","env","appSessionId","userId","profile"}` | First frame on a FRESH host: spawn the CLI with exactly these, write the meta, attach this client from seq 0. `env` is held in memory only — it never reaches the meta or the journal (it carries the chosen account's `CLAUDE_CODE_OAUTH_TOKEN` when the door holds one, MAN-8848); `profile` (the launch profile) goes to the meta |
 | `{"t":"hello","fromSeq":number\|"acked"}` | First frame on a RE-ATTACH: replay journal frames past that cursor, then `live`, then attach |
 | `{"t":"stdin","b64":string}` | Bytes for the CLI's stdin, base64 so no frame boundary can split a character. Buffered to complete lines; a trailing partial line waits |
 | `{"t":"end_input"}` | `child.stdin.end()` — the only path by which the CLI ever sees end-of-file |
@@ -263,6 +263,8 @@ written** — the meta is written at spawn, before the CLI has said anything. Wh
 is in the journal (`system/init`'s `claude_code_version`), and THAT is what a re-adoption reads
 (`host-registry.js`'s `lastReportedCliVersion`) and hands the provider as `KeepaliveReattach.cliVersion`.
 Two records by two hands on purpose: the meta is the launch, the journal is the answer.
+
+`profile.account` and `profile.accountSlug` are the account digest and slug the CLI was started on (the door's answer at the spawn, MAN-8848); `null` when the door gave none. A re-adopted host's profile comes from here, so it too is replaced at its next message when the house has chosen another account; a meta from before the fields reads as not heard and is never replaced for it.
 
 Liveness is always the tmux session, never this file: a meta says what a host believed when it
 last wrote, and only `tmux has-session` says whether anything is still running.

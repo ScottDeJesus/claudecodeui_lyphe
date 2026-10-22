@@ -7,14 +7,16 @@ import type { ClaudeUsagePace, ClaudeUsageWindow } from '@/shared/types.js';
 import { isFiniteNumber, isRecord, resetEpoch } from './usage-windows.js';
 
 /**
- * Both halves of the pacer's door: CloudCLI's usage meter handing every good reading it takes to
- * the house's record (`~/.claude/scripts/pacer note --source meter`), and the same meter reading
- * the pacer's projection back out of it (`status --json --account <digest>`) to draw on its bars.
+ * Both halves of the pacer's door: the readings CloudCLI hands to the house's record
+ * (`~/.claude/scripts/pacer note --source meter|chat`), and the pacer's projection read back out of
+ * it (`status --json --account <digest>`) to draw on the meters' bars.
  *
- * WHY THE METER FILES. The Claude children's own `rate_limit_event` stream covers the times the
- * house is working; the meter covers the times it is idle with the app open — including the instant
- * of an account switch, when its re-read is the new account's first reading. The pacer's projection
- * needs both, and nothing else polls the OAuth endpoint (`claude-api-backup` ruled polling out).
+ * WHO FILES. The meter files the times the house is idle with the app open — including the instant
+ * of an account switch, when its re-read is the new account's first reading. A chat files its own
+ * `rate_limit_event` stream under the account its process was launched on (`claude-chat-readings.ts`,
+ * source "chat"): those are the times the house is working, and they are what lets the operator's
+ * own chats trigger the account rule. The pacer's projection needs both, and nothing else polls the
+ * OAuth endpoint (`claude-api-backup` ruled polling out).
  *
  * WHAT THE DOOR TAKES. One JSON object on stdin: `{"account", "at" (epoch seconds), "five":
  * {"used": fraction, "resets_at": epoch} | null, "week": … | null}`. Fractions here are 0..1, the
@@ -33,9 +35,9 @@ import { isFiniteNumber, isRecord, resetEpoch } from './usage-windows.js';
  * to it; the next poll reads again.
  *
  * `status()` — the read call, which draws the projection — is the drawing side's half of this door;
- * `note()` is the meter's. It asks for ONE named account and answers `null` on any failure, so the
- * projection on the meters is always the picture of the login the reading came from and never the
- * account some other command happens to consider in use.
+ * `note()` is the writing half, for the meter and for a chat. `status()` asks for ONE named account
+ * and answers `null` on any failure, so the projection on the meters is always the picture of the
+ * login the reading came from and never the account some other command happens to consider in use.
  */
 
 /** The door's ceiling. The command writes one stdout line and exits; ten seconds is a fault, not a
@@ -106,14 +108,22 @@ function doorWindow(
 }
 
 /**
- * File one good meter reading with the pacer, as `source` "meter".
+ * File one good reading with the pacer, under the source word that names who read it: `'meter'` for
+ * the browser's usage poll, `'chat'` for a CloudCLI chat's own `rate_limit_event`.
  *
- * Consumers: `usage.service.ts`'s `measure`, after it has re-read the credential stamp and found the
- * login unchanged. `digest` is `liveAccountDigest()`'s answer; `checkedAt` is the reading's
- * `checkedAt` in epoch MILLISECONDS. SYNCHRONOUS BY DESIGN — it starts the child and returns, so
- * nothing on the route ever awaits it. Never raises.
+ * Consumers: `usage.service.ts`'s `measure` (source `'meter'`), after it has re-read the credential
+ * stamp and found the login unchanged, and `claude-chat-readings.ts` (source `'chat'`, through the
+ * accounts barrel), under the account its chat process was launched on. `digest` is
+ * `liveAccountDigest()`'s answer for the meter, the launch profile's account for a chat;
+ * `checkedAt` is the reading's own instant in epoch MILLISECONDS. SYNCHRONOUS BY DESIGN — it starts
+ * the child and returns, so nothing on the route ever awaits it. Never raises.
  */
-export function note(digest: string, windows: ClaudeUsageWindow[], checkedAt: number): void {
+export function note(
+  digest: string,
+  windows: ClaudeUsageWindow[],
+  checkedAt: number,
+  source: 'meter' | 'chat',
+): void {
   const account = digest.trim();
   if (!account) return; // no login, no owner for the reading
   const five = doorWindow(windows, 'five_hour', checkedAt);
@@ -127,7 +137,7 @@ export function note(digest: string, windows: ClaudeUsageWindow[], checkedAt: nu
   try {
     const child = execFile(
       pacerBin(),
-      ['note', '--source', 'meter'],
+      ['note', '--source', source],
       { timeout: NOTE_TIMEOUT_MS },
       // The door's own stdout/stderr end here and go no further: `NOTED` and `DROPPED` are the
       // operator's words at a terminal, and the server's journal must not carry the door's lines.

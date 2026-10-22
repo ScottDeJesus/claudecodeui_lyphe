@@ -13,9 +13,11 @@ export type DispatcherVerbScope = 'plan' | 'arc';
  * The verb a press is relaying: the dispatcher's own verbs, plus the card's `answer`. The answer is
  * a door of its own (`POST /api/dispatcher/answer`, never one of the verb routes), and the union
  * stays LOCAL to this hook — `DispatcherVerb` remains exactly the set the server spawns, so no
- * route or service is ever read against a word the dispatcher's binary does not know.
+ * route or service is ever read against a word the dispatcher's binary does not know. `override-off` is
+ * the card's Turn off: the same dispatcher verb as `override` through its own route, named apart so a
+ * refusal of Turn off is headed in Turn off's word.
  */
-type DispatcherPress = DispatcherVerb | 'answer';
+type DispatcherPress = DispatcherVerb | 'answer' | 'override-off';
 
 /** What a plan card may press. */
 export type DispatcherPlanVerbs = ArmAcceptPlanVerbs & {
@@ -27,6 +29,9 @@ export type DispatcherPlanVerbs = ArmAcceptPlanVerbs & {
   drop(): Promise<void>;
   /** The plan's stalled planner outing put back to work — the dispatcher picks the door (`cut`, `judge`, or a `tell` of `continue`). */
   plannerResume(): Promise<void>;
+  /** The operator's lift of the pacer's hold for this plan, and its undo: the pacer's gate and nothing else. */
+  override(): Promise<void>;
+  overrideOff(): Promise<void>;
   setModel(choice: DispatcherModelChoice): Promise<void>;
   /**
    * The operator's word on the prompt this plan's card is drawing: the chosen label (or typed
@@ -52,7 +57,7 @@ export type DispatcherArcVerbs = ArmAcceptArcVerbs & {
 };
 
 /**
- * Stop, Resume, Schedule, Park, Unpark, Model, Drop, Resume planner and Answer for one plan — or Stop, Resume
+ * Stop, Resume, Schedule, Park, Unpark, Model, Drop, Resume planner, Override (and its undo) and Answer for one plan — or Stop, Resume
  * and Model for one dispatch ARC — and what to say about each.
  *
  * ONE HOOK, TWO DOORS, because the two are the same act on the same store through the same verbs:
@@ -124,6 +129,8 @@ export function useDispatcherVerbs(
       if (verb === 'unpark') return t('dispatcher.unpark');
       if (verb === 'drop') return t('dispatcher.delete.word');
       if (verb === 'planner-resume') return t('dispatcher.plannerResume');
+      if (verb === 'override') return t('dispatcher.override.press');
+      if (verb === 'override-off') return t('dispatcher.override.off');
       if (verb === 'schedule') return t('runner.schedule.refused');
       if (verb === 'model') return t('runner.model.refused');
       if (verb === 'answer') return t('dispatcher.ask.word');
@@ -191,7 +198,7 @@ export function useDispatcherVerbs(
     [name, scope, send],
   );
 
-  // The plan card's own five, which no arc header draws and no arc route exists for.
+  // The plan card's own verbs, which no arc header draws and no arc route exists for.
   const park = useCallback(async () => { await send('park', () => api.dispatcher.park(name)); }, [name, send]);
   const unpark = useCallback(async () => { await send('unpark', () => api.dispatcher.unpark(name)); }, [name, send]);
   const drop = useCallback(async () => { await send('drop', () => api.dispatcher.drop(name)); }, [name, send]);
@@ -199,6 +206,9 @@ export function useDispatcherVerbs(
     async () => { await send('planner-resume', () => api.dispatcher.plannerResume(name)); },
     [name, send],
   );
+  // The pacer's hold lifted for this plan, and put back: two doors of one dispatcher verb, so one `busy`.
+  const override = useCallback(async () => { await send('override', () => api.dispatcher.override(name)); }, [name, send]);
+  const overrideOff = useCallback(async () => { await send('override-off', () => api.dispatcher.overrideOff(name)); }, [name, send]);
 
   // The card's own press: the operator's word on the prompt it is drawing, relayed to the lane's
   // answer door rather than a verb route — and handed on, because the card draws its answered
@@ -213,5 +223,5 @@ export function useDispatcherVerbs(
   const armVerbs = useArmAcceptVerbs(name, scope, send);
 
   if (scope === 'arc') return { stop, resume, setModel, ...armVerbs, busy };
-  return { stop, resume, schedule, park, unpark, drop, plannerResume, setModel, answer, ...armVerbs, busy };
+  return { stop, resume, schedule, park, unpark, drop, plannerResume, override, overrideOff, setModel, answer, ...armVerbs, busy };
 }

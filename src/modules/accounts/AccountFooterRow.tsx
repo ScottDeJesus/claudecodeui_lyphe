@@ -58,6 +58,9 @@ export function AccountFooterRow({ collapsed = false, onExpand }: AccountFooterR
   // Whether the provider's own login is running in the embedded terminal. Held here rather
   // than in the panel because the panel closes and this must not close with it.
   const [loginOpen, setLoginOpen] = useState(false);
+  // The Set up window's account. One object, so an open window always has a slug and the command can
+  // never run `setup-token` without one. Inert until phase panel-fill moves it into a hook.
+  const [setup] = useState<{ slug: string } | null>(null);
 
   // The glance labels count DOWN, so they cannot wait for the three-minute usage poll to be
   // redrawn — a "1m" would sit there for three. One tick a minute, and only while there is a
@@ -143,6 +146,8 @@ export function AccountFooterRow({ collapsed = false, onExpand }: AccountFooterR
     })
     .filter((entry): entry is GlanceWindow & { usageWindow: ClaudeUsageWindow } => entry !== null);
 
+  // FILL: the account in use's slug — the door's picture names it (`in_use`); until panel-fill passes
+  // that picture, this row falls back to the saved slot's label.
   const label = picture?.activeLabel ?? '—';
   const hasCountdown = glanceWindows.some(({ usageWindow }) => Boolean(usageWindow.resetsAt));
 
@@ -271,6 +276,22 @@ export function AccountFooterRow({ collapsed = false, onExpand }: AccountFooterR
         onClose={() => { void handleLoginClose(); }}
         provider="claude"
       />
+
+      {/* The Set up window, beside the Re-login one: the same embedded terminal, running the account
+          CLI's `setup-token` for one account. It exists only while panel-fill names that account, so
+          a bare `setup-token` — a usage error — cannot be run from it. */}
+      {/* FILL: setupOpen — panel-fill names an account and the window mounts open; null renders nothing. */}
+      {setup !== null && (
+        <ProviderLoginModal
+          isOpen
+          // FILL: setupSlug — the account the window signs in.
+          customCommand={`~/.claude/scripts/claude-account setup-token ${setup.slug}`}
+          title={`Set up ${setup.slug}'s sign-in token`}
+          // FILL: setupClose — closes the window and re-reads the panel.
+          onClose={() => undefined}
+          provider="claude"
+        />
+      )}
     </div>
   );
 }

@@ -1291,6 +1291,13 @@
     "park": "Park",
     "unpark": "Unpark",
     "plannerResume": "Resume planner",
+    "override": {
+      "press": "Override",
+      "pressTitle": "Start this feature even when the usage limit says wait. Nothing else changes — not its model, not the queue.",
+      "on": "Override on · starts even when the usage limit says wait",
+      "off": "Turn off",
+      "offTitle": "Hold this feature for the usage limit again"
+    },
     "acceptWhenCut": "Accept when cut",
     "acceptWhenCutArmed": "Accepted · starts when cut",
     "acceptWhenCutCancel": "Cancel",

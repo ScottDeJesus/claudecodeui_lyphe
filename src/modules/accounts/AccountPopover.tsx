@@ -1,3 +1,4 @@
+import { ClaudeAccountRows } from '@/modules/accounts/ClaudeAccountRows';
 import { DeepseekBalanceReadout } from '@/modules/accounts/DeepseekBalanceReadout';
 import { DeepseekPeakHours } from '@/modules/accounts/DeepseekPeakHours';
 import type { JevBalance } from '@/modules/accounts/hooks/useJevBalance';
@@ -160,6 +161,12 @@ export function AccountPopover({
       <DeepseekBalanceReadout balance={balance} />
       <DeepseekPeakHours now={now} />
       <JevBalanceReadout balance={jevBalance} />
+
+      {/* The new account section: the door's own picture, one row per account, the automatic switch
+          and the last switch. It renders nothing until it is handed a picture, so the panel reads
+          exactly as it does today until phase panel-fill passes it. */}
+      {/* FILL: the door's picture and the four acts */}
+      <ClaudeAccountRows />
 
       <div className="flex flex-col gap-1.5">
         <div className="text-[11px] uppercase tracking-[0.14em] text-ink-faint">

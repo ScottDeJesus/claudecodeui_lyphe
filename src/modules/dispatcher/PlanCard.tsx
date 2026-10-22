@@ -9,10 +9,10 @@ import { putAwayVerb } from '@/modules/dispatcher/hiddenPlans';
 import { useDispatcherPlans } from '@/modules/dispatcher/hooks/useDispatcherPlans';
 import { useRiseOnce } from '@/modules/dispatcher/hooks/useFirstSight';
 import { CardDescription, LaneCardHead } from '@/modules/dispatcher/LaneCardHead';
+import { PaceOverride } from '@/modules/dispatcher/PaceOverride';
 import { PlanAsk } from '@/modules/dispatcher/PlanAsk';
 import { PlanControls } from '@/modules/dispatcher/PlanControls';
 import { PlanClock, PlanFace, PlanStatusBadge } from '@/modules/dispatcher/PlanFace';
-import { PaceHoldLine } from '@/modules/dispatcher/PaceLine';
 import { PlannerBadge } from '@/modules/dispatcher/PlannerBadge';
 import { SpendPills } from '@/modules/dispatcher/SpendPills';
 import { WorkingPill } from '@/modules/dispatcher/WorkingPill';
@@ -140,8 +140,9 @@ export function PlanCard({
   // question, and the dialog is mounted only while it is asked.
   const [deleting, setDeleting] = useState(false);
   const { planners } = useDispatcherPlans();
-  // The pacer's clause for this plan (`plan.pace_hold`, `pace_report.hold`): the gate sends it in
-  // the same row as `queue_hold`, one at a time. Absent on a dispatcher older than the key reads.
+  // The pacer's clause for this plan (`plan.pace_hold`, `pace_report.hold`, else that of a queued planner
+  // outing aimed at it or its epic): the gate sends it in the same row as `queue_hold`, one at a time. Absent on a dispatcher
+  // older than the key reads.
   const paceHold = plan.pace_hold ?? '';
   const menuItems: ActionMenuItem[] = planDroppable(plan, planners)
     ? [{ key: 'delete', label: t('dispatcher.delete.menu'), icon: Trash2, isDanger: true, onSelect: () => setDeleting(true) }]
@@ -174,7 +175,7 @@ export function PlanCard({
                 {/* WHO IS OUT ON THIS PLAN and what it waits on, under its description: the word says
                     what the PLAN is (`designing`), the badge who is doing something about it; the wait is
                     a fact about THIS plan ("before this, that"). Neither draws anything when absent. */}
-                {(plan.planner || waitsOn.length > 0 || plan.queue_hold || paceHold || plan.stalled) && (
+                {(plan.planner || waitsOn.length > 0 || plan.queue_hold || paceHold || plan.overridden || plan.stalled) && (
                   <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
                     {plan.planner && <PlannerBadge planner={plan.planner} />}
                     {waitsOn.length > 0 && (
@@ -188,7 +189,11 @@ export function PlanCard({
                         {t('dispatcher.queueHold', { clause: queueClause(plan.queue_hold) })}
                       </span>
                     )}
-                    {paceHold && <PaceHoldLine hold={paceHold} />}
+                    {/* The pacer's clause with its Override, or the Override standing with its Turn off: the
+                        press lifts the pacer alone, so a queue hold draws none (`PaceOverride`). */}
+                    {(paceHold || plan.overridden) && (
+                      <PaceOverride name={plan.name} hold={paceHold} overridden={plan.overridden} />
+                    )}
                     {plan.stalled && (
                       <span data-plan-stalled={plan.stalled} className="min-w-0 break-words text-xs text-foreground">
                         {t(`dispatcher.stalled.${plan.stalled}`)}
