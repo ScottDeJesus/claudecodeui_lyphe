@@ -2287,7 +2287,9 @@ type TaskPriority = 'high' | 'medium' | 'low' | string;
 
 /**
  * One account in the door's picture, relayed unchanged from `claude-account status --json`.
- * `slug` is the account's name in every sentence a person reads; `digest` stays in data. Times are
+ * `slug` is the account's name in every sentence a person reads; `email` is its sign-in email off its
+ * saved slot, the name its row and the closed footer row SHOW (null when the slot names none, and the
+ * slug shows instead); `digest` stays in data. Times are
  * epoch SECONDS. `reading.five` and `reading.week` are fractions 0..1 — window POINTS once multiplied
  * by 100, never dollars (INV-4299) — or null for a window the pacer could not measure, which draws
  * as unknown and never as zero; `reading.at` is when that reading was filed. `token` is the
@@ -2296,6 +2298,7 @@ type TaskPriority = 'high' | 'medium' | 'low' | string;
  */
 export type ClaudeAccountRow = {
   slug: string;
+  email: string | null;
   digest: string;
   token: 'none' | 'saved' | 'checking';
   expires_at: number | null;
@@ -2333,7 +2336,7 @@ export type ClaudeAccountSwitch = {
  */
 export type ClaudeAccountsPicture = {
   accounts: ClaudeAccountRow[];
-  candidates: { slug: string; digest: string }[];
+  candidates: { slug: string; digest: string; email: string | null }[];
   auto: boolean;
   held: boolean;
   chosen: { slug: string; digest: string; at: number; by: 'operator' | 'auto'; why: string } | null;

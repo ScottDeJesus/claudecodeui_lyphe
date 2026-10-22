@@ -145,10 +145,12 @@ export function AccountFooterRow({ collapsed = false, onExpand }: AccountFooterR
     })
     .filter((entry): entry is GlanceWindow & { usageWindow: ClaudeUsageWindow } => entry !== null);
 
-  // The account in use's slug, as the door marks it (`in_use`). No mark — the door's store does not
-  // hold the live identity yet, or the door cannot answer — draws the rail's own blank.
-  const inUseSlug = accountInUse(accounts)?.slug ?? null;
-  const label = inUseSlug ?? '—';
+  // The account in use, as the door marks it (`in_use`): its email names it, the slug standing in when
+  // its saved slot names no email, and the slug draws the avatar's initials. No mark — the door's store
+  // does not hold the live identity yet, or the door cannot answer — draws the rail's own blank.
+  const inUse = accountInUse(accounts);
+  const inUseSlug = inUse?.slug ?? null;
+  const label = inUse?.email ?? inUseSlug ?? '—';
   const hasCountdown = glanceWindows.some(({ usageWindow }) => Boolean(usageWindow.resetsAt));
 
   useEffect(() => {

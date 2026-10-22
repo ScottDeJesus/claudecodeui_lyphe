@@ -13701,7 +13701,8 @@ Reference: door face MAN-8843 (`claude-account status --json`); the routes MAN-8
 - The acts: `api.accounts.use(slug)` · `.auto(on)` · `.remove(slug)` → `POST /api/accounts/use|auto|remove`. `doorWrite` holds the single-writer guard (`writingRef`), clears the banner on start, shows a 422's `{error}` verbatim in the panel's warn banner, and re-reads the picture when a write lands.
 - `closeSetup` clears `setup` and calls `announceAccountsChanged()` (`cloudcli:accounts-changed`); the row's ONE poller re-reads at once. A second read loop is never started.
 - While the Set up window is open (`setup !== null`) the panel's outside-pointer and Escape dismissal is suspended, as for the Re-login window; a press in the row menu is not outside (MAN-466 rule 7).
-- The closed row and the rail avatar name `accountInUse(accounts)?.slug`, else `—`, and draw the two glance windows from `accountInUseUsage` (MAN-8862).
+- The closed row names the account in use by its `email`, its `slug` when that is null, else `—`; the rail avatar's initials come from the slug; both draw the two glance windows from `accountInUseUsage` (MAN-8862).
+- Every row and candidate names its account by `email`, the `slug` standing in when it is null. The name keeps its line whole: a cue that does not fit beside it (*✓ in use now*, *Use*) wraps under it, and only a name wider than the row alone ends in an ellipsis (the full name rides `title`). Acts, aria-labels, data attributes, initials and the door's `why` keep the slug.
 
 ## `ClaudeAccountRows` props (all optional)
 | prop | meaning |

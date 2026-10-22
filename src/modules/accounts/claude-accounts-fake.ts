@@ -79,6 +79,7 @@ function ceilingWords(slug: string, used: number | null | undefined, projected: 
 function row(overrides: Partial<ClaudeAccountRow> & { slug: string; digest: string }): ClaudeAccountRow {
   return {
     token: 'saved',
+    email: `${overrides.slug}@example.com`,
     expires_at: null,
     chosen: false,
     live: false,
@@ -273,7 +274,7 @@ export function claudeAccountFakes(nowMs: number): Record<FakeClaudeAccountsStat
     // nothing wears the in-use wash, and the candidate is the only row that can be set up.
     candidate: picture({
       accounts: pair(nowMs, { live: false, in_use: false }, { live: false }),
-      candidates: [{ slug: 'scottdejesus.dev', digest: 'ef43a9e9' }],
+      candidates: [{ slug: 'scottdejesus.dev', digest: 'ef43a9e9', email: 'scottdejesus.dev@example.com' }],
     }),
 
     // The rule may not switch on its own; the switch reads off and the section says what that means.
@@ -303,7 +304,7 @@ export function claudeAccountFakes(nowMs: number): Record<FakeClaudeAccountsStat
         row({ slug: 'okonkwo', digest: '77b21d05', expires_at: expiry(nowMs), live: false, in_use: false, reading: reading(nowMs, 0.55, 0.72) }),
         row({ slug: 'takeda', digest: 'c9e03b71', expires_at: expiry(nowMs), live: false, in_use: false, reading: reading(nowMs, 0.12, 0.28) }),
       ],
-      candidates: [{ slug: 'scottdejesus.dev', digest: 'ef43a9e9' }],
+      candidates: [{ slug: 'scottdejesus.dev', digest: 'ef43a9e9', email: 'scottdejesus.dev@example.com' }],
       chosen: chosenByHand(nowSeconds),
       last_switch: switchedByHand(nowSeconds),
     }),
