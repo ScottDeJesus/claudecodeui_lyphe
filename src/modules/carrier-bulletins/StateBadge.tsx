@@ -1,9 +1,13 @@
-import type { BulletinLook } from '@/modules/carrier-bulletins/utils/bulletinModel';
+import type { LucideIcon } from 'lucide-react';
+
+import type { Tone } from '@/shared/types';
 import { Badge } from '@/shared/ui';
 
 type StateBadgeProps = {
-  /** The state's tone and glyph, from one of `bulletinModel`'s look tables. */
-  look: BulletinLook;
+  /** The state's tone, which lands on the badge as `data-tone`: from one of `bulletinModel`'s look tables. */
+  tone: Tone;
+  /** The glyph that says the state without colour, from the same table. */
+  icon: LucideIcon;
   /** The state in words, which a reader without the colour reads. */
   words: string;
 };
@@ -15,10 +19,9 @@ type StateBadgeProps = {
  * Used by the carrier-bulletins module's `CarrierRow`, `CarrierPages`, `PageRow`, `PageScreen` and `JudgedList`, which
  * each draw a carrier's standing, a page's state or a rule's verdict and must not each spell a pill of their own.
  */
-export function StateBadge({ look, words }: StateBadgeProps) {
-  const Icon = look.icon;
+export function StateBadge({ tone, icon: Icon, words }: StateBadgeProps) {
   return (
-    <Badge as="span" tone={look.tone} className="max-w-full flex-none gap-1.5 whitespace-nowrap">
+    <Badge as="span" tone={tone} className="max-w-full flex-none gap-1.5 whitespace-nowrap">
       <Icon className="size-3.5 flex-none" aria-hidden="true" />
       <span className="truncate">{words}</span>
     </Badge>

@@ -44,11 +44,11 @@ export function PageRow({ page, onOpen }: PageRowProps) {
           {t('cerberus.bulletins.pageRow.page', { page: page.page })}
         </span>
         <span className="col-start-2 row-start-1 flex min-w-0 justify-end [@container(min-width:720px)]:justify-start">
-          <StateBadge look={PAGE_STATE_LOOK[page.state]} words={t(`cerberus.bulletins.pageState.${page.state}`)} />
+          <StateBadge tone={PAGE_STATE_LOOK[page.state].tone} icon={PAGE_STATE_LOOK[page.state].icon} words={t(`cerberus.bulletins.pageState.${page.state}`)} />
         </span>
         <ChevronRight className="col-start-3 row-start-1 size-4 flex-none text-ink-faint [@container(min-width:720px)]:col-start-5" aria-hidden="true" />
         {answered && (
-          <span className="col-span-3 min-w-0 text-[13px] tabular-nums text-foreground [@container(min-width:720px)]:col-span-1 [@container(min-width:720px)]:col-start-3 [@container(min-width:720px)]:row-start-1">
+          <span className="col-span-3 min-w-0 text-[13px] text-foreground [@container(min-width:720px)]:col-span-1 [@container(min-width:720px)]:col-start-3 [@container(min-width:720px)]:row-start-1">
             {found}
           </span>
         )}

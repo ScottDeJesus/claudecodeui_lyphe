@@ -5,10 +5,9 @@ import { useTranslation } from 'react-i18next';
 import { BulletinsTrouble } from '@/modules/carrier-bulletins/BulletinsTrouble';
 import { CarrierRow } from '@/modules/carrier-bulletins/CarrierRow';
 import { RefreshButton } from '@/modules/carrier-bulletins/RefreshButton';
-import { carrierGroups } from '@/modules/carrier-bulletins/utils/bulletinModel';
-import type { CarrierGroup } from '@/modules/carrier-bulletins/utils/bulletinModel';
+import { carrierGroups, GROUP_TONE } from '@/modules/carrier-bulletins/utils/bulletinModel';
 import type { OverviewRow } from '@/shared/carrier-bulletins-types';
-import type { AffectedAreasTrouble, Tone } from '@/shared/types';
+import type { AffectedAreasTrouble } from '@/shared/types';
 import { Card, EmptyState } from '@/shared/ui';
 
 type OverviewScreenProps = {
@@ -18,9 +17,6 @@ type OverviewScreenProps = {
   onOpenCarrier: (bulletinId: string) => void;
   onRefresh: () => void;
 };
-
-/** The headline's accent takes the tone of what it says: act while anything needs the operator, calm once all is settled. */
-const HEADLINE_TONE: Record<CarrierGroup, Tone> = { needs: 'warn', notSettled: 'info', settled: 'positive' };
 
 /** Four rows of Verve's waiting surface in the shape of a carrier row, while the first read is out. */
 function ReadingRows() {
@@ -61,9 +57,9 @@ export function OverviewScreen({ rows, trouble, onOpenCarrier, onRefresh }: Over
   const { t } = useTranslation();
   const baseId = useId();
   const groups = rows === null ? [] : carrierGroups(rows);
-  const counted = (group: CarrierGroup) => groups.find((entry) => entry.group === group)?.rows.length ?? 0;
-  // The headline says the first group there is: what needs him, else what is not settled, else that all is.
-  const lead = groups.length > 0 && trouble === null ? groups[0].group : null;
+  // The headline says the first group there is: what needs him, else what is not settled, else that all is. Held back on a
+  // fault: a monitor that cannot see must not look calm.
+  const lead = groups.length > 0 && trouble === null ? groups[0] : null;
 
   let body;
   if (trouble !== null) body = <BulletinsTrouble trouble={trouble} subject="overview" onRetry={onRefresh} />;
@@ -96,12 +92,12 @@ export function OverviewScreen({ rows, trouble, onOpenCarrier, onRefresh }: Over
           ) : (
             <>
               <h2 className="font-serif text-[length:clamp(22px,5.5cqi,26px)] font-normal leading-[1.15] text-foreground">
-                {t(`cerberus.bulletins.overview.headline.${lead}Lead`, { count: counted(lead) })}{' '}
-                <em data-tone={HEADLINE_TONE[lead]} className="italic text-tone-ink">
-                  {t(`cerberus.bulletins.overview.headline.${lead}Accent`, { count: counted(lead) })}
+                {t(`cerberus.bulletins.overview.headline.${lead.group}Lead`, { count: lead.rows.length })}{' '}
+                <em data-tone={GROUP_TONE[lead.group]} className="italic text-tone-ink">
+                  {t(`cerberus.bulletins.overview.headline.${lead.group}Accent`, { count: lead.rows.length })}
                 </em>
               </h2>
-              <p className="text-[13.5px] tabular-nums text-muted-foreground">
+              <p className="text-[13.5px] text-muted-foreground">
                 {[
                   t('cerberus.bulletins.overview.summary.carriers', { count: rows?.length ?? 0 }),
                   t('cerberus.bulletins.overview.summary.pages', { count: rows?.reduce((sum, row) => sum + row.pages, 0) ?? 0 }),

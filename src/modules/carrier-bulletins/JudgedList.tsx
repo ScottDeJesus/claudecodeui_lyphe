@@ -45,11 +45,11 @@ export function JudgedList({ judged }: JudgedListProps) {
               <li key={index} className="flex flex-col gap-1.5 px-4 py-3">
                 <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-1.5">
                   <p className="min-w-0 flex-[1_1_220px] text-[13.5px] font-medium leading-snug text-foreground [overflow-wrap:anywhere]">{rule.words}</p>
-                  <StateBadge look={VERDICT_LOOK[rule.verdict]} words={t(`cerberus.bulletins.verdict.${rule.verdict}`)} />
+                  <StateBadge tone={VERDICT_LOOK[rule.verdict].tone} icon={VERDICT_LOOK[rule.verdict].icon} words={t(`cerberus.bulletins.verdict.${rule.verdict}`)} />
                 </div>
                 {rule.from_revision !== null && (
                   <p className="text-[12px] text-ink-faint">
-                    {t('cerberus.bulletins.judged.fromRevision')} <span className="tabular-nums">{rule.from_revision}</span>
+                    {t('cerberus.bulletins.judged.fromRevision')} {rule.from_revision}
                   </p>
                 )}
                 {refused && (

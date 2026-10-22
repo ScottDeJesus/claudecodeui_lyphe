@@ -95,8 +95,8 @@ export function PageScreen({
           )}
           {(state !== null || stamp !== null) && (
             <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 pt-1">
-              {state !== null && <StateBadge look={PAGE_STATE_LOOK[state]} words={t(`cerberus.bulletins.pageState.${state}`)} />}
-              {stamp !== null && <span className="text-[12.5px] tabular-nums text-muted-foreground">{stampWords(stamp, t)}</span>}
+              {state !== null && <StateBadge tone={PAGE_STATE_LOOK[state].tone} icon={PAGE_STATE_LOOK[state].icon} words={t(`cerberus.bulletins.pageState.${state}`)} />}
+              {stamp !== null && <span className="text-[12.5px] text-muted-foreground">{stampWords(stamp, t)}</span>}
             </div>
           )}
         </div>

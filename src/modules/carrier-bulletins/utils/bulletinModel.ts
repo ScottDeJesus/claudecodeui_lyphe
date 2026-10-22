@@ -15,7 +15,7 @@ import type { Tone } from '@/shared/types';
  */
 
 /** How a state is drawn: its tone, which lands as `data-tone`, and the glyph that says it without colour. */
-export type BulletinLook = { tone: Tone; icon: LucideIcon };
+type BulletinLook = { tone: Tone; icon: LucideIcon };
 
 /**
  * Where a carrier's current file stands, by need: `waiting`, a page Claude tried and has no answer for, which holds the
@@ -23,10 +23,10 @@ export type BulletinLook = { tone: Tone; icon: LucideIcon };
  * some of it read, or all of it read and not yet written into the rules; `unread`, nothing on it read yet; `settled`,
  * every page answered and written into the rules.
  */
-export type CarrierStanding = 'waiting' | 'stopped' | 'partly' | 'unread' | 'settled';
+type CarrierStanding = 'waiting' | 'stopped' | 'partly' | 'unread' | 'settled';
 
 /** The overview's three groups, in the order it lists them: what needs the operator first, what is calm last. */
-export type CarrierGroup = 'needs' | 'notSettled' | 'settled';
+type CarrierGroup = 'needs' | 'notSettled' | 'settled';
 
 /** A carrier's standing read off its overview row. A settled file stays settled whatever a later run met (a usage limit is no try). */
 export function carrierStanding(row: OverviewRow): CarrierStanding {
@@ -50,6 +50,9 @@ const STANDING_ORDER: readonly CarrierStanding[] = ['waiting', 'stopped', 'partl
 
 /** The groups in the order the overview lists them. */
 const GROUP_ORDER: readonly CarrierGroup[] = ['needs', 'notSettled', 'settled'];
+
+/** The tone the overview's headline speaks a group in: act while anything needs the operator, calm once all is settled. */
+export const GROUP_TONE: Record<CarrierGroup, Tone> = { needs: 'warn', notSettled: 'info', settled: 'positive' };
 
 /**
  * The overview's carriers under their groups: each group in need order, then by name, and a group with no carrier left
@@ -90,7 +93,7 @@ export const VERDICT_ORDER: readonly VerdictWord[] = ['unsettled', 'corrected', 
 const PART_JOIN = ' | ';
 
 /** A page's part as the view shows it: the part the page sits in, and the part that ends on it, null on every other page. */
-export type PagePart = { heading: string; closes: string | null };
+type PagePart = { heading: string; closes: string | null };
 
 /**
  * Splits a page's wire `part`. On the page where a part begins after page 1 it reads "<the part before> | <the part
@@ -108,7 +111,7 @@ export function splitPart(part: string, before: string | null | undefined): Page
 }
 
 /** One part of a bulletin as its pages list it: the heading the bulletin prints ('' for pages in no part) and its pages, in order. */
-export type PartGroup = { heading: string; pages: BulletinPage[] };
+type PartGroup = { heading: string; pages: BulletinPage[] };
 
 /**
  * A bulletin's pages under their parts, in page order: the main program, then each exhibit. The page where a part

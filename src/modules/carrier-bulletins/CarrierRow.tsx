@@ -35,6 +35,7 @@ const STAGGER_ROWS = 12;
  */
 export function CarrierRow({ row, index, onOpen }: CarrierRowProps) {
   const { t } = useTranslation();
+  const look = STANDING_LOOK[carrierStanding(row)];
   const pullFailed = row.last_pull !== null && row.last_pull.outcome.startsWith('failed');
   return (
     <li>
@@ -47,9 +48,9 @@ export function CarrierRow({ row, index, onOpen }: CarrierRowProps) {
         <span className="flex min-w-0 flex-1 flex-col gap-1.5">
           <span className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5">
             <span className="min-w-0 text-[15px] font-medium text-foreground [overflow-wrap:anywhere]">{row.carrier}</span>
-            <StateBadge look={STANDING_LOOK[carrierStanding(row)]} words={standingWords(row, t)} />
+            <StateBadge tone={look.tone} icon={look.icon} words={standingWords(row, t)} />
           </span>
-          <span className="grid gap-x-8 gap-y-0.5 tabular-nums [@container(min-width:720px)]:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)]">
+          <span className="grid gap-x-8 gap-y-0.5 [@container(min-width:720px)]:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)]">
             <span className="flex min-w-0 flex-col gap-0.5 text-[13px]">
               <span className="text-muted-foreground">{fileWords(row, t)}</span>
               <span className="text-foreground">{pageSplitWords(row, t)}</span>

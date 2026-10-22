@@ -9,7 +9,6 @@ import { PageRow } from '@/modules/carrier-bulletins/PageRow';
 import { RefreshButton } from '@/modules/carrier-bulletins/RefreshButton';
 import { StateBadge } from '@/modules/carrier-bulletins/StateBadge';
 import { carrierStanding, partGroups, STANDING_LOOK } from '@/modules/carrier-bulletins/utils/bulletinModel';
-import type { PartGroup } from '@/modules/carrier-bulletins/utils/bulletinModel';
 import { fileWords, pageSplitWords, pullCommand, standingWords } from '@/modules/carrier-bulletins/utils/bulletinWords';
 import type { BulletinPage, OverviewRow } from '@/shared/carrier-bulletins-types';
 import type { AffectedAreasTrouble } from '@/shared/types';
@@ -27,7 +26,7 @@ type CarrierPagesProps = {
 };
 
 /** A part's pages in figures: "Pages 11–51 · 41 pages · 1 waiting", the waiting and unread ones counted where there are any. */
-function partRange({ pages }: PartGroup, t: TFunction): string {
+function partRange(pages: BulletinPage[], t: TFunction): string {
   const first = pages[0].page;
   const last = pages[pages.length - 1].page;
   const parts = [pages.length === 1 ? t('cerberus.bulletins.carrier.onePage', { page: first }) : t('cerberus.bulletins.carrier.pageRange', { from: first, to: last, count: pages.length })];
@@ -93,8 +92,8 @@ export function CarrierPages({ row, pages, trouble, onBack, onOpenPage, onRefres
               <h2 className="text-[20px] font-bold leading-tight tracking-[-0.01em] text-foreground [overflow-wrap:anywhere]">{row.carrier}</h2>
               <p className="text-[13.5px] text-muted-foreground">{fileWords(row, t)}</p>
               <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 pt-1">
-                <StateBadge look={STANDING_LOOK[carrierStanding(row)]} words={standingWords(row, t)} />
-                <span className="text-[12.5px] tabular-nums text-muted-foreground">{pageSplitWords(row, t)}</span>
+                <StateBadge tone={STANDING_LOOK[carrierStanding(row)].tone} icon={STANDING_LOOK[carrierStanding(row)].icon} words={standingWords(row, t)} />
+                <span className="text-[12.5px] text-muted-foreground">{pageSplitWords(row, t)}</span>
               </div>
             </>
           )}
@@ -136,7 +135,7 @@ export function CarrierPages({ row, pages, trouble, onBack, onOpenPage, onRefres
             <h3 id={`${baseId}-${index}`} className="min-w-0 text-[15px] font-semibold text-foreground [overflow-wrap:anywhere]">
               {part.heading === '' ? t('cerberus.bulletins.carrier.noPart') : part.heading}
             </h3>
-            <p className="text-[12.5px] tabular-nums text-muted-foreground">{partRange(part, t)}</p>
+            <p className="text-[12.5px] text-muted-foreground">{partRange(part.pages, t)}</p>
           </div>
           <Card className="overflow-hidden">
             <ul aria-labelledby={`${baseId}-${index}`} className="m-0 list-none divide-y divide-border p-0">

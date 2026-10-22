@@ -62,7 +62,7 @@ export function BulletinsView() {
   const onRefresh: () => void = unwired();
   // FILL: onEnlarge — opens the page's image in the house Lightbox: setEnlarged(true).
   const onEnlarge: () => void = unwired(setEnlarged);
-  // FILL: onEnlarge (its close) — the Lightbox's Escape, its ✕ and its backdrop: setEnlarged(false).
+  // FILL: onShrink — the Lightbox's close, from its Escape, its ✕ and its backdrop: setEnlarged(false).
   const onShrink: () => void = unwired(setEnlarged);
 
   // The carrier as the overview listed it: its pages and its page draw their header from it at once, while their reads are out.
