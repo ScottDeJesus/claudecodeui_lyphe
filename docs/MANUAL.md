@@ -13,9 +13,13 @@ The foot of the sidebar: which Claude account signs the next request, how much o
 account has spent, what is left on the DeepSeek account this host's builds spend, and the two writes
 that change the first of those. `src/modules/accounts/` is `AccountPopover` (with `UsageMeters`, its
 own `AccountRow`, and `DeepseekBalanceReadout`) under the one `AccountFooterRow` its barrel exports,
-with `hooks/useClaudeAccounts` holding the picture and the writes, `hooks/useClaudeUsage` holding
-the readings, `hooks/useDeepseekBalance` holding the balance, and `utils/accountInitials` drawing the
-two letters on the avatar. Everything but the balance comes from this app's own server, in
+with `hooks/useClaudeAccounts` holding the picture (`data`, and the door's own under `door`) and the
+writes (`switchTo`, `capture`, and the door's `chooseAccount` / `setAuto` / `removeAccount`),
+`hooks/useAccountSetup` holding the account the Set up window signs in, `hooks/useClaudeUsage`
+holding the readings, `hooks/useDeepseekBalance` holding the balance, `utils/accountInUseUsage`
+choosing which account the meters draw (MAN-8862), and `utils/accountInitials` drawing the
+two letters on the avatar. `ClaudeAccountRows` (MAN-8847) is the account section above the slot
+switcher. Everything but the balance comes from this app's own server, in
 `server/modules/accounts/`: `accounts.routes.ts` holds the routes (the slot switcher's four, and the door's
 picture under `door` on `GET /api/accounts` with `POST /api/accounts/use|auto|remove`, MAN-8858) and the calm 200,
 `usage.service.ts` the reading and its cache, `account-store.service.ts` the slots (under
@@ -35,7 +39,8 @@ this route goes out to api.deepseek.com for every reading the server takes.
 `SidebarCollapsed` renders the same component as the rail's avatar, and never both at once. That
 mutual exclusion is the whole design: all three hooks live inside the row, so the app holds exactly
 one poller per reading no matter how often the panel is opened or the sidebar collapsed. The row hands its ONE balance reading to both registers it draws, so the line under the
-account name and the block in the panel cannot disagree.
+account name and the block in the panel cannot disagree. The usage figures have one conversion too:
+the row's glance bars and the panel's meters both call `accountInUseUsage`.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts
 
@@ -100,10 +105,10 @@ touched, so the answers may not change underneath it. What each answer looks lik
 ## MAN-462 — What the footer row says
 section: accounts/002 What the footer row says
 
-The avatar's initials come from the local part of the active label and nothing else — everyone here
+The label is the account in use as the door marks it (`in_use`: the chosen account with a checked token, else the live login), as its slug; the saved slot's label stands in until the door's first picture lands or when the door cannot answer (MAN-8847). The avatar's initials come from the local part of that label and nothing else — everyone here
 shares a domain, so a domain letter hides identity rather than carrying it. The label sits beside
-it, truncated, with the full address in a `title`. Under the label are the two windows worth a
-glance, as inline `Meter`s: the `five_hour` and `seven_day` windows, each labelled with its reset
+it, truncated, with the full label in a `title`. Under the label are the two windows worth a
+glance, as inline `Meter`s, drawn from the account in use's figures (`accountInUseUsage`, MAN-8862), never from another login's: the `five_hour` and `seven_day` windows, each labelled with its reset
 countdown where the reading gives one and with `5h`/`7d` where it does not, and `usage —` on the line
 instead when neither window is in the reading. A window absent from the reading draws no bar at all;
 a window present with `percent: null` draws an empty track and an em-dash, which is the one honest
@@ -127,7 +132,7 @@ both.
 
 | The server answered | The panel draws |
 |---|---|
-| a picture with slots | the meters, `Switch account · N`, the date line, one row per slot, `↻ Re-login` |
+| a picture with slots | the meters (the account in use's, MAN-8862), the balances, the account section (`ClaudeAccountRows`, MAN-8847), `Switch account · N`, the date line, one row per slot, `↻ Re-login` |
 | `unreadable: true` | the count reads `0` and no rows follow, under *The saved accounts could not be read — none can be listed.* — said in words, because an empty switcher otherwise reads as "you have no accounts" |
 | `reachable: false` | *The server could not read accounts or usage — both are unknown.* in place of the meters, the count as an em-dash, no rows and no `↻ Re-login` |
 | nothing yet | the meters draw an em-dash and the count reads `—`; the first reading normally lands before anyone opens the panel |
@@ -191,7 +196,7 @@ the provider's own label, which is the only place a `weekly_scoped:*` plan is ev
 | `windows: []` + `degraded` | *No figures are available under this account.* |
 | `reachable: false` | *Usage is unknown — \<the reason, in English\>* |
 
-`GET /api/usage` carries `account`: the digest of the live login the figures were read from (`liveAccountDigest()`, read beside the token; `''` when it cannot be told), on cached, pending and degraded answers alike, so the panel can tell whether the numbers belong to the account in use. An `expiresAt` (epoch ms) already passed means the token is never sent: degraded `credentials`, status 0, no fetch. A `401`/`403` is `auth` — the endpoint refusing a token the clock still counted live.
+`GET /api/usage` carries `account`: the digest of the live login the figures were read from (`liveAccountDigest()`, read beside the token; `''` when it cannot be told), on cached, pending and degraded answers alike, so the panel can tell whether the numbers belong to the account in use (the client's test and its fallback: MAN-8862). An `expiresAt` (epoch ms) already passed means the token is never sent: degraded `credentials`, status 0, no fetch. A `401`/`403` is `auth` — the endpoint refusing a token the clock still counted live.
 
 A window with a `resetsAt` also says when it turns over, counted in hours inside a day and in
 weekdays past one. The instant is read by `resetInstant` (`utils/usageWindows.ts`), which takes a
@@ -252,6 +257,8 @@ re-points the active account at whatever it just saved (`accounts.routes.ts`). A
 re-login's captures is a warn toast with the store's own words (`Could not save <email>`), since the
 re-login has no panel to put a banner in; `Save it` below keeps the panel's banner.
 
+**The door's acts.** `Use`, the automatic switch and `Remove` on the account section (MAN-8847) are `chooseAccount`, `setAuto` and `removeAccount` in `useClaudeAccounts`, over `api.accounts.use|auto|remove` (MAN-8858). They share the switch's single-writer guard and `busy`, clear the banner when they start, and re-read the picture when they land. A 422 shows the door's own `{error}` sentence in the warn banner; a non-JSON or failed answer reads `The server is not reachable.` No toast is raised for them. **Set up** is not a write from this app: the row opens a `ProviderLoginModal` on `claude-account setup-token <slug>`, the door saves the token itself, and closing the window re-reads the picture.
+
 **Drift.** When the picture reports the live login differs from its saved copy, a warn `Banner` names
 both — the one in use and the one *Save it* would adopt — and `Save it` is the same capture.
 
@@ -289,7 +296,8 @@ section: accounts/006 The rules that bite
    row — *in use now · none proven running*, the only count the server can state — rather than a
    modal. What is refused is a write while
    one is in flight, read from a ref rather than from `busy`, since a render value lands too late to
-   stop a second press in the same tick. The re-login flow (`useReloginCapture`) holds a ref of its
+   stop a second press in the same tick. The slot switch, the capture and the door's three acts
+(`chooseAccount`, `setAuto`, `removeAccount`, through `doorWrite`) share that one guard. The re-login flow (`useReloginCapture`) holds a ref of its
    own over its reads and captures and lends its `busy` to the panel, so Re-login, the rows and Save it
    all wait while it works.
 
@@ -315,7 +323,9 @@ section: accounts/006 The rules that bite
    number you opened the panel for. It also carries a five-second floor of its own
    (`useDeepseekBalance`), because the row is a button pressed while thinking and each press would
    otherwise spend a vendor call; a skipped read is not invisible, since the age line under the
-   figure says when the figure was taken.
+figure says when the figure was taken.
+
+9. **Neither dismissal fires while a sign-in window is up; a press in a menu is not outside.** The outside-pointer and Escape listeners in `AccountFooterRow` attach only while `open && !loginOpen && setup === null`. The Re-login window and the account's Set up window are drawn on `document.body`, outside the panel's root, so every press in them would read as outside and an Escape meant for the terminal would close the panel behind it. A third sign-in overlay extends that one condition. A `pointerdown` whose target is inside `[role="menu"]` is the panel's own surface — `ActionMenu` portals the row menu to `body`, so without the exemption `Remove` closes the panel before its press lands. Closing the Set up window announces `cloudcli:accounts-changed` (`announceAccountsChanged`), and the row's one poller re-reads at once.
 
 ## MAN-467 — What is left standing
 section: accounts/007 What is left standing
@@ -13806,7 +13816,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/pacer-do
 
 ## MAN-8847 — The account section — ClaudeAccountRows over the door's picture
 
-Reference: door face MAN-8843 (`claude-account status --json`); the panel it sits in MAN-463; the panel's rules MAN-466; the types' mirror rule INV-9252.
+Reference: door face MAN-8843 (`claude-account status --json`); the routes MAN-8858; the panel it sits in MAN-463; the panel's rules MAN-466; the types' mirror rule INV-9252; the meters over the same picture MAN-8862.
 
 ## Files — `src/modules/accounts/`
 | file | owns |
@@ -13814,12 +13824,18 @@ Reference: door face MAN-8843 (`claude-account status --json`); the panel it sit
 | `ClaudeAccountRows.tsx` | `ClaudeAccountRows`: header, rows, candidates, auto switch, last switch, closing sentence |
 | `ClaudeAccountRowViews.tsx` | `AccountRowView` (one account the store holds), `CandidateRow` (one live identity the store lacks) |
 | `claude-accounts-fake.ts` | `claudeAccountFakes(nowMs)`: 18 whole-value states, one per `FakeClaudeAccountsState`; nothing in `src/` imports it |
-| `AccountPopover.tsx` | mounts `<ClaudeAccountRows />` after the meters and balances, above `Switch account · N` |
-| `AccountFooterRow.tsx` | `setup` state + a `ProviderLoginModal` running `~/.claude/scripts/claude-account setup-token <slug>`, mounted only while `setup !== null` |
+| `AccountPopover.tsx` | mounts `<ClaudeAccountRows picture={door} …/>` after the meters and balances, above `Switch account · N` |
+| `AccountFooterRow.tsx` | a second `ProviderLoginModal` beside the Re-login one, running `~/.claude/scripts/claude-account setup-token <slug>` under the title `Set up <slug>'s sign-in token`, mounted only while `setup !== null` |
+| `hooks/useAccountSetup.ts` | `{setup, openSetup, closeSetup}`; `setup` is `{slug} \| null`, one object so an open window always has a slug |
+| `hooks/useClaudeAccounts.ts` | `door` (`data.door` off the one poll), `chooseAccount`, `setAuto`, `removeAccount`, all through one `doorWrite` |
 
-## Wiring state
-- `AccountPopover` passes `<ClaudeAccountRows />` no props; every handler defaults to `NO_ACT`; `setup` in `AccountFooterRow` is never set; `GET /api/accounts` fills `ClaudeAccounts.door` (MAN-8858) and nothing in `src/` reads it yet. The panel draws as it did before the section.
-- Each unwired read or act carries a `// FILL:` comment: `grep -rn "FILL:" src/modules/accounts`.
+## Wiring
+- `GET /api/accounts` fills `ClaudeAccounts.door` (MAN-8858); `useClaudeAccounts` returns it as `door: ClaudeDoorPicture | null` (`src/shared/types.ts`: `ClaudeAccountsPicture \| {reachable:false; reason}`); null before the first answer and when the lane itself answered `{reachable:false}`.
+- `AccountFooterRow` hands `door` and `onUse` / `onSetAuto` / `onRemove` / `onSetup` to `AccountPopover`, which hands them to `ClaudeAccountRows` with its `busy` and its minute clock as `nowMs`.
+- The acts: `api.accounts.use(slug)` · `.auto(on)` · `.remove(slug)` → `POST /api/accounts/use|auto|remove`. `doorWrite` holds the single-writer guard `switchTo` and `capture` hold (`writingRef`), clears the banner on start, shows a 422's `{error}` verbatim in the panel's warn banner, and re-reads the picture when a write lands.
+- `closeSetup` clears `setup` and calls `announceAccountsChanged()` (`cloudcli:accounts-changed`); the row's ONE poller re-reads at once. A second read loop is never started.
+- While the Set up window is open (`setup !== null`) the panel's outside-pointer and Escape dismissal is suspended, as for the Re-login window; a press in the row menu is not outside (MAN-466 rule 9).
+- The closed row and the rail avatar name `accountInUse(door)?.slug`, else `picture.activeLabel`, else `—`, and draw the two glance windows from `accountInUseUsage` (MAN-8862).
 
 ## `ClaudeAccountRows` props (all optional)
 | prop | meaning |
@@ -13827,19 +13843,21 @@ Reference: door face MAN-8843 (`claude-account status --json`); the panel it sit
 | `picture` | `ClaudeAccountsPicture` \| `{reachable:false; reason}` \| `null`; absent/`null` renders nothing; `reachable:false` renders one calm line, never a banner |
 | `busy` | disables every press |
 | `nowMs` | the caller's clock, epoch ms; omitted, the section ticks its own minute (`useMinuteTick`) |
-| `onUse(slug)` `onSetAuto(on)` `onRemove(slug)` `onSetup(slug)` | the four acts |
+| `onUse(slug)` `onSetAuto(on)` `onRemove(slug)` `onSetup(slug)` | the four acts; each defaults to `NO_ACT` (the fakes' fixture), so a press with no handler does nothing |
 
 ## Rules an editor must not break
 1. **`why` is the door's sentence.** Drawn as it arrives (INV-76: slugs, never digests). The one edit: the no-room caveat drops a leading `<slug>'s ` / `<slug> ` (`withoutOwnName`) because the row already names the account; a `why` without that lead is untouched.
 2. **A refused token draws the wall and no date.** `wall.kind === "refused"` → `sign-in token refused — set it up again` (`data-tone="warn"`), no `valid until`. The door still relays `expires_at` for it; the suppression is in the view. `checking` keeps its date.
 3. **A full account with a checked token stays pressable.** A hand pick that is held is legal; the cue reads `Use anyway` and the caveat `no room now — …`. The in-use row never draws the caveat while `held`: it says `stays chosen until it has room again`.
 4. **`Use` needs `token === 'saved'`, not refused, not in use.** `none` or refused → `Set up`; `checking` → the word `checking`, no press.
-5. **Points, never dollars; unknown is `—`, never 0%.** `5h N% · wk N%` is the fraction ×100 rounded; `reading === null` → `5h — · wk —`; `as of <relative>` only past `READING_STALE_MS` (3 min).
+5. **Points, never dollars; unknown is `—`, never 0% and never `NaN%`.** `5h N% · wk N%` is the fraction ×100 rounded (`figureInPoints`); `reading === null` → `5h — · wk —`; a `five` / `week` that is null, absent or non-finite → `—` for that window; `as of <relative>` only past `READING_STALE_MS` (3 min), and only when `reading.at` names an instant (`readingAgeInWords` returns `null` otherwise).
 6. **The in-use row carries the record's why.** `chosen.by === "auto"` and `chosen.slug` the row's slug → `chosen.why` verbatim under the row.
 7. **The last-switch line is the why's headline.** `whyHeadline` cuts at the first `;` or ` (`; the whole sentence stays in the `title`; two-line clamp.
 8. **The auto switch's label and `aria` label are both `Switch automatically when the account in use fills`.** Off-state line follows it. The closing `SWITCHING_IN_WORDS` sentence draws only with at least one account.
 9. **`Remove` lives in the row's `ActionMenu`** (`isDanger`), with no confirm.
 10. **The Set up window mounts only with a slug.** A bare `setup-token` is a usage error.
+11. **A token date needs a readable `expires_at`.** `tokenDateInWords` returns `null` for a null, absent or non-finite expiry: `new Date(NaN).toISOString()` throws in render and takes the whole app to the error screen, not one row. A past expiry says `expired <date>`.
+12. **Closing the Set up window writes nothing.** The door saves only a token the window captured; a window closed without signing in leaves the store untouched. Close → `announceAccountsChanged()` → one re-read.
 
 ## Fakes — `claude-accounts-fake.ts`
 - Each state is the whole value the route will relay, never a prop-shaped sketch.
@@ -13849,6 +13867,50 @@ Reference: door face MAN-8843 (`claude-account status --json`); the panel it sit
 
 ## Proving a state
 - Mount the section with a fake over the live Vite app's token layer (`.verify/lib/mountReact.mjs`); photograph each state at 1440×900, 390×844, 320×800, light and dark.
+- The wired panel: `node .verify/panel-fill.mjs` (dev client `:5183`, API `:3011`). `/api/accounts` and `/api/usage` are stubbed, no door write is sent, the Set up window is real (`claude-account setup-token scottdejesus` reaches the sign-in screen; closed with ✕ without a code). Shots `panel-fill-{desktop,phone}-{top,rows,foot,row}-{light,dark}.png`.
+- 2026-10-21: 90 ok, 0 failed. Later runs failed one check each on the app-wide console gate (`TypeError: Failed to fetch` from `useSlashCommands` / `useFileMentions` at mount) — chat boot fetches, not account code.
+- The server keeps a sign-in window's pty alive up to 30 minutes after the socket closes; end a probe's own `claude setup-token` and `plan_runner.claude_account setup-token` pids by exact verified pid.
+- Not pressed by the suite: the row menu (`Remove`).
 - 2026-10-21: 19 states × 3 widths × 2 themes = 114 readings, 0 page errors, 0 horizontal overflow; frame 294 px inside 320.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/ClaudeAccountRows.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/ClaudeAccountRowViews.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/claude-accounts-fake.ts
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/AccountFooterRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/AccountPopover.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/ClaudeAccountRows.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/ClaudeAccountRowViews.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/claude-accounts-fake.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/hooks/useAccountSetup.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/hooks/useClaudeAccounts.ts
+
+## MAN-8862 — The meters follow the account in use — accountInUseUsage.ts
+
+Reference: the meters' states MAN-464 (`UsageMeters` is unchanged); the door's picture MAN-8843 and its relay MAN-8858; the types INV-9252; the section over the same picture MAN-8847.
+
+## Which account the meters draw
+`accountInUse(door)` = the `accounts` row the door marks `in_use` (the chosen account when it holds a checked token, else the live login). A picture the door could not answer (`{reachable:false}`), or none yet, has no account in use.
+
+| `accountInUseUsage(usage, door, nowMs)` when | returns |
+|---|---|
+| no account in use (no picture, door unreachable) | `usage` untouched — what the panel drew before the file existed |
+| `usage` reachable, not `degraded`, and `usage.account === row.digest` | `usage` — a measurement taken now beats anything filed |
+| anything else | `pictureReading(row, usage, nowMs)` — the row's newest reading as a `ClaudeUsage` |
+
+- The route's body is never drawn under another account's name: identity match plus health is the test. `GET /api/usage` measures the box's live login (`account` = its digest, MAN-464); once the store chooses another account those figures belong to the outgoing login.
+- Callers: `AccountPopover` (`UsageMeters`) and `AccountFooterRow` (the closed row's two glance bars). Both call the one function, so the two registers cannot disagree.
+
+## `pictureReading` — the row's reading as `ClaudeUsage`
+| door field | `ClaudeUsage` field |
+|---|---|
+| `reading === null` | both windows `percent: null`, `resetsAt: null`; `degraded: false`; `checkedAt` = now (seconds) |
+| `reading.five` / `.week` (fraction 0..1) | `percent` = `Math.round(fraction × 100)` on `five_hour` ("Current 5-hour window") and `seven_day` ("This week") |
+| `reading.five_resets` / `.week_resets` (epoch seconds) | `resetsAt` ISO-8601 |
+| `reading.at` (epoch seconds) older than 3 min (`PICTURE_READING_STALE_MS`) | `degraded: true`, `staleSince: at`; the meters dim to 60% under *As of \<local time\> — \<why\>* |
+| `row.pace` | `ClaudeUsage.pace` in percent: `projected5` / `ceiling5` / `projected7` / `ceiling7` = `points(fraction)`; `used5` / `used7` = the reading's own percent; `words: ''`. Key ABSENT when `row.pace === null`; a null `pace.five` / `.week` is a null pair |
+| `reason` | the usage route's `reason` only when the route body is itself degraded AND the reading is stale; else `''` (the meters word that as "the provider gave no figures") |
+
+## Rules an editor must not break
+1. **`accountInUseUsage.ts` is the one place the door's fractions become the meters' percent.** Any new window or pacer figure is converted here; no renderer multiplies.
+2. **Unknown is `null`, never `0` and never `NaN`.** `points(fraction)` returns `null` for `null`, absent or non-finite input (`Math.round(undefined*100)` is `NaN`, which `Meter` draws as a live bar with `aria-valuenow="NaN"`). `ClaudeAccountRow.reading.five` / `.week` are `number | null` (INV-9252): the pacer files one-window readings.
+3. **Every wire stamp is read through a finite check.** `resetStamp` returns `null` for null, absent or non-finite seconds (`new Date(undefined).toISOString()` throws in render and takes the whole app down). `reading.at` is normalised once into `filedAt`: unreadable → the conversion moment, never stale, and `checkedAt` stays a number.
+4. **The reading's age is judged from the picture's own clock.** `nowMs` is the panel's minute tick (`AccountPopover`'s `now`, the row's `nowTick`), not a fresh `Date.now()`.
+5. **Row-side figures obey the same rules.** `ClaudeAccountRowViews.tsx` applies the null / non-finite / unreadable-instant guard at its own read sites (`figureInPoints`, `readingAgeInWords`, `tokenDateInWords`; MAN-8847); a guard added to one file is added to the other.
+6. **No whole-object validator at the door boundary.** The edge guards live at each read site, after the `resetStamp` precedent.
+
+## Measured
+- 2026-10-21, `.verify/panel-fill.mjs` against dev client `:5183` / API `:3011`, `/api/accounts` and `/api/usage` stubbed: 90 ok, 0 failed (fallback panel: the door's 27% / 83% drawn, the route's other login's 5% / 6% not drawn; stale panel: same figures at 60% under *As of …*).
+- 2026-10-21, before the guards: a reading with no `five` drew `5h NaN% · wk 60%` and `aria-valuenow="NaN"`; one with no `at`, or an account with no `expires_at`, threw `RangeError: Invalid time value` and took the app to the error screen.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/utils/accountInUseUsage.ts

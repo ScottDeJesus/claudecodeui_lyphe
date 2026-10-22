@@ -36,9 +36,8 @@ function unreachableReasonInWords(reason: string): string {
 }
 
 /**
- * `staleSince` and `checkedAt` arrive in epoch SECONDS — the wire's own unit, unlike
- * `ClaudeAccountSlot.expiresAt`, which is already milliseconds. The `* 1000` is what keeps this
- * line out of January 1970.
+ * `staleSince` and `checkedAt` arrive in epoch SECONDS — the wire's own unit. The `* 1000` is what
+ * keeps this line out of January 1970.
  */
 function secondsStampInWords(seconds: number): string {
   return new Date(seconds * 1000).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' });

@@ -2160,18 +2160,11 @@ export type SandboxCommandService = {
 
 // ---------------------------
 //----------------- CLAUDE ACCOUNT CONTRACTS ------------
-// The account switcher's own wire shapes, produced by `server/modules/accounts/` and mirrored
+// The account lane's own wire shapes, produced by `server/modules/accounts/` and mirrored
 // field-for-field in `src/shared/types.ts`. The envelope survives because the client is built on it:
 // a read never fails, and a picture nobody can compute is a calm 200 `{reachable:false, reason}`,
-// never a 5xx. Units differ and are not interchangeable — `expiresAt`/`liveExpiresAt` are epoch
-// MILLISECONDS, `checkedAt`/`staleSince` epoch SECONDS, `resetsAt` an ISO-8601 string.
-/** One Claude account slot the store holds. `expiresAt` is epoch MILLISECONDS, `null` when unread — never 0, so an unknown expiry cannot render as "expired". */
-export type ClaudeAccountSlot = { slug: string; label: string; expiresAt: number | null; isActive: boolean };
-/** The whole account picture, or the calm reason it is unknown. `liveExpiresAt` is epoch MILLISECONDS like `ClaudeAccountSlot.expiresAt` — NOT seconds like `ClaudeUsage.checkedAt`. `liveSessions` is how many Claude sessions this box can prove are running: a fact a row states, never a gate on switching.
- *  `unreadable:true` is the account store answering with nothing — no captured slot AND no readable live login: `slots` is `[]` and every label `null`. Say that in words, because an empty switcher reads as "you have no accounts". */
-export type ClaudeAccounts =
-  | { reachable: true; active: string | null; activeLabel: string | null; slots: ClaudeAccountSlot[]; liveLabel: string | null; liveExpiresAt: number | null; drift: boolean; liveSessions: number; unreadable: boolean; /** The door's picture, beside today's slot summary until the old switcher is removed; absent renders nothing. */ door?: ClaudeAccountsPicture | { reachable: false; reason: string } }
-  | { reachable: false; reason: string };
+// never a 5xx. Units differ and are not interchangeable — every `claude-account` stamp and
+// `checkedAt`/`staleSince` are epoch SECONDS, `resetsAt` an ISO-8601 string.
 
 /**
  * One account in the door's picture, relayed unchanged from `claude-account status --json`.
@@ -2240,6 +2233,14 @@ export type ClaudeAccountsPicture = {
   chosen: { slug: string; digest: string; at: number; by: 'operator' | 'auto'; why: string } | null;
   last_switch: ClaudeAccountSwitch | null;
 };
+/**
+ * The accounts lane's answer, as `GET /api/accounts` sends it: the door's picture under the lane's
+ * own `reachable: true`, or the calm reason it could not be read. Both are a 200 — the tag says
+ * whether there is a picture, never whether the request worked. The client's panel branches on it.
+ */
+export type ClaudeAccounts =
+  | ({ reachable: true } & ClaudeAccountsPicture)
+  | { reachable: false; reason: string };
 /** One usage window. A `null` `percent` is "no reading": draw an empty track, never 0 %. `rolled:true` is NOT that — the percent is a REAL but HISTORICAL figure whose window has since ended, so keep the bar at low opacity and label it "was"; draining it draws a full tank nobody measured (`server/modules/accounts/usage-windows.ts`, `markRolled`).
  *  `severity` is present ONLY when the vendor flagged the window non-benign; it may ESCALATE a meter's tone, never soften it — a flagged window can read a comfortable 12 % and still mean an account lock (`usage-windows.ts`, `parseWindows`). */
 export type ClaudeUsageWindow = { key: string; label: string; percent: number | null; resetsAt: string | null; rolled?: boolean; severity?: string };

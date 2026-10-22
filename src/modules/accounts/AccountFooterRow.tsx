@@ -3,11 +3,10 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { ACCOUNT_PANEL_ID, AccountPopover } from '@/modules/accounts/AccountPopover';
 import { DeepseekBalanceReadout } from '@/modules/accounts/DeepseekBalanceReadout';
 import { useAccountSetup } from '@/modules/accounts/hooks/useAccountSetup';
-import { useClaudeAccounts } from '@/modules/accounts/hooks/useClaudeAccounts';
+import { announceAccountsChanged, useClaudeAccounts } from '@/modules/accounts/hooks/useClaudeAccounts';
 import { useClaudeUsage } from '@/modules/accounts/hooks/useClaudeUsage';
 import { useDeepseekBalance } from '@/modules/accounts/hooks/useDeepseekBalance';
 import { useJevBalance } from '@/modules/accounts/hooks/useJevBalance';
-import { useReloginCapture } from '@/modules/accounts/hooks/useReloginCapture';
 import { JevBalanceReadout } from '@/modules/accounts/JevBalanceReadout';
 import { accountInitials } from '@/modules/accounts/utils/accountInitials';
 import { accountInUse, accountInUseUsage } from '@/modules/accounts/utils/accountInUseUsage';
@@ -44,7 +43,7 @@ type AccountFooterRowProps = {
  * desktop and mobile blocks separately would double the read rate D7 caps.
  */
 export function AccountFooterRow({ collapsed = false, onExpand }: AccountFooterRowProps) {
-  const { data: accounts, door, switchTo, capture, chooseAccount, setAuto, removeAccount, busy, error, clearError } =
+  const { data: accounts, chooseAccount, setAuto, removeAccount, busy, error, clearError } =
     useClaudeAccounts();
   const { data: usage, refresh: refreshUsage } = useClaudeUsage();
   // A different account from the one above, from a route of its own — held here so the row and
@@ -52,8 +51,6 @@ export function AccountFooterRow({ collapsed = false, onExpand }: AccountFooterR
   const { data: balance, refresh: refreshBalance } = useDeepseekBalance();
   // The third account on this row: a seeded credit metered locally, read from a local route.
   const { data: jevBalance, refresh: refreshJevBalance } = useJevBalance();
-  // What the login window does to the switcher: saves the login before it opens, files the new one when it closes.
-  const { begin: beginRelogin, finish: finishRelogin, busy: reloginBusy } = useReloginCapture();
 
   // Whether the account panel is showing. Not derivable from the picture: the picture says
   // which account is live, and the panel is open precisely while that is being reconsidered.
@@ -122,25 +119,24 @@ export function AccountFooterRow({ collapsed = false, onExpand }: AccountFooterR
     };
   }, [open, loginOpen, setup, closePanel]);
 
-  const picture = accounts?.reachable ? accounts : null;
-
-  // A newly loaded account is read at once. A switch, a re-login and a capture all move the account in
-  // use, and the three-minute tick would otherwise leave the last account's figures under the new name;
-  // the server's cache misses on the swap (`usage.service.ts`), so this reading is the new account's own.
-  // The first account seen is the mount's own reading already (`useClaudeUsage`), so only a change reads.
-  const activeSlug = picture ? picture.active : undefined;
-  const seenSlugRef = useRef(activeSlug);
+  // A newly chosen account is read at once. The door's choice moves which account is in use, and the
+  // three-minute tick would otherwise leave the last account's figures under the new name; the
+  // server's cache misses when the box's own login moves (`usage.service.ts`), so this reading is
+  // the new one's own. The first account seen is the mount's own reading already (`useClaudeUsage`),
+  // so only a change reads.
+  const inUseDigest = accountInUse(accounts)?.digest;
+  const seenDigestRef = useRef(inUseDigest);
   useEffect(() => {
-    if (activeSlug === undefined) return;
-    if (seenSlugRef.current !== undefined && seenSlugRef.current !== activeSlug) void refreshUsage();
-    seenSlugRef.current = activeSlug;
-  }, [activeSlug, refreshUsage]);
+    if (inUseDigest === undefined) return;
+    if (seenDigestRef.current !== undefined && seenDigestRef.current !== inUseDigest) void refreshUsage();
+    seenDigestRef.current = inUseDigest;
+  }, [inUseDigest, refreshUsage]);
 
   // The two windows worth a glance, as bars — the account in use's, converted exactly as the panel's
   // meters convert it, so the two registers cannot disagree. `weekly_scoped:*` plans are left out:
   // the row has space for two, and the panel carries every window. An absent window draws no bar;
   // `percent: null` does — an empty track and an em-dash, the honest picture of "nobody has this number".
-  const metersUsage = accountInUseUsage(usage, door, nowTick);
+  const metersUsage = accountInUseUsage(usage, accounts, nowTick);
   const windows = metersUsage?.reachable ? metersUsage.windows : [];
   const glanceWindows = GLANCE_WINDOWS
     .map((glance) => {
@@ -149,9 +145,9 @@ export function AccountFooterRow({ collapsed = false, onExpand }: AccountFooterR
     })
     .filter((entry): entry is GlanceWindow & { usageWindow: ClaudeUsageWindow } => entry !== null);
 
-  // The account in use's slug, as the door marks it (`in_use`). The saved slot's label is the fallback
-  // for the moment before the door's first picture lands, or for a box whose door cannot answer.
-  const inUseSlug = accountInUse(door)?.slug ?? picture?.activeLabel ?? null;
+  // The account in use's slug, as the door marks it (`in_use`). No mark — the door's store does not
+  // hold the live identity yet, or the door cannot answer — draws the rail's own blank.
+  const inUseSlug = accountInUse(accounts)?.slug ?? null;
   const label = inUseSlug ?? '—';
   const hasCountdown = glanceWindows.some(({ usageWindow }) => Boolean(usageWindow.resetsAt));
 
@@ -176,20 +172,17 @@ export function AccountFooterRow({ collapsed = false, onExpand }: AccountFooterR
     void refreshJevBalance();
   };
 
-  // Re-login, the panel's one sign-in door (for the same account or another): save the login that is live
-  // NOW before the CLI can replace it, then run the provider's own login. The window is opened only after
-  // the save has landed.
-  const handleRelogin = useCallback(async () => {
-    if (await beginRelogin()) setLoginOpen(true);
-  }, [beginRelogin]);
-
-  // Closing the window files the live login when it changed while the window was open, and the
-  // switcher lands on that account — see `useReloginCapture` for why the login, and not the command's
-  // exit code, is the signal. A window closed without signing in writes nothing.
-  const handleLoginClose = useCallback(async () => {
+  // Re-login, the panel's one sign-in door: it signs the box's own login in again. There is nothing
+  // to save before it opens and nothing to file when it closes — the token switch owns the account,
+  // and a new live identity lands in the panel as a "Set up" row.
+  const handleRelogin = useCallback(() => setLoginOpen(true), []);
+  // Closing the window re-reads the panel, so a sign-in made in there shows at once instead of at
+  // the poller's next minute tick. A window closed without signing in changes no account, and the
+  // re-read is harmless.
+  const handleLoginClose = useCallback(() => {
     setLoginOpen(false);
-    await finishRelogin();
-  }, [finishRelogin]);
+    announceAccountsChanged();
+  }, []);
 
   if (collapsed) {
     return (
@@ -264,15 +257,12 @@ export function AccountFooterRow({ collapsed = false, onExpand }: AccountFooterR
       {open && (
         <AccountPopover
           accounts={accounts}
-          door={door}
           usage={usage}
           balance={balance}
           jevBalance={jevBalance}
-          busy={busy || reloginBusy}
+          busy={busy}
           error={error}
-          onSwitch={(slug) => { void switchTo(slug); }}
-          onRelogin={() => { void handleRelogin(); }}
-          onSaveLiveLogin={() => { void capture(); }}
+          onRelogin={handleRelogin}
           onUse={(slug) => { void chooseAccount(slug); }}
           onSetAuto={(on) => { void setAuto(on); }}
           onRemove={(slug) => { void removeAccount(slug); }}
@@ -282,7 +272,7 @@ export function AccountFooterRow({ collapsed = false, onExpand }: AccountFooterR
 
       <ProviderLoginModal
         isOpen={loginOpen}
-        onClose={() => { void handleLoginClose(); }}
+        onClose={handleLoginClose}
         provider="claude"
       />
 

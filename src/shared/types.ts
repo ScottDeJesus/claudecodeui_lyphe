@@ -2286,23 +2286,6 @@ type TaskPriority = 'high' | 'medium' | 'low' | string;
 // are the half a SCREEN has to get right: which unit a number is in, and what "unknown" looks like.
 
 /**
- * One Claude account slot the switcher holds.
- * `expiresAt` is epoch MILLISECONDS — compare it to `Date.now()` with no conversion; `null`
- * means the expiry was never read, which renders as an em-dash and never as a warning.
- */
-export type ClaudeAccountSlot = { slug: string; label: string; expiresAt: number | null; isActive: boolean };
-
-/**
- * The whole account picture, or the calm reason there is none.
- * `drift` (the live login differs from its saved copy) and `liveSessions` are facts a row
- * STATES; neither gates a switch. `unreadable: true` is reachable-with-no-slots — say that in
- * words, because an empty switcher otherwise reads as "you have no accounts".
- */
-export type ClaudeAccounts =
-  | { reachable: true; active: string | null; activeLabel: string | null; slots: ClaudeAccountSlot[]; liveLabel: string | null; liveExpiresAt: number | null; drift: boolean; liveSessions: number; unreadable: boolean; /** The door's picture, beside today's slot summary until the old switcher is removed; absent renders nothing. */ door?: ClaudeAccountsPicture | { reachable: false; reason: string } }
-  | { reachable: false; reason: string };
-
-/**
  * One account in the door's picture, relayed unchanged from `claude-account status --json`.
  * `slug` is the account's name in every sentence a person reads; `digest` stays in data. Times are
  * epoch SECONDS. `reading.five` and `reading.week` are fractions 0..1 — window POINTS once multiplied
@@ -2358,11 +2341,14 @@ export type ClaudeAccountsPicture = {
 };
 
 /**
- * The door's answer as `GET /api/accounts` carries it under `door`: the whole picture, or the calm
- * reason it could not be read. Named once so the hook that holds it, the section that draws it and
- * the meters' fallback all speak of the same union — the same two shapes `ClaudeAccounts.door` has.
+ * The accounts lane's answer, as `GET /api/accounts` sends it: the door's picture under the lane's
+ * own `reachable: true`, or the calm reason it could not be read. Both are a 200 — the tag says
+ * whether there is a picture, never whether the request worked. The panel branches on it; with
+ * `reachable: true` every field is the door's own.
  */
-export type ClaudeDoorPicture = ClaudeAccountsPicture | { reachable: false; reason: string };
+export type ClaudeAccounts =
+  | ({ reachable: true } & ClaudeAccountsPicture)
+  | { reachable: false; reason: string };
 
 /**
  * One usage window as the meter measured it.
@@ -2394,8 +2380,8 @@ export type ClaudeUsagePace = {
 
 /**
  * Usage as the meter last measured it.
- * `checkedAt` and `staleSince` are epoch SECONDS — multiply by 1000 before `new Date`, unlike
- * `ClaudeAccountSlot.expiresAt`, which is already milliseconds. With `reachable: false` the `reason`
+ * `checkedAt` and `staleSince` are epoch SECONDS — multiply by 1000 before `new Date`, like every
+ * stamp the account door sends. With `reachable: false` the `reason`
  * is the route's own word (`unreachable`); with `reachable: true`
  * it is the meter's — `''` healthy, `pending` a poll in flight (reading, not broken), otherwise
  * the cause of a degraded reading.

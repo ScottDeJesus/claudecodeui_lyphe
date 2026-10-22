@@ -18,10 +18,11 @@ import { isRecord, markRolled, parseWindows } from './usage-windows.js';
  * on purpose, and it is why the split exists: this half owns the token, so nothing that only reads
  * a payload may reach one.
  *
- * THE TOKEN SEAM — one deliberate divergence from the account store's rule, and the five bounds that
- * keep it checkable. `account-store.service.ts` never parses a token: it copies credential BYTES file
- * to file and reads only `expiresAt`. This module has to HOLD one, because the endpoint wants a
- * Bearer header. The divergence is confined to this file and bounded:
+ * THE TOKEN SEAM — one deliberate divergence from the house's secret rule, and the five bounds that
+ * keep it checkable. A sign-in token has one home (`claude_account/tokens.py`, reached only through
+ * `token_for`) and never leaves it; this meter is the exception, because the endpoint wants a Bearer
+ * header and the meter reads the credential file the `claude` CLI itself wrote. The divergence is
+ * confined to this file and bounded:
  *
  *   1. ONE READER. `readCredentials` is the only token read in this module, and the only one in the
  *      server.

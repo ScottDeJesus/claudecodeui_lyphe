@@ -229,15 +229,16 @@ const claudeUpdates = createClaudeUpdatesModule({
 app.use('/api/system', authenticateToken, systemRoutes);
 app.use('/api/claude-updates', authenticateToken, claudeUpdates.router);
 
-// The Claude account switcher and its usage meter (protected), mounted at `/api` so its four paths
-// land at `/api/accounts`, `/api/usage`, `/api/accounts/switch` and `/api/accounts/capture`.
+// The Claude account lane and its usage meter (protected), mounted at `/api` so its paths land at
+// `/api/accounts`, `/api/usage` and the door's `/api/accounts/use`, `/api/accounts/auto` and
+// `/api/accounts/remove`.
 //
 // ⚠ THE GUARD IS APPLIED BY PREFIX, AND THAT IS A SECURITY PROPERTY RATHER THAN A STYLE CHOICE.
 // Express routes are matched case-insensitively with an optional trailing slash, so a guard that
 // compares `request.path` against a list of spellings guards the spellings it was taught and lets
-// every other one through unauthenticated — measured 2026-09-18: `/api/accounts/`, `/api/ACCOUNTS`,
-// `/api/accounts//` and `POST /api/accounts/capture/` all answered 200/201 with no token, leaking
-// the live slots and able to re-point the active mark. A prefix mount cannot have that gap: the
+// every other one through unauthenticated — measured 2026-09-18: `/api/accounts/`, `/api/ACCOUNTS`
+// and `/api/accounts//` all answered 200 with no token, leaking the live accounts and able to
+// move which account was in use. A prefix mount cannot have that gap: the
 // guard is matched by the SAME matcher that admits the request to the router below, so any spelling
 // Express routes is a spelling that has already passed the JWT check.
 //

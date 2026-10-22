@@ -4,103 +4,19 @@ import { DeepseekPeakHours } from '@/modules/accounts/DeepseekPeakHours';
 import type { JevBalance } from '@/modules/accounts/hooks/useJevBalance';
 import { JevBalanceReadout } from '@/modules/accounts/JevBalanceReadout';
 import { UsageMeters } from '@/modules/accounts/UsageMeters';
-import { accountInitials } from '@/modules/accounts/utils/accountInitials';
 import { accountInUseUsage } from '@/modules/accounts/utils/accountInUseUsage';
 import { useMinuteTick } from '@/modules/accounts/hooks/useMinuteTick';
-import { weeklyResetInWords } from '@/modules/accounts/utils/weeklyReset';
-import { Avatar, Banner, Button, Card } from '@/shared/ui';
-import type { ClaudeAccounts, ClaudeAccountSlot, ClaudeDoorPicture, ClaudeUsage, DeepseekBalance } from '@/shared/types';
+import { Banner, Card } from '@/shared/ui';
+import type { ClaudeAccounts, ClaudeUsage, DeepseekBalance } from '@/shared/types';
 
-/** The line that closes the switcher, because "will this lose my work?" is the only question a switch actually raises. */
-const SWITCH_REASSURANCE =
-  'Switching changes only which account signs the requests. Your projects, conversations and running work stay exactly as they are — open conversations keep their history and resume on the new account.';
-
-/**
- * What the date on a row means, said once so no row has to imply it.
- *
- * The account store calls `expiresAt` "a freshness clock, not a secret" and renders no warning from
- * it anywhere. It is the provider's expiry inside the COPY the store holds, read from that slot's
- * own file — so the date is the age of the copy and nothing more. On the live store, two of three
- * sit in the past.
- *
- * It says what the date IS and draws no contrast, deliberately. Every clause that sorted the rows
- * into "the one in use" and "the rest" turned out false: nothing refreshes a copy on a clock, so
- * the active slot's stamp passes like any other; and a switch writes the OUTGOING slot fresh
- * first, so a just-docked copy carries a future date for hours.
- * `savedCopyFreshness` below has a future-tense branch for exactly that row. A sentence that
- * merely names the field cannot be contradicted by any row beneath it.
- *
- * Kept to ONE line's worth of words on purpose. It sits above the rows (which is where it has
- * to be — every row below carries the phrase it disarms), so every line it costs pushes the
- * switcher and Re-login further down a panel that already scrolls.
- */
-const DATE_MEANING = 'A date in the past is normal — it is the expiry on the saved copy.';
-
-/** Said in words, because an empty switcher would otherwise read as "you have no accounts". */
+/** Said in words, because an empty panel would otherwise read as "you have no accounts". */
 const UNREACHABLE_LINE = 'The server could not read accounts or usage — both are unknown.';
 
 /** The panel's own id, so the trigger can point at it with `aria-controls`. */
 export const ACCOUNT_PANEL_ID = 'account-panel';
 
-/**
- * The freshness of a saved copy, as a fact and never as a verdict.
- *
- * `expiresAt` is epoch MILLISECONDS — handed to `new Date` with no conversion. The tense
- * follows the clock so the sentence stays true, and that is ALL it does: no mark, no amber, no
- * button. A stamp in the past is the normal condition of a docked account, so treating it as
- * an alarm made an alarm that is always on, which is not an alarm.
- */
-function savedCopyFreshness(expiresAt: number | null): string {
-  if (expiresAt === null) return '—';
-  const when = new Date(expiresAt).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' });
-  return expiresAt < Date.now() ? `Saved copy expired ${when}` : `Saved copy expires ${when}`;
-}
-
-/** What the account in use says about itself: that it is in use, and how much work is riding on it right now. */
-function activeMeta(liveSessions: number): string {
-  if (liveSessions <= 0) return 'in use now · none proven running';
-  return `in use now · ${liveSessions} session${liveSessions === 1 ? '' : 's'} running`;
-}
-
-type AccountRowProps = {
-  slot: ClaudeAccountSlot;
-  hue: number;
-  busy: boolean;
-  onSwitch: (slug: string) => void;
-  /** The panel's ticking clock, passed in so every row counts down from the same instant. */
-  now: number;
-};
-
-/** One switchable account. The whole row is the button: there is no second control on it, so there is nothing to nest. */
-function AccountRow({ slot, hue, busy, onSwitch, now }: AccountRowProps) {
-  const weeklyReset = weeklyResetInWords(slot.slug, now);
-
-  return (
-    <div data-account-slug={slot.slug} className="flex items-center gap-2">
-      <button
-        type="button"
-        data-slug={slot.slug}
-        disabled={busy}
-        onClick={() => onSwitch(slot.slug)}
-        className="flex min-w-0 flex-1 items-center gap-2.5 rounded-lg px-2.5 py-2 text-left transition-colors hover:bg-muted/60 disabled:opacity-60"
-      >
-        <Avatar initials={accountInitials(slot.label)} hue={hue} size={24} />
-        <span className="min-w-0 flex-1">
-          {/* The label truncates at this width, so the full address lives in a `title` — the
-              avatar's two letters can collide and the row must stay identifiable. */}
-          <span className="block truncate text-[13px] font-medium text-foreground" title={slot.label}>{slot.label}</span>
-          <span className="block text-xs text-muted-foreground">{savedCopyFreshness(slot.expiresAt)}</span>
-          {weeklyReset && <span className="block text-xs text-ink-faint">{weeklyReset}</span>}
-        </span>
-      </button>
-    </div>
-  );
-}
-
 type AccountPopoverProps = {
   accounts: ClaudeAccounts | null;
-  /** The door's picture: the account store's own rows, readings and rule marks. Null before its first answer. */
-  door: ClaudeDoorPicture | null;
   usage: ClaudeUsage | null;
   /** The DeepSeek reading, held by the row. Not part of `usage`: a different account, from a route of its own. */
   balance: DeepseekBalance | null;
@@ -108,10 +24,8 @@ type AccountPopoverProps = {
   jevBalance: JevBalance | null;
   busy: boolean;
   error: string | null;
-  onSwitch: (slug: string) => void;
   /** Opens the provider's login window — the panel's one sign-in door, for the same account or another. */
   onRelogin: () => void;
-  onSaveLiveLogin: () => void;
   /** The door's three acts, held by the row's `useClaudeAccounts`: use this account, turn the rule on or off, remove one. */
   onUse: (slug: string) => void;
   onSetAuto: (on: boolean) => void;
@@ -121,25 +35,22 @@ type AccountPopoverProps = {
 };
 
 /**
- * The account panel: what this account has used, and which account signs the next request.
- * Used by the accounts module's AccountFooterRow, which anchors it above the sidebar footer
- * and owns the open state.
+ * The account panel: what the account in use has spent, one row per account the door holds, and
+ * the door's sign-in window. Used by the accounts module's AccountFooterRow, which anchors it above
+ * the sidebar footer and owns the open state.
  *
- * It composes Card rather than adopting the library's Menu: a Menu is a list of labelled
- * choices, and this panel carries meters, avatars and buttons. Codex is deliberately absent —
- * these are the Claude slots the store holds, and Codex stays in Settings → Agents (D6).
+ * It composes Card rather than adopting the library's Menu: a Menu is a list of labelled choices,
+ * and this panel carries meters, avatars and buttons. Codex is deliberately absent — these are the
+ * Claude accounts the door holds, and Codex stays in Settings → Agents (D6).
  */
 export function AccountPopover({
   accounts,
-  door,
   usage,
   balance,
   jevBalance,
   busy,
   error,
-  onSwitch,
   onRelogin,
-  onSaveLiveLogin,
   onUse,
   onSetAuto,
   onRemove,
@@ -149,14 +60,10 @@ export function AccountPopover({
   // interval exists only for as long as this component does, and this component is mounted
   // only while the panel is showing.
   const now = useMinuteTick();
-  const picture = accounts?.reachable ? accounts : null;
   const unknown = accounts !== null && !accounts.reachable;
-  // Read off `picture` rather than kept as its own binding: narrowing has to survive into the
-  // rows, where the active one reads `liveSessions` from the same object.
-  const slotCount = picture?.slots.length ?? 0;
   // The meters draw the account in use — the chosen account, else the live login — which is not
   // always the login `/api/usage` measured. This is the one conversion; UsageMeters is unchanged.
-  const metersUsage = accountInUseUsage(usage, door, now);
+  const metersUsage = accountInUseUsage(usage, accounts, now);
 
   return (
     // The ceiling has to fit the space ABOVE the row this hangs from, not the viewport: the
@@ -179,12 +86,11 @@ export function AccountPopover({
       <DeepseekPeakHours now={now} />
       <JevBalanceReadout balance={jevBalance} />
 
-      {/* The account store's own section, above today's slot switcher: one row per account, the
-          automatic switch, the last switch, and the four acts the row's hooks hand it. It renders
-          nothing until the door's first picture lands — a lane that cannot answer is its own calm
-          line inside the section, never a blank space. */}
+      {/* The account section: one row per account, the automatic switch, the last switch, and the
+          four acts the row's hooks hand it. It renders nothing until the first answer lands — a
+          lane that cannot answer is its own calm line inside the section, never a blank space. */}
       <ClaudeAccountRows
-        picture={door}
+        picture={accounts}
         busy={busy}
         nowMs={now}
         onUse={onUse}
@@ -194,101 +100,22 @@ export function AccountPopover({
       />
 
       <div className="flex flex-col gap-1.5">
-        <div className="text-[11px] uppercase tracking-[0.14em] text-ink-faint">
-          {`Switch account · ${picture ? slotCount : '—'}`}
-        </div>
-
-        {/* ABOVE the rows, deliberately. This is the sentence that makes "Saved copy expired"
-            read as routine rather than as a fault, and every row below it carries that phrase —
-            so a reader who meets the rows first has already met the explanation. Rendered last
-            it sat below the fold at every viewport height the panel was measured at. */}
-        {slotCount > 0 && (
-          <p className="pb-0.5 text-xs leading-relaxed text-ink-faint">{DATE_MEANING}</p>
-        )}
-
-        {/* The server answered, but its own account store would not read. The switcher is empty
-            for a reason the reader is owed in words. */}
-        {picture?.unreadable && (
-          <p className="text-xs leading-relaxed text-muted-foreground">
-            The saved accounts could not be read — none can be listed.
-          </p>
-        )}
-
-        {picture?.slots.map((slot, index) => {
-          if (!slot.isActive) {
-            return <AccountRow key={slot.slug} slot={slot} hue={index} busy={busy} onSwitch={onSwitch} now={now} />;
-          }
-
-          const weeklyReset = weeklyResetInWords(slot.slug, now);
-
-          return (
-            <div
-              key={slot.slug}
-              data-account-slug={slot.slug}
-              className="flex items-center gap-2.5 rounded-lg bg-primary/10 px-2.5 py-2"
-            >
-              <Avatar initials={accountInitials(slot.label)} hue={index} size={24} />
-              <div className="min-w-0 flex-1">
-                {/* The mark rides on the LABEL's line rather than at the row's right edge. Out
-                    there it cost every line beneath it 20px of width, and the reset countdown —
-                    the longest of them — wrapped for want of exactly that. The label truncates
-                    and carries its full address in a `title`, so it is the line that can spare
-                    the room. The account in use is already switched to, so it carries a mark
-                    rather than a button — and the mark is a glyph, not a colour (doctrine §6). */}
-                <div className="flex items-center gap-1.5">
-                  <div className="truncate text-[13px] font-medium text-accent-ink" title={slot.label}>{slot.label}</div>
-                  <span title="In use now" className="flex-none text-xs text-accent-ink">✓</span>
-                </div>
-                <div className="text-xs text-muted-foreground">{activeMeta(picture.liveSessions)}</div>
-                {weeklyReset && <div className="text-xs text-ink-faint">{weeklyReset}</div>}
-              </div>
-            </div>
-          );
-        })}
-
-        {/* The panel's sign-in door: the sign-in Settings → Agents → Claude → Re-login runs,
-            reached from where the account in use is read. It saves the live login first, so
-            signing in as someone else here loses nothing — and files the login it ends on when
-            the window closes, under that login's own email, so this panel then shows it as the
-            account in use. */}
-        {picture && (
-          <button
-            type="button"
-            disabled={busy}
-            onClick={onRelogin}
-            className="rounded-lg px-2.5 py-2 text-left text-[13px] text-accent-ink transition-colors hover:bg-primary/10 disabled:opacity-60"
-          >
-            ↻ Re-login
-          </button>
-        )}
-
-        {/* The live login and its saved copy have diverged. A fact with a remedy, not an
-            error: both accounts are named, because "Save it" adopts the live one. */}
-        {picture?.drift && (
-          <Banner
-            tone="warn"
-            action={
-              <Button variant="tonal" size="sm" className="h-8 flex-none px-2.5 text-xs" disabled={busy} onClick={onSaveLiveLogin}>
-                Save it
-              </Button>
-            }
-          >
-            <span className="text-xs">
-              {`The live login (${picture.liveLabel ?? 'unnamed'}) differs from the saved copy of ${picture.activeLabel ?? 'the account in use'}`}
-            </span>
-          </Banner>
-        )}
+        {/* The panel's one sign-in door: it signs the box's own login in again. Closing its window
+            re-reads the panel, where a new live identity appears as a "Set up" row — the sign-in
+            itself changed no account the door holds. */}
+        <button
+          type="button"
+          disabled={busy}
+          onClick={onRelogin}
+          className="rounded-lg px-2.5 py-2 text-left text-[13px] text-accent-ink transition-colors hover:bg-primary/10 disabled:opacity-60"
+        >
+          ↻ Re-login
+        </button>
 
         {error && (
           <Banner tone="warn">
             <span className="text-xs">{error}</span>
           </Banner>
-        )}
-
-        {/* Both closing lines are about switching between accounts, so neither renders when
-            there are no accounts to switch between. */}
-        {slotCount > 0 && (
-          <p className="px-2.5 pt-0.5 text-xs leading-relaxed text-ink-faint">{SWITCH_REASSURANCE}</p>
         )}
       </div>
     </Card>

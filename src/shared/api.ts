@@ -829,14 +829,14 @@ export const api = {
     setAutoInstall: (enabled: boolean) => put('/api/claude-updates/auto-install', { enabled }),
   },
 
-  // The Claude account switcher and its usage meter, served by the server's own accounts module.
-  // Both reads answer 200 whatever the state — the calm `{reachable:false, reason}` picture when
-  // nothing can be computed — so a caller reads the BODY rather than the status. Every write carries
-  // the service's OWN status and body through, which is why they are read from the raw response and
+  // The Claude account lane and its usage meter, served by the server's own accounts module.
+  // Both reads answer 200 whatever the state — the calm `{reachable:false, reason}` when nothing
+  // can be computed — so a caller reads the BODY rather than the status. Every write carries the
+  // service's OWN status and body through, which is why they are read from the raw response and
   // never through `readApiJson`; a door write's refusal is a 422 whose `error` is the door's own words.
   accounts: {
     // `picture`, not `accounts`: the group is already named for the lane, and the panel calls this
-    // body a picture everywhere it appears. The door's own picture rides inside it under `door`.
+    // body a picture everywhere it appears. The body is the door's own picture under `reachable`.
     picture: () => get('/api/accounts'),
     usage: () => get('/api/usage'),
     // The door's three writes: choose the account in use, turn the automatic switch on or off, and
@@ -844,9 +844,6 @@ export const api = {
     use: (slug: string) => post('/api/accounts/use', { slug }),
     auto: (on: boolean) => post('/api/accounts/auto', { on }),
     remove: (slug: string) => post('/api/accounts/remove', { slug }),
-    // Today's slot store, kept until phase old-switcher removes it.
-    switchAccount: (slug: string) => post('/api/accounts/switch', { slug }),
-    capture: () => post('/api/accounts/capture', {}),
   },
 
   // The memory-intake lane (docs/MANUAL.md (memory-intake)): what a session PROPOSES and a person reviews.
@@ -1332,7 +1329,7 @@ export const api = {
   cliVersion: () => get('/api/cli-version'),
 
   // The money left on this host's DeepSeek account (docs/MANUAL.md (deepseek-balance)). A different account
-  // from the Claude slots the switcher holds, and a different origin: the server reads it from the
+  // from the Claude accounts the door holds, and a different origin: the server reads it from the
   // vendor with the key it holds, so the key never reaches this side. Answers 200 always, for the
   // same reason `accounts.usage` does — no reading is a reading in words, never an error wall.
   deepseek: {

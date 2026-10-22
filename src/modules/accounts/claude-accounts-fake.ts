@@ -1,15 +1,15 @@
-import type { ClaudeAccountRow, ClaudeAccountsPicture } from '@/shared/types';
+import type { ClaudeAccountRow, ClaudeAccounts, ClaudeAccountsPicture } from '@/shared/types';
 
 /**
- * The account section's fake states. Every entry is a WHOLE value the route will one day relay, so a
- * fixture can draw a state without standing up the door, the store or a server — and so a reviewer
- * sees the state the panel will really be handed, never a prop-shaped sketch of it.
+ * The account section's fake states. Every entry is a WHOLE value the route relays, so a fixture can
+ * draw a state without standing up the door, the store or a server — and so a reviewer sees the
+ * state the panel will really be handed, never a prop-shaped sketch of it.
  *
  * Used by the fixture under /tmp that photographs `ClaudeAccountRows` in each state, at three widths
  * and in both themes. Not imported by the app: nothing in `src/` outside this file's fixture is meant
  * to read it, and the bundle never includes it.
  */
-export type FakeClaudeAccounts = ClaudeAccountsPicture | { reachable: false; reason: string };
+export type FakeClaudeAccounts = ClaudeAccounts;
 
 /** The state names, one per picture below. */
 export type FakeClaudeAccountsState =
@@ -93,7 +93,7 @@ function row(overrides: Partial<ClaudeAccountRow> & { slug: string; digest: stri
 }
 
 /** A whole picture, with every list and flag present and the per-row chosen flag derived. */
-function picture(overrides: Partial<ClaudeAccountsPicture>): ClaudeAccountsPicture {
+function picture(overrides: Partial<ClaudeAccountsPicture>): ClaudeAccounts {
   const chosen = overrides.chosen ?? null;
   // The door's per-row `chosen` is true exactly on the chosen record's digest (`door_status.py`), so
   // derive it: no fake claims a chosen account the picture's own record does not name.
@@ -104,7 +104,7 @@ function picture(overrides: Partial<ClaudeAccountsPicture>): ClaudeAccountsPictu
     // so. A full row's ceiling or wall sentence is the state's to pass; nothing here invents one.
     why: account.why === '' && account.room ? roomWords(account.slug, account.reading) : account.why,
   }));
-  return { candidates: [], auto: true, held: false, chosen: null, last_switch: null, ...overrides, accounts };
+  return { reachable: true, candidates: [], auto: true, held: false, chosen: null, last_switch: null, ...overrides, accounts };
 }
 
 /**

@@ -10991,8 +10991,9 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/sett
 
 Reference: MAN-8847 (the section that reads them), MAN-8843 (the door face they describe).
 1. **Each of the three types is byte-identical in `src/shared/types.ts` and `server/shared/types.ts`**, comment and body. The `door?:` member on the `reachable: true` variant of `ClaudeAccounts` is the same line in both. A change to one lands in the other in the same edit. 2026-10-21: three block checksums equal across the mirrors.
-2. **They describe `claude-account status --json` as the door sends it.** Times are epoch SECONDS (`ClaudeAccountSlot.expiresAt` beside them is MILLISECONDS); `reading.five` / `.week` are fractions 0..1; `token` is a state word (`none` | `saved` | `checking`), never a token or a digest of one; `why` is the rule's sentence (INV-76).
+2. **They describe `claude-account status --json` as the door sends it.** Times are epoch SECONDS (`ClaudeAccountSlot.expiresAt` beside them is MILLISECONDS); `reading.five` / `.week` are fractions 0..1 or `null` (a window the pacer could not measure — the pacer files one-window readings), and `null` draws as unknown, never zero (MAN-8862); `token` is a state word (`none` | `saved` | `checking`), never a token or a digest of one; `why` is the rule's sentence (INV-76).
 3. **`door?:` is optional** while the old slot summary stands: absent means `ClaudeAccountRows` draws nothing. Required only when the old switcher is removed.
+4. **`ClaudeDoorPicture` is client-only** (`src/shared/types.ts`): `ClaudeAccountsPicture | {reachable:false; reason: string}`, the two shapes `ClaudeAccounts.door` has. It is not a mirrored type; the three above are.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts
 
@@ -11306,3 +11307,61 @@ measured 2026-10-21 by chain chain-usage-limits--account-switch--chat-readings-2
 probe-key: 5a170e582c0172a5691c5671e5138f9f02d3446a
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/pacer-door.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/usage.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-chat-readings.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-limit-memory.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-runtime.provider.js, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-runtime-signals.ts, /home/lyphe/.claude/hooks/plan_runner/pacer/door.py
+
+## INV-9289 — probe — the untrusted-wire rule the fix names was applied to one field, not the root: an absent figure still draws "NaN%", and an absent `at` still takes the whole app down
+
+the untrusted-wire rule the fix names was applied to one field, not the root: an absent figure still draws "NaN%", and an absent `at` still takes the whole app down
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'SH'
+#!/usr/bin/env bash
+set -u
+D=${1:?}
+cat > "$D/p.mjs" <<'EOF'
+import { openConsole } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/console.mjs';
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const nowS = () => Math.floor(Date.now() / 1000);
+const other = { slug: 'scottdejesus', digest: 'f9caa612', token: 'saved', expires_at: nowS() + 86400, chosen: false, live: true, in_use: false, wall: null,
+  reading: { five: 0.81, five_resets: nowS() + 3600, week: 0.16, week_resets: nowS() + 86400, at: nowS() - 60, source: 'meter' }, pace: null, room: true, why: '' };
+const accountsWith = (row) => ({ reachable: true, active: 'sdjesus89', activeLabel: 'sdjesus89', slots: [], liveLabel: 'scottdejesus@gmail.com', liveExpiresAt: null, drift: false, liveSessions: 0, unreadable: false,
+  door: { accounts: [row, other], candidates: [], auto: true, held: false, chosen: '8b907ae7', last_switch: null } });
+const usage = { reachable: true, account: 'f9caa612', degraded: false, reason: '', staleSince: null, checkedAt: nowS(), pace: null, windows: [] };
+async function run(row, label) {
+  const s = await openConsole({ viewport: { width: 1440, height: 900 } });
+  const { page } = s;
+  const pageErrors = [];
+  page.on('pageerror', (e) => pageErrors.push(String(e.message || e).split('\n')[0]));
+  await page.route(/\/api\/accounts(?:[/?#]|$)/, (r) => r.fulfill({ json: accountsWith(row) }));
+  await page.route(/\/api\/usage(?:[?#]|$)/, (r) => r.fulfill({ json: usage }));
+  await page.reload({ waitUntil: 'domcontentloaded' }); await sleep(2000);
+  const out = { label, footer: await page.locator('button[data-account-row]').count() };
+  await page.locator('button[data-account-row]').click().catch((e) => pageErrors.push(`click-failed: ${e.message.split('\n')[0]}`));
+  await sleep(1200);
+  out.panel = await page.locator('#account-panel').count();
+  out.body = (await page.locator('body').innerText()).replace(/\n+/g, ' | ').slice(0, 90);
+  if (out.panel > 0) {
+    out.row = (await page.locator('#account-panel [data-account-slug="sdjesus89"]').innerText()).split('\n').find((l) => /5h/.test(l));
+    out.meters = await page.locator('#account-panel [role="meter"]').evaluateAll((els) => els.map((e) => [e.getAttribute('aria-label'), e.getAttribute('aria-valuenow'), e.querySelector('.vv-meter__value')?.textContent]));
+  }
+  out.pageErrors = pageErrors.slice(-1);
+  console.log(`${label} ${JSON.stringify(out)}`);
+  await s.browser.close();
+}
+await run({ slug: 'sdjesus89', digest: '8b907ae7', token: 'saved', expires_at: nowS() + 86400, chosen: true, live: false, in_use: true, wall: null,
+  reading: { five_resets: nowS() + 3600, week: 0.6, week_resets: nowS() + 86400, at: nowS() - 60, source: 'meter' }, pace: null, room: true, why: '' }, 'ABSENT-five');
+await run({ slug: 'sdjesus89', digest: '8b907ae7', token: 'saved', expires_at: nowS() + 86400, chosen: true, live: false, in_use: true, wall: null,
+  reading: { five: 0.4, week: 0.6, source: 'meter' }, pace: null, room: true, why: '' }, 'ABSENT-at');
+EOF
+cd /home/lyphe/.claude/claudecodeui_lyphe
+node "$D/p.mjs"
+SH
+bash "$D/p.sh" "$D"
+case "$D" in /tmp/athena-probe.??????) rm -rf "$D";; esac
+expect: ABSENT-five {"footer":1,"panel":1,…,"row":"5h NaN% · wk 60%","meters":[["Current 5-hour window","NaN","NaN% used"],["This week","60","60% used"]],"pageErrors":[]}; ABSENT-at {"footer":1,"panel":0,"body":"CloudCLI hit an error | …","pageErrors":["Invalid time value"]}. Cured: ABSENT-five row "5h — · wk 60%" with no aria-valuenow on the 5-hour meter, and ABSENT-at panel 1 with row "5h 40% · wk 60%" and no pageerror.
+```
+
+measured 2026-10-21 by chain chain-usage-limits--account-switch--panel-fill-20261021-193921-04ef, finding L1, LOW
+probe-key: e9633bd2babd88258ddd1436d550a5be4b8b76ce
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/AccountFooterRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/AccountPopover.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/ClaudeAccountRows.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/ClaudeAccountRowViews.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/hooks/useAccountSetup.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/hooks/useClaudeAccounts.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/utils/accountInUseUsage.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/panel-fill.mjs

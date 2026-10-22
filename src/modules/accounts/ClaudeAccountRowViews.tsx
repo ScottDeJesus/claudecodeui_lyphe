@@ -8,20 +8,31 @@ import { formatRelativeTime, formatShortDate } from '@/shared/utils';
 /** A reading older than this says when it was taken; below it, the figures read as current. */
 const READING_STALE_MS = 3 * 60_000;
 
-/** The two windows each row states, in points (the door's fractions ×100); an unmeasured window is an em-dash, never 0%. */
+/**
+ * One window as the row states it, in points (the door's fractions ×100). The wire is untrusted at
+ * its edges: a null, absent or unreadable fraction is an em-dash — never `0%` for a number nobody
+ * measured, and never `NaN%` for one `Math.round` could not read.
+ */
+function figureInPoints(fraction: number | null): string {
+  if (fraction === null || !Number.isFinite(fraction)) return '—';
+  return `${Math.round(fraction * 100)}%`;
+}
+
+/** The two windows each row states, through the one reading rule above. */
 function figuresInPoints(reading: ClaudeAccountRow['reading']): string {
   if (reading === null) return '5h — · wk —';
-  const five = reading.five === null ? '—' : `${Math.round(reading.five * 100)}%`;
-  const week = reading.week === null ? '—' : `${Math.round(reading.week * 100)}%`;
-  return `5h ${five} · wk ${week}`;
+  return `5h ${figureInPoints(reading.five)} · wk ${figureInPoints(reading.week)}`;
 }
 
 /** How old a row's figures are, in words — only once they are old enough that "current" would be a lie. */
 function readingAgeInWords(reading: ClaudeAccountRow['reading'], nowMs: number): string | null {
   if (reading === null) return null;
-  const takenAtMs = reading.at * 1000;
-  if (nowMs - takenAtMs <= READING_STALE_MS) return null;
-  return `as of ${formatRelativeTime(new Date(takenAtMs).toISOString())}`;
+  // `at` is wire input: a stamp naming no instant has no age to state, and
+  // `new Date(NaN).toISOString()` throws in render — taking the whole app down, not one row.
+  const takenAt = new Date(reading.at * 1000);
+  if (Number.isNaN(takenAt.getTime())) return null;
+  if (nowMs - takenAt.getTime() <= READING_STALE_MS) return null;
+  return `as of ${formatRelativeTime(takenAt.toISOString())}`;
 }
 
 /**
@@ -38,9 +49,14 @@ function withoutOwnName(why: string, slug: string): string {
 /** The day a saved token stops working. A past date says `expired`, because "valid until" a past day is false. */
 function tokenDateInWords(expiresAt: number | null, nowMs: number): string | null {
   if (expiresAt === null) return null;
-  const date = formatShortDate(new Date(expiresAt * 1000).toISOString());
+  // The same untrusted edge as the reading's: an absent or unreadable expiry names no day, and
+  // `new Date(NaN).toISOString()` throws before the row can draw.
+  const expiresAtMs = expiresAt * 1000;
+  const instant = new Date(expiresAtMs);
+  if (Number.isNaN(instant.getTime())) return null;
+  const date = formatShortDate(instant.toISOString());
   if (date === null) return null;
-  return expiresAt * 1000 < nowMs ? `expired ${date}` : `valid until ${date}`;
+  return expiresAtMs < nowMs ? `expired ${date}` : `valid until ${date}`;
 }
 
 type AccountRowViewProps = {

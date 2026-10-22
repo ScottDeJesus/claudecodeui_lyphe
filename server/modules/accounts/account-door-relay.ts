@@ -22,9 +22,9 @@ const execFileAsync = promisify(execFile);
  *
  * A WRITE'S VERDICT IS THE DOOR'S. Exit 0 answers the door's line (`USING <slug>`, `AUTO on`,
  * `REMOVED <slug>`); exit 2 with a `REFUSED` line is `AccountDoorRefusal` carrying the door's
- * sentence, so `accounts.routes.ts` answers it as a 422 exactly as it answers the slot store's
- * `AccountRefusal`; every other failure is a 502 whose sentence is the door's one stderr line,
- * redacted. `use` and `remove` kick the dispatcher inside the door itself (INV-187) — no kick here.
+ * sentence, so `accounts.routes.ts` answers it as a 422 with the door's own words; every other
+ * failure is a 502 whose sentence is the door's one stderr line, redacted. `use` and `remove` kick
+ * the dispatcher inside the door itself (INV-187) — no kick here.
  *
  * A FREE-FORM NAME RIDES AFTER `--`. The door is argparse, so `use --help` prints the subparser's
  * help, exits 0 and would be relayed as a 200 for a write that never happened; `['use', '--', slug]`

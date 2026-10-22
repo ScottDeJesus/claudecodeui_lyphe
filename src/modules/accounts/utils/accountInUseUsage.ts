@@ -1,4 +1,4 @@
-import type { ClaudeAccountRow, ClaudeDoorPicture, ClaudeUsage, ClaudeUsagePace, ClaudeUsageWindow } from '@/shared/types';
+import type { ClaudeAccountRow, ClaudeAccounts, ClaudeUsage, ClaudeUsagePace, ClaudeUsageWindow } from '@/shared/types';
 
 /**
  * THE METERS FOLLOW THE ACCOUNT IN USE, WHICH IS NO LONGER ALWAYS THE BOX'S LIVE LOGIN.
@@ -26,10 +26,13 @@ const WEEKLY = { key: 'seven_day', label: 'This week' } as const;
 /**
  * A fraction 0..1 as the wire's whole percent — the same rounding `usage.service.ts` applies.
  * `null` is a window the pacer could not measure, and stays `null`: the meters draw an em-dash,
- * never a false `0% used` (the pacer files one-window readings).
+ * never a false `0% used` (the pacer files one-window readings). The wire is untrusted at its
+ * edges: an absent or unreadable figure is `null` too, because `Math.round(undefined * 100)` is
+ * `NaN`, which `Meter` would draw as a live `NaN%` bar carrying `aria-valuenow="NaN"`.
  */
 function points(fraction: number | null): number | null {
-  return fraction === null ? null : Math.round(fraction * 100);
+  if (fraction === null || !Number.isFinite(fraction)) return null;
+  return Math.round(fraction * 100);
 }
 
 /**
@@ -74,8 +77,8 @@ function paceInPercent(row: ClaudeAccountRow, five: number | null, week: number 
  * the live login (`store.current()`). So the mark, not a guess assembled from `chosen` and `live`, is
  * the answer — and a picture the door could not answer has no account in use at all.
  */
-export function accountInUse(picture: ClaudeDoorPicture | null | undefined): ClaudeAccountRow | null {
-  if (picture === null || picture === undefined || 'reachable' in picture) return null;
+export function accountInUse(picture: ClaudeAccounts | null | undefined): ClaudeAccountRow | null {
+  if (picture === null || picture === undefined || !picture.reachable) return null;
   return picture.accounts.find((account) => account.in_use) ?? null;
 }
 
@@ -104,7 +107,11 @@ function pictureReading(row: ClaudeAccountRow, usage: ClaudeUsage | null, nowMs:
 
   const five = points(reading.five);
   const week = points(reading.week);
-  const stale = nowMs - reading.at * 1000 > PICTURE_READING_STALE_MS;
+  // The row's filed-at is wire input as much as its figures are: a stamp naming no instant cannot
+  // establish an age, and `checkedAt` must stay a number. The moment this picture was read is the
+  // only time we can vouch for, so such a reading is stamped with it and never shown as stale.
+  const filedAt = Number.isFinite(reading.at) ? reading.at : Math.floor(nowMs / 1000);
+  const stale = nowMs - filedAt * 1000 > PICTURE_READING_STALE_MS;
   const usageExplains = usage !== null && usage.reachable && usage.degraded ? usage.reason : '';
   const pace = paceInPercent(row, five, week);
 
@@ -117,8 +124,8 @@ function pictureReading(row: ClaudeAccountRow, usage: ClaudeUsage | null, nowMs:
     ],
     degraded: stale,
     reason: stale ? usageExplains : '',
-    staleSince: stale ? reading.at : null,
-    checkedAt: reading.at,
+    staleSince: stale ? filedAt : null,
+    checkedAt: filedAt,
     // The key stays absent, not null, when the pacer could weigh neither window.
     ...(pace === undefined ? {} : { pace }),
   };
@@ -138,7 +145,7 @@ function pictureReading(row: ClaudeAccountRow, usage: ClaudeUsage | null, nowMs:
  */
 export function accountInUseUsage(
   usage: ClaudeUsage | null,
-  picture: ClaudeDoorPicture | null | undefined,
+  picture: ClaudeAccounts | null | undefined,
   nowMs: number,
 ): ClaudeUsage | null {
   const row = accountInUse(picture);

@@ -1,12 +1,13 @@
 import { AccountRowView, CandidateRow } from '@/modules/accounts/ClaudeAccountRowViews';
 import { useMinuteTick } from '@/modules/accounts/hooks/useMinuteTick';
 import { Switch } from '@/shared/ui';
-import type { ClaudeAccountSwitch, ClaudeAccountsPicture } from '@/shared/types';
+import type { ClaudeAccountSwitch, ClaudeAccounts } from '@/shared/types';
 import { formatShortDate } from '@/shared/utils';
 
 /**
  * The line that closes the section. A switch raises one question — "will this lose my work?" — and
- * this answers it in the same words the old switcher used where they still apply.
+ * this answers it: work already running finishes on its account, and an open conversation moves at
+ * its next message.
  */
 const SWITCHING_IN_WORDS =
   'Switching changes which account new chats and plan runs start on. Work already running finishes on its account; an open conversation moves at its next message.';
@@ -40,8 +41,8 @@ function whyHeadline(why: string): string {
 }
 
 type ClaudeAccountRowsProps = {
-  /** The door's picture, or the calm reason it could not answer. Absent renders nothing. */
-  picture?: ClaudeAccountsPicture | { reachable: false; reason: string } | null;
+  /** The accounts lane's answer, or `null` before its first answer. Absent renders nothing. */
+  picture?: ClaudeAccounts | null;
   busy?: boolean;
   /** The panel's clock, epoch milliseconds. Passed, the section shares the popover's minute instead of ticking a second one. */
   nowMs?: number;
@@ -56,9 +57,9 @@ type ClaudeAccountRowsProps = {
  * box is signed in to but the store does not hold, the automatic switch, the last switch and why,
  * and the one sentence that says what a switch does to work already running.
  *
- * Used by the accounts module's AccountPopover, after the meters and the balances and above the old
- * "Switch account" block; the fakes beside it (`claude-accounts-fake.ts`) draw every state without a
- * server, so a state is reviewable before the route that carries it exists.
+ * Used by the accounts module's AccountPopover, after the meters and the balances; the fakes beside
+ * it (`claude-accounts-fake.ts`) draw every state without a server, so a state is reviewable before
+ * the door answers one.
  *
  * Given no picture it renders nothing (the lane has not answered yet); a picture whose door could
  * not answer draws that calm line instead.
@@ -91,7 +92,7 @@ function AccountRowsBody({
 }: ClaudeAccountRowsProps & { nowMs: number }) {
   if (picture === null) return null;
 
-  if ('reachable' in picture) {
+  if (!picture.reachable) {
     return (
       <div className="flex flex-col gap-1.5">
         <div className="text-[11px] uppercase tracking-[0.14em] text-ink-faint">Accounts</div>

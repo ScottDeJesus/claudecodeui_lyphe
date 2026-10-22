@@ -8,10 +8,9 @@ import { isRecord } from './usage-windows.js';
 /**
  * WHICH Claude account the live login is — as eight hex of a digest, and never the account itself.
  *
- * A usage limit belongs to an ACCOUNT, and this box's login moves when the operator switches slots:
- * `account-store.service.ts` swaps `~/.claude/.credentials.json` and `~/.claude.json` together. The
- * meter's reading therefore has to name the login it came from, in a form the pacer can file a row
- * under and no surface can read an identity out of.
+ * A usage limit belongs to an ACCOUNT, and this box's login changes when a re-login signs a new one
+ * in. The meter's reading therefore has to name the login it came from, in a form the pacer can file
+ * a row under and no surface can read an identity out of.
  *
  * THE RECIPE IS `plan_runner/claude_account.digest`, byte for byte: sha256 over the TRIMMED UTF-8
  * `oauthAccount.accountUuid` in `~/.claude.json`, first eight hex — where "trimmed" is Python's
@@ -34,9 +33,9 @@ import { isRecord } from './usage-windows.js';
  * store never gains a row with a blank owner. `liveAccountDigest` NEVER RAISES, because its caller
  * is a poll route that is forbidden to fail.
  *
- * THE PATH IS FIXED, unlike the account store's slots. A variable that moved it could name an
+ * THE PATH IS FIXED, and not environment-redirectable. A variable that moved it could name an
  * account whose token this process is not holding — the same reason `credentialsPath` in
- * `usage.service.ts` is not environment-redirectable.
+ * `usage.service.ts` is not.
  */
 
 /** How many hex of the sha256 stand for an account — `claude_account.DIGEST_HEX`. */
