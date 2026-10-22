@@ -11257,3 +11257,52 @@ measured 2026-10-21 by chain chain-plan-card-override-20261021-171051-2000, find
 probe-key: dc4beed602d6d014784324f1d583f7f7b1647d30
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/hooks/useDispatcherVerbs.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-pace-override.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-pace-override.sh, /home/lyphe/.claude/hooks/dispatcher/pace_demand.py, /home/lyphe/.claude/hooks/dispatcher/pace_report.py
+
+## INV-9270 — probe — Two accounts' limit notices still collapse in the orchestrator's 20 s dedupe
+
+Two accounts' limit notices still collapse in the orchestrator's 20 s dedupe
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/keys.mts" <<'TS'
+import { detectRuntimeSignals, createSignalState } from '/home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-runtime-signals.ts';
+const now = Math.floor(Date.now() / 1000);
+const e = { type: 'rate_limit_event', rate_limit_info: { status: 'allowed_warning', rateLimitType: 'five_hour', utilization: 0.91, resetsAt: now + 9000 } };
+const out: string[] = [];
+const emit = (s: any) => out.push(s.dedupeKey);
+detectRuntimeSignals(e, createSignalState(), { sessionId: 's1', account: 'aaaa1111', accountSlug: 'alpha', emit });
+detectRuntimeSignals(e, createSignalState(), { sessionId: 's2', account: 'bbbb2222', accountSlug: 'beta', emit });
+console.log(JSON.stringify(out, null, 1));
+TS
+CLOUDCLI_LIMIT_MEMORY_PATH="$D/lm.json" PACER_BIN=/bin/true \
+  /home/lyphe/.claude/claudecodeui_lyphe/node_modules/.bin/tsx \
+  --tsconfig /home/lyphe/.claude/claudecodeui_lyphe/server/tsconfig.json "$D/keys.mts"
+case "$D" in /tmp/athena-probe.??????) rm -rf -- "$D" ;; esac
+```
+
+measured 2026-10-21 by chain chain-usage-limits--account-switch--chat-readings-20261021-183913-317f, finding M1, MEDIUM
+probe-key: 639ca0b35b59fb582c831573742c52a08a382ecd
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/pacer-door.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/usage.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-chat-readings.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-limit-memory.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-runtime.provider.js, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-runtime-signals.ts, /home/lyphe/.claude/hooks/plan_runner/pacer/door.py
+
+## INV-9271 — probe — A per-account notice cannot say which account it is about
+
+A per-account notice cannot say which account it is about
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/copy.mts" <<'TS'
+import { buildNotificationText } from '/home/lyphe/.claude/claudecodeui_lyphe/server/modules/notifications/services/notification-copy.service.ts';
+console.log(JSON.stringify(buildNotificationText({ provider: 'claude', sessionId: 's1', kind: 'limit',
+  code: 'limit.warning', severity: 'warning', meta: { rateLimitType: 'seven_day', resetsAt: 1793084400, pct: 96 },
+  sessionName: 'probe chat' } as any)));
+TS
+/home/lyphe/.claude/claudecodeui_lyphe/node_modules/.bin/tsx \
+  --tsconfig /home/lyphe/.claude/claudecodeui_lyphe/server/tsconfig.json "$D/copy.mts"
+case "$D" in /tmp/athena-probe.??????) rm -rf -- "$D" ;; esac
+```
+
+measured 2026-10-21 by chain chain-usage-limits--account-switch--chat-readings-20261021-183913-317f, finding L1, LOW
+probe-key: 5a170e582c0172a5691c5671e5138f9f02d3446a
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/pacer-door.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/usage.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-chat-readings.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-limit-memory.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-runtime.provider.js, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-runtime-signals.ts, /home/lyphe/.claude/hooks/plan_runner/pacer/door.py

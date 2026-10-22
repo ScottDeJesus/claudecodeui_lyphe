@@ -3804,6 +3804,7 @@ The two reads the rest of the server makes of the house's Claude account store. 
 | `launchCredential` | `account-door.ts` | the account in use and its token, for a CLI start |
 | `chosenAccount` | `chosen-account.ts` | the house's choice now, or `null` |
 | `liveAccountEmail` | `account-store.service.ts` | the live login's email |
+| `notePacerReading` | `pacer-door.ts` (`note`) | files one window reading with the pacer: `(digest, windows, checkedAt, 'meter' \| 'chat')`; consumers `usage.service.ts` (`'meter'`) and `claude-chat-readings.ts` (`'chat'`, MAN-8859) |
 | `createAccountsModule` | `accounts.module.ts` | the composition root |
 
 ## `launchCredential()` — `account-door.ts`
@@ -3813,6 +3814,8 @@ The two reads the rest of the server makes of the house's Claude account store. 
 - The read end is drained synchronously, once, on the child's `close`; at exit every byte is in the pipe buffer, so the drain sees all of it and then end-of-file.
 - Every failure answers `{ account: null, slug: null, token: null }` and the launch rides the live login: FIFO not creatable, spawn error, non-zero exit, 10 s bound (`SIGKILL`), stdout not the promised shape (`token` not a boolean, `account`/`slug` neither string nor null).
 - The only relayed string is the door's stderr on a non-zero exit, logged `[claude-account] credential: <text>` with `sk-ant-[A-Za-z0-9_-]{8,}` replaced by `[key]`. Stdout is parsed and never printed.
+
+- `account-door.ts` also carries the panel's door faces — `accountsPicture`, `useAccount`, `setAuto`, `removeAccount`, with the relay in `account-door-relay.ts`: MAN-8858.
 
 ## `chosenAccount()` — `chosen-account.ts`
 - Returns `{ digest, slug } | null`, read on every call from `<home>/chosen.json`; never cached, never called on a timer.
@@ -3825,3 +3828,49 @@ The two reads the rest of the server makes of the house's Claude account store. 
 - Measured 2026-10-21: turn 1 answers `Failed to authenticate. API Error: 401 OAuth access token is invalid.` (the made-up token rode); after `store.choose` of the other account the same chat's next message logs the replacement and the launch record gains a `respawn: account probe-alpha → probe-beta` line; the token appears in 0 lines of the server log, the sessions directory and the launch record.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/account-door.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/chosen-account.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/account-chat-launch.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/account-chat-launch.sh
+
+## MAN-8858 — The account door's panel faces — the picture and the three writes (account-door-relay.ts, accounts.routes.ts)
+
+Reference: door verbs MAN-8842, the picture's shape MAN-8843, the types' mirror rule INV-9252, the launch reads in the same barrel MAN-8849, the panel MAN-460.
+
+## Files — `server/modules/accounts/`
+| file | owns |
+|---|---|
+| `account-door-relay.ts` | `accountsPicture()`, `writeDoor(args)`, `AccountDoorRefusal`, `doorBin()`, `redact()`, `DOOR_TIMEOUT_MS` |
+| `account-door.ts` | re-exports `AccountDoorRefusal` and `accountsPicture`; `useAccount(slug)`, `setAuto(on)`, `removeAccount(slug)` (each → the door's line); the credential read (MAN-8849) |
+| `accounts.routes.ts` | the routes below, beside the slot switcher's `/accounts/switch`, `/accounts/capture` and `GET /usage` |
+
+## Routes — mounted at `/api` behind `authenticateToken`
+| route | body | 200 | refused |
+|---|---|---|---|
+| `GET /api/accounts` | — | the slot summary plus `door` | never a 5xx |
+| `POST /api/accounts/use` | `{slug: string}` | `{line}` = `USING <slug>…` | 422 `{error}` |
+| `POST /api/accounts/auto` | `{on: boolean}` | `{line}` = `AUTO on` / `AUTO off` | 422 `{error}` |
+| `POST /api/accounts/remove` | `{slug: string}` | `{line}` = `REMOVED <slug>` | 422 `{error}` |
+
+## `door` on `GET /api/accounts`
+- `claude-account status --json` relayed whole (`ClaudeAccountsPicture`, MAN-8843) in both picture branches, the unreadable-slots one included.
+- A door that cannot answer is `door: {reachable:false, reason}` inside a 200. `door` is absent only on the belt's own `{reachable:false}` answer.
+- `reason`: `timeout` (bound hit), `bad-response` (stdout is not JSON, or lacks `accounts`/`candidates` arrays, `auto`/`held` booleans, `chosen`/`last_switch` null-or-object), `unreachable` (anything else: missing binary, non-zero exit).
+- Every string of the picture, a line, a refusal and a 502 sentence passes `redact` (`sk-ant-[A-Za-z0-9_-]{8,}` → `[key]`).
+
+## The writes
+- A malformed body is refused before the door is asked: `{}` → 422 `{error:"slug is required"}`; `{"on":"yes"}` → 422 `{error:"on must be true or false"}`.
+- 422 `{error}` = door exit 2 with a stdout line beginning `REFUSED`; the protocol word is stripped, the sentence is the door's (a `use` of an unknown or tokenless slug, a `remove` of an unknown slug). Caught by class (`AccountDoorRefusal`): a new refusal sentence in the door needs no change here.
+- Any other failure of a write is a 502 `AppError` `CLAUDE_ACCOUNT_DOOR_FAILED` carrying the door's one stderr line (redacted), else `the claude-account door did not answer` / `… in time`. A write that did not land never answers as a read does.
+- The routes send no kick: the door's `use` and `remove` kick the dispatcher themselves (INV-187).
+
+## Rules an editor must not break
+| edit | breaks | why |
+|---|---|---|
+| Hand a free-form value to a door write without `--` before it (`['use','--',slug]`, `['remove','--',slug]`) | `use --help` answers usage text with exit 0 and relays as a 200 for a write that never happened; `--state` answers a usage error as a 502 | the door is argparse; `--` makes the slug a positional |
+| Refuse a leading `-` in a slug at the route | a slot named `-foo` can no longer be switched from the panel | the door's `_slot_name` accepts it; the separator is the cure |
+| Make a door refusal the panel shows as 422 anything but exit 2 plus a `REFUSED …` stdout line | it relays as a 502 with the class name | the relay classifies on that shape only |
+| Drop `killSignal: 'SIGKILL'` from either `execFile` | a door or `CLAUDE_ACCOUNT_BIN` wrapper that traps SIGTERM holds the status-chip poll for its whole life | `killed` stays true on SIGKILL, so the read still answers `timeout` |
+| Let `accountsPicture()` reject | the status-chip poll answers a 5xx | the route's `.catch` is a belt over a read that is total by construction |
+
+## Measured
+- 2026-10-21, live dev API: `GET /api/accounts` → `reachable:true`, 3 slots, `door` naming 2 accounts (`token:"none"`, `auto:true`).
+- 2026-10-21, probe server `:7898` on a scratch home: `use` tokenless → 422 `beta: no checked sign-in token — set it up first`; `use` checked → 200 `{"line":"USING alpha"}`, GET shows alpha `in_use:true, chosen:true`; `auto` → `AUTO off` / `AUTO on`; `remove` → `REMOVED beta`, GET drops it.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/account-door-relay.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/account-door.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/accounts.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/accounts.routes.ts

@@ -106,12 +106,20 @@ function warningReading(info: Record<string, unknown>): { pct: number; bucket: n
   return { pct, bucket: pct >= HIGH_WARNING_PCT ? HIGH_WARNING_PCT : LOW_WARNING_PCT };
 }
 
-/** Severity answers one question: does this stop the work? */
+/**
+ * One limit notice. Severity answers one question: does this stop the work?
+ *
+ * THE KEY NAMES THE ACCOUNT. The orchestrator dedupes on `dedupeKey` alone for twenty seconds, so
+ * two chats on two accounts crossing the same window at the same moment are two notices, never a
+ * repeat — the notice layer must not silence what the per-account memory just stopped silencing.
+ * `accountSlug`, when the launch profile knew one, is carried for the copy, which names it.
+ */
 function emitLimit(context: SignalContext, code: string, rateLimitType: string, meta: Record<string, unknown>, keyPart: string): void {
   context.emit({
-    kind: 'limit', code, meta: { rateLimitType, ...meta },
+    kind: 'limit', code,
+    meta: { rateLimitType, ...meta, ...(context.accountSlug ? { accountSlug: context.accountSlug } : {}) },
     severity: HARD_LIMIT_CODES.has(code) ? 'error' : 'warning',
-    dedupeKey: `claude:${code}:${rateLimitType}:${keyPart}`,
+    dedupeKey: `claude:${code}:${limitAccountOf(context)}:${rateLimitType}:${keyPart}`,
   });
 }
 

@@ -818,7 +818,7 @@ Every Claude CLI start in CloudCLI rides the account the house chose. The door's
 ## Profile fields — `LaunchProfile.account`, `.accountSlug`
 | profile | value |
 |---|---|
-| the process's (set at spawn) | the door's answer at the spawn; `null` when the door gave none, and for a re-adopted host whose meta holds none |
+| the process's (set at spawn) | the door's answer at the spawn; `null` when the door gave none, and for a re-adopted host whose meta holds none. Also the account the process's limit signals and rate-limit readings belong to (MAN-8859) |
 | a message's (`launchProfileOf`, 6th and 7th arguments) | the account the house has chosen now (`chosenAccount()`); `null` when the record is absent or unreadable |
 
 ## Join — an account change replaces the process
@@ -838,3 +838,38 @@ Every Claude CLI start in CloudCLI rides the account the house chose. The door's
 `.verify/account-chat-launch.sh` — scratch home with two made-up accounts: the token rides the first turn (a 401 from the made-up token), `store.choose` of the other account replaces the process at the next message, the launch record carries both lines, and the token appears in no log, session file or launch record. `.verify/account-chat-launch.mjs` drives one turn on a chat.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/diagnosis/diagnosis-agent.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/cerberus/diagnosis/diagnosis-audit.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-engine-catalog.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-launch-account.ts
+
+## MAN-8859 — Claude chats' limits and readings by launch account — claude-limit-memory.ts, claude-chat-readings.ts, the account key in claude-runtime-signals.ts
+
+What a chat's rate-limit events and limit notices belong to: the account the chat PROCESS WAS LAUNCHED ON, never the live login (after a switch, the live login is not the account an open chat rides). The signals table and the two memories: MAN-614. The launch profile: MAN-8848.
+
+## The account key
+- `claude-runtime.provider.js` hands `detectRuntimeSignals` a context with `account` (digest or `null`) and `accountSlug` (slug or `null`), read off the process's launch profile; a re-adoption uses its recorded profile, `null` when it holds none.
+- `limitAccountOf(context)` (`claude-runtime-signals.ts`) = `accountSlug || account || 'unknown'`. It keys the limit memory AND the notice `dedupeKey`; change it and both move together.
+- The key is never `liveAccountEmail()`: a limit belongs to the account that met it, and a warning sent for one account never silences another's.
+
+## Limit memory — `claude-limit-memory.ts`
+| fact | value |
+|---|---|
+| file | `~/.cloudcli/limit-memory.json`, mode 0600, staged and renamed; `CLOUDCLI_LIMIT_MEMORY_PATH` moves it, read on every call |
+| `accountLimitMemory(account)` | `{ windows: Map<rateLimitType, LimitMemory>, creditsExhaustedAnnounced }`; a falsy `account` is `'unknown'` |
+| `windowMemory(rateLimitType, account)` | one window's `LimitMemory`: `announcedResetsAt`, `warnedBuckets`, `warnedWindowResetsAt`, `warnedAt`, `overageAnnounced`; reset timers are not stored |
+| unreadable or malformed file | an empty memory; the cost is one warning too many |
+| keys in the file | slugs, digests or `unknown`; a key that is an email address is dead data, nothing reads or writes one |
+
+## Notice key and title — `emitLimit`, `buildNotificationText`
+- `emitLimit` builds every limit notice: `dedupeKey` = `claude:<code>:<limitAccountOf>:<rateLimitType>:<keyPart>`. The orchestrator (`notification-orchestrator.service.js`) dedupes on `dedupeKey` alone for 20 s, so two accounts crossing the same window together are two notices.
+- `meta.accountSlug` rides on the notice when the launch profile has a slug.
+- `buildNotificationText` (`notification-copy.service.ts`): a code in `ACCOUNT_LIMIT_CODES` appends ` · <slug>` to its title when `meta.accountSlug` is a non-blank string; every channel reads that one title. Never a digest in a title (INV-76). No slug in the launch record: the title is unnamed.
+
+## Chat readings — `claude-chat-readings.ts`
+- `noteChatWindows(account, unifiedWindows)`, called by the `rate_limit_event` branch with `context.account` (the DIGEST). A null or empty `account`, or an event with no readable window, files nothing.
+- Conversion: `unifiedWindows.five_hour` / `.seven_day`: `utilization` fraction → percent (one decimal, 0..150), `resetsAt` epoch seconds → ISO instant, into `ClaudeUsageWindow` rows with keys `five_hour` / `seven_day`. An entry that is not a live window is left absent, never 0 %.
+- One reading per move: an in-memory map (account digest → the two windows last filed) lives in the server process; a reading is filed only when either window's percent or `resetsAt` differs from it. The first event after a restart files once; the pacer's store dedupes an identical row on its own (MAN-8844).
+- Filing: `notePacerReading(account, rows, Date.now(), 'chat')` → `pacer note --source chat` (`note` in `pacer-door.ts`, exported through `server/modules/accounts/index.ts`). `at` is the instant the event arrived (the event carries none). `note` takes `'meter' | 'chat'` with no default.
+- A stored chat step wakes the dispatcher and settles the account rule like a meter's (MAN-8846), so a chat's reading can trigger a switch. The pacer's source table: MAN-8628.
+
+## Proof
+Measured 2026-10-21, live dev API :3011, two Haiku turns in a scratch project: launch record `{account:"f9caa612", slug:"scottdejesus", why:"new"}`; `readings.newest("f9caa612")` → `source='chat'`, `at` = the turn's time; the second turn's identical windows filed nothing; `limit-memory.json` gained a `scottdejesus` key carrying the chat's `five_hour` window.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-chat-readings.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-limit-memory.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-runtime-signals.ts

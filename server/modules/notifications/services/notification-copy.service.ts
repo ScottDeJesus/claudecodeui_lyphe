@@ -49,7 +49,10 @@ const WINDOW_LABELS: Record<string, string> = {
   overage: 'Overage',
 };
 
-/** Codes about the account's usage windows: their title names the window, never a session. */
+/**
+ * Codes about the account's usage windows: their title names the window — and, when the emitter
+ * sent one, the account's slug — never a session.
+ */
 const ACCOUNT_LIMIT_CODES = new Set([
   'limit.reached',
   'limit.reset',
@@ -418,17 +421,23 @@ const COPY_BY_CODE = new Map<string, CodeCopy>([
  * push, desktop and ntfy all send its output) and exported from the module
  * barrel for any caller that must show an event's wording. The title is the
  * code's headline followed by ` · <session name>` when one is known — except
- * an account-limit code, whose headline names the window instead; an
- * unknown code renders the generic CloudCLI copy rather than nothing.
+ * an account-limit code, whose headline names the window instead, followed by
+ * the launch account's slug when the emitter sent one; an unknown code renders
+ * the generic CloudCLI copy rather than nothing.
  */
 export function buildNotificationText(event: NotificationEventLike): NotificationText {
   const meta = isRecord(event.meta) ? event.meta : {};
   const copy = typeof event.code === 'string' ? COPY_BY_CODE.get(event.code) : undefined;
   const { headline, body } = copy ? copy({ meta, providerLabel: providerLabel(event.provider) }) : FALLBACK_COPY;
-  const sessionName = ACCOUNT_LIMIT_CODES.has(event.code ?? '') ? null : event.sessionName ?? readText(meta.sessionName);
+  const accountLimit = ACCOUNT_LIMIT_CODES.has(event.code ?? '');
+  const sessionName = accountLimit ? null : event.sessionName ?? readText(meta.sessionName);
+  // A limit belongs to ONE account, so its title names that account's slug when the emitter knows
+  // it (`claude-runtime-signals.ts` sends the launch profile's). Never a digest: the words a person
+  // reads name accounts by slug (INV-76).
+  const accountSlug = accountLimit && typeof meta.accountSlug === 'string' ? readText(meta.accountSlug) : null;
 
   return {
-    title: `${headline}${sessionName ? ` · ${sessionName}` : ''}`,
+    title: `${headline}${accountSlug ? ` · ${accountSlug}` : ''}${sessionName ? ` · ${sessionName}` : ''}`,
     body: body.slice(0, MAX_BODY_CHARS),
   };
 }

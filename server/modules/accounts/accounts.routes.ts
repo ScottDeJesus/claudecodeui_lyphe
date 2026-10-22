@@ -123,6 +123,11 @@ const LIVE_SESSIONS_UNKNOWN = 0;
  * One slug is a NAME, so only a non-empty string is one. A number, a `null`, a blank or a missing
  * key is a malformed request refused HERE — before the store is asked anything, so a bad body cannot
  * move a credential file even as far as a validation read.
+ *
+ * A LEADING `-` IS NOT REFUSED HERE. A slug is a name, and the door's own `_slot_name` accepts a
+ * slot directory named `-foo`; what must never happen is argparse reading a name as an option, so
+ * the relay puts `--` before the slug. Refusing it here would make such a slot unswitchable from
+ * the panel while closing nothing the separator does not.
  */
 function requestedSlug(body: unknown): string | null {
   const slug = (body as { slug?: unknown } | undefined)?.slug;

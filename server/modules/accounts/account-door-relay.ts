@@ -25,11 +25,22 @@ const execFileAsync = promisify(execFile);
  * sentence, so `accounts.routes.ts` answers it as a 422 exactly as it answers the slot store's
  * `AccountRefusal`; every other failure is a 502 whose sentence is the door's one stderr line,
  * redacted. `use` and `remove` kick the dispatcher inside the door itself (INV-187) — no kick here.
+ *
+ * A FREE-FORM NAME RIDES AFTER `--`. The door is argparse, so `use --help` prints the subparser's
+ * help, exits 0 and would be relayed as a 200 for a write that never happened; `['use', '--', slug]`
+ * makes every slug a positional, which is what a name is (the door's `_slot_name` accepts `-foo`).
  */
 const DEFAULT_BIN = '~/.claude/scripts/claude-account';
 
-/** A status read and a write answer at once; this bounds a door that is stuck, nobody waits it out. */
+/** A status read and a write answer at once; this bounds a door that is stuck, nobody waits it out.
+ *  The bound kills with SIGKILL (`KILL_AT_BOUND`): `execFile`'s default SIGTERM can be trapped, and a
+ *  door that ignores it would hold the status-chip poll for its whole life. */
 export const DOOR_TIMEOUT_MS = 10_000;
+
+/** The signal the bound sends. SIGKILL cannot be trapped, so a door — or a `CLAUDE_ACCOUNT_BIN`
+ *  wrapper — that ignores SIGTERM is still cut at the bound; `killed` stays true on the rejection,
+ *  so the read still answers `timeout` rather than `bad-response`. */
+const KILL_AT_BOUND = 'SIGKILL';
 
 /** The picture is a few kilobytes; `execFile`'s 1 MiB default is ample. Named so a future picture
  *  cannot silently outgrow a bound nobody chose. */
@@ -110,6 +121,7 @@ export async function accountsPicture(): Promise<ClaudeAccountsPicture | { reach
   try {
     ({ stdout } = await execFileAsync(doorBin(), ['status', '--json'], {
       timeout: DOOR_TIMEOUT_MS,
+      killSignal: KILL_AT_BOUND,
       maxBuffer: DOOR_MAX_BUFFER,
     }));
   } catch (error) {
@@ -133,6 +145,7 @@ export async function writeDoor(args: string[]): Promise<string> {
   try {
     const { stdout } = await execFileAsync(doorBin(), args, {
       timeout: DOOR_TIMEOUT_MS,
+      killSignal: KILL_AT_BOUND,
       maxBuffer: DOOR_MAX_BUFFER,
     });
     return redact(stdout.trim());

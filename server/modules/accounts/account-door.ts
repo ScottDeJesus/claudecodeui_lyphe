@@ -38,6 +38,11 @@ import { DOOR_TIMEOUT_MS, doorBin, redact, writeDoor } from './account-door-rela
  *
  * THE DOOR'S OTHER FACES — the panel's picture and the three writes that move the choice — are
  * `account-door-relay.ts`, and are re-exported here so a caller has one door to import.
+ *
+ * A SLUG RIDES AFTER `--`. The door is argparse, so a bare `use --help` answers the subparser's
+ * usage text on stdout with exit 0 — a 200 for a write that never happened — and `--state` answers a
+ * UsageError. The separator makes the slug a positional, so a slot named `-foo` (the door's own
+ * `_slot_name` accepts one) is looked up as the name it is.
  */
 export { AccountDoorRefusal, accountsPicture } from './account-door-relay.js';
 
@@ -205,7 +210,7 @@ export function launchCredential(): Promise<ClaudeAccountCredential> {
  * the dispatcher itself (INV-187).
  */
 export function useAccount(slug: string): Promise<string> {
-  return writeDoor(['use', slug]);
+  return writeDoor(['use', '--', slug]);
 }
 
 /**
@@ -222,5 +227,5 @@ export function setAuto(on: boolean): Promise<string> {
  * itself (INV-187); answers `REMOVED <slug>`.
  */
 export function removeAccount(slug: string): Promise<string> {
-  return writeDoor(['remove', slug]);
+  return writeDoor(['remove', '--', slug]);
 }

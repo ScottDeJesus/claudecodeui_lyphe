@@ -16,7 +16,8 @@ own `AccountRow`, and `DeepseekBalanceReadout`) under the one `AccountFooterRow`
 with `hooks/useClaudeAccounts` holding the picture and the writes, `hooks/useClaudeUsage` holding
 the readings, `hooks/useDeepseekBalance` holding the balance, and `utils/accountInitials` drawing the
 two letters on the avatar. Everything but the balance comes from this app's own server, in
-`server/modules/accounts/`: `accounts.routes.ts` holds the four routes and the calm 200,
+`server/modules/accounts/`: `accounts.routes.ts` holds the routes (the slot switcher's four, and the door's
+picture under `door` on `GET /api/accounts` with `POST /api/accounts/use|auto|remove`, MAN-8858) and the calm 200,
 `usage.service.ts` the reading and its cache, `account-store.service.ts` the slots (under
 `CLOUDCLI_ACCOUNTS_ROOT`, default `~/.cloudcli/accounts`). `server/index.ts` mounts them at `/api`
 behind `authenticateToken`, applied by PREFIX — the comment at the mount says why a list of paths is
@@ -190,6 +191,8 @@ the provider's own label, which is the only place a `weekly_scoped:*` plan is ev
 | `windows: []` + `degraded` | *No figures are available under this account.* |
 | `reachable: false` | *Usage is unknown — \<the reason, in English\>* |
 
+`GET /api/usage` carries `account`: the digest of the live login the figures were read from (`liveAccountDigest()`, read beside the token; `''` when it cannot be told), on cached, pending and degraded answers alike, so the panel can tell whether the numbers belong to the account in use. An `expiresAt` (epoch ms) already passed means the token is never sent: degraded `credentials`, status 0, no fetch. A `401`/`403` is `auth` — the endpoint refusing a token the clock still counted live.
+
 A window with a `resetsAt` also says when it turns over, counted in hours inside a day and in
 weekdays past one. The instant is read by `resetInstant` (`utils/usageWindows.ts`), which takes a
 stamp carrying no offset as UTC — the rule `server/modules/accounts/usage-windows.ts` applies when it
@@ -214,7 +217,9 @@ it belongs to. A window whose reset, rounded to whole seconds, is not after the 
 is dropped ALONE: the pacer's door demands `at < resets_at` strictly and refuses the whole note over
 one such window, so the other window still files. `pacer-door.ts` is the one place this panel's PERCENT becomes the pacer's fraction, and
 the note rides a child process with a ten-second ceiling, never awaited and never logged: a failed
-note costs one reading, and the next poll reads again.
+note costs one reading, and the next poll reads again. `note` takes the source word as its fourth
+argument (`'meter'` here); a chat's own `rate_limit_event` files through the same function with
+`'chat'`, under the account its process was launched on (MAN-8859).
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/account-digest.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/pacer-door.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/usage.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/usage-windows.ts
 
@@ -6640,6 +6645,7 @@ reads, and the rules that keep one piece of bad news to one push:
 | --- | --- |
 | `rate_limit_event`, `status: 'allowed_warning'` | `limit.warning`, carrying the window's true reading (`meta.pct`). Two steps per window, 80% and 95%: a reading inside a step already announced is silent, whichever session reads it — the steps are remembered against the window's own `resetsAt` — within a minute's slack, so a reset time that drifts a second is the same window — so a limit is one buzz for the account and not one per running chat. An event that names no `resetsAt` says nothing about which window it read, so it neither forgets the steps nor the window's name; only a warning older than an hour is forgotten that way |
 | `rate_limit_event`, `status: 'rejected'` | `limit.reached`, once per rejection — a window that moves its `resetsAt` counts as a new one |
+| `rate_limit_event` carrying `unifiedWindows` | no notification: the windows are filed with the pacer under the launch account when either moved (`claude-chat-readings.ts`, MAN-8859). Every `limit.*` notice's `dedupeKey` carries that account, and its title names the account's slug |
 | `rate_limit_event`, `status: 'allowed'` after a rejection | `limit.reset`. The warning steps are NOT forgotten here: an ordinary reading from one session would otherwise let every other session re-announce the same threshold. A new `resetsAt` — a new window — is what forgets them |
 | `isUsingOverage` / `overageDisabledReason: 'out_of_credits'` | `limit.overage` / `limit.out_of_credits`, once each until the field says it stopped. Out of credits is one flag for the whole account, shared by both roads — a `rate_limit_event`'s `overageDisabledReason` and an assistant `billing_error` — so one emptied wallet is one push however many sessions and window types hit it. Only overage actually being available again re-arms it (no disabled reason, or `isUsingOverage`): another reason does not, because `org_level_disabled` rides on every event this account sends, full wallet or empty |
 | `system` / `api_retry` | nothing. The attempt is *recorded*, so the `api.error` that follows can say "overloaded after 3 retries" instead of one push per retry |
@@ -6650,8 +6656,9 @@ reads, and the rules that keep one piece of bad news to one push:
 Two memories, different in lifetime. **Per run**: the last retry, and whether this run has
 already said "sign in again". **Per account, one record per rate-limit window, on disk**
 (`claude-limit-memory.ts`, `~/.cloudcli/limit-memory.json`): limits are account-wide, so a second
-session must not re-announce what the first one did. The record is keyed by the live login's email,
-so a switched-to account warns for its own windows, and it lives on disk because the dev server
+session must not re-announce what the first one did. The record is keyed by the account the chat process was LAUNCHED on
+(its launch profile's slug, else its digest, else `unknown`; MAN-8859), never the live login, so a
+chat warns for its own account's windows after a switch, and it lives on disk because the dev server
 hands over to a new process on every save under `server/` — held in the heap, every handover
 forgot what was sent and re-sent it (2026-09-17: "Weekly limit at 76%" three times in 17 minutes).
 A reset needs a timer that outlives the run that armed it; timers are not stored, so a rejection
@@ -13811,7 +13818,7 @@ Reference: door face MAN-8843 (`claude-account status --json`); the panel it sit
 | `AccountFooterRow.tsx` | `setup` state + a `ProviderLoginModal` running `~/.claude/scripts/claude-account setup-token <slug>`, mounted only while `setup !== null` |
 
 ## Wiring state
-- `AccountPopover` passes `<ClaudeAccountRows />` no props; every handler defaults to `NO_ACT`; `setup` in `AccountFooterRow` is never set; no route fills `ClaudeAccounts.door`. The panel draws as it did before the section.
+- `AccountPopover` passes `<ClaudeAccountRows />` no props; every handler defaults to `NO_ACT`; `setup` in `AccountFooterRow` is never set; `GET /api/accounts` fills `ClaudeAccounts.door` (MAN-8858) and nothing in `src/` reads it yet. The panel draws as it did before the section.
 - Each unwired read or act carries a `// FILL:` comment: `grep -rn "FILL:" src/modules/accounts`.
 
 ## `ClaudeAccountRows` props (all optional)
