@@ -188,3 +188,39 @@ export function faceCounts(
   }
   return { areas: listedAreas(read).standing, setAside: 0, proposed: 0 };
 }
+
+/**
+ * The first parts of a photo's caption: its areas, and the ones set aside and proposed when there are any, so the list,
+ * the badges and the caption always add up. A caller adds how far the photo is read in its own words — a view's read
+ * time, a pano's "6 of 6 views read". Read by `PanoScreen` and `PanoSphere`.
+ */
+export function areaWords(
+  counts: { areas: number; setAside: number; proposed: number },
+  t: TFunction,
+): (string | null)[] {
+  return [
+    t('affectedAreas.pano.faceAreas', { count: counts.areas }),
+    counts.setAside > 0 ? t('affectedAreas.pano.setAside', { count: counts.setAside }) : null,
+    counts.proposed > 0 ? t('affectedAreas.pano.proposed', { count: counts.proposed }) : null,
+  ];
+}
+
+/**
+ * A whole pano's counts: the three `faceCounts` gives a view, summed across the pano's six, and `read`, how many of the
+ * views carry a read. A view not read yet contributes nothing but is still owed, which is why `read` is counted here and
+ * not implied by the areas. Read by the 360° tab in the face strip and by the sphere's caption, so the strip's numbers
+ * add up and the caption accounts for every outline across the views.
+ */
+export function panoCounts(
+  views: (ViewEntry | ViewDetail)[],
+): { areas: number; setAside: number; proposed: number; read: number } {
+  return views.reduce(
+    (sum, view) => {
+      const counts = faceCounts(view);
+      return counts === undefined
+        ? sum
+        : { areas: sum.areas + counts.areas, setAside: sum.setAside + counts.setAside, proposed: sum.proposed + counts.proposed, read: sum.read + 1 };
+    },
+    { areas: 0, setAside: 0, proposed: 0, read: 0 },
+  );
+}

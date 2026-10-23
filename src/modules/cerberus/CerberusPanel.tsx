@@ -1,13 +1,16 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { AffectedAreasView, ViewBoundary } from '@/modules/affected-areas';
+import { AffectedAreasView } from '@/modules/affected-areas';
+import { BulletinsView } from '@/modules/carrier-bulletins';
 import { CatalogView } from '@/modules/cerberus/catalog/CatalogView';
 import { CerberusHeader } from '@/modules/cerberus/CerberusHeader';
 import { useCerberus } from '@/modules/cerberus/context/CerberusContext';
 import { ProjectChoicesContext } from '@/modules/cerberus/context/ProjectChoicesContext';
 import { FleetView } from '@/modules/cerberus/fleet/FleetView';
 import { HistoryView } from '@/modules/cerberus/history/HistoryView';
+import { useKeptViews } from '@/modules/cerberus/hooks/useKeptViews';
+import { KeptView } from '@/modules/cerberus/KeptView';
 import { EnrollDialog } from '@/modules/cerberus/modals/EnrollDialog';
 import { MuteDialog } from '@/modules/cerberus/modals/MuteDialog';
 import { PromoteDialog } from '@/modules/cerberus/modals/PromoteDialog';
@@ -41,7 +44,7 @@ const VIEWS: readonly { id: CerberusView; labelKey: string; hintKey: string }[] 
   { id: 'catalog', labelKey: 'cerberus.catalog.tab', hintKey: 'cerberus.catalog.tabHint' },
   { id: 'history', labelKey: 'cerberus.fleet.tabs.history', hintKey: 'cerberus.fleet.tabs.historyHint' },
   { id: 'tours', labelKey: 'cerberus.tours.tab', hintKey: 'cerberus.tours.tabHint' },
-  // FILL: bulletins-row — { id: 'bulletins', labelKey: 'cerberus.bulletins.tab', hintKey: 'cerberus.bulletins.tabHint' }, the fifth view after Tours; CerberusView gains 'bulletins'.
+  { id: 'bulletins', labelKey: 'cerberus.bulletins.tab', hintKey: 'cerberus.bulletins.tabHint' },
 ];
 
 /** A view arriving: Verve's page entrance at the prototype's .45 s. It plays again each time a view is shown. */
@@ -58,7 +61,7 @@ const GUTTER = 'px-[clamp(16px,4cqi,32px)]';
  * 1. `CerberusHeader`: the headline, the summary, the clock pill, the update button and Enroll a node.
  * 2. Only while the fleet on screen is stale: "Cerberus can't be reached · Showing the last answer it
  *    gave." with Try again.
- * 3. The strip, Fleet · Catalog · History · Tours, with a hint beside it saying how the view shown is read.
+ * 3. The strip, Fleet · Catalog · History · Tours · Bulletins, with a hint beside it saying how the view shown is read.
  * 4. The view shown.
  *
  * WHILE THERE IS NO FLEET, TWO STATES. Until the first read answers: "Loading Cerberus…", held back
@@ -81,9 +84,10 @@ const GUTTER = 'px-[clamp(16px,4cqi,32px)]';
  * place in the fleet, and they come back as they were left, as the prototype keeps them. Fleet reads
  * nothing of its own, so hidden it costs nothing. Catalog holds no place of its own, and History reads its
  * index, its feed and a check every 30 s, so each is mounted only while it shows. A view shown again plays
- * its entrance again. Tours is the second view kept mounted, for the same reason: it mounts on its first show and is
- * `hidden` after, so the tour, pano, face and scroll a person left survive a visit to Fleet. It reads on open and on a
- * press and never on a timer or while hidden (`src/modules/affected-areas`), so kept mounted it costs nothing.
+ * its entrance again. Tours and Bulletins are kept mounted for the same reason (`KeptView`): each mounts on its first
+ * show and is `hidden` after, so the tour, pano and face, or the carrier and page, and the scroll a person left survive a
+ * visit to Fleet. Each reads on open and on a press and never on a timer or while hidden (`src/modules/affected-areas`,
+ * `src/modules/carrier-bulletins`), so kept mounted it costs nothing.
  *
  * THE PROJECTS A NODE CAN TAKE come in as a prop and reach the Fleet view through `ProjectChoicesContext`:
  * the workspace owns that list and imports this module, so the panel is handed it, never reads it.
@@ -115,15 +119,10 @@ export function CerberusPanel({ projectChoices }: CerberusPanelProps) {
   const [narrow, setNarrow] = useState(false);
   // The view the strip shows: the person's place among the tab's views, kept for as long as the tab stands.
   const [view, setView] = useState<CerberusView>('fleet');
-  // Whether Tours has been shown once. It mounts on its first show and stays mounted (hidden) after, as Fleet does, so
-  // the tour, pano, face and scroll a person left survive a visit to Fleet; nothing else knows it was ever shown.
-  const [toursShown, setToursShown] = useState(false);
-  // The panel's scroller (the box inside `ScrollArea`), whose offset Tours keeps through a visit to another view.
+  // The panel's scroller (the box inside `ScrollArea`), whose offset the kept views (Tours, Bulletins) keep through a visit to another view.
   const scrollerRef = useRef<HTMLDivElement>(null);
-  // Where Tours was scrolled to when it was last left. A ref: written as Tours is left, read as it returns, and nothing
-  // draws from it. The views share ONE scroller, so its offset follows whichever view is taller and Fleet's own height
-  // takes Tours's place in it; Tours is the view that is kept mounted for its place, so its offset is kept here.
-  const toursScrollRef = useRef(0);
+  // Which views have been shown, and the offset a kept view is left at (`leaving`), so each comes back where it was.
+  const { shownOnce, leaving } = useKeptViews(view, scrollerRef);
   // The check the sheet is open on and the moment its lookup opens at (a Fleet cell's own minute, or now
   // for a service row and a Needs-you card); null while the sheet is closed.
   const [sheet, setSheet] = useState<CerberusSheetTarget | null>(null);
@@ -159,15 +158,9 @@ export function CerberusPanel({ projectChoices }: CerberusPanelProps) {
     void refresh().then(() => setAttempt((finished) => finished + 1));
   };
   const onView = (next: CerberusView) => {
-    if (view === 'tours' && next !== 'tours') toursScrollRef.current = scrollerRef.current?.scrollTop ?? 0;
-    if (next === 'tours') setToursShown(true);
+    leaving(next);
     setView(next);
   };
-  // Tours comes back where it was left: the offset is written once its panel is out of `hidden` (this runs after the
-  // commit that unhid it, before paint, so there is no frame at the other view's offset).
-  useLayoutEffect(() => {
-    if (view === 'tours' && scrollerRef.current !== null) scrollerRef.current.scrollTop = toursScrollRef.current;
-  }, [view]);
   const onOpenSheet = (target: CerberusSheetTarget) => setSheet(target);
   const onCloseSheet = () => setSheet(null);
   // The sheet stays open under the Mute dialog: the dialog opens in front of it.
@@ -216,15 +209,18 @@ export function CerberusPanel({ projectChoices }: CerberusPanelProps) {
               </div>
             )}
             <div className={cn('flex flex-wrap items-center justify-between gap-3 pt-5', GUTTER)}>
-              <Tabs
-                tabs={VIEWS.map((entry) => ({ id: entry.id, label: t(entry.labelKey) }))}
-                active={view}
-                onChange={(id) => {
-                  const next = VIEWS.find((entry) => entry.id === id);
-                  if (next) onView(next.id);
-                }}
-                ariaLabel={t('tabs.cerberus')}
-              />
+              {/* The tray is as wide as its five words (429 px); on a phone it scrolls in its own box rather than pan the whole tab. */}
+              <div className="scrollbar-hide min-w-0 max-w-full overflow-x-auto">
+                <Tabs
+                  tabs={VIEWS.map((entry) => ({ id: entry.id, label: t(entry.labelKey) }))}
+                  active={view}
+                  onChange={(id) => {
+                    const next = VIEWS.find((entry) => entry.id === id);
+                    if (next) onView(next.id);
+                  }}
+                  ariaLabel={t('tabs.cerberus')}
+                />
+              </div>
               <p className="text-[12.5px] text-muted-foreground">{t(shown.hintKey)}</p>
             </div>
 
@@ -244,18 +240,15 @@ export function CerberusPanel({ projectChoices }: CerberusPanelProps) {
                 <HistoryView />
               </div>
             )}
-            {/* Tours is `hidden` once left rather than unmounted, as Fleet is, and for the same reason: the open tour,
-                pano, face and scroll are the person's place (MAN-7891). It reads on open and on a press, never while hidden,
-                so left mounted it costs nothing. Its code is its own chunk, loaded when Tours is first shown, and its
-                surround keeps a chunk that fails to load from taking the rest of the tab with it. */}
-            {toursShown && (
-              <div role="tabpanel" aria-label={t('cerberus.tours.tab')} hidden={view !== 'tours'}>
-                <ViewBoundary>
-                  <AffectedAreasView />
-                </ViewBoundary>
-              </div>
-            )}
-            {/* FILL: bulletins-panel — mounted on first show inside the view boundary, kept hidden after */}
+            {/* Tours and Bulletins are `hidden` once left rather than unmounted, as Fleet is, and for the same reason: the
+                open tour, pano and face, or the open carrier and page, and the scroll are the person's place (MAN-7891).
+                Each reads on open and on a press, never while hidden. Each is its own chunk, loaded on its first show. */}
+            <KeptView id="tours" view={view} shownOnce={shownOnce} label={t('cerberus.tours.tab')}>
+              <AffectedAreasView />
+            </KeptView>
+            <KeptView id="bulletins" view={view} shownOnce={shownOnce} label={t('cerberus.bulletins.tab')}>
+              <BulletinsView />
+            </KeptView>
           </>
         )}
       </ScrollArea>

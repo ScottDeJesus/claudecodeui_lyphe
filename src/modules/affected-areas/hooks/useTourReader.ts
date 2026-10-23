@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 
-import { troubleOfFailure, troubleOfResponse } from '@/modules/affected-areas/utils/laneTrouble';
 import { FACES, needsRead } from '@/modules/affected-areas/utils/tourModel';
 import type { PanoEntry, ReadResult } from '@/shared/affected-areas-types';
 import { api } from '@/shared/api';
 import type { TourReaderProgress } from '@/shared/types';
+import { troubleOfFailure, troubleOfResponse } from '@/shared/utils';
 
 /** The walk of one tour as the screens draw it, with the tour it belongs to. */
 type WalkRecord = { tourId: string; progress: TourReaderProgress };

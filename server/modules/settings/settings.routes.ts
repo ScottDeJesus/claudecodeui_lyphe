@@ -147,6 +147,10 @@ export function createSettingsRouter(
   // the file holds one line — a bare count of at least 1.
   router.get('/planner-lanes', respond(() => service.getPlannerLanes()));
   router.put('/planner-lanes', respond((req) => service.setPlannerLanes(req.body?.lanes)));
+  // The usage pacer's weekly stop, host-wide like the switches above: it steers the pacer on this host, so
+  // no `userId` is read. One integer on the PUT body, because the file holds one line — a whole percent.
+  router.get('/weekly-stop', respond(() => service.getWeeklyStop()));
+  router.put('/weekly-stop', respond((req) => service.setWeeklyStop(req.body?.percent)));
   // The heal reflex's four switches, host-wide and read the same way: they are flag files steering a
   // worker on this host, so no `userId` is read. THE MASTER is the first of the family — one line,
   // `off` or `on`, and the only one of the four the reflex's whole launching hangs on. The CYCLE
@@ -161,6 +165,11 @@ export function createSettingsRouter(
   router.put('/heal-cycle', respond((req) => service.setHealCycle(req.body?.enabled, req.body?.hour)));
   router.get('/heal-cap', respond(() => service.getHealCap()));
   router.put('/heal-cap', respond((req) => service.setHealCap(req.body?.usd)));
+  // The Gemini budget's per-plan cap, host-wide like the switches above: the backend's gate reads the file
+  // at every Gemini call. One dollar amount on the PUT body, because the file holds one line — and no null,
+  // because the cap has no off state.
+  router.get('/gemini-plan-cap', respond(() => service.getGeminiPlanCap()));
+  router.put('/gemini-plan-cap', respond((req) => service.setGeminiPlanCap(req.body?.usd)));
   router.get('/heal-model', respond(() => service.getHealModel()));
   router.put('/heal-model', respond((req) => service.setHealModel(req.body?.model)));
   // Also host-wide, and for the same reason: these flag files steer hooks and scripts on this host,

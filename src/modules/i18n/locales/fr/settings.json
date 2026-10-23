@@ -345,6 +345,12 @@
       "lanesLabel": "Planificateurs lancés en même temps",
       "unreadable": "Le réglage n'a pas pu être lu depuis le serveur, sa position est donc inconnue. Une nouvelle tentative a lieu chaque fois que cette page reprend le focus."
     },
+    "weeklyStop": {
+      "label": "Arrêt hebdomadaire",
+      "description": "Les plans cessent de démarrer lorsque la semaine est en passe de dépasser {{percent}} % de sa limite. Réglé à un niveau égal ou inférieur à ce que la semaine a déjà consommé, aucun plan ne démarre tant que vous ne le relevez pas ou que la semaine n'est pas réinitialisée ; ce même niveau décide aussi quand ce compte est considéré comme plein pour le changement de compte automatique. Les plans déjà en cours ne sont jamais arrêtés, et la fenêtre de 5 heures garde sa propre limite. Effet immédiat.",
+      "selectLabel": "Arrêt hebdomadaire, en pourcentage de la limite hebdomadaire",
+      "unreadable": "Le réglage n'a pas pu être lu depuis le serveur, sa valeur est donc inconnue. Une nouvelle tentative a lieu chaque fois que cette page reprend le focus."
+    },
     "jev": {
       "master": {
         "label": "Jugement sémantique de Jev",

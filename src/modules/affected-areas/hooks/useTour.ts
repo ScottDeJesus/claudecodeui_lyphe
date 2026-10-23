@@ -1,6 +1,6 @@
-import { useLaneRead } from '@/modules/affected-areas/hooks/useLaneRead';
 import type { TourDetail } from '@/shared/affected-areas-types';
 import { api } from '@/shared/api';
+import { useLaneRead } from '@/shared/hooks/useLaneRead';
 import type { AffectedAreasRead } from '@/shared/types';
 
 /** One tour's read, by the id it is asked for: module-level so `useLaneRead` sees the same function every render. */

@@ -91,8 +91,10 @@ const LEADING_BOM = /^\uFEFF/;
  * `inf` / `nan` words (which its finite check then refuses) — so a hand-typed outlier can read as a
  * ceiling there and as no-ceiling here. The writer below never emits either, and anything else that
  * is not a decimal reads as no ceiling on both sides.
+ *
+ * Exported for `gemini-plan-cap.ts`, which reads the Gemini budget's cap in this same grammar.
  */
-const DOLLARS = /^[+-]?(\d+(\.\d*)?|\.\d+)([eE][+-]?\d+)?$/;
+export const DOLLARS = /^[+-]?(\d+(\.\d*)?|\.\d+)([eE][+-]?\d+)?$/;
 
 /** The master's one word: the whole of what stops the reflex launching. */
 const MASTER_OFF = 'off';

@@ -147,6 +147,7 @@ function AccountRowsBody({
           <CandidateRow
             key={candidate.digest}
             slug={candidate.slug}
+            email={candidate.email ?? null}
             hue={accounts.length + index}
             busy={busy}
             onSetup={onSetup}

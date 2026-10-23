@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 
-import { useLaneRead } from '@/modules/affected-areas/hooks/useLaneRead';
 import type { TourList, TourSummary } from '@/shared/affected-areas-types';
 import { api } from '@/shared/api';
+import { useLaneRead } from '@/shared/hooks/useLaneRead';
 import type { AffectedAreasRead } from '@/shared/types';
 
 /** The most tours the picker lists: recent ones, newest first. A search narrows them; it does not page. */

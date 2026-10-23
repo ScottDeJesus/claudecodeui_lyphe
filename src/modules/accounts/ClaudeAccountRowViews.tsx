@@ -96,8 +96,9 @@ export function AccountRowView({ account, hue, nowMs, busy, autoWhy, held, onUse
 
   const details = (
     <>
-      <span className="flex min-w-0 items-center gap-1.5">
-        <span className="min-w-0 flex-1 truncate text-[13px] font-medium text-foreground" title={account.slug}>{account.slug}</span>
+      {/* The email keeps its line whole: a cue that does not fit beside it wraps under it. */}
+      <span className="flex min-w-0 flex-wrap items-center gap-x-1.5">
+        <span className="min-w-0 grow truncate text-[13px] font-medium text-foreground" title={account.email ?? account.slug}>{account.email ?? account.slug}</span>
         {account.in_use && <span className="flex-none text-xs text-accent-ink">✓ in use now</span>}
         {canUse && <span className="flex-none text-xs text-accent-ink">{useCue}</span>}
       </span>
@@ -186,12 +187,12 @@ export function AccountRowView({ account, hue, nowMs, busy, autoWhy, held, onUse
  * A live identity the store does not hold yet: the same Set up row, with no figures and no menu.
  * Used by the accounts module's ClaudeAccountRows, one per live identity the store does not hold.
  */
-export function CandidateRow({ slug, hue, busy, onSetup }: { slug: string; hue: number; busy: boolean; onSetup: (slug: string) => void }) {
+export function CandidateRow({ slug, email, hue, busy, onSetup }: { slug: string; email: string | null; hue: number; busy: boolean; onSetup: (slug: string) => void }) {
   return (
     <div data-account-candidate={slug} className="flex items-start gap-2.5 px-2 py-1.5">
       <Avatar initials={accountInitials(slug)} hue={hue} size={24} />
       <span className="min-w-0 flex-1">
-        <span className="block truncate text-[13px] font-medium text-foreground" title={slug}>{slug}</span>
+        <span className="block truncate text-[13px] font-medium text-foreground" title={email ?? slug}>{email ?? slug}</span>
         <span className="block text-xs leading-relaxed text-ink-faint">signed in on this box — not set up yet</span>
         <button
           type="button"

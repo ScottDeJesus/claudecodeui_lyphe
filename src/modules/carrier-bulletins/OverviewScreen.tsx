@@ -6,13 +6,15 @@ import { BulletinsTrouble } from '@/modules/carrier-bulletins/BulletinsTrouble';
 import { CarrierRow } from '@/modules/carrier-bulletins/CarrierRow';
 import { RefreshButton } from '@/modules/carrier-bulletins/RefreshButton';
 import { carrierGroups, GROUP_TONE } from '@/modules/carrier-bulletins/utils/bulletinModel';
-import type { OverviewRow } from '@/shared/carrier-bulletins-types';
+import type { LeftOutCarrier, OverviewRow } from '@/shared/carrier-bulletins-types';
 import type { AffectedAreasTrouble } from '@/shared/types';
-import { Card, EmptyState } from '@/shared/ui';
+import { Banner, Card, EmptyState } from '@/shared/ui';
 
 type OverviewScreenProps = {
   /** Every carrier with a current file, as the overview answered; null while the read is out or when it failed. */
   rows: OverviewRow[] | null;
+  /** The carriers the engine could not plan, so the rows leave them out; empty when none is. */
+  leftOut: LeftOutCarrier[];
   trouble: AffectedAreasTrouble | null;
   onOpenCarrier: (bulletinId: string) => void;
   onRefresh: () => void;
@@ -49,24 +51,31 @@ function ReadingRows() {
  * to three groups — Needs you (a page waiting, a reading stopped), Not settled yet (read in part, or not read at all),
  * Settled — each a card of `CarrierRow`s, need first, then by name. A group with no carrier is left out.
  *
+ * A carrier the engine could not plan has no row, so the list alone would not say it is missing: a warn banner under the
+ * header names each one and why, and the calm headline ("Every file is read and settled") is held back while any is left
+ * out, since a list that cannot see a carrier must not look settled.
+ *
  * States: the first read out (four shimmering rows), the lane's fault (its banner with Try again, the headline held back:
- * a monitor that cannot see must not look calm), no carrier on file, and the groups.
+ * a monitor that cannot see must not look calm), carriers left out (the banner), no carrier on file, and the groups.
  *
  * Used by the carrier-bulletins module's view root, which holds the read and the presses.
  */
-export function OverviewScreen({ rows, trouble, onOpenCarrier, onRefresh }: OverviewScreenProps) {
+export function OverviewScreen({ rows, leftOut, trouble, onOpenCarrier, onRefresh }: OverviewScreenProps) {
   const { t } = useTranslation();
   const baseId = useId();
   const groups = rows === null ? [] : carrierGroups(rows);
   // The headline says the first group there is: what needs him, else what is not settled, else that all is. Held back on a
   // fault: a monitor that cannot see must not look calm.
-  const lead = groups.length > 0 && trouble === null ? groups[0] : null;
+  const calmHeld = leftOut.length > 0 && groups[0]?.group === 'settled';
+  const lead = groups.length > 0 && trouble === null && !calmHeld ? groups[0] : null;
 
   let body;
   if (trouble !== null) body = <BulletinsTrouble trouble={trouble} subject="overview" onRetry={onRefresh} />;
   else if (rows === null) body = <ReadingRows />;
   else if (rows.length === 0) {
-    body = <EmptyState icon={FileText} title={t('cerberus.bulletins.overview.empty')} message={t('cerberus.bulletins.overview.emptyMessage')} />;
+    // "No carrier has a bulletin on file" is false when every carrier is left out (each has one the engine could not plan):
+    // the banner above says so, and nothing is drawn under it.
+    body = leftOut.length > 0 ? null : <EmptyState icon={FileText} title={t('cerberus.bulletins.overview.empty')} message={t('cerberus.bulletins.overview.emptyMessage')} />;
   } else {
     body = groups.map(({ group, rows: listed }) => (
       <section key={group} aria-labelledby={`${baseId}-${group}`} className="flex min-w-0 flex-col gap-2">
@@ -110,6 +119,21 @@ export function OverviewScreen({ rows, trouble, onOpenCarrier, onRefresh }: Over
         </div>
         <RefreshButton onRefresh={onRefresh} />
       </header>
+      {leftOut.length > 0 && trouble === null && (
+        <Banner tone="warn">
+          <p className="text-sm font-medium">{t('cerberus.bulletins.overview.leftOut', { count: leftOut.length })}</p>
+          <p className="mt-0.5 text-xs">{t('cerberus.bulletins.overview.leftOutDetail', { count: leftOut.length })}</p>
+          <ul className="m-0 mt-1.5 flex list-none flex-col gap-0.5 p-0 text-[13px] [overflow-wrap:anywhere]">
+            {/* Words from the engine, so text nodes. An unreadable header gives one unnamed entry, which has no line. */}
+            {leftOut.filter((entry) => entry.carrier !== '').map((entry) => (
+              <li key={entry.carrier}>
+                <span className="font-medium">{entry.carrier}</span>
+                {entry.reason !== '' && <> · {entry.reason}</>}
+              </li>
+            ))}
+          </ul>
+        </Banner>
+      )}
       {body}
     </div>
   );

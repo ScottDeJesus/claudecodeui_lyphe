@@ -104,6 +104,26 @@ export type OverviewRow = {
   not_placed: number;
 };
 
+/**
+ * A carrier the overview left out. GET /overview answers a bare array, so a carrier whose current file could not be
+ * planned has no row in it; the engine names each such carrier in the response header `X-Left-Out`, a JSON array of
+ * these, which the lane passes on. `reason` is the engine's words with ids taken out. Both members are `''` for a
+ * header that is there and cannot be read, which still says a carrier is missing.
+ */
+export type LeftOutCarrier = {
+  carrier: string;
+  reason: string;
+};
+
+/**
+ * The overview as the view holds it: the rows of the body and the carriers the header says are missing from them. One
+ * answer, so the screen cannot draw the rows without knowing what they leave out. Not a wire body: `useOverview` builds it.
+ */
+export type OverviewAnswer = {
+  rows: OverviewRow[];
+  left_out: LeftOutCarrier[];
+};
+
 // ---------------------------
 
 //----------------- A BULLETIN'S PAGES ------------
@@ -123,6 +143,9 @@ export type VerdictCounts = {
  * the page where a part begins after page 1. `read_at` is when the page's answer was read, `null` for an
  * `unread` or `waiting` page; `read_from` is the stored date of the earlier file that answer was read on,
  * `null` when it was read on this one. `requirements` is a count: the page's own list is on `PageReading`.
+ * `waiting` is `null` unless the page waits, and is the page's try as `PageReading.waiting` has it, so a list of
+ * pages can say why each waits without a read per page. A `reason` that is not the page's own opens with whose
+ * try it is ("the file's outline: …", "the pages beside it: …"): a failed outline holds every page of the file.
  */
 export type BulletinPage = {
   page: number;
@@ -132,6 +155,7 @@ export type BulletinPage = {
   read_from: string | null;
   requirements: number;
   verdicts: VerdictCounts;
+  waiting: PageWaiting | null;
 };
 
 // ---------------------------
@@ -159,17 +183,24 @@ export type RequirementThreshold = {
 };
 
 /**
- * A requirement's deadline: `hours` counted on `basis` (`calendar`, `business`, …) from `anchor`, the event it
- * starts at. `hours` is `null` only for a deadline that counts none ("by the end of the next business day");
- * `anchor` is `null` when the page gives no start.
+ * A requirement's window, which holds two things (shadow-connector's `view_reading._window` puts them in one object).
+ * A deadline: `hours` counted on `basis` (`calendar`, `business`, …) from `anchor`, the event it starts at; `hours` is
+ * `null` only for a deadline that counts none ("by the end of the next business day"), `anchor` is `null` when the page
+ * gives no start. And a cadence: how often (`daily`, `weekly`, `monthly`). A requirement that recurs and has no deadline
+ * comes over as `{ cadence: 'daily' }` alone, with no deadline key, so every member is optional: a screen reads the
+ * deadline only where `basis` is present.
  */
 export type RequirementWindow = {
-  hours: number | null;
-  basis: string;
-  anchor: string | null;
+  hours?: number | null;
+  basis?: string;
+  anchor?: string | null;
+  cadence?: string;
 };
 
-/** The jobs a requirement applies to. A list that is `null` means every one of its kind. */
+/**
+ * The jobs a requirement applies to. A list the page names none for means every one of its kind: shadow-connector's
+ * `requirement_body` sends it empty (`[]`), and the type allows `null` for the same meaning.
+ */
 export type RequirementScope = {
   services: string[] | null;
   loss_types: string[] | null;
@@ -189,7 +220,9 @@ export type SettledRule = {
 /**
  * One requirement the page states. `words` is the requirement on one line, `kind` and `subject` its name in
  * the rule vocabulary, `quote` the page's own words. `rule` is `null` for a page that is `read` and not yet
- * `settled`: the requirement has no list rule to point at.
+ * `settled`: the requirement has no list rule to point at. `beside` is `true` when the entry was read from the
+ * pages beside this one (a rule not found on its cited page is read against the pages either side), so its
+ * `quote` stands on a neighbouring page and not on this page's picture.
  */
 export type PageRequirement = {
   words: string;
@@ -200,6 +233,7 @@ export type PageRequirement = {
   scope: RequirementScope;
   quote: string | null;
   rule: SettledRule | null;
+  beside: boolean;
 };
 
 /**
@@ -207,6 +241,7 @@ export type PageRequirement = {
  * `from_revision` the bulletin revision it came from. `said` is what the model gave and `verdict` the
  * word the house stored: they differ when the house's checks refused the answer (stored `unsettled`).
  * `quote` is the page's words, `reason` the model's why, `duplicate_of_words` the rule a `duplicate` points at.
+ * `beside` is as on `PageRequirement`: the judgement was read from the pages beside this one.
  */
 export type JudgedRule = {
   words: string;
@@ -216,6 +251,7 @@ export type JudgedRule = {
   reason: string | null;
   quote: string | null;
   duplicate_of_words: string | null;
+  beside: boolean;
 };
 
 /** A duty the page states that the rule vocabulary has no key for: it never runs, and is shown here. `quote` is the page's words, `doubt` what it asks. */

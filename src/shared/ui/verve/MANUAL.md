@@ -104,7 +104,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/main.tsx, /home/lyphe/.claud
 ## MAN-740 — The library those tokens paint
 section: README/002 The library those tokens paint
 
-36 components carry Verve paint (2026-10-17: a file in `src/shared/ui/` that puts a `.vv-*` class in its markup; a comment naming one does not count, and `Toast` with `ToastStack`, `Tabs` with `TabsMore`, `Gallery` with `PhotoFill`, `RegionImage` with `RegionDrawLayer` count once). The sheet that paints each (rule 6):
+37 components carry Verve paint (a file in `src/shared/ui/` that puts a `.vv-*` class in its markup; a comment naming one does not count, and `Toast` with `ToastStack`, `Tabs` with `TabsMore`, `Gallery` with `PhotoFill`, `RegionImage` with `RegionDrawLayer`, `SphereView` with `sphere/SphereCanvas` count once). The sheet that paints each (rule 6):
 
 | sheet | components |
 |---|---|
@@ -112,7 +112,7 @@ section: README/002 The library those tokens paint
 | `feedback.css` | Banner, Toast, Tabs, EmptyState, Menu, Dialog, Tooltip, ActionMenu |
 | `surfaces.css` | DockableFab, SplitPane, ResizeGrip |
 | `panels.css` | TextArea, Sheet, Timeline, Steps, Checkbox, DialogFrame |
-| `media.css` | RegionImage, Gallery |
+| `media.css` | RegionImage, SphereView, Gallery |
 | `data.css` | SegmentedControl, DataTable |
 | `board.css` | KanbanLane, KanbanCard |
 
@@ -123,6 +123,7 @@ section: README/002 The library those tokens paint
 - `DialogFrame` is Verve's `overlays/Modal` on the house `Dialog`, in the library because Verve draws it (MAN-571): its props, behaviour and paint are MAN-7963.
 - `DockableFab`, `SplitPane` and `ResizeGrip` were admitted on the barrel's *mechanism* test, not its two-module rule (`index.ts`'s own header). `ResizeGrip`'s one consumer is `ChatHostPanel`.
 - `RegionImage` and `Gallery` joined for the Cerberus Tours tab; props, drawing and paint: MAN-8579. `RegionImage` is admitted on the *mechanism* test (`index.ts`'s own header): an SVG layer in the image's own 0..1 space, a polygon hit-test and a badge clamped inside the image are what no arrangement of the parts here produces. `Gallery` is admitted because Verve draws it (§10 Media, MAN-571), with or without a second module. Both put a photo in a box through `PhotoFill`, which the barrel does not export.
+- `SphereView` joined for the Tours view's pano screen, on the *mechanism* test (`index.ts`'s own header): a WebGL sphere with a frame loop, its drag and zoom, and outlines laid on it by yaw and pitch are what no arrangement of the parts here produces. One consumer, `PanoSphere.tsx`; its next is the roadmap's photo work, where in a tour's pano a CompanyCam photo was taken. Its four types are in `src/shared/types.ts`: `CubeFaces`, `SphereShape`, `SphereLook`, `SphereTrouble`. It knows a cube, outlines and tones; the engine's faces, areas and looks stay in the module. Its viewer and three.js load in a chunk of their own, so the barrel names the piece and never `sphere/SphereCanvas`. Its paint in `media.css`: `.vv-sphere` (the `--surface2` ground, a `.vv-skeleton` while its faces load), `.vv-sphere .psv-overlay*` (house type), `.vv-sphere .vv-region-badge` (its press on the sphere); the full table: MAN-8943. Rules and proof: MAN-8944. It does not use `PhotoFill`.
 - `SegmentedControl` and `DataTable` joined for the affected-areas module's marking screens, because Verve draws them (§11 Plumbing and §5, MAN-571), with or without a second module; props, behaviour and paint: MAN-8580. `RegionImage` also gained `drawing` (a box dragged on the photo) and `focusId` (one region at full wash, the rest dimmed): MAN-8579.
 - `ConfirmDialog` was admitted on the two-module rule and paints nothing of its own: it is `Dialog` and `Button`, both already painted. It is not in the table.
 
@@ -157,7 +158,7 @@ What they share is the contract every later one joins:
    | 2 | `feedback.css` | 2nd | 440 | — |
    | 3 | [`surfaces.css`](surfaces.css) | 4th | 402 | the `body.vv-dragging` / `vv-drag-fab` / `vv-drag-split` / `vv-drag-resize` classes a drag of any piece sets for its length (why a new file: that sheet's own header); `[data-hold-lift]` (a hold-lift handle's callout, selection and native drag, off on touch screens from the first touch), and `[data-carried]` (an item in a hand: `--shadow-lift` and a `--border-strong` hairline) |
    | 4 | [`panels.css`](panels.css) | 5th | 341 | `.vv-input`'s colours and ground said back over `src/index.css`'s `!important` pins on every bare `textarea` (the piece's own header says why) |
-   | 5 | [`media.css`](media.css) | 6th | 238 | the one literal-colour exception: the gallery tag's and count's near-black scrim and white ink, which sit on a photograph and must not flip with the theme (the sheet's own header says why) |
+   | 5 | [`media.css`](media.css) | 6th | 280 (2026-10-22) | the one literal-colour exception: the gallery tag's and count's near-black scrim and white ink, which sit on a photograph and must not flip with the theme (the sheet's own header says why) |
    | 6 | [`data.css`](data.css) | 7th | 210 | the segmented count pill, spelt again because feedback.css is at its ceiling and takes no more lines |
    | 7 | `board.css` | 3rd | 227 | the `.vv-lane`, `.vv-lane__head` and `.vv-lane-card` rules and their variants |
 
@@ -174,7 +175,7 @@ What they share is the contract every later one joins:
 Which components exist at all, and when a screen composes instead of asking for a new one, is
 doctrine §1–§3. Read it there, not here.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Checkbox.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/DialogFrame.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Gallery.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/PhotoFill.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/RegionImage.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Sheet.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Steps.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/TextArea.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Timeline.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/verve/media.css, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/verve/panels.css
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Checkbox.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/DialogFrame.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Gallery.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/PhotoFill.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/RegionImage.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Sheet.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/sphere/SphereCanvas.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/SphereView.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Steps.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/TextArea.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Timeline.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/verve/media.css, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/verve/panels.css
 
 ## MAN-741 — The overlay half
 section: README/003 The overlay half
@@ -322,9 +323,20 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/DialogFrame.tsx
 
 ## MAN-8579 — `PhotoFill`, `RegionImage` and `Gallery` — the Tours view (affected areas) library pieces: a photo with its regions, a set of photo tiles; props, drawing, paint (`verve/media.css`)
 
-`src/shared/ui/RegionImage.tsx`, `Gallery.tsx` and `PhotoFill.tsx` put a photograph on screen: `RegionImage` draws a view's regions over it and `Gallery` lays a tour's panos out as tiles, for the Cerberus Tours view (affected areas). `RegionImage` and `Gallery` are in the library by the barrel's admission tests (MAN-740): `RegionImage` on the *mechanism* test, `Gallery` because Verve draws it (§10 Media, MAN-571). Consumer: the Tours view (MAN-8575); the photo-match viewer is `RegionImage`'s next. Paint: `verve/media.css`, imported by the barrel after `panels.css` and before `board.css` (MAN-740 rule 6). Both are exported from `@/shared/ui`; the types `RegionShape` and `GalleryItem` are in `src/shared/types.ts`.
+`src/shared/ui/RegionImage.tsx`, `Gallery.tsx` and `PhotoFill.tsx` put a photograph on screen: `RegionImage` draws a view's regions over it and `Gallery` lays a tour's panos out as tiles, for the Cerberus Tours view (affected areas). `RegionImage` and `Gallery` are in the library by the barrel's admission tests (MAN-740): `RegionImage` on the *mechanism* test, `Gallery` because Verve draws it (§10 Media, MAN-571). Consumer: the Tours view (MAN-8575); the photo-match viewer is `RegionImage`'s next. Paint: `verve/media.css`, imported by the barrel after `panels.css` and before `board.css` (MAN-740 rule 6). Both are exported from `@/shared/ui`; the types `RegionShape` and `GalleryItem` are in `src/shared/types.ts`. `SphereView` lays the same outlines and badges on a 360° sphere: props, files and paint MAN-8943; rules and proof MAN-8944.
 
-## `RegionImage`
+## `SphereView` beside `RegionImage`
+| what | holds |
+|---|---|
+| share | the `.vv-region*` paint, toned by `data-tone`; one outline per region and one number per badge; no words on the photo |
+| differ | yaw and pitch in place of the photo's 0..1; the library's markers in place of `RegionImage`'s one `<svg>`; the chosen outline drawn last, because SVG paints in document order |
+| with the library | the wheel is gated on Ctrl or ⌘ by the piece itself; the navbar's one button shows only while fullscreen; WebGL 2 is asked before the chunk loads; the WebGL context is lost on unmount; three.js and the viewer load in one chunk of their own, named in `optimizeDeps.include` and in no manual chunk |
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Gallery.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/PhotoFill.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/RegionDrawLayer.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/RegionImage.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/SphereView.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/verve/media.css
+
+## MAN-8945 — `PhotoFill`, `RegionImage` and `Gallery` — the Tours view (affected areas) — `RegionImage`
+section: `PhotoFill`, `RegionImage` and `Gallery` — the Tours view (affected areas) library pieces: a photo with its regions, a set of photo tiles; props, drawing, paint (`verve/media.css`)/001 `RegionImage`
+
 | prop | meaning |
 |---|---|
 | `src` | the photo; `null` draws the neutral tile, and the regions still draw and select over it |
@@ -345,6 +357,12 @@ Draws, in one `relative w-full` box:
 
 Rules:
 - Words never sit on the photo. why: the number is how a reader finds the region's row in the list beside it.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Gallery.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/PhotoFill.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/RegionDrawLayer.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/RegionImage.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/verve/media.css
+
+## MAN-8946 — `PhotoFill`, `RegionImage` and `Gallery` — the Tours view (affected areas) — The badge is the one control for keyboard and screen reader; the outline is the pointer's second way
+section: `PhotoFill`, `RegionImage` and `Gallery` — the Tours view (affected areas) library pieces: a photo with its regions, a set of photo tiles; props, drawing, paint (`verve/media.css`)/002 The badge is the one control for keyboard and screen reader; the outline is the pointer's second way
+
 - The badge is the one control for keyboard and screen reader; the outline is the pointer's second way in, hidden from the accessibility tree with no tab stop. why: each region would otherwise be spoken twice, the second time by a button no key can reach.
 - Region selection is off while `drawing` is set: no outline is pressable and every badge is an inert `<span>`, so a press on the photo can only start a box.
 - Only `.vv-region--pressable` (set exactly when `onSelect` is given and nothing is being drawn) takes the pointer, the cursor and the hover. why: a display-only copy inside the `Lightbox` must pan with the picture; give a `Lightbox` copy no `onSelect` (MAN-7426).
@@ -368,7 +386,11 @@ Rules:
 ## `PhotoFill` (not exported by the barrel)
 The one broken-image tile for both pieces. Verve's rule: never a blank cell or a broken-image glyph. Props `src`, `alt`, `fit` (`fill` \| `cover`). It draws `.vv-gallery__fallback` with the word `media.photo` ("Photo"); the tile is named (`role="img"`) only when `alt` is non-empty. Words `media.photo` and `media.showMore` live at the root of `en/common.json`; `en` only.
 
-## Paint — `verve/media.css` (238 lines, 2026-10-17)
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Gallery.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/PhotoFill.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/RegionDrawLayer.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/RegionImage.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/verve/media.css
+
+## MAN-8947 — `PhotoFill`, `RegionImage` and `Gallery` — the Tours view (affected areas) — Paint — `verve/media.css` (280 lines, 2026-10-22)
+section: `PhotoFill`, `RegionImage` and `Gallery` — the Tours view (affected areas) library pieces: a photo with its regions, a set of photo tiles; props, drawing, paint (`verve/media.css`)/003 Paint — `verve/media.css` (280 lines, 2026-10-22)
+
 | class | holds |
 |---|---|
 | `.vv-region` | the outline: fill 30% of `--tone-dot`, a 2 px edge in it |
@@ -383,6 +405,7 @@ The one broken-image tile for both pieces. Verve's rule: never a blank cell or a
 | `.vv-gallery` · `.vv-gallery__tile` | the grid · a tile: 10 px radius, `--surface2` ground, hover lift under `(hover: hover)`, `[aria-current='true']` accent ring |
 | `.vv-gallery__tag` · `.vv-gallery__badge` · `.vv-gallery__more` | the tag · the caller's mark · the "+N" over its scrim |
 | `.vv-gallery__fallback` | the neutral tile |
+| `.vv-sphere*` · `.vv-sphere .psv-*` | `SphereView`'s box and its overrides of the library's DOM: MAN-8943. It wears `.vv-region`, `.vv-region--pressable`, `--dashed`, `--wash-*`, `--selected` and `.vv-region-badge` unchanged, and overrides two (`.vv-region-badge` pointer events, `--selected` pointer events) under `.vv-sphere`: a change to those rules here moves the sphere |
 
 - Inside the `Lightbox` (MAN-7426) the content carries `--lightbox-scale` (a number, 1 at fit; unset elsewhere, so every use falls back to 1). The edge, the dashes and the badge divide by it. why: `non-scaling-stroke` does not hold under an ancestor's CSS transform (measured: 2 px at fit, 4.5 px at 225%).
 - The one literal-colour exception: the tag's scrim `rgba(16,17,22,.5)`, the count's `.55` and the ink `#fff`. why: they sit on a photograph and must not flip with the theme. The tag measures 19.9:1 over a black photo and 3.55:1 over a white one, under AA's 4.5:1; a darker scrim is the operator's call.
@@ -444,3 +467,90 @@ No tone is declared in `data.css` (MAN-739 rule 4).
 Contrast, light theme, Verve's own pairs reproduced as drawn (measured off `tokens.css`; the sheet's header says the same): an unsorted sortable head 3.12:1 (`--ink-faint` 12 px bold on `--canvas`), an unchosen segmented label 4.46:1 (`--ink-muted` on the `--surface2` tray), muted figures on the `--accent-soft` hover and open row 4.44:1 — each under AA's 4.5:1 for small text. The dark theme clears all three (4.74, 6.51, 5.32). A darker ink for them is the operator's call.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/DataTable.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/SegmentedControl.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/verve/data.css
+
+## MAN-8943 — `SphereView` — the Tours view's 360° library piece: props, files and paint (`verve/media.css`)
+
+`src/shared/ui/SphereView.tsx` stitches six square photos of a cube into one sphere you drag and zoom (Photo Sphere Viewer on three.js) and lays areas on it as `RegionImage`'s outlines and numbered badges, by yaw and pitch. Consumer: the affected-areas pano screen (`PanoSphere.tsx`); the module's half (which view is which face, areas as looks): MAN-8942. Admitted on the barrel's *mechanism* test (MAN-740, `index.ts`'s own header). Exported from `@/shared/ui`; the types `CubeFaces`, `SphereShape`, `SphereLook`, `SphereTrouble` are in `src/shared/types.ts`. The piece knows a cube, outlines and tones; faces, standing and what a look means stay with the caller. Shared `.vv-region*` rules: MAN-8579. Rules that bite, proof and limits: MAN-8944.
+
+## Props
+| prop | meaning |
+|---|---|
+| `faces` | `CubeFaces \| null`: six photo URLs (object URLs included). Null: the box is a skeleton of itself. A new object naming the same six URLs is the same panorama; other URLs go through `setPanorama` on the same viewer |
+| `regions` | `SphereShape[]`: `id`, `ordinal`, `polygon` and `badgeAt` (`[yawDeg, pitchDeg]`), `tone`, `edge`, `wash`. Larger boxes first: later ones draw over earlier |
+| `selectedId?` | the chosen area: heavier outline, ringed badge. One chosen somewhere else turns the view to it (`markers.gotoMarker`, `8rpm`, at once under `prefers-reduced-motion`). One chosen at opening, or one the piece reported pressed, turns nothing |
+| `onSelect?` | called with an area's id by its outline or its badge (the badge marker's `~badge` suffix dropped) |
+| `look` | where the view opens: `{ yawDeg, pitchDeg, fovDeg }`, yaw growing turning right, pitch up, (0, 0) the front face's centre. A new value turns the view there (`8rpm`, at once under reduced motion); a value within 0.1° of what `onLook` last reported, or opened at, turns nothing |
+| `onLook?` | where the view came to rest, 250 ms after a drag, zoom or turn stops (`REST_MS`); yaw folded into (−180, 180]. A report pending at unmount is flushed |
+| `fullscreen` · `onFullscreen` | controlled both ways: `fullscreen` true calls the viewer's `enterFullscreen`; the viewer's own `fullscreen` event (its button, Escape) calls `onFullscreen(on)`. A fullscreen the browser refuses calls `onFullscreen(false)`; so does unmounting while fullscreen |
+| `label` | the box's accessible name |
+| `zoomHint` | the words of the overlay a plain scroll shows ("Hold Ctrl and scroll to zoom") |
+| `onTrouble?` | `'no_webgl'` (no WebGL 2) or `'photo_failed'` (a face would not load: the library's `panorama-error`) |
+
+Field of view runs 30°–110° (`MIN_FOV_DEG`, `MAX_FOV_DEG`); the library's zoom level is linear in it, so 90° opens at level 25.
+
+## Files
+| file | holds |
+|---|---|
+| `SphereView.tsx` | the barrel's piece: the box, the WebGL 2 verdict, `ErrorBoundary` + `Suspense` around the lazy canvas, the skeleton, the failure banner |
+| `sphere/SphereCanvas.tsx` | the lazy half: ONE viewer per mount, three.js, the viewer and its CSS. Never named by the barrel |
+| `sphere/fixedContaining.ts` | `fixedContainingRelease(stage)`: the switch `SphereCanvas` calls for the iPhone's emulated fullscreen (rules: MAN-8944) |
+| `sphere/sphereLook.ts` | `toRadians`, `toDegrees`, `zoomLevelOfFov`, `fovOfZoomLevel`, `foldYaw`, `sameLook` |
+| `sphere/sphereMarkers.ts` | `markerConfigsOf(shapes, selectedId)`, `regionIdOfMarker(markerId)` |
+| `sphere/wheelGate.ts` | `gateWheel(stage, viewer, hint)`, which returns the function that takes it down |
+
+Packages: `@photo-sphere-viewer/core`, `cubemap-adapter`, `markers-plugin`, each `5.15.1`, exact (`package.json`). Words in `en/common.json` `media`: `sphereLeaveFullscreen`, `sphereFailed`, `sphereFailedDetail`; `label` and `zoomHint` are the caller's.
+
+## Paint — `verve/media.css`, the SphereView section
+Outline and badge wear `.vv-region*` unchanged, toned by `data-tone` (`svgStyle: { dataTone }`); editing those rules moves the sphere too. Sphere-only rules, tokens only:
+| rule | holds, and why |
+|---|---|
+| `.vv-sphere` | square to the parent's width (`aspect-ratio: 1`), `overflow: hidden`, `--surface2` ground, so a face still loading is never a hole; the waiting surface is `.vv-skeleton` |
+| `.vv-sphere__stage` | `absolute inset-0`, `touch-action: none`: the element the library is handed, which puts its root inside and fullscreens the stage |
+| `.vv-sphere .vv-region-badge` | `border-box`, `pointer-events: auto`, pointer cursor. why: `span.vv-region-badge` makes every span badge inert (RegionImage's display-only badge) and the library's `.psv-container *` is `content-box`, which grows the 22 px badge by its border |
+| `.vv-sphere .vv-region--selected` | `pointer-events: none`. why: the chosen outline is drawn last and would cover a smaller area inside it and take its press; its badge is still pressed |
+| `.vv-sphere .psv-navbar` | `height: 48px; bottom: -48px`; `.psv-button` `padding: 14px` (20 px icon, a 44 px press) |
+| `.vv-sphere .psv-navbar:not(.psv-navbar--open)` | `visibility: hidden`. why: the library's `navbar.hide()` only slides the bar below the box, so its button kept its tab stop and tree entry; focusing it scrolled the box's overflow 48 px (the photo moved, the bar stood inside the box) and Enter on "Leave fullscreen" entered fullscreen. The slide-out ends invisibly at once. Do not remove as redundant |
+| `.vv-sphere .psv-overlay*` | house type and tokens; the overlay has `pointer-events: none`. why: the library skips a wheel whose target is inside an overlay, so a Ctrl-scroll that fell through would zoom the page |
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/sphere/sphereLook.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/sphere/sphereMarkers.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/SphereView.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/verve/media.css
+
+## MAN-8944 — `SphereView` — rules that bite and its proof: the lazy chunk, one viewer per mount, the wheel gate, fullscreen, `.verify/sphere-view.mjs`
+
+What an editor of `SphereView.tsx`, `sphere/SphereCanvas.tsx` or `sphere/wheelGate.ts` must not break. Props, files, paint: MAN-8943. The module's half: MAN-8942.
+
+## Rules that bite
+- The barrel exports `SphereView` and never `SphereCanvas`. why: three.js and the viewer load in one lazy chunk (`SphereCanvas-*.js`, 677 kB, 177 kB gzip, 2026-10-22) the first time a sphere is drawn; `dist/index.html` preloads only `vendor-react`.
+- Keep the `import()` of `sphere/SphereCanvas` literal. `vite.config.js` `optimizeDeps.include` names the four packages, but it is NOT what prevents a page reload: on a cold dev server with a private cache the first sphere opens in one document load with them and without (`.verify/sphere-cold-start.mjs`). Vite's start-up scan finds them through the literal `import()`.
+- WebGL 2 is asked once per page (`supportsWebGl2`: a scratch `webgl2` canvas, its context given back) before the chunk is fetched. No WebGL 2: nothing fetched or drawn, `onTrouble('no_webgl')`. why: `new Viewer` does not throw without it; it draws its own error and returns a viewer with no renderer (`SphereCanvas` reports `no_webgl` for that case too).
+- One viewer per mount. The screen re-renders on every `onLook`, so nothing is keyed on an object's identity: the panorama is its six URLs, the markers are their content (`JSON.stringify` of areas and choice), and a change goes through `setPanorama` / `setMarkers`, never a new viewer. Callbacks and props the viewer's handlers read live in the `latest` ref.
+- Each load asks for its photos under URLs of its OWN: the same photo plus `#sphere-<n>` (a fetch ignores the fragment). why: three.js's `FileLoader` shares one in-flight request between every loader asking for the same URL, and the viewer that made it aborts it on `destroy()`; under `React.StrictMode` (viewer, teardown, viewer) the second viewer got an AbortError the library takes for its own and waited for ever with no picture and no error. Possible outside dev too, when a sphere unmounts and another mounts on the same photos.
+- Teardown calls `loseContext` on the canvas. why: `viewer.destroy()` leaves the WebGL context to garbage collection and a browser keeps about sixteen; the pano screen makes a sphere per pano and per return from Fleet. 2026-10-22: twenty mounts and unmounts leave no context warning and no viewer context alive; without `loseContext` the same run warns. One context stays alive per page: the library's own capability probe.
+- Stacking is the ORDER the markers are added, never `zIndex`. why: the plugin appends every polygon to one `<svg>` in order, and `z-index` on an SVG path lifts nothing. Outlines go in the order given, the chosen one last; badges are html, so the chosen badge's `zIndex` (3, others 2) does lift.
+- A badge's html is built from the tone's letters and the ordinal truncated to an integer, never from text. why: the library sets a marker's `html` as `innerHTML`. The hint's overlay title is escaped for the same reason.
+- An area with fewer than three vertices, or a non-finite angle in a vertex or `badgeAt`, is left out.
+- The wheel is gated by `gateWheel`; the library's `mousewheelCtrlKey` stays off. why: the library reads the Control KEY alone, so ⌘ never zooms on a Mac and a trackpad pinch (a wheel with `ctrlKey`, no key down) shows the hint while the browser zooms the page. A plain wheel is stopped at the stage in the capture phase (`stopPropagation`, never `preventDefault`: the page scrolls on) and shows the hint for 2 s; Ctrl or ⌘ goes on to the library and zooms; a fullscreen wheel zooms. The listener is passive.
+- `touchmoveTwoFingers` is off: one finger turns the view, and `.vv-sphere__stage` is `touch-action: none`.
+- The navbar is `['fullscreen']` only: the way out, which a phone needs (no Escape). It shows only while fullscreen (`settleNavbar`, on `fullscreen` and again on `ready`: the library opens it itself just before `ready`). Its title is `media.sphereLeaveFullscreen` (`lang.fullscreen`).
+- `lang.loadError` is `''`. why: the library's overlay sentence is English only; a failed photo keeps its icon and the caller says the words (`onTrouble`).
+- The stage's `requestFullscreen` is wrapped to swallow the rejection. why: the library drops the promise, so a refusal is an unhandled rejection; the `fullscreenerror` listener, on the stage because it does not bubble, tells the caller.
+- Two presses on two different areas under 300 ms apart report only the first. why: the library's single-click window (`DBLCLICK_DELAY`) dispatches no click for the second; 5.15.1 has no option to turn it off.
+- The iPhone's fullscreen is emulated (`psv-fullscreen-emulation`; iOS has no fullscreen API): the library makes the stage `position: fixed`, and an ancestor that is a containing block for fixed descendants (`container-type`, `transform`, `filter`, `backdrop-filter`, `perspective`, `contain`, `will-change`) makes the stage fill that ancestor and not the phone. Cerberus's panel root carries `container-type: inline-size`. `sphere/fixedContaining.ts` `fixedContainingRelease(stage)(on)`: `SphereCanvas` calls it on the viewer's `fullscreen` event with `stage.classList.contains('psv-fullscreen-emulation')`, and with `false` in teardown; while on, each such ancestor takes the neutral value with `!important` (an animation's fill beats a plain inline style), and off puts every property's inline value and priority back as found. Another fixed overlay in this app uses it, or stands in a chain with no containing block. A page-in wrapper filled `both` is one such ancestor (`SCREEN_ENTER`, MAN-8577).
+- The box is `role="img"` named by `label`, and `role="group"` while fullscreen. why: the children of an image are not exposed, and the way-out button inside the box must be found. The caller's list is the keyboard's way to an area.
+- A chunk that will not load (a hashed file the server no longer has) or a viewer that throws is held in the box by `ErrorBoundary`: `SphereFailed`, a `warn` `Banner` (`media.sphereFailed`, `media.sphereFailedDetail`) and a reload of the page (`viewBoundary.reload`), never a retry. why: `lazy` and the browser's module map both remember a rejected import.
+- A photo that fails gives `photo_failed`; new faces recover on the same viewer.
+
+## Proof — the live :5183 app, nothing stubbed (`.verify/` is gitignored)
+| command | does |
+|---|---|
+| `node .verify/sphere-view.mjs [--only frame\|behaviour\|trouble\|contexts]` | Clarence Tse's kitchen pano (tour `6ad29b4c93d5140395dcaa76`, pano `6ad29b4c12f14e4d72c81901`), its six photos through the lane with the dev token, `cubeFaces` and `sphereShapes` from the module. Exits 1 on any FAIL. Shots: `.verify/shots/sphere-view/`. `frame`: face centres, 12 cube edges, outlines (numbers: MAN-8942). `behaviour`: one viewer per mount, select by badge and outline, turns, wheel gate, fullscreen on desktop and an iPhone emulation. `trouble`: `--disable-3d-apis` gives `no_webgl`, no canvas, no chunk fetched. `contexts`: twenty mounts |
+| `node .verify/sphere-cold-start.mjs` | two scratch Vite servers with private caches (never the live :5183 cache), with and without the four packages in `optimizeDeps.include`; prints the documents the page loaded; exits 1 if the `with` run reloaded |
+
+`.verify/lib/sphere-fixture.mjs` opens the app, puts the photos in the page as object URLs and mounts `SphereView` through `mountReact.mjs`; the page side is `window.__sphere` (`mount`, `unmount`, `set`, `viewer`, `events`, `ready`).
+
+2026-10-22: `sphere-view.mjs` 100 of 100 PASS before the `visibility` navbar rule; not re-run since. Viewers survive re-renders unbuilt; a plain scroll shows the hint and neither zooms nor stops the page; Ctrl, ⌘ and a pinch zoom; fullscreen is left by the button on an iPhone emulation. 2026-10-22, `.verify/affected-areas-sphere.mjs` (MAN-8956), iPhone user agent on the Tours view: the emulated fullscreen fills 390×844 at (0,0); its button leaves it.
+
+## Unmeasured, and known limits
+- Exact cube-edge angles render wrongly in headless Chromium's software renderer: at the angles where an edge meets the view centre (e.g. (0, −45)) and within about 0.05° of them, the picture collapses to flat colour or a face swims. A box corner sits on the camera plane. A drag, `gotoMarker` or any of the piece's own looks essentially never lands there. A real GPU is not measured. The run photographs the two named edges 0.5° off (`edge-*-exact-*.png` beside them) and lists the affected looks as NOTEs.
+- A native Escape in fullscreen: headless Chromium ignores a page-side Escape, so the run calls `document.exitFullscreen()`; the key is not measured.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/sphere/fixedContaining.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/sphere/SphereCanvas.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/SphereView.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/sphere/wheelGate.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/sphere-fixture.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/sphere-cold-start.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/sphere-view.mjs, /home/lyphe/.claude/claudecodeui_lyphe/vite.config.js

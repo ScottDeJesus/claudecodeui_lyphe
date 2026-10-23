@@ -1641,10 +1641,19 @@
   },
   "media": {
     "photo": "Photo",
-    "showMore": "Show {{remaining}} more"
+    "showMore": "Show {{remaining}} more",
+    "sphereLeaveFullscreen": "Leave fullscreen",
+    "sphereFailed": "The 360° view could not be shown",
+    "sphereFailedDetail": "Reloading the page usually brings it back."
   },
   "timeline": {
     "noDetail": "No further detail on file."
+  },
+  "viewBoundary": {
+    "loading": "Loading {{view}}…",
+    "failed": "{{view}} could not be shown",
+    "failedDetail": "The rest of Cerberus is not affected. Reloading the page usually brings {{view}} back.",
+    "reload": "Reload the page"
   },
   "shapes": {
     "diagramFailed": "This diagram could not be drawn — showing its source.",
@@ -2288,6 +2297,10 @@
         "reading": "Reading the carriers' bulletins…",
         "empty": "No carrier has a bulletin on file",
         "emptyMessage": "A carrier shows here once a pull stores its current bulletin.",
+        "leftOut_one": "{{count}} carrier is left out of this list",
+        "leftOut_other": "{{count}} carriers are left out of this list",
+        "leftOutDetail_one": "shadow-connector could not plan its current file, so it has no row here and nothing below says whether it is read.",
+        "leftOutDetail_other": "shadow-connector could not plan their current files, so they have no row here and nothing below says whether they are read.",
         "groups": {
           "needs": "Needs you",
           "notSettled": "Not settled yet",
@@ -2398,6 +2411,7 @@
         "hours_one": "{{count}} hour",
         "hours_other": "{{count}} hours",
         "from": "{{span}}, counted from {{anchor}}",
+        "cadence": "Recurs {{cadence}}",
         "threshold": "Threshold {{value}} {{unit}} ({{measure}})",
         "services": "Services: {{list}}",
         "lossTypes": "Loss types: {{list}}",
@@ -2519,12 +2533,6 @@
       "notAChange": "Not a change"
     },
     "list": "{{rest}} and {{last}}",
-    "view": {
-      "loading": "Loading Tours…",
-      "failed": "Tours could not be shown",
-      "failedDetail": "The rest of Cerberus is not affected. Reloading the page usually brings Tours back.",
-      "reload": "Reload the page"
-    },
     "trouble": {
       "no_secret": "CloudCLI could not read shadow-connector's internal secret",
       "no_secretDetail": "Nothing here can be read until shadow-connector's env file holds EIS_INTERNAL_SECRET.",
@@ -2626,7 +2634,7 @@
       "back": "Back to {{tour}}",
       "floor": "Floor {{floor}}",
       "captured": "captured {{when}}",
-      "facesLabel": "Faces of this pano",
+      "viewsLabel": "Views of this pano",
       "reading": "Reading the pano…",
       "uncut": "This pano hasn't been cut into views yet",
       "uncutMessage": "Opening it cuts its six views; they show here once the cut is done.",
@@ -2644,6 +2652,19 @@
       "nothingMessage": "The reader looked and marked no change here.",
       "markedTitle": "Marked on this view",
       "listLabel": "Marked on the {{face}} view"
+    },
+    "sphere": {
+      "tab": "360°",
+      "label": "{{room}}: its six views as one 360° photo, every area outlined",
+      "hint": "Drag to look around · pinch, or Ctrl and scroll, to zoom",
+      "ctrlZoom": "Hold Ctrl and scroll to zoom",
+      "chosen": "{{n}}. {{kind}} · {{view}}",
+      "markOn": "Mark it on {{view}}",
+      "photoFailed": "The 360° photo can't be drawn: one of the pano's six photos didn't arrive",
+      "noWebgl": "This device can't draw the 360° photo; the six views above still show every area",
+      "viewsRead": "{{read}} of {{total}} views read",
+      "nothingOn": "Nothing found on {{views}}",
+      "notReadYet": "Not read yet: {{views}}"
     },
     "region": {
       "sure": "{{percent}}% sure",

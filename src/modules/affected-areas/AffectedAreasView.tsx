@@ -2,9 +2,10 @@ import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { useCodebook } from '@/modules/affected-areas/hooks/useCodebook';
-import { useImageUrl } from '@/modules/affected-areas/hooks/useImageUrl';
+import { useImageUrls } from '@/modules/affected-areas/hooks/useImageUrl';
 import { useMarkedRegions } from '@/modules/affected-areas/hooks/useMarkedRegions';
 import { usePano } from '@/modules/affected-areas/hooks/usePano';
+import { usePanoPlace } from '@/modules/affected-areas/hooks/usePanoPlace';
 import { useTilePhotos } from '@/modules/affected-areas/hooks/useTilePhotos';
 import { useTour } from '@/modules/affected-areas/hooks/useTour';
 import { useTourReader } from '@/modules/affected-areas/hooks/useTourReader';
@@ -16,25 +17,16 @@ import { TablesScreen } from '@/modules/affected-areas/TablesScreen';
 import { TourPicker } from '@/modules/affected-areas/TourPicker';
 import { TourScreen } from '@/modules/affected-areas/TourScreen';
 import { ToursSwitch } from '@/modules/affected-areas/ToursSwitch';
-import { FACES, listedAreas, tourName, tourUnread } from '@/modules/affected-areas/utils/tourModel';
-import type { Face, PanoEntry, Region } from '@/shared/affected-areas-types';
-import type { RegionLayer, ToursScreenKey } from '@/shared/types';
+import { tourName, tourUnread } from '@/modules/affected-areas/utils/tourModel';
+import type { Region } from '@/shared/affected-areas-types';
+import type { ToursScreenKey } from '@/shared/types';
 
 /** A screen arriving: Verve's page entrance, as the Cerberus tab's own views enter. It plays each time one opens. */
-const SCREEN_ENTER = 'motion-safe:animate-[vv-pagein_.45s_theme(transitionTimingFunction.enter)_both]';
-
-/**
- * The first face, in the strip's order, whose read found an area, standing or proposed; Ahead when none did or the
- * pano is not listed.
- */
-function firstFaceWithAreas(entry: PanoEntry | undefined): Face {
-  return FACES.find((face) => {
-    const read = entry?.views.find((view) => view.face === face)?.read;
-    if (read?.status !== 'read') return false;
-    const { standing, found } = listedAreas(read);
-    return standing > 0 || found > 0;
-  }) ?? 'ahead';
-}
+// `backwards`, never `both`: a forward-filled transform animation keeps the screen a containing block for fixed
+// descendants after it ends (the computed transform reads `none`, the animation still fills), and the sphere's iPhone
+// fullscreen is a fixed stage — it would fill this screen's box instead of the phone's screen. The keyframes end at the
+// element's own state, so the last frame is the same either way.
+const SCREEN_ENTER = 'motion-safe:animate-[vv-pagein_.45s_theme(transitionTimingFunction.enter)_backwards]';
 
 /**
  * THE TOURS VIEW: the affected areas a reader marked on a DocuSketch tour, drawn on the single photo so a change can
@@ -48,10 +40,11 @@ function firstFaceWithAreas(entry: PanoEntry | undefined): Face {
  * - Mark (`MarkScreen`): a queue the engine orders, one area at a time.
  * - Tables (`TablesScreen`): how right the reader is per kind, and the line that decides each kind.
  *
- * THE VIEW KEEPS ITS PLACE. Its root holds the open tour and pano, the face and the chosen region, and the Cerberus
- * tab keeps it mounted (hidden) after its first show, so all of it survives a visit to Fleet. It reads nothing on its
- * own while hidden: it reads on open and on a person's presses, never on a timer. A surface the switch shows again
- * reads again, quietly, on that press: a judgment made on one moves the others.
+ * THE VIEW KEEPS ITS PLACE. Its root holds the open tour and pano and, through `usePanoPlace`, what the pano shows (360°
+ * or a face), where the sphere looks and the chosen region, and the Cerberus tab keeps it mounted (hidden) after its first
+ * show, so all of it survives a visit to Fleet. It reads nothing on its own while hidden: it reads on open and on a
+ * person's presses, never on a timer. A surface the switch shows again reads again, quietly, on that press: a judgment
+ * made on one moves the others.
  *
  * The root is the data hub for the Tours screens: every read, photo, walk and press is wired here, and the screens draw
  * what they are handed. Mark and Tables read and press for themselves (`useQueue`, `useProving`). Words are
@@ -73,15 +66,12 @@ export function AffectedAreasView() {
   const [tourId, setTourId] = useState<string | null>(null);
   // The open pano; null shows its tour.
   const [panoId, setPanoId] = useState<string | null>(null);
-  // The face the pano screen shows: the person's place among six, kept while they look at the list or the Lightbox.
-  const [face, setFace] = useState<Face>('ahead');
-  // The region chosen on the shown face, outline and row at once; null when none is.
-  const [selectedRegionId, setSelectedRegionId] = useState<string | null>(null);
-  // Whether the shown face is open in the Lightbox.
-  const [enlarged, setEnlarged] = useState(false);
-  // What the pano's photo draws: every area (All, the default: the operator is judging what the model proposed, and hiding
-  // the unsure ones would hide the ones that most need his eye) or only the ones the engine says stand.
-  const [layer, setLayer] = useState<RegionLayer>('all');
+  // Where the person is in the open pano: 360° or a face, where the sphere looks, the area chosen, enlarged or not, and the
+  // layer (`usePanoPlace`).
+  const place = usePanoPlace();
+  // The read of the open pano's six photos: a Retry on a photo that did not arrive bumps it, and the six are fetched again
+  // under the new key (`useImageUrls`), for the sphere and the shown view alike.
+  const [photoAttempt, setPhotoAttempt] = useState(0);
   // The surface the switch shows: Tours, Mark or Tables.
   const [activeScreen, setActiveScreen] = useState<ToursScreenKey>('tours');
   // The surfaces the switch has shown. Mark and Tables mount on their first show and stay mounted (hidden while another
@@ -134,12 +124,13 @@ export function AffectedAreasView() {
   const unread = tourUnread(detail?.panos ?? []);
 
   // ── The photos, the walk and the presses. Everything below them is composition. ──
-  // The shown face's photo: the pano's view for that face, from the pano once it answered, else from the tour's listing.
-  const shownView = (pano.value ?? entry)?.views.find((candidate) => candidate.face === face);
-  const photo = useImageUrl(shownView?.sha256 ?? null);
+  // The open pano's six photos, by view sha: the sphere stitches all six and a shown view draws its own out of the same
+  // record, so opening a view costs no second read. A sha absent while it loads, null when its bytes did not arrive.
+  const panoViews = (marked.pano ?? entry)?.views ?? [];
+  const photos = useImageUrls(panoViews.map((view) => view.sha256), photoAttempt);
   // The gallery's tiles: each pano's Ahead view, fetched only while the tour screen shows them, and only the tiles it draws
   // until its "+N" opens the rest.
-  const { photos, onOverflowOpen } = useTilePhotos(tourId, panoId, detail?.panos ?? null);
+  const { photos: tilePhotos, onOverflowOpen } = useTilePhotos(tourId, panoId, detail?.panos ?? null);
 
   // The walk of the tour's unread panos. It is the viewer's: one armed press per pano, each answer read into the tour
   // (and into the pano on screen, when the walk just read that one), and none sent while the view is hidden.
@@ -161,44 +152,31 @@ export function AffectedAreasView() {
   const onOpenTour = (openedTourId: string) => {
     setTourId(openedTourId);
     setPanoId(null);
-    setSelectedRegionId(null);
-    setEnlarged(false);
+    place.letGo();
     showTop();
   };
   const onBack = () => {
     setTourId(null);
     setPanoId(null);
-    setSelectedRegionId(null);
-    setEnlarged(false);
+    place.letGo();
     // Back is a press, and the picker is about how far each tour is read: what was read on the tour just left shows in
     // its row. A quiet read, so the list stays on screen until the new one lands.
     tours.reload();
   };
   const onOpenPano = (openedPanoId: string) => {
     setPanoId(openedPanoId);
-    setFace(firstFaceWithAreas(detail?.panos.find((candidate) => candidate.panoId === openedPanoId)));
-    setSelectedRegionId(null);
-    // A new pano opens on All again, whatever the last one was set to; a face of the same pano keeps the person's choice.
-    setLayer('all');
+    place.openPano(detail?.panos.find((candidate) => candidate.panoId === openedPanoId));
     showTop();
   };
   const onBackToTour = () => {
     setPanoId(null);
-    setSelectedRegionId(null);
-    setEnlarged(false);
+    place.letGo();
     showTop();
     // Back is a press, and a judgment on the pano moved its tile's area count, its room's "Affected per the photos" and
     // the face a pano opens on: the tour is read again, quietly, as Back to the picker reads the list. One GET per Back;
     // the pano is not read again (`usePano` reads by tour and pano, which a tour reload does not change).
     tour.reload();
   };
-  const onFace = (shownFace: Face) => {
-    setFace(shownFace);
-    setSelectedRegionId(null);
-  };
-  // The photo and the list choose the same region; pressing the chosen one lets go of it.
-  const onSelectRegion = (regionId: string) => setSelectedRegionId((chosen) => (chosen === regionId ? null : regionId));
-  const onLayer = setLayer;
   // The switch: showing a surface again reads what it shows, quietly, on that press (never on a timer). Mark and Tables
   // read themselves when their `shown` turns true; Tours reads what it is on: the open pano, else the open tour, else the list.
   const onScreen = (next: ToursScreenKey) => {
@@ -210,8 +188,6 @@ export function AffectedAreasView() {
     else if (tourId !== null) tour.reload();
     else tours.reload();
   };
-  const onEnlarge = () => setEnlarged(true);
-  const onShrink = () => setEnlarged(false);
   const onReadPano = () => pano.pressRead(false);
   const onReadAgain = () => pano.pressRead(true);
   const onReadRest = reader.start;
@@ -226,7 +202,7 @@ export function AffectedAreasView() {
         summary={summary}
         detail={detail}
         trouble={tour.trouble}
-        photos={photos}
+        photos={tilePhotos}
         unreadPanos={unread.panos}
         unreadViews={unread.views}
         walk={walk}
@@ -247,23 +223,28 @@ export function AffectedAreasView() {
         tourName={named === null ? '' : tourName(named, t)}
         room={room}
         codebook={codebook.value}
-        face={face}
-        selectedRegionId={selectedRegionId}
-        layer={layer}
-        photo={photo}
-        enlarged={enlarged}
+        shown={place.shown}
+        selectedRegionId={place.selectedRegionId}
+        layer={place.layer}
+        photos={photos}
+        enlarged={place.enlarged}
+        sphereLook={place.sphereLook}
         press={pano.press}
         walk={walk}
         unreadPanos={unread.panos}
         unreadViews={unread.views}
         onBack={onBackToTour}
-        onFace={onFace}
-        onSelectRegion={onSelectRegion}
-        onLayer={onLayer}
+        onShow={place.onShow}
+        onSelectRegion={place.onSelectRegion}
+        onLayer={place.onLayer}
+        onLook={place.onLook}
+        onMarkOn={place.onMarkOn}
+        onFullscreen={place.onFullscreen}
+        onRetryPhotos={() => setPhotoAttempt((attempt) => attempt + 1)}
         onMarked={(region: Region) => marked.replace(tourId, panoId, region)}
         onMissed={(viewSha: string, region: Region) => marked.append(tourId, panoId, viewSha, region)}
-        onEnlarge={onEnlarge}
-        onShrink={onShrink}
+        onEnlarge={place.onEnlarge}
+        onShrink={place.onShrink}
         onReadPano={onReadPano}
         onReadAgain={onReadAgain}
         onReadRest={onReadRest}

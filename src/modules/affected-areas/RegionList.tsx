@@ -15,6 +15,8 @@ type RegionListProps = {
   kindLabel: (cls: string) => string;
   /** The list's accessible name: whose regions these are ("Marked on the Behind view"). */
   label: string;
+  /** The heading that names this card instead of its own title: on 360° each view's name stands over its list. Absent, the card draws "Marked on this view" as it does on a view. */
+  headingId?: string;
   onSelect: (regionId: string) => void;
 };
 
@@ -55,9 +57,9 @@ function regionMeta(region: Region, t: TFunction): string {
  *
  * Used by the affected-areas module's `PanoScreen`, which draws it beside the face while the face has regions.
  */
-export function RegionList({ regions, selectedId, kindLabel, label, onSelect }: RegionListProps) {
+export function RegionList({ regions, selectedId, kindLabel, label, headingId, onSelect }: RegionListProps) {
   const { t } = useTranslation();
-  const headingId = useId();
+  const ownHeadingId = useId();
   // The list's box: the chosen row is found in it and brought into view.
   const listRef = useRef<HTMLUListElement>(null);
   // A region chosen on the photo may stand far down a long list: its row is brought into view. `nearest` moves the panel
@@ -71,8 +73,11 @@ export function RegionList({ regions, selectedId, kindLabel, label, onSelect }: 
   }, [selectedId]);
 
   return (
-    <Card role="region" aria-labelledby={headingId} className="flex min-w-0 flex-col overflow-hidden">
-      <h3 id={headingId} className="px-4 pb-2 pt-4 text-xs uppercase tracking-[0.14em] text-ink-faint">{t('affectedAreas.pano.markedTitle')}</h3>
+    <Card role="region" aria-labelledby={headingId ?? ownHeadingId} className="flex min-w-0 flex-col overflow-hidden">
+      {/* A caller that draws the card's heading (360°'s view name) hands its id in; its own title gives way to it. */}
+      {headingId === undefined && (
+        <h3 id={ownHeadingId} className="px-4 pb-2 pt-4 text-xs uppercase tracking-[0.14em] text-ink-faint">{t('affectedAreas.pano.markedTitle')}</h3>
+      )}
       <ul ref={listRef} aria-label={label} className="m-0 list-none divide-y divide-border border-t border-border p-0">
         {regions.map((region) => {
           const look = REGION_LOOK[regionState(region)];

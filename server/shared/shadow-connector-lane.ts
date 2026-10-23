@@ -71,6 +71,13 @@ export type LaneRequest = {
   timeoutMs: number;
   /** What a 2xx answer carries: a JSON document, or the bytes of an image. */
   expect: 'json' | 'bytes';
+  /**
+   * Response headers of the upstream answer to carry back on a JSON answer, named in lower case. A header
+   * the engine did not send is left out. Absent or empty carries none, which is what a lane that reads no
+   * header gets: the transport hands on only what a lane names, so a header the engine sets for its own
+   * reasons never reaches a browser by accident. A `bytes` answer carries none; its router sets its own.
+   */
+  passHeaders?: readonly string[];
 };
 
 /**
@@ -84,7 +91,8 @@ export type LaneRequest = {
  *  - `no_secret`    the internal secret could not be read, so nothing was sent.
  */
 export type LaneAnswer =
-  | { ok: true; status: number; kind: 'json'; body: unknown }
+  // `headers` is the upstream headers the request's `passHeaders` named and the engine sent (lower-case keys); empty when none.
+  | { ok: true; status: number; kind: 'json'; body: unknown; headers: Record<string, string> }
   | { ok: true; status: number; kind: 'bytes'; body: Buffer; contentType: string }
   | { ok: false; reason: 'unreachable' | 'unreadable' | 'no_secret'; message: string };
 
@@ -115,6 +123,8 @@ export type ShadowConnectorLane = {
  * A quoted value is whatever stands between its quotes, kept verbatim; only whitespace or a `# comment`
  * may follow the closing quote, and a quote that never closes names no secret. An unquoted value loses a
  * trailing ` # comment` and its edge whitespace. Both are the way the dotenv loader reads the same line.
+ * So a secret that really begins with a `"` or `'` must be written quoted in the env file, or it reads as
+ * an unclosed quote and the lane answers `no_secret`.
  */
 function parseSecret(envText: string): string | null {
   let raw: string | null = null;
@@ -204,7 +214,10 @@ export function createShadowConnectorLane({
 
     const headers: Record<string, string> = {
       [SECRET_HEADER]: secret,
-      Accept: request.expect === 'bytes' ? 'image/jpeg' : 'application/json',
+      // `image/*`, not one type: the Tours lane's images are JPEGs and the bulletins lane's are PNGs, and a
+      // route that names the type it wants would refuse the other lane's. Which type a lane accepts is the
+      // lane's to enforce on the answer (its router checks the Content-Type), not this transport's.
+      Accept: request.expect === 'bytes' ? 'image/*' : 'application/json',
     };
     const actingUser = sanitiseActingUser(request.actingUser);
     if (actingUser !== null) headers[ACTING_USER_HEADER] = actingUser;
@@ -214,6 +227,7 @@ export function createShadowConnectorLane({
     let contentType: string;
     let bytes: Buffer | null = null;
     let text = '';
+    const passed: Record<string, string> = {};
     try {
       const url = new URL(`${origin}${request.path}`);
       for (const [key, value] of Object.entries(request.query ?? {})) url.searchParams.set(key, value);
@@ -229,6 +243,11 @@ export function createShadowConnectorLane({
       });
       status = response.status;
       contentType = response.headers.get('content-type') ?? '';
+      // Only the headers the lane named, and only the ones the engine sent: nothing else of the answer travels.
+      for (const name of request.passHeaders ?? []) {
+        const value = response.headers.get(name);
+        if (value !== null) passed[name.toLowerCase()] = value;
+      }
       // A bytes route answers bytes only on success; its refusals (404 `no such image`) are JSON.
       if (request.expect === 'bytes' && response.ok) bytes = Buffer.from(await response.arrayBuffer());
       else text = await response.text();
@@ -238,7 +257,7 @@ export function createShadowConnectorLane({
 
     if (bytes !== null) return { ok: true, status, kind: 'bytes', body: bytes, contentType };
     try {
-      return { ok: true, status, kind: 'json', body: JSON.parse(text) as unknown };
+      return { ok: true, status, kind: 'json', body: JSON.parse(text) as unknown, headers: passed };
     } catch {
       return { ok: false, reason: 'unreadable', message: 'shadow-connector did not answer with JSON' };
     }

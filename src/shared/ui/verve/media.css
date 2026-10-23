@@ -1,8 +1,12 @@
-/* Verve media paint — the rules for the two pieces that put a photograph on screen: RegionImage, the
- * regions drawn over one photo, and Gallery, Verve's §10 Media gallery.
+/* Verve media paint — the rules for the three pieces that put a photograph on screen: RegionImage, the
+ * regions drawn over one photo, SphereView, six photos stitched into one sphere with the same regions laid on
+ * it, and Gallery, Verve's §10 Media gallery.
  *
  * RegionImage's focus and drawing (`.vv-region--dim`, `.vv-region-draw`, `.vv-region--drawing`) sit with its
  * outline rules below; SegmentedControl and DataTable are not photographs and paint in data.css.
+ *
+ * SphereView draws its outlines and badges with the `.vv-region*` rules below, unchanged and toned by `data-tone`;
+ * what it adds (the box, and two overrides for the library's DOM) is its own section.
  *
  * The sixth paint file, opened rather than squeezed in: controls.css is past its stated ceiling,
  * feedback.css is at it, and the other four are each one family's. README rule 6: the next file opens
@@ -144,6 +148,44 @@ span.vv-region-badge { cursor: default; pointer-events: none; }
   box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--tone-dot);
   z-index: 1;
 }
+
+/* ---------------------------------------------------------------- SphereView */
+/* The box is square to its parent's width, on the neutral ground, so a face still loading never shows a hole;
+ * the waiting surface over it is tokens.css's `.vv-skeleton`. The stage is the element Photo Sphere Viewer is
+ * handed: it puts its own root inside, fullscreens the stage, and takes the pointer whole — one finger turns the
+ * sphere, so the browser must not also scroll or pinch the page from it (`touch-action`, as `.vv-region-draw`). */
+.vv-sphere { position: relative; width: 100%; aspect-ratio: 1; overflow: hidden; background: var(--surface2); }
+.vv-sphere__stage { position: absolute; inset: 0; touch-action: none; }
+
+/* The sphere's badge is a span, and `span.vv-region-badge` above makes every span badge inert (RegionImage's display-only
+ * badge). Here it is pressed — the library finds the marker from the closest `.psv-marker` — and the library's
+ * `.psv-container *` sets `content-box`, which would grow the 22px badge by its border. */
+.vv-sphere .vv-region-badge { box-sizing: border-box; pointer-events: auto; cursor: pointer; }
+
+/* The chosen outline is drawn last (the sphere's stacking is the order the plugin adds them in), so a chosen area that holds a
+ * smaller one would cover it and take its press. It is already chosen and has nothing to answer, so it lets the press through
+ * to whatever lies under it; its badge, which is not an outline, is still pressed. */
+.vv-sphere .vv-region--selected { pointer-events: none; }
+
+/* The library's one button, the way out of fullscreen, at the phone's 44px press: its 20px icon in 14px of padding (the
+ * library's is 10px, a 40px square). The bar is as tall as the button, and closed it is parked below the box by its own height.
+ * Parked is not out of reach: the library only slides the closed bar out of sight, so its button kept its tab stop and its place
+ * in the accessibility tree, and focusing it scrolled the box's overflow by the bar's height (the photo moved 48px, the bar
+ * stood inside the box) with a name that says "leave" on a press that enters. Closed, the bar is `visibility: hidden`, which takes
+ * the button out of the tab order and the tree and leaves nothing to scroll to; open (fullscreen) it is the library's own. */
+.vv-sphere .psv-navbar { height: 48px; bottom: -48px; }
+.vv-sphere .psv-navbar:not(.psv-navbar--open) { visibility: hidden; }
+.vv-sphere .psv-navbar--open { bottom: 0; }
+.vv-sphere .psv-button { padding: 14px; }
+
+/* The library's overlay (the scroll hint, a photo that would not load) in the house type and tokens instead of 30px white
+ * sans-serif. It takes no pointer: a wheel over it must reach the canvas, because the library skips a wheel whose target is
+ * inside an overlay, and a Ctrl-scroll that fell through would zoom the page. */
+.vv-sphere .psv-overlay { background: var(--surface); opacity: 0.92; pointer-events: none; }
+.vv-sphere .psv-overlay-image { color: var(--ink-faint); }
+.vv-sphere .psv-overlay-image svg { display: block; width: 56px; margin: 0 auto; }
+.vv-sphere .psv-overlay-title { margin: 0.75em 0 0; padding: 0 24px; color: var(--ink); font: 600 15px/1.4 var(--font-body); }
+.vv-sphere .psv-overlay-text { padding: 0 24px; color: var(--ink-faint); font: 13px/1.4 var(--font-body); }
 
 /* ---------------------------------------------------------------- Gallery */
 /* Verve's grid, `repeat(auto-fill, minmax(96px, 1fr))` at 8px: as many 96px-and-up squares as fit. */

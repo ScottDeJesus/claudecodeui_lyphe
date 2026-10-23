@@ -270,9 +270,11 @@ export function createDispatcherRouter(dependencies: DispatcherRouterDependencie
   router.post('/plans/:name/unpark', relay('unpark'));
   // A plan taken out of the store for good (`dispatcher drop <name>`) — the one press no other press
   // undoes, and a plan's alone: no arc door opens on it. No body and no argument. `statusForVerb`
-  // needs no branch for it: `DROPPED <name>` is a 200, and the dispatcher's two refusals — `REFUSED
-  // drop …` while a phase walks or a planner outing for the plan or its arc is live (exit 2), and
-  // `no plan <name>` (exit 1) — are each a 409 whose body is that sentence, untouched.
+  // needs no branch for it: `DROPPED <name>` is a 200 — and so is `DROPPED <name> — withdrew its queued
+  // <soul> <verb>`, the plan's own outing still waiting in the queue going with it — and the
+  // dispatcher's two refusals — `REFUSED drop …` while a phase walks or a planner outing for the plan or
+  // its arc is live and not that (exit 2), and `no plan <name>` (exit 1) — are each a 409 whose body is
+  // that sentence, untouched.
   router.post('/plans/:name/drop', relay('drop'));
   // A plan's STALLED planner outing put back to work (`dispatcher planner-resume <plan> --by app:card`) —
   // the card's `Resume planner`. THE DISPATCHER CHOOSES THE DOOR, from its own store at the press: a cut

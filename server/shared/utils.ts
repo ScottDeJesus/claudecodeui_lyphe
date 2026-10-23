@@ -182,6 +182,44 @@ export class AppError extends Error {
 }
 
 // ---------------------------
+//----------------- HOST FLAG FILE UTILITIES ------------
+/**
+ * Python's `str.strip()`, both ends — spelled out, because neither of JavaScript's two trims is it. `\s` is
+ * the wrong set in both directions: it lacks the C0 separators `\x1c`–`\x1f` and NEL (`\u0085`), which
+ * `strip()` takes, and it holds the byte-order mark `\uFEFF`, which `strip()` keeps. The separators are written
+ * as ESCAPES, never as the bytes: a literal control character in a source file is invisible and an editor can drop it.
+ */
+const FLAG_TRIM = new RegExp(
+  '^[\\t\\n\\v\\f\\r\\x1c-\\x1f \\u0085\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000]+'
+  + '|[\\t\\n\\v\\f\\r\\x1c-\\x1f \\u0085\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000]+$',
+  'g',
+);
+
+/** The ONE leading BOM the Python side's `utf-8-sig` decode takes off, and no other: a BOM anywhere else stays in the word, as it does there. */
+const LEADING_BOM = /^\uFEFF/;
+
+/**
+ * One flag file's single word, trimmed the way Python's `str.strip()` trims, or `null` when the file
+ * cannot be trusted to hold one: absent, unreadable, not a regular file, or larger than `maxBytes`.
+ * `maxBytes` is the dispatcher's or pacer's own bound on that file, kept identical on both sides so a
+ * file past it reads the default in both languages. A FIFO or a directory at the path is `null` rather
+ * than a read that never returns. The caller decides what `null` means (a default) and what grammar the
+ * word must be in; this never throws.
+ *
+ * Used by `planner-lanes.ts` (the dispatcher's planner-lane dial) and `weekly-stop.ts` (the pacer's
+ * weekly stop), whose readers agree with their Python counterparts clause for clause.
+ */
+export async function readFlagWord(filePath: string, maxBytes: number): Promise<string | null> {
+  try {
+    const info = await stat(filePath);
+    if (!info.isFile() || info.size > maxBytes) return null;
+    return (await readFile(filePath, 'utf8')).replace(LEADING_BOM, '').replace(FLAG_TRIM, '');
+  } catch {
+    return null;
+  }
+}
+
+// ---------------------------
 //----------------- WORKSPACE PATH VALIDATION UTILITIES ------------
 /**
  * Root directory that all workspace/project paths must stay under.

@@ -2,7 +2,7 @@ import { clsx, type ClassValue } from 'clsx';
 import { extendTailwindMerge, validators } from 'tailwind-merge';
 
 import type { RoadmapFeatureWord, RoadmapPicture } from '@/shared/roadmap-types';
-import type { DispatcherModelWord, Project, ProjectSession, SlashCommand } from '@/shared/types';
+import type { AffectedAreasTrouble, DispatcherModelWord, Project, ProjectSession, SlashCommand } from '@/shared/types';
 
 //----------------- DEPLOYMENT MODE ------------
 
@@ -611,4 +611,38 @@ export function wheelZoomRatio(event: WheelEvent): number {
  */
 export function isEngineHandledCommand(command: SlashCommand): boolean {
   return command.type === 'skill' || command.type === 'engine' || command.metadata?.type === 'skill';
+}
+
+// ---------------------------
+
+//----------------- A LANE READ THAT BROUGHT NO ANSWER ------------
+// Pure: the hooks hand these what `fetch` gave or threw, and draw the trouble each returns.
+
+/**
+ * The trouble a non-2xx answer of a shadow-connector lane stands for (the Tours lane's and the Bulletins lane's: one
+ * forwarder). The lane's own faults carry their status (`api.affectedAreas`'s note): 502 is an answer that was not JSON,
+ * 503 is either the missing secret or a shadow-connector that did not answer, told apart by the lane's sentence (it
+ * names the secret; the other never does). A 404 is the tour, pano, bulletin or page gone; anything else (a 422, a 500)
+ * is a refusal the screen can only call a failed read.
+ *
+ * Used by `useLaneRead`, by the affected-areas module's `usePano` and `useTourReader`, and by its `answerOfWrite`.
+ */
+export async function troubleOfResponse(response: Response): Promise<AffectedAreasTrouble> {
+  if (response.status === 404) return 'gone';
+  if (response.status === 502) return 'unreadable';
+  if (response.status === 503) {
+    const body: unknown = await response.json().catch(() => null);
+    const sentence = typeof body === 'object' && body !== null ? (body as { error?: unknown }).error : null;
+    return typeof sentence === 'string' && sentence.includes('secret') ? 'no_secret' : 'unreachable';
+  }
+  return 'failed';
+}
+
+/**
+ * The trouble a thrown `fetch` or `.json()` stands for: a body that would not parse is an answer CloudCLI cannot
+ * read; everything else (no connection, the client's own deadline) is no answer in time. Used where
+ * `troubleOfResponse` is.
+ */
+export function troubleOfFailure(failure: unknown): AffectedAreasTrouble {
+  return failure instanceof SyntaxError ? 'unreadable' : 'unreachable';
 }

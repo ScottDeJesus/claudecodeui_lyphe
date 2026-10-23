@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
 
-import { troubleOfFailure, troubleOfResponse } from '@/modules/affected-areas/utils/laneTrouble';
 import type { AffectedAreasRead, AffectedAreasTrouble } from '@/shared/types';
+import { troubleOfFailure, troubleOfResponse } from '@/shared/utils';
 
 type Settled<T> = { key: string; value: T | null; trouble: AffectedAreasTrouble | null };
 
 /**
- * One JSON read of the affected-areas lane, kept for the key it was made for. The read happens when the key is set or
+ * One JSON read of a shadow-connector lane (affected-areas', carrier-bulletins'), kept for the key it was made for. The read happens when the key is set or
  * changes and when `retry` or `reload` is called — never on a timer, so a view that is hidden reads nothing. A null
  * key reads nothing. `fetchFor` must be the same function on every render (a module-level one): it is in the
  * effect's dependencies, so a new one each render would read again each render.
@@ -18,7 +18,8 @@ type Settled<T> = { key: string; value: T | null; trouble: AffectedAreasTrouble 
  * a pano the tour had not yet listed as cut, answers after the key was set), and it outranks every read that began
  * before it: those are dropped on arrival, so a stale read can never land over a newer answer.
  *
- * Used by the affected-areas module's `useTours`, `useTour`, `useCodebook`, `usePano`, `useQueue` and `useProving`.
+ * Used by the affected-areas module's `useTours`, `useTour`, `useCodebook`, `usePano`, `useQueue` and `useProving`, and the
+ * carrier-bulletins module's `useOverview`, `useBulletinPages` and `usePageReading`.
  */
 export function useLaneRead<T>(key: string | null, fetchFor: (key: string) => Promise<Response>): AffectedAreasRead<T> & {
   reload: () => void;

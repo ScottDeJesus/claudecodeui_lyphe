@@ -14,3 +14,6 @@ export { each, field, isCount, isCountOrNull, isFlag, isList, isRecord, isText, 
 // bulletins lane), each of which owns its allowlist and builds its own forwarder with its own label.
 export { createShadowConnectorLane } from './shadow-connector-lane.js';
 export type { LaneAnswer, LaneRequest, ShadowConnectorLane, ShadowConnectorLaneDependencies } from './shadow-connector-lane.js';
+// The allowlist router the two lanes' routes files hand their tables to, and the id checks they share.
+export { LOWERCASE_UUID_RULE, LOWERCASE_UUID_SOURCE, SHA256_RULE, createLaneRouter, patternRule } from './shadow-connector-lane-router.js';
+export type { LaneRoute, LaneRouterDefinition, LaneRule } from './shadow-connector-lane-router.js';

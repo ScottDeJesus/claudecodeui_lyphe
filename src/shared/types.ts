@@ -3,7 +3,7 @@ import type { TFunction } from 'i18next';
 import type { ComponentType, HTMLAttributes, ReactNode } from 'react';
 import type { NavigateFunction } from 'react-router-dom';
 
-import type { QueueItem, ReadResult, Region } from '@/shared/affected-areas-types';
+import type { Face, QueueItem, ReadResult, Region } from '@/shared/affected-areas-types';
 import type { AppEntry } from '@/shared/app-types';
 import type { CerberusNodeView, CerberusServiceView, CerberusStatus } from '@/shared/cerberus-types';
 
@@ -376,6 +376,42 @@ export type RegionShape = {
   wash: 'full' | 'light' | 'none';
   label: string;
 };
+
+/**
+ * Six square photos of a cube seen from its centre, for the kit's `SphereView`: `left`, `front`, `right` and `back`
+ * upright; `top` as seen looking up, its upper edge toward `back`; `bottom` as seen looking down, its upper edge
+ * toward `front`. Each is a URL the browser can load (an object URL included).
+ */
+export type CubeFaces = {
+  left: string;
+  front: string;
+  right: string;
+  back: string;
+  top: string;
+  bottom: string;
+};
+
+/**
+ * One area the kit's `SphereView` draws on its sphere, already translated into looks, as `RegionShape` is for a flat
+ * photo. `polygon` and `badgeAt` are `[yawDeg, pitchDeg]`: yaw grows turning right, pitch grows up, and (0, 0) is the
+ * front face's centre. `ordinal` is the number on the badge, which sits at `badgeAt`; `tone`, `edge` and `wash` are the
+ * outline's look, the same three words `RegionShape` carries.
+ */
+export type SphereShape = {
+  id: string;
+  ordinal: number;
+  polygon: [number, number][];
+  badgeAt: [number, number];
+  tone: Tone;
+  edge: 'solid' | 'dashed';
+  wash: 'full' | 'light' | 'none';
+};
+
+/** Where a `SphereView` looks: the centre of its view (yaw and pitch, as `SphereShape` has them) and its field of view, in degrees. */
+export type SphereLook = { yawDeg: number; pitchDeg: number; fovDeg: number };
+
+/** What can go wrong inside a `SphereView`, said to its caller: the browser has no WebGL 2, or a face's photo would not load. */
+export type SphereTrouble = 'no_webgl' | 'photo_failed';
 
 /**
  * One tile of the kit's `Gallery`. `tag` is the word every tile carries (a room's name), `src` the photo
@@ -2287,7 +2323,9 @@ type TaskPriority = 'high' | 'medium' | 'low' | string;
 
 /**
  * One account in the door's picture, relayed unchanged from `claude-account status --json`.
- * `slug` is the account's name in every sentence a person reads; `digest` stays in data. Times are
+ * `slug` is the account's name in every sentence a person reads; `email` is its sign-in email off its
+ * saved slot, the name its row and the closed footer row SHOW (null when the slot names none, and the
+ * slug shows instead); `digest` stays in data. Times are
  * epoch SECONDS. `reading.five` and `reading.week` are fractions 0..1 — window POINTS once multiplied
  * by 100, never dollars (INV-4299) — or null for a window the pacer could not measure, which draws
  * as unknown and never as zero; `reading.at` is when that reading was filed. `token` is the
@@ -2296,6 +2334,7 @@ type TaskPriority = 'high' | 'medium' | 'low' | string;
  */
 export type ClaudeAccountRow = {
   slug: string;
+  email: string | null;
   digest: string;
   token: 'none' | 'saved' | 'checking';
   expires_at: number | null;
@@ -2333,7 +2372,7 @@ export type ClaudeAccountSwitch = {
  */
 export type ClaudeAccountsPicture = {
   accounts: ClaudeAccountRow[];
-  candidates: { slug: string; digest: string }[];
+  candidates: { slug: string; digest: string; email: string | null }[];
   auto: boolean;
   held: boolean;
   chosen: { slug: string; digest: string; at: number; by: 'operator' | 'auto'; why: string } | null;
@@ -2685,10 +2724,10 @@ export type CerberusEnrollRefusal =
 // What the Cerberus tab's root (`src/modules/cerberus/CerberusPanel.tsx`) holds between presses.
 
 /**
- * The Cerberus tab's views, in the order its strip offers them: Fleet, Catalog, History, then Tours. The root's
- * view table gives each its name and its hint.
+ * The Cerberus tab's views, in the order its strip offers them: Fleet, Catalog, History, Tours, then Bulletins. The
+ * root's view table gives each its name and its hint.
  */
-export type CerberusView = 'fleet' | 'catalog' | 'history' | 'tours';
+export type CerberusView = 'fleet' | 'catalog' | 'history' | 'tours' | 'bulletins';
 
 // ---------------------------
 
@@ -2749,6 +2788,13 @@ export type ToursScreenKey = 'tours' | 'mark' | 'tables';
  * `standing` flag is true: what the system currently believes. The flag is the engine's; the screen never re-derives it.
  */
 export type RegionLayer = 'standing' | 'all';
+
+/**
+ * What a pano shows: one of its six views at a time (`Face`, the engine's own word for one), or `sphere`, the same six
+ * stitched back into one 360° photo. The face strip offers 360° first, and a pano opens on it. Held by the view root
+ * (`usePanoPlace`) and shared by `FaceStrip` and `PanoScreen`.
+ */
+export type PanoShown = 'sphere' | Face;
 
 /**
  * The Mark screen's walk through one queue the engine orders (`useQueue(mode, cls)` over `GET /queue`):

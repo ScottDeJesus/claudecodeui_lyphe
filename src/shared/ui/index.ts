@@ -40,6 +40,12 @@
  * module. Both paint in verve/media.css; both put a photo in a box through PhotoFill, which is not exported
  * from here: the broken-image tile is one drawing for the two, and nothing outside this folder asks for it.
  *
+ * SphereView came in with one consumer, the affected-areas module's pano screen, on the same mechanism test: a WebGL sphere
+ * with a frame loop, its drag and zoom, and outlines laid on it by yaw and pitch are what no arrangement of the parts here
+ * produces. Its next is the roadmap's photo work, where in a tour's pano a CompanyCam photo was taken. It knows a cube, its
+ * outlines and their tones; the engine's faces, areas and looks stay in the module. three.js and the viewer load in a chunk
+ * of their own the first time a sphere is drawn, so this barrel names the piece and never its canvas (`sphere/`).
+ *
  * SegmentedControl and DataTable came in because Verve draws them (§11 Plumbing and §5), with or without a second
  * module ("If Verve draws it, it is in the library. Full stop."), for the affected-areas module's marking screens: the
  * three switches and the proving tables. They paint in verve/data.css. The chat transcript's own `DataTable`
@@ -62,8 +68,8 @@ import '@/shared/ui/verve/surfaces.css';
 // here depends on its place against controls.css, feedback.css or surfaces.css, and the one constraint
 // is that board.css stays last, below.
 import '@/shared/ui/verve/panels.css';
-// media.css holds the paint of RegionImage and Gallery. Its place is free: no selector in it is shared with
-// any sibling sheet (`.vv-region*` and `.vv-gallery*` are its own), and every rule reads only tokens, so
+// media.css holds the paint of RegionImage, SphereView and Gallery. Its place is free: no selector in it is shared with
+// any sibling sheet (`.vv-region*`, `.vv-sphere*` and `.vv-gallery*` are its own), and every rule reads only tokens, so
 // nothing depends on its landing before or after controls.css, feedback.css, surfaces.css or panels.css.
 // The one constraint is still that board.css stays last, below.
 import '@/shared/ui/verve/media.css';
@@ -161,6 +167,9 @@ export { SettingRow } from '@/shared/ui/SettingRow';
 export { Sheet } from '@/shared/ui/Sheet';
 export { Shimmer } from '@/shared/ui/Shimmer';
 export { Spinner } from '@/shared/ui/Spinner';
+// Six photos of a cube stitched into one sphere you drag and zoom, with RegionImage's outlines and numbered badges laid on
+// it by yaw and pitch. The affected-areas module's pano screen draws a pano's six views with it; the viewer loads on first use.
+export { SphereView } from '@/shared/ui/SphereView';
 export { SplitPane, SPLIT_MIN_RATIO, SPLIT_MAX_RATIO } from '@/shared/ui/SplitPane';
 export { Stepper } from '@/shared/ui/Stepper';
 // Verve's navigation stepper: numbered rounds, a ✓ once done, an accent rail between. `Steps` and not
@@ -183,4 +192,7 @@ export { Timeline } from '@/shared/ui/Timeline';
 export { Toast } from '@/shared/ui/Toast';
 export { ToastStack } from '@/shared/ui/ToastStack';
 export { Tooltip } from '@/shared/ui/Tooltip';
+// The waiting ring and the failure banner around a lazy view: the Cerberus tab's `KeptView` surrounds the Tours view and
+// the Bulletins view with it, so a chunk that cannot load stays that view's message, never the whole tab's.
+export { ViewBoundary } from '@/shared/ui/ViewBoundary';
 export { ConfirmDialog } from '@/shared/ui/ConfirmDialog';

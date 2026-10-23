@@ -9349,18 +9349,19 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/cl
 
 ## INV-8633 — The lanes to shadow-connector read the secret from its env file at call time and copy it nowhere; an allowlist is the only door
 
-Rules for `server/modules/affected-areas/` (manual: MAN-8559) and the forwarder it builds, `server/shared/shadow-connector-lane.ts` (manual: MAN-8863), which every lane to shadow-connector shares:
+Rules for the two lanes to shadow-connector — `server/modules/affected-areas/` (manual: MAN-8559) and `server/modules/carrier-bulletins/` (manual: MAN-8909) — the forwarder they share, `server/shared/shadow-connector-lane.ts` (manual: MAN-8863), and the allowlist router beside it, `server/shared/shadow-connector-lane-router.ts` (manual: MAN-8908):
 
-1. `EIS_INTERNAL_SECRET` is read in `server/shared/shadow-connector-lane.ts` and nowhere else, and is never written to `process.env`, this server's `.env`, a log line or an error message. why: a copy drifts on rotation, and the agent sessions this server spawns inherit its environment. A second lane imports the forwarder; it does not parse the env file itself.
+1. `EIS_INTERNAL_SECRET` is read in `server/shared/shadow-connector-lane.ts` and nowhere else, and is never written to `process.env`, this server's `.env`, a log line or an error message. why: a copy drifts on rotation, and the agent sessions this server spawns inherit its environment. A lane imports the forwarder; it does not parse the env file itself.
 2. `describeFailure` uses only an error's NAME and its cause's CODE, never its message. why: a transport error can quote the request, and the request carries the secret.
-3. Only `affected-areas.module.ts` reads `SHADOW_CONNECTOR_URL` / `SHADOW_CONNECTOR_ENV_FILE` for this lane, and passes the values to `createShadowConnectorLane` with its `label`. why: a scratch engine or an empty env file is proven by setting the variable before `createAffectedAreasModule()`.
-4. A new engine route reaches the browser only as a row of `ALLOWLIST` with its id rules, query rules and body kind. why: an unlisted path is the lane's own 404 and a bad id a 422 before any byte leaves; the lane never forwards a caller-invented path or query key.
-5. The lane never reshapes an upstream body: status and JSON pass through whole; only lane faults carry `{ error }`.
+3. Only a lane's own module (`affected-areas.module.ts`, `carrier-bulletins.module.ts`) reads `SHADOW_CONNECTOR_URL` / `SHADOW_CONNECTOR_ENV_FILE` for its lane, and passes the values to `createShadowConnectorLane` with its own distinct `label`. why: a scratch engine or an empty env file is proven by setting the variable before `createAffectedAreasModule()` / `createCarrierBulletinsModule()`; a shared label would make two lanes' journal lines indistinguishable.
+4. A new engine route reaches the browser only as a row of its lane's `ALLOWLIST` with its id rules, query rules and body kind, answered by `createLaneRouter`. why: an unlisted path is the lane's own 404 and a bad id a 422 before any byte leaves; the lane never forwards a caller-invented path or query key. The bulletins lane's table is GET rows only, because its surface is read-only (INV-9382 in shadow-connector).
+5. The lane never reshapes an upstream body: status and JSON pass through whole; only lane faults carry `{ error }`. An upstream response header travels only when the lane names it (`passHeaders`); the Tours lane names none, the bulletins lane `x-left-out` and `cache-control`. An image is relayed only if its bytes begin with the lane's format signature as well as carrying its Content-Type.
 6. `fetch` keeps `redirect: 'manual'`. why: the secret header must not follow a `Location`.
+7. A lane's routes do not copy the router's loop, its tails or its fault-to-status map: a lane that needs different behaviour changes `LaneRouterDefinition`. why: two copies of the checks drift, and a check that is weaker in one lane is an id the engine sees.
 
-Trap: a unit that exports `EIS_INTERNAL_SECRET` in its own environment overrides `.env` for the engine (`main.py` calls `load_dotenv()` with its default `override=False`, so the process environment wins) but not for the lane, which reads only the file: the two then disagree and every forward is the engine's 403. Read from the code 2026-10-17; not reproduced.
+Trap: a unit that exports `EIS_INTERNAL_SECRET` in its own environment overrides `.env` for the engine (`main.py` calls `load_dotenv()` with its default `override=False`, so the process environment wins) but not for the lanes, which read only the file: the two then disagree and every forward is the engine's 403. Read from the code 2026-10-17; not reproduced.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/affected-areas/affected-areas.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/affected-areas/affected-areas.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/shadow-connector-lane.ts
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/affected-areas/affected-areas.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/affected-areas/affected-areas.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/carrier-bulletins/carrier-bulletins.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/carrier-bulletins/carrier-bulletins.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/shadow-connector-lane-router.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/shadow-connector-lane.ts
 
 ## INV-8644 — probe — LOW — The gallery tag is 3.55:1 over a white photo, and neither the sheet nor the report says so
 
@@ -9489,7 +9490,7 @@ expect: "image requests after the tour opens: 30 | unique shas: 30 | tiles drawn
 measured 2026-10-17 by chain chain-tour-affected-areas--viewer--fill-20261017-140745-860f, finding L1, LOW
 probe-key: a7177ed89906e14a4ad694f7ee445c78b126b296
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/hooks/useImageUrl.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/hooks/useLaneRead.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/hooks/usePano.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/utils/laneTrouble.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/CerberusPanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/common.json, /home/lyphe/.claude/claudecodeui_lyphe/.verify/affected-areas-view.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/affected-areas-walk.mjs
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/hooks/useImageUrl.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/hooks/usePano.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/utils/laneTrouble.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/CerberusPanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/common.json, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/useLaneRead.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/affected-areas-view.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/affected-areas-walk.mjs
 
 ## INV-8675 — probe — (LOW) — A never-cut pano whose cut failed to answer has no Try again
 
@@ -9503,7 +9504,7 @@ expect: "alerts":["shadow-connector can't be reached"] and "buttons":["Israel Se
 measured 2026-10-17 by chain chain-tour-affected-areas--viewer--fill-20261017-140745-860f, finding L3, LOW
 probe-key: 3ea2d1ac777ea3fde8a56e570c07c5ed9a6b6555
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/hooks/useImageUrl.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/hooks/useLaneRead.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/hooks/usePano.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/utils/laneTrouble.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/CerberusPanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/common.json, /home/lyphe/.claude/claudecodeui_lyphe/.verify/affected-areas-view.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/affected-areas-walk.mjs
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/hooks/useImageUrl.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/hooks/usePano.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/utils/laneTrouble.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/CerberusPanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/common.json, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/useLaneRead.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/affected-areas-view.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/affected-areas-walk.mjs
 
 ## INV-8676 — probe — (LOW) — An in-flight press is forgotten when another pano is opened and the first one comes back
 
@@ -9517,7 +9518,7 @@ expect: line "back on A, A still in flight" reads btn ["Read this pano"], busy 0
 measured 2026-10-17 by chain chain-tour-affected-areas--viewer--fill-20261017-140745-860f, finding L4, LOW
 probe-key: 5aae3c8d51a81dfcf76a3b9748aec062a3a61077
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/hooks/useImageUrl.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/hooks/useLaneRead.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/hooks/usePano.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/utils/laneTrouble.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/CerberusPanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/common.json, /home/lyphe/.claude/claudecodeui_lyphe/.verify/affected-areas-view.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/affected-areas-walk.mjs
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/hooks/useImageUrl.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/hooks/usePano.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/utils/laneTrouble.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/CerberusPanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/common.json, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/useLaneRead.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/affected-areas-view.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/affected-areas-walk.mjs
 
 ## INV-8687 — probe — LOW — Skip on the last area of a batch while its mark is out reads a batch that serves the marked area again, offered with its presses on; a second press writes a second row
 
@@ -11426,43 +11427,6 @@ probe-key: bda706a7a70fa1a3de7d7b31e8c4820d226f6238
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/account-digest.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/account-door-relay.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/account-identity.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/accounts.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/accounts.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/account-store.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/usage.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-auth.provider.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/AccountFooterRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/AccountPopover.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/ClaudeAccountRows.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/claude-accounts-fake.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/hooks/useClaudeAccounts.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/UsageMeters.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/utils/accountInUseUsage.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/Settings.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Banner.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/panel-fill.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-14.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-19.mjs
 
-## INV-9302 — probe — MEDIUM — `said` is typed `VerdictWord` on `JudgedRule` and `PageFailure`, and the owner stores `"(no entry)"` there
-
-MEDIUM — `said` is typed `VerdictWord` on `JudgedRule` and `PageFailure`, and the owner stores `"(no entry)"` there
-
-```probe
-D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
-cat > "$D/p.sh" <<'EOF'
-cd /opt/shadow-connector || exit 1
-venv/bin/python - <<'PY'
-import asyncio, datetime as dt, uuid
-from extractors.servpro_bulletins.verify.read import read_page, unsettled_entry
-from extractors.servpro_bulletins.verify.prompt import PageContext
-from extractors.servpro_bulletins.verify.candidates import Candidate
-async def ask(prompt, pdf, mime, **kw):
-    return "this is not json"
-now = dt.datetime.now(dt.timezone.utc)
-cand = Candidate(id=str(uuid.uuid4()), bulletin_id=str(uuid.uuid4()), page=3, subject="x", raw_rule_text="Contact within 24 hours.",
-                 fields=dict(requires_pre_approval=False, notification_window_hours=24, window_time_basis='calendar', threshold_value=None,
-                             threshold_unit=None, stage=None, deadline_type=None, loss_types=None, cadence_period=None, is_cadence=False),
-                 stamps={}, revised_at=now, is_current=True, bulletin_number="1", revision="A", created_at=now)
-res = asyncio.run(read_page(PageContext(carrier="Stub", bulletin="#1", total_pages=5, page=3, held=(3,)), b"%PDF", "Contact within 24 hours.", [cand], model="stub", ask=ask))
-print("refused:", bool(res.refused))
-for e in res.entries:
-    print("entry verdict=%r said=%r failures=%d" % (e.verdict, e.said, len(e.failures)))
-PY
-grep -n "said:" /home/lyphe/.claude/claudecodeui_lyphe/src/shared/carrier-bulletins-types.ts || echo "types: no said member"
-grep -n "no entry" /opt/shadow-connector/extractors/servpro_bulletins/verify/views.py 2>/dev/null || echo "views.py: absent or silent on the word"
-EOF
-bash "$D/p.sh"
-expect: while the defect stands: `refused: True`, `entry verdict='unsettled' said='(no entry)' failures=1`, two lines `said: VerdictWord;` (207 and 226), and `views.py: absent or silent on the word`; cured when the types' `said` members admit the word, or `views.py` is shown to map it and the header says so
-```
-
-measured 2026-10-21 by chain chain-bulletins-read-by-claude--wire-20261021-220823-7261, finding M1, MEDIUM
-probe-key: f43f6eaaefa657324cf3d15a85a9276f920d7b2a
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/.oxlintrc.json, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/carrier-bulletins-types.ts
-
 ## INV-9303 — probe — LOW — `MAN-8865` is not served on a touch of `api.ts`, and the row that is served does not name `carrierBulletins`
 
 LOW — `MAN-8865` is not served on a touch of `api.ts`, and the row that is served does not name `carrierBulletins`
@@ -11621,3 +11585,427 @@ measured 2026-10-21 by chain chain-usage-limits--account-switch--whole-20261021-
 probe-key: cea89c710a67633226d57a865016753d0f04adef
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/console.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/whole-account-switch-panel.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/whole-account-switch-passes.py, /home/lyphe/.claude/claudecodeui_lyphe/.verify/whole-account-switch.sh, /home/lyphe/.claude/hooks/enforce_claude_api_secret.py, /home/lyphe/.claude/hooks/plan_runner/claude_account/route.py
+
+## INV-9404 — probe — MEDIUM — the lane drops every response header, so the engine's `X-Left-Out` never reaches the browser, and the requirement was deleted instead of met
+
+MEDIUM — the lane drops every response header, so the engine's `X-Left-Out` never reaches the browser, and the requirement was deleted instead of met
+
+```probe
+D=$(mktemp -d /tmp/athena-probe-lo.XXXXXX) || exit 1
+cat > "$D/p.mts" <<'EOF'
+import http from 'node:http'; import fs from 'node:fs'; import os from 'node:os'; import path from 'node:path'; import express from 'express';
+const eng = http.createServer((_q, r) => { r.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store, max-age=0', 'x-left-out': '[{"carrier":"State Farm","reason":"unplannable"}]' }); r.end('[{"carrier":"Hanover Insurance"}]'); });
+await new Promise<void>((res) => eng.listen(0, '127.0.0.1', res));
+const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'athena-lo-env-')); const env = path.join(tmp, 'env'); fs.writeFileSync(env, 'EIS_INTERNAL_SECRET=scratch-secret\n');
+process.env.SHADOW_CONNECTOR_URL = `http://127.0.0.1:${(eng.address() as any).port}`; process.env.SHADOW_CONNECTOR_ENV_FILE = env;
+const { createCarrierBulletinsModule } = await import('/home/lyphe/.claude/claudecodeui_lyphe/server/modules/carrier-bulletins/index.ts');
+const app = express(); app.use('/api/carrier-bulletins', createCarrierBulletinsModule().router);
+const lane = http.createServer(app); await new Promise<void>((res) => lane.listen(0, '127.0.0.1', res));
+const rs = await fetch(`http://127.0.0.1:${(lane.address() as any).port}/api/carrier-bulletins/overview`);
+console.log('lane answers', rs.status, '| x-left-out=' + rs.headers.get('x-left-out'), '| cache-control=' + rs.headers.get('cache-control'), '| body=' + (await rs.text()));
+process.exit(0);
+EOF
+cd /home/lyphe/.claude/claudecodeui_lyphe && TSX_TSCONFIG_PATH=server/tsconfig.json timeout 60 node --import tsx "$D/p.mts"
+expect: lane answers 200 | x-left-out=null | cache-control=null | body=[{"carrier":"Hanover Insurance"}]
+```
+
+measured 2026-10-22 by chain chain-bulletins-read-by-claude--relay-20261022-095239-89c8, finding M1, MEDIUM
+probe-key: 48e4e43024f75119b9a380d59beed15149ae8d4f
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/affected-areas/affected-areas.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/carrier-bulletins/carrier-bulletins.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/carrier-bulletins/carrier-bulletins.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/carrier-bulletins/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/shadow-connector-lane-router.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/shadow-connector-lane.ts
+
+## INV-9405 — probe — LOW — "a 2xx that is not a PNG is the lane's unreadable" is held by the Content-Type header alone
+
+LOW — "a 2xx that is not a PNG is the lane's unreadable" is held by the Content-Type header alone
+
+```probe
+D=$(mktemp -d /tmp/athena-probe-png.XXXXXX) || exit 1
+cat > "$D/p.mts" <<'EOF'
+import http from 'node:http'; import fs from 'node:fs'; import os from 'node:os'; import path from 'node:path'; import express from 'express';
+const eng = http.createServer((_q, r) => { r.writeHead(200, { 'content-type': 'image/png' }); r.end('<html>an error page, not a PNG</html>'); });
+await new Promise<void>((res) => eng.listen(0, '127.0.0.1', res));
+const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'athena-png-env-')); const env = path.join(tmp, 'env'); fs.writeFileSync(env, 'EIS_INTERNAL_SECRET=scratch-secret\n');
+process.env.SHADOW_CONNECTOR_URL = `http://127.0.0.1:${(eng.address() as any).port}`; process.env.SHADOW_CONNECTOR_ENV_FILE = env;
+const { createCarrierBulletinsModule } = await import('/home/lyphe/.claude/claudecodeui_lyphe/server/modules/carrier-bulletins/index.ts');
+const app = express(); app.use('/api/carrier-bulletins', createCarrierBulletinsModule().router);
+const lane = http.createServer(app); await new Promise<void>((res) => lane.listen(0, '127.0.0.1', res));
+const sha = 'a'.repeat(64);
+const rs = await fetch(`http://127.0.0.1:${(lane.address() as any).port}/api/carrier-bulletins/files/${sha}/pages/1/image`);
+const b = Buffer.from(await rs.arrayBuffer());
+console.log('lane answers', rs.status, '| content-type=' + rs.headers.get('content-type'), '| cache-control=' + rs.headers.get('cache-control'), '| PNG signature=' + (b.subarray(0, 8).toString('hex') === '89504e470d0a1a0a'), '| first bytes=' + JSON.stringify(b.subarray(0, 12).toString('latin1')));
+process.exit(0);
+EOF
+cd /home/lyphe/.claude/claudecodeui_lyphe && TSX_TSCONFIG_PATH=server/tsconfig.json timeout 60 node --import tsx "$D/p.mts"
+expect: lane answers 200 | content-type=image/png | cache-control=private, max-age=31536000, immutable | PNG signature=false | first bytes="<html>an err"   (cured: 502 and no cache-control)
+```
+
+measured 2026-10-22 by chain chain-bulletins-read-by-claude--relay-20261022-095239-89c8, finding L1, LOW
+probe-key: 34b30e90d6daa6cf7193349afd1df8abc6a3d5b0
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/affected-areas/affected-areas.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/carrier-bulletins/carrier-bulletins.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/carrier-bulletins/carrier-bulletins.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/carrier-bulletins/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/shadow-connector-lane-router.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/shadow-connector-lane.ts
+
+## INV-9406 — probe — LOW — rows lost: the move out of MAN-8559 dropped three facts that no row carries now
+
+LOW — rows lost: the move out of MAN-8559 dropped three facts that no row carries now
+
+```probe
+for t in MAN-8863 INV-8633 MAN-8908 MAN-8909 MAN-8559; do echo "$t begins-with-quote=$(docstore get $t --text | grep -c -i 'begins with') next(error)=$(docstore get $t --text | grep -c 'next(error)')"; done; docstore history MAN-8559 --limit 1 --diff --text | grep -c 'really begins with'
+expect: every row prints begins-with-quote=0 next(error)=0, and the last line prints 1 (the clause sits in the before-image of MAN-8559's 17:03 write)
+```
+
+measured 2026-10-22 by chain chain-bulletins-read-by-claude--relay-20261022-095239-89c8, finding L2, LOW
+probe-key: f0bf3cac0de8086c7847e20ea4216170a1db7b88
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/affected-areas/affected-areas.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/carrier-bulletins/carrier-bulletins.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/carrier-bulletins/carrier-bulletins.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/carrier-bulletins/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/shadow-connector-lane-router.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/shadow-connector-lane.ts
+
+## INV-9443 — probe — MEDIUM — the card's Delete is never drawn for a plan whose design is waiting, so "the card's Delete relays this verb, so it withdraws too, with no app change" is false
+
+MEDIUM — the card's Delete is never drawn for a plan whose design is waiting, so "the card's Delete relays this verb, so it withdraws too, with no app change" is false
+
+```probe
+bash /home/lyphe/.claude/state/pipeline-reviews/queued-design-amend-withdraw/athena-probes/card.sh
+echo "[probe exit $?]"
+expect: `card draws Delete with its design queued: true` (today: false; the no-outing line prints true either way)
+```
+
+measured 2026-10-22 by chain chain-queued-design-amend-withdraw-20261022-142729-ba02, finding M1, MEDIUM
+probe-key: 539be1f68ee680e5b51ad25df18fd80ae1962dfd
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/dispatcherState.ts, /home/lyphe/.claude/hooks/dispatcher/planner_claim.py, /home/lyphe/.claude/hooks/dispatcher/planner_waiting.py, /home/lyphe/.claude/hooks/dispatcher/store.py, /home/lyphe/.claude/skills/feature/SKILL.md
+
+## INV-9444 — probe — MEDIUM — `tell <plan>` can amend the ARC's waiting `tell`, and the appended words name no plan
+
+MEDIUM — `tell <plan>` can amend the ARC's waiting `tell`, and the appended words name no plan
+
+```probe
+bash /home/lyphe/.claude/state/pipeline-reviews/queued-design-amend-withdraw/athena-probes/arc_addressee.sh
+echo "[probe exit $?]"
+expect: `a queued brief names the plan ax--p: True` (today: False; the door prints AMENDED tell ax--p over the arc's row)
+```
+
+measured 2026-10-22 by chain chain-queued-design-amend-withdraw-20261022-142729-ba02, finding M2, MEDIUM
+probe-key: d3e8fd1e1c7242c96d1d153fc0d8a7c45797dbf4
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/dispatcherState.ts, /home/lyphe/.claude/hooks/dispatcher/planner_claim.py, /home/lyphe/.claude/hooks/dispatcher/planner_waiting.py, /home/lyphe/.claude/hooks/dispatcher/store.py, /home/lyphe/.claude/skills/feature/SKILL.md
+
+## INV-9445 — probe — LOW — an amend skips the Rework's disarm, so an armed Accept-when-cut stands over a design a tell is about to change
+
+LOW — an amend skips the Rework's disarm, so an armed Accept-when-cut stands over a design a tell is about to change
+
+```probe
+bash /home/lyphe/.claude/state/pipeline-reviews/queued-design-amend-withdraw/athena-probes/armed_amend.sh
+echo "[probe exit $?]"
+expect: `Accept still armed after the second tell: False` (today: True)
+```
+
+measured 2026-10-22 by chain chain-queued-design-amend-withdraw-20261022-142729-ba02, finding L1, LOW
+probe-key: db35e1860cc9a42bfb49a131c15baa02104185cf
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/dispatcherState.ts, /home/lyphe/.claude/hooks/dispatcher/planner_claim.py, /home/lyphe/.claude/hooks/dispatcher/planner_waiting.py, /home/lyphe/.claude/hooks/dispatcher/store.py, /home/lyphe/.claude/skills/feature/SKILL.md
+
+## INV-9446 — probe — LOW — when the claim file cannot be written, a `tell` in the fork window prints AMENDED over a body the fork never reads (a `drop` there would delete the row under a forked child)
+
+LOW — when the claim file cannot be written, a `tell` in the fork window prints AMENDED over a body the fork never reads (a `drop` there would delete the row under a forked child)
+
+```probe
+bash /home/lyphe/.claude/state/pipeline-reviews/queued-design-amend-withdraw/athena-probes/claim_unwritable.sh
+echo "[probe exit $?]"
+expect: the door does not print AMENDED while no claim stands (today: `claim file during the fork window: []`, AMENDED, `the forked outing read the body: False`)
+```
+
+measured 2026-10-22 by chain chain-queued-design-amend-withdraw-20261022-142729-ba02, finding L2, LOW
+probe-key: 66717b08870e4a1875036280772c03300db8cd8c
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/dispatcherState.ts, /home/lyphe/.claude/hooks/dispatcher/planner_claim.py, /home/lyphe/.claude/hooks/dispatcher/planner_waiting.py, /home/lyphe/.claude/hooks/dispatcher/store.py, /home/lyphe/.claude/skills/feature/SKILL.md
+
+## INV-9447 — probe — LOW — three statements the change made false stay in the docs
+
+LOW — three statements the change made false stay in the docs
+
+```probe
+bash /home/lyphe/.claude/state/pipeline-reviews/queued-design-amend-withdraw/athena-probes/docs.sh
+echo "[probe exit $?]"
+expect: no stale lines (today: 3 lines, MANUAL:96, MANUAL:121, dispatcherState.ts:225)
+```
+
+measured 2026-10-22 by chain chain-queued-design-amend-withdraw-20261022-142729-ba02, finding L3, LOW
+probe-key: 0e08bed802a9a12261d0c8f9b2f41aadc173706b
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/dispatcherState.ts, /home/lyphe/.claude/hooks/dispatcher/planner_claim.py, /home/lyphe/.claude/hooks/dispatcher/planner_waiting.py, /home/lyphe/.claude/hooks/dispatcher/store.py, /home/lyphe/.claude/skills/feature/SKILL.md
+
+## INV-9448 — probe — LOW — the skill says a waiting design is "withdrawn by `dispatcher drop <name>`", but the feature leaves the roadmap with it
+
+LOW — the skill says a waiting design is "withdrawn by `dispatcher drop <name>`", but the feature leaves the roadmap with it
+
+```probe
+bash /home/lyphe/.claude/state/pipeline-reviews/queued-design-amend-withdraw/athena-probes/drop_roadmap.sh
+echo "[probe exit $?]"
+expect: `f still on the roadmap after the drop: 0` and the skill line names the feature leaving (today: skill count 0)
+```
+
+measured 2026-10-22 by chain chain-queued-design-amend-withdraw-20261022-142729-ba02, finding L4, LOW
+probe-key: d9abf2728342deb01dd53c852b32c2d3c38fe1ae
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/dispatcher/dispatcher.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/dispatcherState.ts, /home/lyphe/.claude/hooks/dispatcher/planner_claim.py, /home/lyphe/.claude/hooks/dispatcher/planner_waiting.py, /home/lyphe/.claude/hooks/dispatcher/store.py, /home/lyphe/.claude/skills/feature/SKILL.md
+
+## INV-9451 — probe — . The standing proof cannot run on today's data, and its `RequirementWindow` verdict now false-FAILs on a healthy deadline-only or cadence-only page — the H1 cure made `cadence` a mirror member beside three optional ones, and the proof still compares for equality
+
+. The standing proof cannot run on today's data, and its `RequirementWindow` verdict now false-FAILs on a healthy deadline-only or cadence-only page — the H1 cure made `cadence` a mirror member beside three optional ones, and the proof still compares for equality
+
+```probe
+D=$(mktemp -d /tmp/athena-probe-rw2-XXXXXX) || exit 1
+cat > "$D/p.mjs" <<'JS'
+import fs from 'node:fs';
+import { curlJson, loginToken } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/whole-check-kit.mjs';
+const mirror = fs.readFileSync('/home/lyphe/.claude/claudecodeui_lyphe/src/shared/carrier-bulletins-types.ts', 'utf8');
+// the proof's own member regex and its own equality (.verify/bulletins-view.mjs `membersOf` / `sameList`)
+const body = mirror.match(/export type RequirementWindow = \{([\s\S]*?)\n\};/);
+const mirrored = body === null ? null : [...body[1].matchAll(/^ {2}(\w+)\??:/gm)].map((m) => m[1]).sort();
+console.log('RequirementWindow members as the proof reads them:', JSON.stringify(mirrored));
+const token = loginToken();
+const get = (r) => { for (let i = 0; i < 6; i++) { try { const a = curlJson('GET', `/api/carrier-bulletins${r}`, undefined, token); if (a.status === 200) return a.body; } catch (e) {} } return null; };
+const ov = get('/overview') ?? [];
+const sf = ov.find((r) => r.carrier === 'State Farm');
+const pagesOfSf = sf ? get(`/bulletins/${sf.bulletin_id}/pages`) ?? [] : [];
+const state = (n) => pagesOfSf.find((p) => p.page === n)?.state ?? 'none';
+console.log(`the proof's page pick: State Farm p13 is ${state(13)}, p22 is ${state(22)} (it exits 2 unless one is read or settled)`);
+let shown = 0;
+for (const r of ov) {
+  if (shown >= 3) break;
+  for (const p of (get(`/bulletins/${r.bulletin_id}/pages`) ?? []).filter((x) => x.state !== 'unread')) {
+    const ws = (get(`/bulletins/${r.bulletin_id}/pages/${p.page}`)?.requirements ?? []).map((q) => q.window).filter(Boolean);
+    if (ws.length === 0) continue;
+    const live = [...new Set(ws.flatMap((w) => Object.keys(w)))].sort();
+    console.log(`${r.carrier} p${p.page}: live ${JSON.stringify(live)} → "has exactly the members of RequirementWindow": ${JSON.stringify(live) === JSON.stringify(mirrored) ? 'PASS' : 'FAIL'}`);
+    if (++shown >= 3) break;
+  }
+}
+if (shown === 0) console.log('no live requirement window on any read page right now');
+JS
+(cd "$D" && timeout 200 node p.mjs)
+expect: while the defect stands, the mirror line reads ["anchor","basis","cadence","hours"] and every deadline-only page prints FAIL (and while State Farm's p13 and p22 are unread, the pick line says so); once the verdict compares optional members as a subset, no page that carries only known keys prints FAIL
+```
+
+measured 2026-10-22 by chain chain-bulletins-read-by-claude--fill-20261022-124505-62e0, finding M1, MEDIUM
+probe-key: 383215e821c4c890380f82df64a02fd15c8c755c
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/carrier-bulletins/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/bulletins-view.mjs
+
+## INV-9452 — probe — . Three rows are stale or contradict the cures
+
+. Three rows are stale or contradict the cures
+
+```probe
+cd /tmp || exit 1
+echo "MAN-8865 lines still stating window is {hours, basis, anchor}: $(docstore get MAN-8865 | python3 -c "import sys,json; print(sum(1 for l in json.load(sys.stdin)['row']['body'].split('\n') if '\`window\` is \`{ hours, basis, anchor }\`' in l))")"
+echo "MAN-8928 lines naming the left-out banner: $(docstore get MAN-8928 | python3 -c "import sys,json; print(sum(1 for l in json.load(sys.stdin)['row']['body'].split('\n') if 'left out' in l.lower() or 'X-Left-Out' in l))")"
+expect: while the rows are stale, "MAN-8865 lines still stating window is {hours, basis, anchor}: 1" and "MAN-8928 lines naming the left-out banner: 0"; healed, 0 and at least 1
+```
+
+measured 2026-10-22 by chain chain-bulletins-read-by-claude--fill-20261022-124505-62e0, finding L1, LOW
+probe-key: 6f098e7133465e04a89c24e274c2aebc9b9b00f9
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/carrier-bulletins/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/bulletins-view.mjs
+
+## INV-9453 — probe — . With every carrier left out, the overview says both "13 carriers are left out" and "No carrier has a bulletin on file"
+
+. With every carrier left out, the overview says both "13 carriers are left out" and "No carrier has a bulletin on file"
+
+```probe
+cd /home/lyphe/.claude/claudecodeui_lyphe/src/modules/carrier-bulletins || exit 1
+echo "empty-state branch: $(grep -n 'rows.length === 0' OverviewScreen.tsx | head -1 | cut -c1-90)"
+echo "empty-state words say \"none on file\" while leftOut is in scope: $(awk '/rows.length === 0/{f=1} f&&/emptyMessage/{print (/leftOut/ ? "guarded" : "not guarded"); exit}' OverviewScreen.tsx)"
+expect: while the gap stands, "not guarded"; once the empty branch says something true when carriers are left out, "guarded" (or the branch is no longer reached with leftOut non-empty)
+```
+
+measured 2026-10-22 by chain chain-bulletins-read-by-claude--fill-20261022-124505-62e0, finding L2, LOW
+probe-key: 1b5b2cadb17e992bc2916a5fc77e340789fa16ea
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/carrier-bulletins/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/bulletins-view.mjs
+
+## INV-9456 — probe — LOW — the kept walk cannot tell whether `openPano` reads its entry
+
+LOW — the kept walk cannot tell whether `openPano` reads its entry
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX)
+cat > "$D/p.sh" <<'EOF'
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+cat > "$0.mjs" <<'JS'
+import { curlJson, loginToken } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/whole-check-kit.mjs';
+const FACES = ['ahead', 'right', 'behind', 'left', 'ceiling', 'floor'];
+const token = loginToken();
+const tour = curlJson('GET', '/api/affected-areas/tours/6ad29b4c93d5140395dcaa76', undefined, token).body;
+const opens = (pano) => FACES.find((face) => {
+  const read = pano.views.find((view) => view.face === face)?.read;
+  return read?.status === 'read' && ((read.standingCount ?? read.regionsCount) > 0 || read.regionsCount > 0);
+}) ?? 'ahead';
+const rows = (tour?.panos ?? []).map((pano) => `${pano.room ?? pano.name ?? pano.panoId}→${opens(pano)}`);
+const kitchen = (tour?.panos ?? []).find((pano) => pano.panoId === '6ad29b4c12f14e4d72c81901');
+console.log('walk opens only the Kitchen, which opens on:', kitchen ? opens(kitchen) : 'not listed');
+console.log('panos that open off Ahead:', rows.filter((r) => !r.endsWith('→ahead')).join(' | ') || 'none');
+JS
+node "$0.mjs" 2>&1 | tail -4
+EOF
+bash "$D/p.sh"
+expect: "walk opens only the Kitchen, which opens on: ahead" and a non-empty "panos that open off Ahead:" list (today five panos: Front Entry and one more →right, Bathroom →floor, Dinning Room →left, Closet →behind); cured when the walk also opens one of them
+```
+
+measured 2026-10-22 by chain chain-tour-affected-areas--360-view--place-20261022-154331-9d2f, finding L1, LOW
+probe-key: 75b68e16406165d7c5ecd3c11796a267230385d5
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/AffectedAreasView.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/hooks/usePanoPlace.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/affected-areas-place.mjs
+
+## INV-9457 — probe — MEDIUM — the way-out button is focusable while it is hidden: reaching it shifts the photo 48 px, pops the closed bar into the box, and its name says "Leave fullscreen" while Enter enters
+
+MEDIUM — the way-out button is focusable while it is hidden: reaching it shifts the photo 48 px, pops the closed bar into the box, and its name says "Leave fullscreen" while Enter enters
+
+```probe
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'SH'
+set -u
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+here=$(dirname "$0")
+cat > "$here/p.mjs" <<'JS'
+import { fetchPano, installSphereFixture, newContext, openApp, pw } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/sphere-fixture.mjs';
+const browser = await pw.chromium.launch();
+const { pano, images } = await fetchPano();
+const context = await newContext(browser, { viewport: { width: 1280, height: 900 } });
+const page = await context.newPage();
+await openApp(page);
+await installSphereFixture(page, { pano, images });
+await page.evaluate(() => { const s = window.__sphere; return s.mount({ regions: s.shapes('all', null) }); });
+await page.evaluate(() => window.__sphere.ready());
+await page.waitForTimeout(900);
+const read = () => page.evaluate(() => {
+  const box = document.querySelector('#sx .vv-sphere');
+  const container = document.querySelector('#sx .psv-container');
+  const navbar = document.querySelector('#sx .psv-navbar');
+  const button = document.querySelector('#sx .psv-fullscreen-button');
+  const top = (el) => Math.round(el.getBoundingClientRect().top);
+  return {
+    active: document.activeElement.tagName,
+    boxRole: box.getAttribute('role'),
+    boxBottom: Math.round(box.getBoundingClientRect().bottom),
+    navbarOpen: navbar.classList.contains('psv-navbar--open'),
+    navbarTop: top(navbar),
+    buttonTop: top(button),
+    buttonTabIndex: button.tabIndex,
+    buttonTitle: button.title,
+    containerScrollTop: container.scrollTop,
+    canvasTop: Math.round(document.querySelector('#sx .psv-canvas-container').getBoundingClientRect().top),
+    fullscreen: !!document.fullscreenElement,
+    events: window.__sphere.events.fullscreens.slice(),
+  };
+});
+console.log('closed ', JSON.stringify(await read()));
+const client = await context.newCDPSession(page);
+const { nodes } = await client.send('Accessibility.getFullAXTree');
+console.log('ax-closed', JSON.stringify(nodes.filter((n) => /Leave fullscreen/.test(n.name?.value ?? '')).map((n) => ({ role: n.role?.value, name: n.name?.value, ignored: n.ignored }))));
+await page.focus('#sx .psv-fullscreen-button');
+await page.waitForTimeout(500);
+console.log('focused', JSON.stringify(await read()));
+await page.keyboard.press('Enter');
+await page.waitForTimeout(1200);
+console.log('enter  ', JSON.stringify(await read()));
+await page.evaluate(() => document.exitFullscreen().catch(() => undefined));
+await page.waitForTimeout(500);
+await page.evaluate(() => document.activeElement?.blur());
+await page.waitForTimeout(300);
+console.log('left   ', JSON.stringify(await read()));
+// the cure, measured on the same page (nothing is edited)
+await page.evaluate(() => document.exitFullscreen().catch(() => undefined));
+await page.addStyleTag({ content: '.vv-sphere .psv-navbar:not(.psv-navbar--open) { visibility: hidden; }' });
+await page.waitForTimeout(200);
+await page.evaluate(() => document.querySelector('#sx .psv-container').scrollTop = 0);
+await page.evaluate(() => document.querySelector('#sx .psv-fullscreen-button').focus());
+await page.waitForTimeout(400);
+console.log('cured  ', JSON.stringify(await read()));
+await context.close();
+await browser.close();
+JS
+node "$here/p.mjs"
+SH
+bash "$D/p.sh"
+```
+
+measured 2026-10-22 by chain chain-tour-affected-areas--360-view--library-20261022-154330-58da, finding M1, MEDIUM
+probe-key: ba39f4f5a3408f6feddfc35e33c2af5916b68f89
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/utils/sphereFaces.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/common.json, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/sphere/SphereCanvas.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/sphere/sphereLook.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/sphere/sphereMarkers.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/SphereView.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/sphere/wheelGate.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/verve/media.css, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/sphere-fixture.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/sphere-view.mjs, /home/lyphe/.claude/claudecodeui_lyphe/vite.config.js
+
+## INV-9491 — probe — MEDIUM — the dropdown stands 26px short of every other control on the Runner card
+
+MEDIUM — the dropdown stands 26px short of every other control on the Runner card
+
+```probe
+cd /home/lyphe/.claude/claudecodeui_lyphe && timeout 200 node /home/lyphe/.claude/state/pipeline-reviews/weekly-stop-setting/athena-probes/row-alignment.mjs
+echo "[probe exit $?]"
+expect: `desktop 1440: weekly control right edge 1109 | the other 7 controls end at 1134..1135 | weekly stands 26px short` and `phone 390: … 335 … 360..361 | weekly stands 26px short`; cured when both lines end `aligned`
+```
+
+measured 2026-10-22 by chain chain-weekly-stop-setting-20261022-194612-739f, finding M1, MEDIUM
+probe-key: e011ebb125c3b372a478fa27022716f9dec6ade3
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/settings/weekly-stop.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/utils.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/settings.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/hooks/useWeeklyStop.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/agents-settings/sections/content/RunnerWeeklyStopRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-weekly-stop.mjs, /home/lyphe/.claude/hooks/plan_runner/pacer/door_windows.py, /home/lyphe/.claude/hooks/plan_runner/pacer/project.py, /home/lyphe/.claude/hooks/plan_runner/pacer/weekly_stop.py, /home/lyphe/.claude/settings.json
+
+## INV-9492 — probe — LOW — the two readers do not agree "clause for clause" on a byte-order mark that is not the first byte
+
+LOW — the two readers do not agree "clause for clause" on a byte-order mark that is not the first byte
+
+```probe
+bash /home/lyphe/.claude/state/pipeline-reviews/weekly-stop-setting/athena-probes/bom-readers.sh
+echo "[probe exit $?]"
+expect: the `leading BOM` row reads `80 80`; the `trailing BOM`, `doubled BOM` and `space then BOM` rows read `95 80` while the defect stands (pacer then CloudCLI); cured when every row has equal columns
+```
+
+measured 2026-10-22 by chain chain-weekly-stop-setting-20261022-194612-739f, finding L1, LOW
+probe-key: 3dd28a3229c1a9d48c5b565db4b6b0e2f47063db
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/settings/weekly-stop.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/utils.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/settings.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/hooks/useWeeklyStop.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/agents-settings/sections/content/RunnerWeeklyStopRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-weekly-stop.mjs, /home/lyphe/.claude/hooks/plan_runner/pacer/door_windows.py, /home/lyphe/.claude/hooks/plan_runner/pacer/project.py, /home/lyphe/.claude/hooks/plan_runner/pacer/weekly_stop.py, /home/lyphe/.claude/settings.json
+
+## INV-9493 — probe — LOW — `pacer windows` prints today's weekly line on windows that were weighed at another one
+
+LOW — `pacer windows` prints today's weekly line on windows that were weighed at another one
+
+```probe
+python3 -I /home/lyphe/.claude/state/pipeline-reviews/weekly-stop-setting/athena-probes/windows-header-ceiling.py
+echo "[probe exit $?]"
+expect: today `windows whose header week_ceiling differs from what their own lines were weighed at: 9 of 19` (the figure drifts as windows age out); cured `0 of N`
+```
+
+measured 2026-10-22 by chain chain-weekly-stop-setting-20261022-194612-739f, finding L2, LOW
+probe-key: 754730454775a5f4f6754943cd295fdbdb3a7163
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/settings/weekly-stop.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/utils.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/settings.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/hooks/useWeeklyStop.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/agents-settings/sections/content/RunnerWeeklyStopRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-weekly-stop.mjs, /home/lyphe/.claude/hooks/plan_runner/pacer/door_windows.py, /home/lyphe/.claude/hooks/plan_runner/pacer/project.py, /home/lyphe/.claude/hooks/plan_runner/pacer/weekly_stop.py, /home/lyphe/.claude/settings.json
+
+## INV-9494 — probe — LOW — "healed means deleted" missed one stale sentence: `week_ceiling` 99% in the `pacer windows` row
+
+LOW — "healed means deleted" missed one stale sentence: `week_ceiling` 99% in the `pacer windows` row
+
+```probe
+bash /home/lyphe/.claude/state/pipeline-reviews/weekly-stop-setting/athena-probes/man8714-week-ceiling.sh
+echo "[probe exit $?]"
+expect: today `stale `week_ceiling` 99% still stands: True`; cured `False`
+```
+
+measured 2026-10-22 by chain chain-weekly-stop-setting-20261022-194612-739f, finding L3, LOW
+probe-key: 380d3bbe7563b428660bf0aa230610e7facda38b
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/settings/weekly-stop.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/utils.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/settings.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/hooks/useWeeklyStop.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/agents-settings/sections/content/RunnerWeeklyStopRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-weekly-stop.mjs, /home/lyphe/.claude/hooks/plan_runner/pacer/door_windows.py, /home/lyphe/.claude/hooks/plan_runner/pacer/project.py, /home/lyphe/.claude/hooks/plan_runner/pacer/weekly_stop.py, /home/lyphe/.claude/settings.json
+
+## INV-9495 — probe — LOW — the row's hint does not say what a line at or under the week's current figure does
+
+LOW — the row's hint does not say what a line at or under the week's current figure does
+
+```probe
+bash /home/lyphe/.claude/state/pipeline-reviews/weekly-stop-setting/athena-probes/hint-and-hold.sh
+echo "[probe exit $?]"
+expect: `the hint names a hold of every start, or the account switch: False`, `weekly … ceiling 60%` over a week used near 89%, and the settle dry run naming the weekly at its ceiling; cured when the first line reads True
+```
+
+measured 2026-10-22 by chain chain-weekly-stop-setting-20261022-194612-739f, finding L4, LOW
+probe-key: 1fd6e19439583d9a596b9dc8f6caf9a5673dc416
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/settings/weekly-stop.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/utils.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/settings.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/hooks/useWeeklyStop.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/agents-settings/sections/content/RunnerWeeklyStopRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-weekly-stop.mjs, /home/lyphe/.claude/hooks/plan_runner/pacer/door_windows.py, /home/lyphe/.claude/hooks/plan_runner/pacer/project.py, /home/lyphe/.claude/hooks/plan_runner/pacer/weekly_stop.py, /home/lyphe/.claude/settings.json

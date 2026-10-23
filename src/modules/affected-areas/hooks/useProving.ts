@@ -1,9 +1,9 @@
 import { useEffect, useRef } from 'react';
 
-import { useLaneRead } from '@/modules/affected-areas/hooks/useLaneRead';
 import { useWhenShown } from '@/modules/affected-areas/hooks/useViewShown';
 import type { Proving, ProvingClass } from '@/shared/affected-areas-types';
 import { api } from '@/shared/api';
+import { useLaneRead } from '@/shared/hooks/useLaneRead';
 import type { AffectedAreasRead } from '@/shared/types';
 
 /** The tables are one document for the pinned model on the current contract: their read has one key. */

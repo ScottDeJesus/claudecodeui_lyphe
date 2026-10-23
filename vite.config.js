@@ -43,7 +43,10 @@ export default defineConfig(({ mode }) => {
     // The file editor reaches every grammar through a dynamic import() and the file previews reach
     // their renderers the same way, so Vite would discover each one only when Edit is first pressed
     // on a file of that kind or a PDF is first opened — and the discovery reloads the page. Naming
-    // them here pre-bundles them at server start instead.
+    // them here pre-bundles them at server start instead. The 360° sphere (three.js and the viewer) is first
+    // imported when a pano opens, which is the discovery above. Measured on a cold cache (`.verify/sphere-cold-start.mjs`):
+    // the start-up scan follows SphereView's literal import() and finds the four anyway, so the first sphere opens in one
+    // document load with or without them here; naming them keeps it so should that import ever be computed.
     optimizeDeps: {
       include: [
         '@codemirror/lang-css',
@@ -53,8 +56,12 @@ export default defineConfig(({ mode }) => {
         '@codemirror/lang-markdown',
         '@codemirror/lang-python',
         '@codemirror/lang-yaml',
+        '@photo-sphere-viewer/core',
+        '@photo-sphere-viewer/cubemap-adapter',
+        '@photo-sphere-viewer/markers-plugin',
         'docx-preview',
         'pdfjs-dist',
+        'three',
         'xlsx'
       ]
     },

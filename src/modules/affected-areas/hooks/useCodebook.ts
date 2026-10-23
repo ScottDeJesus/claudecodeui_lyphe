@@ -1,6 +1,6 @@
-import { useLaneRead } from '@/modules/affected-areas/hooks/useLaneRead';
 import type { Codebook } from '@/shared/affected-areas-types';
 import { api } from '@/shared/api';
+import { useLaneRead } from '@/shared/hooks/useLaneRead';
 import type { AffectedAreasRead } from '@/shared/types';
 
 /** The codebook is one document: its read has one key. */
