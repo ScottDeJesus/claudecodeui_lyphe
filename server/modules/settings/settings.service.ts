@@ -10,6 +10,7 @@ import { readHealModel, writeHealModel } from './heal-model-switch.js';
 import type { HealModel } from './heal-model-switch.js';
 import { readHealCycle, writeHealCycle } from './heal-cycle-switch.js';
 import { readHealCap, readHealMaster, writeHealCap, writeHealMaster } from './heal-switch.js';
+import { getGeminiPlanCapState, setGeminiPlanCapState } from './gemini-plan-cap.js';
 import { getParkAtPeakState, setParkAtPeakState } from './park-at-peak-switch.js';
 import { getPlannerLanesState, setPlannerLanesState } from './planner-lanes.js';
 import { getWeeklyStopState, setWeeklyStopState } from './weekly-stop.js';
@@ -412,6 +413,13 @@ export function createSettingsService(dependencies: SettingsDependencies) {
       }
       await writeHealCap(usd);
       return { usd: await readHealCap() };
+    },
+    // The Gemini budget's per-plan cap: the file, its grammar and its 400 live in `gemini-plan-cap.ts`.
+    async getGeminiPlanCap() {
+      return getGeminiPlanCapState();
+    },
+    async setGeminiPlanCap(usdInput: unknown) {
+      return setGeminiPlanCapState(usdInput);
     },
     /**
      * The heal reflex's MODEL switch: which model a heal's souls run on — DeepSeek's billed flash, or

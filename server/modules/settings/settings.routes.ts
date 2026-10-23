@@ -165,6 +165,11 @@ export function createSettingsRouter(
   router.put('/heal-cycle', respond((req) => service.setHealCycle(req.body?.enabled, req.body?.hour)));
   router.get('/heal-cap', respond(() => service.getHealCap()));
   router.put('/heal-cap', respond((req) => service.setHealCap(req.body?.usd)));
+  // The Gemini budget's per-plan cap, host-wide like the switches above: the backend's gate reads the file
+  // at every Gemini call. One dollar amount on the PUT body, because the file holds one line — and no null,
+  // because the cap has no off state.
+  router.get('/gemini-plan-cap', respond(() => service.getGeminiPlanCap()));
+  router.put('/gemini-plan-cap', respond((req) => service.setGeminiPlanCap(req.body?.usd)));
   router.get('/heal-model', respond(() => service.getHealModel()));
   router.put('/heal-model', respond((req) => service.setHealModel(req.body?.model)));
   // Also host-wide, and for the same reason: these flag files steer hooks and scripts on this host,
