@@ -7818,38 +7818,6 @@ probe-key: 933db6d0dd228f1703edca566df2af9f9a029a6d
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/
 
-## INV-7575 — probe — the report says none of the three earlier-shape messages appears verbatim anywhere in the new `84a97950` seed; one appears whole, in block 0
-
-the report says none of the three earlier-shape messages appears verbatim anywhere in the new `84a97950` seed; one appears whole, in block 0
-
-```probe
-D=$(mktemp -d /tmp/athena-p.XXXXXX) || exit 1
-cat > "$D/p.sh" <<'EOF'
-python3 -I - <<'PY'
-import sys, json, os, re
-sys.path.insert(0, "/home/lyphe/.claude/hooks")
-from plan_runner.summarize import render, rows
-P = os.path.expanduser("~/.claude/projects/-home-lyphe--claude/")
-sid = "84a97950-c636-4d29-a72d-a054226a9f15"
-seed = json.load(open("/home/lyphe/.claude/state/summarize/summarize-1791579024310-3393540/result.json"))["seed"]
-old = next(render.row_seed(r) for r in rows.live_rows(P + sid + ".jsonl", sid) if render.row_seed(r) is not None)
-for piece in re.split(r"\n\n(?=### )", old.earlier):
-    lines = piece.splitlines()
-    if lines[0] == "### User" and not lines[1].startswith("<task-notification>"):
-        body = "\n".join(lines[1:]).strip()
-        print(len(body), "chars; whole text in the new seed's blocks:", [i for i, b in enumerate(seed) if body in b] or "none")
-PY
-EOF
-bash "$D/p.sh"
-cd /tmp; case "$D" in /tmp/athena-p.??????) rm -r "$D";; esac
-expect: `198 … none`, `1217 … none`, `151 … [0]`
-```
-
-measured 2026-10-09 by chain chain-compaction-handover--docs-20261009-165748-35f0, finding L4, LOW
-probe-key: e6852f37a3718584776643cb3876c453c74c9664
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/
-
 ## INV-7576 — probe — two same-named projects in the same parent folder get the SAME hint
 
 two same-named projects in the same parent folder get the SAME hint
