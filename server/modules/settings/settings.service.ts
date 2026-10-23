@@ -12,6 +12,7 @@ import { readHealCycle, writeHealCycle } from './heal-cycle-switch.js';
 import { readHealCap, readHealMaster, writeHealCap, writeHealMaster } from './heal-switch.js';
 import { getParkAtPeakState, setParkAtPeakState } from './park-at-peak-switch.js';
 import { getPlannerLanesState, setPlannerLanesState } from './planner-lanes.js';
+import { getWeeklyStopState, setWeeklyStopState } from './weekly-stop.js';
 
 /**
  * Every field a `PUT /jev` body may name — the master plus each scope in the table — for the two
@@ -312,6 +313,21 @@ export function createSettingsService(dependencies: SettingsDependencies) {
       // The press is the event: a wider dial frees queued planners the rule was holding, and they are
       // taken up on the kick rather than at the next session event. A refused input has thrown by now
       // and nothing was written, so no kick rides on a press that never moved the file.
+      void kickDispatcher();
+      return state;
+    },
+    /**
+     * Where the usage pacer stops starting plans on the weekly window, in whole percent. Both bodies
+     * live in `weekly-stop.ts`, as the planner-lane pair above does.
+     */
+    async getWeeklyStop() {
+      return getWeeklyStopState();
+    },
+    async setWeeklyStop(percentInput: unknown) {
+      const state = await setWeeklyStopState(percentInput);
+      // The press is the event: a higher line frees starts the pacer was holding, and the daemon takes
+      // them up on the kick rather than at the next session event. A refused input has thrown by now and
+      // nothing was written, so no kick rides on a press that never moved the file.
       void kickDispatcher();
       return state;
     },

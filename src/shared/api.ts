@@ -659,6 +659,11 @@ export const api = {
     plannerLanes: () => get('/api/settings/planner-lanes'),
     savePlannerLanes: (state: { lanes: number }) => put('/api/settings/planner-lanes', state),
 
+    // The usage pacer's weekly stop — where plans stop starting on the weekly window. Host-wide with the
+    // same read-back answer: `percent` is the whole number the file holds, 50 to 99, 95 when none is set.
+    weeklyStop: () => get('/api/settings/weekly-stop'),
+    saveWeeklyStop: (state: { percent: number }) => put('/api/settings/weekly-stop', state),
+
     // The dispatcher's park-at-peak switch — the fourth flag file on this host, and the same shape
     // as the three above for the same reason: a file the dispatcher's own process re-reads, not a
     // preference the browser owns. On, an Accept during DeepSeek's peak window queues the plan and

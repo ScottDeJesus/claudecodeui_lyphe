@@ -6,15 +6,17 @@ import { LaneTrouble } from '@/modules/affected-areas/LaneTrouble';
 import { LayerSwitch } from '@/modules/affected-areas/LayerSwitch';
 import { MarkBar } from '@/modules/affected-areas/MarkBar';
 import { MissedDraw } from '@/modules/affected-areas/MissedDraw';
+import { PanoAreas } from '@/modules/affected-areas/PanoAreas';
+import { PanoSphere } from '@/modules/affected-areas/PanoSphere';
 import { ReadControl } from '@/modules/affected-areas/ReadControl';
 import { ReadingList } from '@/modules/affected-areas/ReadingList';
 import { RegionList } from '@/modules/affected-areas/RegionList';
 import { RoomDrying } from '@/modules/affected-areas/RoomDrying';
 import { UnderstandingCard } from '@/modules/affected-areas/UnderstandingCard';
 import { REGION_LOOK, regionState } from '@/modules/affected-areas/utils/regionLook';
-import { faceCounts, kindName, roomWords } from '@/modules/affected-areas/utils/tourModel';
+import { areaWords, faceCounts, kindName, roomWords } from '@/modules/affected-areas/utils/tourModel';
 import type { Codebook, Face, PanoDetail, PanoEntry, Region, RoomEntry, ViewDetail, ViewEntry } from '@/shared/affected-areas-types';
-import type { AffectedAreasTrouble, PanoPress, RegionLayer, RegionShape, TourReaderProgress } from '@/shared/types';
+import type { AffectedAreasTrouble, PanoPress, PanoShown, RegionLayer, RegionShape, SphereLook, TourReaderProgress } from '@/shared/types';
 import { Button, Card, EmptyState, Lightbox, RegionImage } from '@/shared/ui';
 import { formatRelativeTime, formatShortDate } from '@/shared/utils';
 
@@ -30,22 +32,33 @@ type PanoScreenProps = {
   room: RoomEntry | null;
   /** The kinds' labels and the contract and model a read is current under; null until the codebook answers. */
   codebook: Codebook | null;
-  face: Face;
+  /** What the screen shows: 360°, or one of the six views. */
+  shown: PanoShown;
   selectedRegionId: string | null;
-  /** What the photo draws: every area (the default), or only the ones the engine says stand. Held by the view root, set by the layer switch. */
+  /** What the photo and the sphere draw: every area (the default), or only the ones the engine says stand. Held by the view root, set by the layer switch. */
   layer: RegionLayer;
-  /** The shown face's photo as an object URL; null while it loads, when it failed, or for a face with no view. */
-  photo: string | null;
-  /** Whether the shown face is open in the Lightbox. */
+  /** The pano's six photos as object URLs by view sha; a shown view's photo is one of them. A sha absent while it loads, null when its bytes did not arrive. */
+  photos: Record<string, string | null>;
+  /** Whether the pano is enlarged: the shown view in the Lightbox, the sphere filling the screen on 360°. */
   enlarged: boolean;
+  /** Where the sphere looks when it is drawn: Ahead's, the view a person returned from, then where it came to rest. */
+  sphereLook: SphereLook;
   press: PanoPress;
   walk: TourReaderProgress;
   unreadPanos: number;
   unreadViews: number;
   onBack: () => void;
-  onFace: (face: Face) => void;
+  onShow: (shown: PanoShown) => void;
   onSelectRegion: (regionId: string) => void;
   onLayer: (layer: RegionLayer) => void;
+  /** The sphere came to rest: the root keeps where it looks, so a return to 360° finds it there. */
+  onLook: (look: SphereLook) => void;
+  /** Mark it on {view}: that view shown with the area still chosen, its presses under its photo. */
+  onMarkOn: (face: Face, regionId: string) => void;
+  /** Enlarge pressed, and the sphere's own entering and leaving of fullscreen: the root's `enlarged`. */
+  onFullscreen: (on: boolean) => void;
+  /** Try again on a photo that did not arrive: the root reads the pano's six again. */
+  onRetryPhotos: () => void;
   /** A mark's answer, the judged region: the view root puts it in place of the one it holds (`useMarkedRegions`). */
   onMarked: (region: Region) => void;
   /** Missed one's answer, the new human region and the sha of the view it was drawn on: the view root appends it. */
@@ -63,20 +76,23 @@ type PanoScreenProps = {
 const COLUMNS = 'grid items-start gap-5 [@container(min-width:720px)]:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]';
 
 /**
- * A PANO: its room, the press, its six faces, and the shown face drawn with its regions beside their list.
+ * A PANO: its room, the press, its six faces, and what is shown — 360°, or one face drawn with its regions beside their list.
  *
  * Read top to bottom: the way back (the tour's name), the room and when it was captured, with `ReadControl` beside
- * them once the pano has answered; the face strip, Ahead · Right · Behind · Left · Ceiling · Floor, each counting its
- * areas; then the face: its photo with every region outlined in its look and numbered (`RegionImage`), a caption that
- * accounts for every outline ("3 areas · 2 set aside · read 3h ago") with Enlarge, and beside it `RegionList`, the same
- * numbers in words under "Marked on this view". Choosing a region on either chooses it on both, and its presses
- * (`MarkBar`) stand under the photo; Missed one and the layer switch (All · Standing) stand over it (`MissedDraw`).
- * Under them, `UnderstandingCard` (what the reader made of the face) and `RoomDrying` (the room's numbers).
+ * them once the pano has answered; the face strip, 360° and then Ahead · Right · Behind · Left · Ceiling · Floor, each
+ * counting its areas; then the figure and its list. On 360° the figure is `PanoSphere` — the six views stitched into
+ * one sphere, every area outlined — and the list column is `PanoAreas`, every view's list under its name. On a face it
+ * is the photo with every region outlined in its look and numbered (`RegionImage`), a caption that accounts for every
+ * outline ("3 areas · 2 set aside · read 3h ago") with Enlarge, and beside it `RegionList`, the same numbers in words
+ * under "Marked on this view". Choosing a region on either chooses it on both, and its presses (`MarkBar`) stand under
+ * the photo; Missed one and the layer switch (All · Standing) stand over it (`MissedDraw`). Under them,
+ * `UnderstandingCard` (what the reader made of the face, on a view only) and `RoomDrying` (the room's numbers).
  *
- * Wide, the face keeps its place while a long list scrolls past it (thirty regions is a tall list); narrow, the
- * blocks stack in reading order. Enlarge opens the house `Lightbox` around a second `RegionImage`: its zoom and pan
- * are `useZoomPan`'s, and the outlines and badges ride the same transform as the photo, so they stay on it at every
- * zoom. That copy takes no presses (no `onSelect`), so a drag anywhere pans; the inline face draws at fit.
+ * Wide, the figure keeps its place while a long list scrolls past it (thirty regions is a tall list); narrow, the
+ * blocks stack in reading order. Enlarge opens the house `Lightbox` around a second `RegionImage` on a view, and the
+ * sphere's own fullscreen on 360°: the Lightbox's zoom and pan are `useZoomPan`'s, and the outlines and badges ride the
+ * same transform as the photo, so they stay on it at every zoom. That copy takes no presses (no `onSelect`), so a drag
+ * anywhere pans; the inline face draws at fit.
  *
  * States: the pano read (header and photo first, from the tour's own listing); a pano never cut (one sentence, while
  * the dry run cuts it); a face not read yet (its photo, and where to press); a face read with nothing found; the lane's
@@ -86,19 +102,20 @@ const COLUMNS = 'grid items-start gap-5 [@container(min-width:720px)]:grid-cols-
  * Used by the affected-areas module's view root.
  */
 export function PanoScreen({
-  entry, detail, trouble, tourName, room, codebook, face, selectedRegionId, layer, photo, enlarged, press, walk, unreadPanos,
-  unreadViews, onBack, onFace, onSelectRegion, onLayer, onMarked, onMissed, onEnlarge, onShrink, onReadPano, onReadAgain,
-  onReadRest, onStopRest, onRetry,
+  entry, detail, trouble, tourName, room, codebook, shown, selectedRegionId, layer, photos, enlarged, sphereLook, press, walk,
+  unreadPanos, unreadViews, onBack, onShow, onSelectRegion, onLayer, onLook, onMarkOn, onFullscreen, onRetryPhotos, onMarked, onMissed,
+  onEnlarge, onShrink, onReadPano, onReadAgain, onReadRest, onStopRest, onRetry,
 }: PanoScreenProps) {
   const { t } = useTranslation();
   const views: (ViewEntry | ViewDetail)[] = detail?.views ?? entry?.views ?? [];
-  const view = views.find((candidate) => candidate.face === face);
-  const regions = detail?.views.find((candidate) => candidate.face === face)?.regions ?? [];
-  const understanding = detail?.views.find((candidate) => candidate.face === face)?.understanding ?? null;
+  const view = shown === 'sphere' ? undefined : views.find((candidate) => candidate.face === shown);
+  const regions = shown === 'sphere' ? [] : detail?.views.find((candidate) => candidate.face === shown)?.regions ?? [];
+  const understanding = shown === 'sphere' ? null : detail?.views.find((candidate) => candidate.face === shown)?.understanding ?? null;
+  const photo = view === undefined ? null : photos[view.sha256] ?? null;
   const floor = detail?.floor ?? entry?.floor ?? null;
   const capturedAt = detail?.capturedAt ?? entry?.capturedAt ?? null;
   const roomTitle = roomWords(detail?.roomName ?? entry?.roomName ?? null, floor, false, t);
-  const faceName = t(`affectedAreas.faces.${face}`);
+  const faceName = shown === 'sphere' ? '' : t(`affectedAreas.faces.${shown}`);
   const alt = t('affectedAreas.pano.photo', { face: faceName, room: roomTitle });
   const selected = regions.find((region) => region.regionId === selectedRegionId) ?? null;
   // The photo draws every area, or on Standing only the ones the engine says stand (its wire `standing` flag, never worked
@@ -125,16 +142,15 @@ export function PanoScreen({
   const counts = faceCounts(view);
   const caption = counts === undefined
     ? t('affectedAreas.pano.faceUnread')
-    : [
-        t('affectedAreas.pano.faceAreas', { count: counts.areas }),
-        counts.setAside > 0 ? t('affectedAreas.pano.setAside', { count: counts.setAside }) : null,
-        counts.proposed > 0 ? t('affectedAreas.pano.proposed', { count: counts.proposed }) : null,
-        t('affectedAreas.pano.faceRead', { when: formatRelativeTime(view?.read?.readAt) }),
-      ].filter((part) => part !== null).join(' · ');
+    : [...areaWords(counts, t), t('affectedAreas.pano.faceRead', { when: formatRelativeTime(view?.read?.readAt) })].filter((part) => part !== null).join(' · ');
   const ratio = view !== undefined && view.height > 0 ? view.width / view.height : 1;
 
   let list;
-  if (view?.read?.status !== 'read') {
+  if (shown === 'sphere') {
+    // 360°: every area of every read view under the name of the view it was marked on, so two areas numbered 1 are told apart.
+    // Until the detail answers, the column waits as a view's does (`ReadingList`): the listing counts a pano's areas but carries none.
+    list = detail === null ? <ReadingList /> : <PanoAreas views={detail.views} selectedRegionId={selectedRegionId} codebook={codebook} onSelectRegion={onSelectRegion} />;
+  } else if (view?.read?.status !== 'read') {
     list = (
       <Card className="flex flex-col gap-1 px-[18px] py-4">
         <p className="text-[15px] font-medium text-foreground">{t('affectedAreas.pano.unread', { face: faceName })}</p>
@@ -211,11 +227,18 @@ export function PanoScreen({
         )
       ) : (
         <>
-          <FaceStrip views={views} face={face} onFace={onFace} />
+          <FaceStrip views={views} shown={shown} onShow={onShow} />
 
           <div className={COLUMNS}>
             <figure className="m-0 flex min-w-0 flex-col gap-2 [@container(min-width:720px)]:sticky [@container(min-width:720px)]:top-4">
-              {view !== undefined && detail !== null ? (
+              {shown === 'sphere' ? (
+                <PanoSphere
+                  panoId={detail?.panoId ?? entry?.panoId ?? ''} views={views} photos={photos} room={roomTitle}
+                  layer={layer} selectedRegionId={selectedRegionId} enlarged={enlarged} codebook={codebook} reading={detail === null}
+                  onLayer={onLayer} onSelectRegion={onSelectRegion} look={sphereLook} onLook={onLook}
+                  onFullscreen={onFullscreen} onMarkOn={onMarkOn} onRetryPhotos={onRetryPhotos}
+                />
+              ) : view !== undefined && detail !== null ? (
                 // Missed one stands where the photo stood and draws it, with the layer switch at the start of its tool row and the
                 // chosen area's presses under it. Keyed by the face's view, so a box drawn or held on one face, its note and its
                 // refusal never ride to another face.
@@ -239,19 +262,24 @@ export function PanoScreen({
                   <RegionImage src={photo} alt={alt} width={view?.width ?? 1} height={view?.height ?? 1} regions={shapes} selectedId={selectedRegionId} onSelect={onSelectRegion} />
                 </div>
               )}
-              <figcaption className="flex items-center justify-between gap-3">
-                <span className="min-w-0 text-[12.5px] text-muted-foreground">{caption}</span>
-                <Button variant="ghost" size="sm" className="flex-none max-md:h-11" onClick={onEnlarge}>
-                  <Maximize2 aria-hidden="true" />
-                  {t('affectedAreas.pano.enlarge')}
-                </Button>
-              </figcaption>
+              {shown !== 'sphere' && (
+                <figcaption className="flex items-center justify-between gap-3">
+                  <span className="min-w-0 text-[12.5px] text-muted-foreground">{caption}</span>
+                  <Button variant="ghost" size="sm" className="flex-none max-md:h-11" onClick={onEnlarge}>
+                    <Maximize2 aria-hidden="true" />
+                    {t('affectedAreas.pano.enlarge')}
+                  </Button>
+                </figcaption>
+              )}
             </figure>
+            {/* The list column: a view's list, or on 360° PanoAreas, every view's list under its name. */}
             <div className="min-w-0">{list}</div>
           </div>
 
           <div className={COLUMNS}>
-            {understanding !== null && <UnderstandingCard understanding={understanding} read={view?.read ?? null} />}
+            {/* What the reader understood is one view's account, so it shows on a view only; the room's drying numbers are
+                the room's, and stand on 360° too. */}
+            {shown !== 'sphere' && understanding !== null && <UnderstandingCard understanding={understanding} read={view?.read ?? null} />}
             <div className="min-w-0 [@container(min-width:720px)]:col-start-2">
               <RoomDrying room={room} />
             </div>

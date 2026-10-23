@@ -2,7 +2,7 @@
 
 ## MAN-8702 — settings
 
-The `/api/settings` module: thin transport in `settings.routes.ts` over `settings.service.ts`, and beside them one small file per host-wide switch — a flag file read and written whole (the two DeepSeek switches, park-at-peak, planner lanes, Dactyls, Custom compaction, main-session Dactyls, the heal reflex's four and JEV) — plus `dispatcher-kick.ts`, the one kick every switch write ends with (MAN-1497), and `claude-api-keys.ts`, the Claude API keys' relay over the `claude-api` door (MAN-8701). `settings.module.ts` wires the router, and `index.ts` is the barrel other modules reach it through.
+The `/api/settings` module: thin transport in `settings.routes.ts` over `settings.service.ts`, and beside them one small file per host-wide switch — a flag file read and written whole (the two DeepSeek switches, park-at-peak, planner lanes, the pacer's weekly stop, Dactyls, Custom compaction, main-session Dactyls, the heal reflex's four and JEV) — plus `dispatcher-kick.ts`, the one kick every switch write ends with (MAN-1497), and `claude-api-keys.ts`, the Claude API keys' relay over the `claude-api` door (MAN-8701). `settings.module.ts` wires the router, and `index.ts` is the barrel other modules reach it through.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/settings/
 

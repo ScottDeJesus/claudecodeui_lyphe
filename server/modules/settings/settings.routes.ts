@@ -147,6 +147,10 @@ export function createSettingsRouter(
   // the file holds one line — a bare count of at least 1.
   router.get('/planner-lanes', respond(() => service.getPlannerLanes()));
   router.put('/planner-lanes', respond((req) => service.setPlannerLanes(req.body?.lanes)));
+  // The usage pacer's weekly stop, host-wide like the switches above: it steers the pacer on this host, so
+  // no `userId` is read. One integer on the PUT body, because the file holds one line — a whole percent.
+  router.get('/weekly-stop', respond(() => service.getWeeklyStop()));
+  router.put('/weekly-stop', respond((req) => service.setWeeklyStop(req.body?.percent)));
   // The heal reflex's four switches, host-wide and read the same way: they are flag files steering a
   // worker on this host, so no `userId` is read. THE MASTER is the first of the family — one line,
   // `off` or `on`, and the only one of the four the reflex's whole launching hangs on. The CYCLE

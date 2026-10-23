@@ -1639,7 +1639,10 @@
   },
   "media": {
     "photo": "Photo",
-    "showMore": "Show {{remaining}} more"
+    "showMore": "Show {{remaining}} more",
+    "sphereLeaveFullscreen": "Leave fullscreen",
+    "sphereFailed": "The 360° view could not be shown",
+    "sphereFailedDetail": "Reloading the page usually brings it back."
   },
   "timeline": {
     "noDetail": "No further detail on file."
@@ -2629,7 +2632,7 @@
       "back": "Back to {{tour}}",
       "floor": "Floor {{floor}}",
       "captured": "captured {{when}}",
-      "facesLabel": "Faces of this pano",
+      "viewsLabel": "Views of this pano",
       "reading": "Reading the pano…",
       "uncut": "This pano hasn't been cut into views yet",
       "uncutMessage": "Opening it cuts its six views; they show here once the cut is done.",
@@ -2647,6 +2650,19 @@
       "nothingMessage": "The reader looked and marked no change here.",
       "markedTitle": "Marked on this view",
       "listLabel": "Marked on the {{face}} view"
+    },
+    "sphere": {
+      "tab": "360°",
+      "label": "{{room}}: its six views as one 360° photo, every area outlined",
+      "hint": "Drag to look around · pinch, or Ctrl and scroll, to zoom",
+      "ctrlZoom": "Hold Ctrl and scroll to zoom",
+      "chosen": "{{n}}. {{kind}} · {{view}}",
+      "markOn": "Mark it on {{view}}",
+      "photoFailed": "The 360° photo can't be drawn: one of the pano's six photos didn't arrive",
+      "noWebgl": "This device can't draw the 360° photo; the six views above still show every area",
+      "viewsRead": "{{read}} of {{total}} views read",
+      "nothingOn": "Nothing found on {{views}}",
+      "notReadYet": "Not read yet: {{views}}"
     },
     "region": {
       "sure": "{{percent}}% sure",

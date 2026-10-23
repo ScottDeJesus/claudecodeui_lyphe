@@ -1,8 +1,7 @@
-import { stat, readFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 
-import { AppError, expandHome } from '@/shared/utils.js';
+import { AppError, expandHome, readFlagWord } from '@/shared/utils.js';
 
 import { writeFlagText } from './deepseek-flash-switch.js';
 
@@ -36,14 +35,6 @@ const PLANNER_LANES_MIN = 1;
 /** The dispatcher's own bound on the file (`planner_lanes.MAX_BYTES`), kept identical so a file past it reads the default on both sides. */
 const FLAG_MAX_BYTES = 64;
 
-/**
- * The trim `String.trim()` does not do, added so this reader and Python's `str.strip()` agree — the
- * same class the deepseek-flash switch splits its words on, for the same reason: the C0 separators `\x1c`–`\x1f` and NEL are
- * whitespace to Python and not to JavaScript, and `\s` already covers the BOM the dispatcher reads
- * through `utf-8-sig`.
- */
-const FLAG_TRIM = /^[\s\x1c-\x1f\u0085]+|[\s\x1c-\x1f\u0085]+$/g;
-
 /** What the dial is set to. */
 type PlannerLanes = { lanes: number };
 
@@ -67,17 +58,12 @@ function plannersFlagPath(): string {
  * wide one.
  */
 async function readPlannerLanes(): Promise<PlannerLanes> {
-  const filePath = plannersFlagPath();
-  try {
-    if ((await stat(filePath)).size > FLAG_MAX_BYTES) return { lanes: PLANNER_LANES_DEFAULT };
-    const word = (await readFile(filePath, 'utf8')).replace(FLAG_TRIM, '');
-    if (!/^[0-9]+$/.test(word)) return { lanes: PLANNER_LANES_DEFAULT };
-    const lanes = Number.parseInt(word, 10);
-    if (lanes < PLANNER_LANES_MIN) return { lanes: PLANNER_LANES_DEFAULT };
-    return { lanes: Number.isSafeInteger(lanes) ? lanes : Number.MAX_SAFE_INTEGER };
-  } catch {
-    return { lanes: PLANNER_LANES_DEFAULT };   // absent or unreadable reads the default, never an error to the caller
-  }
+  // `null` is absent, unreadable, not a regular file or past the bound: the default, never an error to the caller.
+  const word = await readFlagWord(plannersFlagPath(), FLAG_MAX_BYTES);
+  if (word === null || !/^[0-9]+$/.test(word)) return { lanes: PLANNER_LANES_DEFAULT };
+  const lanes = Number.parseInt(word, 10);
+  if (lanes < PLANNER_LANES_MIN) return { lanes: PLANNER_LANES_DEFAULT };
+  return { lanes: Number.isSafeInteger(lanes) ? lanes : Number.MAX_SAFE_INTEGER };
 }
 
 /** Used by `settings.service.ts` (`getPlannerLanes`, behind `GET /planner-lanes`); the body lives here because that file is over its ceiling and takes call-in lines only. */

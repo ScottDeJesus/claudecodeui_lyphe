@@ -11427,43 +11427,6 @@ probe-key: bda706a7a70fa1a3de7d7b31e8c4820d226f6238
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/account-digest.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/account-door-relay.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/account-identity.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/accounts.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/accounts.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/account-store.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/usage.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-auth.provider.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/AccountFooterRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/AccountPopover.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/ClaudeAccountRows.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/claude-accounts-fake.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/hooks/useClaudeAccounts.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/UsageMeters.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/utils/accountInUseUsage.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/Settings.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Banner.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/panel-fill.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-14.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-19.mjs
 
-## INV-9302 — probe — MEDIUM — `said` is typed `VerdictWord` on `JudgedRule` and `PageFailure`, and the owner stores `"(no entry)"` there
-
-MEDIUM — `said` is typed `VerdictWord` on `JudgedRule` and `PageFailure`, and the owner stores `"(no entry)"` there
-
-```probe
-D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
-cat > "$D/p.sh" <<'EOF'
-cd /opt/shadow-connector || exit 1
-venv/bin/python - <<'PY'
-import asyncio, datetime as dt, uuid
-from extractors.servpro_bulletins.verify.read import read_page, unsettled_entry
-from extractors.servpro_bulletins.verify.prompt import PageContext
-from extractors.servpro_bulletins.verify.candidates import Candidate
-async def ask(prompt, pdf, mime, **kw):
-    return "this is not json"
-now = dt.datetime.now(dt.timezone.utc)
-cand = Candidate(id=str(uuid.uuid4()), bulletin_id=str(uuid.uuid4()), page=3, subject="x", raw_rule_text="Contact within 24 hours.",
-                 fields=dict(requires_pre_approval=False, notification_window_hours=24, window_time_basis='calendar', threshold_value=None,
-                             threshold_unit=None, stage=None, deadline_type=None, loss_types=None, cadence_period=None, is_cadence=False),
-                 stamps={}, revised_at=now, is_current=True, bulletin_number="1", revision="A", created_at=now)
-res = asyncio.run(read_page(PageContext(carrier="Stub", bulletin="#1", total_pages=5, page=3, held=(3,)), b"%PDF", "Contact within 24 hours.", [cand], model="stub", ask=ask))
-print("refused:", bool(res.refused))
-for e in res.entries:
-    print("entry verdict=%r said=%r failures=%d" % (e.verdict, e.said, len(e.failures)))
-PY
-grep -n "said:" /home/lyphe/.claude/claudecodeui_lyphe/src/shared/carrier-bulletins-types.ts || echo "types: no said member"
-grep -n "no entry" /opt/shadow-connector/extractors/servpro_bulletins/verify/views.py 2>/dev/null || echo "views.py: absent or silent on the word"
-EOF
-bash "$D/p.sh"
-expect: while the defect stands: `refused: True`, `entry verdict='unsettled' said='(no entry)' failures=1`, two lines `said: VerdictWord;` (207 and 226), and `views.py: absent or silent on the word`; cured when the types' `said` members admit the word, or `views.py` is shown to map it and the header says so
-```
-
-measured 2026-10-21 by chain chain-bulletins-read-by-claude--wire-20261021-220823-7261, finding M1, MEDIUM
-probe-key: f43f6eaaefa657324cf3d15a85a9276f920d7b2a
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/.oxlintrc.json, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/carrier-bulletins-types.ts
-
 ## INV-9303 — probe — LOW — `MAN-8865` is not served on a touch of `api.ts`, and the row that is served does not name `carrierBulletins`
 
 LOW — `MAN-8865` is not served on a touch of `api.ts`, and the row that is served does not name `carrierBulletins`
@@ -11859,3 +11822,190 @@ measured 2026-10-22 by chain chain-bulletins-read-by-claude--fill-20261022-12450
 probe-key: 1b5b2cadb17e992bc2916a5fc77e340789fa16ea
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/carrier-bulletins/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/bulletins-view.mjs
+
+## INV-9456 — probe — LOW — the kept walk cannot tell whether `openPano` reads its entry
+
+LOW — the kept walk cannot tell whether `openPano` reads its entry
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX)
+cat > "$D/p.sh" <<'EOF'
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+cat > "$0.mjs" <<'JS'
+import { curlJson, loginToken } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/whole-check-kit.mjs';
+const FACES = ['ahead', 'right', 'behind', 'left', 'ceiling', 'floor'];
+const token = loginToken();
+const tour = curlJson('GET', '/api/affected-areas/tours/6ad29b4c93d5140395dcaa76', undefined, token).body;
+const opens = (pano) => FACES.find((face) => {
+  const read = pano.views.find((view) => view.face === face)?.read;
+  return read?.status === 'read' && ((read.standingCount ?? read.regionsCount) > 0 || read.regionsCount > 0);
+}) ?? 'ahead';
+const rows = (tour?.panos ?? []).map((pano) => `${pano.room ?? pano.name ?? pano.panoId}→${opens(pano)}`);
+const kitchen = (tour?.panos ?? []).find((pano) => pano.panoId === '6ad29b4c12f14e4d72c81901');
+console.log('walk opens only the Kitchen, which opens on:', kitchen ? opens(kitchen) : 'not listed');
+console.log('panos that open off Ahead:', rows.filter((r) => !r.endsWith('→ahead')).join(' | ') || 'none');
+JS
+node "$0.mjs" 2>&1 | tail -4
+EOF
+bash "$D/p.sh"
+expect: "walk opens only the Kitchen, which opens on: ahead" and a non-empty "panos that open off Ahead:" list (today five panos: Front Entry and one more →right, Bathroom →floor, Dinning Room →left, Closet →behind); cured when the walk also opens one of them
+```
+
+measured 2026-10-22 by chain chain-tour-affected-areas--360-view--place-20261022-154331-9d2f, finding L1, LOW
+probe-key: 75b68e16406165d7c5ecd3c11796a267230385d5
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/AffectedAreasView.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/hooks/usePanoPlace.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/affected-areas-place.mjs
+
+## INV-9457 — probe — MEDIUM — the way-out button is focusable while it is hidden: reaching it shifts the photo 48 px, pops the closed bar into the box, and its name says "Leave fullscreen" while Enter enters
+
+MEDIUM — the way-out button is focusable while it is hidden: reaching it shifts the photo 48 px, pops the closed bar into the box, and its name says "Leave fullscreen" while Enter enters
+
+```probe
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'SH'
+set -u
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+here=$(dirname "$0")
+cat > "$here/p.mjs" <<'JS'
+import { fetchPano, installSphereFixture, newContext, openApp, pw } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/sphere-fixture.mjs';
+const browser = await pw.chromium.launch();
+const { pano, images } = await fetchPano();
+const context = await newContext(browser, { viewport: { width: 1280, height: 900 } });
+const page = await context.newPage();
+await openApp(page);
+await installSphereFixture(page, { pano, images });
+await page.evaluate(() => { const s = window.__sphere; return s.mount({ regions: s.shapes('all', null) }); });
+await page.evaluate(() => window.__sphere.ready());
+await page.waitForTimeout(900);
+const read = () => page.evaluate(() => {
+  const box = document.querySelector('#sx .vv-sphere');
+  const container = document.querySelector('#sx .psv-container');
+  const navbar = document.querySelector('#sx .psv-navbar');
+  const button = document.querySelector('#sx .psv-fullscreen-button');
+  const top = (el) => Math.round(el.getBoundingClientRect().top);
+  return {
+    active: document.activeElement.tagName,
+    boxRole: box.getAttribute('role'),
+    boxBottom: Math.round(box.getBoundingClientRect().bottom),
+    navbarOpen: navbar.classList.contains('psv-navbar--open'),
+    navbarTop: top(navbar),
+    buttonTop: top(button),
+    buttonTabIndex: button.tabIndex,
+    buttonTitle: button.title,
+    containerScrollTop: container.scrollTop,
+    canvasTop: Math.round(document.querySelector('#sx .psv-canvas-container').getBoundingClientRect().top),
+    fullscreen: !!document.fullscreenElement,
+    events: window.__sphere.events.fullscreens.slice(),
+  };
+});
+console.log('closed ', JSON.stringify(await read()));
+const client = await context.newCDPSession(page);
+const { nodes } = await client.send('Accessibility.getFullAXTree');
+console.log('ax-closed', JSON.stringify(nodes.filter((n) => /Leave fullscreen/.test(n.name?.value ?? '')).map((n) => ({ role: n.role?.value, name: n.name?.value, ignored: n.ignored }))));
+await page.focus('#sx .psv-fullscreen-button');
+await page.waitForTimeout(500);
+console.log('focused', JSON.stringify(await read()));
+await page.keyboard.press('Enter');
+await page.waitForTimeout(1200);
+console.log('enter  ', JSON.stringify(await read()));
+await page.evaluate(() => document.exitFullscreen().catch(() => undefined));
+await page.waitForTimeout(500);
+await page.evaluate(() => document.activeElement?.blur());
+await page.waitForTimeout(300);
+console.log('left   ', JSON.stringify(await read()));
+// the cure, measured on the same page (nothing is edited)
+await page.evaluate(() => document.exitFullscreen().catch(() => undefined));
+await page.addStyleTag({ content: '.vv-sphere .psv-navbar:not(.psv-navbar--open) { visibility: hidden; }' });
+await page.waitForTimeout(200);
+await page.evaluate(() => document.querySelector('#sx .psv-container').scrollTop = 0);
+await page.evaluate(() => document.querySelector('#sx .psv-fullscreen-button').focus());
+await page.waitForTimeout(400);
+console.log('cured  ', JSON.stringify(await read()));
+await context.close();
+await browser.close();
+JS
+node "$here/p.mjs"
+SH
+bash "$D/p.sh"
+```
+
+measured 2026-10-22 by chain chain-tour-affected-areas--360-view--library-20261022-154330-58da, finding M1, MEDIUM
+probe-key: ba39f4f5a3408f6feddfc35e33c2af5916b68f89
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/utils/sphereFaces.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/common.json, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/sphere/SphereCanvas.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/sphere/sphereLook.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/sphere/sphereMarkers.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/SphereView.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/sphere/wheelGate.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/verve/media.css, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/sphere-fixture.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/sphere-view.mjs, /home/lyphe/.claude/claudecodeui_lyphe/vite.config.js
+
+## INV-9491 — probe — MEDIUM — the dropdown stands 26px short of every other control on the Runner card
+
+MEDIUM — the dropdown stands 26px short of every other control on the Runner card
+
+```probe
+cd /home/lyphe/.claude/claudecodeui_lyphe && timeout 200 node /home/lyphe/.claude/state/pipeline-reviews/weekly-stop-setting/athena-probes/row-alignment.mjs
+echo "[probe exit $?]"
+expect: `desktop 1440: weekly control right edge 1109 | the other 7 controls end at 1134..1135 | weekly stands 26px short` and `phone 390: … 335 … 360..361 | weekly stands 26px short`; cured when both lines end `aligned`
+```
+
+measured 2026-10-22 by chain chain-weekly-stop-setting-20261022-194612-739f, finding M1, MEDIUM
+probe-key: e011ebb125c3b372a478fa27022716f9dec6ade3
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/settings/weekly-stop.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/utils.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/settings.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/hooks/useWeeklyStop.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/agents-settings/sections/content/RunnerWeeklyStopRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-weekly-stop.mjs, /home/lyphe/.claude/hooks/plan_runner/pacer/door_windows.py, /home/lyphe/.claude/hooks/plan_runner/pacer/project.py, /home/lyphe/.claude/hooks/plan_runner/pacer/weekly_stop.py, /home/lyphe/.claude/settings.json
+
+## INV-9492 — probe — LOW — the two readers do not agree "clause for clause" on a byte-order mark that is not the first byte
+
+LOW — the two readers do not agree "clause for clause" on a byte-order mark that is not the first byte
+
+```probe
+bash /home/lyphe/.claude/state/pipeline-reviews/weekly-stop-setting/athena-probes/bom-readers.sh
+echo "[probe exit $?]"
+expect: the `leading BOM` row reads `80 80`; the `trailing BOM`, `doubled BOM` and `space then BOM` rows read `95 80` while the defect stands (pacer then CloudCLI); cured when every row has equal columns
+```
+
+measured 2026-10-22 by chain chain-weekly-stop-setting-20261022-194612-739f, finding L1, LOW
+probe-key: 3dd28a3229c1a9d48c5b565db4b6b0e2f47063db
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/settings/weekly-stop.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/utils.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/settings.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/hooks/useWeeklyStop.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/agents-settings/sections/content/RunnerWeeklyStopRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-weekly-stop.mjs, /home/lyphe/.claude/hooks/plan_runner/pacer/door_windows.py, /home/lyphe/.claude/hooks/plan_runner/pacer/project.py, /home/lyphe/.claude/hooks/plan_runner/pacer/weekly_stop.py, /home/lyphe/.claude/settings.json
+
+## INV-9493 — probe — LOW — `pacer windows` prints today's weekly line on windows that were weighed at another one
+
+LOW — `pacer windows` prints today's weekly line on windows that were weighed at another one
+
+```probe
+python3 -I /home/lyphe/.claude/state/pipeline-reviews/weekly-stop-setting/athena-probes/windows-header-ceiling.py
+echo "[probe exit $?]"
+expect: today `windows whose header week_ceiling differs from what their own lines were weighed at: 9 of 19` (the figure drifts as windows age out); cured `0 of N`
+```
+
+measured 2026-10-22 by chain chain-weekly-stop-setting-20261022-194612-739f, finding L2, LOW
+probe-key: 754730454775a5f4f6754943cd295fdbdb3a7163
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/settings/weekly-stop.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/utils.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/settings.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/hooks/useWeeklyStop.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/agents-settings/sections/content/RunnerWeeklyStopRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-weekly-stop.mjs, /home/lyphe/.claude/hooks/plan_runner/pacer/door_windows.py, /home/lyphe/.claude/hooks/plan_runner/pacer/project.py, /home/lyphe/.claude/hooks/plan_runner/pacer/weekly_stop.py, /home/lyphe/.claude/settings.json
+
+## INV-9494 — probe — LOW — "healed means deleted" missed one stale sentence: `week_ceiling` 99% in the `pacer windows` row
+
+LOW — "healed means deleted" missed one stale sentence: `week_ceiling` 99% in the `pacer windows` row
+
+```probe
+bash /home/lyphe/.claude/state/pipeline-reviews/weekly-stop-setting/athena-probes/man8714-week-ceiling.sh
+echo "[probe exit $?]"
+expect: today `stale `week_ceiling` 99% still stands: True`; cured `False`
+```
+
+measured 2026-10-22 by chain chain-weekly-stop-setting-20261022-194612-739f, finding L3, LOW
+probe-key: 380d3bbe7563b428660bf0aa230610e7facda38b
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/settings/weekly-stop.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/utils.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/settings.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/hooks/useWeeklyStop.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/agents-settings/sections/content/RunnerWeeklyStopRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-weekly-stop.mjs, /home/lyphe/.claude/hooks/plan_runner/pacer/door_windows.py, /home/lyphe/.claude/hooks/plan_runner/pacer/project.py, /home/lyphe/.claude/hooks/plan_runner/pacer/weekly_stop.py, /home/lyphe/.claude/settings.json
+
+## INV-9495 — probe — LOW — the row's hint does not say what a line at or under the week's current figure does
+
+LOW — the row's hint does not say what a line at or under the week's current figure does
+
+```probe
+bash /home/lyphe/.claude/state/pipeline-reviews/weekly-stop-setting/athena-probes/hint-and-hold.sh
+echo "[probe exit $?]"
+expect: `the hint names a hold of every start, or the account switch: False`, `weekly … ceiling 60%` over a week used near 89%, and the settle dry run naming the weekly at its ceiling; cured when the first line reads True
+```
+
+measured 2026-10-22 by chain chain-weekly-stop-setting-20261022-194612-739f, finding L4, LOW
+probe-key: 1fd6e19439583d9a596b9dc8f6caf9a5673dc416
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/settings/weekly-stop.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/utils.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/settings.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/hooks/useWeeklyStop.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/agents-settings/sections/content/RunnerWeeklyStopRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-weekly-stop.mjs, /home/lyphe/.claude/hooks/plan_runner/pacer/door_windows.py, /home/lyphe/.claude/hooks/plan_runner/pacer/project.py, /home/lyphe/.claude/hooks/plan_runner/pacer/weekly_stop.py, /home/lyphe/.claude/settings.json
