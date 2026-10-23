@@ -113,6 +113,7 @@ export default function RunnerModelContent() {
       <RunnerWeeklyStopRow />
 
       <RunnerParkAtPeakRow />
+      {/* FILL: gemini-budget-row — <RunnerGeminiBudgetRow />, directly under Park at peak */}
 
       {/* THE MASTER OF THE HEAL REFLEX — the one switch on this card that STOPS work rather than
           starting it, and the answer to "theyre running crazy, theres suppose to be a toggle for it
