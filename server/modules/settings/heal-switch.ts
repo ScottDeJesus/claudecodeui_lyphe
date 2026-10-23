@@ -94,7 +94,7 @@ const LEADING_BOM = /^\uFEFF/;
  *
  * Exported for `gemini-plan-cap.ts`, which reads the Gemini budget's cap in this same grammar.
  */
-export const DOLLARS =/^[+-]?(\d+(\.\d*)?|\.\d+)([eE][+-]?\d+)?$/;
+export const DOLLARS = /^[+-]?(\d+(\.\d*)?|\.\d+)([eE][+-]?\d+)?$/;
 
 /** The master's one word: the whole of what stops the reflex launching. */
 const MASTER_OFF = 'off';

@@ -7062,6 +7062,8 @@ side in every state), which is why the parses in `heal-switch.ts` are written to
 clause with the Python rather than to be lenient in one direction: a reader that took `on3`, or a
 writer that emitted it, would leave the operator pressing a switch the worker does not see move.
 
+`DOLLARS`, `PY_SPACE`, `readFlagText` and `writeFlag` are exported for the other readers of a flag file: `heal-model-switch.ts`, `heal-cycle-switch.ts`, and the Gemini plan cap (`gemini-plan-cap.ts`, MAN-8963), which reads in `DOLLARS`' grammar and is not a heal flag. A FIFO at any path read through `readFlagText` hangs the read (INV-9509).
+
 **THE DAILY CAP IS A DEEPSEEK FIGURE, and so is the peak park.** The worker sums the day's heals whose
 row says they ran on DeepSeek — each booked at its chain's DeepSeek stages alone — plus a reserve for
 the ones still walking (`spend_today` landed + `spend_reserved`: running heals × the mean of the last
