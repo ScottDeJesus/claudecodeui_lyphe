@@ -724,6 +724,8 @@ export const api = {
     saveHealCycle: (state: { enabled: boolean; hour: number }) => put('/api/settings/heal-cycle', state),
     healCap: () => get('/api/settings/heal-cap'),
     saveHealCap: (usd: number | null) => put('/api/settings/heal-cap', { usd }),
+    geminiPlanCap: () => get('/api/settings/gemini-plan-cap'),
+    saveGeminiPlanCap: (usd: number) => put('/api/settings/gemini-plan-cap', { usd }),
 
     // The heal reflex's MODEL switch — which model a heal's souls run on, its own file beside the
     // chat composer's DeepSeek switch rather than the same one, so the two can disagree: the heal's

@@ -2,7 +2,7 @@ import { Gem } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { geminiPlanCapFake } from '@/modules/settings/tabs/agents-settings/sections/content/gemini-plan-cap-fake';
+import { useGeminiPlanCap } from '@/modules/settings/hooks/useGeminiPlanCap';
 import { Button, Field, Input, SettingRow } from '@/shared/ui';
 
 /** The field's id: its label's `htmlFor`, and the handle a verify script reads the amount by. */
@@ -47,23 +47,32 @@ export default function RunnerGeminiBudgetRow() {
   const { t } = useTranslation('settings');
 
   // ── The wires: the read and its two acts. Everything below them is composition. ──
-  // FILL: state — cap-fill's `useGeminiPlanCap()` replaces this fake read and adds `save` and `refresh` to
-  // what it hands back: GET /api/settings/gemini-plan-cap's amount (`null` until a read succeeds), whether
-  // the last read failed, and whether a write is in flight.
-  const { usd, unreadable, saving } = geminiPlanCapFake();
+  // GET /api/settings/gemini-plan-cap's amount (`null` until a read succeeds), whether the last read failed,
+  // whether a write is in flight, and the two acts: `save` writes an amount and settles once the file's
+  // truth is drawn, `refresh` asks again.
+  const { usd, unreadable, saving, save, refresh } = useGeminiPlanCap();
 
   // What the operator has typed and not yet left: a draft, never the cap. `null` draws the saved amount, so a
   // read landing mid-type cannot overwrite the typing, and dropping the draft is how the field snaps back.
   const [draft, setDraft] = useState<string | null>(null);
 
-  // FILL: onBlur — the draft, trimmed. No draft (the field left untouched) sends nothing. A blank, a
-  // non-number or a negative sends nothing and drops the draft, which snaps the field back to the saved
-  // amount: there is no "no ceiling". Anything else is `save(Number(typed))`, and the draft is dropped when
-  // that write answers, so the field draws what the file holds — the amount read back, or after a refusal
-  // the amount re-read.
-  const onBlur = (): void => {};
-  // FILL: onRetry — `void refresh()`.
-  const onRetry = (): void => {};
+  // The draft, trimmed. No draft (the field left untouched) sends nothing. A blank, a non-number or a
+  // negative sends nothing and drops the draft, which snaps the field back to the saved amount: there is no
+  // "no ceiling". Anything else is `save(Number(typed))`. When that write answers, the draft is dropped only
+  // if it still holds the text this blur sent, so the field draws what the file holds (the amount read
+  // back, or after a refusal the amount re-read) and a next amount typed during the write survives.
+  const onBlur = (): void => {
+    if (draft === null) return;
+    const sent = draft;
+    const typed = sent.trim();
+    const amount = Number(typed);
+    if (typed === '' || !Number.isFinite(amount) || amount < 0) {
+      setDraft(null);
+      return;
+    }
+    void save(amount).then(() => setDraft((now) => (now === sent ? null : now)));
+  };
+  const onRetry = (): void => void refresh();
 
   const label = t('agents.runnerGeminiBudget.label', { defaultValue: 'Gemini budget per plan' });
   // No amount is not the $5.00 default, and the row says so in words where the reader is already looking.

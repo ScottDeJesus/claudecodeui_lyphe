@@ -13795,3 +13795,50 @@ The operator's weekly stop: where the usage pacer stops starting plans on the WE
 **The standing proof.** `node .verify/probe-weekly-stop.mjs` (dev server on :5183, desktop and mobile, dark and light): opens Settings → Agents, reads the row's DOM, opens the dropdown, picks 99% and then back to the line it found through it, and after each reads the file, `GET /api/settings/weekly-stop` and `pacer status --json`'s weekly ceiling, screenshots to `.verify/out/`, zero console errors. It only ever writes 99 and then the line it found — never a line tighter than the operator's — and declines (`[SKIPPED]`, exit 0) when the week has already used 94% or more. It leaves the setting exactly where it found it: a run that throws between the two picks (its `finally`) puts the operator's file back over its own 99; a SIGKILL runs no `finally`.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/settings/weekly-stop.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/hooks/useWeeklyStop.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/agents-settings/sections/content/RunnerWeeklyStopRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-weekly-stop.mjs, /home/lyphe/.claude/hooks/plan_runner/pacer/weekly_stop.py
+
+## MAN-8966 — Gemini budget per plan — the Settings row and its hook: files, handle, strings, states
+
+`RunnerGeminiBudgetRow.tsx` (Settings → Agents → Claude → Account) is the operator's view of the Gemini plan cap: ONE dollar amount that binds every plan's and every ownerless chain's Gemini spend. The server half (file, GET/PUT `/api/settings/gemini-plan-cap`): MAN-8963. The gate that enforces it: MAN-8959.
+
+## Status
+- 2026-10-23: LIVE. `RunnerModelContent.tsx` draws `<RunnerGeminiBudgetRow />` directly under `<RunnerParkAtPeakRow />`, and its docstring names the row among its siblings. The row reads and writes through `useGeminiPlanCap`, the one reader and writer of the cap in `src/`.
+
+## The hook (`src/modules/settings/hooks/useGeminiPlanCap.ts`)
+- Calls `api.settings.geminiPlanCap()` / `saveGeminiPlanCap(usd)` (`src/shared/api.ts`, beside `healCap`) and answers `{usd: number | null, unreadable, saving, save(next), refresh()}`; `usd` is `null` until a read succeeds. Shape of `usePlannerLanes` (the row it feeds: MAN-7509).
+- A body without a finite `usd` of 0 or more (the API's `{success:false,…}` envelope, a 502, a 401) is "could not ask", never the default.
+- ONE REQUEST AT A TIME. A read is not asked while another read or a write is in flight (focus and `visibilitychange` of one return to the page are one read); a write waits out a read already on the wire. So no read lands after a write and draws the amount the file has left. Nothing polls: mount, focus, `visibilitychange` and after a write are the only asks.
+- NOTHING IS OPTIMISTIC. The row draws the write's own read-back; a refused write (any non-2xx) is followed by a re-read, and when that fails too `usd` is `null` again (the row says unknown, with Retry). why: the amount in force is the file's, not the one asked for, and a write the server took whose answer was lost leaves the file's amount unknown. A failed re-ask on focus or `visibilitychange` is different: the row keeps the last amount it read and `unreadable` is set.
+- `save(next)` refuses (sends nothing) a non-finite or negative amount. A save made while a write is in flight is folded into the loop (newest wins) and settles with it; a save waiting behind a write that is refused is still written next (one refusal says nothing about the amount typed after it).
+
+## The fill (`RunnerGeminiBudgetRow.tsx`)
+- `onBlur` keeps `sent` = the draft as it stood at blur: no draft → nothing; trimmed blank, non-number or negative → nothing sent and the draft dropped (the snap-back; there is no "no ceiling"); else `save(Number(typed))`, and the draft is dropped on the write's answer ONLY by `setDraft((now) => (now === sent ? null : now))`. why: a plain `.then(() => setDraft(null))` erases an amount typed while the write was in flight.
+- `onRetry` is `void refresh()`.
+
+## Composition
+`RunnerPlannerLanesRow`'s grammar (unknown amount said in words, Retry in the control slot); wears lucide `Gem` (no other row on the card); handle `data-runner-gemini-budget="unknown|set"`; field id `runner-gemini-budget-usd`; description block id `runner-gemini-budget-about`, the field's `aria-describedby`.
+
+| state | description | control slot |
+|---|---|---|
+| `usd === null`, not `unreadable` (asking) | `status.loading` (`Loading...`) | Retry |
+| `usd === null`, `unreadable` | the `unreadable` sentence | Retry |
+| `usd` 5 / 12.5 | `description` | field `5.00` / `12.50` |
+| `usd === 0` | `description` + warn-tone `data-gemini-budget-zero` line (`▲` + `zero`) | field `0.00` |
+| `saving` | `description` | field, wrapper `aria-busy="true"` |
+
+- Number input, `inputMode="decimal"`, `min` 0, `step` 0.5, `w-32` (the heal cap's input).
+- Typing is a draft (`useState<string | null>`); the field draws `draft ?? dollars(usd)`; dropping the draft is the snap-back; a read never overwrites a draft; no `useEffect`.
+- `dollars(usd)`: two decimals, more only when the file holds more (`7.125` is never drawn `7.13`).
+- Enter blurs the field, so the keyboard saves through the blur path.
+- The input is never `disabled` mid-write: Chromium blurs a control the instant one lands, and the next amount may already be typing. Saving is marked by `aria-busy` alone.
+- Unknown is never `$5.00`: no field is drawn until a read answers.
+- `$0.00` is a real cap every call has met, not "unlimited"; the row says so while the file holds 0.
+
+## Strings
+`agents.runnerGeminiBudget` in `src/modules/i18n/locales/en/settings.json`, directly after `runnerParkAtPeak`: `label`, `description`, `field`, `zero`, `unreadable`. Every call carries a `defaultValue`; `buttons.retry` and `status.loading` come from `common`. The row's `buttons.retry` fallback is `'Try again'`, the card's other rows' fallback; the key shows `Retry`.
+
+## Measured
+- 2026-10-23, the served app (:5184, `.verify/gemini-budget-cap-row.mjs`; `.verify/` is gitignored): with no cap file the row reads `5.00` at 1440×900 and 390×844, light and dark. Typing `5` and leaving the field PUTs once, the file then holds `5\n`, and the field draws the read-back. `-1` and a blank each snap back to `5.00` with no PUT in the page's network log and the file's bytes and mtime unchanged. A PUT answered 500 inside the page snaps the field back to `5.00` after a re-read GET, the file untouched. `PUT {"usd": -1}` on :3011 answers 400 `INVALID_GEMINI_PLAN_CAP`. The probe refuses to start (exit 2) when a cap file exists, types the amount the row reads, and removes the file it created, so the host is left with none and an operator's own cap is never typed over.
+- 2026-10-23: `zero` line contrast 5.25:1 light, 9.33:1 dark.
+- 2026-10-23: at 390 wide the field stays beside a narrow text column (as every `SettingRow`); the zero state is 296 px tall. A `SettingRow` stacking change is the shared library's, one change for every Settings row.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/hooks/useGeminiPlanCap.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/agents-settings/sections/content/RunnerGeminiBudgetRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/agents-settings/sections/content/RunnerModelContent.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/gemini-budget-cap-row.mjs

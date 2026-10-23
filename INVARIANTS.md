@@ -12009,3 +12009,45 @@ measured 2026-10-22 by chain chain-weekly-stop-setting-20261022-194612-739f, fin
 probe-key: 1fd6e19439583d9a596b9dc8f6caf9a5673dc416
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/settings/weekly-stop.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/utils.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/settings.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/hooks/useWeeklyStop.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/agents-settings/sections/content/RunnerWeeklyStopRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-weekly-stop.mjs, /home/lyphe/.claude/hooks/plan_runner/pacer/door_windows.py, /home/lyphe/.claude/hooks/plan_runner/pacer/project.py, /home/lyphe/.claude/hooks/plan_runner/pacer/weekly_stop.py, /home/lyphe/.claude/settings.json
+
+## INV-9522 — probe — (MEDIUM) — MAN-8966 says a refused write plus a failed re-read leaves `usd` null (row "unknown"); the hook keeps the last amount, and `unreadable` is dead state after the first read
+
+(MEDIUM) — MAN-8966 says a refused write plus a failed re-read leaves `usd` null (row "unknown"); the hook keeps the last amount, and `unreadable` is dead state after the first read
+
+```probe
+node /home/lyphe/.claude/state/pipeline-reviews/gemini-budget--cap-fill/athena-probes/cap-row.mjs stale
+expect: `stale: row=set field=5.00 retryButton=false (doc says: row=unknown)` while the doc and the hook disagree; once they agree, either the row reads unknown with the Retry button or the doc's line no longer says so
+```
+
+measured 2026-10-23 by chain chain-gemini-budget--cap-fill-20261023-044036-8763, finding M2, MEDIUM
+probe-key: 9e3acc9980fdc1ebb322d60dfe2e4e2d50430b2a
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/hooks/useGeminiPlanCap.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/agents-settings/sections/content/RunnerGeminiBudgetRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/agents-settings/sections/content/RunnerModelContent.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/gemini-budget-cap-row.mjs
+
+## INV-9523 — probe — (LOW) — an amount typed while a write is out is dropped without being tried when that write is refused
+
+(LOW) — an amount typed while a write is out is dropped without being tried when that write is refused
+
+```probe
+node /home/lyphe/.claude/state/pipeline-reviews/gemini-budget--cap-fill/athena-probes/cap-row.mjs queued
+expect: `queued: PUTs=[7] file=5 field=5.00` while the queued 8 is dropped; cured, PUTs ends with 8 and the file is 8
+```
+
+measured 2026-10-23 by chain chain-gemini-budget--cap-fill-20261023-044036-8763, finding L1, LOW
+probe-key: c36e61bb534be80f6d95f5ed333403689f4045c9
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/hooks/useGeminiPlanCap.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/agents-settings/sections/content/RunnerGeminiBudgetRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/agents-settings/sections/content/RunnerModelContent.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/gemini-budget-cap-row.mjs
+
+## INV-9524 — probe — (LOW, note) — a window switch with an unfinished amount commits it
+
+(LOW, note) — a window switch with an unfinished amount commits it
+
+```probe
+node /home/lyphe/.claude/state/pipeline-reviews/gemini-budget--cap-fill/athena-probes/cap-row.mjs blurpartial
+expect: `blurpartial: PUTs=[{"usd":1}]` while a window blur commits the partial amount
+```
+
+measured 2026-10-23 by chain chain-gemini-budget--cap-fill-20261023-044036-8763, finding L2, LOW
+probe-key: d578d31d4c591cbbc5d130230bb00ce21ba352cf
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/hooks/useGeminiPlanCap.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/agents-settings/sections/content/RunnerGeminiBudgetRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/agents-settings/sections/content/RunnerModelContent.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/gemini-budget-cap-row.mjs
