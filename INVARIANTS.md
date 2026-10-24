@@ -761,20 +761,6 @@ probe-key: 3d2505355b432dfaed5d0ad22452cf30cffe063d
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat-gutters/ChatGutterLayout.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat-host/ChatHostPlaceholder.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat-host/ChatHostSlot.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat-host/hooks/useFloatingPanel.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat-host/utils/placeNode.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/hooks/useChatDoor.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/chat-floats-panel.mjs
 
-## INV-6003 — probe — `ChatHostContext.tsx:152` still says `moveBefore` keeps the composer's caret
-
-`ChatHostContext.tsx:152` still says `moveBefore` keeps the composer's caret
-
-```probe
-cd /home/lyphe/.claude/claudecodeui_lyphe && grep -n 'then keeps' src/modules/chat-host/context/ChatHostContext.tsx
-expect: no output (today: line 152, "`moveBefore` then keeps / the composer's caret and the widget frames alive")
-```
-
-measured 2026-09-30 by chain chain-app-drawer-chat--float-panel-20260929-224731-39b9, finding L1, LOW
-probe-key: ce23ae3d8f64fb75b7e69b209f95595d083951f1
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat-gutters/ChatGutterLayout.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat-host/ChatHostPlaceholder.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat-host/ChatHostSlot.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat-host/hooks/useFloatingPanel.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat-host/utils/placeNode.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/hooks/useChatDoor.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/chat-floats-panel.mjs
-
 ## INV-6010 — WorkspaceFrame's reportCovered is a layout effect — a passive one loses the race with a reply
 
 `WorkspaceFrame` reports whether an application covers the main region with `useLayoutEffect(() => reportCovered(covered), [covered, reportCovered])`. Keep it a layout effect.
@@ -798,20 +784,6 @@ measured 2026-09-30 by chain chain-app-drawer-chat--radial-fill-20260930-002344-
 probe-key: d0acbb8cd3549ac83ed13eaec368502feb5d83e0
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/AppSwitcherFab.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat-host/hooks/useUnreadReply.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/fab-radial-door.mjs
-
-## INV-6012 — probe — three checks in `.verify/fab-radial-door.mjs` cannot fail
-
-three checks in `.verify/fab-radial-door.mjs` cannot fail
-
-```probe
-sed -n 325,336p /home/lyphe/.claude/claudecodeui_lyphe/.verify/fab-radial-door.mjs | grep -c "frame("
-expect: at least 1 (a frame delivered before the check that claims a reply landed on screen; today 0)
-```
-
-measured 2026-09-30 by chain chain-app-drawer-chat--radial-fill-20260930-002344-4ad4, finding L2, LOW
-probe-key: 41705d7e6e2e0f2f60aa2258d74911df0ba6c6fb
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/fab-radial-door.mjs
 
 ## INV-6016 — probe — a `requestWindow` that throws synchronously, or returns a non-promise, wedges the door for the life of the page
 

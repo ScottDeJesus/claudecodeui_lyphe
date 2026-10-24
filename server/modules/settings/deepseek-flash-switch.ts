@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
-import { mkdir, readFile, realpath, rename, stat, unlink, writeFile } from 'node:fs/promises';
+import { constants } from 'node:fs';
+import { mkdir, open, realpath, rename, unlink, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 
@@ -48,13 +49,22 @@ const FLAG_TRIM = /^[\s\x1c-\x1f]+|[\s\x1c-\x1f]+$/g;
  * OFF in every other case, including a file that is not there (an ENOENT is `false`, never a
  * throw) — a caller asking whether a flag is set gets an answer, not an exception it has to
  * invent a meaning for.
+ *
+ * THE OPEN IS `O_NONBLOCK`, and only a regular file is read (as `readFlagText` in `heal-switch.ts` does): a FIFO
+ * left at a flag path passes a `stat` size check, and a blocking open then waits for a writer that never comes —
+ * and holds a libuv thread each, so four such reads stall every other file read of the process.
  */
 export async function readFlagFile(filePath: string): Promise<boolean> {
+  let handle;
   try {
-    if ((await stat(filePath)).size > FLAG_MAX_BYTES) return false;
-    return (await readFile(filePath, 'utf8')).replace(FLAG_TRIM, '') === 'on';
+    handle = await open(filePath, constants.O_RDONLY | constants.O_NONBLOCK);
+    const info = await handle.stat();
+    if (!info.isFile() || info.size > FLAG_MAX_BYTES) return false;
+    return (await handle.readFile('utf8')).replace(FLAG_TRIM, '') === 'on';
   } catch {
     return false;                 // absent or unreadable is OFF, never an error to the caller
+  } finally {
+    await handle?.close().catch(() => undefined);
   }
 }
 

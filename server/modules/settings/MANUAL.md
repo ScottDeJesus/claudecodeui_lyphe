@@ -58,7 +58,7 @@ THERE IS NO OFF STATE: no `null`, never "no ceiling" (cf. the heal cap, MAN-630)
 
 Empty is tested by hand before `Number()`: `Number('')` is 0, and an empty file reading as zero would refuse every Gemini call where the backend reads the default.
 
-The grammar is written twice, here and in `ledger.cap_usd`, and answers the same number for the same bytes. 2026-10-22: 30 byte shapes (BOMs, NEL and C0 separators, invalid UTF-8, trailing NUL, the 256/257-byte bound, `1e999`, `-0`, `.5`, `5.`, `1_000`, `nan`, file absent), 0 disagreements. One shape is not equal: a FIFO at the path (INV-9509).
+The grammar is written twice, here and in `ledger.cap_usd`, and answers the same number for the same bytes. 2026-10-22: 30 byte shapes (BOMs, NEL and C0 separators, invalid UTF-8, trailing NUL, the 256/257-byte bound, `1e999`, `-0`, `.5`, `5.`, `1_000`, `nan`, file absent), 0 disagreements. A FIFO at the path is equal too: it reads the default, `5`, at once (INV-9509).
 
 ## Routes
 `GET`/`PUT /api/settings/gemini-plan-cap` in `settings.routes.ts`, host-wide: no `userId` is read, unauthenticated is 401 (the `/api/settings` mount).
