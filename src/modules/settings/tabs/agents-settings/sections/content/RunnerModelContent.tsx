@@ -6,6 +6,7 @@ import { useHealMasterSwitch } from '@/shared/hooks/useHealMasterSwitch';
 import { Button, LLMProviderLogo, SettingRow } from '@/shared/ui';
 import SettingsToggle from '@/modules/settings/SettingsToggle';
 import RunnerCompactionRow from '@/modules/settings/tabs/agents-settings/sections/content/RunnerCompactionRow';
+import RunnerGeminiBudgetRow from '@/modules/settings/tabs/agents-settings/sections/content/RunnerGeminiBudgetRow';
 import RunnerHealModelRow from '@/modules/settings/tabs/agents-settings/sections/content/RunnerHealModelRow';
 import RunnerMainSessionDactylsRow from '@/modules/settings/tabs/agents-settings/sections/content/RunnerMainSessionDactylsRow';
 import RunnerParkAtPeakRow from '@/modules/settings/tabs/agents-settings/sections/content/RunnerParkAtPeakRow';
@@ -25,8 +26,8 @@ import RunnerWeeklyStopRow from '@/modules/settings/tabs/agents-settings/section
  * The read, the write and the re-read live in `useDeepSeekFlashSwitch` and `useHealMasterSwitch` —
  * one hook per switch rather than one generalised switch, because switches sharing a module move
  * together the first time one of them is edited, and these must never. The planner
- * lanes, the weekly stop, the park-at-peak switch, the Custom compaction switch and Dactyls for the main session each have a row of
- * their own file (`RunnerPlannerLanesRow`, `RunnerWeeklyStopRow`, `RunnerParkAtPeakRow`, `RunnerCompactionRow` — drawn
+ * lanes, the weekly stop, the park-at-peak switch, the Gemini budget cap, the Custom compaction switch and Dactyls for the main session each have a row of
+ * their own file (`RunnerPlannerLanesRow`, `RunnerWeeklyStopRow`, `RunnerParkAtPeakRow`, `RunnerGeminiBudgetRow`, `RunnerCompactionRow` — drawn
  * directly under the DeepSeek row, because it asks that row's question of a chat's compaction: which small model does
  * a big model's chore — and `RunnerMainSessionDactylsRow`, drawn directly under that one, because it asks the same of
  * a main session's edits) with a hook of its own, and the fourth heal switch, `useHealModelSwitch`, is drawn by `RunnerHealModelRow` — its own file, because
@@ -113,6 +114,7 @@ export default function RunnerModelContent() {
       <RunnerWeeklyStopRow />
 
       <RunnerParkAtPeakRow />
+      <RunnerGeminiBudgetRow />
 
       {/* THE MASTER OF THE HEAL REFLEX — the one switch on this card that STOPS work rather than
           starting it, and the answer to "theyre running crazy, theres suppose to be a toggle for it

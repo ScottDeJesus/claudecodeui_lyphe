@@ -463,6 +463,13 @@
       "description": "An Accept during DeepSeek’s peak window (01:00–04:00 and 06:00–10:00 UTC, weekdays) queues the feature and starts it when the window lifts. Off: Accept walks now.",
       "unreadable": "The switch could not be read from the server, so its position is unknown — this is not the same as off. It is retried whenever this page regains focus."
     },
+    "runnerGeminiBudget": {
+      "label": "Gemini budget per plan",
+      "description": "The most one plan may spend on the Gemini API — design, build, review and testing together, across all its souls. An /inline chain is a budget of its own. At the cap the backend refuses that budget’s Gemini calls. Takes effect at the next call.",
+      "field": "USD per plan",
+      "zero": "Every plan’s and chain’s Gemini calls are refused at $0.00 — zero does not mean unlimited.",
+      "unreadable": "The cap could not be read from the server, so its amount is unknown — this is not the $5.00 default. It is retried whenever this page regains focus."
+    },
     "runnerCompaction": {
       "label": "Custom compaction",
       "description": "On: a chat’s compaction is written by <model>{{model}}</model> at {{effort}} effort instead of by the chat’s own model, in three cases:",
