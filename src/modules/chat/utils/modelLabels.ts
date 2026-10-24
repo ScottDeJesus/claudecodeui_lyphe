@@ -85,9 +85,9 @@ function aliasMatching(
  *
  * In order:
  * 1. An option's own value — the alias the composer sent (`opus[1m]`) — takes that option's label.
- * 2. The provider's own name for the id, where its catalog lists it (`labelsByModelId`, Claude's
+ * 2. The provider's name for the id, where its catalog lists it (`labelsByModelId`, Claude's
  *    `LABELS_BY_MODEL_ID`): `claude-sonnet-5-5` → "Sonnet 5.5", `claude-sonnet-5` → "Sonnet 5". The
- *    CLI names its models; nothing here second-guesses it.
+ *    server has already put the generation into that name; nothing here second-guesses it.
  * 3. Only for an id no catalog names: the id is read as its dash-separated segments and matched
  *    against the options' aliases — segments, never substrings, because `opus` is inside `opusplan`
  *    and a substring match would hand back the wrong name with no way to tell — and captioned with

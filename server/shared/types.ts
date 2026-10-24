@@ -97,8 +97,9 @@ export type ProviderModelOption = {
  * Provider model catalog returned by `GET /api/providers/:provider/models`.
  *
  * `LABELS_BY_MODEL_ID` is present only where the provider reports its own catalog (Claude): the
- * name it gives each concrete model id it can run, offered in `OPTIONS` or not, so a stored turn
- * that recorded `claude-sonnet-5` is captioned "Sonnet 5" by the CLI's own words.
+ * name the picker gives each concrete model id the catalog lists, offered in `OPTIONS` or not, so a
+ * stored turn that recorded `claude-sonnet-5` is captioned "Sonnet 5". It is the catalog's name, with
+ * the version the entry's description states where the name carries none (`claude-model-options.ts`).
  */
 export type ProviderModelsDefinition = {
   OPTIONS: ProviderModelOption[];
