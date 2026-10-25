@@ -51,8 +51,8 @@ export function announceAccountsChanged(): void {
  * The Claude accounts the door holds, and the three writes that change them.
  *
  * Used by the accounts module's AccountRailButton, which owns the single instance — the views rail
- * and the collapsed sidebar each render the button, and are mutually exclusive, so there is exactly
- * one poller in the app at a time.
+ * renders the button once and stands whether the chat list shows or is collapsed, so there is exactly
+ * one poller in the app.
  *
  * ONE PICTURE, THREE WRITES. `GET /api/accounts` answers the door's own picture, tagged with
  * `reachable`; `use`/`auto`/`remove` are the writes that choose, unchoose and drop an account.
@@ -74,7 +74,7 @@ export function useClaudeAccounts() {
   // standing state, and one left standing would greet the next person who opens it.
   const [error, setError] = useState<string | null>(null);
 
-  // Mount flag: a poll that resolves after the sidebar collapsed must not set state.
+  // Mount flag: a poll that resolves after the button unmounted (a sign-out, or the rail leaving the tree) must not set state.
   const mountedRef = useRef(true);
   // The in-flight guard read synchronously — `busy` is a render value and lands too late to
   // stop a second press in the same tick.

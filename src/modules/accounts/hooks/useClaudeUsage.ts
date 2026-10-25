@@ -23,7 +23,7 @@ export function useClaudeUsage() {
   // is: `null` (not asked yet) and `{reachable:false}` (asked, no reading) are different
   // things to say, and neither of them is zero.
   const [data, setData] = useState<ClaudeUsage | null>(null);
-  // Mount flag: a poll that resolves after the sidebar collapsed must not set state.
+  // Mount flag: a poll that resolves after the button unmounted (a sign-out, or the rail leaving the tree) must not set state.
   const mountedRef = useRef(true);
 
   const refresh = useCallback(async () => {

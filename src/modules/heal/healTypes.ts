@@ -1,5 +1,5 @@
 /**
- * The Heal tab's vocabulary — two words, never one (heal-reflex plan §Interfaces).
+ * The Heal section's vocabulary — two words, never one (heal-reflex plan §Interfaces).
  *
  * `kind` is THE DOOR'S OWN WORD for a piece of friction, written by whoever filed the row and never
  * a judgment: `rail-deny`, `script-nudge-blocked`, `tool-error`. A heal is scoped to a kind, the

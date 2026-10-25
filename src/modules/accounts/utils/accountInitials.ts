@@ -14,8 +14,8 @@
  * An empty label gets the em-dash the rest of the panel uses for "we do not know", never a
  * blank circle that looks like a person with no name.
  *
- * Module-private to `accounts`, in its own file because both the panel's rows and the footer
- * row draw the same avatar and neither may spell this rule a second time.
+ * Module-private to `accounts`, in its own file because both the panel's rows and the rail's
+ * account button draw the same avatar and neither may spell this rule a second time.
  */
 export function accountInitials(label: string | null): string {
   const localPart = (label ?? '').split('@')[0] ?? '';

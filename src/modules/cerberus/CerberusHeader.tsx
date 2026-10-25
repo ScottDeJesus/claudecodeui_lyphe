@@ -47,7 +47,7 @@ type CerberusHeaderProps = {
  * wardens dialog. It is drawn only once the wardens read has answered with a release, since with none
  * there is nothing to offer. Then Enroll a node.
  *
- * The headline's number is `counts.needsYou`, the same count the workspace strip's pill shows, so the
+ * The headline's number is `counts.needsYou`, the same count the rail's Cerberus badge shows, so the
  * two never disagree. The header enters on Verve's page entrance with the rest of the tab.
  *
  * Used by the cerberus module's root, `CerberusPanel`, above its tabs.

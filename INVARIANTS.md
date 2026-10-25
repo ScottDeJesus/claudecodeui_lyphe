@@ -63,7 +63,7 @@ expect: the "S9 round trip" line reads `[HOLD] … returns the deck with 4 of it
 measured 2026-09-28 by chain chain-done-cards-leave-20260928-160626-ad80, finding M1, MEDIUM
 probe-key: 8734efe63225eeacfb3de1416303af86f7100857
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/ArcDeck.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/DeletePlanDialog.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/hiddenPlans.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/hooks/useDispatcherPlans.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/putAwayFocus.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/common.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/hooks/useWorkspaceTabGates.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/useCardFold.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-arc-nest.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-arc-strip-return.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-dismiss-done.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-runner-widget-list.mjs
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/ArcDeck.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/DeletePlanDialog.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/hiddenPlans.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/hooks/useDispatcherPlans.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/putAwayFocus.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/common.json, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/useCardFold.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-arc-nest.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-arc-strip-return.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-dismiss-done.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-runner-widget-list.mjs
 
 ## INV-5680 — probe — The standing proof passes a lead that paints nothing
 
@@ -12983,3 +12983,215 @@ measured 2026-10-25 by chain chain-sidebar-rail--account-20261025-120712-1ebd, f
 probe-key: 080a7aebf9340c8debf3dbc4b7d63b8e627ba970
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/account-rail-live.mjs
+
+## INV-9644 — probe — (MEDIUM) — With the list collapsed and an application pane up, the account panel opens under the application and cannot be seen or clicked
+
+(MEDIUM) — With the list collapsed and an application pane up, the account panel opens under the application and cannot be seen or clicked
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'SH'
+#!/usr/bin/env bash
+D="$1"
+cat > "$D/p.mjs" <<'JS'
+import { openConsole } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/console.mjs';
+const s = await openConsole({ viewport: { width: 1440, height: 900 } });
+const { page } = s;
+try {
+  // writes dropped: the dev account is never left collapsed
+  await page.route(/\/api\/user\/preferences(?:[?#].*)?$/, (r) => (r.request().method() === 'GET' ? r.fallback() : r.fulfill({ status: 200, json: { success: true } })));
+  const NAV = 'nav[aria-label="Views"]';
+  await page.waitForSelector('button.vv-fab.vv-fab--docked', { timeout: 20000 });
+  await page.waitForTimeout(800);
+  await page.locator('button.vv-fab').click();
+  await page.locator('[data-app-switcher-radial="open"] [data-act="applications"]').click();
+  await page.waitForTimeout(900);
+  const row = page.locator('[role="dialog"] button:has-text("127.0.0.1")').first();
+  if ((await row.count()) === 0) { console.log('no application row on this box'); process.exitCode = 0; }
+  else {
+    await row.click();
+    await page.waitForTimeout(2500);
+    await page.locator('button[title="Hide sidebar"], button[aria-label="Hide the chat list"]').first().click();
+    await page.waitForTimeout(900);
+    await page.locator(`${NAV} button[aria-haspopup="dialog"]`).click();
+    await page.waitForTimeout(900);
+    const r = await page.evaluate(() => {
+      const p = document.querySelector('#account-panel');
+      if (!p) return 'no panel';
+      const b = p.getBoundingClientRect();
+      const top = document.elementFromPoint(b.x + b.width / 2, b.y + b.height / 2);
+      return `panel open (aria-expanded=${document.querySelector('nav[aria-label="Views"] button[aria-haspopup="dialog"]').getAttribute('aria-expanded')}); topmost at its centre: ${p.contains(top) ? 'PANEL' : top.tagName}`;
+    });
+    console.log(r);
+  }
+} catch (e) { console.log('probe error:', String(e.message).split('\n')[0]); }
+finally { await s.browser.close(); }
+JS
+node "$D/p.mjs"
+SH
+bash "$D/p.sh" "$D"
+case "$D" in /tmp/athena-probe.??????) rm -rf "$D";; esac
+# expect: `panel open (aria-expanded=true); topmost at its centre: IFRAME` while the defect stands; cured: `… PANEL` (or `no application row on this box` when the registry holds none). About 40 s; opens the drawer and an application pane, writes nothing to the dev account.
+```
+
+measured 2026-10-25 by chain chain-sidebar-rail--collapse-20261025-131007-2af8, finding M1, MEDIUM
+probe-key: 5fb9cbf7684a92ece964de58317c5bb00fcd100d
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/AppSwitcherDock.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/constants.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/rail-collapse-live.mjs
+
+## INV-9645 — probe — (LOW) — A keyboard press on the dock's own button drops focus to `<body>`
+
+(LOW) — A keyboard press on the dock's own button drops focus to `<body>`
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'SH'
+#!/usr/bin/env bash
+D="$1"
+cat > "$D/p.mjs" <<'JS'
+import { openConsole } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/console.mjs';
+const s = await openConsole({ viewport: { width: 1440, height: 900 } });
+const { page } = s;
+try {
+  await page.route(/\/api\/user\/preferences(?:[?#].*)?$/, (r) => (r.request().method() === 'GET' ? r.fallback() : r.fulfill({ status: 200, json: { success: true } })));
+  const NAV = 'nav[aria-label="Views"]';
+  const OWN = `${NAV} button[aria-label="Show the chat list"]`;
+  await page.waitForSelector('button.vv-fab.vv-fab--docked', { timeout: 20000 });
+  await page.waitForTimeout(800);
+  // drag the disc out of its dock, then collapse the list: the dock draws its own button
+  const b = await page.locator('button.vv-fab').boundingBox();
+  await page.mouse.move(b.x + 14, b.y + 14); await page.mouse.down();
+  await page.mouse.move(b.x + 26, b.y + 26, { steps: 4 });
+  await page.mouse.move(760, 420, { steps: 14 }); await page.mouse.up();
+  await page.waitForTimeout(600);
+  await page.locator('button[title="Hide sidebar"], button[aria-label="Hide the chat list"]').first().click();
+  await page.waitForTimeout(800);
+  await page.locator(OWN).focus();
+  await page.keyboard.press('Enter');
+  await page.waitForTimeout(700);
+  const a = await page.evaluate(() => ({ list: !!document.querySelector('div.md\\:w-\\[17\\.5rem\\]'), active: document.activeElement.tagName + (document.activeElement.getAttribute('aria-label') ? `[${document.activeElement.getAttribute('aria-label')}]` : '') }));
+  console.log(`list shown: ${a.list}; focus after the keyboard press: ${a.active}`);
+} catch (e) { console.log('probe error:', String(e.message).split('\n')[0]); }
+finally { await s.browser.close(); }
+JS
+node "$D/p.mjs"
+SH
+bash "$D/p.sh" "$D"
+case "$D" in /tmp/athena-probe.??????) rm -rf "$D";; esac
+# expect: `list shown: true; focus after the keyboard press: BODY` while the defect stands; cured: the focus names a control (the disc or the hide button). About 40 s; writes nothing.
+```
+
+measured 2026-10-25 by chain chain-sidebar-rail--collapse-20261025-131007-2af8, finding L1, LOW
+probe-key: ebd195d4d02a91bdfbcf1a2cce52a655c29f0226
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/AppSwitcherDock.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/constants.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/rail-collapse-live.mjs
+
+## INV-9646 — probe — (LOW) — With the list collapsed on load the only door back is the document's last Tab stop
+
+(LOW) — With the list collapsed on load the only door back is the document's last Tab stop
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'SH'
+#!/usr/bin/env bash
+D="$1"
+cat > "$D/p.mjs" <<'JS'
+import { openConsole } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/console.mjs';
+import { pinPreferences, HARNESS_PREFERENCES } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/prefs-pin.mjs';
+const s = await openConsole({ viewport: { width: 1440, height: 900 } });
+const { page } = s;
+try {
+  await pinPreferences(page.context(), { ...HARNESS_PREFERENCES, uiPreferences: { sidebarVisible: false } }, { writes: 'drop' });
+  await page.reload({ waitUntil: 'networkidle' });
+  await page.waitForSelector('button.vv-fab.vv-fab--docked', { timeout: 30000 });
+  await page.waitForTimeout(1500);
+  await page.evaluate(() => document.activeElement && document.activeElement.blur());
+  let presses = 0; let hit = false;
+  while (presses < 60 && !hit) {
+    await page.keyboard.press('Tab'); presses += 1;
+    hit = await page.evaluate(() => document.activeElement.getAttribute('aria-label') === 'Show the chat list');
+  }
+  const railButtons = await page.evaluate(() => document.querySelectorAll('nav[aria-label="Views"] button').length);
+  console.log(`list collapsed on load; Tab presses from the page top to the one door back to the list: ${hit ? presses : 'not reached in 60'} (the rail holds ${railButtons} buttons)`);
+} catch (e) { console.log('probe error:', String(e.message).split('\n')[0]); }
+finally { await s.browser.close(); }
+JS
+node "$D/p.mjs"
+SH
+bash "$D/p.sh" "$D"
+case "$D" in /tmp/athena-probe.??????) rm -rf "$D";; esac
+# expect: `… to the one door back to the list: 14 (the rail holds 14 buttons)` while the disc is the last Tab stop of the document; cured: a count of 1 to 3. About 40 s; writes nothing.
+```
+
+measured 2026-10-25 by chain chain-sidebar-rail--collapse-20261025-131007-2af8, finding L2, LOW
+probe-key: 405cbcfb55c68005f10c8faae0a27e525fd0ec72
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/AppSwitcherDock.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/constants.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/rail-collapse-live.mjs
+
+## INV-9647 — probe — (LOW) — Five comments still say a collapsed sidebar renders or unmounts the account button
+
+(LOW) — Five comments still say a collapsed sidebar renders or unmounts the account button
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'SH'
+#!/usr/bin/env bash
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+rg -n "and the collapsed sidebar|after the sidebar collapsed|collapsed sidebar render" src/modules/accounts || echo none
+SH
+bash "$D/p.sh"
+case "$D" in /tmp/athena-probe.??????) rm -rf "$D";; esac
+# expect: five lines (accounts/index.ts:1, useClaudeAccounts.ts:54 and :77, useClaudeUsage.ts:26, useDeepseekBalance.ts:58) while the defect stands; cured: `none`.
+```
+
+measured 2026-10-25 by chain chain-sidebar-rail--collapse-20261025-131007-2af8, finding L3, LOW
+probe-key: 2f18f78c6b079412b5e18cbe61a6cd035554b377
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/AppSwitcherDock.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/constants.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/rail-collapse-live.mjs
+
+## INV-9648 — probe — (LOW) — Doc rows about these files still carry the old shape, and the dock file has no governing row
+
+(LOW) — Doc rows about these files still carry the old shape, and the dock file has no governing row
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'SH'
+#!/usr/bin/env bash
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+for t in MAN-491 MAN-460; do
+  docstore get "$t" | python3 -c "
+import sys, json
+b = json.load(sys.stdin)['row']['body']
+print('$t', 'dockPress:', b.count('dockPress'), 'pressOverride:', b.count('pressOverride'), 'AccountFooterRow:', b.count('AccountFooterRow'), 'paints nothing:', b.count('It paints nothing'))
+"
+done
+docstore govern src/modules/app-switcher/AppSwitcherDock.tsx | python3 -c "
+import sys, json
+rows = json.load(sys.stdin)['rows']
+print('rows governing AppSwitcherDock.tsx by name:', [r['token'] for r in rows if any(g.endswith('app-switcher/AppSwitcherDock.tsx') for g in (r.get('governs') or []))] or 'none')
+"
+SH
+bash "$D/p.sh"
+case "$D" in /tmp/athena-probe.??????) rm -rf "$D";; esac
+# expect: `MAN-491 dockPress: 0 pressOverride: 0 … paints nothing: 1`, `MAN-460 … AccountFooterRow: 1`, and `rows governing AppSwitcherDock.tsx by name: none` while the defect stands; cured: MAN-491 counts above 0 for dockPress and 0 for `paints nothing`, MAN-460 reads AccountFooterRow 0, and a row token is named.
+```
+
+measured 2026-10-25 by chain chain-sidebar-rail--collapse-20261025-131007-2af8, finding L4, LOW
+probe-key: 075d9d6506a545ba87b080a4b1c09c923402086a
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/AppSwitcherDock.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/constants.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/rail-collapse-live.mjs
+
+## INV-9649 — Browser view — `browserUseSettingsChanged` has one reader, `BrowserUsePanel`; never delete the dispatch as dead
+
+`BrowserUseSettingsTab` dispatches `window` event `browserUseSettingsChanged` after each saved settings write (`api.browserUse.saveSettings`). `BrowserUsePanel` is its one listener: an effect re-runs `refresh()` on it and removes the listener on unmount.
+
+why: the panel's "Open Browser settings" door (`onShowSettings('browser')`) opens Settings over the still-mounted panel. Without the re-read it keeps saying "Browser is disabled" after the switch is saved, until Refresh is pressed.
+
+| rule | why |
+|---|---|
+| Keep the dispatch in `BrowserUseSettingsTab` while `BrowserUsePanel` listens | the panel is the only thing that hears it; a grep for other listeners finds none and is not proof the dispatch is dead |
+| Add no gate hook for the Browser view | the view is ungated: `useWorkspaceViews` carries `browser` unconditionally and the panel draws "Browser is disabled" itself (MAN-8999) |
+
+The barrel `src/modules/browser-use/index.ts` exports `BrowserUsePanel` only (lazy: its own chunk, loaded on the view's first open).
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/browser-use/BrowserUsePanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/browser-use/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/browser-use-settings/BrowserUseSettingsTab.tsx

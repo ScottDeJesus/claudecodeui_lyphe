@@ -91,8 +91,6 @@ type SidebarContentProps = {
   // fills it, so the body composer never has to know which mode is rendering. `null` means the
   // tree — the ScrollArea body below falls through to its usual arms.
   simpleList: ReactNode | null;
-  // The workspace tab strip, same slot discipline as `simpleList` — handed straight to the header.
-  tabs: ReactNode;
   runningSessionsCount: number;
   archivedProjects: ArchivedProjectListItem[];
   archivedSessions: ArchivedSessionListItem[];
@@ -125,12 +123,13 @@ type SidebarContentProps = {
   isRefreshing: boolean;
   onCreateProject: () => void;
   onCollapseSidebar: () => void;
+  /** Handed straight to the header's mobile close button. */
+  onCloseDrawer?: () => void;
   updateAvailable: boolean;
   restartRequired: boolean;
   releaseInfo: ReleaseInfo | null;
   latestVersion: string | null;
   onShowVersionModal: () => void;
-  onShowSettings: () => void;
   /** Opens Settings on its Updates tab — passed through to the footer's Claude row. */
   onShowUpdates: () => void;
   projectListProps: SidebarProjectListProps;
@@ -144,7 +143,6 @@ export default function SidebarContent({
   isLoading,
   projects,
   simpleList,
-  tabs,
   runningSessionsCount,
   archivedProjects,
   archivedSessions,
@@ -175,12 +173,12 @@ export default function SidebarContent({
   isRefreshing,
   onCreateProject,
   onCollapseSidebar,
+  onCloseDrawer,
   updateAvailable,
   restartRequired,
   releaseInfo,
   latestVersion,
   onShowVersionModal,
-  onShowSettings,
   onShowUpdates,
   projectListProps,
   t,
@@ -220,8 +218,8 @@ export default function SidebarContent({
         isRefreshing={isRefreshing}
         onCreateProject={onCreateProject}
         onCollapseSidebar={onCollapseSidebar}
+        onCloseDrawer={onCloseDrawer}
         simpleMode={simpleList !== null}
-        tabs={tabs}
         t={t}
       />
 
@@ -707,7 +705,6 @@ export default function SidebarContent({
           releaseInfo={releaseInfo}
           latestVersion={latestVersion}
           onShowVersionModal={onShowVersionModal}
-          onShowSettings={onShowSettings}
           onShowUpdates={onShowUpdates}
           t={t}
         />

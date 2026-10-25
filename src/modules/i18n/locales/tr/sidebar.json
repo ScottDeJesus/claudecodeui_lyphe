@@ -44,7 +44,8 @@
   },
   "tooltips": {
     "viewEnvironments": "Ortamları Görüntüle",
-    "hideSidebar": "Kenar çubuğunu gizle",
+    "hideList": "Sohbet listesini gizle",
+    "closeDrawer": "Paneli kapat",
     "createProject": "Yeni proje oluştur",
     "refresh": "Projeleri ve oturumları yenile (Ctrl+R)",
     "renameProject": "Projeyi yeniden adlandır (F2)",
@@ -69,7 +70,6 @@
   },
   "actions": {
     "refresh": "Yenile",
-    "settings": "Ayarlar",
     "collapseAll": "Tümünü Daralt",
     "expandAll": "Tümünü Genişlet",
     "cancel": "İptal",

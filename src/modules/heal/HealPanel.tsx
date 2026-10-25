@@ -26,7 +26,7 @@ const PILL_TARGET: Record<HealPillKey, string | 'settings'> = {
 };
 
 /**
- * The Heal tab: what hurt since the last heal, and what the reflex did about it.
+ * The Inbox's Heal section: what hurt since the last heal, and what the reflex did about it.
  *
  * ORDERED THE WAY A READER TRIAGES. The header is the house panel header — the mark, the title, and
  * one cog for the settings. Under it the toolbar (`HealActions`): the model and the cycle's Start/Stop,

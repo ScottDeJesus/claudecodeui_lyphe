@@ -63,6 +63,7 @@ export default function BrowserUseSettingsTab() {
       const response = await api.browserUse.saveSettings(nextSettings);
       const data = await readApiJson<{ data: { settings: BrowserUseSettings } }>(response);
       setSettings(data.data.settings);
+      // The Browser view re-reads its status on this (BrowserUsePanel): it can be mounted under this dialog.
       window.dispatchEvent(new Event('browserUseSettingsChanged'));
       setIsStatusLoading(true);
       await loadStatus();

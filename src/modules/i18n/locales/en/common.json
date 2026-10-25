@@ -24,19 +24,14 @@
     "git": "Git",
     "tasks": "Tasks",
     "browser": "Browser",
-    "memory": "Memory",
     "runner": "Roadmap",
-    "heal": "Heal",
     "inbox": "Inbox",
     "api": "API",
     "kanban": "Kanban",
     "universe": "Universe",
     "schedules": "Schedules",
     "notes": "Notes",
-    "cerberus": "Cerberus",
-    "project": "This project",
-    "house": "The house",
-    "more": "More views"
+    "cerberus": "Cerberus"
   },
   "rail": {
     "label": "Views",

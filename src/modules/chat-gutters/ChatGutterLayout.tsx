@@ -92,7 +92,7 @@ export function ChatGutterLayout({
   // heading over cards the count has counted — the In flight face's own rule (`useDispatcherPlans.count`).
   // `tone` is the badge's colour, not its number: the count stays what it always was, and wears what
   // the lane is DOING — amber while a plan owes the operator a word, blue while anything runs, green
-  // only once all of it is finished — the same colour the Roadmap tab's dot wears (`useDispatcherPlans.tone`).
+  // only once all of it is finished (`useDispatcherPlans.tone`).
   const { count: runnerCount, tone: runnerTone } = useDispatcherPlans();
   // The Roadmap widget's badge counts what is being worked on — features still being designed and features in
   // flight, on the ONE roadmap on screen — and turns amber while any of them owes the operator a word: the

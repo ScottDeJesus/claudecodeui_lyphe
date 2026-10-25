@@ -106,8 +106,8 @@ function withFixFields(body: CerberusOverview): CerberusOverview {
  * authenticated route and must never be asked against the login screen, and the frames that move
  * this picture — `cerberus_changed` and `websocket_reconnected` — arrive on the one socket above it.
  *
- * ONE READ, EVERY READER. The tab's Fleet view, its header and the workspace strip's count pill all
- * draw from the one overview, so a mute pressed in the sheet is already in the strip's number when
+ * ONE READ, EVERY READER. The tab's Fleet view, its header and the rail's badge all
+ * draw from the one overview, so a mute pressed in the sheet is already in the badge's number when
  * the sheet closes, and no reader can hold a copy of the fleet the others cannot see. The catalog is read
  * with it, in the same `refresh`, so a run's press and an auto-run switch bring the entry and the run
  * back together; so are the wardens (`GET /wardens`: the release on offer and the batch running), which the

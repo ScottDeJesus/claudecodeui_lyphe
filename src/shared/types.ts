@@ -62,7 +62,7 @@ export type ProviderModelActions = {
 //----------------- PROJECTS AND SESSIONS ------------
 
 /** Identifies the workspace pane the user is looking at; plugin panes are namespaced by plugin id. */
-export type AppTab = 'chat' | 'files' | 'shell' | 'git' | 'tasks' | 'browser' | 'memory' | 'inbox' | 'runner' | 'heal' | 'api' | 'cerberus' | 'kanban' | 'universe' | 'schedules' | 'notes' | `plugin:${string}`;
+export type AppTab = 'chat' | 'files' | 'shell' | 'git' | 'tasks' | 'browser' | 'inbox' | 'runner' | 'api' | 'cerberus' | 'kanban' | 'universe' | 'schedules' | 'notes' | `plugin:${string}`;
 
 /** A message queued to be sent to a session at a future time. */
 export type ScheduledMessage = {

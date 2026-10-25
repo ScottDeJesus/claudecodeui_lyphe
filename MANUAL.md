@@ -697,7 +697,7 @@ Every unit above has `hostWindow` in the dependency list of each effect that bin
 | --- | --- |
 | `DockableFab.tsx`, `usePointerDrag.ts`, `SplitPane.tsx` | the FAB, its drags and the split live in the opener around the chat |
 | `KanbanLane.tsx`, `KanbanCard.tsx` | the board's own code |
-| `useTabsOverflow.ts` | its only caller is `WorkspaceTabs`, the opener's tab rows |
+| `useTabsOverflow.ts` | no caller: `Tabs`'s overflow capability stands unused |
 | `jevSwitchesStore.ts` and the five switch hooks | one page-wide store each, polled on the opener's focus and visibility |
 | `SessionProtectionContext.tsx` | one provider above the chat host; its poll and `visibilitychange` catch-up serve the opener tab |
 | `ThemeContext.tsx` | writes the opener's `<body>`; the PiP window mirrors it |
@@ -849,7 +849,7 @@ Scratch chat in `.verify/lib/probe-project.mjs`'s project (under `/tmp`), opened
 | mode | does |
 | --- | --- |
 | `before` | run against a tree without the slot. Writes `.verify/artifacts/chat-host-home.json`: `getBoundingClientRect()` of the textarea and of the transcript scroller. Throws and writes nothing when `[data-chat-host-node]` is already drawn: the pre-change record cannot be retaken from the post-change tree |
-| `after` | reads the record and holds both rects equal; checks the node's parent has `data-chat-host-home`, the transcript and composer stand inside the node, `document.querySelector('textarea') === window.__ta` after a Files-tab trip (at 390 the tab strip is in the sidebar drawer: the probe opens "Open menu" first). `--turn`: a Haiku turn streams and the transcript follows its foot |
+| `after` | reads the record and holds both rects equal; checks the node's parent has `data-chat-host-home`, the transcript and composer stand inside the node, `document.querySelector('textarea') === window.__ta` after a Files-tab trip (at 390 the views rail is in the sidebar drawer: the probe opens "Open menu" first). `--turn`: a Haiku turn streams and the transcript follows its foot |
 
 Shots: `.verify/shots/chat-host-home-{before,after}-{1440,390}-light.png`.
 
@@ -3459,7 +3459,7 @@ section: The Tours view — src/modules/affected-areas: where state lives, what 
 
 - `.verify/affected-areas-view.mjs`: Cerberus → Tours → CLARENCE TSE → Dinning Room → each face at 1280 and 390 px: the polygons on the photo equal the engine's regions per face, the badges read 1..n and are the list's rows and the engine's ordinals, a region chosen on the photo is the row's and back, Enlarge keeps every outline on the photo (0.00 px off), nothing is read while the pano idles or Fleet shows, and Read this pano on one unread pano answers 200 `read`, 6 views, and the face strip counts the engine's areas at once.
 - `.verify/affected-areas-walk.mjs`: Stop after this pano ends the walk after the pano in hand; a view hidden mid-walk sends no second press and reads nothing until it returns, then reads the tour once; the walk goes pano to pano on each answer, in capture order.
-- `.verify/affected-areas-rooms.mjs --tour <24-hex tourId> [--expect-affected] [--evidence <dir>]` (the tour must be linked to a job, else exit 2): Cerberus → Tours → the tour → the Rooms card at 1280 then 390 px, once in a light and once in a dark `openConsole({ dark })` context. The app keeps the theme server-side against the dev user, so each pass switches the stored theme (`ensureTheme`, `lib/console.mjs`) and a run leaves it on dark. `--expect-affected` FAILs the run unless at least one row on the screens reads "Affected …"; without it, a run that showed none ends on a `NOTE` line and still exits 0. `WIDTHS[0]` stays 1280: `openCerberusTab` finds "More views" only on the wide layout. Holds against `GET /api/affected-areas/tours/{tour}`: one row per wire room in its order, with name and floor; the words from `docusketchAffected` and `photosAffected` alone (written out in the script, not read from the component); warn tone and dot on the rows with words only; no fetch/XHR path of its own for rooms; no sideways scroll, measured on the Rooms card (`scrollWidth - clientWidth`; the card clips its overflow, so the page-level number is 0 whatever the rows do); no authenticated console error. Writes `rooms-<theme>-<width>.png`, `rooms-card-<theme>-<width>.png` and `rooms.json` (keys `<theme>-<width>`) under `.verify/shots/affected-areas-rooms/`.
+- `.verify/affected-areas-rooms.mjs --tour <24-hex tourId> [--expect-affected] [--evidence <dir>]` (the tour must be linked to a job, else exit 2): Cerberus → Tours → the tour → the Rooms card at 1280 then 390 px, once in a light and once in a dark `openConsole({ dark })` context. The app keeps the theme server-side against the dev user, so each pass switches the stored theme (`ensureTheme`, `lib/console.mjs`) and a run leaves it on dark. `--expect-affected` FAILs the run unless at least one row on the screens reads "Affected …"; without it, a run that showed none ends on a `NOTE` line and still exits 0. `WIDTHS[0]` stays 1280: `openCerberusTab` (`lib/node-card.mjs`) presses the rail's Cerberus button, which sits in the closed drawer at 390. Holds against `GET /api/affected-areas/tours/{tour}`: one row per wire room in its order, with name and floor; the words from `docusketchAffected` and `photosAffected` alone (written out in the script, not read from the component); warn tone and dot on the rows with words only; no fetch/XHR path of its own for rooms; no sideways scroll, measured on the Rooms card (`scrollWidth - clientWidth`; the card clips its overflow, so the page-level number is 0 whatever the rows do); no authenticated console error. Writes `rooms-<theme>-<width>.png`, `rooms-card-<theme>-<width>.png` and `rooms.json` (keys `<theme>-<width>`) under `.verify/shots/affected-areas-rooms/`.
 - 2026-10-18, `.verify/affected-areas-rooms.mjs --tour 6ace5eb736f92c16415baa7e` with one demonstration confirm on its Garage drying-equipment region (deleted by its mark id after; the ledger counted back to 0 marks, 0 thresholds, 0 drawn areas): 26 PASS, 0 FAIL, exit 0, light and dark, 1280 and 390 px. One row, Garage, Floor 1, "Affected per the photos" (`docusketchAffected` false, `photosAffected` true, `regionsStanding` 1); at 390 px overflow `{"page":0,"rooms":0}`, warn tone and dot on that row.
 - `.verify/affected-areas-tours-told.mjs [--evidence <dir>]` (reads the live lane first and exits 2 when it holds no unlinked tour with a loss type or none without facts; buys and writes nothing; its one stub is the rewritten pano GET below): at 1280 and 390 px, no picker row reads "Tour with no job or address" and every pre-job tour (8 on 2026-10-18) is in the picker by its DocuSketch name, with "No job linked"; an unlinked tour with a loss type draws it ("Water loss", from its own `context.lossType`) and the DocuSketch-alone line, no Property and no "isn't linked", its address beside its name; a factless unlinked tour draws the DocuSketch-alone line only; a room whose `demoBeforeTour` is false says "No demo recorded before the tour", true "Demo had begun before the tour". `openTour` throws unless the client asked the lane for the pressed tour's id (a label can belong to two tours). At 1280 only: the pano GET is rewritten so its first view reads `current: false` and no view `contextChanged` (every shown read on file is current today), and the pano offers Read again with `affectedAreas.read.againCurrent` naming the codebook's `contractVersion` and `model`. 2026-10-18: 27 PASS, 0 FAIL, exit 0.
 
@@ -4283,7 +4283,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/FaceS
 
 ## MAN-8999 — command palette — the Navigate group: the views list `useWorkspaceViews`, `PaletteNavRow` and the Settings row
 
-The palette's `Navigate` group is the workspace's views list, one `Go to <label>` row per view, then a `Go to Settings` row. A view added to the list is a palette row with no second edit. The old strip (`WorkspaceTabs`, gates from `useWorkspaceTabGates`) is still drawn beside it; the two agree on the views both carry and differ on purpose on Memory and Heal (see §"Not in the list").
+The palette's `Navigate` group is the workspace's views list, one `Go to <label>` row per view, then a `Go to Settings` row. A view added to the list is a palette row with no second edit. The list is also the views rail's (`WorkspaceRail`, MAN-9005): the rail draws these views in this order, and the palette lists them by name.
 
 ## Pieces
 
@@ -4309,13 +4309,13 @@ The palette's `Navigate` group is the workspace's views list, one `Go to <label>
 | after the list | the Settings row | none |
 
 - `browser` is ungated: with the feature off the pane draws "Browser is disabled" and a door into its Settings tab. `WorkspaceMain` has no snap-back for it.
-- `WorkspaceMain` keeps two snap-backs to `chat`, tasks and shell, each waiting on `preferencesSettled`. The `browser`, `memory`, `runner` and `heal` panes mount on `activeTab === '<id>'` alone.
+- `WorkspaceMain` keeps two snap-backs to `chat`, tasks and shell, each waiting on `preferencesSettled`. The `browser` and `runner` panes mount on `activeTab === '<id>'` alone.
 - `views` is memoised on `[shouldShowShellTab, shouldShowTasksTab, plugins, t]`; `t` stands in for the language.
 - Keywords live in the hook's constants (`CHAT_VIEW`, `OPEN_TOOL_VIEWS`, `SHELL_VIEW`, `TASKS_VIEW`, `PLAN_VIEWS`, `HOUSE_VIEWS`) beside each view's glyph.
 
 ## Not in the list
 
-- Memory and Heal are data-gated, sticky tabs on the strip (MAN-601); the views list carries no data-gated view, so there is no `Go to Memory` and no `Go to Heal` row. The strip still reaches both.
+- Memory and Heal are sections of the Inbox (`inbox` is the rail's foot view); the list carries one row for them, `Go to Inbox`, and no `Go to Memory` or `Go to Heal`. A stored `activeTab` of `memory` or `heal` reads back as `inbox` (`readPersistedTab`).
 - `Actions` holds `Start new chat` and `Toggle theme` only. `Open settings` is the Settings row under `Navigate`; `Settings: <tab>` rows stay in the `Settings` group.
 - `ProjectCommandState` (`ProjectsStateContext.tsx`) carries `selectedProject`, `handleNewSession`, `openSettings`, `setActiveTab` and no `activeTab`, so the palette does not re-render on a tab switch.
 
@@ -4325,7 +4325,6 @@ The palette's `Navigate` group is the workspace's views list, one `Go to <label>
 |---|---|
 | Add a view in `useWorkspaceViews.ts` only; never a second list in the palette | one list is the palette's and the pane gates' truth |
 | The Settings row's keywords start `open settings preferences` | the typed phrase `open settings` must match as one string; `settings preferences open` did not, and the search ran `Go to API` |
-| When the rail swaps in for the strip, delete both sides together: the strip's gates in `useWorkspaceTabGates` and the strip | the palette and the strip disagree on Memory and Heal until then |
 
 ## Proof
 
@@ -4356,9 +4355,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/command-palette/Comm
 | Chat, Shell, Tasks, a plugin's view | the choose-a-project body (`WorkspaceStateView mode="empty" showHeader={false}`), built once in `WorkspaceMain` as `chooseProjectBody`. Tasks draws it only while `activeTab === 'tasks'` |
 | Files, Git | the pane itself, on its own roots (the git repositories, and for Files the operator's pins). Neither reads the open project |
 | Roadmap (`runner`), Kanban, Browser, API, Cerberus, Notes and the other house views | the pane itself. Kanban gets `projectId={selectedProject?.projectId ?? null}` (MAN-589) |
-| Memory, Heal | the pane |
 
-- `ProjectSidebarRegion` draws the old tab strip with no project selected too. why: every strip button lands on a pane that draws.
 - `useRunnerLanding({ activeTab, setActiveTab })` takes no project. Roadmap comes forward as soon as a name is held (MAN-7531 rule 1).
 
 ## `WorkspaceStateView` props
@@ -4377,7 +4374,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/command-palette/Comm
 | --- | --- | --- | --- |
 | Chat | the open chat's title, or `newSessionLabel` with no session | with a session | with a project selected |
 | a view in the views list | its rail name (`Roadmap`, `Files`, `Notes`) | none | none |
-| an id the list lacks (Memory, Heal until the rail swap; a plugin whose list is loading or gone) | the chat's face: `viewLabel` is `null` | as Chat | as Chat |
+| an id the list lacks (a plugin whose list is loading or gone) | the chat's face: `viewLabel` is `null` | as Chat | as Chat |
 
 ## `.verify/probe-house-views-no-project.mjs`
 
@@ -4400,13 +4397,13 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/Wo
 
 ## MAN-9005 — The views rail, composed — `WorkspaceRail`, `RailButton`, the focus tooltip, the edge lines and the live rail probe
 
-`WorkspaceRail` is the views rail, live beside the chat list. `ProjectSidebarRegion` renders it into the sidebar's `rail` slot (`const renderRail = useCallback((list) => <WorkspaceRail list={list} isMobile={isMobile} />, [isMobile])`); `Sidebar` draws `<div className="flex h-full">{rail({ collapsed: isSidebarCollapsed, expand })}{!isSidebarCollapsed && <SidebarContent …/>}</div>`: collapsing hides the list column only, so the rail stands alone at 48px and nothing in it remounts (the switcher's dock and the account panel keep their place). `expand` is one identity across renders (`setSidebarVisible` is a `useCallback`). While the list is collapsed the rail hands the dock `pressOverride` "Show the chat list" (`rail.showList`), memoised on `list.collapsed` and `list.expand`; a press on the seated disc brings the list back, and with the disc dragged out the dock draws its own button with the same name and act (MAN-486). A 48px rail and the list's `md:w-[17.5rem]` make the docked sidebar's 20.5rem, so the main region does not move; on a phone the list is `min-w-0 flex-1` and fills what the rail leaves. The list's root carries the one hairline between the two (`border-l border-border/50`). The old rows (`WorkspaceTabs`, the header's `tabs` slot) still stand beside it and both switch the one `activeTab`.
+`WorkspaceRail` is the views rail, live beside the chat list. `ProjectSidebarRegion` renders it into the sidebar's `rail` slot (`const renderRail = useCallback((list) => <WorkspaceRail list={list} isMobile={isMobile} />, [isMobile])`); `Sidebar` draws `<div className="flex h-full">{rail({ collapsed: isSidebarCollapsed, expand })}{!isSidebarCollapsed && <SidebarContent …/>}</div>`: collapsing hides the list column only, so the rail stands alone at 48px and nothing in it remounts (the switcher's dock and the account panel keep their place). `expand` is one identity across renders (`setSidebarVisible` is a `useCallback`). While the list is collapsed the rail hands the dock `pressOverride` "Show the chat list" (`rail.showList`), memoised on `list.collapsed` and `list.expand`; a press on the seated disc brings the list back, and with the disc dragged out the dock draws its own button with the same name and act (MAN-486). A 48px rail and the list's `md:w-[17.5rem]` make the docked sidebar's 20.5rem, so the main region does not move; on a phone the list is `min-w-0 flex-1` and fills what the rail leaves. The list's root carries the one hairline between the two (`border-l border-border/50`). The rail is the one place that switches `activeTab` by hand; the list column carries no tab row and no Settings button, and the list header's hide button is named "Hide the chat list" (`tooltips.hideList`, `aria-label` and `title`).
 
 ## Pieces
 
 | piece | where | fact |
 |---|---|---|
-| `WorkspaceRail({ list, isMobile })` | `src/modules/project-workspace/WorkspaceRail.tsx`, default export | `<nav aria-label={t('rail.label')}>` ("Views"), `relative z-10 w-12 bg-background`, top padding `pt-2`, bottom `pb-[calc(0.5rem+env(safe-area-inset-bottom,0px))]`. Top to bottom: disc cell, scroll region, foot |
+| `WorkspaceRail({ list, isMobile })` | `src/modules/project-workspace/WorkspaceRail.tsx`, default export | `<nav aria-label={t('rail.label')}>` ("Views"), `relative z-50 w-12 bg-background` (above the application layer, z-40, so the account panel it opens stands over an open application with the list collapsed), top padding `pt-2`, bottom `pb-[calc(0.5rem+env(safe-area-inset-bottom,0px))]`. Top to bottom: disc cell, scroll region, foot |
 | `RailButton({ label, viewId, icon, lit, badge, onPress })` | `src/modules/project-workspace/RailButton.tsx`, default export | one view's button; `icon` null (a plugin view) draws a `size-6` disc holding the label's first letter, uppercased |
 | `RailBadge` | `src/shared/types.ts` | `{ count: number, words: string }`: `count` above zero (a zero is no badge), `words` the sentence read through `aria-describedby`. `useRailBadges` builds exactly this shape |
 | `useRailBadges()` | `src/modules/project-workspace/hooks/useRailBadges.ts` | `Partial<Record<AppTab, RailBadge>>`: Cerberus = `useCerberusNeeds()` (`rail.badge.cerberus`, plural), Inbox = `useInboxWaiting().total` (read through the inbox barrel; `rail.badge.inbox`), Chat = the figure 1 while `useChatHost().unread` (`rail.badge.chat`). A zero has no entry. The views list carries no count, so a reader of it does not re-render when one moves |
@@ -4458,7 +4455,7 @@ section: The views rail, composed — `WorkspaceRail`, `RailButton`, the focus t
 | bottom | `sticky bottom-0 z-20 mt-1 h-px w-full bg-border` | `relative z-30 -mt-px h-px w-full bg-background` |
 
 - At rest neither line draws. On the first pixel of scroll the 24px hairline widens to the full width on the same row.
-- z-index inside the nav's own stacking context: focused button 10, edge lines 20, covers 30, foot 40. The nav is `z-10` against the list beside it; the account panel opens inside the foot, so it stands above the list.
+- z-index inside the nav's own stacking context: focused button 10, edge lines 20, covers 30, foot 40. The nav is `z-50`: above the application layer (`z-40`), below the FAB (`z-60`). The account panel opens inside the foot, so it stands above the list and above an open application.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/hooks/useRailBadges.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/RailButton.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/WorkspaceRail.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Tooltip.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/rail-mockup.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/rail-read.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/sheet.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/rail-live.mjs
 
@@ -4467,7 +4464,7 @@ section: The views rail, composed — `WorkspaceRail`, `RailButton`, the focus t
 
 1. The two edge pairs, the region's `mt-1` and its empty padding are the composition; the fill leaves them. why: the hairline under the disc is the top cover's, and padding would draw it twice.
 2. No fade at an edge. why: it washes the rings and glyphs of the buttons it crosses.
-3. The reveal is an effect on `activeTab` and on the lit button first appearing (a persisted plugin view lands with the plugin list), run in a `requestAnimationFrame`: `scrollIntoView({ block: 'nearest' })` on the region's `[aria-current="page"]` button, whatever moved the view (the rail, the old rows, the palette); `scroll-py-1.5` keeps its ring 6px clear of the edge. why a frame later: a dialog closing on the same commit (the palette's "Go to") returns focus to the rail button that held it, and focusing it scrolls the region back to it; the reveal must come after that.
+3. The reveal is an effect on `activeTab` and on the lit button first appearing (a persisted plugin view lands with the plugin list), run in a `requestAnimationFrame`: `scrollIntoView({ block: 'nearest' })` on the region's `[aria-current="page"]` button, whatever moved the view (the rail, the palette); `scroll-py-1.5` keeps its ring 6px clear of the edge. why a frame later: a dialog closing on the same commit (the palette's "Go to") returns focus to the rail button that held it, and focusing it scrolls the region back to it; the reveal must come after that.
 4. The foot stays above both edges. why: a phone's focus ring sits on the button's edge, and the bottom line would cross it.
 5. An edge line says runs are hidden, not that one needs you: a badge on a hidden run shows no sign. The Chat badge is the exception, because while the disc is seated it is the only sign of a waiting reply: while a reply waits, the rail watches the Chat button (`data-view-id="chat"`) with an IntersectionObserver rooted at the region, and when it is not whole in the region (under 90%) the rail tells the dock (`unreadBadgeHidden`) and the seated disc draws its dot (MAN-486).
 6. A file created under `src/` draws unstyled on `:5183` until `touch src/index.css` (INV-6586).
@@ -4476,16 +4473,9 @@ section: The views rail, composed — `WorkspaceRail`, `RailButton`, the focus t
 
 `WorkspaceRail` reads `useProjectSidebarState()` (`activeTab`, `setActiveTab`, `setSidebarOpen`, `sidebarSharedProps.onShowSettings`), `useWorkspaceViews().views` and `useRailBadges()`. A view press is `setActiveTab(id)` and, on a phone (`isMobile`), `setSidebarOpen(false)` too: the drawer covers the view chosen.
 
-## Markers still open
-
-| marker | what the fill puts there |
-|---|---|
-| `FILL(collapse)` list, pressOverride | `list.collapsed ? { label: t('rail.showList'), run: list.expand } : null` for the dock |
-| `FILL(account)` | `<AccountRailButton />` in place of the placeholder cell, an inert avatar until then; the account row still stands in the list's foot |
-
 ## Proof
 
-`node .verify/rail-live.mjs` (gitignored; live client `:5183`; `ONLY=dark` for one theme) drives the rail in the sidebar through `openConsole`, at 1440×900 with the list shown and at 390×844 with the drawer open. It prints the nav's buttons in order with the names and descriptions Chrome computes, the lit one's `aria-current`, the computed colours of its bar and of a badge against the tokens, the Cerberus badge beside the Cerberus view's own headline and the Inbox badge beside the Inbox's three sections, a keyboard Tab bringing up a tooltip, a press on a rail view and on the same view in the old rows each landing on it, and the Chat badge reading 1 with the docked disc dotless after one Haiku turn in a scratch chat whose reply lands while Files is showing (with the control: dragged out, the disc draws its dot). It then sets each layout beside the mockup's. The scratch chat is deleted at the end, and preference writes are dropped once the theme is set (`pinPreferences` with `writes: 'drop'`), so the collapse/expand pair leaves `sidebarVisible` as it found it.
+The collapse walk is `node .verify/rail-collapse-live.mjs` (MAN-486). `node .verify/rail-live.mjs` (gitignored; live client `:5183`; `ONLY=dark` for one theme) drives the rail in the sidebar through `openConsole`, at 1440×900 with the list shown and at 390×844 with the drawer open. It prints the nav's buttons in order with the names and descriptions Chrome computes, the lit one's `aria-current`, the computed colours of its bar and of a badge against the tokens, the Cerberus badge beside the Cerberus view's own headline and the Inbox badge beside the Inbox's three sections, a keyboard Tab bringing up a tooltip, a press on a rail view landing on it, and the Chat badge reading 1 with the docked disc dotless after one Haiku turn in a scratch chat whose reply lands while Files is showing (with the control: dragged out, the disc draws its dot). It then sets each layout beside the mockup's. The scratch chat is deleted at the end, and preference writes are dropped once the theme is set (`pinPreferences` with `writes: 'drop'`), so the collapse/expand pair leaves `sidebarVisible` as it found it. Its old-rows legs (`oldRow`, and the 390×844 Kanban press) address the deleted tab strip and stand unrewritten.
 
 | file | exports |
 |---|---|
@@ -4496,3 +4486,41 @@ section: The views rail, composed — `WorkspaceRail`, `RailButton`, the focus t
 2026-10-25: `PASS — 51 ok, 0 skipped, 0 failed` in both themes. INV-5768's probe, `node .verify/probe-settings-rows.mjs after`, reads `pane kept=true` on all eight legs with the rail in place. No standing leg runs a window short enough for the region to scroll.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/hooks/useRailBadges.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/RailButton.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/WorkspaceRail.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Tooltip.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/rail-mockup.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/rail-read.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/sheet.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/rail-live.mjs
+
+## MAN-9011 — The chat list column after the rail swap — no tab rows, Settings or account in it; `onCloseDrawer`, the hide and close names, the footer banners, stored `memory`/`heal` ids, and `swap-live.mjs`
+
+The sidebar's list column (`SidebarContent`) holds the wordmark header, the body and the footer, and nothing the views rail owns. Rail: MAN-9005. Views list: MAN-8999. One tree across 768px: INV-5768.
+
+## What the list holds
+| part | fact |
+|---|---|
+| tab rows | none. `Sidebar` and `SidebarContent` take no `tabs` prop; `SidebarHeader` imports no `useCompactSidebar` |
+| Settings button | none in the list. The rail's foot Settings button runs `sidebarSharedProps.onShowSettings()` (MAN-9005); `Sidebar` and `SidebarContent` take no `onShowSettings`; `actions.settings` is in no `sidebar.json` |
+| account row | none in the list; the rail's foot holds the account cell |
+| footer (`SidebarFooter`) | the restart-required banner, `ClaudeUpdateFooterRow` (MAN-7404), the update-available banner. Empty (0px) when none shows |
+
+## Names and the mobile row
+| piece | fact |
+|---|---|
+| desktop hide button | `onCollapseSidebar`; `tooltips.hideList` = "Hide the chat list" as `aria-label` and `title` (`sidebar.json`, all eleven locales) |
+| mobile header row | create project (`tooltips.createProject`), refresh (`tooltips.refresh`), then close (`tooltips.closeDrawer` = "Close the drawer", `PanelLeftClose`), left to right, each with an `aria-label` |
+| close press | runs `onCloseDrawer`: `ProjectSidebarRegion`'s `closeDrawer` = `setSidebarOpen(false)`, threaded `Sidebar` → `SidebarContent` → `SidebarHeader`. Optional: absent where the sidebar is not a drawer. The scrim (`handleBackdropClick`) closes it too |
+| `ProjectSidebarRegion` | one return (INV-5768); passes `rail={renderRail}` and `onCloseDrawer={closeDrawer}` to `Sidebar` |
+
+## Stored view ids
+- `AppTab` and `VALID_TABS` hold no `memory` and no `heal`; `WorkspaceMain` mounts no Memory or Heal pane. Both are sections of the Inbox (`InboxPanel`).
+- `readPersistedTab` (`useProjectsState.ts`) maps a stored `jev` to `api` and a stored `memory` or `heal` to `inbox`; the stored value is rewritten to `inbox`.
+
+## Proof — `node .verify/swap-live.mjs`
+Gitignored; dev client `:5183`; `ONLY=dark` for dark; `openConsole` from `.verify/lib/console.mjs`; preference writes dropped, nothing written to the account.
+
+| section | reads |
+|---|---|
+| 1. 1440×900, list shown | list tablists, tabs, Settings buttons, account buttons all 0; foot 0px; hide button named "Hide the chat list"; rail holds one Settings and one account button and no Memory or Heal button |
+| 2. 1440×900, list collapsed | rail alone at 48px, Settings and account still in it |
+| 3. 390×844, drawer open | header buttons in order create, refresh, "Close the drawer"; the close press and the scrim each put the drawer away |
+| 4. stored `heal`, then `memory` | each reload lands on the Inbox (lit button, pane) and `localStorage.activeTab` reads `inbox` |
+
+2026-10-25 light: 17 ok, 0 skipped, 0 failed.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/ProjectSidebarRegion.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/SidebarFooter.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/SidebarHeader.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/swap-live.mjs

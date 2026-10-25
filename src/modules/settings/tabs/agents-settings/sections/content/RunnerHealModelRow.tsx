@@ -42,7 +42,7 @@ export default function RunnerHealModelRow() {
               defaultValue: 'Pinned to Claude — your subscription, so these heals are capped by nothing and count against no daily cap. It steers the heal reflex’s souls only: the chat composer’s Flash switch is a different file and never moves with it. Press the chip to send them back to DeepSeek Flash.',
             })
           : t('agents.runnerHealModel.descriptionDeepseek', {
-              defaultValue: 'Pinned to DeepSeek Flash. These heals count against the daily cap on the Heal tab, and park until midnight once it is reached. It steers the heal reflex’s souls only: the chat composer’s Flash switch is a different file and never moves with it. Press the chip to send them to Claude instead.',
+              defaultValue: 'Pinned to DeepSeek Flash. These heals count against the daily cap shown in the Inbox’s Heal section, and park until midnight once it is reached. It steers the heal reflex’s souls only: the chat composer’s Flash switch is a different file and never moves with it. Press the chip to send them to Claude instead.',
             })}
     >
       {summary === null ? (

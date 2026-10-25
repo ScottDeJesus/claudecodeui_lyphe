@@ -47,7 +47,8 @@
   },
   "tooltips": {
     "viewEnvironments": "Visualizza ambienti",
-    "hideSidebar": "Nascondi barra laterale",
+    "hideList": "Nascondi l'elenco delle chat",
+    "closeDrawer": "Chiudi il pannello",
     "createProject": "Crea nuovo progetto",
     "refresh": "Aggiorna progetti e sessioni (Ctrl+R)",
     "renameProject": "Rinomina progetto (F2)",
@@ -72,7 +73,6 @@
   },
   "actions": {
     "refresh": "Aggiorna",
-    "settings": "Impostazioni",
     "collapseAll": "Comprimi tutto",
     "expandAll": "Espandi tutto",
     "cancel": "Annulla",

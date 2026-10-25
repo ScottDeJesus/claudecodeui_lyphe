@@ -13,7 +13,7 @@ import { Badge, EmptyState, Spinner } from '@/shared/ui';
 
 /**
  * How many filed memories the gutter draws. The gutter is company for a conversation, not an
- * archive: twenty is more than anyone reads there, and the Memory tab remains the place to read
+ * archive: twenty is more than anyone reads there, and the Inbox's Memory section remains the place to read
  * the whole list.
  */
 const APPROVED_CAP = 20;
@@ -98,8 +98,8 @@ function toastFor(outcome: MemoryReviewOutcome, t: ReturnType<typeof useTranslat
  * The chrome, the slots and the scrolling belong to `src/modules/chat-gutters`; this body is the
  * content and nothing else.
  *
- * THE PENDING VERBS ARE THE TAB'S VERBS. `useMemoryReview` and the toast helper are asked for here
- * exactly as the Memory tab asks for them, so a memory filed from the gutter is filed the same way
+ * THE PENDING VERBS ARE THE SECTION'S VERBS. `useMemoryReview` and the toast helper are asked for here
+ * exactly as the Inbox's Memory section asks for them, so a memory filed from the gutter is filed the same way
  * — same in-flight guard, same refusal text held per id, same words spoken afterwards.
  *
  * THE ONLY ORDERING THIS BODY DOES IS THE LIFT. Pending rows keep the queue's order; filed rows go

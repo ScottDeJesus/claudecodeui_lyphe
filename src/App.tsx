@@ -164,12 +164,12 @@ export default function App() {
                           the `notes_changed` frame that re-reads it. */}
                       <NotesProvider>
                       {/* Above the Router, so every route under it reads ONE 60-second poll of the
-                          reflex's summary — the workspace's own tab-gate hook included, which weighs
-                          the ledger's live count for the Heal tab's badge. */}
+                          reflex's summary — the Inbox's waiting count included, which weighs
+                          the ledger's live count for the rail's Inbox badge. */}
                       <HealProvider>
                       {/* The fleet's health: ONE read of Cerberus's overview for every reader — the
-                          tab's views and the strip's count pill — above the Router so the pill is
-                          honest on every tab. Inside the auth gate like its neighbours, so the read
+                          tab's views and the rail's Cerberus badge — above the Router so the badge is
+                          honest on every view. Inside the auth gate like its neighbours, so the read
                           never fires against the login screen, and below WebSocketProvider, whose one
                           socket carries the `cerberus_changed` hint that re-reads it. */}
                       <CerberusProvider>

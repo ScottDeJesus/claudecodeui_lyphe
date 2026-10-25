@@ -36,8 +36,8 @@ type MenuProps = {
  * A choice list hung under whatever the caller hands in as its trigger.
  *
  * Used by the kit's own Tabs, as the More menu an overflowing row collapses its trailing tabs
- * into — the workspace's two rows in the sidebar. A Select owns ONE value and shows it in its
- * own trigger; a Menu decorates a trigger the caller already drew.
+ * into. A Select owns ONE value and shows it in its own trigger; a Menu decorates a trigger the
+ * caller already drew.
  *
  * Dismissal is two-way for the same reason Select's is: a pointer outside closes it, and
  * Escape closes it without moving the pointer, handing focus back to the trigger rather than

@@ -6,7 +6,7 @@ import { useMemoryIntake } from '@/modules/memory-intake';
 /**
  * What waits on the operator, per section of the Inbox and in all: the memories sessions proposed, the live friction
  * in the heal ledger, and the asks the roadmap's features and epics are stopped on. Each figure is the one its own
- * module already counts — the Memory tab's pending badge, the Heal tab's `live` (the whole live ledger, which is not
+ * module already counts — the Memory panel's pending count, the Heal panel's `live` (the whole live ledger, which is not
  * the headline `Friction` figure the Heal panel opens on: that one is the cut since the last heal), the lane's
  * `waiting` (asks by identity, never cards) — so the memory and roadmap counts are the very figures their panels print.
  *

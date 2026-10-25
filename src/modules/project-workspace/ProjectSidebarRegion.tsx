@@ -6,9 +6,7 @@ import type {
 import { useTranslation } from 'react-i18next';
 
 import { useProjectSidebarState } from '@/modules/project-workspace/context/ProjectsStateContext';
-import { useWorkspaceTabGates } from '@/modules/project-workspace/hooks/useWorkspaceTabGates';
 import WorkspaceRail from '@/modules/project-workspace/WorkspaceRail';
-import WorkspaceTabs from '@/modules/project-workspace/WorkspaceTabs';
 import { Sidebar } from '@/modules/sidebar';
 import type { ProjectWorkspaceShellProps, SidebarListState } from '@/shared/types';
 
@@ -17,57 +15,18 @@ function ProjectSidebarRegion({
   isMobile,
 }: Pick<ProjectWorkspaceShellProps, 'isMobile'>) {
   const { t } = useTranslation('common');
-  const { sidebarOpen, setSidebarOpen, sidebarSharedProps, activeTab, setActiveTab } = useProjectSidebarState();
-  const {
-    shouldShowTasksTab,
-    shouldShowBrowserTab,
-    shouldShowShellTab,
-    shouldShowMemoryTab,
-    memoryPendingCount,
-    runnerCount,
-    runnerWaiting,
-    runnerTone,
-    shouldShowHealTab,
-    healCount,
-    cerberusNeeds,
-  } = useWorkspaceTabGates(activeTab);
+  const { sidebarOpen, setSidebarOpen, sidebarSharedProps } = useProjectSidebarState();
 
-  // Choosing a tab on a phone means choosing a pane the drawer is covering, so the drawer gets
-  // out of the way. On desktop the sidebar is docked and this closes nothing.
-  const handleTabChange = useCallback(() => {
-    if (isMobile) setSidebarOpen(false);
-  }, [isMobile, setSidebarOpen]);
-
-  // The workspace tab strip, rendered INTO the sidebar as a slot node. The sidebar module never
-  // imports project-workspace — the dependency points one way, the way it already did.
-  // Drawn with no project selected too: every pane draws now (the house views need no project, and
-  // the ones that read it show the choose-a-project body), so none of the strip's buttons is dead.
-  const tabs = (
-    <WorkspaceTabs
-      activeTab={activeTab}
-      setActiveTab={setActiveTab}
-      shouldShowTasksTab={shouldShowTasksTab}
-      shouldShowBrowserTab={shouldShowBrowserTab}
-      shouldShowShellTab={shouldShowShellTab}
-      shouldShowMemoryTab={shouldShowMemoryTab}
-      memoryPendingCount={memoryPendingCount}
-      runnerCount={runnerCount}
-      runnerWaiting={runnerWaiting}
-      runnerTone={runnerTone}
-      shouldShowHealTab={shouldShowHealTab}
-      healCount={healCount}
-      cerberusNeeds={cerberusNeeds}
-      onTabChange={handleTabChange}
-    />
-  );
-
-  // The views rail, rendered INTO the sidebar through its `rail` slot, as the strip above is through `tabs`: the rail is
-  // this module's and the list is the sidebar's, so the sidebar tells the rail whether the list is collapsed and never
-  // imports it. Stable on `isMobile`, so the sidebar's render does not hand the slot a new function each time.
+  // The views rail, rendered INTO the sidebar through its `rail` slot: the rail is this module's and the list is the
+  // sidebar's, so the sidebar tells the rail whether the list is collapsed and never imports it. Stable on `isMobile`,
+  // so the sidebar's render does not hand the slot a new function each time.
   const renderRail = useCallback(
     (list: SidebarListState) => <WorkspaceRail list={list} isMobile={isMobile} />,
     [isMobile],
   );
+
+  // The list header's close button on a phone, beside the scrim: both put the drawer away.
+  const closeDrawer = useCallback(() => setSidebarOpen(false), [setSidebarOpen]);
 
   const handleBackdropClick = useCallback((event: ReactMouseEvent<HTMLButtonElement>) => {
     event.stopPropagation();
@@ -120,7 +79,7 @@ function ProjectSidebarRegion({
         onClick={stopPropagation}
         onTouchStart={stopPropagation}
       >
-        <Sidebar {...sidebarSharedProps} tabs={tabs} rail={renderRail} />
+        <Sidebar {...sidebarSharedProps} rail={renderRail} onCloseDrawer={closeDrawer} />
       </div>
     </div>
   );

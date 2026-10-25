@@ -38,7 +38,7 @@ async function readBody(response: Response): Promise<unknown> {
  * The two review verbs and their lifecycle. Module-private, with ONE caller: MemoryIntakePanel.
  *
  * It lives here rather than in MemoryIntakeContext on purpose. The context is read by the
- * workspace tab gates and the chat gutter as well as the panel; a value that also carried
+ * Inbox's waiting count and the chat gutter as well as the panel; a value that also carried
  * the in-flight id and the held refusals would change on every button press and re-render all
  * of them for a fact only the panel can see.
  *

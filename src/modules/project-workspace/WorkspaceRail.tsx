@@ -49,8 +49,10 @@ function RailHairline({ className }: { className?: string }) {
  *
  * THE GROUND is the canvas, the list's own, and a badge's ring is the ground of the button it stands on. The hairline
  * between the rail and the list is the list's left edge, not the rail's right one, so a rail standing alone — the
- * list collapsed — draws one edge, the sidebar's own. `relative z-10`, so what the rail opens beside itself (the
- * account panel) stands above the list.
+ * list collapsed — draws one edge, the sidebar's own. `relative z-50`, so what the rail opens beside itself (the
+ * account panel) stands above the list and, with the list collapsed, above an open application's layer: the layer is
+ * `z-40` in this same stacking context and begins where the rail ends, so it would cover the panel at any lower level.
+ * The FAB (60) stays above the rail.
  *
  * Composed for this module's ProjectSidebarRegion, which renders it into the sidebar's `rail` slot.
  */
@@ -124,7 +126,7 @@ export default function WorkspaceRail({ list, isMobile }: { list: SidebarListSta
   return (
     <nav
       aria-label={t('rail.label')}
-      className="relative z-10 flex h-full w-12 flex-none flex-col items-center bg-background pb-[calc(0.5rem+env(safe-area-inset-bottom,0px))] pt-2"
+      className="relative z-50 flex h-full w-12 flex-none flex-col items-center bg-background pb-[calc(0.5rem+env(safe-area-inset-bottom,0px))] pt-2"
     >
       <div className="grid size-11 flex-none place-items-center md:size-10">
         <AppSwitcherDock unreadBadgeHidden={chatBadged && !chatInView} pressOverride={pressOverride} />

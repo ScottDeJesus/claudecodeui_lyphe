@@ -31,7 +31,9 @@ import { cn } from '@/shared/utils';
  * keeps registering its rect beneath that button, so a drag back still docks. When an override ARRIVES just as the
  * element that held focus has left the page (the list's hide button, unmounted by the collapse it ran), focus is handed
  * to the seated disc, or to that button when the disc is out: a keyboard reader who collapsed the list lands on the way
- * back. A page that loads collapsed, or a collapse that arrives from another tab, has no such element and moves nothing.
+ * back. When the override ends with the dock's own button holding focus (it was pressed to show the list, and unmounts), focus
+ * goes to the disc. A page that loads collapsed, or a collapse that arrives from another tab, has no such element and moves
+ * nothing.
  *
  * `unreadBadgeHidden` is the rail's one other fact the FAB needs: a reply waits and the Chat badge that says so is scrolled
  * out of the rail's region (a window too short for the rail). The seated disc draws no dot while the badge shows, so
@@ -122,17 +124,19 @@ export function AppSwitcherDock({
     return () => document.removeEventListener('focusin', remember);
   }, []);
 
-  // Focus follows the override's ARRIVAL, not its presence: the previous value starts as the mount's, so a page that
+  // Focus follows the override's CHANGE, not its presence: the previous value starts as the mount's, so a page that
   // loads with the list already collapsed has no arrival. Then only while nothing holds focus (`document.body`) and the
-  // element that did has gone, which is what a pressed hide button unmounting leaves behind.
+  // element that did has gone, which is what a pressed hide button unmounting leaves behind — or, as the override ends,
+  // the dock's own button, pressed to show the list. An arrival goes to the seated disc, or to the dock's own button
+  // when the disc is out; a departure goes to the disc, the one control of the dock that is left.
   const hasOverride = pressOverride !== null;
   const hadOverride = useRef(hasOverride);
   useEffect(() => {
     if (hadOverride.current === hasOverride) return;
     hadOverride.current = hasOverride;
     const holder = lastFocused.current;
-    if (!hasOverride || document.activeElement !== document.body || holder === null || holder.isConnected) return;
-    const target = seatedRef.current ? document.querySelector<HTMLElement>(FAB_SELECTOR) : ownButtonRef.current;
+    if (document.activeElement !== document.body || holder === null || holder.isConnected) return;
+    const target = hasOverride && !seatedRef.current ? ownButtonRef.current : document.querySelector<HTMLElement>(FAB_SELECTOR);
     target?.focus();
   }, [hasOverride]);
 

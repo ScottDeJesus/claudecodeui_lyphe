@@ -9,8 +9,8 @@ type WorkspaceHeaderProps = {
   selectedSession: ProjectSession | null;
   /**
    * The active view's rail name; `null` on Chat, where the header names the open chat instead. `null` is
-   * also what an id the views list does not hold gets — Memory and Heal until the swap, a plugin's view
-   * while the plugin list loads or after the plugin is gone — and the header then reads as the chat.
+   * also what an id the views list does not hold gets — a plugin's view while the plugin list loads or
+   * after the plugin is gone — and the header then reads as the chat.
    */
   viewLabel: string | null;
   isMobile: boolean;

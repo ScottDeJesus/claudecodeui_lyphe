@@ -7,7 +7,7 @@ import { useRateChangeTick } from '@/shared/hooks/useRateChangeTick';
 import { Chip, ClaudeCodeMark, LLMProviderLogo } from '@/shared/ui';
 
 /**
- * The Heal tab's own model switch — WHICH MODEL A HEAL'S SOULS RUN ON — drawn in the tab's toolbar
+ * The Heal section's own model switch — WHICH MODEL A HEAL'S SOULS RUN ON — drawn in the section's toolbar
  * (`HealActions`) beside the cycle's Start/Stop, and again as the fourth row of Settings → Agents.
  *
  * IT IS THE COMPOSER'S CHIP AND NOT THE COMPOSER'S SWITCH. The shape is the composer's on purpose —

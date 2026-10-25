@@ -2174,7 +2174,7 @@ export type SandboxCommandService = {
 /**
  * One account in the door's picture, relayed unchanged from `claude-account status --json`.
  * `slug` is the account's name in every sentence a person reads; `email` is its sign-in email off its
- * saved slot, the name its row and the closed footer row SHOW (null when the slot names none, and the
+ * saved slot, the name its row and the rail's account button SHOW (null when the slot names none, and the
  * slug shows instead); `digest` stays in data. Times are
  * epoch SECONDS. `reading.five` and `reading.week` are fractions 0..1 — window POINTS once multiplied
  * by 100, never dollars (INV-4299) — or null for a window the pacer could not measure, which draws

@@ -12,9 +12,7 @@ import { BrowserUsePanel } from '@/modules/browser-use';
 import { usePaletteOpsRegister } from '@/modules/command-palette';
 import { InboxPanel } from '@/modules/inbox';
 import { KanbanPanel } from '@/modules/kanban';
-import { MemoryIntakePanel } from '@/modules/memory-intake';
 import { RoadmapTab } from '@/modules/roadmap';
-import { HealPanel } from '@/modules/heal';
 import { ApiPanel } from '@/modules/api-tab';
 import { CerberusPanel } from '@/modules/cerberus';
 import { TaskMasterPanel, useTaskMasterProjectSync } from '@/modules/task-master';
@@ -312,7 +310,8 @@ function WorkspaceMain({
   const chooseProjectBody = <WorkspaceStateView mode="empty" showHeader={false} isMobile={isMobile} onMenuClick={onMenuClick} />;
 
   // Chat names the open chat in the phone header; every other view names itself. An id the list does not
-  // hold (Memory and Heal, until the swap) has no name to give, so there the header names the chat.
+  // hold (a plugin's, while the plugin list loads or after the plugin is gone) has no name to give, so there
+  // the header names the chat.
   const viewLabel = activeTab === 'chat' ? null : (views.find((view) => view.id === activeTab)?.label ?? null);
 
   return (
@@ -427,12 +426,6 @@ function WorkspaceMain({
             </div>
           )}
 
-          {activeTab === 'memory' && (
-            <div className="h-full overflow-hidden">
-              <MemoryIntakePanel />
-            </div>
-          )}
-
           {activeTab === 'runner' && (
             <div className="h-full overflow-hidden">
               <RoadmapTab
@@ -441,12 +434,6 @@ function WorkspaceMain({
                 openRoadmap={openRoadmap}
                 onRoadmapOpened={clearOpenRoadmap}
               />
-            </div>
-          )}
-
-          {activeTab === 'heal' && (
-            <div className="h-full overflow-hidden">
-              <HealPanel />
             </div>
           )}
 

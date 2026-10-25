@@ -117,8 +117,8 @@ export function ProjectsStateProvider({
       sidebarOpen: state.sidebarOpen,
       setSidebarOpen: state.setSidebarOpen,
       sidebarSharedProps: state.sidebarSharedProps,
-      // The workspace tab strip renders in the sidebar now, so the sidebar needs the same tab
-      // state the main region switches its panes on — the one `useProjectsState` already owns.
+      // The views rail renders in the sidebar, so the sidebar needs the same tab state the main
+      // region switches its panes on — the one `useProjectsState` already owns.
       activeTab: state.activeTab,
       setActiveTab: state.setActiveTab,
     }),

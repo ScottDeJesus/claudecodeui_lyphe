@@ -45,7 +45,8 @@
   },
   "tooltips": {
     "viewEnvironments": "View Environments",
-    "hideSidebar": "Hide sidebar",
+    "hideList": "Hide the chat list",
+    "closeDrawer": "Close the drawer",
     "createProject": "Create new project",
     "refresh": "Refresh projects and sessions (Ctrl+R)",
     "renameProject": "Rename project (F2)",
@@ -70,7 +71,6 @@
   },
   "actions": {
     "refresh": "Refresh",
-    "settings": "Settings",
     "collapseAll": "Collapse All",
     "expandAll": "Expand All",
     "cancel": "Cancel",

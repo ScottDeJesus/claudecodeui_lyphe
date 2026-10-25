@@ -35,8 +35,8 @@ const MemoryIntakeContext = createContext<MemoryIntakeValue | null>(null);
  * The app's ONE memory-intake poller, mounted inside the auth gate so it never asks against
  * the login screen.
  *
- * It holds the READING and nothing else. The workspace tab gates, the chat gutter and the panel
- * read it, and only the panel writes; keeping the write lifecycle out (hooks/useMemoryReview.ts)
+ * It holds the READING and nothing else. The Inbox's waiting count, the chat gutter and the
+ * panel read it, and only the panel writes; keeping the write lifecycle out (hooks/useMemoryReview.ts)
  * is what stops a button press re-rendering the readers.
  */
 export function MemoryIntakeProvider({ children }: { children: ReactNode }) {
@@ -109,7 +109,7 @@ export function MemoryIntakeProvider({ children }: { children: ReactNode }) {
   return <MemoryIntakeContext.Provider value={value}>{children}</MemoryIntakeContext.Provider>;
 }
 
-/** The pending picture, for the tab gates, the chat gutter and the panel. */
+/** The pending picture, for the Inbox's waiting count, the chat gutter and the panel. */
 export function useMemoryIntake(): MemoryIntakeValue {
   const value = useContext(MemoryIntakeContext);
   if (!value) {

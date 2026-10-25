@@ -41,7 +41,8 @@
   },
   "tooltips": {
     "viewEnvironments": "查看环境",
-    "hideSidebar": "隐藏侧边栏",
+    "hideList": "隐藏聊天列表",
+    "closeDrawer": "关闭侧边栏",
     "createProject": "创建新项目",
     "refresh": "刷新项目和会话 (Ctrl+R)",
     "renameProject": "重命名项目 (F2)",
@@ -66,7 +67,6 @@
   },
   "actions": {
     "refresh": "刷新",
-    "settings": "设置",
     "collapseAll": "全部折叠",
     "expandAll": "全部展开",
     "cancel": "取消",

@@ -340,7 +340,7 @@ const removeSessionFromProject = (project: Project, sessionIdToDelete: string): 
   return updatedProject;
 };
 
-const VALID_TABS: Set<string> = new Set(['chat', 'files', 'shell', 'git', 'tasks', 'browser', 'memory', 'inbox', 'runner', 'heal', 'api', 'cerberus', 'kanban', 'universe', 'schedules', 'notes']);
+const VALID_TABS: Set<string> = new Set(['chat', 'files', 'shell', 'git', 'tasks', 'browser', 'inbox', 'runner', 'api', 'cerberus', 'kanban', 'universe', 'schedules', 'notes']);
 
 const isValidTab = (tab: string): tab is AppTab => {
   return VALID_TABS.has(tab) || tab.startsWith('plugin:');
@@ -349,8 +349,9 @@ const isValidTab = (tab: string): tab is AppTab => {
 const readPersistedTab = (): AppTab => {
   try {
     const raw = localStorage.getItem('activeTab');
-    // The Jev tab became the API tab on 2026-09-22, and a browser may still hold the old id.
-    const stored = raw === 'jev' ? 'api' : raw;
+    // The Jev tab became the API tab on 2026-09-22, and a browser may still hold the old id. Memory and Heal became
+    // sections of the Inbox, and a browser may still hold either id.
+    const stored = raw === 'jev' ? 'api' : raw === 'memory' || raw === 'heal' ? 'inbox' : raw;
     if (stored && isValidTab(stored)) {
       return stored as AppTab;
     }

@@ -44,7 +44,8 @@
   },
   "tooltips": {
     "viewEnvironments": "Umgebungen anzeigen",
-    "hideSidebar": "Seitenleiste ausblenden",
+    "hideList": "Chatliste ausblenden",
+    "closeDrawer": "Seitenleiste schließen",
     "createProject": "Neues Projekt erstellen",
     "refresh": "Projekte und Sitzungen aktualisieren (Strg+R)",
     "renameProject": "Projekt umbenennen (F2)",
@@ -69,7 +70,6 @@
   },
   "actions": {
     "refresh": "Aktualisieren",
-    "settings": "Einstellungen",
     "collapseAll": "Alle einklappen",
     "expandAll": "Alle ausklappen",
     "cancel": "Abbrechen",

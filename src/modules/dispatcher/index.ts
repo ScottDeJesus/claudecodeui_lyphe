@@ -3,8 +3,8 @@
 export { DispatcherFeed } from '@/modules/dispatcher/DispatcherFeed';
 // The lane's read side — every plan the store holds, this box's posture beside them, and which of
 // them the operator has hidden or dismissed. The In flight face reads it for the card list and the
-// `Hidden` list; the tab strip and the Roadmap tab's In flight switch read the `count` and `waiting`
-// that mark them, and the Inbox's waiting count (`useInboxWaiting`) reads `waiting` as its Roadmap figure.
+// `Hidden` list; the Roadmap tab's In flight switch reads the `count` and `waiting`
+// that mark it, and the Inbox's waiting count (`useInboxWaiting`) reads `waiting` as its Roadmap figure.
 export { useDispatcherPlans } from '@/modules/dispatcher/hooks/useDispatcherPlans';
 // Both hands, one hook: the plan card's verbs and the arc header's three — stop, resume,
 // the arc's model word — relayed to the dispatcher's own binary and answered with its own

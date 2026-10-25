@@ -873,8 +873,8 @@ export const api = {
   },
 
   // The memory-intake lane (docs/MANUAL.md (memory-intake)): what a session PROPOSES and a person reviews.
-  // The reads answer 200 with the `reachable` envelope the panel, the tab gates and the command
-  // palette all branch on — it is a fact about the read now rather than about a remote server, and
+  // The reads answer 200 with the `reachable` envelope the panel, the Inbox's waiting count and the
+  // command palette all branch on — it is a fact about the read now rather than about a remote server, and
   // no shape moved when the lane moved here. The two writes are read from the RAW response for the
   // same reason the accounts writes are: a 422 is a VERDICT the caller reads — the cap guard
   // refusing in plain English, with the candidate left pending — never a failed request.

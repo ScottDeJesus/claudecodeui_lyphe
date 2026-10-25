@@ -51,11 +51,11 @@ function summaryOf(body: unknown): HealSummary {
 }
 
 /**
- * The tab's picture of the reflex, and the one way to ask for it again.
+ * The Heal section's picture of the reflex, and the one way to ask for it again.
  *
  * `summary` is `null` until the first answer lands, which is "not asked yet" and nothing else: the
- * workspace's tab gate weighs the ledger's live count, and a gate handed a fabricated zero would keep
- * the Heal tab shut for the first minute after every reload. `state` carries the three facts the panel
+ * Inbox's entry rule weighs the ledger's live count, and a rule handed a fabricated zero would pass
+ * over the Heal section for the first minute after every reload. `state` carries the three facts the panel
  * renders — loading, error, ready — so no consumer has to infer one from the other.
  */
 type HealContextValue = {
@@ -71,8 +71,8 @@ type HealContextValue = {
 const HealContext = createContext<HealContextValue | null>(null);
 
 /**
- * The app's ONE heal poller — above the Router, so the panel and the tab gates read the same
- * reading, and inside the auth gate, so it never asks against the login
+ * The app's ONE heal poller — above the Router, so the panel and the Inbox's waiting count read the
+ * same reading, and inside the auth gate, so it never asks against the login
  * screen. It holds the READING and nothing else: every control that changes something calls
  * `refresh()` and shows what the server read back, so no pressed button writes a value into this
  * state that the worker has not been seen to agree with.
@@ -141,7 +141,7 @@ export function HealProvider({ children }: { children: ReactNode }) {
   return <HealContext.Provider value={value}>{children}</HealContext.Provider>;
 }
 
-/** The tab's picture, for the panel and the tab gates. */
+/** The Heal section's picture, for the panel and the Inbox's waiting count. */
 export function useHeal(): HealContextValue {
   const value = useContext(HealContext);
   if (!value) {

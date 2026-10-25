@@ -55,7 +55,7 @@ export function useDeepseekBalance() {
   // The last reading the server answered with. `null` (not asked yet) and `{reachable:false}`
   // (asked, and there was no reading) are different things to say, and neither of them is zero.
   const [data, setData] = useState<DeepseekBalance | null>(null);
-  // Mount flag: a poll that resolves after the sidebar collapsed must not set state.
+  // Mount flag: a poll that resolves after the button unmounted (a sign-out, or the rail leaving the tree) must not set state.
   const mountedRef = useRef(true);
   // The read already on the wire, if any. Toggling the panel is the ordinary way to use this row,
   // and every open asks for a fresh figure — without this, ten open/close cycles put ten requests
