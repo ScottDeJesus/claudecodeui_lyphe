@@ -761,20 +761,6 @@ probe-key: 3d2505355b432dfaed5d0ad22452cf30cffe063d
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat-gutters/ChatGutterLayout.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat-host/ChatHostPlaceholder.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat-host/ChatHostSlot.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat-host/hooks/useFloatingPanel.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat-host/utils/placeNode.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/hooks/useChatDoor.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/chat-floats-panel.mjs
 
-## INV-6003 — probe — `ChatHostContext.tsx:152` still says `moveBefore` keeps the composer's caret
-
-`ChatHostContext.tsx:152` still says `moveBefore` keeps the composer's caret
-
-```probe
-cd /home/lyphe/.claude/claudecodeui_lyphe && grep -n 'then keeps' src/modules/chat-host/context/ChatHostContext.tsx
-expect: no output (today: line 152, "`moveBefore` then keeps / the composer's caret and the widget frames alive")
-```
-
-measured 2026-09-30 by chain chain-app-drawer-chat--float-panel-20260929-224731-39b9, finding L1, LOW
-probe-key: ce23ae3d8f64fb75b7e69b209f95595d083951f1
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat-gutters/ChatGutterLayout.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat-host/ChatHostPlaceholder.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat-host/ChatHostSlot.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat-host/hooks/useFloatingPanel.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat-host/utils/placeNode.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/hooks/useChatDoor.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/chat-floats-panel.mjs
-
 ## INV-6010 — WorkspaceFrame's reportCovered is a layout effect — a passive one loses the race with a reply
 
 `WorkspaceFrame` reports whether an application covers the main region with `useLayoutEffect(() => reportCovered(covered), [covered, reportCovered])`. Keep it a layout effect.
@@ -798,20 +784,6 @@ measured 2026-09-30 by chain chain-app-drawer-chat--radial-fill-20260930-002344-
 probe-key: d0acbb8cd3549ac83ed13eaec368502feb5d83e0
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/AppSwitcherFab.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat-host/hooks/useUnreadReply.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/fab-radial-door.mjs
-
-## INV-6012 — probe — three checks in `.verify/fab-radial-door.mjs` cannot fail
-
-three checks in `.verify/fab-radial-door.mjs` cannot fail
-
-```probe
-sed -n 325,336p /home/lyphe/.claude/claudecodeui_lyphe/.verify/fab-radial-door.mjs | grep -c "frame("
-expect: at least 1 (a frame delivered before the check that claims a reply landed on screen; today 0)
-```
-
-measured 2026-09-30 by chain chain-app-drawer-chat--radial-fill-20260930-002344-4ad4, finding L2, LOW
-probe-key: 41705d7e6e2e0f2f60aa2258d74911df0ba6c6fb
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/fab-radial-door.mjs
 
 ## INV-6016 — probe — a `requestWindow` that throws synchronously, or returns a non-promise, wedges the door for the life of the page
 
@@ -12019,3 +11991,47 @@ measured 2026-10-23 by chain chain-gemini-budget--cap-fill-20261023-044036-8763,
 probe-key: d578d31d4c591cbbc5d130230bb00ce21ba352cf
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/hooks/useGeminiPlanCap.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/agents-settings/sections/content/RunnerGeminiBudgetRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/agents-settings/sections/content/RunnerModelContent.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/gemini-budget-cap-row.mjs
+
+## INV-9539 — probe — LOW — the client mirror of `ProviderModelsDefinition`, and the sibling probe's header, still say the names are the CLI's own words
+
+LOW — the client mirror of `ProviderModelsDefinition`, and the sibling probe's header, still say the names are the CLI's own words
+
+```probe
+cd /home/lyphe/.claude/claudecodeui_lyphe && echo "client mirror still says provider's own words: $(grep -c "in the provider's own words" src/shared/types.ts) | server mirror: $(grep -c "in the provider's own words" server/shared/types.ts) | probe-opus-55 header says the CLI names it Opus 5.5: $(grep -c 'resolves the `opus` alias to `claude-opus-5-5` and names it "Opus 5.5"' .verify/probe-opus-55-selector.mjs)"
+echo "[probe exit $?]"
+# expect: `1 | 0 | 1` while the sentences stand; `0 | 0 | 0` once the client mirror and the probe header say the picker composes the name
+```
+
+measured 2026-10-24 by chain chain-model-version-labels-20261024-071937-430a, finding L1, LOW
+probe-key: 9d6e0fad37a141fc8b027502fb6523fa89144600
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-model-options.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-claude-catalog-picker.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-opus-55-selector.mjs
+
+## INV-9540 — probe — LOW — a `[1m]`-suffixed pinned value with no `resolvedModel` is now dropped; HEAD offered it (synthetic payload — the real record always carries `resolvedModel`)
+
+LOW — a `[1m]`-suffixed pinned value with no `resolvedModel` is now dropped; HEAD offered it (synthetic payload — the real record always carries `resolvedModel`)
+
+```probe
+D=$(mktemp -d /tmp/athena-mvl-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+D=$(cd "$(dirname "$0")" && pwd)
+cat > "$D/o.mts" <<'TS'
+import { buildClaudeModelsDefinition } from '/home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-model-options.ts';
+const entries = [
+  { value: 'opus', displayName: 'Opus', description: 'Opus 5.5 · x' },
+  { value: 'claude-fable-5-1[1m]', displayName: 'Fable', description: 'Fable 5.1 · x' },
+];
+const def = buildClaudeModelsDefinition(entries as any);
+console.log('no resolvedModel, Fable pinned with the [1m] suffix -> options:', def ? def.OPTIONS.map((o) => `${o.value}=${o.label}`).join(' | ') : 'null');
+TS
+cd /home/lyphe/.claude/claudecodeui_lyphe && TSX_TSCONFIG_PATH=server/tsconfig.json timeout 90 node --import tsx "$D/o.mts" 2>&1 | tail -1
+EOF
+bash "$D/p.sh"; case "$D" in /tmp/athena-mvl-probe.??????) rm -r "$D";; esac
+echo "[probe exit $?]"
+# expect: `opus[1m]=Opus 5.5` alone while the defect stands (HEAD printed `opus[1m]=Opus | claude-fable-5-1[1m]=Fable`); `opus[1m]=Opus 5.5 | fable=Fable 5.1` once the suffix is stripped from the model id as well
+```
+
+measured 2026-10-24 by chain chain-model-version-labels-20261024-071937-430a, finding L2, LOW
+probe-key: 2b3d7c825ebd5ec21d7b4df97a2afeacf3476dd9
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-model-options.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-claude-catalog-picker.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-opus-55-selector.mjs

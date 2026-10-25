@@ -3,16 +3,21 @@
  *
  * Claude Code reports its catalog through the SDK's `supportedModels()` (read by
  * `claude-model-catalog.ts`): every model it can run, the alias each family answers to, the name it
- * gives each model, a description, and the effort levels each accepts. The picker's options, labels,
+ * gives each model, a description, and the effort levels each accepts. The picker's options,
  * descriptions and effort levels are all taken from that answer, so a CLI release that moves an alias
- * moves the picker with it. Claude Code 2.1.284 moved `sonnet` to `claude-sonnet-5-5`, and the entry
- * reads "Sonnet 5.5" because the CLI says so.
+ * moves the picker with it. So are its names, with one rule about the version (`shownNameOf`): the CLI
+ * words a name either with the version in it ("Haiku 4.5") or by family alone ("Opus") with the
+ * version opening the description ("Opus 5.5 · Best for everyday, complex tasks"). A name that
+ * carries a version is shown as the CLI gives it. A name that carries none, whose description opens
+ * with that name, a version and ` · `, is shown as "Opus 5.5" over the description that follows the
+ * separator, so the menu, the composer chip and chat captions all name the generation and stay
+ * correct with each release. Any other name or description is shown exactly as the CLI says it.
  *
  * Which entries are offered: the newest model of each family, one row per family.
  * - A family's ALIAS entry (`opus`, `sonnet`, `haiku` — a value that is the family's own name) is
  *   the CLI's pointer at that family's current model, so it wins whenever the catalog has one.
- * - A family with no alias (Fable, on 2.1.284) is offered through its newest PINNED entry, one whose
- *   value is the model id it runs (`claude-fable-5-1`).
+ * - A family with no alias (Fable) is offered through its newest PINNED entry, one whose value is
+ *   the model id it runs, with or without the `[1m]` context suffix (`claude-fable-5-1[1m]`).
  * - Everything else is dropped: the older pinned versions, and `default`, which names a policy
  *   ("the recommended model") and duplicates a family's own entry (`POLICY_SELECTORS`).
  * A family the catalog gains appears on its own, in the catalog's order.
@@ -68,7 +73,35 @@ const STORED_VALUE_BY_FAMILY: Readonly<Record<string, string>> = {
  */
 const POLICY_SELECTORS: ReadonlySet<string> = new Set(['default', 'best']);
 
+/** The `[1m]` context suffix a catalog value may carry after the model id it runs. */
+const ONE_MILLION_SUFFIX = /\[1m\]$/i;
+
+/** A version as a description states it right after the family's name: `5`, `5.5`, `4.8`. */
+const DESCRIPTION_VERSION_THEN_SEPARATOR = /^(\d+(?:\.\d+)*) · ([\s\S]*)$/;
+
 type EffortLevel = NonNullable<ModelInfo['supportedEffortLevels']>[number];
+
+/**
+ * The name and description the picker shows for one catalog entry.
+ *
+ * A name with no digit in it states no version. When the entry's description then opens with that
+ * very name, a space, a version and ` · `, the version belongs to this entry and the name becomes
+ * `<name> <version>`; the description is what follows the separator, so the menu does not say the
+ * version twice. A description that opens with another name ("Default (recommended)" over
+ * "Sonnet 5.5 · …") or with a notice ("Newer version available · …") says nothing about this entry's
+ * version, so such an entry is shown as the catalog has it, as is one with no description.
+ */
+function shownNameOf(entry: ModelInfo): { label: string; description: string | undefined } {
+  const asCatalogHasIt = { label: entry.displayName, description: entry.description || undefined };
+  if (/\d/.test(entry.displayName) || typeof entry.description !== 'string') return asCatalogHasIt;
+
+  const nameThenSpace = `${entry.displayName} `;
+  if (!entry.description.startsWith(nameThenSpace)) return asCatalogHasIt;
+  const stated = DESCRIPTION_VERSION_THEN_SEPARATOR.exec(entry.description.slice(nameThenSpace.length));
+  if (!stated) return asCatalogHasIt;
+
+  return { label: `${entry.displayName} ${stated[1]}`, description: stated[2].trim() || undefined };
+}
 
 /** The effort choices one model offers: the catalog's levels, plus ultracode wherever xhigh is one. */
 function effortFor(levels: readonly EffortLevel[]): Pick<ProviderModelOption, 'effort'> {
@@ -115,41 +148,51 @@ const isReadableEntry = (entry: unknown): entry is ModelInfo => {
  * The picker's definition, built from one catalog answer, or null when the answer offers nothing the
  * picker can show (the caller treats that exactly like a failed read).
  *
- * `LABELS_BY_MODEL_ID` carries the catalog's own name for every concrete model id it lists, offered
- * or not, so a stored turn is captioned the way the CLI names its model: `claude-sonnet-5-5` reads
- * "Sonnet 5.5" and the `claude-sonnet-5` that answered earlier turns reads "Sonnet 5".
+ * `LABELS_BY_MODEL_ID` carries the picker's name (`shownNameOf`) for every concrete model id the catalog
+ * lists, offered or not, so a stored turn is captioned with the generation its model has:
+ * `claude-sonnet-5-5` reads "Sonnet 5.5" and the `claude-sonnet-5` that answered earlier turns reads
+ * "Sonnet 5".
  *
  * consumer: claude-model-catalog.ts (on every fresh read, and on every catalog loaded from disk)
  */
 export function buildClaudeModelsDefinition(catalog: readonly unknown[]): ProviderModelsDefinition | null {
   // Insertion order is first appearance in the catalog, and a newer entry replacing an older one
   // keeps its family's place — so the rows come out in the CLI's own order.
-  const newestByFamily = new Map<string, { entry: ModelInfo; version: number[]; isAlias: boolean }>();
+  const newestByFamily = new Map<string, {
+    entry: ModelInfo;
+    shown: ReturnType<typeof shownNameOf>;
+    version: number[];
+    isAlias: boolean;
+  }>();
   const labelsByModelId: Record<string, string> = {};
 
   for (const entry of catalog) {
     if (!isReadableEntry(entry) || POLICY_SELECTORS.has(entry.value)) continue;
-    const modelId = entry.resolvedModel?.trim() || entry.value;
+    // The id the entry runs, without the context suffix: a value that is `claude-fable-5-1[1m]` with no
+    // `resolvedModel` still names `claude-fable-5-1`, and `1m` is not a word of the family's name.
+    const modelId = (entry.resolvedModel?.trim() || entry.value).replace(ONE_MILLION_SUFFIX, '');
     const identity = identityOf(modelId);
     if (!identity) continue;
 
     const isAlias = entry.value === identity.family;
-    const isPinned = entry.value === modelId;
+    // The context suffix names a window of the same model, so a value that is the id plus `[1m]` is pinned too.
+    const isPinned = entry.value.replace(ONE_MILLION_SUFFIX, '') === modelId;
     if (!isAlias && !isPinned) continue;
 
     // First name wins: the alias row comes before its own pinned twin, and both say the same.
-    labelsByModelId[modelId] ??= entry.displayName;
+    const shown = shownNameOf(entry);
+    labelsByModelId[modelId] ??= shown.label;
 
     const held = newestByFamily.get(identity.family);
     const replaces = !held
       || (!held.isAlias && (isAlias || compareVersions(identity.version, held.version) > 0));
-    if (replaces) newestByFamily.set(identity.family, { entry, version: identity.version, isAlias });
+    if (replaces) newestByFamily.set(identity.family, { entry, shown, version: identity.version, isAlias });
   }
 
-  const options: ProviderModelOption[] = [...newestByFamily].map(([family, { entry }]) => ({
+  const options: ProviderModelOption[] = [...newestByFamily].map(([family, { entry, shown }]) => ({
     value: STORED_VALUE_BY_FAMILY[family] ?? entry.value,
-    label: entry.displayName,
-    ...(entry.description ? { description: entry.description } : {}),
+    label: shown.label,
+    ...(shown.description ? { description: shown.description } : {}),
     ...effortFor(entry.supportsEffort ? entry.supportedEffortLevels ?? [] : []),
   }));
   if (options.length === 0) return null;

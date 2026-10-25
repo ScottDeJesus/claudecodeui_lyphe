@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
-import { mkdir, readFile, realpath, rename, stat, unlink, writeFile } from 'node:fs/promises';
+import { constants } from 'node:fs';
+import { mkdir, open, realpath, rename, unlink, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 
@@ -134,18 +135,28 @@ export async function readHealCap(): Promise<number | null> {
  * BOM off — exactly what a `utf-8-sig` decode takes off on the Python side before its `strip()`
  * runs — then trimmed with `FLAG_TRIM`, which is that side's own `str.strip()` set and nothing else.
  *
- * `null` is "not this reader's to trust": not there, unreadable, or past the bound. Each caller
- * answers it in its own direction — the master ON, the cap NO CEILING — which is why this reads and
- * decides nothing. Exported because the family's other two switches read through it too
+ * `null` is "not this reader's to trust": not there, unreadable, not a regular file, or past the
+ * bound. Each caller answers it in its own direction — the master ON, the cap NO CEILING — which is
+ * why this reads and decides nothing.
+ *
+ * THE OPEN IS `O_NONBLOCK`, as the Python twin's `ledger.cap_usd()` is: a FIFO left at a flag path
+ * passes a `stat` size check (0 bytes) and a blocking open then waits for a writer that never comes,
+ * so every GET of five files would never answer. The open returns at once, and the descriptor's own
+ * `fstat` (the same file the read then reads) turns a FIFO away. Exported because the family's other two switches read through it too
  * (`heal-model-switch.ts`, `heal-cycle-switch.ts`): one bound, one BOM rule, one Python-space class
  * for every flag file here.
  */
 export async function readFlagText(path: string): Promise<string | null> {
+  let handle;
   try {
-    if ((await stat(path)).size > FLAG_MAX_BYTES) return null;
-    return (await readFile(path, 'utf8')).replace(LEADING_BOM, '').replace(FLAG_TRIM, '');
+    handle = await open(path, constants.O_RDONLY | constants.O_NONBLOCK);
+    const info = await handle.stat();
+    if (!info.isFile() || info.size > FLAG_MAX_BYTES) return null;
+    return (await handle.readFile('utf8')).replace(LEADING_BOM, '').replace(FLAG_TRIM, '');
   } catch {
     return null;                  // absent or unreadable is not an error to the caller
+  } finally {
+    await handle?.close().catch(() => undefined);
   }
 }
 

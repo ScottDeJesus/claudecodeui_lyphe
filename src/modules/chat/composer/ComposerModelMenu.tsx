@@ -29,7 +29,7 @@ type ComposerModelMenuProps = {
   model: string;
   /** Model catalog for the active provider; empty hides the section. */
   modelOptions: ProviderModelOption[];
-  /** The provider's own name for each model id its catalog lists (`LABELS_BY_MODEL_ID`), for a stored id on the chip. */
+  /** The picker's name for each model id the provider's catalog lists (`LABELS_BY_MODEL_ID`), for a stored id on the chip. */
   modelLabelsById?: Record<string, string>;
   onSelectModel: (model: string) => void;
   modelsLoading: boolean;

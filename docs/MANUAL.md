@@ -6996,7 +6996,8 @@ different sets and were measured diverging in BOTH directions: `trim()` drops th
 `strip()` keeps — the reachable half, since a flag saved by a Windows editor or PowerShell `Out-File`
 carries one, and this reader then said ON while the runner went on spending Claude — and `strip()`
 drops the C0 separators `\x1c`–`\x1f` that `trim()` keeps. Closed on both sides: an explicit trim
-class here, `utf-8-sig` there. Change either and change the other.
+class here, `utf-8-sig` there. Change either and change the other. `readFlagFile` also opens
+`O_NONBLOCK` and reads a regular file only: a FIFO at the path is OFF at once, never a hang (INV-9509).
 
 **What the switch DOES is the runner's rule and lives there**, not in this repository. It is
 re-read at every builder spawn, so a flip here reaches the next phase with nothing restarted on
@@ -7062,7 +7063,7 @@ side in every state), which is why the parses in `heal-switch.ts` are written to
 clause with the Python rather than to be lenient in one direction: a reader that took `on3`, or a
 writer that emitted it, would leave the operator pressing a switch the worker does not see move.
 
-`DOLLARS`, `PY_SPACE`, `readFlagText` and `writeFlag` are exported for the other readers of a flag file: `heal-model-switch.ts`, `heal-cycle-switch.ts`, and the Gemini plan cap (`gemini-plan-cap.ts`, MAN-8963), which reads in `DOLLARS`' grammar and is not a heal flag. A FIFO at any path read through `readFlagText` hangs the read (INV-9509).
+`DOLLARS`, `PY_SPACE`, `readFlagText` and `writeFlag` are exported for the other readers of a flag file: `heal-model-switch.ts`, `heal-cycle-switch.ts`, and the Gemini plan cap (`gemini-plan-cap.ts`, MAN-8963), which reads in `DOLLARS`' grammar and is not a heal flag. `readFlagText` opens `O_NONBLOCK` and trusts a regular file only: a FIFO at any path it reads answers `null` at once (INV-9509).
 
 **THE DAILY CAP IS A DEEPSEEK FIGURE, and so is the peak park.** The worker sums the day's heals whose
 row says they ran on DeepSeek — each booked at its chain's DeepSeek stages alone — plus a reserve for

@@ -30,8 +30,9 @@ export type ProviderModelOption = {
 
 /**
  * The full model catalog for one provider: every option plus the value used when the user has not chosen one.
- * `LABELS_BY_MODEL_ID` comes only from a provider that reports its own catalog (Claude): the name it gives each
- * concrete model id it can run, so a stored turn's id is captioned in the provider's own words.
+ * `LABELS_BY_MODEL_ID` comes only from a provider that reports its own catalog (Claude): the name the picker gives
+ * each concrete model id the catalog lists, so a stored turn's id is captioned with its generation. It is the
+ * catalog's name, with the version the entry's description states where the name carries none.
  */
 export type ProviderModelsDefinition = {
   OPTIONS: ProviderModelOption[];
