@@ -28,8 +28,6 @@ type SidebarHeaderProps = {
   simpleMode?: boolean;
   /** The workspace tab strip, rendered under the wordmark. A slot: this file never imports it. */
   tabs?: ReactNode;
-  /** Rendered left of the wordmark, gated like `tabs`. A slot: this file never imports it. */
-  leading?: ReactNode;
   t: TFunction;
 };
 
@@ -107,7 +105,6 @@ export default function SidebarHeader({
   onCollapseSidebar,
   simpleMode,
   tabs,
-  leading,
   t,
 }: SidebarHeaderProps) {
   // This file draws its desktop and mobile headers as two blocks and hides one with CSS, so a
@@ -132,7 +129,6 @@ export default function SidebarHeader({
         style={{}}
       >
         <div className="flex items-center justify-between gap-2">
-          {leading && !isCompact && <div className="flex flex-shrink-0">{leading}</div>}
           {IS_PLATFORM ? (
             <a
               href="https://cloudcli.ai/dashboard"
@@ -236,7 +232,6 @@ export default function SidebarHeader({
         style={isPWA && isMobile ? { paddingTop: '16px' } : {}}
       >
         <div className="flex items-center justify-between">
-          {leading && isCompact && <div className="mr-2 flex flex-shrink-0">{leading}</div>}
           {IS_PLATFORM ? (
             <a
               href="https://cloudcli.ai/dashboard"

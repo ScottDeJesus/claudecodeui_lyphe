@@ -134,8 +134,7 @@ function pictureReading(row: ClaudeAccountRow, usage: ClaudeUsage | null, nowMs:
 /**
  * The `ClaudeUsage` the account panel's meters draw.
  *
- * Used by the accounts module's AccountPopover (the meters) and AccountFooterRow (the closed row's
- * two windows), so both registers name the same account and show the same figures.
+ * Used by the accounts module's AccountPopover, so the meters name the account in use and show its figures.
  *
  * The route's body wins when it belongs to the account in use and is healthy — it is a measurement
  * taken now, fresher than anything filed. Every other case falls back to the account in use's newest

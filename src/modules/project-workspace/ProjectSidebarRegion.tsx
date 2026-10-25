@@ -5,12 +5,12 @@ import type {
 } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { AppSwitcherDock } from '@/modules/app-switcher';
 import { useProjectSidebarState } from '@/modules/project-workspace/context/ProjectsStateContext';
 import { useWorkspaceTabGates } from '@/modules/project-workspace/hooks/useWorkspaceTabGates';
+import WorkspaceRail from '@/modules/project-workspace/WorkspaceRail';
 import WorkspaceTabs from '@/modules/project-workspace/WorkspaceTabs';
 import { Sidebar } from '@/modules/sidebar';
-import type { ProjectWorkspaceShellProps } from '@/shared/types';
+import type { ProjectWorkspaceShellProps, SidebarListState } from '@/shared/types';
 
 /** Rendered by ProjectWorkspaceShell to host the sidebar module, docked on desktop and as a drawer on mobile. */
 function ProjectSidebarRegion({
@@ -40,9 +40,9 @@ function ProjectSidebarRegion({
 
   // The workspace tab strip, rendered INTO the sidebar as a slot node. The sidebar module never
   // imports project-workspace — the dependency points one way, the way it already did.
-  // Gated on a selected project because with none the main region shows its empty state, and a
-  // strip that switches between panes that are not there is a row of dead buttons.
-  const tabs = sidebarSharedProps.selectedProject ? (
+  // Drawn with no project selected too: every pane draws now (the house views need no project, and
+  // the ones that read it show the choose-a-project body), so none of the strip's buttons is dead.
+  const tabs = (
     <WorkspaceTabs
       activeTab={activeTab}
       setActiveTab={setActiveTab}
@@ -59,7 +59,15 @@ function ProjectSidebarRegion({
       cerberusNeeds={cerberusNeeds}
       onTabChange={handleTabChange}
     />
-  ) : null;
+  );
+
+  // The views rail, rendered INTO the sidebar through its `rail` slot, as the strip above is through `tabs`: the rail is
+  // this module's and the list is the sidebar's, so the sidebar tells the rail whether the list is collapsed and never
+  // imports it. Stable on `isMobile`, so the sidebar's render does not hand the slot a new function each time.
+  const renderRail = useCallback(
+    (list: SidebarListState) => <WorkspaceRail list={list} isMobile={isMobile} />,
+    [isMobile],
+  );
 
   const handleBackdropClick = useCallback((event: ReactMouseEvent<HTMLButtonElement>) => {
     event.stopPropagation();
@@ -112,7 +120,7 @@ function ProjectSidebarRegion({
         onClick={stopPropagation}
         onTouchStart={stopPropagation}
       >
-        <Sidebar {...sidebarSharedProps} tabs={tabs} leading={<AppSwitcherDock />} />
+        <Sidebar {...sidebarSharedProps} tabs={tabs} rail={renderRail} />
       </div>
     </div>
   );

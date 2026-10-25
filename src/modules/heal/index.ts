@@ -1,14 +1,14 @@
 import { lazy } from 'react';
 
-// The heal module's public surface: the panel the Heal tab renders, and the one control another
-// module draws.
+// The heal module's public surface: the panel the Heal tab and the Inbox's Heal section render, and the
+// one control another module draws.
 // Lazy, the way the Memory and Runner panels are: the panel is its tab's whole tree and loads on
 // the tab's first open, so importing this barrel for anything else never pulls it into the first
 // page load.
 export const HealPanel = lazy(() => import('@/modules/heal/HealPanel').then((m) => ({ default: m.HealPanel })));
 // The context is NOT lazy: it is mounted in src/App.tsx beside MemoryIntakeProvider and ABOVE the
-// Router, because the workspace's tab gates and the command palette read `useHeal()` from outside the
-// panel's own tree — none of which a lazy panel export could reach.
+// Router, because the workspace's tab gates and the Inbox's waiting count (`useInboxWaiting`) read
+// `useHeal()` from outside the panel's own tree — none of which a lazy panel export could reach.
 export { HealProvider, useHeal } from '@/modules/heal/context/HealContext';
 // The model switch, exported because it has a SECOND surface: Settings → Agents draws the same chip
 // under the heal master (the switch the operator asked for lives on the tab, and the one screen every

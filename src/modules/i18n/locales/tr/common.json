@@ -326,9 +326,7 @@
     },
     "ariaLabels": {
       "closeModal": "Sürüm yükseltme modalını kapat",
-      "showSidebar": "Kenar çubuğunu göster",
       "settings": "Ayarlar",
-      "updateAvailable": "Güncelleme mevcut",
       "closeSidebar": "Kenar çubuğunu kapat"
     }
   },

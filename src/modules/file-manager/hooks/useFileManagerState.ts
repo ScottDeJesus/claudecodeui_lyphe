@@ -38,9 +38,10 @@ async function readRefusal(response: Response, fallback: string): Promise<string
  * Puts a path from anywhere in the app into the one form this hook holds: relative to the
  * project root, `''` for the root itself.
  *
- * The three caller families spell a path three ways — the tree and the chat cards hand over an
- * absolute path, the git panel one already relative to the repository root — and the server's own
- * `DirectoryListing.path` is the resolved ABSOLUTE directory. All of them arrive here. Nothing is
+ * Paths spell two ways — every open request arrives absolute (the workspace and the git panel join a
+ * relative path to its folder before raising one), the listing's own rows arrive relative to the
+ * project root — and the server's own `DirectoryListing.path` is the resolved ABSOLUTE directory.
+ * All of them arrive here. Nothing is
  * FILTERED on the way through: an absolute path outside the project stays absolute, exactly as it
  * came, and the server decides — it serves a file the workspace allows (a picture the assistant
  * read under `~/.claude`) and answers 403 to the rest. Stripping its leading `/` here would turn

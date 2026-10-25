@@ -7,7 +7,7 @@ The Cerberus tab: the fleet's health on the house row. One provider reads `GET /
 ## Where each subject lives
 | subject | row | code |
 |---|---|---|
-| the tab on the house row: `AppTab`, `VALID_TABS`, `CERBERUS_TAB`, count pill, pane, both palettes | MAN-7866 | `WorkspaceTabs.tsx`, `useWorkspaceTabGates.ts`, `ProjectSidebarRegion.tsx`, `WorkspaceMain.tsx`, `useProjectsState.ts`, `ProjectCommandPalette.tsx`, `command-palette/CommandPalette.tsx` |
+| the tab on the house row: `AppTab`, `VALID_TABS`, `CERBERUS_TAB`, count pill, pane, palette row | MAN-7866 | `WorkspaceTabs.tsx`, `useWorkspaceTabGates.ts`, `ProjectSidebarRegion.tsx`, `WorkspaceMain.tsx`, `useProjectsState.ts`, `hooks/useWorkspaceViews.ts`, `ProjectCommandPalette.tsx` |
 | the root, the header, the clock pill, the passing count | MAN-7891 | `CerberusPanel.tsx`, `CerberusHeader.tsx`, `hooks/useClock.ts`, `hooks/useCountTo.ts` |
 | the provider, `useCerberusNeeds`, what triggers a read, `useCheckDetail` and `?end=`, `api.cerberus`, `cerberusTime` | MAN-7871 | `context/CerberusContext.ts`, `context/CerberusProvider.tsx`, `hooks/useCheckDetail.ts`, `utils/cerberusTime.ts`, `index.ts`, `src/shared/api.ts` |
 | the status table, the four marks, minute cells, lookup moment, recorded results | MAN-7873 (marks MAN-7874, lookup MAN-7875, traps MAN-7876) | `utils/cerberusStatus.ts`, `StatusMarks.tsx`, `sheet/MinuteCells.tsx`, `sheet/LookupMoment.tsx`, `sheet/RecordedResults.tsx` |
@@ -41,7 +41,7 @@ The Cerberus tab: the fleet's health on the house row. One provider reads `GET /
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/
 
-## MAN-7866 — Cerberus — the tab on the house row: `AppTab`, `VALID_TABS`, `CERBERUS_TAB`, the count pill, the pane, both palettes
+## MAN-7866 — Cerberus — the tab on the house row: `AppTab`, `VALID_TABS`, `CERBERUS_TAB`, the count pill, the pane, the palette row
 
 Where the Cerberus tab stands in the workspace and what feeds its count. The tab's own tree: MAN-7891. The reader behind the count: MAN-7871. The words: MAN-7870. Row map: MAN-7868.
 
@@ -71,14 +71,13 @@ Where the Cerberus tab stands in the workspace and what feeds its count. The tab
 - 9 glyphs with Memory and Heal on = `9 × 36 + 8 × 2 = 340px` against the 304px strip: the strip holds seven and the More trigger takes the last two (API, Cerberus). A selected tab takes the row's last slot and the one before it collapses (measured 2026-10-06).
 - The glyph-width comment in `WorkspaceTabs.tsx` counts nine.
 
-## Pane and palettes
+## Pane and palette
 | piece | fact |
 |---|---|
 | pane (`WorkspaceMain.tsx`) | `activeTab === 'cerberus'` → `<div className="h-full overflow-hidden"><CerberusPanel projectChoices={projectChoices} /></div>`, after the API pane, inside the file's `Suspense`; the panel is the barrel's `lazy` export, its own chunk, loaded on the first open. The "No gate" comment sits above it |
-| `NAV_TABS` (`command-palette/CommandPalette.tsx`) | `{ id: 'cerberus', label: 'Go to Cerberus', keywords: 'cerberus fleet health monitoring checks wardens nodes' }`, after API |
-| `visibleTabs` (`ProjectCommandPalette.tsx`) | the always-on list names `'cerberus'` after `'api'`: a `NAV_TABS` row shows only if this list names it |
+| `HOUSE_VIEWS` (`project-workspace/hooks/useWorkspaceViews.ts`) | `{ id: 'cerberus', group: 'house', icon: Radar, keywords: 'cerberus fleet health monitoring checks wardens nodes' }`, after Universe and before API; ungated. `ProjectCommandPalette.tsx` makes it the `Go to Cerberus` row (MAN-8999) |
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/command-palette/CommandPalette.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/hooks/useProjectsState.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/hooks/useWorkspaceTabGates.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/ProjectCommandPalette.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/ProjectSidebarRegion.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/WorkspaceMain.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/WorkspaceTabs.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/command-palette/CommandPalette.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/hooks/useProjectsState.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/hooks/useWorkspaceTabGates.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/hooks/useWorkspaceViews.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/ProjectCommandPalette.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/ProjectSidebarRegion.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/WorkspaceMain.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/WorkspaceTabs.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts
 
 ## MAN-7867 — Cerberus — the slots later plans fill: every `SLOT:` and `FILL:` comment, the `VIEWS` table and `activityEvents`
 
@@ -1100,7 +1099,7 @@ section: Cerberus — the tab root and header: `CerberusPanel`, `CerberusHeader`
 | passing count as drawn (header) | `useCountTo(counts.passing)`: the number itself on mount; on a change it counts from the number last drawn over 1.4 s, ease-out `1 − (1 − k)³`, rounded, one step a frame on the host window; with motion reduced it is the target at once |
 
 ## On the workspace
-The tab's place on the house row, its count pill, its pane and both palettes: MAN-7866.
+The tab's place on the house row, its count pill, its pane and its palette row: MAN-7866.
 
 ## Banner re-announce
 - An alert is heard when it mounts. Both root banners are keyed by `attempt`, so a retry that fails again mounts afresh and is heard again.

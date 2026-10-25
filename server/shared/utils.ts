@@ -105,6 +105,26 @@ export function asyncHandler(
   };
 }
 
+/**
+ * The account an authenticated request acts for, or the app's own 401 `USER_REQUIRED`.
+ *
+ * It REFUSES where a `Number()` coercion would quietly act for account 0 (`Number(null)`, `Number('')` and
+ * `Number([])` are all `0`): a row written for the wrong account is worse than a row not written. Mounted
+ * behind `authenticateToken`, which sets `request.user` to the account row whose `id` is the table's own
+ * positive integer, so it refuses nothing a real session can send. Consumed by `notes.routes.ts` and
+ * `followups.routes.ts`, the two lanes whose rows belong to one account.
+ */
+export function readAuthenticatedUserId(request: Request): number {
+  const userId = (request as Request & { user?: { id?: number | string } }).user?.id;
+  if (typeof userId !== 'number' || !Number.isInteger(userId) || userId <= 0) {
+    throw new AppError('Authenticated user is required.', {
+      code: 'USER_REQUIRED',
+      statusCode: 401,
+    });
+  }
+  return userId;
+}
+
 // ---------------------------
 //----------------- ROUTE PARAMETER PARSING ------------
 /**

@@ -22,7 +22,7 @@ const DEFAULT_BRANCH = 'main';
 type GitPanelProps = {
   repository: GitRepository;
   isMobile?: boolean;
-  /** Absent when the repository on screen is not the workspace's project, which is all Files browses. */
+  /** Opens a changed file in Files, by absolute path; the changes view offers `Open in Files` only when it is given one. */
   onFileOpen?: FileOpenHandler;
 };
 

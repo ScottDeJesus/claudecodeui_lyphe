@@ -1,4 +1,4 @@
-import { type ReactNode, useCallback, useEffect, useRef, useState } from 'react';
+import { type FocusEvent, type KeyboardEvent, type ReactNode, useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 
 import { useHostWindow } from '@/shared/context/HostWindowContext';
@@ -12,6 +12,12 @@ type TooltipProps = {
   position?: TooltipPosition;
   className?: string;
   delay?: number;
+  /**
+   * Also show for the keyboard: a focus inside the wrapper that matches `:focus-visible` shows the tooltip at once,
+   * blur hides it, and Escape dismisses it. Off by default, because most callers wrap inputs and controls whose focus
+   * is a reader getting to work, not asking a name.
+   */
+  showOnFocus?: boolean;
 };
 
 /**
@@ -35,13 +41,19 @@ function getArrowClasses(position: TooltipPosition): string {
   }
 }
 
-/** Used by the project-workspace, sidebar and task-master modules and by the shared PromptInput primitive. */
+/**
+ * Used by the project-workspace, sidebar and task-master modules and by the shared PromptInput primitive.
+ *
+ * `showOnFocus` is the project-workspace views rail's: its buttons are glyphs, so a reader who tabs along it needs the
+ * name a pointer reader hovers for.
+ */
 export function Tooltip({
   children,
   content,
   position = 'top',
   className = '',
   delay = 350,
+  showOnFocus = false,
 }: TooltipProps) {
   const hostWindow = useHostWindow();
   const [isVisible, setIsVisible] = useState(false);
@@ -135,6 +147,25 @@ export function Tooltip({
     setIsVisible(false);
   };
 
+  // `:focus-visible` and nothing broader: a pointer press focuses the control too, and its hover has already given
+  // the name. At once, with no delay — a keyboard reader asked for this control by arriving on it.
+  const handleFocus = (event: FocusEvent<HTMLDivElement>) => {
+    if (!event.target.matches(':focus-visible')) return;
+    clearTooltipTimer();
+    setIsVisible(true);
+  };
+
+  const handleBlur = () => {
+    clearTooltipTimer();
+    setIsVisible(false);
+  };
+
+  // Content that a focus brought up can be put away without moving the focus (WCAG 1.4.13). Not stopped: an Escape
+  // that also closes a drawer or a dialog still reaches it.
+  const handleKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    if (event.key === 'Escape') setIsVisible(false);
+  };
+
   useEffect(() => {
     // Avoid delayed updates after unmount.
     return () => {
@@ -197,6 +228,9 @@ export function Tooltip({
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
       onTouchCancel={handleTouchEnd}
+      onFocus={showOnFocus ? handleFocus : undefined}
+      onBlur={showOnFocus ? handleBlur : undefined}
+      onKeyDown={showOnFocus ? handleKeyDown : undefined}
     >
       {children}
       {isVisible && createPortal(

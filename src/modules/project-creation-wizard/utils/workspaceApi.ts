@@ -138,7 +138,9 @@ export const createProjectRequest = async (payload: CreateProjectPayload) => {
   const data = await parseJson<CreateProjectResponse>(response);
 
   if (!response.ok) {
-    throw new Error(resolveCreateProjectErrorMessage(data) || 'Failed to create project');
+    // The status rides on the error for a caller that acts on the KIND of refusal (FilesView takes a 409 as "a project is
+    // already registered there"); the message stays the server's own sentence for everyone else.
+    throw Object.assign(new Error(resolveCreateProjectErrorMessage(data) || 'Failed to create project'), { status: response.status });
   }
 
   return data.project;

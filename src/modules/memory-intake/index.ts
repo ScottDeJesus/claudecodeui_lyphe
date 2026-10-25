@@ -1,7 +1,8 @@
 import { lazy } from 'react';
 
 // The memory-intake module's whole public surface: the provider App mounts, the reading the
-// workspace tab gates and the command palette ask for, and the panel the Memory tab renders.
+// workspace tab gates and the Inbox's waiting count (`useInboxWaiting`) ask for, and the panel the Memory tab
+// and the Inbox's Memory section render.
 export { MemoryIntakeProvider } from '@/modules/memory-intake/context/MemoryIntakeContext';
 export { useMemoryIntake } from '@/modules/memory-intake/context/MemoryIntakeContext';
 

@@ -109,7 +109,7 @@ export function useCerberus(): CerberusValue {
 /**
  * How many checks need a person right now: the overview's own count, `0` while it has not been read.
  * Read by src/modules/project-workspace, through the module's barrel, as the Cerberus tab's count
- * pill on the strip — the same number the tab's headline says.
+ * pill on the strip and the Cerberus glyph's badge on the views rail — the same number the tab's headline says.
  */
 export function useCerberusNeeds(): number {
   return useCerberus().overview?.counts.needsYou ?? 0;

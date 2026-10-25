@@ -18,15 +18,15 @@ export const ACCOUNT_PANEL_ID = 'account-panel';
 type AccountPopoverProps = {
   accounts: ClaudeAccounts | null;
   usage: ClaudeUsage | null;
-  /** The DeepSeek reading, held by the row. Not part of `usage`: a different account, from a route of its own. */
+  /** The DeepSeek reading, held by the rail button. Not part of `usage`: a different account, from a route of its own. */
   balance: DeepseekBalance | null;
-  /** The Jev estimate, held by the row for the same reason. */
+  /** The Jev estimate, held by the rail button for the same reason. */
   jevBalance: JevBalance | null;
   busy: boolean;
   error: string | null;
   /** Opens the provider's login window — the panel's one sign-in door, for the same account or another. */
   onRelogin: () => void;
-  /** The door's three acts, held by the row's `useClaudeAccounts`: use this account, turn the rule on or off, remove one. */
+  /** The door's three acts, held by the rail button's `useClaudeAccounts`: use this account, turn the rule on or off, remove one. */
   onUse: (slug: string) => void;
   onSetAuto: (on: boolean) => void;
   onRemove: (slug: string) => void;
@@ -36,8 +36,8 @@ type AccountPopoverProps = {
 
 /**
  * The account panel: what the account in use has spent, one row per account the door holds, and
- * the door's sign-in window. Used by the accounts module's AccountFooterRow, which anchors it above
- * the sidebar footer and owns the open state.
+ * the door's sign-in window. Used by the accounts module's AccountRailButton, which owns the open state and
+ * stands it beside the views rail, on the foot of the rail's account button.
  *
  * It composes Card rather than adopting the library's Menu: a Menu is a list of labelled choices,
  * and this panel carries meters, avatars and buttons. Codex is deliberately absent — these are the
@@ -66,15 +66,16 @@ export function AccountPopover({
   const metersUsage = accountInUseUsage(usage, accounts, now);
 
   return (
-    // The ceiling has to fit the space ABOVE the row this hangs from, not the viewport: the
-    // panel grows upward, so a cap taller than that space pushes its top edge off screen and
-    // the first meter loses its label. 70vh sits inside it at every height the app supports,
-    // and the panel scrolls from a top edge the reader can see.
+    // Beside the rail, level with the foot of the button it hangs from, and growing upward from there. The rail is
+    // 48px wide and the panel 17.5rem, capped at the viewport less the rail's width and a margin so a phone's
+    // narrow screen keeps its right edge. The height cap is the viewport less the button's own distance from the
+    // foot and the safe-area insets: a cap taller than the room above the button pushes the top edge off screen and
+    // the first meter loses its label. Past the cap the panel scrolls from a top edge the reader can see.
     <Card
       id={ACCOUNT_PANEL_ID}
       role="dialog"
       aria-label="Account and usage"
-      className="absolute bottom-full left-0 right-0 z-50 mb-2 flex max-h-[70vh] flex-col gap-3 overflow-y-auto p-3"
+      className="absolute bottom-0 left-full z-50 ml-2 flex max-h-[calc(100dvh-1rem-env(safe-area-inset-top,0px)-env(safe-area-inset-bottom,0px))] w-[17.5rem] max-w-[calc(100vw-4rem)] flex-col gap-3 overflow-y-auto p-3"
     >
       {unknown ? <p className="text-xs leading-relaxed text-muted-foreground">{UNREACHABLE_LINE}</p> : <UsageMeters usage={metersUsage} />}
 

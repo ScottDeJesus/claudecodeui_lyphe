@@ -81,9 +81,15 @@ export default {
         // `accent-ink` exists because `primary` is the accent FILL and reads at 2.55:1 as text.
         // A green word is `text-accent-ink`; a green shape is `text-primary`. Getting that pair
         // the wrong way round is how the sidebar's most important label went under AA.
+        //
+        // `accent-soft` and its hover are the soft green ground a lit control stands on — the views
+        // rail's lit glyph, `text-accent-ink` on `bg-accent-soft`. They need names of their own
+        // because `accent` above is the shadcn legacy, mapped to `--surface2`.
         "ink-faint": "color-mix(in srgb, var(--ink-faint) calc(<alpha-value> * 100%), transparent)",
         "warn-ink": "color-mix(in srgb, var(--warn-ink) calc(<alpha-value> * 100%), transparent)",
         "accent-ink": "color-mix(in srgb, var(--accent-ink) calc(<alpha-value> * 100%), transparent)",
+        "accent-soft": "color-mix(in srgb, var(--accent-soft) calc(<alpha-value> * 100%), transparent)",
+        "accent-soft-hover": "color-mix(in srgb, var(--accent-soft-hover) calc(<alpha-value> * 100%), transparent)",
         // The tone swap's own properties (tokens.css, the `[data-tone]` rules), named. A container
         // that sets `data-tone` hands `--tone-soft`, `--tone-ink` and `--tone-dot` to everything inside
         // it, and these three let that content spell them as Tailwind names: a status mark is

@@ -6,7 +6,7 @@ import { FileTree, useFileTreeUpload } from '@/modules/file-tree';
 import { Button, ConfirmDialog } from '@/shared/ui';
 import { useToast } from '@/shared/context/ToastContext';
 import { cn, downloadBlobAsFile, formatBytes } from '@/shared/utils';
-import type { Project, UploadedFileRecord } from '@/shared/types';
+import type { FileOpenRequest, FilesRoot, UploadedFileRecord } from '@/shared/types';
 import { getEditSessionStatus, useEditSessionStatus } from '@/modules/file-editor';
 import { DirectoryListing } from '@/modules/file-manager/DirectoryListing';
 import { FileBreadcrumb } from '@/modules/file-manager/FileBreadcrumb';
@@ -14,16 +14,18 @@ import { PreviewPane } from '@/modules/file-manager/PreviewPane';
 import { useEditGuard } from '@/modules/file-manager/hooks/useEditGuard';
 import { useFileManagerState } from '@/modules/file-manager/hooks/useFileManagerState';
 
-/** What the file manager needs; rendered by the project-workspace module as the Files tab. */
+/** What the file manager needs; rendered by this module's FilesView, once per root on the strip. */
 type FileManagerProps = {
-  selectedProject: Project;
+  /** The root this manager browses. Every path below is measured against its `fullPath`, and every file route is asked with its `projectId`. */
+  root: FilesRoot;
   /**
-   * A path somewhere else in the app asked to open, and the line it asked for when it named one. It
+   * A path somewhere else in the app asked to open — absolute, and held by this root, which the view
+   * has already checked — and the line it asked for when it named one. It
    * is a fresh wrapper every time, and the owner retires it once `onRequestHandled` fires — which is
    * what makes asking for the SAME path twice a second request rather than a no-op. `nonce` carries
    * that same "this is a new ask" downward, where the wrapper's identity does not reach.
    */
-  openRequest: { path: string; line?: number; nonce: number } | null;
+  openRequest: FileOpenRequest | null;
   /** Called once the request above has been acted on, so the owner can retire it. */
   onRequestHandled: () => void;
   /** The one "open a path" capability, so the tree reaches the workspace the way chat and git do. */
@@ -67,23 +69,23 @@ function readDroppedFiles(transfer: DataTransfer): { files: File[]; folders: num
 }
 
 /**
- * The Files tab: the project tree, the directory in view, and one file's preview.
+ * One root's files: its tree, the directory in view, and one file's preview.
  *
- * Exported through the file-manager barrel; the project-workspace module renders it as the Files
- * tab and owns the `openRequest` that chat, git and the palette all raise.
+ * Used inside this module by FilesView, which keys it on the root and hands it only the open
+ * requests that root holds; the project-workspace module owns the request that chat, git and the
+ * palette all raise.
  *
  * The three panes sit side by side and WRAP rather than switch on a breakpoint, so a narrow
  * window stacks them without a second layout to keep in step. Every toast raised here is
  * advisory — the listing that refreshes underneath it is the record of what happened.
  */
-export function FileManager({ selectedProject, openRequest, onRequestHandled, onFileOpen }: FileManagerProps) {
+export function FileManager({ root, openRequest, onRequestHandled, onFileOpen }: FileManagerProps) {
   const push = useToast();
-  const projectId = selectedProject.projectId;
-  const projectName = selectedProject.displayName || projectId;
+  const projectId = root.projectId;
+  const projectName = root.displayName || projectId;
 
-  // `path` is the working directory the app opened the project at; `fullPath` is what the sidebar
-  // falls back to when it is absent. Either one is the root every path below is measured against,
-  // and an empty root simply leaves absolute paths absolute — which the server accepts.
+  // `root.fullPath` is the root every path below is measured against; a path outside it stays
+  // absolute, which the server accepts or refuses.
   const {
     currentDir,
     listing,
@@ -99,7 +101,7 @@ export function FileManager({ selectedProject, openRequest, onRequestHandled, on
     up,
     select,
     refresh,
-  } = useFileManagerState(projectId, selectedProject.path ?? selectedProject.fullPath ?? '');
+  } = useFileManagerState(projectId, root.fullPath);
 
   // What the in-flight upload should be called if it fails. The upload hook reports a failure as
   // a message with no file in it, and "was not uploaded" needs to name something.
@@ -157,7 +159,7 @@ export function FileManager({ selectedProject, openRequest, onRequestHandled, on
   }, [push]);
 
   const { uploadFiles, uploadProgress } = useFileTreeUpload({
-    selectedProject,
+    selectedProject: root,
     onRefresh: refresh,
     showToast: reportUploadFailure,
   });
@@ -302,7 +304,7 @@ export function FileManager({ selectedProject, openRequest, onRequestHandled, on
           at every width — the tree has no horizontal scroll to reach it with. Narrowing this pane
           again means re-measuring the controls, not the grid. */}
       <section aria-label="Project files" className={cn('flex h-[210px] flex-none flex-col overflow-hidden rounded-xl border border-border bg-card md:h-auto md:w-[320px]', editing && 'max-md:hidden')}>
-        <FileTree selectedProject={selectedProject} onFileOpen={onFileOpen} />
+        <FileTree selectedProject={root} onFileOpen={onFileOpen} />
       </section>
 
       <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-xl border border-border bg-card">

@@ -1,16 +1,20 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { NoteDraftsContext, NotesContext, type NoteDraftsValue, type NotesValue } from '@/modules/notes/context/NotesContext';
-import { api, refusalSentence } from '@/shared/api';
+import {
+  COMPOSER_TARGET,
+  NoteDraftsContext,
+  NotesContext,
+  type NoteDraftsValue,
+  type NotesValue,
+} from '@/modules/notes/context/NotesContext';
+import { useNoteSaver } from '@/modules/notes/hooks/useNoteSaver';
+import { api, attemptWrite } from '@/shared/api';
 import { useToast } from '@/shared/context/ToastContext';
 import { useWebSocket } from '@/shared/context/WebSocketContext';
-import type { Note, NoteInput } from '@/shared/types';
+import type { Note, NoteInput, NoteSaveStatus } from '@/shared/types';
 
-/** The blank card's target in the write map below. A note id is a UUID, so the word can never be one. */
-const COMPOSER_TARGET = 'composer';
-
-/** Nothing typed: the blank card's draft on mount, and again once an add has landed and been re-read. */
+/** Nothing typed: the blank card's draft on mount, and again once the card has let go of the note it became. */
 const BLANK_DRAFT: NoteInput = { title: '', description: '' };
 
 /**
@@ -25,15 +29,7 @@ function withoutKey<T>(record: Record<string, T>, key: string): Record<string, T
 }
 
 /**
- * True when two drafts are the same two strings: the test that tells the draft a write SENT from a
- * newer one typed while that write was in flight.
- */
-function sameDraft(a: NoteInput, b: NoteInput): boolean {
-  return a.title === b.title && a.description === b.description;
-}
-
-/**
- * THE NOTES LIST'S ONE READER AND WRITER, AND THE DRAFTS THAT OUTLIVE THE PANE THEY WERE TYPED IN.
+ * THE NOTES LIST'S ONE READER, AND THE DRAFTS THAT OUTLIVE THE PANE THEY WERE TYPED IN.
  *
  * Mounted once by App, inside the auth gate and below WebSocketProvider: `api.notes` is an
  * authenticated route and must never be asked against the login screen, and the two frames that
@@ -43,24 +39,41 @@ function sameDraft(a: NoteInput, b: NoteInput): boolean {
  * over the same contexts, so a note added in either home is in both, a draft typed in one is still
  * there when the other is opened, and neither can hold a copy of the list the other cannot see.
  *
- * THE READ IS THE LIST. A write answers the note it wrote and nothing reads that body: the list on
- * screen comes from the read that follows the write — which is also why a write's busy mark stays
- * up until that read has returned, and why the draft a write sent is dropped only then — so a card
- * never shows the text it just replaced, and a newer draft typed during the flight is never eaten.
+ * NOTHING TYPED IS EVER LOST, AND NOTHING IS PRESSED TO SAVE. Every keystroke into the blank card or
+ * an open note is kept here as a draft and handed to the autosave (`useNoteSaver`), which writes it
+ * about a second after typing stops and at once when the card is left; this provider owns the state
+ * the autosave reports into — the quiet `Saving…` / `Saved` lines, and the note the blank card became.
+ *
+ * THE BLANK CARD BECOMES THE NOTE. Its first save is a create, and the answer names the note
+ * (`composerNoteId`): from then on the very same card — text, focus and caret untouched — is that
+ * note's, and the list leaves the note out of its wall until the card lets go of it
+ * (`finishComposer`), when a fresh blank card takes the place. While the create's answer is still on
+ * its way the card does not know the id yet, so the wall hides every note that was not there when the
+ * create left (`createBaseline`) — the server's own frame can bring the new note back before the answer.
+ *
+ * THE READ IS THE LIST. A write answers the note it wrote and nothing draws from that body: the list on
+ * screen comes from the read that follows the write, and an open card draws its draft, never the
+ * server's answer — so a card never shows the text it just replaced, a landed save or a re-read
+ * cannot move the caret or eat a letter, and a card is closed only after the read that carries its
+ * text has returned.
  *
  * A FRAME IS A HINT, NOT A PICTURE. `notes_changed` names no note and no account, so the answer to
  * it is always "read this account's own list again" — and reads overlap (a frame's, a write's, the
  * mount's), so each takes a ticket and answers are published in TICKET order, never arrival order.
+ * A read never touches a card with typing in it: that card is neither overwritten nor closed. A card
+ * with NOTHING typed since it opened or last saved follows the server instead (`rebaseCleanCards`): a
+ * note another device saved shows its new text, so the next keystroke here does not write the old one
+ * back over it.
  */
 export function NotesProvider({ children }: { children: ReactNode }) {
   const { t } = useTranslation();
   const toast = useToast();
   const { subscribe } = useWebSocket();
 
-  // The translator of the LATEST render, read through a ref: the six verbs below keep one identity
+  // The translator of the LATEST render, read through a ref: the verbs below keep one identity
   // for the app's life (the list memo, and every consumer memoising on these verbs, depends on it),
   // and a verb closing over `t` directly would be rebuilt on every language switch. Read at the
-  // press, this speaks whatever language the app is in then.
+  // failure, this speaks whatever language the app is in then.
   const tRef = useRef(t);
   useLayoutEffect(() => {
     tRef.current = t;
@@ -76,31 +89,42 @@ export function NotesProvider({ children }: { children: ReactNode }) {
   // list on screen, so this never turns true over one.
   const [unreachable, setUnreachable] = useState(false);
 
-  // What is typed into the blank card and not yet added. Essential: the draft outlives the pane it
-  // was typed in — the tab and the gutter widget are two homes for one card — so it cannot live in
-  // the form.
+  // What is typed into the blank card. Essential: the draft outlives the pane it was typed in — the
+  // tab and the gutter widget are two homes for one card — so it cannot live in the form. It is
+  // never replaced by what the server answered: the card keeps the typist's own text.
   const [composer, setComposer] = useState<NoteInput>(BLANK_DRAFT);
 
-  // What is typed over a note and not yet saved, by note id. Essential: a card is in edit mode
-  // exactly while it has an entry here, so the draft survives a re-render, a scroll and a switch of
-  // home, and only a save, a cancel or a landed write takes the entry away.
+  // The note the blank card has become, or `null`. Essential: it is what keeps that note out of the
+  // wall while its card is still being typed in, and what shows the card's Done. Set when the first
+  // save lands, cleared when the card lets go of the note.
+  const [composerNoteId, setComposerNoteId] = useState<string | null>(null);
+
+  // The ids the wall held when the blank card's create left, while that create is in the air; `null`
+  // otherwise. Essential: the card learns its note's id only from the create's answer, and the server's
+  // frame can bring the note into the list first — this is what lets the wall hide it until then.
+  const [createBaseline, setCreateBaseline] = useState<ReadonlySet<string> | null>(null);
+
+  // What is typed over a note, by note id. Essential: a card is in edit mode exactly while it has an
+  // entry here, so the draft survives a re-render, a scroll and a switch of home, and only Done (or a
+  // re-read that finds the note gone) takes the entry away.
   const [edits, setEdits] = useState<Record<string, NoteInput>>({});
 
-  // The blank card's add is in flight. Essential: the card reads `busy` from here, from the press
-  // until the re-read that follows the write has returned.
-  const [adding, setAdding] = useState(false);
-
-  // The notes with a save or a delete in flight. Essential: each card's own buttons carry their own
-  // busy state, so one note's write never marks another's.
+  // The notes with a delete in flight. Essential: the delete dialog's own button carries the busy
+  // state, so one note's delete never marks another's.
   const [writing, setWriting] = useState<Record<string, true>>({});
+
+  // Each card's quiet saving line, by `COMPOSER_TARGET` or note id. Essential: the autosave runs
+  // outside React and this is the only way its `Saving…` / `Saved` / title-needed reaches a card;
+  // a card with no entry says nothing.
+  const [saveStates, setSaveStates] = useState<Record<string, NoteSaveStatus>>({});
 
   // Mount flag: a read or a write that lands after this provider is gone must not set state or
   // raise a toast about a list nobody is looking at any more.
   const mountedRef = useRef(true);
 
-  // The list as the last read left it, mirrored so `refresh` can judge an answer — and drop the
-  // edits of notes it no longer holds — without depending on the state it publishes: a `refresh`
-  // rebuilt on every published list would re-subscribe the socket below.
+  // The list as the last read left it, mirrored so `refresh` can judge an answer without depending
+  // on the state it publishes: a `refresh` rebuilt on every published list would re-subscribe the
+  // socket below.
   const notesRef = useRef<Note[] | null>(null);
 
   // Which read this is. Reads overlap — a frame's, a write's, the mount's — so each takes a ticket.
@@ -110,19 +134,26 @@ export function NotesProvider({ children }: { children: ReactNode }) {
   // the pre-write list back on screen.
   const newestAnswerRef = useRef(0);
 
-  // The write in flight per target — the blank card, or a note's id. A second press on a target
-  // that is already writing answers this promise and starts no second write; the entry leaves when
-  // the promise settles, which is after the re-read that follows a write that landed.
-  const writesInFlightRef = useRef(new Map<string, Promise<boolean>>());
+  // `rebaseCleanCards` of the latest render, so `apply` (built before the saver exists) can call it. Only
+  // read inside `apply`, never while rendering.
+  const rebaseRef = useRef<(next: Note[]) => void>(() => {});
+
+  // The delete in flight per note id. A second press on a note that is already being deleted answers
+  // this promise and starts no second delete; the entry leaves when the promise settles, which is
+  // after the re-read that follows a delete that landed.
+  const deletesInFlightRef = useRef(new Map<string, Promise<boolean>>());
 
   /**
    * A good answer, applied wholesale: the list IS the answer, so it replaces what was held rather
    * than merging with it. Any edit draft whose note is absent from it has nothing left to edit —
    * the card it belonged to is gone, deleted here or in another tab — so the entry goes with it.
+   * A card with typing in it, and the blank card, are left exactly as typed; a card with none follows
+   * the list (`rebaseCleanCards`).
    */
   const apply = useCallback((next: Note[]) => {
     if (!mountedRef.current) return;
     notesRef.current = next;
+    rebaseRef.current(next);
     setNotes(next);
     setUnreachable(false);
     setEdits((live) => {
@@ -165,122 +196,160 @@ export function NotesProvider({ children }: { children: ReactNode }) {
   }, [apply]);
 
   /**
-   * ONE WRITE PER TARGET. The promise is on the map before a second press can see it, and `mark`
-   * puts the busy flag up synchronously with the press — the button reads `busy` on the next
-   * render — so two presses cannot become two writes.
+   * The one place a refused write becomes a sentence: a warning toast titled in the app's language,
+   * with the SERVER'S OWN WORDS under it when it sent any. Raised only while this provider is still
+   * mounted — a write that failed after the app moved on is nobody's to read.
    */
-  const writeOnce = useCallback((
-    target: string,
-    mark: () => void,
-    write: () => Promise<boolean>,
-  ): Promise<boolean> => {
-    const held = writesInFlightRef.current.get(target);
-    if (held) return held;
-    mark();
-    const promise = write().finally(() => {
-      writesInFlightRef.current.delete(target);
+  const raiseFailure = useCallback((titleKey: string, sentence: string | null) => {
+    if (!mountedRef.current) return;
+    toast({
+      tone: 'warn',
+      title: tRef.current(titleKey),
+      ...(sentence === null ? {} : { message: sentence }),
     });
-    writesInFlightRef.current.set(target, promise);
-    return promise;
-  }, []);
-
-  /**
-   * One write, and the one place a refused write becomes a sentence. The verdict is `response.ok`
-   * alone — the note in the body is not read, because the list comes from the re-read and not from
-   * this answer — and a refusal's body is read for the SERVER'S OWN WORDS, which go under the
-   * toast when it carried any. A write that landed says nothing here.
-   */
-  const sendNoteWrite = useCallback(async (request: () => Promise<Response>, titleKey: string): Promise<boolean> => {
-    let sentence: string | null = null;
-    try {
-      const response = await request();
-      if (response.ok) return true;
-      sentence = await refusalSentence(response);
-    } catch {
-      // No answer at all — this app's own network — so there is no server sentence to carry; the
-      // toast still says the write did not land.
-    }
-    // Raised only while this provider is still mounted: a write that failed after the app moved on
-    // is nobody's to read.
-    if (mountedRef.current) {
-      toast({
-        tone: 'warn',
-        title: tRef.current(titleKey),
-        ...(sentence === null ? {} : { message: sentence }),
-      });
-    }
-    return false;
   }, [toast]);
 
-  /** The blank card's add. The draft it sent is emptied only once its re-read has returned —
-   *  whichever way that went — so the card never shows, not even for one frame, the text it just
-   *  added; a draft typed while the write was in flight is newer than the write and stands. */
-  const add = useCallback((draft: NoteInput): Promise<boolean> => writeOnce(
-    COMPOSER_TARGET,
-    () => setAdding(true),
-    async () => {
-      const landed = await sendNoteWrite(() => api.notes.create(draft), 'notes.toast.saveFailed');
-      if (!landed) {
-        setAdding(false);
-        return false;
-      }
-      await refresh();
-      // Only the draft this write SENT is cleared, and only while the composer still holds it
-      // verbatim: typing that began while the write was in flight is newer than the write and must
-      // not be eaten. An untouched composer is exactly the draft that was sent, so the card still
-      // never shows the text it just added.
-      setComposer((live) => (sameDraft(live, draft) ? BLANK_DRAFT : live));
-      setAdding(false);
-      return true;
-    },
-  ), [writeOnce, sendNoteWrite, refresh]);
+  // The saver's three reports. None depends on a draft, so the writer's verbs keep one identity.
+  const setStatus = useCallback((target: string, status: NoteSaveStatus | null) => {
+    if (!mountedRef.current) return;
+    setSaveStates((live) => {
+      if (status === null) return withoutKey(live, target);
+      return live[target] === status ? live : { ...live, [target]: status };
+    });
+  }, []);
 
-  /** A note's save. The edit draft it sent is dropped only once its re-read has returned, so the
-   *  form never falls back to the old text between the write and the list that replaces it; a draft
-   *  typed during the flight is newer than the write and leaves the card in edit mode holding it. */
-  const saveEdit = useCallback((id: string, draft: NoteInput): Promise<boolean> => writeOnce(
-    id,
-    () => setWriting((live) => ({ ...live, [id]: true })),
-    async () => {
-      const landed = await sendNoteWrite(() => api.notes.update(id, draft), 'notes.toast.saveFailed');
-      if (!landed) {
-        setWriting((live) => withoutKey(live, id));
-        return false;
-      }
-      await refresh();
-      // The blank card's rule, for a note's own entry: dropped only while it still holds the draft
-      // this write sent, never over a newer one typed during the flight.
+  const onBound = useCallback((target: string, noteId: string | null) => {
+    if (mountedRef.current && target === COMPOSER_TARGET) setComposerNoteId(noteId);
+  }, []);
+
+  // A create leaves: remember which notes the wall holds, so the new one is not drawn beside the card
+  // that is making it. The create ends (landed, failed or lost): the memory goes — a landed one has
+  // `composerNoteId` by then, in the same batch.
+  const onCreating = useCallback((target: string, creating: boolean) => {
+    if (!mountedRef.current || target !== COMPOSER_TARGET) return;
+    setCreateBaseline(creating ? new Set((notesRef.current ?? []).map((note) => note.id)) : null);
+  }, []);
+
+  // One toast per run of failures: the saver stays quiet until a save has landed again.
+  const onFailure = useCallback(
+    (sentence: string | null) => raiseFailure('notes.toast.saveFailed', sentence),
+    [raiseFailure],
+  );
+
+  const saver = useNoteSaver({ setStatus, onBound, onCreating, refresh, onFailure });
+
+  /**
+   * A re-read has landed: every card with nothing typed in it takes the text of a note another writer
+   * saved since (`saver.rebase`), whether it is an open note's card or the blank card's own note.
+   * The saver decides; this only puts the answers where the cards draw from.
+   */
+  const rebaseCleanCards = useCallback((next: Note[]) => {
+    const rebased: Record<string, NoteInput> = {};
+    let composerText: NoteInput | null = null;
+    for (const note of next) {
+      const text = saver.rebase(note.id, note);
+      if (text !== null) rebased[note.id] = text;
+      const typed = saver.rebase(COMPOSER_TARGET, note);
+      if (typed !== null) composerText = typed;
+    }
+    if (Object.keys(rebased).length > 0) {
       setEdits((live) => {
-        const entry = live[id];
-        return entry !== undefined && sameDraft(entry, draft) ? withoutKey(live, id) : live;
+        const out = { ...live };
+        for (const [id, text] of Object.entries(rebased)) if (id in out) out[id] = text;
+        return out;
       });
-      setWriting((live) => withoutKey(live, id));
-      return true;
-    },
-  ), [writeOnce, sendNoteWrite, refresh]);
+    }
+    if (composerText !== null) setComposer(composerText);
+  }, [saver]);
+  useLayoutEffect(() => {
+    rebaseRef.current = rebaseCleanCards;
+  }, [rebaseCleanCards]);
 
-  /** A note's delete. Its edit draft — if one is somehow open — goes with it, also once the re-read
-   *  has returned: the card must not draw a form over a note the list no longer holds. */
-  const remove = useCallback((id: string): Promise<boolean> => writeOnce(
-    id,
-    () => setWriting((live) => ({ ...live, [id]: true })),
-    async () => {
-      const landed = await sendNoteWrite(() => api.notes.remove(id), 'notes.toast.deleteFailed');
-      if (!landed) {
+  /** The blank card's typing: kept as the draft, and handed to the autosave. */
+  const changeComposer = useCallback((draft: NoteInput) => {
+    setComposer(draft);
+    saver.type(COMPOSER_TARGET, draft);
+  }, [saver]);
+
+  /** Opens a note for editing over its text as it stands; the autosave holds that text, and the note's `updatedAt`, as what the server has. */
+  const openEdit = useCallback((note: Note) => {
+    const text: NoteInput = { title: note.title, description: note.description };
+    saver.open(note.id, note.id, text, note.updatedAt);
+    setEdits((live) => ({ ...live, [note.id]: text }));
+  }, [saver]);
+
+  /** An open note's typing. A keystroke that arrives after the card closed finds no entry and is dropped. */
+  const changeEdit = useCallback((id: string, draft: NoteInput) => {
+    setEdits((live) => (id in live ? { ...live, [id]: draft } : live));
+    saver.type(id, draft);
+  }, [saver]);
+
+  const saveComposerNow = useCallback(async () => {
+    await saver.flush(COMPOSER_TARGET);
+  }, [saver]);
+
+  const saveEditNow = useCallback(async (id: string) => {
+    await saver.flush(id);
+  }, [saver]);
+
+  const finishComposer = useCallback(async (): Promise<boolean> => {
+    const outcome = await saver.flush(COMPOSER_TARGET);
+    // Let go only of a note that exists and whose newest text is saved: nothing typed, no title, a save
+    // that did not land, and typing that began during the save all leave the card exactly as it is.
+    if (outcome !== 'saved' || !saver.isBound(COMPOSER_TARGET) || !saver.isClean(COMPOSER_TARGET)) return false;
+    saver.close(COMPOSER_TARGET);
+    setComposer(BLANK_DRAFT);
+    setComposerNoteId(null);
+    setSaveStates((live) => withoutKey(live, COMPOSER_TARGET));
+    return true;
+  }, [saver]);
+
+  const finishEdit = useCallback(async (id: string): Promise<boolean> => {
+    const outcome = await saver.flush(id);
+    // Closed only when everything typed is saved. A save that did not land, typing that began during
+    // it, and a title that draws as nothing (`blocked`: the last saved version stands and nothing under
+    // the empty title can be sent) all leave the card open with what was typed, as the blank card does.
+    if (outcome !== 'saved' || !saver.isClean(id)) return false;
+    saver.close(id);
+    setEdits((live) => withoutKey(live, id));
+    setSaveStates((live) => withoutKey(live, id));
+    return true;
+  }, [saver]);
+
+  /**
+   * A note's delete: one at a time per note, with its busy mark up from the press until the re-read
+   * that follows has returned. The card's autosave is ended first, so a write never chases a note
+   * that is going. A failed delete raises the toast and leaves the note and its dialog alone.
+   */
+  const remove = useCallback((id: string): Promise<boolean> => {
+    const held = deletesInFlightRef.current.get(id);
+    if (held) return held;
+    setWriting((live) => ({ ...live, [id]: true }));
+    saver.close(id);
+    const promise = (async () => {
+      const attempt = await attemptWrite(() => api.notes.remove(id));
+      if (!attempt.landed) {
+        raiseFailure('notes.toast.deleteFailed', attempt.sentence);
         setWriting((live) => withoutKey(live, id));
         return false;
       }
       await refresh();
       setEdits((live) => withoutKey(live, id));
+      setSaveStates((live) => withoutKey(live, id));
       setWriting((live) => withoutKey(live, id));
       return true;
-    },
-  ), [writeOnce, sendNoteWrite, refresh]);
+    })().finally(() => {
+      deletesInFlightRef.current.delete(id);
+    });
+    deletesInFlightRef.current.set(id, promise);
+    return promise;
+  }, [saver, raiseFailure, refresh]);
 
-  /** `null` leaves edit mode and drops what was typed; anything else stores the draft as it is. */
-  const setEdit = useCallback((id: string, draft: NoteInput | null) => {
-    setEdits((live) => (draft === null ? withoutKey(live, id) : { ...live, [id]: draft }));
-  }, []);
+  // A lane lives exactly while its card is open: when an entry leaves `edits` — Done, a delete, or a
+  // re-read that found the note gone — its writer ends with it.
+  useEffect(() => {
+    saver.retain(Object.keys(edits));
+  }, [saver, edits]);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -296,26 +365,49 @@ export function NotesProvider({ children }: { children: ReactNode }) {
     };
   }, [refresh, subscribe]);
 
-  // Anything that reads the list re-draws when a read lands. The six verbs keep one identity, so in
+  // THE PAGE GOING AWAY. A phone switching apps hides the page and a closing tab or a navigation hides
+  // it too; either way whatever is typed and unsaved is sent now, with `keepalive`, so the request
+  // outlives the page — including text typed while an earlier save was still in the air
+  // (`saver.leave`). `pagehide` is the one that fires on a real unload; `visibilitychange` is the one a
+  // phone sends when it backgrounds the page and may never unload it.
+  useEffect(() => {
+    const flushWhenHidden = () => {
+      if (document.visibilityState === 'hidden') saver.leave();
+    };
+    const flushWhenLeaving = () => saver.leave();
+    document.addEventListener('visibilitychange', flushWhenHidden);
+    window.addEventListener('pagehide', flushWhenLeaving);
+    return () => {
+      document.removeEventListener('visibilitychange', flushWhenHidden);
+      window.removeEventListener('pagehide', flushWhenLeaving);
+    };
+  }, [saver]);
+
+  // Anything that reads the list re-draws when a read lands. The verbs keep one identity, so in
   // practice only `notes` and `unreachable` ever make a new value here.
   const value = useMemo<NotesValue>(() => ({
     notes,
     unreachable,
     refresh,
-    setComposer,
-    setEdit,
-    add,
-    saveEdit,
+    changeComposer,
+    openEdit,
+    changeEdit,
+    saveComposerNow,
+    saveEditNow,
+    finishComposer,
+    finishEdit,
     remove,
-  }), [notes, unreachable, refresh, setComposer, setEdit, add, saveEdit, remove]);
+  }), [notes, unreachable, refresh, changeComposer, openEdit, changeEdit, saveComposerNow, saveEditNow, finishComposer, finishEdit, remove]);
 
   // A keystroke re-draws the one form that holds the draft, and nothing behind it.
   const draftsValue = useMemo<NoteDraftsValue>(() => ({
     composer,
+    composerNoteId,
+    createBaseline,
     edits,
-    adding,
     writing,
-  }), [composer, edits, adding, writing]);
+    saveStates,
+  }), [composer, composerNoteId, createBaseline, edits, writing, saveStates]);
 
   return (
     <NotesContext.Provider value={value}>

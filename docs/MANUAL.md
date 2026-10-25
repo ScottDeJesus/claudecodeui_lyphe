@@ -34,12 +34,11 @@ and a meter that fails cannot take the money down with it. The two also fail dif
 accounts picture is read off local files and the usage figures from Anthropic through a cache, while
 this route goes out to api.deepseek.com for every reading the server takes.
 
-**One row, one poller.** `SidebarFooter` renders `AccountFooterRow` above Settings and
-`SidebarCollapsed` renders the same component as the rail's avatar, and never both at once. That
-mutual exclusion is the whole design: all three hooks live inside the row, so the app holds exactly
-one poller per reading no matter how often the panel is opened or the sidebar collapsed. The row hands its ONE balance reading to both registers it draws, so the line under the
-account name and the block in the panel cannot disagree. The usage figures have one conversion too:
-the row's glance bars and the panel's meters both call `accountInUseUsage`.
+**One button, one poller.** The project-workspace module's `WorkspaceRail` renders `AccountRailButton` at
+the rail's foot, the one instance in the app. The rail stands whether the chat list shows or is collapsed
+(collapsing hides the list column only), so the button never remounts on a collapse: all the hooks live
+inside it, so the app holds exactly one poller per reading no matter how often the panel is opened or the
+list collapsed.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts
 
@@ -332,7 +331,7 @@ section: api-tab/001 What the tab holds
 | Tab entry | `WorkspaceTabs.tsx` — `API_TAB: BuiltInTab = { id: 'api', labelKey: 'tabs.api', icon: Coins }`, in `houseTabs` |
 | Panel | `src/modules/api-tab/ApiPanel.tsx`, re-exported lazily by `src/modules/api-tab/index.ts`; rendered for `activeTab === 'api'` in `WorkspaceMain.tsx` |
 | Views | `JevPanel` (`@/modules/jev`) and `DeepseekUsagePanel` (`@/modules/deepseek-spend`), each imported through its module's `index.ts` |
-| Command palette | `CommandPalette.tsx` `{ id: 'api', label: 'Go to API', … }`; `ProjectCommandPalette.tsx` lists `'api'` among its `tabs` |
+| Command palette | `Go to API`: the `api` entry of `HOUSE_VIEWS` in `src/modules/project-workspace/hooks/useWorkspaceViews.ts`, last of the house run; `ProjectCommandPalette.tsx` turns every view into a Navigate row (MAN-8999) |
 
 - Sub-tab ids are `jev` and `deepseek`; their labels come from the `api.subtabs` map in
   `src/modules/i18n/locales/en/common.json` — `jev` reads "Jev", `deepseek` reads "DeepSeek".
@@ -488,8 +487,8 @@ section: applications/000
 
 Eight routes under `/api/apps`, behind `authenticateToken` on the MOUNT (`app.use('/api/apps', authenticateToken, createAppsModule())` in `server/index.ts` — no
 route file imports the guard), wired in `createAppsModule()`. What they carry is a list of the
-operator's own applications; what the client draws from it is a small round button in the sidebar's
-logo row, a radial of its acts that can run that fans out from it, a drawer of rows, and one or two framed panes over the main region. The client's half is
+operator's own applications; what the client draws from it is a small round button docked at the top of the sidebar's
+views rail, a radial of its acts that can run that fans out from it, a drawer of rows, and one or two framed panes over the main region. The client's half is
 one group in `src/shared/api.ts` (`api.apps`, built on the same `get`/`post`/`patch`/`del` helpers the rest
 of that file uses, with the bearer token attached by `authenticatedFetch` — no caller passes one).
 
@@ -744,28 +743,39 @@ One control, and it is the reader's way in and out of every pane.
   circle inside a 1px accent rim. The catch is a transparent `::before` on `.vv-fab`,
   so a press up to 22px from the centre starts a drag while `getBoundingClientRect()` still answers
   28px, and every rect the drag, the clamp and the dock snap read is the circle the reader sees.
-- **It sits docked to the left of the wordmark**, in the sidebar's logo row. The rail holds 30px
-  icon buttons beside a 26px serif wordmark in 328px of width, so the button stays the smallest
-  thing in the row, its catch reaches exactly the `gap-2` before the wordmark, and the wordmark
-  still renders untruncated at a 320px viewport, which the probe checks.
-- **The dock is a slot, not an import.** `ProjectSidebarRegion.tsx` passes `leading={<AppSwitcherDock />}`
-  to `Sidebar` at both of its call sites (the desktop branch and the mobile drawer branch), and
-  `SidebarHeader` renders it as the FIRST child of the logo row — a sibling of the anchor and the
-  `LogoBlock`, never inside them, because two of `LogoBlock`'s call sites sit inside an `<a>` and a
-  button inside an anchor is invalid HTML that navigates away instead of answering the press. The
-  sidebar module never imports the switcher, exactly as it never imports the tabs.
-- **Exactly one dock is on the page**, gated the way `tabs` is (`{leading && !isCompact}` in the
-  desktop header, `{leading && isCompact}` in the mobile one). The header draws both blocks and
-  hides one with CSS; a slot placed in both would leave two docks reporting one rect.
+- **It sits docked at the top of the sidebar's views rail**: the dock's 28px box is centred in the rail's
+  top cell (40px, 44px below md), about 24px in from the rail's left edge and 28px down. The button stays
+  the smallest thing in the rail, and its 44px catch fits the rail's 48px width, so it never reaches the
+  chat list beside it.
+- **The dock is a slot, not an import.** project-workspace's `WorkspaceRail` mounts `<AppSwitcherDock />` in
+  its top cell, and `ProjectSidebarRegion.tsx` hands the rail to `Sidebar` through its `rail` slot, once
+  for both layouts (the docked column and the mobile drawer are one tree: INV-5768). The sidebar module
+  never imports the switcher, exactly as it never imports the tabs. Collapsing the list hides the list
+  column only: the rail, and the dock in it, keep their place in the tree and their rect, so the FAB
+  stays seated through a collapse and the dock never unmounts on one.
+- **The rail can hand the dock a press override** (`AppSwitcherDock`'s `pressOverride`: `{ label, run }`, or
+  null). The dock writes it to the context as `dockPress` from a layout effect and clears it on unmount. The
+  workspace rail hands "Show the chat list" while the list is collapsed. The FAB owns which press goes which
+  way (below); the rail only says what the override is. A disc dragged out of its dock is not seated, so with
+  an override set the dock draws its own 40px rail button over its box (lucide `PanelLeftOpen`, named
+  `label`, the kit `Tooltip` right with `showOnFocus`, `RAIL_BUTTON_BASE`/`RAIL_BUTTON_UNLIT`), running
+  `run`; the 28px box keeps registering its rect beneath, so a drag back still docks. When an override
+  arrives while `document.activeElement` is the body (the list's hide button has just unmounted), focus
+  moves to the seated FAB (`FAB_SELECTOR`), or to that button when the FAB is not seated; a page that loads
+  with the list already collapsed is not an arrival.
+- **Exactly one dock is on the page**: the sidebar renders its `rail` slot once, so one box reports one rect.
 - **It drags.** Past a 4px threshold the press becomes a drag; `onDragStart` fires once, on the first move
   past it, and the radial closes on it. Clamped to the viewport with 8px of padding on every side, so it can
   never be thrown off screen and lost.
 - **A tap is `onPress({ keyboard })`** — a click that did not end a drag: a mouse click, a finger's tap, Enter or
   Space; `keyboard` is true when no pointer was behind it. `AppSwitcherFab` answers it: while the chat floats a
-  tap collapses it; otherwise a tap opens the radial of the acts that can run and a second tap closes it (MAN-7475). The FAB
+  tap collapses it; else, seated with a `dockPress`, it runs `dockPress.run()` ("Show the chat list" while the
+  list is collapsed; the radial stays reachable then from the palette's Applications group); otherwise a tap
+  opens the radial of the acts that can run and a second tap closes it (MAN-7475). The FAB
   opens nothing else: the drawer is the Applications act (printed "Apps"), a radial item and a row of the palette's Applications group (MAN-487).
-- **Its label says what a tap will do**: `applications.fabLabelMenu` ("Open the menu"), or
-  `applications.fabLabelCollapse` ("Collapse chat") while the chat floats. It is the tooltip too.
+- **Its label says what a tap will do**, in the same order: `applications.fabLabelCollapse` ("Collapse chat")
+  while the chat floats; else, seated with a `dockPress`, that override's label; else
+  `applications.fabLabelMenu` ("Open the menu"). It is the tooltip too.
 - **Ctrl+. (⌘. on a Mac)** presses the chat's door from anywhere in the workspace and from inside the
   picture-in-picture window: it floats the chat, or collapses it while it floats (MAN-7492). The radial's Chat
   act and the palette's Chat row print the chord.
@@ -784,7 +794,7 @@ One control, and it is the reader's way in and out of every pane.
   on the light surface, the edge is 5:1 light and 9:1 dark. `pointer-events: none`. What it means in words is
   the owner's, put into `label`, which is also the tooltip; the dot is decoration to a screen reader. The pop on
   arrival is its only motion (none under `prefers-reduced-motion`); forced colours draw `Highlight` with a
-  `Canvas` ring. `AppSwitcherFab` passes `indicator` while `chatDoor.unread` and the chat is not floating, and appends `applications.fabUnread` to the label. `active` (`aria-expanded`, the pressed wash) is on while the radial or the drawer is up.
+  `Canvas` ring. `AppSwitcherFab` passes `indicator` while `chatDoor.unread`, the chat is not floating and the FAB is not seated (`fabPosition.docked` on a measured dock), and appends `applications.fabUnread` to the label only while the dot is drawn. Seated in the rail the disc draws no dot: badges are the rail's, and its Chat glyph wears the badge 1 for the same reply, so a rail carries no bare dot and a collapsed rail still says a reply landed. The one exception is a window too short for the rail, where its region scrolls and can take the Chat glyph out of sight: the dock then reports `dockBadgeHidden` (from the rail's `unreadBadgeHidden`, an IntersectionObserver on the Chat button rooted at the region) and the seated disc draws the dot and the unread words, so a waiting reply is never unsigned. `active` (`aria-expanded`, the pressed wash) is on while the radial or the drawer is up.
 
   What lights it: a `complete` frame (unless the reader aborted the turn) or a `permission_request` for the chat's own conversation, arriving while the chat is out of sight — its tab hidden, or an application covering the main region — and not floating. What clears it: the chat coming on screen (floated, or the chat tab open with nothing over it), or the conversation changing (MAN-7492, MAN-7482).
 
@@ -1051,8 +1061,8 @@ section: applications/013 The switcher's own files
 | File | What |
 |---|---|
 | `context/AppSwitcherContext.tsx` | The one state home: the registry, the two panes, dual, the ratio, the FAB position, the dock rect, the drawer's open flag, `projects` (`ProjectChoice[]`, handed in by the shell: the one outside list the switcher reads), `frontSide`, `closePane`, `openInDualScreen` (dual-on-and-filled in one update) — and `refresh()` on every drawer open. Once a registry read has landed it clears, in the render that sees it, any pane whose row the registry no longer holds; a failed read keeps the last good list, so a refusal never empties a pane. |
-| `AppSwitcherDock.tsx` | The empty 28px box in the logo row. It paints nothing; it holds the space open and reports its rect. |
-| `AppSwitcherFab.tsx` · `AppDrawer.tsx` | The kit's FAB wearing the app logo. A tap collapses a floating chat, else opens `AppSwitcherRadial` beside it (drawing only the acts that can run), whose Applications act opens `AppDrawer` (MAN-7475). `AppSwitcherFab({ chatDoor: ChatDoor, onAnchorChange: (rect: DOMRect \| null) => void })` passes the kit's rect report on and reports `null` when it unmounts; it draws the dot while `chatDoor.unread` and the chat is not floating (MAN-486); the module imports nothing of chat-host (MAN-7478). |
+| `AppSwitcherDock.tsx` | The empty 28px box in the top cell of the sidebar's views rail (project-workspace's `WorkspaceRail` mounts it). It paints nothing; it holds the space open and reports its rect. |
+| `AppSwitcherFab.tsx` · `AppDrawer.tsx` | The kit's FAB wearing the app logo. A tap collapses a floating chat, else opens `AppSwitcherRadial` beside it (drawing only the acts that can run), whose Applications act opens `AppDrawer` (MAN-7475). `AppSwitcherFab({ chatDoor: ChatDoor, onAnchorChange: (rect: DOMRect \| null) => void })` passes the kit's rect report on and reports `null` when it unmounts; it draws the dot while `chatDoor.unread`, the chat is not floating and the disc is not seated in the rail (or is seated with the rail's Chat badge scrolled out of sight: `dockBadgeHidden`) (MAN-486); the module imports nothing of chat-host (MAN-7478). |
 | `AppSwitcherRadial.tsx` · `utils/radialLabels.ts` | The acts that can run drawn on the arc as `role="menuitem"` discs with label pills, and the plan that puts each label on a side of its disc. Not in the barrel; mounted only by `AppSwitcherFab`. Rules, seams, proof: MAN-7475. |
 | `AppDrawerHeader.tsx` | The sheet's "Your apps" heading, the count line and Close all — extracted out of `AppDrawer.tsx` at the 300-line ceiling. |
 | `AppDrawerDivider.tsx` · `hooks/useDrawerLayout.ts` · `utils/moveItems.ts` | One divider row with its in-place title; the drawer's layout acts (add/rename/remove a divider, move a row) with their one refusal banner; the kebab's shared Move up / Move down pair. |
@@ -1254,7 +1264,9 @@ child's env carries `CLAUDE_SURFACE=cloudcli`, and its system prompt gains `SURF
 fullscreen switch (`EMBED_SIGNAL`), then a short paragraph naming the
 four markdown conventions this surface draws as components (`MARKDOWN_SIGNAL`; what it names, and
 why only four, is [docs/architecture/MANUAL.md (08-rendered-shapes)](architecture/MANUAL.md)
-§"The triggers"). Both come from `surface-signal.ts` and nowhere else — never `.env`,
+§"The triggers"). A chat whose launch carries the chat credential (`CLOUDCLI_TOOLSET_TOKEN`: not a node's chat) is
+also led by `FOLLOWUPS_SIGNAL`, the Next steps instruction (`leadWithFollowupsSignal`, MAN-9004), applied after the
+toolsets hook has answered. All of it comes from `surface-signal.ts` and nowhere else — never `.env`,
 never a systemd unit, never `process.env` read at module load. A terminal launch of `claude` reads
 neither, so their absence is what tells a turn it is not talking to CloudCLI's chat; the runner's
 own souls (Heph, Athena, Prometheus, …) run a different path entirely and never pass through this
@@ -1341,8 +1353,7 @@ Pipeline depth: MAN-7401 (check), MAN-7402 (runner), MAN-7403 (API side), MAN-74
 
 | form | where |
 | --- | --- |
-| `ClaudeUpdateFooterRow({ onOpen })` | sidebar footer, directly above the upstream update row; desktop and mobile variants; `Download` icon and pulse dot |
-| `ClaudeUpdateRailButton({ onOpen })` | collapsed rail, right after Settings; icon only, `aria-label` = both lines |
+| `ClaudeUpdateFooterRow({ onOpen })` | sidebar footer, directly above the upstream update row; desktop and mobile variants; `Download` icon and pulse dot. It is in the list's foot, so with the list collapsed it is not drawn and it returns the moment the list shows |
 
 | state | title | detail |
 | --- | --- | --- |
@@ -2508,8 +2519,8 @@ section: deepseek-balance/006 What is left standing
 - **A vendor that answers 200 with a body it cannot read is indistinguishable from one that answers
   500.** Both are `bad-response`, and neither is logged anywhere — deliberate, since the vendor's
   refusal text carries part of the key, but it means a real shape change is a silently calm em-dash.
-- **The balance is not in the collapsed rail.** The rail draws the avatar alone; the figure is one
-  click away, in the expanded row and the panel.
+- **The balance is not on the rail.** The rail draws the avatar alone; the figure is one click away, in
+  the panel.
 - **The type register is composed by VALUE, not by class, so it can drift silently.** The stacked
   form restates Verve's meter register in Tailwind — `text-[13px] font-medium text-foreground`,
   `text-[12.5px] tabular-nums text-muted-foreground`, `text-xs text-ink-faint` — against
@@ -3986,16 +3997,47 @@ section: file-manager/000
 
 The Files tab: the project tree, the directory in view, and one file beside it — its lines, a
 document preview, or the editor. `src/modules/file-manager/` is `DirectoryListing`,
-`FileBreadcrumb` and `PreviewPane` under the one `FileManager` its barrel exports, with
+`FileBreadcrumb` and `PreviewPane` under the one `FileManager` each root of `FilesView` mounts, with
 `useFileManagerState` holding where it is and `useEditGuard` settling what an open does to an
 unsaved session. The server half — the routes, the refusal table, the no-overwrite rule — is
 [docs/MANUAL.md (files-api)](MANUAL.md).
+
+## FilesView — the strip of roots over the selected root's file manager
+
+`src/modules/file-manager/FilesView.tsx`, exported lazily through the barrel; the project-workspace module's `WorkspaceMain` mounts it as the Files pane. Files never follows the open chat's project: it browses its own roots. Shapes `FilesRoot` and `FileOpenRequest` live in `src/shared/types.ts`.
+
+- Roots: `useFilesRoots(projects, gitRepositories)` (project-workspace, called by `ProjectsStateContext`, memoised on a key string of the fields a root carries) — the git repositories first (`pinned` false), then each pin matched by exact `fullPath` to a registered project that is not already a root (`pinned` true). Every file route takes a registered project's id, so a pin with no registered project is no root.
+- Pins: the entry-patched preference `filesPins` = `{ pinned: string[] }`, absolute paths in pin order. `useFilesPins()` (barrel) reads it; a stored value that is not `{ pinned: string[] }` reads as no pins. `pinFolder(path)` and `unpinFolder(path)` are each one `writeUserPreferenceEntries('filesPins', { pinned: { [path]: path | null } })`, so a pin made on one device never erases one made on another.
+- Selected root: `useSelectedFilesRoot()` and `selectFilesRoot(path)`, module scope, localStorage `filesTab.selectedRootPath` — per device, as the git tab's repository is. The stored path while it is on the strip, else the first root.
+
+- Props: `roots: FilesRoot[]` (git repositories first, then pinned folders), `projectChoices`, `openRequest: FileOpenRequest | null`, `onRequestHandled`, `onFileOpen`, `onProjectsChanged: () => Promise<void>`.
+- Strip: `role="group"` `aria-label="Folders"`. One `Chip` per root, full path as its title, selected root pressed, pinned roots wear a pin glyph. Then the "Pin a folder" `Chip` (`action`, no `aria-pressed`), then the "Unpin <name>" ghost `Button`.
+- Unpin slot is mounted whenever any root is pinned; `invisible` (width kept, out of the tab order and accessibility tree) while a git root is selected. With no pin there is no slot. why: strip rows follow the roots, never the selection, so the body never jumps.
+- Unpin hover is `hover:!bg-secondary`: the kit's ghost hover rule outranks a plain hover utility.
+- No roots: no strip; `EmptyState` "No folders to browse" with the pin chip under it.
+- Chips wrap, never scroll. The strip stands on the body's background at the body's inset with no rule, so `FileManager`'s outer padding is the whole strip-to-body gap and must stay.
+- Focus after the roots redraw: unpin → the pressed chip; answered pin → the new root's chip; pin closed with no answer → "Pin a folder".
+- Open request: its path is absolute — `WorkspaceMain` joins a relative one to the open project's `fullPath`, and the git panel joins a changed-file row to the repository on screen, both through `absolutePathIn(folder, path)` (`src/shared/utils.ts`). The request's root is the deepest root whose `fullPath` holds the path (equal, or a prefix then `/`, because `~/.claude` and `~/.claude/claudecodeui_lyphe` are both roots); when none holds it, the selected root, which takes it as an absolute path and the server decides. When that root is not the selected one an effect selects it, and the request goes only to the `FileManager` of its own root, so the root on screen never acts on another root's path. With no roots the request is retired unacted.
+- Pin flow: "Pin a folder" opens the wizard's `FolderBrowserModal` (barrel, lazy) in a `Suspense` of its own. Its answer: already a root → select it; a registered project at that path (`projectChoices`) → `pinFolder` and select; otherwise `createProjectRequest({ path })`, `await onProjectsChanged()`, then `pinFolder` of the project's own resolved `fullPath` and select. A refusal is a toast carrying the server's sentence, except a 409 ("a project is already registered at that path", which a page whose projects list is stale — another window registered it — gets): that refreshes the list and pins the folder as the registered project it is. `create-project` reactivates a project archived from the chat list, so pinning such a folder brings the project back to the chat list; the pin chip's title says so.
+- The folder browser is mounted in a `role="dialog" aria-modal` wrapper `FilesView` owns, because the wizard's modal (shared with the wizard) has neither: focus moves to its first control once the lazy modal has loaded, Tab wraps inside it, and Escape closes it (not while the new-folder field is focused: that Escape is the field's).
+- Unpin: `unpinFolder(root.fullPath)` for the selected pin; nothing on disk is touched.
+- Body: `<FileManager key={root.projectId} root={root} …/>`. `FileManager` measures every path against `root.fullPath`; the file tree reads only a project's id.
+
+### FilesView — shown
+
+`node .verify/probe-files-roots.mjs` on :5183 at 1440×900, two pages of one signed-in context. It makes `/home/lyphe/tmp/files-pin-proof` empty for the run and removes the project it registers (`DELETE /api/projects/<id>?force=true`); the folder itself is removed by `rmdir` on its literal path after the script. It prints: the four git roots; a chat opened in another project leaving strip and listing as they were; ArchPulse pinned on one page and on the second after its reload; a folder the app never opened pinned on the second through `create-project`, then both pins on the first after its reload; a chat Edit card's file under `~/.claude/claudecodeui_lyphe` opened under `claudecodeui_lyphe` (the deepest root, not `.claude`) and a shadow-connector changed-file row under `shadow-connector`; both pins taken off.
+
+`node .verify/probe-files-pin-edges.mjs` on :5183 at 1440×900 — the pin flow's three edges. It makes `/home/lyphe/tmp/files-pin-archived` for the run (it refuses to start when the folder holds anything) and removes the project it registers (`DELETE /api/projects/<id>?force=true`); the folder itself is removed by `rmdir` on its literal path after the script. It prints: the folder browser cancelled leaves focus on "Pin a folder"; the server's real 400 for `/etc` (the folder browser cannot leave `~`) replayed to the page's one `create-project` call gives a toast carrying the server's sentence, nothing pinned, focus back; a project archived with `DELETE /api/projects/<id>` and then pinned comes back through `create-project` and joins the strip pinned and selected.
+
+The folder browser reads one level: `browseWorkspace` (`server/modules/file-tree/file-tree.service.ts`) builds its listing at depth 0, so a folder whose subfolders hold more than the 10,000-entry file-tree budget (`~/.claude`) still browses.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/file-tree/file-tree.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/file-manager/FilesView.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/file-manager/hooks/useFilesPins.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/file-manager/hooks/useSelectedFilesRoot.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/file-manager/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-creation-wizard/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/hooks/useFilesRoots.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-files-pin-edges.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-files-roots.mjs
 
 ## MAN-540 — The rules that bite
 section: file-manager/001 The rules that bite
 
 1. **One handler opens a path, and it is retired the moment it is acted on.** `WorkspaceMain` owns
-   `openRequest: { path; line?; nonce } | null`; `handleFileOpen` sets it and brings the Files tab
+   `openRequest: FileOpenRequest | null` (`src/shared/types.ts`: `{ path; line?; nonce }`); `handleFileOpen` sets it and brings the Files tab
    forward, `openFileAt` does the same act WITH a line, `onRequestHandled` puts it back to `null`.
    Two functions rather than one with a second parameter, because `handleFileOpen` is a
    `FileOpenHandler` whose second parameter is already carrying a real `diffInfo` from
@@ -4034,6 +4076,11 @@ section: file-manager/001 The rules that bite
    image's `1440 × 900` is drawn only once `onLoad` reports a natural width. Both formatters live
    in `src/shared/utils.ts` under FORMATTING — `just now`, `4m ago`, `3h ago`, `yesterday`,
    `2 days ago`, then a plain locale date past thirty.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/transcript/shapes/detect.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/document-preview/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/file-editor/utils/windowPolicy.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/file-manager/utils/previewBody.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/utils.ts
+
+## MAN-9000 — The rules that bite — The pane's body is decided in one place, and it has three. `choosePreviewBody`
+section: file-manager/001 The rules that bite/001 The pane's body is decided in one place, and it has three. `choosePreviewBody`
 
 5. **The pane's body is decided in one place, and it has three.** `choosePreviewBody`
    (`src/modules/file-manager/utils/previewBody.ts`) answers with the body, whether Edit is offered
@@ -4074,6 +4121,11 @@ section: file-manager/001 The rules that bite
 8. **What is missing is deliberate.** No New folder, no Rename — the tree beside this pane already
    carries both. A folder's size is `—` and never `N files`, because no child count is on the wire
    and counting one is a read per row.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/transcript/shapes/detect.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/document-preview/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/file-editor/utils/windowPolicy.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/file-manager/utils/previewBody.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/utils.ts
+
+## MAN-9001 — The rules that bite — One file is open for editing at a time, a window of lines at a time. The header's Edit puts
+section: file-manager/001 The rules that bite/002 One file is open for editing at a time, a window of lines at a time. The header's Edit puts
 
 9. **One file is open for editing at a time, a window of lines at a time.** The header's Edit puts
    `FileEditor` in the pane for the selected text file. It reads a viewport plus two screens of
@@ -4438,8 +4490,8 @@ section: git-panel/002 The rules that bite
 
 8. **Opening a row shows a diff; the only way out is Files.** One row at a time, a second click
    closes it, and `Open in Files` hands the path to the workspace's file manager — see
-   MAN-539. It is offered only while the repository on screen is the
-   workspace's own project, because Files browses that project and no other. `GitDiffViewer`
+   MAN-539. It is always offered: `GitRepositoriesPanel` joins the row's repository-relative path
+   to the repository on screen, and Files opens it under the root that holds it. `GitDiffViewer`
    bounds what it paints at 200,000 characters and 1,500 lines and says so when it has cut
    something, so a huge diff cannot freeze the tab.
 
@@ -5404,10 +5456,12 @@ scoped by it. It is not inert either, and it has not been since the driver lande
 through `projectsDb` to that project's path and becomes the ONE `--add-dir` this board's Metis is
 given, so a board with a null `project_id` hands her no directory at all and she works only inside
 her own session directory (§"A board's Metis, launched"). `projectId` reaches the panel for exactly
-one purpose: **on FIRST mount only, when `currentBoardId` is null, the panel asks
+one purpose: **on FIRST mount only, when `currentBoardId` is null and a project is open, the panel asks
 `boardForProject(projectId)` and selects that board if one comes back.** That is a first-run
 convenience and nothing more — it fires at most once per mount, it never fires when a board is
-already selected, and it never fires on a project switch.
+already selected, and it never fires on a project switch. The tab opens with no project selected too
+(`projectId` is `null` then): the mount adopts no board, a new board is made with `projectId: null`
+(so it hands Metis no directory until relabelled), and `data-project-id` is written only for a project.
 
 **Lazy loading.** On mount the panel fetches the board list, then the current board's lane counts
 and its vitals together (`Promise.all`, `useKanbanLaneFeed.ts`). Each lane then fetches its OWN first
@@ -6092,12 +6146,11 @@ MAN-460. The shapes on the wire are read from their declarations, not from a cop
 here (see §"Where the shapes live").
 
 **One provider, one poller.** `App.tsx` mounts `MemoryIntakeProvider` inside `ProtectedRoute`, so
-the queue is never asked for against the login screen. The provider holds the READING alone: four
-consumers read it — `useWorkspaceTabGates` three times over, once at each of its call sites (the
-sidebar region that renders the strip, the main region, the command palette), and the panel — and
-only the panel writes. The write lifecycle lives in `useMemoryReview` rather than in the context for
-exactly that reason: a value carrying the in-flight id and the held refusals would change on every
-button press and re-render all four.
+the queue is never asked for against the login screen. The provider holds the READING alone: the
+readers are `useWorkspaceTabGates` (called once, by the sidebar region that renders the strip), the
+chat gutter and the panel, and only the panel writes. The write lifecycle lives in `useMemoryReview`
+rather than in the context for exactly that reason: a value carrying the in-flight id and the held
+refusals would change on every button press and re-render every reader.
 
 ## MAN-601 — Where the tab is, and when
 section: memory-intake/001 Where the tab is, and when
@@ -6112,19 +6165,19 @@ anything reading this strip's count reads. Both are absent below 1: a queue that
 emptied leaves a plain glyph rather than a zero nobody needs to read. That count is the memory
 queue's alone (`pendingCount` in the provider): a staged lesson, though the pane now lists it,
 neither adds to it nor keeps the tab on the strip.
-`useWorkspaceTabGates(activeTab)` is the one place the rule lives; `ProjectSidebarRegion` (which
-hands the strip its props), `WorkspaceMain` and `ProjectCommandPalette` all read it, so the strip,
-the pane and the palette cannot disagree about whether the tab exists.
+`useWorkspaceTabGates(activeTab)` is the one place the rule lives; `ProjectSidebarRegion` is its one
+reader and hands the strip its props. `WorkspaceMain` mounts the pane on `activeTab === 'memory'`
+alone, and the palette's views list carries no Memory view (MAN-8999), so there is no `Go to Memory` row.
 
 **The tab is sticky, and that is the whole design.** `shouldShowMemoryTab` is
 `pendingCount > 0 || activeTab === 'memory'`: once it is the tab a person is standing in it stays on
 the bar until they choose another one. Filing the last pending memory therefore empties the panel to
 *All filed* instead of taking the tab out from under the person who just pressed the button.
 
-That is also why there is no snap-back effect for it. `WorkspaceMain` has three, one each for the
-tabs that vanish when a preference is switched off — tasks, shell, browser — because leaving the
+That is also why there is no snap-back effect for it. `WorkspaceMain` has two, one each for the
+tabs that vanish when a preference is switched off — tasks, shell — because leaving the
 workspace pointed at a tab no longer on the bar leaves an empty pane. The Memory tab is DATA-gated
-rather than preference-gated, its gate is written to hold while it is selected, and a fourth effect
+rather than preference-gated, its gate is written to hold while it is selected, and a third effect
 would fight that rule. The Heal tab is the second tab written this way and takes the rule whole,
 snap-back and all — that is, none. (The Roadmap tab, MAN-7654, is not gated at all.) Two kinds of
 tab, two policies, each in the layer that owns the act: the gate rule in the hook that decides a tab
@@ -6138,8 +6191,8 @@ off it when nothing is.
 `memory` is a valid persisted tab (`VALID_TABS`), so a reload restores it — and the sticky clause
 holds it there through the first paint, before the first poll has answered.
 
-**In the palette.** `Go to Memory` (keywords `memory intake pending`) is offered exactly
-when the tab is on the bar, since the palette reads the same hook. It carries no count.
+**In the palette.** No row: the Navigate group is the views list (`useWorkspaceViews`), which carries
+no data-gated view. The strip reaches the tab.
 
 ## MAN-602 — The reading, and when it is taken
 section: memory-intake/002 The reading, and when it is taken
@@ -10037,7 +10090,7 @@ section: verification/009 What bites people/001 The git tab reads "Git"
 | **The Shell tab prints `bash: claude: command not found`** | The PTY spawns `bash -c "claude …"` — a bare `PATH` lookup — and the server process on this host carries no `~/.npm-global/bin`, which is where the CLI is. `.env`'s `CLAUDE_CLI_PATH` does not reach it: that is read by the SDK providers through `server/shared/claude-cli-path.ts`, never by the PTY. Nor does upstream's `prioritizeUserNpmGlobalBin`, which only re-*orders* entries already on `PATH` and hands it back untouched when none of its candidates are there — `npm_config_prefix` being set is not enough. An environment fact rather than a fork defect, and the fix belongs at deploy time: whatever runs the server must have the CLI's directory on its own `PATH`. |
 | **`uiPreferences` is one stored key, not six** | The preference store keeps a row per name, and all six workspace booleans live inside the single `uiPreferences` value. A `PATCH /api/user/preferences` carrying `{"uiPreferences":{"hideShellTab":false}}` therefore *replaces* the blob and silently drops the other five. Click the switch, or send the whole object back. A flat key is its own row and patches safely alone — which is why `phase-4.mjs` patches `tasksEnabled` directly and clicks for the rest. |
 | **The Tasks tab is absent** | It is preference-gated and TaskMaster is not installed here, so its absence is recorded as a note rather than asserted as a pass — except in `phase-4.mjs`, which asserts the biconditional instead: the tab is on the bar exactly when TaskMaster is installed. A tab that can never appear would also leave the board itself unmeasured, so `phase-16.mjs` opens the tab when it is there and otherwise mounts the app's own `TaskBoardContent` and `TaskEmptyState` from the running dev server — phase 2's technique, and it says in a `[NOTE]` which of the two it read. |
-| **The Memory tab is on the bar only while something is waiting** | It is gated on the board's own pending queue rather than on a preference, so a host with an empty queue has no Memory tab and no *Go to Memory* row in the palette — an absence, not a fault. `phase-20.mjs` falls back to a synthetic two-row queue answered inside the page when the live count is 0, and says so in a `[NOTE]`. It also STAYS on the strip at a count of zero while it is the selected tab, deliberately — the Heal tab is the second tab written that way, and both are read by the same gate. Its contract is at [docs/MANUAL.md (memory-intake)](MANUAL.md). |
+| **The Memory tab is on the bar only while something is waiting** | It is gated on the board's own pending queue rather than on a preference, so a host with an empty queue has no Memory tab on the strip — an absence, not a fault. The palette has no `Go to Memory` row at any count (MAN-8999). `phase-20.mjs` falls back to a synthetic two-row queue answered inside the page when the live count is 0, and says so in a `[NOTE]`. It also STAYS on the strip at a count of zero while it is the selected tab, deliberately — the Heal tab is the second tab written that way, and both are read by the same gate. Its contract is at [docs/MANUAL.md (memory-intake)](MANUAL.md). |
 | **The Memory panel is driven by its English strings** | `phase-20.mjs` finds the two verbs by the words `file it` and `discard`, the empty state by `All filed`, and the global-blast mark by the substring `global`. All four live under `memory.*` in `en/common.json` (English only; the other locales fall back to `en`). Re-word one and the phase stops finding a control rather than reporting one wrong — re-point it in the same change, the way `phase-4.mjs` is re-pointed for Settings. |
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/shared/claude-cli-path.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/main.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Collapsible.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/uiPreferences.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/console.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/shapes-fixture.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/ntfy/settings-probe.mjs
@@ -10881,7 +10934,7 @@ Three parts that decide when the chat is drawn out of sight, who presses it, and
 - **On screen** = floating, or home with the chat tab showing and no application covering the main region (`reportCovered`).
 - **Lights** on a frame for the chat's own `sessionId`, arriving while the chat is off screen, that is a `complete` (not an `aborted` one: the reader's own act) or a `permission_request`. Every other frame leaves it alone.
 - **Clears** when the chat comes on screen, and when the conversation changes.
-- Drawn by `AppSwitcherFab` as the dot: `indicator` while `chatDoor.unread` and the chat is not floating (MAN-486).
+- Drawn by `AppSwitcherFab` as the dot: `indicator` while `chatDoor.unread`, the chat is not floating and the disc is not seated in the rail (or is seated with the rail's Chat badge scrolled out of sight) (MAN-486).
 - The frame is judged against the latest facts: the socket subscription is bound once and reads `sessionId` and `onScreen` through refs written in a layout effect.
 - `WorkspaceFrame` reports `covered` from a layout effect. why: a passive one lets a reply that lands right after the drawer closes be judged against a chat still in sight (INV-6010).
 
@@ -11091,6 +11144,8 @@ A change to either shape belongs in both files at once. Field detail lives in th
 |---|---|---|
 | `Note` | `id`, `title`, `description`, `createdAt`, `updatedAt` (all `string`) | `createdAt` orders the list and never moves; `updatedAt` is the last save; both ISO-8601 UTC with ms |
 | `NoteInput` | `title`, `description` | the whole of both fields on both writes, never a patch; also the shape of a draft |
+| `NoteSaveStatus` | `'saving' \| 'saved' \| 'titleNeeded'` | client only: a card's quiet saving line (`src/shared/types.ts`, not mirrored in `server/shared/types.ts`) |
+| `NoteSaveOutcome` | `'saved' \| 'blocked' \| 'failed'` | client only: how one card's autosave ended (MAN-8998) |
 
 - The owning account never appears on the wire (`NoteRow.user_id` stays server-side, MAN-7510).
 - `title` and `description` are the writer's own text: a client draws them as text nodes, never as markup.
@@ -11117,8 +11172,8 @@ A change to either shape belongs in both files at once. Field detail lives in th
 `en/common.json` alone also carries:
 
 - `tabs.notes` = `Notes`, after `tabs.schedules`.
-- Top-level `notes`, after `gutters` (20 leaves): `title`, `reading`, `unreachable`, `retry`,
-  `empty.{title,message}`, `form.{title,description,descriptionPlaceholder,add,save,cancel}`,
+- Top-level `notes`, after `gutters` (21 leaves): `title`, `reading`, `unreachable`, `retry`,
+  `empty.{title,message}`, `form.{title,description,descriptionPlaceholder,done,saving,saved,titleNeeded}`,
   `card.{edit,delete}`, `delete.{title,message,confirm,cancel}`, `toast.{saveFailed,deleteFailed}`.
 - Interpolation: `card.edit` and `card.delete` take `{{title}}`; `delete.message` takes `{{title}}`.
 
@@ -11220,14 +11275,17 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/index.ts
 
 ## `/api/notes` — mount and layers
 
-Mount: `app.use('/api/notes', authenticateToken, createNotesModule())` in `server/index.ts`, directly after `/api/memory`.
-One address, no second router. A request with no token is 401 at the mount.
+Mount: `const notes = createNotesModule(); app.use('/api/notes', authenticateToken, notes.userRouter)` in `server/index.ts`, directly after `/api/memory`.
+One address for the operator's door, no second router on it. A request with no token is 401 at the mount, and so is one carrying a chat's credential.
+
+A second door sits beside it for the `notes` command a chat runs: `app.use('/api/notes-cmd', notes.commandRouter)`, behind the chat's own credential and not the operator's login — its verbs (list, show, add), its guard and its account are MAN-8993. It calls the SAME `notesService`, so every refusal below holds on both doors and a write on either sends the frame.
 
 | File | Owns |
 |---|---|
 | `notes.routes.ts` | `createNotesRoutes(service: NotesService): Router` — transport shape only: the caller is an account, `title` and a present `description` are strings, `:id` is a path parameter |
-| `notes.service.ts` | `notesService` (`list`, `create`, `update`, `remove`) and `NotesService = typeof notesService` — normalise, then judge, then write; module-private `toNote` and `broadcastNotesChanged` |
-| `notes.module.ts` | `createNotesModule(): Router` — one `notesService` instance handed to `createNotesRoutes` |
+| `notes.command-routes.ts` | `createNotesCommandRoutes(service)` — the command door (MAN-8993) |
+| `notes.service.ts` | `notesService` (`list`, `get`, `create`, `update`, `remove`) and `NotesService = typeof notesService` — normalise, then judge, then write; module-private `toNote` and `broadcastNotesChanged` |
+| `notes.module.ts` | `createNotesModule(): { userRouter, commandRouter }` — one `notesService` instance handed to both route files; links `~/.local/bin/notes` |
 | `index.ts` | barrel: `createNotesModule` only |
 
 `NoteRow` and `notesDb` come through `@/modules/database/index.js` (MAN-7510); `connectedClients` and `WS_OPEN_STATE` through `@/modules/websocket/index.js`. `Note` and `NoteInput`: MAN-7513.
@@ -11265,11 +11323,11 @@ Success: `{ success: true, data }`. Failure: `{ success: false, error: { code, m
 | `description` | `trimEnd()` — leading indent and interior breaks stay | `DESCRIPTION_MAX = 20_000` |
 
 - `TITLE_MAX` and `DESCRIPTION_MAX` are mirrored by `TITLE_MAX_LENGTH` and `DESCRIPTION_MAX_LENGTH` in `NoteForm.tsx` (MAN-7518); the client build cannot import from `server/`. Change one, change both.
-- A title of only characters that draw as nothing — whitespace, format characters (U+200B ZERO WIDTH SPACE and its family, which `\s` misses; U+200C/U+200D included), control characters — answers 400 `TITLE_REQUIRED`: the check strips those classes and refuses when nothing is left. The stored text is never rewritten, so a ZWJ inside an emoji and the ZWNJ of Persian, Arabic and Indic text survive it; `NoteForm.tsx`'s blank check is the mirror (MAN-7518).
+- A title of only characters that draw as nothing — whitespace, format characters (U+200B ZERO WIDTH SPACE and its family, which `\s` misses; U+200C/U+200D included), control characters — answers 400 `TITLE_REQUIRED`: the check strips those classes and refuses when nothing is left. The stored text is never rewritten, so a ZWJ inside an emoji and the ZWNJ of Persian, Arabic and Indic text survive it; `DRAWS_AS_NOTHING` in `useNoteSaver.ts`, which keeps such a title from being sent, is the mirror (MAN-7521).
 
-## `readUserId` — the account reader
+## `readAuthenticatedUserId` — the account reader
 
-- Module-local in `notes.routes.ts`: same shape and same 401 `USER_REQUIRED` as `scheduled-messages.routes.ts`, but it REFUSES where that one coerces.
+- `server/shared/utils.ts`, used by `notes.routes.ts` and `followups.routes.ts` (MAN-9003): same shape and same 401 `USER_REQUIRED` as `readUserId` in `scheduled-messages.routes.ts`, but it REFUSES where that one coerces.
 - Accepts a `number` that `Number.isInteger` and is above 0. Refused: `'1'`, `null`, `true`, `[]`, `1.5`, `0`, no `user`.
 - `why:` `Number(null)`, `Number([])` and `Number('')` are `0`; a coercing reader would act for account 0.
 - `authenticateToken` sets `request.user` from a `users` row, so no live session sends anything this refuses.
@@ -11279,13 +11337,13 @@ Success: `{ success: true, data }`. Failure: `{ success: false, error: { code, m
 
 - Shape: `NotesChangedEvent` = `{ kind: 'notes_changed'; at: number }`, `at` epoch ms; declared in `server/shared/types.ts` and a member of `GatewayEventKind`.
 - No `seq`, no `sessionId`: it never becomes a transcript row, so `useChatRealtimeHandlers` needs no edit.
-- Sent once per write that landed — create, update, delete — after the write. A refused write (400, 404) and a read send none.
+- Sent once per write that landed — create, update, delete — after the write. A refused write (400, 404) and a read send none. Every autosave of a card is one update (`updated_at` moves, `created_at` and the order never do), so typing in an open note sends one frame per pause, not one per keystroke.
 - Goes to every client in `connectedClients` whose `readyState` is `WS_OPEN_STATE`; `JSON.stringify` once, a catch per client. It copies `broadcastKanbanEvent`.
 - No per-account filter: the frame names no note and no account. A client that hears it reads its own list again.
 - `broadcastNotesChanged` and `toNote` are module-private; export one at its declaration when a second file needs it.
 - 2026-09-30, live: 6 landed writes sent 6 frames; a blank title, an unknown id and 2 reads sent none.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notes/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notes/notes.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notes/notes.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notes/notes.service.ts
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notes/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notes/notes.command-routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notes/notes.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notes/notes.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notes/notes.service.ts
 
 ## MAN-7518 — Notes — the screen: component map, keyboard, focus and wall rules
 
@@ -11295,15 +11353,15 @@ All in `src/modules/notes/`. Wire types `Note`, `NoteInput`: MAN-7513. Locale ke
 
 | File | Export | Props | Reads |
 |---|---|---|---|
-| `NoteForm.tsx` | `NoteForm` | `draft`, `onChange`, `onSubmit`, `onCancel?`, `submitLabel`, `busy`, `titleRef?` | no context; owner holds the draft |
-| `NoteCard.tsx` | `NoteCard` | `note`, `onDelete` | `NotesValue`: `setEdit`, `saveEdit`; `NoteDraftsValue`: `edits`, `writing` |
-| `NotesList.tsx` | `NotesList` | none | `NotesValue`: `notes`, `unreachable`, `refresh`, `setComposer`, `add`, `remove`; `NoteDraftsValue`: `composer`, `adding`, `writing`; own state `deleting: Note \| null`, initial `null` |
+| `NoteForm.tsx` | `NoteForm` | `draft`, `onChange`, `onDone`, `showDone`, `onLeave`, `onSaveNow`, `status`, `titleRef?` | no context; owner holds the draft and does the saving |
+| `NoteCard.tsx` | `NoteCard` | `note`, `onDelete` | `NotesValue`: `openEdit`, `changeEdit`, `saveEditNow`, `finishEdit`; `NoteDraftsValue`: `edits`, `saveStates` |
+| `NotesList.tsx` | `NotesList` | none | `NotesValue`: `notes`, `unreachable`, `refresh`, `changeComposer`, `saveComposerNow`, `finishComposer`, `remove`; `NoteDraftsValue`: `composer`, `composerNoteId`, `createBaseline`, `writing`, `saveStates`; own state `deleting: Note \| null`, initial `null` |
 | `NotesPanel.tsx` | `NotesPanel` | none | `NotesValue`: `notes` (the count) |
 | `NotesWidgetBody.tsx` | `NotesWidgetBody` | none | none; mounts `NotesList` |
 
 - `NotesList` is the one list in both homes: `NotesPanel` (the Notes tab's pane) and `NotesWidgetBody` (the chat gutter's widget).
 - Every reader takes `useNotes()` / `useNoteDrafts()` from `@/modules/notes/context/NotesContext` by path.
-- `NoteCard` reads both values: `setEdit`/`saveEdit` come from `NotesValue`, `edits`/`writing` from `NoteDraftsValue`.
+- `NoteCard` reads both values: `openEdit`/`changeEdit`/`saveEditNow`/`finishEdit` come from `NotesValue`, `edits`/`saveStates` from `NoteDraftsValue`.
 - The gutter's Notes widget: `GutterWidgetId` member `'notes'` (`src/shared/types.ts`); `DEFAULT_PLACEMENTS.notes` = `{ side: 'right', order: 2, open: false }` (`useGutterPlacements.ts`), under embed and folded; `ChatGutterLayout`'s widget table entry `notes` = title `gutters.notes.title`, `count` = `useNotes().notes?.length ?? 0`, icon `StickyNoteIcon`, `Body: NotesWidgetBody`; not `flush`, no header action.
 - A stored arrangement without `notes` gains it at its default: `parsePlacements` is seeded from `DEFAULT_PLACEMENTS`; no stored value is rewritten.
 
@@ -11316,41 +11374,61 @@ All in `src/modules/notes/`. Wire types `Note`, `NoteInput`: MAN-7513. Locale ke
 | house-row entry | `src/modules/project-workspace/WorkspaceTabs.tsx` `HOUSE_BASE_TABS` | `{ id: 'notes', labelKey: 'tabs.notes', icon: StickyNote }`, fifth after Schedules; no gate, no count dot |
 | pane | `src/modules/project-workspace/WorkspaceMain.tsx` | `activeTab === 'notes'` → `<NotesPanel />` in `div.h-full.overflow-hidden`, after Schedules; no gate |
 | barrel | `src/modules/notes/index.ts` | `NotesPanel` = `lazy(() => import(...))`; own chunk, loads on the tab's first open. `NotesWidgetBody` is a plain re-export, not lazy |
-| palette rows | `src/modules/command-palette/CommandPalette.tsx` `NAV_TABS` | `{ id: 'notes', label: 'Go to Notes', keywords: 'notes note cards jot write memo' }`, after Schedules |
-| palette tab list | `src/modules/project-workspace/ProjectCommandPalette.tsx` `visibleTabs` | `'notes'` in the base list, after `'schedules'` |
+| palette row | `src/modules/project-workspace/hooks/useWorkspaceViews.ts` `PLAN_VIEWS` | `{ id: 'notes', group: 'plans', icon: StickyNote, keywords: 'notes note cards jot write memo' }`, after Schedules; `ProjectCommandPalette.tsx` makes every view a `Go to <label>` row (MAN-8999), so the row stands whenever the view does |
 
 - No gate. `why:` the notes belong to the account, not the project; a tab a person opens to write in stays on the row whatever the gates say.
 - House row with both gates on (Memory, Heal) holds 9 glyphs (the Cerberus tab, MAN-7891, is the ninth, after API), the always-on Roadmap tab among them: `9 × 36 + 8 × 2 = 340px` against the 304px strip, so the More trigger (`overflowLabel`) takes the trailing tabs and a narrower strip hands it more.
 - `2026-10-06`: at 1440 the strip holds seven tabs and the More trigger takes API and Cerberus; Notes is the fifth tab, unmoved.
 - `2026-09-30`: a reload on the Notes tab restores it; Ctrl+K → `Go to Notes` selects it.
 
-## Notes screen — keyboard and focus
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/notes/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/notes/NoteCard.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/notes/NoteForm.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/notes/NotesList.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/notes/NotesPanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/notes/NotesWidgetBody.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/hooks/useProjectsState.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/WorkspaceMain.tsx
+
+## MAN-8994 — Notes — the screen: component map, keyboard, focus and wall rules — Notes screen — keyboard and focus
+section: Notes — the screen: component map, keyboard, focus and wall rules/001 Notes screen — keyboard and focus
 
 | Where | Key | Does |
 |---|---|---|
-| `NoteForm` title | Enter | submits |
+| `NoteForm` title | Enter | finishes the note (`onDone`: the same as Done) |
 | `NoteForm` description | Enter | new line |
-| `NoteForm` description | Ctrl+Enter / ⌘+Enter | submits |
+| `NoteForm` description | Ctrl+Enter / ⌘+Enter | finishes the note |
 | either field | no Escape | the fullscreen widget's Escape belongs to the gutter layout |
 
-- Submit is disabled while the title holds nothing the eye can see — whitespace, format (U+200B and family) and control characters stripped, nothing left — or while `busy`; the button and both Enter keys ask that one `canSubmit` (the service's mirror, MAN-7517).
-- Both `onKeyDown` handlers return first on `event.nativeEvent.isComposing`. `why:` an IME's committing Enter would submit the title; `useChatComposerState.ts` and `KanbanMetisConversation.tsx` guard the same way. A composing keystroke is not `preventDefault`ed.
+- There is no button that saves. The one button, Done, is drawn on an open note and on the blank card once it has become a note; it saves what is typed and closes the card (the blank card lets go of its note: a fresh blank card takes its place). Enter keys do the same.
+- Nothing is saved from a title that holds nothing the eye can see — whitespace, format (U+200B and family) and control characters stripped, nothing left (`DRAWS_AS_NOTHING` in `useNoteSaver.ts`, the service's mirror, MAN-7517). The card's quiet line then says `notes.form.titleNeeded` and the last saved version stands; Done on such a card leaves it open with what was typed, as the blank card does, until a title is back. Nothing typed under the empty title is sent while it stays empty — not by Done, not on the way out of the page.
+- Both `onKeyDown` handlers return first on `event.nativeEvent.isComposing`. `why:` an IME's committing Enter would finish the note; `useChatComposerState.ts` and `KanbanMetisConversation.tsx` guard the same way. A composing keystroke is not `preventDefault`ed.
 - `maxLength` on the fields: `TITLE_MAX_LENGTH = 200`, `DESCRIPTION_MAX_LENGTH = 20000`, mirroring the service limits (MAN-7517).
 
 | Event | Keyboard goes to |
 |---|---|
 | Edit pressed | the form's title inside the card |
-| Save landed, Cancel pressed | that card's Edit button |
-| Add landed, delete landed | the blank card's title (`composerTitleRef`) |
+| Done closed an open note | that card's Edit button |
+| Done or Enter let go of the blank card's note, delete landed | the blank card's title (`composerTitleRef`) |
+| focus moved off a card | nowhere: where it went is the person's |
 
-- A save or add that did not land leaves the form standing with the draft and the keyboard in it.
+- A Done whose save did not land leaves the form standing with the draft and the keyboard in it.
 
-## Notes screen — wall and card rules
+## Notes screen — leaving a card and the quiet line
+
+| What happens | The card does |
+|---|---|
+| focus moves to something outside the form while the page keeps focus (a click, a Tab out) | saves at once (`onLeave`); the blank card, once it holds a saved note, lets go of it and a fresh blank card takes its place; an open note stays open |
+| the window loses focus (an app switch, `document.hasFocus()` false) | saves at once (`onSaveNow`) and keeps its place, caret included |
+| the form unmounts (the Notes tab changes, the gutter widget folds) | the same as focus leaving, through the unmount effect |
+| the page is hidden or unloaded | the provider sends every open card's newest text with `keepalive`, beside a save still in the air (MAN-8998) |
+| focus moves between the form's own title, description and Done | nothing: that is not leaving |
+
+- The quiet line under the fields is `[data-note-status]`, a polite live region that keeps its height when empty: `notes.form.saving` while typed text waits for or is on its way to the server, `notes.form.saved` once the newest text has landed, `notes.form.titleNeeded` while no title can be sent. Never a toast for a save that worked; a failed save raises the one `notes.toast.saveFailed` toast with the server's sentence (MAN-7521) and the line says nothing.
+- The blank card does NOT move when its first save lands: the same `<li data-note-composer>` and the same textarea stay mounted, so focus, caret and text are where they were; `NotesList` leaves that note out of the wall (`composerNoteId`) so it is not drawn twice.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/notes/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/notes/NoteCard.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/notes/NoteForm.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/notes/NotesList.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/notes/NotesPanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/notes/NotesWidgetBody.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/hooks/useProjectsState.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/WorkspaceMain.tsx
+
+## MAN-8995 — Notes — the screen: component map, keyboard, focus and wall rules — Notes screen — wall and card rules
+section: Notes — the screen: component map, keyboard, focus and wall rules/002 Notes screen — wall and card rules
 
 - Wall: `NOTES_WALL_GRID` = `grid grid-cols-[repeat(auto-fill,minmax(min(100%,18rem),1fr))] items-start gap-4`; the blank card is the first `<li data-note-composer>`.
 - `min-w-0` on every grid item and every `Card`. `why:` `min-width: auto` lets one unbroken URL widen a track; `break-words` on the card then splits it.
 - Read mode: `title` and `description` are text nodes; description `whitespace-pre-wrap break-words`; nothing clamped.
-- Edit mode is `edits[note.id] !== undefined`; `NoteCard` holds no edit flag.
+- Edit mode is `edits[note.id] !== undefined`; `NoteCard` holds no edit flag. A card in edit mode shows its draft in input values, so a probe finds it by `data-note-id="<id>"`, never by the words it shows.
 - Card verbs (Edit, Delete): `h-10 w-10` until `sm`, `sm:h-8 sm:w-8`. `why:` the house corner-button floor (`LaneCardHead` `CORNER_BUTTON`, `CardFold`); these are the card's only controls on a phone.
 - `NotesPanel`'s `Badge` draws only when `notes.length > 0`; `notes === null` draws none.
 
@@ -11358,7 +11436,7 @@ All in `src/modules/notes/`. Wire types `Note`, `NoteInput`: MAN-7513. Locale ke
 |---|---|
 | `notes === null`, `unreachable` | `EmptyState` with `notes.retry` → `refresh()` |
 | `notes === null`, not `unreachable` | `Spinner` |
-| `notes` answered | the wall, blank card first |
+| `notes` answered | the wall, blank card first; it leaves out the note in `composerNoteId`, and while `createBaseline` is set every note outside that set (MAN-8996) |
 | `notes.length === 0` | wall plus `EmptyState` under it |
 
 - Both the `null` branch and the empty `EmptyState` sit in `flex items-center justify-center px-4 py-10`. `why:` a bare `EmptyState` stretches its dashed frame across the pane; same wrapper as `MemoryIntakePanel`, `RunnerPanel`, `KanbanPanel`, `ShellEmptyState`.
@@ -11374,7 +11452,7 @@ All in `src/modules/notes/`. Wire types `Note`, `NoteInput`: MAN-7513. Locale ke
 | `data-notes-list` | the wall `<ul>` |
 | `data-note-composer` | the blank card's `<li>` |
 | `data-note-id` | each note's `<li>` |
-| `data-note-form`, `data-note-title`, `data-note-description`, `data-note-submit`, `data-note-cancel` | `NoteForm` parts |
+| `data-note-form`, `data-note-title`, `data-note-description`, `data-note-done`, `data-note-status` | `NoteForm` parts; `data-note-status` carries the status word (`saving`, `saved`, `titleNeeded`, or empty) |
 | `data-note-edit`, `data-note-delete` | the card's two verbs |
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/notes/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/notes/NoteCard.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/notes/NoteForm.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/notes/NotesList.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/notes/NotesPanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/notes/NotesWidgetBody.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/hooks/useProjectsState.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/WorkspaceMain.tsx
@@ -11447,6 +11525,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/utils/simple
 |---|---|
 | `src/modules/notes/context/NotesContext.ts` | `NotesContext`, `NoteDraftsContext`, types `NotesValue`, `NoteDraftsValue`, hooks `useNotes`, `useNoteDrafts` — no component |
 | `src/modules/notes/context/NotesProvider.tsx` | `NotesProvider` only |
+| `src/modules/notes/hooks/useNoteSaver.ts` | `useNoteSaver` only — the autosave's writer, one lane per open card; the provider is its one caller |
 | `src/modules/notes/index.ts` | `NotesProvider` (App mounts it), `useNotes` (the chat gutter's widget count), `NotesPanel` (`lazy`; the Notes tab's pane, mounted by `WorkspaceMain`: MAN-7518), `NotesWidgetBody` (the gutter widget's body, mounted by `ChatGutterLayout`) |
 
 - Mount in `src/App.tsx`: `<NotesProvider>` inside `<MemoryIntakeProvider>`, wrapping `<HealProvider>`; inside the auth gate, below `WebSocketProvider`. `why:` `api.notes` is authenticated and must not fire against the login screen; both re-read frames arrive on the one socket.
@@ -11455,7 +11534,10 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/utils/simple
 - `ChatGutterLayout` (`src/modules/chat-gutters`) reads `useNotes()` at its top level for the widget's badge and mounts `NotesWidgetBody`; it is the one consumer outside `src/modules/notes/` (MAN-7518).
 - `NoteCard.tsx`, `NotesList.tsx`, `NotesPanel.tsx` read `useNotes()` / `useNoteDrafts()` from `@/modules/notes/context/NotesContext` by path.
 
-## Notes provider — the two values
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/App.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/notes/context/NotesContext.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/notes/context/NotesProvider.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/notes/hooks/useNoteSaver.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/notes/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts
+
+## MAN-8996 — Notes — the client provider: contexts, reads, writes, drafts — Notes provider — the two values
+section: Notes — the client provider: contexts, reads, writes, drafts/001 Notes provider — the two values
 
 Two contexts. `why:` the list changes when a read lands, a draft on every keystroke; a letter typed into the blank card must not re-render the wall.
 
@@ -11464,28 +11546,37 @@ Two contexts. `why:` the list changes when a read lands, a draft on every keystr
 | `notes: Note[] \| null` | newest first; `null` = no read has ever answered |
 | `unreachable: boolean` | true only while `notes` is `null` and the last read failed |
 | `refresh(): Promise<void>` | one read; also the Try again press |
-| `setComposer(draft)` | replaces the blank card's draft |
-| `setEdit(id, draft \| null)` | `null` deletes the entry and leaves edit mode |
-| `add(draft)`, `saveEdit(id, draft)`, `remove(id)` | each `Promise<boolean>`: `true` = the write landed; `false` = it did not, and the toast is already raised |
+| `changeComposer(draft)` | replaces the blank card's draft and hands it to the autosave |
+| `openEdit(note)` | puts the note in edit mode over its text as it stands; the autosave holds that text, and the note's `updatedAt`, as what the server has |
+| `changeEdit(id, draft)` | replaces an open note's draft (a keystroke after the card closed finds no entry and is dropped) and hands it to the autosave |
+| `saveComposerNow()`, `saveEditNow(id)` | save what is typed now and leave the card as it is; `Promise<void>` |
+| `finishComposer()` | the blank card is left (Done, Enter, focus off, its tab or widget gone): save now, and once the card holds a saved note whose newest text has landed, let go of it — `composer` blank, `composerNoteId` null, a fresh blank card. `true` when it let go; `false` for nothing typed, no title, a save that did not land, or typing that began during the save |
+| `finishEdit(id)` | Done: save now, then drop the entry (`true`). A save that did not land, more typed during it, or a title that draws as nothing (nothing can be sent under it) leaves the card open with its text (`false`) |
+| `remove(id)` | `Promise<boolean>`: `true` = the delete landed; `false` = it did not, and the toast is already raised |
 
 | `NoteDraftsValue` member | Meaning |
 |---|---|
-| `composer: NoteInput` | the blank card's draft |
+| `composer: NoteInput` | the blank card's draft; never replaced by what the server answered |
+| `composerNoteId: string \| null` | the note the blank card has become, from the landing of its first save until `finishComposer`; `NotesList` leaves that note out of the wall while it is set |
+| `createBaseline: ReadonlySet<string> \| null` | the ids the wall held when the blank card's first save left, until its answer (or failure) arrives; `NotesList` hides every note outside it, because the server's frame can bring the new note into the list before the answer names it |
 | `edits: Record<string, NoteInput>` | drafts over notes by id; a card is in edit mode exactly while it has an entry |
-| `adding: boolean` | the blank card's add is in flight |
-| `writing: Record<string, true>` | note ids with a save or delete in flight |
+| `writing: Record<string, true>` | note ids with a delete in flight |
+| `saveStates: Record<string, NoteSaveStatus>` | each card's quiet saving line, by `COMPOSER_TARGET` (`'composer'`) or note id: `saving`, `saved`, `titleNeeded`; no entry says nothing |
 
-- Write `edits` only through `setEdit`, `composer` only through `setComposer`; no consumer keeps a second draft.
-- The six verbs (`refresh`, `setComposer`, `setEdit`, `add`, `saveEdit`, `remove`) keep one identity for the app's life; a consumer may memoise on them.
+- Write `edits` only through `openEdit` / `changeEdit` / `finishEdit`, `composer` only through `changeComposer` / `finishComposer`; no consumer keeps a second draft.
+- The nine members that are verbs (`refresh`, `changeComposer`, `openEdit`, `changeEdit`, `saveComposerNow`, `saveEditNow`, `finishComposer`, `finishEdit`, `remove`) keep one identity for the app's life; a consumer may memoise on them.
 - The translator is read through `tRef`, set in `useLayoutEffect`; a verb never lists `t` in its deps, so a language switch rebuilds nothing. A new verb follows the same pattern. `why:` a render-time ref write trips the `react(refs)` lint ratchet.
 
-## Notes provider — reads
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/App.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/notes/context/NotesContext.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/notes/context/NotesProvider.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/notes/hooks/useNoteSaver.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/notes/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts
+
+## MAN-8997 — Notes — the client provider: contexts, reads, writes, drafts — Notes provider — reads
+section: Notes — the client provider: contexts, reads, writes, drafts/002 Notes provider — reads
 
 `api.notes.list()` = `GET /api/notes` (MAN-7517).
 
 | Answer | Effect |
 |---|---|
-| `response.ok` and `data` an array | `notes` replaced whole, never merged; `unreachable` false; `edits` entries for ids absent from the list dropped |
+| `response.ok` and `data` an array | `notes` replaced whole, never merged; `unreachable` false; `edits` entries for ids absent from the list dropped; a card with NOTHING typed in it (clean lane, nothing in the air) whose note now carries a NEWER `updatedAt` than the card's base takes the server's text (`rebaseCleanCards` → `saver.rebase`), so another device's save is not written back over by this card's next keystroke. A card with typing in it, and any older answer, are left alone |
 | not ok, `data` not an array, or a throw | list kept; `unreachable` set true only while `notes` is `null` |
 
 | Read trigger | Source |
@@ -11493,39 +11584,42 @@ Two contexts. `why:` the list changes when a read lands, a draft on every keystr
 | mount | the provider's effect |
 | `notes_changed` | `useWebSocket().subscribe` |
 | `websocket_reconnected` | the same subscription; client-synthetic, dispatched on socket open |
-| own landed write | the re-read inside `add` / `saveEdit` / `remove` |
+| own landed write | the re-read at the end of an autosave drain, and inside `remove` |
 | Try again | `refresh()` |
 
 - The effect subscribes before the first read. `why:` a frame landing between the two starts its own read instead of being missed.
 - Tickets: a read takes `++newestReadRef`; an answer with a ticket below `newestAnswerRef` is dropped, every trigger alike. `why:` a read that left before a write's re-read must not land after it and restore the pre-write list.
 - State is set and toasts are raised only while mounted (`mountedRef`).
 - `2026-09-30`, dev: boot makes 2–4 `GET /api/notes` (StrictMode's double mount, plus one or two reconnect frames); a production build loses the StrictMode duplicate. Designed; the reconnect trigger stays.
-- `2026-09-30`: one press costs two reads under real frame traffic (the write's re-read, the broadcast's read). A client-side de-dup needs an origin the frame lacks (no per-account filter, MAN-7517); the cure is server-side origin tagging or client caching, each its own design.
+- `2026-09-30`: one write costs two reads under real frame traffic (the write's re-read, the broadcast's read); an autosave drain is one write per pause. A client-side de-dup needs an origin the frame lacks (no per-account filter, MAN-7517); the cure is server-side origin tagging or client caching, each its own design.
 
-## Notes provider — writes
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/App.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/notes/context/NotesContext.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/notes/context/NotesProvider.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/notes/hooks/useNoteSaver.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/notes/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts
 
-| `api.notes` | Request |
+## MAN-8998 — Notes — the client provider: contexts, reads, writes, drafts — Notes provider — the autosave (`hooks/useNoteSaver.ts`)
+section: Notes — the client provider: contexts, reads, writes, drafts/003 Notes provider — the autosave (`hooks/useNoteSaver.ts`)
+
+A LANE is one open card's writer: the blank card's (`COMPOSER_TARGET`) or a note's (its id). It keeps the newest typed text (`latest`), the text the server is known to hold (`saved`, as typed — never what the server answered), a quiet-period timer, at most one flight, and the note it writes to (`noteId`; null until the blank card's first save creates one). A lane lives exactly while its card is open: `openEdit` makes a note's, the first keystroke makes the blank card's, and the provider ends a lane when its `edits` entry leaves (`saver.retain`), on `finishEdit` / `finishComposer` and on `remove`.
+
+| Fact | Value |
 |---|---|
-| `list()` | `GET /api/notes` |
-| `create(input: NoteInput)` | `POST /api/notes` |
-| `update(id, input: NoteInput)` | `PUT /api/notes/<encodeURIComponent(id)>` |
-| `remove(id)` | `DELETE /api/notes/<encodeURIComponent(id)>` |
+| quiet period | `AUTOSAVE_DELAY_MS = 1000`: every keystroke resets the timer |
+| at once | `saveComposerNow`, `saveEditNow`, `finishComposer`, `finishEdit`; the card's `onLeave` (focus off, unmount) and `onSaveNow` (window blur); `saver.leave()` on `visibilitychange` to hidden and on `pagehide` |
+| a save | `api.notes.create(draft)` for a lane with no `noteId`, else `api.notes.update(noteId, draft)`; both `keepalive: true` while the JSON body of the draft is at most `KEEPALIVE_BODY_MAX_BYTES = 60_000` bytes (browsers refuse a keepalive body over 64 KiB; a longer note saves the ordinary way and does not outlive a closing page) |
+| title that draws as nothing | never sent: `blocked`, line `titleNeeded` (a blank card with nothing typed says nothing); `DRAWS_AS_NOTHING` mirrors the service's class |
+| order | a lane's `drain` is one loop: send the newest text, and when it lands read `latest` again, until `saved` equals `latest`; typing during a flight therefore costs one more save after it, carrying the newest text, and a `flush` while a flight is up is handed that same flight. There is never a second request in the air to overtake the first — except when the page is going away (next row) |
+| the page going away | `saver.leave()`: a lane with nothing in the air flushes at once; a note's lane with a save in the air also sends its newest text as one more `update` with `keepalive` (the loop's next request would go out only after an answer the closing page may never see), unless the request in the air or the last leave already carries that text and unless its title draws as nothing. The two events of one close (`visibilitychange`, `pagehide`) send it once. A blank card whose create is still in the air has no id to update, so what was typed after the create left is not sent. The in-flight save left first, so the server normally has it first; a request that overtook it would be written over by it only on a page that is still alive, and there the loop then sends the newest text again |
+| the list | one `refresh()` per drain, after its last landed save (and before `blocked` or `failed` when something landed); an open card draws its draft, never the server's answer, so a re-read cannot move the caret or eat a letter |
+| a create's answer | the body's `data.id` is read (the one write body this module reads): `onBound` sets `composerNoteId`, and every later save of that card is an update of that note. The answers' `updatedAt` is also read: it is the lane's base for `rebase`. A create that landed but named no note is reported as a failure. A create in the air raises `onCreating`, which snapshots the wall's ids (`createBaseline`). An update of the blank card's note that answers 404 `NOTE_NOT_FOUND` (deleted on another device) is no failure: the lane lets go of the id (`onBound(target, null)`) and the loop creates a new note from the text; an open note's lane keeps the ordinary failure and its entry goes when a re-read no longer holds the note |
+| status | `saving` from the keystroke (or the flush) until the newest text has landed; `saved` after the last landing; `titleNeeded`; typed back to the saved text clears it |
+| a save that did not land | `failed`: one `warn` toast, `title` = `t('notes.toast.saveFailed')`, `message` = the server's own sentence (`attemptWrite` in `src/shared/api.ts` → `refusalSentence`), omitted when none; the lane keeps its text, says nothing inline, and retries on the next change or flush. It stays quiet (`complained`) until a save has landed again, so a server that is down raises one toast, not one per pause |
+| a lane closed mid-flight | the drain stops writing for it |
 
-- No write's response body is read. The verdict is `response.ok`; the list on screen comes from the re-read that follows. A consumer never draws from a write's answer.
-- One write per target: `writesInFlightRef` maps the target (`'composer'`, or a note id) to its in-flight promise. A second press on a target returns the held promise and starts no second write. The entry leaves when the promise settles.
-- The busy mark goes up synchronously at the press and stays until the re-read after a landed write has returned.
+`remove(id)` is not the autosave's: one delete per note id at a time (`deletesInFlightRef`, a second press returns the held promise), `writing[id]` up from the press until the re-read after a landed delete has returned, the note's lane ended first; a failure raises `notes.toast.deleteFailed` with the server's sentence, turns the mark off and touches no draft.
 
-| Verb | Target | Mark | Toast title key on failure | Cleared after the landed write's re-read |
-|---|---|---|---|---|
-| `add` | `composer` | `adding` | `notes.toast.saveFailed` | `composer` ← blank, only while it still holds the sent draft; `adding` off |
-| `saveEdit` | note id | `writing[id]` | `notes.toast.saveFailed` | `edits[id]` dropped, only while it still holds the sent draft; `writing[id]` off |
-| `remove` | note id | `writing[id]` | `notes.toast.deleteFailed` | `edits[id]` dropped; `writing[id]` off |
+- A write that landed is silent; the quiet line is the only sign. The provider raises toasts only while mounted (`mountedRef`).
+- Dev only: React StrictMode's simulated unmount calls each form's `onLeave` once on a fresh mount, where no lane exists, so it saves and releases nothing.
 
-- A write that did not land answers `false`, turns its mark off, touches no draft, and raises one `warn` toast: `title` = `t(key)`; `message` = the server's own sentence, `refusalSentence(response)` from `src/shared/api.ts` (`errorMessage(error) ?? errorMessage(details)` of the refusal body; the one copy `CerberusProvider` shares, MAN-7871), omitted when the body carries none or is not JSON.
-- A write that landed is silent and answers `true`.
-- Drafts clear only after the re-read has returned, whichever way the re-read went — and only the draft the write SENT, only while it is still that text: typing that began while the write was in flight is newer than the write and is left standing. `why:` a card never shows the text it just replaced, and no keystroke is ever eaten.
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/App.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/notes/context/NotesContext.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/notes/context/NotesProvider.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/notes/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/App.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/notes/context/NotesContext.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/notes/context/NotesProvider.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/notes/hooks/useNoteSaver.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/notes/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts
 
 ## MAN-7527 — Notes
 
@@ -11537,13 +11631,14 @@ The **Notes** tab in the workspace: one account's cards — a sticky note each, 
 | the wire shapes and the locale keys | MAN-7513 |
 | the API at `/api/notes` and the `notes_changed` frame | MAN-7517 |
 | the screen — components, keyboard, focus, wall rules | MAN-7518 |
-| the provider — contexts, reads, writes, drafts | MAN-7521 |
+| the provider — contexts, reads, drafts, the autosave | MAN-7521 |
+| Claude's door — the `notes` command, `/api/notes-cmd`, the `notes` skill | MAN-8993 |
 
 ## The tab
 - Fifth on the house row (`HOUSE_BASE_TABS`, `src/modules/project-workspace/WorkspaceTabs.tsx`), after Schedules, ahead of the data-gated Memory and Heal tabs and the API tab — so it never moves and is never a trailing tab.
 - `{ id: 'notes', labelKey: 'tabs.notes', icon: StickyNote }`; the label is `tabs.notes` (`"Notes"`, `src/modules/i18n/locales/en/common.json`). **No gate and no count** — `why:` a note is not something waiting to be read, and the cards belong to the account, not to the open project.
-- `Go to Notes` (`NAV_TABS`, `src/modules/command-palette/CommandPalette.tsx`, after Schedules; keywords `notes note cards jot write memo`), offered while the tab is on the row: `'notes'` sits in `ProjectCommandPalette.tsx`'s base `visibleTabs` list.
-- `'notes'` is a valid persisted tab (`VALID_TABS`, `hooks/useProjectsState.ts`; read back by `readPersistedTab`). A reload at `/` lands on "Choose Your Project" — no project is restored; the workspace returns with Notes selected and its list drawn once a project row is picked. 2026-09-30, live: stored tab `"notes"`, workspace back on Notes after the row click. A probe of the persisted tab clicks `PROJECT_ROW` (`.verify/lib/console.mjs`) after the reload.
+- `Go to Notes`: the `notes` entry of `PLAN_VIEWS` (`src/modules/project-workspace/hooks/useWorkspaceViews.ts`, after Schedules; keywords `notes note cards jot write memo`), a Navigate row whenever the view exists (MAN-8999).
+- `'notes'` is a valid persisted tab (`VALID_TABS`, `hooks/useProjectsState.ts`; read back by `readPersistedTab`). A reload at `/` restores no project and needs none: the Notes pane draws at once with the stored tab, and on a phone the header reads "Notes". The pane belongs to the account, so nothing in it waits for a project row.
 - The pane is `NotesPanel`, mounted by `WorkspaceMain.tsx` while the tab is active: the header the In flight face and the Memory pane wear (icon tile, `notes.title` in an `h2`, a count `Badge` — Notes and the In flight face draw theirs above zero only; the Memory pane's badge shows its count whenever the intake queue is reachable) over a `ScrollArea` holding `NotesList`.
 
 ## The widget
@@ -11556,37 +11651,41 @@ The **Notes** tab in the workspace: one account's cards — a sticky note each, 
 - `NotesList` is mounted by `NotesPanel` (the tab) and by `NotesWidgetBody` (the gutter) — one list, one provider, so a note added in either home is in both and neither holds a copy the other cannot see.
 - One auto-fill grid, and it is what makes the list a wall in the tab and a stack in a gutter: `NOTES_WALL_GRID` = `grid grid-cols-[repeat(auto-fill,minmax(min(100%,18rem),1fr))] items-start gap-4` (`NotesList.tsx`): each column is at least 18rem wide and the columns share the leftover width (`1fr`: a 700 px container draws 342 px columns, not 288), and a container narrower than 18rem gets one column as wide as the container — the wall's cards are 18rem and up, and a gutter card is its column.
 
-## The drafts
-- `NotesProvider` holds the drafts on the second context (`NoteDraftsContext`): `composer`, what is typed in the blank card, and `edits` by note id — a card is in edit mode exactly while it has an entry.
-- They outlive the pane and a folded widget: the provider is mounted once above both homes. They end at sign-out — the provider unmounts with the auth gate — and on a reload; nothing writes them anywhere.
+## The drafts and the autosave
+- `NotesProvider` holds the drafts on the second context (`NoteDraftsContext`): `composer`, what is typed in the blank card; `composerNoteId`, the note the blank card has become; `edits` by note id — a card is in edit mode exactly while it has an entry; and `saveStates`, each card's quiet saving line.
+- **Nothing is pressed to save.** An open card saves itself about a second after typing stops (`AUTOSAVE_DELAY_MS`, `hooks/useNoteSaver.ts`) and at once when it is left: Done, focus leaving the card, its tab or the gutter widget going away, or the page being hidden or closed (`visibilitychange`, `pagehide`). Saves carry `keepalive` while the body is at most 60,000 bytes, so a save on the way out outlives the page; a hidden page also sends the newest text of a note beside a save still in the air, and a blank card whose first save has not been answered cannot (no id yet), so what was typed after that save left stays in the card. The blank card saves itself as a NEW note once it has a title and typing pauses, and stays open on that note — text, focus and caret where they were, Done drawn — until it is left, when a fresh blank card takes its place. A description with no title, and a saved note whose title was cleared, send nothing: the card says a title is needed and the last saved version stands. A failed save raises one toast with the server's sentence and keeps the text. The writer: MAN-7521; the card: MAN-7518.
+- The drafts outlive the pane and a folded widget: the provider is mounted once above both homes. They end at sign-out — the provider unmounts with the auth gate — and on a reload; a draft reaches the server only through the autosave.
 - `App.tsx` mounts `NotesProvider` inside the auth gate and below `WebSocketProvider`, the socket that carries the frame re-reading the list.
 
 ## The table, the routes and the frame
 - Table `notes` (`server/modules/database/notes-schema.ts`; `notesDb` in `repositories/notes.db.ts` — MAN-7510): per account, newest first (`created_at DESC`, then `rowid DESC`), and an edit never moves a card (`created_at` never moves, `updated_at` is the last save). Every statement carries `user_id = ?`, so an id of another account reads as no row.
 - Four routes on one mount, `/api/notes` (`server/index.ts`, behind `authenticateToken`; MAN-7517): `GET` → 200 `Note[]`; `POST` → 201 `Note`; `PUT /:id` → 200 `Note`; `DELETE /:id` → 200 `{ deleted: true }`.
+- A second door beside it, `/api/notes-cmd`, for the `notes` command a chat runs and Claude's `notes` skill: behind the chat's own credential and no login, list, show and add only, over the same `notesService` (MAN-8993). `/api/notes` still refuses that credential.
 - Refusals: 401 `USER_REQUIRED` (the account is not an integer above 0); 400 `INVALID_REQUEST_BODY` (`title`, or a present `description`, is not a string); after normalising, 400 `TITLE_REQUIRED` (empty title — nothing the eye can see), `TITLE_TOO_LONG` (over 200), `DESCRIPTION_TOO_LONG` (over 20,000); 404 `NOTE_NOT_FOUND` for an id no row of the account carries.
 - `notes_changed` — `{ kind: 'notes_changed', at }` — goes to every open `/ws` socket after each write that landed, through `connectedClients` (MAN-315). It names no note and no account, so the only answer to it is "read this account's own list again".
-- The reads it triggers: `NotesProvider` reads on mount, on a `notes_changed` frame, on `websocket_reconnected`, and after each of its own writes. A socket of another account learns only that something moved.
+- The reads it triggers: `NotesProvider` reads on mount, on a `notes_changed` frame, on `websocket_reconnected`, and after each of its own writes. A socket of another account learns only that something moved. A note Claude adds through the command door sends the same frame, so an open Notes tab draws it with no reload; a read never touches a draft.
 
 ## The files
 | File | Holds |
 |---|---|
-| `server/modules/notes/notes.service.ts` | the four verbs — normalise, judge, write — and the frame |
-| `server/modules/notes/notes.routes.ts` | the four routes and their transport refusals |
-| `server/modules/notes/notes.module.ts` | `createNotesModule`: the one router, mounted at `/api/notes` and nowhere else |
+| `server/modules/notes/notes.service.ts` | the verbs — list, get, create, update, remove: normalise, judge, write — and the frame |
+| `server/modules/notes/notes.routes.ts` | the tab's four routes and their transport refusals |
+| `server/modules/notes/notes.command-routes.ts` | the `notes` command's door, `POST /api/notes-cmd`: list, show, add (MAN-8993) |
+| `server/modules/notes/notes.module.ts` | `createNotesModule`: the tab's router (`/api/notes`) and the command's (`/api/notes-cmd`); links `~/.local/bin/notes` |
 | `server/modules/notes/index.ts` | the barrel: `createNotesModule` |
 | `server/modules/database/notes-schema.ts` | `NOTES_SCHEMA_SQL`: the table and its one index |
 | `server/modules/database/repositories/notes.db.ts` | `notesDb` and `NoteRow` |
 | `src/modules/notes/context/NotesContext.ts` | the two contexts, `NotesValue` and `NoteDraftsValue`, `useNotes` and `useNoteDrafts` |
-| `src/modules/notes/context/NotesProvider.tsx` | the reads, the writes, the drafts |
+| `src/modules/notes/context/NotesProvider.tsx` | the reads, the drafts, the saving lines, the delete |
+| `src/modules/notes/hooks/useNoteSaver.ts` | the autosave: one writer per open card |
 | `src/modules/notes/NotesList.tsx` | the wall and its grid, the blank card, the delete question |
-| `src/modules/notes/NoteForm.tsx` | the controlled form and the two length limits |
+| `src/modules/notes/NoteForm.tsx` | the controlled form, its quiet saving line, Done, and the two length limits |
 | `src/modules/notes/NoteCard.tsx` | one card: read mode, edit mode, Edit and Delete |
 | `src/modules/notes/NotesPanel.tsx` | the tab's pane: header and `ScrollArea` |
 | `src/modules/notes/NotesWidgetBody.tsx` | the gutter's body: `NotesList` and nothing else |
 | `src/modules/notes/index.ts` | the barrel: `NotesProvider`, `useNotes`, lazy `NotesPanel`, `NotesWidgetBody` |
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/notes-schema.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/notes.db.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notes/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notes/notes.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notes/notes.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notes/notes.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/notes/context/NotesContext.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/notes/context/NotesProvider.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/notes/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/notes/NoteCard.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/notes/NoteForm.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/notes/NotesList.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/notes/NotesPanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/notes/NotesWidgetBody.tsx
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/notes-schema.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/notes.db.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notes/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notes/notes.command-routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notes/notes.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notes/notes.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notes/notes.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/notes/context/NotesContext.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/notes/context/NotesProvider.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/notes/hooks/useNoteSaver.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/notes/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/notes/NoteCard.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/notes/NoteForm.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/notes/NotesList.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/notes/NotesPanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/notes/NotesWidgetBody.tsx
 
 ## MAN-7530 — Where a tap lands
 
@@ -11624,7 +11723,7 @@ The workspace's half of a tap on a plan's prompt. The server's half (`landingPat
 | --- | --- | --- |
 | `ProjectEffects` | `src/modules/project-workspace/controllers/ProjectEffects.tsx` | on the service worker's `notification:navigate`: `setActiveTab('chat')`, then `navigate(message.urlPath)` when `urlPath` is a string starting with `/`, verbatim |
 | `useRunnerLanding` | `src/modules/project-workspace/hooks/useRunnerLanding.ts` | reads `?runner=` and `?roadmap=` (MAN-7748), holds each name (`revealPlan`, `openRoadmap`), brings the Roadmap tab (the `runner` id) forward for either, strips both params in one call, retires both names when the tab leaves the screen |
-| `WorkspaceMain` | `src/modules/project-workspace/WorkspaceMain.tsx` | calls `useRunnerLanding({ selectedProject, activeTab, setActiveTab })`; renders `<RoadmapTab revealPlan={revealPlan} onRevealed={clearReveal} openRoadmap={openRoadmap} onRoadmapOpened={clearOpenRoadmap} />` |
+| `WorkspaceMain` | `src/modules/project-workspace/WorkspaceMain.tsx` | calls `useRunnerLanding({ activeTab, setActiveTab })`; renders `<RoadmapTab revealPlan={revealPlan} onRevealed={clearReveal} openRoadmap={openRoadmap} onRoadmapOpened={clearOpenRoadmap} />` |
 | `RoadmapTab` | `src/modules/roadmap/RoadmapTab.tsx` | a non-null `revealPlan` turns it to the In flight face during render, before `RoadmapTreeFace` can mount; hands the plan to `RunnerPanel` (MAN-7640) |
 | `RunnerPanel` | `src/modules/runner-tab/RunnerPanel.tsx` | scrolls the named card into view (an arc's plan: its deck, then the deck's strip paged to the card), then calls `onRevealed` |
 
@@ -11634,10 +11733,10 @@ The workspace's half of a tap on a plan's prompt. The server's half (`landingPat
 - The param's name is `RUNNER_LANDING_PARAM` (`src/shared/constants.ts`), read here. Written by the server's `landingPathOf` and by `useRevealCard` (MAN-7650), which navigates (`replace`) to `?runner=<plan>` from a roadmap press with no Roadmap tab above it.
 
 ## `useRunnerLanding` — rules
-1. The name is held from the commit that first sees it, NOT from the commit a project exists. why: at `/` no tab strip is drawn until a project is picked, and the pick (`handleProjectSelect`) rewrites the location to bare `/`, so a read that waited for `selectedProject` finds the param gone.
+1. The name is held from the commit that first sees it, with a project selected or not. why: every view's pane draws with no project (the Roadmap view among them), so nothing waits for a pick; and the pick (`handleProjectSelect`) rewrites the location to bare `/`, so the URL is no place to keep a name.
 2. An empty or whitespace `runner` or `roadmap` moves nothing: no tab, no strip, no `localStorage.activeTab` write, URL left as typed.
-3. The params are stripped (`setSearchParams(…, { replace: true })`, rebuilt so other keys survive) only once `selectedProject` is non-null. With no project they stay in the URL, so a reload during the wait re-lands. why: `replace`, so Back never returns to a URL that re-lands.
-4. `setActiveTab('runner')` runs when `revealPlan` or `openRoadmap` is set and `selectedProject` is non-null. The effect keys on the HELD names, never on the params.
+3. The params are stripped (`setSearchParams(…, { replace: true })`, rebuilt so other keys survive) in the same commit that reads them, project or not. why: `replace`, so Back never returns to a URL that re-lands.
+4. `setActiveTab('runner')` runs when `revealPlan` or `openRoadmap` is set. The effect keys on the HELD names, never on the params.
 5. `revealPlan` and `openRoadmap` are state, not a live read of the URL. why: the pane mounts a render after the strip, so a URL read there finds nothing.
 6. `clearReveal` and `clearOpenRoadmap` are stable `useCallback`s. why: the pane's and the tab's effects list them; a fresh identity would re-run a retired request.
 7. Both params go in ONE `setSearchParams`. why: its updater gets the params of the render that made it, so a second call in the same pass rebuilds from the same start and puts the first's key back.
@@ -11662,7 +11761,7 @@ The workspace's half of a tap on a plan's prompt. The server's half (`landingPat
 | --- | --- |
 | `/session/<id>?runner=<plan>`, persisted tab `chat` | Roadmap tab selected on its In flight face, target top inside the viewport, `location.search` without `runner` |
 | session chat with no param, handed the worker's `notification:navigate` message on `navigator.serviceWorker` | lands the same way (`ProjectEffects`' half; no push sent) |
-| `/?runner=<plan>`, no project picked | nothing lands, the param stays |
+| `/?runner=<plan>`, no project picked | Roadmap tab selected on its In flight face, target top inside the viewport, `location.search` without `runner` |
 | control: persisted tab `runner`, no param, opened on In flight | pane `scrollTop: 0` |
 
 - The target is the last card of `[data-runner-loose-plans]` as the live In flight face draws it; with no loose plan, the last `[data-dispatch-arc]`'s first plan.
@@ -13100,8 +13199,8 @@ The Roadmap tab is the workspace tab whose id is `runner`: label `Roadmap`, glyp
 | width | 9 glyphs with Memory and Heal on = 340px against the 304px strip, so the More trigger takes the trailing tabs there, and a narrower strip hands it more; never the tab a person is standing in |
 
 ## Ungated
-- `useWorkspaceTabGates` returns `shouldShowRunnerTab: true`, a literal and never a reading. `WorkspaceMain` and `ProjectCommandPalette` still read the field; it is always true.
-- `WorkspaceTabs` takes no `shouldShowRunnerTab` prop and `houseTabs` adds nothing conditionally for this tab. The lane's contents never move the row.
+- No gate exists for it anywhere: `useWorkspaceTabGates` has no `runner` field, `WorkspaceMain` mounts the pane on `activeTab === 'runner'` alone, and the views list (`useWorkspaceViews`, MAN-8999) carries `runner` unconditionally.
+- `WorkspaceTabs` takes no gate prop for it and `houseTabs` adds nothing conditionally for this tab. The lane's contents never move the row.
 - `WorkspaceMain` has no snap-back effect for it (MAN-601).
 - why: a row that reflowed would move every tab a hand already knows the position of; the tab takes the first house slot once and never toggles.
 - A lane with nothing on it leaves the tab on the row; the In flight face draws `EmptyState` (`runner.empty` = `Nothing in flight`).
@@ -13114,7 +13213,7 @@ The Roadmap tab is the workspace tab whose id is `runner`: label `Roadmap`, glyp
 
 ## Two faces
 - The chat gutter's Roadmap widget draws this same tab at full screen, handed no landing (`RoadmapWidgetFullscreenBody`, MAN-7668): both faces behind the same switch; a card press there turns to In flight through the tab's own `openCard`.
-- `RoadmapTab({ revealPlan, onRevealed, openRoadmap, onRoadmapOpened })` mounts as the `runner` pane: `{shouldShowRunnerTab && activeTab === 'runner' && <RoadmapTab … />}` in `WorkspaceMain`, imported from the roadmap barrel (lazy).
+- `RoadmapTab({ revealPlan, onRevealed, openRoadmap, onRoadmapOpened })` mounts as the `runner` pane: `{activeTab === 'runner' && <RoadmapTab … />}` in `WorkspaceMain`, imported from the roadmap barrel (lazy).
 - `face` is local state, `path` or `inFlight`, never remembered: every visit opens on the `startFace` prop, default `inFlight`; the widget at full screen passes `path` (MAN-7668). `data-roadmap-tab=<face>`.
 - A restored `runner` tab lands on the pane (`VALID_TABS`); choosing a conversation returns to chat from it, as from every tab (`handleSessionSelect`).
 - Words: `roadmap.faces.path` = `Roadmap`, `roadmap.faces.inFlight` = `In flight`; `runner.title` = `In flight` heads `RunnerPanel`.
@@ -13125,8 +13224,8 @@ The Roadmap tab is the workspace tab whose id is `runner`: label `Roadmap`, glyp
 - A feature dialog's Open its card or Answer on its card lands the same way, inside the tab (the face's `openCard` prop) or by `?runner=` where no tab is above (`useRevealCard`, MAN-7650).
 
 ## Palette
-- `CommandPalette.tsx` `NAV_TABS` row `runner`: label `Go to Roadmap`; keywords `roadmap milestone epic feature task goal path in flight runner feature epic task run live plan phases`.
-- `ProjectCommandPalette` `visibleTabs` pushes `runner` when `shouldShowRunnerTab`, so the row is always offered.
+- `Go to Roadmap`: the `runner` entry of `PLAN_VIEWS` in `src/modules/project-workspace/hooks/useWorkspaceViews.ts`, first of the plans run; keywords `roadmap milestone epic feature task goal path in flight runner feature epic task run live plan phases`.
+- `ProjectCommandPalette` turns every view into a Navigate row (MAN-8999), so the row is always offered.
 
 ## Proof
 `node .verify/probe-roadmap-tab.mjs` (readings in MAN-7830): the strip at 1440, light and dark; both roadmaps' trees at 1440×900 and 390×844; the `?runner=` landing; the palette row.
@@ -13160,10 +13259,15 @@ Two per-user preferences, kept in the per-user store every setting lives in (mir
 
 | half | list | holds | file |
 |---|---|---|---|
-| client | `ENTRY_PATCHED_KEYS` = `dispatcher`, `roadmapSeen` | folds two patches queued in one debounce per entry, retries only the failed entries, keeps the persisted outbox until the server has them | `src/shared/userSettings.ts` |
-| server | `ENTRY_LISTED_KEYS` = `dispatcher`, `roadmapSeen` | `mergeEntryLists` replaces the named entry and keeps the others; at most `ENTRY_LIST_CAP` (200) entries, newest last. Under `FORWARD_ONLY_KEYS` (`roadmapSeen`) an entry whose `at` is older than the stored one is a stale device's retry and is NOT applied; a `null` entry still drops, so a rewind is drop, then write. The client's `applyEntryPatch` and `unreflectedEntries` take the key's `FORWARD_ONLY_ENTRY_KEYS` flag and say the same | `server/modules/database/repositories/user-preferences.db.ts` |
+| client | `ENTRY_PATCHED_KEYS` = `dispatcher`, `roadmapSeen`, `filesPins` | folds two patches queued in one debounce per entry, retries only the failed entries, keeps the persisted outbox until the server has them | `src/shared/userSettings.ts` |
+| server | `ENTRY_LISTED_KEYS` = `dispatcher`, `roadmapSeen`, `filesPins` | `mergeEntryLists` replaces the named entry and keeps the others; at most `ENTRY_LIST_CAP` (200) entries, newest last. Under `FORWARD_ONLY_KEYS` (`roadmapSeen`) an entry whose `at` is older than the stored one is a stale device's retry and is NOT applied; a `null` entry still drops, so a rewind is drop, then write. The client's `applyEntryPatch` and `unreflectedEntries` take the key's `FORWARD_ONLY_ENTRY_KEYS` flag and say the same | `server/modules/database/repositories/user-preferences.db.ts` |
 
 - One list without the other sends patches the server stores whole, or stores whole what the client patches. The two change together.
+- `filesPins` is the third key in both lists, not forward-only: `{ pinned: string[] }`, each entry a folder's absolute path and its own entry key, so `{ pinned: { [path]: path } }` pins and `{ pinned: { [path]: null } }` unpins without touching another pin. It is the Files tab strip's pin list.
+- `filesPins` reader rules (the merge is shared with the other two keys and holds neither):
+  - Keep only `typeof === 'string'` entries of `pinned`: the merge stores any entry whose `name` equals its key, not just a bare string.
+  - Read an absent key, `null`, `{ pinned: [] }` and a missing `pinned` alike: the merge keeps the key after the last unpin.
+  - The mirror's order can differ from the server's. The mirror applies each write at once; the debounce folds a patch with `{ ...earlier, ...listPatch }` (`foldEntryPatches`), where a re-named key keeps its first slot. Pin A, pin B, pin A again inside one flush: mirror `…, B, A`, server `…, A, B`.
 - The merge compares no `at`: a writer never sends an `at` older than the one it read. Rule and residual window: INV-6580.
 - Entries of removed roadmaps are never pruned.
 
@@ -13368,7 +13472,7 @@ The workspace's second landing, beside `?runner=<plan>` (MAN-7531). The hook's s
 - Wait for `selected !== null` before `select`. why: `selected` is `null` until preferences hydrate (MAN-7655), and a write on a cold mirror is overwritten by the hydrate.
 - A name the picture lacks needs no wait: the tab opens on the Roadmap face on the roadmap already on screen, and the request is retired at once.
 - `?runner=<plan>&roadmap=<name>` together: both params leave the URL in one pass, In flight shows with the card in view, the roadmap is selected.
-- `/?roadmap=<name>` with no project picked: the param stays in the URL and the name is held; after a project is picked it lands and the param is stripped.
+- `/?roadmap=<name>` with no project picked: the Roadmap tab comes forward at once on its Roadmap face with the named roadmap selected, and the param is stripped in the pass that read it. Every view's pane draws without a project, so nothing waits for a pick.
 
 ## The standing proof
 `node .verify/probe-roadmap-landing.mjs` on the live app, 1440×900, light; exit 0 and `PASS` when clean. Artifacts: `.verify/artifacts/roadmap-widget/landing-{lyphecli,no-such-roadmap,runner-in-flight}-light.png`. `roadmapSelected` is read through the harness's `api()` (the server's copy) before and after each landing, and written back last.
@@ -13380,7 +13484,7 @@ The workspace's second landing, beside `?runner=<plan>` (MAN-7531). The hook's s
 | `?roadmap=no-such-roadmap` | tab on the Roadmap face; `roadmapSelected` and the roadmap on screen unchanged, also after a trip away and back; URL stripped |
 | `?runner=<live card's plan>` | In flight face, that card in view, `runner` gone |
 | `?runner=<plan>&roadmap=lyphecli` | both gone from the URL, In flight with the card in view, lyphecli selected |
-| `/?roadmap=lyphecli`, no project | param stays; after a project click: lands on lyphecli, param stripped |
+| `/?roadmap=lyphecli`, no project | Roadmap tab selected, Roadmap face showing lyphecli, param stripped (no pick needed) |
 
 - 2026-10-04: `node .verify/probe-roadmap-landing.mjs` ends `PASS`, the `[root]` leave-drop leg and the face turn on arrival among its checks.
 - Counts console errors only from each page's own life: a chat fetch aborted by `goto` leaving the previous page is not a finding.
@@ -13843,3 +13947,145 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/settings/weekly-s
 - 2026-10-23: at 390 wide the field stays beside a narrow text column (as every `SettingRow`); the zero state is 296 px tall. A `SettingRow` stacking change is the shared library's, one change for every Settings row.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/hooks/useGeminiPlanCap.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/agents-settings/sections/content/RunnerGeminiBudgetRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/agents-settings/sections/content/RunnerModelContent.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/gemini-budget-cap-row.mjs
+
+## MAN-8993 — Notes — Claude's door: the `notes` command, `/api/notes-cmd` and the `notes` skill
+
+Claude's door onto the operator's notes: the `notes` command a chat runs, the `/api/notes-cmd` door it calls, and the `notes` skill that tells a session when to reach for it. A chat can READ the notes and ADD one; it cannot edit or delete (those stay the operator's, in the Notes tab). The tab and the rest of the lane: MAN-7527; the tab's API: MAN-7517; the credential, the guard, the account of a chat and the link: MAN-8992.
+
+## The door — `POST /api/notes-cmd`
+
+`server/modules/notes/notes.command-routes.ts`, `createNotesCommandRoutes(service)`, mounted in `server/index.ts` beside `/api/notes` with NO `authenticateToken` (the command holds no user token): the router's first middleware is `chatCredentialGuard` (MAN-8992), so a request without the chat's credential is 401 `CHAT_CREDENTIAL_REFUSED` before anything else. `/api/notes` itself is unchanged and still refuses that credential.
+
+Body `{ claudeSessionId, action: 'list' | 'show' | 'add', id?, title?, description? }`. The account is `accountOfChat(chatAppSessionOf(response))`; none → 403 `CHAT_ACCOUNT_UNKNOWN`. Every verb is ONE call on the same `notesService` the tab's routes call, so the validation and the frame are identical:
+
+| action | calls | answers |
+| --- | --- | --- |
+| `list` | `service.list(userId)` | 200 `Note[]`, newest first |
+| `show` (`id`) | `service.get(userId, id)` | 200 `Note`; an id no note of the account carries (another account's included) → 404 `NOTE_NOT_FOUND`; a missing or empty `id` → 400 `INVALID_REQUEST_BODY` |
+| `add` (`title`, `description?`) | `service.create(userId, readNoteInput(body))` | 201 `Note`; a title that draws as nothing → 400 `TITLE_REQUIRED`, over 200 → `TITLE_TOO_LONG`, a description over 20,000 → `DESCRIPTION_TOO_LONG` (MAN-7517) |
+| anything else | — | 400 `NOTES_ACTION_INVALID` |
+
+A note added here sends the same `notes_changed` frame, so a Notes tab that is already open lists it at once, with no reload. There is no edit and no delete action, on purpose.
+
+## The command — `bin/notes.mjs`
+
+Plain dependency-free Node ESM, run by bare `node` (mode 755), linked to `~/.local/bin/notes` at boot by `createNotesModule()` through `ensureChatCommandLink('notes', 'notes')`. It sends the credential the chat already carries: `CLOUDCLI_TOOLSET_URL`, `CLOUDCLI_TOOLSET_TOKEN` and `CLAUDE_CODE_SESSION_ID`, as `toolset` does; `POST ${url}/api/notes-cmd`, `Authorization: Bearer <token>`, `AbortSignal.timeout(30_000)`.
+
+| call | does |
+| --- | --- |
+| `notes list` | one line per note, newest first: `id · title · last saved · the description's first line` (that line cut at 120 characters with `…`; `No notes.` when there are none) |
+| `notes show <id>` | `id:`, `title:`, `created:`, `saved:` lines, then a blank line and the whole description |
+| `notes add --title "<title>" [--body "<text>" \| --body -]` | adds one note (`-` reads the description from stdin) and prints `Added.` and the note as `show` prints it, with its id |
+
+| exit | meaning | stream |
+| --- | --- | --- |
+| 0 | done | stdout |
+| 1 | not done: the server refused (its own sentence, `notes: <message>`), CloudCLI does not answer or is not CloudCLI, or there is no chat credential in the environment (`notes: this is not a CloudCLI chat (no chat credential in the environment), so there are no notes to reach`) | stderr |
+| 2 | a malformed call: the usage is printed | stderr |
+
+## The skill — `~/.claude/skills/notes/SKILL.md`
+
+`/notes`; its description names "check my notes", "what did I note about…", "add that to my notes". The rules it gives a session: read only when he asks; add only what he asked for; tell him what was added; never delete or rewrite his notes (there is no verb for it).
+
+## Whose notes
+
+The chat's owner, read from the run (MAN-8992): a chat started from the operator's login reads and adds in the operator's notes; one started by the harness's `verve` login, in `verve`'s. A subagent soul's shell holds its PARENT chat's credential (MAN-8992), so `notes` from inside a soul answers as for an unknown session.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/bin/notes.mjs, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notes/notes.command-routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notes/notes.module.ts, /home/lyphe/.claude/skills/notes/SKILL.md
+
+## MAN-9003 — Next steps — the followups lane: the table, every session-row removal, the service rules, both doors and the frame
+
+A chat's own next steps and known gaps, filled by the chat itself with the `followups` command and drawn in the gutter beside it, so none is lost. One list per chat, keyed on the chat's APP session id (`sessions.session_id`: the id the gutter is handed, the guard's `chatAppSessionOf`); the provider session id is not stable (a chat's provider id changes when its transcript is replaced) and is never a key. There is no second model and no per-turn reader of replies: the chat already knows what it left open, and a reader would spend usage on every turn of every chat. Uncommitted work is never filed (the Git tab shows it; a "commit this" item would go stale the moment `/git` runs from another chat).
+
+The credential, the guard, the account of a chat and the link: MAN-8992. The gutter's table: MAN-7526. The command, the standing instruction and the widget, with the measured proof: MAN-9004.
+
+| file | owns |
+| --- | --- |
+| `server/modules/database/followups-schema.ts` | `FOLLOWUPS_SCHEMA_SQL`, `IF NOT EXISTS`, exec'd at every boot beside `NOTES_SCHEMA_SQL` (`migrations.ts`) |
+| `server/modules/database/repositories/followups.db.ts` | `followupsDb` (`listForChat`, `listForChatOfUser`, `getInChat`, `getOfUser`, `addMany`, `closeInChat`, `setStateForUser`, `moveToSession`), `FollowupRow`, `FollowupKind` |
+| `server/modules/followups/followups.service.ts` | `followupsService`: the judging, the dedupe, the frame |
+| `server/modules/followups/followups.routes.ts` | the widget's door (`/api/followups`), `readFollowupId` |
+| `server/modules/followups/followups.command-routes.ts` | the command's door (`/api/followups-cmd`) |
+| `server/modules/followups/followups.module.ts`, `index.ts` | `createFollowupsModule()`: both routers over one service; links `~/.local/bin/followups` |
+| `bin/followups.mjs` | the command |
+| `server/modules/providers/list/claude/surface-signal.ts` | `FOLLOWUPS_SIGNAL`, the standing instruction |
+| `src/modules/followups/` | `useFollowups` (hooks/), `FollowupsContext` (context/), `FollowupsWidgetBody`, `FollowupRow`, barrel |
+
+## The table `followups`
+
+`id` INTEGER AUTOINCREMENT (never reused: a chat holds ids in its context, and an old number must never name a different item), `session_id` (FK `sessions(session_id)` ON DELETE CASCADE), `user_id` (FK `users(id)` ON DELETE CASCADE; the account `accountOfChat` named at add), `kind` `next` | `gap`, `text`, `state` `open` | `done`, `created_at`, `updated_at`, `done_at`, `closed_by` `chat` | `user`; ISO-8601 UTC with milliseconds, written in JS. Index `ix_followups_session(session_id, state, id)`. The DDL is `IF NOT EXISTS`: editing a column there changes nothing on a database that has the table (a later column needs `addColumnToTableIfNotExists`).
+
+## Every path that removes a session row
+
+| path (`sessions.db.ts`) | what becomes of the items |
+| --- | --- |
+| `deleteSessionById` (the app's delete) | deleted with the row, by the foreign key's cascade |
+| `deleteSessionsByProjectPath` (a project's chats going) | deleted, by the cascade |
+| `assignProviderSessionId`: the watcher's duplicate row merged into the app row | moved to the surviving id first (`followupsDb.moveToSession`), then the duplicate is deleted |
+| `repointSessionToProviderSession`: the replaced row | moved to the surviving id first |
+| `createForkedSession`: the watcher's row for the new transcript | the new row is inserted FIRST (a foreign key needs its parent), the items move onto it, then the watcher's row is deleted |
+| the legacy `sessions` rebuild in `migrations.ts` (copy-and-rename, foreign keys off, one-time) | runs before the table exists |
+
+The cascade is why no delete path needs to know the table; the merges are the one place it would be wrong, so each moves before it deletes. Measured: deleting three probe chats in the app left 0 of their 4 rows.
+
+## The service — what a line is
+
+A line is trimmed and must be 1-240 characters, one line of plain text with no control character in it (NUL, ESC, tab ...), and draw as something (a line of only zero-width or control characters is empty). It is REFUSED, never repaired: 422 `FOLLOWUP_TEXT_REFUSED` whose sentence says why ("A line cannot be empty." / "A line must be one line, with no line breaks in it." / "A line can be 240 characters at most; this one is 241."). A call is judged whole before a row is written: with several lines the sentence names the line ("Line 2 of 2 was refused, and nothing from this call was filed: ..."), and none is filed. More than 20 lines in one call is 422 `FOLLOWUP_BATCH_TOO_LARGE`; none, 400 `FOLLOWUP_NOTHING_TO_FILE`. A line identical (same kind, same text) to one of the chat's still-OPEN items answers that item's id and writes nothing, so a retried call or a forgotten earlier filing never grows the list. An id no item of the chat carries is 404 `FOLLOWUP_NOT_FOUND`, and a `done` call is refused whole, naming every unknown id and, when it carried several, saying nothing from it was closed ("No item #7 in this chat. Run "followups" to list the ids that are open here." / "No items #7, #8 in this chat, so nothing from this call was closed. ..."). The widget's tick of an item that is gone gets the same code with a sentence for a person: "That item is no longer there."
+
+## The two doors
+
+| door | mount | guard | verbs |
+| --- | --- | --- | --- |
+| the chat's | `POST /api/followups-cmd`, `{ claudeSessionId, action, ... }` | `chatCredentialGuard` and nothing else; the chat is `chatAppSessionOf(response)`, never the body | `list` (open items; `all: true` adds done), `add` (`items: [{ kind, text }]`, 201; needs the account: none is 403 `CHAT_ACCOUNT_UNKNOWN`), `done` (`ids`; every id is checked against THIS chat first, one of another chat refuses the whole call with the 404) |
+| the person's | `/api/followups`, `authenticateToken` | the operator's JWT; it refuses the chat credential (401) | `GET ?session=<app session id>`: the chat's items, open and done, oldest first, only where `user_id` is the caller's (a chat of another account answers `[]`); `PATCH /:id { state: 'open' | 'done' }`: ticks or unticks, another account's id is 404 |
+
+There is no delete and no reopen on the chat's door: an item leaves only with its chat, and the person unticks in the widget. A subagent soul launched from a chat carries the PARENT's credential beside its own session id, and the guard refuses that pair (MAN-8992): that is what keeps a soul out of the chat's list. `readAuthenticatedUserId` (`server/shared/utils.ts`) is the strict account reader both this door and `/api/notes` use.
+
+## The frame
+
+Every write that changed a row sends ONE `followups_changed { appSessionId, at }` to every open socket (`FollowupsChangedEvent`). The key is `appSessionId` and NOT `sessionId`: `useProjectsState` flags a chat for attention (the unread mark) when any frame carries a `sessionId` that is not the one on screen. The widget re-reads on a frame naming its own chat and on `websocket_reconnected`; a frame for another chat is ignored. The subscription is made before the first read; reads take tickets and an older answer never replaces a newer one, but only an answer that APPLIES moves the ticket, so a newer failed read never discards an older good one.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/followups-schema.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/followups.db.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/sessions.db.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/followups/
+
+## MAN-9004 — Next steps — the `followups` command, the standing instruction that makes a chat use it, and the widget
+
+The `followups` command, the standing instruction that makes a chat use it, and the Next steps widget. The store, the doors, the frame and the rules a line must meet are MAN-9003; the credential and the guard are MAN-8992; the gutter's table is MAN-7526.
+
+## The command — `bin/followups.mjs`
+
+Plain dependency-free Node ESM, mode 755, linked at boot by `ensureChatCommandLink('followups', 'followups')`. It sends the credential the chat already carries (`CLOUDCLI_TOOLSET_URL`, `CLOUDCLI_TOOLSET_TOKEN`, `CLAUDE_CODE_SESSION_ID`).
+
+| call | prints |
+| --- | --- |
+| `followups` or `followups list [--all]` | one line per item, oldest first: `#<id>  next|gap  <age>  <text>` (a done item's text is prefixed `[done] `); with nothing: `Nothing open in this chat.` |
+| `followups add [--next "<line>"]... [--gap "<line>"]...` | one line per filed item in the order given: `#<id>  <kind>  <text>` |
+| `followups done <id> [<id>...]` | `Closed #3, #4.` (`#3` is accepted too) |
+
+Outside a CloudCLI chat: says so, exit 1. A malformed call: usage, exit 2. A server refusal: its sentence, exit 1.
+
+## The standing instruction
+
+`FOLLOWUPS_SIGNAL` in `surface-signal.ts` is the "automatically": the sentence group that leads a chat's surface prompt, pronoun-free toward the person ("the user"; CloudCLI has more than one account). `leadWithFollowupsSignal` puts it in front of `SURFACE_PROMPT_APPEND` only for a launch that carries the chat credential (`CLOUDCLI_TOOLSET_TOKEN`): a chat whose project runs on a Cerberus node, one with no app session id and one whose toolsets hook did not answer carry none, cannot run the command, and are not told to. Such a chat's widget still draws, and reads "Nothing open in this chat." because nothing can be filed there. It says to file in the SAME turn, before the reply's final text, with `followups add --next` for what the reply leaves open (a question, an offer waiting on a yes, a step put off) and `--gap` for what is left (untested, unchecked from here, unhandled, a limit chosen), no codes or ids in a line, never what the same reply finishes, never uncommitted work, and to close with `followups done <id>` after listing.
+
+What it took (Haiku, 2026-10-25, one short turn naming neither widget nor command): the first wording, appended LAST and phrased as a description ("you keep it current ..."), drew no `followups` call: the reply asked its question and named what it could not check, and filed neither. The sharpened wording (said FIRST, in the imperative, "before you write the final text of the reply", "a reply that asks the user a question or says that something went unchecked always has an item to file") filed `followups add --next ...` and `followups add --gap ...` by itself, two invocations in one Bash call.
+
+## The widget
+
+Id `followups`, title `gutters.followups.title` ("Next steps"), `ListChecksIcon`; default place the top of the right side, OPEN (MAN-7526). The badge is the count of open items across both groups. `ChatGutterLayout` calls `useFollowups(wide ? sessionId : null)` once and provides the reading to `FollowupsWidgetBody` through `FollowupsContext`, so the badge and the rows are one list and nothing is read while the gutters are not drawn (phone, narrow window, floating chat). The body composes shared components only (`Checkbox`, `Collapsible`, `FoldChevron`, `EmptyState`, `Spinner`): two groups "Next steps" and "Known gaps", each row the line (wrapping, an unbroken run included), a muted age and a tick; a group with nothing open is not drawn; both empty reads "Nothing open in this chat."; a closed "Done (N)" fold lists the done items, each with an untick. Every word is in `followups.*` of the English locale; the other locales fall back. No phone surface: gutters do not draw on phone. A reading is kept only for elements that are items (`isFollowup`): the array feeds the badge outside every widget's boundary, so a `null` or a half-item is dropped on arrival.
+
+## Run the probe — `.verify/probe-followups-widget.mjs` (`.verify/lib/followups-kit.mjs` holds its measuring half)
+
+| when | do |
+| --- | --- |
+| re-run against the live app | `node .verify/probe-followups-widget.mjs`: ONE Haiku turn, restarts nothing; exits 1 listing the failed checks |
+| first run of a change (new prompt and client must be live) | `PROBE_RESTART=1 node .verify/probe-followups-widget.mjs`: touches a file under `server/` for the supervisor's handover and rebuilds :5184 |
+| the BEFORE shots (`.verify/out/followups-before-*`) | taken only while git HEAD still holds the pre-widget gutter files; after the change is committed the step says so and is skipped, and the stored shots stand |
+| no model turn | `PROBE_DRY=1`: skips the BEFORE step and puts the two rows a chat would have filed into the table by hand; the checks that need a chat's own run are expected to fail |
+
+Every run checks that :5184 was built after this change's own client files, and reports a failed check when the BEFORE phone shot is missing for the phone diff.
+
+## Measured
+
+`.verify/probe-followups-widget.mjs` (headless, live app, production client :5184, one Haiku turn in the scratch project): the chat filed a next step and a known gap by itself; the widget showed them with no reload, dark and light, badge 2; ticking one moved it to "Done (1)" and it stayed done after a reload; a second chat's widget showed none; the phone chat view is pixel-for-pixel what it was and makes no followups request; the command door refused 241 characters, a two-line text and an empty text with 422 sentences, answered an id of another chat with 404, and a half-bad batch filed nothing; the user door returned only the caller's own rows and refused the chat credential; the probe chats' rows went with the chats; the operator's notes and gutter arrangement were byte-identical after. The only failed responses after sign-in were the app's own 404 of an empty chat's `token-usage` read, which the pre-change client makes too.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/bin/followups.mjs, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/surface-signal.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/followups/, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/followups-kit.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-followups-widget.mjs

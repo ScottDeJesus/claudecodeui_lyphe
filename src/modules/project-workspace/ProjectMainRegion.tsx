@@ -13,6 +13,7 @@ function ProjectMainRegion({
 }: ProjectWorkspaceShellProps) {
   const {
     gitRepositories,
+    filesRoots,
     projectChoices,
     selectProjectById,
     selectedProject,
@@ -25,6 +26,7 @@ function ProjectMainRegion({
     externalMessageUpdate,
     newSessionTrigger,
     registerOptimisticSession,
+    refreshProjectsSilently,
   } = useProjectMainState();
 
   const handleOpenSidebar = useCallback(() => {
@@ -48,6 +50,7 @@ function ProjectMainRegion({
   return (
     <WorkspaceMain
       gitRepositories={gitRepositories}
+      filesRoots={filesRoots}
       projectChoices={projectChoices}
       onSelectProject={selectProjectById}
       selectedProject={selectedProject}
@@ -64,6 +67,7 @@ function ProjectMainRegion({
       onShowSettings={openSettings}
       externalMessageUpdate={externalMessageUpdate}
       newSessionTrigger={newSessionTrigger}
+      onProjectsChanged={refreshProjectsSilently}
     />
   );
 }

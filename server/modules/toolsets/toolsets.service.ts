@@ -1,3 +1,4 @@
+import { chatCredential } from '@/modules/chat-commands/index.js';
 import { projectsDb, sessionUserStateDb, sessionsDb } from '@/modules/database/index.js';
 import { providerRuntimeService } from '@/modules/providers/index.js';
 import { WS_OPEN_STATE, connectedClients } from '@/modules/websocket/index.js';
@@ -10,9 +11,8 @@ import type {
   ToolsetSwitchResult,
   ToolsetSyncOutcome,
 } from '@/shared/toolset-types.js';
-import { AppError, SESSION_ID_PATTERN, loopbackApiOrigin } from '@/shared/utils.js';
+import { AppError, loopbackApiOrigin } from '@/shared/utils.js';
 
-import { toolsetCredential, toolsetCredentialMatches } from './toolsets.credential.js';
 import { toolsetPointer } from './toolsets.pointer.js';
 import { SET_NAME_PATTERN, readToolsetRegistry, resolveToolsetsFile } from './toolsets.registry.js';
 
@@ -24,7 +24,8 @@ import { SET_NAME_PATTERN, readToolsetRegistry, resolveToolsetsFile } from './to
  * takes a server config, so a session can switch a set that is defined and never define one.
  *
  * Consumed by `toolsets.routes.ts` (both doors) and `toolsets.module.ts`, which registers `launchFor`
- * with the Claude runtime. Every other module is reached through its barrel.
+ * with the Claude runtime. Every other module is reached through its barrel. The credential a chat
+ * carries is `chat-commands`', shared with the other command doors; this file only hands it to a launch.
  */
 
 type ChatRow = NonNullable<ReturnType<typeof sessionsDb.getSessionById>>;
@@ -111,7 +112,7 @@ async function launchFor(input: { appSessionId: string | null; onNode: boolean }
 
   const env = {
     CLOUDCLI_TOOLSET_URL: loopbackApiOrigin(),
-    CLOUDCLI_TOOLSET_TOKEN: toolsetCredential(input.appSessionId),
+    CLOUDCLI_TOOLSET_TOKEN: chatCredential(input.appSessionId),
   };
 
   let sets: ToolsetDefinition[];
@@ -255,22 +256,4 @@ async function switchSet(appSessionId: string, set: unknown, on: boolean): Promi
   };
 }
 
-/**
- * The command door's one question: does this bearer belong to the Claude chat that session id names?
- * Answers the chat's APP session id, or null for every miss alike — an id no chat carries, a chat
- * that is not Claude's, a missing or wrong credential — so the caller cannot tell them apart and
- * neither can the CLI's model. The id the CLI holds is a Claude id (`CLAUDE_CODE_SESSION_ID`), which
- * the sessions table maps back to the app's.
- */
-function appSessionForCredential(claudeSessionId: unknown, bearer: string | null): string | null {
-  if (bearer === null || typeof claudeSessionId !== 'string' || !SESSION_ID_PATTERN.test(claudeSessionId)) {
-    return null;
-  }
-
-  const row = sessionsDb.getSessionById(sessionsDb.resolveAppSessionId(claudeSessionId));
-  if (!row || row.provider !== 'claude') return null;
-
-  return toolsetCredentialMatches(row.session_id, bearer) ? row.session_id : null;
-}
-
-export const toolsetsService = { launchFor, view, switchSet, appSessionForCredential };
+export const toolsetsService = { launchFor, view, switchSet };

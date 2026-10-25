@@ -1,8 +1,8 @@
 import type { Router } from 'express';
 
+import { ensureChatCommandLink } from '@/modules/chat-commands/index.js';
 import { providerRuntimeService } from '@/modules/providers/index.js';
 
-import { ensureToolsetCommandLink } from './toolsets.command-link.js';
 import { createToolsetsCommandRouter, createToolsetsUserRouter } from './toolsets.routes.js';
 import { ensureToolsetsFile } from './toolsets.registry.js';
 import { toolsetsService } from './toolsets.service.js';
@@ -30,7 +30,7 @@ export function createToolsetsModule(): { userRouter: Router; commandRouter: Rou
   }
 
   try {
-    ensureToolsetCommandLink();
+    ensureChatCommandLink('toolset', 'toolsets');
   } catch (error) {
     console.warn(
       '[toolsets] could not link the toolset command — the API stays up:',

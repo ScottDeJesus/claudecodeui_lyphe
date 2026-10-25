@@ -67,6 +67,7 @@ import { createDeepseekModule } from './modules/deepseek/index.js';
 import { createKanbanModule } from './modules/kanban/index.js';
 import { createKanbanMetisModule, kanbanMetisSecretGuard } from './modules/kanban-metis/index.js';
 import { createMemoryIntakeModule, listMemoryCandidates } from './modules/memory-intake/index.js';
+import { createFollowupsModule } from './modules/followups/index.js';
 import { createNotesModule } from './modules/notes/index.js';
 import { createCerberusModule } from './modules/cerberus/index.js';
 import { createDispatchSoulsModule } from './modules/dispatch-souls/index.js';
@@ -279,7 +280,28 @@ app.use('/api/memory', authenticateToken, createMemoryIntakeModule());
 // One account's cards (protected), at this ONE address and on no other router: the notes lane, whose
 // four verbs are the whole of it. Every write here sends one `notes_changed` to the open sockets, and
 // the frame names neither a note nor an account — a client that hears it reads its own list again.
-app.use('/api/notes', authenticateToken, createNotesModule());
+const notes = createNotesModule();
+app.use('/api/notes', authenticateToken, notes.userRouter);
+
+// The SAME lane's second door, for the `notes` command a chat's CLI runs and nothing else — there is
+// deliberately NO `authenticateToken`: the command holds no user token, and the operator's JWT never
+// enters a CLI's environment. The router's own first middleware checks the credential derived from
+// the chat (`chatCredential`, the one `toolset` sends), and the account is the chat's own owner; the
+// verbs are list, show and add, the same `NotesService` calls the tab's routes make, with no edit and
+// no delete. `/api/notes` above still refuses that credential.
+app.use('/api/notes-cmd', notes.commandRouter);
+
+// One chat's next steps and known gaps (protected), at this ONE address and on no other router: the
+// followups lane. The widget beside the chat reads its own chat's items here and ticks or unticks one;
+// every write sends one `followups_changed` naming the chat's app session id.
+const followups = createFollowupsModule();
+app.use('/api/followups', authenticateToken, followups.userRouter);
+
+// The SAME lane's second door, for the `followups` command a chat's CLI runs and nothing else — NO
+// `authenticateToken`, for the reason `/api/notes-cmd` above gives: the router's own first middleware
+// checks the chat's credential, and the chat is the one that credential names. The verbs are list, add
+// and done; `/api/followups` above still refuses that credential.
+app.use('/api/followups-cmd', followups.commandRouter);
 
 // The fleet's health (protected), mounted at this ONE address. Its gateway — where each node's
 // warden dials in — is a listener of its own on the tailnet, never a path on this server, so
@@ -309,7 +331,7 @@ app.use('/api/toolsets', authenticateToken, toolsets.userRouter);
 // The SAME module's second door, for the `toolset` command a chat's CLI runs and nothing else — there
 // is deliberately NO `authenticateToken`: the command holds no user token, and the operator's JWT never
 // enters a CLI's environment. The router's own first middleware checks a credential derived from the
-// chat (`toolsetCredential`), so a chat can switch its own sets and no other chat's.
+// chat (`chatCredential`), so a chat can switch its own sets and no other chat's.
 app.use('/api/toolsets-cmd', toolsets.commandRouter);
 
 // Installed CLI version + what the live runs are on (protected)

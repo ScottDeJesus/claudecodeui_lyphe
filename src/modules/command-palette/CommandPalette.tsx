@@ -7,7 +7,6 @@ import {
   GitMerge,
   MessageSquare,
   MessageSquarePlus,
-  Settings,
   SunMoon,
   X,
 } from 'lucide-react';
@@ -26,7 +25,7 @@ import {
 import { useTheme } from '@/shared/context/ThemeContext';
 import { usePaletteOps } from '@/modules/command-palette/context/PaletteOpsContext';
 import { CHAT_TOGGLE_KEY, SETTINGS_MAIN_TABS } from '@/shared/constants';
-import type { AppTab, Project, SwitcherAction } from '@/shared/types';
+import type { AppTab, PaletteNavRow, Project, SwitcherAction } from '@/shared/types';
 import { PaletteSwitcherGroup } from '@/modules/command-palette/PaletteSwitcherGroup';
 import { createSwitcherFilter } from '@/modules/command-palette/utils/switcherActFilter';
 import { useSessionsSource } from '@/modules/command-palette/hooks/useSessionsSource';
@@ -57,10 +56,10 @@ type CommandPaletteProps = {
    */
   onShowRepoInGitTab: (() => void) | null;
   /**
-   * The built-in tabs currently on the workspace tab bar. The Navigate group offers exactly the
-   * NAV_TABS rows this list names, so a row added below without a matching gate never appears.
+   * The Navigate group's rows, in order — the workspace's views by the names the rail gives them, then Settings.
+   * The palette lists them and runs the one chosen; which views exist is the workspace's to say.
    */
-  visibleTabs: AppTab[];
+  navRows: PaletteNavRow[];
   /**
    * The application switcher's five acts, from the switcher's own list (the one the radial draws), drawn
    * as the Applications group. The palette knows nothing of what an act does; it lists them and runs the
@@ -69,29 +68,6 @@ type CommandPaletteProps = {
   switcherActions: SwitcherAction[];
 };
 
-/**
- * Every workspace tab the palette knows how to reach. Deliberately static: which of them a
- * given workspace is showing is the `visibleTabs` prop's answer, resolved by the one component
- * that already reads the gates, and the Navigate group filters this list through it. A new row
- * here needs its tab named in that prop too, or it is filtered out and never shows.
- */
-const NAV_TABS: Array<{ id: AppTab; label: string; keywords: string }> = [
-  { id: 'chat', label: 'Go to Chat', keywords: 'chat messages conversation' },
-  { id: 'files', label: 'Go to Files', keywords: 'files file tree explorer' },
-  { id: 'shell', label: 'Go to Shell', keywords: 'shell terminal console' },
-  { id: 'git', label: 'Go to Git', keywords: 'git diff branches' },
-  { id: 'kanban', label: 'Go to Kanban', keywords: 'kanban board lanes cards backlog' },
-  { id: 'universe', label: 'Go to Universe', keywords: 'universe galaxy stars repos map graph' },
-  { id: 'schedules', label: 'Go to Schedules', keywords: 'schedules cron jobs registry scheduled prompts sync' },
-  { id: 'notes', label: 'Go to Notes', keywords: 'notes note cards jot write memo' },
-  { id: 'tasks', label: 'Go to Tasks', keywords: 'tasks taskmaster' },
-  { id: 'memory', label: 'Go to Memory', keywords: 'memory intake pending' },
-  { id: 'runner', label: 'Go to Roadmap', keywords: 'roadmap milestone epic feature task goal path in flight runner feature epic task run live plan phases' },
-  { id: 'heal', label: 'Go to Heal', keywords: 'heal friction ledger reflex regression ignore' },
-  { id: 'api', label: 'Go to API', keywords: 'api jev deepseek spend balance burn tokens consumers usage outings typesafe' },
-  { id: 'cerberus', label: 'Go to Cerberus', keywords: 'cerberus fleet health monitoring checks wardens nodes' },
-];
-
 /** Rendered by the project-workspace module to search projects, sessions, files, branches and commits and run their actions. */
 function CommandPalette({
   selectedProject,
@@ -99,7 +75,7 @@ function CommandPalette({
   onOpenSettings,
   onShowTab,
   onShowRepoInGitTab,
-  visibleTabs,
+  navRows,
   switcherActions,
 }: CommandPaletteProps) {
   const [open, setOpen] = React.useState(false);
@@ -257,10 +233,6 @@ function CommandPalette({
                     <span className="text-xs text-muted-foreground">Select a project first</span>
                   )}
                 </CommandItem>
-                <CommandItem value="Open settings" onSelect={() => run(() => onOpenSettings())}>
-                  <Settings className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
-                  <span className="flex-1">Open settings</span>
-                </CommandItem>
                 <CommandItem value="Toggle theme dark light mode" onSelect={() => run(toggleDarkMode)}>
                   <SunMoon className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
                   <span className="flex-1">Toggle theme</span>
@@ -272,13 +244,13 @@ function CommandPalette({
 
             {showActions && (
               <CommandGroup heading="Navigate">
-                {NAV_TABS.filter((tab) => visibleTabs.includes(tab.id)).map((tab) => (
+                {navRows.map((row) => (
                   <CommandItem
-                    key={tab.id as string}
-                    value={`${tab.label} ${tab.keywords}`}
-                    onSelect={() => run(() => onShowTab?.(tab.id))}
+                    key={row.key}
+                    value={`Go to ${row.label} ${row.keywords}`}
+                    onSelect={() => run(row.run)}
                   >
-                    <span className="flex-1">{tab.label}</span>
+                    <span className="flex-1">{`Go to ${row.label}`}</span>
                   </CommandItem>
                 ))}
               </CommandGroup>

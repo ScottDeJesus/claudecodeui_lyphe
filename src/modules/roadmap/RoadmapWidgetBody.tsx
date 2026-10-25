@@ -18,7 +18,7 @@ import { Button } from '@/shared/ui';
  * is a pick on the tab, on every device. A feature dialog opens over the chat; its Open its card and Answer on its
  * card, and the foot's "Open the roadmap", are landings (`?runner=<plan>`, `?roadmap=<name>`), because the gutter has
  * no hold on which tab the workspace shows (`openCard` is `null`, so the face reaches the landing through
- * `useRevealCard`). `data-roadmap-widget` is the face's handle in this fit, and `data-roadmap-widget-open` the foot
+ * the shared `useRevealCard`). `data-roadmap-widget` is the face's handle in this fit, and `data-roadmap-widget-open` the foot
  * press's.
  *
  * The roadmap is the account's and not the chat's, so the chat's id the gutter hands every body is not read. The

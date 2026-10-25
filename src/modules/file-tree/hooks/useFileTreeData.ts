@@ -27,7 +27,7 @@ function readResponseErrorMessage(responseBody: string): string | null {
   }
 }
 
-export function useFileTreeData(selectedProject: Project | null): UseFileTreeDataResult {
+export function useFileTreeData(selectedProject: Pick<Project, 'projectId'> | null): UseFileTreeDataResult {
   const [files, setFiles] = useState<FileTreeNode[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);

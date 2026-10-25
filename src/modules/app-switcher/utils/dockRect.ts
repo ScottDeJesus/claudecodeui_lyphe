@@ -1,7 +1,7 @@
 /**
  * The two rules that read a measured `DOMRect`, and nothing else.
  *
- * The dock hands over what `getBoundingClientRect()` said about the sidebar header's leading slot;
+ * The dock hands over what `getBoundingClientRect()` said about its box in the sidebar's views rail;
  * these decide whether that measurement may be believed and whether it is news. Both are plain
  * functions over a rect, so they live beside the other browser rules this module keeps
  * (`resolveAppUrl.ts`) rather than inside the provider that calls them.

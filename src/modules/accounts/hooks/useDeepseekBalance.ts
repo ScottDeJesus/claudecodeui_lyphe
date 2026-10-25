@@ -44,9 +44,8 @@ function isBalanceReport(body: unknown): body is DeepseekBalance {
 /**
  * The money left on this host's DeepSeek account.
  *
- * Used by the accounts module's footer row, which owns the ONE instance and hands the same reading
- * to both registers it draws — the line under the account name and the row in the panel — so the
- * two can never disagree and opening the panel starts no second poller.
+ * Used by the accounts module's AccountRailButton, which owns the ONE instance and hands the reading
+ * to the panel, so opening the panel starts no second poller.
  *
  * It is a hook of its own rather than a third read inside `useClaudeUsage` because it is a
  * different account, a different server route and a different origin: the account lane is down

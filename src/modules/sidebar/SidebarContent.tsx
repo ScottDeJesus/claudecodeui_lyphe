@@ -93,8 +93,6 @@ type SidebarContentProps = {
   simpleList: ReactNode | null;
   // The workspace tab strip, same slot discipline as `simpleList` — handed straight to the header.
   tabs: ReactNode;
-  // The control left of the wordmark, same slot discipline — OPTIONAL, unlike `tabs`.
-  leading?: ReactNode;
   runningSessionsCount: number;
   archivedProjects: ArchivedProjectListItem[];
   archivedSessions: ArchivedSessionListItem[];
@@ -147,7 +145,6 @@ export default function SidebarContent({
   projects,
   simpleList,
   tabs,
-  leading,
   runningSessionsCount,
   archivedProjects,
   archivedSessions,
@@ -199,7 +196,11 @@ export default function SidebarContent({
 
   return (
     <div
-      className="flex h-full flex-col bg-background/80 backdrop-blur-sm md:w-[20.5rem] md:select-none"
+      // The list beside the views rail (a 48px column in Sidebar's row). From md it is 17.5rem, so the two make the
+      // docked sidebar's 20.5rem and the main region does not move; on a phone it fills what the rail leaves. Its left
+      // edge is the hairline between the rail and the list: it belongs to the list, so a rail standing alone draws
+      // only the sidebar's own edge. `md:w-[17.5rem]` is also how `.verify/lib/console.mjs` finds the list.
+      className="flex h-full min-w-0 flex-1 flex-col border-l border-border/50 bg-background/80 backdrop-blur-sm md:w-[17.5rem] md:flex-none md:select-none"
       style={{}}
     >
       <SidebarHeader
@@ -221,7 +222,6 @@ export default function SidebarContent({
         onCollapseSidebar={onCollapseSidebar}
         simpleMode={simpleList !== null}
         tabs={tabs}
-        leading={leading}
         t={t}
       />
 

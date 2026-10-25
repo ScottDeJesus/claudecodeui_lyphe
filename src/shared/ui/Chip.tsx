@@ -41,18 +41,26 @@ type ChipProps = {
    * The refusal itself is the caller's, in its own handler.
    */
   busy?: boolean;
+  /**
+   * The press RUNS something — opens a dialog, adds an entry — instead of setting a position, so
+   * the button announces no `aria-pressed`: "toggle button, not pressed" promises a state the press
+   * never sets. `selected` and `indeterminate` mean nothing beside it. The Files view's "Pin a
+   * folder", which opens the folder browser, is the first.
+   */
+  action?: boolean;
 };
 
 /**
  * A pill that reads as one selectable token — a filter, a tag, a mode.
- * Used by settings (Phase 4) for the appearance and permission filters, by the chat
- * composer (Phase 6) for its model and permission tokens, by the cerberus module for Fleet's
- * filters and the Mute dialog's durations, and by the agent-launch, git-panel, heal, jev,
- * kanban, roadmap, sidebar and task-master modules; each needs the same pill and none should
- * spell it a second time.
+ * Used by settings for the appearance and permission filters, by the chat composer for its
+ * model and permission tokens, by the cerberus module for Fleet's filters and the Mute dialog's
+ * durations, by the file-manager module for the Files view's strip of roots, and by the
+ * agent-launch, git-panel, heal, jev, kanban, roadmap, sidebar and task-master modules; each
+ * needs the same pill and none should spell it a second time.
  *
  * With `onClick` it renders a real `<button>` so it is reachable by keyboard and announces
- * its pressed state; without one it is a `<span>`, because a static tag that takes focus
+ * its pressed state (`action` drops that state, for a press that sets none); without one it
+ * is a `<span>`, because a static tag that takes focus
  * sends the reader somewhere nothing happens. `busy` and `indeterminate` are for a chip whose
  * state lives somewhere else — a switch read back off the server — where a press cannot always
  * be taken yet and the position is not always known.
@@ -68,6 +76,7 @@ export function Chip({
   ariaLabel,
   indeterminate = false,
   busy = false,
+  action = false,
 }: ChipProps) {
   const className = cn(
     'vv-chip inline-flex items-center gap-1.5',
@@ -91,7 +100,7 @@ export function Chip({
       data-selected={selected}
       data-tone={tone}
       data-state={indeterminate ? 'unknown' : undefined}
-      aria-pressed={indeterminate ? 'mixed' : selected}
+      aria-pressed={action ? undefined : indeterminate ? 'mixed' : selected}
       aria-label={ariaLabel}
       aria-disabled={busy || undefined}
       onClick={onClick}

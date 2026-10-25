@@ -7,17 +7,25 @@ type WorkspaceStateViewProps = {
   mode: 'loading' | 'empty';
   isMobile: boolean;
   onMenuClick: () => void;
+  /** Draw the phone's menu row above the body. Off for a pane that sits under WorkspaceMain's own header. */
+  showHeader?: boolean;
 };
 
-/** Rendered by WorkspaceMain instead of the workspace while projects load or when none is selected. */
-export default function WorkspaceStateView({ mode, isMobile, onMenuClick }: WorkspaceStateViewProps) {
+/**
+ * Rendered by WorkspaceMain in two places:
+ * - as the whole screen (`mode="loading"`, header on) while projects load, when no workspace header exists yet;
+ * - as the choose-a-project body (`mode="empty"`, `showHeader={false}`) inside a pane that reads the open
+ *   project — Chat, Files, Shell, Git, Tasks and a plugin's — when none is selected. Those panes sit under
+ *   WorkspaceMain's own header, so a second menu row here would stack two of them on a phone.
+ */
+export default function WorkspaceStateView({ mode, isMobile, onMenuClick, showHeader = true }: WorkspaceStateViewProps) {
   const { t } = useTranslation();
 
   const isLoading = mode === 'loading';
 
   return (
     <div className="flex h-full flex-col">
-      {isMobile && (
+      {showHeader && isMobile && (
         <div className="pwa-header-safe flex-shrink-0 border-b border-border/50 bg-background/80 p-2 backdrop-blur-sm sm:p-3">
           <MobileMenuButton onMenuClick={onMenuClick} compact />
         </div>

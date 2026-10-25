@@ -1,7 +1,8 @@
-import { useMemo } from 'react';
+import { useCallback, useMemo } from 'react';
 
 import type { FileOpenHandler, GitRepository } from '@/shared/types';
 import { EmptyState, Tabs } from '@/shared/ui';
+import { absolutePathIn } from '@/shared/utils';
 import GitPanel from '@/modules/git-panel/GitPanel';
 import { selectGitRepository, useSelectedGitRepository } from '@/modules/git-panel/hooks/useSelectedGitRepository';
 
@@ -12,24 +13,20 @@ type GitRepositoriesPanelProps = {
    * routes to read, so it never arrives here.
    */
   repositories: GitRepository[];
-  /**
-   * The workspace's project path. It decides nothing about which repository shows — only whether a
-   * changed file can open in Files, which browses that project and no other.
-   */
-  selectedProjectPath: string;
   isMobile: boolean;
-  onFileOpen?: FileOpenHandler;
+  /** Opens a path in Files. A changed file's row hands over the repository-relative path, and this panel makes it absolute first. */
+  onFileOpen: FileOpenHandler;
 };
 
 /**
  * Exported through the git-panel barrel; the project-workspace module renders it as the git tab.
  *
  * The tab's own strip of repositories decides what is on screen — never the workspace's session or
- * project, so changing either leaves the git tab on the repository it was showing.
+ * project, so changing either leaves the git tab on the repository it was showing. Files browses its
+ * own roots, which always include the repository on screen, so a changed file opens from any of them.
  */
 export default function GitRepositoriesPanel({
   repositories,
-  selectedProjectPath,
   isMobile,
   onFileOpen,
 }: GitRepositoriesPanelProps) {
@@ -47,6 +44,13 @@ export default function GitRepositoriesPanel({
     ?? repositories[0]
     ?? null;
 
+  // A changed file's path is relative to its repository, and Files picks the root that holds an
+  // ABSOLUTE path — so the row's path is joined to the repository on screen before it leaves.
+  const activeRepositoryPath = activeRepository?.fullPath ?? null;
+  const openInFiles = useCallback((relativePath: string) => {
+    if (activeRepositoryPath !== null) onFileOpen(absolutePathIn(activeRepositoryPath, relativePath));
+  }, [activeRepositoryPath, onFileOpen]);
+
   if (!activeRepository) {
     return (
       <div className="flex h-full items-center justify-center p-4">
@@ -57,10 +61,6 @@ export default function GitRepositoriesPanel({
       </div>
     );
   }
-
-  // Files browses the workspace's project, so a changed path can open there only when the
-  // repository on screen IS that project — any other would open the wrong file, or none.
-  const canOpenInFiles = selectedProjectPath === activeRepository.fullPath;
 
   return (
     <div className="flex h-full flex-col bg-background">
@@ -83,7 +83,7 @@ export default function GitRepositoriesPanel({
           key={activeRepository.projectId}
           repository={activeRepository}
           isMobile={isMobile}
-          onFileOpen={canOpenInFiles ? onFileOpen : undefined}
+          onFileOpen={openInFiles}
         />
       </div>
     </div>

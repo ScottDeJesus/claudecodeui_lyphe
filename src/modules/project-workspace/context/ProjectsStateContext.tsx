@@ -2,11 +2,12 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef } fr
 import type { ReactNode } from 'react';
 import type { NavigateFunction } from 'react-router-dom';
 
+import { useFilesRoots } from '@/modules/project-workspace/hooks/useFilesRoots';
 import { useOpenProjectChat } from '@/modules/project-workspace/hooks/useOpenProjectChat';
 import { useProjectsState } from '@/modules/project-workspace/hooks/useProjectsState';
 import { GIT_REPO_PATHS } from '@/shared/constants';
 import { projectNameHints } from '@/shared/projectNameHints';
-import type { GitRepository, IsSessionProcessing, Project, ProjectChoice, ServerEvent } from '@/shared/types';
+import type { FilesRoot, GitRepository, IsSessionProcessing, Project, ProjectChoice, ServerEvent } from '@/shared/types';
 
 type ProjectsState = ReturnType<typeof useProjectsState>;
 
@@ -32,6 +33,8 @@ type ProjectMainState = Pick<
 > & {
   /** The git tab's repositories in strip order, memoised on the fields the tab reads. */
   gitRepositories: GitRepository[];
+  /** The Files view's roots in strip order — the git repositories, then the folders the operator pinned — memoised on the fields the view reads. */
+  filesRoots: FilesRoot[];
   /** Every project, by name, memoised on its id, name, path, name hint and folder mark; a new chat's picker lists those whose folder exists. */
   projectChoices: ProjectChoice[];
   /** Points the workspace at a project by id; an id no longer in the list does nothing. */
@@ -40,7 +43,7 @@ type ProjectMainState = Pick<
 
 type ProjectCommandState = Pick<
   ProjectsState,
-  'selectedProject' | 'handleNewSession' | 'openSettings' | 'activeTab' | 'setActiveTab'
+  'selectedProject' | 'handleNewSession' | 'openSettings' | 'setActiveTab'
 >;
 
 type ProjectEffectsState = Pick<
@@ -145,6 +148,9 @@ export function ProjectsStateProvider({
       .map(([projectId, fullPath, displayName]) => ({ projectId, fullPath, displayName })),
     [gitRepositoriesKey],
   );
+  // Files browses its own roots and never the open chat's project: the repositories above plus the pins
+  // that match a registered project, on the same key-string discipline.
+  const filesRoots = useFilesRoots(state.projects, gitRepositories);
 
   // The same discipline for the new-chat project picker: a list keyed on the id, name, path, name
   // hint and folder mark alone, so a session upsert that rebuilds `state.projects` does not wake the
@@ -184,6 +190,7 @@ export function ProjectsStateProvider({
   const mainState = useMemo<ProjectMainState>(
     () => ({
       gitRepositories,
+      filesRoots,
       projectChoices,
       selectProjectById,
       selectedProject: state.selectedProject,
@@ -206,6 +213,7 @@ export function ProjectsStateProvider({
       state.isLoadingProjects,
       state.newSessionTrigger,
       gitRepositories,
+      filesRoots,
       projectChoices,
       selectProjectById,
       state.openSettings,
@@ -223,10 +231,9 @@ export function ProjectsStateProvider({
       selectedProject: state.selectedProject,
       handleNewSession: state.handleNewSession,
       openSettings: state.openSettings,
-      activeTab: state.activeTab,
       setActiveTab: state.setActiveTab,
     }),
-    [state.activeTab, state.handleNewSession, state.openSettings, state.selectedProject, state.setActiveTab],
+    [state.handleNewSession, state.openSettings, state.selectedProject, state.setActiveTab],
   );
 
   const effectsState = useMemo<ProjectEffectsState>(

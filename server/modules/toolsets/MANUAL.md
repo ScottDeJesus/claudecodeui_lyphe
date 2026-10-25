@@ -7,12 +7,12 @@ Named MCP tool sets, defined per box and switched on per conversation: the box f
 | file | owns |
 | --- | --- |
 | `toolsets.registry.ts` | `resolveToolsetsFile`, `ensureToolsetsFile`, `readToolsetRegistry`, `SET_NAME_PATTERN` |
-| `toolsets.service.ts` | `toolsetsService` = `launchFor`, `view`, `switchSet`, `appSessionForCredential` |
-| `toolsets.routes.ts` | `createToolsetsUserRouter`, `createToolsetsCommandRouter`, the command door's guard |
-| `toolsets.credential.ts` | `toolsetCredential`, `toolsetCredentialMatches` |
+| `toolsets.service.ts` | `toolsetsService` = `launchFor`, `view`, `switchSet` |
+| `toolsets.routes.ts` | `createToolsetsUserRouter`, `createToolsetsCommandRouter` (its first middleware is the shared `chatCredentialGuard`) |
 | `toolsets.pointer.ts` | `toolsetPointer(sets)` |
-| `toolsets.command-link.ts` | `ensureToolsetCommandLink()` |
 | `toolsets.module.ts`, `index.ts` | `createToolsetsModule()` — the barrel's one export |
+
+The credential a chat carries, the guard of the command doors, the account of a chat and the link that puts a command into `~/.local/bin` are `server/modules/chat-commands/` (MAN-8992), shared with the `notes` command.
 
 Outside the directory: `bin/toolset.mjs`, `server/shared/toolset-types.ts` (+ `src/shared/` mirror), `claude-toolset-seams.ts` in `providers`, the composer section in `src/modules/chat/`.
 
@@ -21,7 +21,8 @@ Outside the directory: `bin/toolset.mjs`, `server/shared/toolset-types.ts` (+ `s
 | question | row |
 | --- | --- |
 | the box file, its validation rules, `sessions.toolsets` | MAN-8498 |
-| the two doors, the guard, the per-chat credential, the mounts, `createToolsetsModule` | MAN-8499 |
+| the two doors, the mounts, `createToolsetsModule` | MAN-8499 |
+| the per-chat credential, the command doors' guard, the account of a chat, the command link | MAN-8992 |
 | `view`, `switchSet`, every refusal code, the launch hook, the pointer sentence, the frame | MAN-8500 |
 | the `toolset` command: usage, stdout, exit codes, the link, the PATH | MAN-8501 |
 | edits that break the mechanism (one `setMcpServers` path, the retry's call, the base-name guard, the SDK-server trap, tool sets stay a live setting) | INV-8471 |
@@ -106,7 +107,7 @@ All-or-nothing, in file order; the first defect is the one reported, as `AppErro
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/.gitignore, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/migrations.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/session-user-state.db.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/schema.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/toolsets/toolsets.registry.ts
 
-## MAN-8499 — Tool sets doors — `/api/toolsets`, `/api/toolsets-cmd`, the per-chat credential and its guard
+## MAN-8499 — Tool sets doors — `/api/toolsets`, `/api/toolsets-cmd`, the mounts and `createToolsetsModule`
 
 Two routers from `createToolsetsModule()`; each route parses, calls one `toolsetsService` verb and answers (verbs: MAN-8500). Map: MAN-8497. A body never carries a server config.
 
@@ -115,7 +116,7 @@ Two routers from `createToolsetsModule()`; each route parses, calls one `toolset
 Called once in `server/index.ts`, before both mounts. In order:
 
 1. `ensureToolsetsFile()` — creates the box file as `{}` (MAN-8498).
-2. `ensureToolsetCommandLink()` — links `~/.local/bin/toolset` (MAN-8501).
+2. `ensureChatCommandLink('toolset', 'toolsets')` — links `~/.local/bin/toolset` (MAN-8992, MAN-8501).
 3. `providerRuntimeService.useChatToolsets({ launchFor })` — registers the launch hook (MAN-8487).
 
 Steps 1 and 2 are each wrapped: a failure is one `[toolsets]` warning and the API stays up. why: a read-only root or home must not take down chat, files and git for a list of sets; the view answers the broken setup on the one request that needs the file.
@@ -125,7 +126,7 @@ Steps 1 and 2 are each wrapped: a failure is one `[toolsets]` warning and the AP
 | path | guard | router |
 | --- | --- | --- |
 | `/api/toolsets` | `authenticateToken` | `userRouter` |
-| `/api/toolsets-cmd` | none at the mount; `toolsetCommandGuard` is the router's first middleware | `commandRouter` |
+| `/api/toolsets-cmd` | none at the mount; `chatCredentialGuard` (MAN-8992) is the router's first middleware | `commandRouter` |
 
 - Both mount after `/api/apps` and above the `/api` 404 (`API_ROUTE_NOT_FOUND`).
 - `validateApiKey` guards all of `/api`: with `API_KEY` set, the `toolset` command (it sends no `x-api-key`) gets 401 at `/api/toolsets-cmd`. This box has no `API_KEY` in `.env`.
@@ -146,34 +147,20 @@ Steps 1 and 2 are each wrapped: a failure is one `[toolsets]` warning and the AP
 
 - Body `ToolsetCommandRequest` = `{ claudeSessionId, action: 'list' | 'on' | 'off', set? }`. Any other `action` → 400 `TOOLSET_ACTION_INVALID`.
 - `list` → `{ success: true, data: SessionToolsetsView }`; `on` / `off` → `{ success: true, data: ToolsetSwitchResult }`. A missing or malformed `set` reaches `switchSet`, which answers 400 `TOOLSET_NAME_INVALID`.
-- The route takes the chat's app session id from `res.locals.toolsetAppSessionId`, never from the body.
+- The route takes the chat's app session id from `chatAppSessionOf(res)`, never from the body.
 - Client: `bin/toolset.mjs` (MAN-8501).
 
-### Guard — `toolsetCommandGuard`
+### Guard and credential
 
-1. Bearer from `Authorization` (scheme case-insensitive) and `claudeSessionId` from the body.
-2. `toolsetsService.appSessionForCredential(claudeSessionId, bearer)`: `SESSION_ID_PATTERN`, then `sessionsDb.resolveAppSessionId` (the CLI holds a Claude id), then `getSessionById`, which must be a Claude row, then `toolsetCredentialMatches`.
-3. Any miss → 401 `TOOLSET_CREDENTIAL_REFUSED`, "This credential does not belong to a CloudCLI chat with that session id." One answer for no bearer, malformed id, unknown session, non-Claude chat, wrong credential and the operator's JWT alike.
-4. A pass puts the app session id in `res.locals.toolsetAppSessionId`.
+The guard is `chatCredentialGuard` and the credential is `chatCredential(appSessionId)`, both of `server/modules/chat-commands/` (MAN-8992), shared with the doors of the `notes` and `followups` commands. A miss of any kind is 401 `CHAT_CREDENTIAL_REFUSED`; a pass leaves the chat's app session id for `chatAppSessionOf(res)`.
 
-Measured 2026-10-16: `POST /api/toolsets-cmd` with no credential → HTTP 401 and that envelope; `GET /api/toolsets/sessions/<id>` with no token → 401.
+Measured 2026-10-25: `POST /api/toolsets-cmd` with a wrong bearer → HTTP 401 and that envelope. Measured 2026-10-16: `GET /api/toolsets/sessions/<id>` with no token → 401.
 
-## The credential — `toolsets.credential.ts`
-
-| fact | value |
-| --- | --- |
-| value | `toolsetCredential(appSessionId)` = hex HMAC-SHA256 of `toolset:${appSessionId}`, keyed by `JWT_SECRET` (exported by `server/modules/auth/index.ts` for this) |
-| stored | nowhere: the launch hands the digest to the CLI, the guard recomputes it. A restart changes nothing; a chat that ended is a row that is gone |
-| compared | `toolsetCredentialMatches`: `crypto.timingSafeEqual` after a length check |
-| scope | one chat. A model holding it cannot switch another chat's sets. The operator's JWT never enters a CLI's environment |
-| prefix | `toolset:` keeps it from standing in for the `kanban-pm` door's credential, derived the same way |
-| rotation | `JWT_SECRET` is `process.env.JWT_SECRET` or the database's persisted secret; changing it makes every running CLI's credential refuse, and `toolset` reports `unavailable — CloudCLI does not know this session` until the chat's next process |
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/auth/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/toolsets/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/toolsets/toolsets.credential.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/toolsets/toolsets.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/toolsets/toolsets.routes.ts
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/toolsets/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/toolsets/toolsets.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/toolsets/toolsets.routes.ts
 
 ## MAN-8500 — Tool sets verbs — `view`, `switchSet`, the launch hook `launchFor`, the pointer sentence and the `session_toolsets_changed` frame
 
-`toolsetsService` = `{ launchFor, view, switchSet, appSessionForCredential }` (`toolsets.service.ts`). Callers: the two doors (MAN-8499), `server/index.ts` through `createToolsetsModule()`. Map: MAN-8497. Types: MAN-8487.
+`toolsetsService` = `{ launchFor, view, switchSet }` (`toolsets.service.ts`). Callers: the two doors (MAN-8499), `server/index.ts` through `createToolsetsModule()`. Map: MAN-8497. Types: MAN-8487.
 
 ## `view(appSessionId)` → `SessionToolsetsView`
 
@@ -238,7 +225,7 @@ Registered through `useChatToolsets`; the Claude runtime asks it at every messag
 | row `NULL` | the two variables | `null` | `toolsetPointer(sets)` |
 | row holds names | the two variables | merged `mcpServers` of the row's names the box still defines, set-name order; `{}` when none | `toolsetPointer(sets)` |
 
-- The two variables: `CLOUDCLI_TOOLSET_URL` = `loopbackApiOrigin()` (`SERVER_PORT`, MAN-8487), `CLOUDCLI_TOOLSET_TOKEN` = `toolsetCredential(appSessionId)`. Every Claude chat on the box carries both, whatever the registry holds. why: a chat that started before the first set was registered can still switch it on.
+- The two variables: `CLOUDCLI_TOOLSET_URL` = `loopbackApiOrigin()` (`SERVER_PORT`, MAN-8487), `CLOUDCLI_TOOLSET_TOKEN` = `chatCredential(appSessionId)` (MAN-8992: the one credential every command of the chat sends, `notes` too). Every Claude chat on the box carries both, whatever the registry holds. why: a chat that started before the first set was registered can still switch it on.
 - A node chat gets neither. why: a stdio command names this box's paths and could not reach this box's loopback.
 - Set-name order is load-bearing: the runtime digests the map's JSON to learn whether a process already carries it.
 - `servers: null` = nothing in play, no control request. `{}` = in play, no server (a row of `[]`, or only strays).
@@ -295,7 +282,7 @@ Request: `POST ${CLOUDCLI_TOOLSET_URL}/api/toolsets-cmd`, `Authorization: Bearer
 | the URL or the token is missing | `this chat's CLI was started without the tool-set credential; its next process carries it` |
 | `CLAUDE_CODE_SESSION_ID` is missing | `CLAUDE_CODE_SESSION_ID is not set, so this conversation cannot be named` |
 | no answer at the URL (refused, timeout after 45 s, a restricted port) | `CloudCLI does not answer at <url> (<reason>)` |
-| HTTP 401 carrying CloudCLI's envelope (`success` is a boolean: `TOOLSET_CREDENTIAL_REFUSED`) | `CloudCLI does not know this session` |
+| HTTP 401 carrying CloudCLI's envelope (`success` is a boolean: `CHAT_CREDENTIAL_REFUSED`) | `CloudCLI does not know this session` |
 | an answer that is not CloudCLI's JSON envelope — any status, a 401 without `success` included (`validateApiKey`'s `{"error":"Invalid API key"}` on a box with `API_KEY` set) | `<url> answered HTTP <status>, which is not a CloudCLI answer` |
 | a defect in the script itself | `internal error: <message>` |
 
@@ -314,9 +301,9 @@ Measured 2026-10-16: `env -u CLAUDE_SURFACE toolset list` → `toolset: unavaila
 
 Outcomes are `ToolsetServerOutcome.outcome` (MAN-8487): `connected`, `failed`, `removed`, `unchanged`, `pending`, `unconfirmed`.
 
-## The link — `ensureToolsetCommandLink()`
+## The link — `ensureChatCommandLink('toolset', 'toolsets')`
 
-Called by `createToolsetsModule()` (wrapped: a failure is one warning). Keeps `~/.local/bin/toolset` a symlink to `<application root>/bin/toolset.mjs`; `~/.local/bin` is made if missing.
+`ensureChatCommandLink(commandName, logLabel)` is `server/modules/chat-commands/`' (MAN-8992), shared with the `notes` and `followups` commands: `createToolsetsModule()` calls it once (wrapped: a failure is one warning). It keeps `~/.local/bin/toolset` a symlink to `<application root>/bin/toolset.mjs`; `~/.local/bin` is made if missing.
 
 | state found | does | journal |
 | --- | --- | --- |
@@ -343,4 +330,4 @@ Measured 2026-10-16: `~/.local/bin/toolset -> /home/lyphe/.claude/claudecodeui_l
 - This box needs no hand step because of that one settings line, which this repo does not control. A box without it gets `toolset: command not found` (127) in a chat while the pointer sentence still names the command.
 - Adding `__HOME__/.local/bin` to the unit's `Environment=PATH=` is not applied: the operator's call (it needs `deploy/systemd/install.sh` and a daemon-reload).
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/bin/toolset.mjs, /home/lyphe/.claude/claudecodeui_lyphe/deploy/systemd/cloudcli-server-dev.service, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/toolsets/toolsets.command-link.ts
+governs: /home/lyphe/.claude/claudecodeui_lyphe/bin/toolset.mjs, /home/lyphe/.claude/claudecodeui_lyphe/deploy/systemd/cloudcli-server-dev.service, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/chat-commands/chat-commands.link.ts

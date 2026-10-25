@@ -18,6 +18,7 @@ import {
   USER_NOTIFICATION_PREFERENCES_TABLE_SCHEMA_SQL,
   VAPID_KEYS_TABLE_SCHEMA_SQL,
 } from '@/modules/database/schema.js';
+import { FOLLOWUPS_SCHEMA_SQL } from '@/modules/database/followups-schema.js';
 import { KANBAN_SCHEMA_SQL } from '@/modules/database/kanban-schema.js';
 import { MEMORY_SCHEMA_SQL } from '@/modules/database/memory-schema.js';
 import { NOTES_SCHEMA_SQL } from '@/modules/database/notes-schema.js';
@@ -709,6 +710,9 @@ export const runMigrations = (db: Database) => {
     // The notes table, in its own script: one account's cards, not a board's and not a preference
     // document. It sits after the projects rebuild while referencing `users` alone.
     db.exec(NOTES_SCHEMA_SQL);
+    // The followups table: a chat's own next steps and known gaps. It references `sessions` (its
+    // cascade is what removes a deleted chat's items) and `users`, both of which exist by here.
+    db.exec(FOLLOWUPS_SCHEMA_SQL);
 
     db.exec('CREATE INDEX IF NOT EXISTS idx_session_ids_lookup ON sessions(session_id)');
     db.exec('CREATE INDEX IF NOT EXISTS idx_sessions_provider_session_id ON sessions(provider_session_id)');

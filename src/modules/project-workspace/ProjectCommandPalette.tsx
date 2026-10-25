@@ -1,12 +1,13 @@
 import { memo, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { useSwitcherActions } from '@/modules/app-switcher';
 import { CommandPalette } from '@/modules/command-palette';
 import { selectGitRepository } from '@/modules/git-panel';
 import { useProjectCommandState } from '@/modules/project-workspace/context/ProjectsStateContext';
-import { useWorkspaceTabGates } from '@/modules/project-workspace/hooks/useWorkspaceTabGates';
+import { useWorkspaceViews } from '@/modules/project-workspace/hooks/useWorkspaceViews';
 import { GIT_REPO_PATHS } from '@/shared/constants';
-import type { AppTab, ChatDoor } from '@/shared/types';
+import type { ChatDoor, PaletteNavRow } from '@/shared/types';
 
 /**
  * Rendered by WorkspaceFrame to bind this module's project state, and the chat's door, to the
@@ -15,26 +16,18 @@ import type { AppTab, ChatDoor } from '@/shared/types';
  * "which press goes which way" to keep in step.
  */
 function ProjectCommandPalette({ chatDoor }: { chatDoor: ChatDoor }) {
+  const { t } = useTranslation();
   const {
     selectedProject,
     handleNewSession,
     openSettings,
-    activeTab,
     setActiveTab,
   } = useProjectCommandState();
+  const { views } = useWorkspaceViews();
 
   // The switcher's five acts, the list the radial draws too. They are the switcher's to define (which
   // pane is in front, what a Reload is), so this only forwards them to the palette's Applications group.
   const switcherActions = useSwitcherActions(chatDoor);
-
-  const {
-    shouldShowShellTab,
-    shouldShowTasksTab,
-    shouldShowBrowserTab,
-    shouldShowMemoryTab,
-    shouldShowRunnerTab,
-    shouldShowHealTab,
-  } = useWorkspaceTabGates(activeTab);
 
   // The commit and branch rows lead to the git tab on this project's repository, so they are
   // offered only for a project that tab carries — a row for any other would bring forward a
@@ -51,24 +44,22 @@ function ProjectCommandPalette({ chatDoor }: { chatDoor: ChatDoor }) {
     [selectedRepoPath, setActiveTab],
   );
 
-  // Every gate comes off the one hook the tab strip reads, so the palette can never disagree
-  // with the bar about which tabs exist — it used to recompute three of them from the same
-  // contexts, which is a second source for a decision already made, and the Memory tab's sticky
-  // rule cannot be recomputed privately at all without a second copy of the rule. Browser is
-  // still offered even though NAV_TABS has no row for it yet: a list that quietly omits a gate
-  // is a list that puts the next row someone adds behind a filter nobody remembers writing.
-  // Plugin tabs remain the one exclusion — they are discovered at runtime and the palette has no
-  // rows for them at all. Memoised because a fresh array on every render would defeat the memo().
-  const visibleTabs = useMemo<AppTab[]>(() => {
-    const tabs: AppTab[] = ['chat', 'files', 'git', 'kanban', 'universe', 'schedules', 'notes', 'api', 'cerberus'];
-    if (shouldShowShellTab) tabs.push('shell');
-    if (shouldShowTasksTab) tabs.push('tasks');
-    if (shouldShowBrowserTab) tabs.push('browser');
-    if (shouldShowMemoryTab) tabs.push('memory');
-    if (shouldShowRunnerTab) tabs.push('runner');
-    if (shouldShowHealTab) tabs.push('heal');
-    return tabs;
-  }, [shouldShowBrowserTab, shouldShowHealTab, shouldShowMemoryTab, shouldShowRunnerTab, shouldShowShellTab, shouldShowTasksTab]);
+  // The Navigate rows come off the one list the rail reads, so the palette reaches every view by the names the
+  // rail gives them, and a view added to that list is reachable here with no second edit. Settings is the one
+  // row of ours: it is not a view but a door, so it comes last. Memoised because a fresh array on every
+  // render would defeat the memo().
+  const navRows = useMemo<PaletteNavRow[]>(
+    () => [
+      ...views.map((view) => ({
+        key: view.id,
+        label: view.label,
+        keywords: view.keywords,
+        run: () => setActiveTab(view.id),
+      })),
+      { key: 'settings', label: t('rail.settings'), keywords: 'open settings preferences', run: () => openSettings() },
+    ],
+    [views, t, setActiveTab, openSettings],
+  );
 
   return (
     <CommandPalette
@@ -77,7 +68,7 @@ function ProjectCommandPalette({ chatDoor }: { chatDoor: ChatDoor }) {
       onOpenSettings={openSettings}
       onShowTab={setActiveTab}
       onShowRepoInGitTab={showSelectedRepoInGitTab}
-      visibleTabs={visibleTabs}
+      navRows={navRows}
       switcherActions={switcherActions}
     />
   );

@@ -1216,20 +1216,6 @@ probe-key: ee261bd85314737e61744922604d0d610f5fa454
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/claude-updates-auto-install.mjs
 
-## INV-6073 — probe — one press costs two reads under the app's real frame traffic
-
-one press costs two reads under the app's real frame traffic
-
-```probe
-node /tmp/athena-prov.EWQzOh/press.mjs
-expect: `(a) one press: POSTs=1 GETs=2 resolved=true` — the press's own post-write re-read plus the read the server's own broadcast provokes when its frame arrives.
-```
-
-measured 2026-09-30 by chain chain-simple-notes--provider-20260930-112739-1ce0, finding L2, LOW
-probe-key: 7fd9e84a057d5fba1f3c54ea1d3a8000a2e5a4b1
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/App.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/notes/context/NotesContext.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/notes/context/NotesProvider.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/notes/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts
-
 ## INV-6074 — probe — two `removeLocal` calls in one tick lose the first removal, while both `total` decrements land
 
 two `removeLocal` calls in one tick lose the first removal, while both `total` decrements land
@@ -1312,34 +1298,6 @@ Every opener of a push's `data.path` opens it only when it is a rooted, same-ori
 - `src/modules/project-workspace/controllers/ProjectEffects.tsx` checks `startsWith('/')` only, which accepts `//host/x`. It is fed by the worker's validated `urlPath`; feed it from anywhere else and it needs the same regex.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/electron/main.js, /home/lyphe/.claude/claudecodeui_lyphe/public/sw.js, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notifications/services/notification-landing.service.ts
-
-## INV-6084 — probe — `/?runner=<plan>` at the root never lands after the project is picked (scenario S6)
-
-`/?runner=<plan>` at the root never lands after the project is picked (scenario S6)
-
-```probe
-node /home/lyphe/.claude/state/pipeline-reviews/prompts-in-cards--reveal/athena-probes/landing-attacks-2.mjs   # dev client on 127.0.0.1:5183
-expect: [FAIL] S6 the pick never lands: the tab stays Chat and the landing URL is gone (navigate('/') in handleProjectSelect) — rootPick.after `/ | tab Chat | stored chat | pane no cards 0 | target false`, while beforePick the same page holds `/?runner=coi-backend-conformance | tab null | tabs []`; S6b prints [OK] on the already-picked page
-```
-
-measured 2026-09-30 by chain chain-prompts-in-cards--reveal-20260930-133613-4585, finding M1, MEDIUM
-probe-key: 7176ac370388533667b3d08cf94c59333e01a442
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/controllers/ProjectEffects.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/hooks/useRunnerLanding.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/WorkspaceMain.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/runner-tab/RunnerPanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-runner-landing.mjs
-
-## INV-6086 — probe — the reveal is not retired over an empty lane; it stays pending and fires late (scenario S21)
-
-the reveal is not retired over an empty lane; it stays pending and fires late (scenario S21)
-
-```probe
-node /home/lyphe/.claude/state/pipeline-reviews/prompts-in-cards--reveal/athena-probes/landing-attacks-2.mjs
-expect: [FAIL] S21 the reveal was still PENDING over the empty lane: after the lane drew 8 cards the pane moved to 2970px (target top 464px) with no landing
-```
-
-measured 2026-09-30 by chain chain-prompts-in-cards--reveal-20260930-133613-4585, finding L2, LOW
-probe-key: 63ba668cb176b779e21f795140b570dba7b1d7cb
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/controllers/ProjectEffects.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/hooks/useRunnerLanding.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/WorkspaceMain.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/runner-tab/RunnerPanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-runner-landing.mjs
 
 ## INV-6090 — probe — a title of two ZERO WIDTH SPACEs is accepted: a card that draws as nothing
 
@@ -1631,7 +1589,7 @@ CloudCLI's text names arcs, plans and phases as epics, features and tasks. Ident
 - The en locale: `src/modules/i18n/locales/en/{common,chat,settings}.json`.
 - The roadmap screen: the `roadmap` block of `en/common.json` (MAN-7634) and the Roadmap tab's `tabs.runner`, `runner.title`, `runner.empty` (MAN-7654). It says milestone, epic, feature and task everywhere, and shows a slug only as the `Name for Claude: <name>` line of a feature's dialog (MAN-7645).
 - The `defaultValue` beside a key: the drawn text when its key is absent, the fallback when present — both carry the new words (`ComposerDeepSeekSwitch.tsx`, `RunnerParkAtPeakRow.tsx`).
-- The command palette's `Go to Roadmap` keywords carry both vocabularies (`CommandPalette.tsx`).
+- The command palette's `Go to Roadmap` keywords carry both vocabularies (the `runner` entry of `PLAN_VIEWS`, `useWorkspaceViews.ts`).
 - The ten other locales hold none of the dispatcher keys and fall back to English. Their values whose English changed say what the new English says: `chat.json` `input.deepseekFlashTooltip`, `settings.json` `agents.runnerModel.description`, fr `agents.runnerParkAtPeak.*`. "plan runner" is "runner" in them, left in English.
 - The push copy: `notification-copy.service.ts` — `Feature finished`, `Epic finished`, `Feature paused`, `Features paused …`, `Task relaunched`, `Task <key> was taken up again`, `<done>/<n> tasks`.
 - The server's two sentences: `NO_ANSWER.timeout` (`server/shared/dispatcher-command.ts`), `OTHER_PROCESS_EXAMPLES` (`claude-activity.service.ts`).
@@ -9142,7 +9100,7 @@ INV-8471 is not governed on the files four of its six clauses name
 
 ```probe
 cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
-for f in bin/toolset.mjs server/modules/toolsets/toolsets.credential.ts server/modules/toolsets/toolsets.module.ts; do
+for f in bin/toolset.mjs server/modules/chat-commands/chat-commands.credential.ts server/modules/toolsets/toolsets.module.ts; do
   echo "$f: $(~/.claude/scripts/docstore govern "/home/lyphe/.claude/claudecodeui_lyphe/$f" --limit 200 --text | grep -c INV-8471)"
 done
 expect: `0` for all three while the defect stands; cured when each prints 1
@@ -9220,7 +9178,7 @@ expect: `retired MAN-8491 had: shell-snapshots+well under a second+ | MAN-8501 h
 measured 2026-10-16 by chain chain-toolset-skeleton--docs-20261016-092338-5af2, finding L5, LOW
 probe-key: d11c501bcd2456dd0b141441eca51f4e4c61f776
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/bin/toolset.mjs, /home/lyphe/.claude/claudecodeui_lyphe/deploy/systemd/cloudcli-server-dev.service, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/toolsets/toolsets.command-link.ts
+governs: /home/lyphe/.claude/claudecodeui_lyphe/bin/toolset.mjs, /home/lyphe/.claude/claudecodeui_lyphe/deploy/systemd/cloudcli-server-dev.service, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/chat-commands/chat-commands.link.ts
 
 ## INV-8499 — usage-hold-account probes — a scratch chain that names its own HEAL_LEDGER_PATH launches a Chiron judge on the default model
 
@@ -12035,3 +11993,993 @@ measured 2026-10-24 by chain chain-model-version-labels-20261024-071937-430a, fi
 probe-key: 2b3d7c825ebd5ec21d7b4df97a2afeacf3476dd9
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-model-options.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-claude-catalog-picker.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-opus-55-selector.mjs
+
+## INV-9606 — probe — MEDIUM — text typed while a save is in flight is not sent when the page is hidden or closed
+
+MEDIUM — text typed while a save is in flight is not sent when the page is hidden or closed
+
+```probe
+D=$(mktemp -d /tmp/athena-p.XXXXXX) || exit 1
+cat > "$D/p.mjs" <<'EOF'
+import { STUBBED_REQUESTS, PROJECT_ROW, openConsole } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/console.mjs';
+const NOTES_TAB = '[role="tab"][aria-label="Notes"]';
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const session = await openConsole({ dark: true, viewport: { width: 1440, height: 900 } });
+const token = await session.page.evaluate(() => localStorage.getItem('auth-token'));
+const api = async (path, init = {}) => { const r = await fetch(`http://127.0.0.1:3011${path}`, { ...init, headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' } }); return r.json().catch(() => null); };
+const sweep = async () => { for (const n of (await api('/api/notes')).data.filter((x) => x.title.startsWith('athena-p '))) await api(`/api/notes/${n.id}`, { method: 'DELETE' }); };
+const card = (page, id) => page.locator(`[data-note-id="${id}"]`);
+const open = async (page) => { await page.locator(`${NOTES_TAB}:visible`).first().click(); await page.waitForSelector('[data-note-composer] [data-note-title]'); };
+try {
+  const page = session.page;
+  await open(page);
+  const made = await api('/api/notes', { method: 'POST', body: JSON.stringify({ title: 'athena-p flight', description: 'base' }) });
+  await card(page, made.data.id).waitFor();
+  await card(page, made.data.id).locator('[data-note-edit]').click();
+  await card(page, made.data.id).locator('[data-note-description]').click(); await page.keyboard.press('Control+End');
+  const puts = [];
+  await page.route('**/api/notes/*', async (route) => {          // the server gets the save at once; its answer is slow
+    if (route.request().method() !== 'PUT') return route.continue();
+    puts.push(route.request().postDataJSON().description);
+    const response = await route.fetch(); await sleep(3000); await route.fulfill({ response }).catch(() => {});
+  });
+  await page.keyboard.type('A'); await page.waitForTimeout(1400);   // the pause passed: save 1 is in flight
+  await page.keyboard.type('BCD');                                  // typed during the flight
+  await page.evaluate(() => { document.dispatchEvent(new Event('visibilitychange')); window.dispatchEvent(new Event('pagehide')); });
+  await page.waitForTimeout(700);
+  console.log('saves sent by 700 ms after pagehide:', JSON.stringify(puts));
+  await page.close({ runBeforeUnload: true }).catch(() => {});
+  await sleep(2500);
+  console.log('server holds:', JSON.stringify((await api('/api/notes')).data.find((n) => n.id === made.data.id)?.description));
+} catch (e) { console.log('probe error:', String(e.message).split('\n')[0]); }
+finally { await sweep(); console.log('left behind in the harness account:', (await api('/api/notes')).data.filter((x) => x.title.startsWith('athena-p ')).length); await session.browser.close(); }
+EOF
+cat > "$D/p.sh" <<'EOF'
+node "$1/p.mjs" 2>&1 | cut -c1-300
+EOF
+bash "$D/p.sh" "$D"
+cd /tmp; case "$D" in /tmp/athena-p.??????) rm -r "$D";; esac
+echo "[probe exit $?]"
+# expect: saves sent by 700 ms after pagehide: ["baseA"] and server holds: "baseA" while the defect stands; cured when a save carrying the text typed during the flight leaves at pagehide and the server holds "baseABCD"
+```
+
+measured 2026-10-25 by chain chain-notes-autosave-and-claude-20261025-072504-7fb7, finding M1, MEDIUM
+probe-key: 25d622b76231dd18a171c761c6d1b55d3099b7b6
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/bin/notes.mjs, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/notes/context/NotesProvider.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/notes/hooks/useNoteSaver.ts, /home/lyphe/.claude/skills/notes/SKILL.md
+
+## INV-9607 — probe — MEDIUM — Done on a note with a cleared title throws away the description typed under it
+
+MEDIUM — Done on a note with a cleared title throws away the description typed under it
+
+```probe
+D=$(mktemp -d /tmp/athena-p.XXXXXX) || exit 1
+cat > "$D/p.mjs" <<'EOF'
+import { STUBBED_REQUESTS, PROJECT_ROW, openConsole } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/console.mjs';
+const NOTES_TAB = '[role="tab"][aria-label="Notes"]';
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const session = await openConsole({ dark: true, viewport: { width: 1440, height: 900 } });
+const token = await session.page.evaluate(() => localStorage.getItem('auth-token'));
+const api = async (path, init = {}) => { const r = await fetch(`http://127.0.0.1:3011${path}`, { ...init, headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' } }); return r.json().catch(() => null); };
+const sweep = async () => { for (const n of (await api('/api/notes')).data.filter((x) => x.title.startsWith('athena-p '))) await api(`/api/notes/${n.id}`, { method: 'DELETE' }); };
+const card = (page, id) => page.locator(`[data-note-id="${id}"]`);
+const open = async (page) => { await page.locator(`${NOTES_TAB}:visible`).first().click(); await page.waitForSelector('[data-note-composer] [data-note-title]'); };
+try {
+  const page = session.page;
+  await open(page);
+  const made = await api('/api/notes', { method: 'POST', body: JSON.stringify({ title: 'athena-p title', description: 'original text' }) });
+  const c = card(page, made.data.id); await c.waitFor();
+  await c.locator('[data-note-edit]').click();
+  await c.locator('[data-note-title]').fill('');
+  await c.locator('[data-note-description]').click(); await page.keyboard.press('Control+End');
+  await page.keyboard.type(' + three paragraphs I just wrote');
+  await page.waitForTimeout(1700);
+  console.log('line while the title is empty:', JSON.stringify((await c.locator('[data-note-status]').textContent())?.trim()));
+  await c.locator('[data-note-done]').click(); await page.waitForTimeout(900);
+  console.log('after Done, server holds:', JSON.stringify((await api('/api/notes')).data.find((n) => n.id === made.data.id)?.description));
+} catch (e) { console.log('probe error:', String(e.message).split('\n')[0]); }
+finally { await sweep(); console.log('left behind in the harness account:', (await api('/api/notes')).data.filter((x) => x.title.startsWith('athena-p ')).length); await session.browser.close(); }
+EOF
+cat > "$D/p.sh" <<'EOF'
+node "$1/p.mjs" 2>&1 | cut -c1-300
+EOF
+bash "$D/p.sh" "$D"
+cd /tmp; case "$D" in /tmp/athena-p.??????) rm -r "$D";; esac
+echo "[probe exit $?]"
+# expect: line while the title is empty: "A title is needed to save this note." and after Done, server holds: "original text" while the defect stands; cured when the typed description is still on the card (or saved) after Done
+```
+
+measured 2026-10-25 by chain chain-notes-autosave-and-claude-20261025-072504-7fb7, finding M2, MEDIUM
+probe-key: 11f9156f83464f32d1c599cee4084ca573faf340
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/bin/notes.mjs, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/notes/context/NotesProvider.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/notes/hooks/useNoteSaver.ts, /home/lyphe/.claude/skills/notes/SKILL.md
+
+## INV-9608 — probe — MEDIUM — an edit card left open on one device overwrites another device's saved text on the next keystroke
+
+MEDIUM — an edit card left open on one device overwrites another device's saved text on the next keystroke
+
+```probe
+D=$(mktemp -d /tmp/athena-p.XXXXXX) || exit 1
+cat > "$D/p.mjs" <<'EOF'
+import { STUBBED_REQUESTS, PROJECT_ROW, openConsole } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/console.mjs';
+const NOTES_TAB = '[role="tab"][aria-label="Notes"]';
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const session = await openConsole({ dark: true, viewport: { width: 1440, height: 900 } });
+const token = await session.page.evaluate(() => localStorage.getItem('auth-token'));
+const api = async (path, init = {}) => { const r = await fetch(`http://127.0.0.1:3011${path}`, { ...init, headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' } }); return r.json().catch(() => null); };
+const sweep = async () => { for (const n of (await api('/api/notes')).data.filter((x) => x.title.startsWith('athena-p '))) await api(`/api/notes/${n.id}`, { method: 'DELETE' }); };
+const card = (page, id) => page.locator(`[data-note-id="${id}"]`);
+const open = async (page) => { await page.locator(`${NOTES_TAB}:visible`).first().click(); await page.waitForSelector('[data-note-composer] [data-note-title]'); };
+try {
+  const page1 = session.page;
+  await open(page1);
+  const made = await api('/api/notes', { method: 'POST', body: JSON.stringify({ title: 'athena-p two devices', description: 'base' }) });
+  const page2 = await page1.context().newPage();
+  for (const { pattern, body } of STUBBED_REQUESTS) await page2.route(pattern, (r) => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body) }));
+  await page2.setViewportSize({ width: 1440, height: 900 });
+  await page2.goto(page1.url(), { waitUntil: 'networkidle' });
+  if ((await page2.locator(NOTES_TAB).count()) === 0) { await page2.locator(PROJECT_ROW).first().click(); await page2.waitForTimeout(800); }
+  await open(page2);
+  for (const pg of [page1, page2]) { await card(pg, made.data.id).waitFor(); await card(pg, made.data.id).locator('[data-note-edit]').click(); }
+  await card(page2, made.data.id).locator('[data-note-description]').click(); await page2.keyboard.press('Control+End');
+  await page2.keyboard.type(' -from-device-2'); await page2.waitForTimeout(1800);
+  console.log('server after device 2 typed:', JSON.stringify((await api('/api/notes')).data.find((n) => n.id === made.data.id).description));
+  await card(page1, made.data.id).locator('[data-note-description]').click(); await page1.keyboard.press('Control+End');
+  await page1.keyboard.type(' -from-device-1'); await page1.waitForTimeout(1800);
+  console.log('server after device 1 typed:', JSON.stringify((await api('/api/notes')).data.find((n) => n.id === made.data.id).description));
+} catch (e) { console.log('probe error:', String(e.message).split('\n')[0]); }
+finally { await sweep(); console.log('left behind in the harness account:', (await api('/api/notes')).data.filter((x) => x.title.startsWith('athena-p ')).length); await session.browser.close(); }
+EOF
+cat > "$D/p.sh" <<'EOF'
+node "$1/p.mjs" 2>&1 | cut -c1-300
+EOF
+bash "$D/p.sh" "$D"
+cd /tmp; case "$D" in /tmp/athena-p.??????) rm -r "$D";; esac
+echo "[probe exit $?]"
+# expect: server after device 2 typed: "base -from-device-2", then server after device 1 typed: "base -from-device-1" while the defect stands; cured when the second line still carries "-from-device-2" (or the stale card showed it before typing)
+```
+
+measured 2026-10-25 by chain chain-notes-autosave-and-claude-20261025-072504-7fb7, finding M3, MEDIUM
+probe-key: a1878256f1de19204a26c4121ab08c60aee37d6b
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/bin/notes.mjs, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/notes/context/NotesProvider.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/notes/hooks/useNoteSaver.ts, /home/lyphe/.claude/skills/notes/SKILL.md
+
+## INV-9609 — probe — LOW — a blank card whose note was deleted elsewhere can never save again, and says nothing after the first toast
+
+LOW — a blank card whose note was deleted elsewhere can never save again, and says nothing after the first toast
+
+```probe
+D=$(mktemp -d /tmp/athena-p.XXXXXX) || exit 1
+cat > "$D/p.mjs" <<'EOF'
+import { STUBBED_REQUESTS, PROJECT_ROW, openConsole } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/console.mjs';
+const NOTES_TAB = '[role="tab"][aria-label="Notes"]';
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const session = await openConsole({ dark: true, viewport: { width: 1440, height: 900 } });
+const token = await session.page.evaluate(() => localStorage.getItem('auth-token'));
+const api = async (path, init = {}) => { const r = await fetch(`http://127.0.0.1:3011${path}`, { ...init, headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' } }); return r.json().catch(() => null); };
+const sweep = async () => { for (const n of (await api('/api/notes')).data.filter((x) => x.title.startsWith('athena-p '))) await api(`/api/notes/${n.id}`, { method: 'DELETE' }); };
+const card = (page, id) => page.locator(`[data-note-id="${id}"]`);
+const open = async (page) => { await page.locator(`${NOTES_TAB}:visible`).first().click(); await page.waitForSelector('[data-note-composer] [data-note-title]'); };
+try {
+  const page = session.page;
+  await open(page);
+  const T = '[data-note-composer] [data-note-title]', D = '[data-note-composer] [data-note-description]';
+  await page.fill(T, 'athena-p gone'); await page.fill(D, 'one'); await page.waitForTimeout(1700);
+  const made = (await api('/api/notes')).data.find((n) => n.title === 'athena-p gone');
+  await api(`/api/notes/${made.id}`, { method: 'DELETE' });          // the phone deletes it
+  await page.waitForTimeout(800);
+  await page.locator(D).click(); await page.keyboard.press('Control+End'); await page.keyboard.type(' two three');
+  await page.waitForTimeout(1700);
+  await page.keyboard.type(' four five'); await page.waitForTimeout(1700);
+  console.log('status line:', JSON.stringify((await page.locator('[data-note-composer] [data-note-status]').textContent())?.trim()));
+  console.log('toast:', JSON.stringify(((await page.evaluate(() => document.querySelector('[data-verve-toast-stack]')?.textContent)) ?? '').slice(0, 80)));
+  await page.locator(T).click(); await page.keyboard.press('Enter'); await page.waitForTimeout(900);
+  console.log('after Done, the card still holds:', JSON.stringify(await page.locator(D).inputValue()), '| Done drawn:', await page.locator('[data-note-composer] [data-note-done]').count());
+  console.log('notes on the server with that title:', (await api('/api/notes')).data.filter((n) => n.title === 'athena-p gone').length);
+} catch (e) { console.log('probe error:', String(e.message).split('\n')[0]); }
+finally { await sweep(); console.log('left behind in the harness account:', (await api('/api/notes')).data.filter((x) => x.title.startsWith('athena-p ')).length); await session.browser.close(); }
+EOF
+cat > "$D/p.sh" <<'EOF'
+node "$1/p.mjs" 2>&1 | cut -c1-300
+EOF
+bash "$D/p.sh" "$D"
+cd /tmp; case "$D" in /tmp/athena-p.??????) rm -r "$D";; esac
+echo "[probe exit $?]"
+# expect: status line: "" , the toast "That note could not be savedThat note is no longer there.", and the card still holding "one two three four five" with Done drawn and 0 notes on the server while the defect stands; cured when the card lets go of the dead note (fresh blank card) or re-creates it
+```
+
+measured 2026-10-25 by chain chain-notes-autosave-and-claude-20261025-072504-7fb7, finding L1, LOW
+probe-key: 81a8b2f30cd6748ec4a42e9fb484dd76bb87dfec
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/bin/notes.mjs, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/notes/context/NotesProvider.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/notes/hooks/useNoteSaver.ts, /home/lyphe/.claude/skills/notes/SKILL.md
+
+## INV-9610 — probe — LOW — the wall draws the note a second time while a create's answer is slow
+
+LOW — the wall draws the note a second time while a create's answer is slow
+
+```probe
+D=$(mktemp -d /tmp/athena-p.XXXXXX) || exit 1
+cat > "$D/p.mjs" <<'EOF'
+import { STUBBED_REQUESTS, PROJECT_ROW, openConsole } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/console.mjs';
+const NOTES_TAB = '[role="tab"][aria-label="Notes"]';
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const session = await openConsole({ dark: true, viewport: { width: 1440, height: 900 } });
+const token = await session.page.evaluate(() => localStorage.getItem('auth-token'));
+const api = async (path, init = {}) => { const r = await fetch(`http://127.0.0.1:3011${path}`, { ...init, headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' } }); return r.json().catch(() => null); };
+const sweep = async () => { for (const n of (await api('/api/notes')).data.filter((x) => x.title.startsWith('athena-p '))) await api(`/api/notes/${n.id}`, { method: 'DELETE' }); };
+const card = (page, id) => page.locator(`[data-note-id="${id}"]`);
+const open = async (page) => { await page.locator(`${NOTES_TAB}:visible`).first().click(); await page.waitForSelector('[data-note-composer] [data-note-title]'); };
+try {
+  const page = session.page;
+  await open(page);
+  await page.route('**/api/notes', async (route) => {            // the server stores the note and sends its frame at once; the create's ANSWER is slow
+    if (route.request().method() !== 'POST') return route.continue();
+    const response = await route.fetch(); await sleep(2500); await route.fulfill({ response }).catch(() => {});
+  });
+  await page.fill('[data-note-composer] [data-note-title]', 'athena-p dup');
+  await page.fill('[data-note-composer] [data-note-description]', 'typed');
+  const t0 = Date.now(); const seen = [];
+  const timer = setInterval(async () => { seen.push([Date.now() - t0, await page.locator('[data-note-id]:has-text("athena-p dup")').count().catch(() => 0)]); }, 80);
+  await page.waitForTimeout(5200); clearInterval(timer);
+  const dup = seen.filter(([, n]) => n > 0);
+  console.log(`wall cards for the note while the blank card still holds it: ${dup.length} of ${seen.length} samples, from ${dup[0]?.[0] ?? 'never'} ms to ${dup.at(-1)?.[0] ?? 'never'} ms`);
+} catch (e) { console.log('probe error:', String(e.message).split('\n')[0]); }
+finally { await sweep(); console.log('left behind in the harness account:', (await api('/api/notes')).data.filter((x) => x.title.startsWith('athena-p ')).length); await session.browser.close(); }
+EOF
+cat > "$D/p.sh" <<'EOF'
+node "$1/p.mjs" 2>&1 | cut -c1-300
+EOF
+bash "$D/p.sh" "$D"
+cd /tmp; case "$D" in /tmp/athena-p.??????) rm -r "$D";; esac
+echo "[probe exit $?]"
+# expect: wall cards for the note while the blank card still holds it: ~30 of 64 samples, from ~1040 ms to ~3450 ms while the defect stands; 0 of 64 once the wall hides a note its own blank card is creating
+```
+
+measured 2026-10-25 by chain chain-notes-autosave-and-claude-20261025-072504-7fb7, finding L2, LOW
+probe-key: 9f2caff37a58398e23fa524635c635a20bb1e02f
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/bin/notes.mjs, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/notes/context/NotesProvider.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/notes/hooks/useNoteSaver.ts, /home/lyphe/.claude/skills/notes/SKILL.md
+
+## INV-9611 — probe — LOW — the one stale probe row of this ground (INV-6073) was not retired or rewritten
+
+LOW — the one stale probe row of this ground (INV-6073) was not retired or rewritten
+
+```probe
+D=$(mktemp -d /tmp/athena-p.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+echo "INV-6073 pinned on the provider: $(docstore govern "$PWD/src/modules/notes/context/NotesProvider.tsx" --limit 200 --text | grep -c '^INV-6073')"
+echo "verbs its script calls (add, setComposer) still in NotesValue: $(grep -c -E '^\s+(add|setComposer):' src/modules/notes/context/NotesContext.ts)"
+echo "its script, run: $(timeout 100 node /tmp/athena-prov.EWQzOh/press.mjs 2>&1 | grep -m1 -E 'no handle|one press' || echo 'script gone')"
+EOF
+bash "$D/p.sh"
+cd /tmp; case "$D" in /tmp/athena-p.??????) rm -r "$D";; esac
+echo "[probe exit $?]"
+# expect: `pinned … : 1`, `still in NotesValue: 0` and `page.evaluate: Error: no handle add` (or `script gone` once /tmp is swept) while the row stands; cured when the row is retired or rewritten to autosave (pinned 0)
+```
+
+measured 2026-10-25 by chain chain-notes-autosave-and-claude-20261025-072504-7fb7, finding L3, LOW
+probe-key: ac8a8348d53c7bc03d10f823e55ea06fb223f154
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/bin/notes.mjs, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/notes/context/NotesProvider.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/notes/hooks/useNoteSaver.ts, /home/lyphe/.claude/skills/notes/SKILL.md
+
+## INV-9612 — probe — a re-pin inside one 400 ms flush orders the page's mirror differently from the server
+
+a re-pin inside one 400 ms flush orders the page's mirror differently from the server
+
+```probe
+D=$(mktemp -d /tmp/athena-ord.XXXXXX) || exit 1
+cat > "$D/order.ts" <<'TS'
+import { applyEntryPatch, foldEntryPatches } from '/home/lyphe/.claude/claudecodeui_lyphe/src/shared/preferenceEntryPatch.ts';
+const pin = (p: string) => ({ pinned: { [p]: p } });
+const writes = [pin('/p/a'), pin('/p/b'), pin('/p/a')];
+const mirror = writes.reduce((doc: unknown, patch) => applyEntryPatch(doc, patch), {});
+const wire = writes.reduce((pending: unknown, patch) => (pending === undefined ? patch : foldEntryPatches(pending, patch)), undefined as unknown);
+console.log('mirror', JSON.stringify(mirror), 'server', JSON.stringify(applyEntryPatch({}, wire as never)));
+TS
+cd /home/lyphe/.claude/claudecodeui_lyphe && node_modules/.bin/tsx "$D/order.ts"
+# expect: the two lists are equal once cured; while the defect stands it prints mirror {"pinned":["/p/b","/p/a"]} server {"pinned":["/p/a","/p/b"]}
+```
+
+measured 2026-10-25 by chain chain-sidebar-rail--files-prefs-20261025-085855-e8e4, finding L1, LOW
+probe-key: 34ccf3c6ad8698fb0c848ed324655e4ecb3bcda8
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/user-preferences.db.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/userSettings.ts
+
+## INV-9613 — probe — a `{ name }` record under a held key is stored, so `pinned` can hold a non-string
+
+a `{ name }` record under a held key is stored, so `pinned` can hold a non-string
+
+```probe
+API=http://127.0.0.1:3011
+T=$(curl -s -X POST $API/api/auth/login -H 'content-type: application/json' -d '{"username":"verve","password":"verve-dev-2026"}' | jq -r .token)
+patch(){ curl -s -X PATCH $API/api/user/preferences -H "authorization: Bearer $T" -H 'content-type: application/json' -d "$1" >/dev/null; }
+patch '{"filesPins":{"pinned":{"/athena-obj":{"name":"/athena-obj","x":1}}}}'
+curl -s $API/api/user/preferences -H "authorization: Bearer $T" | jq -c '.preferences.filesPins.pinned|map(type)|unique'
+patch '{"filesPins":{"pinned":{"/athena-obj":null}}}'
+curl -s $API/api/user/preferences -H "authorization: Bearer $T" | jq -c '.preferences.filesPins'
+# expect: ["string"] or [] once a string-only rule exists; while it stands the first line prints ["object"] (the second line always prints {"pinned":[]}, the cleanup)
+```
+
+measured 2026-10-25 by chain chain-sidebar-rail--files-prefs-20261025-085855-e8e4, finding L2, LOW
+probe-key: 49819ce3824944abd7b85ec8c086dc5026177c53
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/user-preferences.db.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/userSettings.ts
+
+## INV-9614 — probe — MAN-7655's table states the two key sets as `dispatcher`, `roadmapSeen`; both are now three
+
+MAN-7655's table states the two key sets as `dispatcher`, `roadmapSeen`; both are now three
+
+```probe
+D=$(mktemp -d /tmp/athena-man.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+docstore get MAN-7655 --text | grep -cE 'ENTRY_(PATCHED|LISTED)_KEYS` = `dispatcher`, `roadmapSeen` \|' || true
+docstore get MAN-7655 --text | grep -c 'filesPins' || true
+EOF
+bash "$D/p.sh"
+# expect: while the row is stale it prints 2 then 0; cured it prints 0 then a number of 2 or more
+```
+
+measured 2026-10-25 by chain chain-sidebar-rail--files-prefs-20261025-085855-e8e4, finding L3, LOW
+probe-key: 826cfeea19cf5466864dd7b9718624ba39c63725
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/user-preferences.db.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/userSettings.ts
+
+## INV-9615 — probe — MEDIUM — MAN-7748 still teaches the wait, and its standing proof now exits red
+
+MEDIUM — MAN-7748 still teaches the wait, and its standing proof now exits red
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+echo "manual lines still teaching the wait: $(grep -c -F -e 'with no project picked: the param stays' -e '`/?roadmap=lyphecli`, no project | param stays' docs/MANUAL.md)"
+echo "probe lines still teaching the wait: $(grep -c -F -e 'No tab strip at the root until a project is picked' -e 'with no project picked the param is still in the URL' .verify/probe-roadmap-landing.mjs)"
+EOF
+bash "$D/p.sh"
+case "$D" in /tmp/athena-probe.??????) cd /tmp && rm -r "$D";; esac
+# expect: today "manual lines still teaching the wait: 2" and "probe lines still teaching the wait: 2"; cured when both print 0 (the live run, `node .verify/probe-roadmap-landing.mjs`, then ends PASS on its [root] leg)
+```
+
+measured 2026-10-25 by chain chain-sidebar-rail--house-views-20261025-094226-f96d, finding M1, MEDIUM
+probe-key: 41a0d719038c511d9496b456f8d5cc42877fb82a
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/WorkspaceHeader.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/WorkspaceStateView.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-house-views-no-project.mjs
+
+## INV-9616 — probe — LOW — the Notes row still says a reload at `/` shows only the choose-a-project body
+
+LOW — the Notes row still says a reload at `/` shows only the choose-a-project body
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+echo "Notes row still saying a reload at / waits for a project row: $(grep -c -F 'the workspace returns with Notes selected and its list drawn once a project row is picked' docs/MANUAL.md)"
+EOF
+bash "$D/p.sh"
+case "$D" in /tmp/athena-probe.??????) cd /tmp && rm -r "$D";; esac
+# expect: today 1; cured 0
+```
+
+measured 2026-10-25 by chain chain-sidebar-rail--house-views-20261025-094226-f96d, finding L1, LOW
+probe-key: 5b99b4e25ce58e7a158bff58e2c5a7cb8e8fcf73
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/WorkspaceHeader.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/WorkspaceStateView.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-house-views-no-project.mjs
+
+## INV-9617 — probe — LOW — `WorkspaceHeader`'s docblock says every other view is named; an id the list does not hold gets the chat's face
+
+LOW — `WorkspaceHeader`'s docblock says every other view is named; an id the list does not hold gets the chat's face
+
+```probe
+node /home/lyphe/.claude/state/pipeline-reviews/sidebar-rail--house-views/athena-probes/header-plugin-loading.mjs
+# expect: today `header lines while the plugins list loads ["<the chat's title>","<its project>"] (2 line(s)); after the list arrives ["Demo plugin"] (1 line(s))`; cured when the first part is one line (a name, or blank) rather than the chat's two
+```
+
+measured 2026-10-25 by chain chain-sidebar-rail--house-views-20261025-094226-f96d, finding L2, LOW
+probe-key: fc81a77333578b11b0d3e8a0b35166d164bf1221
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/WorkspaceHeader.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/WorkspaceStateView.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-house-views-no-project.mjs
+
+## INV-9618 — probe — MEDIUM — the rows that protect the data never reach an editor of the file where they bind
+
+MEDIUM — the rows that protect the data never reach an editor of the file where they bind
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+for f in server/modules/database/repositories/sessions.db.ts server/modules/followups/followups.command-routes.ts bin/followups.mjs; do
+  printf '%s: ' "$f"
+  docstore govern "/home/lyphe/.claude/claudecodeui_lyphe/$f" --touch write --limit 80 --text | cut -d' ' -f1 | grep -E '^(INV-9605|MAN-9003)$' | tr '\n' ' '
+  echo
+done
+EOF
+bash "$D/p.sh"
+case "$D" in /tmp/athena-probe.??????) rm -rf "$D";; esac
+echo "[probe exit $?]"
+# expect: while the defect stands, `sessions.db.ts:` and `bin/followups.mjs:` print nothing after the colon and `followups.command-routes.ts: MAN-9003`; cured, INV-9605 is on all three lines and MAN-9003 is on the first
+```
+
+measured 2026-10-25 by chain chain-chat-next-steps-widget-20261025-101705-3041, finding M1, MEDIUM
+probe-key: 86aef3d809fdef102cfc248d3fca034119b3b834
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/bin/followups.mjs, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/chat-commands/chat-commands.credential.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/followups-schema.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/migrations.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/followups.db.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/followups/followups.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/surface-signal.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/followups/hooks/useFollowups.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/common.json, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/followups-kit.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-followups-widget.mjs
+
+## INV-9619 — probe — MEDIUM — a chat that runs on a node is told to run `followups` every turn and carries nothing to run it with
+
+MEDIUM — a chat that runs on a node is told to run `followups` every turn and carries nothing to run it with
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/q.mts" <<'TS'
+const m = await import('@/modules/database/index.js');
+await m.initializeDatabase();
+const { SURFACE_PROMPT_APPEND } = await import('@/modules/providers/list/claude/surface-signal.js');
+const { applyToolsetLaunch } = await import('@/modules/providers/list/claude/claude-toolset-seams.js');
+const { toolsetsService } = await import('@/modules/toolsets/toolsets.service.js');
+for (const onNode of [false, true]) {
+  const launch = await toolsetsService.launchFor({ appSessionId: 'athena-probe-node', onNode });
+  const sdkOptions: any = { env: { PATH: '/bin' }, systemPrompt: { type: 'preset', preset: 'claude_code', append: SURFACE_PROMPT_APPEND } };
+  applyToolsetLaunch(sdkOptions, launch);
+  console.log(`F-node onNode=${onNode}: prompt tells the chat to run followups: ${/followups add --next/.test(sdkOptions.systemPrompt.append)} | env carries the chat credential: ${'CLOUDCLI_TOOLSET_TOKEN' in sdkOptions.env}`);
+}
+process.exit(0);
+TS
+cat > "$D/p.sh" <<'EOF'
+D=$1
+sqlite3 ~/.cloudcli/auth.db ".backup '$D/auth.db'" || exit 1
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+DATABASE_PATH=$D/auth.db TSX_TSCONFIG_PATH=server/tsconfig.json node --import tsx "$D/q.mts" 2>&1 | grep -E '^F-node|Error' | head -5
+printf 'projects whose chats run on a node: '; sqlite3 ~/.cloudcli/auth.db "select group_concat(project_path || ' -> ' || node, ', ') from projects where node is not null and node <> ''"
+EOF
+bash "$D/p.sh" "$D"
+cd /tmp && case "$D" in /tmp/athena-probe.??????) rm -r "$D";; esac
+echo "[probe exit $?]"
+# expect: `onNode=false: … true | env carries the chat credential: true` then `onNode=true: prompt tells the chat to run followups: true | env carries the chat credential: false` while the defect stands; cured, the onNode=true line reads `false | false`
+```
+
+measured 2026-10-25 by chain chain-chat-next-steps-widget-20261025-101705-3041, finding M2, MEDIUM
+probe-key: 2d9c7ce9a54a6752cc898383841eca9212ae8967
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/bin/followups.mjs, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/chat-commands/chat-commands.credential.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/followups-schema.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/migrations.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/followups.db.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/followups/followups.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/surface-signal.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/followups/hooks/useFollowups.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/common.json, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/followups-kit.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-followups-widget.mjs
+
+## INV-9620 — probe — LOW — one `null` in the list the widget reads takes the whole chat pane down
+
+LOW — one `null` in the list the widget reads takes the whole chat pane down
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.mjs" <<'EOF2'
+const L = "/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib";
+const { openConsole } = await import(`${L}/console.mjs`);
+const sc = await import(`${L}/scratch-chat.mjs`);
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const s = await openConsole({ appUrl: "http://127.0.0.1:5184", viewport: { width: 1920, height: 1080 } });
+const id = await sc.createScratchChat(s);
+try {
+  for (const [label, data] of [["empty list", []], ["list holding a null", [null]]]) {
+    s.errors.length = 0;
+    await s.page.route("**/api/followups?*", (r) => r.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ success: true, data }) }));
+    await s.page.goto(`http://127.0.0.1:5184/session/${id}`, { waitUntil: "networkidle" });
+    await sleep(2500);
+    const bad = s.errors.filter((e) => /authenticated/.test(e) && !/404/.test(e)).map((e) => e.slice(0, 110));
+    console.log(`${label}: composer textareas ${await s.page.locator("textarea").count()}, widget ${await s.page.locator('[data-widget="followups"]').count()}, errors ${JSON.stringify(bad.slice(0, 1))}`);
+    await s.page.unroute("**/api/followups?*");
+  }
+} finally {
+  await sc.deleteScratchChat(s, id);
+  await s.browser.close();
+}
+EOF2
+printf 'node "$1/p.mjs"\n' > "$D/p.sh"
+bash "$D/p.sh" "$D"
+case "$D" in /tmp/athena-probe.??????) rm -rf "$D";; esac
+echo "[probe exit $?]"
+# expect: `empty list: composer textareas 2, widget 1, errors []` then, while the defect stands, `list holding a null: composer textareas 0, widget 0, errors ["authenticated light 1920x1080: TypeError: Cannot read properties of null (reading 'state')…`; cured, the second line matches the first
+```
+
+measured 2026-10-25 by chain chain-chat-next-steps-widget-20261025-101705-3041, finding L1, LOW
+probe-key: 6fe0c76e0b44a0cc312cd1e855e3ea3d4926d84b
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/bin/followups.mjs, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/chat-commands/chat-commands.credential.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/followups-schema.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/migrations.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/followups.db.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/followups/followups.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/surface-signal.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/followups/hooks/useFollowups.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/common.json, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/followups-kit.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-followups-widget.mjs
+
+## INV-9621 — probe — LOW — two refusal sentences say less, or something else, than their reader needs
+
+LOW — two refusal sentences say less, or something else, than their reader needs
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.mjs" <<'EOF2'
+const kit = await import("/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/followups-kit.mjs");
+const { API, chatCredential, doorCall, withDb } = kit;
+const login = await (await fetch(`${API}/api/auth/login`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ username: "verve", password: "verve-dev-2026" }) })).json();
+const H = { authorization: `Bearer ${login.token}`, "content-type": "application/json" };
+const made = await (await fetch(`${API}/api/providers/sessions`, { method: "POST", headers: H, body: JSON.stringify({ provider: "claude", projectPath: "/tmp/cloudcli-probe-chat", initialMessage: "" }) })).json();
+const chat = made.data.sessionId;
+try {
+  const now = new Date().toISOString();
+  const mine = withDb((db) => Number(db.prepare("insert into followups (session_id,user_id,kind,text,state,created_at,updated_at) values (?,?,?,?,?,?,?)").run(chat, 1, "next", "probe item", "open", now, now).lastInsertRowid), { write: true });
+  const cred = chatCredential(chat);
+  const mix = await doorCall(chat, cred, { action: "done", ids: [mine, 987654321, 987654322] });
+  const stateAfter = withDb((db) => db.prepare("select state from followups where id = ?").get(mine).state);
+  console.log("chat: done [valid, unknown, unknown] ->", mix.status, JSON.stringify(mix.body?.error?.message), "| the valid item is now:", stateAfter);
+  const tick = await fetch(`${API}/api/followups/987654321`, { method: "PATCH", headers: H, body: JSON.stringify({ state: "done" }) });
+  console.log("widget: tick of an item that is not there ->", tick.status, JSON.stringify((await tick.json()).error?.message));
+} finally {
+  await fetch(`${API}/api/providers/sessions/${encodeURIComponent(chat)}?force=true`, { method: "DELETE", headers: H });
+}
+EOF2
+printf 'node "$1/p.mjs"\n' > "$D/p.sh"
+bash "$D/p.sh" "$D"
+case "$D" in /tmp/athena-probe.??????) rm -rf "$D";; esac
+echo "[probe exit $?]"
+# expect: while the defect stands, the first line's sentence names only `#987654321` and says nothing of the valid item (which is `open`), and the second line's sentence contains `Run "followups"`; cured, the first says nothing was closed and the second has no shell instruction
+```
+
+measured 2026-10-25 by chain chain-chat-next-steps-widget-20261025-101705-3041, finding L2, LOW
+probe-key: f772ca976439b08358b9ca5123d03a8d1f908741
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/bin/followups.mjs, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/chat-commands/chat-commands.credential.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/followups-schema.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/migrations.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/followups.db.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/followups/followups.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/surface-signal.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/followups/hooks/useFollowups.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/common.json, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/followups-kit.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-followups-widget.mjs
+
+## INV-9622 — probe — LOW — "one plain line" lets control characters through
+
+LOW — "one plain line" lets control characters through
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/q.mjs" <<'EOF'
+const m = await import('@/modules/database/index.js');
+await m.initializeDatabase();
+const { followupsService: S } = await import('@/modules/followups/followups.service.js');
+m.sessionsDb.createAppSession('athena-probe-ctl', 'claude', '/tmp/athena-probe-ctl', 'ctl');
+for (const [label, text] of [['NUL', 'a\u0000b'], ['ESC colour code', 'a\u001b[31mred\u001b[0mb'], ['vertical tab', 'a\u000bb'], ['form feed', 'a\fb'], ['tab', 'a\tb']]) {
+  let r; try { r = 'stored ' + JSON.stringify(S.add('athena-probe-ctl', 1, [{ kind: 'gap', text }])[0].text); } catch (e) { r = 'refused ' + e.statusCode; }
+  console.log(label.padEnd(16), r);
+}
+process.exit(0);
+EOF
+cat > "$D/p.sh" <<'EOF'
+D=$1
+sqlite3 ~/.cloudcli/auth.db ".backup '$D/auth.db'" || exit 1
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+DATABASE_PATH=$D/auth.db TSX_TSCONFIG_PATH=server/tsconfig.json node --import tsx "$D/q.mjs" 2>&1 | grep -E '^(NUL|ESC|vertical|form|tab)'
+EOF
+bash "$D/p.sh" "$D"
+cd /tmp && case "$D" in /tmp/athena-probe.??????) rm -rf "$D";; esac
+echo "[probe exit $?]"
+# expect: five `stored "…"` lines while the defect stands; cured, at least the NUL and ESC lines read `refused 422`
+```
+
+measured 2026-10-25 by chain chain-chat-next-steps-widget-20261025-101705-3041, finding L3, LOW
+probe-key: 02b4f09f155ab03c523b58e8918627220aefb37b
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/bin/followups.mjs, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/chat-commands/chat-commands.credential.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/followups-schema.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/migrations.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/followups.db.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/followups/followups.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/surface-signal.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/followups/hooks/useFollowups.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/common.json, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/followups-kit.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-followups-widget.mjs
+
+## INV-9623 — probe — LOW — "Healed means deleted" was not applied to the counts and lists the new command changes
+
+LOW — "Healed means deleted" was not applied to the counts and lists the new command changes
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+printf 'rows that still say "both doors" about the one credential (MAN-8992, INV-9605): '
+n=0; for t in MAN-8992 INV-9605; do n=$((n + $(docstore get $t --text | grep -c 'both doors'))); done; echo $n
+printf 'credential.ts comment saying "both doors": '; grep -c 'both doors' server/modules/chat-commands/chat-commands.credential.ts
+printf 'toolsets rows sharing the guard/link with "the `notes` command" only (MAN-8499, MAN-8501): '
+n=0; for t in MAN-8499 MAN-8501; do n=$((n + $(docstore get $t --text | grep -c 'shared with the `notes` command'))); done; echo $n
+printf 'rows listing the parts of SURFACE_PROMPT_APPEND without FOLLOWUPS_SIGNAL (MAN-500, MAN-5900): '
+n=0; for t in MAN-500 MAN-5900; do docstore get $t --text | grep -q 'WIDGET_SIGNAL' && ! docstore get $t --text | grep -q 'FOLLOWUPS_SIGNAL' && n=$((n + 1)); done; echo $n
+EOF
+bash "$D/p.sh"
+case "$D" in /tmp/athena-probe.??????) rm -rf "$D";; esac
+echo "[probe exit $?]"
+# expect: 2, 1, 2, 2 while the defect stands; cured, all four read 0
+```
+
+measured 2026-10-25 by chain chain-chat-next-steps-widget-20261025-101705-3041, finding L4, LOW
+probe-key: 8f456e289164cdc3b6336ba3d5983a2ce4d9dee0
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/bin/followups.mjs, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/chat-commands/chat-commands.credential.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/followups-schema.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/migrations.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/followups.db.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/followups/followups.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/surface-signal.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/followups/hooks/useFollowups.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/common.json, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/followups-kit.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-followups-widget.mjs
+
+## INV-9624 — probe — LOW — the standing proof cannot be re-run once the work is committed, and each run restarts the live server
+
+LOW — the standing proof cannot be re-run once the work is committed, and each run restarts the live server
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+printf 'HEAD gutter files that already carry followups: '
+n=0; for f in src/modules/chat-gutters/hooks/useGutterPlacements.ts src/modules/chat-gutters/ChatGutterLayout.tsx; do n=$((n + $(git show HEAD:$f | grep -c followups))); done; echo $n
+printf 'live-server or production-build side effects per run of the proof: '
+grep -c 'restartThroughSupervisor()\|prod-client-build.sh' .verify/probe-followups-widget.mjs
+EOF
+bash "$D/p.sh"
+case "$D" in /tmp/athena-probe.??????) rm -rf "$D";; esac
+echo "[probe exit $?]"
+# expect: `0` and `2` today; once the change is committed the first number is above 0 and the proof's BEFORE check is unreachable
+```
+
+measured 2026-10-25 by chain chain-chat-next-steps-widget-20261025-101705-3041, finding L5, LOW
+probe-key: 598be690ece9e3ce936e9ed1897855f9d5a10542
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/bin/followups.mjs, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/chat-commands/chat-commands.credential.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/followups-schema.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/migrations.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/followups.db.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/followups/followups.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/surface-signal.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/followups/hooks/useFollowups.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/common.json, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/followups-kit.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-followups-widget.mjs
+
+## INV-9625 — probe — (MEDIUM) — The pin modal cannot be operated from the keyboard: focus never enters it, Tab walks the file manager behind the scrim, Escape does nothing
+
+(MEDIUM) — The pin modal cannot be operated from the keyboard: focus never enters it, Tab walks the file manager behind the scrim, Escape does nothing
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX)
+cat > "$D/p.mjs" <<'EOF'
+import { openConsole } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/console.mjs';
+const STRIP = '[role="group"][aria-label="Folders"]';
+const s = await openConsole({ viewport: { width: 1440, height: 900 } });
+const p = s.page;
+const rail = p.locator('nav[aria-label="Views"] button[aria-label="Files"]');
+if (await rail.count()) await rail.first().click(); else await p.locator('[role="tab"][aria-label="Files"]').first().click();
+await p.waitForSelector(STRIP, { timeout: 30000 }); await p.waitForTimeout(1000);
+const where = () => p.evaluate(() => { const a = document.activeElement; return `${a?.tagName}:${(a?.innerText || a?.getAttribute('aria-label') || '').trim().slice(0, 28)} inModal=${!!a?.closest('div.fixed.inset-0.z-\\[70\\]')}`; });
+await p.locator(`${STRIP} button:not([aria-pressed])`).first().focus();
+await p.keyboard.press('Enter');
+const modal = p.locator('div.fixed.inset-0.z-\\[70\\]').filter({ has: p.locator('h3', { hasText: 'Select Folder' }) });
+await modal.waitFor({ timeout: 30000 }).catch(() => {}); await p.waitForTimeout(600);
+console.log('focus after Enter on "Pin a folder":', await where());
+const trail = []; for (let i = 0; i < 4; i += 1) { await p.keyboard.press('Tab'); trail.push(await where()); }
+console.log('next 4 Tab stops:', JSON.stringify(trail));
+console.log('modal role/aria-modal:', await modal.evaluate((el) => `${el.getAttribute('role')}/${el.getAttribute('aria-modal')}`).catch(() => 'no modal'));
+await p.keyboard.press('Escape'); await p.waitForTimeout(500);
+console.log('modal still open after Escape:', (await modal.count()) > 0);
+await modal.getByRole('button', { name: 'Cancel' }).click({ timeout: 2000 }).catch(() => {});
+await s.browser.close();
+EOF
+cat > "$D/p.sh" <<'EOF'
+cd /home/lyphe/.claude/claudecodeui_lyphe && timeout 150 node "$(dirname "$0")/p.mjs" 2>&1 | tail -8
+echo "[probe exit $?]"
+EOF
+bash "$D/p.sh"
+# expect: today `focus after Enter … inModal=false`, every Tab stop `inModal=false`, `role/aria-modal: null/null`, `modal still open after Escape: true`; cured: focus `inModal=true`, Tab stops inside the modal, `dialog/true`, `still open after Escape: false`
+```
+
+measured 2026-10-25 by chain chain-sidebar-rail--files-fill-20261025-102928-5d42, finding M1, MEDIUM
+probe-key: 7aabae9832fcd834c2b3be793cd215112900de86
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/file-tree/file-tree.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/file-manager/hooks/useFilesPins.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/file-manager/hooks/useSelectedFilesRoot.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/file-manager/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-creation-wizard/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/context/ProjectsStateContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/hooks/useFilesRoots.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-files-pin-edges.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-files-roots.mjs
+
+## INV-9626 — probe — (LOW) — A pin on a page whose projects list is stale ends on "not pinned: Project path already exists", and the page never refreshes its list, so the retry fails the same way
+
+(LOW) — A pin on a page whose projects list is stale ends on "not pinned: Project path already exists", and the page never refreshes its list, so the retry fails the same way
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX)
+mkdir -p /home/lyphe/tmp/athena-probe-stale
+cat > "$D/p.mjs" <<'EOF'
+import { openConsole } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/console.mjs';
+import { rmdirSync } from 'node:fs';
+const FOLDER = '/home/lyphe/tmp/athena-probe-stale';
+const STRIP = '[role="group"][aria-label="Folders"]';
+const s = await openConsole({ viewport: { width: 1440, height: 900 } });
+const p = s.page;
+const jsonInit = (method, body) => ({ method, headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+let id = null; const patches = [];
+p.on('request', (r) => { if (r.method() === 'PATCH' && /preferences/.test(r.url())) patches.push((r.postData() || '').slice(0, 100)); });
+try {
+  const made = await s.api('/api/projects/create-project', jsonInit('POST', { path: FOLDER }));
+  id = made.body?.project?.projectId;
+  const hide = async (route) => { if (route.request().method() !== 'GET') return route.fallback(); const r = await route.fetch(); const b = await r.json(); return route.fulfill({ response: r, json: Array.isArray(b) ? b.filter((x) => x.fullPath !== FOLDER) : b }); };
+  await p.route(/\/api\/projects(?:\?.*)?$/, hide);
+  await p.reload({ waitUntil: 'networkidle' });
+  const rail = p.locator('nav[aria-label="Views"] button[aria-label="Files"]');
+  if (await rail.count()) await rail.first().click(); else await p.locator('[role="tab"][aria-label="Files"]').first().click();
+  await p.waitForSelector(STRIP, { timeout: 30000 }); await p.waitForTimeout(1000);
+  const modal = p.locator('div.fixed.inset-0.z-\\[70\\]').filter({ has: p.locator('h3', { hasText: 'Select Folder' }) });
+  const pinOnce = async () => {
+    await p.locator(`${STRIP} button:not([aria-pressed])`).first().click();
+    await modal.waitFor({ timeout: 30000 });
+    await modal.locator('div.flex.items-center.gap-2 button span', { hasText: /^tmp$/ }).first().click();
+    await p.waitForFunction(() => document.querySelector('div.fixed.inset-0.z-\\[70\\] code')?.textContent?.endsWith('/tmp'), null, { timeout: 30000 });
+    await modal.locator('div.flex.items-center.gap-2').filter({ has: p.locator('span', { hasText: /^athena-probe-stale$/ }) }).getByRole('button', { name: 'Select' }).click();
+    await modal.waitFor({ state: 'detached', timeout: 30000 });
+    await p.waitForTimeout(2500);
+    const toast = await p.evaluate(() => [...document.querySelectorAll('[role="status"],[role="alert"],[aria-live]')].map((e) => e.innerText.replace(/\s+/g, ' ').trim()).filter(Boolean).join(' | '));
+    const chips = await p.locator(`${STRIP} button[aria-pressed]`).evaluateAll((bs) => bs.map((b) => b.innerText.trim()));
+    return `toast=${JSON.stringify(toast)} onStrip=${chips.includes('athena-probe-stale')}`;
+  };
+  console.log('1st pin, this page\'s list lacks the folder:', await pinOnce());
+  await p.unroute(/\/api\/projects(?:\?.*)?$/, hide);
+  console.log('2nd pin, the server now answers its real list:', await pinOnce());
+  console.log('preference writes sent:', patches.length);
+} finally {
+  await s.api('/api/user/preferences', jsonInit('PATCH', { filesPins: { pinned: { [FOLDER]: null } } })).catch(() => {});
+  if (typeof id === 'string' && id !== '') console.log('cleanup DELETE force', (await s.api(`/api/projects/${encodeURIComponent(id)}?force=true`, { method: 'DELETE' })).status);
+  rmdirSync(FOLDER);
+  await s.browser.close();
+}
+EOF
+cat > "$D/p.sh" <<'EOF'
+cd /home/lyphe/.claude/claudecodeui_lyphe && timeout 200 node "$(dirname "$0")/p.mjs" 2>&1 | tail -6
+echo "[probe exit $?]"
+EOF
+bash "$D/p.sh"
+# expect: today both lines read `toast="That folder was not pinned Project path already exists: /home/lyphe/tmp/athena-probe-stale" onStrip=false` and `preference writes sent: 0`; cured: the 2nd (or the 1st) line reads `onStrip=true`
+```
+
+measured 2026-10-25 by chain chain-sidebar-rail--files-fill-20261025-102928-5d42, finding L1, LOW
+probe-key: 4bc7fd9196d77bb15def15ac4e872280ca96fbc9
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/file-tree/file-tree.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/file-manager/hooks/useFilesPins.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/file-manager/hooks/useSelectedFilesRoot.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/file-manager/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-creation-wizard/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/context/ProjectsStateContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/hooks/useFilesRoots.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-files-pin-edges.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-files-roots.mjs
+
+## INV-9627 — probe — (LOW) — The archived-folder branch can never run, and what really happens (a Files pin silently un-archives the project in the chat list) is said nowhere
+
+(LOW) — The archived-folder branch can never run, and what really happens (a Files pin silently un-archives the project in the chat list) is said nowhere
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX)
+cat > "$D/p.mjs" <<'EOF'
+import { mkdirSync, rmdirSync } from 'node:fs';
+const API = 'http://127.0.0.1:3011';
+const FOLDER = '/home/lyphe/tmp/athena-probe-archived';
+mkdirSync(FOLDER, { recursive: true });
+const login = await (await fetch(`${API}/api/auth/login`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ username: 'verve', password: 'verve-dev-2026' }) })).json();
+const auth = { Authorization: `Bearer ${login.token}`, 'content-type': 'application/json' };
+const call = async (method, path, body) => { const r = await fetch(`${API}${path}`, { method, headers: auth, body: body ? JSON.stringify(body) : undefined }); let j = null; try { j = await r.json(); } catch {} return { status: r.status, body: j }; };
+const rows = (list) => (Array.isArray(list) ? list : list?.data?.projects ?? []);
+const holds = (list) => rows(list).some((p) => p.fullPath === FOLDER);
+let id = null;
+try {
+  id = (await call('POST', '/api/projects/create-project', { path: FOLDER })).body?.project?.projectId;
+  await call('DELETE', `/api/projects/${id}`);
+  console.log(`archived: archived list holds it ${holds((await call('GET', '/api/projects/archived')).body)}, chat list holds it ${holds((await call('GET', '/api/projects')).body)}`);
+  const again = await call('POST', '/api/projects/create-project', { path: FOLDER });
+  console.log(`create-project on the archived folder: status ${again.status}, project.isArchived=${again.body?.project?.isArchived}, same id ${again.body?.project?.projectId === id}`);
+  console.log(`after: archived list holds it ${holds((await call('GET', '/api/projects/archived')).body)}, chat list holds it ${holds((await call('GET', '/api/projects')).body)}`);
+} finally {
+  if (typeof id === 'string' && id !== '') console.log('cleanup DELETE force', (await call('DELETE', `/api/projects/${encodeURIComponent(id)}?force=true`)).status);
+  rmdirSync(FOLDER);
+}
+EOF
+cat > "$D/p.sh" <<'EOF'
+cd /home/lyphe/.claude/claudecodeui_lyphe && timeout 60 node "$(dirname "$0")/p.mjs" 2>&1 | tail -6
+echo "[probe exit $?]"
+EOF
+bash "$D/p.sh"
+# expect: today `project.isArchived=false, same id true` and `after: archived list holds it false, chat list holds it true` (the isArchived-true branch cannot fire; the pin un-archives); cured by a server that keeps it archived: `isArchived=true`
+```
+
+measured 2026-10-25 by chain chain-sidebar-rail--files-fill-20261025-102928-5d42, finding L2, LOW
+probe-key: 5d6587ce8c4d5239795fc839149522b1ee3d6b88
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/file-tree/file-tree.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/file-manager/hooks/useFilesPins.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/file-manager/hooks/useSelectedFilesRoot.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/file-manager/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-creation-wizard/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/context/ProjectsStateContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/hooks/useFilesRoots.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-files-pin-edges.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-files-roots.mjs
+
+## INV-9628 — probe — (LOW) — The build left four statements that are no longer true (healed means deleted)
+
+(LOW) — The build left four statements that are no longer true (healed means deleted)
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX)
+cat > "$D/p.sh" <<'EOF'
+cd /home/lyphe/.claude/claudecodeui_lyphe
+hits=$(rg -n "offered only while the repository on screen is the|Absent when the repository on screen is not the workspace's project|the git panel one already relative|Opened by WorkspacePathField so" docs/MANUAL.md src/modules/git-panel/GitPanel.tsx src/modules/file-manager/hooks/useFileManagerState.ts src/modules/project-creation-wizard/FolderBrowserModal.tsx)
+if [ -n "$hits" ]; then echo "$hits" | cut -c1-150; else echo none; fi
+echo "[probe exit 0]"
+EOF
+bash "$D/p.sh"
+# expect: today four hits (docs/MANUAL.md, GitPanel.tsx, useFileManagerState.ts, FolderBrowserModal.tsx); cured: `none`
+```
+
+measured 2026-10-25 by chain chain-sidebar-rail--files-fill-20261025-102928-5d42, finding L3, LOW
+probe-key: 9ac528137aa6add394eaafcf8b8681693df31538
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/file-tree/file-tree.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/file-manager/hooks/useFilesPins.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/file-manager/hooks/useSelectedFilesRoot.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/file-manager/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-creation-wizard/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/context/ProjectsStateContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/hooks/useFilesRoots.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-files-pin-edges.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-files-roots.mjs
+
+## INV-9629 — probe — MEDIUM — `shootStrip` answers `null` (or a half-slid sliver) on the documented phone path: `openDrawer`, then `shootStrip`
+
+MEDIUM — `shootStrip` answers `null` (or a half-slid sliver) on the documented phone path: `openDrawer`, then `shootStrip`
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+D=$(mktemp -d /tmp/athena-probe-shots.XXXXXX) || exit 1
+cat > "$D/p.mjs" <<'JS'
+import { createRequire } from 'node:module';
+import { readFileSync } from 'node:fs';
+const R = '/home/lyphe/.claude/claudecodeui_lyphe';
+const { chromium } = createRequire(`${R}/package.json`)('playwright');
+const { pinPreferences, HARNESS_PREFERENCES } = await import(`${R}/.verify/lib/prefs-pin.mjs`);
+const { shootStrip, RAIL } = await import(`${R}/.verify/lib/roadmap-page.mjs`);
+const { openDrawer } = await import(`${R}/.verify/lib/layout-nav.mjs`);
+const login = await fetch('http://127.0.0.1:3011/api/auth/login', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ username: 'verve', password: 'verve-dev-2026' }) }).then((r) => r.json());
+const browser = await chromium.launch();
+const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, serviceWorkers: 'block' });
+await ctx.addInitScript((t) => { try { localStorage.setItem('auth-token', t); } catch {} }, login.token);
+await pinPreferences(ctx, HARNESS_PREFERENCES, { writes: 'drop' });
+await ctx.route(/\/api\//, (r) => (r.request().method() === 'GET' ? r.fallback() : r.fulfill({ status: 200, json: { success: true } })));
+const page = await ctx.newPage();
+await page.goto('http://127.0.0.1:5183', { waitUntil: 'networkidle' });
+await page.waitForSelector(RAIL, { state: 'attached', timeout: 60000 });
+let whole = 0, nulls = 0, partial = 0;
+for (let i = 0; i < 4; i++) {
+  await openDrawer(page, `${RAIL} button[aria-label="Git"]`);
+  const file = await shootStrip(page, `${process.argv[2]}/s${i}.png`).catch(() => 'threw');
+  if (file === null || file === 'threw') nulls += 1;
+  else if (readFileSync(file).readUInt32BE(16) >= 60) whole += 1;
+  else partial += 1;
+  await page.locator('button[aria-label="Close sidebar"]').first().dispatchEvent('click');
+  await page.waitForTimeout(900);
+}
+console.log(`shootStrip right after openDrawer at 390, 4 tries: whole=${whole} null=${nulls} partial=${partial}`);
+await browser.close();
+JS
+node "$D/p.mjs" "$D"
+EOF
+bash "$D/p.sh"
+# expect: whole=4 null=0 partial=0 once cured; whole=0 null=4 partial=0 while the defect stands
+```
+
+measured 2026-10-25 by chain chain-sidebar-rail--harness-20261025-120712-2bf9, finding M1, MEDIUM
+probe-key: 72286f291aad4d6a4b22cc5232cf203c36b03781
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-rail-helpers.mjs
+
+## INV-9630 — probe — LOW — `openTab` / `railButton` throw a selector `SyntaxError` for a label holding a double quote, though `openTab` is documented to answer `false` for a view the rail does not carry
+
+LOW — `openTab` / `railButton` throw a selector `SyntaxError` for a label holding a double quote, though `openTab` is documented to answer `false` for a view the rail does not carry
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+D=$(mktemp -d /tmp/athena-probe-quote.XXXXXX) || exit 1
+cat > "$D/p.mjs" <<'JS'
+import { createRequire } from 'node:module';
+const R = '/home/lyphe/.claude/claudecodeui_lyphe';
+const { chromium } = createRequire(`${R}/package.json`)('playwright');
+const { openTab } = await import(`${R}/.verify/lib/console.mjs`);
+const browser = await chromium.launch();
+const page = await browser.newPage();
+await page.goto('about:blank');
+for (const label of ['Nonesuch', 'He said "hi"']) {
+  const got = await openTab(page, label).then(String, (e) => `THROWS ${String(e.message).split('\n')[0].slice(0, 70)}`);
+  console.log(`openTab ${JSON.stringify(label)} -> ${got}`);
+}
+await browser.close();
+JS
+node "$D/p.mjs"
+EOF
+bash "$D/p.sh"
+# expect: both rows read false once cured; the second reads THROWS locator.count: SyntaxError while the defect stands
+```
+
+measured 2026-10-25 by chain chain-sidebar-rail--harness-20261025-120712-2bf9, finding L1, LOW
+probe-key: 977f03f6fb8e2ab4bbd265cee69ac19828a8db63
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-rail-helpers.mjs
+
+## INV-9631 — probe — (MEDIUM) — the target script never judges a mount's usage reads; "one read at the mount … which is one poller" is only printed
+
+(MEDIUM) — the target script never judges a mount's usage reads; "one read at the mount … which is one poller" is only printed
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'SH'
+#!/usr/bin/env bash
+cd /home/lyphe/.claude/claudecodeui_lyphe
+grep -n "report.ok(.*\(loadReads\|beforeCollapse\)" .verify/account-rail-live.mjs || echo "no verdict on a mount's reads"
+grep -n "report.note(.*usage reading" .verify/account-rail-live.mjs
+SH
+bash "$D/p.sh"
+case "$D" in /tmp/athena-probe.??????) rm -rf "$D";; esac
+# expect: `no verdict on a mount's reads` then three report.note lines (:137 :194 :227) while the defect stands; cured: a report.ok line naming loadReads / the remount's reads.
+```
+
+measured 2026-10-25 by chain chain-sidebar-rail--account-20261025-120712-1ebd, finding M1, MEDIUM
+probe-key: 72f020d15f7f1e42a8ca1bda913bfb43ccee9356
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/account-rail-live.mjs
+
+## INV-9632 — probe — (MEDIUM) — `.verify/rail-live.mjs` (the rail's own probe) exits 1 after this phase: its foot assertion still says the rail ends `Inbox · Settings`
+
+(MEDIUM) — `.verify/rail-live.mjs` (the rail's own probe) exits 1 after this phase: its foot assertion still says the rail ends `Inbox · Settings`
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'SH'
+#!/usr/bin/env bash
+cd /home/lyphe/.claude/claudecodeui_lyphe
+timeout 280 node .verify/rail-live.mjs 2>&1 | grep -E "plugin run|^(PASS|FAIL) —" || echo none
+SH
+bash "$D/p.sh"
+case "$D" in /tmp/athena-probe.??????) rm -rf "$D";; esac
+# expect: two `[FAIL] …: the plugin run [none enabled] sits between API and the foot: Inbox · Settings` lines (1440x900, 390x844) and `FAIL — 49 ok, 0 skipped, 2 failed` while the defect stands; cured: those two lines read [OK] and the last line is PASS.
+```
+
+measured 2026-10-25 by chain chain-sidebar-rail--account-20261025-120712-1ebd, finding M2, MEDIUM
+probe-key: f137ef1b0db7eb86ac2a06d0da61d380d1ddd837
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/rail-live.mjs
+
+## INV-9633 — probe — (MEDIUM) — `.verify/panel-fill.mjs` exits 1 (12 failed): the handle was re-pointed, the checks about the deleted glance were left
+
+(MEDIUM) — `.verify/panel-fill.mjs` exits 1 (12 failed): the handle was re-pointed, the checks about the deleted glance were left
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'SH'
+#!/usr/bin/env bash
+cd /home/lyphe/.claude/claudecodeui_lyphe
+timeout 280 node .verify/panel-fill.mjs 2>&1 | grep -E "closed row|^(PASS|FAIL) —" | sed -E 's#^\[FAIL\] [a-z0-9]+/[a-z]+: #[FAIL] <leg>: #' | sort | uniq -c || echo none
+SH
+bash "$D/p.sh"
+case "$D" in /tmp/athena-probe.??????) rm -rf "$D";; esac
+# expect: `4 [FAIL] <leg>: the closed row names the account in use…`, `4 … two bars carry 40% and 60%`, `2 … the closed row names sdjesus89`, `1 FAIL — 78 ok, 0 skipped, 12 failed` while the defect stands; cured: no `closed row` lines and a PASS.
+```
+
+measured 2026-10-25 by chain chain-sidebar-rail--account-20261025-120712-1ebd, finding M3, MEDIUM
+probe-key: a641ff55b2b8d7c548283a9cc3297cd5a154a871
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/panel-fill.mjs
+
+## INV-9634 — probe — (LOW) — `probe-sidebar-chrome.mjs` passes by reading nothing (disclosed by the builder)
+
+(LOW) — `probe-sidebar-chrome.mjs` passes by reading nothing (disclosed by the builder)
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'SH'
+#!/usr/bin/env bash
+D=${1:?}
+cd /home/lyphe/.claude/claudecodeui_lyphe
+timeout 250 node .verify/probe-sidebar-chrome.mjs > "$D/chrome.out" 2>&1
+echo "exit $?"
+grep -E "^meters:" "$D/chrome.out" || echo "no meters line"
+SH
+bash "$D/p.sh" "$D"
+case "$D" in /tmp/athena-probe.??????) rm -rf "$D";; esac
+# expect: `exit 0` and `meters: []` while the defect stands; cured: no meters line, or a non-empty list read from the open panel.
+```
+
+measured 2026-10-25 by chain chain-sidebar-rail--account-20261025-120712-1ebd, finding L1, LOW
+probe-key: 4a37533ae4a7511d87d0f6a65bdf03d115a48c99
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/account-rail-live.mjs
+
+## INV-9635 — probe — (LOW) — the script excuses a class of console error: `/Failed to fetch/` is filtered from "no console errors" (:229)
+
+(LOW) — the script excuses a class of console error: `/Failed to fetch/` is filtered from "no console errors" (:229)
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'SH'
+#!/usr/bin/env bash
+cd /home/lyphe/.claude/claudecodeui_lyphe
+grep -n "Failed to fetch" .verify/account-rail-live.mjs || echo none
+SH
+bash "$D/p.sh"
+case "$D" in /tmp/athena-probe.??????) rm -rf "$D";; esac
+# expect: line 229 `const errors = session.errors.filter((line) => !/Failed to fetch/.test(line));` while the defect stands; cured: none.
+```
+
+measured 2026-10-25 by chain chain-sidebar-rail--account-20261025-120712-1ebd, finding L2, LOW
+probe-key: 58626851457dff890af1250c8a59e0d73dcf46d6
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/account-rail-live.mjs
+
+## INV-9636 — probe — (LOW) — the geometry assertions are looser than the design, and the hit test is blind to the strip past the list
+
+(LOW) — the geometry assertions are looser than the design, and the hit test is blind to the strip past the list
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'SH'
+#!/usr/bin/env bash
+cd /home/lyphe/.claude/claudecodeui_lyphe
+grep -n "panel.box.left >= opened.box.right" .verify/account-rail-live.mjs || echo none
+SH
+bash "$D/p.sh"
+case "$D" in /tmp/athena-probe.??????) rm -rf "$D";; esac
+# expect: line 112 with `panel.box.left >= opened.box.right - 0.5 &&` (one-sided) while the defect stands; cured: a two-sided `near(panel.box.left − button right, 8, 1)` or none.
+```
+
+measured 2026-10-25 by chain chain-sidebar-rail--account-20261025-120712-1ebd, finding L3, LOW
+probe-key: 080a7aebf9340c8debf3dbc4b7d63b8e627ba970
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/account-rail-live.mjs

@@ -26,13 +26,23 @@ function sameRect(a: DOMRect, b: DOMRect): boolean {
  * its parent: the FAB is one node for its whole life (DockableFab.tsx), and a radial drawn inside it would
  * unmount it — and the pointer capture of a drag — whenever the radial changed.
  *
- * A TAP COLLAPSES A FLOATING CHAT, or else opens the radial of the acts that can run (`useSwitcherActions`, less
- * any it marks `disabled`): Chat and Applications with no application up, all five with one up; a second tap
- * closes it. The drawer is one of them — Applications — so it stays reachable from the FAB at every moment,
+ * A TAP COLLAPSES A FLOATING CHAT; else, SEATED while the rail has handed the dock a press override (`dockPress`: the
+ * chat list is collapsed and the rail names the way back), it runs that override — "Show the chat list" — instead; else
+ * it opens the radial of the acts that can run (`useSwitcherActions`, less any it marks `disabled`): Chat and
+ * Applications with no application up, all five with one up; a second tap closes it. Which press goes which way is
+ * decided here, where the FAB, its seat and its drag live; the rail only says what the override is. A disc dragged out
+ * of its dock is not seated, so its tap opens the radial, and the dock draws its own button for the override. With the
+ * override up the radial stays reachable from the palette's Applications group. The drawer is one of them — Applications — so it stays reachable from the FAB at every moment,
  * and the FAB reads as pressed while either the radial or the drawer is up. The radial closes when a drag
  * starts (the button is about to move out from under its arc) and when the chat starts floating (the reader's
  * attention has moved to the chat, and its Chat act has become Collapse). The label says what a tap will do,
- * and while a reply waits out of sight the dot shows and the label says so.
+ * and while a reply waits out of sight and the FAB floats the dot shows and the label says so.
+ *
+ * SEATED IN THE RAIL (docked, with a dock measured), the FAB draws no dot and its label does not carry the unread
+ * words: the views rail is where badges live, and its Chat glyph wears the badge 1 for the same reply. A rail has no
+ * bare dot, and a collapsed rail still says a reply landed. The one exception is a window too short for the rail,
+ * where the rail's region scrolls and can take the Chat glyph out of sight: the dock then reports the badge hidden
+ * (`dockBadgeHidden`) and the seated disc draws the dot, so a waiting reply is never unsigned.
  *
  * `chatDoor` is the chat's one door, handed in by project-workspace, which alone knows which conversation an
  * application brings; this module never imports the chat's host. `onAnchorChange` is how the floating chat
@@ -49,7 +59,7 @@ export function AppSwitcherFab({
   onAnchorChange: (rect: DOMRect | null) => void;
 }) {
   const { t } = useTranslation();
-  const { fabPosition, dockRect, drawerOpen, moveFab } = useAppSwitcher();
+  const { fabPosition, dockRect, dockBadgeHidden, dockPress, drawerOpen, moveFab } = useAppSwitcher();
   const acts = useSwitcherActions(chatDoor);
   // The acts the radial draws: the ones that can run, and no others, so nothing in the arc is a dead press and
   // the arc is laid out for exactly what it shows. (The command palette draws the whole list, `disabled` and all.)
@@ -105,11 +115,21 @@ export function AppSwitcherFab({
     onAnchorChange(rect);
   }
 
-  // A press that never became a drag, or Enter/Space. A floating chat is put away; otherwise the press
-  // toggles the radial, so the FAB closes what it opened.
+  // Seated: docked on a dock that measured. The kit's own test for "drawn in the dock", less the drag in hand.
+  const seated = fabPosition.docked && dockRect !== null;
+  // The press the rail asked the seated disc to run in place of the radial, or null. One value for the press and the
+  // label below, so what the label says is what the press does.
+  const seatedPress = seated ? dockPress : null;
+
+  // A press that never became a drag, or Enter/Space. A floating chat is put away; else a seated disc runs the rail's
+  // override; otherwise the press toggles the radial, so the FAB closes what it opened.
   function handlePress({ keyboard }: { keyboard: boolean }) {
     if (chatDoor.floating) {
       chatDoor.collapse();
+      return;
+    }
+    if (seatedPress !== null) {
+      seatedPress.run();
       return;
     }
     setRadialOpenedBy((current) => (current === null ? (keyboard ? 'keyboard' : 'pointer') : null));
@@ -121,9 +141,14 @@ export function AppSwitcherFab({
   }
 
   // What a press will do, in words; the label is the tooltip too. The dot is aria-hidden, so what it means is
-  // said here, after what the press does.
-  const pressLabel = chatDoor.floating ? t('applications.fabLabelCollapse') : t('applications.fabLabelMenu');
-  const showsDot = chatDoor.unread && !chatDoor.floating;
+  // said here, after what the press does — and only while the dot is drawn: seated, the rail's Chat badge says it,
+  // unless the rail has scrolled that badge out of sight.
+  const pressLabel = chatDoor.floating
+    ? t('applications.fabLabelCollapse')
+    : seatedPress !== null
+      ? seatedPress.label
+      : t('applications.fabLabelMenu');
+  const showsDot = chatDoor.unread && !chatDoor.floating && (!seated || dockBadgeHidden);
 
   return (
     <>

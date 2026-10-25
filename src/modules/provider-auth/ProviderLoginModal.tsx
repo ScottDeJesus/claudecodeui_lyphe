@@ -98,7 +98,7 @@ export default function ProviderLoginModal({
 
   // Drawn on `document.body`, not where the caller mounts it. `fixed` is laid out against the
   // nearest ancestor with a `backdrop-filter` (or `transform`, `filter`, `contain`…), and the sidebar's
-  // root carries `backdrop-blur-sm` — so mounted in place inside the account row, this window filled
+  // root carries `backdrop-blur-sm` — so mounted in place inside the account button, this window filled
   // the side panel instead of the screen. Settings and onboarding mounted it the same way and were
   // only spared by having no such ancestor. The portal is the same cure `SidebarModals` gives the
   // app's other dialogs; React events still bubble to the caller through it, so nothing that listened

@@ -37,9 +37,10 @@ import { Banner, EmptyState, Spinner } from '@/shared/ui';
  */
 
 type KanbanPanelProps = {
-  /** The open project. Read ONCE on first mount, to pick this project's board when none is
-   *  selected — never as a filter: a board's project is a label, not a scope. */
-  projectId: string;
+  /** The open project, or `null` when none is selected. Read ONCE on first mount, to pick this
+   *  project's board when none is selected — never as a filter: a board's project is a label, not a
+   *  scope. With `null` the mount adopts no board and a new board carries no label. */
+  projectId: string | null;
 };
 
 /** Rendered by WorkspaceMain while the Kanban tab is active, and mounted nowhere else. */
@@ -170,7 +171,7 @@ export function KanbanPanel({ projectId }: KanbanPanelProps) {
   };
 
   return (
-    <div className="vv-board flex h-full min-h-0 flex-col" data-kanban-panel data-project-id={projectId}>
+    <div className="vv-board flex h-full min-h-0 flex-col" data-kanban-panel data-project-id={projectId ?? undefined}>
       <KanbanBoardHeader
         boards={boards}
         currentBoardId={currentBoardId}
@@ -190,7 +191,7 @@ export function KanbanPanel({ projectId }: KanbanPanelProps) {
           if (currentBoardId) void updateBoard(currentBoardId, { deepseekFlash: next });
         }}
         // A kit `Dialog` + `Field`, never `window.prompt`: a new board is labelled with THIS panel's
-        // projectId, and that label is the point of `board.project_id`.
+        // projectId (none, when no project is open), and that label is the point of `board.project_id`.
         onNewBoard={() => setDialog('new')}
         onRenameBoard={() => setDialog('rename')}
         onArchiveBoard={() => setDialog('archive')}

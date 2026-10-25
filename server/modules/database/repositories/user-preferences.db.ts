@@ -96,13 +96,18 @@ function mergeGutters(stored: unknown, incoming: unknown): unknown {
  * celebration, and a whole-document write would let the device that read it last erase the other
  * roadmap's stamp and replay its completions.
  *
+ * `filesPins` is the third: one `pinned` list holding the folders pinned on the Files tab's strip, each a
+ * bare string — the folder's absolute path, which is its own entry key (`entryKeyOf`). So
+ * `{ pinned: { [path]: path } }` adds a pin, `{ pinned: { [path]: null } }` removes it, and neither
+ * touches another pin. It is not forward-only: a pin carries no stamp to rewind.
+ *
  * A STAMP LIST MOVES FORWARD ONLY (`FORWARD_ONLY_KEYS`). The rule is "replace the named entry", except
  * that a `roadmapSeen` patch carrying an OLDER `at` than the stored entry is a stale device's retry and
  * is not applied: it would move the stamp backward, and the other device would play what it had already
  * played. The client's `applyEntryPatch` keeps the same rule (`FORWARD_ONLY_ENTRY_KEYS`), and the writer
  * still never sends a stamp older than the one it read (`useCelebrations`).
  */
-const ENTRY_LISTED_KEYS: ReadonlySet<string> = new Set(['dispatcher', 'roadmapSeen']);
+const ENTRY_LISTED_KEYS: ReadonlySet<string> = new Set(['dispatcher', 'roadmapSeen', 'filesPins']);
 /** The keys whose entries carry an `at` that only moves forward. Mirrors the client's `FORWARD_ONLY_ENTRY_KEYS`. */
 const FORWARD_ONLY_KEYS: ReadonlySet<string> = new Set(['roadmapSeen']);
 /** The most entries one list keeps, newest last. Mirrors the client's own cap. */
@@ -188,7 +193,7 @@ export const userPreferencesDb = {
    * Merge-patches preferences: keys present in `updates` are written, keys
    * absent are left alone, and a key given as `undefined` is deleted.
    *
-   * `chatGutters` merges one level deeper, per chat, and `dispatcher` and `roadmapSeen` per entry of their lists — see
+   * `chatGutters` merges one level deeper, per chat, and `dispatcher`, `roadmapSeen` and `filesPins` per entry of their lists — see
    * `mergeGutters` and `mergeEntryLists` above for why neither can be replaced wholesale.
    *
    * Runs in one transaction so a multi-key save from the settings dialog can

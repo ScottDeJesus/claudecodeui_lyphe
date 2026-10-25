@@ -9,8 +9,8 @@ import { lazy } from 'react';
 // inside the tab's own tree.
 export { CerberusProvider } from '@/modules/cerberus/context/CerberusProvider';
 
-// Read by src/modules/project-workspace (useWorkspaceTabGates) for the Cerberus tab's count pill:
-// how many checks need a person right now, `0` until the first read answers.
+// Read by src/modules/project-workspace (useWorkspaceTabGates for the Cerberus tab's count pill, useRailBadges for the
+// Cerberus glyph's badge on the views rail): how many checks need a person right now, `0` until the first read answers.
 export { useCerberusNeeds } from '@/modules/cerberus/context/CerberusContext';
 
 // The Cerberus tab's pane, mounted by src/modules/project-workspace (WorkspaceMain): the fleet's

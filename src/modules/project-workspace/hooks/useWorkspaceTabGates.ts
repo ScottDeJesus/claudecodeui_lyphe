@@ -15,12 +15,6 @@ export type WorkspaceTabGates = {
   shouldShowMemoryTab: boolean;
   /** How many memories are waiting. Zero whenever the lane could not be read, so the pill and the gate agree. */
   memoryPendingCount: number;
-  /**
-   * Always true. The Roadmap tab (the `runner` id) is where the operator lives, so it is first in the house row
-   * whatever the lane holds and nothing can take it off the bar — the way the Universe tab is global. The gate
-   * exists only so the strip, the palette and the pane read the same shape.
-   */
-  shouldShowRunnerTab: boolean;
   /** How many plans the lane DRAWS, for the tab's count pill. Paused and queued plans are counted: they are still plans. A hidden one is not. */
   runnerCount: number;
   /**
@@ -37,48 +31,27 @@ export type WorkspaceTabGates = {
   healCount: number;
   /** How many checks need a person right now, for the Cerberus tab's count pill. Zero until the first read answers. The tab itself is never gated: it is on the bar whatever the fleet says. */
   cerberusNeeds: number;
-  /**
-   * Always true. The Universe tab is GLOBAL — not per project or per session, exactly as the
-   * kanban board is — so it is here whatever the workspace is pointed at and nothing can take it
-   * off the bar. The gate exists only so the strip, the palette and the pane read the same shape.
-   */
-  shouldShowUniverseTab: boolean;
-  /** True once the UI preference store has answered — the snap-back effects wait on it. */
-  preferencesSettled: boolean;
 };
 
 /**
- * Which optional workspace tabs are on the bar.
+ * Which optional tabs are on the old two-row strip (WorkspaceTabs), and the counts it draws.
  *
- * The strip and the panes it switches between live in different regions now — the tabs render in
- * the sidebar, the panes in the main region — so the gates are read HERE and nowhere else.
- * Two components each computing them from `useTasksSettings` / `useBrowserUseEnabled` /
- * `useUiPreferences` / `useMemoryIntake` would be two sources for one decision, and they would
- * disagree the moment one of them is given a different rule; every reading below comes off the
- * same source in the same order, so a strip and a pane cannot diverge about the RULE a tab
- * exists by.
- *
- * One reading is weaker than that, and it is worth naming rather than papering over:
- * `useBrowserUseEnabled` is not a context but a per-call-site hook holding its own `useState`
- * and its own fetch, so the three callers below hold three independent copies of that one
- * boolean and can disagree for the frame between their fetches landing. Pre-existing, and the
- * cure is a context for it — never a fourth private reading here.
+ * ProjectSidebarRegion is the one reader left: it takes the gates here and hands them to the strip as
+ * props, so the strip never computes a gate of its own. The palette and the main region read the
+ * views list (`useWorkspaceViews`) instead, which carries no count and no data-gated tab.
  *
  * The Memory tab is STICKY, which is the whole reason `activeTab` is an argument: once it is the
  * tab a person is standing in it stays on the bar until they choose another one, so filing the
- * last pending memory empties the panel rather than taking the tab out from under them — and no
- * snap-back effect exists for it, because the gate itself never turns off mid-act. The Heal tab is
- * the SECOND such data-gated, sticky tab and takes that rule whole: it appears while the ledger holds
- * live friction and stays while it is the selected tab. The Roadmap tab is not gated by data at all —
- * it is the operator's home, ungated like Universe. Tasks, Shell and Browser are PREFERENCE-gated and
- * keep their snap-backs in WorkspaceMain.
+ * last pending memory empties the panel rather than taking the tab out from under them. The Heal
+ * tab is the SECOND such data-gated, sticky tab and takes that rule whole: it appears while the
+ * ledger holds live friction and stays while it is the selected tab. The Roadmap tab is not gated by
+ * data at all — it is the operator's home, ungated like Universe.
  *
- * Three call sites read this now — WorkspaceMain, ProjectSidebarRegion and ProjectCommandPalette
- * — each passing its own `activeTab`. The palette used to recompute the gates privately from the
- * same contexts; it does not any more, so there are three callers and exactly one rule.
+ * `useBrowserUseEnabled` is not a context but a per-call-site hook holding its own `useState` and its
+ * own fetch, so the Browser tab appears a frame after the others while that fetch lands.
  */
 export function useWorkspaceTabGates(activeTab: AppTab): WorkspaceTabGates {
-  const { hideShellTab, settled: preferencesSettled } = useUiPreferences();
+  const { hideShellTab } = useUiPreferences();
   const { tasksEnabled, isTaskMasterInstalled } = useTasksSettings();
   const browserUseEnabled = useBrowserUseEnabled();
   const { pendingCount } = useMemoryIntake();
@@ -88,9 +61,9 @@ export function useWorkspaceTabGates(activeTab: AppTab): WorkspaceTabGates {
   // the tab: it is on the bar with an empty lane too.
   const { count: runnerCount, waiting: runnerWaiting, tone: runnerTone } = useDispatcherPlans();
   // The live count off the Heal tab's own context — the one poll of the ledger, read here in the
-  // sidebar, the main region and the palette as well as in the panel. Zero until a read has landed
-  // AND while one is failing, so the pill and the gate can never disagree; an unreadable ledger is
-  // not friction, and the tab is reachable all the same by pressing where it sat.
+  // sidebar as well as in the panel. Zero until a read has landed AND while one is failing, so the
+  // pill and the gate can never disagree; an unreadable ledger is not friction, and the tab is
+  // reachable all the same by pressing where it sat.
   const { summary } = useHeal();
   const healCount = summary?.live ?? 0;
   // The fleet's count off Cerberus's own provider — the one read of the overview, shared with the tab's
@@ -103,16 +76,11 @@ export function useWorkspaceTabGates(activeTab: AppTab): WorkspaceTabGates {
     shouldShowShellTab: !hideShellTab,
     shouldShowMemoryTab: pendingCount > 0 || activeTab === 'memory',
     memoryPendingCount: pendingCount,
-    // The literal true, never a reading: the Roadmap tab is the operator's home, the way the Universe tab is global.
-    shouldShowRunnerTab: true,
     runnerCount,
     runnerWaiting,
     runnerTone,
     shouldShowHealTab: healCount > 0 || activeTab === 'heal',
     healCount,
     cerberusNeeds,
-    // The literal true, never a reading: the Universe tab is global, the way the kanban board is.
-    shouldShowUniverseTab: true,
-    preferencesSettled,
   };
 }

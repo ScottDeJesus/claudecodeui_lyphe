@@ -20,11 +20,12 @@ import { readUserPreference, subscribeToUserPreferences, writeUserPreference } f
  * The stored value is whatever an older build wrote, so it is PARSED and never trusted: an entry
  * that is missing, names no usable side, or carries an `open` that is not a boolean falls back to
  * that widget's default, and ranks are renumbered so two widgets can never claim one place. The
- * defaults put `runner` first on the left and `memory` first on the right, both collapsed — the
- * state that costs the chat nothing — `roadmap` under the runner, OPEN, because the operator asked for
- * it beside the Runs widget and a widget he asked for is seen without hunting, `subagents` under the
- * roadmap, open, `embed` under memory, collapsed until a chat names a page for it, and `notes` under
- * embed, collapsed: the account's cards are the same in every chat, and folded costs a chat nothing.
+ * defaults put `runner` first on the left, collapsed — the state that costs the chat nothing — `roadmap`
+ * under the runner, OPEN, because the operator asked for it beside the Runs widget and a widget he asked
+ * for is seen without hunting, `subagents` under the roadmap, open; on the right `followups` first, OPEN
+ * for the same reason (he asked for the chat's next steps to fill in by themselves), then `memory`
+ * collapsed, `embed` under it, collapsed until a chat names a page for it, and `notes` under embed,
+ * collapsed: the account's cards are the same in every chat, and folded costs a chat nothing.
  *
  * THE STORED SHAPE is `{ fallback, sessions: { <sessionId>: placements } }`, and an older build's
  * flat record reads as the fallback with no sessions — so an arrangement made before this is the one
@@ -48,20 +49,26 @@ import { readUserPreference, subscribeToUserPreferences, writeUserPreference } f
  */
 
 const DEFAULT_PLACEMENTS: ChatGutterPlacements = {
+  // OPEN, and the top of the right side: the operator asked for the chat's next steps to be filled in for him so
+  // none is lost, and a widget he asked for is seen without hunting (as `roadmap` is). It is the FIRST key of this
+  // record on purpose: `GUTTER_WIDGET_ORDER` breaks rank ties in key order, so in a stored arrangement that predates
+  // it — which gains it through the parser's own repair, at order 0 on the right — it sorts ahead of the widget
+  // that holds that rank, and nothing the reader placed changes order relative to the rest.
+  followups: { side: 'right', order: 0, open: true },
   runner: { side: 'left', order: 0, open: false },
   // Open, and on the left under the runner, for the reason the header gives: it opens itself in every chat.
   // A stored arrangement that predates it gains it through the parser's own repair.
   roadmap: { side: 'left', order: 1, open: true },
-  memory: { side: 'right', order: 0, open: false },
+  memory: { side: 'right', order: 1, open: false },
   subagents: { side: 'left', order: 2, open: true },
   // Collapsed, and on the right under memory: an embed is a page the chat has yet to name, so a
   // widget that opened itself would give a column's height to an empty frame in every chat that
   // never uses one. It opens itself the moment a chat declares an address — see `ChatGutterLayout`.
-  embed: { side: 'right', order: 1, open: false },
+  embed: { side: 'right', order: 2, open: false },
   // Collapsed, and on the right under embed: the notes are the account's own cards, kept and shown
   // whatever chat is open, and a folded widget costs a chat nothing — the reader who wants them
   // opens them. A stored arrangement that predates it gains it through the parser's own repair.
-  notes: { side: 'right', order: 2, open: false },
+  notes: { side: 'right', order: 3, open: false },
 };
 
 /** Every widget there is, in the order a repair falls back to. */

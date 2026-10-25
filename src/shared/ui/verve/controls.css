@@ -369,7 +369,7 @@
 .vv-meter__sub { font-size: var(--vv-text-meta, 12px); color: var(--ink-faint); }
 
 /* Inline register — label, track and figure on one baseline, for chrome with a single line to
- * spare (the sidebar's account row). The track is the only thing that flexes, so two meters set
+ * spare (a table cell, a checklist row). The track is the only thing that flexes, so two meters set
  * side by side keep their figures aligned however long the labels are. */
 .vv-meter--inline .vv-meter__label { flex: none; font-size: var(--vv-text-meta, 10.5px); color: var(--ink-faint); }
 .vv-meter--inline .vv-meter__track { flex: 1 1 auto; min-width: 16px; height: 4px; }

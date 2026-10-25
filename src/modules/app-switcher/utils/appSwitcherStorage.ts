@@ -20,7 +20,7 @@ import type { DockableFabPosition } from '@/shared/ui';
 
 const STORAGE_KEY = 'app-switcher';
 
-/** At or above this width the FAB starts docked in the sidebar header; below it, it floats. */
+/** At or above this width the FAB starts docked in the sidebar's rail; below it, it floats. */
 const DOCK_MIN_WIDTH = 768;
 
 /**

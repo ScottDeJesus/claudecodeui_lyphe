@@ -1,7 +1,6 @@
 import { ArrowUpCircle, Settings } from 'lucide-react';
 import type { TFunction } from 'i18next';
 
-import { AccountFooterRow } from '@/modules/accounts';
 import { ClaudeUpdateFooterRow } from '@/modules/claude-updates';
 import { Banner } from '@/shared/ui';
 import type { ReleaseInfo } from '@/shared/types';
@@ -17,7 +16,7 @@ type SidebarFooterProps = {
   t: TFunction;
 };
 
-/** Rendered by SidebarContent at the bottom of the panel for the account row, update status and Settings. */
+/** Rendered by SidebarContent at the bottom of the panel for the restart and update status and Settings. */
 export default function SidebarFooter({
   updateAvailable,
   restartRequired,
@@ -88,15 +87,6 @@ export default function SidebarFooter({
           </div>
         </>
       )}
-
-      <div className="nav-divider" />
-
-      {/* The signed-in account, above Settings in both layouts — ONE instance carrying its own
-          responsive sizing, not one per block: two mounts would mean two usage pollers, and
-          D7 caps how often that read may happen. */}
-      <div className="px-3 py-2 md:px-2 md:py-1.5">
-        <AccountFooterRow />
-      </div>
 
       <div className="nav-divider" />
 

@@ -2,8 +2,9 @@
  * The surface signal — how a Claude turn learns it is running inside CloudCLI's chat,
  * rather than a terminal.
  *
- * Both exports below are set on `sdkOptions` INSIDE `mapCliOptionsToSDK`, per turn, in
- * `claude-runtime.provider.js` — never in `.env`, a systemd unit, or `process.env` at
+ * The exports below are applied to `sdkOptions` by `claude-runtime.provider.js`, per turn (`SURFACE_ENV` and
+ * `SURFACE_PROMPT_APPEND` inside `mapCliOptionsToSDK`, `leadWithFollowupsSignal` after the toolsets hook has
+ * answered) — never in `.env`, a systemd unit, or `process.env` at
  * module load. That is deliberate: a terminal launch of `claude` reads none of this, so
  * its ABSENCE is what tells a turn it is not talking to CloudCLI's chat. Hoisting either
  * export to somewhere always-on would erase that signal for every terminal session on
@@ -46,4 +47,29 @@ const EMBED_SIGNAL =
 const MARKDOWN_SIGNAL =
   'Four markdown conventions also draw as components here: a fence whose info string is exactly stats, holding one label | value | delta line per tile (the delta is optional and its sign sets its colour), renders as stat tiles. A paragraph that is exactly VERDICT: PASS or VERDICT: FAIL, optionally followed by — B:n H:n M:n L:n, renders as a verdict banner carrying those blocking, high, medium and low counts. A path/to/file.ext:line reference, in prose or in inline code, renders as a chip that opens that file at that line, and a mermaid fence renders as a diagram. Ordinary markdown — tables, > [!NOTE] alerts, task lists, diff fences — already renders as rich components on this surface, so none of it needs a widget.';
 
+// The Next steps widget (server/modules/followups/): the chat's own next steps and known gaps, kept in the
+// gutter beside the transcript. This is the "automatically": no second model reads replies, the chat that
+// knows what it left open files it with the `followups` command (bin/followups.mjs) over the chat-commands
+// door. Pronoun-free toward the person ("the user") because CloudCLI has more than one account.
+//
+// LEADS the surface prompt (`leadWithFollowupsSignal`), and says WHEN and HOW in the imperative. Measured 2026-10-25 on a Haiku chat:
+// the same rules appended LAST and phrased as a description ("you keep it current ...") drew no `followups` call —
+// the reply asked a question and named something unchecked, and filed neither. This wording is the sharpened one —
+// said first, told to run the call BEFORE the reply's final text, and naming the two replies that always owe an item —
+// and the same kind of turn filed a next step and a known gap by itself (MAN-9004).
+const FOLLOWUPS_SIGNAL =
+  `Beside this chat sits its Next steps widget, which keeps this chat's open next steps and known gaps in front of the user so none is lost, and you are the one who fills it, with the followups command, in the same turn as the reply that opens or settles an item. Do it before you write the final text of the reply, as one Bash call, even when the turn has nothing else to run. When the reply leaves something open for later (a question or choice you put to the user, an offer waiting on a yes from the user, a step you put off), file it with followups add --next "<one plain line>"; when you know of a gap you are leaving (something not tested or that you could not check from here, a case not handled, a limit or risk you chose not to fix), file it with followups add --gap "<one plain line>". Word each line as you would say it to the user, with no codes or ids, and put every --next and --gap of the turn in one call. A reply that asks the user a question or says that something went unchecked always has an item to file. Never file what the same reply finishes, and never file uncommitted work: the Git tab already shows it. When an item is settled (answered, done, or no longer true) close it with followups done <id>; followups lists what is open with ids, so run it before closing anything you did not file this turn.`;
+
 export const SURFACE_PROMPT_APPEND = `${WIDGET_SIGNAL} ${EMBED_SIGNAL} ${MARKDOWN_SIGNAL}`;
+
+/**
+ * The surface prompt with the Next steps instruction in front of it. Called by `claude-runtime.provider.js`
+ * after the toolsets hook has answered, and ONLY for a launch that carries the chat credential
+ * (`CLOUDCLI_TOOLSET_TOKEN` in the launch's env): the instruction tells the chat to run `followups`, and the
+ * command has nothing to run with in a chat that has no credential — one whose project runs on a Cerberus node
+ * (the hook gives those none: a stdio command there could not reach this box's loopback), one with no app session
+ * id, or one whose hook did not answer. Such a chat keeps `SURFACE_PROMPT_APPEND` as it was.
+ */
+export function leadWithFollowupsSignal(append: string): string {
+  return `${FOLLOWUPS_SIGNAL} ${append}`;
+}

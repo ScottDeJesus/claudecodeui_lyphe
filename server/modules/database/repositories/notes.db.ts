@@ -44,6 +44,15 @@ export const notesDb = {
       .all(userId) as NoteRow[];
   },
 
+  /** One of the account's notes by id, or `null` when no row of that account carries it. */
+  get(userId: number, id: string): NoteRow | null {
+    const row = getConnection()
+      .prepare(`SELECT ${NOTE_COLUMNS} FROM notes WHERE id = ? AND user_id = ?`)
+      .get(id, userId) as NoteRow | undefined;
+
+    return row ?? null;
+  },
+
   /**
    * Inserts one note under a `randomUUID()` id, both timestamps `new Date().toISOString()`, and
    * answers the row as stored.

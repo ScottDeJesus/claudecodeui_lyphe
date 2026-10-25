@@ -71,8 +71,8 @@ type HealContextValue = {
 const HealContext = createContext<HealContextValue | null>(null);
 
 /**
- * The app's ONE heal poller — above the Router, so the panel, the two tab gates and the command
- * palette all read the same reading, and inside the auth gate, so it never asks against the login
+ * The app's ONE heal poller — above the Router, so the panel and the tab gates read the same
+ * reading, and inside the auth gate, so it never asks against the login
  * screen. It holds the READING and nothing else: every control that changes something calls
  * `refresh()` and shows what the server read back, so no pressed button writes a value into this
  * state that the worker has not been seen to agree with.
@@ -141,7 +141,7 @@ export function HealProvider({ children }: { children: ReactNode }) {
   return <HealContext.Provider value={value}>{children}</HealContext.Provider>;
 }
 
-/** The tab's picture, for the panel, the two tab gates and the command palette. */
+/** The tab's picture, for the panel and the tab gates. */
 export function useHeal(): HealContextValue {
   const value = useContext(HealContext);
   if (!value) {

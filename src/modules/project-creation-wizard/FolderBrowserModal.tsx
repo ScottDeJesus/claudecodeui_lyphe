@@ -13,7 +13,7 @@ type FolderBrowserModalProps = {
   onFolderSelected: (folderPath: string, advanceToConfirm: boolean) => void;
 };
 
-/** Opened by WorkspacePathField so the user can browse the filesystem and pick or create the workspace folder. */
+/** Opened by WorkspacePathField so the user can browse the filesystem and pick or create the workspace folder, and by the file-manager module's FilesView to pick a folder to pin. */
 export default function FolderBrowserModal({
   isOpen,
   autoAdvanceOnSelect,

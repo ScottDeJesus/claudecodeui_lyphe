@@ -3,7 +3,7 @@ import {
   getStoredAuthToken,
   storeAuthToken,
 } from '@/shared/authToken';
-import type { AuthTraceEvent, CerberusEnrollInput, CerberusLabelInput, CerberusMuteInput, CerberusPromoteInput, ClaudeApiKeySave, DeepseekRange, DispatcherAsk, DispatcherEpicsWord, DispatcherModelChoice, DispatcherQueueMove, FileLinePatch, JevRange, NoteInput, NtfySettingsInput, SimpleListItemRef, SimpleListPosition, SubagentTranscriptResult } from '@/shared/types';
+import type { AuthTraceEvent, CerberusEnrollInput, CerberusLabelInput, CerberusMuteInput, CerberusPromoteInput, ClaudeApiKeySave, DeepseekRange, DispatcherAsk, DispatcherEpicsWord, DispatcherModelChoice, DispatcherQueueMove, FileLinePatch, JevRange, NoteInput, NtfySettingsInput, SimpleListItemRef, SimpleListPosition, SubagentTranscriptResult, WriteAttempt } from '@/shared/types';
 import type { AgentLaunchDefaultsChange, AgentLaunchRowChange } from '@/shared/agent-launch-types';
 import type { MarkRequest, MissedRequest, Queue, ReadRequest, ThresholdRequest, UnderstandingMarkRequest } from '@/shared/affected-areas-types';
 import type { CerberusCatalogEntryInput } from '@/shared/cerberus-types';
@@ -199,6 +199,25 @@ export async function refusalSentence(response: Response): Promise<string | null
     return errorMessage(envelope.error) ?? errorMessage(envelope.details);
   } catch {
     return null;
+  }
+}
+
+/**
+ * One write, judged: lands (a 2xx) or does not, and when it does not, the server's own sentence and
+ * machine-readable code if it sent them. A refusal, an unanswered request and a thrown fetch are all
+ * "did not land" — the caller raises its own toast over the verdict, which is why this never throws.
+ * For the writers that keep the person's text when a write fails (the notes' autosave and delete).
+ */
+export async function attemptWrite(request: () => Promise<Response>): Promise<WriteAttempt> {
+  try {
+    const response = await request();
+    if (response.ok) return { landed: true, response };
+    // The code first: it reads a clone, so the sentence below can still read the body.
+    const code = await refusalCode(response);
+    return { landed: false, sentence: await refusalSentence(response), code };
+  } catch {
+    // No answer at all — this app's own network — so there is no server sentence or code to carry.
+    return { landed: false, sentence: null, code: null };
   }
 }
 
@@ -868,14 +887,25 @@ export const api = {
   },
 
   // The notes lane (docs/MANUAL.md MAN-7517): one account's cards, read whole. The read answers the
-  // list, newest first, which is exactly the shape the wall draws; the three writes answer the note
-  // they wrote, and NOBODY reads that body — the list on screen comes from the read that follows
-  // the write, so a card is never drawn from an answer the server has already moved past.
+  // list, newest first, which is exactly the shape the wall draws. The two saves answer the note they
+  // wrote — a create's answer is read for the new note's id, which is what lets the card it was typed
+  // in stay open on that note — but the list on screen still comes from the read that follows the
+  // write, so a card is never drawn from an answer the server has already moved past. The two saves
+  // take request options because autosave sends them `keepalive`, so a save on the way out of a page
+  // outlives the page.
   notes: {
     list: () => get('/api/notes'),
-    create: (input: NoteInput) => post('/api/notes', input),
-    update: (id: string, input: NoteInput) => put(`/api/notes/${encodeURIComponent(id)}`, input),
+    create: (input: NoteInput, options?: ApiRequestOptions) => post('/api/notes', input, options),
+    update: (id: string, input: NoteInput, options?: ApiRequestOptions) => put(`/api/notes/${encodeURIComponent(id)}`, input, options),
     remove: (id: string) => del(`/api/notes/${encodeURIComponent(id)}`),
+  },
+
+  // The followups lane: one chat's next steps and known gaps, keyed on the chat's app session id. The
+  // read answers the chat's items, open and done, oldest first; `setState` ticks (`done`) or unticks
+  // (`open`) one and answers the item as stored. Both answer `{ success: true, data }`.
+  followups: {
+    list: (appSessionId: string) => get(`/api/followups?session=${encodeURIComponent(appSessionId)}`),
+    setState: (id: number, state: 'open' | 'done') => patch(`/api/followups/${id}`, { state }),
   },
 
   // The tool-set lane (MAN-8490): which of the box's named MCP sets one chat has on.

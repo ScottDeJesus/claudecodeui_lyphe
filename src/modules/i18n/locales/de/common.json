@@ -296,9 +296,7 @@
     },
     "ariaLabels": {
       "closeModal": "Versions-Update-Modal schließen",
-      "showSidebar": "Seitenleiste anzeigen",
       "settings": "Einstellungen",
-      "updateAvailable": "Update verfügbar",
       "closeSidebar": "Seitenleiste schließen"
     }
   },

@@ -14,9 +14,9 @@ const HUE_CLASSES = ['', 'vv-avatar--hue1', 'vv-avatar--hue2'];
 
 /**
  * A round initials badge.
- * Used by the accounts module (Phase 13) in three places: the sidebar footer's account row, the
- * same row drawn smaller in the collapsed rail, and each switchable account in the panel — which
- * is the only caller that passes `hue`, one per row, so two rows never read alike.
+ * Used by the accounts module (Phase 13) in two places: the rail's account button, and each switchable
+ * account in the panel — which is the only caller that passes `hue`, one per row, so two rows never
+ * read alike.
  *
  * Geometry is inline because `size` is a number the caller chooses; every colour is a class,
  * so a new palette never means editing this file.

@@ -70,8 +70,11 @@ const KIND_TAG: Record<Kind, { icon: LucideIcon; wordKey: string }> = {
  * It rides INSIDE the heading, before the name, so heading navigation hears "Epic restorly" or
  * "Feature roadmap--store", and the tag and the name wrap as words do. `data-kind-tag` is the browser
  * harness's handle.
+ *
+ * Drawn by this head, and by `WaitingAsks` in this module, whose rows name the feature or epic an ask
+ * stands on with the tag the card its Answer opens wears.
  */
-function KindTag({ kind }: { kind: Kind }) {
+export function KindTag({ kind }: { kind: Kind }) {
   const { t } = useTranslation();
   const { icon: Glyph, wordKey } = KIND_TAG[kind];
   return (

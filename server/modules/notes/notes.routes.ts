@@ -2,7 +2,7 @@ import express from 'express';
 import type { Request, Response, Router } from 'express';
 
 import type { NoteInput } from '@/shared/types.js';
-import { AppError, asyncHandler, createApiSuccessResponse, readPathParam } from '@/shared/utils.js';
+import { AppError, asyncHandler, createApiSuccessResponse, readAuthenticatedUserId, readPathParam } from '@/shared/utils.js';
 
 import type { NotesService } from './notes.service.js';
 
@@ -22,30 +22,6 @@ import type { NotesService } from './notes.service.js';
  * `USER_REQUIRED` as 401. Nothing here shapes an error by hand.
  */
 
-type AuthenticatedRequest = Request & { user?: { id?: number | string } };
-
-/**
- * The account this request acts for. Its SHAPE is `scheduled-messages.routes.ts`'s — a module-local
- * reader that throws the app's own 401 `USER_REQUIRED` — but it REFUSES where that one coerces, and
- * the difference is deliberate: `Number()` answers `0` for a `null`, an empty string or an empty
- * array, so a caller that coerced would quietly act for account 0, and a note written to the wrong
- * account is worse than a note not written.
- *
- * `authenticateToken` is mounted ahead of every handler here and sets `request.user` to the account
- * row, whose `id` is the table's own positive integer — so this refuses nothing a real session can
- * send, and the strictness costs a live request nothing.
- */
-function readUserId(request: Request): number {
-  const userId = (request as AuthenticatedRequest).user?.id;
-  if (typeof userId !== 'number' || !Number.isInteger(userId) || userId <= 0) {
-    throw new AppError('Authenticated user is required.', {
-      code: 'USER_REQUIRED',
-      statusCode: 401,
-    });
-  }
-  return userId;
-}
-
 /**
  * The draft a write carries, as the service takes it.
  *
@@ -53,8 +29,10 @@ function readUserId(request: Request): number {
  * caller that only has a title does not have to send one. A key that IS there and is not a string is
  * refused rather than coerced: a number or an object under `description` is a client bug, and
  * guessing at `String(value)` would store `[object Object]` in a person's note.
+ *
+ * Consumed by `notes.command-routes.ts`, whose `add` takes the same two fields off its own body.
  */
-function readNoteInput(body: unknown): NoteInput {
+export function readNoteInput(body: unknown): NoteInput {
   const source = (body ?? {}) as Record<string, unknown>;
 
   if (typeof source.title !== 'string') {
@@ -74,14 +52,14 @@ export function createNotesRoutes(service: NotesService): Router {
   router.get(
     '/',
     asyncHandler(async (request: Request, response: Response) => {
-      response.json(createApiSuccessResponse(service.list(readUserId(request))));
+      response.json(createApiSuccessResponse(service.list(readAuthenticatedUserId(request))));
     })
   );
 
   router.post(
     '/',
     asyncHandler(async (request: Request, response: Response) => {
-      const note = service.create(readUserId(request), readNoteInput(request.body));
+      const note = service.create(readAuthenticatedUserId(request), readNoteInput(request.body));
       response.status(201).json(createApiSuccessResponse(note));
     })
   );
@@ -90,7 +68,7 @@ export function createNotesRoutes(service: NotesService): Router {
     '/:id',
     asyncHandler(async (request: Request, response: Response) => {
       const id = readPathParam(request.params.id, 'id');
-      const note = service.update(readUserId(request), id, readNoteInput(request.body));
+      const note = service.update(readAuthenticatedUserId(request), id, readNoteInput(request.body));
       response.json(createApiSuccessResponse(note));
     })
   );
@@ -98,7 +76,7 @@ export function createNotesRoutes(service: NotesService): Router {
   router.delete(
     '/:id',
     asyncHandler(async (request: Request, response: Response) => {
-      service.remove(readUserId(request), readPathParam(request.params.id, 'id'));
+      service.remove(readAuthenticatedUserId(request), readPathParam(request.params.id, 'id'));
       response.json(createApiSuccessResponse({ deleted: true }));
     })
   );

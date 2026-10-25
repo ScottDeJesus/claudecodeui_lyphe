@@ -764,7 +764,8 @@
     box-sizing: border-box;
   }
 
-  /* Hide scrollbar utility for horizontal scroll */
+  /* Hide the scrollbar of a strip with no room for one — a row of chips scrolling sideways, the views rail's
+     runs scrolling down. The strip still scrolls by wheel, swipe and keyboard. */
   .scrollbar-hide {
     -ms-overflow-style: none;
     scrollbar-width: none;

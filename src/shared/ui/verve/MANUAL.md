@@ -42,7 +42,11 @@ section: README/001 The rules that keep it one source
    first two for the task board, the third for accent TEXT — each one `color-mix` over a token
    `tokens.css` already declared. `accent-ink` is the readable half of a pair, because `primary`
    is the accent FILL: a green WORD is `text-accent-ink`, a green SHAPE is `text-primary`, and
-   the wrong way round is how the sidebar's most important label went under AA. `tone-soft`,
+   the wrong way round is how the sidebar's most important label went under AA. `accent-soft` and
+   `accent-soft-hover` joined for the soft green ground a lit control stands on (`text-accent-ink`
+   on `bg-accent-soft`, the views rail's lit glyph), each `color-mix` over `--accent-soft` or
+   `--accent-soft-hover`; bare `accent` is the shadcn legacy over `--surface2`, so the soft ground
+   needed names of its own. `tone-soft`,
    `tone-ink` and `tone-dot` joined as names over the tone swap's own properties, not over a palette
    token: each is `color-mix` over `--tone-soft`, `--tone-ink` or `--tone-dot`, which the
    `[data-tone]` rules of rule 4 hand to everything inside a container. `bg-tone-dot` is the dot of
