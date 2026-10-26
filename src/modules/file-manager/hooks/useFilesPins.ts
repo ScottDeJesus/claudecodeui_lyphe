@@ -19,7 +19,7 @@ const NO_PINS: readonly string[] = [];
 let lastRaw: unknown = undefined;
 let lastPins: readonly string[] = NO_PINS;
 
-/** The pins as stored, or none when the value is not `{ pinned: string[] }`. */
+/** The pins as stored: the string entries of `pinned`, and none when it is absent, `null`, empty or not a list. */
 function readPins(): readonly string[] {
   const stored = readUserPreference<unknown>(KEY, null);
   const raw = stored !== null && typeof stored === 'object' && !Array.isArray(stored)
@@ -27,9 +27,8 @@ function readPins(): readonly string[] {
     : undefined;
   if (raw === lastRaw) return lastPins;
   lastRaw = raw;
-  lastPins = Array.isArray(raw) && raw.length > 0 && raw.every((entry) => typeof entry === 'string')
-    ? (raw as string[])
-    : NO_PINS;
+  const pins = Array.isArray(raw) ? raw.filter((entry): entry is string => typeof entry === 'string') : NO_PINS;
+  lastPins = pins.length > 0 ? pins : NO_PINS;
   return lastPins;
 }
 

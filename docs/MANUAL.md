@@ -11621,6 +11621,7 @@ The workspace's half of a tap on a plan's prompt. The server's half (`landingPat
 7. Both params go in ONE `setSearchParams`. why: its updater gets the params of the render that made it, so a second call in the same pass rebuilds from the same start and puts the first's key back.
 8. A name still held when `activeTab` moves off `runner` is retired, `revealPlan` and `openRoadmap` both: an effect registers a cleanup once `activeTab === 'runner'`. why: an operator who presses another tab before the tab answers has declined the landing; a held name would fire on his next plain visit and re-take the tab on the next project switch.
 9. The leave-drop lives in the hook, never in an unmount cleanup in `RoadmapTab`. why: `main.tsx` runs StrictMode, whose dev-only unmount would retire the landing before the picture is read; the take effect holds the names again right after the cleanup's one dev run.
+10. The take-and-strip effect keys on the location's `key` as well as on the two names. why: a second press of the same landing that reaches the router before the first press's strip has rendered (a double click on Answer) sets the URL back to the name the hook last saw, and an effect keyed on the names alone does not run: the param stays in the URL and every later press of that plan lands nowhere. Every navigation carries a fresh `key`, so every press is taken and stripped. Walked by `.verify/probe-runner-landing-twice.mjs`.
 
 ## `RunnerPanel` — the reveal effect
 - Props: `revealPlan?: string | null` (default `null`), `onRevealed: () => void`.

@@ -12148,49 +12148,6 @@ probe-key: ac8a8348d53c7bc03d10f823e55ea06fb223f154
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/bin/notes.mjs, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/notes/context/NotesProvider.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/notes/hooks/useNoteSaver.ts, /home/lyphe/.claude/skills/notes/SKILL.md
 
-## INV-9612 — probe — a re-pin inside one 400 ms flush orders the page's mirror differently from the server
-
-a re-pin inside one 400 ms flush orders the page's mirror differently from the server
-
-```probe
-D=$(mktemp -d /tmp/athena-ord.XXXXXX) || exit 1
-cat > "$D/order.ts" <<'TS'
-import { applyEntryPatch, foldEntryPatches } from '/home/lyphe/.claude/claudecodeui_lyphe/src/shared/preferenceEntryPatch.ts';
-const pin = (p: string) => ({ pinned: { [p]: p } });
-const writes = [pin('/p/a'), pin('/p/b'), pin('/p/a')];
-const mirror = writes.reduce((doc: unknown, patch) => applyEntryPatch(doc, patch), {});
-const wire = writes.reduce((pending: unknown, patch) => (pending === undefined ? patch : foldEntryPatches(pending, patch)), undefined as unknown);
-console.log('mirror', JSON.stringify(mirror), 'server', JSON.stringify(applyEntryPatch({}, wire as never)));
-TS
-cd /home/lyphe/.claude/claudecodeui_lyphe && node_modules/.bin/tsx "$D/order.ts"
-# expect: the two lists are equal once cured; while the defect stands it prints mirror {"pinned":["/p/b","/p/a"]} server {"pinned":["/p/a","/p/b"]}
-```
-
-measured 2026-10-25 by chain chain-sidebar-rail--files-prefs-20261025-085855-e8e4, finding L1, LOW
-probe-key: 34ccf3c6ad8698fb0c848ed324655e4ecb3bcda8
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/user-preferences.db.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/userSettings.ts
-
-## INV-9613 — probe — a `{ name }` record under a held key is stored, so `pinned` can hold a non-string
-
-a `{ name }` record under a held key is stored, so `pinned` can hold a non-string
-
-```probe
-API=http://127.0.0.1:3011
-T=$(curl -s -X POST $API/api/auth/login -H 'content-type: application/json' -d '{"username":"verve","password":"verve-dev-2026"}' | jq -r .token)
-patch(){ curl -s -X PATCH $API/api/user/preferences -H "authorization: Bearer $T" -H 'content-type: application/json' -d "$1" >/dev/null; }
-patch '{"filesPins":{"pinned":{"/athena-obj":{"name":"/athena-obj","x":1}}}}'
-curl -s $API/api/user/preferences -H "authorization: Bearer $T" | jq -c '.preferences.filesPins.pinned|map(type)|unique'
-patch '{"filesPins":{"pinned":{"/athena-obj":null}}}'
-curl -s $API/api/user/preferences -H "authorization: Bearer $T" | jq -c '.preferences.filesPins'
-# expect: ["string"] or [] once a string-only rule exists; while it stands the first line prints ["object"] (the second line always prints {"pinned":[]}, the cleanup)
-```
-
-measured 2026-10-25 by chain chain-sidebar-rail--files-prefs-20261025-085855-e8e4, finding L2, LOW
-probe-key: 49819ce3824944abd7b85ec8c086dc5026177c53
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/user-preferences.db.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/userSettings.ts
-
 ## INV-9617 — probe — LOW — `WorkspaceHeader`'s docblock says every other view is named; an id the list does not hold gets the chat's face
 
 LOW — `WorkspaceHeader`'s docblock says every other view is named; an id the list does not hold gets the chat's face
@@ -12825,29 +12782,6 @@ measured 2026-10-25 by chain chain-sidebar-rail--whole-20261025-170311-1711, fin
 probe-key: 5bfe213acec8c4f29be1e5d6efb900d1072c463d
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/composer/ComposerModelMenu.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/scratch-chat.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/whole-sidebar-rail.mjs
-
-## INV-9663 — probe — (MEDIUM) — INV-9662 says `useFilesPins` keeps only the string entries; the code drops the whole list on one non-string
-
-(MEDIUM) — INV-9662 says `useFilesPins` keeps only the string entries; the code drops the whole list on one non-string
-
-```probe
-D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
-cat > "$D/p.sh" <<'SH'
-#!/usr/bin/env bash
-cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
-H=src/modules/file-manager/hooks/useFilesPins.ts
-echo "code: all-or-nothing .every(string) lines: $(grep -c "raw.every((entry) => typeof entry === 'string')" $H); per-entry .filter( lines: $(grep -c '\.filter(' $H)"
-echo "row INV-9662 says the reader keeps only the string entries: $(~/.claude/scripts/docstore get INV-9662 --text | grep -c "keeps only .typeof === 'string'. entries")"
-node -e "const raw=['/p/a',{name:'/p/b'}]; const pins=Array.isArray(raw)&&raw.length>0&&raw.every((e)=>typeof e==='string')?raw:[]; console.log('the same test on [string, record] ->',JSON.stringify(pins))" 2>&1
-SH
-bash "$D/p.sh"
-case "$D" in /tmp/athena-probe.??????) rm -rf "$D";; esac
-```
-
-measured 2026-10-25 by chain chain-sidebar-rail--docs-20261025-180958-6603, finding M1, MEDIUM
-probe-key: 15a1f0f31236b010b266e971c8d6384ae996d3c4
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/user-preferences.db.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/file-manager/hooks/useFilesPins.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/preferenceEntryPatch.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/userSettings.ts
 
 ## INV-9664 — probe — (MEDIUM) — rows still annotate the deleted strip and known-red harness legs instead of deleting the sentence (healed means deleted; intent item 14)
 
