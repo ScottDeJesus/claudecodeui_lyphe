@@ -14,7 +14,8 @@
 //
 // JSON is camelCase on every route; wire.py's `cls` is the key `class`, and it is a key here too.
 // Every date and datetime is ISO text (`2026-10-13`, `2026-10-13T08:00:00Z`), every id is text, and
-// a point is `[x, y]` and a box `[x0, y0, x1, y1]`, both in 0..1 of one view.
+// a point is `[x, y]` and a box `[x0, y0, x1, y1]`, both in 0..1 of the frame the shape sits in: one view
+// for a region, the floor's drawing for the day-one plan (see `affected-areas-layout-types.ts`).
 //
 // A response field is always present: wire.py dumps a `None` as `null` and an unset list as `[]`.
 // A field a later plan fills is typed now and reads `null` until that plan lands — `null` is "not

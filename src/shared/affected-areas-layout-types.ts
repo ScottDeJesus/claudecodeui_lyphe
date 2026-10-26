@@ -64,9 +64,13 @@ export type LayoutViewState = {
  * - `partial`: the plan in force is drawn from today's inputs and some panos have no layout read.
  * - `built`: the plan in force is drawn from today's inputs and every pano is read.
  * - `stale`: the plan in force was drawn from other inputs than today's (a newer layout read, a moved
- *   tilt, a changed shot group); a rebuild from what is stored, with no model, brings it up to date.
- * - `unavailable`: reads exist and no plan could be drawn (DocuSketch unreadable, or no room measurable).
+ *   tilt, a changed shot group), or a tour that has layout reads has no plan in force yet (a run that
+ *   ended before its rebuild); a rebuild from what is stored, with no model, brings it up to date.
+ * - `unavailable`: reads exist and no plan could be drawn (DocuSketch unreadable, or no room measurable)
+ *   — a rebuild was tried and drew nothing.
  *
+ * `stale` wins over `partial`: a plan drawn from other inputs is `stale` whether or not panos are missing
+ * reads, since the rebuild comes first. `panosTotal` counts the tour's panos known to the engine;
  * `panosRead` counts the panos whose six views each have a shown layout read; `contractVersions` the
  * layout contract versions of the reads the plan in force was drawn from.
  */
