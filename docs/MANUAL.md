@@ -40,7 +40,7 @@ the rail's foot, the one instance in the app. The rail stands whether the chat l
 inside it, so the app holds exactly one poller per reading no matter how often the panel is opened or the
 list collapsed.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/AccountRailButton.tsx
 
 ## MAN-461 — The nine rules the server half keeps
 section: accounts/001 The nine rules the server half keeps
@@ -103,6 +103,8 @@ section: accounts/002 What the rail button says
 - **Initials:** from the account's slug, local part only (`accountInitials`): everyone here shares a domain, so a domain letter hides identity rather than carrying it. With no slug the avatar is muted and reads `—`.
 - **Tooltip:** `Account`, to the right, on focus as well as hover; hidden while the panel is open, since the panel stands where it would.
 - **Button:** `aria-haspopup="dialog"`, `aria-expanded` while the panel is open, `aria-controls` pointed at the panel only while it is open. A press toggles the panel, which opens beside the rail.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/AccountRailButton.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/utils/accountInitials.ts
 
 ## MAN-463 — What the panel says
 section: accounts/003 What the panel says
@@ -266,15 +268,16 @@ section: accounts/007 What is left standing
 - **One Escape dismisses the frontmost overlay AND this panel behind it.** Marking rather than
   stopping is what lets the overlay have its key; the panel's own handler still fires on the same
   event. Measured, and the lesser of the two costs.
-- **The avatar hue is positional.** The footer always draws hue 0 and the panel indexes by row, so
-  the same account can carry one colour in the footer and another in the list.
+- **The avatar hue is positional.** The rail button always draws hue 0 and the panel indexes by row, so
+  the same account can carry one colour on the rail and another in the list.
 - **The panel scrolls to its action.** Usage renders above the account section by the plan's own step
   order, and the panel grows upward into the space above the row, so `↻ Re-login` sits at the foot of
   a panel that scrolls. `panel-fill.mjs` (MAN-8847) opens it at 1440 × 900 and at 390 × 844, in
   both themes, and photographs its top, its rows and its foot; it asserts the button is there, not that it
   is on screen without scrolling.
 - **Two live addresses draw the same `SD`.** A property of the addresses, not of the rule; the
-  mitigations are the per-row hue and the full address in a `title` on every label.
+  mitigations are the per-row hue and the full address in a `title` on every label (the rail button's
+  accessible name carries it whole: `Account <email>`).
 - **Nothing marks the panel inert while the login window covers it.** Both dismissals stand down so
   the panel is not closed behind the window, but the panel keeps its own focus order behind the
   overlay, and the window traps neither focus nor body scroll.
@@ -286,6 +289,8 @@ section: accounts/007 What is left standing
   have, and the module's only finding. The balance hook beside it, of the same shape, reads clean.
   The repo reads 129 warnings and 0 errors, one fewer than before this pass, and nothing here added
   a class.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/AccountRailButton.tsx
 
 ## MAN-468 — Proving it
 section: accounts/008 Proving it
@@ -742,32 +747,20 @@ One control, and it is the reader's way in and out of every pane.
   never imports the switcher, exactly as it never imports the tabs. Collapsing the list hides the list
   column only: the rail, and the dock in it, keep their place in the tree and their rect, so the FAB
   stays seated through a collapse and the dock never unmounts on one.
-- **The rail can hand the dock a press override** (`AppSwitcherDock`'s `pressOverride`: `{ label, run }`, or
-  null). The dock writes it to the context as `dockPress` from a layout effect and clears it on unmount. The
-  workspace rail hands "Show the chat list" while the list is collapsed. The FAB owns which press goes which
-  way (below); the rail only says what the override is. A disc dragged out of its dock is not seated, so with
-  an override set the dock draws its own 40px rail button over its box (lucide `PanelLeftOpen`, named
-  `label`, the kit `Tooltip` right with `showOnFocus`, `RAIL_BUTTON_BASE`/`RAIL_BUTTON_UNLIT`), running
-  `run`; the 28px box keeps registering its rect beneath, so a drag back still docks. When an override
-  arrives while `document.activeElement` is the body and the element that last held focus has left the
-  document (the list's hide button, unmounted by the collapse it ran), focus moves to the seated FAB
-  (`FAB_SELECTOR`), or to that button when the FAB is not seated; when the override ends with that button
-  holding focus (pressed to show the list, it unmounts) focus goes to the FAB. A page that loads with the list already
-  collapsed, or a stored preference that arrives after the load or from another tab, has no such element
-  and moves nothing.
+- **The rail can hand the dock a press override** (`pressOverride`, written to the context as `dockPress`): the
+  workspace rail hands "Show the chat list" while the list is collapsed. The pieces, the press order, the
+  dock's own button for a disc dragged out and the focus move: MAN-9014.
 - **Exactly one dock is on the page**: the sidebar renders its `rail` slot once, so one box reports one rect.
 - **It drags.** Past a 4px threshold the press becomes a drag; `onDragStart` fires once, on the first move
   past it, and the radial closes on it. Clamped to the viewport with 8px of padding on every side, so it can
   never be thrown off screen and lost.
 - **A tap is `onPress({ keyboard })`** — a click that did not end a drag: a mouse click, a finger's tap, Enter or
   Space; `keyboard` is true when no pointer was behind it. `AppSwitcherFab` answers it: while the chat floats a
-  tap collapses it; else, seated with a `dockPress`, it runs `dockPress.run()` ("Show the chat list" while the
-  list is collapsed; the radial stays reachable then from the palette's Applications group); otherwise a tap
+  tap collapses it; else, seated with a `dockPress`, it runs that (MAN-9014); otherwise a tap
   opens the radial of the acts that can run and a second tap closes it (MAN-7475). The FAB
   opens nothing else: the drawer is the Applications act (printed "Apps"), a radial item and a row of the palette's Applications group (MAN-487).
-- **Its label says what a tap will do**, in the same order: `applications.fabLabelCollapse` ("Collapse chat")
-  while the chat floats; else, seated with a `dockPress`, that override's label; else
-  `applications.fabLabelMenu` ("Open the menu"). It is the tooltip too.
+- **Its label says what a tap will do**, in the same order (MAN-9014): `applications.fabLabelCollapse`
+  ("Collapse chat"), the `dockPress` label, `applications.fabLabelMenu` ("Open the menu"). It is the tooltip too.
 - **Ctrl+. (⌘. on a Mac)** presses the chat's door from anywhere in the workspace and from inside the
   picture-in-picture window: it floats the chat, or collapses it while it floats (MAN-7492). The radial's Chat
   act and the palette's Chat row print the chord.
@@ -786,11 +779,11 @@ One control, and it is the reader's way in and out of every pane.
   on the light surface, the edge is 5:1 light and 9:1 dark. `pointer-events: none`. What it means in words is
   the owner's, put into `label`, which is also the tooltip; the dot is decoration to a screen reader. The pop on
   arrival is its only motion (none under `prefers-reduced-motion`); forced colours draw `Highlight` with a
-  `Canvas` ring. `AppSwitcherFab` passes `indicator` while `chatDoor.unread`, the chat is not floating and the FAB is not seated (`fabPosition.docked` on a measured dock), and appends `applications.fabUnread` to the label only while the dot is drawn. Seated in the rail the disc draws no dot: badges are the rail's, and its Chat glyph wears the badge 1 for the same reply, so a rail carries no bare dot and a collapsed rail still says a reply landed. The one exception is a window too short for the rail, where its region scrolls and can take the Chat glyph out of sight: the dock then reports `dockBadgeHidden` (from the rail's `unreadBadgeHidden`, an IntersectionObserver on the Chat button rooted at the region) and the seated disc draws the dot and the unread words, so a waiting reply is never unsigned. `active` (`aria-expanded`, the pressed wash) is on while the radial or the drawer is up.
+  `Canvas` ring. `AppSwitcherFab` passes `indicator` while `chatDoor.unread`, the chat is not floating and the FAB is not seated (`fabPosition.docked` on a measured dock), and appends `applications.fabUnread` to the label only while the dot is drawn. Seated in the rail the disc draws no dot: badges are the rail's, and its Chat glyph wears the badge 1 for the same reply, so a rail carries no bare dot and a collapsed chat list still says a reply landed. The one exception is a window too short for the rail, where its region scrolls and can take the Chat glyph out of sight: the dock then reports `dockBadgeHidden` (from the rail's `unreadBadgeHidden`, an IntersectionObserver on the Chat button rooted at the region) and the seated disc draws the dot and the unread words, so a waiting reply is never unsigned. `active` (`aria-expanded`, the pressed wash) is on while the radial or the drawer is up.
 
   What lights it: a `complete` frame (unless the reader aborted the turn) or a `permission_request` for the chat's own conversation, arriving while the chat is out of sight — its tab hidden, or an application covering the main region — and not floating. What clears it: the chat coming on screen (floated, or the chat tab open with nothing over it), or the conversation changing (MAN-7492, MAN-7482).
 
-**Proof:** `node .verify/rail-collapse-live.mjs` (gitignored; live client `:5183`, 1440×900 and a 390×844 leg; `ONLY=dark` for the dark theme; preference writes are dropped, so the dev account is never left collapsed). 2026-10-25: 24 of 24, taken before the focus hand-off on the override's end and the rail's `z-50`; not rerun since. Legs: seated disc (collapse leaves the same rail node, 48px, alone; the disc stays docked, named "Show the chat list", focused; a press brings the list back and opens no radial); disc dragged out (the dock's own 40×40 button, focused, the floating disc keeps its ordinary name, dropping the disc home docks it and the button gives way); keyboard (Enter on the hide button lands on the disc, or on the dock's own button when the disc is out); list shown (the seated disc opens the radial); a page loading collapsed (the disc named at once, nothing takes focus); phone (the 28px box centred in its 44px cell, the disc seated); the collapsed rail beside the mockup's List collapsed sheet. No leg reads the rail's stacking over an open application or the focus hand-off as the override ends.
+**Proof:** `node .verify/rail-collapse-live.mjs` (gitignored; live client `:5183`, 1440×900 and a 390×844 leg; `ONLY=dark` for the dark theme; preference writes are dropped, so the dev account is never left collapsed). 2026-10-26: `PASS — 24 ok, 0 skipped, 0 failed`. Legs: seated disc (collapse leaves the same rail node, 48px, alone; the disc stays docked, named "Show the chat list", focused; a press brings the list back and opens no radial); disc dragged out (the dock's own 40×40 button, focused, the floating disc keeps its ordinary name, dropping the disc home docks it and the button gives way); keyboard (Enter on the hide button lands on the disc, or on the dock's own button when the disc is out); list shown (the seated disc opens the radial); a page loading collapsed (the disc named at once, nothing takes focus); phone (the 28px box centred in its 44px cell, the disc seated); the collapsed rail beside the mockup's List collapsed sheet. No leg reads the rail's stacking over an open application or the focus hand-off as the override ends.
 
 **What is remembered is furniture, and only furniture** — one `localStorage` key, `app-switcher`,
 per browser, never the server:
@@ -1059,8 +1052,8 @@ section: applications/013 The switcher's own files/001 `context/AppSwitcherConte
 
 | File | What |
 |---|---|
-| `context/AppSwitcherContext.tsx` | The one state home: the registry, the two panes, dual, the ratio, the FAB position, the dock rect, the dock's press override (`dockPress`, with its stable `setDockPress`: what a press on the seated disc does instead of opening the radial, and the name it carries), the drawer's open flag, `projects` (`ProjectChoice[]`, handed in by the shell: the one outside list the switcher reads), `frontSide`, `closePane`, `openInDualScreen` (dual-on-and-filled in one update) — and `refresh()` on every drawer open. Once a registry read has landed it clears, in the render that sees it, any pane whose row the registry no longer holds; a failed read keeps the last good list, so a refusal never empties a pane. |
-| `AppSwitcherDock.tsx` | `AppSwitcherDock({ unreadBadgeHidden?, pressOverride? })`: the empty 28px box in the top cell of the sidebar's views rail (project-workspace's `WorkspaceRail` mounts it), which holds the space open and reports its rect, and never unmounts on a collapse of the chat list. `pressOverride` (`DockPress`: `{ label, run }`, or null) is written to the context as `dockPress`; with the disc dragged out and an override set the dock draws its own 40px rail button over the box (PanelLeftOpen, the kit `Tooltip` right with `showOnFocus`) and hands focus to the disc or that button when an override arrives, and to the disc when it ends, as the focused element leaves the page (MAN-486). |
+| `context/AppSwitcherContext.tsx` | The one state home: the registry, the two panes, dual, the ratio, the FAB position, the dock rect, the dock's press override (`dockPress`, with its stable `setDockPress`: MAN-9014), the drawer's open flag, `projects` (`ProjectChoice[]`, handed in by the shell: the one outside list the switcher reads), `frontSide`, `closePane`, `openInDualScreen` (dual-on-and-filled in one update) — and `refresh()` on every drawer open. Once a registry read has landed it clears, in the render that sees it, any pane whose row the registry no longer holds; a failed read keeps the last good list, so a refusal never empties a pane. |
+| `AppSwitcherDock.tsx` | `AppSwitcherDock({ unreadBadgeHidden?, pressOverride? })`: the empty 28px box in the top cell of the sidebar's views rail (project-workspace's `WorkspaceRail` mounts it), which holds the space open and reports its rect, and never unmounts on a collapse of the chat list. `pressOverride` (`DockPress`), the dock's own button for a disc dragged out and the focus move: MAN-9014. |
 | `AppSwitcherFab.tsx` · `AppDrawer.tsx` | The kit's FAB wearing the app logo. A tap collapses a floating chat, else (seated with a `dockPress`) runs the rail's override, else opens `AppSwitcherRadial` beside it (drawing only the acts that can run), whose Applications act opens `AppDrawer` (MAN-7475). `AppSwitcherFab({ chatDoor: ChatDoor, onAnchorChange: (rect: DOMRect \| null) => void })` passes the kit's rect report on and reports `null` when it unmounts; it draws the dot while `chatDoor.unread`, the chat is not floating and the disc is not seated in the rail (or is seated with the rail's Chat badge scrolled out of sight: `dockBadgeHidden`) (MAN-486); the module imports nothing of chat-host (MAN-7478). |
 | `AppSwitcherRadial.tsx` · `utils/radialLabels.ts` | The acts that can run drawn on the arc as `role="menuitem"` discs with label pills, and the plan that puts each label on a side of its disc. Not in the barrel; mounted only by `AppSwitcherFab`. Rules, seams, proof: MAN-7475. |
 | `AppDrawerHeader.tsx` | The sheet's "Your apps" heading, the count line and Close all — extracted out of `AppDrawer.tsx` at the 300-line ceiling. |
@@ -6163,7 +6156,7 @@ section: memory-intake/002 The reading, and when it is taken
 
 | Asked | Why |
 |---|---|
-| on the provider mounting | the first picture, so the tab can be right before anyone looks |
+| on the provider mounting | the first picture, so the Inbox's Memory count (and the rail's Inbox badge) is right before anyone looks |
 | every 60 s | the same floor the accounts poller keeps; nothing here moves except when a session proposes a memory or a person reviews one |
 | the browser tab returning to the foreground | a backgrounded interval is throttled to near-nothing, so what a person reads on return is a reading of now |
 | the Inbox's Memory section opening | `MemoryIntakePanel`'s own mount read — the same reason, one level down |
@@ -6183,7 +6176,7 @@ a spinner, the second is words.
 section: memory-intake/003 What the panel says
 
 A header carrying *Memory intake* and, when there is a picture at all, a neutral `N pending` badge.
-Below it, ONE `ScrollArea` for the whole tab, holding two sections: the memory queue, then the
+Below it, ONE `ScrollArea` for the whole panel (the Inbox's Memory section: MAN-9013), holding two sections: the memory queue, then the
 lessons. The queue draws one of four things:
 
 | The provider holds | The queue draws |
@@ -6199,8 +6192,8 @@ push the lessons below the fold on the very visit where the queue has nothing to
 The badge is drawn only on `reachable === true`. Stating "0 pending" above *The memory queue is not
 reachable* would have the panel contradict itself in two adjacent lines.
 
-**Beneath the queue, the lessons.** `LessonReviewList` is a SECTION of this tab — an `h3` under the
-panel's `h2`, in the queue's own `max-w-2xl` column — and neither a third tab nor a second provider.
+**Beneath the queue, the lessons.** `LessonReviewList` is a SECTION of this panel — an `h3` under the
+panel's `h2`, in the queue's own `max-w-2xl` column — and neither a fourth Inbox section nor a second provider.
 `MemoryIntakePanel` mounts it after the queue, inside the same scroll, whatever the queue holds, and
 it draws its own four states: reading, could not be read, none staged, and the rows. The lifecycle —
 the staged list, the one lesson opened whole, and the two reviews — is `useLessonReview`
@@ -6406,10 +6399,10 @@ section: memory-intake/009 What is left standing
 
 - **The count is never part of the tab's name.** `Tabs` keeps `aria-label={tab.label}` as the
   accessible name so the harness can select by the bare word `Memory` and the label never grows a
-  number, and the accent dot beside the glyph is `aria-hidden` outright — it says THAT something
-  waits, never how much. The number itself rides the tab's `title`, a hover affordance rather than
-  the tab's name; the panel's own `N pending` badge is where the count is stated in the pane a
-  person is actually reading.
+  number, and the count pill is `aria-hidden` outright. The number rides the tab's `title` beside
+  the attention sentence (`Memory (3) · 3 waiting on you`), a hover affordance rather than the
+  tab's name; the panel's own `N pending` badge is where the count is stated in the pane a person
+  is actually reading.
 - **No row is announced when it arrives.** The queue can grow under a person reading it — the panel
   has no live region, so a memory proposed while the tab is open appears silently at the next poll.
 - **A read that failed is retried, a read that succeeded is not.** `readFailed` leaves the card
@@ -6421,17 +6414,9 @@ section: memory-intake/009 What is left standing
 ## MAN-610 — Proving it
 section: memory-intake/010 Proving it
 
-Two probes, and neither reviews a card. `phase-20.mjs` opens the Memory tab on the deleted workspace strip and its sticky-tab legs address a gate that no longer exists: it stands unrewritten. `node .verify/phase-19.mjs` is the HTTP half — the four
-route contracts, no browser. `node .verify/phase-20.mjs` is this surface in headless Chromium: the
-tab on the strip with its count and its untouched accessible name, one row per candidate, the global
-mark, a body read on expand, both verbs offered, and the sticky rule driven both ways — the tab held
-at zero while it is selected, then dropped on the first tab change and brought back when something
-waits again. The zero-count half is produced by answering the tab's own read (`GET /api/memory`, the
-path `api.memory.pending` calls) inside the page and re-reading through the provider's own visibility
-path, so the live queue is left exactly as it was found. Shots are `20-memory-light`, `20-memory-expanded-light`, `20-memory-empty-light`,
-`20-memory-390-light` and `20-memory-dark`. See MAN-670.
+Two proofs, and neither reviews a card. `node .verify/phase-19.mjs` is the HTTP half: the four route contracts, no browser. The panel is shown inside the Inbox's Memory section: `node .verify/probe-inbox.mjs` reads the Memory panel's pending badge beside the strip's Memory count and screenshots the panel (MAN-9013), and `node .verify/whole-sidebar-rail.mjs` reads the same sum (MAN-9012). The zero-count half is produced by answering the panel's own read (`GET /api/memory`, the path `api.memory.pending` calls) inside the page, so the live queue is left exactly as it was found. See MAN-670.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-19.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-20.mjs
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-19.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-inbox.mjs
 
 ## MAN-611 — Notifications
 section: notifications/000
@@ -7620,7 +7605,10 @@ section: simple-chat-list/002 The preference keys
 two flat keys in the same per-user preference store every other setting lives in — theme, sort
 order, the selected provider. They are not folded into `uiPreferences`: that blob is a typed
 boolean reducer (`src/shared/uiPreferences.ts`), and a project id is a `string | null`, not a
-flag. The store itself — how a write reaches the mirror before the server, the legacy-key seeding
+flag. `filesPins` (`{ pinned: string[] }`, the folders pinned on the Files view's strip) is the Files
+view's one key. `useFilesPins` reads it and `pinFolder` / `unpinFolder` write it by entry patch, never whole
+(INV-9662; the other entry-patched keys: `dispatcher` INV-4406, `roadmapSeen` INV-6580). The store itself —
+how a write reaches the mirror before the server, the legacy-key seeding
 rule, why a setting born after that migration seeds nothing — is documented once, in
 [src/shared/userSettings.ts](../src/shared/userSettings.ts)'s own header.
 
@@ -8294,40 +8282,6 @@ count moves with the queue rather than staying pinned. Like phase 12, the down p
 against a closed port and never by stopping the operator's own server — which, with nothing pending ever
 written to, is what makes this one safe to run while the operator is in the app: it toggles no
 preference, moves no card and opens no browser. Its contract is at
-[docs/MANUAL.md (memory-intake)](MANUAL.md).
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/deploy/dev-supervisor/README.md, /home/lyphe/.claude/claudecodeui_lyphe/node_modules/playwright/index.js, /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/supervised-boot.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/tsconfig.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/transcript/shapes/detect.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/transcript/shapes/InlineMarks.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/transcript/shapes/remarkShapeGroups.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/constants.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/all.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/artifacts/21-surface.json, /home/lyphe/.claude/claudecodeui_lyphe/.verify/artifacts/phase-11-press.json, /home/lyphe/.claude/claudecodeui_lyphe/.verify/artifacts/shapes-elements-baseline.html, /home/lyphe/.claude/claudecodeui_lyphe/.verify/artifacts/shapes-gallery-last-run.log, /home/lyphe/.claude/claudecodeui_lyphe/.verify/artifacts/verve-life-before/shapes-elements-baseline.html, /home/lyphe/.claude/claudecodeui_lyphe/.verify/artifacts/verve-life-retone.sed, /home/lyphe/.claude/claudecodeui_lyphe/.verify/handover/seam-probe.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/keepalive-cases-p3.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/keepalive-cases-p4.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/keepalive-host-case.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/keepalive-lib.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/keepalive-turn.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/color.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/console.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/runner-fixture.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/shapes-fixture.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/verve-life.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-32.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-33.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-34.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-files-api.py, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-files-editor.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-files-previews.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-markdown-cards.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-baseline.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-detect.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-fences.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-groups.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-inline.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-lists.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-prose.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-tables.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-sidebar-state-api.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-simple-icons-unread.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-simple-reorder.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/shots/cfep-editor-390-light.png, /home/lyphe/.claude/claudecodeui_lyphe/.verify/shots/cfep-preview-pdf-390-light.png, /home/lyphe/.claude/claudecodeui_lyphe/.verify/shots/phase-34-light.png, /home/lyphe/.claude/claudecodeui_lyphe/.verify/verve-life-compare.sh
-
-## MAN-7005 — The browser harness — Phase 20 is that lane's screen — the Memory tab — and it is back in Chromium, and like Phase 19 it
-section: verification/004 The browser harness/008 Phase 20 is that lane's screen — the Memory tab — and it is back in Chromium, and like Phase 19 it
-
-Phase 20 is that lane's screen — the Memory tab — and it is back in Chromium, and like Phase 19 it
-no longer runs green: its `page.route` globs and its whole-card read still name the retired proxy's
-memory path, a path the client stopped calling, so they need re-pointing at `/api/memory`
-first. Its legs for the tab on the strip and the sticky rule address the Memory tab, removed with the workspace strip (the panel is now the Inbox's Memory section). Eleven gates, in
-three movements: the tab is on the strip and carries the pending count while its `aria-label` stays
-the bare word `Memory` (1-3), and it selects (4); the panel behind it draws one
-row per waiting candidate, marks the global-blast one, reads a body whole on expand and offers both
-verbs (5-8); and the sticky rule, which is this phase's own decision, is driven both ways — the tab
-HELD on the strip and still selected at a count of zero, showing *All filed* with no count (9), gone
-on the first tab change (10), back the moment something waits again (11). Gate 6 depends on what the
-queue holds: with nothing targeting the global file it prints a `[NOTE]` and no gate. It reviews
-nothing, and the run's whole shape is built around that — filing a card writes into a file every
-future session reads and discarding one destroys a proposal — so the zero-count half is produced by
-answering the memory read inside the page and re-reading through a dispatched
-`visibilitychange`, the provider's own return-to-the-foreground path, rather than by emptying the
-queue. When the board's own pending queue is empty, the UI half runs on a synthetic two-row
-list injected the same way, since a probe that quietly passed on an empty queue would be measuring
-an absence; a `[NOTE]` says which of the two it read. The 390 px pass MEASURES the one new thing on
-the mobile strip rather than photographing it — choosing a tab closes the drawer, so the tab's
-bounding box is read while the drawer is still up, a tab pushed out of its row by its own count
-being indistinguishable in the picture. Unlike its HTTP-only sibling this one is **not**
-safe to run while the operator is in the app, for a reason that has nothing to do with memory: it
-opens two `openConsole` sessions and each ends in `ensureTheme`, so it leaves the dev account on
-whichever mode ran last — every browser probe's cost here, see *Hosted instance* below. What is true
-of it narrowly is that it reviews no card, toggles no preference of its own, and leaves the pending
-queue exactly as it found it. Shots are `20-memory-light`, `20-memory-expanded-light`,
-`20-memory-empty-light`, `20-memory-390-light` and `20-memory-dark`. Its contract is at
 [docs/MANUAL.md (memory-intake)](MANUAL.md).
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/deploy/dev-supervisor/README.md, /home/lyphe/.claude/claudecodeui_lyphe/node_modules/playwright/index.js, /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/supervised-boot.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/tsconfig.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/transcript/shapes/detect.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/transcript/shapes/InlineMarks.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/transcript/shapes/remarkShapeGroups.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/constants.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/all.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/artifacts/21-surface.json, /home/lyphe/.claude/claudecodeui_lyphe/.verify/artifacts/phase-11-press.json, /home/lyphe/.claude/claudecodeui_lyphe/.verify/artifacts/shapes-elements-baseline.html, /home/lyphe/.claude/claudecodeui_lyphe/.verify/artifacts/shapes-gallery-last-run.log, /home/lyphe/.claude/claudecodeui_lyphe/.verify/artifacts/verve-life-before/shapes-elements-baseline.html, /home/lyphe/.claude/claudecodeui_lyphe/.verify/artifacts/verve-life-retone.sed, /home/lyphe/.claude/claudecodeui_lyphe/.verify/handover/seam-probe.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/keepalive-cases-p3.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/keepalive-cases-p4.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/keepalive-host-case.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/keepalive-lib.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/keepalive-turn.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/color.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/console.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/runner-fixture.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/shapes-fixture.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/verve-life.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-32.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-33.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-34.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-files-api.py, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-files-editor.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-files-previews.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-markdown-cards.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-baseline.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-detect.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-fences.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-groups.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-inline.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-lists.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-prose.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-shapes-tables.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-sidebar-state-api.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-simple-icons-unread.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-simple-reorder.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/shots/cfep-editor-390-light.png, /home/lyphe/.claude/claudecodeui_lyphe/.verify/shots/cfep-preview-pdf-390-light.png, /home/lyphe/.claude/claudecodeui_lyphe/.verify/shots/phase-34-light.png, /home/lyphe/.claude/claudecodeui_lyphe/.verify/verve-life-compare.sh
@@ -10009,12 +9963,11 @@ section: verification/009 What bites people/001 The git tab reads "Git"
 
 | | |
 |---|---|
-| **The git tab reads "Git"** | Tabs are selected by `[role=tab][aria-label]`, and that is the label on it. |
-| **The Shell tab is off the bar by default** | `hideShellTab` defaults to `true` in `src/shared/uiPreferences.ts`, so a fresh account opens with no Shell tab and no "Go to Shell" in the command palette — an absence to reveal, not a fault to chase. Reveal it the way a person does: Settings → **Appearance** → *Tabs in the workspace* → **Hide the Shell tab**, off. Hiding a tab disconnects nothing; a running shell keeps going exactly as it does while another tab is selected, and the server ends it 30 minutes after nothing is attached (`PTY_SESSION_TIMEOUT`). |
-| **The Shell tab prints `bash: claude: command not found`** | The PTY spawns `bash -c "claude …"` — a bare `PATH` lookup — and the server process on this host carries no `~/.npm-global/bin`, which is where the CLI is. `.env`'s `CLAUDE_CLI_PATH` does not reach it: that is read by the SDK providers through `server/shared/claude-cli-path.ts`, never by the PTY. Nor does upstream's `prioritizeUserNpmGlobalBin`, which only re-*orders* entries already on `PATH` and hands it back untouched when none of its candidates are there — `npm_config_prefix` being set is not enough. An environment fact rather than a fork defect, and the fix belongs at deploy time: whatever runs the server must have the CLI's directory on its own `PATH`. |
+| **The Git view reads "Git"** | A view is pressed by its rail button's `aria-label` (`railButton(label)` in `.verify/lib/console.mjs`), and that is the label on it. |
+| **The Shell view is off the rail by default** | `hideShellTab` defaults to `true` in `src/shared/uiPreferences.ts`, so a fresh account opens with no Shell button on the rail and no "Go to Shell" in the command palette — an absence to reveal, not a fault to chase. Reveal it the way a person does: Settings → **Appearance** → *Tabs in the workspace* → **Hide the Shell tab**, off. Hiding a tab disconnects nothing; a running shell keeps going exactly as it does while another tab is selected, and the server ends it 30 minutes after nothing is attached (`PTY_SESSION_TIMEOUT`). |
+| **The Shell view prints `bash: claude: command not found`** | The PTY spawns `bash -c "claude …"` — a bare `PATH` lookup — and the server process on this host carries no `~/.npm-global/bin`, which is where the CLI is. `.env`'s `CLAUDE_CLI_PATH` does not reach it: that is read by the SDK providers through `server/shared/claude-cli-path.ts`, never by the PTY. Nor does upstream's `prioritizeUserNpmGlobalBin`, which only re-*orders* entries already on `PATH` and hands it back untouched when none of its candidates are there — `npm_config_prefix` being set is not enough. An environment fact rather than a fork defect, and the fix belongs at deploy time: whatever runs the server must have the CLI's directory on its own `PATH`. |
 | **`uiPreferences` is one stored key, not six** | The preference store keeps a row per name, and all six workspace booleans live inside the single `uiPreferences` value. A `PATCH /api/user/preferences` carrying `{"uiPreferences":{"hideShellTab":false}}` therefore *replaces* the blob and silently drops the other five. Click the switch, or send the whole object back. A flat key is its own row and patches safely alone — which is why `phase-4.mjs` patches `tasksEnabled` directly and clicks for the rest. |
-| **The Tasks tab is absent** | It is preference-gated and TaskMaster is not installed here, so its absence is recorded as a note rather than asserted as a pass — except in `phase-4.mjs`, which asserts the biconditional instead: the tab is on the bar exactly when TaskMaster is installed. A tab that can never appear would also leave the board itself unmeasured, so `phase-16.mjs` opens the tab when it is there and otherwise mounts the app's own `TaskBoardContent` and `TaskEmptyState` from the running dev server — phase 2's technique, and it says in a `[NOTE]` which of the two it read. |
-| **The Memory panel is driven by its English strings** | `phase-20.mjs` finds the two verbs by the words `file it` and `discard`, the empty state by `All filed`, and the global-blast mark by the substring `global`. All four live under `memory.*` in `en/common.json` (English only; the other locales fall back to `en`). Re-word one and the phase stops finding a control rather than reporting one wrong — re-point it in the same change, the way `phase-4.mjs` is re-pointed for Settings. |
+| **The Tasks view is absent** | It is preference-gated and TaskMaster is not installed here, so its absence is recorded as a note rather than asserted as a pass — except in `phase-4.mjs`, which asserts the biconditional instead: the rail button is there exactly when TaskMaster is installed. A view that can never appear would also leave the board itself unmeasured, so `phase-16.mjs` opens the view when it is there and otherwise mounts the app's own `TaskBoardContent` and `TaskEmptyState` from the running dev server — phase 2's technique, and it says in a `[NOTE]` which of the two it read. |
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/shared/claude-cli-path.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/main.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Collapsible.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/uiPreferences.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/console.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/shapes-fixture.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/ntfy/settings-probe.mjs
 
@@ -10508,7 +10461,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/agent-launch/AgentLa
 
 ## MAN-7427 — Agent Chains window — the Settings row, the dialog, its stand-ins and the rules that bite
 
-Agent Chains opens from one row in Settings → Agents → Claude → Account, in a window above Settings. The workspace strip and both command palettes carry no Agents entry. Panel: MAN-7417. Data path and hook: MAN-7420. Routes: MAN-7418.
+Agent Chains opens from one row in Settings → Agents → Claude → Account, in a window above Settings. The views rail and both command palettes carry no Agents entry. Panel: MAN-7417. Data path and hook: MAN-7420. Routes: MAN-7418.
 
 ## the row
 | fact | value |
@@ -11616,7 +11569,7 @@ decides where a tap on a push opens. It returns a PATH, never a URL; each opener
 | --- | --- |
 | Has a `sessionId` | `/session/<sessionId>` |
 | No session | `/` |
-| `permission.required` whose `meta.plan` is a non-empty string (a plan's prompt) | the path above plus `?runner=<plan>` — the workspace's `useRunnerLanding` opens the Roadmap tab on its In flight face at that plan's card (MAN-7531) |
+| `permission.required` whose `meta.plan` is a non-empty string (a plan's prompt) | the path above plus `?runner=<plan>` — the workspace's `useRunnerLanding` brings the Roadmap view forward on its In flight face at that plan's card, with a project selected or not (MAN-7531) |
 | Any other event | the first two rows only; `meta.plan` on any other code is ignored |
 
 - Both values go through `encodeURIComponent`.
@@ -11817,19 +11770,17 @@ Proof: `node .verify/probe-card-ask.mjs` — the In flight face of the live clie
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/LockAnswer.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/PlanAsk.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/RoundAnswer.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/SnapStrip.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/ask-lane.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/deck-strip.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/round-strip.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-card-ask.mjs
 
-## MAN-7540 — The plan card — the ask's bell and the Roadmap tab's amber mark (`DispatcherAskBell`, `waiting`, `TabItem.attention`)
+## MAN-7540 — The plan card — the ask's bell and the In flight tab's amber pill (`DispatcherAskBell`, `waiting`, `TabItem.attention`)
 
-**What says, outside the card, that the lane owes the operator a word: a chime, an amber tab mark, an amber widget badge.** All three read the `asking` key of the lane's plans (MAN-7532); none draws a question panel (the composer's `.chat-composer-shell` holds no `[data-question-card]`; the transcript's answered questions wear it too).
+**What says, outside the card, that the lane owes the operator a word: a chime, the amber pill of the Roadmap view's In flight face tab, an amber widget badge.** The rail's Roadmap button carries no mark; its asks reach the rail through the Inbox's badge (MAN-9013, MAN-9005). All three read the `asking` key of the lane's plans (MAN-7532); none draws a question panel (the composer's `.chat-composer-shell` holds no `[data-question-card]`; the transcript's answered questions wear it too).
 
 | piece | file | does |
 |---|---|---|
 | `DispatcherAskBell` | `src/modules/dispatcher/DispatcherAskBell.tsx` | mounted by `DispatcherFeed` beside `{children}`; returns `null`; calls `playNotificationSound()` (tones 740 Hz then 988 Hz) |
 | `useDispatcherPlans().waiting` | `src/modules/dispatcher/hooks/useDispatcherPlans.ts` | distinct open asks, by `askIdentity`, across the DRAWN plans |
 | `useDispatcherPlans().tone` | `src/modules/dispatcher/hooks/useDispatcherPlans.ts` | the lane's one mark for the Runs badge: `warn` while `waiting > 0`, else `info` while a drawn plan is `live` or a planner outing is `out`, else `positive` when every drawn plan is `complete`, else `neutral`; `null` with nothing drawn. Running outranks finished (operator, 2026-10-08: the accent dot is the done-green, and an epic in flight read as finished) |
-| `TabItem.attention` | `src/shared/ui/Tabs.tsx` | a sentence; while set, the tab's mark takes `data-tone="warn"` and the title carries it |
-| `TabItem.tone` | `src/shared/ui/Tabs.tsx` | the mark's register while nothing waits on the operator; `markTone` = `attention ? 'warn' : tone`; absent wears the accent. No caller sets it now |
-| `TabsMore` / `MoreFace` `tone` | `src/shared/ui/TabsMore.tsx` | the trigger's dot takes the most urgent mark among the collapsed tabs that draw one; `Tabs` passes `collapsedTone(collapsed)` (danger › warn › info › positive › neutral) |
-| `.vv-tabs__dot[data-tone]` | `src/shared/ui/verve/feedback.css` | `background: var(--tone-dot)` (tokens.css `[data-tone]`); the ring is untouched |
+| `TabItem.attention` | `src/shared/ui/Tabs.tsx` | a sentence; while set, the tab's count pill takes `data-tone="warn"` and the title carries it |
+| `TabItem.tone` | `src/shared/ui/Tabs.tsx` | the pill's register while nothing waits on the operator; `markTone` = `attention ? 'warn' : tone`; absent wears the neutral grey. Set by `InboxPanel` (`warn`) and `FaceStrip` (`info`) |
 | `waiting` on the In flight switch | `src/modules/roadmap/RoadmapTab.tsx` | the In flight tab item's `attention` = `t('runner.waiting', { count: waiting })` while `waiting > 0`, its `count` = `useDispatcherPlans().count` while above 0 |
 | `GutterWidgetFrame.countTone` | `src/modules/chat-gutters/GutterWidgetFrame.tsx` | the header badge's tone, default `info`; `ChatGutterLayout` passes `useDispatcherPlans().tone` for `runner` |
 
@@ -11841,7 +11792,7 @@ Rules:
 5. The bell reads the bus picture's `plans[].asking`, not `useDispatcherPlans`. why: a plan put away still owes a word; the bell knows no Hide list.
 6. Memory is a ref array. A re-seen identity moves to the new end; past `HEARD_LIMIT` (200) the oldest leaves. why: a standing ask is never pushed out by churn and rung twice.
 7. `waiting` counts questions, not cards: a lock names every plan of its arc and is ONE. `count` stays plans. Both read drawn plans only.
-8. `attention` decides a mark's tone, never whether a mark exists: `count > 0` still draws the dot (icon tab) or the pill (word tab).
+8. `attention` decides a pill's tone, never whether a pill exists: `count > 0` still draws it.
 9. Title with attention: `<label> (<count>) · <attention>` (`tabTitle`), e.g. `In flight (5) · 4 waiting for you` (five plans, four questions). A tab without attention draws and titles as before.
 10. `runner.waiting_one` / `_other` are in `en/common.json` only; other locales fall back.
 
@@ -11856,9 +11807,9 @@ Proof: `node .verify/probe-card-ask.mjs --retired` (`:5183`; dark and light at 1
 | Runs widget (1920×1080) | count badge `data-tone="warn"` |
 | chat composer (`.chat-composer-shell`) | no `[data-question-card]` |
 
-The title reading pushes its picture once more and waits for the title: a live frame can land after the pushed picture and put the lane back. Shots: `.verify/shots/card-ask-desktop-1440x900-{dark,light}-amber-tab.png`, `…-amber-widget.png`. 2026-09-30: 248 `[OK]`, 0 `[FAIL]`, when the tab was labelled `Runner`. The probe's amber-tab legs find the Roadmap button by `[role="tab"][aria-label="Runner"]` (`RUNNER_TAB`) and expect `Runner (5) · 4 waiting for you` (`RETIRED_TITLE`): the button is a rail button now, not a strip tab, and the mark is the In flight switch's (MAN-679, MAN-7654); those legs stand unrewritten.
+The title reading pushes its picture once more and waits for the title: a live frame can land after the pushed picture and put the lane back. Shot: `.verify/shots/card-ask-desktop-1440x900-{dark,light}-amber-widget.png`.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/DispatcherAskBell.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/TabsMore.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Tabs.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/verve/feedback.css
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/DispatcherAskBell.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Tabs.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/verve/feedback.css
 
 ## MAN-7577 — The card order and the sortable lists
 
@@ -12798,8 +12749,6 @@ section: The roadmap face — RoadmapTab, RoadmapTreeFace and RoadmapPicker (src
 Proof: `node .verify/probe-roadmap-tab.mjs` (dev client; signs in through `lib/console.mjs`; shots in `.verify/artifacts/roadmap-screen/`)
 | reading | holds |
 |---|---|
-| strip at 1440, light and dark | addresses the deleted tab strip; stands unrewritten (MAN-7654) |
-| amber | read on a lane rewritten in the page (`lib/ask-lane.mjs`, store untouched): title `Roadmap (3) · 3 waiting for you`, dot `warn` on the strip's tab; the live lane's `asking` is null, so no amber there. Addresses the deleted tab strip; the mark is now the In flight switch's (MAN-7540) |
 | both roadmaps, 1440×900 and 390×844 | `[data-roadmap-face] [data-roadmap-tree] [data-roadmap-milestone]` counts the roadmap's milestones; no sideways scroll of the page at 390 |
 | the switch | switch pill and `RunnerPanel`'s header read the same count |
 | a feature's dot, the panel's Open, the dialog's "Open its card" | face turns to In flight; the named card's own box is on screen in both axes (target: a plan not first in its arc) |
@@ -13064,7 +13013,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/modals/Block
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/hooks/useCelebrations.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/utils/celebrationMoments.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/utils/seenStamp.ts
 
-## MAN-7650 — The roadmap face's context, dialog host and card opener — RoadmapFaceContext, OpenDialog, useRevealCard (src/modules/roadmap)
+## MAN-7650 — The roadmap face's context, dialog host and card opener — RoadmapFaceContext and OpenDialog (src/modules/roadmap), useRevealCard (src/shared/hooks)
 
 What every press under `RoadmapTreeFace` reaches. The face: MAN-7829. Dialogs: MAN-7643. Words: MAN-7634.
 
@@ -13091,17 +13040,18 @@ What every press under `RoadmapTreeFace` reaches. The face: MAN-7829. Dialogs: M
 - `RoadmapTreeFace` mounts it in its one slot (`dialog !== null`), after the scroller and before `CelebrationLayer`, closing with `setDialog(null)`.
 - `PromoteDialog` is not a `FaceDialog`: `FeatureDialog` draws it as its own follow-on (MAN-7645).
 
-## useRevealCard — `hooks/useRevealCard.ts`
-`useRevealCard(): (plan: string) => void`; read by `RoadmapTreeFace` for a feature dialog's Open its card and Answer on its card (`onOpenCard`), after the face has closed the dialog.
-| when | does |
-|---|---|
-| the face's `openCard` prop is set (the tab, the widget at full screen) | the face calls `openCard(plan)`: `RoadmapTab` turns to In flight and hands the plan to `RunnerPanel` |
-| `openCard` is `null` (the gutter's widget) | `reveal(plan)`: `navigate({ search: '?runner=<plan>' }, { replace: true })`; `useRunnerLanding` brings the tab forward and the card into view |
+## useRevealCard — `src/shared/hooks/useRevealCard.ts`
+`useRevealCard(): (plan: string) => void`. Shared because two modules read it: the roadmap module's `RoadmapTreeFace` (a feature dialog's Open its card and Answer on its card, `onOpenCard`, after the face has closed the dialog) and the dispatcher module's `WaitingAsks` (the Answer button of each row of the Inbox's Roadmap section: MAN-9013).
+| caller | when | does |
+|---|---|---|
+| `RoadmapTreeFace` | the face's `openCard` prop is set (the tab, the widget at full screen) | the face calls `openCard(plan)`: `RoadmapTab` turns to In flight and hands the plan to `RunnerPanel` |
+| `RoadmapTreeFace` | `openCard` is `null` (the gutter's widget) | `reveal(plan)`: `navigate({ search: '?runner=<plan>' }, { replace: true })`; `useRunnerLanding` brings the view forward and the card into view |
+| `WaitingAsks` | every Answer press | `reveal(plan)`, the same `?runner=<plan>` landing: the Roadmap view comes forward on In flight with that feature's card in view, with or without a project selected |
 - `replace: true`. why: the press is a redirection; Back must not find the same URL twice (`useRunnerLanding` strips the param the same way).
 - The param is `RUNNER_LANDING_PARAM` (`src/shared/constants.ts`), shared with `useRunnerLanding`.
 - Needs a router above it (`useNavigate`).
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/faceContext.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/hooks/useRevealCard.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/modals/OpenDialog.tsx
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/faceContext.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/modals/OpenDialog.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/useRevealCard.ts
 
 ## MAN-7654 — The Roadmap tab — its place on the rail, ungated, the In flight switch's pill and amber mark, two faces, palette row and landing (useWorkspaceViews, WorkspaceMain)
 
@@ -13126,7 +13076,7 @@ The Roadmap tab is the workspace view whose id is `runner`: label `Roadmap`, gly
 ## Pill and amber mark
 - The Roadmap button carries no mark. The pill and the amber live on the In flight switch inside the tab.
 - `RoadmapTab` reads `useDispatcherPlans()`: `count` (cards drawn, an arc's own plans among them) and `waiting` (open asks).
-- In flight tab item: `count` above 0 draws the pill (`Tabs` word tab: `.vv-tabs__count`); `attention` = `t('runner.waiting', { count: waiting })` while `waiting > 0` turns it amber (`data-tone="warn"`, MAN-7540).
+- In flight tab item: `count` above 0 draws the pill (`Tabs`: `.vv-tabs__count`); `attention` = `t('runner.waiting', { count: waiting })` while `waiting > 0` turns it amber (`data-tone="warn"`, MAN-7540).
 - `RunnerPanel`'s header count is the same `count` off the same hook: one value, two readers.
 
 ## Two faces
@@ -13139,14 +13089,15 @@ The Roadmap tab is the workspace view whose id is `runner`: label `Roadmap`, gly
 ## Landing
 - `?runner=<plan>`: `useRunnerLanding` brings the tab forward and holds `revealPlan`; `RoadmapTab` sets `inFlight` while rendering, before `RunnerPanel` is handed the plan; the card is scrolled into view and the param is stripped.
 - `?roadmap=<name>`: `useRunnerLanding` brings the tab forward and holds `openRoadmap`; `RoadmapTab` turns to the Roadmap face on arrival, selects that roadmap once the picture is read (an absent name selects nothing) and the param is stripped (MAN-7748). With `?runner=` too, In flight wins the face.
-- A feature dialog's Open its card or Answer on its card lands the same way, inside the tab (the face's `openCard` prop) or by `?runner=` where no tab is above (`useRevealCard`, MAN-7650).
+- A feature dialog's Open its card or Answer on its card lands the same way, inside the tab (the face's `openCard` prop) or by `?runner=` where no tab is above (`useRevealCard`, MAN-7650); the Inbox's Roadmap section's Answer is the same press (MAN-9013).
+- With no project selected both landings still land: `/?runner=<plan>` and `/?roadmap=<name>` hold the name and strip the param in the commit that reads them, and bring the view forward at once, because the pane draws without a project (`WorkspaceMain` draws the choose-a-project body in place of the Chat, Shell, Tasks and plugin panes alone: MAN-9002). `useRunnerLanding` waits for no pick (MAN-7531 rules 1, 3, 4).
 
 ## Palette
 - `Go to Roadmap`: the `runner` entry of `PLAN_VIEWS` in `src/modules/project-workspace/hooks/useWorkspaceViews.ts`, first of the plans run; keywords `roadmap milestone epic feature task goal path in flight runner feature epic task run live plan phases`.
 - `ProjectCommandPalette` turns every view into a Navigate row (MAN-8999), so the row is always offered.
 
 ## Proof
-`node .verify/probe-roadmap-tab.mjs` (readings in MAN-7830): both roadmaps' trees at 1440×900 and 390×844; the `?runner=` landing; the palette row. Its strip reading at 1440 addresses the deleted tab strip and stands unrewritten.
+`node .verify/probe-roadmap-tab.mjs` (readings in MAN-7830): both roadmaps' trees at 1440×900 and 390×844; the `?runner=` landing; the palette row.
 The `?roadmap=` landing: `node .verify/probe-roadmap-landing.mjs` (MAN-7748).
 
 ## Traps
@@ -13180,11 +13131,7 @@ Two per-user preferences, kept in the per-user store every setting lives in (mir
 | server | `ENTRY_LISTED_KEYS` = `dispatcher`, `roadmapSeen`, `filesPins` | `mergeEntryLists` replaces the named entry and keeps the others; at most `ENTRY_LIST_CAP` (200) entries, newest last. Under `FORWARD_ONLY_KEYS` (`roadmapSeen`) an entry whose `at` is older than the stored one is a stale device's retry and is NOT applied; a `null` entry still drops, so a rewind is drop, then write. The client's `applyEntryPatch` and `unreflectedEntries` take the key's `FORWARD_ONLY_ENTRY_KEYS` flag and say the same | `server/modules/database/repositories/user-preferences.db.ts` |
 
 - One list without the other sends patches the server stores whole, or stores whole what the client patches. The two change together.
-- `filesPins` is the third key in both lists, not forward-only: `{ pinned: string[] }`, each entry a folder's absolute path and its own entry key, so `{ pinned: { [path]: path } }` pins and `{ pinned: { [path]: null } }` unpins without touching another pin. It is the Files tab strip's pin list.
-- `filesPins` reader rules (the merge is shared with the other two keys and holds neither):
-  - Keep only `typeof === 'string'` entries of `pinned`: the merge stores any entry whose `name` equals its key, not just a bare string.
-  - Read an absent key, `null`, `{ pinned: [] }` and a missing `pinned` alike: the merge keeps the key after the last unpin.
-  - The mirror's order can differ from the server's. The mirror applies each write at once; the debounce folds a patch with `{ ...earlier, ...listPatch }` (`foldEntryPatches`), where a re-named key keeps its first slot. Pin A, pin B, pin A again inside one flush: mirror `…, B, A`, server `…, A, B`.
+- `filesPins` is the third key in both lists, not forward-only; its writes and reader rules: INV-9662.
 - The merge compares no `at`: a writer never sends an `at` older than the one it read. Rule and residual window: INV-6580.
 - Entries of removed roadmaps are never pruned.
 
@@ -14006,3 +13953,89 @@ Every run checks that :5184 was built after this change's own client files, and 
 `.verify/probe-followups-widget.mjs` (headless, live app, production client :5184, one Haiku turn in the scratch project): the chat filed a next step and a known gap by itself; the widget showed them with no reload, dark and light, badge 2; ticking one moved it to "Done (1)" and it stayed done after a reload; a second chat's widget showed none; the phone chat view is pixel-for-pixel what it was and makes no followups request; the command door refused 241 characters, a two-line text and an empty text with 422 sentences, answered an id of another chat with 404, and a half-bad batch filed nothing; the user door returned only the caller's own rows and refused the chat credential; the probe chats' rows went with the chats; the operator's notes and gutter arrangement were byte-identical after. The only failed responses after sign-in were the app's own 404 of an empty chat's `token-usage` read, which the pre-change client makes too.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/bin/followups.mjs, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/surface-signal.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/followups/, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/followups-kit.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-followups-widget.mjs
+
+## MAN-9013 — The Inbox — InboxPanel, its three sections and entry rule, useInboxWaiting, and the Roadmap section's WaitingAsks
+
+The Inbox is everything waiting on the operator, in three sections behind one strip: Memory (the memories sessions proposed), Heal (the live friction) and Roadmap (each ask a feature or an epic is stopped on). The view is `inbox`, the foot of the views rail (MAN-9005). Module: `src/modules/inbox/`. The words say feature and epic, never plan or arc (INV-6394).
+
+## Where it stands
+| fact | value |
+|---|---|
+| view | `inbox` (`AppTab`), group `foot`, lucide `Inbox`, label `tabs.inbox` = `Inbox`, keywords `inbox memory heal roadmap waiting asks proposals friction` (`useWorkspaceViews.ts`, MAN-8999) |
+| gate | none. why: an Inbox that hid on a quiet day could never say that nothing waits. `WorkspaceMain` mounts `<InboxPanel />` on `activeTab === 'inbox'` alone, with or without a selected project (MAN-9002) |
+| palette | `Go to Inbox`; there is no `Go to Memory` and no `Go to Heal` (MAN-8999) |
+| badge | `useRailBadges` draws `useInboxWaiting().total` on the Inbox button, words `rail.badge.inbox` = `{{count}} waiting on you` (MAN-9005) |
+| stored ids | `AppTab` and `VALID_TABS` hold `inbox`; a stored `memory` or `heal` reads back as `inbox` (`readPersistedTab`, MAN-9011) |
+| barrel | `src/modules/inbox/index.ts`: `InboxPanel` (`lazy`, its own chunk, loaded on the first open) and `useInboxWaiting` |
+| leaving | choosing a conversation sends every view back to `chat` (`handleSessionSelect`) |
+
+## `useInboxWaiting()` — `hooks/useInboxWaiting.ts`
+`{ memory, heal, roadmap, total, landed }`.
+| field | reads |
+|---|---|
+| `memory` | `useMemoryIntake().pendingCount`: the memory queue's alone; a staged lesson, though the Memory panel lists it, neither adds to it nor is counted |
+| `heal` | `useHeal().summary?.live ?? 0`: the whole live ledger, not the `Friction` pill the Heal panel opens on (`live_since_last_heal`, another cut) |
+| `roadmap` | `useDispatcherPlans().waiting`: asks by `askIdentity`, never cards |
+| `total` | `memory + heal + roadmap`, summed here and nowhere else, so the rail's badge and the strip's counts cannot tell different stories |
+| `landed` | `{ memory, heal, roadmap }` booleans: `pending !== null`, `state.phase !== 'loading'`, `useLiveTopic(DISPATCHER_ALL_TOPIC) !== undefined`. A refused or unreachable reading has landed (its zero is honest); only "not asked yet" has not |
+A reading not yet landed counts as zero.
+
+## `InboxPanel` — `InboxPanel.tsx`
+- Strip: the kit `Tabs` in its default segmented register, as the Roadmap view's faces draw it (`ariaLabel` `inbox.sections.label`). Three word tabs in the operator's order: Memory, Heal, Roadmap (`inbox.sections.*`). A tab carries `count` while its section's figure is above zero, `tone: 'warn'`, and `attention` = `inbox.sections.waiting` (`{{count}} waiting on you`), which the kit speaks as the tab's description. A section with nothing waiting stays on the strip, quiet. On a phone the tray is `equal`, the bar `px-3`.
+- Body: `role="tabpanel"` in its own `Suspense`, one section at a time: `MemoryIntakePanel` (MAN-603), `HealPanel`, `WaitingAsks`. Each is a full-height panel with scrollers of its own, so they mount whole under the strip, never stacked.
+- Handle: `data-inbox-panel=<memory|heal|roadmap>`, `deciding` until the entry is decided.
+- Held section: localStorage `inbox.section`, written only by a pick on the strip; a value that is not a section reads as Memory.
+- Entry rule (`entrySection(held, counts, landed)`): the held section if something waits in it, else the first section in strip order that has something waiting, else the held one. It answers `null` while a reading it rests on has not landed: no tab lit, the body a spinner. It answers the moment the answer is settled (the held section as soon as it has landed and waits).
+- An entry is decided once, latched in `entered` for the visit. A count falling to zero under the reader (he answers the last ask, accepts the last memory) never moves the section. The reader's own pick (`chosen`) outranks the entry.
+
+## The Roadmap section — `WaitingAsks`
+`src/modules/dispatcher/WaitingAsks.tsx`, exported by the dispatcher barrel and mounted by `InboxPanel`.
+- One row per distinct ask (`askIdentity`) among `useDispatcherPlans().plans`: the row count equals `useDispatcherPlans().waiting`. A lock naming one ask on three cards is one row.
+- A row: the ask's first line (`askHeadline`, two lines at most); the thing it stands on, drawn as the card head draws it (`KindTag`, then the mono name); the word owed (`inbox.asks.accept`, `acceptFeatures` over the features an epic's Accept covers, or `questions` counted); an outline `Answer` button named `Answer <name>` (`inbox.asks.answerOn`).
+- The thing it stands on is the feature when the ask names one feature, the epic when one ask stands on several features of it (`ask.plans.length > 1`, the epic being the first card's `arc`). The count is read off `ask.plans`, so a feature the operator hid still counts.
+- Answer runs `useRevealCard()(plans[0].name)` (`src/shared/hooks/useRevealCard.ts`, MAN-7650): the `?runner=<plan>` landing brings the Roadmap view forward on In flight with that feature's card in view (MAN-7531). Nothing is answered in the list; the one answer form is on the card.
+- The head: the Roadmap glyph tile, `dispatcher.ask.waiting` (`Waiting for your word`) and a neutral `Badge` with the row count above zero.
+- Empty: `EmptyState` `inbox.asks.empty` = `Nothing waits on your word`, with `inbox.asks.emptyMessage`. There is no loading state: the lane collapses "nothing retained yet" into an empty lane.
+
+## Proof
+`node .verify/probe-inbox.mjs` (gitignored; dev client `:5183`; the page's lane rewritten to `.verify/lib/ask-lane.mjs`'s fixture, every non-GET answered in the page): the palette's Navigate rows and `Go to Inbox`; each section's count beside what its own body prints (the Memory panel's pending badge, `live` of `GET /api/heal/summary`, the Roadmap section's row count) and their sum; each section's panel; the asks rows (a loose feature's Accept, an epic's one Accept over two features, a round of questions); an Answer on the loose row and on the epic's landing on that card in In flight; the entry rule's four cases; `localStorage.activeTab` `inbox` after a reload. Exit 1 with the failed readings counted. 2026-10-26: `PASS — 30 ok, 0 skipped, 0 failed` (counts memory 42, heal 429, roadmap 3 on the fixture lane). The whole walk: MAN-9012.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/WaitingAsks.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/inbox/hooks/useInboxWaiting.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/inbox/InboxPanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/inbox/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/useRevealCard.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-inbox.mjs
+
+## MAN-9014 — The disc's dock press — DockPress, pressOverride, dockPress, the dock's own button and the focus move
+
+What a press on the switcher's disc (the FAB, MAN-486) does while it sits in the views rail and the chat list is collapsed. The rail says what the press is; the FAB decides which press goes which way.
+
+## Pieces
+| piece | where | fact |
+|---|---|---|
+| `DockPress` | `src/shared/types.ts` | `{ label: string, run: () => void }`: `label` is the disc's tooltip and accessible name, `run` the act |
+| `pressOverride` | `AppSwitcherDock({ unreadBadgeHidden?, pressOverride?: DockPress \| null })` | handed in by the owner of the rail. `WorkspaceRail` hands `{ label: t('rail.showList'), run: list.expand }` while `list.collapsed`, else null; memoised on `list.collapsed`, `list.expand`, `t`, so the dock writes once per change of the collapse |
+| `dockPress` / `setDockPress` | `AppSwitcherContext.tsx` | `DockPress \| null` and its stable setter. The dock writes `pressOverride` from a layout effect and clears it on unmount; the cleanup runs before each write and the two are batched, so the FAB never sees the null between them. Why a layout effect: no frame where the list is collapsed and the disc still opens the radial |
+| `seated` | `AppSwitcherFab.tsx`, `AppSwitcherDock.tsx` | `fabPosition.docked && dockRect !== null`: the disc is drawn in the dock |
+
+## Press order (`AppSwitcherFab.handlePress`)
+| order | when | does |
+|---|---|---|
+| 1 | the chat floats | collapses it (`chatDoor.collapse()`) |
+| 2 | `seated` and `dockPress` set | `dockPress.run()`; opens no radial |
+| 3 | otherwise | toggles the radial |
+- The label follows the same order: `applications.fabLabelCollapse` (`Collapse chat`), then `dockPress.label` (`Show the chat list`), then `applications.fabLabelMenu` (`Open the menu`). It is the tooltip too.
+- `indicator = showsDot` with `showsDot = chatDoor.unread && !chatDoor.floating && (!seated || dockBadgeHidden)`: no dot while the disc sits in the rail unless the rail's Chat badge has scrolled out of sight (MAN-486).
+- With the override up the radial's acts stay reachable from the palette's Applications group (MAN-7483).
+
+## The dock's own button
+- A disc dragged out of its dock is not seated, so nothing seated answers an override. With `pressOverride` set and `!seated` the dock draws a 40px rail button (`RAIL_BUTTON_BASE` + `RAIL_BUTTON_UNLIT`) over its box: lucide `PanelLeftOpen`, `aria-label` = `label`, the kit `Tooltip position="right" showOnFocus`, `onClick` = `run`.
+- The 28px box keeps registering its rect beneath that button, so a drag back still docks.
+
+## The focus move
+A focused button that unmounts leaves focus on `<body>` and fires no event anyone hears. The hide button of the list unmounts with the collapse it ran, so the dock moves focus itself.
+- It moves only when the override's presence CHANGES (`hadOverride` starts as the mount's value), `document.activeElement` is the body, and the last element that held focus (`focusin` is remembered) is no longer connected.
+- Arrival: focus goes to the seated disc (`FAB_SELECTOR` = `.vv-fab`), or to the dock's own button when the disc is out (`seatedRef`, read at the arrival so a later drag does not re-run it).
+- Departure (the dock's own button was pressed to show the list and unmounts): focus goes to the disc.
+- A page that loads with the list collapsed, or a collapsed preference that arrives after load or from another tab, has no such element and moves nothing.
+
+## Proof
+`node .verify/rail-collapse-live.mjs` (MAN-486): the seated disc named "Show the chat list" and focused after a collapse, its press bringing the list back with no radial; the disc dragged out, the dock's own button carrying the same name and act; with the list shown the disc still opens the radial. `node .verify/rail-live.mjs` and the whole walk (MAN-9012) read the same names.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/AppSwitcherDock.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/AppSwitcherFab.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/context/AppSwitcherContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/WorkspaceRail.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/rail-collapse-live.mjs

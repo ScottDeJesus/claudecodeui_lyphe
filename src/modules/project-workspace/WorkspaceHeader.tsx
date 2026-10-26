@@ -37,10 +37,9 @@ type WorkspaceHeaderProps = {
  * the logo and the project line belong to that chat. A view with no name to give (`viewLabel` null for
  * an id the views list does not hold) cannot be told apart from Chat here, so it wears the chat's face.
  *
- * The Chat / Files / Git tabs used to live here too, with a scroller and a pair of chevrons;
- * they moved to the sidebar under the wordmark and did not come back. The token count came the
- * other way: on a phone the composer's footer row is the tightest strip on the screen, so below
- * `md` the count sits at this row's right edge and the composer hides its copy. The export
+ * The views (Chat, Files, Git and the rest) are not here: they are the rail's buttons, beside the chat
+ * list. The token count is here instead: on a phone the composer's footer row is the tightest strip on the
+ * screen, so below `md` the count sits at this row's right edge and the composer hides its copy. The export
  * button sits to the count's right for the same reason: on a phone it floated over the top of
  * the transcript it was offering to export.
  */

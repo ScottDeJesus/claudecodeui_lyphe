@@ -108,8 +108,8 @@ export function TabbedCode({ node, children }: TabbedCodeProps) {
         <>
           {/* Pulled out to the frame's edges so the strip's rule meets the frame's own border. The
               inner `w-max` sizes the strip to its labels: the underline register spreads its tabs
-              across whatever width it is given, which suits a sidebar of icons and turns two code
-              tabs into two half-width slabs. */}
+              across whatever width it is given, which would turn two code tabs into two half-width
+              slabs. */}
           <div className="-mx-3 -mt-2 overflow-x-auto border-b border-border/70 px-1">
             <div className="w-max">
               <Tabs

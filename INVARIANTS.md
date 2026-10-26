@@ -382,16 +382,18 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/NtfySetting
 
 `ProjectSidebarRegion` returns ONE tree for the docked sidebar (from 768px) and the mobile drawer; only classes and the scrim change. Never give the two layouts separate `return`s, nor wrap `Sidebar` in a different element type per layout.
 
-why: `Sidebar` hosts `SidebarModals`, which renders the Settings dialog. Two returns put `Sidebar` at two positions in the React tree, so crossing 768px (a phone turning to landscape, a window dragged over the line, a tablet) unmounts the whole sidebar and mounts a new one. The dialog stays open (its flag lives in `useProjectsState`, above) but every bit of its state starts again: `useSettingsController` seeds `activeTab` from `initialTab`, so the open tab snapped back to Agents, and the sidebar's own draft state was lost with it. Measured before the fix: the `.modal-backdrop` node and the sidebar root were replaced on a 1440 → 700 resize; after it they are the same nodes. `Settings.tsx`'s `key={activeTab}` remounts the pane on a tab change only and is not part of this.
+The views rail lives inside `Sidebar`, beside the list, through the `rail(list)` slot (`ProjectSidebarRegion`'s `renderRail`; `Sidebar` draws `<div className="flex h-full">{rail(list)}{!isSidebarCollapsed && <SidebarContent …/>}</div>`). Collapsing the list hides the list column only and never swaps a subtree. `ProjectSidebarRegion` keeps its one `return`.
+
+why: `Sidebar` hosts `SidebarModals`, which renders the Settings dialog, and the rail's disc dock and account panel; a swapped subtree would remount all three. Two returns put `Sidebar` at two positions in the React tree, so crossing 768px (a phone turning to landscape, a window dragged over the line, a tablet) unmounts the whole sidebar and mounts a new one. The dialog stays open (its flag lives in `useProjectsState`, above) but every bit of its state starts again: `useSettingsController` seeds `activeTab` from `initialTab`, so the open tab snapped back to Agents, and the sidebar's own draft state was lost with it. Measured before the fix: the `.modal-backdrop` node and the sidebar root were replaced on a 1440 → 700 resize; after it they are the same nodes. `Settings.tsx`'s `key={activeTab}` remounts the pane on a tab change only and is not part of this.
 
 how it holds: slot 0 of the wrapper is the scrim or nothing, slot 1 is the panel, and the drawer's `stopPropagation` handlers are attached on the drawer only.
 
 ```probe
 node .verify/probe-settings-rows.mjs after
-expect: the "open Settings tab across a resize over 768" section reads `pane kept=true` on every leg (the two window crossings and the two rotations, both themes), and the run ends settings-rows=pass
+expect: the "open Settings tab across a resize over 768" section reads `pane kept=true` on every leg (the two window crossings and the two rotations, both themes); the run's verdict line (`settings-rows=pass`) also covers the SettingRow sections (MAN-7425), which this invariant does not
 ```
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/ProjectSidebarRegion.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/Settings.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/SidebarModals.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/Sidebar.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-settings-rows.mjs
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/ProjectSidebarRegion.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/WorkspaceRail.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/Settings.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/SidebarModals.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/Sidebar.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-settings-rows.mjs
 
 ## INV-5769 — probe — the viewer opens INVISIBLY behind the PRD editor (`z-[200]` over the viewer's `z-[100]`)
 
@@ -4623,7 +4625,7 @@ expect: the second line reads {"roadmap":"lyphecli","ringInsidePane":true,...} o
 measured 2026-10-06 by chain chain-roadmap-tree-view--face-20261006-153849-ee8f, finding L1, LOW
 probe-key: 2413c5094f06dd144ffdab5d71ab4ac2b173ae2a
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/hooks/useRevealCard.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/hooks/useTreeRoom.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/RoadmapTreeFace.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/RoadmapWidgetBody.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/UnplacedBanner.tsx
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/hooks/useTreeRoom.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/RoadmapTreeFace.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/RoadmapWidgetBody.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/UnplacedBanner.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/useRevealCard.ts
 
 ## INV-7071 — probe — LOW — The column fit's picker row carries `data-roadmap-header`, so two exist whenever the gutter and the Roadmap tab are both mounted
 
@@ -4659,7 +4661,7 @@ expect: the line ends in 1 once only one fit draws the attribute; it ends in 2 w
 measured 2026-10-06 by chain chain-roadmap-tree-view--face-20261006-153849-ee8f, finding L2, LOW
 probe-key: fecf7a9434d39a6d28e522549ac0a6949544a170
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/hooks/useRevealCard.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/hooks/useTreeRoom.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/RoadmapTreeFace.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/RoadmapWidgetBody.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/UnplacedBanner.tsx
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/hooks/useTreeRoom.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/RoadmapTreeFace.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/RoadmapWidgetBody.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/UnplacedBanner.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/hooks/useRevealCard.ts
 
 ## INV-7072 — probe — LOW: a node the filter leaves out stays selected and its panel returns when the filter clears; Iris's comment says the filter "closes it"
 
@@ -6904,21 +6906,6 @@ measured 2026-10-08 by chain chain-custom-compaction--seams-20261008-095144-d30e
 probe-key: a63d4f381d3df722c616b1847a936414c325e493
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts
-
-## INV-7385 — probe — LOW — a comment still points at the button that is gone
-
-LOW — a comment still points at the button that is gone
-
-```probe
-cd /home/lyphe/.claude/claudecodeui_lyphe && grep -n -i "second button\|to add one" src/modules/accounts/AccountPopover.tsx src/modules/accounts/AccountFooterRow.tsx || echo none
-echo "[probe exit $?]"
-expect: `src/modules/accounts/AccountPopover.tsx:221:` prints while the defect stands; `none` once the comment stops referring to a second button
-```
-
-measured 2026-10-08 by chain chain-remove-add-account-button-20261008-103333-20a8, finding L1, LOW
-probe-key: a5b8e01c128691f28b87f61510fb05747010377d
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/AccountFooterRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/AccountPopover.tsx
 
 ## INV-7416 — probe — a stray that ran and a stray the fence refused print the same report; nothing notices a fence that never ran
 
@@ -11204,7 +11191,7 @@ re-pinned to the lane's top-level picture (no `door` envelope, `chosen` a record
 old-switcher fix-pass, not re-measured (a LOW takes no proof run)
 probe-key: e9633bd2babd88258ddd1436d550a5be4b8b76ce
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/AccountFooterRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/AccountPopover.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/ClaudeAccountRows.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/ClaudeAccountRowViews.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/hooks/useAccountSetup.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/hooks/useClaudeAccounts.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/utils/accountInUseUsage.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/panel-fill.mjs
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/AccountPopover.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/AccountRailButton.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/ClaudeAccountRows.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/ClaudeAccountRowViews.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/hooks/useAccountSetup.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/hooks/useClaudeAccounts.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/utils/accountInUseUsage.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/panel-fill.mjs
 
 ## INV-9290 — probe — `healed means deleted` was not applied to the names of what this phase removed (LOW)
 
@@ -11231,7 +11218,7 @@ case "$D" in /tmp/athena-probe.??????) rm -rf "$D";; esac
 measured 2026-10-21 by chain chain-usage-limits--account-switch--old-switcher-20261021-211135-37f2, finding L1, LOW
 probe-key: b0a33f825002044cc2f16dd32c6ac182a3f72f80
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/account-digest.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/account-door-relay.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/account-identity.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/accounts.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/accounts.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/usage.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-auth.provider.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/AccountFooterRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/AccountPopover.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/ClaudeAccountRows.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/claude-accounts-fake.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/hooks/useClaudeAccounts.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/UsageMeters.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/utils/accountInUseUsage.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/Settings.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Banner.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/panel-fill.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-14.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-19.mjs
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/account-digest.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/account-door-relay.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/account-identity.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/accounts.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/accounts.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/usage.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-auth.provider.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/AccountPopover.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/AccountRailButton.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/ClaudeAccountRows.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/claude-accounts-fake.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/hooks/useClaudeAccounts.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/UsageMeters.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/utils/accountInUseUsage.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/Settings.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Banner.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/panel-fill.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-14.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-19.mjs
 
 ## INV-9291 — probe — INV-9252's body still teaches the deleted `door`/slot shape, and the builder's report does not name it for the sweep (LOW)
 
@@ -11252,7 +11239,7 @@ case "$D" in /tmp/athena-probe.??????) rm -rf "$D";; esac
 measured 2026-10-21 by chain chain-usage-limits--account-switch--old-switcher-20261021-211135-37f2, finding L2, LOW
 probe-key: 32bf18ed906c667a65538dd7dd656af31bc92cc2
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/account-digest.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/account-door-relay.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/account-identity.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/accounts.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/accounts.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/usage.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-auth.provider.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/AccountFooterRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/AccountPopover.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/ClaudeAccountRows.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/claude-accounts-fake.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/hooks/useClaudeAccounts.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/UsageMeters.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/utils/accountInUseUsage.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/Settings.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Banner.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/panel-fill.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-14.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-19.mjs
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/account-digest.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/account-door-relay.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/account-identity.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/accounts.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/accounts.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/usage.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-auth.provider.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/AccountPopover.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/AccountRailButton.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/ClaudeAccountRows.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/claude-accounts-fake.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/hooks/useClaudeAccounts.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/UsageMeters.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/utils/accountInUseUsage.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/Settings.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Banner.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/panel-fill.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-14.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-19.mjs
 
 ## INV-9292 — probe — INV-9289's pinned probe stubs the deleted envelope and now crashes on both of its own cases (LOW)
 
@@ -11281,7 +11268,7 @@ case "$D" in /tmp/athena-probe.??????) rm -rf "$D";; esac
 measured 2026-10-21 by chain chain-usage-limits--account-switch--old-switcher-20261021-211135-37f2, finding L3, LOW
 probe-key: a8997485737f7eb65016bbc0299f2ed90ce3e162
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/account-digest.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/account-door-relay.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/account-identity.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/accounts.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/accounts.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/usage.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-auth.provider.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/AccountFooterRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/AccountPopover.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/ClaudeAccountRows.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/claude-accounts-fake.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/hooks/useClaudeAccounts.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/UsageMeters.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/utils/accountInUseUsage.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/Settings.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Banner.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/panel-fill.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-14.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-19.mjs
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/account-digest.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/account-door-relay.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/account-identity.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/accounts.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/accounts.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/usage.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-auth.provider.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/AccountPopover.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/AccountRailButton.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/ClaudeAccountRows.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/claude-accounts-fake.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/hooks/useClaudeAccounts.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/UsageMeters.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/utils/accountInUseUsage.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/Settings.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Banner.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/panel-fill.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-14.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-19.mjs
 
 ## INV-9293 — probe — an unreadable `last_switch.at` still takes the whole app down (LOW; predates this phase, measured on this ground)
 
@@ -11323,7 +11310,7 @@ case "$D" in /tmp/athena-probe.??????) rm -rf "$D";; esac
 measured 2026-10-21 by chain chain-usage-limits--account-switch--old-switcher-20261021-211135-37f2, finding L4, LOW
 probe-key: bda706a7a70fa1a3de7d7b31e8c4820d226f6238
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/account-digest.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/account-door-relay.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/account-identity.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/accounts.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/accounts.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/usage.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-auth.provider.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/AccountFooterRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/AccountPopover.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/ClaudeAccountRows.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/claude-accounts-fake.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/hooks/useClaudeAccounts.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/UsageMeters.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/utils/accountInUseUsage.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/Settings.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Banner.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/panel-fill.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-14.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-19.mjs
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/account-digest.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/account-door-relay.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/account-identity.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/accounts.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/accounts.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/accounts/usage.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-auth.provider.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/AccountPopover.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/AccountRailButton.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/ClaudeAccountRows.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/claude-accounts-fake.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/hooks/useClaudeAccounts.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/UsageMeters.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/utils/accountInUseUsage.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/Settings.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Banner.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/panel-fill.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-14.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-19.mjs
 
 ## INV-9303 — probe — LOW — `MAN-8865` is not served on a touch of `api.ts`, and the row that is served does not name `carrierBulletins`
 
@@ -12306,66 +12293,6 @@ probe-key: 49819ce3824944abd7b85ec8c086dc5026177c53
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/user-preferences.db.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/userSettings.ts
 
-## INV-9614 — probe — MAN-7655's table states the two key sets as `dispatcher`, `roadmapSeen`; both are now three
-
-MAN-7655's table states the two key sets as `dispatcher`, `roadmapSeen`; both are now three
-
-```probe
-D=$(mktemp -d /tmp/athena-man.XXXXXX) || exit 1
-cat > "$D/p.sh" <<'EOF'
-docstore get MAN-7655 --text | grep -cE 'ENTRY_(PATCHED|LISTED)_KEYS` = `dispatcher`, `roadmapSeen` \|' || true
-docstore get MAN-7655 --text | grep -c 'filesPins' || true
-EOF
-bash "$D/p.sh"
-# expect: while the row is stale it prints 2 then 0; cured it prints 0 then a number of 2 or more
-```
-
-measured 2026-10-25 by chain chain-sidebar-rail--files-prefs-20261025-085855-e8e4, finding L3, LOW
-probe-key: 826cfeea19cf5466864dd7b9718624ba39c63725
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/user-preferences.db.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/userSettings.ts
-
-## INV-9615 — probe — MEDIUM — MAN-7748 still teaches the wait, and its standing proof now exits red
-
-MEDIUM — MAN-7748 still teaches the wait, and its standing proof now exits red
-
-```probe
-D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
-cat > "$D/p.sh" <<'EOF'
-cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
-echo "manual lines still teaching the wait: $(grep -c -F -e 'with no project picked: the param stays' -e '`/?roadmap=lyphecli`, no project | param stays' docs/MANUAL.md)"
-echo "probe lines still teaching the wait: $(grep -c -F -e 'No tab strip at the root until a project is picked' -e 'with no project picked the param is still in the URL' .verify/probe-roadmap-landing.mjs)"
-EOF
-bash "$D/p.sh"
-case "$D" in /tmp/athena-probe.??????) cd /tmp && rm -r "$D";; esac
-# expect: today "manual lines still teaching the wait: 2" and "probe lines still teaching the wait: 2"; cured when both print 0 (the live run, `node .verify/probe-roadmap-landing.mjs`, then ends PASS on its [root] leg)
-```
-
-measured 2026-10-25 by chain chain-sidebar-rail--house-views-20261025-094226-f96d, finding M1, MEDIUM
-probe-key: 41a0d719038c511d9496b456f8d5cc42877fb82a
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/WorkspaceHeader.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/WorkspaceStateView.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-house-views-no-project.mjs
-
-## INV-9616 — probe — LOW — the Notes row still says a reload at `/` shows only the choose-a-project body
-
-LOW — the Notes row still says a reload at `/` shows only the choose-a-project body
-
-```probe
-D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
-cat > "$D/p.sh" <<'EOF'
-cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
-echo "Notes row still saying a reload at / waits for a project row: $(grep -c -F 'the workspace returns with Notes selected and its list drawn once a project row is picked' docs/MANUAL.md)"
-EOF
-bash "$D/p.sh"
-case "$D" in /tmp/athena-probe.??????) cd /tmp && rm -r "$D";; esac
-# expect: today 1; cured 0
-```
-
-measured 2026-10-25 by chain chain-sidebar-rail--house-views-20261025-094226-f96d, finding L1, LOW
-probe-key: 5b99b4e25ce58e7a158bff58e2c5a7cb8e8fcf73
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/WorkspaceHeader.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/WorkspaceStateView.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-house-views-no-project.mjs
-
 ## INV-9617 — probe — LOW — `WorkspaceHeader`'s docblock says every other view is named; an id the list does not hold gets the chat's face
 
 LOW — `WorkspaceHeader`'s docblock says every other view is named; an id the list does not hold gets the chat's face
@@ -12605,173 +12532,6 @@ probe-key: 598be690ece9e3ce936e9ed1897855f9d5a10542
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/bin/followups.mjs, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/chat-commands/chat-commands.credential.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/followups-schema.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/migrations.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/followups.db.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/followups/followups.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/surface-signal.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/followups/hooks/useFollowups.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/common.json, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/followups-kit.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-followups-widget.mjs
 
-## INV-9625 — probe — (MEDIUM) — The pin modal cannot be operated from the keyboard: focus never enters it, Tab walks the file manager behind the scrim, Escape does nothing
-
-(MEDIUM) — The pin modal cannot be operated from the keyboard: focus never enters it, Tab walks the file manager behind the scrim, Escape does nothing
-
-```probe
-D=$(mktemp -d /tmp/athena-probe.XXXXXX)
-cat > "$D/p.mjs" <<'EOF'
-import { openConsole } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/console.mjs';
-const STRIP = '[role="group"][aria-label="Folders"]';
-const s = await openConsole({ viewport: { width: 1440, height: 900 } });
-const p = s.page;
-const rail = p.locator('nav[aria-label="Views"] button[aria-label="Files"]');
-if (await rail.count()) await rail.first().click(); else await p.locator('[role="tab"][aria-label="Files"]').first().click();
-await p.waitForSelector(STRIP, { timeout: 30000 }); await p.waitForTimeout(1000);
-const where = () => p.evaluate(() => { const a = document.activeElement; return `${a?.tagName}:${(a?.innerText || a?.getAttribute('aria-label') || '').trim().slice(0, 28)} inModal=${!!a?.closest('div.fixed.inset-0.z-\\[70\\]')}`; });
-await p.locator(`${STRIP} button:not([aria-pressed])`).first().focus();
-await p.keyboard.press('Enter');
-const modal = p.locator('div.fixed.inset-0.z-\\[70\\]').filter({ has: p.locator('h3', { hasText: 'Select Folder' }) });
-await modal.waitFor({ timeout: 30000 }).catch(() => {}); await p.waitForTimeout(600);
-console.log('focus after Enter on "Pin a folder":', await where());
-const trail = []; for (let i = 0; i < 4; i += 1) { await p.keyboard.press('Tab'); trail.push(await where()); }
-console.log('next 4 Tab stops:', JSON.stringify(trail));
-console.log('modal role/aria-modal:', await modal.evaluate((el) => `${el.getAttribute('role')}/${el.getAttribute('aria-modal')}`).catch(() => 'no modal'));
-await p.keyboard.press('Escape'); await p.waitForTimeout(500);
-console.log('modal still open after Escape:', (await modal.count()) > 0);
-await modal.getByRole('button', { name: 'Cancel' }).click({ timeout: 2000 }).catch(() => {});
-await s.browser.close();
-EOF
-cat > "$D/p.sh" <<'EOF'
-cd /home/lyphe/.claude/claudecodeui_lyphe && timeout 150 node "$(dirname "$0")/p.mjs" 2>&1 | tail -8
-echo "[probe exit $?]"
-EOF
-bash "$D/p.sh"
-# expect: today `focus after Enter … inModal=false`, every Tab stop `inModal=false`, `role/aria-modal: null/null`, `modal still open after Escape: true`; cured: focus `inModal=true`, Tab stops inside the modal, `dialog/true`, `still open after Escape: false`
-```
-
-measured 2026-10-25 by chain chain-sidebar-rail--files-fill-20261025-102928-5d42, finding M1, MEDIUM
-probe-key: 7aabae9832fcd834c2b3be793cd215112900de86
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/file-tree/file-tree.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/file-manager/hooks/useFilesPins.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/file-manager/hooks/useSelectedFilesRoot.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/file-manager/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-creation-wizard/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/context/ProjectsStateContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/hooks/useFilesRoots.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-files-pin-edges.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-files-roots.mjs
-
-## INV-9626 — probe — (LOW) — A pin on a page whose projects list is stale ends on "not pinned: Project path already exists", and the page never refreshes its list, so the retry fails the same way
-
-(LOW) — A pin on a page whose projects list is stale ends on "not pinned: Project path already exists", and the page never refreshes its list, so the retry fails the same way
-
-```probe
-D=$(mktemp -d /tmp/athena-probe.XXXXXX)
-mkdir -p /home/lyphe/tmp/athena-probe-stale
-cat > "$D/p.mjs" <<'EOF'
-import { openConsole } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/console.mjs';
-import { rmdirSync } from 'node:fs';
-const FOLDER = '/home/lyphe/tmp/athena-probe-stale';
-const STRIP = '[role="group"][aria-label="Folders"]';
-const s = await openConsole({ viewport: { width: 1440, height: 900 } });
-const p = s.page;
-const jsonInit = (method, body) => ({ method, headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
-let id = null; const patches = [];
-p.on('request', (r) => { if (r.method() === 'PATCH' && /preferences/.test(r.url())) patches.push((r.postData() || '').slice(0, 100)); });
-try {
-  const made = await s.api('/api/projects/create-project', jsonInit('POST', { path: FOLDER }));
-  id = made.body?.project?.projectId;
-  const hide = async (route) => { if (route.request().method() !== 'GET') return route.fallback(); const r = await route.fetch(); const b = await r.json(); return route.fulfill({ response: r, json: Array.isArray(b) ? b.filter((x) => x.fullPath !== FOLDER) : b }); };
-  await p.route(/\/api\/projects(?:\?.*)?$/, hide);
-  await p.reload({ waitUntil: 'networkidle' });
-  const rail = p.locator('nav[aria-label="Views"] button[aria-label="Files"]');
-  if (await rail.count()) await rail.first().click(); else await p.locator('[role="tab"][aria-label="Files"]').first().click();
-  await p.waitForSelector(STRIP, { timeout: 30000 }); await p.waitForTimeout(1000);
-  const modal = p.locator('div.fixed.inset-0.z-\\[70\\]').filter({ has: p.locator('h3', { hasText: 'Select Folder' }) });
-  const pinOnce = async () => {
-    await p.locator(`${STRIP} button:not([aria-pressed])`).first().click();
-    await modal.waitFor({ timeout: 30000 });
-    await modal.locator('div.flex.items-center.gap-2 button span', { hasText: /^tmp$/ }).first().click();
-    await p.waitForFunction(() => document.querySelector('div.fixed.inset-0.z-\\[70\\] code')?.textContent?.endsWith('/tmp'), null, { timeout: 30000 });
-    await modal.locator('div.flex.items-center.gap-2').filter({ has: p.locator('span', { hasText: /^athena-probe-stale$/ }) }).getByRole('button', { name: 'Select' }).click();
-    await modal.waitFor({ state: 'detached', timeout: 30000 });
-    await p.waitForTimeout(2500);
-    const toast = await p.evaluate(() => [...document.querySelectorAll('[role="status"],[role="alert"],[aria-live]')].map((e) => e.innerText.replace(/\s+/g, ' ').trim()).filter(Boolean).join(' | '));
-    const chips = await p.locator(`${STRIP} button[aria-pressed]`).evaluateAll((bs) => bs.map((b) => b.innerText.trim()));
-    return `toast=${JSON.stringify(toast)} onStrip=${chips.includes('athena-probe-stale')}`;
-  };
-  console.log('1st pin, this page\'s list lacks the folder:', await pinOnce());
-  await p.unroute(/\/api\/projects(?:\?.*)?$/, hide);
-  console.log('2nd pin, the server now answers its real list:', await pinOnce());
-  console.log('preference writes sent:', patches.length);
-} finally {
-  await s.api('/api/user/preferences', jsonInit('PATCH', { filesPins: { pinned: { [FOLDER]: null } } })).catch(() => {});
-  if (typeof id === 'string' && id !== '') console.log('cleanup DELETE force', (await s.api(`/api/projects/${encodeURIComponent(id)}?force=true`, { method: 'DELETE' })).status);
-  rmdirSync(FOLDER);
-  await s.browser.close();
-}
-EOF
-cat > "$D/p.sh" <<'EOF'
-cd /home/lyphe/.claude/claudecodeui_lyphe && timeout 200 node "$(dirname "$0")/p.mjs" 2>&1 | tail -6
-echo "[probe exit $?]"
-EOF
-bash "$D/p.sh"
-# expect: today both lines read `toast="That folder was not pinned Project path already exists: /home/lyphe/tmp/athena-probe-stale" onStrip=false` and `preference writes sent: 0`; cured: the 2nd (or the 1st) line reads `onStrip=true`
-```
-
-measured 2026-10-25 by chain chain-sidebar-rail--files-fill-20261025-102928-5d42, finding L1, LOW
-probe-key: 4bc7fd9196d77bb15def15ac4e872280ca96fbc9
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/file-tree/file-tree.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/file-manager/hooks/useFilesPins.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/file-manager/hooks/useSelectedFilesRoot.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/file-manager/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-creation-wizard/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/context/ProjectsStateContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/hooks/useFilesRoots.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-files-pin-edges.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-files-roots.mjs
-
-## INV-9627 — probe — (LOW) — The archived-folder branch can never run, and what really happens (a Files pin silently un-archives the project in the chat list) is said nowhere
-
-(LOW) — The archived-folder branch can never run, and what really happens (a Files pin silently un-archives the project in the chat list) is said nowhere
-
-```probe
-D=$(mktemp -d /tmp/athena-probe.XXXXXX)
-cat > "$D/p.mjs" <<'EOF'
-import { mkdirSync, rmdirSync } from 'node:fs';
-const API = 'http://127.0.0.1:3011';
-const FOLDER = '/home/lyphe/tmp/athena-probe-archived';
-mkdirSync(FOLDER, { recursive: true });
-const login = await (await fetch(`${API}/api/auth/login`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ username: 'verve', password: 'verve-dev-2026' }) })).json();
-const auth = { Authorization: `Bearer ${login.token}`, 'content-type': 'application/json' };
-const call = async (method, path, body) => { const r = await fetch(`${API}${path}`, { method, headers: auth, body: body ? JSON.stringify(body) : undefined }); let j = null; try { j = await r.json(); } catch {} return { status: r.status, body: j }; };
-const rows = (list) => (Array.isArray(list) ? list : list?.data?.projects ?? []);
-const holds = (list) => rows(list).some((p) => p.fullPath === FOLDER);
-let id = null;
-try {
-  id = (await call('POST', '/api/projects/create-project', { path: FOLDER })).body?.project?.projectId;
-  await call('DELETE', `/api/projects/${id}`);
-  console.log(`archived: archived list holds it ${holds((await call('GET', '/api/projects/archived')).body)}, chat list holds it ${holds((await call('GET', '/api/projects')).body)}`);
-  const again = await call('POST', '/api/projects/create-project', { path: FOLDER });
-  console.log(`create-project on the archived folder: status ${again.status}, project.isArchived=${again.body?.project?.isArchived}, same id ${again.body?.project?.projectId === id}`);
-  console.log(`after: archived list holds it ${holds((await call('GET', '/api/projects/archived')).body)}, chat list holds it ${holds((await call('GET', '/api/projects')).body)}`);
-} finally {
-  if (typeof id === 'string' && id !== '') console.log('cleanup DELETE force', (await call('DELETE', `/api/projects/${encodeURIComponent(id)}?force=true`)).status);
-  rmdirSync(FOLDER);
-}
-EOF
-cat > "$D/p.sh" <<'EOF'
-cd /home/lyphe/.claude/claudecodeui_lyphe && timeout 60 node "$(dirname "$0")/p.mjs" 2>&1 | tail -6
-echo "[probe exit $?]"
-EOF
-bash "$D/p.sh"
-# expect: today `project.isArchived=false, same id true` and `after: archived list holds it false, chat list holds it true` (the isArchived-true branch cannot fire; the pin un-archives); cured by a server that keeps it archived: `isArchived=true`
-```
-
-measured 2026-10-25 by chain chain-sidebar-rail--files-fill-20261025-102928-5d42, finding L2, LOW
-probe-key: 5d6587ce8c4d5239795fc839149522b1ee3d6b88
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/file-tree/file-tree.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/file-manager/hooks/useFilesPins.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/file-manager/hooks/useSelectedFilesRoot.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/file-manager/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-creation-wizard/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/context/ProjectsStateContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/hooks/useFilesRoots.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-files-pin-edges.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-files-roots.mjs
-
-## INV-9628 — probe — (LOW) — The build left four statements that are no longer true (healed means deleted)
-
-(LOW) — The build left four statements that are no longer true (healed means deleted)
-
-```probe
-D=$(mktemp -d /tmp/athena-probe.XXXXXX)
-cat > "$D/p.sh" <<'EOF'
-cd /home/lyphe/.claude/claudecodeui_lyphe
-hits=$(rg -n "offered only while the repository on screen is the|Absent when the repository on screen is not the workspace's project|the git panel one already relative|Opened by WorkspacePathField so" docs/MANUAL.md src/modules/git-panel/GitPanel.tsx src/modules/file-manager/hooks/useFileManagerState.ts src/modules/project-creation-wizard/FolderBrowserModal.tsx)
-if [ -n "$hits" ]; then echo "$hits" | cut -c1-150; else echo none; fi
-echo "[probe exit 0]"
-EOF
-bash "$D/p.sh"
-# expect: today four hits (docs/MANUAL.md, GitPanel.tsx, useFileManagerState.ts, FolderBrowserModal.tsx); cured: `none`
-```
-
-measured 2026-10-25 by chain chain-sidebar-rail--files-fill-20261025-102928-5d42, finding L3, LOW
-probe-key: 9ac528137aa6add394eaafcf8b8681693df31538
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/file-tree/file-tree.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/file-manager/hooks/useFilesPins.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/file-manager/hooks/useSelectedFilesRoot.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/file-manager/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-creation-wizard/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/context/ProjectsStateContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/hooks/useFilesRoots.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-files-pin-edges.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-files-roots.mjs
-
 ## INV-9629 — probe — MEDIUM — `shootStrip` answers `null` (or a half-slid sliver) on the documented phone path: `openDrawer`, then `shootStrip`
 
 MEDIUM — `shootStrip` answers `null` (or a half-slid sliver) on the documented phone path: `openDrawer`, then `shootStrip`
@@ -12984,108 +12744,6 @@ probe-key: 080a7aebf9340c8debf3dbc4b7d63b8e627ba970
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/account-rail-live.mjs
 
-## INV-9644 — probe — (MEDIUM) — With the list collapsed and an application pane up, the account panel opens under the application and cannot be seen or clicked
-
-(MEDIUM) — With the list collapsed and an application pane up, the account panel opens under the application and cannot be seen or clicked
-
-```probe
-D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
-cat > "$D/p.sh" <<'SH'
-#!/usr/bin/env bash
-D="$1"
-cat > "$D/p.mjs" <<'JS'
-import { openConsole } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/console.mjs';
-const s = await openConsole({ viewport: { width: 1440, height: 900 } });
-const { page } = s;
-try {
-  // writes dropped: the dev account is never left collapsed
-  await page.route(/\/api\/user\/preferences(?:[?#].*)?$/, (r) => (r.request().method() === 'GET' ? r.fallback() : r.fulfill({ status: 200, json: { success: true } })));
-  const NAV = 'nav[aria-label="Views"]';
-  await page.waitForSelector('button.vv-fab.vv-fab--docked', { timeout: 20000 });
-  await page.waitForTimeout(800);
-  await page.locator('button.vv-fab').click();
-  await page.locator('[data-app-switcher-radial="open"] [data-act="applications"]').click();
-  await page.waitForTimeout(900);
-  const row = page.locator('[role="dialog"] button:has-text("127.0.0.1")').first();
-  if ((await row.count()) === 0) { console.log('no application row on this box'); process.exitCode = 0; }
-  else {
-    await row.click();
-    await page.waitForTimeout(2500);
-    await page.locator('button[title="Hide sidebar"], button[aria-label="Hide the chat list"]').first().click();
-    await page.waitForTimeout(900);
-    await page.locator(`${NAV} button[aria-haspopup="dialog"]`).click();
-    await page.waitForTimeout(900);
-    const r = await page.evaluate(() => {
-      const p = document.querySelector('#account-panel');
-      if (!p) return 'no panel';
-      const b = p.getBoundingClientRect();
-      const top = document.elementFromPoint(b.x + b.width / 2, b.y + b.height / 2);
-      return `panel open (aria-expanded=${document.querySelector('nav[aria-label="Views"] button[aria-haspopup="dialog"]').getAttribute('aria-expanded')}); topmost at its centre: ${p.contains(top) ? 'PANEL' : top.tagName}`;
-    });
-    console.log(r);
-  }
-} catch (e) { console.log('probe error:', String(e.message).split('\n')[0]); }
-finally { await s.browser.close(); }
-JS
-node "$D/p.mjs"
-SH
-bash "$D/p.sh" "$D"
-case "$D" in /tmp/athena-probe.??????) rm -rf "$D";; esac
-# expect: `panel open (aria-expanded=true); topmost at its centre: IFRAME` while the defect stands; cured: `… PANEL` (or `no application row on this box` when the registry holds none). About 40 s; opens the drawer and an application pane, writes nothing to the dev account.
-```
-
-measured 2026-10-25 by chain chain-sidebar-rail--collapse-20261025-131007-2af8, finding M1, MEDIUM
-probe-key: 5fb9cbf7684a92ece964de58317c5bb00fcd100d
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/AppSwitcherDock.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/constants.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/rail-collapse-live.mjs
-
-## INV-9645 — probe — (LOW) — A keyboard press on the dock's own button drops focus to `<body>`
-
-(LOW) — A keyboard press on the dock's own button drops focus to `<body>`
-
-```probe
-D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
-cat > "$D/p.sh" <<'SH'
-#!/usr/bin/env bash
-D="$1"
-cat > "$D/p.mjs" <<'JS'
-import { openConsole } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/console.mjs';
-const s = await openConsole({ viewport: { width: 1440, height: 900 } });
-const { page } = s;
-try {
-  await page.route(/\/api\/user\/preferences(?:[?#].*)?$/, (r) => (r.request().method() === 'GET' ? r.fallback() : r.fulfill({ status: 200, json: { success: true } })));
-  const NAV = 'nav[aria-label="Views"]';
-  const OWN = `${NAV} button[aria-label="Show the chat list"]`;
-  await page.waitForSelector('button.vv-fab.vv-fab--docked', { timeout: 20000 });
-  await page.waitForTimeout(800);
-  // drag the disc out of its dock, then collapse the list: the dock draws its own button
-  const b = await page.locator('button.vv-fab').boundingBox();
-  await page.mouse.move(b.x + 14, b.y + 14); await page.mouse.down();
-  await page.mouse.move(b.x + 26, b.y + 26, { steps: 4 });
-  await page.mouse.move(760, 420, { steps: 14 }); await page.mouse.up();
-  await page.waitForTimeout(600);
-  await page.locator('button[title="Hide sidebar"], button[aria-label="Hide the chat list"]').first().click();
-  await page.waitForTimeout(800);
-  await page.locator(OWN).focus();
-  await page.keyboard.press('Enter');
-  await page.waitForTimeout(700);
-  const a = await page.evaluate(() => ({ list: !!document.querySelector('div.md\\:w-\\[17\\.5rem\\]'), active: document.activeElement.tagName + (document.activeElement.getAttribute('aria-label') ? `[${document.activeElement.getAttribute('aria-label')}]` : '') }));
-  console.log(`list shown: ${a.list}; focus after the keyboard press: ${a.active}`);
-} catch (e) { console.log('probe error:', String(e.message).split('\n')[0]); }
-finally { await s.browser.close(); }
-JS
-node "$D/p.mjs"
-SH
-bash "$D/p.sh" "$D"
-case "$D" in /tmp/athena-probe.??????) rm -rf "$D";; esac
-# expect: `list shown: true; focus after the keyboard press: BODY` while the defect stands; cured: the focus names a control (the disc or the hide button). About 40 s; writes nothing.
-```
-
-measured 2026-10-25 by chain chain-sidebar-rail--collapse-20261025-131007-2af8, finding L1, LOW
-probe-key: ebd195d4d02a91bdfbcf1a2cce52a655c29f0226
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/AppSwitcherDock.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/constants.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/rail-collapse-live.mjs
-
 ## INV-9646 — probe — (LOW) — With the list collapsed on load the only door back is the document's last Tab stop
 
 (LOW) — With the list collapsed on load the only door back is the document's last Tab stop
@@ -13128,59 +12786,6 @@ probe-key: 405cbcfb55c68005f10c8faae0a27e525fd0ec72
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/AppSwitcherDock.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/constants.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/rail-collapse-live.mjs
 
-## INV-9647 — probe — (LOW) — Five comments still say a collapsed sidebar renders or unmounts the account button
-
-(LOW) — Five comments still say a collapsed sidebar renders or unmounts the account button
-
-```probe
-D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
-cat > "$D/p.sh" <<'SH'
-#!/usr/bin/env bash
-cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
-rg -n "and the collapsed sidebar|after the sidebar collapsed|collapsed sidebar render" src/modules/accounts || echo none
-SH
-bash "$D/p.sh"
-case "$D" in /tmp/athena-probe.??????) rm -rf "$D";; esac
-# expect: five lines (accounts/index.ts:1, useClaudeAccounts.ts:54 and :77, useClaudeUsage.ts:26, useDeepseekBalance.ts:58) while the defect stands; cured: `none`.
-```
-
-measured 2026-10-25 by chain chain-sidebar-rail--collapse-20261025-131007-2af8, finding L3, LOW
-probe-key: 2f18f78c6b079412b5e18cbe61a6cd035554b377
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/AppSwitcherDock.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/constants.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/rail-collapse-live.mjs
-
-## INV-9648 — probe — (LOW) — Doc rows about these files still carry the old shape, and the dock file has no governing row
-
-(LOW) — Doc rows about these files still carry the old shape, and the dock file has no governing row
-
-```probe
-D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
-cat > "$D/p.sh" <<'SH'
-#!/usr/bin/env bash
-cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
-for t in MAN-491 MAN-460; do
-  docstore get "$t" | python3 -c "
-import sys, json
-b = json.load(sys.stdin)['row']['body']
-print('$t', 'dockPress:', b.count('dockPress'), 'pressOverride:', b.count('pressOverride'), 'AccountFooterRow:', b.count('AccountFooterRow'), 'paints nothing:', b.count('It paints nothing'))
-"
-done
-docstore govern src/modules/app-switcher/AppSwitcherDock.tsx | python3 -c "
-import sys, json
-rows = json.load(sys.stdin)['rows']
-print('rows governing AppSwitcherDock.tsx by name:', [r['token'] for r in rows if any(g.endswith('app-switcher/AppSwitcherDock.tsx') for g in (r.get('governs') or []))] or 'none')
-"
-SH
-bash "$D/p.sh"
-case "$D" in /tmp/athena-probe.??????) rm -rf "$D";; esac
-# expect: `MAN-491 dockPress: 0 pressOverride: 0 … paints nothing: 1`, `MAN-460 … AccountFooterRow: 1`, and `rows governing AppSwitcherDock.tsx by name: none` while the defect stands; cured: MAN-491 counts above 0 for dockPress and 0 for `paints nothing`, MAN-460 reads AccountFooterRow 0, and a row token is named.
-```
-
-measured 2026-10-25 by chain chain-sidebar-rail--collapse-20261025-131007-2af8, finding L4, LOW
-probe-key: 075d9d6506a545ba87b080a4b1c09c923402086a
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/AppSwitcherDock.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/constants.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/rail-collapse-live.mjs
-
 ## INV-9649 — Browser view — `browserUseSettingsChanged` has one reader, `BrowserUsePanel`; never delete the dispatch as dead
 
 `BrowserUseSettingsTab` dispatches `window` event `browserUseSettingsChanged` after each saved settings write (`api.browserUse.saveSettings`). `BrowserUsePanel` is its one listener: an effect re-runs `refresh()` on it and removes the listener on unmount.
@@ -13195,3 +12800,261 @@ why: the panel's "Open Browser settings" door (`onShowSettings('browser')`) open
 The barrel `src/modules/browser-use/index.ts` exports `BrowserUsePanel` only (lazy: its own chunk, loaded on the view's first open).
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/browser-use/BrowserUsePanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/browser-use/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/browser-use-settings/BrowserUseSettingsTab.tsx
+
+## INV-9656 — probe — MEDIUM — "each equals the count its own panel prints" is false for Heal. The walk reads the API instead, and the report says it held.
+
+MEDIUM — "each equals the count its own panel prints" is false for Heal. The walk reads the API instead, and the report says it held.
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+#!/bin/bash
+# Heal tab figure on the Inbox strip against the figure the Heal panel opens on (read-only; preference writes dropped)
+cat > "$(dirname "$0")/p.mjs" <<'JS'
+import { openConsole, RAIL, railButton } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/console.mjs';
+import { pinPreferences, HARNESS_PREFERENCES } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/prefs-pin.mjs';
+const session = await openConsole({ viewport: { width: 1440, height: 900 } });
+await pinPreferences(session.page.context(), HARNESS_PREFERENCES, { writes: 'drop' });
+try {
+  const { page } = session;
+  await page.evaluate(() => localStorage.setItem('inbox.section', 'heal'));
+  await page.locator(`${railButton('Inbox')}:visible`).first().click();
+  await page.waitForSelector('[data-inbox-panel="heal"]', { timeout: 20000 });
+  await page.waitForTimeout(2500);
+  const r = await page.evaluate(() => {
+    const tab = [...document.querySelectorAll('[data-inbox-panel] [role="tab"]')].find((t) => /^Heal/.test(t.textContent.trim()));
+    const text = document.querySelector('[data-heal-panel]')?.innerText ?? '';
+    return { tab: Number(tab?.textContent.replace(/\D+/g, '') || 0), headline: Number(/Friction\s+(\d+)/.exec(text)?.[1] ?? NaN) };
+  });
+  console.log(`Heal tab ${r.tab}; Heal panel headline (Friction) ${r.headline}; ${r.tab === r.headline ? 'equal' : 'DIFFER'}`);
+} finally { await session.browser.close(); }
+JS
+node "$(dirname "$0")/p.mjs" 2>&1 | tail -1
+EOF
+bash "$D/p.sh"
+case "$D" in /tmp/athena-probe.*) cd /tmp && rm -rf "$D";; esac
+```
+
+measured 2026-10-25 by chain chain-sidebar-rail--whole-20261025-170311-1711, finding M1, MEDIUM
+probe-key: 300d64278e04787f45b8eee9d1e2dee9d54ca0e6
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/composer/ComposerModelMenu.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/scratch-chat.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/whole-sidebar-rail.mjs
+
+## INV-9657 — probe — LOW — `openScratchChatOnHaiku` throws after 30 s from a phone with a stored non-Chat view, and the comment the builder wrote about it is false
+
+LOW — `openScratchChatOnHaiku` throws after 30 s from a phone with a stored non-Chat view, and the comment the builder wrote about it is false
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+#!/bin/bash
+# lib/scratch-chat.mjs openScratchChatOnHaiku from a phone-width page whose stored view is not Chat (an existing chat is only opened; no turn is sent)
+cat > "$(dirname "$0")/p.mjs" <<'JS'
+import { openConsole } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/console.mjs';
+import { pinPreferences, HARNESS_PREFERENCES } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/prefs-pin.mjs';
+import { openScratchChatOnHaiku } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/scratch-chat.mjs';
+const session = await openConsole({ viewport: { width: 390, height: 844 } });
+await pinPreferences(session.page.context(), HARNESS_PREFERENCES, { writes: 'drop' });
+try {
+  await session.page.evaluate(() => localStorage.setItem('activeTab', 'cerberus'));
+  const out = await openScratchChatOnHaiku(session, '82c22bae-0279-44a8-9b22-344db28c4401').then((c) => `chip reads "${c}"`).catch((e) => `THROWS ${String(e.message).split('\n')[0].slice(0, 90)}`);
+  console.log(`390px, stored view cerberus: ${out}`);
+} finally { await session.browser.close(); }
+JS
+node "$(dirname "$0")/p.mjs" 2>&1 | tail -1
+EOF
+bash "$D/p.sh"
+case "$D" in /tmp/athena-probe.*) cd /tmp && rm -rf "$D";; esac
+```
+
+measured 2026-10-25 by chain chain-sidebar-rail--whole-20261025-170311-1711, finding L1, LOW
+probe-key: f6f68260ba9410d2a994cb59c5e8656d2404bbb2
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/composer/ComposerModelMenu.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/scratch-chat.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/whole-sidebar-rail.mjs
+
+## INV-9658 — probe — LOW — a mistyped `LEGS` runs nothing and prints `PASS`, exit 0
+
+LOW — a mistyped `LEGS` runs nothing and prints `PASS`, exit 0
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+#!/bin/bash
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+LEGS=typo node .verify/whole-sidebar-rail.mjs
+echo "exit $?"
+EOF
+bash "$D/p.sh"
+case "$D" in /tmp/athena-probe.*) cd /tmp && rm -rf "$D";; esac
+```
+
+measured 2026-10-25 by chain chain-sidebar-rail--whole-20261025-170311-1711, finding L2, LOW
+probe-key: b822c35d381f873489d3eb6ca055d6236b742b61
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/composer/ComposerModelMenu.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/scratch-chat.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/whole-sidebar-rail.mjs
+
+## INV-9659 — probe — LOW — the account's pin restore is a UI click-through in a `finally`; an interrupt leaves a pin behind
+
+LOW — the account's pin restore is a UI click-through in a `finally`; an interrupt leaves a pin behind
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+#!/bin/bash
+# Interrupts the Files leg of the walk 3s after its first pin, reads the account's pins, then cleans up by re-running the leg (its finally unpins).
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+OUT="$(dirname "$0")/out"
+pins() {
+  local t
+  t=$(curl -s -X POST http://127.0.0.1:3011/api/auth/login -H 'content-type: application/json' -d '{"username":"verve","password":"verve-dev-2026"}' | python3 -c 'import sys,json;print(json.load(sys.stdin).get("token",""))')
+  curl -s -H "Authorization: Bearer $t" http://127.0.0.1:3011/api/user/preferences | python3 -c 'import sys,json;d=json.load(sys.stdin);print(json.dumps((d.get("preferences") or d).get("filesPins")))'
+}
+LEGS=files node .verify/whole-sidebar-rail.mjs > "$OUT" 2>&1 &
+PID=$!
+case "$PID" in ''|*[!0-9]*|0|1|0[0-9]*) echo "bad pid"; exit 1;; esac
+timeout 150 bash -c 'until grep -q "is pinned on page A" "$0"; do sleep 1; done' "$OUT"
+python3 -c 'import time; time.sleep(3)'
+kill -INT "$PID"; wait "$PID" 2>/dev/null
+echo "filesPins after an interrupt: $(pins)"
+LEGS=files timeout 280 node .verify/whole-sidebar-rail.mjs > "$OUT.2" 2>&1
+echo "filesPins after the cleaning re-run: $(pins)"
+EOF
+bash "$D/p.sh"
+case "$D" in /tmp/athena-probe.*) cd /tmp && rm -rf "$D";; esac
+```
+
+measured 2026-10-25 by chain chain-sidebar-rail--whole-20261025-170311-1711, finding L3, LOW
+probe-key: 5bfe213acec8c4f29be1e5d6efb900d1072c463d
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/composer/ComposerModelMenu.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/scratch-chat.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/whole-sidebar-rail.mjs
+
+## INV-9663 — probe — (MEDIUM) — INV-9662 says `useFilesPins` keeps only the string entries; the code drops the whole list on one non-string
+
+(MEDIUM) — INV-9662 says `useFilesPins` keeps only the string entries; the code drops the whole list on one non-string
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'SH'
+#!/usr/bin/env bash
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+H=src/modules/file-manager/hooks/useFilesPins.ts
+echo "code: all-or-nothing .every(string) lines: $(grep -c "raw.every((entry) => typeof entry === 'string')" $H); per-entry .filter( lines: $(grep -c '\.filter(' $H)"
+echo "row INV-9662 says the reader keeps only the string entries: $(~/.claude/scripts/docstore get INV-9662 --text | grep -c "keeps only .typeof === 'string'. entries")"
+node -e "const raw=['/p/a',{name:'/p/b'}]; const pins=Array.isArray(raw)&&raw.length>0&&raw.every((e)=>typeof e==='string')?raw:[]; console.log('the same test on [string, record] ->',JSON.stringify(pins))" 2>&1
+SH
+bash "$D/p.sh"
+case "$D" in /tmp/athena-probe.??????) rm -rf "$D";; esac
+```
+
+measured 2026-10-25 by chain chain-sidebar-rail--docs-20261025-180958-6603, finding M1, MEDIUM
+probe-key: 15a1f0f31236b010b266e971c8d6384ae996d3c4
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/user-preferences.db.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/file-manager/hooks/useFilesPins.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/preferenceEntryPatch.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/userSettings.ts
+
+## INV-9664 — probe — (MEDIUM) — rows still annotate the deleted strip and known-red harness legs instead of deleting the sentence (healed means deleted; intent item 14)
+
+(MEDIUM) — rows still annotate the deleted strip and known-red harness legs instead of deleting the sentence (healed means deleted; intent item 14)
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'SH'
+#!/usr/bin/env bash
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+for t in MAN-7654 MAN-7830 MAN-7540 MAN-610; do
+  printf '%s: ' "$t"
+  ~/.claude/scripts/docstore get "$t" --text | grep -ciE 'deleted (tab )?strip|legs? (reads?|fails?)|so those legs fail|does not run' || true
+done
+SH
+bash "$D/p.sh"
+case "$D" in /tmp/athena-probe.??????) rm -rf "$D";; esac
+```
+
+measured 2026-10-25 by chain chain-sidebar-rail--docs-20261025-180958-6603, finding M2, MEDIUM
+probe-key: d7cf7dfe5806a795acc1dd28e0199013ac75527d
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/command-palette/CommandPalette.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/DispatcherAskBell.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/hooks/useRunnerLanding.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/hooks/useWorkspaceViews.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/ProjectCommandPalette.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/WorkspaceMain.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/RoadmapPicker.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/RoadmapTab.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/RoadmapTreeFace.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/UnplacedBanner.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Tabs.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/verve/feedback.css, /home/lyphe/.claude/claudecodeui_lyphe/.verify/phase-19.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-inbox.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-roadmap-tab.mjs
+
+## INV-9665 — probe — (MEDIUM) — MAN-6353 still tells a harness author to select views by `[role=tab][aria-label]`
+
+(MEDIUM) — MAN-6353 still tells a harness author to select views by `[role=tab][aria-label]`
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'SH'
+#!/usr/bin/env bash
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+echo "MAN-6353 lines telling a reader to select views by role=tab: $(~/.claude/scripts/docstore get MAN-6353 --text | grep -c 'Tabs are selected by `\[role=tab\]\[aria-label\]`' || true)"
+echo "RailButton / WorkspaceRail lines that set role=tab: $(grep -c 'role="tab"' src/modules/project-workspace/RailButton.tsx src/modules/project-workspace/WorkspaceRail.tsx | tr '\n' ' ')"
+echo "MAN-9012 trap row says no view is a strip tab: $(~/.claude/scripts/docstore get MAN-9012 --text | grep -c 'no view is a strip tab' || true)"
+SH
+bash "$D/p.sh"
+case "$D" in /tmp/athena-probe.??????) rm -rf "$D";; esac
+```
+
+measured 2026-10-25 by chain chain-sidebar-rail--docs-20261025-180958-6603, finding M3, MEDIUM
+probe-key: 7a6ee4966bb270efaf8050b85425c58c44400296
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/shared/claude-cli-path.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/main.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Collapsible.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/uiPreferences.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/console.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/shapes-fixture.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/ntfy/settings-probe.mjs
+
+## INV-9666 — probe — (LOW) — MAN-7866 says a project row is chosen first on a reload; the house views now open with none
+
+(LOW) — MAN-7866 says a project row is chosen first on a reload; the house views now open with none
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'SH'
+#!/usr/bin/env bash
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+echo "MAN-7866 says a project row is chosen first: $(~/.claude/scripts/docstore get MAN-7866 --text | grep -c 'so a project row is chosen first, as for every view' || true)"
+grep -n -A2 "activeTab === 'cerberus'" src/modules/project-workspace/WorkspaceMain.tsx | cut -c1-120
+SH
+bash "$D/p.sh"
+case "$D" in /tmp/athena-probe.??????) rm -rf "$D";; esac
+```
+
+measured 2026-10-25 by chain chain-sidebar-rail--docs-20261025-180958-6603, finding L1, LOW
+probe-key: dd4a0c8971b1b326b34acd8ed72b14a398151416
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/command-palette/CommandPalette.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/hooks/useProjectsState.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/hooks/useRailBadges.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/hooks/useWorkspaceViews.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/ProjectCommandPalette.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/WorkspaceMain.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts
+
+## INV-9667 — probe — (LOW) — intent item 9 names MAN-7530; it was not touched and still says "opens the Roadmap tab", with nothing of the no-project landing
+
+(LOW) — intent item 9 names MAN-7530; it was not touched and still says "opens the Roadmap tab", with nothing of the no-project landing
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'SH'
+#!/usr/bin/env bash
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+echo "MAN-7530 'opens the Roadmap tab' lines: $(~/.claude/scripts/docstore get MAN-7530 --text | grep -c 'opens the Roadmap tab on its In flight face' || true)"
+~/.claude/scripts/docstore history MAN-7530 --text | head -1 | cut -c1-80
+SH
+bash "$D/p.sh"
+case "$D" in /tmp/athena-probe.??????) rm -rf "$D";; esac
+```
+
+measured 2026-10-25 by chain chain-sidebar-rail--docs-20261025-180958-6603, finding L2, LOW
+probe-key: db11e066bcc3c2337a85dcf789c9c9377d4ffa81
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/electron/desktopNotifications.js, /home/lyphe/.claude/claudecodeui_lyphe/electron/main.js, /home/lyphe/.claude/claudecodeui_lyphe/public/sw.js, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notifications/services/notification-landing.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notifications/services/notification-orchestrator.service.js, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notifications/services/ntfy-action-decisions.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notifications/services/ntfy-channel.service.ts
+
+## INV-9668 — probe — (LOW) — MAN-9007 (and the builder's report) understate where INV-5768's probe goes red
+
+(LOW) — MAN-9007 (and the builder's report) understate where INV-5768's probe goes red
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'SH'
+#!/usr/bin/env bash
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+timeout 540 node .verify/probe-settings-rows.mjs after 2>&1 | grep -E '^agents +[0-9]+ ' | awk '$10>0{print $2,$3,$4,"dropped="$10}' | sort | uniq -c
+echo "row says: $(~/.claude/scripts/docstore get MAN-9007 --text | grep -o 'two Agents rows at 320px' || echo none)"
+SH
+bash "$D/p.sh"
+case "$D" in /tmp/athena-probe.??????) rm -rf "$D";; esac
+```
+
+measured 2026-10-25 by chain chain-sidebar-rail--docs-20261025-180958-6603, finding L3, LOW
+probe-key: 8980010a9caf79bb63a758bd85a2b4ca4b456fa8
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/hooks/useRailBadges.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/ProjectSidebarRegion.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/RailButton.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/WorkspaceRail.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/Settings.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/SidebarModals.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/Sidebar.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Tooltip.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/rail-mockup.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/rail-read.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/sheet.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-settings-rows.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/rail-live.mjs

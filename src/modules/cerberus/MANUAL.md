@@ -49,7 +49,7 @@ Where the Cerberus view stands in the workspace and what feeds its badge. The ta
 | piece | fact |
 |---|---|
 | `AppTab` (`src/shared/types.ts`) | contains `'cerberus'`, after `'api'` |
-| `VALID_TABS` (`useProjectsState.ts`) | contains `'cerberus'`, after `'api'`: a stored tab is restored on reload only for an id in this set. The app keeps no project selected across a reload, so a project row is chosen first, as for every view |
+| `VALID_TABS` (`useProjectsState.ts`) | contains `'cerberus'`, after `'api'`: a stored tab is restored on reload only for an id in this set. A reload at `/` restores no project and needs none: the pane draws on the stored tab alone |
 | rail (`useWorkspaceViews.ts`) | `HOUSE_VIEWS` entry `{ id: 'cerberus', group: 'house', icon: Radar, keywords: 'cerberus fleet health monitoring checks wardens nodes' }`, after Universe and before API: the `house` run of the rail, no view a hand already knows has moved |
 | gate | none. why: the fleet's health is a fact about the house whichever project is open, and a monitor that hid on a quiet day could never say "All quiet" |
 | label | `tabs.cerberus` = "Cerberus" (`en/common.json`, after `tabs.notes`) |
@@ -59,8 +59,8 @@ Where the Cerberus view stands in the workspace and what feeds its badge. The ta
 | step | file | holds |
 |---|---|---|
 | 1 | `CerberusContext.ts` | `useCerberusNeeds()` = `overview?.counts.needsYou ?? 0` |
-| 2 | `useRailBadges.ts` | `badges.cerberus = { count: cerberusNeeds, words: t('rail.badge.cerberus', { count }) }` while `cerberusNeeds > 0`; a zero has no entry |
-| 3 | `WorkspaceRail.tsx` | draws the badge on the Cerberus button: MAN-9005 |
+| 2 | `useRailBadges.ts` | `badges.cerberus = { count: cerberusNeeds, words: t('rail.badge.cerberus', { count }) }` while `cerberusNeeds > 0`; a zero has no entry. The words: `{{count}} needs you` (one), `{{count}} need you` (other), read through the button's `aria-describedby` |
+| 3 | `WorkspaceRail.tsx`, `RailButton.tsx` | draw the badge on the Cerberus button, in the house run: the amber pill (`data-tone="warn"`) with the figure. Colour is never the whole signal: the number is in it. MAN-9005 |
 
 - The badge's number and the tab headline's number are one value: `CerberusHeader` reads `counts.needsYou` from the same overview (MAN-7891).
 - Zero until the first read answers: no badge.
@@ -1105,7 +1105,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/CerberusHea
 ## MAN-8916 — Cerberus — the tab root and header: `CerberusPanel`, `CerberusHeader` — `CerberusHeader`
 section: Cerberus — the tab root and header: `CerberusPanel`, `CerberusHeader`/003 `CerberusHeader`
 
-- Eyebrow `cerberus.header.eyebrow`; headline `<lead> <em>accent</em>`: "All *quiet*", "One check *needs you*", "3 checks *need you*", from `counts.needsYou` (the number the workspace strip's pill shows).
+- Eyebrow `cerberus.header.eyebrow`; headline `<lead> <em>accent</em>`: "All *quiet*", "One check *needs you*", "3 checks *need you*", from `counts.needsYou` (the number the views rail's Cerberus badge shows: MAN-7866).
 - Accent: italic, never bold (the display serif has none); `data-tone="positive"` at quiet, `info` for "One fix *running*" (the only need has its fix going: `accentTone` takes the run's own tone, `RUN_LOOK.going.tone`), `warn` while anything else needs you, `text-tone-ink`. why: the call to act is never painted passing green, and a need already being fixed is not painted as one still waiting.
 - A changed headline re-mounts (keyed by its words) and rises in (`animate-shape-rise`).
 - Summary: "`passing` of `checks` checks passing · `muted` muted · `nodes` nodes · last result `ago`". `muted` is left out at 0, the age while `lastResultAt === null`. The age is `agoPhrase` from `utils/fleetWords.ts` (MAN-7879).

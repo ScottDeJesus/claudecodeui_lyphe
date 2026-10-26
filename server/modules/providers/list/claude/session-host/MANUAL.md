@@ -672,7 +672,7 @@ Evidence in `<dir>`: `steps.txt`, `step1-card-assigned.png`, `step5-node-card-<1
 
 | export | does |
 |---|---|
-| `openCerberusTab(page)` | `openTab(page, 'Cerberus')`, else `More views` menu → `Cerberus` (the tab is last on the house row, behind the menu at the sidebar's width) |
+| `openCerberusTab(page)` | `openTab(page, 'Cerberus')` on the views rail (MAN-9005); a rail with no Cerberus button throws `the views rail has no Cerberus button` |
 | `openNodeCard(page, nodeId)` | opens the tab, closes then presses open the node's header button (`aria-expanded`), answers the card locator |
 | `findOpenCard(page, nodeId)` | the open card, no navigation |
 | `assignFromCard(page, card, projectPath)` | "Run a project here" → the menu row whose path line is exactly `projectPath` → waits for the tile; throws naming the offered rows when absent |

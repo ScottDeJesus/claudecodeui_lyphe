@@ -64,8 +64,8 @@ export default function WorkspaceRail({ list, isMobile }: { list: SidebarListSta
 
   // The scroll region: the reveal finds the lit button in it, and the Chat watch below reads it as its root.
   const scrollRef = useRef<HTMLDivElement>(null);
-  // The lit button comes into view whenever the view changes, wherever the change came from (the old rows, the palette,
-  // a link), and when the lit button first appears (a persisted plugin view lands with the plugin list, after the view
+  // The lit button comes into view whenever the view changes, wherever the change came from (the palette, a link, a
+  // stored id), and when the lit button first appears (a persisted plugin view lands with the plugin list, after the view
   // was chosen): in a window too short for the rail it may be in a run scrolled out of sight. `nearest` leaves the
   // region be when the button is already whole in it. A FRAME LATER, because a dialog closing on the same commit
   // (the palette's "Go to") returns focus to the rail button that held it, and focusing it scrolls the region back to

@@ -64,7 +64,7 @@ function SearchModeChips({
     : t('search.modeRunning');
 
   return (
-    // Wraps rather than scrolling sideways: four chips do not fit a 328px rail, and a chip half
+    // Wraps rather than scrolling sideways: four chips do not fit the list's 280px column, and a chip half
     // off the edge with no scrollbar reads as a broken row rather than as more to come.
     <div className="flex flex-wrap gap-1.5">
       <Chip size="sm" selected={searchMode === 'projects'} onClick={() => onSearchModeChange('projects')}>

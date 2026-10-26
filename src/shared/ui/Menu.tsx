@@ -3,7 +3,6 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useHostWindow } from '@/shared/context/HostWindowContext';
 import { OWNS_ESCAPE } from '@/shared/ui/overlayEscape';
 import { useEdgeShift } from '@/shared/ui/useEdgeShift';
-import { cn } from '@/shared/utils';
 
 type MenuItem = {
   id: string;
@@ -11,33 +10,22 @@ type MenuItem = {
   description?: string;
   /** Marks the row as the current choice — filled and ticked, so it survives greyscale. */
   selected?: boolean;
-  /**
-   * A count out loud at the row's end, drawn only above zero. The Tabs overflow is the one
-   * caller: a tab collapsed into the menu keeps the number its dot stood for.
-   */
-  count?: number;
 };
 
 type MenuProps = {
   trigger: ReactNode;
-  /**
-   * The trigger's accessible name and hover title, for a trigger that draws no words of its own —
-   * the Tabs overflow's glyph. A trigger that already reads as words needs none.
-   */
-  triggerLabel?: string;
   items: MenuItem[];
   onSelect: (id: string) => void;
-  /** Panel width in px. The panel is what `align` places, so it is what a width sizes. */
+  /** Panel width in px. The panel hangs from the trigger's left edge, so a width sizes what hangs there. */
   width?: number;
-  align?: 'left' | 'right';
 };
 
 /**
  * A choice list hung under whatever the caller hands in as its trigger.
  *
- * Used by the kit's own Tabs, as the More menu an overflowing row collapses its trailing tabs
- * into. A Select owns ONE value and shows it in its own trigger; a Menu decorates a trigger the
- * caller already drew.
+ * Used by the affected-areas module: `MarkPresses`' Rename to… and `FacePhoto`'s kind menu for a
+ * missed area. A Select owns ONE value and shows it in its own trigger; a Menu decorates a trigger
+ * the caller already drew.
  *
  * Dismissal is two-way for the same reason Select's is: a pointer outside closes it, and
  * Escape closes it without moving the pointer, handing focus back to the trigger rather than
@@ -53,7 +41,7 @@ type MenuProps = {
  * measured at 390 × 664 with CDP touch — so a touch (or pen) outside waits for it. A mouse has no such ambiguity
  * and still closes on the press.
  */
-export function Menu({ trigger, triggerLabel, items, onSelect, width, align = 'left' }: MenuProps) {
+export function Menu({ trigger, items, onSelect, width }: MenuProps) {
   const hostWindow = useHostWindow();
   // Whether the panel is showing. Not derivable: `selected` is the choice already made, and
   // the panel is open precisely while the reader is reconsidering it.
@@ -122,8 +110,6 @@ export function Menu({ trigger, triggerLabel, items, onSelect, width, align = 'l
         className="vv-menu__trigger"
         aria-haspopup="menu"
         aria-expanded={open}
-        aria-label={triggerLabel}
-        title={triggerLabel}
         onClick={() => setOpen((wasOpen) => !wasOpen)}
       >
         {trigger}
@@ -132,7 +118,7 @@ export function Menu({ trigger, triggerLabel, items, onSelect, width, align = 'l
       {open && (
         <ul
           ref={panelRef}
-          className={cn('vv-menu__panel', `vv-menu__panel--${align}`)}
+          className="vv-menu__panel"
           role="menu"
           // The panel owns Escape while it is up — see `shared/ui/overlayEscape`.
           {...OWNS_ESCAPE}
@@ -163,11 +149,6 @@ export function Menu({ trigger, triggerLabel, items, onSelect, width, align = 'l
                 <span className="block">{item.label}</span>
                 {item.description && <span className="vv-menu__description block">{item.description}</span>}
               </span>
-              {item.count !== undefined && item.count > 0 && (
-                <span className="vv-menu__count" data-tone="neutral">
-                  {item.count}
-                </span>
-              )}
             </li>
           ))}
         </ul>
