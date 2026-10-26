@@ -8,8 +8,13 @@ import { projectsDb, sessionUserStateDb, sessionsDb } from '@/modules/database/i
 import { clearPresence, markPresence } from '@/modules/notifications/index.js';
 import { providerModelsService, sessionHostLivenessSnapshot, sessionsService } from '@/modules/providers/index.js';
 import { chatRunRegistry } from '@/modules/websocket/services/chat-run-registry.service.js';
+import { abortChatRun, answerChatPermission } from '@/modules/websocket/services/chat-run-verbs.service.js';
 import { broadcastSessionUpserted } from '@/modules/websocket/services/session-upsert-broadcast.service.js';
-import { connectedClients, WS_OPEN_STATE } from '@/modules/websocket/services/websocket-state.service.js';
+import {
+  connectedClients,
+  registerSocketUser,
+  WS_OPEN_STATE,
+} from '@/modules/websocket/services/websocket-state.service.js';
 import {
   getGlobalImageAssetsDir,
   isImageAttachmentDescriptor,
@@ -81,7 +86,8 @@ export type ProviderRuntimeGateway = {
   getPendingApprovalsForSession(sessionId: string): unknown[];
 };
 
-type ChatWebSocketDependencies = {
+/** Consumed by `chat-run-verbs.service.ts`, whose verbs take the same dependencies as the handlers they were moved out of. */
+export type ChatWebSocketDependencies = {
   /** Central dispatcher for every provider SDK/CLI runtime. */
   runtime: ProviderRuntimeGateway;
 };
@@ -263,6 +269,11 @@ async function dispatchRun(
   if (typeof clientOptions.effort === 'string' && clientOptions.effort.trim()) {
     providerModelsService.setSessionEffort(provider, sessionId, clientOptions.effort);
   }
+  // The permission mode rides beside them: a send the companion relays reads the chat's recorded
+  // mode instead of launching in `default`, which on a live process would flip a bypass chat.
+  if (typeof clientOptions.permissionMode === 'string' && clientOptions.permissionMode.trim()) {
+    providerModelsService.setSessionPermissionMode(provider, sessionId, clientOptions.permissionMode);
+  }
 
   const attachmentCandidates = [
     ...normalizeAttachmentDescriptors(clientOptions.images),
@@ -440,18 +451,9 @@ async function handleChatAbort(
     return;
   }
 
-  const run = chatRunRegistry.getRun(sessionId);
-  if (!run || run.status !== 'running') {
+  if ((await abortChatRun(sessionId, dependencies)) === 'not_running') {
     sendProtocolError(ws, 'NO_ACTIVE_RUN', `Session "${sessionId}" has no active run.`, sessionId);
-    return;
   }
-
-  const success = await dependencies.runtime.abort(run.provider, sessionId);
-
-  chatRunRegistry.completeRun(sessionId, {
-    exitCode: success ? 0 : 1,
-    aborted: true,
-  });
 }
 
 /**
@@ -531,12 +533,12 @@ function handlePermissionResponse(data: AnyRecord, dependencies: ChatWebSocketDe
     return;
   }
 
-  dependencies.runtime.resolveToolApproval(data.requestId, {
+  answerChatPermission(data.requestId, {
     allow: Boolean(data.allow),
     updatedInput: data.updatedInput,
     message: typeof data.message === 'string' ? data.message : undefined,
     rememberEntry: data.rememberEntry,
-  });
+  }, dependencies);
 }
 
 /**
@@ -647,16 +649,12 @@ export async function runDetachedChatTurn(
     if (!input.interruptActiveRun) {
       return { started: false, error: 'A run was already in progress for this session.' };
     }
-    // Same shape as `chat.abort`: cancel the provider run and emit the
+    // The same stop as `chat.abort`: cancel the provider run and emit the
     // terminal `complete` on its behalf, so every watching client sees the
     // interrupted run end before this turn's stream begins. The interrupted
     // run's own dispatch settles later through completeRunIfCurrent, which is
     // scoped to that run and cannot touch the one started here.
-    const aborted = await dependencies.runtime.abort(activeRun.provider, input.sessionId);
-    chatRunRegistry.completeRun(input.sessionId, {
-      exitCode: aborted ? 0 : 1,
-      aborted: true,
-    });
+    await abortChatRun(input.sessionId, dependencies);
   }
 
   return dispatchRun(
@@ -684,6 +682,10 @@ export function handleChatConnection(
   void dependencies.whenHostsReadopted().then(() => sendJson(ws, sessionHostLivenessSnapshot()));
 
   const userId = readRequestUserId(request);
+  if (userId !== null) {
+    // Which account this socket belongs to, so `sendToUser` reaches only that account's pages.
+    registerSocketUser(ws, userId);
+  }
 
   ws.on('message', async (rawMessage) => {
     try {

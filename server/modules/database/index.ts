@@ -108,6 +108,21 @@ export { memoryCandidatesDb } from '@/modules/database/repositories/memory-candi
 // Used by the followups module; `sessions.db.ts` moves a merged chat's items itself.
 export { followupsDb } from '@/modules/database/repositories/followups.db.js';
 export type { FollowupKind, FollowupRow } from '@/modules/database/repositories/followups.db.js';
+// The companion's own tables: Kaylee's per-account state, exchange (the newest 400 rows) and note cards, as rows —
+// snake_case columns, JSON columns as text. Used by the companion module's store, which maps them to the wire contract.
+export { companionDb } from '@/modules/database/repositories/companion.db.js';
+export type {
+  CompanionClearResult,
+  CompanionLogInput,
+  CompanionLogRow,
+  CompanionNoteRow,
+  CompanionStatePatch,
+  CompanionStateRow,
+} from '@/modules/database/repositories/companion.db.js';
+// Every brief Kaylee has relayed into a chat, keyed on the chat so it survives her Clear. Used by the companion
+// module to record a send and by Providers to mark the matching user messages "Through Kaylee" in history.
+export { relayedSendsDb } from '@/modules/database/repositories/relayed-sends.db.js';
+export type { RelayedSendRow } from '@/modules/database/repositories/relayed-sends.db.js';
 // The notes lane's own table: one account's cards, written one row at a time. It is not a board
 // table and no board reads it.
 export { notesDb } from '@/modules/database/repositories/notes.db.js';

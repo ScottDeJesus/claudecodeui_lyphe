@@ -52,6 +52,15 @@ export const SHA256_RULE: LaneRule = patternRule(/^[0-9a-f]{64}$/, '64 lowercase
 //----------------- THE TABLE A LANE DECLARES ------------
 
 /**
+ * The one image type a `bytes` answer may be: a 2xx whose Content-Type is anything else, or whose bytes do not
+ * begin with `signature` (the format's magic number: `89504e470d0a1a0a` for a PNG, `ffd8ff` for a JPEG, `<svg` for
+ * the day-one plan's drawing), is the lane's `unreadable`: the Content-Type is the engine's word and the bytes are
+ * what would be cached for a year. `noun` ('a JPEG', 'a PNG', 'an SVG') is how the 502 sentence names what was expected.
+ * Consumers: a lane's `image` (its default) and a `bytes` row's own `image`, which wins over it.
+ */
+export type LaneImage = { contentType: string; noun: string; signature: Buffer };
+
+/**
  * One row of a lane's allowlist. Consumers: the `affected-areas` and `carrier-bulletins` routes, each of
  * which declares its whole contract as a list of these.
  */
@@ -65,6 +74,12 @@ export type LaneRoute = {
   query?: Record<string, LaneRule>;
   /** `object`: the request's JSON object is forwarded. `none`: the route reads no body and none is sent. */
   body: 'object' | 'none';
+  /**
+   * The image type THIS `bytes` row answers, for a lane that serves more than one (the Tours lane's views are JPEGs and
+   * its plan drawings SVGs). It wins over the lane's `image`; a row that names none answers the lane's. Meaningless on a
+   * `json` row.
+   */
+  image?: LaneImage;
 };
 
 /**
@@ -82,12 +97,10 @@ export type LaneRouterDefinition = {
   /** The forwarder's `forward`. */
   forward: ShadowConnectorLane['forward'];
   /**
-   * The one image type this lane's `bytes` routes answer. A 2xx whose Content-Type is anything else, or
-   * whose bytes do not begin with `signature` (the format's magic number: `89504e470d0a1a0a` for a PNG,
-   * `ffd8ff` for a JPEG), is the lane's `unreadable`: the Content-Type is the engine's word and the bytes
-   * are what would be cached for a year. `noun` ('a JPEG', 'a PNG') is how the 502 sentence names what was expected.
+   * The image type this lane's `bytes` routes answer unless a row names its own (`LaneRoute.image`): see `LaneImage`
+   * for what a different Content-Type or signature makes of a 2xx.
    */
-  image: { contentType: string; noun: string; signature: Buffer };
+  image: LaneImage;
   /**
    * Upstream response headers a JSON answer carries back to the browser, named in lower case (the
    * forwarder's `LaneRequest.passHeaders`). Absent carries none, so a lane reads only what it names: the
@@ -158,9 +171,9 @@ function forwardedQuery(spec: LaneRoute, request: express.Request): Record<strin
  * One answer, written. An upstream answer keeps its status and its JSON untouched — the lane never
  * reshapes a body, so the browser reads exactly what the engine wrote — and carries back the headers
  * the lane named (`passHeaders`), none otherwise. A 2xx image is relayed as bytes, under the one type
- * the lane expects and a year's cache (it is keyed by the sha256 of what it shows).
+ * the route expects (its row's own `image`, else the lane's) and a year's cache (it is keyed by the sha256 of what it shows).
  */
-function emit(response: express.Response, answer: LaneAnswer, image: LaneRouterDefinition['image']): void {
+function emit(response: express.Response, answer: LaneAnswer, image: LaneImage): void {
   if (!answer.ok) {
     response.status(STATUS_FOR_FAULT[answer.reason]).json({ error: answer.message });
     return;
@@ -226,7 +239,7 @@ export function createLaneRouter({
             expect: spec.expect,
             passHeaders,
           }),
-          image,
+          spec.image ?? image,
         );
       } catch (error) {
         // The forwarder resolves every fault it can name, so reaching here means something this lane

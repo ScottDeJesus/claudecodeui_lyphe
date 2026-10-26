@@ -4,7 +4,7 @@
  * Runs Claude through the @anthropic-ai/claude-agent-sdk, one CLI process per CONVERSATION:
  * the first message spawns it, every later message is pushed into its open input stream, and
  * the process ends only when the conversation has been silent for the idle window and nothing
- * in it is running or watching (chat-process.ts) — or when a message carries a launch argument
+ * in it is running or watching (shared/prompt-stream.ts) — or when a message carries a launch argument
  * the running process cannot take, which retires it and spawns a fresh one.
  *
  * Key features:
@@ -98,7 +98,7 @@ const TOOL_APPROVAL_TIMEOUT_MS = parseInt(process.env.CLAUDE_TOOL_APPROVAL_TIMEO
 // Passed to the spawned CLI as CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS: how long, AFTER its stdin
 // has ended, the CLI waits for still-running background tasks before killing them and exiting.
 // On this path stdin ends only once nothing is running (the idle closer asks first — see
-// chat-process.ts), on a Stop with nothing left to hear from, on a Stop whose interrupt went
+// shared/prompt-stream.ts), on a Stop with nothing left to hear from, on a Stop whose interrupt went
 // unanswered, or on a retirement for a launch-bound setting. So this ceiling is the backstop for a
 // task that started in the gap between that check and the EOF, never the normal way a process
 // ends — and never on the Stop that keeps its process alive for the tasks it still has running
@@ -783,7 +783,7 @@ async function loadMcpConfig(cwd) {
  * One CLI per conversation. The first message spawns it; every later message is pushed into
  * that process's open input stream, after any setting the SDK can change live has been applied
  * to it. The promise returned here settles when THIS turn's `result` lands — the process keeps
- * running, owned by `spawnProcess`'s loop, until the idle closer ends it (chat-process.ts) or a
+ * running, owned by `spawnProcess`'s loop, until the idle closer ends it (shared/prompt-stream.ts) or a
  * message arrives with a launch argument the running process cannot take. That message retires
  * the process — interrupt FIRST, then end-of-input — and spawns a fresh one. The other order
  * (end-of-input, then interrupt) wrote the interrupt into a stdin the SDK had already ended, so

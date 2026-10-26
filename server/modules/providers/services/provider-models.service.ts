@@ -17,6 +17,7 @@ type ProviderModelsSessionStore = {
   getSessionById(sessionId: string): { model: string | null; effort: string | null } | null;
   setSessionModel(sessionId: string, model: string): void;
   setSessionEffort(sessionId: string, effort: string): void;
+  setSessionPermissionMode(sessionId: string, mode: string): void;
 };
 
 /** SQLite catalog operations used by the Providers service and its unit fakes. */
@@ -297,6 +298,37 @@ export const createProviderModelsService = (dependencies: ProviderModelsServiceD
   };
 
   /**
+   * Records the permission mode one session's send ran under.
+   *
+   * Called from `chat.send` on every turn that carries one, so a send the companion relays into the
+   * chat runs in the mode the chat's own composer last used. Like `setSessionModel` and
+   * `setSessionEffort`, it ignores an id with no row yet: the next send records it once the row exists.
+   */
+  const setSessionPermissionMode = (
+    provider: LLMProvider,
+    sessionId: string,
+    permissionMode: string,
+  ): { provider: LLMProvider; sessionId: string; permissionMode: string; source: 'session' } | null => {
+    const normalizedSessionId = sessionId.trim();
+    const normalizedPermissionMode = permissionMode.trim();
+    if (!normalizedSessionId || !normalizedPermissionMode) {
+      return null;
+    }
+
+    if (!readRecordedSessionSelection(normalizedSessionId)) {
+      return null;
+    }
+
+    sessions.setSessionPermissionMode(normalizedSessionId, normalizedPermissionMode);
+    return {
+      provider,
+      sessionId: normalizedSessionId,
+      permissionMode: normalizedPermissionMode,
+      source: 'session',
+    };
+  };
+
+  /**
    * Answers "which model is this session using?" for every display surface.
    *
    * Precedence, highest first:
@@ -397,6 +429,7 @@ export const createProviderModelsService = (dependencies: ProviderModelsServiceD
     deleteCustomModel,
     setSessionModel,
     setSessionEffort,
+    setSessionPermissionMode,
     resolveSessionModel,
     resolveResumeModel,
   };

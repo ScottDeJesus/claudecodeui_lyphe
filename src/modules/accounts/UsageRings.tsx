@@ -2,12 +2,15 @@ import { useAccountsContext } from '@/modules/accounts/context/AccountsContext';
 import { useMinuteTick } from '@/modules/accounts/hooks/useMinuteTick';
 import { resetsLine } from '@/modules/accounts/UsageMeters';
 import { accountInUseUsage } from '@/modules/accounts/utils/accountInUseUsage';
-import { WINDOW_NAMES, ringTone, windowPercent, windowValue } from '@/modules/accounts/utils/usageWindows';
+import { WINDOW_NAMES, resetCountdown, ringTone, windowPercent, windowValue } from '@/modules/accounts/utils/usageWindows';
 import type { ClaudeUsageWindow } from '@/shared/types';
 import { Meter, Tooltip } from '@/shared/ui';
 import { cn } from '@/shared/utils';
 
-/** The two rings, top to bottom: the 5-hour window over the week, labelled in the words the account rows print (`5h … · wk …`). */
+/**
+ * The two rings, top to bottom: the 5-hour window over the week. Each is labelled with the time left until its window
+ * resets (`resetCountdown`); `short` — the words the account rows print, `5h … · wk …` — names a ring with no figure.
+ */
 const RINGS = [
   { key: 'five_hour', short: '5h' },
   { key: 'seven_day', short: 'wk' },
@@ -22,10 +25,12 @@ type UsageRingProps = {
   usageWindow: ClaudeUsageWindow | null;
   /** The reading is the last one filed, not a current one: the ring dims as the panel's bars do. */
   degraded: boolean;
+  /** The rings' minute tick, epoch milliseconds: the clock the label counts down by. */
+  now: number;
 };
 
 /** One ring and its hover words. The words ARE the ring's accessible name: paint alone would tell a screen reader nothing. */
-function UsageRing({ ring, usageWindow, degraded }: UsageRingProps) {
+function UsageRing({ ring, usageWindow, degraded, now }: UsageRingProps) {
   const percent = usageWindow === null ? null : windowPercent(usageWindow);
   const rolled = Boolean(usageWindow?.rolled);
   const tone = ringTone(ring.key, percent);
@@ -41,6 +46,10 @@ function UsageRing({ ring, usageWindow, degraded }: UsageRingProps) {
     if (reset) words.push(reset);
   }
 
+  // The label is the countdown to this window's reset. A window with no figure keeps its name instead, for the reason
+  // the words above drop its reset time.
+  const label = (percent === null ? null : resetCountdown(usageWindow?.resetsAt ?? null, now)) ?? ring.short;
+
   return (
     <Tooltip
       position="right"
@@ -55,7 +64,7 @@ function UsageRing({ ring, usageWindow, degraded }: UsageRingProps) {
           reading is old, so both dim exactly as the panel's bars do — a red ring on a window that has reset would be a
           false alarm. */}
       <div data-tone={tone ?? undefined} className={cn('grid size-8 place-items-center', (degraded || rolled) && 'opacity-60')}>
-        <Meter variant="ring" percent={percent} label={ring.short} ariaLabel={words.join('. ')} value={windowValue(percent, rolled)} />
+        <Meter variant="ring" percent={percent} label={label} ariaLabel={words.join('. ')} value={windowValue(percent, rolled)} />
       </div>
     </Tooltip>
   );
@@ -69,7 +78,7 @@ function UsageRing({ ring, usageWindow, degraded }: UsageRingProps) {
  * in use's own figures, not the raw `/api/usage` body, which measures the box's live login and can belong to another
  * account. So a ring and its meter always show the same number, and no ring ever reads under the wrong owner. It starts
  * no fetch and no poll: whatever re-reads the provider's readings redraws the rings. The minute tick is a clock, not a
- * read — it dates a filed reading's age (when the ring dims) and keeps the hover's countdown true.
+ * read — it dates a filed reading's age (when the ring dims) and moves each ring's countdown label and the hover's countdown on.
  *
  * The rings keep their places whatever the reading says — an unreachable reading, a missing window, nothing asked yet
  * all draw the bare track — so the rail's foot never jumps. They are a status, not a control: no button, no tab stop.
@@ -91,6 +100,7 @@ export function UsageRings() {
           ring={ring}
           usageWindow={windows.find((usageWindow) => usageWindow.key === ring.key) ?? null}
           degraded={degraded}
+          now={now}
         />
       ))}
     </div>

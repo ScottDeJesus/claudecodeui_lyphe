@@ -11,8 +11,9 @@ import { getConnection } from '@/modules/database/connection.js';
  * `followups-schema.ts`) — nothing here deletes one — and moves with its chat when a duplicate row is
  * merged away (`moveToSession`).
  *
- * Consumers: `server/modules/followups/followups.service.ts` — the lane's only reader and writer —
- * and `sessions.db.ts`, which calls `moveToSession` inside its merge transactions. Reach it through
+ * Consumers: `server/modules/followups/followups.service.ts` — the lane's only reader and writer; the
+ * companion reads through the followups barrel's `listOpenFollowups`, never this file — and `sessions.db.ts`,
+ * which calls `moveToSession` inside its merge transactions. Reach it through
  * `@/modules/database/index.js`. Every statement runs on the caller's connection; only `addMany`
  * opens a transaction of its own, so a batch lands whole or not at all.
  */
@@ -50,6 +51,17 @@ export const followupsDb = {
     return getConnection()
       .prepare(`SELECT ${FOLLOWUP_COLUMNS} FROM followups WHERE session_id = ? AND user_id = ? ORDER BY id`)
       .all(sessionId, userId) as FollowupRow[];
+  },
+
+  /**
+   * The account's OPEN items across every chat, newest first (`id` is the order they were filed in), at most
+   * `limit` of them — the companion's read, which names what a chat left for him. `limit` is a whole number of
+   * 1 or more; the service holds it there.
+   */
+  listOpenOfUser(userId: number, limit: number): FollowupRow[] {
+    return getConnection()
+      .prepare(`SELECT ${FOLLOWUP_COLUMNS} FROM followups WHERE user_id = ? AND state = 'open' ORDER BY id DESC LIMIT ?`)
+      .all(userId, limit) as FollowupRow[];
   },
 
   /** One item of the chat by id, or `null` when no item of THAT chat carries it. */

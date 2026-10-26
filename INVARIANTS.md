@@ -13108,3 +13108,550 @@ measured 2026-10-26 by chain chain-usage-rings-rail-20261026-124656-8568, findin
 probe-key: 229476df0ab5a86794aeee18819a78f7da46dd0a
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/UsageMeters.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/UsageRings.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/utils/usageWindows.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Meter.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/verve/controls.css, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-usage-rings.mjs
+
+## INV-9746 — probe — LOW — the `consumer:` line names a companion path with a space where a slash belongs
+
+LOW — the `consumer:` line names a companion path with a space where a slash belongs
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+cd /home/lyphe/.claude/claudecodeui_lyphe
+grep -n "modules/companion session" server/shared/prompt-stream.ts || echo none
+EOF
+bash "$D/p.sh"
+# expect: none (while the defect stands it prints line 21, `modules/companion session/companion-session.ts`)
+```
+
+measured 2026-10-26 by chain chain-kaylee--companion--prompt-stream-20261026-152016-42a4, finding L1, LOW
+probe-key: a3a2c739d74edb86a20c15634fe4d63058d57d7b
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.oxlintrc.json, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/prompt-stream.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/chat-process-reuse.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/prompt-stream-join.mjs
+
+## INV-9747 — probe — LOW — the new file is governed by no docstore row, though MAN-699 now says the queue and closer live there
+
+LOW — the new file is governed by no docstore row, though MAN-699 now says the queue and closer live there
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+docstore govern /home/lyphe/.claude/claudecodeui_lyphe/server/shared/prompt-stream.ts --touch write --limit 5 --text | cut -c1-100
+EOF
+bash "$D/p.sh"
+# expect: a row naming MAN-699 (while the defect stands it prints `(no rows)`)
+```
+
+measured 2026-10-26 by chain chain-kaylee--companion--prompt-stream-20261026-152016-42a4, finding L2, LOW
+probe-key: d214a9c831cef7d6c4ff56a13816896c17ac7ea7
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.oxlintrc.json, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/prompt-stream.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/chat-process-reuse.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/prompt-stream-join.mjs
+
+## INV-9748 — probe — LOW — three comments in the runtime, and one manual row, still send the reader to `chat-process.ts` for the idle closer
+
+LOW — three comments in the runtime, and one manual row, still send the reader to `chat-process.ts` for the idle closer
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+cd /home/lyphe/.claude/claudecodeui_lyphe
+grep -nE "chat-process\.ts\)" server/modules/providers/list/claude/claude-runtime.provider.js | grep -vc "Everything the SDK can change"
+EOF
+bash "$D/p.sh"
+# expect: 0 once the three pointers say prompt-stream (3 while the defect stands: lines 7, 101, 786)
+```
+
+measured 2026-10-26 by chain chain-kaylee--companion--prompt-stream-20261026-152016-42a4, finding L3, LOW
+probe-key: 931e74fb8acc9f70e67a236bf94c2f9e5e2d419c
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.oxlintrc.json, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/prompt-stream.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/chat-process-reuse.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/prompt-stream-join.mjs
+
+## INV-9749 — probe — LOW — `.verify/prompt-stream-join.mjs` cannot attribute the join line it asks the reader to find
+
+LOW — `.verify/prompt-stream-join.mjs` cannot attribute the join line it asks the reader to find
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+cd /home/lyphe/.claude/claudecodeui_lyphe
+echo "distinct sessions with a join line since 15:23 today:"
+sudo -n journalctl -u cloudcli-server-dev.service --since "2026-10-26 15:23:00" --no-pager -o cat | grep 'Message joined the running process' | grep -oE 'session [0-9a-f-]+' | sort -u | wc -l
+echo "console.log lines in the script that print a chat or provider id:"
+grep -c "console.log.*\(CHAT\|chat_id\|prov\)" .verify/prompt-stream-join.mjs
+EOF
+bash "$D/p.sh"
+# expect: the script line count is 0 and the first count is 2 or more (a cured script prints its chat id, so the second count is 1 or more)
+```
+
+measured 2026-10-26 by chain chain-kaylee--companion--prompt-stream-20261026-152016-42a4, finding L4, LOW
+probe-key: 5a015f6dcd8772136225b3289b8959b0b9624e03
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/prompt-stream-join.mjs
+
+## INV-9750 — probe — LOW — `readLog` dies on a finite `limit` of 2^63 or more
+
+LOW — `readLog` dies on a finite `limit` of 2^63 or more
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+D=$1
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+sqlite3 -readonly ~/.cloudcli/auth.db ".backup '$D/work.db'" || exit 1
+cat > "$D/p.mjs" <<'JS'
+const m = await import('@/modules/database/index.js');
+await m.initializeDatabase();
+for (const limit of [2 ** 40, 2 ** 53, 2 ** 63, 1e21]) {
+  try { console.log(`readLog limit ${limit}:`, m.companionDb.readLog(1, limit).length, 'rows'); }
+  catch (e) { console.log(`readLog limit ${limit}: THREW`, e.code); }
+}
+JS
+DATABASE_PATH="$D/work.db" TSX_TSCONFIG_PATH=server/tsconfig.json node --import tsx "$D/p.mjs" 2>&1 | grep -E '^readLog'
+EOF
+bash "$D/p.sh" "$D"
+case "$D" in /tmp/athena-probe.*) rm -rf "$D";; esac
+# expect: limits 2**40 and 2**53 answer "N rows"; 2**63 and 1e21 print "THREW SQLITE_MISMATCH" while the defect stands (a cure prints rows for all four)
+```
+
+measured 2026-10-26 by chain chain-kaylee--companion--storage-20261026-152017-1a2e, finding L1, LOW
+probe-key: 76044802317323bb0cc71465b1ac334b28319486
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/companion-schema.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/companion.db.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/relayed-sends.db.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-permission-mode.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-storage.ts
+
+## INV-9751 — probe — LOW — `record` stores the brief verbatim; the history mark (interface 8) compares the user row's TRIMMED content with it
+
+LOW — `record` stores the brief verbatim; the history mark (interface 8) compares the user row's TRIMMED content with it
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+D=$1
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+sqlite3 -readonly ~/.cloudcli/auth.db ".backup '$D/work.db'" || exit 1
+cat > "$D/p.mjs" <<'JS'
+const m = await import('@/modules/database/index.js');
+await m.initializeDatabase();
+m.sessionsDb.createAppSession('athena-probe-app', 'claude', '/tmp/athena-probe-proj', 'app');
+const row = m.relayedSendsDb.record('athena-probe-app', 'turn', '  padded brief\n');
+console.log('stored text:', JSON.stringify(row.text), '| equals its own trim():', row.text === row.text.trim());
+JS
+DATABASE_PATH="$D/work.db" TSX_TSCONFIG_PATH=server/tsconfig.json node --import tsx "$D/p.mjs" 2>&1 | grep -E '^stored text|Error'
+EOF
+bash "$D/p.sh" "$D"
+case "$D" in /tmp/athena-probe.*) rm -rf "$D";; esac
+# expect: 'stored text: "  padded brief\n" | equals its own trim(): false' while record() stores the text verbatim (a cure that trims prints "padded brief" and true)
+```
+
+measured 2026-10-26 by chain chain-kaylee--companion--storage-20261026-152017-1a2e, finding L2, LOW
+probe-key: efe6dc0eebed07bfcfa362f72f8c44b71af1fade
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/companion-schema.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/companion.db.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/relayed-sends.db.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-permission-mode.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-storage.ts
+
+## INV-9752 — probe — LOW — `relayed_sends` is not carried across the three merge paths, and the rule is written nowhere
+
+LOW — `relayed_sends` is not carried across the three merge paths, and the rule is written nowhere
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+D=$1
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+sqlite3 -readonly ~/.cloudcli/auth.db ".backup '$D/work.db'" || exit 1
+cat > "$D/p.mjs" <<'JS'
+const m = await import('@/modules/database/index.js');
+await m.initializeDatabase();
+const { relayedSendsDb: R, sessionsDb: S } = m;
+S.createAppSession('athena-probe-app', 'claude', '/tmp/athena-probe-proj', 'app');
+S.createSession('athena-probe-dup', 'claude', '/tmp/athena-probe-proj', 'watcher row');
+R.record('athena-probe-dup', 'turn', 'recorded on the watcher row');
+S.assignProviderSessionId('athena-probe-app', 'athena-probe-dup');
+const kept = R.listForSession('athena-probe-app').map((r) => r.text);
+console.log('send recorded on the merged-away row survived on the app chat:', kept.includes('recorded on the watcher row'), JSON.stringify(kept));
+JS
+DATABASE_PATH="$D/work.db" TSX_TSCONFIG_PATH=server/tsconfig.json node --import tsx "$D/p.mjs" 2>&1 | grep -E '^send recorded|Error'
+EOF
+bash "$D/p.sh" "$D"
+case "$D" in /tmp/athena-probe.*) rm -rf "$D";; esac
+# expect: "survived on the app chat: false []" while no code moves relayed_sends before assignProviderSessionId deletes the duplicate row (a cure prints true)
+```
+
+measured 2026-10-26 by chain chain-kaylee--companion--storage-20261026-152017-1a2e, finding L3, LOW
+probe-key: 0be1f436db61660bb9fa63bdfb0a334e714c9a1e
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/companion-schema.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/companion.db.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/relayed-sends.db.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-permission-mode.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-storage.ts
+
+## INV-9753 — probe — LOW — `.verify/companion-storage.ts` refuses the live database by ONE spelling of its path
+
+LOW — `.verify/companion-storage.ts` refuses the live database by ONE spelling of its path
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+D=$1
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+F="$D/fakehome"; mkdir -p "$F/.cloudcli" || exit 1
+sqlite3 -readonly ~/.cloudcli/auth.db ".backup '$F/.cloudcli/auth.db'" || exit 1
+# a stand-in "live" database under a fake HOME: the guard builds its path from homedir(), so this is the file it guards
+HOME="$F" DATABASE_PATH="$F/.cloudcli/./auth.db" TSX_TSCONFIG_PATH=server/tsconfig.json node --import tsx .verify/companion-storage.ts > "$D/out.txt" 2>&1
+echo "exit $?; first line: $(head -1 "$D/out.txt")"
+echo "stand-in live db sessions with a permission_mode afterwards: $(sqlite3 "$F/.cloudcli/auth.db" 'select count(permission_mode) from sessions')"
+EOF
+bash "$D/p.sh" "$D"
+case "$D" in /tmp/athena-probe.*) rm -rf "$D";; esac
+# expect: "exit 0" and a nonzero permission_mode count while the guard compares one spelling of the path (a cure prints "exit 2; first line: DATABASE_PATH must point at a copy" and 0)
+```
+
+measured 2026-10-26 by chain chain-kaylee--companion--storage-20261026-152017-1a2e, finding L4, LOW
+probe-key: 4b7a47440c876fef188228cd41576b5d89c574db
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-storage.ts
+
+## INV-9754 — probe — LOW — `runDactylRead` settles only on `close`, so a descendant that holds the dactyl's stdout keeps a call pending past its 180 s bound
+
+LOW — `runDactylRead` settles only on `close`, so a descendant that holds the dactyl's stdout keeps a call pending past its 180 s bound
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+D="$1"
+R=/home/lyphe/.claude/claudecodeui_lyphe
+mkdir -p "$D/home/.claude/scripts" || exit 1
+printf '#!/bin/bash\nsleep 305 &\necho $! > "%s/pid"\nwait\n' "$D" > "$D/home/.claude/scripts/dactyl"
+chmod 755 "$D/home/.claude/scripts/dactyl"
+sed 's/180_000/2000/; s/DACTYL_KILL_GRACE_MS = 5_000/DACTYL_KILL_GRACE_MS = 1_000/' "$R/server/modules/companion/tools/transcript-render.ts" > "$D/tr.ts"
+echo '# x' > "$D/f.md"
+cat > "$D/run.mts" <<'INNER'
+const D = process.argv[2];
+const { runDactylRead } = await import(`${D}/tr.ts`);
+const t = Date.now();
+const r = await Promise.race([runDactylRead([`${D}/f.md`], 'x').then((x: any) => `resolved after ${Date.now() - t} ms: ${JSON.stringify(x)}`), new Promise((res) => setTimeout(() => res('PENDING 8 s after a 2 s bound'), 8000))]);
+console.log(r);
+process.exit(0);
+INNER
+( cd "$R" && HOME="$D/home" TSX_TSCONFIG_PATH=server/tsconfig.json timeout 60 node --import tsx "$D/run.mts" "$D" 2>&1 | tail -3 )
+P=$(cat "$D/pid" 2>/dev/null)
+case "$P" in ''|*[!0-9]*|0|1) ;; *) [ "$(ps -o comm= -p "$P" 2>/dev/null)" = sleep ] && kill "$P";; esac
+EOF
+bash "$D/p.sh" "$D"
+cd /tmp && case "$D" in /tmp/athena-probe.??????) rm -r "$D";; esac
+# expect: today "PENDING 8 s after a 2 s bound"; cured: a line starting "resolved after" with `ok":false` and "took longer than 2 seconds"
+```
+
+measured 2026-10-26 by chain chain-kaylee--companion--render-20261026-152329-cd93, finding L1, LOW
+probe-key: 52c0b8ab15b26a0e95144c927a519f829c9d989e
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.oxlintrc.json, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/transcript-render.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/followups.db.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/followups/followups.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/followups/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/tool-call-hint.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-companion-reads.mjs
+
+## INV-9755 — probe — LOW — the digest handed to her carries the dactyl's spend line (tokens, seconds), which Ruling 17 keeps out of her mouth
+
+LOW — the digest handed to her carries the dactyl's spend line (tokens, seconds), which Ruling 17 keeps out of her mouth
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+D="$1"
+R=/home/lyphe/.claude/claudecodeui_lyphe
+mkdir -p "$D/home/.claude/scripts" || exit 1
+cat > "$D/home/.claude/scripts/dactyl" <<'STUB'
+#!/bin/bash
+cat > /dev/null
+printf '✓ dactyl --read /tmp/x.md — 150 lines\n  claude-haiku-5-5 (served claude-haiku-5-5) · xhigh · 1 turns · 12s · 5.5k in · 2.3k out\n**Got done**\n- L150: it landed\n  quotes: 1 checked, all found\n'
+STUB
+chmod 755 "$D/home/.claude/scripts/dactyl"
+echo '# x' > "$D/f.md"
+cat > "$D/run.mts" <<'INNER'
+const D = process.argv[2];
+const { runDactylRead } = await import('@/modules/companion/tools/transcript-render.js');
+const r: any = await runDactylRead([`${D}/f.md`], 'x');
+console.log('spend line in the text she is handed:', /· \d+(\.\d+)?k? in · \d+(\.\d+)?k? out/.test(r.text ?? ''), '| quote line kept:', /quotes: 1 checked/.test(r.text ?? ''));
+process.exit(0);
+INNER
+( cd "$R" && HOME="$D/home" TSX_TSCONFIG_PATH=server/tsconfig.json timeout 60 node --import tsx "$D/run.mts" "$D" 2>&1 | tail -3 )
+EOF
+bash "$D/p.sh" "$D"
+cd /tmp && case "$D" in /tmp/athena-probe.??????) rm -r "$D";; esac
+# expect: today "spend line in the text she is handed: true | quote line kept: true"; cured: "false | quote line kept: true"
+```
+
+measured 2026-10-26 by chain chain-kaylee--companion--render-20261026-152329-cd93, finding L2, LOW
+probe-key: 7fba4856221c94f9231972aa7c3c7f7354fc9bfb
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.oxlintrc.json, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/transcript-render.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/followups.db.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/followups/followups.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/followups/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/tool-call-hint.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-companion-reads.mjs
+
+## INV-9756 — probe — LOW — a background-task notice is rendered as a turn he "said"
+
+LOW — a background-task notice is rendered as a turn he "said"
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+D="$1"
+R=/home/lyphe/.claude/claudecodeui_lyphe
+cat > "$D/run.mts" <<'INNER'
+import fs from 'node:fs';
+const D = process.argv[2];
+const { renderTurns } = await import('@/modules/companion/tools/transcript-render.js');
+const note = '<task-notification>\n<task-id>bwi4ett4h</task-id>\n<status>completed</status>\n<summary>Background command "load test" completed (exit code 0)</summary>\n</task-notification>';
+const rows: any[] = [
+  { kind: 'text', role: 'user', content: 'run the load test in the background', timestamp: '2026-10-26T10:00:00Z' },
+  { kind: 'text', role: 'assistant', content: 'Started it.' },
+  { kind: 'text', role: 'user', content: note, timestamp: '2026-10-26T10:05:00Z' },
+  { kind: 'text', role: 'assistant', content: 'It passed.' },
+];
+const turns = renderTurns('s', rows, `${D}/o.md`);
+const lines = fs.readFileSync(`${D}/o.md`, 'utf8').split('\n');
+const at = lines.findIndex((l) => l.startsWith('<task-notification>'));
+console.log(`turns: ${turns}; the notice sits under: ${JSON.stringify(lines[at - 1])}`);
+process.exit(0);
+INNER
+( cd "$R" && TSX_TSCONFIG_PATH=server/tsconfig.json timeout 60 node --import tsx "$D/run.mts" "$D" 2>&1 | tail -3 )
+EOF
+bash "$D/p.sh" "$D"
+cd /tmp && case "$D" in /tmp/athena-probe.??????) rm -r "$D";; esac
+# expect: today `turns: 2; the notice sits under: "He said:"`; cured: the line above the notice is no longer "He said:"
+```
+
+measured 2026-10-26 by chain chain-kaylee--companion--render-20261026-152329-cd93, finding L3, LOW
+probe-key: 10c925208fe3e24e402f5348481d861bfc7cb104
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.oxlintrc.json, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/transcript-render.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/followups.db.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/followups/followups.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/followups/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/tool-call-hint.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-companion-reads.mjs
+
+## INV-9757 — probe — (LOW) — the "comparison sign" exception the builder added deletes words when a letter follows `<`
+
+(LOW) — the "comparison sign" exception the builder added deletes words when a letter follows `<`
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.mjs" <<'EOF'
+import { DEFAULT_SOUND_TAGS, parseExpression } from '/home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/sentence-stream.ts';
+for (const raw of ['if x < y then keep it, but z > w is fine', '3 < 5 and 7 > 2', '<1> hi']) console.log(JSON.stringify(parseExpression(raw, DEFAULT_SOUND_TAGS)?.speech ?? null));
+EOF
+cat > "$D/p.sh" <<'EOF'
+cd /home/lyphe/.claude/claudecodeui_lyphe && TSX_TSCONFIG_PATH=server/tsconfig.json node --import tsx "$1"
+EOF
+bash "$D/p.sh" "$D/p.mjs"
+cd /tmp && case "$D" in /tmp/athena-probe.??????) rm -r "$D";; esac
+# expect: three lines — "if x w is fine" (words lost; the whole sentence once cured), "3 < 5 and 7 > 2", "<1> hi"
+```
+
+measured 2026-10-26 by chain chain-kaylee--companion--words-20261026-152016-1688, finding L1, LOW
+probe-key: 8e712599e208fb9bd06ae5ad7e765a32810458a1
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-envelopes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-prompt.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/sentence-stream.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/companion-types.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-wire-contract.mjs
+
+## INV-9758 — probe — (LOW) — the private-use character U+E000 is the parse's internal sound mark, so one in her text becomes a sound with no tag
+
+(LOW) — the private-use character U+E000 is the parse's internal sound mark, so one in her text becomes a sound with no tag
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.mjs" <<'EOF'
+import { DEFAULT_SOUND_TAGS, parseExpression } from '/home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/sentence-stream.ts';
+console.log(JSON.stringify(parseExpression('Hello  there', DEFAULT_SOUND_TAGS)));
+EOF
+cat > "$D/p.sh" <<'EOF'
+cd /home/lyphe/.claude/claudecodeui_lyphe && TSX_TSCONFIG_PATH=server/tsconfig.json node --import tsx "$1"
+EOF
+bash "$D/p.sh" "$D/p.mjs"
+cd /tmp && case "$D" in /tmp/athena-probe.??????) rm -r "$D";; esac
+# expect: speech "Hello <undefined> there" and sounds [{"at":5}] with no tag; once cured, sounds is [] and speech has no "undefined"
+```
+
+measured 2026-10-26 by chain chain-kaylee--companion--words-20261026-152016-1688, finding L2, LOW
+probe-key: 6144482b1e5783ee738a9101a05999cde74293de
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-envelopes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-prompt.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/sentence-stream.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/companion-types.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-wire-contract.mjs
+
+## INV-9759 — probe — (LOW) — an unclosed `<` or `[` earlier in a long clause turns every cut off, so the 300-character cut lands in the middle of a word
+
+(LOW) — an unclosed `<` or `[` earlier in a long clause turns every cut off, so the 300-character cut lands in the middle of a word
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.mjs" <<'EOF'
+import { createSentenceStream } from '/home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/sentence-stream.ts';
+const out = [];
+const stream = createSentenceStream((sentence) => out.push(sentence));
+stream.push('see [1 ' + 'word '.repeat(70).trim() + '.');
+stream.flush();
+console.log(JSON.stringify(out.map((piece) => piece.length)), JSON.stringify([out[1]?.slice(-4), out[2]?.slice(0, 4)]));
+EOF
+cat > "$D/p.sh" <<'EOF'
+cd /home/lyphe/.claude/claudecodeui_lyphe && TSX_TSCONFIG_PATH=server/tsconfig.json node --import tsx "$1"
+EOF
+bash "$D/p.sh" "$D/p.mjs"
+cd /tmp && case "$D" in /tmp/athena-probe.??????) rm -r "$D";; esac
+# expect: [3,300,53] and ["d wo","rd w"] — a word torn between the 300-character piece and the next; once cured the second piece ends on a whole word
+```
+
+measured 2026-10-26 by chain chain-kaylee--companion--words-20261026-152016-1688, finding L3, LOW
+probe-key: 087119697ab0c75f62cc5d5d57121cf71ea39622
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-envelopes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-prompt.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/sentence-stream.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/companion-types.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-wire-contract.mjs
+
+## INV-9760 — probe — (LOW) — the docs say to flush once per turn, and a turn's text blocks end with no whitespace, so a sentence is held and the next block's leading `[mood]` is dropped
+
+(LOW) — the docs say to flush once per turn, and a turn's text blocks end with no whitespace, so a sentence is held and the next block's leading `[mood]` is dropped
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.mjs" <<'EOF'
+import { DEFAULT_SOUND_TAGS, createSentenceStream, parseExpression } from '/home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/sentence-stream.ts';
+const blocks = ['Let me check.', '[delighted] Okay, three are working.'];
+for (const flushEachBlock of [false, true]) {
+  const out = [];
+  const stream = createSentenceStream((sentence) => out.push(sentence));
+  for (const block of blocks) { for (let at = 0; at < block.length; at += 7) stream.push(block.slice(at, at + 7)); if (flushEachBlock) stream.flush(); }
+  stream.flush();
+  console.log(flushEachBlock ? 'per block' : 'turn end ', JSON.stringify(out), JSON.stringify(parseExpression(out[out.length - 1], DEFAULT_SOUND_TAGS)?.mood));
+}
+EOF
+cat > "$D/p.sh" <<'EOF'
+cd /home/lyphe/.claude/claudecodeui_lyphe && TSX_TSCONFIG_PATH=server/tsconfig.json node --import tsx "$1"
+EOF
+bash "$D/p.sh" "$D/p.mjs"
+cd /tmp && case "$D" in /tmp/athena-probe.??????) rm -r "$D";; esac
+# expect: "turn end" gives one sentence ["Let me check.[delighted] Okay, three are working."] with mood null; "per block" gives two sentences and mood "delighted"
+```
+
+measured 2026-10-26 by chain chain-kaylee--companion--words-20261026-152016-1688, finding L4, LOW
+probe-key: 6e20a39cefb332ae9ee7980b9ad56682812796d0
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-envelopes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-prompt.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/sentence-stream.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/companion-types.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-wire-contract.mjs
+
+## INV-9761 — probe — (LOW) — `CompanionAlertKind` is exported without a comment naming its consumer
+
+(LOW) — `CompanionAlertKind` is exported without a comment naming its consumer
+
+```probe
+cd /home/lyphe/.claude/claudecodeui_lyphe && grep -B1 'export type CompanionAlertKind' server/modules/companion/session/companion-envelopes.ts | grep -c -i 'consum'
+# expect: 0 — the type's doc comment names no consumer; 1 once it does
+```
+
+measured 2026-10-26 by chain chain-kaylee--companion--words-20261026-152016-1688, finding L5, LOW
+probe-key: f04729f22ca37d5db61dce1bff49dee5af438e48
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-envelopes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-prompt.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/sentence-stream.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/companion-types.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-wire-contract.mjs
+
+## INV-9762 — probe — (LOW) — `CompanionSound`'s doc says which text `at` counts into and not in what unit
+
+(LOW) — `CompanionSound`'s doc says which text `at` counts into and not in what unit
+
+```probe
+cd /home/lyphe/.claude/claudecodeui_lyphe && grep -c -i -E 'utf-16|code unit|UTF16' server/shared/companion-types.ts src/shared/companion-types.ts
+# expect: server/shared/companion-types.ts:0 and src/shared/companion-types.ts:0 — no unit named; 1 each once it is
+```
+
+measured 2026-10-26 by chain chain-kaylee--companion--words-20261026-152016-1688, finding L6, LOW
+probe-key: ca0308ce523c271a0afea0682f98d5623ab0dae4
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-envelopes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-prompt.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/sentence-stream.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/companion-types.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-wire-contract.mjs
+
+## INV-9765 — probe — LOW — `sendToUser`'s failure depends on whether a page is open, and a non-JSON payload reaches the page as an empty binary frame
+
+LOW — `sendToUser`'s failure depends on whether a page is open, and a non-JSON payload reaches the page as an empty binary frame
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+cat > "$(dirname "$0")/x.mts" <<'EOT'
+import { connectedClients, registerSocketUser, sendToUser } from '/home/lyphe/.claude/claudecodeui_lyphe/server/modules/websocket/services/websocket-state.service.ts';
+const got: unknown[] = [];
+const tryBigint = (label: string, id: number) => {
+  try { sendToUser(id, { n: 10n }); console.log(label, 'returns'); } catch (e) { console.log(label, 'throws:', (e as Error).message); }
+};
+tryBigint('bigint_account_with_no_page', 777);
+const page = { readyState: 1, send: (d: unknown) => got.push(d) };
+connectedClients.add(page); registerSocketUser(page, 9);
+tryBigint('bigint_account_with_open_page', 9);
+sendToUser(9, undefined);
+console.log('undefined_payload_reaches_page_as', JSON.stringify(got));
+EOT
+cd /home/lyphe/.claude/claudecodeui_lyphe && npx tsx --tsconfig server/tsconfig.json "$(dirname "$0")/x.mts" 2>&1 | tail -4
+EOF
+bash "$D/p.sh"
+# expect: while the defect stands: bigint_account_with_no_page returns, bigint_account_with_open_page throws "Do not know how to serialize a BigInt", and undefined_payload_reaches_page_as prints [null] (a non-string frame). Cured: both bigint lines show the same outcome and no non-string frame is sent.
+```
+
+measured 2026-10-26 by chain chain-kaylee--companion--run-verbs-20261026-152017-c24a, finding L1, LOW
+probe-key: 2de2d063130156669c9a23516fa6077f4f16bd5a
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/websocket/services/chat-websocket.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-p3-run-verbs.mjs
+
+## INV-9766 — probe — LOW — the builder's driver has a check that cannot fail: `permission_answer_reached_the_turn`
+
+LOW — the builder's driver has a check that cannot fail: `permission_answer_reached_the_turn`
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+cat > "$(dirname "$0")/pane.mjs" <<'EOT'
+import { createScratchChat, deleteScratchChat, openScratchChatOnHaiku, sendTurn } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/scratch-chat.mjs';
+import { openConsole } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/console.mjs';
+import { readFileSync } from 'node:fs';
+const driver = readFileSync('/home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-p3-run-verbs.mjs', 'utf8');
+const prompt = /sendTurn\(page, '([^']*AskUserQuestion[^']*)'\)/.exec(driver)?.[1];
+const checkStillThere = /permission_answer_reached_the_turn[^\n]*includes\('Blue'\)/.test(driver);
+console.log('driver_check_includes_Blue_present=' + checkStillThere);
+if (!prompt) { console.log('driver prompt not found'); process.exit(0); }
+const session = await openConsole({ launchOptions: { handleSIGINT: false, handleSIGTERM: false, handleSIGHUP: false } });
+let id = null;
+try {
+  id = await createScratchChat(session);
+  await openScratchChatOnHaiku(session, id);
+  await sendTurn(session.page, prompt);
+  await session.page.waitForTimeout(1200);
+  const pane = await session.page.locator('.chat-messages-pane').innerText();
+  console.log('pane_has_Blue_before_any_answer=' + pane.includes('Blue'));
+} finally {
+  if (id) await deleteScratchChat(session, id);
+  await session.browser.close();
+}
+EOT
+cd "$(dirname "$0")" && timeout 150 node pane.mjs 2>&1 | tail -3
+EOF
+bash "$D/p.sh"
+# expect: while the defect stands: driver_check_includes_Blue_present=true and pane_has_Blue_before_any_answer=true (the check passes before any answer is given). Cured: the check no longer reads a word the user's own prompt contains, or the pane line prints false.
+```
+
+measured 2026-10-26 by chain chain-kaylee--companion--run-verbs-20261026-152017-c24a, finding L2, LOW
+probe-key: f5dd83769f676bb2621fcf37274035e87de887f3
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/websocket/services/chat-websocket.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-p3-run-verbs.mjs
+
+## INV-9767 — probe — LOW — `abortChatRun` ends the session's NEXT run when one starts during its `await` (carried verbatim from the old handler; a new door reaches it)
+
+LOW — `abortChatRun` ends the session's NEXT run when one starts during its `await` (carried verbatim from the old handler; a new door reaches it)
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cp /home/lyphe/.cloudcli/auth.db "$D/auth.db" || exit 1
+cat > "$D/p.sh" <<'EOF'
+cat > "$(dirname "$0")/x.mts" <<'EOT'
+const R = '/home/lyphe/.claude/claudecodeui_lyphe/server/modules/websocket/services/';
+const { chatRunRegistry } = await import(R + 'chat-run-registry.service.ts');
+const { abortChatRun } = await import(R + 'chat-run-verbs.service.ts');
+const stub = () => ({ readyState: 1, got: [] as string[], send(d: string) { this.got.push(d); } });
+const a = stub(), b = stub();
+const runA = chatRunRegistry.startRun({ appSessionId: 'r', provider: 'claude', providerSessionId: null, connection: a, userId: 1 })!;
+// While the runtime's abort is awaited, the old run settles on its own and a queued message starts the next one.
+const deps: any = { runtime: { abort: async () => {
+  chatRunRegistry.completeRunIfCurrent(runA, { exitCode: 0 });
+  chatRunRegistry.startRun({ appSessionId: 'r', provider: 'claude', providerSessionId: null, connection: b, userId: 1 });
+  await new Promise((r) => setTimeout(r, 10));
+  return true;
+} } };
+const outcome = await abortChatRun('r', deps);
+const frames = (s: any) => s.got.map((x: string) => { const j = JSON.parse(x); return j.kind + (j.kind === 'complete' ? `(aborted=${j.aborted})` : ''); });
+console.log('outcome', outcome, '| successor status', chatRunRegistry.getRun('r')?.status, '| successor frames', JSON.stringify(frames(b)));
+process.exit(0);
+EOT
+cd /home/lyphe/.claude/claudecodeui_lyphe && DATABASE_PATH="$(dirname "$0")/auth.db" npx tsx --tsconfig server/tsconfig.json "$(dirname "$0")/x.mts" 2>&1 | grep '^outcome'
+EOF
+bash "$D/p.sh"
+# expect: while the defect stands: "outcome stopped | successor status completed | successor frames ["complete(aborted=true)"]" (the stop ended the NEXT run). Cured: "successor status running" and no frames.
+```
+
+measured 2026-10-26 by chain chain-kaylee--companion--run-verbs-20261026-152017-c24a, finding L3, LOW
+probe-key: 8141bc8d88794fde25ff44caa53224faea1aa1be
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/websocket/services/chat-websocket.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-p3-run-verbs.mjs

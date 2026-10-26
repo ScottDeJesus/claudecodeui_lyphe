@@ -319,11 +319,12 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/panel-fill.mjs
 ## MAN-9033 — The usage rings on the views rail — UsageRings, Meter's ring face, ringTone, .verify/probe-usage-rings.mjs
 section: accounts/010 The usage rings on the views rail
 
-Two rings at the foot of the views rail, directly above Inbox — "5h" over "wk". `UsageRings` (accounts module, exported through its barrel, mounted by `WorkspaceRail`'s foot: MAN-9005) draws them with the library's `Meter` in `variant="ring"`. They stand wherever the rail does: docked on a desktop, inside the drawer on a phone (one tree across 768px).
+Two rings at the foot of the views rail, directly above Inbox — the 5-hour over the week, each labelled with the time left until its window resets ("2h", "4d"). `UsageRings` (accounts module, exported through its barrel, mounted by `WorkspaceRail`'s foot: MAN-9005) draws them with the library's `Meter` in `variant="ring"`. They stand wherever the rail does: docked on a desktop, inside the drawer on a phone (one tree across 768px).
 
 ## What they read
 - `accountInUseUsage(usage, accounts, now)` (MAN-8862) — the SAME reading the panel's top meters draw, so a ring and its meter always show one figure. Never the raw `useAccountsContext().usage`: `GET /api/usage` measures the box's live login, which is not always the account in use, and a ring on it would read under the wrong owner. `now` is `useMinuteTick()`. No fetch, no poll.
 - The figure is `windowPercent(window)` — the integer the meter prints. The colour is judged on that integer, so the tooltip never says 75% beside a green ring.
+- The label is `resetCountdown(resetsAt, now)` (`utils/usageWindows.ts`): ONE unit, rounded up — whole days while a day or more is left, then hours, then minutes ("5d", "4h", "45m"), and "0m" once the reset has passed; a figure that rounds up into the next unit is said in it ("1h", never "60m"; "1d", never "24h"). `now` is the rings' minute tick, so the label moves on once a minute. A ring with no figure keeps its name, "5h" or "wk".
 - The hover words, also the ring's `aria-label` (joined with ". "): `WINDOW_NAMES[key]` ("Current 5-hour window" / "This week"), `windowValue` ("42% used", "was 42% used" for a rolled window), `resetsLine(resetsAt)`. All three helpers are the meters' own (`utils/usageWindows.ts`, `UsageMeters.tsx`).
 - No reading — `usage` null, unreachable with no filed reading under it, a body with no `windows` array, the window absent from `windows`, or a window whose `percent` is absent or not finite (`windowPercent` answers `null`, never `NaN`) — draws the track only: no arc element, no `data-tone`, no `aria-valuenow`, and the words say *No reading yet*. The two cells never go away, so the foot never jumps.
 - A degraded reading and a rolled window dim to `opacity-60`, as the panel's bars do: a red ring on a window that has already reset would be a false alarm.
@@ -347,9 +348,9 @@ A figure on a boundary takes the higher colour. The 5-hour yellow comes later be
 
 ## Proof
 `node .verify/probe-usage-rings.mjs before|after`, against the production client (:5184; `scripts/prod-client-build.sh` between the two runs). Logs in as the dev account, drops every preference write and refuses every account write.
-- (a) desktop and phone, light and dark: two rings directly above Inbox, "5h" over "wk", centred, 28px, 4.5px arc; each figure equals its meter's printed figure (the open Accounts widget, else the account popover); each tone is the band rule's and the arc is painted in that tone's colour; no tab stop; the hover words are in the accessible name; the panel's stacked meters keep their markup; a 560px phone keeps the foot whole while the runs scroll; reduced motion stills the arc; console errors 0.
-- (b) the usage reply replaced in the browser only (`page.route`): the week at 74/75/89/90 → green/yellow/yellow/red, the 5-hour at 79/80/89/90 likewise, a reply without the weekly window, and an unreachable reply.
-- 2026-10-26: 72 PASS, 0 FAIL, exit 0.
+- (a) desktop and phone, light and dark: two rings directly above Inbox, the 5-hour over the week, each labelled with a countdown (the 5-hour's in hours or minutes), centred, 28px, 4.5px arc; each figure equals its meter's printed figure (the open Accounts widget, else the account popover); each tone is the band rule's and the arc is painted in that tone's colour; no tab stop; the hover words are in the accessible name; the panel's stacked meters keep their markup; a 560px phone keeps the foot whole while the runs scroll; reduced motion stills the arc; console errors 0.
+- (b) the usage reply replaced in the browser only (`page.route`): the week at 74/75/89/90 → green/yellow/yellow/red, the 5-hour at 79/80/89/90 likewise, resets 2½ hours and 2½ days ahead labelled "3h" and "3d", a reply without the weekly window (its ring keeps its name "wk"), and an unreachable reply.
+- 2026-10-26, with the countdown labels: 73 PASS, 0 FAIL, exit 0.
 
 ## Traps
 - To fake "no reading" the probe must also blank the in-use row's filed `reading`: with an account in use, an unreachable `/api/usage` still draws that row's reading (MAN-8862), in the meters and the rings alike. A faked healthy reply must carry the in-use account's `digest` for the same reason.
@@ -9662,13 +9663,26 @@ Four things to know before running one:
   nudge no longer depends on that file being reachable by an import; it stays there because it is
   never a change under test. Never aim it at a file the run is verifying.
 
+A lighter check of the same join — it restarts and hands over nothing, so it needs no sudo and may run beside others:
+
+```bash
+node .verify/prompt-stream-join.mjs
+```
+
+It creates a scratch chat in `PROBE_PROJECT`, puts it on Haiku, sends two one-line messages, prints
+`model_chip`, `CHAT <id>`, `first_reply`, `second_reply`, `provider_session_id`, `chat_deleted`, and
+exits 1 when the second reply never arrives. The join itself is read from the journal afterwards
+(`sudo journalctl -u cloudcli-server-dev.service --since "<start>"`, grepped for `Message joined the
+running process` and filtered by the `CHAT` id and `provider_session_id`): the dev app is shared, so
+a bare grep also prints other chats' join lines.
+
 Its siblings — the driver they all spawn, the `turn|abort|env-off|unit-down` cases and the
 host-only one — share the same discipline, and which script drives what is in §"The browser
 harness" above, under *Keepalive survival*. What the mechanism itself is, and what the boot pass
 does, is in [docs/MANUAL.md (hosting)](MANUAL.md) §"Rules that bite" and
 [`server/modules/providers/list/claude/session-host/MANUAL.md (README)`](../server/modules/providers/list/claude/session-host/MANUAL.md).
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/session-host/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/chat-process-reuse.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/keepalive-cases-p4.mjs
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/session-host/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/chat-process-reuse.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/keepalive-cases-p4.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/prompt-stream-join.mjs
 
 ## MAN-677 — The handover cases
 section: verification/007 The handover cases
@@ -13926,11 +13940,11 @@ The credential, the guard, the account of a chat and the link: MAN-8992. The gut
 | file | owns |
 | --- | --- |
 | `server/modules/database/followups-schema.ts` | `FOLLOWUPS_SCHEMA_SQL`, `IF NOT EXISTS`, exec'd at every boot beside `NOTES_SCHEMA_SQL` (`migrations.ts`) |
-| `server/modules/database/repositories/followups.db.ts` | `followupsDb` (`listForChat`, `listForChatOfUser`, `getInChat`, `getOfUser`, `addMany`, `closeInChat`, `setStateForUser`, `moveToSession`), `FollowupRow`, `FollowupKind` |
-| `server/modules/followups/followups.service.ts` | `followupsService`: the judging, the dedupe, the frame |
+| `server/modules/database/repositories/followups.db.ts` | `followupsDb` (`listForChat`, `listForChatOfUser`, `listOpenOfUser`, `getInChat`, `getOfUser`, `addMany`, `closeInChat`, `setStateForUser`, `moveToSession`), `FollowupRow`, `FollowupKind` |
+| `server/modules/followups/followups.service.ts` | `followupsService`: the judging, the dedupe, the frame, and the companion's read (`listOpenForAccount`) |
 | `server/modules/followups/followups.routes.ts` | the widget's door (`/api/followups`), `readFollowupId` |
 | `server/modules/followups/followups.command-routes.ts` | the command's door (`/api/followups-cmd`) |
-| `server/modules/followups/followups.module.ts`, `index.ts` | `createFollowupsModule()`: both routers over one service; links `~/.local/bin/followups` |
+| `server/modules/followups/followups.module.ts`, `index.ts` | `createFollowupsModule()`: both routers over one service; links `~/.local/bin/followups`. The barrel also exports `listOpenFollowups`, the companion's read |
 | `bin/followups.mjs` | the command |
 | `server/modules/providers/list/claude/surface-signal.ts` | `FOLLOWUPS_SIGNAL`, the standing instruction |
 | `src/modules/followups/` | `useFollowups` (hooks/), `FollowupsContext` (context/), `FollowupsWidgetBody`, `FollowupRow`, barrel |
@@ -13949,8 +13963,9 @@ The credential, the guard, the account of a chat and the link: MAN-8992. The gut
 | `repointSessionToProviderSession`: the replaced row | moved to the surviving id first |
 | `createForkedSession`: the watcher's row for the new transcript | the new row is inserted FIRST (a foreign key needs its parent), the items move onto it, then the watcher's row is deleted |
 | the legacy `sessions` rebuild in `migrations.ts` (copy-and-rename, foreign keys off, one-time) | runs before the table exists |
+| any of the three merges above, for the companion's `relayed_sends` rows (`companion-schema.ts`) | not moved, and none to move: a merge deletes only a watcher's row (its `session_id` is its provider session id), and the companion records a send only on a chat of her list (`session_id <> provider_session_id`), so no send sits on a row a merge removes |
 
-The cascade is why no delete path needs to know the table; the merges are the one place it would be wrong, so each moves before it deletes. Measured: deleting three probe chats in the app left 0 of their 4 rows.
+The cascade is why no delete path needs to know the table; the merges are the one place it would be wrong, so each moves before it deletes. `relayed_sends` hangs on `sessions` the same way and is the one table the merges do not move, for the reason in the last row; a writer that records sends on any other kind of row extends those three paths first (`relayed-sends.db.ts` carries the same sentence). Measured: deleting three probe chats in the app left 0 of their 4 rows.
 
 ## The service — what a line is
 
@@ -13964,6 +13979,10 @@ A line is trimmed and must be 1-240 characters, one line of plain text with no c
 | the person's | `/api/followups`, `authenticateToken` | the operator's JWT; it refuses the chat credential (401) | `GET ?session=<app session id>`: the chat's items, open and done, oldest first, only where `user_id` is the caller's (a chat of another account answers `[]`); `PATCH /:id { state: 'open' | 'done' }`: ticks or unticks, another account's id is 404 |
 
 There is no delete and no reopen on the chat's door: an item leaves only with its chat, and the person unticks in the widget. A subagent soul launched from a chat carries the PARENT's credential beside its own session id, and the guard refuses that pair (MAN-8992): that is what keeps a soul out of the chat's list. `readAuthenticatedUserId` (`server/shared/utils.ts`) is the strict account reader both this door and `/api/notes` use.
+
+## The companion's read
+
+`listOpenFollowups(userId, appSessionId | null, limit = 20)` (barrel; `followupsService.listOpenForAccount`) answers `Array<{ sessionId, followup }>`: that account's OPEN items, newest first, for one chat or, with `null`, for every chat, each mapped by the same `toFollowup` the widget's read uses, so a line reads exactly as the Next steps widget shows it. `limit` is held to 1-200 (a non-finite one is 20): the answer lands in a model's context. One chat's read is `listForChatOfUser` (the account's rows only, so a chat of another account reads none); the account-wide read is `followupsDb.listOpenOfUser(userId, limit)`, `ORDER BY id DESC`. Its consumer is the companion's `list_followups(session)` tool, which `companion-prompt.ts` names; 2026-10-26: nothing in `server/` calls `listOpenFollowups` yet. Shown by `.verify/probe-companion-reads.mjs` step 7: two items filed through the command door read back field for field as `GET /api/followups?session=` answers them.
 
 ## The frame
 

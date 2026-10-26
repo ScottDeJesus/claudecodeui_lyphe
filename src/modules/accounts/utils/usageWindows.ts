@@ -90,3 +90,23 @@ const HAS_ZONE = /(?:Z|[+-]\d{2}:?\d{2})$/i;
 export function resetInstant(resetsAt: string): number {
   return new Date(HAS_ZONE.test(resetsAt) ? resetsAt : `${resetsAt}Z`).getTime();
 }
+
+/**
+ * The time left until `resetsAt`, as a usage ring's label says it: ONE unit, rounded UP — whole days while a day or more
+ * is left, then whole hours, then whole minutes ("5d", "4h", "45m"), and "0m" once the moment has passed. Rounded up, so
+ * the label never says the reset is nearer than it is; a figure that rounds up into the next unit is said in that unit
+ * ("1h", never "60m"; "1d", never "24h"). `null` when there is no reset time to count to.
+ *
+ * `now` is the caller's clock in epoch milliseconds (the rings' minute tick), so the label moves on with it.
+ */
+export function resetCountdown(resetsAt: string | null, now: number): string | null {
+  if (!resetsAt) return null;
+  const msLeft = resetInstant(resetsAt) - now;
+  if (Number.isNaN(msLeft)) return null;
+  if (msLeft <= 0) return '0m';
+  const minutes = Math.ceil(msLeft / 60_000);
+  if (minutes < 60) return `${minutes}m`;
+  const hours = Math.ceil(msLeft / 3_600_000);
+  if (hours < 24) return `${hours}h`;
+  return `${Math.ceil(msLeft / 86_400_000)}d`;
+}
