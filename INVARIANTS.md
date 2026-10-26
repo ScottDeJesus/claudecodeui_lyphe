@@ -9233,20 +9233,6 @@ probe-key: 3cb83b06247521d690c82ed1ae10ba6b77ad6115
 
 governs: /opt/shadow-connector/core/estimator/fire_smoke_breakdown.py
 
-## INV-8670 — probe — LOW — "the one home of the repeat-shot rule" in MAN-3037 and INV-2337 is unscoped; `_pano_seed` strips ` #N` by its own regex
-
-LOW — "the one home of the repeat-shot rule" in MAN-3037 and INV-2337 is unscoped; `_pano_seed` strips ` #N` by its own regex
-
-```probe
-cd /opt/shadow-connector && grep -n "_SHOT_SUFFIX" extractors/docusketch/panoramas.py core/sketch_forge/_pano_seed.py | head -4; docstore get MAN-3037 --text | grep -c "the one home of the repeat-shot rule"
-expect: two `_SHOT_SUFFIX…` definitions (panoramas.py:67 and _pano_seed.py:54) and a count of 1 while MAN-3037 says "the one home" unscoped
-```
-
-measured 2026-10-17 by chain chain-tour-affected-areas--rooms--docs-20261017-151147-c858, finding L6, LOW
-probe-key: 02fcf21b7c1ab10735441ae3b9a45d241ecaa80c
-
-governs: /opt/shadow-connector/cerberus/preliminary_editor_v2_SHIP_HISTORY.md, /opt/shadow-connector/core/estimator/extract_docusketch.py, /opt/shadow-connector/core/estimator/fire_smoke_breakdown.py, /opt/shadow-connector/core/estimator/SHIP_HISTORY.md, /opt/shadow-connector/core/preliminary_estimator/photo_areas.py, /opt/shadow-connector/core/preliminary_estimator/room_list.py, /opt/shadow-connector/extractors/docusketch/docusketch.md, /opt/shadow-connector/extractors/docusketch/panoramas.py, /opt/shadow-connector/installation_guides/preliminary_estimator_schema.sql, /opt/shadow-connector/installation_guides/preliminary_estimator_v2_schema.sql, /opt/shadow-connector/plans/predictive-estimator.md, /opt/shadow-connector/plans/preliminary-editor-v2.md, /opt/shadow-connector/scripts/migrate_preliminary_estimates.py
-
 ## INV-8671 — probe — LOW — two of the five seam runs the brief asked for are not in the report, and the required search does not print two of its three subjects
 
 LOW — two of the five seam runs the brief asked for are not in the report, and the required search does not print two of its three subjects
