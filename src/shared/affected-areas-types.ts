@@ -9,6 +9,9 @@
 // first. The two edit TOGETHER: a field renamed on one side and not the other is a screen that quietly
 // stops reading. CloudCLI's lane forwards every body untouched, so there is no third copy.
 //
+// The day-one sketch's shapes (the room-layout read, the plan, a region's placement) are wire_layout.py's,
+// mirrored in `affected-areas-layout-types.ts` and re-exported below by name: import them from here.
+//
 // JSON is camelCase on every route; wire.py's `cls` is the key `class`, and it is a key here too.
 // Every date and datetime is ISO text (`2026-10-13`, `2026-10-13T08:00:00Z`), every id is text, and
 // a point is `[x, y]` and a box `[x0, y0, x1, y1]`, both in 0..1 of one view.
@@ -21,6 +24,29 @@
 //
 // It imports NOTHING from `server/`: the client tsconfig does not compile server code, and an
 // `import type` across that boundary is a bundle that cannot build.
+
+import type { DayOneFloor, LayoutStatus, LayoutViewState, Placement } from '@/shared/affected-areas-layout-types';
+
+export type {
+  AreaPhoto,
+  DayOneArea,
+  DayOneFloor,
+  DayOneObject,
+  DayOneOpening,
+  DayOneRoom,
+  DayOneSpot,
+  LayoutPlanResult,
+  LayoutReadResult,
+  LayoutStatus,
+  LayoutViewState,
+  PinLine,
+  PinLoop,
+  Placement,
+  RoomCheck,
+  RoomSide,
+  ScaleLine,
+  ScaleSource,
+} from '@/shared/affected-areas-layout-types';
 
 // ---------------------------
 
@@ -173,6 +199,8 @@ export type ViewEntry = {
   height: number;
   /** Reader. */
   read: ReadState | null;
+  /** Day-one plan: the layout read, routes. The room-layout read this view shows. */
+  layout: LayoutViewState | null;
 };
 
 /** One panorama of a tour. `live` is false when DocuSketch could not be asked and the pano is known from stored rows only. */
@@ -194,6 +222,12 @@ export type TourDetail = {
   context: ContextSummary;
   rooms: RoomEntry[];
   panos: PanoEntry[];
+  /**
+   * Day-one plan: routes. Where the tour's room-layout reads and plan stand, and the plan itself, one entry
+   * per floor; read from the plan in force, never built by this GET.
+   */
+  layout: LayoutStatus | null;
+  dayOne: DayOneFloor[];
 };
 
 /** POST /tours/{tourId}/panos/{panoId}/views. */
@@ -270,6 +304,8 @@ export type Region = {
   standing: boolean | null;
   /** Marks: the line the operator set for this kind on this read's model and contract, or `null` when none is set. */
   threshold: number | null;
+  /** Day-one plan: judgment. Where the region lands on the plan and the area it is counted in. */
+  placement: Placement | null;
 };
 
 /** A view with what the reader made of it. Reader. */

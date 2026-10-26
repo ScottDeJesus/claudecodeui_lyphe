@@ -3181,14 +3181,15 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/cerberus-needs-you-sever
 
 ## MAN-8558 — Affected-areas client wire — src/shared/affected-areas-types.ts and api.affectedAreas
 
-The browser's typed view of `/api/affected-areas` (the Tours tab): one wire-type file and one `api` block. The one home of every shape is shadow-connector's `core/affected_areas/wire.py` (INV-8564); the routes are MAN-8540.
+The browser's typed view of `/api/affected-areas` (the Tours tab): one wire-type file and one `api` block. The one home of every shape is shadow-connector's `core/affected_areas/wire.py` and its sibling `wire_layout.py` for the day-one plan (INV-8564); the routes are MAN-8540.
 
 ## Files
 | file | holds |
 |---|---|
-| `src/shared/affected-areas-types.ts` | 39 exported types: every `wire.py` model, its 11 nested ones and the four envelopes `TourList`, `ViewsResult`, `UnderstandingMarkResult`, `Refusal`; plus the unions `Face`, `Basis`, `Verdict`, `MarkQueue`. `Point` and `Box` are file-private (`number[]`). Imports nothing from `server/`. |
+| `src/shared/affected-areas-types.ts` | 39 types it defines, and the 18 of the next row re-exported by name (`export type { … } from '@/shared/affected-areas-layout-types'`): every `wire.py` model, its 11 nested ones and the four envelopes `TourList`, `ViewsResult`, `UnderstandingMarkResult`, `Refusal`; plus the unions `Face`, `Basis`, `Verdict`, `MarkQueue`. `Point` and `Box` are file-private (`number[]`). Imports nothing from `server/`. |
+| `src/shared/affected-areas-layout-types.ts` | 18 types: every `wire_layout.py` model (the layout read, the plan's rooms, spots, openings, objects, areas, scale and pins, `Placement`), and the four fields they fill on `ViewEntry`, `Region` and `TourDetail` live in the file above. `Point` and `Box` are file-private here too, in 0..1 of the FLOOR's drawing frame. Imports `Budget`, `Face`, `Region` with `import type` from `@/shared/affected-areas-types` (the lint rule bans the relative form) |
 | `src/shared/api.ts` | `api.affectedAreas`, 12 verbs, beside `api.cerberus`; a type-only import from the mirror. The same file holds `api.carrierBulletins` (the Bulletins view's four GET verbs and their own mirror, `carrier-bulletins-types.ts`): MAN-8865 |
-| `.oxlintrc.json` | `src/shared/affected-areas-types.ts` in the `frontend-shared-file` list (INV-5890) |
+| `.oxlintrc.json` | `src/shared/affected-areas-types.ts` and `src/shared/affected-areas-layout-types.ts` in the `frontend-shared-file` list (INV-5890): a new shared file is an unknown element until listed |
 
 ## Verbs
 Every answer is the wire shape bare, the type named in a `// →` comment above the verb. Ids go through `encodeURIComponent`. The lane also forwards the cut of a pano's views and the plan of a whole tour (MAN-8559); no screen calls them, so `api` holds no verb for either, and `ViewsResult` and `TourPlan` stay as the wire's mirror of their answers.
@@ -3216,7 +3217,7 @@ Every answer is the wire shape bare, the type named in a `// →` comment above 
 | `{ error, detail }` (`Refusal`) | shadow-connector's marks routes |
 
 ## Rules an editor must not break
-- A shape changes in `wire.py` first; the mirror moves in the same change. why: a field renamed on one side is a screen that stops reading.
+- A shape changes in `wire.py` (the day-one plan's in `wire_layout.py`) first; the mirror moves in the same change. why: a field renamed on one side is a screen that stops reading.
 - Field names are the wire's camelCase; `class` is a key (`wire.py`'s `cls` alias). Dates are ISO text, ids text, a point `[x, y]` and a box `[x0, y0, x1, y1]`, both in 0..1 of one view.
 - A response field is never optional. A field a later plan fills (`read`, `understanding`, `regions`, `mark`, `standing`, `threshold`, `holdout`, `regionsStanding`, `marksCount`, `standingCount`, `photosAffected`, `understandingMark`, `current`, `effectiveClass`, `tourName`, …) is `T | null`: `null` is "not judged", never "judged and found nothing".
 - A request field `wire.py` defaults is optional (`newClass?: string | null`).
@@ -3228,7 +3229,7 @@ Every answer is the wire shape bare, the type named in a `// →` comment above 
 - 2026-10-17: `GET /queue` answered 200 with the keys `mode`, `items`, `remaining` (an item: `tourId`, `panoId`, `roomName`, `jobLabel`, `view`, `region`); `GET /proving` answered 200 with `model`, `contractVersion`, `contractHash`, `understanding`, `classes` (a class: the twelve fields of `ProvingClass`). Each is the typed key set.
 - 2026-10-18: the file's property names, read by the TypeScript compiler, against `model_json_schema(by_alias=True)` per model: 39 of 39 equal. The five fields the fix added (`photosAffected`, `understandingMark`, `current`, `effectiveClass`, `tourName`) are each `T | null` here as `T | None` there; no model class was added.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/affected-areas-types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/affected-areas-layout-types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/affected-areas-types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts
 
 ## MAN-8559 — The affected-areas lane — /api/affected-areas forwarded to shadow-connector
 

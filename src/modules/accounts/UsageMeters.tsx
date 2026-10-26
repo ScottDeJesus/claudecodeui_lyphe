@@ -87,8 +87,11 @@ function heavyLine(tone: 'accent' | 'warn', sub: string | undefined): string | u
  *
  * The instant comes from `resetInstant`, the one reader this module has, so the countdown here
  * and the `rolled` flag the server set describe the same moment.
+ *
+ * `lead` opens the sentence. The meters say "Resets"; each account row (`ClaudeAccountRowViews`)
+ * says "Weekly resets" for that account's own week.
  */
-function resetsLine(resetsAt: string | null): string | undefined {
+export function resetsLine(resetsAt: string | null, lead = 'Resets'): string | undefined {
   if (!resetsAt) return undefined;
   const at = new Date(resetInstant(resetsAt));
   if (Number.isNaN(at.getTime())) return undefined;
@@ -101,15 +104,15 @@ function resetsLine(resetsAt: string | null): string | undefined {
   const clock = new Date(Math.round(at.getTime() / 60_000) * 60_000)
     .toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   const msLeft = at.getTime() - Date.now();
-  if (msLeft <= 0) return `Resets at ${clock}`;
+  if (msLeft <= 0) return `${lead} at ${clock}`;
 
   const hoursLeft = Math.round(msLeft / 3_600_000);
-  if (hoursLeft < 1) return `Resets at ${clock} · under an hour left`;
-  if (hoursLeft < 24) return `Resets at ${clock} · about ${hoursLeft} hour${hoursLeft === 1 ? '' : 's'} left`;
+  if (hoursLeft < 1) return `${lead} at ${clock} · under an hour left`;
+  if (hoursLeft < 24) return `${lead} at ${clock} · about ${hoursLeft} hour${hoursLeft === 1 ? '' : 's'} left`;
 
   const daysLeft = Math.round(msLeft / 86_400_000);
   const weekday = at.toLocaleDateString([], { weekday: 'long' });
-  return `Resets ${weekday} ${clock} · about ${daysLeft} day${daysLeft === 1 ? '' : 's'} left`;
+  return `${lead} ${weekday} ${clock} · about ${daysLeft} day${daysLeft === 1 ? '' : 's'} left`;
 }
 
 /**
