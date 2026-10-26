@@ -58,6 +58,8 @@ export function PanoAreas({ views, selectedRegionId, codebook, onSelectRegion }:
               label={t('affectedAreas.pano.listLabel', { face: faceName })}
               // The view's name above names this card, so its own "Marked on this view" title gives way.
               headingId={headingId}
+              // FILL: placement — the pano's room (key and floor) handed on, so each row's meta line says "Counted in {room}" when
+              // its placement credits another room and "Seen in {n} photos" when several photos see its area.
               onSelect={onSelectRegion}
             />
           </div>

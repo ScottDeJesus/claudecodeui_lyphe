@@ -25,6 +25,12 @@ type RegionImageProps = {
    * naming no region here: nothing is dimmed — an id that matches nothing must not grey the whole photo.
    */
   focusId?: string | null;
+  /**
+   * Points laid on the picture, each a round mark centred at `x`, `y` in 0..1 of the image, above every region: where a camera
+   * stood (the day-one sketch's panos). With `onPress` a spot is a button named by its `label`, one tab stop each after the
+   * badges; without it, or while a box is being drawn, an inert mark (a display-only copy in the Lightbox). Omitted: none.
+   */
+  spots?: { id: string; x: number; y: number; label: string; onPress?: () => void }[];
 };
 
 /** 0..1 → 0..100, held inside the image; a missing or non-finite coordinate reads as the edge. */
@@ -74,8 +80,13 @@ function toPoints(polygon: number[][]): string | null {
  * was given, and every other one dims. `drawing` is how Missed one asks for a region the reader never drew: a
  * `RegionDrawLayer` covers the photo, and while it is there the regions are drawn and inert, so a press on one
  * starts a box instead of choosing it.
+ *
+ * `spots` is how the day-one sketch shows where each pano's camera stood on the plan's drawing: a round mark centred
+ * on its point (`.vv-region-spot`, `verve/spots.css`), drawn after the badges and above them, a button named by its
+ * label when it can be pressed. A spot carries no number and no word on the picture; its name is for the keyboard and
+ * the screen reader.
  */
-export function RegionImage({ src, alt, width, height, regions, selectedId = null, onSelect: onSelectRegion, drawing = null, focusId = null }: RegionImageProps) {
+export function RegionImage({ src, alt, width, height, regions, selectedId = null, onSelect: onSelectRegion, drawing = null, focusId = null, spots = [] }: RegionImageProps) {
   // Region selection is off while a box is being drawn: with no handler, no outline is pressable and every badge is
   // an inert span, so the draw layer's press is the only thing a pointer on the photo can mean.
   const onSelect = drawing ? undefined : onSelectRegion;
@@ -155,6 +166,16 @@ export function RegionImage({ src, alt, width, height, regions, selectedId = nul
           >
             {region.ordinal}
           </span>
+        );
+      })}
+
+      {spots.map((spot) => {
+        // Centred on its point by its paint's translate; the point is held inside the image as a badge's corner is.
+        const place = { left: `${toPercent(spot.x)}%`, top: `${toPercent(spot.y)}%` };
+        return spot.onPress && !drawing ? (
+          <button key={spot.id} type="button" style={place} aria-label={spot.label} onClick={spot.onPress} className="vv-region-spot absolute" />
+        ) : (
+          <span key={spot.id} style={place} aria-hidden="true" className="vv-region-spot absolute" />
         );
       })}
 

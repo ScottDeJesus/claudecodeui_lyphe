@@ -109,6 +109,7 @@ export function TourScreen({
         <>
           <ContextCard key={detail.tour.tourId} context={detail.context} linked={detail.tour.jobId !== null} />
           <TourRooms rooms={detail.rooms} />
+          {/* FILL: day-one — DayOneSketch with the tour's dayOne, layout status and the press */}
           <section aria-labelledby={panosHeadingId} className="flex min-w-0 flex-col gap-3">
             <h3 id={panosHeadingId} className={EYEBROW}>
               {t('affectedAreas.tour.panosTitle')} · {detail.panos.length}

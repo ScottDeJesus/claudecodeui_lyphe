@@ -1,0 +1,54 @@
+/* Verve spot paint — RegionImage's `spots`: where a camera stood, laid on the picture as a round press. Its first site is
+ * the Tours view's day-one sketch, where each pano's spot sits on the plan's drawing and opens that pano.
+ *
+ * The eighth paint file, opened rather than squeezed in: media.css, where the rest of RegionImage paints, stood at 280
+ * lines and the spot paint would carry it past 300 (README rule 6). It is RegionImage's paint all the same, so it reads
+ * beside media.css's `.vv-region*` rules: the same `--lightbox-scale` division, the same inert span for a display-only copy.
+ *
+ * Same contract as its siblings: the class string carries `vv-region-spot` plus layout utilities (`absolute`) and nothing
+ * else, and every colour is a token. The spot is an ink disc in a surface ring with an ink hairline outside it, so it reads
+ * on a picture that does not flip with the theme (a photograph, the plan's drawing on its own white ground) and on the
+ * canvas alike: in the light theme a dark disc in a white ring, in the dark a light disc in a dark ring, and either ring
+ * keeps it off whatever it stands on. It is not a tone: a camera's place is no state (README rule 4).
+ *
+ * Imported once, for side effect, from src/shared/ui/index.ts, right after media.css. Its place is free: `.vv-region-spot`
+ * is its own selector and every rule reads only tokens, so it depends on landing before or after no sibling sheet.
+ */
+
+/* ---------------------------------------------------------------- RegionImage: the spot */
+/* Centred on its point (RegionImage sets `left`/`top` to the point as a percentage) and above every outline and badge:
+ * a spot is drawn last and stands on its own layer, so a badge at a region's corner never covers the way into a pano.
+ * Inside the Lightbox it is scaled down by the zoom about its centre (`--lightbox-scale`, see media.css's outline), so it
+ * stays one size and stays on its point. The ::before widens the press to 34px, and to 44px on a touch screen (Verve's
+ * touch minimum), without widening the mark. */
+.vv-region-spot {
+  --vv-region-spot-size: 16px;
+  width: var(--vv-region-spot-size);
+  height: var(--vv-region-spot-size);
+  padding: 0;
+  border: 2px solid var(--surface);
+  border-radius: 999px;
+  background: var(--ink);
+  box-shadow: 0 0 0 1.5px var(--ink);
+  transform: translate(-50%, -50%) scale(calc(1 / var(--lightbox-scale, 1)));
+  z-index: 2;
+  cursor: pointer;
+  transition: box-shadow var(--dur-quick) ease;
+}
+.vv-region-spot::before {
+  content: '';
+  position: absolute;
+  inset: -9px;
+  border-radius: 999px;
+}
+@media (pointer: coarse) {
+  .vv-region-spot::before { inset: -14px; }
+}
+
+/* A pointer that really hovers lifts the spot with a soft halo in its own ink; a tap leaves nothing "hovered" behind. */
+@media (hover: hover) {
+  button.vv-region-spot:hover { box-shadow: 0 0 0 1.5px var(--ink), 0 0 0 6px color-mix(in srgb, var(--ink) 16%, transparent); }
+}
+
+/* A display-only spot (a span: no `onPress`, or a box being drawn) is inert like a display-only badge, so a press on it pans. */
+span.vv-region-spot { cursor: default; pointer-events: none; }
