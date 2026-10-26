@@ -4417,7 +4417,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/Wo
 |---|---|
 | disc cell | `size-11 md:size-10` (44px phone, 40px desktop) holding `<AppSwitcherDock />`: its 28px box is centred at (24, 28) on a desktop and the app switcher's FAB is drawn over it. While the disc is seated here it draws no dot (see MAN-486): the Chat glyph's badge says a reply landed |
 | scroll region | the runs of `SCROLL_GROUPS` in order: `chat`, `tools`, `plans`, `house`, `plugins`. A run with no view is dropped first; a `RailHairline` (`h-px w-6 bg-border`, `aria-hidden`, `my-1`) stands between two drawn runs |
-| foot | outside the scroll, `relative z-40`: the views whose `group` is `foot` (Inbox: MAN-9013), the Settings button (`t('rail.settings')`, running `sidebarSharedProps.onShowSettings()`), then the account cell |
+| foot | outside the scroll, `relative z-40`: the usage rings (`UsageRings` from the accounts barrel: "5h" over "wk", 28px rings in 32px cells, a status and no button; MAN-9033), the views whose `group` is `foot` (Inbox: MAN-9013), the Settings button (`t('rail.settings')`, running `sidebarSharedProps.onShowSettings()`), then the account cell |
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/hooks/useRailBadges.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/RailButton.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/WorkspaceRail.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Tooltip.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/rail-mockup.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/rail-read.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/sheet.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/rail-live.mjs
 
@@ -4564,3 +4564,32 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/Pr
 - The Inbox's own Memory / Heal strip (`[data-inbox-panel] [role="tab"]`) is real; those selectors are right.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/whole-sidebar-rail.mjs
+
+## MAN-9038 — The day-one sketch section — src/modules/affected-areas: DayOneSketch, DayOnePlan, DayOneRooms, DayOnePress, utils/dayOneModel.ts, dayOne-fake.ts and their two probes
+
+Scaffold, 2026-10-26: composed over fake data. `TourScreen.tsx` mounts it at its `FILL: day-one` marker, unwired; the wiring of each handler and data hook is named at its own `FILL:` marker (`grep -rn "FILL:" src/modules/affected-areas`).
+
+| file | holds |
+|---|---|
+| `DayOneSketch.tsx` | the section: `data-day-one` = `plan` \| `none` \| `unavailable` \| `pending` \| `unknown`. Eyebrow `affectedAreas.dayOne.title`; status line (`panosRead` of `panosTotal` · drawn when · "from the calibration reads" when `contractVersions` holds `layout.cal0`); a floor switch (`SegmentedControl`) only when `floors.length > 1`; `DayOnePress` top right; `DayOnePlan` beside `DayOneRooms` from 960 px of container, under it below. Its one state is the chosen floor's place in `floors` |
+| `DayOnePlan.tsx` | one floor: `RegionImage` (`badgePlacement="clear"`, MAN-8945) over the engine's drawing; one outline and number per area, fixture and piece of contents; one spot per pano named "{room} 360° photo" ("…, n of m" for a room with several shots). Caption lines `data-day-one-line="scale" \| "pins" \| "spots"`. Enlarge opens a display-only copy in `Lightbox`. Drawing bytes absent: waiting surface; failed: `data-day-one-failed` box with Try again (`onRetryDrawing`) |
+| `DayOneRooms.tsx` | per room (`data-day-one-room`): size, area, perimeter, ceiling, each side's source with its band, a warning when unpinned, the sketch and first-report checks; then its numbered rows (`data-day-one-item`) with "Seen in {n} photos" above 1 |
+| `DayOnePress.tsx` | `data-day-one-press`: the unread panos and views, today's budget, the walk (meter, Stop), the refusals in words |
+| `utils/dayOneModel.ts` | pure, one model for the drawing and the list: `numberedItems(floor, codebook, t)` → `SketchItem[]`; `feet`, `band`, `inches` |
+| `dayOne-fake.ts` | `FAKE_DAY_ONE` (Clarence Tse's tour, one entry per state of the section) and `FAKE_DRAWINGS`; imported only by the scaffold probe, 2026-10-26 |
+
+Rules:
+- Presentational: every datum is a prop. Every position is the engine's, in 0..1 of the floor's drawing; the browser computes none.
+- Numbers: the wire numbers areas only (`DayOneArea.number`, from 1 per floor, in the plan's room order). `numberedItems` numbers fixtures and contents after the last area, in the wire's order. The drawing's tab order is the areas by number, then the objects.
+- An area is drawn in `REGION_LOOK` of its member (`regionState`); a fixture or contents in the neutral tone with the light wash.
+- Words never sit on the drawing: a number meets its row in `DayOneRooms`.
+- `DayOnePress` reads `lastAnswer`: the dry run on open, then each armed answer the walk lands. why: its budget lines go stale otherwise.
+- A press on an area or object calls `onOpenPanoAt(panoId, face, regionId)`, `regionId` null for an object; a press on a spot calls `onOpenPano(panoId)`. The Lightbox copy passes spots without `onPress`: inert.
+- The drawing loads as an `<img>`, so it cannot follow the theme: the engine's SVG carries its own white ground. Spots are the one fixed-colour mark on it (MAN-8947); room names clear of the spots: INV-9720.
+- Words: `affectedAreas.dayOne.*` in `src/modules/i18n/locales/en/common.json`, `en` only.
+
+Probes (`.verify/`, git-ignored; run against the real :5183 client, no model call):
+- `node .verify/affected-areas-day-one-scaffold.mjs [--states a,b] [--evidence <dir>]`: mounts `DayOneSketch` over each `FAKE_DAY_ONE` state, photographs 390 and 1280 px in both themes, presses every callback, and exits 1 on a FAIL. Fails when a `partial` or `built` number is less than 80% shown or its middle's press lands elsewhere (light theme).
+- `node .verify/affected-areas-day-one-unchanged.mjs --stage before|after`: the live Tours view's words, element count and class multiset must be equal across the two stages; exits 1 on any difference.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/dayOne-fake.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/DayOnePlan.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/DayOnePress.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/DayOneRooms.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/DayOneSketch.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/utils/dayOneModel.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/affected-areas-day-one-scaffold.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/affected-areas-day-one-unchanged.mjs

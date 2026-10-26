@@ -82,8 +82,9 @@ function checkWords(room: DayOneRoom, t: TFunction): string {
  *    against the rest; a room that is no rectangle says so;
  * 5. the same room in the job's own sketch and the first drying report, for the reader to grade the plan by;
  * 6. what lies in it, by kind: its areas, its fixtures, its contents, each kind's numbers the ones the drawing wears, in
- *    their look's tone; a thing several photos see says "Seen in {n} photos". A number is a press: it opens that thing's
- *    photo at its face, its region chosen.
+ *    their look's tone; an area no longer only proposed says where it stands in the operator's judgment ("Not a change",
+ *    "Confirmed", "Drawn by hand", "Unsure"), so a set-aside area never reads as damage by its colour alone; a thing several
+ *    photos see says "Seen in {n} photos". A number is a press: it opens that thing's photo at its face, its region chosen.
  *
  * Used by the affected-areas module's `DayOneSketch`, in the column beside `DayOnePlan`.
  */
@@ -95,7 +96,8 @@ export function DayOneRooms({ floor, codebook, onOpenPanoAt }: DayOneRoomsProps)
 
   return (
     <Card role="region" aria-labelledby={headingId} className="flex min-w-0 flex-col overflow-hidden" data-day-one-rooms="">
-      <h3 id={headingId} className="px-4 pb-2 pt-4 text-xs uppercase tracking-[0.14em] text-ink-faint">{t('affectedAreas.dayOne.rooms.title')}</h3>
+      {/* A part of the "Day-one sketch" section (its `h3`), so one level under it. */}
+      <h4 id={headingId} className="px-4 pb-2 pt-4 text-xs uppercase tracking-[0.14em] text-ink-faint">{t('affectedAreas.dayOne.rooms.title')}</h4>
       <ul aria-labelledby={headingId} className="m-0 list-none divide-y divide-border border-t border-border p-0">
         {floor.rooms.map((room) => {
           const held = items.filter((item) => item.roomKey === room.roomKey);
@@ -104,10 +106,10 @@ export function DayOneRooms({ floor, codebook, onOpenPanoAt }: DayOneRoomsProps)
             <li key={room.roomKey} data-day-one-room={room.roomKey} className="flex min-w-0 flex-col gap-1 px-4 py-3">
               <div className="flex min-w-0 flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5">
                 <span className="text-sm font-semibold text-foreground [overflow-wrap:anywhere]">{roomWords(room.roomName, null, false, t)}</span>
-                <span className="text-[13px] tabular-nums text-foreground">{sizeWords(room, t)}</span>
+                <span className="text-[13px] text-foreground">{sizeWords(room, t)}</span>
               </div>
-              <p className="text-[12.5px] tabular-nums text-muted-foreground">{measureWords(room, t)}</p>
-              <p className="text-[12.5px] tabular-nums text-muted-foreground">{sideWords(room, t)}</p>
+              <p className="text-[12.5px] text-muted-foreground">{measureWords(room, t)}</p>
+              <p className="text-[12.5px] text-muted-foreground">{sideWords(room, t)}</p>
               {several && !room.pinned && (
                 <p data-tone="warn" className="flex items-start gap-2 text-[12.5px] text-tone-ink">
                   <span aria-hidden="true" className="mt-1.5 size-2 flex-none rounded-full bg-tone-dot" />
@@ -115,7 +117,7 @@ export function DayOneRooms({ floor, codebook, onOpenPanoAt }: DayOneRoomsProps)
                 </p>
               )}
               {!room.rectangular && !open && <p className="text-[12.5px] text-muted-foreground">{t('affectedAreas.dayOne.rooms.notRectangle')}</p>}
-              <p className="text-[12.5px] tabular-nums text-muted-foreground">{checkWords(room, t)}</p>
+              <p className="text-[12.5px] text-muted-foreground">{checkWords(room, t)}</p>
 
               {held.length === 0 ? (
                 <p className="pt-1 text-[12.5px] text-muted-foreground">{t('affectedAreas.dayOne.rooms.nothing')}</p>
@@ -136,20 +138,23 @@ export function DayOneRooms({ floor, codebook, onOpenPanoAt }: DayOneRoomsProps)
                               <span className="mr-0.5 text-[13px] text-foreground">{kind}</span>
                               {ofGroup.filter((item) => item.name === kind).map((item) => {
                                 const seen = item.views > 1 ? t('affectedAreas.dayOne.seenIn', { count: item.views }) : null;
+                                // Its judgment first (where it stands), then how many photos see it: said and named alike.
+                                const notes = [item.judgment, seen].filter((part) => part !== null).join(' · ');
                                 return (
                                   <button
                                     key={item.id}
                                     type="button"
-                                    aria-label={[`${item.number}. ${item.name}`, seen].filter((part) => part !== null).join(' · ')}
+                                    aria-label={[`${item.number}. ${item.name}`, notes].filter((part) => part !== '').join(' · ')}
                                     data-day-one-item={item.id}
-                                    // FILL: onOpenPanoAt — the root's verb, as a press on the drawing: the pano of `item.photo`, at its face, its region chosen.
+                                    // FILL: onOpenPanoAt — the root's verb, as a press on the drawing: the pano of `item.photo`, at its face, with
+                                    // `place.onMarkOn(face, regionId)` for an area and `place.onShow(face)` for an object (no region).
                                     onClick={() => onOpenPanoAt(item.photo.panoId, item.photo.face, item.photo.regionId)}
                                     className="inline-flex min-h-8 items-center gap-1 rounded-md px-1 hover:bg-background max-md:min-h-11"
                                   >
                                     <Badge as="span" tone={item.shape.tone} className="min-w-[26px] flex-none justify-center border-tone-dot px-1.5 font-bold tabular-nums">
                                       {item.number}
                                     </Badge>
-                                    {seen !== null && <span className="text-xs text-muted-foreground">{seen}</span>}
+                                    {notes !== '' && <span className="text-xs text-muted-foreground">{notes}</span>}
                                   </button>
                                 );
                               })}

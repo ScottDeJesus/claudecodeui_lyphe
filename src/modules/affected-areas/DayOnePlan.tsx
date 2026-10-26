@@ -20,6 +20,8 @@ type DayOnePlanProps = {
   onOpenPanoAt: (panoId: string, face: Face, regionId: string | null) => void;
   /** A spot pressed: its pano opened. */
   onOpenPano: (panoId: string) => void;
+  /** Try again, on a drawing whose bytes did not arrive: its drawing read again. */
+  onRetryDrawing: () => void;
 };
 
 /**
@@ -52,8 +54,10 @@ function pinLine(floor: DayOneFloor, t: TFunction): { words: string; tone: Tone 
   const pinned = total - floor.pins.unpinnedRooms.length;
   const groups = floor.pins.components - floor.pins.unpinnedRooms.length;
   const worst = floor.pins.loops.reduce((most, loop) => Math.max(most, loop.closureFt), 0);
+  let joined = t('affectedAreas.dayOne.pins.some', { pinned, count: total });
+  if (pinned === total) joined = total === 2 ? t('affectedAreas.dayOne.pins.both') : t('affectedAreas.dayOne.pins.all', { count: total });
   const words = [
-    pinned === total ? t('affectedAreas.dayOne.pins.all', { count: total }) : t('affectedAreas.dayOne.pins.some', { pinned, count: total }),
+    joined,
     groups > 1 ? t('affectedAreas.dayOne.pins.groups', { count: groups }) : null,
     floor.pins.loops.length > 0 ? t('affectedAreas.dayOne.pins.loops', { count: floor.pins.loops.length, ft: feet(worst) }) : null,
   ].filter((part) => part !== null).join(' · ');
@@ -77,6 +81,12 @@ function spotsOf(floor: DayOneFloor, t: TFunction): { id: string; x: number; y: 
   });
 }
 
+/**
+ * The tallest the drawing stands: a deep plan at its full width would push its own caption (the scale, the pins, Enlarge)
+ * below the fold of a laptop while it stands beside the room list, so it narrows to keep this height.
+ */
+const DRAWING_MAX_HEIGHT = 'min(70vh, 720px)';
+
 /** One line of the caption: a dot in its tone and its words, the words in the tone's ink when they warn. */
 function CaptionLine({ words, tone, handle }: { words: string; tone: Tone; handle: string }) {
   return (
@@ -92,20 +102,22 @@ function CaptionLine({ words, tone, handle }: { words: string; tone: Tone; handl
  * 1. The engine's own drawing of the plan (rooms, walls, door gaps, names, a scale bar), framed as a view's photo is, with
  *    `RegionImage` over it: each area in its look, each fixture and piece of contents in the neutral tone with the light wash,
  *    each numbered as its row beside it (`numberedItems`), and each pano's spot. Words never sit on the drawing: a number
- *    on it meets its row in `DayOneRooms`. Pressing an area or an object opens its photo's pano at its face, with its region
- *    chosen; pressing a spot opens its pano.
- * 2. The caption: the scale line and the pin line (each a dot in its tone and its words), with Enlarge, which opens the
- *    drawing in the house `Lightbox` to zoom and pan, display only.
+ *    on it meets its row in `DayOneRooms`. The numbers stand clear of each other and of the spots (`badgePlacement="clear"`),
+ *    and the spots lie under them. Pressing an area or an object opens its photo's pano at its face, with its region
+ *    chosen; pressing a spot opens its pano. A deep plan narrows to `DRAWING_MAX_HEIGHT`, so its caption stays in view.
+ * 2. The caption: the scale line and the pin line (each a dot in its tone and its words), and what the spots are, with
+ *    Enlarge, which opens the drawing in the house `Lightbox` to zoom and pan, display only.
  *
  * States: the drawing loading (Verve's waiting surface in the drawing's own box, the caption and the rooms already there);
- * drawn; its bytes did not arrive (the neutral tile, the areas and spots still laid on its frame, and one line saying so).
- * At 720 px of panel and up the figure stands beside the room list and stays in view while the list scrolls past it.
+ * drawn; its bytes did not arrive (the box says so in words, with Try again, and the rooms beside it still list everything
+ * on the plan).
+ * At 960 px of panel and up the figure stands beside the room list and stays in view while the list scrolls past it.
  *
- * Handles: `data-day-one-line="scale" | "pins"` on the caption's lines.
+ * Handles: `data-day-one-line="scale" | "pins" | "spots"` on the caption's lines.
  *
  * Used by the affected-areas module's `DayOneSketch`.
  */
-export function DayOnePlan({ floor, drawing, codebook, onOpenPanoAt, onOpenPano }: DayOnePlanProps) {
+export function DayOnePlan({ floor, drawing, codebook, onOpenPanoAt, onOpenPano, onRetryDrawing }: DayOnePlanProps) {
   const { t } = useTranslation();
   // Whether the drawing is open in the Lightbox. Only this figure asks, and a floor switched or a tour left forgets it.
   const [enlarged, setEnlarged] = useState(false);
@@ -118,6 +130,8 @@ export function DayOnePlan({ floor, drawing, codebook, onOpenPanoAt, onOpenPano 
   const pins = pinLine(floor, t);
   // The box's aspect is the frame's: the drawing, every outline and every spot are in its 0..1, so they meet exactly.
   const frame = { width: floor.widthFt, height: floor.lengthFt };
+  // Full width, unless that would stand the drawing taller than `DRAWING_MAX_HEIGHT`; its aspect is kept either way.
+  const box = { width: `min(100%, calc(${DRAWING_MAX_HEIGHT} * ${frame.width / frame.height}))`, aspectRatio: `${frame.width} / ${frame.height}` };
 
   const openItem = (id: string) => {
     const item = items.find((candidate) => candidate.id === id);
@@ -125,14 +139,27 @@ export function DayOnePlan({ floor, drawing, codebook, onOpenPanoAt, onOpenPano 
   };
 
   return (
-    <figure className="m-0 flex min-w-0 flex-col gap-2 [@container(min-width:720px)]:sticky [@container(min-width:720px)]:top-4" data-day-one-plan="">
-      {drawing === undefined ? (
-        <div aria-busy="true" className="ring-1 ring-border">
+    <figure className="m-0 flex min-w-0 flex-col gap-2 [@container(min-width:960px)]:sticky [@container(min-width:960px)]:top-4" data-day-one-plan="">
+      {drawing === undefined && (
+        <div aria-busy="true" className="ring-1 ring-border" style={box}>
           <p role="status" className="sr-only">{t('affectedAreas.dayOne.plan.loading')}</p>
-          <div aria-hidden="true" className="vv-skeleton w-full rounded-none" style={{ aspectRatio: `${frame.width} / ${frame.height}` }} />
+          <div aria-hidden="true" className="vv-skeleton size-full rounded-none" />
         </div>
-      ) : (
-        <div className="ring-1 ring-border">
+      )}
+      {/* No bytes, no picture: the box says so rather than wearing the photo tile's "Photo" over a floor plan, on the surface
+          ground (the muted words read 5.06:1 there; on the muted ground they fell under AA), with Try again, as a photo that
+          did not arrive offers on the pano screen. */}
+      {drawing === null && (
+        <div role="status" data-day-one-failed="" className="flex flex-col items-center justify-center gap-3 bg-card p-6 text-center ring-1 ring-border" style={box}>
+          <p className="max-w-[36ch] text-[12.5px] text-muted-foreground">{t('affectedAreas.dayOne.plan.drawingFailed')}</p>
+          {/* FILL: onRetryDrawing — the floor's drawing read again: a new attempt for its sha, as `useImageUrls`' `attempt` reads a pano's photos again. */}
+          <Button variant="outline" size="sm" className="max-md:h-11" onClick={onRetryDrawing}>
+            {t('affectedAreas.trouble.retry')}
+          </Button>
+        </div>
+      )}
+      {typeof drawing === 'string' && (
+        <div className="ring-1 ring-border" style={{ width: box.width }}>
           <RegionImage
             // FILL: drawing — the floor's SVG through `api.affectedAreas.planDrawing(drawingSha)` with the token, made an
             // object URL as `hooks/useImageUrl.ts` makes a view's and revoked when it changes.
@@ -141,7 +168,9 @@ export function DayOnePlan({ floor, drawing, codebook, onOpenPanoAt, onOpenPano 
             width={frame.width}
             height={frame.height}
             regions={shapes}
-            // FILL: onOpenPanoAt — the root's verb: `onOpenPano(panoId)`, then `place.onMarkOn(face, regionId)` when a region is named.
+            badgePlacement="clear"
+            // FILL: onOpenPanoAt — the root's verb: `onOpenPano(panoId)`, then `place.onMarkOn(face, regionId)` when a region is
+            // named (an area), else `place.onShow(face)` (an object, which has a layout read and no region): its photo, at its face.
             onSelect={openItem}
             // FILL: onOpenPano — the root's `onOpenPano` (`AffectedAreasView`), as a gallery tile opens its pano.
             spots={spots.map((spot) => ({ ...spot, onPress: () => onOpenPano(spot.id) }))}
@@ -153,9 +182,18 @@ export function DayOnePlan({ floor, drawing, codebook, onOpenPanoAt, onOpenPano 
         <ul className="m-0 flex min-w-0 list-none flex-col gap-1 p-0">
           <CaptionLine words={scale.words} tone={scale.tone} handle="scale" />
           <CaptionLine words={pins.words} tone={pins.tone} handle="pins" />
-          {drawing === null && <li className="text-[12.5px] text-muted-foreground">{t('affectedAreas.dayOne.plan.drawingFailed')}</li>}
+          {typeof drawing === 'string' && spots.length > 0 && (
+            <li data-day-one-line="spots" className="flex min-w-0 items-start gap-2 text-[12.5px]">
+              {/* The spot's own mark on a swatch of the drawing's own ground, so the legend looks like what it explains in
+                  both themes. */}
+              <span aria-hidden="true" className="vv-region-spot-swatch flex-none">
+                <span className="vv-region-spot vv-region-spot--legend" />
+              </span>
+              <span className="text-muted-foreground">{t('affectedAreas.dayOne.plan.spotsLegend')}</span>
+            </li>
+          )}
         </ul>
-        {drawing !== undefined && (
+        {typeof drawing === 'string' && (
           <Button variant="ghost" size="sm" className="flex-none max-md:h-11" onClick={() => setEnlarged(true)}>
             <Maximize2 aria-hidden="true" />
             {t('affectedAreas.pano.enlarge')}
@@ -163,11 +201,11 @@ export function DayOnePlan({ floor, drawing, codebook, onOpenPanoAt, onOpenPano 
         )}
       </figcaption>
 
-      {enlarged && drawing !== undefined && (
+      {enlarged && typeof drawing === 'string' && (
         <Lightbox label={alt} onClose={() => setEnlarged(false)}>
           {/* Display only, as every Lightbox copy is: no press on an outline or a spot, so a drag pans the drawing. */}
           <div className="shadow-2xl" style={{ width: `min(92vw, calc(88vh * ${frame.width / frame.height}))` }}>
-            <RegionImage src={drawing} alt={alt} width={frame.width} height={frame.height} regions={shapes} spots={spots} />
+            <RegionImage src={drawing} alt={alt} width={frame.width} height={frame.height} regions={shapes} spots={spots} badgePlacement="clear" />
           </div>
         </Lightbox>
       )}

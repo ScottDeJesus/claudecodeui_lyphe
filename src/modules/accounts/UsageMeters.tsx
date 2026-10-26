@@ -1,5 +1,5 @@
 import { Meter } from '@/shared/ui';
-import { resetInstant, windowPercent, windowTone } from '@/modules/accounts/utils/usageWindows';
+import { WINDOW_NAMES, resetInstant, windowPercent, windowTone, windowValue } from '@/modules/accounts/utils/usageWindows';
 import type { ClaudeUsage, ClaudeUsagePace, ClaudeUsageWindow } from '@/shared/types';
 
 /** The line that closes the block, because a blank bar has to be readable as "unknown" and not as "you have used nothing". */
@@ -45,25 +45,8 @@ function secondsStampInWords(seconds: number): string {
 
 /** The two windows this app has its own name for; everything else keeps the provider's label, which is the only place a `weekly_scoped:*` plan is named. */
 function windowLabel(usageWindow: ClaudeUsageWindow): string {
-  if (usageWindow.key === 'five_hour') return 'Current 5-hour window';
-  if (usageWindow.key === 'seven_day') return 'This week';
+  if (usageWindow.key === 'five_hour' || usageWindow.key === 'seven_day') return WINDOW_NAMES[usageWindow.key];
   return usageWindow.label;
-}
-
-/**
- * The figure as the reader should see it.
- *
- * `0` is a REAL reading and says "0% used" over an empty track; only `null` is an em-dash.
- * A `rolled` window keeps its real percent and says "was" — its window has already ended, and
- * draining the bar would draw a full tank nobody measured.
- *
- * No `▲` is written here: the Meter's own warn rule prepends it, and a second one would
- * double the mark.
- */
-function windowValue(percent: number | null, rolled: boolean): string {
-  if (percent === null) return '—';
-  const figure = `${percent}% used`;
-  return rolled ? `was ${figure}` : figure;
 }
 
 /**
@@ -144,7 +127,8 @@ function paceForWindow(key: string, pace: ClaudeUsagePace | null): { tickAt: num
 
 /**
  * The usage block of the account panel (D7).
- * Used by the accounts module's AccountPanelBody, which the popover and the Accounts widget both draw — the only screens that show usage;
+ * Used by the accounts module's AccountPanelBody, which the popover and the Accounts widget both draw — the only screens that draw these
+ * bars (the rail's UsageRings show the same two figures as rings);
  * it is a separate file because the account rows below it are a different subject and this
  * one is all about what a number does and does not mean.
  *
@@ -180,7 +164,8 @@ function renderReading(usage: ClaudeUsage | null, pace: ClaudeUsagePace | null) 
 
   const asOf = degradedLine(usage.degraded, usage.staleSince, usage.reason);
 
-  if (usage.windows.length === 0) {
+  // `Array.isArray`: a reachable body with no `windows` is the same calm silence as an empty list, not a TypeError in render.
+  if (!Array.isArray(usage.windows) || usage.windows.length === 0) {
     // Three different silences: a poll in flight is calm, a reading the meter could not parse
     // KNOWS why it is empty, and a degraded read has surrendered.
     if (usage.reason === 'pending') return <UsageNote>A fresh reading is on its way.</UsageNote>;

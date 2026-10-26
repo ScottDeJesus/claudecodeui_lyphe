@@ -186,10 +186,13 @@ function drawingOf(spec: FloorSpec, x0: number, y0: number, w: number, l: number
   const s = (value: number) => r1(value * 100) / 100;
   const rooms = spec.rooms.map(({ at: [a, b, c, d], name, how }) => {
     const [x, y, rw, rh] = [s(a - x0), s(b - y0), s(c - a), s(d - b)];
+    // The name stands over the room's camera, clear of the spot the screen lays there, and inside the room.
+    const root = spec.spots.find((spot) => spot[1] === name && spot[4]);
+    const [nx, ny] = root === undefined ? [x + rw / 2, y + rh / 2] : [s(root[2] - x0), Math.max(y + 0.75, s(root[3] - y0 - 1.25))];
     const walls = how[3] === 'o'
       ? `<path d="M${x} ${y + rh}V${y}H${x + rw}V${y + rh}" fill="none" stroke="#2b2f36" stroke-width="0.32"/><path d="M${x} ${y + rh}H${x + rw}" stroke="#2b2f36" stroke-width="0.16" stroke-dasharray="0.5 0.4"/>`
       : `<rect x="${x}" y="${y}" width="${rw}" height="${rh}" fill="none" stroke="#2b2f36" stroke-width="0.32"/>`;
-    return `<rect x="${x}" y="${y}" width="${rw}" height="${rh}" fill="#eef0f3"/>${walls}<text x="${s(x + rw / 2)}" y="${s(y + rh / 2)}" font-size="${rw < 7 ? 0.62 : 0.85}" text-anchor="middle" dominant-baseline="middle" fill="#4a5160" font-family="Inter, Arial, sans-serif">${name}</text>`;
+    return `<rect x="${x}" y="${y}" width="${rw}" height="${rh}" fill="#eef0f3"/>${walls}<text x="${s(nx)}" y="${s(ny)}" font-size="${rw < 7 ? 0.62 : 0.85}" text-anchor="middle" dominant-baseline="middle" fill="#4a5160" font-family="Inter, Arial, sans-serif">${name}</text>`;
   }).join('');
   const gaps = spec.openings.filter((open) => keys.has(open[0])).map(([, , kind, ax, ay, bx, by]) => (
     `<line x1="${s(ax - x0)}" y1="${s(ay - y0)}" x2="${s(bx - x0)}" y2="${s(by - y0)}" stroke="#ffffff" stroke-width="0.5"/>${kind === 'door' ? `<line x1="${s(ax - x0)}" y1="${s(ay - y0)}" x2="${s(bx - x0)}" y2="${s(by - y0)}" stroke="#8a919e" stroke-width="0.08"/>` : ''}`
@@ -237,27 +240,32 @@ const IDLE: TourReaderProgress = { running: false, index: 0, total: 0, lastRefus
 
 /** One state of the section as its props would carry it. */
 type FakeState = {
-  floors: DayOneFloor[]; layout: LayoutStatus | null; rebuilding: boolean; dryRun: LayoutReadResult | null;
+  floors: DayOneFloor[]; layout: LayoutStatus | null; rebuilding: boolean; lastAnswer: LayoutReadResult | null;
   walk: TourReaderProgress; unreadPanos: number; unreadViews: number; drawings: Record<string, string | null>;
 };
-const state = (patch: Partial<FakeState>): FakeState => ({ floors: [], layout: null, rebuilding: false, dryRun: null, walk: IDLE, unreadPanos: 0, unreadViews: 0, drawings: FAKE_DRAWINGS, ...patch });
+const state = (patch: Partial<FakeState>): FakeState => ({ floors: [], layout: null, rebuilding: false, lastAnswer: null, walk: IDLE, unreadPanos: 0, unreadViews: 0, drawings: FAKE_DRAWINGS, ...patch });
 
 /**
  * Every state the scaffold draws, by name: what the fixture mounts. `partial` is Clarence's plan from the five stored
- * calibration outlines (layout.cal0); `built` is the eight panos read under layout.v1.
+ * calibration outlines (layout.cal0); `built` is the eight panos read under layout.v1. `lastAnswer` is the press's latest
+ * answer: the dry run on open, or the walk's last armed answer (`refusal`'s carries the spent budget it stopped at).
  */
 export const FAKE_DAY_ONE: Record<string, FakeState> = {
-  none: state({ layout: status('none', 0, [], null), dryRun: planned(0, 12), unreadPanos: 8, unreadViews: 48 }),
-  partial: state({ floors: [PARTIAL.floor], layout: status('partial', 5, ['layout.cal0']), dryRun: planned(30, 42), unreadPanos: 3, unreadViews: 18 }),
+  none: state({ layout: status('none', 0, [], null), lastAnswer: planned(0, 12), unreadPanos: 8, unreadViews: 48 }),
+  partial: state({ floors: [PARTIAL.floor], layout: status('partial', 5, ['layout.cal0']), lastAnswer: planned(30, 42), unreadPanos: 3, unreadViews: 18 }),
   built: state({ floors: [BUILT.floor], layout: status('built', 8, ['layout.v1']) }),
   stale: state({ floors: [BUILT.floor], layout: status('stale', 8, ['layout.v1'], '2026-10-24T15:05:00Z'), rebuilding: true }),
-  unavailable: state({ layout: status('unavailable', 2, ['layout.v1'], null), dryRun: planned(12, 54), unreadPanos: 6, unreadViews: 36 }),
+  drawingPlan: state({ layout: status('stale', 8, ['layout.v1'], null), rebuilding: true }),
+  notDrawn: state({ layout: status('stale', 8, ['layout.v1'], null) }),
+  unavailable: state({ layout: status('unavailable', 2, ['layout.v1'], null), lastAnswer: planned(12, 54), unreadPanos: 6, unreadViews: 36 }),
+  unknown: state({ lastAnswer: planned(0, 12), unreadPanos: 8, unreadViews: 48 }),
   loading: state({ floors: [BUILT.floor], layout: status('built', 8, ['layout.v1']), drawings: {} }),
-  walking: state({ floors: [EARLY.floor], layout: status('partial', 2, ['layout.v1']), dryRun: planned(0, 12), walk: { running: true, index: 3, total: 8, lastRefusal: null, skipped: 0 }, unreadPanos: 6, unreadViews: 36 }),
-  refusal: state({ floors: [PARTIAL.floor], layout: status('partial', 5, ['layout.cal0']), dryRun: planned(354, 402), walk: { running: false, index: 2, total: 3, lastRefusal: 'budget', skipped: 0 }, unreadPanos: 2, unreadViews: 12 }),
-  switchedOff: state({ layout: status('none', 0, [], null), dryRun: refused('flag_off'), unreadPanos: 8, unreadViews: 48 }),
-  budgetSpent: state({ floors: [PARTIAL.floor], layout: status('partial', 5, ['layout.cal0']), dryRun: refused('budget', 360, 418), unreadPanos: 3, unreadViews: 18 }),
-  noKey: state({ layout: status('none', 0, [], null), dryRun: refused('no_key'), unreadPanos: 8, unreadViews: 48 }),
-  geminiOff: state({ layout: status('none', 0, [], null), dryRun: refused('gemini_off'), unreadPanos: 8, unreadViews: 48 }),
+  drawingFailed: state({ floors: [BUILT.floor], layout: status('built', 8, ['layout.v1']), drawings: { [BUILT.floor.drawingSha]: null } }),
+  walking: state({ floors: [EARLY.floor], layout: status('partial', 2, ['layout.v1']), lastAnswer: planned(0, 12), walk: { running: true, index: 3, total: 8, lastRefusal: null, skipped: 0 }, unreadPanos: 6, unreadViews: 36 }),
+  refusal: state({ floors: [PARTIAL.floor], layout: status('partial', 5, ['layout.cal0']), lastAnswer: refused('budget', 360, 408), walk: { running: false, index: 2, total: 3, lastRefusal: 'budget', skipped: 0 }, unreadPanos: 2, unreadViews: 12 }),
+  switchedOff: state({ layout: status('none', 0, [], null), lastAnswer: refused('flag_off'), unreadPanos: 8, unreadViews: 48 }),
+  budgetSpent: state({ floors: [PARTIAL.floor], layout: status('partial', 5, ['layout.cal0']), lastAnswer: refused('budget', 360, 418), unreadPanos: 3, unreadViews: 18 }),
+  noKey: state({ layout: status('none', 0, [], null), lastAnswer: refused('no_key'), unreadPanos: 8, unreadViews: 48 }),
+  geminiOff: state({ layout: status('none', 0, [], null), lastAnswer: refused('gemini_off'), unreadPanos: 8, unreadViews: 48 }),
   floors: state({ floors: [BUILT.floor, UPSTAIRS.floor], layout: status('built', 8, ['layout.v1']) }),
 };

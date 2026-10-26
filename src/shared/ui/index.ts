@@ -76,7 +76,7 @@ import '@/shared/ui/verve/panels.css';
 import '@/shared/ui/verve/media.css';
 // spots.css holds RegionImage's spots: where a camera stood, a round press laid on the picture. It was opened beside
 // media.css rather than squeezed into it (media.css stood at 280 lines; README rule 6), and its place is as free:
-// `.vv-region-spot` is its own selector and every rule reads only tokens. The one constraint is still that board.css stays last.
+// `.vv-region-spot` is its own selector and no rule in it leans on a sibling sheet. The one constraint is still that board.css stays last.
 import '@/shared/ui/verve/spots.css';
 // data.css holds the paint of SegmentedControl and DataTable. Like media.css, its place is free: `.vv-segmented*` and
 // `.vv-datatable*` are its own and every rule reads only tokens. The one constraint is still that board.css stays last, below.

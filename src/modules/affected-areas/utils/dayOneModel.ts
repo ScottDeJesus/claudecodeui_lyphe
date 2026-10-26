@@ -21,6 +21,12 @@ type SketchItem = {
   group: 'area' | 'fixture' | 'contents';
   /** What it is: the codebook's label for an area's kind, a fixture's name, or a piece of contents' own words. */
   name: string;
+  /**
+   * Where an area stands in the operator's judgment, in its look's word ("Confirmed", "Drawn by hand", "Unsure", "Not a
+   * change"); null for an area still only proposed (the reader's word, what an area is unless said otherwise) and for an object,
+   * which is never judged. The list says it beside the number, so a set-aside area never reads as damage by its colour alone.
+   */
+  judgment: string | null;
   /** The room the plan credits it to; null when the plan names none. */
   roomKey: string | null;
   /** How many photos see it; above 1 the list says "Seen in {n} photos". */
@@ -92,10 +98,11 @@ function objectName(object: DayOneObject, t: TFunction): string {
  */
 export function numberedItems(floor: DayOneFloor, codebook: Codebook | null, t: TFunction): SketchItem[] {
   const areas = [...floor.areas].sort((a, b) => a.number - b.number).map((area): SketchItem => {
-    const look = REGION_LOOK[regionState(area.region)];
+    const state = regionState(area.region);
+    const look = REGION_LOOK[state];
     const name = kindName(area.class, codebook);
     return {
-      id: area.areaId, number: area.number, group: 'area', name, roomKey: area.roomKey, views: area.views, photo: area.photo,
+      id: area.areaId, number: area.number, group: 'area', name, judgment: state === 'proposed' ? null : t(look.wordKey), roomKey: area.roomKey, views: area.views, photo: area.photo,
       shape: { id: area.areaId, ordinal: area.number, polygon: area.footprint, box: boxOf(area.footprint), tone: look.tone, edge: look.edge, wash: look.wash, label: name },
     };
   });
@@ -104,7 +111,7 @@ export function numberedItems(floor: DayOneFloor, codebook: Codebook | null, t: 
     const number = lastArea + index + 1;
     const name = objectName(object, t);
     return {
-      id: object.objectId, number, group: object.kind === 'contents' ? 'contents' : 'fixture', name, roomKey: object.roomKey, views: object.views, photo: object.photo,
+      id: object.objectId, number, group: object.kind === 'contents' ? 'contents' : 'fixture', name, judgment: null, roomKey: object.roomKey, views: object.views, photo: object.photo,
       shape: { id: object.objectId, ordinal: number, polygon: object.footprint, box: boxOf(object.footprint), tone: 'neutral', edge: 'solid', wash: 'light', label: name },
     };
   });

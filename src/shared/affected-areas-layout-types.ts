@@ -138,9 +138,10 @@ export type PinLine = {
 
 //----------------- THE PLAN'S ROOMS, SPOTS, OPENINGS, OBJECTS, AREAS ------------
 
-/** One side of a room's rectangle, with where its length came from. */
+/** One side of a room's rectangle: how far it stands from the camera that measured the room, and what put it there. */
 export type RoomSide = {
   side: 'left' | 'right' | 'front' | 'back';
+  /** Feet from that camera to the side, along the side's normal, as drawn. `null` while the side is open. */
   ft: number | null;
   /** Carried, never hidden: how far `ft` could be off. */
   bandFt: number | null;
@@ -171,7 +172,7 @@ export type DayOneRoom = {
   perimeterLf: number | null;
   ceilingFt: number | null;
   rectangular: boolean;
-  /** Every side has a length. */
+  /** All four sides are closed (each has a distance). */
   determined: boolean;
   /** Joined to another room through a doorway. */
   pinned: boolean;

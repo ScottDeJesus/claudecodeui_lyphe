@@ -6,8 +6,12 @@ import type { AffectedAreasTrouble, TourReaderProgress } from '@/shared/types';
 import { Banner, Button, Meter } from '@/shared/ui';
 
 type DayOnePressProps = {
-  /** The dry run sent on open (one unarmed layout press, which buys nothing): its budget, or its refusal. Null while it is out, and when nothing is left to read. */
-  dryRun: LayoutReadResult | null;
+  /**
+   * The press's latest answer: the dry run sent on open (one unarmed layout press, which buys nothing), then each armed
+   * answer as the walk lands it. Its budget makes the line under the count and its refusal a wall, so the numbers said are
+   * never older than the last press. Null while the dry run is out, and when nothing is left to read.
+   */
+  lastAnswer: LayoutReadResult | null;
   /** The lane's fault when the dry run brought no answer at all. */
   trouble: AffectedAreasTrouble | null;
   /** The walk of the tour's panos whose room layout needs a read, one armed press each, in capture order. */
@@ -71,22 +75,23 @@ function Wall({ words }: { words: string }) {
  * press that buys it, drawn as the tour screen draws Read the rest (`ReadControl`).
  *
  * Top to bottom: what the press would read ("8 panos · 48 views need a room-layout read"), or "Every pano's room layout is
- * read."; under it, from the dry run sent on open, today's budget ("Budget today: 30 of 360 reads on this tour, 42 of 900
- * across all tours"), or "Working out what a read would cost…" while it is out; then each wall in words BEFORE the press it
- * refuses — the dry run refused (switched off, today's budget spent, no key, Gemini off), the lane's fault, where the walk
- * stopped, the panos it passed over; then Read the room layout. While it walks: "Reading the room layout…" on the press, and
+ * read."; under it, from the latest answer (the dry run on open, then the walk's last), today's budget ("Budget today: 30 of
+ * 360 reads on this tour, 42 of 900 across all tours"), or "Working out what a room-layout read would cost…" while the dry run
+ * is out; then each wall in words BEFORE the press it refuses — the answer refused (switched off, today's budget spent, no key,
+ * Gemini off), the lane's fault, where the walk stopped, the panos it passed over; then Read the room layout. While it walks:
+ * "Reading the room layout…" on the press, and
  * "Reading 3 of 8" over a meter with Stop after this pano beside it. While a wall no retry clears today stands, the press
  * drops to outline. It stays in the tab order while busy (`busy`, never `disabled`).
  *
  * Used by the affected-areas module's `DayOneSketch`, at the top right of the section.
  */
-export function DayOnePress({ dryRun, trouble, walk, unreadPanos, unreadViews, onRead, onStop }: DayOnePressProps) {
+export function DayOnePress({ lastAnswer, trouble, walk, unreadPanos, unreadViews, onRead, onStop }: DayOnePressProps) {
   const { t } = useTranslation();
-  const dryRefusal = dryRun?.status === 'refused' ? dryRun.reason ?? 'failed' : null;
+  const answerRefusal = lastAnswer?.status === 'refused' ? lastAnswer.reason ?? 'failed' : null;
   const walkStop = walk.running ? null : walk.lastRefusal;
-  // One wall met by both the dry run and the walk is said once, in the walk's sentence.
-  const oneWall = walkStop !== null && walkStop === dryRefusal;
-  const quiet = [dryRefusal, walkStop].some((reason) => reason !== null && LASTING_REFUSALS.includes(reason));
+  // One wall met by both the last answer and the walk is said once, in the walk's sentence, with the answer's numbers.
+  const oneWall = walkStop !== null && walkStop === answerRefusal;
+  const quiet = [answerRefusal, walkStop].some((reason) => reason !== null && LASTING_REFUSALS.includes(reason));
   const left = unreadPanos > 0;
   const need = t('affectedAreas.read.rest', {
     panos: t('affectedAreas.tour.panos', { count: unreadPanos }),
@@ -94,12 +99,12 @@ export function DayOnePress({ dryRun, trouble, walk, unreadPanos, unreadViews, o
   });
 
   let budgetLine = null;
-  if (left && trouble === null && dryRefusal === null && !walk.running) {
-    budgetLine = dryRun === null
+  if (left && trouble === null && answerRefusal === null && !walk.running) {
+    budgetLine = lastAnswer === null
       ? t('affectedAreas.dayOne.press.planning')
       : t('affectedAreas.dayOne.press.budget', {
-        tourUsed: counted(dryRun.budget.tourUsed), tourCap: COUNT.format(dryRun.budget.tourCap),
-        fleetUsed: counted(dryRun.budget.fleetUsed), fleetCap: COUNT.format(dryRun.budget.fleetCap),
+        tourUsed: counted(lastAnswer.budget.tourUsed), tourCap: COUNT.format(lastAnswer.budget.tourCap),
+        fleetUsed: counted(lastAnswer.budget.fleetUsed), fleetCap: COUNT.format(lastAnswer.budget.fleetCap),
       });
   }
 
@@ -109,9 +114,9 @@ export function DayOnePress({ dryRun, trouble, walk, unreadPanos, unreadViews, o
       {budgetLine !== null && <p className="text-[12.5px] text-muted-foreground">{budgetLine}</p>}
 
       {trouble !== null && <Wall words={refusalWords(trouble, t)} />}
-      {dryRefusal !== null && !oneWall && <Wall words={refusalWords(dryRefusal, t, dryRun?.budget)} />}
+      {answerRefusal !== null && !oneWall && <Wall words={refusalWords(answerRefusal, t, lastAnswer?.budget)} />}
       {walkStop !== null && (
-        <Wall words={t('affectedAreas.read.stopped', { index: walk.index, total: walk.total, reason: refusalWords(walkStop, t, oneWall ? dryRun?.budget : undefined) })} />
+        <Wall words={t('affectedAreas.read.stopped', { index: walk.index, total: walk.total, reason: refusalWords(walkStop, t, oneWall ? lastAnswer?.budget : undefined) })} />
       )}
       {!walk.running && walk.skipped > 0 && <Wall words={t('affectedAreas.read.skipped', { count: walk.skipped })} />}
 

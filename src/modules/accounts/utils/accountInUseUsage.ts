@@ -1,3 +1,4 @@
+import { WINDOW_NAMES } from '@/modules/accounts/utils/usageWindows';
 import type { ClaudeAccountRow, ClaudeAccounts, ClaudeUsage, ClaudeUsagePace, ClaudeUsageWindow } from '@/shared/types';
 
 /**
@@ -20,8 +21,8 @@ import type { ClaudeAccountRow, ClaudeAccounts, ClaudeUsage, ClaudeUsagePace, Cl
 const PICTURE_READING_STALE_MS = 3 * 60_000;
 
 /** The two windows every account row states, and the labels the meters already give them. */
-const FIVE_HOUR = { key: 'five_hour', label: 'Current 5-hour window' } as const;
-const WEEKLY = { key: 'seven_day', label: 'This week' } as const;
+const FIVE_HOUR = { key: 'five_hour', label: WINDOW_NAMES.five_hour } as const;
+const WEEKLY = { key: 'seven_day', label: WINDOW_NAMES.seven_day } as const;
 
 /**
  * A fraction 0..1 as the wire's whole percent — the same rounding `usage.service.ts` applies.

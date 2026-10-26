@@ -19,8 +19,11 @@ type MeterProps = {
    * `stacked` is the full block — label and figure over the bar, with room for `sub`.
    * `inline` is the one-line form for tight chrome (a table cell, a checklist row, a card's strip): label, track and
    * figure on a single baseline, no `sub`.
+   * `ring` is the glanceable form for a rail or a header: a thick ring, 28px across, whose arc fills clockwise from 12
+   * o'clock to `percent` and whose middle holds `label` (a word or two: "5h"). It draws no figure and no `sub` — the
+   * caller's tooltip says the words — so `ariaLabel` is what names it, and `value` still feeds `aria-valuetext`.
    */
-  variant?: 'stacked' | 'inline';
+  variant?: 'stacked' | 'inline' | 'ring';
   /**
    * The ceiling, in percent, as a tick on the track — drawn only when given, so every meter that
    * is not a usage window's is exactly the bar it was. The raw figure is kept for the words and
@@ -36,10 +39,15 @@ type MeterProps = {
 };
 
 /**
- * A labelled horizontal bar with its figure and a line of context under it.
- * Used by the accounts module (Phase 13) for the usage windows on the signed-in account, by the
- * file manager for an upload in flight, and by TaskMaster's task card for its subtask progress;
- * all three need the same bar and the same treatment of a figure nobody has yet.
+ * A labelled horizontal bar with its figure and a line of context under it — or, as `variant="ring"`, a small ring.
+ * Used by the accounts module (Phase 13) for the usage windows on the signed-in account (the bars in its panel, and the
+ * two rings at the foot of the project-workspace rail), by the file manager for an upload in flight, and by
+ * TaskMaster's task card for its subtask progress; all of them need the same treatment of a figure nobody has yet.
+ *
+ * THE RING takes its arc's colour from `--tone-dot`, which the nearest `data-tone` container hands down (README rule 4:
+ * tone is a token swap), and names no colour of its own: with no container it falls back to the meter's own accent, or
+ * to the warn amber when `tone="warn"`. The arc sweeps and the colour eases when the figure or the tone changes, and
+ * stands still under `prefers-reduced-motion`.
  *
  * The fill scales with `transform`, never `width`, so the bar animates without laying the
  * row out again on every frame. An unknown percent draws no fill at all and shows an
@@ -110,6 +118,32 @@ export function Meter({ percent, tone = 'accent', label, ariaLabel, value, sub, 
     ...(known ? { 'aria-valuenow': clamped } : {}),
     'aria-valuetext': markWords.length > 0 ? `${valueWords} · ${markWords.join(', ')}` : valueWords,
   };
+
+  // The ring: a pie with its middle cut out for the label. Both circles share one 0..100 path length, so the arc's
+  // length is `percent` whatever the radius, and `strokeDashoffset` (100 minus the figure) is the only thing that moves
+  // when the figure does — which is what the CSS transition sweeps. An unknown percent draws no arc at all: a track
+  // alone says "no reading", where an arc at zero would claim "none used". `tickAt`, `markAt` and `sub` belong to the
+  // bar registers and are not drawn here.
+  if (variant === 'ring') {
+    return (
+      <div className={cn('vv-meter vv-meter--ring', tone === 'warn' && 'vv-meter--warn')} {...aria}>
+        <svg className="vv-meter__ring" viewBox="0 0 28 28" aria-hidden="true" focusable="false">
+          <circle className="vv-meter__ring-track" cx="14" cy="14" r="11.75" pathLength={100} />
+          {known && (
+            <circle
+              className="vv-meter__arc"
+              cx="14"
+              cy="14"
+              r="11.75"
+              pathLength={100}
+              style={{ strokeDashoffset: 100 - clamped }}
+            />
+          )}
+        </svg>
+        <span className="vv-meter__ring-label">{label}</span>
+      </div>
+    );
+  }
 
   // `sub` is deliberately dropped in the inline register rather than wrapped under the bar: this
   // form exists for a row that has one line to spare, and a second line would defeat it. The

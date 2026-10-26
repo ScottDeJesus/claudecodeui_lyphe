@@ -31,3 +31,18 @@ measured 2026-10-17 by chain chain-tour-affected-areas--viewer--docs-20261017-16
 probe-key: 561cc9c48776d39e0d11f22e3298513176d56476
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Gallery.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/PhotoFill.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/RegionDrawLayer.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/RegionImage.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/verve/media.css
+
+## INV-9721 — `regionBadgePlaces.ts` mirrors three sizes the paint sets — change a paint size and its constant together
+
+`clearBadgePlaces` (`RegionImage`'s `badgePlacement="clear"`, MAN-8945) places a badge on screen sizes it cannot read from the CSS:
+
+| constant | value | the paint it mirrors |
+|---|---|---|
+| `BADGE_PX` | 22 | `--vv-region-badge-size` (`media.css`) |
+| `SPOT_PX` | 18 | `--vv-region-spot-size` 16 px plus the 1 px hairline on each side (`spots.css`) |
+| `PRESS_PX` | 6 | `.vv-region-badge::before`, `inset: -6px` (`media.css`) |
+
+- A paint size changed alone moves badges onto what they were placed to clear, or keeps them off space that is free.
+- The order a place is weighed in (`Cost`: covers no earlier badge or spot · middle on no other region's box · touches its own box · press clear of neighbours · least on other boxes) is the contract, stated in MAN-8945's `badgePlacement` row; a change to it changes that row in the same edit.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/regionBadgePlaces.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/verve/media.css, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/verve/spots.css

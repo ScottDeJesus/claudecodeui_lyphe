@@ -158,11 +158,12 @@ the provider's own label, which is the only place a `weekly_scoped:*` plan is ev
 |---|---|
 | `percent: 42` | "42% used" over a bar at 42 |
 | `percent: 0` | "0% used" over an empty track — a real reading, not an absence |
-| `percent: null` | "—", no fill at all, and no `aria-valuenow` |
+| `percent: null`, or the key absent / not a finite number (`windowPercent` answers `null`, never `NaN`) | "—", no fill at all, and no `aria-valuenow` |
 | `percent ≥ 80` | amber, the library's `▲`, and *Running heavy* in words under the bar |
 | `severity` present | amber at any percent — a flagged window can read a comfortable 12 % and still mean an account lock |
 | `rolled: true` | the real percent, dimmed, as "was 36% used" — draining it would draw a full tank nobody measured |
 | `degraded: true` | the last figures at 60 % opacity under *As of \<local time\> — \<why\>.* |
+| `windows` absent (a reachable body with no `windows` array) | read as `windows: []` — the three rows below; never a TypeError in render |
 | `windows: []` + `reason: 'pending'` | *A fresh reading is on its way.* — reading, not broken |
 | `windows: []` + `reason: 'shape'` | *The provider answered in a shape this app did not recognise.* — the meter KNOWS why it is empty, so it says so instead of the generic line below |
 | `windows: []` + `degraded` | *No figures are available under this account.* |
@@ -314,6 +315,47 @@ answers `/api/deepseek/balance` with `page.route`, never api.deepseek.com, which
 stub can reach. See MAN-670.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/panel-fill.mjs
+
+## MAN-9033 — The usage rings on the views rail — UsageRings, Meter's ring face, ringTone, .verify/probe-usage-rings.mjs
+section: accounts/010 The usage rings on the views rail
+
+Two rings at the foot of the views rail, directly above Inbox — "5h" over "wk". `UsageRings` (accounts module, exported through its barrel, mounted by `WorkspaceRail`'s foot: MAN-9005) draws them with the library's `Meter` in `variant="ring"`. They stand wherever the rail does: docked on a desktop, inside the drawer on a phone (one tree across 768px).
+
+## What they read
+- `accountInUseUsage(usage, accounts, now)` (MAN-8862) — the SAME reading the panel's top meters draw, so a ring and its meter always show one figure. Never the raw `useAccountsContext().usage`: `GET /api/usage` measures the box's live login, which is not always the account in use, and a ring on it would read under the wrong owner. `now` is `useMinuteTick()`. No fetch, no poll.
+- The figure is `windowPercent(window)` — the integer the meter prints. The colour is judged on that integer, so the tooltip never says 75% beside a green ring.
+- The hover words, also the ring's `aria-label` (joined with ". "): `WINDOW_NAMES[key]` ("Current 5-hour window" / "This week"), `windowValue` ("42% used", "was 42% used" for a rolled window), `resetsLine(resetsAt)`. All three helpers are the meters' own (`utils/usageWindows.ts`, `UsageMeters.tsx`).
+- No reading — `usage` null, unreachable with no filed reading under it, a body with no `windows` array, the window absent from `windows`, or a window whose `percent` is absent or not finite (`windowPercent` answers `null`, never `NaN`) — draws the track only: no arc element, no `data-tone`, no `aria-valuenow`, and the words say *No reading yet*. The two cells never go away, so the foot never jumps.
+- A degraded reading and a rolled window dim to `opacity-60`, as the panel's bars do: a red ring on a window that has already reset would be a false alarm.
+- Not a button, no tab stop. The `Tooltip` is the rail's (`position="right"`), on hover and a phone's long press.
+
+## The bands — `ringTone(key, percent)` in `utils/usageWindows.ts`, the only place a threshold is written
+It returns the Verve tone the ring's cell carries as `data-tone` (README rule 4); `null` for no figure.
+
+| window | green | yellow | red |
+|---|---|---|---|
+| `seven_day` | below 75 | 75 to 89 | 90 and up |
+| `five_hour` | below 80 | 80 to 89 | 90 and up |
+
+A figure on a boundary takes the higher colour. The 5-hour yellow comes later because the window refills within hours. A vendor `severity` flag does NOT move a ring (it still forces the bar meter amber, `windowTone`); the bar meters keep their own two states and thresholds.
+
+## The ring face of `Meter` (`src/shared/ui/Meter.tsx`, `.vv-meter--ring` in `controls.css`)
+- A 28px `viewBox` svg: a track circle and an arc circle, r 11.75, stroke 4.5, both `pathLength=100`; the arc is `stroke-dasharray: 100` with `strokeDashoffset: 100 - percent`, and the svg is turned -90deg so the fill runs clockwise from 12 o'clock. The label (`.vv-meter__ring-label`, 9px) is centred in the hole.
+- The arc's ink is `var(--tone-dot, var(--accent))` (`var(--warn-dot)` as the fallback under `tone="warn"`): the ring names no colour, the nearest `data-tone` container hands one down. A `data-tone` ancestor higher up recolours it.
+- `percent: null` draws no arc. `ariaLabel` names the meter; `value` feeds `aria-valuetext`. `tickAt`, `markAt` and `sub` are bar-only. `stacked` and `inline` are unchanged.
+- The sweep and the colour ease over `--dur-move`; under `prefers-reduced-motion` the arc has no transition (the ring's own rule, and the app's `index.css` reset beneath it).
+
+## Proof
+`node .verify/probe-usage-rings.mjs before|after`, against the production client (:5184; `scripts/prod-client-build.sh` between the two runs). Logs in as the dev account, drops every preference write and refuses every account write.
+- (a) desktop and phone, light and dark: two rings directly above Inbox, "5h" over "wk", centred, 28px, 4.5px arc; each figure equals its meter's printed figure (the open Accounts widget, else the account popover); each tone is the band rule's and the arc is painted in that tone's colour; no tab stop; the hover words are in the accessible name; the panel's stacked meters keep their markup; a 560px phone keeps the foot whole while the runs scroll; reduced motion stills the arc; console errors 0.
+- (b) the usage reply replaced in the browser only (`page.route`): the week at 74/75/89/90 → green/yellow/yellow/red, the 5-hour at 79/80/89/90 likewise, a reply without the weekly window, and an unreachable reply.
+- 2026-10-26: 72 PASS, 0 FAIL, exit 0.
+
+## Traps
+- To fake "no reading" the probe must also blank the in-use row's filed `reading`: with an account in use, an unreachable `/api/usage` still draws that row's reading (MAN-8862), in the meters and the rings alike. A faked healthy reply must carry the in-use account's `digest` for the same reason.
+- `Date.now()` in `UsageRings` is a lint failure (`react/purity`); the clock is `useMinuteTick`.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/UsageRings.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/utils/usageWindows.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Meter.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-usage-rings.mjs
 
 ## MAN-469 — The API tab
 section: api-tab/000
@@ -13733,7 +13775,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/AccountPane
 
 ## MAN-8862 — The meters follow the account in use — accountInUseUsage.ts
 
-Reference: the meters' states MAN-464 (`UsageMeters` is unchanged); the door's picture MAN-8843 and its relay MAN-8858; the types INV-9252; the section over the same picture MAN-8847.
+Reference: the meters' states MAN-464; the door's picture MAN-8843 and its relay MAN-8858; the types INV-9252; the section over the same picture MAN-8847.
 
 ## Which account the meters draw
 `accountInUse(picture)` = the `accounts` row the door marks `in_use` (the chosen account when it holds a checked token, else the live login). A picture the door could not answer (`{reachable:false}`), or none yet, has no account in use.
@@ -13745,7 +13787,7 @@ Reference: the meters' states MAN-464 (`UsageMeters` is unchanged); the door's p
 | anything else | `pictureReading(row, usage, nowMs)` — the row's newest reading as a `ClaudeUsage` |
 
 - The route's body is never drawn under another account's name: identity match plus health is the test. `GET /api/usage` measures the box's live login (`account` = its digest, MAN-464); once the store chooses another account those figures belong to the outgoing login.
-- Callers: `AccountPanelBody` (`UsageMeters`), the one reader — drawn by the popover and by the Accounts widget alike.
+- Callers: `AccountPanelBody` (`UsageMeters`) — drawn by the popover and by the Accounts widget alike — and `UsageRings` (the two rings on the views rail, MAN-9033). Both read it so a ring and its meter show the same figure.
 
 ## `pictureReading` — the row's reading as `ClaudeUsage`
 | door field | `ClaudeUsage` field |
@@ -13761,7 +13803,7 @@ Reference: the meters' states MAN-464 (`UsageMeters` is unchanged); the door's p
 1. **`accountInUseUsage.ts` is the one place the door's fractions become the meters' percent.** Any new window or pacer figure is converted here; no renderer multiplies.
 2. **Unknown is `null`, never `0` and never `NaN`.** `points(fraction)` returns `null` for `null`, absent or non-finite input (`Math.round(undefined*100)` is `NaN`, which `Meter` draws as a live bar with `aria-valuenow="NaN"`). `ClaudeAccountRow.reading.five` / `.week` are `number | null` (INV-9252): the pacer files one-window readings.
 3. **Every wire stamp is read through a finite check.** `resetStamp` returns `null` for null, absent or non-finite seconds (`new Date(undefined).toISOString()` throws in render and takes the whole app down). `reading.at` is normalised once into `filedAt`: unreadable → the conversion moment, never stale, and `checkedAt` stays a number.
-4. **The reading's age is judged from the picture's own clock.** `nowMs` is the panel's minute tick (`AccountPanelBody`'s `now`, the row's `nowTick`), not a fresh `Date.now()`.
+4. **The reading's age is judged from the picture's own clock.** `nowMs` is a minute tick (`useMinuteTick`: `AccountPanelBody`'s `now`, the row's `nowTick`, `UsageRings`' own), not a fresh `Date.now()`.
 5. **Row-side figures obey the same rules.** `ClaudeAccountRowViews.tsx` applies the null / non-finite / unreadable-instant guard at its own read sites (`figureInPoints`, `readingAgeInWords`, `tokenDateInWords`; MAN-8847); a guard added to one file is added to the other.
 6. **No whole-object validator at the door boundary.** The edge guards live at each read site, after the `resetStamp` precedent.
 

@@ -2969,15 +2969,18 @@
         "read_one": "{{read}} of {{count}} pano read",
         "read_other": "{{read}} of {{count}} panos read",
         "drawn": "drawn {{when}}",
-        "from": "from {{versions}} reads",
-        "stale": "not from the newest reads",
+        "drawnOlder": "drawn {{when}} from older reads",
+        "calibration": "from the calibration reads",
+        "partlyCalibration": "partly from the calibration reads",
         "redrawing": "redrawing…"
       },
       "empty": {
         "noneTitle": "No room layout read yet",
         "noneMessage": "Read the room layout, above, and the tour's own panos draw a rough floor plan: every room measured from its camera and pinned to its neighbours through the doorways both cameras see.",
+        "noneRefusedMessage": "The warning above says why nothing can be read now. Once it clears, Read the room layout draws a rough floor plan from the tour's own panos.",
         "unknownTitle": "No plan to show",
         "unknownMessage": "shadow-connector didn't say where this tour's room layout stands. Read the room layout, above, to draw a plan.",
+        "unknownRefusedMessage": "shadow-connector didn't say where this tour's room layout stands, and the warning above says why nothing can be read now.",
         "unavailableTitle": "No plan could be drawn",
         "unavailableMessage": "The room layout was read, but no room could be measured from it, or DocuSketch couldn't be read.",
         "pendingTitle": "The plan isn't drawn yet",
@@ -3008,7 +3011,8 @@
         "alt": "Day-one sketch: {{rooms}} drawn from the panos",
         "altFloor": "Day-one sketch, floor {{floor}}: {{rooms}} drawn from the panos",
         "loading": "Loading the plan's drawing…",
-        "drawingFailed": "The plan's drawing didn't arrive; its areas, things and spots stand where the plan put them."
+        "drawingFailed": "The plan's drawing didn't arrive. Its rooms and everything placed in them are still listed.",
+        "spotsLegend": "Where each 360° photo was taken: press one to open it"
       },
       "spot": "{{room}} 360° photo",
       "spotNth": "{{room}} 360° photo, {{n}} of {{total}}",
@@ -3024,6 +3028,7 @@
       },
       "pins": {
         "single": "One room: nothing to pin it to",
+        "both": "Both rooms pinned through a doorway",
         "all_one": "{{count}} room pinned through a doorway",
         "all_other": "All {{count}} rooms pinned through doorways",
         "some_one": "{{pinned}} of {{count}} room pinned through doorways",

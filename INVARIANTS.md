@@ -13009,3 +13009,116 @@ measured 2026-10-26 by chain chain-accounts-usage-widget-20261026-092630-176a, f
 probe-key: 9c8a1c6bc101ac055a0aa75d8cec40160032b15d
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/scripts/prod-client-build.sh, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/AccountPanelBody.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/AccountPopover.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/AccountsWidgetBody.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/context/AccountsContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-accounts-widget.mjs
+
+## INV-9717 — probe — MEDIUM — `UsageRings` trusts `reading.windows` and `percent`: a reply without them takes the whole app down on every page, and a window with no figure draws a green ring reading "NaN% used"
+
+MEDIUM — `UsageRings` trusts `reading.windows` and `percent`: a reply without them takes the whole app down on every page, and a window with no figure draws a green ring reading "NaN% used"
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'SH'
+#!/usr/bin/env bash
+set -u
+D=${1:?}
+DIGEST=$(~/.claude/scripts/claude-account status --json | python3 -I -c "import json,sys; print([a['digest'] for a in json.load(sys.stdin)['accounts'] if a.get('in_use')][0])") || exit 1
+cat > "$D/p.mjs" <<'EOF'
+import pw from '/opt/shadow-connector/node_modules/playwright/index.js';
+import { DEV_USER, PROJECT_ROW } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/console.mjs';
+import { closeBrowser } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/guard-route.mjs';
+import { pinPreferences } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/prefs-pin.mjs';
+const digest = process.argv[2];
+const base = { reachable: true, account: digest, degraded: false, reason: '', staleSince: null, checkedAt: 1 };
+const shapes = [
+  ['phone, reply with no windows key, panel never opened', { width: 390, height: 844 }, true, base],
+  ['desktop, windows with no percent', { width: 1920, height: 1000 }, false, { ...base, windows: [{ key: 'five_hour', label: 'x' }, { key: 'seven_day', label: 'y' }] }],
+];
+for (const [label, viewport, phone, body] of shapes) {
+  const browser = await pw.chromium.launch();
+  const context = await browser.newContext({ viewport, serviceWorkers: 'block', ...(phone ? { isMobile: true, hasTouch: true } : {}) });
+  await pinPreferences(context, () => ({ theme: 'light', themeFollowsSun: false, userLanguage: 'en', simpleChatList: false, uiPreferences: { sidebarVisible: true } }), { writes: 'drop', onRefuse: () => {} });
+  let fake = false;
+  await context.route(/\/api\/usage(?:[?#].*)?$/, (r) => (fake && r.request().method() === 'GET' ? r.fulfill({ json: body }) : r.fallback()));
+  const page = await context.newPage();
+  await page.goto('http://127.0.0.1:5184', { waitUntil: 'networkidle' });
+  await page.fill('#username', DEV_USER.username); await page.fill('#password', DEV_USER.password);
+  await page.click('button[type="submit"]');
+  await page.waitForFunction(() => Boolean(localStorage.getItem('auth-token')));
+  fake = true;
+  await page.goto('http://127.0.0.1:5184', { waitUntil: 'networkidle' });
+  await (await page.waitForSelector(PROJECT_ROW, { timeout: 20000 }).catch(() => null))?.click();
+  await page.waitForTimeout(3000);
+  const whole = (await page.locator('body').innerText()).includes('CloudCLI hit an error') ? 'WHOLE-APP-ERROR' : 'app drawn';
+  const rings = await page.evaluate(() => [...document.querySelectorAll('nav[aria-label="Views"] [role="meter"]')].filter((m) => !m.closest('#account-panel')).map((m) => `${m.textContent.trim()}:${m.closest('[data-tone]')?.dataset.tone ?? 'no-tone'}:${m.getAttribute('aria-valuetext')}`));
+  console.log(JSON.stringify({ shape: label, whole, rings }));
+  await closeBrowser(browser);
+}
+EOF
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+node "$D/p.mjs" "$DIGEST" 2>&1 | grep '^{'
+SH
+bash "$D/p.sh" "$D"
+case "$D" in /tmp/athena-probe.??????) cd /tmp && rm -r "$D";; esac
+echo "[probe exit $?]"
+# expect: ~40 s, against the prod client :5184. While the defect stands: the phone shape prints "whole":"WHOLE-APP-ERROR" with "rings":[], and the desktop shape prints "rings":["5h:positive:NaN% used","wk:positive:NaN% used"]. Cured: the phone shape prints "app drawn" with two rings and no tone, and the desktop shape prints rings with no tone and valuetext "unknown"
+```
+
+measured 2026-10-26 by chain chain-usage-rings-rail-20261026-124656-8568, finding M1, MEDIUM
+probe-key: f5936709ce01ade0d275918602802de50f92df56
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/UsageMeters.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/UsageRings.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/utils/usageWindows.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Meter.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/verve/controls.css, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-usage-rings.mjs
+
+## INV-9718 — probe — LOW — the rings start a perpetual minute timer, which the brief and the break-it note said they would not (disclosed by the builder)
+
+LOW — the rings start a perpetual minute timer, which the brief and the break-it note said they would not (disclosed by the builder)
+
+```probe
+cd /home/lyphe/.claude/claudecodeui_lyphe && grep -n "useMinuteTick()" src/modules/accounts/UsageRings.tsx || echo none
+echo "[probe exit $?]"
+# expect: `79:  const now = useMinuteTick();` while the rings own a timer; `none` once they read their age from data and not a clock (or the operator accepts it and the row is retired)
+```
+
+measured 2026-10-26 by chain chain-usage-rings-rail-20261026-124656-8568, finding L1, LOW
+probe-key: 7a8946f4883f25b5138b31b3934e98e5d405d439
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/UsageMeters.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/UsageRings.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/utils/usageWindows.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Meter.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/verve/controls.css, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-usage-rings.mjs
+
+## INV-9719 — probe — LOW — in light mode two of the three tone arcs miss the house's own 3:1 graphics floor against the rail, and the yellow arc is 1.57:1 against its own track
+
+LOW — in light mode two of the three tone arcs miss the house's own 3:1 graphics floor against the rail, and the yellow arc is 1.57:1 against its own track
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'SH'
+#!/usr/bin/env bash
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+python3 -I - <<'PY'
+import re
+src = open('src/shared/ui/verve/tokens.css').read()
+light = src.split('[data-theme="dark"]')[0] if '[data-theme="dark"]' in src else src
+def tok(name):
+    m = re.search(r'--%s:\s*(#[0-9a-fA-F]{6})' % name, light)
+    return tuple(int(m.group(1)[i:i+2], 16) for i in (1, 3, 5)) if m else None
+def lum(c):
+    f = lambda v: (v/255)/12.92 if v/255 <= 0.03928 else (((v/255)+0.055)/1.055)**2.4
+    return 0.2126*f(c[0]) + 0.7152*f(c[1]) + 0.0722*f(c[2])
+def ratio(a, b):
+    x, y = sorted([lum(a), lum(b)], reverse=True)
+    return round((x+0.05)/(y+0.05), 2)
+rail = (247, 247, 249)   # the rail's own background, measured live in light mode (color(srgb .9686 .9686 .9765))
+track = tok('border-strong')
+for name in ('pos-dot', 'warn-dot', 'danger-dot'):
+    dot = tok(name)
+    print(name, dot, 'vs rail', ratio(dot, rail) if dot else None, '| vs track', ratio(dot, track) if dot and track else None)
+print('track', track, 'vs rail', ratio(track, rail) if track else None)
+PY
+SH
+bash "$D/p.sh"
+case "$D" in /tmp/athena-probe.??????) cd /tmp && rm -r "$D";; esac
+echo "[probe exit $?]"
+# expect: pos-dot 2.81 vs rail / 2.14 vs track, warn-dot 2.07 / 1.57, danger-dot 5.56 / 4.24 while the ring arcs read the light-mode dots; cured when the arc ink in light mode clears 3:1 against the rail
+```
+
+measured 2026-10-26 by chain chain-usage-rings-rail-20261026-124656-8568, finding L2, LOW
+probe-key: 229476df0ab5a86794aeee18819a78f7da46dd0a
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/UsageMeters.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/UsageRings.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/utils/usageWindows.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Meter.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/verve/controls.css, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-usage-rings.mjs
