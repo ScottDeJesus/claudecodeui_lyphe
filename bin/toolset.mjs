@@ -17,7 +17,7 @@
 //
 // WHY IT LIVES IN CLOUDCLI'S REPO. Its whole contract is CloudCLI's command door
 // (`POST /api/toolsets-cmd`, server/modules/toolsets/toolsets.routes.ts) and four variables, so the
-// two change together. CloudCLI links it into ~/.local/bin at boot (toolsets.command-link.ts).
+// two change together. CloudCLI links it into ~/.local/bin at boot (chat-commands.link.ts).
 //
 // It holds no state, imports nothing, and is run by bare `node` — the same footing as `warden/`.
 //   CLAUDE_SURFACE            'cloudcli' inside a CloudCLI chat (set at launch)

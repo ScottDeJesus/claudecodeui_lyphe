@@ -1,4 +1,4 @@
-import { ActivityIcon, BotIcon, BrainIcon, GlobeIcon, RouteIcon, StickyNoteIcon, type LucideIcon } from 'lucide-react';
+import { ActivityIcon, BotIcon, BrainIcon, GlobeIcon, ListChecksIcon, RouteIcon, StickyNoteIcon, type LucideIcon } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ComponentType, ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -15,6 +15,7 @@ import { GUTTER_SIDES, useGutterPlacements, widgetsOn } from '@/modules/chat-gut
 import { GutterColumn } from '@/modules/chat-gutters/GutterColumn';
 import { GutterWidgetFrame } from '@/modules/chat-gutters/GutterWidgetFrame';
 import { useDispatcherPlans } from '@/modules/dispatcher';
+import { FollowupsContext, FollowupsWidgetBody, useFollowups } from '@/modules/followups';
 import { MemoryWidgetBody, useMemoryIntake } from '@/modules/memory-intake';
 import { NotesWidgetBody, useNotes } from '@/modules/notes';
 import { RoadmapWidgetBody, RoadmapWidgetFullscreenBody, useRoadmap } from '@/modules/roadmap';
@@ -48,7 +49,7 @@ const GUTTER_MIN_PX = 300;
 const MIN_REGION_PX = CHAT_COLUMN_PX + 2 * (GUTTER_MIN_PX + GUTTER_GAP_PX);
 
 /**
- * The desktop chat's side gutters: the runner, roadmap, memory, subagents, embed and notes widgets beside the
+ * The desktop chat's side gutters: the runner, roadmap, memory, subagents, embed, notes and next-steps widgets beside the
  * transcript, each of them draggable into either side's stack, at any place in it, and any one of
  * them able to take the whole viewport for as long as the reader wants it.
  *
@@ -91,7 +92,7 @@ export function ChatGutterLayout({
   // heading over cards the count has counted — the In flight face's own rule (`useDispatcherPlans.count`).
   // `tone` is the badge's colour, not its number: the count stays what it always was, and wears what
   // the lane is DOING — amber while a plan owes the operator a word, blue while anything runs, green
-  // only once all of it is finished — the same colour the Roadmap tab's dot wears (`useDispatcherPlans.tone`).
+  // only once all of it is finished (`useDispatcherPlans.tone`).
   const { count: runnerCount, tone: runnerTone } = useDispatcherPlans();
   // The Roadmap widget's badge counts what is being worked on — features still being designed and features in
   // flight, on the ONE roadmap on screen — and turns amber while any of them owes the operator a word: the
@@ -223,6 +224,12 @@ export function ChatGutterLayout({
   const dragging = wide ? draggingState : null;
   const hovered = wide ? hoveredState : null;
 
+  // The open chat's own next steps and known gaps, read ONCE here: the badge below needs the count outside every
+  // widget's boundary, and the Next steps widget's body draws the same reading through `FollowupsContext`, so the
+  // two cannot disagree. Read only while the gutters are drawn: on a phone or a narrow window there is no badge and
+  // no body to feed, so no request is made and no socket frame is listened for.
+  const followups = useFollowups(wide ? sessionId : null);
+
   // A capitalised local, because JSX reads a lowercase tag as an intrinsic element: this is what
   // lets the boundary arrive as a prop instead of this module importing the workspace's own.
   const Boundary = boundary;
@@ -339,6 +346,14 @@ export function ChatGutterLayout({
       icon: StickyNoteIcon,
       Body: NotesWidgetBody,
     },
+    // The open chat's own next steps and known gaps, filled by the chat itself through the `followups` command.
+    // The badge is how many are open across both groups.
+    followups: {
+      title: t('gutters.followups.title'),
+      count: followups.openCount,
+      icon: ListChecksIcon,
+      Body: FollowupsWidgetBody,
+    },
   };
 
   const renderWidget = (widget: GutterWidgetId): ReactNode => {
@@ -422,14 +437,19 @@ export function ChatGutterLayout({
             the centred `max-w-[1860px]` above stops at 480px — 1860 is 868 + 2 * (480 + 16), and
             past 480 a run list is a list spread across a screen it does not fill. What is left over
             sits OUTSIDE the three columns, never between a widget and the chat. */}
-        {wide && GUTTER_SIDES.map((side) => (
-          <div
-            key={side}
-            className={cn('row-start-1 h-full min-h-0', side === 'left' ? 'col-start-1' : 'col-start-3')}
-          >
-            {renderColumn(side)}
-          </div>
-        ))}
+        {wide && (
+          // The provider draws no element, so the two asides stay the grid's own children. Only they read it.
+          <FollowupsContext.Provider value={followups}>
+            {GUTTER_SIDES.map((side) => (
+              <div
+                key={side}
+                className={cn('row-start-1 h-full min-h-0', side === 'left' ? 'col-start-1' : 'col-start-3')}
+              >
+                {renderColumn(side)}
+              </div>
+            ))}
+          </FollowupsContext.Provider>
+        )}
       </div>
     </div>
   );

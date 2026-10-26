@@ -1,4 +1,5 @@
 import { getConnection } from '@/modules/database/connection.js';
+import { followupsDb } from '@/modules/database/repositories/followups.db.js';
 import { projectsDb } from '@/modules/database/repositories/projects.db.js';
 import { SESSION_UNREAD_SQL } from '@/modules/database/repositories/session-user-state.db.js';
 import { NEXT_TOP_SIMPLE_LIST_RANK_SQL } from '@/modules/database/repositories/simple-list-ladder.db.js';
@@ -244,12 +245,9 @@ export const sessionsDb = {
 
     projectsDb.createProjectPath(normalizedProjectPath);
 
-    // The watcher may already have created a row for the new transcript. Its
-    // id is the provider-native one, which is what this row claims, so replace
-    // it rather than leaving two sidebar entries for one conversation.
+    // The new row goes in FIRST: the watcher row's followups move onto it (a foreign key needs its
+    // parent to exist), and only then is the watcher row deleted, so the cascade finds nothing to take.
     db.transaction(() => {
-      db.prepare('DELETE FROM sessions WHERE session_id = ? AND session_id <> ?')
-        .run(input.providerSessionId, input.sessionId);
       db.prepare(
         `INSERT INTO sessions (session_id, provider, provider_session_id, custom_name, project_path, jsonl_path, model, effort, forked_from_session_id, isArchived, created_at, updated_at)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`
@@ -264,6 +262,9 @@ export const sessionsDb = {
         input.effort,
         input.forkedFromSessionId,
       );
+      followupsDb.moveToSession(input.providerSessionId, input.sessionId);
+      db.prepare('DELETE FROM sessions WHERE session_id = ? AND session_id <> ?')
+        .run(input.providerSessionId, input.sessionId);
     })();
 
     return input.sessionId;
@@ -292,6 +293,8 @@ export const sessionsDb = {
         .get(providerSessionId, providerSessionId, sessionId) as SessionRow | undefined;
 
       if (duplicate) {
+        // The chat's followups follow it onto the surviving row; the cascade would drop them with the duplicate.
+        followupsDb.moveToSession(duplicate.session_id, sessionId);
         db.prepare('DELETE FROM sessions WHERE session_id = ?').run(duplicate.session_id);
         db.prepare(
           `UPDATE sessions SET
@@ -335,6 +338,8 @@ export const sessionsDb = {
     const db = getConnection();
 
     db.transaction(() => {
+      // Moved first, then the row is deleted: the cascade would otherwise take the replaced row's followups.
+      followupsDb.moveToSession(input.providerSessionId, sessionId);
       db.prepare('DELETE FROM sessions WHERE session_id = ? AND session_id <> ?')
         .run(input.providerSessionId, sessionId);
       db.prepare(

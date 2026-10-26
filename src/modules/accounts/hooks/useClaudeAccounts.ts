@@ -38,8 +38,8 @@ async function readBody(response: Response): Promise<unknown> {
 const ACCOUNTS_CHANGED_EVENT = 'cloudcli:accounts-changed';
 
 /**
- * Tells the account row the picture moved under it. Fired when the Re-login window closes (the
- * footer's door and Settings' door both) and when the Set up window closes: each ran a command this
+ * Tells the account button the picture moved under it. Fired when the Re-login window closes (the
+ * panel's door and Settings' door both) and when the Set up window closes: each ran a command this
  * app cannot see the end of, so the panel re-reads rather than going on showing the old account
  * until its next tick.
  */
@@ -50,20 +50,20 @@ export function announceAccountsChanged(): void {
 /**
  * The Claude accounts the door holds, and the three writes that change them.
  *
- * Used by the accounts module's footer row, which owns the single instance — the sidebar
- * renders the row once (the collapsed rail and the expanded footer are mutually exclusive),
- * so there is exactly one poller in the app at a time.
+ * Used by the accounts module's AccountRailButton, which owns the single instance — the views rail
+ * renders the button once and stands whether the chat list shows or is collapsed, so there is exactly
+ * one poller in the app.
  *
  * ONE PICTURE, THREE WRITES. `GET /api/accounts` answers the door's own picture, tagged with
  * `reachable`; `use`/`auto`/`remove` are the writes that choose, unchoose and drop an account.
  * Every write re-reads the picture when it lands, because none of the three is meaningful on a
  * stale one.
  *
- * A write is deliberately unguarded by a dialog: the row states the fact it would ask about.
+ * A write is deliberately unguarded by a dialog: the panel's row states the fact it would ask about.
  * What IS guarded is a SECOND write while one is in flight, since the choice is not re-entrant.
  */
 export function useClaudeAccounts() {
-  // The last picture the route answered with. Held because the footer row and the panel both
+  // The last picture the route answered with. Held because the rail button and the panel both
   // read it between polls, and because `null` (nothing asked yet) has to look different from
   // `{reachable:false}` (asked, and there was no picture to be had).
   const [data, setData] = useState<ClaudeAccounts | null>(null);
@@ -74,7 +74,7 @@ export function useClaudeAccounts() {
   // standing state, and one left standing would greet the next person who opens it.
   const [error, setError] = useState<string | null>(null);
 
-  // Mount flag: a poll that resolves after the sidebar collapsed must not set state.
+  // Mount flag: a poll that resolves after the button unmounted (a sign-out, or the rail leaving the tree) must not set state.
   const mountedRef = useRef(true);
   // The in-flight guard read synchronously — `busy` is a render value and lands too late to
   // stop a second press in the same tick.

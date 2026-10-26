@@ -62,8 +62,8 @@ function pageStripToCard(deck: Element, plan: string): HTMLElement | null {
  *
  * THE COUNT IS OF THE CARDS DRAWN — plans paused, queued and ended included, the hidden and dismissed
  * ones not — and
- * it agrees with the tab's badge because both read the same `count` off the same hook: the badge from
- * `useWorkspaceTabGates`, this header from here, one value with two readers. A badge of 3 over a panel
+ * it agrees with the In flight face's pill because both read the same `count` off the same hook: the
+ * pill from `RoadmapTab`, this header from here, one value with two readers. A pill of 3 over a panel
  * of 2 cards would make a liar of one of them.
  *
  * `data-runner-panel` is the browser harness's handle, on the ROOT: a probe scopes every reading to

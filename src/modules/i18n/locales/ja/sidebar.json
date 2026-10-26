@@ -41,7 +41,8 @@
   },
   "tooltips": {
     "viewEnvironments": "環境を表示",
-    "hideSidebar": "サイドバーを隠す",
+    "hideList": "チャット一覧を隠す",
+    "closeDrawer": "サイドバーを閉じる",
     "createProject": "新しいプロジェクトを作成",
     "refresh": "プロジェクトとセッションを更新 (Ctrl+R)",
     "renameProject": "プロジェクト名を変更 (F2)",
@@ -65,7 +66,6 @@
   },
   "actions": {
     "refresh": "更新",
-    "settings": "設定",
     "collapseAll": "すべて折りたたむ",
     "expandAll": "すべて展開",
     "cancel": "キャンセル",

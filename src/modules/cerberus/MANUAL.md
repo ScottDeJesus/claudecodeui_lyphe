@@ -2,12 +2,12 @@
 
 ## MAN-7868 — Cerberus — the tab: `CerberusProvider`, the status table and the views, where each subject is documented, and the rules of the module
 
-The Cerberus tab: the fleet's health on the house row. One provider reads `GET /api/cerberus/overview` and holds it for every reader; the views draw from it, and a check's sheet reads one check. The tab is composed from `@/shared/ui`, with five pieces added to the library for it (Sheet, Timeline, Steps, Checkbox, DialogFrame: every module with a panel to raise or a feed to draw composes them); TextArea came for the roadmap and the Mute dialog takes it too. Server module: MAN-7815. Wire shapes: MAN-7807. Design: `design/cerberus/Cerberus Spec.dc.html`, whose Table 8 makes it reference for layout, copy and motion only: no prototype markup or script is in `src/`.
+The Cerberus tab: the fleet's health, on the views rail's house run. One provider reads `GET /api/cerberus/overview` and holds it for every reader; the views draw from it, and a check's sheet reads one check. The tab is composed from `@/shared/ui`, with five pieces added to the library for it (Sheet, Timeline, Steps, Checkbox, DialogFrame: every module with a panel to raise or a feed to draw composes them); TextArea came for the roadmap and the Mute dialog takes it too. Server module: MAN-7815. Wire shapes: MAN-7807. Design: `design/cerberus/Cerberus Spec.dc.html`, whose Table 8 makes it reference for layout, copy and motion only: no prototype markup or script is in `src/`.
 
 ## Where each subject lives
 | subject | row | code |
 |---|---|---|
-| the tab on the house row: `AppTab`, `VALID_TABS`, `CERBERUS_TAB`, count pill, pane, both palettes | MAN-7866 | `WorkspaceTabs.tsx`, `useWorkspaceTabGates.ts`, `ProjectSidebarRegion.tsx`, `WorkspaceMain.tsx`, `useProjectsState.ts`, `ProjectCommandPalette.tsx`, `command-palette/CommandPalette.tsx` |
+| the view on the rail: `AppTab`, `VALID_TABS`, the rail badge, pane, palette row | MAN-7866 | `hooks/useRailBadges.ts`, `hooks/useWorkspaceViews.ts`, `WorkspaceMain.tsx`, `useProjectsState.ts`, `ProjectCommandPalette.tsx` |
 | the root, the header, the clock pill, the passing count | MAN-7891 | `CerberusPanel.tsx`, `CerberusHeader.tsx`, `hooks/useClock.ts`, `hooks/useCountTo.ts` |
 | the provider, `useCerberusNeeds`, what triggers a read, `useCheckDetail` and `?end=`, `api.cerberus`, `cerberusTime` | MAN-7871 | `context/CerberusContext.ts`, `context/CerberusProvider.tsx`, `hooks/useCheckDetail.ts`, `utils/cerberusTime.ts`, `index.ts`, `src/shared/api.ts` |
 | the status table, the four marks, minute cells, lookup moment, recorded results | MAN-7873 (marks MAN-7874, lookup MAN-7875, traps MAN-7876) | `utils/cerberusStatus.ts`, `StatusMarks.tsx`, `sheet/MinuteCells.tsx`, `sheet/LookupMoment.tsx`, `sheet/RecordedResults.tsx` |
@@ -41,44 +41,37 @@ The Cerberus tab: the fleet's health on the house row. One provider reads `GET /
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/
 
-## MAN-7866 — Cerberus — the tab on the house row: `AppTab`, `VALID_TABS`, `CERBERUS_TAB`, the count pill, the pane, both palettes
+## MAN-7866 — Cerberus — the view on the rail: `AppTab`, `VALID_TABS`, the rail badge, the pane, the palette row
 
-Where the Cerberus tab stands in the workspace and what feeds its count. The tab's own tree: MAN-7891. The reader behind the count: MAN-7871. The words: MAN-7870. Row map: MAN-7868.
+Where the Cerberus view stands in the workspace and what feeds its badge. The tab's own tree: MAN-7891. The reader behind the count: MAN-7871. The words: MAN-7870. Row map: MAN-7868. The rail: MAN-9005.
 
 ## Placement
 | piece | fact |
 |---|---|
 | `AppTab` (`src/shared/types.ts`) | contains `'cerberus'`, after `'api'` |
-| `VALID_TABS` (`useProjectsState.ts`) | contains `'cerberus'`, after `'api'`: a stored tab is restored on reload only for an id in this set. The app keeps no project selected across a reload, so a project row is chosen first, as for every tab |
-| house row (`WorkspaceTabs.tsx`) | `CERBERUS_TAB = { id: 'cerberus', labelKey: 'tabs.cerberus', icon: Radar }`, appended after `API_TAB`: last built-in of row two, plugin tabs after it, no tab a hand already knows has moved |
+| `VALID_TABS` (`useProjectsState.ts`) | contains `'cerberus'`, after `'api'`: a stored tab is restored on reload only for an id in this set. A reload at `/` restores no project and needs none: the pane draws on the stored tab alone |
+| rail (`useWorkspaceViews.ts`) | `HOUSE_VIEWS` entry `{ id: 'cerberus', group: 'house', icon: Radar, keywords: 'cerberus fleet health monitoring checks wardens nodes' }`, after Universe and before API: the `house` run of the rail, no view a hand already knows has moved |
 | gate | none. why: the fleet's health is a fact about the house whichever project is open, and a monitor that hid on a quiet day could never say "All quiet" |
 | label | `tabs.cerberus` = "Cerberus" (`en/common.json`, after `tabs.notes`) |
 | provider | `<CerberusProvider>` inside `<HealProvider>` in `src/App.tsx`: MAN-7871 |
 
-## Count pill
+## Rail badge
 | step | file | holds |
 |---|---|---|
 | 1 | `CerberusContext.ts` | `useCerberusNeeds()` = `overview?.counts.needsYou ?? 0` |
-| 2 | `useWorkspaceTabGates.ts` | `cerberusNeeds: number` from `useCerberusNeeds()` |
-| 3 | `ProjectSidebarRegion.tsx` | passes `cerberusNeeds` to `WorkspaceTabs` |
-| 4 | `WorkspaceTabs.tsx` | prop `cerberusNeeds`; `countFor('cerberus')` is it when above zero, else `undefined` (no mark) |
+| 2 | `useRailBadges.ts` | `badges.cerberus = { count: cerberusNeeds, words: t('rail.badge.cerberus', { count }) }` while `cerberusNeeds > 0`; a zero has no entry. The words: `{{count}} needs you` (one), `{{count}} need you` (other), read through the button's `aria-describedby` |
+| 3 | `WorkspaceRail.tsx`, `RailButton.tsx` | draw the badge on the Cerberus button, in the house run: the amber pill (`data-tone="warn"`) with the figure. Colour is never the whole signal: the number is in it. MAN-9005 |
 
-- The strip's number and the tab headline's number are one value: `CerberusHeader` reads `counts.needsYou` from the same overview (MAN-7891).
-- An icon tab draws a dot and says the number in its title: `Cerberus (<count>)` (`Tabs.tsx`).
-- Zero until the first read answers: no mark.
+- The badge's number and the tab headline's number are one value: `CerberusHeader` reads `counts.needsYou` from the same overview (MAN-7891).
+- Zero until the first read answers: no badge.
 
-## Width
-- 9 glyphs with Memory and Heal on = `9 × 36 + 8 × 2 = 340px` against the 304px strip: the strip holds seven and the More trigger takes the last two (API, Cerberus). A selected tab takes the row's last slot and the one before it collapses (measured 2026-10-06).
-- The glyph-width comment in `WorkspaceTabs.tsx` counts nine.
-
-## Pane and palettes
+## Pane and palette
 | piece | fact |
 |---|---|
 | pane (`WorkspaceMain.tsx`) | `activeTab === 'cerberus'` → `<div className="h-full overflow-hidden"><CerberusPanel projectChoices={projectChoices} /></div>`, after the API pane, inside the file's `Suspense`; the panel is the barrel's `lazy` export, its own chunk, loaded on the first open. The "No gate" comment sits above it |
-| `NAV_TABS` (`command-palette/CommandPalette.tsx`) | `{ id: 'cerberus', label: 'Go to Cerberus', keywords: 'cerberus fleet health monitoring checks wardens nodes' }`, after API |
-| `visibleTabs` (`ProjectCommandPalette.tsx`) | the always-on list names `'cerberus'` after `'api'`: a `NAV_TABS` row shows only if this list names it |
+| `HOUSE_VIEWS` (`project-workspace/hooks/useWorkspaceViews.ts`) | the entry above; ungated. `ProjectCommandPalette.tsx` makes it the `Go to Cerberus` row (MAN-8999) |
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/command-palette/CommandPalette.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/hooks/useProjectsState.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/hooks/useWorkspaceTabGates.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/ProjectCommandPalette.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/ProjectSidebarRegion.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/WorkspaceMain.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/WorkspaceTabs.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/command-palette/CommandPalette.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/hooks/useProjectsState.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/hooks/useRailBadges.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/hooks/useWorkspaceViews.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/ProjectCommandPalette.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/WorkspaceMain.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts
 
 ## MAN-7867 — Cerberus — the slots later plans fill: every `SLOT:` and `FILL:` comment, the `VIEWS` table and `activityEvents`
 
@@ -198,10 +191,10 @@ The browser's one reader of Cerberus: a provider holds the overview for every re
 | `src/shared/types.ts` | `CerberusMuteInput`, `CerberusLabelInput`, `CerberusEnrollInput` (client-only: the routes read a loose JSON body); the dialogs' `CerberusEnrollRefusal`: MAN-7884 |
 
 ## Mount and barrel
-- `src/App.tsx`: `<CerberusProvider>` directly inside `<HealProvider>`, wrapping `<Router>`; inside the auth gate, below `WebSocketProvider`. why: `api.cerberus` is authenticated; `cerberus_changed` arrives on the one socket; above the Router a count pill is honest on every tab.
+- `src/App.tsx`: `<CerberusProvider>` directly inside `<HealProvider>`, wrapping `<Router>`; inside the auth gate, below `WebSocketProvider`. why: `api.cerberus` is authenticated; `cerberus_changed` arrives on the one socket; above the Router the rail's badge is honest on every view.
 - The barrel exports `CerberusPanel` too, as `lazy(() => import(...))`: the panel is the tab's whole tree, its own chunk, loaded on the tab's first open (`WorkspaceMain` renders it inside its `Suspense`). Nothing else. Module files import siblings by path, never through the barrel.
 - `useCerberus()` throws outside the provider (`useCerberus must be used within a CerberusProvider`).
-- `useCerberusNeeds()` = `overview?.counts.needsYou ?? 0`. Read by `useWorkspaceTabGates` for the Cerberus tab's count pill, so the strip and the tab's headline are the same number.
+- `useCerberusNeeds()` = `overview?.counts.needsYou ?? 0`. Read by `useRailBadges` for the Cerberus button's badge on the views rail (MAN-7866), so the rail and the tab's headline are the same number.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/App.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/context/CerberusContext.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/context/CerberusProvider.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/context/ProjectChoicesContext.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/hooks/useCheckDetail.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/utils/cerberusTime.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts
 
@@ -1100,7 +1093,7 @@ section: Cerberus — the tab root and header: `CerberusPanel`, `CerberusHeader`
 | passing count as drawn (header) | `useCountTo(counts.passing)`: the number itself on mount; on a change it counts from the number last drawn over 1.4 s, ease-out `1 − (1 − k)³`, rounded, one step a frame on the host window; with motion reduced it is the target at once |
 
 ## On the workspace
-The tab's place on the house row, its count pill, its pane and both palettes: MAN-7866.
+The view's place on the rail, its badge, its pane and its palette row: MAN-7866.
 
 ## Banner re-announce
 - An alert is heard when it mounts. Both root banners are keyed by `attempt`, so a retry that fails again mounts afresh and is heard again.
@@ -1112,7 +1105,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/cerberus/CerberusHea
 ## MAN-8916 — Cerberus — the tab root and header: `CerberusPanel`, `CerberusHeader` — `CerberusHeader`
 section: Cerberus — the tab root and header: `CerberusPanel`, `CerberusHeader`/003 `CerberusHeader`
 
-- Eyebrow `cerberus.header.eyebrow`; headline `<lead> <em>accent</em>`: "All *quiet*", "One check *needs you*", "3 checks *need you*", from `counts.needsYou` (the number the workspace strip's pill shows).
+- Eyebrow `cerberus.header.eyebrow`; headline `<lead> <em>accent</em>`: "All *quiet*", "One check *needs you*", "3 checks *need you*", from `counts.needsYou` (the number the views rail's Cerberus badge shows: MAN-7866).
 - Accent: italic, never bold (the display serif has none); `data-tone="positive"` at quiet, `info` for "One fix *running*" (the only need has its fix going: `accentTone` takes the run's own tone, `RUN_LOOK.going.tone`), `warn` while anything else needs you, `text-tone-ink`. why: the call to act is never painted passing green, and a need already being fixed is not painted as one still waiting.
 - A changed headline re-mounts (keyed by its words) and rises in (`animate-shape-rise`).
 - Summary: "`passing` of `checks` checks passing · `muted` muted · `nodes` nodes · last result `ago`". `muted` is left out at 0, the age while `lastResultAt === null`. The age is `agoPhrase` from `utils/fleetWords.ts` (MAN-7879).

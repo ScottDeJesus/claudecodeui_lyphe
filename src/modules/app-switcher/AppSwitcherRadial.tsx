@@ -2,6 +2,7 @@ import { type CSSProperties, useEffect, useLayoutEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { labelTranslate, planRadialLabels } from '@/modules/app-switcher/utils/radialLabels';
+import { FAB_SELECTOR } from '@/shared/constants';
 import type { SwitcherAction } from '@/shared/types';
 import { OWNS_ESCAPE } from '@/shared/ui/overlayEscape';
 import { cn } from '@/shared/utils';
@@ -27,8 +28,6 @@ const BLOOM_STAGGER_MS = 35;
 const FADE_MS = 200;
 /** How long a press or a hover takes to show: the same 150ms every button in the house answers in. */
 const FEEDBACK_MS = 150;
-/** The kit's FAB, which the radial fans out from: the press that is its own toggle, and where focus goes back to. There is one. */
-const FAB_SELECTOR = '.vv-fab';
 
 /**
  * The disc: the kit's `vv-fab-disc` (the FAB's own size, glyph size and 44px catch, all from `--vv-fab-size`

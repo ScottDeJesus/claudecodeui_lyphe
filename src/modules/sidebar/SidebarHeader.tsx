@@ -1,11 +1,9 @@
 import { FolderPlus, PanelLeftClose, Plus, RefreshCw, Search, X } from 'lucide-react';
-import type { ReactNode } from 'react';
 import type { TFunction } from 'i18next';
 
 import { Button, Chip, Input } from '@/shared/ui';
 import { IS_PLATFORM, modifierKeyLabel } from '@/shared/utils';
 import type { SidebarSearchMode } from '@/shared/types';
-import { useCompactSidebar } from '@/modules/sidebar/hooks/useCompactSidebar';
 
 type SidebarHeaderProps = {
   isPWA: boolean;
@@ -24,12 +22,10 @@ type SidebarHeaderProps = {
   isRefreshing: boolean;
   onCreateProject: () => void;
   onCollapseSidebar: () => void;
+  /** Puts the mobile drawer away: the mobile row's close button runs it. Absent where the sidebar is not a drawer. */
+  onCloseDrawer?: () => void;
   /** True while SidebarContent is rendering the simple chat list in place of the tree. */
   simpleMode?: boolean;
-  /** The workspace tab strip, rendered under the wordmark. A slot: this file never imports it. */
-  tabs?: ReactNode;
-  /** Rendered left of the wordmark, gated like `tabs`. A slot: this file never imports it. */
-  leading?: ReactNode;
   t: TFunction;
 };
 
@@ -68,7 +64,7 @@ function SearchModeChips({
     : t('search.modeRunning');
 
   return (
-    // Wraps rather than scrolling sideways: four chips do not fit a 328px rail, and a chip half
+    // Wraps rather than scrolling sideways: four chips do not fit the list's 280px column, and a chip half
     // off the edge with no scrollbar reads as a broken row rather than as more to come.
     <div className="flex flex-wrap gap-1.5">
       <Chip size="sm" selected={searchMode === 'projects'} onClick={() => onSearchModeChange('projects')}>
@@ -105,16 +101,10 @@ export default function SidebarHeader({
   isRefreshing,
   onCreateProject,
   onCollapseSidebar,
+  onCloseDrawer,
   simpleMode,
-  tabs,
-  leading,
   t,
 }: SidebarHeaderProps) {
-  // This file draws its desktop and mobile headers as two blocks and hides one with CSS, so a
-  // slot placed in both would put TWO live tablists on the page — a duplicate accessible name and
-  // a second strip for anything that addresses tabs by role. The strip is rendered into whichever
-  // block is actually on screen, and once.
-  const isCompact = useCompactSidebar();
   const showSearchTools = (projectsCount > 0 || runningSessionsCount > 0 || archivedSessionsCount > 0 || isArchivedSessionsLoading) && !isLoading && !simpleMode;
   const searchPlaceholder = searchMode === 'conversations'
     ? t('search.conversationsPlaceholder')
@@ -132,7 +122,6 @@ export default function SidebarHeader({
         style={{}}
       >
         <div className="flex items-center justify-between gap-2">
-          {leading && !isCompact && <div className="flex flex-shrink-0">{leading}</div>}
           {IS_PLATFORM ? (
             <a
               href="https://cloudcli.ai/dashboard"
@@ -174,14 +163,13 @@ export default function SidebarHeader({
               size="sm"
               className="h-[30px] w-[30px] rounded-lg p-0 text-muted-foreground hover:text-foreground"
               onClick={onCollapseSidebar}
-              title={t('tooltips.hideSidebar')}
+              aria-label={t('tooltips.hideList')}
+              title={t('tooltips.hideList')}
             >
               <PanelLeftClose className="h-3.5 w-3.5" />
             </Button>
           </div>
         </div>
-
-        {tabs && !isCompact && <div className="mt-2.5">{tabs}</div>}
 
         {/* Search bar */}
         {showSearchTools && (
@@ -226,8 +214,8 @@ export default function SidebarHeader({
 
       {/* Desktop divider — the line that closes the header off from the list below it.
           Not drawn in simple mode: it exists to sit under the search field and its chips, and
-          with those gone it collapses to 8px under the tab strip (measured; 138px with them),
-          where it reads as a second rule under the tabs rather than the end of a header. */}
+          with those gone it would stand right under the wordmark row, where it reads as a second
+          rule rather than the end of a header. */}
       {!simpleMode && <div className="nav-divider hidden md:block" />}
 
       {/* Mobile header */}
@@ -236,7 +224,6 @@ export default function SidebarHeader({
         style={isPWA && isMobile ? { paddingTop: '16px' } : {}}
       >
         <div className="flex items-center justify-between">
-          {leading && isCompact && <div className="mr-2 flex flex-shrink-0">{leading}</div>}
           {IS_PLATFORM ? (
             <a
               href="https://cloudcli.ai/dashboard"
@@ -251,22 +238,31 @@ export default function SidebarHeader({
 
           <div className="ml-auto flex flex-shrink-0 gap-1.5">
             <button
-              className="flex h-8 w-8 items-center justify-center rounded-lg bg-muted/50 transition-all active:scale-95"
-              onClick={onRefresh}
-              disabled={isRefreshing}
-            >
-              <RefreshCw className={`h-4 w-4 text-muted-foreground ${isRefreshing ? 'animate-spin' : ''}`} />
-            </button>
-            <button
               className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground transition-all active:scale-95"
               onClick={onCreateProject}
+              aria-label={t('tooltips.createProject')}
             >
               <FolderPlus className="h-4 w-4" />
             </button>
+            <button
+              className="flex h-8 w-8 items-center justify-center rounded-lg bg-muted/50 transition-all active:scale-95"
+              onClick={onRefresh}
+              disabled={isRefreshing}
+              aria-label={t('tooltips.refresh')}
+            >
+              <RefreshCw className={`h-4 w-4 text-muted-foreground ${isRefreshing ? 'animate-spin' : ''}`} />
+            </button>
+            {/* The drawer's own way out, beside the scrim's: a phone's scrim is the sliver of page the drawer leaves,
+                and a button in the header is where a thumb already is. */}
+            <button
+              className="flex h-8 w-8 items-center justify-center rounded-lg bg-muted/50 transition-all active:scale-95"
+              onClick={onCloseDrawer}
+              aria-label={t('tooltips.closeDrawer')}
+            >
+              <PanelLeftClose className="h-4 w-4 text-muted-foreground" />
+            </button>
           </div>
         </div>
-
-        {tabs && isCompact && <div className="mt-2.5">{tabs}</div>}
 
         {/* Mobile search */}
         {showSearchTools && (

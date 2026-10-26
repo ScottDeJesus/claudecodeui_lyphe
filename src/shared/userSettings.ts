@@ -55,6 +55,8 @@ export type UserPreferences = {
   roadmapSelected: string | null;
   /** The completion each roadmap last celebrated for this user, one entry list written by entry patch (`writeUserPreferenceEntries`): `{ seen: { name: string, at: string }[] }` — `name` the roadmap's, `at` the dispatcher's UTC string of the newest `shipped_at`, `completed_at` or `reached_at` played. Phone and desktop share it, so a completion plays once between them — provided a writer never sends an `at` older than the one it read: the merge replaces the named entry and does not compare (see `ENTRY_LISTED_KEYS` in `user-preferences.db.ts`). See `modules/roadmap/hooks/useCelebrations.ts`. */
   roadmapSeen: unknown;
+  /** The folders pinned on the Files tab's strip, one entry list written by entry patch (`writeUserPreferenceEntries`): `{ pinned: string[] }` — each entry a folder's absolute path, which is also its own key, in pin order (the newest last). Pins follow the operator to every device, and a pin made on one must survive a stale device's write: `{ pinned: { [path]: path } }` adds a pin and `{ pinned: { [path]: null } }` removes it, neither touching another. See `modules/file-manager/hooks/useFilesPins.ts`. */
+  filesPins: unknown;
 };
 
 export type UserPreferenceKey = keyof UserPreferences;
@@ -103,6 +105,7 @@ const LEGACY_STORAGE_KEYS: Record<UserPreferenceKey, string | null> = {
   chatGutters: null,
   roadmapSelected: null,
   roadmapSeen: null,
+  filesPins: null,
 };
 
 const PREFERENCE_KEYS = Object.keys(LEGACY_STORAGE_KEYS) as UserPreferenceKey[];
@@ -114,10 +117,12 @@ const PREFERENCE_KEYS = Object.keys(LEGACY_STORAGE_KEYS) as UserPreferenceKey[];
  * than replaced, a retry is rebuilt per named entry, and every patch is kept in the persisted outbox
  * (`preferenceEntryPatch.ts`) until the server has it, so a reload or a late sign-in read loses none.
  * `roadmapSeen` joins `dispatcher` here: two stamps queued in one debounce fold per entry, a failed
- * write retries only its own entries, and the outbox keeps it. Its server half is `ENTRY_LISTED_KEYS`
+ * write retries only its own entries, and the outbox keeps it. `filesPins` joins them for the same
+ * reason: the Files strip's pins are a list every device writes, and a pin list written whole by a
+ * stale device would erase the pins made on another. Its server half is `ENTRY_LISTED_KEYS`
  * in `user-preferences.db.ts` — the two lists change together.
  */
-const ENTRY_PATCHED_KEYS: ReadonlySet<UserPreferenceKey> = new Set<UserPreferenceKey>(['dispatcher', 'roadmapSeen']);
+const ENTRY_PATCHED_KEYS: ReadonlySet<UserPreferenceKey> = new Set<UserPreferenceKey>(['dispatcher', 'roadmapSeen', 'filesPins']);
 
 type PreferenceRecord = Partial<Record<UserPreferenceKey, unknown>>;
 

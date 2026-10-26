@@ -1,6 +1,6 @@
 import { createContext, useContext } from 'react';
 
-import type { Note, NoteInput } from '@/shared/types';
+import type { Note, NoteInput, NoteSaveStatus } from '@/shared/types';
 
 /**
  * The two values the notes module publishes, and the two readers that guard them. No component
@@ -17,10 +17,20 @@ import type { Note, NoteInput } from '@/shared/types';
  */
 
 /**
- * The account's notes and the six verbs that read and write them. `notes` is `null` until a read
+ * The blank card's target in the autosave's lane map. A note id is a UUID, so the word can never be
+ * one. Read by the provider and the saver, and by the list for the blank card's quiet line.
+ */
+export const COMPOSER_TARGET = 'composer';
+
+/**
+ * The account's notes and the verbs that read, type into and write them. `notes` is `null` until a read
  * answers — "not asked yet", which a screen has to tell apart from an answer of nothing — and the
- * six verbs keep one identity for the app's life, so nothing that memoises on them is rebuilt by a
+ * verbs keep one identity for the app's life, so nothing that memoises on them is rebuilt by a
  * keystroke or a language switch somewhere else.
+ *
+ * THERE IS NO SAVE VERB A PERSON CALLS. A card saves itself about a second after typing stops
+ * (`changeComposer`, `changeEdit`), and the verbs named `...Now` and `finish...` are what a card's
+ * leaving calls: focus moving off it, Done, its tab or widget going away.
  */
 export type NotesValue = {
   /** The account's notes, newest first. `null` until a read has answered. */
@@ -28,30 +38,58 @@ export type NotesValue = {
   /** True while no read has ever answered and the last one failed. A read that fails after a good one keeps the list it had. */
   unreachable: boolean;
   refresh: () => Promise<void>;
-  setComposer: (draft: NoteInput) => void;
-  /** `null` leaves edit mode and drops what was typed. */
-  setEdit: (id: string, draft: NoteInput | null) => void;
-  /** Each of the three answers `true` when the write landed. On `false` it has already raised the toast. */
-  add: (draft: NoteInput) => Promise<boolean>;
-  saveEdit: (id: string, draft: NoteInput) => Promise<boolean>;
+  /** The blank card's typing: kept, and saved as a new note once it has a title and typing pauses. */
+  changeComposer: (draft: NoteInput) => void;
+  /** Opens a note for editing over its text as it stands. */
+  openEdit: (note: Note) => void;
+  /** An open note's typing: kept, and saved about a second after it stops. */
+  changeEdit: (id: string, draft: NoteInput) => void;
+  /** Saves what is typed in the blank card now, leaving it as it is. */
+  saveComposerNow: () => Promise<void>;
+  /** Saves what is typed in an open note now, leaving it open. */
+  saveEditNow: (id: string) => Promise<void>;
+  /**
+   * The blank card is left (Done, Enter, focus moving off, its tab or widget going away): it saves
+   * now, and once it holds a saved note the card lets go of it — a fresh blank card takes its place
+   * and the note is one of the wall's own. Answers `true` when it let go, `false` when it did not
+   * (nothing typed, no title, or the save did not land — the draft stays).
+   */
+  finishComposer: () => Promise<boolean>;
+  /**
+   * Done on an open note: it saves now and closes. Answers `true` when it closed. It closes only once
+   * everything typed is saved: a save that did not land, and a title that draws as nothing (nothing can
+   * be sent under it, and the card's quiet line says a title is needed), leave it open with its text.
+   */
+  finishEdit: (id: string) => Promise<boolean>;
+  /** Answers `true` when the delete landed. On `false` it has already raised the toast. */
   remove: (id: string) => Promise<boolean>;
 };
 
 /**
- * What is typed and not yet written. Separate from `NotesValue` because the two change for
- * different reasons: this one on every keystroke, the list on every read. `composer` and `edits`
- * are the drafts themselves; `adding` and `writing` are the in-flight marks the forms read as
- * `busy`.
+ * What is typed and not yet written, and what each card says about its saving. Separate from
+ * `NotesValue` because the two change for different reasons: this one on every keystroke, the list on
+ * every read. `composer` and `edits` are the drafts themselves; `writing` marks the deletes in flight.
  */
 export type NoteDraftsValue = {
-  /** What is typed in the blank card and not yet added. */
+  /** What is typed in the blank card. */
   composer: NoteInput;
-  /** What is typed over a note and not yet saved, by note id. A card is in edit mode exactly while it has an entry. */
+  /**
+   * The note the blank card has become, once its first save landed — it stays that note's card, its
+   * text and caret untouched, until it is left. `null` while the card is still blank or unsaved.
+   */
+  composerNoteId: string | null;
+  /**
+   * The ids of the notes the wall held when the blank card's first save left, while that save's answer
+   * is still on its way; `null` otherwise. The wall hides any note outside it, because the new note can
+   * reach the list (through the server's frame) before the answer names it.
+   */
+  createBaseline: ReadonlySet<string> | null;
+  /** What is typed over a note, by note id. A card is in edit mode exactly while it has an entry. */
   edits: Record<string, NoteInput>;
-  /** The blank card's add is in flight. */
-  adding: boolean;
-  /** The notes with a save or a delete in flight. */
+  /** The notes with a delete in flight. */
   writing: Record<string, true>;
+  /** Each card's quiet saving line, by `COMPOSER_TARGET` or note id. A card with no entry says nothing. */
+  saveStates: Record<string, NoteSaveStatus>;
 };
 
 export const NotesContext = createContext<NotesValue | null>(null);
@@ -71,7 +109,7 @@ export function useNotes(): NotesValue {
 }
 
 /**
- * The drafts and the in-flight marks. Read by the module's own `NotesList` and `NoteCard` alone —
+ * The drafts and the saving lines. Read by the module's own `NotesList` and `NoteCard` alone —
  * the two homes draw the same list, so both need what is typed into it, and no screen outside the
  * module ever does.
  */

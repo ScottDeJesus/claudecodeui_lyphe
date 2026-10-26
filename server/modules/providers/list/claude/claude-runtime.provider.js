@@ -76,7 +76,7 @@ import { assertProjectFolderExists, ProjectFolderMissingError } from './claude-p
 import { createSignalState, detectRuntimeSignals } from './claude-runtime-signals.js';
 import { installedCliVersionForLaunch } from './installed-cli-version.js';
 import { readMcpSignIn } from './mcp-sign-in.js';
-import { SURFACE_ENV, SURFACE_PROMPT_APPEND } from './surface-signal.js';
+import { SURFACE_ENV, SURFACE_PROMPT_APPEND, leadWithFollowupsSignal } from './surface-signal.js';
 
 const activeSessions = new Map();
 const pendingToolApprovals = new Map();
@@ -844,6 +844,11 @@ async function resolveSdkOptions(options, context) {
   applyCompactionSettings(sdkOptions, await askCompactionTakesOver(context, options));
   const launch = await askToolsetLaunch(context, { appSessionId: options.sessionId ?? null, onNode: Boolean(options.node) });
   applyToolsetLaunch(sdkOptions, launch);
+  // The Next steps instruction tells the chat to run `followups`, which needs the chat credential: a launch that
+  // carries none (a node's chat, no app session id, a hook that did not answer) is not told to use it.
+  if (launch.env.CLOUDCLI_TOOLSET_TOKEN) {
+    sdkOptions.systemPrompt.append = leadWithFollowupsSignal(sdkOptions.systemPrompt.append);
+  }
   const mcpServers = await loadMcpConfig(options.cwd);
   const mcpUnreadable = mcpServers === MCP_CONFIG_UNREADABLE;
   if (mcpServers && !mcpUnreadable) {

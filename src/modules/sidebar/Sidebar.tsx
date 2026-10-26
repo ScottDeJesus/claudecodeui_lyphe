@@ -11,8 +11,7 @@ import { useSidebarController } from '@/modules/sidebar/hooks/useSidebarControll
 import { useTaskMaster, useTasksSettings } from '@/modules/task-master';
 import { usePaletteOps } from '@/modules/command-palette';
 import { useBusySessionIdSet, useRunningSessions } from '@/shared/context/SessionProtectionContext';
-import type { LLMProvider, LoadingProgress, MCPServerStatus, Project, ProjectSession, SidebarProjectListProps } from '@/shared/types';
-import SidebarCollapsed from '@/modules/sidebar/SidebarCollapsed';
+import type { LLMProvider, LoadingProgress, MCPServerStatus, Project, ProjectSession, SidebarListState, SidebarProjectListProps } from '@/shared/types';
 import SidebarContent from '@/modules/sidebar/SidebarContent';
 import SidebarModals from '@/modules/sidebar/SidebarModals';
 import SidebarSimpleList from '@/modules/sidebar/SidebarSimpleList';
@@ -33,18 +32,18 @@ type SidebarProps = {
   isLoading: boolean;
   loadingProgress: LoadingProgress | null;
   onRefresh: () => Promise<void> | void;
-  onShowSettings: () => void;
   /** Opens Settings on its Updates tab — what the Claude row and its rail icon are for. */
   onShowUpdates: () => void;
   showSettings: boolean;
   settingsInitialTab: string;
   onCloseSettings: () => void;
   isMobile: boolean;
-  // A slot, not an import: the workspace tab strip is built by project-workspace and rendered
-  // here, under the wordmark, so the dependency keeps pointing one way. `null` = no strip.
-  tabs?: ReactNode;
-  // Same slot discipline, for the control left of the wordmark. `undefined` = nothing there.
-  leading?: ReactNode;
+  // A slot, not an import: the views rail down the list's left edge is built by project-workspace and rendered here,
+  // so the dependency keeps pointing one way. A function, not a node: the collapse is this
+  // component's to decide, so it tells the rail through `list` and the rule is computed once, here.
+  rail: (list: SidebarListState) => ReactNode;
+  /** Puts the mobile drawer away — what the list header's close button runs. Absent where the sidebar is not a drawer. */
+  onCloseDrawer?: () => void;
 };
 
 type TaskMasterSidebarContext = {
@@ -67,14 +66,13 @@ function Sidebar({
   isLoading,
   loadingProgress,
   onRefresh,
-  onShowSettings,
   onShowUpdates,
   showSettings,
   settingsInitialTab,
   onCloseSettings,
   isMobile,
-  tabs,
-  leading,
+  rail,
+  onCloseDrawer,
 }: SidebarProps) {
   const { t } = useTranslation(['sidebar', 'common']);
   // Here, not in the project tree: this component renders in BOTH sidebar modes.
@@ -87,6 +85,9 @@ function Sidebar({
   const preferences = useUiPreferences();
   const setPreference = useSetUiPreference();
   const { sidebarVisible } = preferences;
+  // One identity across renders: the controller's `expandSidebar` is built on it, and the rail hands `expand` on to the
+  // switcher's dock, which writes it into a context from a layout effect keyed on it.
+  const setSidebarVisible = useCallback((visible: boolean) => setPreference('sidebarVisible', visible), [setPreference]);
   const { setCurrentProject, mcpServerStatus } = useTaskMaster() as TaskMasterSidebarContext;
   const { tasksEnabled } = useTasksSettings();
   const paletteOps = usePaletteOps();
@@ -175,7 +176,7 @@ function Sidebar({
     onLoadMoreSessions,
     onProjectDelete,
     setCurrentProject,
-    setSidebarVisible: (visible) => setPreference('sidebarVisible', visible),
+    setSidebarVisible,
     sidebarVisible,
   });
 
@@ -246,8 +247,8 @@ function Sidebar({
 
   return (
     <>
-        <SidebarModals
-          projects={projects}
+      <SidebarModals
+        projects={projects}
         showSettings={showSettings}
         settingsInitialTab={settingsInitialTab}
         onCloseSettings={onCloseSettings}
@@ -267,19 +268,12 @@ function Sidebar({
         t={t}
       />
 
-      {isSidebarCollapsed ? (
-        <SidebarCollapsed
-          onExpand={handleExpandSidebar}
-          onShowSettings={onShowSettings}
-          onShowUpdates={onShowUpdates}
-          updateAvailable={updateAvailable}
-          restartRequired={restartRequired}
-          onShowVersionModal={() => setShowVersionModal(true)}
-          t={t}
-        />
-      ) : (
-        <>
-        <SidebarContent
+      {/* ONE TREE WHETHER THE LIST SHOWS OR NOT (INV-5768). Collapsing hides the list column only: the rail, and the
+          switcher's dock and the account panel in it, keep their place in the tree, so nothing in the rail remounts. */}
+      <div className="flex h-full">
+        {rail({ collapsed: isSidebarCollapsed, expand: handleExpandSidebar })}
+        {!isSidebarCollapsed && (
+          <SidebarContent
             isPWA={isPWA}
             isMobile={isMobile}
             isLoading={isLoading}
@@ -298,8 +292,6 @@ function Sidebar({
                 t={t}
               />
             ) : null}
-            tabs={tabs}
-            leading={leading}
             runningSessionsCount={runningSessionsCount}
             archivedProjects={archivedProjects}
             archivedSessions={archivedSessions}
@@ -367,19 +359,18 @@ function Sidebar({
             isRefreshing={isRefreshing}
             onCreateProject={() => setShowNewProject(true)}
             onCollapseSidebar={handleCollapseSidebar}
+            onCloseDrawer={onCloseDrawer}
             updateAvailable={updateAvailable}
             restartRequired={restartRequired}
             releaseInfo={releaseInfo}
             latestVersion={latestVersion}
             onShowVersionModal={() => setShowVersionModal(true)}
-            onShowSettings={onShowSettings}
             onShowUpdates={onShowUpdates}
             projectListProps={projectListProps}
             t={t}
           />
-        </>
-      )}
-
+        )}
+      </div>
     </>
   );
 }

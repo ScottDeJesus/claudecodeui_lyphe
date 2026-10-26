@@ -1,7 +1,8 @@
+import { useEffect, useLayoutEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { RefObject } from 'react';
 
-import type { NoteInput } from '@/shared/types';
+import type { NoteInput, NoteSaveStatus } from '@/shared/types';
 import { Button, Input } from '@/shared/ui';
 
 /**
@@ -13,66 +14,81 @@ const TITLE_MAX_LENGTH = 200;
 /** The description's ceiling, the mirror of `notes.service.ts`'s own. */
 const DESCRIPTION_MAX_LENGTH = 20000;
 
-/**
- * The characters that DRAW AS NOTHING, the mirror of `notes.service.ts`'s own: whitespace (`\s`),
- * format characters — U+200B ZERO WIDTH SPACE and its family, which `\s` misses — and control
- * characters. The service refuses a title that is only these; this field will not offer one.
- *
- * The two classes are one decision written twice — the client build cannot import from `server/`.
- * Change one and change the other.
- */
-const DRAWS_AS_NOTHING = /[\s\p{Cf}\p{Cc}]/gu;
+/** The words of each quiet saving line, by key under `notes.form`. */
+const STATUS_WORDS: Record<NoteSaveStatus, string> = {
+  saving: 'notes.form.saving',
+  saved: 'notes.form.saved',
+  titleNeeded: 'notes.form.titleNeeded',
+};
 
 type NoteFormProps = {
   draft: NoteInput;
   onChange: (draft: NoteInput) => void;
-  onSubmit: () => void;
-  /** Present on an edit, absent on the blank card. */
-  onCancel?: () => void;
-  submitLabel: string;
-  busy: boolean;
+  /** Finish this note now: Enter in the title, Ctrl/⌘+Enter in the description, and the Done button. */
+  onDone: () => void;
+  /** Whether the Done button is drawn. The blank card has nothing to close until it has become a note. */
+  showDone: boolean;
+  /** Focus moved off the card and stayed in the page, or the card is going away: the owner saves, and lets go if it is the blank card. */
+  onLeave: () => void;
+  /** Focus left with the window (an app switch) or the page is hiding: the owner saves and keeps the card exactly as it is. */
+  onSaveNow: () => void;
+  /** The card's quiet saving line, or `undefined` for none. */
+  status: NoteSaveStatus | undefined;
   /** The title input, for the owner that has to put the keyboard on it. */
   titleRef?: RefObject<HTMLInputElement>;
 };
 
 /**
- * The notes module's one form: a title, a description and the one verb that writes them.
+ * The notes module's one form: a title, a description and the quiet line that says how saving is going.
+ * There is no button that saves — the owner's autosave does, about a second after typing stops — and
+ * the one button, Done, only closes the card.
  *
  * READ BY TWO OWNERS, READING NO CONTEXT OF ITS OWN. `NotesList` draws it in the blank card over the
  * composer, and `NoteCard` draws it over a note in edit mode — so every keystroke leaves through
- * `onChange`, every submit through `onSubmit`, and who holds the draft and what a submit writes are
- * the owner's business, not this form's. It is controlled in both fields, so a draft that outlives
- * its card's re-render is the provider's state and never this component's.
+ * `onChange`, and who holds the draft, who saves it and what finishing means are the owner's business,
+ * not this form's. It is controlled in both fields, so a draft that outlives its card's re-render is the
+ * provider's state and never this component's, and nothing the server answers can move its caret.
  *
- * ONE DISABLED RULE, READ ONCE: a title of nothing is not a note, and a write already in flight is
- * not a second write, so the button and both Enter keys ask the same question.
+ * LEAVING. A card is left when focus moves to something outside the form (`onBlur`, which also fires when
+ * a phone's keyboard closes) and when the form unmounts (a tab changing, the widget folding). A blur
+ * that comes with the WINDOW losing focus — an app switch — only asks the owner to save: the card keeps
+ * its place, and the person finds the caret where it was. Moving between the form's own title,
+ * description and Done is not leaving.
  *
- * THE KEYBOARD. Enter in the title submits — a one-line field that does nothing on Enter is a field
- * that has stopped feeling like one. In the description Enter is a new line, because a description is
- * written in paragraphs, and Ctrl+Enter or ⌘+Enter submits for a keyboard reader who does not want
- * to reach for the button. No Escape: a fullscreen widget's Escape belongs to the gutter layout.
+ * THE KEYBOARD. Enter in the title finishes the note — a one-line field that does nothing on Enter is a
+ * field that has stopped feeling like one. In the description Enter is a new line, because a description is
+ * written in paragraphs, and Ctrl+Enter or ⌘+Enter finishes it for a keyboard reader who does not want to
+ * reach for the button. No Escape: a fullscreen widget's Escape belongs to the gutter layout.
  *
  * AN IME'S ENTER IS THE IME'S. While a composition is being built (a Japanese, Korean or Chinese
  * title), the Enter that commits the composed word arrives as a keydown this form would otherwise
- * take for a submit — so both handlers return before it, as the house's two other Enter-as-send
+ * take for finishing — so both handlers return before it, as the house's two other Enter-as-send
  * handlers do (`useChatComposerState.ts`, `KanbanMetisConversation.tsx`).
  */
-export function NoteForm({ draft, onChange, onSubmit, onCancel, submitLabel, busy, titleRef }: NoteFormProps) {
+export function NoteForm({ draft, onChange, onDone, showDone, onLeave, onSaveNow, status, titleRef }: NoteFormProps) {
   const { t } = useTranslation();
 
-  const canSubmit = draft.title.replace(DRAWS_AS_NOTHING, '') !== '' && !busy;
-
-  const submit = () => {
-    if (canSubmit) onSubmit();
-  };
+  // The owner's `onLeave` of the LATEST render, so the unmount below calls the one the card has now.
+  const onLeaveRef = useRef(onLeave);
+  useLayoutEffect(() => {
+    onLeaveRef.current = onLeave;
+  }, [onLeave]);
+  useEffect(() => () => onLeaveRef.current(), []);
 
   return (
     <form
       data-note-form
       className="flex min-w-0 flex-col gap-2"
       onSubmit={(event) => {
+        // A one-field form would submit itself on Enter; the title's keydown below has already taken it.
         event.preventDefault();
-        submit();
+      }}
+      onBlur={(event) => {
+        const next = event.relatedTarget;
+        if (next instanceof Node && event.currentTarget.contains(next)) return;
+        // `document.hasFocus()` is false when the window itself lost focus: the card stays as it is.
+        if (document.hasFocus()) onLeave();
+        else onSaveNow();
       }}
     >
       <Input
@@ -83,14 +99,12 @@ export function NoteForm({ draft, onChange, onSubmit, onCancel, submitLabel, bus
         placeholder={t('notes.form.title')}
         aria-label={t('notes.form.title')}
         onChange={(event) => onChange({ ...draft, title: event.target.value })}
-        // Taken here rather than left to the form's own implicit submission, so the disabled rule
-        // is asked in one place and a busy form cannot be submitted by a keystroke. The composition
-        // guard comes first, so the Enter that commits an IME's word is left to the IME.
+        // The composition guard comes first, so the Enter that commits an IME's word is left to the IME.
         onKeyDown={(event) => {
           if (event.nativeEvent.isComposing) return;
           if (event.key === 'Enter') {
             event.preventDefault();
-            submit();
+            onDone();
           }
         }}
       />
@@ -111,22 +125,22 @@ export function NoteForm({ draft, onChange, onSubmit, onCancel, submitLabel, bus
           if (event.nativeEvent.isComposing) return;
           if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) {
             event.preventDefault();
-            submit();
+            onDone();
           }
         }}
         className="vv-input w-full resize-y px-3 py-2 text-sm"
       />
-      <div className="flex flex-wrap items-center gap-2">
-        <Button type="submit" data-note-submit disabled={!canSubmit}>
-          {submitLabel}
-        </Button>
-        {/* Only an edit has anything to back out of; the blank card's draft is discarded by
-            emptying it, and a Cancel beside Add would be a button that does nothing. */}
-        {onCancel && (
-          <Button type="button" variant="ghost" data-note-cancel onClick={onCancel}>
-            {t('notes.form.cancel')}
+      <div className="flex min-h-4 flex-wrap items-center gap-2">
+        {showDone && (
+          <Button type="button" variant="outline" size="sm" data-note-done onClick={onDone}>
+            {t('notes.form.done')}
           </Button>
         )}
+        {/* Quiet on purpose: muted, small, and a polite live region — never a toast for a save that
+            worked. The line keeps its height when empty, so `Saving…` appearing moves nothing. */}
+        <p data-note-status={status ?? ''} aria-live="polite" className="min-w-0 text-xs text-muted-foreground">
+          {status === undefined ? '' : t(STATUS_WORDS[status])}
+        </p>
       </div>
     </form>
   );

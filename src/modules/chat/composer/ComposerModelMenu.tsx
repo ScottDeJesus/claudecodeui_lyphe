@@ -123,7 +123,7 @@ function ComposerModelMenu({
     ? toolsetView.sets.filter((set) => set.on).length + toolsetView.strays.length
     : 0;
 
-  const triggerLabel = hasModelSection ? modelLabel : effortLabel;
+  const pillLabel = hasModelSection ? modelLabel : effortLabel;
   // The mark on the pill is colour and fill; the words it replaced live on here, so the
   // current mode is still readable by anyone hovering, or on a screen reader. The count of sets on
   // joins them, the one way to read it where the pill has no room for it. The label keeps its
@@ -164,7 +164,7 @@ function ComposerModelMenu({
           tone={hasPermissionSection && permissionMode ? permissionMark(permissionMode).tone : undefined}
           selected={Boolean(hasPermissionSection && permissionMode && permissionMark(permissionMode).writesUnasked)}
         >
-          <span className="max-w-20 truncate sm:max-w-56">{triggerLabel}</span>
+          <span className="max-w-20 truncate sm:max-w-56">{pillLabel}</span>
           {hasModelSection && hasEffortSection && effort !== DEFAULT_EFFORT_VALUE && (
             <span className="hidden shrink-0 capitalize sm:inline">· {effortLabel}</span>
           )}

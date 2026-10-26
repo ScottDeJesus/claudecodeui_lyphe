@@ -12,7 +12,7 @@ import {
 import { dockableRect, sameRect } from '@/modules/app-switcher/utils/dockRect';
 import { EMPTY_SLOT, loneAppOnTheLeft } from '@/modules/app-switcher/utils/paneSlots';
 import type { AppEntry, RegistryRow } from '@/shared/app-types';
-import type { PaneSide, PaneSlot, ProjectChoice } from '@/shared/types';
+import type { DockPress, PaneSide, PaneSlot, ProjectChoice } from '@/shared/types';
 import type { DockableFabPosition } from '@/shared/ui';
 
 type AppSwitcherValue = {
@@ -72,6 +72,17 @@ type AppSwitcherValue = {
   closePane: (side: PaneSide) => void;
   moveFab: (next: DockableFabPosition) => void;
   registerDock: (rect: DOMRect | null) => void;
+  /** Whether the rail around the dock has scrolled the unread-reply badge out of sight; written by the dock, read by the FAB for its dot. */
+  dockBadgeHidden: boolean;
+  setDockBadgeHidden: (hidden: boolean) => void;
+  /**
+   * What a press on the SEATED disc does instead of opening the radial, with the name it carries; null while nothing
+   * overrides it. Written by the dock from its `pressOverride` (the rail names "Show the chat list" while the list is
+   * collapsed), read by the FAB, which decides which press goes which way. Stable identity: the dock writes it from a
+   * layout effect.
+   */
+  dockPress: DockPress | null;
+  setDockPress: (press: DockPress | null) => void;
   chooseSide: (side: PaneSide) => void;
   /** Opening re-reads the registry, so the list is at most one open old. */
   setDrawerOpen: (open: boolean) => void;
@@ -91,7 +102,7 @@ const RATIO_SETTLE_MS = 250;
 
 /**
  * The switcher's one state home, mounted by the project-workspace module around the whole shell
- * so the dock (in the sidebar header), the FAB, its drawer and the layer (over the main region)
+ * so the dock (in the sidebar's rail), the FAB, its drawer and the layer (over the main region)
  * read one truth from four places in the tree.
  *
  * Every action is stable for the life of the provider except where its dependency list says
@@ -117,6 +128,12 @@ export function AppSwitcherProvider({ children, projects }: { children: ReactNod
   const [fabPosition, setFabPosition] = useState<DockableFabPosition>(() => fabPositionOf(initial.fab));
   // The dock's measured rect. Measured by the dock, never derived: it is a fact about layout.
   const [dockRect, setDockRect] = useState<DOMRect | null>(null);
+  // Whether the rail has scrolled its Chat badge out of sight while a reply waits. Reported by the dock, never derived
+  // here: the rail owns the scroll region, and the FAB needs it to know whether a seated disc must draw its own dot.
+  const [dockBadgeHidden, setDockBadgeHidden] = useState(false);
+  // The press the rail has asked the seated disc to run in place of the radial. Written by the dock and read by the
+  // FAB, which are two places in the tree; the rail's own state (the list collapsed) is not this module's to import.
+  const [dockPress, setDockPress] = useState<DockPress | null>(null);
   // Which half the next choice in the drawer fills while dual screen is on. Set from the drawer's Opens-in strip.
   const [nextSide, setNextSide] = useState<PaneSide>('left');
   // Whether the drawer is open. Owned here, not by the FAB, so the FAB's pressed state and the sheet agree.
@@ -285,13 +302,17 @@ export function AppSwitcherProvider({ children, projects }: { children: ReactNod
       closePane,
       moveFab,
       registerDock,
+      dockBadgeHidden,
+      setDockBadgeHidden,
+      dockPress,
+      setDockPress,
       chooseSide,
       setDrawerOpen,
     }),
     [
       apps, rows, selfPorts, icons, registryError, registryRead, refresh, projects, panes, dual, ratio, fabPosition, dockRect,
       nextSide, drawerOpenValue, open, close, toggleDual, openInDualScreen, setRatio, reload, frontSide,
-      closePane, moveFab, registerDock, chooseSide, setDrawerOpen,
+      closePane, moveFab, registerDock, dockBadgeHidden, dockPress, chooseSide, setDrawerOpen,
     ],
   );
 

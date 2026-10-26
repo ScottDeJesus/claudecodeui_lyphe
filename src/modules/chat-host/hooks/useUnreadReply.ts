@@ -11,7 +11,8 @@ type UnreadReplyInput = {
 
 /**
  * Used by chat-host's provider: whether a reply landed in the chat's conversation while the chat was out of
- * sight — the fact the switcher's FAB draws as its dot.
+ * sight — the fact the switcher's FAB draws as its dot while it floats, and the views rail draws as the Chat glyph's
+ * badge while the disc is seated in it (project-workspace's useRailBadges reads it from the host).
  *
  * WHAT LIGHTS IT. A frame for the chat's own session (`event.sessionId`), arriving while `onScreen` is false,
  * that is either the turn's end (`complete`, unless the reader stopped it — `aborted: true` is the reader's own

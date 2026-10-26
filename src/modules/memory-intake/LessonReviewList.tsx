@@ -8,11 +8,11 @@ import { Badge, Button, Card, Spinner } from '@/shared/ui';
 import { cn } from '@/shared/utils';
 
 /**
- * The lessons a build staged, as a SECTION of the Memory tab — under its own heading, in the same
- * measured column as the memory queue above it, inside the same scroll.
+ * The lessons a build staged, as a second HEADING of the Inbox's Memory section — under its own heading,
+ * in the same measured column as the memory queue above it, inside the same scroll.
  *
- * A SECTION AND NOT A TAB, because reviewing what the machine wants to remember is one habit: a
- * second tab would split it in two and hide whichever half was not open. The heading is an `h3`
+ * A HEADING AND NOT A SECTION OF ITS OWN, because reviewing what the machine wants to remember is one
+ * habit: a section of its own would split it in two and hide whichever half was not open. The heading is an `h3`
  * under the panel's `h2`, and the count rides beside it the way the panel's own count does.
  *
  * THE LIST IS LEAN AND STAYS LEAN ON SCREEN. A row is the lesson's name, its one-line summary, when

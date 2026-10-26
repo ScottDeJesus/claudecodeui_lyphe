@@ -325,9 +325,7 @@
     },
     "ariaLabels": {
       "closeModal": "バージョンアップグレードモーダルを閉じる",
-      "showSidebar": "サイドバーを表示",
       "settings": "設定",
-      "updateAvailable": "アップデートあり",
       "closeSidebar": "サイドバーを閉じる"
     }
   },

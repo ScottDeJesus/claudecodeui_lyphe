@@ -8,7 +8,7 @@ import { expireAuthSession, getStoredAuthToken, storeAuthToken } from '@/shared/
 import { MAX_FILE_UPLOAD_SIZE_BYTES, MAX_FILE_UPLOAD_SIZE_LABEL } from '@/shared/constants';
 
 type UseFileTreeUploadOptions = {
-  selectedProject: Project | null;
+  selectedProject: Pick<Project, 'projectId'> | null;
   onRefresh: () => void;
   showToast: (message: string, type: 'success' | 'error') => void;
 };

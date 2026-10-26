@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 
 import { ROADMAP_LANDING_PARAM as ROADMAP_PARAM, RUNNER_LANDING_PARAM as RUNNER_PARAM } from '@/shared/constants';
-import type { AppTab, Project } from '@/shared/types';
+import type { AppTab } from '@/shared/types';
 
 /**
  * The workspace's half of two landings, both onto the Roadmap tab (the `runner` id), which this brings
@@ -14,13 +14,11 @@ import type { AppTab, Project } from '@/shared/types';
  * - `…?roadmap=<name>` — the chat widget's "Open the roadmap": the tab turns to its Roadmap face and
  *   selects that roadmap. Held as `openRoadmap`.
  *
- * THE NAME IS TAKEN THE MOMENT IT IS SEEN, BECAUSE THE PICK TAKES THE PARAM AWAY. At `/` with nothing
- * selected the workspace draws no tab strip and no panes (`ProjectSidebarRegion` gates the strip on the
- * selection), so there is nothing to land in yet — and the pick that follows REWRITES THE LOCATION to
- * bare `/` (`handleProjectSelect`), so a read that waited for `selectedProject` would arrive after the
- * only copy of the name was gone and drop the landing silently. The name is held from the commit that
- * first sees it and consumed when a project arrives — the same wait a `/session/<id>` landing makes,
- * where the project is chosen from the session a frame later.
+ * THE NAME IS TAKEN THE MOMENT IT IS SEEN, WITH A PROJECT SELECTED OR NOT. Every view's pane draws with
+ * no project (the Roadmap view among them), so at `/` the view comes forward as soon as a name is held,
+ * and the same holds on a `/session/<id>` landing, whose project is chosen from the session a frame
+ * later. The URL is no place to keep a name: a pick REWRITES THE LOCATION to bare `/`
+ * (`handleProjectSelect`), so the name is held, and the param stripped, in the commit that first sees it.
  *
  * `revealPlan` AND `openRoadmap` ARE STATE, NOT THE PARAMS. The effect below strips each param from the
  * URL in the same commit that it reads it, and the Roadmap tab mounts a render later (on
@@ -37,10 +35,9 @@ import type { AppTab, Project } from '@/shared/types';
  * drag the workspace back to the tab on the next project switch, long after the URL was clean. So the
  * Roadmap tab leaving the screen retires whatever it had not yet answered.
  *
- * Used by `WorkspaceMain`, which owns the selected project, the active tab and `setActiveTab`.
+ * Used by `WorkspaceMain`, which owns the active tab and `setActiveTab`.
  */
-export function useRunnerLanding({ selectedProject, activeTab, setActiveTab }: {
-  selectedProject: Project | null;
+export function useRunnerLanding({ activeTab, setActiveTab }: {
   activeTab: AppTab;
   setActiveTab: (tab: AppTab) => void;
 }): {
@@ -77,9 +74,7 @@ export function useRunnerLanding({ selectedProject, activeTab, setActiveTab }: {
       // oxlint-disable-next-line react/set-state-in-effect -- the param is stripped in this same pass
       setOpenRoadmap(roadmap);
     }
-    // With no project selected there is nothing to strip FOR — the pick rewrites the location to bare
-    // `/` on its own — so the params stay put and the held names above are what land.
-    if (selectedProject === null) return;
+    // The params go in this same pass: the held names above are what lands from here on.
     // BOTH KEYS GO IN ONE CALL. `setSearchParams`'s updater is handed the params of the render that made
     // it, not the latest location, so two calls in one pass would each rebuild from the same start and
     // the second would put the first's key back. The whole search string is rebuilt rather than the keys
@@ -91,22 +86,22 @@ export function useRunnerLanding({ selectedProject, activeTab, setActiveTab }: {
       if (roadmap !== null) next.delete(ROADMAP_PARAM);
       return next;
     }, { replace: true });
-  }, [runner, roadmap, selectedProject, setSearchParams]);
+  }, [runner, roadmap, setSearchParams]);
 
-  // The landing itself, once there is a project to land in: the tab comes forward as the pick makes the
-  // workspace exist. It keys on the HELD names, never on the params — by this commit the pick has already
-  // rewritten the location to bare `/`, so a param read here would find nothing.
+  // The landing itself: the tab comes forward as soon as a name is held. It keys on the HELD names, never
+  // on the params — by this commit the effect above has already stripped them, so a param read here would
+  // find nothing.
   useEffect(() => {
-    if ((revealPlan === null && openRoadmap === null) || selectedProject === null) return;
+    if (revealPlan === null && openRoadmap === null) return;
     setActiveTab('runner');
-  }, [revealPlan, openRoadmap, selectedProject, setActiveTab]);
+  }, [revealPlan, openRoadmap, setActiveTab]);
 
   // The Roadmap tab leaving the screen retires both held names (see the header): the cleanup runs when
   // `activeTab` moves off `runner`. It is registered only once the tab IS the active one, so a name held
-  // while the pick is still pending (the tab not yet forward) is not dropped before it has landed
-  // anywhere. StrictMode's dev-only unmount-and-remount runs the cleanup once on a first mount that
-  // starts on `runner`; the take effect above runs again right after it, from the same render's params,
-  // and holds the names again.
+  // in the commit before the tab comes forward is not dropped before it has landed anywhere.
+  // StrictMode's dev-only unmount-and-remount runs the cleanup once on a first mount that starts on
+  // `runner`; the take effect above runs again right after it, from the same render's params, and
+  // holds the names again.
   useEffect(() => {
     if (activeTab !== 'runner') return undefined;
     return () => {

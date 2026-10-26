@@ -332,6 +332,35 @@ export const FAB_SIZE_PX = 28;
  */
 export const FAB_CATCH_PX = 44;
 
+/**
+ * The kit's FAB, found in the page: the node the switcher's radial fans out from and gives focus back to, and the
+ * node the dock hands focus to when the list collapses. There is one. The class is `DockableFab`'s own (surfaces.css).
+ *
+ * Used by the app-switcher module's AppSwitcherRadial (the press that is its own toggle, and where an Escape or a
+ * keyboard-chosen act returns focus) and AppSwitcherDock (where focus lands as the list collapses).
+ */
+export const FAB_SELECTOR = '.vv-fab';
+
+// ---------------------------
+
+//----------------- THE VIEWS RAIL'S BUTTON ------------
+
+/**
+ * What every button in the views rail shares: a 40px square (44px below md, the touch floor) that centres a glyph, rounds
+ * to the house radius, fades its ground as the hover comes and goes, and stands above its neighbours while focused. On a
+ * phone the focus ring sits on the button's edge (offset 0), since a 44px button at the house ring's 2px offset is wider
+ * than the 48px rail and its scroll region clips what passes its sides. The lit state, the badge and the letter disc are
+ * the rail button's own.
+ *
+ * Used by the project-workspace module's RailButton, and by the app-switcher module's AppSwitcherDock, whose own button
+ * stands in the rail's disc cell while the disc is out of its dock, so the two can never part in size or in feel.
+ */
+export const RAIL_BUTTON_BASE =
+  'group/rail-button relative grid size-11 flex-none place-items-center rounded-lg transition-colors duration-quick focus-visible:z-10 max-md:focus-visible:outline-offset-0 md:size-10';
+
+/** A rail button at rest and under the pointer: muted ink on the rail's canvas, the secondary ground and full ink on hover. Used with `RAIL_BUTTON_BASE` by RailButton (its unlit state) and by AppSwitcherDock's own button. */
+export const RAIL_BUTTON_UNLIT = 'text-muted-foreground hover:bg-secondary hover:text-foreground';
+
 // ---------------------------
 
 //----------------- THE ROADMAP'S FEATURE WORDS ------------
@@ -412,8 +441,8 @@ export const ROADMAP_DOT_PAINT: Record<RoadmapDotState, { fill: string; stroke: 
 
 /**
  * The query parameter a landing names a plan in (`?runner=<plan>`): the key one side writes and the other
- * reads. Used by the project-workspace module's `useRunnerLanding`, which reads it, and the roadmap
- * module's `useRevealCard`, which writes it from a surface that has no Roadmap tab above it.
+ * reads. Used by the project-workspace module's `useRunnerLanding`, which reads it, and the shared
+ * `useRevealCard`, which writes it from a surface that has no Roadmap tab above it.
  */
 export const RUNNER_LANDING_PARAM = 'runner';
 

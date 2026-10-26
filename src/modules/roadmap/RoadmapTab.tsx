@@ -27,8 +27,8 @@ type RoadmapTabProps = {
  * The Roadmap tab: a segmented switch over its two faces. Roadmap is the tree from the goal
  * (`RoadmapTreeFace`, in viewport fit); In flight is the live cards (`RunnerPanel`, mounted whole beneath the switch with only a
  * reveal handed down). A visit opens on In flight (`startFace`); the Roadmap widget at full screen opens on Roadmap,
- * the face its column body was already showing. In flight carries the tab strip's own pill and amber — the
- * cards drawn, and the sentence for the prompts waiting on the operator — so the switch says where the
+ * the face its column body was already showing. In flight carries a pill and the amber — the cards
+ * drawn, and the sentence for the prompts waiting on the operator — so the switch says where the
  * urgent thing is before he turns to it.
  *
  * Both ways onto a card land on In flight: a `?runner=<plan>` landing, which turns the face before
@@ -129,8 +129,7 @@ export function RoadmapTab({ revealPlan, onRevealed, openRoadmap, onRoadmapOpene
             {
               id: 'inFlight',
               label: t('roadmap.faces.inFlight'),
-              // The strip's own reading of the same two numbers: no pill at zero, and the amber (with its
-              // sentence) only while a prompt waits on the operator.
+              // No pill at zero, and the amber (with its sentence) only while a prompt waits on the operator.
               count: count > 0 ? count : undefined,
               attention: waiting > 0 ? t('runner.waiting', { count: waiting }) : undefined,
             },

@@ -221,6 +221,7 @@ export type GatewayEventKind =
   | 'kanban_metis_state'
   | 'kanban_event'
   | 'notes_changed'
+  | 'followups_changed'
   | 'cerberus_changed'
   | 'cerberus_run_output'
   | 'cerberus_diag_step'
@@ -341,6 +342,9 @@ export type SessionHostLivenessEvent = {
 
 /** Sent to every open socket after a note is created, replaced or deleted. It names no note and no account: a client that hears it reads its own list again. It carries no `seq` and no `sessionId`, so it can never become a transcript row. */
 export type NotesChangedEvent = { kind: 'notes_changed'; at: number };
+
+/** Sent to every open socket after a followup is filed, closed or reopened. It names the chat by its APP session id under `appSessionId` — deliberately NOT `sessionId`: the workspace flags a chat for attention (the unread mark) when any frame carries a `sessionId` that is not the one on screen (`useProjectsState`), and a chat's items moving is no news in the transcript. A widget re-reads when the id is its own chat's and ignores the frame otherwise. It carries no `seq`, so it can never become a transcript row. */
+export type FollowupsChangedEvent = { kind: 'followups_changed'; appSessionId: string; at: number };
 
 // ---------------------------
 //----------------- DISPATCHER: the store's one status document, mirrored key for key ------------
@@ -2170,7 +2174,7 @@ export type SandboxCommandService = {
 /**
  * One account in the door's picture, relayed unchanged from `claude-account status --json`.
  * `slug` is the account's name in every sentence a person reads; `email` is its sign-in email off its
- * saved slot, the name its row and the closed footer row SHOW (null when the slot names none, and the
+ * saved slot, the name its row and the rail's account button SHOW (null when the slot names none, and the
  * slug shows instead); `digest` stays in data. Times are
  * epoch SECONDS. `reading.five` and `reading.week` are fractions 0..1 — window POINTS once multiplied
  * by 100, never dollars (INV-4299) — or null for a window the pacer could not measure, which draws
@@ -2293,6 +2297,23 @@ export type MemoryCandidateRead =
 export type Note = { id: string; title: string; description: string; createdAt: string; updatedAt: string };
 /** What the two writes take: the whole of both fields, never a patch. */
 export type NoteInput = { title: string; description: string };
+
+//----------------- FOLLOWUPS ------------
+// The followups lane's wire shapes, produced by `server/modules/followups/` and mirrored field-for-field in
+// `src/shared/types.ts` § FOLLOWUPS. The frame that says a chat's items have moved is `FollowupsChangedEvent` above.
+/** One item a chat keeps open for the person: a `next` step (a question put, an offer waiting, a step put off) or a known `gap` (something untested, unhandled or risky that was left). `state` is `open` until it is settled; `closedBy` says who settled it — the chat's own command or the person ticking it in the widget — and is `null` while open. All stamps are ISO-8601 UTC with milliseconds; `doneAt` is `null` while open. The chat and the account it belongs to never ride the item: the reader asked for them by chat. */
+export type Followup = {
+  id: number;
+  kind: 'next' | 'gap';
+  text: string;
+  state: 'open' | 'done';
+  createdAt: string;
+  updatedAt: string;
+  doneAt: string | null;
+  closedBy: 'chat' | 'user' | null;
+};
+/** What the chat's `add` takes for each line it files: the kind and the line, before the service judges the line. */
+export type FollowupInput = { kind: 'next' | 'gap'; text: string };
 
 // ---------------------------
 //----------------- CLI VERSION CONTRACTS ------------

@@ -24,7 +24,7 @@ import FileTreeUploadProgress from '@/modules/file-tree/FileTreeUploadProgress';
 
 
 type FileTreeProps = {
-  selectedProject: Project | null;
+  selectedProject: Pick<Project, 'projectId'> | null;
   onFileOpen?: (filePath: string) => void;
 };
 

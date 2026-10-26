@@ -128,7 +128,7 @@ export async function createProject(
     });
   }
 
-  // Archived rows intentionally remain archived when reused, as requested.
+  // An archived row at this path was reactivated by `createProjectPath`'s upsert, so the answer carries `isArchived: false`.
   return {
     outcome: persistedProject.outcome,
     project: mapProjectRowToApiView(projectRow),

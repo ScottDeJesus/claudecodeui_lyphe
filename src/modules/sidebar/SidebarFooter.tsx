@@ -1,7 +1,6 @@
-import { ArrowUpCircle, Settings } from 'lucide-react';
+import { ArrowUpCircle } from 'lucide-react';
 import type { TFunction } from 'i18next';
 
-import { AccountFooterRow } from '@/modules/accounts';
 import { ClaudeUpdateFooterRow } from '@/modules/claude-updates';
 import { Banner } from '@/shared/ui';
 import type { ReleaseInfo } from '@/shared/types';
@@ -12,19 +11,17 @@ type SidebarFooterProps = {
   releaseInfo: ReleaseInfo | null;
   latestVersion: string | null;
   onShowVersionModal: () => void;
-  onShowSettings: () => void;
   onShowUpdates: () => void;
   t: TFunction;
 };
 
-/** Rendered by SidebarContent at the bottom of the panel for the account row, update status and Settings. */
+/** Rendered by SidebarContent at the bottom of the panel for the restart-required and update banners. */
 export default function SidebarFooter({
   updateAvailable,
   restartRequired,
   releaseInfo,
   latestVersion,
   onShowVersionModal,
-  onShowSettings,
   onShowUpdates,
   t,
 }: SidebarFooterProps) {
@@ -88,39 +85,6 @@ export default function SidebarFooter({
           </div>
         </>
       )}
-
-      <div className="nav-divider" />
-
-      {/* The signed-in account, above Settings in both layouts — ONE instance carrying its own
-          responsive sizing, not one per block: two mounts would mean two usage pollers, and
-          D7 caps how often that read may happen. */}
-      <div className="px-3 py-2 md:px-2 md:py-1.5">
-        <AccountFooterRow />
-      </div>
-
-      <div className="nav-divider" />
-
-      {/* Desktop */}
-      <div className="hidden px-2 py-1.5 md:block">
-        <button
-          className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-muted-foreground transition-colors hover:bg-accent/60 hover:text-foreground"
-          onClick={onShowSettings}
-        >
-          <Settings aria-hidden="true" className="h-4 w-4 flex-none" />
-          <span className="truncate text-sm">{t('actions.settings')}</span>
-        </button>
-      </div>
-
-      {/* Mobile: the same action, at thumb size. */}
-      <div className="px-3 pb-3 pt-3 md:hidden">
-        <button
-          className="flex h-10 w-full items-center gap-3 rounded-xl bg-muted/40 px-3.5 transition-all hover:bg-muted/60 active:scale-[0.98]"
-          onClick={onShowSettings}
-        >
-          <Settings aria-hidden="true" className="h-4 w-4 flex-none text-muted-foreground" />
-          <span className="truncate text-sm font-normal text-foreground">{t('actions.settings')}</span>
-        </button>
-      </div>
     </div>
   );
 }

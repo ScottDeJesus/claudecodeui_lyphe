@@ -71,7 +71,7 @@ async function writeSwitch(next: HealModelPosition): Promise<HealModelPosition |
 
 /**
  * Every surface showing the switch right now, each entry a way of being told a position. Two
- * surfaces compose this hook — the Heal tab's header strip and the Settings → Agents row — so a flip
+ * surfaces compose this hook — the Heal section's toolbar and the Settings → Agents row — so a flip
  * made on one tells the other, and neither shows a side the other has left.
  */
 const readers = new Set<(position: HealModelPosition | null, forget?: boolean) => void>();

@@ -104,6 +104,10 @@ export { kanbanQuestionsDb } from '@/modules/database/repositories/kanban-questi
 // The memory-intake lane's own table: proposals to write a memory into one of five destinations,
 // each waiting on a person's approval. It is not a board table and no board reads it.
 export { memoryCandidatesDb } from '@/modules/database/repositories/memory-candidates.db.js';
+// The followups lane's own table: one chat's next steps and known gaps, keyed on the chat's app session id.
+// Used by the followups module; `sessions.db.ts` moves a merged chat's items itself.
+export { followupsDb } from '@/modules/database/repositories/followups.db.js';
+export type { FollowupKind, FollowupRow } from '@/modules/database/repositories/followups.db.js';
 // The notes lane's own table: one account's cards, written one row at a time. It is not a board
 // table and no board reads it.
 export { notesDb } from '@/modules/database/repositories/notes.db.js';

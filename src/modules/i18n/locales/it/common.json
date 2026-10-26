@@ -327,9 +327,7 @@
     },
     "ariaLabels": {
       "closeModal": "Chiudi finestra aggiornamento versione",
-      "showSidebar": "Mostra barra laterale",
       "settings": "Impostazioni",
-      "updateAvailable": "Aggiornamento disponibile",
       "closeSidebar": "Chiudi barra laterale"
     }
   },

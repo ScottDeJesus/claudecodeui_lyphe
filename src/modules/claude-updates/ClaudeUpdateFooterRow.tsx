@@ -6,19 +6,19 @@ import { UPDATE_STEP_LABELS } from '@/modules/claude-updates/updateWording';
 
 /**
  * The sidebar's own line for Claude: an offer when there is one, and the job that is taking it when
- * one is running. Both forms — the footer row and the collapsed rail's icon — read the same two
- * lines off the same hook, so the rail and the panel can never say different things.
+ * one is running. It lives in the list's foot, so it returns the moment a collapsed list shows again; the
+ * rail draws no mark for it.
  *
  * ABSENT IS THE DEFAULT. A package whose update this pipeline cannot install here is not an offer,
- * and a process with nothing on disk to move has nothing to announce; in either case both forms
- * render nothing at all rather than a row that opens a tab with nothing in it to press.
+ * and a process with nothing on disk to move has nothing to announce; in either case the row
+ * renders nothing at all rather than a row that opens a tab with nothing in it to press.
  *
  * WHILE A JOB RUNS the row says so — "Updating Claude…" with the step under it — because a sidebar
  * row that still says "Update available" while the update is happening is a row that invites a
  * second press.
  */
 
-/** The two lines either form draws: what is on offer or running, and what it is. Null = draw nothing. */
+/** The two lines the row draws: what is on offer or running, and what it is. Null = draw nothing. */
 function useUpdatesFooterLine(): { title: string; detail: string } | null {
   const { t } = useTranslation('settings');
   const { report } = useClaudeUpdates();
@@ -98,26 +98,5 @@ export function ClaudeUpdateFooterRow({ onOpen }: { onOpen: () => void }) {
         </button>
       </div>
     </>
-  );
-}
-
-/** The same row as one icon in the collapsed rail, right after Settings. */
-export function ClaudeUpdateRailButton({ onOpen }: { onOpen: () => void }) {
-  const line = useUpdatesFooterLine();
-  if (line === null) return null;
-
-  // The rail hides both lines, so the whole sentence becomes the button's own name.
-  const label = `${line.title} · ${line.detail}`;
-
-  return (
-    <button
-      onClick={onOpen}
-      className="group relative flex h-8 w-8 items-center justify-center rounded-lg transition-colors hover:bg-accent/80"
-      aria-label={label}
-      title={label}
-    >
-      <Download className="h-4 w-4 text-primary" />
-      <span aria-hidden className="vv-pulse absolute right-1.5 top-1.5 h-1.5 w-1.5 rounded-full bg-primary" />
-    </button>
   );
 }

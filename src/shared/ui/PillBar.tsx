@@ -8,9 +8,8 @@ type PillBarProps = ComponentPropsWithoutRef<'div'> & {
 };
 
 /**
- * Used by the settings module's agent selector as its horizontal strip. The workspace tab bar
- * that was its other consumer is the library `Tabs` now, so this is the last one; when the
- * agent selector follows, the file goes with it.
+ * Used by the settings module's agent selector, the jev and deepseek-spend modules' consumer
+ * strips, the app-switcher's drawer and the heal module's pills as a horizontal strip.
  */
 export function PillBar({ children, className, ...props }: PillBarProps) {
   return (

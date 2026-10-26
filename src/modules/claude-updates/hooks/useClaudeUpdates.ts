@@ -2,9 +2,8 @@
  * The Claude updates client: the report the tab draws, and the three things it can be asked to do.
  *
  * ONE REPORT, ONE POLLER, N SUBSCRIBERS. The picture is held at module scope behind one shared
- * poller, because three screens read it — the Settings tab, the sidebar footer's row and the
- * collapsed rail's icon — and a hook that fetched on its own would put three requests on the wire
- * for one answer. It is `useCliVersion`'s idiom on purpose: one module-scope report and `lastBody`,
+ * poller, because two screens read it — the Settings tab and the sidebar footer's row — and a hook
+ * that fetched on its own would put two requests on the wire for one answer. It is `useCliVersion`'s idiom on purpose: one module-scope report and `lastBody`,
  * one timer, one in-flight read, and answers claimed in TOKEN order so an older read landing last
  * cannot overwrite a newer picture with the one it replaced.
  *

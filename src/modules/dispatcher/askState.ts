@@ -22,7 +22,8 @@ type LockOption = { label: string; description: string };
  * The server's name for an ask is `keyOf`; this never computes it.
  *
  * Read by `PlanAsk` for its key, by `DispatchArcDeck` to draw one lock once across the plans it
- * names, and by the lane's bell (`DispatcherAskBell`) as the memory a new ask is heard against.
+ * names, by the lane's bell (`DispatcherAskBell`) as the memory a new ask is heard against, and by
+ * `WaitingAsks`, which keys its one row per ask by it.
  */
 export function askIdentity(ask: DispatcherAsk): string {
   return `${ask.asked.id}-${ask.asked.at}`;
@@ -93,7 +94,7 @@ function firstLineOf(text: string | null): string {
  *
  * Read by `PlanAsk`'s folded bar, which shows it truncated to one line: it is the prompt's first
  * non-blank line, trimmed — for a lock, the census `dispatcher question` prints first, so the bar
- * says at a glance what the plan holds.
+ * says at a glance what the plan holds. Read too by `WaitingAsks`, whose rows lead with it.
  */
 export function askHeadline(ask: DispatcherAsk): string {
   if (ask.kind === 'accept') return firstLineOf(ask.question);

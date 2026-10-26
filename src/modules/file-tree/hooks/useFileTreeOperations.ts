@@ -21,7 +21,7 @@ export type DeleteConfirmation = {
 };
 
 export type UseFileTreeOperationsOptions = {
-  selectedProject: Project | null;
+  selectedProject: Pick<Project, 'projectId'> | null;
   onRefresh: () => void;
   showToast: (message: string, type: 'success' | 'error') => void;
 };

@@ -332,7 +332,10 @@ export function createFileTreeService(dependencies: FileTreeServiceDependencies)
         throw createFileTreeError('Directory not accessible', 404, 'DIRECTORY_NOT_ACCESSIBLE');
       }
 
-      const fileTree = await buildFileTree(resolvedPath, 1);
+      // One level, depth 0: the browser lists this folder's subfolders and reads nothing of theirs. Depth 1
+      // also walked every subfolder's own entries against the shared 10,000-entry budget, so ~/.claude
+      // (19,000 entries two levels down) answered 413 and could not be browsed into at all.
+      const fileTree = await buildFileTree(resolvedPath, 0);
       const directories = fileTree
         .filter((item) => item.type === 'directory')
         .map((item) => ({ path: item.path, name: item.name, type: 'directory' as const }))

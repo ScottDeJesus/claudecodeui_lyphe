@@ -10,10 +10,10 @@ import type { KanbanLesson, KanbanLessonLean } from '@/shared/kanban-types';
  * THE SHAPE IS `useMemoryReview`'s, one section over, because the two surfaces are one habit — a
  * person reads what a build proposed and either files it or throws it away. What that hook holds
  * for a MEMORY this one holds for a LESSON: the list a read produced, the row whose write is in
- * flight, and this tab's freshest refusal per id.
+ * flight, and this panel's freshest refusal per id.
  *
- * IT POLLS NOTHING. The Memory tab's own provider is the only timer on this surface
- * (`context/MemoryIntakeContext.tsx`, a minute), and a second one here would double the tab's
+ * IT POLLS NOTHING. The Memory provider is the only timer on this surface
+ * (`context/MemoryIntakeContext.tsx`, a minute), and a second one here would double the panel's
  * traffic to learn nothing a person is waiting for: nothing stages a lesson while the list is
  * open, and the reviews happen in this panel. So it reads ON MOUNT and after every write, and
  * that is the whole of its clock.

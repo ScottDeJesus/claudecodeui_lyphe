@@ -86,31 +86,31 @@ const NO_FIGURE = '—';
 type Readout = {
   /** The figure, or `null` when the answer carries no amount — the caller draws `NO_FIGURE` for it. */
   figure: string | null;
-  /** What the reading is, in one sentence: the accessible name and the hover text, so the row can abbreviate without the meaning being lost. */
-  sentence: string;
   /** The line under the figure in the panel: what needs explaining, and failing that, when the reading was taken. */
   note: string | null;
 };
 
 /**
- * The ONE reading, in the three forms this component draws it.
+ * The ONE reading, in the two forms this component draws it.
  *
- * Computed together rather than by three functions over the same body, because the two registers
- * are the same reading: a figure of `—` standing under a sentence that says `$ left` is the one
+ * Computed together rather than by two functions over the same body, because the figure and the line
+ * under it are the same reading: a figure of `—` standing over a note that says `$ left` is the one
  * disagreement this component exists to make impossible — and it is not hypothetical, it is what
  * a blank amount drew before this was one function.
  */
 function readOut(balance: DeepseekBalance | null): Readout {
-  if (!balance) return { figure: null, sentence: 'DeepSeek balance — not read yet', note: null };
+  if (!balance) return { figure: null, note: null };
 
   if (!balance.reachable) {
     const reason = unknownReasonInWords(balance.reason);
-    return { figure: null, sentence: `DeepSeek balance — unknown: ${reason}.`, note: `Balance unknown — ${reason}.` };
+    return { figure: null, note: `Balance unknown — ${reason}.` };
   }
 
   if (!balance.available) {
-    const sentence = 'DeepSeek reports this account is not available for requests.';
-    return { figure: moneyInWords(balance.currency, balance.total), sentence, note: sentence };
+    return {
+      figure: moneyInWords(balance.currency, balance.total),
+      note: 'DeepSeek reports this account is not available for requests.',
+    };
   }
 
   const figure = moneyInWords(balance.currency, balance.total);
@@ -119,11 +119,7 @@ function readOut(balance: DeepseekBalance | null): Readout {
   // this app could not read, because that is what it is; inventing a figure here is the one thing
   // this screen must never do.
   if (!figure) {
-    return {
-      figure: null,
-      sentence: `DeepSeek balance — unknown: ${UNREADABLE_IN_WORDS}.`,
-      note: `Balance unknown — ${UNREADABLE_IN_WORDS}.`,
-    };
+    return { figure: null, note: `Balance unknown — ${UNREADABLE_IN_WORDS}.` };
   }
 
   const readAt = readAtInWords(balance.checkedAt);
@@ -132,25 +128,18 @@ function readOut(balance: DeepseekBalance | null): Readout {
   // stopped, and a frozen tab would otherwise hold a five-minute-old number that looks fresh — and
   // a read the client's own floor skipped (see `useDeepseekBalance`) shows as its age, not as a
   // figure that merely looks new.
-  return { figure, sentence: `DeepSeek balance — ${figure} left, read at ${readAt}.`, note: `Read at ${readAt}` };
+  return { figure, note: `Read at ${readAt}` };
 }
 
 type DeepseekBalanceReadoutProps = {
   /** The last reading the server answered with, or `null` while none has been asked for. */
   balance: DeepseekBalance | null;
-  /**
-   * `stacked` is the panel's register: label, figure and a line of words under it.
-   * `inline` is the one-line form for the sidebar's account row, where the figure rides under the
-   * account name beside the usage meters and there is no room for the sentence.
-   */
-  variant?: 'stacked' | 'inline';
 };
 
 /**
  * The money left on this host's DeepSeek account.
- * Used by the accounts module twice: `AccountFooterRow` draws the inline register under the
- * account name, and `AccountPopover` draws the stacked one in the panel. Both read the ONE
- * reading `useDeepseekBalance` holds, so the two registers can never disagree.
+ * Used by the accounts module's AccountPopover, which draws it in the panel from the ONE reading
+ * `useDeepseekBalance` holds in AccountRailButton.
  *
  * Deliberately NOT a Meter. Every other reading on this surface is a share of a limit, and the
  * Meter's whole business is the bar that share is drawn on — but a balance has no limit to be a
@@ -158,29 +147,11 @@ type DeepseekBalanceReadoutProps = {
  * composes the same type register the Meter's stacked form uses — label left, figure right, a
  * faint line under it — and draws no bar at all.
  */
-export function DeepseekBalanceReadout({ balance, variant = 'stacked' }: DeepseekBalanceReadoutProps) {
-  const { figure, sentence, note } = readOut(balance);
+export function DeepseekBalanceReadout({ balance }: DeepseekBalanceReadoutProps) {
+  const { figure, note } = readOut(balance);
   // An em-dash is an unknown, and every unknown is drawn in the faint ink — including a blank
   // amount, which is a reading of nothing rather than a quiet zero.
   const known = figure !== null;
-
-  if (variant === 'inline') {
-    return (
-      <span
-        className="flex min-w-0 items-baseline gap-1.5 text-xs"
-        title={sentence}
-        aria-label={sentence}
-      >
-        <span className="flex flex-none items-center gap-1 self-center text-ink-faint">
-          <LLMProviderLogo provider="deepseek" className="h-3 w-3" />
-          DeepSeek
-        </span>
-        <span className={cn('truncate tabular-nums', known ? 'text-muted-foreground' : 'text-ink-faint')}>
-          {figure ?? NO_FIGURE}
-        </span>
-      </span>
-    );
-  }
 
   return (
     <div className="flex flex-col gap-1.5">

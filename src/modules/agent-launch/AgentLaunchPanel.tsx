@@ -40,7 +40,7 @@ type AgentLaunchPanelProps = {
  * Metis. A pinned row is the exception, so a pin is what stands out down the list.
  *
  * A WIDE PANEL IS A TABLE AND A NARROW ONE IS A STACK. The query is the panel's own width
- * (`container-type` on the root), as the Heal tab's is: a row is three columns — who, what it
+ * (`container-type` on the root), as the Heal panel's is: a row is three columns — who, what it
  * launches at, where that lands — once the panel is 64rem wide, two columns from 48rem and one
  * below that.
  *

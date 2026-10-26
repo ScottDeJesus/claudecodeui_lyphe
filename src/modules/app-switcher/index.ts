@@ -1,6 +1,6 @@
 // The switcher's four doors, and every one is a mount. The project-workspace shell wraps its tree in
 // the provider, renders the layer over the main region and the FAB beside the command palette, and
-// hands the dock to the sidebar header's `leading` slot.
+// the workspace rail mounts the dock in its top cell, in the sidebar's rail.
 //
 // EXACTLY TWO THINGS ELSE LEAVE, and each is one of the two shapes a decision can take across a
 // module boundary. `useCurrentApplication` is an ANSWER — the application in front, or null — and

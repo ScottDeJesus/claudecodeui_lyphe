@@ -498,6 +498,21 @@ export function firstLine(text: unknown): string {
 
 // ---------------------------
 
+//----------------- FILE PATHS ------------
+
+/**
+ * A path made absolute against a folder: an absolute path stays as it is, a relative one joins the
+ * folder (its leading `./` and the folder's trailing slashes dropped), and with no folder there is
+ * nothing to join to, so the path stays as it came. The Files view picks the root that holds an
+ * ABSOLUTE path, so what is headed for it names its root first. Used by the project-workspace
+ * module's open request (a path relative to the open project) and by the git panel (a changed-file
+ * row, relative to its repository).
+ */
+export function absolutePathIn(folder: string | null | undefined, path: string): string {
+  if (!folder || path.startsWith('/')) return path;
+  return `${folder.replace(/\/+$/, '')}/${path.replace(/^\.\//, '')}`;
+}
+
 // ---------------------------
 
 //----------------- KEYBOARD SHORTCUTS ------------

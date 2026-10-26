@@ -27,7 +27,7 @@ export type UiPreferences = {
   sidebarVisible: boolean;
   voiceEnabled: boolean;
   /**
-   * Keeps the Shell tab out of the workspace tab bar. Default ON, because the terminal is
+   * Keeps the Shell view off the views rail. Default ON, because the terminal is
    * the one tab most people never open — and hiding it only stops it being shown: a running
    * shell session is untouched, exactly as it is whenever another tab is active.
    */

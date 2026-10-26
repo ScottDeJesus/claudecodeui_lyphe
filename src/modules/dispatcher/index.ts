@@ -3,8 +3,8 @@
 export { DispatcherFeed } from '@/modules/dispatcher/DispatcherFeed';
 // The lane's read side — every plan the store holds, this box's posture beside them, and which of
 // them the operator has hidden or dismissed. The In flight face reads it for the card list and the
-// `Hidden` list; the tab strip and the Roadmap tab's In flight switch read the `count` and `waiting`
-// that mark them.
+// `Hidden` list; the Roadmap tab's In flight switch reads the `count` and `waiting`
+// that mark it, and the Inbox's waiting count (`useInboxWaiting`) reads `waiting` as its Roadmap figure.
 export { useDispatcherPlans } from '@/modules/dispatcher/hooks/useDispatcherPlans';
 // Both hands, one hook: the plan card's verbs and the arc header's three — stop, resume,
 // the arc's model word — relayed to the dispatcher's own binary and answered with its own
@@ -58,6 +58,10 @@ export { landFocusInHome } from '@/modules/dispatcher/putAwayFocus';
 export { HiddenPlans } from '@/modules/dispatcher/HiddenPlans';
 // The pin a plan wears when the open chat is the one that launched it, drawn by both homes.
 export { SessionPin } from '@/modules/dispatcher/SessionPin';
+// Every ask still waiting on the operator's word, one row per ask with the feature or epic it stands on and an
+// Answer that opens its card: the inbox module's Roadmap section. The asks are this module's vocabulary, so the
+// list is drawn here and the Inbox only mounts it.
+export { WaitingAsks } from '@/modules/dispatcher/WaitingAsks';
 // One planner outing as one line — who is out, on what model, for how long — and the row of them for
 // the outings no card and no deck can carry. Drawn by the plan card's and the arc deck's own headers
 // inside this module, and by the In flight face and the chat gutter's widget above the arc decks for the rest.

@@ -42,7 +42,11 @@ section: README/001 The rules that keep it one source
    first two for the task board, the third for accent TEXT — each one `color-mix` over a token
    `tokens.css` already declared. `accent-ink` is the readable half of a pair, because `primary`
    is the accent FILL: a green WORD is `text-accent-ink`, a green SHAPE is `text-primary`, and
-   the wrong way round is how the sidebar's most important label went under AA. `tone-soft`,
+   the wrong way round is how the sidebar's most important label went under AA. `accent-soft` and
+   `accent-soft-hover` joined for the soft green ground a lit control stands on (`text-accent-ink`
+   on `bg-accent-soft`, the views rail's lit glyph), each `color-mix` over `--accent-soft` or
+   `--accent-soft-hover`; bare `accent` is the shadcn legacy over `--surface2`, so the soft ground
+   needed names of its own. `tone-soft`,
    `tone-ink` and `tone-dot` joined as names over the tone swap's own properties, not over a palette
    token: each is `color-mix` over `--tone-soft`, `--tone-ink` or `--tone-dot`, which the
    `[data-tone]` rules of rule 4 hand to everything inside a container. `bg-tone-dot` is the dot of
@@ -104,7 +108,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/main.tsx, /home/lyphe/.claud
 ## MAN-740 — The library those tokens paint
 section: README/002 The library those tokens paint
 
-37 components carry Verve paint (a file in `src/shared/ui/` that puts a `.vv-*` class in its markup; a comment naming one does not count, and `Toast` with `ToastStack`, `Tabs` with `TabsMore`, `Gallery` with `PhotoFill`, `RegionImage` with `RegionDrawLayer`, `SphereView` with `sphere/SphereCanvas` count once). The sheet that paints each (rule 6):
+37 components carry Verve paint (a file in `src/shared/ui/` that puts a `.vv-*` class in its markup; a comment naming one does not count, and `Toast` with `ToastStack`, `Gallery` with `PhotoFill`, `RegionImage` with `RegionDrawLayer`, `SphereView` with `sphere/SphereCanvas` count once). The sheet that paints each (rule 6):
 
 | sheet | components |
 |---|---|
@@ -123,9 +127,17 @@ section: README/002 The library those tokens paint
 - `DialogFrame` is Verve's `overlays/Modal` on the house `Dialog`, in the library because Verve draws it (MAN-571): its props, behaviour and paint are MAN-7963.
 - `DockableFab`, `SplitPane` and `ResizeGrip` were admitted on the barrel's *mechanism* test, not its two-module rule (`index.ts`'s own header). `ResizeGrip`'s one consumer is `ChatHostPanel`.
 - `RegionImage` and `Gallery` joined for the Cerberus Tours tab; props, drawing and paint: MAN-8579. `RegionImage` is admitted on the *mechanism* test (`index.ts`'s own header): an SVG layer in the image's own 0..1 space, a polygon hit-test and a badge clamped inside the image are what no arrangement of the parts here produces. `Gallery` is admitted because Verve draws it (§10 Media, MAN-571), with or without a second module. Both put a photo in a box through `PhotoFill`, which the barrel does not export.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Checkbox.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/DialogFrame.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Gallery.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/PhotoFill.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/RegionImage.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Sheet.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/sphere/SphereCanvas.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/SphereView.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Steps.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/TextArea.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Timeline.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/verve/media.css, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/verve/panels.css
+
+## MAN-9016 — The library those tokens paint — `SphereView` joined for the Tours view's pano screen, on the *mechanism* test (`index.ts`'s own
+section: README/002 The library those tokens paint/001 `SphereView` joined for the Tours view's pano screen, on the *mechanism* test (`index.ts`'s own
+
 - `SphereView` joined for the Tours view's pano screen, on the *mechanism* test (`index.ts`'s own header): a WebGL sphere with a frame loop, its drag and zoom, and outlines laid on it by yaw and pitch are what no arrangement of the parts here produces. One consumer, `PanoSphere.tsx`; its next is the roadmap's photo work, where in a tour's pano a CompanyCam photo was taken. Its four types are in `src/shared/types.ts`: `CubeFaces`, `SphereShape`, `SphereLook`, `SphereTrouble`. It knows a cube, outlines and tones; the engine's faces, areas and looks stay in the module. Its viewer and three.js load in a chunk of their own, so the barrel names the piece and never `sphere/SphereCanvas`. Its paint in `media.css`: `.vv-sphere` (the `--surface2` ground, a `.vv-skeleton` while its faces load), `.vv-sphere .psv-overlay*` (house type), `.vv-sphere .vv-region-badge` (its press on the sphere); the full table: MAN-8943. Rules and proof: MAN-8944. It does not use `PhotoFill`.
 - `SegmentedControl` and `DataTable` joined for the affected-areas module's marking screens, because Verve draws them (§11 Plumbing and §5, MAN-571), with or without a second module; props, behaviour and paint: MAN-8580. `RegionImage` also gained `drawing` (a box dragged on the photo) and `focusId` (one region at full wash, the rest dimmed): MAN-8579.
 - `ConfirmDialog` was admitted on the two-module rule and paints nothing of its own: it is `Dialog` and `Button`, both already painted. It is not in the table.
+- `Tabs` is one file and one strip: a `role="tablist"` of WORD tabs (`TabItem`: `id`, `label`, and optionally `count`, `attention`, `tone`), in the `segmented` (default) or `underline` register, with `equal` shares and a required `ariaLabel`. A count above zero draws the `.vv-tabs__count` pill in the tab's register: `attention` makes it warn and enters the tab's title (`<label> (<count>) · <attention>`), else `tone`, else neutral. It draws no glyph tab and no overflow menu. Callers: MAN-9013 (the Inbox's sections), MAN-7654 (the Roadmap faces), git-panel, file-manager, api-tab, cerberus, affected-areas, document-preview and the chat's tabbed code.
+- `Menu` is `{ trigger, items, onSelect, width? }`: a choice list hung from the left edge of the trigger the caller draws, an item `{ id, label, description?, selected? }`. No count, no trigger label, no alignment prop. Callers: affected-areas' `MarkPresses` and `FacePhoto`. Its viewport and dismissal rules: INV-8867.
 
 What they share is the contract every later one joins:
 
@@ -143,6 +155,12 @@ What they share is the contract every later one joins:
 3. **Marker classes are surface, not decoration.** `vv-button--<variant>`, `vv-badge--<variant>`
    and `data-tone` are what a verify script queries to prove a variant painted; rename one and a
    gate that never reads your source goes quiet. A variant emitting no marker is unprovable.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Checkbox.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/DialogFrame.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Gallery.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/PhotoFill.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/RegionImage.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Sheet.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/sphere/SphereCanvas.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/SphereView.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Steps.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/TextArea.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Timeline.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/verve/media.css, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/verve/panels.css
+
+## MAN-9017 — The library those tokens paint — Import from the barrel, `@/shared/ui`. It side-effect-imports all seven stylesheets (rule
+section: README/002 The library those tokens paint/002 Import from the barrel, `@/shared/ui`. It side-effect-imports all seven stylesheets (rule
+
 4. **Import from the barrel, `@/shared/ui`.** It side-effect-imports all seven stylesheets (rule
    6), so the barrel — not the component file — is what puts the paint in the document. A deep
    import by path gets an unpainted component unless something else loaded the barrel first.
@@ -554,3 +572,36 @@ What an editor of `SphereView.tsx`, `sphere/SphereCanvas.tsx` or `sphere/wheelGa
 - A native Escape in fullscreen: headless Chromium ignores a page-side Escape, so the run calls `document.exitFullscreen()`; the key is not measured.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/sphere/fixedContaining.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/sphere/SphereCanvas.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/SphereView.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/sphere/wheelGate.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/sphere-fixture.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/sphere-cold-start.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/sphere-view.mjs, /home/lyphe/.claude/claudecodeui_lyphe/vite.config.js
+
+## MAN-9015 — The kit Tooltip — props, the three ways it shows, and showOnFocus for the keyboard
+
+`Tooltip` (`src/shared/ui/Tooltip.tsx`, paint `.vv-tooltip` in `feedback.css`) names a control that draws no words. It wraps one child in a `relative inline-block` div; with no `content` it renders the child bare.
+
+## Props
+| prop | default | does |
+|---|---|---|
+| `content` | none | the bubble's body |
+| `position` | `top` | `top`, `bottom`, `left` or `right` of the wrapper, 8px off, with an arrow |
+| `delay` | `350` | ms before a hover or a touch hold shows it |
+| `className` | `''` | added to the bubble |
+| `showOnFocus` | `false` | also show for the keyboard (below) |
+
+## How it shows
+| trigger | shows | hides |
+|---|---|---|
+| pointer hover | after `delay` | pointer leaves |
+| touch hold | after `delay`, when the finger stays down | lift, unless the hold already showed it; the next `pointerdown` outside the wrapper |
+| `showOnFocus`: a focus inside the wrapper that matches `:focus-visible` | at once, no delay | blur; Escape |
+- A pointer press focuses the control too, so a focus that does not match `:focus-visible` shows nothing: hover has already given the name.
+- Escape hides the bubble without moving focus (WCAG 1.4.13). The key is not stopped: an Escape that also closes a drawer or a dialog still reaches it.
+- Default off. why: most callers wrap inputs, whose focus is a reader getting to work, not asking a name.
+- The bubble is a `position: fixed` portal into the host window's body (`z-index` 9999), re-placed on resize and scroll, so it follows the floating chat window.
+- The wrapper is a div. A div between `role="tablist"` and `role="tab"` breaks the relationship a screen reader announces the strip by, so `Tabs` titles its tabs natively instead.
+
+## Sites that set `showOnFocus`
+All with `position="right"`: `RailButton` (every view button of the views rail), `AccountRailButton` and the dock's own button (`AppSwitcherDock`). The accessible name of each is its `aria-label`; the tooltip repeats it and no native `title` stands beside it (MAN-9006).
+
+## Proof
+2026-10-25: Tab onto the rail's Chat button shows "Chat" 21–33ms after the key (`node .verify/rail-live.mjs`, MAN-9005).
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Tooltip.tsx

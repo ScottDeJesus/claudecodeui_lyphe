@@ -1,55 +1,33 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { ACCOUNT_PANEL_ID, AccountPopover } from '@/modules/accounts/AccountPopover';
-import { DeepseekBalanceReadout } from '@/modules/accounts/DeepseekBalanceReadout';
 import { useAccountSetup } from '@/modules/accounts/hooks/useAccountSetup';
 import { announceAccountsChanged, useClaudeAccounts } from '@/modules/accounts/hooks/useClaudeAccounts';
 import { useClaudeUsage } from '@/modules/accounts/hooks/useClaudeUsage';
 import { useDeepseekBalance } from '@/modules/accounts/hooks/useDeepseekBalance';
 import { useJevBalance } from '@/modules/accounts/hooks/useJevBalance';
-import { JevBalanceReadout } from '@/modules/accounts/JevBalanceReadout';
 import { accountInitials } from '@/modules/accounts/utils/accountInitials';
-import { accountInUse, accountInUseUsage } from '@/modules/accounts/utils/accountInUseUsage';
-import { formatWindowCountdown, windowPercent, windowTone } from '@/modules/accounts/utils/usageWindows';
+import { accountInUse } from '@/modules/accounts/utils/accountInUseUsage';
 import { ProviderLoginModal } from '@/modules/provider-auth';
-import { Avatar, Meter } from '@/shared/ui';
-import type { ClaudeUsageWindow } from '@/shared/types';
-
-type GlanceWindow = { key: string; short: string; full: string };
+import { Avatar, Tooltip } from '@/shared/ui';
 
 /**
- * The windows the collapsed row shows, in the order it shows them. `short` is the fallback for
- * a window the meter gives no reset time for — normally the label is the countdown to that reset.
- * `full` is the accessible name, because "5h" read aloud is not a window anyone knows.
- */
-const GLANCE_WINDOWS: GlanceWindow[] = [
-  { key: 'five_hour', short: '5h', full: 'Current 5-hour window' },
-  { key: 'seven_day', short: '7d', full: 'This week' },
-];
-
-type AccountFooterRowProps = {
-  /** The icon rail draws the avatar alone — there is no room for a label, let alone a panel. */
-  collapsed?: boolean;
-  /** How the rail's avatar opens the sidebar, where the full row and its panel live. */
-  onExpand?: () => void;
-};
-
-/**
- * The signed-in Claude account, at the foot of the sidebar.
+ * The signed-in Claude account, as the button at the foot of the views rail.
  *
- * Used by the sidebar module twice, and never both at once: SidebarFooter renders the full
- * row above Settings, and SidebarCollapsed renders it as the rail's avatar. That mutual
- * exclusion is what keeps ONE account poller in the app — mounting this in the footer's
- * desktop and mobile blocks separately would double the read rate D7 caps.
+ * A 40px rail button (44px below md, the touch floor) holding the account's 26px avatar; a press opens the account
+ * panel beside the rail, where the usage meters, both balances, the account rows and Re-login live. Drawn by the
+ * project-workspace module's WorkspaceRail at the rail's foot. The rail stands whether the chat list shows or is
+ * collapsed (collapsing hides the list column only), so the button never remounts on a collapse, and ONE instance is
+ * mounted at every moment, and with it one usage poller (D7 caps how often that read may happen).
  */
-export function AccountFooterRow({ collapsed = false, onExpand }: AccountFooterRowProps) {
+export function AccountRailButton() {
   const { data: accounts, chooseAccount, setAuto, removeAccount, busy, error, clearError } =
     useClaudeAccounts();
   const { data: usage, refresh: refreshUsage } = useClaudeUsage();
-  // A different account from the one above, from a route of its own — held here so the row and
-  // the panel share their ONE reading, and so neither is hidden when the account lane cannot answer.
+  // A different account from the one above, from a route of its own — held here beside the usage reading
+  // so the panel gets all of them from one place, and none is hidden when the account lane cannot answer.
   const { data: balance, refresh: refreshBalance } = useDeepseekBalance();
-  // The third account on this row: a seeded credit metered locally, read from a local route.
+  // The third account on the panel: a seeded credit metered locally, read from a local route.
   const { data: jevBalance, refresh: refreshJevBalance } = useJevBalance();
 
   // Whether the account panel is showing. Not derivable from the picture: the picture says
@@ -60,11 +38,6 @@ export function AccountFooterRow({ collapsed = false, onExpand }: AccountFooterR
   const [loginOpen, setLoginOpen] = useState(false);
   // The account the Set up window signs in, and the acts that open and close it; closing re-reads the picture.
   const { setup, openSetup, closeSetup } = useAccountSetup();
-
-  // The glance labels count DOWN, so they cannot wait for the three-minute usage poll to be
-  // redrawn — a "1m" would sit there for three. One tick a minute, and only while there is a
-  // countdown on screen to move.
-  const [nowTick, setNowTick] = useState(() => Date.now());
 
   const rootRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -132,32 +105,12 @@ export function AccountFooterRow({ collapsed = false, onExpand }: AccountFooterR
     seenDigestRef.current = inUseDigest;
   }, [inUseDigest, refreshUsage]);
 
-  // The two windows worth a glance, as bars — the account in use's, converted exactly as the panel's
-  // meters convert it, so the two registers cannot disagree. `weekly_scoped:*` plans are left out:
-  // the row has space for two, and the panel carries every window. An absent window draws no bar;
-  // `percent: null` does — an empty track and an em-dash, the honest picture of "nobody has this number".
-  const metersUsage = accountInUseUsage(usage, accounts, nowTick);
-  const windows = metersUsage?.reachable ? metersUsage.windows : [];
-  const glanceWindows = GLANCE_WINDOWS
-    .map((glance) => {
-      const found = windows.find((usageWindow) => usageWindow.key === glance.key);
-      return found ? { ...glance, usageWindow: found } : null;
-    })
-    .filter((entry): entry is GlanceWindow & { usageWindow: ClaudeUsageWindow } => entry !== null);
-
   // The account in use, as the door marks it (`in_use`): its email names it, the slug standing in when
   // its saved slot names no email, and the slug draws the avatar's initials. No mark — the door's store
   // does not hold the live identity yet, or the door cannot answer — draws the rail's own blank.
   const inUse = accountInUse(accounts);
   const inUseSlug = inUse?.slug ?? null;
   const label = inUse?.email ?? inUseSlug ?? '—';
-  const hasCountdown = glanceWindows.some(({ usageWindow }) => Boolean(usageWindow.resetsAt));
-
-  useEffect(() => {
-    if (!hasCountdown) return undefined;
-    const timer = setInterval(() => setNowTick(Date.now()), 60_000);
-    return () => clearInterval(timer);
-  }, [hasCountdown]);
 
   const togglePanel = () => {
     if (open) {
@@ -186,76 +139,33 @@ export function AccountFooterRow({ collapsed = false, onExpand }: AccountFooterR
     announceAccountsChanged();
   }, []);
 
-  if (collapsed) {
-    return (
-      <button
-        type="button"
-        onClick={onExpand}
-        aria-label={`Account ${label}`}
-        title={`Account ${label}`}
-        className="group flex h-8 w-8 items-center justify-center rounded-lg transition-colors hover:bg-accent/80"
-      >
-        <Avatar initials={accountInitials(inUseSlug)} size={22} muted={!inUseSlug} />
-      </button>
-    );
-  }
-
   return (
-    <div className="relative" ref={rootRef}>
-      <button
-        ref={triggerRef}
-        type="button"
-        data-account-row=""
-        aria-haspopup="dialog"
-        aria-expanded={open}
-        aria-controls={open ? ACCOUNT_PANEL_ID : undefined}
-        onClick={togglePanel}
-        className="flex w-full items-center gap-2.5 rounded-xl bg-muted/40 px-3 py-2 text-left transition-colors hover:bg-muted/60 md:rounded-lg md:bg-transparent md:px-2.5 md:hover:bg-accent/60"
-      >
-        <Avatar initials={accountInitials(inUseSlug)} size={26} muted={!inUseSlug} />
-        <span className="min-w-0 flex-1">
-          <span className="block truncate text-[13px] font-medium text-foreground" title={label}>{label}</span>
-          {glanceWindows.length > 0 ? (
-            <span className="mt-1 flex items-center gap-3">
-              {glanceWindows.map(({ key, short, full, usageWindow }) => {
-                const percent = windowPercent(usageWindow);
-                // Time left where there is one, the window's own name where there is not.
-                const countdown = formatWindowCountdown(usageWindow.resetsAt, nowTick);
-                const glanceLabel = countdown ?? short;
-                return (
-                  <span key={key} className="min-w-0 flex-1" title={countdown ? `${full} · ${countdown} left` : full}>
-                    <Meter
-                      variant="inline"
-                      percent={percent}
-                      tone={windowTone(usageWindow, percent)}
-                      label={glanceLabel}
-                      ariaLabel={countdown ? `${full} — ${countdown} left` : `${short} — ${full}`}
-                      value={percent === null ? '—' : `${percent}%`}
-                    />
-                  </span>
-                );
-              })}
-            </span>
-          ) : (
-            <span className="block text-xs text-muted-foreground">usage —</span>
-          )}
-          {/* Under the meters and inside the same column, which is where the account's own
-              readings live: the windows above are what is LEFT of this Claude account, and this
-              line is what is LEFT of the DeepSeek one that pays for builds. It draws while the
-              meters are unknown — the two sources fail independently, and this is the one that
-              still answers when the account lane does not. */}
-          <span className="mt-1 block">
-            <DeepseekBalanceReadout balance={balance} variant="inline" />
-          </span>
-          <span className="mt-0.5 block">
-            <JevBalanceReadout balance={jevBalance} variant="inline" />
-          </span>
-        </span>
-        <span aria-hidden="true" className="flex-none text-[9px] text-ink-faint">▼</span>
-      </button>
+    // `flex` so the root is exactly the button's box: an inline-block tooltip wrapper in a block root would add a line
+    // box's descender gap under the button, and the panel's `bottom-0` would then sit that gap below the button's foot.
+    <div className="relative flex" ref={rootRef}>
+      {/* While the panel is open it stands where this tooltip would, so the bubble is put away (`hidden`) rather than
+          left over the panel's corner: swapping the tooltip out for its bare child would remount the button and
+          drop its focus. */}
+      <Tooltip position="right" showOnFocus content="Account" className={open ? 'hidden' : undefined}>
+        <button
+          ref={triggerRef}
+          type="button"
+          data-account-trigger=""
+          aria-label={`Account ${label}`}
+          aria-haspopup="dialog"
+          aria-expanded={open}
+          aria-controls={open ? ACCOUNT_PANEL_ID : undefined}
+          onClick={togglePanel}
+          // The rail button's ground, hover and focus ring, spelled again because the rail's RailButton is private to the
+          // project-workspace module. `relative` is what lets `focus-visible:z-10` lift the ring over a hovered neighbour.
+          className="relative grid size-11 flex-none place-items-center rounded-lg text-muted-foreground transition-colors duration-quick hover:bg-secondary hover:text-foreground focus-visible:z-10 max-md:focus-visible:outline-offset-0 md:size-10"
+        >
+          <Avatar initials={accountInitials(inUseSlug)} size={26} muted={!inUseSlug} />
+        </button>
+      </Tooltip>
 
-      {/* After the trigger, so a forward Tab walks into the panel instead of past the whole
-          sidebar footer. Its own `bottom-full` is what puts it above the row. */}
+      {/* After the trigger, so a forward Tab walks from the button into the panel. The panel's own
+          `left-full` and `bottom-0` seat it beside the rail, on the button's foot. */}
       {open && (
         <AccountPopover
           accounts={accounts}

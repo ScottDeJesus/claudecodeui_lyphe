@@ -327,9 +327,7 @@
     },
     "ariaLabels": {
       "closeModal": "Fermer la fenêtre de mise à jour",
-      "showSidebar": "Afficher la barre latérale",
       "settings": "Paramètres",
-      "updateAvailable": "Mise à jour disponible",
       "closeSidebar": "Masquer la barre latérale"
     }
   },

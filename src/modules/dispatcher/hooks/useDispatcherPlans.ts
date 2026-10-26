@@ -47,26 +47,25 @@ export function useDispatcherPlans(): {
    * halves read the same document, and this is that join's other side.
    */
   arcs: DispatcherArc[];
-  /** How many plans are DRAWN: the tab's badge and the pane's own count. A hidden or dismissed plan is not counted. */
+  /** How many plans are DRAWN: the In flight face's pill and the pane's own count. A hidden or dismissed plan is not counted. */
   count: number;
   /**
    * How many prompts the DRAWN plans are waiting on — the distinct open asks, by `askIdentity`
    * (`askState.ts`), across the plans this screen draws.
    *
    * COUNTED BY IDENTITY, NOT BY CARD: a lock names every plan of its arc still owing an Accept, and
-   * the operator owes that ONE answer however many cards carry it — so the amber mark the In flight face puts
-   * on the tab strip and the warn tone on the widget's badge count questions, not plans. Asked of the drawn plans
+   * the operator owes that ONE answer however many cards carry it — so the amber mark the In flight face wears
+   * and the warn tone on the widget's badge count questions, not plans. Asked of the drawn plans
    * alone, like `count`, because a plan the operator has put away draws no card his word could reach.
    */
   waiting: number;
   /**
-   * The lane's mark, decided once for both homes that wear it — the Roadmap tab's dot and the chat
-   * gutter's Runs badge: `warn` while a prompt waits on the operator, `info` while an agent is at work
-   * (a drawn plan reading `live`, or a planner outing out), `positive` only once every drawn plan is
-   * `complete`, and `neutral` for work nobody is doing (stalled, paused, scheduled, parked). RUNNING
-   * OUTRANKS FINISHED: a lane still at work never wears the green that says it is done — the accent
-   * the dot wore before this is that same green, and an epic in flight read as finished
-   * (operator, 2026-10-08). `null` while nothing is drawn.
+   * The lane's mark, decided once here for the chat gutter's Runs badge: `warn` while a prompt waits
+   * on the operator, `info` while an agent is at work (a drawn plan reading `live`, or a planner
+   * outing out), `positive` only once every drawn plan is `complete`, and `neutral` for work nobody
+   * is doing (stalled, paused, scheduled, parked). RUNNING OUTRANKS FINISHED: a lane still at work
+   * never wears the green that says it is done — an epic in flight read as finished (operator,
+   * 2026-10-08). `null` while nothing is drawn.
    */
   tone: Tone | null;
   route: DispatcherRoute | null;

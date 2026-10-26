@@ -41,7 +41,8 @@
   },
   "tooltips": {
     "viewEnvironments": "환경 보기",
-    "hideSidebar": "사이드바 숨기기",
+    "hideList": "채팅 목록 숨기기",
+    "closeDrawer": "사이드바 닫기",
     "createProject": "새 프로젝트 생성",
     "refresh": "프로젝트 및 세션 새로고침 (Ctrl+R)",
     "renameProject": "프로젝트 이름 변경 (F2)",
@@ -66,7 +67,6 @@
   },
   "actions": {
     "refresh": "새로고침",
-    "settings": "설정",
     "collapseAll": "모두 접기",
     "expandAll": "모두 펼치기",
     "cancel": "취소",

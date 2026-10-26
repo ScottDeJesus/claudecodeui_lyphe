@@ -2,7 +2,7 @@ import { PlugZapIcon, StickyNoteIcon } from 'lucide-react';
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { useNoteDrafts, useNotes } from '@/modules/notes/context/NotesContext';
+import { COMPOSER_TARGET, useNoteDrafts, useNotes } from '@/modules/notes/context/NotesContext';
 import { NoteCard } from '@/modules/notes/NoteCard';
 import { NoteForm } from '@/modules/notes/NoteForm';
 import type { Note } from '@/shared/types';
@@ -31,14 +31,21 @@ const NOTES_WALL_GRID = 'grid grid-cols-[repeat(auto-fill,minmax(min(100%,18rem)
  * note and writes nothing; the dialog's Delete is what calls the provider, and its `Keep it`, its
  * backdrop and its Escape all just put the question down.
  *
- * THE KEYBOARD COMES HOME TWICE: an add that landed and a delete that landed both leave the reader
- * with a shorter list and a control that has left the screen, so both hand it to the blank card's
- * title — the one control that is always there and always the next thing to type in.
+ * THE BLANK CARD SAVES ITSELF AND BECOMES THE NOTE. Once it has a title and typing pauses, the
+ * provider creates the note and the SAME card stays open on it — text, focus and caret where they
+ * were — with a Done button now drawn; the wall leaves that note out (`composerNoteId`) so it is not
+ * drawn twice. When the card is left (Done, Enter, focus moving off, the tab or widget going away) it
+ * lets go: a fresh blank card is there and the note is one of the wall's own.
+ *
+ * THE KEYBOARD COMES HOME TWICE: a Done or an Enter that let go of the blank card's note, and a
+ * delete that landed, both leave the reader with a control that has left the screen, so both hand it
+ * to the blank card's title — the one control that is always there and always the next thing to
+ * type in. A card left by focus moving elsewhere hands nothing: the person already chose where it went.
  */
 export function NotesList() {
   const { t } = useTranslation();
-  const { notes, unreachable, refresh, setComposer, add, remove } = useNotes();
-  const { composer, adding, writing } = useNoteDrafts();
+  const { notes, unreachable, refresh, changeComposer, saveComposerNow, finishComposer, remove } = useNotes();
+  const { composer, composerNoteId, createBaseline, writing, saveStates } = useNoteDrafts();
 
   // The note the delete dialog is asking about, or `null` while no question is up. Essential: the
   // dialog is the list's own — one list serves both homes — so the question outlives the card that
@@ -49,9 +56,19 @@ export function NotesList() {
   // keyboard, and the one field a person writes in next.
   const composerTitleRef = useRef<HTMLInputElement>(null);
 
-  const onSubmitAdd = async () => {
-    const landed = await add(composer);
-    if (landed) requestAnimationFrame(() => composerTitleRef.current?.focus());
+  const onDoneComposer = async () => {
+    const letGo = await finishComposer();
+    if (letGo) requestAnimationFrame(() => composerTitleRef.current?.focus());
+  };
+
+  // The card left by focus moving elsewhere (or its tab going away) saves and lets go, and puts the
+  // keyboard nowhere — where it went is the person's.
+  const onLeaveComposer = () => {
+    void finishComposer();
+  };
+
+  const onSaveComposerNow = () => {
+    void saveComposerNow();
   };
 
   // A press on a card's Delete only asks: this holds the note the dialog is asking about, and
@@ -102,15 +119,19 @@ export function NotesList() {
           <Card className="min-w-0 p-4">
             <NoteForm
               draft={composer}
-              onChange={setComposer}
-              onSubmit={onSubmitAdd}
-              submitLabel={t('notes.form.add')}
-              busy={adding}
+              onChange={changeComposer}
+              onDone={onDoneComposer}
+              showDone={composerNoteId !== null}
+              onLeave={onLeaveComposer}
+              onSaveNow={onSaveComposerNow}
+              status={saveStates[COMPOSER_TARGET]}
               titleRef={composerTitleRef}
             />
           </Card>
         </li>
-        {notes.map((note) => (
+        {/* The note the blank card has become is drawn by that card, not here — and while its create's
+            answer is still on the way, so is every note the wall did not hold when the create left. */}
+        {notes.filter((note) => note.id !== composerNoteId && (createBaseline === null || createBaseline.has(note.id))).map((note) => (
           <li key={note.id} data-note-id={note.id} className="min-w-0">
             <NoteCard note={note} onDelete={onAskDelete} />
           </li>

@@ -4,28 +4,28 @@ import { useTranslation } from 'react-i18next';
 import { ChatInterface, type ChatExportSurface, type TokenUsageSurface } from '@/modules/chat';
 import { ChatGutterLayout } from '@/modules/chat-gutters';
 import { ChatHostSlot, useChatHost } from '@/modules/chat-host';
-import { FileManager } from '@/modules/file-manager';
+import { FilesView } from '@/modules/file-manager';
 import { StandaloneShell } from '@/modules/standalone-shell';
 import { GitRepositoriesPanel } from '@/modules/git-panel';
 import { PluginTabContent } from '@/modules/plugins';
 import { BrowserUsePanel } from '@/modules/browser-use';
 import { usePaletteOpsRegister } from '@/modules/command-palette';
+import { InboxPanel } from '@/modules/inbox';
 import { KanbanPanel } from '@/modules/kanban';
-import { MemoryIntakePanel } from '@/modules/memory-intake';
 import { RoadmapTab } from '@/modules/roadmap';
-import { HealPanel } from '@/modules/heal';
 import { ApiPanel } from '@/modules/api-tab';
 import { CerberusPanel } from '@/modules/cerberus';
 import { TaskMasterPanel, useTaskMasterProjectSync } from '@/modules/task-master';
 import { UniversePanel } from '@/modules/universe';
 import { SchedulesPanel } from '@/modules/schedules';
 import { NotesPanel } from '@/modules/notes';
-import type { AppTab, GitRepository, Project, ProjectChoice, ProjectSession, SessionEstablishedContext, SessionNavigationOptions, SettingsMainTab } from '@/shared/types';
+import type { AppTab, FileOpenRequest, FilesRoot, GitRepository, Project, ProjectChoice, ProjectSession, SessionEstablishedContext, SessionNavigationOptions, SettingsMainTab } from '@/shared/types';
 import { api } from '@/shared/api';
 import { useUiPreferences } from '@/shared/context/UiPreferencesContext';
+import { absolutePathIn } from '@/shared/utils';
 import { useFileOpenResolver } from '@/modules/project-workspace/hooks/useFileOpenResolver';
 import { useRunnerLanding } from '@/modules/project-workspace/hooks/useRunnerLanding';
-import { useWorkspaceTabGates } from '@/modules/project-workspace/hooks/useWorkspaceTabGates';
+import { useWorkspaceViews } from '@/modules/project-workspace/hooks/useWorkspaceViews';
 import WorkspaceHeader from '@/modules/project-workspace/WorkspaceHeader';
 import WorkspaceStateView from '@/modules/project-workspace/WorkspaceStateView';
 import WorkspaceErrorBoundary from '@/modules/project-workspace/WorkspaceErrorBoundary';
@@ -33,6 +33,8 @@ import WorkspaceErrorBoundary from '@/modules/project-workspace/WorkspaceErrorBo
 type WorkspaceMainProps = {
   /** The git tab's repositories, in strip order — memoised upstream, so its identity is stable. */
   gitRepositories: GitRepository[];
+  /** The Files view's roots, in strip order — memoised upstream, so its identity is stable. */
+  filesRoots: FilesRoot[];
   /** The projects a new chat can start in, and how to switch to one. */
   projectChoices: ProjectChoice[];
   onSelectProject: (projectId: string) => void;
@@ -50,6 +52,8 @@ type WorkspaceMainProps = {
   onShowSettings: (tab?: SettingsMainTab) => void;
   externalMessageUpdate: number;
   newSessionTrigger: number;
+  /** Re-reads the projects list; the Files view waits on it after registering a folder the app had never opened. */
+  onProjectsChanged: () => Promise<void>;
 };
 
 function reloadPage() {
@@ -83,9 +87,15 @@ async function readCapped(response: Response, cap: number): Promise<Blob | null>
   return new Blob(chunks, { type: response.headers.get('content-type') ?? '' });
 }
 
-/** Rendered by ProjectMainRegion to show the selected project's active tab: chat, files, shell, git, tasks, browser or a plugin. */
+/**
+ * Rendered by ProjectMainRegion to show the active view's pane, with a project selected or not. Nothing in the
+ * rail is project-scoped, so the house views (Roadmap, Kanban, Inbox, Browser and the rest) draw on their own;
+ * only the panes that read the open project — Chat, Shell, Tasks and a plugin's — draw the
+ * choose-a-project body when none is selected. Files and Git browse their own roots.
+ */
 function WorkspaceMain({
   gitRepositories,
+  filesRoots,
   projectChoices,
   onSelectProject,
   selectedProject,
@@ -102,26 +112,19 @@ function WorkspaceMain({
   onShowSettings,
   externalMessageUpdate,
   newSessionTrigger,
+  onProjectsChanged,
 }: WorkspaceMainProps) {
   const { t } = useTranslation();
   const preferences = useUiPreferences();
   const { showRawParameters, showThinking, showWork, showCompactSummary, sendByCtrlEnter } = preferences;
 
-  // The same reading the sidebar's tab strip takes — one hook, so the strip and these panes can
-  // never disagree about which tabs exist.
-  const {
-    shouldShowTasksTab,
-    shouldShowBrowserTab,
-    shouldShowShellTab,
-    shouldShowMemoryTab,
-    shouldShowRunnerTab,
-    shouldShowHealTab,
-    preferencesSettled,
-  } = useWorkspaceTabGates(activeTab);
+  // The views list, its two preference gates and their settled flag, off the one hook the rail and the palette
+  // read the list from — so these panes and the rail's buttons can never disagree about which views exist.
+  const { views, shouldShowShellTab, shouldShowTasksTab, preferencesSettled } = useWorkspaceViews();
 
   // The two landings onto the Roadmap tab: `?runner=<plan>` brings it forward on its In flight face with that plan's card in view,
   // and `?roadmap=<name>` on its Roadmap face with that roadmap selected.
-  const { revealPlan, clearReveal, openRoadmap, clearOpenRoadmap } = useRunnerLanding({ selectedProject, activeTab, setActiveTab });
+  const { revealPlan, clearReveal, openRoadmap, clearOpenRoadmap } = useRunnerLanding({ activeTab, setActiveTab });
 
   useTaskMasterProjectSync(selectedProject);
 
@@ -139,7 +142,7 @@ function WorkspaceMain({
   // identity rather than instead of it: the wrapper is retired at the workspace, but the file
   // manager's own selection is not, so re-asking for the same path at the same line needs a value
   // that CHANGES for the selection to notice and re-scroll.
-  const [openRequest, setOpenRequest] = useState<{ path: string; line?: number; nonce: number } | null>(null);
+  const [openRequest, setOpenRequest] = useState<FileOpenRequest | null>(null);
 
   // The counter behind that nonce. A ref, not state: nothing renders from it, and bumping it must
   // not be a second render on top of the request it is part of.
@@ -153,11 +156,14 @@ function WorkspaceMain({
   // over the transcript it was exporting.
   const [chatExportSurface, setChatExportSurface] = useState<ChatExportSurface | null>(null);
 
+  // The request always carries an ABSOLUTE path, because Files picks the root that holds it. A relative
+  // one — a chat card that named a file by its project path — is the open project's, and joins its folder.
+  const projectFolder = selectedProject?.fullPath;
   const handleFileOpen = useCallback((filePath: string) => {
     openRequestNonce.current += 1;
-    setOpenRequest({ path: filePath, nonce: openRequestNonce.current });
+    setOpenRequest({ path: absolutePathIn(projectFolder, filePath), nonce: openRequestNonce.current });
     setActiveTab('files');
-  }, [setActiveTab]);
+  }, [projectFolder, setActiveTab]);
 
   // The same act, at a line. A SECOND function rather than a second parameter on `handleFileOpen`:
   // that one is a `FileOpenHandler`, whose second parameter is `diffInfo` and is already carrying a
@@ -165,9 +171,9 @@ function WorkspaceMain({
   // on every Edit/Write card in the chat. Its three existing consumers are untouched by this.
   const openFileAt = useCallback((filePath: string, line?: number) => {
     openRequestNonce.current += 1;
-    setOpenRequest({ path: filePath, line, nonce: openRequestNonce.current });
+    setOpenRequest({ path: absolutePathIn(projectFolder, filePath), line, nonce: openRequestNonce.current });
     setActiveTab('files');
-  }, [setActiveTab]);
+  }, [projectFolder, setActiveTab]);
 
   // Retired the moment the file manager has acted on it. The request is an EVENT, and leaving it
   // standing turns it into a standing instruction: the manager is mounted only while the Files tab
@@ -249,29 +255,19 @@ function WorkspaceMain({
     return entry.read;
   }, [projectId, resolveFileReference]);
 
-  // The three effects below snap a PREFERENCE-gated tab back to chat when its gate turns off:
-  // tasks, shell and browser vanish the moment a person switches them off, and leaving the
-  // workspace pointed at a tab that is no longer on the bar leaves an empty pane. There is no
-  // fourth effect for the Memory tab, and adding one would fight the design: that tab is
-  // DATA-gated, so its gate is written to HOLD while it is the selected tab
-  // (`useWorkspaceTabGates`) and filing the last pending memory empties the panel instead of
-  // taking the tab away mid-act. The Heal tab is the SECOND DATA-gated tab and takes the same
-  // policy — no fifth effect for it either, for exactly the same reason: a friction cleared under
-  // someone reading its entries must leave them where they are standing. (The Roadmap tab is not
-  // gated at all.) Two kinds of tab, two policies, each living in the layer that
-  // owns the act — the gate rule in the hook that decides a tab exists, the navigation here,
-  // where `setActiveTab` is.
+  // The two effects below snap a PREFERENCE-gated view back to chat when its gate turns off: tasks and
+  // shell vanish from the rail the moment a person switches them off, and leaving the workspace pointed
+  // at a view that is no longer there leaves an empty pane.
   //
-  // The two preference-gated snap-backs wait for `preferencesSettled`, and it is a dependency
-  // rather than an early return so the flag flipping re-runs them on its own — the reducer
-  // returns the SAME state object when the server's value equals the default, so a value that
-  // never moved would otherwise never re-trigger the check.
+  // Both wait for `preferencesSettled`, and it is a dependency rather than an early return so the flag
+  // flipping re-runs them on its own — the reducer returns the SAME state object when the server's value
+  // equals the default, so a value that never moved would otherwise never re-trigger the check.
   //
   // Why they wait at all: `activeTab` is restored from localStorage on mount, and these effects
   // rewrite it. Read off a cold mirror a preference is the DEFAULT, not the user's — so an
-  // unguarded snap-back moves someone off a tab their own saved preference puts on the bar,
-  // and overwrites the stored tab on the way past. Once settled they still run on mount, which
-  // is what keeps a genuinely hidden tab from leaving an empty pane behind.
+  // unguarded snap-back moves someone off a view their own saved preference puts on the rail, and
+  // overwrites the stored tab on the way past. Once settled they still run on mount, which is what
+  // keeps a genuinely hidden view from leaving an empty pane behind.
   useEffect(() => {
     if (preferencesSettled && !shouldShowTasksTab && activeTab === 'tasks') {
       setActiveTab('chat');
@@ -283,15 +279,6 @@ function WorkspaceMain({
       setActiveTab('chat');
     }
   }, [preferencesSettled, shouldShowShellTab, activeTab, setActiveTab]);
-
-  // The browser gate is the same hazard from a DIFFERENT store: `useBrowserUseEnabled` starts
-  // false and turns true after its own fetch, so `preferencesSettled` says nothing about it and
-  // gating on that flag here would be a borrowed signal. Pre-existing; noted, not papered over.
-  useEffect(() => {
-    if (!shouldShowBrowserTab && activeTab === 'browser') {
-      setActiveTab('chat');
-    }
-  }, [shouldShowBrowserTab, activeTab, setActiveTab]);
 
   // Stable so React.memo(ChatInterface) can bail out: an inline arrow here made every
   // WorkspaceMain render re-render the whole chat tree — and this component re-renders on
@@ -318,15 +305,21 @@ function WorkspaceMain({
     return <WorkspaceStateView mode="loading" isMobile={isMobile} onMenuClick={onMenuClick} />;
   }
 
-  if (!selectedProject) {
-    return <WorkspaceStateView mode="empty" isMobile={isMobile} onMenuClick={onMenuClick} />;
-  }
+  // The body a pane that reads the open project draws when none is selected. Built once; WorkspaceMain's own
+  // header stands above it, so it brings none of its own.
+  const chooseProjectBody = <WorkspaceStateView mode="empty" showHeader={false} isMobile={isMobile} onMenuClick={onMenuClick} />;
+
+  // Chat names the open chat in the phone header; every other view names itself. An id the list does not
+  // hold (a plugin's, while the plugin list loads or after the plugin is gone) has no name to give, so there
+  // the header names the chat.
+  const viewLabel = activeTab === 'chat' ? null : (views.find((view) => view.id === activeTab)?.label ?? null);
 
   return (
     <div className="flex h-full flex-col">
       <WorkspaceHeader
         selectedProject={selectedProject}
         selectedSession={selectedSession}
+        viewLabel={viewLabel}
         isMobile={isMobile}
         onMenuClick={onMenuClick}
         newSessionLabel={t('mainContent.newSession')}
@@ -336,43 +329,47 @@ function WorkspaceMain({
 
       <div className="flex min-h-0 min-w-[200px] flex-1 flex-col overflow-hidden">
         <div className={`h-full ${activeTab === 'chat' ? 'block' : 'hidden'}`}>
-          <WorkspaceErrorBoundary showDetails>
-            {/* The gutters wrap the chat from OUTSIDE, so the transcript and the composer keep
-                their own column untouched. The boundary is handed down rather than imported
-                there: each widget body gets its own, and a crashing widget cannot blank the
-                chat tab. */}
-            <ChatGutterLayout enabled={!isMobile && !floating} sessionId={selectedSession?.id ?? null}
-              boundary={WorkspaceErrorBoundary}>
-              <ChatHostSlot sessionId={selectedSession?.id ?? null} showing={activeTab === 'chat'}>
-                <ChatInterface
-                  isActive={activeTab === 'chat' || floating}
-                  selectedProject={selectedProject}
-                  selectedSession={selectedSession}
-                  ws={ws}
-                  sendMessage={sendMessage}
-                  onFileOpen={handleFileOpen}
-                  onNavigateToSession={onNavigateToSession}
-                  onSessionEstablished={onSessionEstablished}
-                  onShowSettings={onShowSettings}
-                  showRawParameters={showRawParameters}
-                  showThinking={showThinking}
-                  showWork={showWork}
-                  showCompactSummary={showCompactSummary}
-                  projectChoices={projectChoices}
-                  onSelectProject={onSelectProject}
-                  sendByCtrlEnter={sendByCtrlEnter}
-                  externalMessageUpdate={externalMessageUpdate}
-                  newSessionTrigger={newSessionTrigger}
-                  onTokenUsageSurface={setTokenUsageSurface}
-                  onChatExportSurface={setChatExportSurface}
-                  onShowAllTasks={shouldShowTasksTab ? showAllTasks : null}
-                />
-              </ChatHostSlot>
-            </ChatGutterLayout>
-          </WorkspaceErrorBoundary>
+          {selectedProject ? (
+            <WorkspaceErrorBoundary showDetails>
+              {/* The gutters wrap the chat from OUTSIDE, so the transcript and the composer keep
+                  their own column untouched. The boundary is handed down rather than imported
+                  there: each widget body gets its own, and a crashing widget cannot blank the
+                  chat tab. */}
+              <ChatGutterLayout enabled={!isMobile && !floating} sessionId={selectedSession?.id ?? null}
+                boundary={WorkspaceErrorBoundary}>
+                <ChatHostSlot sessionId={selectedSession?.id ?? null} showing={activeTab === 'chat'}>
+                  <ChatInterface
+                    isActive={activeTab === 'chat' || floating}
+                    selectedProject={selectedProject}
+                    selectedSession={selectedSession}
+                    ws={ws}
+                    sendMessage={sendMessage}
+                    onFileOpen={handleFileOpen}
+                    onNavigateToSession={onNavigateToSession}
+                    onSessionEstablished={onSessionEstablished}
+                    onShowSettings={onShowSettings}
+                    showRawParameters={showRawParameters}
+                    showThinking={showThinking}
+                    showWork={showWork}
+                    showCompactSummary={showCompactSummary}
+                    projectChoices={projectChoices}
+                    onSelectProject={onSelectProject}
+                    sendByCtrlEnter={sendByCtrlEnter}
+                    externalMessageUpdate={externalMessageUpdate}
+                    newSessionTrigger={newSessionTrigger}
+                    onTokenUsageSurface={setTokenUsageSurface}
+                    onChatExportSurface={setChatExportSurface}
+                    onShowAllTasks={shouldShowTasksTab ? showAllTasks : null}
+                  />
+                </ChatHostSlot>
+              </ChatGutterLayout>
+            </WorkspaceErrorBoundary>
+          ) : chooseProjectBody}
         </div>
 
-        {shouldShowTasksTab && <TaskMasterPanel isVisible={activeTab === 'tasks'} />}
+        {shouldShowTasksTab && (selectedProject
+          ? <TaskMasterPanel isVisible={activeTab === 'tasks'} />
+          : activeTab === 'tasks' && <div className="h-full overflow-hidden">{chooseProjectBody}</div>)}
 
         {/* Every panel below is lazy (its module's barrel exports it that way), so it loads on its
             tab's first open. One boundary for them, and none around the chat above: a panel still
@@ -389,23 +386,27 @@ function WorkspaceMain({
         <Suspense fallback={null}>
           {activeTab === 'files' && (
             <div className="h-full overflow-hidden">
-              <FileManager
-                selectedProject={selectedProject}
+              <FilesView
+                roots={filesRoots}
+                projectChoices={projectChoices}
                 openRequest={openRequest}
                 onRequestHandled={handleRequestHandled}
                 onFileOpen={handleFileOpen}
+                onProjectsChanged={onProjectsChanged}
               />
             </div>
           )}
 
           {shouldShowShellTab && activeTab === 'shell' && (
             <div className="h-full w-full overflow-hidden">
-              <StandaloneShell
-                project={selectedProject}
-                session={selectedSession}
-                showHeader={false}
-                isActive={activeTab === 'shell'}
-              />
+              {selectedProject ? (
+                <StandaloneShell
+                  project={selectedProject}
+                  session={selectedSession}
+                  showHeader={false}
+                  isActive={activeTab === 'shell'}
+                />
+              ) : chooseProjectBody}
             </div>
           )}
 
@@ -413,26 +414,19 @@ function WorkspaceMain({
             <div className="h-full overflow-hidden">
               <GitRepositoriesPanel
                 repositories={gitRepositories}
-                selectedProjectPath={selectedProject.fullPath}
                 isMobile={isMobile}
                 onFileOpen={handleFileOpen}
               />
             </div>
           )}
 
-          {shouldShowBrowserTab && activeTab === 'browser' && (
+          {activeTab === 'browser' && (
             <div className="h-full overflow-hidden">
               <BrowserUsePanel isVisible={activeTab === 'browser'} onShowSettings={onShowSettings} />
             </div>
           )}
 
-          {shouldShowMemoryTab && activeTab === 'memory' && (
-            <div className="h-full overflow-hidden">
-              <MemoryIntakePanel />
-            </div>
-          )}
-
-          {shouldShowRunnerTab && activeTab === 'runner' && (
+          {activeTab === 'runner' && (
             <div className="h-full overflow-hidden">
               <RoadmapTab
                 revealPlan={revealPlan}
@@ -440,12 +434,6 @@ function WorkspaceMain({
                 openRoadmap={openRoadmap}
                 onRoadmapOpened={clearOpenRoadmap}
               />
-            </div>
-          )}
-
-          {shouldShowHealTab && activeTab === 'heal' && (
-            <div className="h-full overflow-hidden">
-              <HealPanel />
             </div>
           )}
 
@@ -466,10 +454,11 @@ function WorkspaceMain({
 
           {/* No gate: the board is always on the strip, the way chat, files and git are. It is also
               GLOBAL — the project it is handed is a first-run hint about which board to select, not
-              a filter — so nothing here unmounts or refetches when the open project changes. */}
+              a filter — so nothing here unmounts or refetches when the open project changes, and
+              with no project open there is simply no hint. */}
           {activeTab === 'kanban' && (
             <div className="h-full overflow-hidden">
-              <KanbanPanel projectId={selectedProject.projectId} />
+              <KanbanPanel projectId={selectedProject?.projectId ?? null} />
             </div>
           )}
 
@@ -497,13 +486,23 @@ function WorkspaceMain({
             </div>
           )}
 
+          {/* No gate, for the same reason: what waits on the operator is the house's, not the open project's.
+              Its three bodies are each a full-height panel with a scroller of its own, so the pane just gives it the room. */}
+          {activeTab === 'inbox' && (
+            <div className="h-full overflow-hidden">
+              <InboxPanel />
+            </div>
+          )}
+
           {activeTab.startsWith('plugin:') && (
             <div className="h-full overflow-hidden">
-              <PluginTabContent
-                pluginName={activeTab.replace('plugin:', '')}
-                selectedProject={selectedProject}
-                selectedSession={selectedSession}
-              />
+              {selectedProject ? (
+                <PluginTabContent
+                  pluginName={activeTab.replace('plugin:', '')}
+                  selectedProject={selectedProject}
+                  selectedSession={selectedSession}
+                />
+              ) : chooseProjectBody}
             </div>
           )}
         </Suspense>

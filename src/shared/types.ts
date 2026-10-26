@@ -62,7 +62,7 @@ export type ProviderModelActions = {
 //----------------- PROJECTS AND SESSIONS ------------
 
 /** Identifies the workspace pane the user is looking at; plugin panes are namespaced by plugin id. */
-export type AppTab = 'chat' | 'files' | 'shell' | 'git' | 'tasks' | 'browser' | 'memory' | 'runner' | 'heal' | 'api' | 'cerberus' | 'kanban' | 'universe' | 'schedules' | 'notes' | `plugin:${string}`;
+export type AppTab = 'chat' | 'files' | 'shell' | 'git' | 'tasks' | 'browser' | 'inbox' | 'runner' | 'api' | 'cerberus' | 'kanban' | 'universe' | 'schedules' | 'notes' | `plugin:${string}`;
 
 /** A message queued to be sent to a session at a future time. */
 export type ScheduledMessage = {
@@ -1088,7 +1088,8 @@ type FileTreeItemType = 'file' | 'directory';
 // The four bodies the files API answers with, mirroring `server/shared/types.ts`'s group of
 // the same name field for field. Read the field-by-field rationale there; the rule that binds
 // every one of them is that `null` means the app never learned the value — never `0`, never an
-// invented timestamp, and never rendered as either.
+// invented timestamp, and never rendered as either. Last come the two shapes the client alone
+// holds: a request to open a file in Files, and a root the Files view's strip carries.
 
 /**
  * One row of a directory listing as the file manager renders it.
@@ -1145,6 +1146,23 @@ export type FilePreview =
     }
   | { kind: 'image'; mime: string; bytes: number | null; mtime: string | null }
   | { kind: 'none'; bytes: number | null; mtime: string | null };
+
+/**
+ * A file somewhere in the app asked to open in Files, and the line it asked for when it named one.
+ * The workspace raises a fresh wrapper per ask and retires it once the file manager reports it
+ * handled; `nonce` carries "this is a new ask" below the wrapper, where its identity does not reach,
+ * so asking for the same path at the same line twice re-scrolls rather than doing nothing.
+ */
+export type FileOpenRequest = { path: string; line?: number; nonce: number };
+
+/**
+ * One folder on the Files view's strip of roots: a registered project narrowed to the three fields
+ * the view reads, and whether the operator pinned it. The git repositories come first with `pinned`
+ * false, then each pinned folder with `pinned` true. A root is always a registered project, because
+ * every file route takes a project's id. FilesView draws one chip per root, and offers Unpin only
+ * while a pinned one is selected — the git roots come from the install, not from a press.
+ */
+export type FilesRoot = Pick<Project, 'projectId' | 'fullPath' | 'displayName'> & { pinned: boolean };
 
 //----------------- FILE EDITING ------------
 
@@ -1733,6 +1751,38 @@ export type ProjectWorkspaceShellProps = RealtimeProps & {
   navigate: NavigateFunction;
 };
 
+/** Which run of the views list a view belongs to; `useWorkspaceViews` stamps it so the rail can draw a hairline between non-empty groups and the palette can keep the same order. */
+export type WorkspaceViewGroup = 'chat' | 'tools' | 'plans' | 'house' | 'plugins' | 'foot';
+
+/**
+ * One entry of the views list that `useWorkspaceViews` resolves: the rail, the command palette and the phone
+ * header all read it, so a view is reached by the same name everywhere. `label` is the rail name (the
+ * button's accessible name and the palette's `Go to <label>` row). `icon` is null for a plugin view, which the
+ * rail draws as a letter disc. `keywords` are the palette's search words. A count never rides here — badges
+ * belong to the rail alone, so a reader of this list does not re-render when a count moves.
+ */
+export type WorkspaceView = {
+  id: AppTab;
+  label: string;
+  group: WorkspaceViewGroup;
+  icon: ComponentType<{ className?: string; strokeWidth?: string | number }> | null;
+  keywords: string;
+};
+
+/** One row of the command palette's Navigate group: `key` is its React key, `label` the name after "Go to", `keywords` the words the search also matches, and `run` the act the row performs when chosen. ProjectCommandPalette builds the list; CommandPalette only draws it. */
+export type PaletteNavRow = {
+  key: string;
+  label: string;
+  keywords: string;
+  run: () => void;
+};
+
+/** One view's badge on the workspace rail: `count` is the figure the badge draws (above zero — a zero is no badge at all), `words` the sentence a screen reader hears for it through the button's `aria-describedby`, since the drawn figure is hidden from it. `useRailBadges` builds them; RailButton draws them. */
+export type RailBadge = {
+  count: number;
+  words: string;
+};
+
 // ---------------------------
 
 //----------------- PROVIDER AUTHENTICATION ------------
@@ -1857,7 +1907,7 @@ export type CursorPermissionsState = {
 export type PreferenceListEntry = string | { name: string; [field: string]: unknown };
 
 /**
- * What ONE write changes in an entry-listed preference (`dispatcher`, `roadmapSeen`): per list, per entry key, the
+ * What ONE write changes in an entry-listed preference (`dispatcher`, `roadmapSeen`, `filesPins`): per list, per entry key, the
  * entry that key now holds, or `null` for gone. An entry the patch does not name stands untouched,
  * on this device and on the server alike. That is the whole point: a device's copy of the document is
  * only read at sign-in, so a write that sent the whole document erased every entry another device
@@ -1957,6 +2007,12 @@ export type ProjectSortOrder = 'name' | 'date';
 
 /** Which list the sidebar is currently showing: projects, conversation search results, running sessions or archived items. */
 export type SidebarSearchMode = 'projects' | 'conversations' | 'running' | 'archived';
+
+/** The sidebar's chat list as `Sidebar` hands it to its `rail` slot: whether the list is collapsed (the rail then stands alone), and the act that brings it back. The sidebar owns the collapse, so the rail reads it here and never decides it. */
+export type SidebarListState = {
+  collapsed: boolean;
+  expand: () => void;
+};
 
 /** A Project narrowed to the archived state so archived entries can be listed and restored without being mistaken for active projects. */
 export type ArchivedProjectListItem = Project & { isArchived: true };
@@ -2325,7 +2381,7 @@ type TaskPriority = 'high' | 'medium' | 'low' | string;
 /**
  * One account in the door's picture, relayed unchanged from `claude-account status --json`.
  * `slug` is the account's name in every sentence a person reads; `email` is its sign-in email off its
- * saved slot, the name its row and the closed footer row SHOW (null when the slot names none, and the
+ * saved slot, the name its row and the rail's account button SHOW (null when the slot names none, and the
  * slug shows instead); `digest` stays in data. Times are
  * epoch SECONDS. `reading.five` and `reading.week` are fractions 0..1 — window POINTS once multiplied
  * by 100, never dollars (INV-4299) — or null for a window the pacer could not measure, which draws
@@ -2498,6 +2554,14 @@ export type MemoryReviewOutcome =
 
 // ---------------------------
 
+//----------------- ONE WRITE'S VERDICT ------------
+// What `attemptWrite` in `src/shared/api.ts` answers, for the writers that raise their own toast.
+
+/** One write's verdict: `landed` with the response (a 2xx), or not landed with the server's own sentence and `error.code` (each `null` when it sent none, or when no answer came at all). Never thrown — the caller decides what a miss costs. */
+export type WriteAttempt = { landed: true; response: Response } | { landed: false; sentence: string | null; code: string | null };
+
+// ---------------------------
+
 //----------------- NOTES ------------
 // The client mirror of `server/shared/types.ts` § NOTES, where the same shapes are stated for the
 // wire. A change to either shape belongs in both files at once.
@@ -2507,6 +2571,33 @@ export type Note = { id: string; title: string; description: string; createdAt: 
 
 /** What the two writes take: the whole of both fields, never a patch. It is also the shape of a draft, and both fields are the writer's own text, drawn as text nodes. */
 export type NoteInput = { title: string; description: string };
+
+/** What a card says quietly about its own saving: `saving` while typed text is waiting for or on its way to the server, `saved` once the newest text has landed, `titleNeeded` while a title is missing and nothing can be sent. A card with no entry says nothing. */
+export type NoteSaveStatus = 'saving' | 'saved' | 'titleNeeded';
+
+/** How one card's autosave ended: `saved` — the newest text is on the server; `blocked` — the title draws as nothing, so nothing was sent and the last saved version stands; `failed` — the server or the network refused, the text is kept and the toast has been raised. */
+export type NoteSaveOutcome = 'saved' | 'blocked' | 'failed';
+
+// ---------------------------
+
+//----------------- FOLLOWUPS ------------
+// The client mirror of `server/shared/types.ts` § FOLLOWUPS, where the same shapes are stated for the
+// wire. A change to either shape belongs in both files at once.
+
+/** One item a chat keeps open for the person: a `next` step (a question put, an offer waiting, a step put off) or a known `gap` (something untested, unhandled or risky that was left). `state` is `open` until it is settled; `closedBy` says who settled it — the chat's own command or the person ticking it in the widget — and is `null` while open. All stamps are ISO-8601 UTC with milliseconds; `doneAt` is `null` while open. The chat and the account it belongs to never ride the item. */
+export type Followup = {
+  id: number;
+  kind: 'next' | 'gap';
+  text: string;
+  state: 'open' | 'done';
+  createdAt: string;
+  updatedAt: string;
+  doneAt: string | null;
+  closedBy: 'chat' | 'user' | null;
+};
+
+/** The frame the server sends to every open socket after a chat's followups moved. It names the chat by its APP session id under `appSessionId` (never `sessionId`, which would raise the chat's unread mark); the widget re-reads when the id is its own chat's. */
+export type FollowupsChangedEvent = { kind: 'followups_changed'; appSessionId: string; at: number };
 
 // ---------------------------
 
@@ -3274,10 +3365,10 @@ export type GutterSide = 'left' | 'right';
 
 /** The widgets a chat gutter can hold: the dispatcher's plan cards, in the operator's own order, the
  *  roadmap the Roadmap tab shows at a column's width, the memory-intake rows the session proposed, the
- *  subagents it has pinned, the embed — a live page the chat named, or the reader typed in — and the
- *  account's notes. These are the ids the DOM carries as `data-widget`, and the keys
- *  `useGutterPlacements` stores its records under. */
-export type GutterWidgetId = 'runner' | 'roadmap' | 'memory' | 'subagents' | 'embed' | 'notes';
+ *  subagents it has pinned, the embed — a live page the chat named, or the reader typed in — the
+ *  account's notes, and the open chat's own next steps and known gaps (`followups`). These are the ids
+ *  the DOM carries as `data-widget`, and the keys `useGutterPlacements` stores its records under. */
+export type GutterWidgetId = 'runner' | 'roadmap' | 'memory' | 'subagents' | 'embed' | 'notes' | 'followups';
 
 /** One widget's place in its side's stack and whether it is expanded. `order` is the sort key within
  *  the side, dense from 0 after every move; a collapsed widget is still placed — it draws as a tab
@@ -3502,7 +3593,7 @@ export type SwitcherAction = {
   key: 'chat' | 'applications' | 'reload' | 'close' | 'open-in-tab';
   /** The words the item shows, already translated. */
   label: string;
-  /** Short English search words the palette matches, as its `NAV_TABS` rows carry. */
+  /** Short English search words the palette matches, as the Navigate rows' `keywords` carry. */
   keywords: string;
   icon: ComponentType<{ className?: string }>;
   /** True when the act has nothing to act on (no application up); the item stays in place, greyed. */
@@ -3511,6 +3602,9 @@ export type SwitcherAction = {
   shortcut: string | null;
   run: () => void;
 };
+
+/** What a press on the seated disc does INSTEAD of opening the radial, with the name it carries: `label` is the disc's tooltip and accessible name, `run` the act. Handed to `AppSwitcherDock` as `pressOverride` by the owner of the rail (the workspace rail names "Show the chat list" while the list is collapsed), written to the switcher's context as `dockPress`, and read back by the FAB. Null is no override. */
+export type DockPress = { label: string; run: () => void };
 
 // ---------------------------
 //----------------- AUTH TRACE: why a page ended, or refused to end, its session ------------

@@ -11,7 +11,9 @@ import { useToast } from '@/shared/context/ToastContext';
  *
  * BOARDS ARE GLOBAL. The selected board is a server-side setting, so switching projects never
  * switches boards and nothing here is filtered by project. `projectId` enters this hook for
- * exactly one purpose, stated once: the FIRST-MOUNT CONVENIENCE below.
+ * exactly one purpose, stated once: the FIRST-MOUNT CONVENIENCE below. The view opens with no
+ * project selected too, and then there is nothing to hint with: the mount adopts no board, and a
+ * board made there carries no project label.
  *
  * EVERY WRITE RE-READS. Selecting, renaming, archiving and flipping either of the board's two
  * switches all change what `listBoards` answers — an archived board drops out of the list, and the
@@ -85,7 +87,7 @@ function saidFor(patch: KanbanBoardPatch, t: TFunction): string | undefined {
  * Called ONCE, by the panel. A second instance is a second `boards()` fetch, a second adopt-ref
  * and two `currentBoardId`s free to disagree the moment either one writes.
  */
-export function useKanbanBoards(projectId: string): KanbanBoards {
+export function useKanbanBoards(projectId: string | null): KanbanBoards {
   const { t } = useTranslation();
   const toast = useToast();
 
@@ -103,9 +105,10 @@ export function useKanbanBoards(projectId: string): KanbanBoards {
     };
   }, []);
 
-  // The project the panel OPENED with. Switching projects is not a reason to adopt again, so the
-  // mount value is kept here rather than read off the prop later — the one caller that needs it
-  // is the first-mount lookup, and it runs before any switch could have happened.
+  // The project the panel OPENED with, `null` when none was selected. Switching projects is not a
+  // reason to adopt again, so the mount value is kept here rather than read off the prop later — the
+  // one caller that needs it is the first-mount lookup, and it runs before any switch could have
+  // happened.
   const openingProjectRef = useRef(projectId);
   // A new board is labelled with the project the reader is IN NOW, which is a different question
   // from the one above and is why the two are separate refs.
@@ -139,7 +142,8 @@ export function useKanbanBoards(projectId: string): KanbanBoards {
   /**
    * The ONE first-mount convenience. Boards are global and the project is a label, so the only
    * thing the project is ever asked for is this: on a first run, when nothing is selected, adopt
-   * that project's board so the tab opens onto work rather than onto an empty state.
+   * the open project's board so the tab opens onto work rather than onto an empty state. With no
+   * project open there is no board to adopt, and it does not run.
    *
    * It fires when the FIRST `boards()` answer comes back with no current board, it fires once,
    * and it is silent about a project that has no board — which is the ordinary answer, not a
@@ -174,9 +178,10 @@ export function useKanbanBoards(projectId: string): KanbanBoards {
       const body = await read();
       if (cancelled || !mountedRef.current) return;
 
-      if (body && body.currentBoardId === null && !adoptedRef.current) {
+      const openingProject = openingProjectRef.current;
+      if (body && body.currentBoardId === null && openingProject !== null && !adoptedRef.current) {
         adoptedRef.current = true;
-        await adoptProjectBoard(openingProjectRef.current);
+        await adoptProjectBoard(openingProject);
       }
 
       if (mountedRef.current) setLoading(false);

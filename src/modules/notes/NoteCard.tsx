@@ -15,7 +15,7 @@ type NoteCardProps = {
 
 /**
  * One note as the notes wall draws it: the title, the two verbs, and the description when it has
- * one — or the form over it while the note is in edit mode.
+ * one — or the form over it while the note is in edit mode, where it saves itself.
  *
  * Used by `src/modules/notes/NotesList`, the one list both homes mount (the Notes tab's pane and
  * the chat gutter's Notes widget), so a note is composed once and reads the same in either place.
@@ -27,11 +27,13 @@ type NoteCardProps = {
  *
  * EDIT MODE IS THE DRAFT'S, NOT THIS CARD'S. `edits[note.id]` is the whole test — a card is in edit
  * mode exactly while the provider holds a draft for it — so the text survives a re-render, a scroll
- * and a switch of home, and a save or a cancel is what takes the entry away.
+ * and a switch of home, and Done is what takes the entry away. Nothing is pressed to save: the
+ * provider's autosave writes the draft about a second after typing stops, and a card that is left
+ * (focus elsewhere, its tab or widget going away) saves at once and stays open as it was.
  *
  * THE KEYBOARD TRAVELS WITH THE MODE: Edit presses put it on the form's title (the line a person
- * came to change), and Save and Cancel hand it back to the Edit button they came from, so a
- * keyboard reader is never dropped on `<body>` by a button that left with the mode it ended.
+ * came to change), and Done hands it back to the Edit button it came from, so a keyboard reader is
+ * never dropped on `<body>` by a button that left with the mode it ended.
  *
  * THE VERBS ARE A THUMB'S, NOT A MOUSE'S: 40px until `sm` and 32 after, the house's corner-button
  * floor (`LaneCardHead`'s CORNER_BUTTON, `CardFold`) — on a phone these two are the card's only
@@ -39,8 +41,8 @@ type NoteCardProps = {
  */
 export function NoteCard({ note, onDelete }: NoteCardProps) {
   const { t } = useTranslation();
-  const { setEdit, saveEdit } = useNotes();
-  const { edits, writing } = useNoteDrafts();
+  const { openEdit, changeEdit, saveEditNow, finishEdit } = useNotes();
+  const { edits, saveStates } = useNoteDrafts();
 
   // The draft this card is editing, if it is editing one at all.
   const draft = edits[note.id];
@@ -50,25 +52,25 @@ export function NoteCard({ note, onDelete }: NoteCardProps) {
   const editButtonRef = useRef<HTMLButtonElement>(null);
 
   const onEdit = () => {
-    setEdit(note.id, { title: note.title, description: note.description });
+    openEdit(note);
     requestAnimationFrame(() => titleRef.current?.focus());
   };
 
   const onEditChange = (next: NoteInput) => {
-    setEdit(note.id, next);
+    changeEdit(note.id, next);
   };
 
-  const onSubmitEdit = async () => {
-    if (draft === undefined) return;
-    const landed = await saveEdit(note.id, draft);
-    // A save that landed takes the form away with it, so the keyboard follows it back to Edit; one
-    // that did not leaves the form standing with the draft still in it, and the keyboard with it.
-    if (landed) requestAnimationFrame(() => editButtonRef.current?.focus());
+  const onDone = async () => {
+    const closed = await finishEdit(note.id);
+    // A Done that closed the card takes the form away with it, so the keyboard follows it back to Edit;
+    // one that did not (the save failed, or more was typed meanwhile) leaves the form standing, and
+    // the keyboard with it.
+    if (closed) requestAnimationFrame(() => editButtonRef.current?.focus());
   };
 
-  const onCancelEdit = () => {
-    setEdit(note.id, null);
-    requestAnimationFrame(() => editButtonRef.current?.focus());
+  // Leaving the card saves what is typed and keeps the card open: only Done closes it.
+  const onLeave = () => {
+    void saveEditNow(note.id);
   };
 
   const editLabel = t('notes.card.edit', { title: note.title });
@@ -80,10 +82,11 @@ export function NoteCard({ note, onDelete }: NoteCardProps) {
         <NoteForm
           draft={draft}
           onChange={onEditChange}
-          onSubmit={onSubmitEdit}
-          onCancel={onCancelEdit}
-          submitLabel={t('notes.form.save')}
-          busy={writing[note.id] === true}
+          onDone={onDone}
+          showDone
+          onLeave={onLeave}
+          onSaveNow={onLeave}
+          status={saveStates[note.id]}
           titleRef={titleRef}
         />
       ) : (

@@ -6,9 +6,9 @@ import { announceAccountsChanged } from '@/modules/accounts/hooks/useClaudeAccou
  * The Set up window: the account whose sign-in token is being saved, and the two acts that open
  * and close it.
  *
- * Used by the accounts module's AccountFooterRow, which mounts `ProviderLoginModal` on the door's
+ * Used by the accounts module's AccountRailButton, which mounts `ProviderLoginModal` on the door's
  * `setup-token <slug>` verb. One object rather than two states, so an open window ALWAYS has a slug:
- * a bare `setup-token` is a usage error, and no press on the row can produce one.
+ * a bare `setup-token` is a usage error, and no press on the panel can produce one.
  */
 export function useAccountSetup() {
   // The account the window signs in; null when no window is up. Nothing else names it: the window's

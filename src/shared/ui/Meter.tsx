@@ -17,7 +17,7 @@ type MeterProps = {
   sub?: string;
   /**
    * `stacked` is the full block — label and figure over the bar, with room for `sub`.
-   * `inline` is the one-line form for tight chrome (the sidebar's account row): label, track and
+   * `inline` is the one-line form for tight chrome (a table cell, a checklist row, a card's strip): label, track and
    * figure on a single baseline, no `sub`.
    */
   variant?: 'stacked' | 'inline';

@@ -325,9 +325,7 @@
     },
     "ariaLabels": {
       "closeModal": "关闭版本升级模态框",
-      "showSidebar": "显示侧边栏",
       "settings": "设置",
-      "updateAvailable": "有可用更新",
       "closeSidebar": "关闭侧边栏"
     }
   },

@@ -28,7 +28,9 @@ type PaneApps = { left: PaneApp | null; right: PaneApp | null };
  *
  * `z-40` sits over everything the main region draws (its sticky rows are z-10 and z-20) and under
  * the mobile sidebar drawer (z-50, the same stacking context), so the drawer still slides in over
- * an open application on a phone. The FAB, at 60, stays above both.
+ * an open application on a phone. The views rail is z-50 too: with the chat list collapsed the layer begins
+ * where the rail ends, and the account panel the rail opens beside itself stands over it. The FAB, at 60,
+ * stays above all three.
  */
 export function AppSwitcherLayer() {
   const { t } = useTranslation();

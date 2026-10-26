@@ -4,7 +4,7 @@ import type { Note, NoteInput, NotesChangedEvent } from '@/shared/types.js';
 import { AppError } from '@/shared/utils.js';
 
 /**
- * The notes lane's four verbs: one account's cards, read newest first, written one row at a time.
+ * The notes lane's verbs: one account's cards, read newest first (or one by id), written one row at a time.
  *
  * WHERE THE JUDGING LIVES. The routes decide whether the body's fields are TEXT — that is transport
  * shape, and a route owns it. Everything below decides whether the text is USABLE: how long it may
@@ -19,8 +19,9 @@ import { AppError } from '@/shared/utils.js';
  * carries no id and no account, so a client of another account learns only that SOMETHING moved and
  * reads its own list again; that read is what tells it whether anything of its own did.
  *
- * Consumers: `notes.routes.ts`, which is handed this object and calls it — the routes judge shape,
- * this module judges content. Reach the table through the database barrel and the sockets through the
+ * Consumers: `notes.routes.ts` (the tab's door) and `notes.command-routes.ts` (the `notes` command's),
+ * which are handed this object and call it — the routes judge shape, this module judges content, so the
+ * two doors refuse alike and both send the frame. Reach the table through the database barrel and the sockets through the
  * websocket barrel; nothing here imports a repository or a transport service directly.
  */
 
@@ -50,8 +51,8 @@ const DESCRIPTION_MAX = 20_000;
  *
  * The class JUDGES and never rewrites: a ZWJ inside an emoji and the ZWNJ of Persian, Arabic and
  * Indic text are part of a title that says something, and what is stored is the normalised text
- * untouched. MIRROR OF `NoteForm.tsx`'s own class, which gates the submit button — one decision
- * written twice, because the client build cannot import from `server/`. Change one and change the
+ * untouched. MIRROR OF `useNoteSaver.ts`'s own class, which keeps a title that draws as nothing from being
+ * sent — one decision written twice, because the client build cannot import from `server/`. Change one and change the
  * other.
  */
 const DRAWS_AS_NOTHING = /[\s\p{Cf}\p{Cc}]/gu;
@@ -144,11 +145,18 @@ function broadcastNotesChanged(): void {
   });
 }
 
-/** The notes lane's verbs, as one instance. `notes.routes.ts` is handed this and calls it verbatim. */
+/** The notes lane's verbs, as one instance. Both route files are handed this and call it verbatim. */
 export const notesService = {
   /** Every note of one account, newest first — the repository's order, passed through unmapped. */
   list(userId: number): Note[] {
     return notesDb.listForUser(userId).map(toNote);
+  },
+
+  /** One of the account's notes as stored — the refusal is the writes' own, so a note of another account is a note that is not there. */
+  get(userId: number, id: string): Note {
+    const row = notesDb.get(userId, id);
+    if (row === null) throw noteNotFound();
+    return toNote(row);
   },
 
   /** Creates one note from a whole draft and answers it as stored, `createdAt === updatedAt`. */

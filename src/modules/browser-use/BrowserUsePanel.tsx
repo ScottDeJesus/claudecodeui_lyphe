@@ -179,6 +179,15 @@ export default function BrowserUsePanel({ isVisible, onShowSettings }: BrowserUs
     void refresh();
   }, [isVisible, refresh]);
 
+  // The view's own door ("Open Browser settings") leads to the switch that enables it, and the panel stays mounted
+  // under the Settings dialog: without this it keeps saying "Browser is disabled" after the save until Refresh is pressed.
+  // BrowserUseSettingsTab announces each save on `window`.
+  useEffect(() => {
+    const reread = () => { void refresh(); };
+    window.addEventListener('browserUseSettingsChanged', reread);
+    return () => window.removeEventListener('browserUseSettingsChanged', reread);
+  }, [refresh]);
+
   const runAction = useCallback(async (action: () => Promise<void>) => {
     setIsBusy(true);
     setError(null);
