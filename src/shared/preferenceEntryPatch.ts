@@ -25,7 +25,8 @@ import type { PreferenceEntryPatch } from '@/shared/types';
  *
  * A STRING LIST HOLDS STRINGS (`STRING_ONLY_ENTRY_KEYS`). `filesPins` is a list of folder paths, each
  * its own key: an entry that is not a string is not stored, and one already stored is dropped by the
- * next patch to its list, so `pinned` is always a `string[]`. The server's merge says the same.
+ * next patch to its list, so `pinned` never holds a non-string entry. The server's merge says the same,
+ * and keeps only the string entries of a list sent whole.
  *
  * The store's other needs live here too, beside the rule they follow: folding two patches queued
  * inside one debounce window (`foldEntryPatches`), rebuilding a failed patch from what the store

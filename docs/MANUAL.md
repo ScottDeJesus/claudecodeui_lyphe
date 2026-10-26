@@ -4007,7 +4007,7 @@ unsaved session. The server half — the routes, the refusal table, the no-overw
 `src/modules/file-manager/FilesView.tsx`, exported lazily through the barrel; the project-workspace module's `WorkspaceMain` mounts it as the Files pane. Files never follows the open chat's project: it browses its own roots. Shapes `FilesRoot` and `FileOpenRequest` live in `src/shared/types.ts`.
 
 - Roots: `useFilesRoots(projects, gitRepositories)` (project-workspace, called by `ProjectsStateContext`, memoised on a key string of the fields a root carries) — the git repositories first (`pinned` false), then each pin matched by exact `fullPath` to a registered project that is not already a root (`pinned` true). Every file route takes a registered project's id, so a pin with no registered project is no root.
-- Pins: the entry-patched preference `filesPins` = `{ pinned: string[] }`, absolute paths in pin order. `useFilesPins()` (barrel) reads it; a stored value that is not `{ pinned: string[] }` reads as no pins. `pinFolder(path)` and `unpinFolder(path)` are each one `writeUserPreferenceEntries('filesPins', { pinned: { [path]: path | null } })`, so a pin made on one device never erases one made on another.
+- Pins: the entry-patched preference `filesPins` = `{ pinned: string[] }`, absolute paths in pin order. `useFilesPins()` (barrel) reads it: the string entries of `pinned`, any other entry ignored; a stored value with no `pinned` list reads as no pins. The key is string-only on both sides (INV-9662). `pinFolder(path)` and `unpinFolder(path)` are each one `writeUserPreferenceEntries('filesPins', { pinned: { [path]: path | null } })`, so a pin made on one device never erases one made on another.
 - Selected root: `useSelectedFilesRoot()` and `selectFilesRoot(path)`, module scope, localStorage `filesTab.selectedRootPath` — per device, as the git tab's repository is. The stored path while it is on the strip, else the first root.
 
 - Props: `roots: FilesRoot[]` (git repositories first, then pinned folders), `projectChoices`, `openRequest: FileOpenRequest | null`, `onRequestHandled`, `onFileOpen`, `onProjectsChanged: () => Promise<void>`.
@@ -11634,6 +11634,9 @@ The workspace's half of a tap on a plan's prompt. The server's half (`landingPat
 - It scrolls. It unfolds nothing and un-hides nothing.
 - Only the pane retires a reveal; the workspace never does.
 
+## The double-press proof
+`node .verify/probe-runner-landing-twice.mjs` on the dev client `:5183`: two presses of the landing a few microtasks or a frame apart (a replaced entry with a fresh location key, then the `popstate` the router hears), then a walk to Chat and one more press. The URL carries no `runner` after either, and the tab is Roadmap after each landing. Exit 0 when clean; preferences pinned and every non-GET answered in-page, as below.
+
 ## The standing proof
 `node .verify/probe-runner-landing.mjs` on the dev client `:5183`, 390×844, six pages (the sixth: an empty `?runner=&roadmap=` keeps the page on Chat, no pane), exit 0 and `PASS` when clean; artifact `.verify/shots/runner-landing.png`; no non-GET request goes out (preferences pinned with `pinPreferences(…, { writes: 'drop' })`, the rest answered in-page and listed; `api.github.com` answered with an empty release, INV-6114).
 
@@ -11647,7 +11650,7 @@ The workspace's half of a tap on a plan's prompt. The server's half (`landingPat
 - The target is the last card of `[data-runner-loose-plans]` as the live In flight face draws it; with no loose plan, the last `[data-dispatch-arc]`'s first plan.
 - 2026-09-30: live lane 8 plans, 0 arcs, so the arc arm (`[data-dispatch-arc][data-arc-name]`) is unexercised by the probe; target at 463 px of 844 (3378 px unscrolled).
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/controllers/ProjectEffects.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/hooks/useRunnerLanding.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-runner-landing.mjs
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/controllers/ProjectEffects.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/hooks/useRunnerLanding.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-runner-landing.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-runner-landing-twice.mjs
 
 ## MAN-7532 — The plan card — the ask vocabulary (`askState.ts`)
 
@@ -13012,7 +13015,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/modals/Block
 - A stop drops the held date: what was not stamped replays whole. A live ship (feature, epic and milestone share one date) stamps when its milestone ends.
 - `currentSeenStamp(name)`: the newer of this device's mirror and the server's copy (`api.user.preferences()`, one GET per call, the mirror alone when it fails). The mirror is hydrated once at sign-in and can be hours old. The return waits for it before playing; the first-visit check asks it too.
 - `rememberSeen(name, at)`: writes run one at a time (module promise chain); each reads `currentSeenStamp` at its turn and calls `writeUserPreferenceEntries('roadmapSeen', { seen: { [name]: { name, at } } })` only when `at` is later; an unparseable `at` is ignored.
-- Residual: the window between that read and the server write. The server merge replaces and compares nothing (INV-6580).
+- The server merge drops an `at` older than the stored one (`FORWARD_ONLY_KEYS`, INV-6580), so a write that was read before another device's stamp landed cannot move the stamp back.
 
 ## Traps
 - `useCelebrations.ts` is 299 of 300 lines: extract the player into a sibling before adding to it.
@@ -13135,11 +13138,11 @@ Two per-user preferences, kept in the per-user store every setting lives in (mir
 | half | list | holds | file |
 |---|---|---|---|
 | client | `ENTRY_PATCHED_KEYS` = `dispatcher`, `roadmapSeen`, `filesPins` | folds two patches queued in one debounce per entry, retries only the failed entries, keeps the persisted outbox until the server has them | `src/shared/userSettings.ts` |
-| server | `ENTRY_LISTED_KEYS` = `dispatcher`, `roadmapSeen`, `filesPins` | `mergeEntryLists` replaces the named entry and keeps the others; at most `ENTRY_LIST_CAP` (200) entries, newest last. Under `FORWARD_ONLY_KEYS` (`roadmapSeen`) an entry whose `at` is older than the stored one is a stale device's retry and is NOT applied; a `null` entry still drops, so a rewind is drop, then write. The client's `applyEntryPatch` and `unreflectedEntries` take the key's `FORWARD_ONLY_ENTRY_KEYS` flag and say the same | `server/modules/database/repositories/user-preferences.db.ts` |
+| server | `ENTRY_LISTED_KEYS` = `dispatcher`, `roadmapSeen`, `filesPins` | `mergeEntryLists` replaces the named entry and keeps the others; at most `ENTRY_LIST_CAP` (200) entries, newest last. Under `FORWARD_ONLY_KEYS` (`roadmapSeen`) an entry whose `at` is older than the stored one is a stale device's retry and is NOT applied; a `null` entry still drops, so a rewind is drop, then write. Under `STRING_ONLY_KEYS` (`filesPins`) an entry that is not a string is not stored, and a stored one is dropped by the next patch to its list. The client's `applyEntryPatch` and `unreflectedEntries` take the key's `EntryRule` (`entryRuleOf`, `src/shared/preferenceEntryPatch.ts`: `FORWARD_ONLY_ENTRY_KEYS`, `STRING_ONLY_ENTRY_KEYS`) and say the same | `server/modules/database/repositories/user-preferences.db.ts` |
 
 - One list without the other sends patches the server stores whole, or stores whole what the client patches. The two change together.
-- `filesPins` is the third key in both lists, not forward-only; its writes and reader rules: INV-9662.
-- The merge compares no `at`: a writer never sends an `at` older than the one it read. Rule and residual window: INV-6580.
+- `filesPins` is the third key in both lists, not forward-only and string-only; its writes and reader rules: INV-9662.
+- A stamp writer never sends an `at` older than the one it read, and the merge drops an older one a stale device retries. Rule: INV-6580.
 - Entries of removed roadmaps are never pruned.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/user-preferences.db.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/hooks/useRoadmap.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/roadmap/utils/seenStamp.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/userSettings.ts

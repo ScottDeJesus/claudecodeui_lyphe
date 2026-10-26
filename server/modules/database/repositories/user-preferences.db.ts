@@ -89,7 +89,8 @@ function mergeGutters(stored: unknown, incoming: unknown): unknown {
  * RECORD is an entry patch (`src/shared/preferenceEntryPatch.ts`, whose rule this mirrors):
  * `{ <entry key>: <entry> | null }` drops every entry it names, appends its non-null entries in its
  * own order (the newest last) and keeps the newest `ENTRY_LIST_CAP`, and every entry it does not name
- * stands. A list sent as an ARRAY is an older build's whole list, and replaces that list alone.
+ * stands. A list sent as an ARRAY is an older build's whole list, and replaces that list alone (under a
+ * string-only key, `STRING_ONLY_KEYS` below, with its string entries only).
  *
  * `roadmapSeen` is the second document written this way: one `seen` list holding, per roadmap, the
  * completion this user last celebrated (`{ name, at }`). Phone and desktop each stamp it after a
@@ -101,7 +102,7 @@ function mergeGutters(stored: unknown, incoming: unknown): unknown {
  * `{ pinned: { [path]: path } }` adds a pin, `{ pinned: { [path]: null } }` removes it, and neither
  * touches another pin. It is not forward-only: a pin carries no stamp to rewind. It is STRING-ONLY
  * (`STRING_ONLY_KEYS`): an entry that is not a string is not stored, and one already stored is dropped
- * by the next patch to its list, so `pinned` is always a `string[]`. The client's `applyEntryPatch`
+ * by the next patch to its list, so `pinned` never holds a non-string entry, however it is sent. The client's `applyEntryPatch`
  * keeps the same rule (`STRING_ONLY_ENTRY_KEYS`).
  *
  * A STAMP LIST MOVES FORWARD ONLY (`FORWARD_ONLY_KEYS`). The rule is "replace the named entry", except
@@ -166,6 +167,11 @@ function patchEntryList(stored: unknown, listPatch: Record<string, unknown>, rul
   return [...kept, ...added].slice(-ENTRY_LIST_CAP);
 }
 
+/** A list sent whole (an older build's write) replaces the stored one; under a string-only key it keeps its string entries. */
+const wholeList = (value: unknown, rule: EntryRule): unknown => (
+  rule.stringOnly && Array.isArray(value) ? value.filter((entry) => isHeldEntry(entry, rule)) : value
+);
+
 function mergeEntryLists(stored: unknown, incoming: unknown, rule: EntryRule): unknown {
   if (!isRecord(incoming)) {
     return incoming;
@@ -173,7 +179,7 @@ function mergeEntryLists(stored: unknown, incoming: unknown, rule: EntryRule): u
 
   const merged: Record<string, unknown> = isRecord(stored) ? { ...stored } : {};
   for (const [list, value] of Object.entries(incoming)) {
-    merged[list] = isRecord(value) ? patchEntryList(merged[list], value, rule) : value;
+    merged[list] = isRecord(value) ? patchEntryList(merged[list], value, rule) : wholeList(value, rule);
   }
   return merged;
 }
