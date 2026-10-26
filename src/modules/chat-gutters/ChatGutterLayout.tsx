@@ -1,8 +1,9 @@
-import { ActivityIcon, BotIcon, BrainIcon, GlobeIcon, ListChecksIcon, RouteIcon, StickyNoteIcon, type LucideIcon } from 'lucide-react';
+import { ActivityIcon, BotIcon, BrainIcon, GlobeIcon, ListChecksIcon, RouteIcon, StickyNoteIcon, UsersRoundIcon, type LucideIcon } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ComponentType, ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { AccountsWidgetBody } from '@/modules/accounts';
 import {
   EmbedWidgetBody,
   SubagentWidgetBody,
@@ -49,7 +50,7 @@ const GUTTER_MIN_PX = 300;
 const MIN_REGION_PX = CHAT_COLUMN_PX + 2 * (GUTTER_MIN_PX + GUTTER_GAP_PX);
 
 /**
- * The desktop chat's side gutters: the runner, roadmap, memory, subagents, embed, notes and next-steps widgets beside the
+ * The desktop chat's side gutters: the runner, roadmap, memory, subagents, embed, notes, next-steps and accounts widgets beside the
  * transcript, each of them draggable into either side's stack, at any place in it, and any one of
  * them able to take the whole viewport for as long as the reader wants it.
  *
@@ -353,6 +354,14 @@ export function ChatGutterLayout({
       count: followups.openCount,
       icon: ListChecksIcon,
       Body: FollowupsWidgetBody,
+    },
+    // The Claude accounts panel: the same body the rail's account button opens, read from the one provider above the
+    // workspace. No badge — `count` is zero, which the frame draws as none.
+    accounts: {
+      title: t('gutters.accounts.title'),
+      count: 0,
+      icon: UsersRoundIcon,
+      Body: AccountsWidgetBody,
     },
   };
 

@@ -384,6 +384,9 @@
     "notes": {
       "title": "メモ"
     },
+    "accounts": {
+      "title": "アカウント"
+    },
     "open": "{{name}} を開く",
     "collapse": "折りたたむ",
     "dragHint": "どちらかの側へドラッグ",

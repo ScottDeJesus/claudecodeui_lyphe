@@ -384,6 +384,9 @@
     "notes": {
       "title": "筆記"
     },
+    "accounts": {
+      "title": "帳號"
+    },
     "open": "開啟 {{name}}",
     "collapse": "收合",
     "dragHint": "拖曳到任一側",

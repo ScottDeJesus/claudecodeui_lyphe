@@ -6757,7 +6757,7 @@ how the pieces fit together.
 
 ## Gutter widgets — ids and default places
 
-`GutterWidgetId` (`src/shared/types.ts`) = `'runner' | 'roadmap' | 'memory' | 'subagents' | 'embed' | 'notes' | 'followups'`. The ids are the DOM's `data-widget` and the keys of the stored record. Seven widgets: left `runner`, `roadmap`, `subagents`; right `followups`, `memory`, `embed`, `notes`. Any of them drags to either side at any rank.
+`GutterWidgetId` (`src/shared/types.ts`) = `'runner' | 'roadmap' | 'memory' | 'subagents' | 'embed' | 'notes' | 'followups' | 'accounts'`. The ids are the DOM's `data-widget` and the keys of the stored record. Eight widgets: left `runner`, `roadmap`, `subagents`; right `followups`, `accounts`, `memory`, `embed`, `notes`. Any of them drags to either side at any rank.
 
 | id | default side | order | open | table entry in `ChatGutterLayout` |
 |---|---|---|---|---|
@@ -6765,12 +6765,14 @@ how the pieces fit together.
 | `roadmap` | left | 1 | yes | badge `designing + in_flight` of `useRoadmap().selected.standing`, each read `?? 0`; `countTone: 'warn'` while `waiting_on_you > 0`; `Body: RoadmapWidgetBody` (MAN-7668); `FullscreenBody: RoadmapWidgetFullscreenBody` (the tab itself, drawn in place of `Body` while the card is full screen, MAN-7668); `flush: true`; title `gutters.roadmap.title` |
 | `subagents` | left | 2 | yes | `HeaderAction: SubagentWidgetClearCompleted` |
 | `followups` | right | 0 | yes | badge `followups.openCount` (the open items of the open chat across both groups), `Body: FollowupsWidgetBody`; not `flush`, no header action; title `gutters.followups.title`, icon `ListChecksIcon`; the open chat's own list, filled by the chat (MAN-9003, MAN-9004) |
+| `accounts` | right | 0, directly behind `followups` (key order breaks the tie) | yes | badge none (`count: 0`); `Body: AccountsWidgetBody`; not `flush`, no header action; title `gutters.accounts.title`, icon `UsersRoundIcon`; the account panel's own body — the usage windows, both balances, every account's `5h · wk` figures, a tap on a row to switch — read from `AccountsProvider` (MAN-460, MAN-463) |
 | `memory` | right | 1 | no | |
 | `embed` | right | 2 | no | `flush: true` |
 | `notes` | right | 3 | no | badge `notes?.length ?? 0`, `Body: NotesWidgetBody`; not `flush`, no header action (MAN-7518) |
 
 Defaults live in `DEFAULT_PLACEMENTS` (`src/modules/chat-gutters/hooks/useGutterPlacements.ts`).
-- `roadmap` and `followups` open themselves: the operator asked for the roadmap beside Runs and for the chat's next steps to fill in by themselves, and a widget he asked for is seen without hunting.
+- `roadmap`, `followups` and `accounts` open themselves: the operator asked for the roadmap beside Runs, for the chat's next steps to fill in by themselves, and for an account usage widget, and a widget he asked for is seen without hunting.
+- `accounts` is the SECOND key of `DEFAULT_PLACEMENTS` and shares `followups`' rank, so it sorts directly behind it and ahead of anything else on that rank. `parsePlacements` seats a stored arrangement's missing `accounts` on whatever side and rank `followups` holds there, rather than at a fixed rank: measured on the operator's own, most chats' arrangements predate Next steps and hold `memory` at the top of the right side, where a fixed rank 1 would have landed it under `memory`, and a reader who dragged Next steps below another widget keeps Accounts behind it.
 - `followups` is the FIRST key of `DEFAULT_PLACEMENTS` on purpose: ties break in key order, so a stored arrangement that predates it (it gains it at order 0 on the right) draws it ahead of the widget holding that rank, and nothing the reader placed changes order relative to the rest.
 - `ChatGutterLayout` takes `RoadmapWidgetBody` and `useRoadmap` from the roadmap barrel (MAN-7635); the body's own row is MAN-7668.
 - The `roadmap` badge reads sit outside every widget's boundary, so the `?? 0` falls are load-bearing: a picture without `standing` costs the badge its number; a throw would take the whole chat to the workspace error panel.
@@ -6786,6 +6788,7 @@ Defaults live in `DEFAULT_PLACEMENTS` (`src/modules/chat-gutters/hooks/useGutter
 - No stored placement is migrated. `parsePlacements` is seeded from `DEFAULT_PLACEMENTS`, so a stored arrangement without the new id gains it at its default; stored values are never rewritten.
 - `GutterWidgetFrame`, `GutterColumn` and the server's preference merge are id-generic: no edit.
 - `count` is the badge and `countTone` its colour; a widget counting something other than a list length changes its own table line.
+- `accounts` keeps its state out of the layout: the panel is also drawn by the rail's popover (the phone's only way in), so `AccountsProvider` (`ProjectWorkspaceShell`, above the rail and the main region) holds the one set of pollers and `AccountsWidgetBody` only reads it. The body mounts only while the widget is unfolded, so unfolding starts no poller and refreshes the readings once.
 - A body is handed the chat's `sessionId` and nothing else. A widget whose badge needs the same data as its body reads it once in `ChatGutterLayout` (a hook, outside every widget's boundary) and hands it to the body through a context the layout provides around the two gutter columns: `followups` does (`useFollowups(wide ? sessionId : null)`, `FollowupsContext`), so the badge and the rows are one reading, and no request is made while the gutters are not drawn (phone, a narrow window, a floating chat).
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat-gutters/ChatGutterLayout.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat-gutters/hooks/useGutterPlacements.ts

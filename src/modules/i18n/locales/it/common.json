@@ -386,6 +386,9 @@
     "notes": {
       "title": "Note"
     },
+    "accounts": {
+      "title": "Account"
+    },
     "open": "Apri {{name}}",
     "collapse": "Comprimi",
     "dragHint": "Trascina su un lato",

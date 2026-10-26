@@ -12890,3 +12890,122 @@ measured 2026-10-25 by chain chain-sidebar-rail--docs-20261025-180958-6603, find
 probe-key: 8980010a9caf79bb63a758bd85a2b4ca4b456fa8
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/hooks/useRailBadges.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/ProjectSidebarRegion.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/RailButton.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/WorkspaceRail.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/Settings.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/SidebarModals.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/Sidebar.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Tooltip.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/rail-mockup.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/rail-read.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/sheet.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-settings-rows.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/rail-live.mjs
+
+## INV-9672 — probe — LOW — four doc statements still name the old owners of what the provider and the body now hold
+
+LOW — four doc statements still name the old owners of what the provider and the body now hold
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'SH'
+#!/usr/bin/env bash
+set -u
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+for t in MAN-1363 MAN-6357 MAN-8862; do
+  printf '%s: ' "$t"
+  docstore get "$t" --text | grep -oE "AccountRailButton. and .Onboarding. mount the modal|AccountRailButton. mounts in the views rail on every probe|Callers: .AccountPopover. \(.UsageMeters.\)|AccountPopover.'s .now." | tr '\n' ';'
+  echo
+done
+SH
+bash "$D/p.sh"
+case "$D" in /tmp/athena-probe.??????) rm -rf "$D";; esac
+echo "[probe exit $?]"
+# expect: while the defect stands, MAN-1363 prints the `AccountRailButton` and `Onboarding` mount the modal line, MAN-6357 the `AccountRailButton` mounts in the views rail line, MAN-8862 both `AccountPopover` lines; cured: all three rows print nothing after the colon
+```
+
+measured 2026-10-26 by chain chain-accounts-usage-widget-20261026-092630-176a, finding L1, LOW
+probe-key: 11d5846ce056e1447764b4aa47aad64bb84ed743
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/scripts/prod-client-build.sh, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/AccountPanelBody.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/AccountPopover.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/AccountsWidgetBody.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/context/AccountsContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-accounts-widget.mjs
+
+## INV-9673 — probe — LOW — a `reachable: true` body with a missing figure still takes the whole app down through the popover, and draws `NaN` in both homes (unchanged by this diff)
+
+LOW — a `reachable: true` body with a missing figure still takes the whole app down through the popover, and draws `NaN` in both homes (unchanged by this diff)
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'SH'
+#!/usr/bin/env bash
+set -u
+D=${1:?}
+DIGEST=$(~/.claude/scripts/claude-account status --json | python3 -I -c "import json,sys; print([a['digest'] for a in json.load(sys.stdin)['accounts'] if a.get('in_use')][0])") || exit 1
+cat > "$D/p.mjs" <<'EOF'
+import { openConsole } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/console.mjs';
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const digest = process.argv[2];
+const usage = { reachable: true, account: digest, degraded: false, reason: '', staleSince: null, checkedAt: Math.floor(Date.now() / 1000), windows: [{ key: 'five_hour', label: 'Current 5-hour window' }, { key: 'seven_day', label: 'This week' }] };
+const shapes = { 'usage window with no percent': { pattern: /\/api\/usage/, body: usage },
+  'deepseek {reachable:true}': { pattern: /\/api\/deepseek\/balance/, body: { reachable: true } },
+  'jev {balance:{}}': { pattern: /\/api\/jev\/summary/, body: { balance: {} } } };
+for (const [label, stub] of Object.entries(shapes)) {
+  const s = await openConsole({ viewport: { width: 1920, height: 1000 }, stubs: [stub] });
+  const { page } = s;
+  await page.locator('[data-widget="accounts"]').waitFor({ timeout: 30000 }).catch(() => {});
+  await sleep(2000);
+  const widget = (await page.locator('[data-widget="accounts"]').innerText().catch(() => 'no widget')).replace(/\n+/g, ' | ');
+  const out = { shape: label, widget: /NaN/.test(widget) ? 'draws NaN' : widget.slice(0, 60), chatPane: await page.locator('[data-testid="chat-gutter-chat"]').count() };
+  await page.locator('[data-account-trigger]').first().click({ timeout: 5000 }).catch(() => {});
+  await sleep(1200);
+  out.afterPopoverOpen = (await page.locator('body').innerText()).includes('CloudCLI hit an error') ? 'WHOLE-APP-ERROR' : (await page.locator('#account-panel').count() ? ((await page.locator('#account-panel').innerText()).includes('NaN') ? 'popover draws NaN' : 'popover drawn') : 'no popover');
+  console.log(JSON.stringify(out));
+  await s.browser.close();
+}
+EOF
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+node "$D/p.mjs" "$DIGEST" 2>&1 | tail -4
+SH
+bash "$D/p.sh" "$D"
+case "$D" in /tmp/athena-probe.??????) rm -rf "$D";; esac
+echo "[probe exit $?]"
+# expect: ~25 s. While the defect stands: `usage window with no percent` → widget "draws NaN", afterPopoverOpen "popover draws NaN"; `deepseek {reachable:true}` and `jev {balance:{}}` → widget "Accounts | Something went wrong | An error occurred while lo", chatPane 1, afterPopoverOpen "WHOLE-APP-ERROR". Cured: the widget draws "—" / the unreachable lines and afterPopoverOpen reads "popover drawn" on all three
+```
+
+measured 2026-10-26 by chain chain-accounts-usage-widget-20261026-092630-176a, finding L2, LOW
+probe-key: 66430a38bf3e70f1594a0d119ddb028a7880b9bb
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/scripts/prod-client-build.sh, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/AccountPanelBody.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/AccountPopover.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/AccountsWidgetBody.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/context/AccountsContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-accounts-widget.mjs
+
+## INV-9674 — probe — LOW — the refusal banner is one slot shared by two homes: it stands in the always-visible widget with nothing to end it, and opening and closing the popover wipes it
+
+LOW — the refusal banner is one slot shared by two homes: it stands in the always-visible widget with nothing to end it, and opening and closing the popover wipes it
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'SH'
+#!/usr/bin/env bash
+set -u
+D=${1:?}
+cat > "$D/p.mjs" <<'EOF'
+import { openConsole } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/console.mjs';
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const s = await openConsole({ viewport: { width: 1920, height: 1000 } });
+const { page } = s;
+// The switch is refused here and never sent: no account is touched.
+await page.route(/\/api\/accounts\/use/, (r) => r.fulfill({ status: 422, json: { error: 'no checked sign-in token — set it up first' } }));
+await page.locator('[data-widget="accounts"] [data-account-slug]').first().waitFor({ timeout: 30000 }).catch(() => {});
+const widget = '[data-widget="accounts"]';
+const banner = async () => (await page.locator(`${widget} [data-accounts-widget]`).innerText().catch(() => '')).includes('sign-in token — set it up first') ? 'standing' : 'gone';
+await page.locator(`${widget} [data-account-slug]`).filter({ hasNotText: 'in use now' }).first().locator('button').first().click().catch(() => {});
+await sleep(1000);
+const out = { 'widget banner 1 s after the refused tap': await banner() };
+await sleep(20000);
+out['widget banner 21 s after']= await banner();
+await page.locator('[data-account-trigger]').first().click(); await sleep(700);
+await page.locator('[data-account-trigger]').first().click(); await sleep(700);
+out['widget banner after the popover was opened and closed'] = await banner();
+console.log(JSON.stringify(out, null, 1));
+await s.browser.close();
+EOF
+cd /home/lyphe/.claude/claudecodeui_lyphe
+node "$D/p.mjs" 2>&1 | tail -6
+SH
+bash "$D/p.sh" "$D"
+case "$D" in /tmp/athena-probe.??????) rm -rf "$D";; esac
+echo "[probe exit $?]"
+# expect: ~30 s. While the defect stands: "standing", "standing", "gone". Cured when the sentence leaves the widget on its own (second line "gone") or the popover's close no longer reaches it (third line "standing")
+```
+
+measured 2026-10-26 by chain chain-accounts-usage-widget-20261026-092630-176a, finding L3, LOW
+probe-key: 9c8a1c6bc101ac055a0aa75d8cec40160032b15d
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/scripts/prod-client-build.sh, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/AccountPanelBody.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/AccountPopover.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/AccountsWidgetBody.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/context/AccountsContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-accounts-widget.mjs

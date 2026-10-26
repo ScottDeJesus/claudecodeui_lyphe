@@ -9,13 +9,16 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/docs/
 ## MAN-460 — The account switcher
 section: accounts/000
 
-The foot of the views rail: which Claude account signs the next request, how much of its windows that account has spent, what is left on the DeepSeek account this host's builds spend, and the three
-writes that change the first of those. `src/modules/accounts/` is `AccountPopover` (with `UsageMeters`,
-`ClaudeAccountRows`, and `DeepseekBalanceReadout`) under the one `AccountRailButton` its barrel exports,
-with `hooks/useClaudeAccounts` holding the picture (`data`: the door's own, tagged `reachable`) and the
-writes (`chooseAccount` / `setAuto` / `removeAccount`),
-`hooks/useAccountSetup` holding the account the Set up window signs in, `hooks/useClaudeUsage`
-holding the readings, `hooks/useDeepseekBalance` holding the balance, `utils/accountInUseUsage`
+The foot of the views rail, and the same panel drawn again in the chat's right gutter as the Accounts widget: which Claude account signs the next request, how much of its windows that account has spent, what is left on the DeepSeek account this host's builds spend, and the three
+writes that change the first of those. `src/modules/accounts/` is `AccountPanelBody` (with `UsageMeters`,
+`ClaudeAccountRows`, and `DeepseekBalanceReadout`) drawn in two homes — `AccountPopover`, under the one
+`AccountRailButton`, and `AccountsWidgetBody`, in the Accounts gutter widget — over the one
+`AccountsProvider` (`context/AccountsContext`) its barrel exports. The provider holds
+`hooks/useClaudeAccounts` (the picture, `data`: the door's own, tagged `reachable`, and the
+writes `chooseAccount` / `setAuto` / `removeAccount`),
+`hooks/useAccountSetup` (the account the Set up window signs in), `hooks/useClaudeUsage`
+(the readings), `hooks/useDeepseekBalance` and `hooks/useJevBalance` (the two balances), and the two sign-in
+windows; `utils/accountInUseUsage`
 choosing which account the meters draw (MAN-8862), and `utils/accountInitials` drawing the
 two letters on the avatar. `ClaudeAccountRows` (MAN-8847) is the account section. Everything but the
 balance comes from this app's own server, in `server/modules/accounts/`: `accounts.routes.ts` holds the
@@ -34,13 +37,16 @@ and a meter that fails cannot take the money down with it. The two also fail dif
 accounts picture is read off local files and the usage figures from Anthropic through a cache, while
 this route goes out to api.deepseek.com for every reading the server takes.
 
-**One button, one poller.** The project-workspace module's `WorkspaceRail` renders `AccountRailButton` at
-the rail's foot, the one instance in the app. The rail stands whether the chat list shows or is collapsed
-(collapsing hides the list column only), so the button never remounts on a collapse: all the hooks live
-inside it, so the app holds exactly one poller per reading no matter how often the panel is opened or the
-list collapsed.
+**One provider, one poller, two homes.** The project-workspace module's `ProjectWorkspaceShell` mounts
+`AccountsProvider` once, above the views rail and the main region, so every hook lives in it and the app
+holds exactly one poller per reading no matter how many places draw the panel, how often the popover is
+opened or the list collapsed. The rail's `AccountRailButton` (at the rail's foot, the one instance in the app;
+the rail stands whether the chat list shows or is collapsed) owns only the popover's open state; the chat's
+Accounts gutter widget (`accounts`, MAN-7526) draws the same `AccountPanelBody` from the same provider, so
+unfolding it starts no poller and a switch made in one home is on screen in the other at once. The popover is
+the only way in on a phone: gutters are not drawn there.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/AccountRailButton.tsx
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/AccountPanelBody.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/AccountRailButton.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/AccountsWidgetBody.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/context/AccountsContext.tsx
 
 ## MAN-461 — The nine rules the server half keeps
 section: accounts/001 The nine rules the server half keeps
@@ -109,9 +115,8 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/AccountRail
 ## MAN-463 — What the panel says
 section: accounts/003 What the panel says
 
-A `Card` with `role="dialog"`, anchored beside the rail on the button's foot (`left-full bottom-0`), capped at the viewport's height and scrolling
-from a top edge the reader can see. Usage first, the DeepSeek balance under it, the account section
-below both, `↻ Re-login` last.
+The panel's body is `AccountPanelBody`, and it is drawn in two homes — the rail button's popover and the chat's Accounts gutter widget (MAN-7526) — from the one `AccountsProvider` (MAN-460), so the two cannot disagree about the account in use or a figure on it. In the popover (`AccountPopover`) it stands in a `Card` with `role="dialog"`, anchored beside the rail on the button's foot (`left-full bottom-0`), capped at the viewport's height and scrolling
+from a top edge the reader can see; in the widget it stands in the gutter frame's own body (`AccountsWidgetBody`, `flex flex-col gap-3`), the frame scrolling it. Top to bottom, in both homes: the usage meters, the account section (directly under the meters, so every account's 5-hour and weekly figures are in view without scrolling the widget), the DeepSeek balance, the DeepSeek rate (`DeepseekPeakHours`), the Jev balance (`JevBalanceReadout`), `↻ Re-login`, a refused write's banner.
 
 | The server answered | The panel draws |
 |---|---|
@@ -141,7 +146,7 @@ provider's login window and nothing else (MAN-465), and a refused write's warn b
 Codex is deliberately absent; these are the Claude accounts the door holds, and Codex stays in
 Settings → Agents.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/AccountPopover.tsx
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/AccountPanelBody.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/AccountPopover.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/AccountsWidgetBody.tsx
 
 ## MAN-464 — The usage meters
 section: accounts/004 The usage meters
@@ -200,11 +205,11 @@ section: accounts/005 The two writes
 
 **The door's acts.** `Use`, the automatic switch and `Remove` on the account section (MAN-8847) are `chooseAccount`, `setAuto` and `removeAccount` in `useClaudeAccounts`, over `api.accounts.use|auto|remove` (MAN-8858), all through `doorWrite`. They share one single-writer guard and `busy`, clear the banner when they start, and re-read the picture when they land. A 422 shows the door's own `{error}` sentence in the warn banner; a non-JSON or failed answer reads `The server is not reachable.`; only a `{reachable:false, reason}` body is translated here (*The server did not answer in time.*, *The server answered with something this app could not read.*, *The server is not reachable.*). No toast is raised for them. The door's `use` and `remove` kick the dispatcher themselves (INV-187); the routes send none.
 
-**Re-login.** `↻ Re-login` is the panel's one sign-in door, always drawn, and it opens `ProviderLoginModal` on the provider's `claude /login` — drawn on `document.body`, so it covers the whole app on a desk (centred) and is the whole screen on a phone, never the side panel (the sidebar's root carries a `backdrop-filter`, which is what `position: fixed` would otherwise be laid out against). It reads nothing before the window opens and files nothing when it closes: the token switch owns the account, and a sign-in changes none the door holds. `claude /login` stays in its prompt after signing in, so the window is closed with ✕ and the command's exit code never arrives; closing it calls `announceAccountsChanged()` and the rail button's one poller re-reads at once. A new live identity then appears as a `Set up` row (MAN-8847); a window closed without signing in changes nothing, and the re-read is harmless. Settings → Agents → Claude → Re-login opens the same window and announces the same way, for the Claude account flow only — another provider's login and the design authorization announce nothing.
+**Re-login.** `↻ Re-login` is the panel's one sign-in door, always drawn in both homes (the popover and the Accounts widget), and it opens `ProviderLoginModal` on the provider's `claude /login` — mounted by `AccountsProvider`, not by either home, so the window outlives the popover that pressed it, and drawn on `document.body`, so it covers the whole app on a desk (centred) and is the whole screen on a phone, never the side panel (the sidebar's root carries a `backdrop-filter`, which is what `position: fixed` would otherwise be laid out against). It reads nothing before the window opens and files nothing when it closes: the token switch owns the account, and a sign-in changes none the door holds. `claude /login` stays in its prompt after signing in, so the window is closed with ✕ and the command's exit code never arrives; closing it calls `announceAccountsChanged()` and the provider's one poller re-reads at once. A new live identity then appears as a `Set up` row (MAN-8847); a window closed without signing in changes nothing, and the re-read is harmless. Settings → Agents → Claude → Re-login opens the same window and announces the same way, for the Claude account flow only — another provider's login and the design authorization announce nothing.
 
 **Set up.** Not a write from this app: the row opens a `ProviderLoginModal` on `claude-account setup-token <slug>`, the door saves the token itself, and closing the window (`useAccountSetup.closeSetup`) re-reads the picture.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/AccountRailButton.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/hooks/useClaudeAccounts.ts
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/AccountRailButton.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/context/AccountsContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/hooks/useClaudeAccounts.ts
 
 ## MAN-466 — The rules that bite
 section: accounts/006 The rules that bite
@@ -233,24 +238,24 @@ section: accounts/006 The rules that bite
    `busy`, since a render value lands too late to stop a second press in the same tick. The door's
    three acts (`chooseAccount`, `setAuto`, `removeAccount`, through `doorWrite`) share that one guard.
 
-5. **A refusal describes one attempt.** The inline banner clears when the next write starts and when
-   the panel closes; one left standing would greet the next person who opens it.
+5. **A refusal describes one attempt.** The inline banner clears when the next write starts, when
+   the popover closes or the Accounts widget is folded, and when the next account picture lands (`useClaudeAccounts`'s `store`: the poll, an announced change, a landed write — a failed write re-reads nothing, so the refusal outlives it until one of those); one left standing would greet the next person who opens it, and in the widget, which is on screen all day with no close, every glance after it. The slot is one for both homes: a close of the popover also drops a refusal the widget is showing.
 
 6. **The floors are 60 s, 180 s and five, and opening the panel is worth two readings.** The picture
    is re-read every minute, and usage and the balance every three, because both move slowly — usage
    comes through the server's own three-minute cache (`HEALTHY_TTL_MS` in `usage.service.ts`), and
    money moves on the scale of a build. `togglePanel` forces
-   a fresh reading of BOTH on open — on open only, so a close costs nothing — so what a person looks
-   at is current without paying for it every minute. A change of the account in use reads usage once more (`AccountRailButton`'s effect on `accountInUse(accounts)?.digest`): a choice would otherwise leave the last account's figures under the new name until the next tick, and the server's cache misses when the box's own login moves (`usage.service.ts`), so that reading is the new account's own. The first account seen is the mount's reading already, so only a change reads. The balance is the one a person would otherwise
+   a fresh reading of BOTH on open (`AccountsProvider.refreshReadings`) — on open only, so a close costs nothing — so what a person looks
+   at is current without paying for it every minute. The Accounts widget reads the same way when it is unfolded (its body mounts only while it is open) and when the page becomes visible again (`refreshStaleReadings`, which leaves alone readings taken in the last ten seconds, so a page load — where the widget mounts just after the provider's own first reads — reads once, not twice). A change of the account in use reads usage once more (`AccountsProvider`'s effect on `accountInUse(accounts)?.digest`): a choice would otherwise leave the last account's figures under the new name until the next tick, and the server's cache misses when the box's own login moves (`usage.service.ts`), so that reading is the new account's own. The first account seen is the mount's reading already, so only a change reads. The balance is the one a person would otherwise
    check twice by hand: a figure that only moves on a timer reads as stale the moment it is the
    number you opened the panel for. It also carries a five-second floor of its own
    (`useDeepseekBalance`), because the row is a button pressed while thinking and each press would
    otherwise spend a vendor call; a skipped read is not invisible, since the age line under the
 figure says when the figure was taken.
 
-7. **Neither dismissal fires while a sign-in window is up; a press in a menu is not outside.** The outside-pointer and Escape listeners in `AccountRailButton` attach only while `open && !loginOpen && setup === null`. The Re-login window and the account's Set up window are drawn on `document.body`, outside the panel's root, so every press in them would read as outside and an Escape meant for the terminal would close the panel behind it. A third sign-in overlay extends that one condition. A `pointerdown` whose target is inside `[role="menu"]` is the panel's own surface — `ActionMenu` portals the row menu to `body`, so without the exemption `Remove` closes the panel before its press lands. Closing either window announces `cloudcli:accounts-changed` (`announceAccountsChanged`), and the rail button's one poller re-reads at once.
+7. **Neither dismissal fires while a sign-in window is up; a press in a menu is not outside.** The outside-pointer and Escape listeners in `AccountRailButton` attach only while `open && !signInOpen` (the provider's `loginOpen || setup !== null`). The Re-login window and the account's Set up window are drawn on `document.body`, outside the panel's root, so every press in them would read as outside and an Escape meant for the terminal would close the panel behind it. A third sign-in overlay extends that one condition. A `pointerdown` whose target is inside `[role="menu"]` is the panel's own surface — `ActionMenu` portals the row menu to `body`, so without the exemption `Remove` closes the panel before its press lands. Closing either window announces `cloudcli:accounts-changed` (`announceAccountsChanged`), and the provider's one poller re-reads at once.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/AccountPopover.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/AccountRailButton.tsx
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/AccountPopover.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/AccountRailButton.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/AccountsWidgetBody.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/context/AccountsContext.tsx
 
 ## MAN-467 — What is left standing
 section: accounts/007 What is left standing
@@ -2385,8 +2390,8 @@ section: deepseek-balance/002 The client's one reading
 
 `src/modules/accounts/hooks/useDeepseekBalance.ts` is the only place in the app that reads the route.
 It polls every 180 s — the usage cadence, deliberately, since both are slow provider-owned facts —
-and `AccountRailButton`'s `togglePanel` forces a fresh reading on open (on OPEN only: closing the panel
-reads nothing), because the balance is the figure a person opens the panel for and a number that only
+and `AccountsProvider.refreshReadings` forces a fresh reading when the popover opens (`AccountRailButton`'s `togglePanel`; on OPEN only: closing the panel
+reads nothing) and when the Accounts widget is unfolded, because the balance is the figure a person opens the panel for and a number that only
 moves on a timer reads as stale at exactly that moment.
 
 Two bounds make that trigger safe to press. A read that finds a request already on the wire JOINS it
@@ -2408,8 +2413,8 @@ own body would have carried. All three paths exist because of what sits in front
 `authenticateToken` answers an expired session with a JSON error, and a proxy answers a bad gateway
 in JSON too.
 
-`AccountRailButton` owns the ONE instance and hands the reading to `AccountPopover`, which draws it
-between the meters and the account rows: label, figure, and the line under it. Opening the panel
+`AccountsProvider` owns the ONE instance and hands the reading to `AccountPanelBody`, which draws it
+between the meters and the account rows — in the popover and in the Accounts widget alike: label, figure, and the line under it. Opening either
 starts no second poller. The panel draws the reading's age as that faint line where the figure has
 nothing else to explain: the panel is where someone checks the money after something stopped, and a
 frozen tab would otherwise hold a five-minute-old number that looks fresh.
@@ -2638,7 +2643,7 @@ section: design-login/002 Where each part lives
 | `src/modules/provider-auth/hooks/useProviderAuthStatus.ts` | `checkProviderAuthStatus(provider, { keepLastAnswerOnFailure? })`: default shows "Checking…", then the answer, a failed read included; with the option it skips "Checking…" and keeps the last answer when the read did not answer. Only `closeLoginModal` passes it; `refreshProviderAuthStatuses` (Settings open, Onboarding close) does not |
 | `src/modules/i18n/locales/en/settings.json` | `agents.designLogin.{title,description,button}` — `en` only, the other locales fall back |
 
-`AccountRailButton` and `Onboarding` mount the modal without `title` or `customCommand`; their
+`AccountsProvider`'s Re-login window and `Onboarding` mount the modal without `title` or `customCommand` (the provider's Set up window passes both); their
 titles and commands are unchanged.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-auth.provider.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/settings.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/onboarding/Onboarding.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/provider-auth/hooks/useProviderAuthStatus.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/provider-auth/ProviderLoginModal.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/hooks/useSettingsController.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/Settings.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/agents-settings/AgentsSettingsTab.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/agents-settings/sections/content/AccountContent.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/standalone-shell/StandaloneShell.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts
@@ -10025,7 +10030,7 @@ section: verification/009 What bites people/005 A gallery over the app must carr
 | **A gallery over the app must carry the app's provider stack** | The probes that mount `MarkdownBody` into a second React root — `phase-22`, `phase-28`, `phase-29`, and every caller of the shared `.verify/lib/shapes-fixture.mjs` — carry `ThemeProvider` and `LiveBusProvider` because `WidgetFrameLive` reaches `useWidgetBridge` → `useLiveBus`, which THROWS outside a provider and takes the whole synthetic root down with it. The only symptom is a `waitForSelector` timeout on a gallery that rendered zero children, which reads as a broken selector rather than as a missing provider. Every specifier is read back out of served source (the `?t=` rule) for the other half of the same rule: two instances of a context module is two contexts, and a provider mounted from a hand-written specifier is invisible to the hook that needs it. The app itself is never affected — it mounts both providers once, at `App.tsx`. `phase-22.mjs` sat broken on exactly this from commit `693c95d` (which introduced the live-bus module and made `useWidgetBridge` a consumer of it) until phase 29's verify block re-ran it and the provider was added back; that repair changed nothing but the provider stack, and no gate, threshold or filter in the file moved with it. `shapes-fixture.mjs` is that rule written down once, for every `probe-shapes-*` caller — including the ones whose documents hold no widget fence, since a throw in one child takes the whole root down: the host survives, the body div never exists, and its `innerHTML` is `''`, so a single widget fence would blank every other block in the document rather than fail on its own. |
 | **The surface probe reads a process that only lives for one turn** | `phase-21.mjs` polls `/proc/<pid>/environ` of the SDK child spawned for its one Claude turn, and that child exists only while the turn is in flight — it is gone by the time a reply is on screen. The poll has to start before the prompt is sent and keep running through it; a reading taken after the reply arrives finds no such pid and proves nothing. |
 | **Three sidebar readings are only as good as this host's data** | "↳ Show N older conversations" is *asserted*, and needs a project whose first page of sessions is not its whole history — a host without one reports a failure where there is an absence. The other two can only be noted: `messageCount` is `0` on every session server-side, so the "N messages" segment never renders, and no plugin is installed here — the registry reads `~/.claude-code-ui/plugins`, not this repo's `plugins/`, and it is empty — so the plugin tabs draw nothing to read. |
-| **Every signed-in page spends a real DeepSeek call, and no `page.route` can reach it** | `AccountRailButton` mounts in the views rail on every probe that signs in, and `useDeepseekBalance` reads on mount, every 180 s, and on each panel open — so each run makes the SERVER call `api.deepseek.com` with the host's own key. It is a read that moves nothing and costs no tokens, but it is a third-party origin that the browser-context stubs above do not and cannot cover: the page only ever sees the same-origin `/api/deepseek/balance`. A probe that needs the figure to be a known value — or needs the vendor left alone — fulfils **that path**, never the vendor's. Its contract is at [docs/MANUAL.md (deepseek-balance)](MANUAL.md). |
+| **Every signed-in page spends a real DeepSeek call, and no `page.route` can reach it** | `AccountsProvider` mounts above the views rail on every probe that signs in, and `useDeepseekBalance` reads on mount, every 180 s, and on each panel open (the rail popover's open, and the Accounts widget's unfolding) — so each run makes the SERVER call `api.deepseek.com` with the host's own key. It is a read that moves nothing and costs no tokens, but it is a third-party origin that the browser-context stubs above do not and cannot cover: the page only ever sees the same-origin `/api/deepseek/balance`. A probe that needs the figure to be a known value — or needs the vendor left alone — fulfils **that path**, never the vendor's. Its contract is at [docs/MANUAL.md (deepseek-balance)](MANUAL.md). |
 | **Nothing in `all.mjs` measures the DeepSeek balance** | It is the one surface here with no `.verify` script: no gate reads the account panel where the figure sits, so the figure could vanish from it with every standing gate still green. The procedure that does prove it, and the vendor-body table that seeds the missing script, are [docs/MANUAL.md (deepseek-balance)](MANUAL.md) §"Proving it". |
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/shared/claude-cli-path.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/main.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Collapsible.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/uiPreferences.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/console.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/shapes-fixture.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/ntfy/settings-probe.mjs
@@ -13671,17 +13676,20 @@ Reference: door face MAN-8843 (`claude-account status --json`); the routes MAN-8
 | `ClaudeAccountRows.tsx` | `ClaudeAccountRows`: header, rows, candidates, auto switch, last switch, closing sentence |
 | `ClaudeAccountRowViews.tsx` | `AccountRowView` (one account the store holds), `CandidateRow` (one live identity the store lacks) |
 | `claude-accounts-fake.ts` | `claudeAccountFakes(nowMs)`: 18 whole-value states, one per `FakeClaudeAccountsState`; nothing in `src/` imports it |
-| `AccountPopover.tsx` | mounts `<ClaudeAccountRows picture={accounts} …/>` after the meters and balances, above `↻ Re-login`, the panel's one sign-in door |
-| `AccountRailButton.tsx` | the rail's account button; owns the panel's open state and a second `ProviderLoginModal` beside the Re-login one, running `~/.claude/scripts/claude-account setup-token <slug>` under the title `Set up <slug>'s sign-in token`, mounted only while `setup !== null` |
+| `AccountPanelBody.tsx` | mounts `<ClaudeAccountRows picture={accounts} …/>` after the meters and balances, above `↻ Re-login`, the panel's one sign-in door; drawn by the popover and by the Accounts widget alike |
+| `AccountPopover.tsx` | the popover's `Card` chrome around the body |
+| `AccountsWidgetBody.tsx` | the Accounts gutter widget's body: the same panel body, refreshed on unfolding and on the page becoming visible |
+| `AccountRailButton.tsx` | the rail's account button; owns the popover's open state |
+| `context/AccountsContext.tsx` | `AccountsProvider` (mounted once by `ProjectWorkspaceShell`): the four hooks, the acts, the account-change re-read, the open-time refresh, and a second `ProviderLoginModal` beside the Re-login one, running `~/.claude/scripts/claude-account setup-token <slug>` under the title `Set up <slug>'s sign-in token`, mounted only while `setup !== null` |
 | `hooks/useAccountSetup.ts` | `{setup, openSetup, closeSetup}`; `setup` is `{slug} \| null`, one object so an open window always has a slug |
 | `hooks/useClaudeAccounts.ts` | `data` (the picture off the one poll), `chooseAccount`, `setAuto`, `removeAccount`, all through one `doorWrite` |
 
 ## Wiring
 - `GET /api/accounts` answers the door's picture at the top level (MAN-8858); `ClaudeAccounts` (`src/shared/types.ts`) is `({reachable:true} & ClaudeAccountsPicture) \| {reachable:false; reason}`; `useClaudeAccounts` returns it as `data: ClaudeAccounts | null`, null before the first answer. There is no `door` member on the wire or in the hook.
-- `AccountRailButton` hands `accounts` (the hook's `data`) and `onUse` / `onSetAuto` / `onRemove` / `onSetup` to `AccountPopover`, which hands them to `ClaudeAccountRows` with its `busy` and its minute clock as `nowMs`.
+- `AccountsProvider` holds `accounts` (the hook's `data`) and `onUse` / `onSetAuto` / `onRemove` / `onSetup`; `AccountPanelBody` reads them and hands them to `ClaudeAccountRows` with its `busy` and its minute clock as `nowMs`.
 - The acts: `api.accounts.use(slug)` · `.auto(on)` · `.remove(slug)` → `POST /api/accounts/use|auto|remove`. `doorWrite` holds the single-writer guard (`writingRef`), clears the banner on start, shows a 422's `{error}` verbatim in the panel's warn banner, and re-reads the picture when a write lands.
-- `closeSetup` clears `setup` and calls `announceAccountsChanged()` (`cloudcli:accounts-changed`); the row's ONE poller re-reads at once. A second read loop is never started.
-- While the Set up window is open (`setup !== null`) the panel's outside-pointer and Escape dismissal is suspended, as for the Re-login window; a press in the row menu is not outside (MAN-466 rule 7).
+- `closeSetup` clears `setup` and calls `announceAccountsChanged()` (`cloudcli:accounts-changed`); the provider's ONE poller re-reads at once. A second read loop is never started.
+- While the Set up window is open (`setup !== null`, so `signInOpen`) the popover's outside-pointer and Escape dismissal is suspended, as for the Re-login window; a press in the row menu is not outside (MAN-466 rule 7).
 - The rail button names the account in use as `Account <email>`, its `slug` when that is null, else `—`; its avatar's initials come from the slug. The panel's meters draw the two windows of that account from `accountInUseUsage` (MAN-8862).
 - Every row and candidate names its account by `email`, the `slug` standing in when it is null. The name keeps its line whole: a cue that does not fit beside it (*✓ in use now*, *Use*) wraps under it, and only a name wider than the row alone ends in an ellipsis (the full name rides `title`). Acts, aria-labels, data attributes, initials and the door's `why` keep the slug.
 
@@ -13721,7 +13729,7 @@ Reference: door face MAN-8843 (`claude-account status --json`); the routes MAN-8
 - Not pressed by the suite: the row menu (`Remove`).
 - 2026-10-21: 19 states × 3 widths × 2 themes = 114 readings, 0 page errors, 0 horizontal overflow; frame 294 px inside 320.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/AccountPopover.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/AccountRailButton.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/ClaudeAccountRows.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/ClaudeAccountRowViews.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/claude-accounts-fake.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/hooks/useAccountSetup.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/hooks/useClaudeAccounts.ts
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/AccountPanelBody.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/AccountPopover.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/AccountRailButton.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/ClaudeAccountRows.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/ClaudeAccountRowViews.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/claude-accounts-fake.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/context/AccountsContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/hooks/useAccountSetup.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/accounts/hooks/useClaudeAccounts.ts
 
 ## MAN-8862 — The meters follow the account in use — accountInUseUsage.ts
 
@@ -13737,7 +13745,7 @@ Reference: the meters' states MAN-464 (`UsageMeters` is unchanged); the door's p
 | anything else | `pictureReading(row, usage, nowMs)` — the row's newest reading as a `ClaudeUsage` |
 
 - The route's body is never drawn under another account's name: identity match plus health is the test. `GET /api/usage` measures the box's live login (`account` = its digest, MAN-464); once the store chooses another account those figures belong to the outgoing login.
-- Callers: `AccountPopover` (`UsageMeters`), the one reader.
+- Callers: `AccountPanelBody` (`UsageMeters`), the one reader — drawn by the popover and by the Accounts widget alike.
 
 ## `pictureReading` — the row's reading as `ClaudeUsage`
 | door field | `ClaudeUsage` field |
@@ -13753,7 +13761,7 @@ Reference: the meters' states MAN-464 (`UsageMeters` is unchanged); the door's p
 1. **`accountInUseUsage.ts` is the one place the door's fractions become the meters' percent.** Any new window or pacer figure is converted here; no renderer multiplies.
 2. **Unknown is `null`, never `0` and never `NaN`.** `points(fraction)` returns `null` for `null`, absent or non-finite input (`Math.round(undefined*100)` is `NaN`, which `Meter` draws as a live bar with `aria-valuenow="NaN"`). `ClaudeAccountRow.reading.five` / `.week` are `number | null` (INV-9252): the pacer files one-window readings.
 3. **Every wire stamp is read through a finite check.** `resetStamp` returns `null` for null, absent or non-finite seconds (`new Date(undefined).toISOString()` throws in render and takes the whole app down). `reading.at` is normalised once into `filedAt`: unreadable → the conversion moment, never stale, and `checkedAt` stays a number.
-4. **The reading's age is judged from the picture's own clock.** `nowMs` is the panel's minute tick (`AccountPopover`'s `now`, the row's `nowTick`), not a fresh `Date.now()`.
+4. **The reading's age is judged from the picture's own clock.** `nowMs` is the panel's minute tick (`AccountPanelBody`'s `now`, the row's `nowTick`), not a fresh `Date.now()`.
 5. **Row-side figures obey the same rules.** `ClaudeAccountRowViews.tsx` applies the null / non-finite / unreadable-instant guard at its own read sites (`figureInPoints`, `readingAgeInWords`, `tokenDateInWords`; MAN-8847); a guard added to one file is added to the other.
 6. **No whole-object validator at the door boundary.** The edge guards live at each read site, after the `resetStamp` precedent.
 
@@ -14049,3 +14057,39 @@ A focused button that unmounts leaves focus on `<body>` and fires no event anyon
 `node .verify/rail-collapse-live.mjs` (MAN-486): the seated disc named "Show the chat list" and focused after a collapse, its press bringing the list back with no radial; the disc dragged out, the dock's own button carrying the same name and act; with the list shown the disc still opens the radial. `node .verify/rail-live.mjs` and the whole walk (MAN-9012) read the same names.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/AppSwitcherDock.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/AppSwitcherFab.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/context/AppSwitcherContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/WorkspaceRail.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/rail-collapse-live.mjs
+
+## MAN-9021 — Proving the Accounts widget — .verify/probe-accounts-widget.mjs
+
+Headless Playwright against the running client; no model call, no chat turn, no test file. Panel and widget: MAN-460, MAN-463.
+
+## Run
+
+| Step | Command | Writes |
+|---|---|---|
+| 1 | `ACCOUNTS_APP=<url of a client built from the commit before the change> node .verify/probe-accounts-widget.mjs before` | `.verify/out/accounts-before-*` (shots, `accounts-before-readings.json`, `accounts-before-picture.json`) |
+| 2 | `node .verify/probe-accounts-widget.mjs after` | `.verify/out/accounts-after-*` (shots, `accounts-after-picture.json`) |
+
+- `ACCOUNTS_APP` defaults to `http://127.0.0.1:5184` (the production client, MAN-558). `before` serves `git archive HEAD` built with `vite build` on a scratch port, run just ahead of `after` so clock-driven lines agree.
+- `after` reads the `before` JSON files; run `before` first.
+- Exit 0 on all checks passed; exit 1 with the failed checks listed; exit 2 on a mode other than `before|after`.
+
+## What `after` checks
+
+| Id | Check |
+|---|---|
+| a | the widget's place in the operator's stored arrangement (right side, directly behind Next steps) and the order inside it: meters, DeepSeek and Jev balances, rows |
+| b | the widget's text equals the popover's text, read in one evaluate, both themes |
+| c | a tap on another account's row sends `POST /api/accounts/use {"slug":…}` from the widget and from the popover; fulfilled by `page.route`, never sent |
+| d | requests to `/api/accounts`, usage and both balance routes land at the same times with the widget open as folded; mounting the widget adds none |
+| e | phone: no gutter, no widget, popover unchanged; desktop popover unchanged |
+| f | the account in use, the account picture and the operator's stored gutter arrangement equal their start values |
+
+## Guards
+
+- Page is the dev account's; preference reads are pinned (`lib/prefs-pin.mjs`), every preference write is dropped.
+- Every non-GET to `/api/accounts/**` is answered in the probe and never sent.
+- Never presses Re-login, Set up, Remove or the automatic-switch toggle.
+- Every desktop page logs one aborted `GET …/file-tree/…/files` (`net::ERR_ABORTED`) on the pre-change build too; the probe counts it aborted, not failed.
+- The meters' "As of …, the provider gave no figures" line appears whenever the in-use account's filed reading is over 3 minutes old; the probe masks it in the before/after comparison.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-accounts-widget.mjs

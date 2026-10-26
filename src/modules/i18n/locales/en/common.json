@@ -1724,6 +1724,9 @@
     "notes": {
       "title": "Notes"
     },
+    "accounts": {
+      "title": "Accounts"
+    },
     "followups": {
       "title": "Next steps"
     },

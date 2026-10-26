@@ -355,6 +355,9 @@
     "notes": {
       "title": "Notizen"
     },
+    "accounts": {
+      "title": "Konten"
+    },
     "open": "{{name}} öffnen",
     "collapse": "Einklappen",
     "dragHint": "Auf eine Seite ziehen",

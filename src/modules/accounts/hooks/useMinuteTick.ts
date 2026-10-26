@@ -4,8 +4,9 @@ import { useEffect, useState } from 'react';
  * A timestamp that advances once a minute, so a countdown rendered from it stays true.
  *
  * The interval lives and dies with the component that calls this, and the only caller is the
- * account panel — which is mounted ONLY while it is open. So nothing ticks behind a closed
- * panel, and no reading is ever a minute older than the panel has been open.
+ * account panel's body — which is mounted ONLY while the popover is open or the gutter widget is
+ * unfolded. So nothing ticks behind a closed panel, and no reading is ever a minute older than the
+ * panel has been showing.
  *
  * The first tick is aligned to the next real minute boundary rather than set a flat 60s from
  * mount: a countdown that turns over 40 seconds after the clock does is a countdown that reads

@@ -141,7 +141,7 @@ function paceForWindow(key: string, pace: ClaudeUsagePace | null): { tickAt: num
 
 /**
  * The usage block of the account panel (D7).
- * Used by the accounts module's AccountPopover, which is the only screen that shows usage;
+ * Used by the accounts module's AccountPanelBody, which the popover and the Accounts widget both draw — the only screens that show usage;
  * it is a separate file because the account rows below it are a different subject and this
  * one is all about what a number does and does not mean.
  *
