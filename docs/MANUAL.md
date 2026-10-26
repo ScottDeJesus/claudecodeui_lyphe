@@ -4725,9 +4725,10 @@ section: hosting/002 Rules that bite
   because it runs Vite 5, which registers the `end` listener but no `data` one, so the end of
   `/dev/null` is never seen (measured 2026-10-26: vite 5.4.21 started with `</dev/null` still
   answered 200 eight seconds later). A scratch server started from a Bash call has the same
-  `/dev/null` stdin and dies the same way under Vite 7 — `Local: …` printed, exit 0, every `curl`
-  `000`: put `CI=true` in front of it (the one value Vite reads), and `vite_stdin_hint.py`
-  (MAN-9019) says so on the start call.
+  `/dev/null` stdin (an `&` job's always; a foreground start's when the call types no `<`) and
+  dies the same way under Vite 7 — `Local: …` printed, exit 0, every `curl` `000`: put
+  `CI=true` in front of it (the one value Vite reads), and `vite_stdin_hint.py` (MAN-9019) says
+  so on the start call.
 - **A dropped HMR socket does not reload the page unless it has to.** Vite's client reloads the
   whole page whenever its socket drops and the server answers again, and a phone drops that
   socket every time it puts a background tab to sleep. `vite-plugins/keepPageOnReconnect.js`

@@ -906,20 +906,6 @@ probe-key: b0dffed85ca37351871965ac08b685cb19ac0254
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/whole-check-inpage-legs.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/whole-check-kit.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/whole-check-window-legs.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/simple-list-deep-link.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/whole-check.mjs
 
-## INV-6048 — probe — a leg name the harness does not know, or a `WIDTH` it does not draw, is a green run
-
-a leg name the harness does not know, or a `WIDTH` it does not draw, is a green run
-
-```probe
-cd /home/lyphe/.claude/claudecodeui_lyphe && WIDTH=500 node .verify/whole-check.mjs > /tmp/athena-vac.log 2>&1; echo "exit=$?"; grep -c '^ok' /tmp/athena-vac.log; grep -c '=== \[' /tmp/athena-vac.log; tail -1 /tmp/athena-vac.log
-expect: exit=0, 4 ok lines, 0 leg headers, last line "ALL CHECKS PASS" (`node .verify/whole-check.mjs windw` ends the same at both widths)
-```
-
-measured 2026-09-30 by chain chain-app-drawer-chat--whole-20260930-040206-0899, finding L1, LOW
-probe-key: ba71fafb5cfb380cf380634166debaca2a8ffd75
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/whole-check-inpage-legs.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/whole-check-kit.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/whole-check-window-legs.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/simple-list-deep-link.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/whole-check.mjs
-
 ## INV-6049 — probe — `windowGone` has no timeout: a window that does not close hangs the run for ever
 
 `windowGone` has no timeout: a window that does not close hangs the run for ever
@@ -945,20 +931,6 @@ expect: first prints "held: the deep link survives a late session lookup in both
 
 measured 2026-09-30 by chain chain-app-drawer-chat--whole-20260930-040206-0899, finding L3, LOW
 probe-key: fa3d7358fd45ad38453c886d20d1e4b9f0f4a61c
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/whole-check-inpage-legs.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/whole-check-kit.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/whole-check-window-legs.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/simple-list-deep-link.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/whole-check.mjs
-
-## INV-6051 — probe — the run's "registry back at its hash" leaves its scratch id in `apps.icons.local.json`
-
-the run's "registry back at its hash" leaves its scratch id in `apps.icons.local.json`
-
-```probe
-cd /home/lyphe/.claude/claudecodeui_lyphe && python3 -c "import json;print('whole-check' in json.load(open('apps.icons.local.json')))"; sha256sum apps.local.json
-expect: True, while the registry hash equals 1c0b0a97c828b1bdc0a6e933fbaaede89a3e744014917c8f8ca22de8417cb7c8
-```
-
-measured 2026-09-30 by chain chain-app-drawer-chat--whole-20260930-040206-0899, finding L4, LOW
-probe-key: 4366e1384a404d427ae03f79a526b79295349c30
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/whole-check-inpage-legs.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/whole-check-kit.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/whole-check-window-legs.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/simple-list-deep-link.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/whole-check.mjs
 
@@ -1007,66 +979,6 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/whole-check-inpage-l
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/utils/radialLabels.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/utils/radialLayout.ts
 
-## INV-6058 — probe — MED — the probe widens the LIVE dial with no look at the queue, so one run can launch a real planner outing on Opus
-
-MED — the probe widens the LIVE dial with no look at the queue, so one run can launch a real planner outing on Opus
-
-```probe
-cd /home/lyphe/.claude/claudecodeui_lyphe && grep -c -i "queued" .verify/probe-planner-lanes.mjs
-expect: a count above 0 — the probe reads the frame's planner rows and declines to widen the live dial over a queued one (today: 0; its `+` launched eupalinos `tell coi-send-switch` on opus, launch dispatch-eupalinos-20260930-103743-6e23)
-```
-
-measured 2026-09-30 by chain chain-planner-lanes-dial-20260930-102233-3f63, finding M1, MEDIUM
-probe-key: 86c8b4a67472b7e879259416e084e8ed82b73f38
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-planner-lanes.mjs, /home/lyphe/.claude/hooks/dispatcher/planner_lanes.py, /home/lyphe/.claude/skills/epic/SKILL.md
-
-## INV-6059 — probe — LOW — `planner_lanes.width_of` has no length bound, so `dispatcher planners <64+ digits>` writes a flag the dispatcher itself ignores, and `width_of` does raise
-
-LOW — `planner_lanes.width_of` has no length bound, so `dispatcher planners <64+ digits>` writes a flag the dispatcher itself ignores, and `width_of` does raise
-
-```probe
-D=$(mktemp -d /tmp/athena-w-XXXXXX) || exit 1; case "$D" in /tmp/athena-w-*) DISPATCHER_PLANNERS_FLAG_PATH="$D/planners.flag" DISPATCHER_HOME="$D/home" ~/.claude/scripts/dispatcher planners "$(python3 -c 'print("9"*70)')" | cut -c1-30; DISPATCHER_PLANNERS_FLAG_PATH="$D/planners.flag" DISPATCHER_HOME="$D/home" ~/.claude/scripts/dispatcher planners; rm -r "$D";; esac
-expect: a `REFUSED planners '…'` line for the 70-digit word, then `PLANNERS lanes=2` (today: `PLANNERS lanes=99999999999999999999999…` exit 0, a 71-byte file, then `PLANNERS lanes=2`; a 5000-digit word today ends in a ValueError line, exit 1)
-```
-
-measured 2026-09-30 by chain chain-planner-lanes-dial-20260930-102233-3f63, finding L1, LOW
-probe-key: 558664d07bfe8d30ef15ff40745f5a8dd0a2a866
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-planner-lanes.mjs, /home/lyphe/.claude/hooks/dispatcher/planner_lanes.py, /home/lyphe/.claude/skills/epic/SKILL.md
-
-## INV-6060 — probe — LOW — the probe's `-` press and its final restore overwrite a change the operator (or another session) made during the run
-
-LOW — the probe's `-` press and its final restore overwrite a change the operator (or another session) made during the run
-
-```probe
-cd /home/lyphe/.claude/claudecodeui_lyphe && [ "$(../scripts/dispatcher status --json | python3 -c 'import json,sys; print(sum(1 for p in json.load(sys.stdin)["planners"] if p["state"]=="queued"))')" = 0 ] && { node .verify/probe-planner-lanes.mjs >/dev/null 2>&1 & P=$!; until [ "$(tr -d '\n' < ../state/planners.flag)" = 3 ]; do sleep 0.05; done; ../scripts/dispatcher planners 5 >/dev/null; wait $P; tr -d '\n' < ../state/planners.flag; echo; ../scripts/dispatcher planners 2; }
-expect: `5` — the probe leaves a mid-run change alone (today: `2`)
-```
-
-measured 2026-09-30 by chain chain-planner-lanes-dial-20260930-102233-3f63, finding L2, LOW
-probe-key: 9159d350d908ed93e2c655fde217aa30f513bfd4
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-planner-lanes.mjs, /home/lyphe/.claude/hooks/dispatcher/planner_lanes.py, /home/lyphe/.claude/skills/epic/SKILL.md
-
-## INV-6061 — probe — `update` can answer `undefined`, a third state its declared type and its docblock both exclude
-
-`update` can answer `undefined`, a third state its declared type and its docblock both exclude
-
-```probe
-DIR=$(mktemp -d); case "$DIR" in /tmp/tmp.*) ;; *) echo "refusing: $DIR"; exit 1;; esac
-sqlite3 ~/.cloudcli/auth.db ".backup '$DIR/auth.db'"
-cd /home/lyphe/.claude/claudecodeui_lyphe
-DATABASE_PATH=$DIR/auth.db TSX_TSCONFIG_PATH=server/tsconfig.json node --import tsx -e 'import("@/modules/database/index.js").then(async (m) => { await m.initializeDatabase(); const db = m.getConnection(); db.exec("CREATE TRIGGER probe_vanishing AFTER UPDATE ON notes BEGIN DELETE FROM notes WHERE id = NEW.id; END"); const a = m.notesDb.create({ userId: 1, title: "probe-vanish", description: "" }); const r = m.notesDb.update(1, a.id, { title: "edited", description: "edited" }); console.log("returned:", r, "| undefined:", r === undefined, "| null:", r === null); });'
-cd /tmp && rm -rf "$DIR"
-expect: `returned: undefined | undefined: true | null: false` — the UPDATE matched (its `changes` was 1) and the read-back found nothing.
-```
-
-measured 2026-09-30 by chain chain-simple-notes--store-20260930-104837-cb87, finding L1, LOW
-probe-key: 1da15b7a807b88e93d4c921913d9b11a49c005db
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/migrations.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/notes-schema.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/notes.db.ts
-
 ## INV-6062 — probe — three pre-existing values were rewritten: `simpleList.stopBody` in ja, zh-CN, zh-TW. [LOW]
 
 three pre-existing values were rewritten: `simpleList.stopBody` in ja, zh-CN, zh-TW. [LOW]
@@ -1099,20 +1011,6 @@ measured 2026-09-30 by chain chain-simple-notes--contract-20260930-104837-0a18, 
 probe-key: 6e6c997d5ea86ba47d757da883492a08e838562f
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/de/common.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/common.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/es/common.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/fr/common.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/it/common.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/ja/common.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/ko/common.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/ru/common.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/tr/common.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/zh-CN/common.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/zh-TW/common.json, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts
-
-## INV-6064 — probe — `npm run typecheck` reads exit 2; both errors are another chain's files, timestamped after this build's run
-
-`npm run typecheck` reads exit 2; both errors are another chain's files, timestamped after this build's run
-
-```probe
-cd /home/lyphe/.claude/claudecodeui_lyphe && npx tsc --noEmit -p tsconfig.json; echo "client exit:$?"; npx tsc --noEmit -p server/tsconfig.json; echo "server exit:$?"
-expect: client exit:0, then the two claude-updates errors above and server exit:2 — no error names src/shared/api.ts or src/shared/types.ts
-```
-
-measured 2026-09-30 by chain chain-simple-chat-folders--contract-20260930-104835-68a5, finding M1, MEDIUM
-probe-key: c40e78bb262cc99351787404e1bf0197ad44d1da
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-simple-list-contract.mjs
 
 ## INV-6065 — probe — `npm run lint` reads exit 1 (three errors, 175 warnings); same foreign files, target files clean
 
