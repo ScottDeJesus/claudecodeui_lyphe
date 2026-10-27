@@ -219,15 +219,14 @@ probe-key: 84ae870657a8db5dfbd97279f63b4c2619ad3e16
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/docs/
 
-## INV-6580 — roadmapSeen is entry-patched, and its merge does not compare stamps — a writer never sends an older at
+## INV-6580 — roadmapSeen is entry-patched and forward-only — a writer never sends an older at
 
 `roadmapSeen` is the second entry-patched preference, beside `dispatcher` (INV-4406). Shape: `{ seen: { name: string; at: string }[] }`, one entry per roadmap; `name` is the roadmap's, `at` is the dispatcher's UTC string of the newest `shipped_at`, `completed_at` or `reached_at` this user's screen celebrated.
 
 - A key joins BOTH lists together: `ENTRY_PATCHED_KEYS` (`src/shared/userSettings.ts`) and `ENTRY_LISTED_KEYS` (`server/modules/database/repositories/user-preferences.db.ts`). One without the other sends patches the server stores whole, or stores whole what the client patches.
 - Write it through `writeUserPreferenceEntries`, never `writeUserPreference('roadmapSeen', …)`. why: a whole write from the device that read last erases the other roadmap's stamp and replays its completions.
-- THE MERGE IS NOT MONOTONIC. `mergeEntryLists` (server) and `applyEntryPatch` (client) replace the named entry and compare no `at`, so a patch carrying an older `at` moves the stamp backward and the other device replays what it already played.
+- THE MERGE IS FORWARD-ONLY for this key (`FORWARD_ONLY_KEYS` in the server file, `FORWARD_ONLY_ENTRY_KEYS` in `src/shared/preferenceEntryPatch.ts`, read through `entryRuleOf`; `roadmapSeen` alone holds it). `mergeEntryLists` (server) and `applyEntryPatch` (client) replace the named entry, except that a patch carrying an OLDER `at` than the stored entry is a stale device's retry and is not applied: it would move the stamp backward and the other device would replay what it already played. `dispatcher`'s and `filesPins`'s lists do not follow this rule.
 - A stamp writer never sends an `at` older than the one it read. The one writer, `rememberSeen` (`src/modules/roadmap/utils/seenStamp.ts`, MAN-7648), reads the newer of the device mirror and the server's copy (`api.user.preferences()`) at its turn, writes one at a time, and sends only a later `at`. why: the mirror is hydrated once at sign-in and can be hours stale.
-- What stays open is the window between that read and the server write: only a merge that keeps the newer `at` per roadmap closes it, on both sides, and `dispatcher`'s lists share that merge.
 - A reader treats `{ "seen": [] }` and an absent key alike: the entry merge keeps the key after every entry is removed.
 - `PreferenceListEntry` (`src/shared/types.ts`) is `string | { name: string; [field: string]: unknown }`, so `{ name, at }` is legal as a literal.
 
@@ -599,13 +598,14 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/dispatcher/SpendPill
 - Every write is `writeUserPreferenceEntries('filesPins', { pinned: { [path]: path | null } })`, through `pinFolder` and `unpinFolder` (`src/modules/file-manager/hooks/useFilesPins.ts`). Never `writeUserPreference('filesPins', …)`. why: a whole write from the device that read last puts back every pin another device took off and erases every pin made there since.
 - The key is in BOTH lists, and the two change together in the same piece of work: `ENTRY_PATCHED_KEYS` (`src/shared/userSettings.ts`) and `ENTRY_LISTED_KEYS` (`server/modules/database/repositories/user-preferences.db.ts`). One without the other sends patches the server stores whole, or stores whole what the client patches. `userSettings.ts` also holds `filesPins: unknown` in `UserPreferences` and `LEGACY_STORAGE_KEYS.filesPins = null`.
 - Not forward-only: the merge compares no stamp (`FORWARD_ONLY_KEYS` holds `roadmapSeen` alone), so `{ pinned: { [path]: null } }` unpins one path and touches no other pin.
-- A reader treats an absent key, `null`, `{ pinned: [] }` and a missing `pinned` alike (the merge keeps the key after the last unpin). `useFilesPins` reads the list whole or not at all: a stored value that is not `{ pinned: string[] }` reads as no pins, so ONE non-string entry (the merge stores any entry whose `name` equals its key: INV-9613) makes every pin read as none.
-- The mirror's order can differ from the server's. The mirror applies each write at once; the debounce folds a patch with `{ ...earlier, ...listPatch }` (`foldEntryPatches`), where a re-named key keeps its first slot. Pin A, pin B, pin A again inside one flush: mirror `…, B, A`, server `…, A, B`.
+- STRING-ONLY on both sides: an entry that is not a string is not stored, and one already stored is dropped by the next patch to its list, and a list sent whole (an older build's write) keeps its string entries only, so `pinned` never holds a non-string entry. The key joins `STRING_ONLY_ENTRY_KEYS` (`src/shared/preferenceEntryPatch.ts`, read through `entryRuleOf`) and `STRING_ONLY_KEYS` (the server file) in the same piece of work, as it joins the two lists above. why: the merge stores any entry whose `name` equals its key, and one record in `pinned` is not a path.
+- A reader treats an absent key, `null`, `{ pinned: [] }` and a missing `pinned` alike (the merge keeps the key after the last unpin). `useFilesPins` keeps the string entries of `pinned` and ignores any other.
+- The mirror and the server order alike. The mirror applies each write at once; the debounce folds the writes queued in one flush (`foldEntryPatches`), and the fold takes a re-named key out of the earlier patch before it lays the newer entry down, so it applies as the writes did one after another. Pin A, pin B, pin A again inside one flush: `…, B, A` on both.
 - The strip's roots and the pin flow: MAN-539. The preference store: MAN-663.
 
 ```probe
-cd /home/lyphe/.claude/claudecodeui_lyphe && grep -cE "ENTRY_PATCHED_KEYS.*'filesPins'" src/shared/userSettings.ts; grep -cE "ENTRY_LISTED_KEYS.*'filesPins'" server/modules/database/repositories/user-preferences.db.ts
-expect: 1 then 1 — a 0 on either line is a key in one list only
+cd /home/lyphe/.claude/claudecodeui_lyphe && grep -cE "ENTRY_PATCHED_KEYS.*'filesPins'" src/shared/userSettings.ts; grep -cE "ENTRY_LISTED_KEYS.*'filesPins'" server/modules/database/repositories/user-preferences.db.ts; grep -cE "STRING_ONLY_ENTRY_KEYS.*'filesPins'" src/shared/preferenceEntryPatch.ts; grep -cE "STRING_ONLY_KEYS.*'filesPins'" server/modules/database/repositories/user-preferences.db.ts
+expect: 1 then 1 then 1 then 1 — a 0 on any line is a key in one list or rule only
 ```
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/user-preferences.db.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/file-manager/hooks/useFilesPins.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/preferenceEntryPatch.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/userSettings.ts

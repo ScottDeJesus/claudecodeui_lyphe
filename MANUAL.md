@@ -3181,17 +3181,18 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/cerberus-needs-you-sever
 
 ## MAN-8558 — Affected-areas client wire — src/shared/affected-areas-types.ts and api.affectedAreas
 
-The browser's typed view of `/api/affected-areas` (the Tours tab): one wire-type file and one `api` block. The one home of every shape is shadow-connector's `core/affected_areas/wire.py` (INV-8564); the routes are MAN-8540.
+The browser's typed view of `/api/affected-areas` (the Tours tab): one wire-type file and one `api` block. The one home of every shape is shadow-connector's `core/affected_areas/wire.py` and its sibling `wire_layout.py` for the day-one plan (INV-8564); the routes are MAN-8540.
 
 ## Files
 | file | holds |
 |---|---|
-| `src/shared/affected-areas-types.ts` | 39 exported types: every `wire.py` model, its 11 nested ones and the four envelopes `TourList`, `ViewsResult`, `UnderstandingMarkResult`, `Refusal`; plus the unions `Face`, `Basis`, `Verdict`, `MarkQueue`. `Point` and `Box` are file-private (`number[]`). Imports nothing from `server/`. |
-| `src/shared/api.ts` | `api.affectedAreas`, 12 verbs, beside `api.cerberus`; a type-only import from the mirror. The same file holds `api.carrierBulletins` (the Bulletins view's four GET verbs and their own mirror, `carrier-bulletins-types.ts`): MAN-8865 |
-| `.oxlintrc.json` | `src/shared/affected-areas-types.ts` in the `frontend-shared-file` list (INV-5890) |
+| `src/shared/affected-areas-types.ts` | 39 types it defines, and the 18 of the next row re-exported by name (`export type { … } from '@/shared/affected-areas-layout-types'`): every `wire.py` model, its 11 nested ones and the four envelopes `TourList`, `ViewsResult`, `UnderstandingMarkResult`, `Refusal`; plus the unions `Face`, `Basis`, `Verdict`, `MarkQueue`. `Point` and `Box` are file-private (`number[]`). Imports nothing from `server/`. |
+| `src/shared/affected-areas-layout-types.ts` | 18 types: every `wire_layout.py` model (the layout read, the plan's rooms, spots, openings, objects, areas, scale and pins, `Placement`), and the four fields they fill on `ViewEntry`, `Region` and `TourDetail` live in the file above. `Point` and `Box` are file-private here too, in 0..1 of the FLOOR's drawing frame. Imports `Budget`, `Face`, `Region` with `import type` from `@/shared/affected-areas-types` (the lint rule bans the relative form) |
+| `src/shared/api.ts` | `api.affectedAreas`, 15 verbs, beside `api.cerberus`; a type-only import from the mirror. The same file holds `api.carrierBulletins` (the Bulletins view's four GET verbs and their own mirror, `carrier-bulletins-types.ts`): MAN-8865 |
+| `.oxlintrc.json` | `src/shared/affected-areas-types.ts` and `src/shared/affected-areas-layout-types.ts` in the `frontend-shared-file` list (INV-5890): a new shared file is an unknown element until listed |
 
 ## Verbs
-Every answer is the wire shape bare, the type named in a `// →` comment above the verb. Ids go through `encodeURIComponent`. The lane also forwards the cut of a pano's views and the plan of a whole tour (MAN-8559); no screen calls them, so `api` holds no verb for either, and `ViewsResult` and `TourPlan` stay as the wire's mirror of their answers.
+Every answer is the wire shape bare, the type named in a `// →` comment above the verb. Ids go through `encodeURIComponent`. The lane also forwards the cut of a pano's views and the reader's plan of a whole tour (MAN-8559); no screen calls them, so `api` holds no verb for either, and `ViewsResult` and `TourPlan` stay as the wire's mirror of their answers.
 
 | verb | route | answer |
 |---|---|---|
@@ -3200,6 +3201,9 @@ Every answer is the wire shape bare, the type named in a `// →` comment above 
 | `pano(tourId, panoId)` | `GET /tours/:tourId/panos/:panoId` | `PanoDetail` |
 | `readPano(tourId, panoId, ReadRequest)` | `POST …/panos/:panoId/read` | `ReadResult`; `timeoutMs` 120 000 |
 | `image(sha, options?)` | `GET /images/:sha` | JPEG bytes: the caller reads `.blob()`; `options.signal` aborts |
+| `readLayout(tourId, panoId, ReadRequest)` | `POST …/panos/:panoId/layout` | `LayoutReadResult`; `timeoutMs` 270 000 (six views at high thinking); `{ armed: false }` is the dry run, `planned` with the count and the budgets |
+| `buildPlan(tourId)` | `POST /tours/:tourId/layout/plan` | `LayoutPlanResult`: the plan rebuilt from the stored reads, no model; the screen sends it once on a `stale` plan |
+| `planDrawing(sha, options?)` | `GET /layout-drawings/:sha` | SVG bytes (`image/svg+xml`): the caller reads `.blob()`, as for `image`; `options.signal` aborts |
 | `codebook()` | `GET /codebook` | `Codebook` |
 | `mark(regionId, MarkRequest)` | `POST /regions/:regionId/marks` | `Region` (comment only) |
 | `missed(sha, MissedRequest)` | `POST /images/:sha/regions` | `Region` (comment only) |
@@ -3216,8 +3220,8 @@ Every answer is the wire shape bare, the type named in a `// →` comment above 
 | `{ error, detail }` (`Refusal`) | shadow-connector's marks routes |
 
 ## Rules an editor must not break
-- A shape changes in `wire.py` first; the mirror moves in the same change. why: a field renamed on one side is a screen that stops reading.
-- Field names are the wire's camelCase; `class` is a key (`wire.py`'s `cls` alias). Dates are ISO text, ids text, a point `[x, y]` and a box `[x0, y0, x1, y1]`, both in 0..1 of one view.
+- A shape changes in `wire.py` (the day-one plan's in `wire_layout.py`) first; the mirror moves in the same change. why: a field renamed on one side is a screen that stops reading.
+- Field names are the wire's camelCase; `class` is a key (`wire.py`'s `cls` alias). Dates are ISO text, ids text, a point `[x, y]` and a box `[x0, y0, x1, y1]`, both in 0..1 of the frame the shape sits in: one view for a region, the floor's drawing for the day-one plan.
 - A response field is never optional. A field a later plan fills (`read`, `understanding`, `regions`, `mark`, `standing`, `threshold`, `holdout`, `regionsStanding`, `marksCount`, `standingCount`, `photosAffected`, `understandingMark`, `current`, `effectiveClass`, `tourName`, …) is `T | null`: `null` is "not judged", never "judged and found nothing".
 - A request field `wire.py` defaults is optional (`newClass?: string | null`).
 - `ViewDetail` is `ViewEntry & {…}`, as `wire.py` inherits it.
@@ -3228,7 +3232,7 @@ Every answer is the wire shape bare, the type named in a `// →` comment above 
 - 2026-10-17: `GET /queue` answered 200 with the keys `mode`, `items`, `remaining` (an item: `tourId`, `panoId`, `roomName`, `jobLabel`, `view`, `region`); `GET /proving` answered 200 with `model`, `contractVersion`, `contractHash`, `understanding`, `classes` (a class: the twelve fields of `ProvingClass`). Each is the typed key set.
 - 2026-10-18: the file's property names, read by the TypeScript compiler, against `model_json_schema(by_alias=True)` per model: 39 of 39 equal. The five fields the fix added (`photosAffected`, `understandingMark`, `current`, `effectiveClass`, `tourName`) are each `T | null` here as `T | None` there; no model class was added.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/affected-areas-types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/affected-areas-layout-types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/affected-areas-types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts
 
 ## MAN-8559 — The affected-areas lane — /api/affected-areas forwarded to shadow-connector
 
@@ -3237,7 +3241,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/affected-areas-types.
 | File | Holds |
 |---|---|
 | `affected-areas.module.ts` | `createAffectedAreasModule()`; the ONLY reader of the environment for this lane |
-| `affected-areas.routes.ts` | `createAffectedAreasRouter({ forward })`: the lane's table, its id shapes and its image type (`image/jpeg`); it hands them to the shared router |
+| `affected-areas.routes.ts` | `createAffectedAreasRouter({ forward })`: the lane's table, its id shapes and its default image type (`image/jpeg`; the drawing row names its own, `image/svg+xml`); it hands them to the shared router |
 | `index.ts` | barrel the entrypoint imports |
 
 Two shared files stand behind it, and neither is in this module: the forwarder (`createShadowConnectorLane({ baseUrl, envFile, label })` → `forward(LaneRequest): Promise<LaneAnswer>`, the secret read and the one `fetch`, `server/shared/shadow-connector-lane.ts`, MAN-8863) and the router (`createLaneRouter`, which checks, forwards and answers from a table, `server/shared/shadow-connector-lane-router.ts`, MAN-8908). The secret has one home, and the checks, the 404 and 422 tails and the status mapping have one copy, shared with the bulletins lane. This module builds the forwarder with `label: 'affected-areas'`, so its log warning reads `[affected-areas] no usable internal secret in <file>: <cause>`.
@@ -3249,7 +3253,7 @@ Two shared files stand behind it, and neither is in this module: the forwarder (
 | `SHADOW_CONNECTOR_URL` | `http://127.0.0.1:8001` | engine origin |
 | `SHADOW_CONNECTOR_ENV_FILE` | `/opt/shadow-connector/.env` | file holding `EIS_INTERNAL_SECRET=` |
 
-## Allowlist (14 rows in `ALLOWLIST`)
+## Allowlist (17 rows in `ALLOWLIST`)
 
 A method+path not in the table is the lane's own 404 `{ error: 'not a route of the affected-areas lane' }`; it never reaches :8001. The table is the lane's whole contract.
 
@@ -3261,7 +3265,10 @@ A method+path not in the table is the lane's own 404 `{ error: 'not a route of t
 | `GET /tours/:tour/panos/:pano` | 20 s | json | none | — |
 | `POST /tours/:tour/panos/:pano/read` | 120 s | json | object | — |
 | `POST /tours/:tour/read` | 20 s | json | none | — |
+| `POST /tours/:tour/panos/:pano/layout` | 270 s | json | object | — |
+| `POST /tours/:tour/layout/plan` | 120 s | json | none | — |
 | `GET /images/:sha` | 20 s | bytes (`image/jpeg`) | none | — |
+| `GET /layout-drawings/:sha` | 20 s | bytes (`image/svg+xml`, its own row's `image`) | none | — |
 | `GET /codebook` | 20 s | json | none | — |
 | `POST /regions/:region/marks` | 20 s | json | object | — |
 | `POST /images/:sha/regions` | 20 s | json | object | — |
@@ -3280,10 +3287,10 @@ A method+path not in the table is the lane's own 404 `{ error: 'not a route of t
 | `:class` | `^[a-z_]{2,40}$` |
 | `limit` | a whole number (`wholeNumber`, private to this file) |
 
-The lane's own 422 is `{ error }`; the engine's is `{ detail: [...] }`: a client reads both. Status mapping, the body-must-be-an-object check and the malformed-escape 422 are the shared router's (MAN-8908 rules 2–4): an upstream answer keeps its status and body; unreachable 503, unreadable 502, no secret 503. Image 2xx: `Content-Type: image/jpeg` and bytes that begin `ffd8ff` (`JPEG_SIGNATURE`; anything else is 502 `shadow-connector did not answer with a JPEG`), `Cache-Control: private, max-age=31536000, immutable`; a non-2xx image answer passes through as its JSON.
+The lane's own 422 is `{ error }`; the engine's is `{ detail: [...] }`: a client reads both. Status mapping, the body-must-be-an-object check and the malformed-escape 422 are the shared router's (MAN-8908 rules 2–4): an upstream answer keeps its status and body; unreachable 503, unreadable 502, no secret 503. Image 2xx: `Content-Type: image/jpeg` and bytes that begin `ffd8ff` (`JPEG_SIGNATURE`; anything else is 502 `shadow-connector did not answer with a JPEG`), `Cache-Control: private, max-age=31536000, immutable`; a non-2xx image answer passes through as its JSON. The one exception is the plan drawing row, which names its own image type (`SVG_IMAGE`: `image/svg+xml`, bytes that begin `<svg`, 502 `shadow-connector did not answer with an SVG`): a row's `image` wins over the lane's, so a JPEG answered for a drawing, and an SVG for a view, are each a 502 (measured 2026-10-26 through the real router with a stub forwarder). The layout press has 270 s because six views at HIGH thinking can outlast the reader's 120 s (`LAYOUT_PRESS_TIMEOUT_MS`); a press the lane gives up on is not cancelled, the engine's reads are kept and the next press finds them cached.
 
 ## The secret read and the headers sent
-Both belong to the forwarder: MAN-8863 (the read: `parseSecret`, `currentSecret`, a rotation lands on the next request) and INV-8633 (the rules). The one fact to carry here: a bytes route is asked for with `Accept: image/*` since 2026-10-22 (it was `image/jpeg`), and this lane still insists on a JPEG in the answer.
+Both belong to the forwarder: MAN-8863 (the read: `parseSecret`, `currentSecret`, a rotation lands on the next request) and INV-8633 (the rules). The one fact to carry here: a bytes route is asked for with `Accept: image/*` since 2026-10-22 (it was `image/jpeg`), and this lane still insists on its image type in the answer (a JPEG; an SVG for a drawing).
 
 ## Probes
 - 2026-10-17: `GET /api/affected-areas/tours?limit=3` → 200, three tours; `GET …/images/<sha>` → 200 JPEG whose `sha256sum` equals the id. `GET /nope`, `DELETE /tours`, `POST /codebook` → 404 with no `shadow-connector` journal line; 422 cases (bad id, `limit=0|101`, 81-char `q`, `mode=bogus`) likewise never reach the journal. An empty env file → 503 `no_secret`, 0 engine requests; writing the secret into it → next request 200, no restart.
@@ -4080,8 +4087,9 @@ Consumers (each declares a table and its id shapes; neither writes a handler):
 
 | export | does |
 |---|---|
-| `createLaneRouter({ lane, upstreamPrefix, pathRules, allowlist, forward, image, passHeaders? })` | one handler per allowlist row (check, fill the path, forward, answer), then the lane's own 404, then the malformed-escape 422. `image` is `{ contentType, noun, signature }`: the one image type the lane's bytes routes answer, how the 502 names it, and the magic number its bytes begin with (PNG `89504e470d0a1a0a`, JPEG `ffd8ff`). `passHeaders` names the upstream response headers a JSON answer carries back (none when absent) |
-| `LaneRoute` | one row: `{ method, route, timeoutMs, expect: json\|bytes, query?, body: object\|none }`; `route` is in Express's form, `:name` is filled from the checked id |
+| `createLaneRouter({ lane, upstreamPrefix, pathRules, allowlist, forward, image, passHeaders? })` | one handler per allowlist row (check, fill the path, forward, answer), then the lane's own 404, then the malformed-escape 422. `image` is `{ contentType, noun, signature }` (`LaneImage`): the image type the lane's bytes routes answer unless a row names its own, how the 502 names it, and the magic number its bytes begin with (PNG `89504e470d0a1a0a`, JPEG `ffd8ff`). `passHeaders` names the upstream response headers a JSON answer carries back (none when absent) |
+| `LaneRoute` | one row: `{ method, route, timeoutMs, expect: json\|bytes, query?, body: object\|none, image? }`; `route` is in Express's form, `:name` is filled from the checked id; `image` is a `bytes` row's OWN image type, which wins over the lane's |
+| `LaneImage` | `{ contentType, noun, signature }`: the type of `createLaneRouter`'s `image` and of a row's `image` |
 | `LaneRule` / `patternRule(regex, expects)` | a check on one id or query value; `expects` is the half of the 422 sentence after the field's name |
 | `LOWERCASE_UUID_SOURCE`, `LOWERCASE_UUID_RULE`, `SHA256_RULE` | the id shapes the two lanes share: a lowercase hyphenated uuid, 64 lowercase hex |
 
@@ -4090,7 +4098,7 @@ Rules (they bind the file; a lane that needs different behaviour changes the def
 2. Every path id and every allowlisted query value is held to its rule BEFORE a byte leaves; a `:name` with no rule in `pathRules` is refused, never forwarded. A failure is the lane's 422 `{ error: '<name> must be <expects>' }`. A query value that is an array or a dictionary (`?q=a&q=b`) is not a value. A query key not in the row is dropped, not forwarded. A `body: 'object'` row needs a JSON object (array, null and scalar are a 422).
 3. A malformed percent-escape in the path (`%ZZ`) throws in Express before any handler runs; the router's last middleware turns it into a 422 and forwards nothing.
 4. An upstream answer keeps its status and its JSON untouched, and carries back the response headers the lane named in `passHeaders` and no others. Only the lane's own faults carry a body of the lane's making, `{ error }`, and their statuses are fixed: `unreachable` 503, `unreadable` 502, `no_secret` 503. A fault the forwarder cannot name (an error thrown, not returned) is passed to `next(error)` and answered by the app's error handler, not by a body of the lane's own. why: turning a fault into a 200 with an empty body would replace the one useful thing in the answer, that nothing was read, with silence a screen shows as data; and a header the engine sets that a lane did not name (`Set-Cookie`, a `Location`) must not reach a browser by accident.
-5. A `bytes` route is relayed only on a 2xx, under the lane's one `image.contentType` and `Cache-Control: private, max-age=31536000, immutable` (the id is the sha256 of the bytes, so it never changes). A 2xx whose Content-Type is not that type, or whose first bytes are not `image.signature`, is `unreadable` (502 `shadow-connector did not answer with <image.noun>`). why: the Content-Type is the engine's word, and the bytes are what a browser would keep for a year. A non-2xx image answer is the engine's JSON, passed through (the forwarder reads bytes only on success).
+5. A `bytes` route is relayed only on a 2xx, under its row's `image` when it names one (the Tours lane's plan drawing: an SVG) and the lane's `image` otherwise, and `Cache-Control: private, max-age=31536000, immutable` (the id is the sha256 of the bytes, so it never changes). A 2xx whose Content-Type is not that type, or whose first bytes are not `image.signature`, is `unreadable` (502 `shadow-connector did not answer with <image.noun>`). why: the Content-Type is the engine's word, and the bytes are what a browser would keep for a year. A non-2xx image answer is the engine's JSON, passed through (the forwarder reads bytes only on success).
 6. The acting user is read from `request.user.username` (the mount's `authenticateToken` set it) and sent as `X-Acting-User`, display only.
 7. Routes here validate and translate and do nothing else: no secret read, no socket, no cache, no model call.
 
@@ -4099,7 +4107,7 @@ Traps
 |---|---|
 | a page number is a pattern, not a number | the bulletins lane's `page` is `^[1-9]\d{0,2}$`, the engine's own spelling: `3`, `03` and `+3` would be three URLs for one page image, cached for a year under its URL. The Tours lane's `limit` is a bounded number (`wholeNumber`, private to its routes) because nothing is cached under it |
 | the 404 sentence names the lane | `lane` is the only word of it that differs; a new lane picks a distinct one so the journal and a screen can tell whose 404 it was |
-| a new lane | adds a module with a table and a mount in `server/index.ts`, builds its forwarder with its own `label` (MAN-8863), and needs no change here unless it relays something other than JSON and one image type |
+| a new lane | adds a module with a table and a mount in `server/index.ts`, builds its forwarder with its own `label` (MAN-8863), and needs no change here unless it relays something other than JSON and images (a lane that serves more than one image type names the odd one on its row: `LaneRoute.image`) |
 
 Moved here from the Tours routes on 2026-10-22 as a pure move: the Tours lane's bodies, statuses and headers for a tour read, an image, a bad id, a bad limit, a path outside the table, a malformed escape and an unknown tour were identical before and after (image sha256 `dd729923…` = its id), except the engine's own `builtAt` stamp.
 
@@ -4416,7 +4424,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/Wo
 |---|---|
 | disc cell | `size-11 md:size-10` (44px phone, 40px desktop) holding `<AppSwitcherDock />`: its 28px box is centred at (24, 28) on a desktop and the app switcher's FAB is drawn over it. While the disc is seated here it draws no dot (see MAN-486): the Chat glyph's badge says a reply landed |
 | scroll region | the runs of `SCROLL_GROUPS` in order: `chat`, `tools`, `plans`, `house`, `plugins`. A run with no view is dropped first; a `RailHairline` (`h-px w-6 bg-border`, `aria-hidden`, `my-1`) stands between two drawn runs |
-| foot | outside the scroll, `relative z-40`: the views whose `group` is `foot` (Inbox: MAN-9013), the Settings button (`t('rail.settings')`, running `sidebarSharedProps.onShowSettings()`), then the account cell |
+| foot | outside the scroll, `relative z-40`: the usage rings (`UsageRings` from the accounts barrel: the 5-hour over the week, each labelled with its countdown to reset, 28px rings in 32px cells, a status and no button; MAN-9033), the views whose `group` is `foot` (Inbox: MAN-9013), the Settings button (`t('rail.settings')`, running `sidebarSharedProps.onShowSettings()`), then the account cell |
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/hooks/useRailBadges.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/RailButton.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/WorkspaceRail.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/ui/Tooltip.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/rail-mockup.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/rail-read.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/sheet.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/rail-live.mjs
 
@@ -4563,3 +4571,32 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/Pr
 - The Inbox's own Memory / Heal strip (`[data-inbox-panel] [role="tab"]`) is real; those selectors are right.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/whole-sidebar-rail.mjs
+
+## MAN-9038 — The day-one sketch section — src/modules/affected-areas: DayOneSketch, DayOnePlan, DayOneRooms, DayOnePress, utils/dayOneModel.ts, dayOne-fake.ts and their two probes
+
+Scaffold, 2026-10-26: composed over fake data. `TourScreen.tsx` mounts it at its `FILL: day-one` marker, unwired; the wiring of each handler and data hook is named at its own `FILL:` marker (`grep -rn "FILL:" src/modules/affected-areas`).
+
+| file | holds |
+|---|---|
+| `DayOneSketch.tsx` | the section: `data-day-one` = `plan` \| `none` \| `unavailable` \| `pending` \| `unknown`. Eyebrow `affectedAreas.dayOne.title`; status line (`panosRead` of `panosTotal` · drawn when · "from the calibration reads" when `contractVersions` holds `layout.cal0`); a floor switch (`SegmentedControl`) only when `floors.length > 1`; `DayOnePress` top right; `DayOnePlan` beside `DayOneRooms` from 960 px of container, under it below. Its one state is the chosen floor's place in `floors` |
+| `DayOnePlan.tsx` | one floor: `RegionImage` (`badgePlacement="clear"`, MAN-8945) over the engine's drawing; one outline and number per area, fixture and piece of contents; one spot per pano named "{room} 360° photo" ("…, n of m" for a room with several shots). Caption lines `data-day-one-line="scale" \| "pins" \| "spots"`. Enlarge opens a display-only copy in `Lightbox`. Drawing bytes absent: waiting surface; failed: `data-day-one-failed` box with Try again (`onRetryDrawing`) |
+| `DayOneRooms.tsx` | per room (`data-day-one-room`): size, area, perimeter, ceiling, each side's source with its band, a warning when unpinned, the sketch and first-report checks; then its numbered rows (`data-day-one-item`) with "Seen in {n} photos" above 1 |
+| `DayOnePress.tsx` | `data-day-one-press`: the unread panos and views, today's budget, the walk (meter, Stop), the refusals in words |
+| `utils/dayOneModel.ts` | pure, one model for the drawing and the list: `numberedItems(floor, codebook, t)` → `SketchItem[]`; `feet`, `band`, `inches` |
+| `dayOne-fake.ts` | `FAKE_DAY_ONE` (Clarence Tse's tour, one entry per state of the section) and `FAKE_DRAWINGS`; imported only by the scaffold probe, 2026-10-26 |
+
+Rules:
+- Presentational: every datum is a prop. Every position is the engine's, in 0..1 of the floor's drawing; the browser computes none.
+- Numbers: the wire numbers areas only (`DayOneArea.number`, from 1 per floor, in the plan's room order). `numberedItems` numbers fixtures and contents after the last area, in the wire's order. The drawing's tab order is the areas by number, then the objects.
+- An area is drawn in `REGION_LOOK` of its member (`regionState`); a fixture or contents in the neutral tone with the light wash.
+- Words never sit on the drawing: a number meets its row in `DayOneRooms`.
+- `DayOnePress` reads `lastAnswer`: the dry run on open, then each armed answer the walk lands. why: its budget lines go stale otherwise.
+- A press on an area or object calls `onOpenPanoAt(panoId, face, regionId)`, `regionId` null for an object; a press on a spot calls `onOpenPano(panoId)`. The Lightbox copy passes spots without `onPress`: inert.
+- The drawing loads as an `<img>`, so it cannot follow the theme: the engine's SVG carries its own white ground. Spots are the one fixed-colour mark on it (MAN-8947); room names clear of the spots: INV-9720.
+- Words: `affectedAreas.dayOne.*` in `src/modules/i18n/locales/en/common.json`, `en` only.
+
+Probes (`.verify/`, git-ignored; run against the real :5183 client, no model call):
+- `node .verify/affected-areas-day-one-scaffold.mjs [--states a,b] [--evidence <dir>]`: mounts `DayOneSketch` over each `FAKE_DAY_ONE` state, photographs 390 and 1280 px in both themes, presses every callback, and exits 1 on a FAIL. Fails when a `partial` or `built` number is less than 80% shown or its middle's press lands elsewhere (light theme).
+- `node .verify/affected-areas-day-one-unchanged.mjs --stage before|after`: the live Tours view's words, element count and class multiset must be equal across the two stages; exits 1 on any difference.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/dayOne-fake.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/DayOnePlan.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/DayOnePress.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/DayOneRooms.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/DayOneSketch.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/utils/dayOneModel.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/affected-areas-day-one-scaffold.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/affected-areas-day-one-unchanged.mjs

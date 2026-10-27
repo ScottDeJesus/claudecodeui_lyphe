@@ -1007,6 +1007,18 @@ export const api = {
     // The bytes of one view's JPEG, not JSON: the caller reads `.blob()`. `options.signal` lets it abort a fetch
     // whose view has since changed.
     image: (sha: string, options: ApiRequestOptions = {}) => get(`/api/affected-areas/images/${encodeURIComponent(sha)}`, options),
+    // The day-one layout (wire shapes in `@/shared/affected-areas-layout-types`). `readLayout` is the layout press: six
+    // views at high thinking, so it outlasts even `readPano` (the lane gives it 270 s), and `{ armed: false }` is the
+    // dry run that answers `planned` with the count and the budgets and buys nothing. `buildPlan` rebuilds the plan from
+    // what is stored, with no model, and spends nothing; the screen sends it once when it opens on a `stale` plan.
+    // → LayoutReadResult
+    readLayout: (tourId: string, panoId: string, body: ReadRequest) =>
+      post(`/api/affected-areas/tours/${encodeURIComponent(tourId)}/panos/${encodeURIComponent(panoId)}/layout`, body, { timeoutMs: 270_000 }),
+    // → LayoutPlanResult
+    buildPlan: (tourId: string) => post(`/api/affected-areas/tours/${encodeURIComponent(tourId)}/layout/plan`, {}),
+    // The bytes of one floor's drawing (`DayOneFloor.drawingSha`), an SVG, not JSON: the caller reads `.blob()`, as it does
+    // for `image`. `options.signal` lets it abort a fetch whose floor has since changed.
+    planDrawing: (sha: string, options: ApiRequestOptions = {}) => get(`/api/affected-areas/layout-drawings/${encodeURIComponent(sha)}`, options),
     // → Codebook
     codebook: () => get('/api/affected-areas/codebook'),
     // The marks writes (`mark`, `missed`, `markUnderstanding`, `setThreshold`) are the marks plan's. wire.py names the

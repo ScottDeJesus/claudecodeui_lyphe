@@ -85,6 +85,8 @@ function ChosenArea({ region, face, codebook, onMarkOn }: ChosenAreaProps) {
         <span className="flex min-w-0 items-baseline gap-1 text-sm">
           <span className="min-w-0 truncate font-semibold text-foreground">{kind}</span>
           <span className="flex-none text-muted-foreground">· {view}</span>
+          {/* FILL: placement — "· Counted in {room}" when the area's placement credits a room other than the pano's, "· Seen in {n}
+              photos" when `placement.views` > 1: muted after the view, giving way before the view does. */}
         </span>
       </div>
       <Button

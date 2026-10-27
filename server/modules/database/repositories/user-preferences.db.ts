@@ -89,7 +89,8 @@ function mergeGutters(stored: unknown, incoming: unknown): unknown {
  * RECORD is an entry patch (`src/shared/preferenceEntryPatch.ts`, whose rule this mirrors):
  * `{ <entry key>: <entry> | null }` drops every entry it names, appends its non-null entries in its
  * own order (the newest last) and keeps the newest `ENTRY_LIST_CAP`, and every entry it does not name
- * stands. A list sent as an ARRAY is an older build's whole list, and replaces that list alone.
+ * stands. A list sent as an ARRAY is an older build's whole list, and replaces that list alone (under a
+ * string-only key, `STRING_ONLY_KEYS` below, with its string entries only).
  *
  * `roadmapSeen` is the second document written this way: one `seen` list holding, per roadmap, the
  * completion this user last celebrated (`{ name, at }`). Phone and desktop each stamp it after a
@@ -99,7 +100,10 @@ function mergeGutters(stored: unknown, incoming: unknown): unknown {
  * `filesPins` is the third: one `pinned` list holding the folders pinned on the Files tab's strip, each a
  * bare string — the folder's absolute path, which is its own entry key (`entryKeyOf`). So
  * `{ pinned: { [path]: path } }` adds a pin, `{ pinned: { [path]: null } }` removes it, and neither
- * touches another pin. It is not forward-only: a pin carries no stamp to rewind.
+ * touches another pin. It is not forward-only: a pin carries no stamp to rewind. It is STRING-ONLY
+ * (`STRING_ONLY_KEYS`): an entry that is not a string is not stored, and one already stored is dropped
+ * by the next patch to its list, so `pinned` never holds a non-string entry, however it is sent. The client's `applyEntryPatch`
+ * keeps the same rule (`STRING_ONLY_ENTRY_KEYS`).
  *
  * A STAMP LIST MOVES FORWARD ONLY (`FORWARD_ONLY_KEYS`). The rule is "replace the named entry", except
  * that a `roadmapSeen` patch carrying an OLDER `at` than the stored entry is a stale device's retry and
@@ -110,6 +114,20 @@ function mergeGutters(stored: unknown, incoming: unknown): unknown {
 const ENTRY_LISTED_KEYS: ReadonlySet<string> = new Set(['dispatcher', 'roadmapSeen', 'filesPins']);
 /** The keys whose entries carry an `at` that only moves forward. Mirrors the client's `FORWARD_ONLY_ENTRY_KEYS`. */
 const FORWARD_ONLY_KEYS: ReadonlySet<string> = new Set(['roadmapSeen']);
+/** The keys whose lists hold bare strings only, each its own entry key. Mirrors the client's `STRING_ONLY_ENTRY_KEYS`. */
+const STRING_ONLY_KEYS: ReadonlySet<string> = new Set(['filesPins']);
+
+/** What one key's lists hold beyond the common rule. Mirrors the client's `EntryRule`. */
+type EntryRule = { forwardOnly: boolean; stringOnly: boolean };
+
+const entryRuleOf = (key: string): EntryRule => ({
+  forwardOnly: FORWARD_ONLY_KEYS.has(key),
+  stringOnly: STRING_ONLY_KEYS.has(key),
+});
+
+/** Whether the list the rule governs may hold this entry. */
+const isHeldEntry = (entry: unknown, rule: EntryRule): boolean => !rule.stringOnly || typeof entry === 'string';
+
 /** The most entries one list keeps, newest last. Mirrors the client's own cap. */
 const ENTRY_LIST_CAP = 200;
 
@@ -127,36 +145,41 @@ function storedIsLater(stored: unknown, sent: unknown): boolean {
   return !Number.isNaN(held) && !Number.isNaN(offered) && held > offered;
 }
 
-function patchEntryList(stored: unknown, listPatch: Record<string, unknown>, forward: boolean): unknown[] {
+function patchEntryList(stored: unknown, listPatch: Record<string, unknown>, rule: EntryRule): unknown[] {
   const held = new Map<string, unknown>();
-  if (forward) {
+  if (rule.forwardOnly) {
     for (const entry of Array.isArray(stored) ? stored : []) {
       const key = entryKeyOf(entry);
       if (key !== null) held.set(key, entry);
     }
   }
   // Under a forward-only key an entry older than the stored one is a stale retry: it names nothing and adds nothing.
-  const sent = Object.entries(listPatch).filter(([key, entry]) => !(forward && storedIsLater(held.get(key), entry)));
+  const sent = Object.entries(listPatch).filter(([key, entry]) => !(rule.forwardOnly && storedIsLater(held.get(key), entry)));
   const named = new Set(sent.map(([key]) => key));
   const kept = (Array.isArray(stored) ? stored : []).filter((entry) => {
     const key = entryKeyOf(entry);
-    return key !== null && !named.has(key);
+    return key !== null && !named.has(key) && isHeldEntry(entry, rule);
   });
   // An entry whose own key is not the key it was sent under is malformed and is not stored.
   const added = sent
-    .filter(([key, entry]) => entry !== null && entryKeyOf(entry) === key)
+    .filter(([key, entry]) => entry !== null && entryKeyOf(entry) === key && isHeldEntry(entry, rule))
     .map(([, entry]) => entry);
   return [...kept, ...added].slice(-ENTRY_LIST_CAP);
 }
 
-function mergeEntryLists(stored: unknown, incoming: unknown, forward: boolean): unknown {
+/** A list sent whole (an older build's write) replaces the stored one; under a string-only key it keeps its string entries. */
+const wholeList = (value: unknown, rule: EntryRule): unknown => (
+  rule.stringOnly && Array.isArray(value) ? value.filter((entry) => isHeldEntry(entry, rule)) : value
+);
+
+function mergeEntryLists(stored: unknown, incoming: unknown, rule: EntryRule): unknown {
   if (!isRecord(incoming)) {
     return incoming;
   }
 
   const merged: Record<string, unknown> = isRecord(stored) ? { ...stored } : {};
   for (const [list, value] of Object.entries(incoming)) {
-    merged[list] = isRecord(value) ? patchEntryList(merged[list], value, forward) : value;
+    merged[list] = isRecord(value) ? patchEntryList(merged[list], value, rule) : wholeList(value, rule);
   }
   return merged;
 }
@@ -226,7 +249,7 @@ export const userPreferencesDb = {
         if (key === GUTTERS_KEY || ENTRY_LISTED_KEYS.has(key)) {
           const row = readOne.get(userId, key) as PreferenceRow | undefined;
           const stored = row ? decodePreference(row)?.[1] : undefined;
-          const merged = key === GUTTERS_KEY ? mergeGutters(stored, value) : mergeEntryLists(stored, value, FORWARD_ONLY_KEYS.has(key));
+          const merged = key === GUTTERS_KEY ? mergeGutters(stored, value) : mergeEntryLists(stored, value, entryRuleOf(key));
           upsert.run(userId, key, JSON.stringify(merged));
           continue;
         }

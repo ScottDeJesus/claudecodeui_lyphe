@@ -1,8 +1,11 @@
+import { useLayoutEffect, useRef, useState } from 'react';
+
 import type { RegionShape } from '@/shared/types';
 import { cn } from '@/shared/utils';
 import { PhotoFill } from '@/shared/ui/PhotoFill';
 import { RegionDrawLayer } from '@/shared/ui/RegionDrawLayer';
 import type { DrawnBox } from '@/shared/ui/RegionDrawLayer';
+import { clearBadgePlaces } from '@/shared/ui/regionBadgePlaces';
 
 type RegionImageProps = {
   /** The photo, or `null` for the neutral tile; the regions still draw over it and still select. */
@@ -25,6 +28,21 @@ type RegionImageProps = {
    * naming no region here: nothing is dimmed — an id that matches nothing must not grey the whole photo.
    */
   focusId?: string | null;
+  /**
+   * Points laid on the picture, each a round mark centred at `x`, `y` in 0..1 of the image, over the outlines and under the
+   * badges: where a camera stood (the day-one sketch's panos). With `onPress` a spot is a button named by its `label`, one tab
+   * stop each, before the badges; without it, or while a box is being drawn, an inert mark (a display-only copy in the
+   * Lightbox). Omitted: none.
+   */
+  spots?: { id: string; x: number; y: number; label: string; onPress?: () => void }[];
+  /**
+   * Where the badges stand. `corner`, or omitted: each at its region's box's top-left, as every photo draws them. `clear`: each
+   * at the cheapest of 24 places at and around its box (`clearBadgePlaces`): covering no badge before it and no spot while a
+   * free place stands, then with its middle on no other region's box and touching its own, then with its press clear of its
+   * neighbours, for the picture's size on screen. Site: the day-one sketch, whose numbers crowd wall runs, cabinet runs and
+   * small rooms (MAN-740 rule 5).
+   */
+  badgePlacement?: 'corner' | 'clear';
 };
 
 /** 0..1 → 0..100, held inside the image; a missing or non-finite coordinate reads as the edge. */
@@ -74,8 +92,31 @@ function toPoints(polygon: number[][]): string | null {
  * was given, and every other one dims. `drawing` is how Missed one asks for a region the reader never drew: a
  * `RegionDrawLayer` covers the photo, and while it is there the regions are drawn and inert, so a press on one
  * starts a box instead of choosing it.
+ *
+ * `spots` is how the day-one sketch shows where each pano's camera stood on the plan's drawing: a round mark centred
+ * on its point (`.vv-region-spot`, `verve/spots.css`), drawn over the outlines and under the badges, so a spot never
+ * covers a number; a button named by its label when it can be pressed. A spot carries no number and no word on the
+ * picture; its name is for the keyboard and the screen reader. `badgePlacement="clear"` is how the same sketch keeps its
+ * numbers readable where they crowd: each badge steps off any badge before it and off every spot, and off other outlines.
  */
-export function RegionImage({ src, alt, width, height, regions, selectedId = null, onSelect: onSelectRegion, drawing = null, focusId = null }: RegionImageProps) {
+export function RegionImage({
+  src, alt, width, height, regions, selectedId = null, onSelect: onSelectRegion, drawing = null, focusId = null, spots = [], badgePlacement = 'corner',
+}: RegionImageProps) {
+  // The box, measured for `clear` badges alone: where a badge can stand depends on how big the picture is on screen.
+  const boxRef = useRef<HTMLDivElement>(null);
+  // The picture's size on screen, for `clear` badges: kept by a ResizeObserver, null until its first answer (every badge
+  // stands at its corner until then). Never measured for `corner` badges, so every other photo draws as it always has.
+  const [size, setSize] = useState<{ width: number; height: number } | null>(null);
+  useLayoutEffect(() => {
+    const box = boxRef.current;
+    if (badgePlacement !== 'clear' || box === null) return undefined;
+    // The box's own window's observer: a Lightbox copy can stand in a popped-out host window.
+    const Observer = box.ownerDocument.defaultView?.ResizeObserver ?? ResizeObserver;
+    const observer = new Observer(([entry]) => setSize({ width: entry.contentRect.width, height: entry.contentRect.height }));
+    observer.observe(box);
+    return () => observer.disconnect();
+  }, [badgePlacement]);
+  const places = badgePlacement === 'clear' && size !== null ? clearBadgePlaces(regions, spots, size.width, size.height) : null;
   // Region selection is off while a box is being drawn: with no handler, no outline is pressable and every badge is
   // an inert span, so the draw layer's press is the only thing a pointer on the photo can mean.
   const onSelect = drawing ? undefined : onSelectRegion;
@@ -86,7 +127,7 @@ export function RegionImage({ src, alt, width, height, regions, selectedId = nul
   const stackOrder = [...regions].sort((a, b) => boxArea(b.box) - boxArea(a.box));
 
   return (
-    <div className="relative w-full" style={{ aspectRatio: toAspectRatio(width, height) }}>
+    <div ref={boxRef} className="relative w-full" style={{ aspectRatio: toAspectRatio(width, height) }}>
       <PhotoFill src={src} alt={alt} fit="fill" />
 
       {/* The layer takes no pointer itself, so an empty part of the photo still passes the press to whatever is
@@ -124,14 +165,26 @@ export function RegionImage({ src, alt, width, height, regions, selectedId = nul
         })}
       </svg>
 
+      {/* Spots before the badges: drawn under them, so a number is never covered by a camera's mark. */}
+      {spots.map((spot) => {
+        // Centred on its point by its paint's translate; the point is held inside the image as a badge's corner is.
+        const place = { left: `${toPercent(spot.x)}%`, top: `${toPercent(spot.y)}%` };
+        return spot.onPress && !drawing ? (
+          <button key={spot.id} type="button" style={place} aria-label={spot.label} onClick={spot.onPress} className="vv-region-spot absolute" />
+        ) : (
+          <span key={spot.id} style={place} aria-hidden="true" className="vv-region-spot absolute" />
+        );
+      })}
+
       {regions.map((region) => {
         const selected = region.id === selectedId;
-        // At the box's top-left, kept wholly inside the image: the percentage is clamped to 0..100 and `min()`
-        // pulls a badge near the right or bottom edge back by its own on-screen size (a custom property
-        // `.vv-region-badge` declares), so a region in a corner never has its number cut off.
+        // At the box's top-left (or, `clear`, where `clearBadgePlaces` stood it), kept wholly inside the image: the
+        // percentage is clamped to 0..100 and `min()` pulls a badge near the right or bottom edge back by its own
+        // on-screen size (a custom property `.vv-region-badge` declares), so a region in a corner never has its number cut off.
+        const at = places?.[region.id] ?? [region.box[0], region.box[1]];
         const place = {
-          left: `min(${toPercent(region.box[0])}%, calc(100% - var(--vv-region-badge-extent)))`,
-          top: `min(${toPercent(region.box[1])}%, calc(100% - var(--vv-region-badge-extent)))`,
+          left: `min(${toPercent(at[0])}%, calc(100% - var(--vv-region-badge-extent)))`,
+          top: `min(${toPercent(at[1])}%, calc(100% - var(--vv-region-badge-extent)))`,
         };
         return onSelect ? (
           <button

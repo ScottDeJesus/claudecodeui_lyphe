@@ -38,7 +38,7 @@ async function readBody(response: Response): Promise<unknown> {
 const ACCOUNTS_CHANGED_EVENT = 'cloudcli:accounts-changed';
 
 /**
- * Tells the account button the picture moved under it. Fired when the Re-login window closes (the
+ * Tells the account provider the picture moved under it. Fired when the Re-login window closes (the
  * panel's door and Settings' door both) and when the Set up window closes: each ran a command this
  * app cannot see the end of, so the panel re-reads rather than going on showing the old account
  * until its next tick.
@@ -50,9 +50,9 @@ export function announceAccountsChanged(): void {
 /**
  * The Claude accounts the door holds, and the three writes that change them.
  *
- * Used by the accounts module's AccountRailButton, which owns the single instance — the views rail
- * renders the button once and stands whether the chat list shows or is collapsed, so there is exactly
- * one poller in the app.
+ * Used by the accounts module's AccountsProvider, which owns the single instance — it is mounted once
+ * above the views rail and the main region, so there is exactly one poller in the app however many
+ * places draw the panel.
  *
  * ONE PICTURE, THREE WRITES. `GET /api/accounts` answers the door's own picture, tagged with
  * `reachable`; `use`/`auto`/`remove` are the writes that choose, unchoose and drop an account.
@@ -70,18 +70,24 @@ export function useClaudeAccounts() {
   // True while any write is in flight, so the rows can refuse a second press.
   const [busy, setBusy] = useState(false);
   // The server's refusal of the LAST write, shown inline as a warn banner. Cleared when the next
-  // write starts and when the panel closes: a refusal describes one attempt, never the panel's
-  // standing state, and one left standing would greet the next person who opens it.
+  // write starts, when the popover closes or the widget is folded, and when the next picture lands: a
+  // refusal describes one attempt, never the panel's standing state, and one left standing would greet
+  // the next person who opens it — or, in the gutter widget that is on screen all day with no close to
+  // end it, every glance until the next write.
   const [error, setError] = useState<string | null>(null);
 
-  // Mount flag: a poll that resolves after the button unmounted (a sign-out, or the rail leaving the tree) must not set state.
+  // Mount flag: a poll that resolves after the provider unmounted (a sign-out, or the workspace leaving the tree) must not set state.
   const mountedRef = useRef(true);
   // The in-flight guard read synchronously — `busy` is a render value and lands too late to
   // stop a second press in the same tick.
   const writingRef = useRef(false);
 
   const store = useCallback((next: ClaudeAccounts) => {
-    if (mountedRef.current) setData(next);
+    if (!mountedRef.current) return;
+    setData(next);
+    // The picture is the fact a refusal was about, and this one is newer than the refusal: a failed write
+    // re-reads nothing, so only a later read — the poll, an announced change, a landed write — ends it.
+    setError(null);
   }, []);
 
   const refresh = useCallback(async () => {
@@ -153,7 +159,7 @@ export function useClaudeAccounts() {
   /** The door's `remove <slug>`: drop the account and its token; a chosen account is unchosen and the dispatcher kicked. */
   const removeAccount = useCallback((slug: string) => doorWrite(() => api.accounts.remove(slug)), [doorWrite]);
 
-  /** Drops a standing refusal. The panel calls it on close; nothing else may need it. */
+  /** Drops a standing refusal. The popover calls it on close and the gutter widget on fold; a landed picture drops it too. */
   const clearError = useCallback(() => setError(null), []);
 
   return { data, refresh, chooseAccount, setAuto, removeAccount, busy, error, clearError };

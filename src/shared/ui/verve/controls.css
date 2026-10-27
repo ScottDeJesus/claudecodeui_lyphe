@@ -378,6 +378,25 @@
  * fill plus the amber figure already carry the warning in two channels. */
 .vv-meter--inline.vv-meter--warn .vv-meter__value::before { content: none; }
 
+/* Ring register — a pie with its middle cut out for the label, 28px across. The arc fills clockwise from 12 o'clock
+ * (the svg is turned a quarter back, a circle's own start being 3 o'clock) over a full-circle track. Both circles are
+ * drawn at pathLength 100, so a dash of 100 and an offset of (100 - percent) is the whole sweep. The arc's ink is the
+ * nearest data-tone container's `--tone-dot` (README rule 4) and no colour of its own: without one it falls back to
+ * the meter's accent, or the warn amber. The sweep and the colour ease over the move duration; reduced motion is still. */
+.vv-meter--ring { position: relative; display: grid; width: 28px; height: 28px; place-items: center; flex: none; }
+.vv-meter__ring { position: absolute; inset: 0; width: 100%; height: 100%; transform: rotate(-90deg); }
+.vv-meter__ring-track,
+.vv-meter__arc { fill: none; stroke-width: 4.5; }
+.vv-meter__ring-track { stroke: var(--border-strong); }
+.vv-meter__arc {
+  stroke: var(--tone-dot, var(--accent));
+  stroke-dasharray: 100;
+  transition: stroke-dashoffset var(--dur-move) var(--ease-enter), stroke var(--dur-move) var(--ease-enter);
+}
+.vv-meter--ring.vv-meter--warn .vv-meter__arc { stroke: var(--tone-dot, var(--warn-dot)); }
+.vv-meter__ring-label { position: relative; font-size: 9px; font-weight: 700; line-height: 1; letter-spacing: -0.01em; color: var(--ink-muted); }
+@media (prefers-reduced-motion: reduce) { .vv-meter__arc { transition: none; } }
+
 /* ---------------------------------------------------------------- Spinner */
 .vv-spinner__ring {
   border-radius: 50%;

@@ -100,9 +100,11 @@ section: README/002 Current File Layout/003 The exception: `list/claude/session-
 conversation's CLI into a tmux server through it instead of as a child of the API, which is what
 lets a chat session outlive an API restart. There is one CLI per conversation, not per message:
 the first message spawns it and every later one is pushed into its open input stream
-(`claude-runtime.provider.js` §`queryClaudeSDK`; the queue, the idle closer and the live-vs-launch
-setting split are in `list/claude/chat-process.ts`, and the bounded reading of the installed CLI
-that split compares against is `list/claude/installed-cli-version.ts`). `claude-runtime.provider.js` imports `armKeepaliveSpawn` and
+(`claude-runtime.provider.js` §`queryClaudeSDK`; the queue and the idle closer are in
+`server/shared/prompt-stream.ts` — `list/claude/chat-process.ts` re-exports them, so the runtime's
+import is unchanged — the live-vs-launch setting split is in `list/claude/chat-process.ts`, and
+the bounded reading of the installed CLI that split compares against is
+`list/claude/installed-cli-version.ts`). `claude-runtime.provider.js` imports `armKeepaliveSpawn` and
 `keepaliveReadopt` from it; `server/index.ts` calls `readoptKeepaliveSessions` once per boot
 through the providers barrel — before `server.listen`, except on a handover boot, where it waits
 for the retiring server to exit first. The mechanism, that exception, its gate, its fallback, and
@@ -125,7 +127,7 @@ with code N"; where this check did not run (a node's project) the host names an 
 that message itself. The run loop's catch stays silent only for a process that has had a turn (or a re-adopted
 one): a run that fails before it opens its first turn failed the message it was started for, and says so.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/chat-process.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-project-folder.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-runtime.provider.js, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/installed-cli-version.ts
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/chat-process.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-project-folder.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-runtime.provider.js, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/installed-cli-version.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/prompt-stream.ts
 
 ## MAN-700 — What Each Facet Does
 section: README/004 What Each Facet Does

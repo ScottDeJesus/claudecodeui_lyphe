@@ -138,8 +138,8 @@ type DeepseekBalanceReadoutProps = {
 
 /**
  * The money left on this host's DeepSeek account.
- * Used by the accounts module's AccountPopover, which draws it in the panel from the ONE reading
- * `useDeepseekBalance` holds in AccountRailButton.
+ * Used by the accounts module's AccountPanelBody, which draws it in the panel from the ONE reading
+ * `useDeepseekBalance` holds in AccountsProvider.
  *
  * Deliberately NOT a Meter. Every other reading on this surface is a share of a limit, and the
  * Meter's whole business is the bar that share is drawn on — but a balance has no limit to be a

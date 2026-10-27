@@ -18,6 +18,7 @@ import {
   USER_NOTIFICATION_PREFERENCES_TABLE_SCHEMA_SQL,
   VAPID_KEYS_TABLE_SCHEMA_SQL,
 } from '@/modules/database/schema.js';
+import { COMPANION_SCHEMA_SQL } from '@/modules/database/companion-schema.js';
 import { FOLLOWUPS_SCHEMA_SQL } from '@/modules/database/followups-schema.js';
 import { KANBAN_SCHEMA_SQL } from '@/modules/database/kanban-schema.js';
 import { MEMORY_SCHEMA_SQL } from '@/modules/database/memory-schema.js';
@@ -570,6 +571,20 @@ const addSessionEffortColumn = (db: Database): void => {
 };
 
 /**
+ * Adds the `permission_mode` column that records the permission mode a session last ran under.
+ *
+ * Recorded beside `model` and `effort` on every send, so a send the companion relays can run in
+ * the mode the chat's own composer last used. Left NULL for pre-existing rows: a chat nobody has
+ * sent on since this column landed has no recorded mode, and `latestPermissionMode` skips NULLs.
+ */
+const addSessionPermissionModeColumn = (db: Database): void => {
+  const sessionsTableInfo = getTableInfo(db, 'sessions');
+  const columnNames = sessionsTableInfo.map((column) => column.name);
+
+  addColumnToTableIfNotExists(db, 'sessions', columnNames, 'permission_mode', 'TEXT');
+};
+
+/**
  * Adds `session_drafts.last_claimed_queue_id`: the id of the queued message the dispatcher last
  * sent for a scope. A save that carries that id again — a browser retrying a request whose response
  * was lost, after the server had stored, claimed and sent it — is ignored instead of sending the
@@ -687,6 +702,7 @@ export const runMigrations = (db: Database) => {
     addProviderSessionIdMapping(db);
     addSessionModelColumn(db);
     addSessionEffortColumn(db);
+    addSessionPermissionModeColumn(db);
     addForkedFromSessionIdColumn(db);
     addSimpleListAtColumn(db);
     addSessionUserStateColumns(db);
@@ -713,6 +729,10 @@ export const runMigrations = (db: Database) => {
     // The followups table: a chat's own next steps and known gaps. It references `sessions` (its
     // cascade is what removes a deleted chat's items) and `users`, both of which exist by here.
     db.exec(FOLLOWUPS_SCHEMA_SQL);
+    // The companion's tables: Kaylee's per-account state, exchange and cards (each cascading from
+    // `users`), and the briefs she has relayed into chats (cascading from `sessions`, which exists
+    // by here with its `permission_mode` column).
+    db.exec(COMPANION_SCHEMA_SQL);
 
     db.exec('CREATE INDEX IF NOT EXISTS idx_session_ids_lookup ON sessions(session_id)');
     db.exec('CREATE INDEX IF NOT EXISTS idx_sessions_provider_session_id ON sessions(provider_session_id)');

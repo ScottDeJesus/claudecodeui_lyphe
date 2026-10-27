@@ -23,9 +23,10 @@ import { readUserPreference, subscribeToUserPreferences, writeUserPreference } f
  * defaults put `runner` first on the left, collapsed — the state that costs the chat nothing — `roadmap`
  * under the runner, OPEN, because the operator asked for it beside the Runs widget and a widget he asked
  * for is seen without hunting, `subagents` under the roadmap, open; on the right `followups` first, OPEN
- * for the same reason (he asked for the chat's next steps to fill in by themselves), then `memory`
- * collapsed, `embed` under it, collapsed until a chat names a page for it, and `notes` under embed,
- * collapsed: the account's cards are the same in every chat, and folded costs a chat nothing.
+ * for the same reason (he asked for the chat's next steps to fill in by themselves), then `accounts`
+ * under it, OPEN, because he asked for the account usage panel and a widget he asked for is seen without
+ * hunting, then `memory` collapsed, `embed` under it, collapsed until a chat names a page for it, and `notes`
+ * under embed, collapsed: the account's cards are the same in every chat, and folded costs a chat nothing.
  *
  * THE STORED SHAPE is `{ fallback, sessions: { <sessionId>: placements } }`, and an older build's
  * flat record reads as the fallback with no sessions — so an arrangement made before this is the one
@@ -55,6 +56,12 @@ const DEFAULT_PLACEMENTS: ChatGutterPlacements = {
   // it — which gains it through the parser's own repair, at order 0 on the right — it sorts ahead of the widget
   // that holds that rank, and nothing the reader placed changes order relative to the rest.
   followups: { side: 'right', order: 0, open: true },
+  // OPEN, and directly under the next steps: the operator asked for the account usage panel — the two windows, both
+  // balances, every account's figures and the switch — and a widget he asked for is seen without hunting. It shares
+  // `followups`' rank and is the SECOND key on purpose: ties break in key order, so it sorts right behind `followups`
+  // and ahead of every widget that holds that rank in a stored arrangement. Where Next steps stands is the
+  // arrangement's to say, so `parsePlacements` seats a missing `accounts` on whatever place `followups` holds.
+  accounts: { side: 'right', order: 0, open: true },
   runner: { side: 'left', order: 0, open: false },
   // Open, and on the left under the runner, for the reason the header gives: it opens itself in every chat.
   // A stored arrangement that predates it gains it through the parser's own repair.
@@ -115,6 +122,12 @@ function parsePlacement(value: unknown): GutterWidgetPlacement | null {
  * A widget whose entry is missing or unreadable takes its default place — `subagents`, whose id an
  * older build never stored, arrives this way — and each side's ranks are then made dense, so a
  * record where two widgets share a rank draws in a settled order instead of an accidental one.
+ *
+ * `accounts` is the one whose default place is a RELATION, not a rank: an arrangement that predates it arrives with
+ * it on `followups`' own side and rank, and the tie breaks in key order, so it draws directly under Next steps
+ * wherever the reader has put them. A fixed rank would land it under whatever holds that rank in a stored record —
+ * measured on the operator's own, most of his chats' arrangements stand from before Next steps existed and hold
+ * `memory` at the top of the right side.
  */
 function parsePlacements(raw: unknown): ChatGutterPlacements {
   // Seeded from the defaults rather than built empty: the record is complete by TYPE, not by a cast,
@@ -123,6 +136,12 @@ function parsePlacements(raw: unknown): ChatGutterPlacements {
   for (const widget of GUTTER_WIDGET_ORDER) {
     const parsed = isRecord(raw) ? parsePlacement(raw[widget]) : null;
     if (parsed) result[widget] = parsed;
+  }
+  if (!(isRecord(raw) && parsePlacement(raw.accounts))) {
+    // The same side and rank as Next steps: `followups` is the first key and `accounts` the second, so the dense pass
+    // below puts it directly behind, ahead of anything else on that rank.
+    const { side, order } = result.followups;
+    result.accounts = { ...DEFAULT_PLACEMENTS.accounts, side, order };
   }
 
   // Ranks are made DENSE per side, in the order they were stored: two widgets that shared a rank

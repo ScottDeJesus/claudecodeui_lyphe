@@ -384,6 +384,9 @@
     "notes": {
       "title": "메모"
     },
+    "accounts": {
+      "title": "계정"
+    },
     "open": "{{name}} 열기",
     "collapse": "접기",
     "dragHint": "양쪽 중 한쪽으로 드래그",

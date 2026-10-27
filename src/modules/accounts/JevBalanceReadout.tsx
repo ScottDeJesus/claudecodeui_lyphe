@@ -14,7 +14,7 @@ type JevBalanceReadoutProps = {
 
 /**
  * What is left of the Jev (TypeSafe) credit.
- * Used by the accounts module's AccountPopover, directly under the DeepSeek balance.
+ * Used by the accounts module's AccountPanelBody, under the DeepSeek balance and its rate line.
  *
  * Unlike that figure this one is NOT the vendor's: TypeSafe publishes no balance route, so it is
  * the credit the operator seeded (`~/.claude/state/jev_account.json`) minus what this host metered

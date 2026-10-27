@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useLocation, useSearchParams } from 'react-router-dom';
 
 import { ROADMAP_LANDING_PARAM as ROADMAP_PARAM, RUNNER_LANDING_PARAM as RUNNER_PARAM } from '@/shared/constants';
 import type { AppTab } from '@/shared/types';
@@ -29,6 +29,13 @@ import type { AppTab } from '@/shared/types';
  * The strip is `replace`: a landing is a redirection, not a place, and Back must not return to a URL
  * that would carry the operator to the same card, or the same roadmap, again.
  *
+ * EVERY NAVIGATION TO A LANDING IS A LANDING, WHATEVER THE NAME. The take effect keys on the location's
+ * `key` as well as on the two names, because a name alone cannot tell two presses of the same landing
+ * from one: a second press that reaches the router before the strip of the first has rendered (a double
+ * click on Answer) puts `?runner=<plan>` back at the value the hook last saw, and an effect keyed on the
+ * names alone would not run again: the param would stay in the URL and every later press of that plan
+ * would land nowhere. A navigation always carries a fresh `key`, so each press takes its name and strips it.
+ *
  * A LANDING THE OPERATOR WALKS AWAY FROM IS DROPPED. Each name is retired by the tab's own signal, which
  * needs the tab mounted and its data read; an operator who presses another tab before that has declined
  * the landing, and a name still held would fire on his next plain visit (writing the stored roadmap) and
@@ -47,6 +54,7 @@ export function useRunnerLanding({ activeTab, setActiveTab }: {
   clearOpenRoadmap: () => void;
 } {
   const [searchParams, setSearchParams] = useSearchParams();
+  const { key: locationKey } = useLocation();
   // An empty value is not a name (`landingPathOf` cannot write one, and the widget writes a roadmap's own
   // name), so it moves nothing at all — no tab, no strip, no stored selection — exactly as a missing
   // param does. Read here so the effect below keys on the two names it acts on.
@@ -86,7 +94,7 @@ export function useRunnerLanding({ activeTab, setActiveTab }: {
       if (roadmap !== null) next.delete(ROADMAP_PARAM);
       return next;
     }, { replace: true });
-  }, [runner, roadmap, setSearchParams]);
+  }, [runner, roadmap, locationKey, setSearchParams]);
 
   // The landing itself: the tab comes forward as soon as a name is held. It keys on the HELD names, never
   // on the params — by this commit the effect above has already stripped them, so a param read here would

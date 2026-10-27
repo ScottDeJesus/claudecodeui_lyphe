@@ -386,6 +386,9 @@
     "notes": {
       "title": "Notas"
     },
+    "accounts": {
+      "title": "Cuentas"
+    },
     "open": "Abrir {{name}}",
     "collapse": "Contraer",
     "dragHint": "Arrastra a cualquier lado",

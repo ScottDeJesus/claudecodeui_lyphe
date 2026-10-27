@@ -385,6 +385,9 @@
     "notes": {
       "title": "Notlar"
     },
+    "accounts": {
+      "title": "Hesaplar"
+    },
     "open": "{{name}} aç",
     "collapse": "Daralt",
     "dragHint": "İki yandan birine sürükleyin",

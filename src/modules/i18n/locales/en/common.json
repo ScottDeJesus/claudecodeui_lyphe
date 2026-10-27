@@ -1726,6 +1726,9 @@
     "notes": {
       "title": "Notes"
     },
+    "accounts": {
+      "title": "Accounts"
+    },
     "followups": {
       "title": "Next steps"
     },
@@ -2958,6 +2961,146 @@
         "bad_threshold": "A line has to be between 0% and 100%",
         "failed": "The line could not be set",
         "other": "Setting the line was refused ({{reason}})"
+      }
+    },
+    "dayOne": {
+      "title": "Day-one sketch",
+      "floorSwitch": "Floor shown",
+      "floorNone": "No floor given",
+      "status": {
+        "read_one": "{{read}} of {{count}} pano read",
+        "read_other": "{{read}} of {{count}} panos read",
+        "drawn": "drawn {{when}}",
+        "drawnOlder": "drawn {{when}} from older reads",
+        "calibration": "from the calibration reads",
+        "partlyCalibration": "partly from the calibration reads",
+        "redrawing": "redrawing…"
+      },
+      "empty": {
+        "noneTitle": "No room layout read yet",
+        "noneMessage": "Read the room layout, above, and the tour's own panos draw a rough floor plan: every room measured from its camera and pinned to its neighbours through the doorways both cameras see.",
+        "noneRefusedMessage": "The warning above says why nothing can be read now. Once it clears, Read the room layout draws a rough floor plan from the tour's own panos.",
+        "unknownTitle": "No plan to show",
+        "unknownMessage": "shadow-connector didn't say where this tour's room layout stands. Read the room layout, above, to draw a plan.",
+        "unknownRefusedMessage": "shadow-connector didn't say where this tour's room layout stands, and the warning above says why nothing can be read now.",
+        "unavailableTitle": "No plan could be drawn",
+        "unavailableMessage": "The room layout was read, but no room could be measured from it, or DocuSketch couldn't be read.",
+        "pendingTitle": "The plan isn't drawn yet",
+        "pendingMessage": "This tour's room layout is read, but its plan hasn't been drawn from those reads yet."
+      },
+      "pending": {
+        "drawing": "Drawing the plan from the stored room-layout reads…"
+      },
+      "press": {
+        "viewsNeedRead_one": "{{count}} view needs a room-layout read",
+        "viewsNeedRead_other": "{{count}} views need a room-layout read",
+        "allRead": "Every pano's room layout is read.",
+        "planning": "Working out what a room-layout read would cost…",
+        "budget": "Budget today: {{tourUsed}} of {{tourCap}} reads on this tour, {{fleetUsed}} of {{fleetCap}} across all tours",
+        "read": "Read the room layout",
+        "reading": "Reading the room layout…"
+      },
+      "refused": {
+        "flag_off": "Room-layout reading is switched off in shadow-connector",
+        "budget": "Today's room-layout budget is spent",
+        "budgetTour": "This tour's room-layout budget for today is spent: {{used}} of {{cap}} reads",
+        "budgetFleet": "Today's room-layout budget is spent: {{used}} of {{cap}} reads across all tours",
+        "permanent": "The layout model turned every view down; it may have been retired",
+        "context_degraded": "This tour's room list couldn't be read, so no room layout is read until it can be",
+        "other": "Room-layout reading was refused ({{reason}})"
+      },
+      "plan": {
+        "alt": "Day-one sketch: {{rooms}} drawn from the panos",
+        "altFloor": "Day-one sketch, floor {{floor}}: {{rooms}} drawn from the panos",
+        "loading": "Loading the plan's drawing…",
+        "drawingFailed": "The plan's drawing didn't arrive. Its rooms and everything placed in them are still listed.",
+        "spotsLegend": "Where each 360° photo was taken: press one to open it"
+      },
+      "spot": "{{room}} 360° photo",
+      "spotNth": "{{room}} 360° photo, {{n}} of {{total}}",
+      "scale": {
+        "verified": "Camera at {{camera}} in, from {{from}}; the stand says {{stand}}",
+        "oneSource": "Camera at {{camera}} in, from {{from}} alone; the stand says {{stand}}",
+        "unverified": "Not checked against the photos: the stand's {{stand}} in",
+        "doorSlabs_one": "a door slab",
+        "doorSlabs_other": "{{count}} door slabs",
+        "floorTile": "the floor tile",
+        "appliances_one": "an appliance's width",
+        "appliances_other": "{{count}} appliance widths"
+      },
+      "pins": {
+        "single": "One room: nothing to pin it to",
+        "both": "Both rooms pinned through a doorway",
+        "all_one": "{{count}} room pinned through a doorway",
+        "all_other": "All {{count}} rooms pinned through doorways",
+        "some_one": "{{pinned}} of {{count}} room pinned through doorways",
+        "some_other": "{{pinned}} of {{count}} rooms pinned through doorways",
+        "groups_one": "{{count}} group",
+        "groups_other": "{{count}} groups set side by side",
+        "loops_one": "{{count}} loop closes within {{ft}} ft",
+        "loops_other": "{{count}} loops close within {{ft}} ft"
+      },
+      "rooms": {
+        "title": "Rooms on the sketch",
+        "size": "{{width}} × {{length}} ft",
+        "widthOnly": "{{width}} ft wide · length not closed",
+        "lengthOnly": "{{length}} ft long · width not closed",
+        "noSize": "Size not closed",
+        "area": "{{sf}} sf",
+        "perimeter": "{{ft}} ft around",
+        "ceiling": "ceiling {{ft}} ft",
+        "noCeiling": "ceiling not measured",
+        "unpinned": "Not pinned to another room: where it sits on the drawing isn't measured against the rest",
+        "notRectangle": "Not a rectangle: drawn as the floor it was read as",
+        "nothing": "No area, fixture or contents placed here",
+        "groups": {
+          "area": "Areas",
+          "fixture": "Fixtures",
+          "contents": "Contents"
+        }
+      },
+      "sides": {
+        "all": "All four sides measured",
+        "allWithin": "All four sides measured, within {{band}} ft",
+        "measured": "{{sides}} measured",
+        "measuredWithin": "{{sides}} measured, within {{band}} ft",
+        "pinned": "{{sides}} from the next room",
+        "pinnedWithin": "{{sides}} from the next room, within {{band}} ft",
+        "door_slab": "{{sides}} at the door frame",
+        "door_slabWithin": "{{sides}} at the door frame, within {{band}} ft",
+        "open": "{{sides}} open: no wall reached",
+        "name": {
+          "left": "left",
+          "right": "right",
+          "front": "front",
+          "back": "back"
+        }
+      },
+      "checks": {
+        "sketch": "Sketch {{width}} × {{length}} ft",
+        "sketchArea": "Sketch {{sf}} sf",
+        "report": "First report {{measures}}",
+        "none": "Not in the job's sketch or its first drying report"
+      },
+      "seenIn_one": "Seen in {{count}} photo",
+      "seenIn_other": "Seen in {{count}} photos",
+      "countedIn": "Counted in {{room}}",
+      "kinds": {
+        "contents": "Contents",
+        "other": "Other fixture",
+        "range": "Range",
+        "refrigerator": "Refrigerator",
+        "dishwasher": "Dishwasher",
+        "washer": "Washer",
+        "dryer": "Dryer",
+        "toilet": "Toilet",
+        "water_heater": "Water heater",
+        "sink": "Sink",
+        "vanity": "Vanity",
+        "tub": "Tub",
+        "shower": "Shower",
+        "cabinets": "Cabinets",
+        "hvac_unit": "HVAC unit"
       }
     }
   },

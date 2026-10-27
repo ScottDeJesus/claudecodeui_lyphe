@@ -41,6 +41,8 @@ function regionMeta(region: Region, t: TFunction): string {
     t(REGION_LOOK[regionState(region)].wordKey),
     region.confidence === null ? null : t('affectedAreas.region.sure', { percent: Math.round(region.confidence * 100) }),
     t(`affectedAreas.region.basis.${region.basis}`),
+    // FILL: placement — "Counted in {room}" (`affectedAreas.dayOne.countedIn`) when `region.placement` credits a room other than the
+    // pano's (its key and floor against the pano's), and "Seen in {n} photos" (`affectedAreas.dayOne.seenIn`) when `placement.views` > 1.
   ].filter((part) => part !== null).join(' · ');
 }
 

@@ -3,7 +3,8 @@
  * it, and Gallery, Verve's §10 Media gallery.
  *
  * RegionImage's focus and drawing (`.vv-region--dim`, `.vv-region-draw`, `.vv-region--drawing`) sit with its
- * outline rules below; SegmentedControl and DataTable are not photographs and paint in data.css.
+ * outline rules below; SegmentedControl and DataTable are not photographs and paint in data.css. RegionImage's
+ * spots (`.vv-region-spot`) paint in spots.css, opened beside this sheet when it stood at 280 lines.
  *
  * SphereView draws its outlines and badges with the `.vv-region*` rules below, unchanged and toned by `data-tone`;
  * what it adds (the box, and two overrides for the library's DOM) is its own section.

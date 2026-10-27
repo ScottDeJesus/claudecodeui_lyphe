@@ -68,7 +68,7 @@ type ClaudeAccountRowsProps = {
  * box is signed in to but the store does not hold, the automatic switch, the last switch and why,
  * and the one sentence that says what a switch does to work already running.
  *
- * Used by the accounts module's AccountPopover, after the meters and the balances; the fakes beside
+ * Used by the accounts module's AccountPanelBody, after the meters and the balances; the fakes beside
  * it (`claude-accounts-fake.ts`) draw every state without a server, so a state is reviewable before
  * the door answers one.
  *
@@ -76,7 +76,7 @@ type ClaudeAccountRowsProps = {
  * not answer draws that calm line instead.
  */
 export function ClaudeAccountRows(props: ClaudeAccountRowsProps) {
-  // A clock handed in is the panel's own, so the section shares the popover's minute rather than
+  // A clock handed in is the panel's own, so the section shares the panel body's minute rather than
   // keeping a second interval. Composed alone (the fakes' fixture), it keeps its own.
   return props.nowMs === undefined
     ? <SelfTickingAccountRows {...props} />

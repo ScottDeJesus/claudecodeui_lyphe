@@ -15,8 +15,8 @@ export type JevBalance = { creditUsd: number; spentUsd: number; leftUsd: number 
 /**
  * What is left of the Jev credit the operator seeded, by this host's own metering.
  *
- * Used by the accounts module's AccountRailButton, which owns the ONE instance and hands the reading to
- * the panel, exactly as `useDeepseekBalance` does. It reads `/api/jev/summary` — the one reader,
+ * Used by the accounts module's AccountsProvider, which owns the ONE instance and hands the reading to
+ * every home of the panel, exactly as `useDeepseekBalance` does. It reads `/api/jev/summary` — the one reader,
  * a local file sum, no vendor call — so it needs no forced-read floor. `null` covers both "not read
  * yet" and "no account seeded": either way there is no figure to draw, and neither is zero.
  */

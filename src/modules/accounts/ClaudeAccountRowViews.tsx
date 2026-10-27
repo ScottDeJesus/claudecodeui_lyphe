@@ -1,6 +1,7 @@
 import { MoreHorizontal } from 'lucide-react';
 
 import { accountInitials } from '@/modules/accounts/utils/accountInitials';
+import { resetsLine } from '@/modules/accounts/UsageMeters';
 import { ActionMenu, Avatar } from '@/shared/ui';
 import type { ClaudeAccountRow } from '@/shared/types';
 import { formatRelativeTime, formatShortDate } from '@/shared/utils';
@@ -85,6 +86,12 @@ export function AccountRowView({ account, hue, nowMs, busy, autoWhy, held, onUse
   const canUse = account.token === 'saved' && !refused && !account.in_use;
   const needsSetup = account.token === 'none' || refused;
   const age = readingAgeInWords(account.reading, nowMs);
+  // The account's own weekly reset, in the meters' words, so each row says when its week turns
+  // over and how many days away that is. A reset already past belongs to a closed week: no line.
+  const weekResetsAt = account.reading?.week_resets ?? null;
+  const weekResets = weekResetsAt !== null && weekResetsAt * 1000 > nowMs
+    ? resetsLine(new Date(weekResetsAt * 1000).toISOString(), 'Weekly resets')
+    : undefined;
   // A refused token's saved expiry promises what the amber line below denies. The row shows the
   // wall, not the date; `checking` keeps its date, qualified by its own state word.
   const tokenDate = refused ? null : tokenDateInWords(account.expires_at, nowMs);
@@ -106,6 +113,7 @@ export function AccountRowView({ account, hue, nowMs, busy, autoWhy, held, onUse
         {figuresInPoints(account.reading)}
         {age !== null && <span className="text-ink-faint"> · {age}</span>}
       </span>
+      {weekResets !== undefined && <span className="block text-xs text-ink-faint">{weekResets}</span>}
       {tokenDate !== null && <span className="block text-xs text-ink-faint">{tokenDate}</span>}
       {refused && (
         <span data-tone="warn" className="block text-xs leading-relaxed text-tone-ink">

@@ -3366,9 +3366,10 @@ export type GutterSide = 'left' | 'right';
 /** The widgets a chat gutter can hold: the dispatcher's plan cards, in the operator's own order, the
  *  roadmap the Roadmap tab shows at a column's width, the memory-intake rows the session proposed, the
  *  subagents it has pinned, the embed — a live page the chat named, or the reader typed in — the
- *  account's notes, and the open chat's own next steps and known gaps (`followups`). These are the ids
+ *  account's notes, the open chat's own next steps and known gaps (`followups`), and the Claude accounts panel
+ *  — the usage windows, both balances, every account's figures and the switch (`accounts`). These are the ids
  *  the DOM carries as `data-widget`, and the keys `useGutterPlacements` stores its records under. */
-export type GutterWidgetId = 'runner' | 'roadmap' | 'memory' | 'subagents' | 'embed' | 'notes' | 'followups';
+export type GutterWidgetId = 'runner' | 'roadmap' | 'memory' | 'subagents' | 'embed' | 'notes' | 'followups' | 'accounts';
 
 /** One widget's place in its side's stack and whether it is expanded. `order` is the sort key within
  *  the side, dense from 0 after every move; a collapsed widget is still placed — it draws as a tab

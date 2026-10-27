@@ -12,7 +12,7 @@ type DeepseekPeakHoursProps = {
 
 /**
  * Which DeepSeek rate is being billed right now, and when the peak windows are, on the reader's
- * own clock. Used by `AccountPopover`, directly under the balance: the money and the price of
+ * own clock. Used by `AccountPanelBody`, directly under the balance: the money and the price of
  * spending it are one question, asked in one place.
  *
  * Green off-peak, amber at peak — the same two tones the composer's Flash chip wears while it is

@@ -2,7 +2,7 @@ import { Settings } from 'lucide-react';
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { AccountRailButton } from '@/modules/accounts';
+import { AccountRailButton, UsageRings } from '@/modules/accounts';
 import { AppSwitcherDock } from '@/modules/app-switcher';
 import { useProjectSidebarState } from '@/modules/project-workspace/context/ProjectsStateContext';
 import { useRailBadges } from '@/modules/project-workspace/hooks/useRailBadges';
@@ -26,10 +26,11 @@ function RailHairline({ className }: { className?: string }) {
  * account a panel. The lit view says so with `aria-current="page"`.
  *
  * TOP TO BOTTOM: the app switcher's disc, a hairline, then the views in their runs — `chat`, `tools`, `plans`, `house`,
- * `plugins` — with a hairline between each pair of runs that are drawn, and at the foot the Inbox, Settings and the
- * account. The runs scroll in a region of their own, so in a window too short for the rail the disc and the foot stay
- * put. The region spans the rail's whole width because a scroller clips at its own box, and the lit bar, the badges
- * and the focus rings reach to the rail's edges. It keeps 6px of scroll padding at each end, so a button the keyboard
+ * `plugins` — with a hairline between each pair of runs that are drawn, and at the foot the two usage rings (5-hour
+ * over weekly: a status, not a button, always in their places), the Inbox, Settings and the account. The runs scroll
+ * in a region of their own, so in a window too short for the rail the disc and the foot stay put. The region spans
+ * the rail's whole width because a scroller clips at its own box, and the lit bar, the badges and the focus rings
+ * reach to the rail's edges. It keeps 6px of scroll padding at each end, so a button the keyboard
  * or the reveal brings in keeps its whole ring clear of the edge. Its scrollbar is hidden: 48px has no room for one,
  * and a wheel, a swipe and the keyboard (a focused button scrolls itself into view) all still scroll it.
  *
@@ -151,6 +152,7 @@ export default function WorkspaceRail({ list, isMobile }: { list: SidebarListSta
         <div aria-hidden="true" className="pointer-events-none relative z-30 -mt-px h-px w-full flex-none bg-background" />
       </div>
       <div className="relative z-40 flex flex-none flex-col items-center">
+        <UsageRings />
         {footViews.map(viewButton)}
         <RailButton
           label={t('rail.settings')}

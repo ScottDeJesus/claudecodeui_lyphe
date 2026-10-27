@@ -25,7 +25,8 @@ import { AppError } from '@/shared/utils.js';
  * the owner only learns that some chat moved. Nothing else rides the frame.
  *
  * Consumers: `followups.routes.ts` (the widget's door) and `followups.command-routes.ts` (the `followups`
- * command's), handed this object — so the two doors refuse alike and both send the frame.
+ * command's), handed this object — so the two doors refuse alike and both send the frame. The companion
+ * module reads through `listOpenForAccount`, by way of the barrel's `listOpenFollowups`.
  */
 
 /** A line's ceiling, in characters after trimming — the number the refusal sentence quotes back to the chat. */
@@ -42,6 +43,10 @@ const CONTROL_CHARACTER = /\p{Cc}/u;
 
 /** Every way a line can break, including the Unicode separators `\s` also takes. */
 const LINE_BREAK = /[\r\n\u0085\u2028\u2029]/;
+
+/** How many open items the account's read answers when the caller names no number, and the most it ever will. */
+const OPEN_LIST_DEFAULT = 20;
+const OPEN_LIST_MAX = 200;
 
 /** One `followups` row as the wire carries it: camelCase, and the chat and account it belongs to stay here. */
 function toFollowup(row: FollowupRow): Followup {
@@ -160,6 +165,28 @@ export const followupsService = {
   /** Every item of one chat that this account owns, open and done, oldest first. The widget's read. */
   listForUser(userId: number, appSessionId: string): Followup[] {
     return followupsDb.listForChatOfUser(appSessionId, userId).map(toFollowup);
+  },
+
+  /**
+   * The account's open items, newest first, each beside the app session id of the chat that filed it: one
+   * chat's when `appSessionId` names it, every chat's when it is `null`. The companion's read — the same
+   * `toFollowup` the widget's read uses, so a line reads here exactly as the Next steps widget shows it.
+   *
+   * `limit` is held to 1-200 (a non-number is the default 20): the answer lands in a model's context, so it is
+   * a handful, never a table. A chat the account does not own answers none, as the widget's read does.
+   */
+  listOpenForAccount(userId: number, appSessionId: string | null, limit = OPEN_LIST_DEFAULT): Array<{ sessionId: string; followup: Followup }> {
+    const bounded = Number.isFinite(limit) ? Math.min(Math.max(Math.trunc(limit), 1), OPEN_LIST_MAX) : OPEN_LIST_DEFAULT;
+    const rows =
+      appSessionId === null
+        ? followupsDb.listOpenOfUser(userId, bounded)
+        : followupsDb
+            .listForChatOfUser(appSessionId, userId)
+            .filter((row) => row.state === 'open')
+            .reverse()
+            .slice(0, bounded);
+
+    return rows.map((row) => ({ sessionId: row.session_id, followup: toFollowup(row) }));
   },
 
   /**

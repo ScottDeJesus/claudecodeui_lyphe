@@ -37,7 +37,8 @@
  * shares an image's coordinate space, a polygon hit-test and a badge clamped inside the image are what no
  * arrangement of the parts here produces, and the photo-match viewer is its next consumer. Gallery came in
  * because Verve draws it (§10 Media) — "If Verve draws it, it is in the library", with or without a second
- * module. Both paint in verve/media.css; both put a photo in a box through PhotoFill, which is not exported
+ * module. Both paint in verve/media.css (RegionImage's spots in verve/spots.css, opened beside it); both put a photo in a
+ * box through PhotoFill, which is not exported
  * from here: the broken-image tile is one drawing for the two, and nothing outside this folder asks for it.
  *
  * SphereView came in with one consumer, the affected-areas module's pano screen, on the same mechanism test: a WebGL sphere
@@ -73,6 +74,10 @@ import '@/shared/ui/verve/panels.css';
 // nothing depends on its landing before or after controls.css, feedback.css, surfaces.css or panels.css.
 // The one constraint is still that board.css stays last, below.
 import '@/shared/ui/verve/media.css';
+// spots.css holds RegionImage's spots: where a camera stood, a round press laid on the picture. It was opened beside
+// media.css rather than squeezed into it (media.css stood at 280 lines; README rule 6), and its place is as free:
+// `.vv-region-spot` is its own selector and no rule in it leans on a sibling sheet. The one constraint is still that board.css stays last.
+import '@/shared/ui/verve/spots.css';
 // data.css holds the paint of SegmentedControl and DataTable. Like media.css, its place is free: `.vv-segmented*` and
 // `.vv-datatable*` are its own and every rule reads only tokens. The one constraint is still that board.css stays last, below.
 import '@/shared/ui/verve/data.css';
@@ -152,7 +157,7 @@ export { QuestionOptionRow } from '@/shared/ui/QuestionOptionRow';
 // A photo with its regions drawn over it: one SVG in the image's own 0..1 space (outline weight constant at any size
 // and zoom), a numbered badge at each region's corner, a press on either selecting it. The affected-areas module draws
 // a view's regions with it; the photo-match viewer is next. It also takes a box dragged on the photo (`drawing`) and
-// dims every region but the focused one (`focusId`).
+// dims every region but the focused one (`focusId`), and lays round pressable spots on it (`spots`): the day-one sketch's cameras.
 export { RegionImage } from '@/shared/ui/RegionImage';
 export { ScrollArea } from '@/shared/ui/ScrollArea';
 // Verve's §11 SegmentedControl: a radio group drawn as one tray, the chosen option lifted, an optional count on each.
