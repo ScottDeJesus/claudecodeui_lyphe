@@ -3,13 +3,14 @@ import { useId } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { ContextCard } from '@/modules/affected-areas/ContextCard';
+import { DayOneSketch } from '@/modules/affected-areas/DayOneSketch';
 import { LaneTrouble } from '@/modules/affected-areas/LaneTrouble';
 import { ReadControl } from '@/modules/affected-areas/ReadControl';
 import { RoomGallery } from '@/modules/affected-areas/RoomGallery';
 import { TourRooms } from '@/modules/affected-areas/TourRooms';
 import { addressBesideName, tourFacts, tourName } from '@/modules/affected-areas/utils/tourModel';
-import type { TourDetail, TourSummary } from '@/shared/affected-areas-types';
-import type { AffectedAreasTrouble, TourReaderProgress } from '@/shared/types';
+import type { Codebook, Face, TourDetail, TourSummary } from '@/shared/affected-areas-types';
+import type { AffectedAreasTrouble, DayOneSection, TourReaderProgress } from '@/shared/types';
 import { Button } from '@/shared/ui';
 
 type TourScreenProps = {
@@ -25,8 +26,14 @@ type TourScreenProps = {
   /** Those panos' unread views: what Read the rest would spend. */
   unreadViews: number;
   walk: TourReaderProgress;
+  /** The day-one sketch's plan, drawings and layout press for this tour (`useDayOne`). */
+  dayOne: DayOneSection;
+  /** The kinds' labels, for the sketch's areas; null until the codebook answers. */
+  codebook: Codebook | null;
   onBack: () => void;
   onOpenPano: (panoId: string) => void;
+  /** An area or an object of the sketch pressed: its photo's pano, at its face, with its region chosen when it has one. */
+  onOpenPanoAt: (panoId: string, face: Face, regionId: string | null) => void;
   /** The gallery's "+N" opened the rest of the panos: their photos may be fetched now. */
   onOverflowOpen: () => void;
   onReadRest: () => void;
@@ -51,13 +58,14 @@ function ReadingBody() {
 }
 
 /**
- * A TOUR: whose it is, then what the reader is told about the job, then its rooms, then its panos.
+ * A TOUR: whose it is, then what the reader is told about the job, then its rooms, then its day-one sketch, then its panos.
  *
  * Read top to bottom: All tours (the way back), the job's name, its address, and one line of what the tour holds
  * and how far it is read, with the walk beside them where the pano screen keeps its press (what it would spend —
  * "45 panos · 270 views need a read" — and Read the rest of this tour, or "Reading 3 of 45" with Stop after this
- * pano while it runs); then `ContextCard`; then `TourRooms`, each room and who calls it affected; then "PANOS · 12"
- * and `RoomGallery`, whose tiles open a pano.
+ * pano while it runs); then `ContextCard`; then `TourRooms`, each room and who calls it affected; then `DayOneSketch`, the
+ * floor plan drawn from the panos' room layouts with its own Read the room layout; then "PANOS · 12" and `RoomGallery`,
+ * whose tiles open a pano.
  *
  * The header draws at once from the picker's row while the detail is read; the card and the gallery wait under
  * Verve's waiting surface. A failed read keeps the header and says why, with Try again.
@@ -65,7 +73,8 @@ function ReadingBody() {
  * Used by the affected-areas module's view root.
  */
 export function TourScreen({
-  summary, detail, trouble, photos, unreadPanos, unreadViews, walk, onBack, onOpenPano, onOverflowOpen, onReadRest, onStopRest, onRetry,
+  summary, detail, trouble, photos, unreadPanos, unreadViews, walk, dayOne, codebook, onBack, onOpenPano, onOpenPanoAt, onOverflowOpen,
+  onReadRest, onStopRest, onRetry,
 }: TourScreenProps) {
   const { t } = useTranslation();
   const panosHeadingId = useId();
@@ -109,7 +118,9 @@ export function TourScreen({
         <>
           <ContextCard key={detail.tour.tourId} context={detail.context} linked={detail.tour.jobId !== null} />
           <TourRooms rooms={detail.rooms} />
-          {/* FILL: day-one — DayOneSketch with the tour's dayOne, layout status and the press */}
+          {/* Keyed by the tour, so a floor chosen or a drawing enlarged on one tour never rides to the next. The card above is keyed by
+              the tour too, and siblings may not share a key: so this one names itself. */}
+          <DayOneSketch key={`day-one-${detail.tour.tourId}`} {...dayOne} codebook={codebook} onOpenPanoAt={onOpenPanoAt} onOpenPano={onOpenPano} />
           <section aria-labelledby={panosHeadingId} className="flex min-w-0 flex-col gap-3">
             <h3 id={panosHeadingId} className={EYEBROW}>
               {t('affectedAreas.tour.panosTitle')} · {detail.panos.length}

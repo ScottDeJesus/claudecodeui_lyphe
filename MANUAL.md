@@ -389,7 +389,7 @@ One labelled setting and its control. Exported from `src/shared/ui/index.ts`. Ev
 | Floor is 10rem. Switch-only rows stay inline at 320, 341, 357, 360 and 390px at 1.0× and 1.072× text scale, and from 357px at 1.2×. | Measured 2026-09-29. 13rem dropped every switch row below its text at 320 (208 + 16 + 52 > 254px) and was too wide at the operator's 1.072× text scale (fix-pass M1). 9rem also holds 341px at 1.2×. |
 | A switch-only row seen dropping below its text near 341–360px: lower the floor. Steppers, buttons, inputs and badges drop below their text by design. | |
 | Icon slot never shrinks, label span is `min-w-0`. No caller patches a glyph. | A wrapping label squeezed a bare icon to nothing. |
-| A fixed-width field carries `max-w-full` (`w-64 max-w-full`, `NtfySettingsCard.tsx` `FIELD_WIDTH`). No `w-full sm:w-*` workaround. | Both were patches for the squeeze the floor now handles. |
+| A fixed-width field carries `max-w-full` (`w-64 max-w-full`, `SETTINGS_FIELD_WIDTH` in `src/shared/constants.ts`: `NtfySettingsCard.tsx` and the companion module's Settings form). No `w-full sm:w-*` workaround. | Both were patches for the squeeze the floor now handles. |
 | `null` children ⇒ no wrapper. | An empty `shrink-0` wrapper takes its own flex line and adds a blank band under the text (Jev's scope rows). |
 | A status badge rides the label line, with `null` children (`AccountContent`'s Connected badge). | In the controls slot the floor treats a badge like a button and drops it under the text at 320px. |
 
@@ -960,7 +960,7 @@ Three presentational components in `src/modules/chat-host/`: the floating chat's
 
 ## `ChatHostPanel` rules
 
-1. Frame is the kit `Card`: `position: fixed`, `z-[45]`, `border-input` (the strong border), inline `boxShadow: var(--shadow-lift)`. Attributes: `role="region"`, `aria-label` = `chatHost.panelLabel`, `data-chat-host-panel`, `data-grip={placement.grip}`.
+1. Frame is the kit `Card`: `position: fixed`, `z-[45]`, `border-input` (the strong border), `shadow-lift` (the lift rung, `--shadow-lift`). Attributes: `role="region"`, `aria-label` = `chatHost.panelLabel`, `data-chat-host-panel`, `data-grip={placement.grip}`.
 2. Parts top to bottom: `header`; body `div[data-chat-host-body].flex.min-h-0.flex-1.flex-col.bg-background` (gets `bodyRef`, empty: the chat's node is moved in by `moveTo`); the grip's wrapper at `placement.grip`, 2px in from the corner (`GRIP_CORNER`).
 3. `z-[45]`: above the application layer (40), below the FAB (60). Measured in the fixture on the shell's own container.
 4. The panel measures nothing and moves nothing: rect and grip corner arrive in `placement`.
@@ -3308,7 +3308,7 @@ The Tours view: a DocuSketch tour's affected areas drawn on a view's photo, or o
 | phase | live: the Cerberus tab's fourth view, reading the lane; run whole against the live engine 2026-10-17 (`.verify/affected-areas-view.mjs`, `.verify/affected-areas-walk.mjs`); its 360° screen run 2026-10-22 (`.verify/affected-areas-sphere.mjs`: MAN-8956) |
 | mounted | `CerberusPanel` imports the lazy `AffectedAreasView` through this module's barrel and draws it after History in the strip, only once center's overview has answered (`overview !== null`, as every view), inside a `KeptView` (MAN-8918): mounted on the first show of the Tours tab, `hidden` after, kept mounted while the Cerberus workspace tab stands (leaving that tab for Chat unmounts the panel and the view with it, and the tour, pano, `shown` and the sphere's look are lost then). why: the tour, pano, `shown` and scroll survive a visit to Fleet (MAN-7891); the views share ONE scroller, so the panel's `useKeptViews` keeps Tours's offset (written as Tours is left, restored as it returns) |
 | words | `affectedAreas.*` and `cerberus.tours.{tab,tabHint}` in `src/modules/i18n/locales/en/common.json` |
-| shared types | `AffectedAreasRead<T>` (`{ value, trouble, retry }`), `PanoPress`, `PanoShown` (`'sphere'` or a `Face`), `TourReaderProgress`, `AffectedAreasTrouble` in `src/shared/types.ts`; the sphere's `CubeFaces`, `SphereShape`, `SphereLook`, `SphereTrouble`: MAN-8943; the marks' `ToursScreenKey`, `RegionLayer`, `MarkWalk`, `MissedStage`: MAN-8582 |
+| shared types | `AffectedAreasRead<T>` (`{ value, trouble, retry }`), `PanoPress`, `PanoShown` (`'sphere'` or a `Face`), `TourReaderProgress`, `AffectedAreasTrouble`, `PanoRoom` (a pano's `roomKey` and `floor`, against which a region's placement says "Counted in {room}"), `DayOneSection` (what `DayOneSketch` is handed, MAN-9038) in `src/shared/types.ts`; the sphere's `CubeFaces`, `SphereShape`, `SphereLook`, `SphereTrouble`: MAN-8943; the marks' `ToursScreenKey`, `RegionLayer`, `MarkWalk`, `MissedStage`: MAN-8582 |
 | shared constants | `AFFECTED_AREAS_LANE_FAULTS` (`no_secret`, `unreachable`, `unreadable`: the faults of the lane whatever was asked, each said in `affectedAreas.trouble.<fault>`) in `src/shared/constants.ts`; read by `LaneTrouble`, `ThresholdControl`, `MarkRefusal`. `MARK_NOTE_MAX` (500) beside it: MAN-8582 |
 
 ## 360° on the pano screen
@@ -3333,8 +3333,8 @@ section: The Tours view — src/modules/affected-areas: where state lives, what 
 | `@/shared/hooks/useLaneRead` | one JSON read of the lane kept for its key, shared with the Bulletins hooks (MAN-8917): `{ value, trouble, retry }` plus `reload` (quiet, keeps the value) and `replace(value, forKey)` (writes an answer that came by another road under the key it is GIVEN, and drops every read begun before it); reads when the key is set or `retry`/`reload` is called, never on a timer |
 | `hooks/useTours.ts` · `useTour.ts` · `useCodebook.ts` | the picker's list (30 newest, the search text cut at 80 characters, read once typing has rested 300 ms, and only while the view is shown; `reload` when the picker comes back) · the open tour · the codebook |
 | `hooks/usePano.ts` | the open pano, the dry run beside it (what a read would buy), and `pressRead(force)`: one armed press at a time per pano (kept in `inFlight`, so a press still out shows as busy when the person leaves the pano and comes back), its answer replaces the pano and the plan at once, under the key the press was made for and outranking any read begun before it, unless the person has gone to another pano. A pano the tour lists with no views is not read (its GET is a 404 until it is cut): its dry run cuts it, and until then the screen is handed it with no views; a cut that brings no answer is that pano's trouble, drawn as the header and a banner with Try again |
-| `hooks/useTourReader.ts` | Read the rest: the unread panos in capture order, one armed press each, after the last one answered, passing a pano whose views cannot be cut; `{ walk, start, stop }` |
-| `hooks/useImageUrl.ts` | `useImageUrls(shas, attempt = 0)` (a list: the open pano's six photos, and the gallery's tiles through `useTilePhotos`; a new `attempt` is a new key, so the same shas are fetched again: Try again on a photo that did not arrive) and `useImageUrl(sha)` (one photo: the Mark screen's): bytes fetched with the token, object URLs revoked on unmount and on a change, aborted on a change, null on failure |
+| `hooks/useTourReader.ts` | Read the rest: the unread panos in capture order (`panosInCaptureOrder`, `utils/tourModel.ts`, the sort `useLayoutWalk` shares), one armed press each, after the last one answered, passing a pano whose views cannot be cut; `{ walk, start, stop }` |
+| `hooks/useImageUrl.ts` | `useImageUrls(shas, attempt = 0)` (a list: the open pano's six photos, and the gallery's tiles through `useTilePhotos`; a new `attempt` is a new key, so the same shas are fetched again: Try again on a photo that did not arrive), `useDrawingUrls(shas, attempt = 0)` (the same fetch over the day-one plan's SVGs, by `drawingSha`: `useDayOne`'s) and `useImageUrl(sha)` (one photo: the Mark screen's): bytes fetched with the token, object URLs revoked on unmount and on a change, aborted on a change, null on failure |
 | `hooks/useTilePhotos.ts` | the tour screen's gallery photos: `useImageUrls` for the first `GALLERY_MAX` (24, `utils/tourModel.ts`) panos' Ahead views, and a second `useImageUrls` for the rest once the gallery's `onOverflowOpen` fires, so a 45-pano tour fetches 24 photos until "+N" is pressed, then the other 21 and none again. Nothing is fetched off the tour screen, and leaving it forgets the opened state (the gallery comes back collapsed) |
 | `hooks/useViewShown.ts` | `isInLayout(element)` (asked before a read starts), `useViewShown(ref)` (whether the view is in layout, as state) and `useWhenShown(shown, fn)` (a word when it comes back) |
 | `hooks/usePanoPlace.ts` | the open pano's place: `shown` (`PanoShown`: `'sphere'` or one of the six `Face`s), `sphereLook`, `selectedRegionId`, `enlarged` and `layer`, with `openPano(entry)` (opens on 360° looking where the pano's Ahead view was cut, `AHEAD_LOOK` when it lists none; nothing chosen, All again), `letGo()` (nothing chosen, not enlarged) and the verbs `onShow` (a tab pressed: nothing chosen; 360° from a view looks where that view looked), `onLook`, `onSelectRegion`, `onLayer`, `onMarkOn(face, regionId)` (that view shown with the area still chosen), `onEnlarge`, `onShrink`, `onFullscreen`. The root keeps no copy of the five and calls the two verbs inside its own handlers (`onOpenTour`, `onBack`, `onOpenPano`, `onBackToTour`) |
@@ -3379,7 +3379,7 @@ section: The Tours view — src/modules/affected-areas: where state lives, what 
 1. state (`query`, `tourId`, `panoId`, `photoAttempt`, `place = usePanoPlace()` holding `shown`, `sphereLook`, `selectedRegionId`, `enlarged`, `layer`)
 2. reads (`useTours`, `useTour`, `usePano`, `useCodebook`), each `{ value, trouble, retry }`; `useTour` adds `reload`, `usePano` adds `press`, `pressRead`, `reload`
 3. derivations (`summary`, `entry`, `room`, `unread = tourUnread(...)`)
-4. photos, walk, handlers (`useImageUrls(…, photoAttempt)`, `useTilePhotos`, `useTourReader`, `on*`)
+4. photos, walk, handlers (`useImageUrls(…, photoAttempt)`, `useTilePhotos`, `useTourReader`, `useDayOne` (the day-one sketch's plan, drawings, dry run and layout walk, handed to `TourScreen` as one `DayOneSection`; each answer of its walk that moved the plan reads the tour and the open pano again, as the reader's walk does), `on*`, `onOpenPanoAt` (an area opens its photo's pano at its face with its region chosen, an object at its face alone))
 
 A step reads only what the steps above it produce. why: the open pano's six photos are read off `marked.pano ?? entry` with no reordering.
 
@@ -4248,9 +4248,9 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/utils
 | piece | does |
 |---|---|
 | `FaceStrip.tsx` | `Tabs` (underline): `sphere` first (`affectedAreas.sphere.tab`, count `panoCounts(views).areas`), then the six `FACES`. Accessible name `affectedAreas.pano.viewsLabel`. Scrolls sideways in its own box; the selected tab is brought in by `scrollLeft`, never `scrollIntoView` (it walks every scrollable ancestor) |
-| `PanoSphere.tsx` | props `panoId`, `views`, `photos`, `room`, `layer`, `selectedRegionId`, `enlarged`, `codebook`, `reading`, `onLayer`, `onSelectRegion`, `look`, `onLook`, `onFullscreen`, `onMarkOn`, `onRetryPhotos`. Top to bottom: `LayerSwitch` in the photo's tool row; `SphereView` (`key={panoId}`, mounted only while its block is in layout, `useViewShown(blockRef)`); while an area is chosen `ChosenArea`; the caption with Enlarge (`onFullscreen(true)`, disabled while `faces === null`); the hint |
-| `ChosenArea` (in `PanoSphere.tsx`) | `role="group"` `data-sphere-chosen`: the number as a `Badge` in the area's look, its kind (`effectiveClass ?? class`), its view's name, and `Mark it on {view}` (`data-sphere-press="mark-on"`, `onMarkOn(face, regionId)`). Sends nothing |
-| `PanoAreas.tsx` | props `views: ViewDetail[]`, `selectedRegionId`, `codebook`, `onSelectRegion`. The views in `FACES` order; a view with regions draws its name as `<h3>` over its `RegionList` (`headingId`). Under them: "Nothing found on …" (read, no regions) and "Not read yet: …". A view holding an area drawn by hand is listed read or not |
+| `PanoSphere.tsx` | props `panoId`, `views`, `photos`, `room`, `panoRoom` (`PanoRoom`, `src/shared/types.ts`: the pano's `roomKey` and `floor`, built by `PanoScreen`), `layer`, `selectedRegionId`, `enlarged`, `codebook`, `reading`, `onLayer`, `onSelectRegion`, `look`, `onLook`, `onFullscreen`, `onMarkOn`, `onRetryPhotos`. Top to bottom: `LayerSwitch` in the photo's tool row; `SphereView` (`key={panoId}`, mounted only while its block is in layout, `useViewShown(blockRef)`); while an area is chosen `ChosenArea`; the caption with Enlarge (`onFullscreen(true)`, disabled while `faces === null`); the hint |
+| `ChosenArea` (in `PanoSphere.tsx`) | `role="group"` `data-sphere-chosen`: the number as a `Badge` in the area's look, its kind (`effectiveClass ?? class`), its view's name, `placementNotes(region.placement, panoRoom, t)` on a line of its own under the kind ("Counted in {room}" when the plan credits the area to another room, "Seen in {n} photos" above 1; nothing before the plan has placed it; MAN-9038), and `Mark it on {view}` (`data-sphere-press="mark-on"`, `onMarkOn(face, regionId)`). Sends nothing |
+| `PanoAreas.tsx` | props `views: ViewDetail[]`, `panoRoom` (handed on to each `RegionList`), `selectedRegionId`, `codebook`, `onSelectRegion`. The views in `FACES` order; a view with regions draws its name as `<h3>` over its `RegionList` (`headingId`). Under them: "Nothing found on …" (read, no regions) and "Not read yet: …". A view holding an area drawn by hand is listed read or not |
 | photos | one record, `useImageUrls(panoViews shas, photoAttempt)` in the root: the sphere stitches all six and a shown view reads its own out of it, so opening a view costs no second read |
 
 `PanoSphere` inputs: faces = `cubeFaces(views, photos)` (null until all six photos have arrived: the box is a skeleton); outlines = `sphereShapes` over the views that carry `regions` only, with `layer` and `selectedRegionId`.
@@ -4435,8 +4435,8 @@ section: The views rail, composed — `WorkspaceRail`, `RailButton`, the focus t
 |---|---|
 | size | `size-11` below md (touch floor), `md:size-10`; glyph `size-5`, stroke 1.75 |
 | name | `aria-label={label}` and nothing else; no native `title`. why: a `title` stacks a second tooltip on the kit's |
-| lit | `aria-current="page"`; `bg-accent-soft text-accent-ink hover:bg-accent-soft-hover`; a `before:` bar 2×20px on the rail's own left edge: `-left-0.5` on a phone (44px button in 48px), `md:-left-1` (40px in 48px). `forced-colors:before:bg-[Highlight]`: forced colours flatten ground and bar to the canvas and leave the lit view unmarked |
-| unlit | `text-muted-foreground hover:bg-secondary hover:text-foreground` |
+| lit | `aria-current="page"`; `RAIL_BUTTON_LIT` (`src/shared/constants.ts`): `bg-accent-soft text-accent-ink hover:bg-accent-soft-hover`; a `before:` bar 2×20px on the rail's own left edge: `-left-0.5` on a phone (44px button in 48px), `md:-left-1` (40px in 48px). `forced-colors:before:bg-[Highlight]`: forced colours flatten ground and bar to the canvas and leave the lit view unmarked. The companion module's door (`CompanionDoorView`) lights with the same constant while her panel is open, its state `aria-expanded` |
+| unlit | `RAIL_BUTTON_UNLIT` (`src/shared/constants.ts`): `text-muted-foreground hover:bg-secondary hover:text-foreground` |
 | badge | `data-tone="warn"` with `bg-tone-dot border-tone-ink`, `h-4 min-w-4`, `text-[10.5px] leading-normal`. Figure `aria-hidden`, `99+` past 99; the sentence sits in an `sr-only` span (`useId()`) named by `aria-describedby`. Box at `right-[calc(50%-20px)] top-[calc(50%-18px)]`: a wider figure grows leftward over the glyph and stays inside the rail. Fill is 2.07:1 on the rail's ground, so the edge and the figure carry it |
 | badge ring | `ring-2` in the button's own ground: lit `ring-accent-soft`, hover `ring-accent-soft-hover`; unlit `ring-background`, hover `ring-secondary` |
 | focus | token ring, `focus-visible:z-10`; `max-md:focus-visible:outline-offset-0`. why: at the house's 2px offset a 44px button's ring is 52px wide in a 48px rail, clipped by the region |
@@ -4572,17 +4572,20 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/Pr
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/whole-sidebar-rail.mjs
 
-## MAN-9038 — The day-one sketch section — src/modules/affected-areas: DayOneSketch, DayOnePlan, DayOneRooms, DayOnePress, utils/dayOneModel.ts, dayOne-fake.ts and their two probes
+## MAN-9038 — The day-one sketch section — src/modules/affected-areas: DayOneSketch, DayOnePlan, DayOneRooms, DayOnePress, useDayOne, useLayoutPlan, useLayoutWalk, utils/dayOneModel.ts, dayOne-fake.ts and their probes
 
-Scaffold, 2026-10-26: composed over fake data. `TourScreen.tsx` mounts it at its `FILL: day-one` marker, unwired; the wiring of each handler and data hook is named at its own `FILL:` marker (`grep -rn "FILL:" src/modules/affected-areas`).
+Wired 2026-10-26. `TourScreen.tsx` mounts `DayOneSketch` between `TourRooms` and the panos, keyed `day-one-<tourId>` (the card above is keyed by the tour too, and siblings may not share a key). The section's data is `useDayOne` (below), called once at the view root and handed down as one `DayOneSection`; the verbs that open a pano (`onOpenPanoAt`, `onOpenPano`) are the root's. The section itself stays presentational.
 
 | file | holds |
 |---|---|
 | `DayOneSketch.tsx` | the section: `data-day-one` = `plan` \| `none` \| `unavailable` \| `pending` \| `unknown`. Eyebrow `affectedAreas.dayOne.title`; status line (`panosRead` of `panosTotal` · drawn when · "from the calibration reads" when `contractVersions` holds `layout.cal0`); a floor switch (`SegmentedControl`) only when `floors.length > 1`; `DayOnePress` top right; `DayOnePlan` beside `DayOneRooms` from 960 px of container, under it below. Its one state is the chosen floor's place in `floors` |
-| `DayOnePlan.tsx` | one floor: `RegionImage` (`badgePlacement="clear"`, MAN-8945) over the engine's drawing; one outline and number per area, fixture and piece of contents; one spot per pano named "{room} 360° photo" ("…, n of m" for a room with several shots). Caption lines `data-day-one-line="scale" \| "pins" \| "spots"`. Enlarge opens a display-only copy in `Lightbox`. Drawing bytes absent: waiting surface; failed: `data-day-one-failed` box with Try again (`onRetryDrawing`) |
+| `DayOnePlan.tsx` | one floor: `RegionImage` (`badgePlacement="clear"`, MAN-8945) over the engine's drawing; one outline and number per area, fixture and piece of contents; one spot per pano named "{room} 360° photo" ("…, n of m" for a room with several shots). Caption lines `data-day-one-line="scale" \| "pins" \| "spots"`. Enlarge opens a display-only copy in `Lightbox`. Drawing bytes absent: waiting surface; a drawing that moves while a walk runs (its address is its content's hash) keeps the last one on screen until the new one arrives, and the plan is keyed by its floor's number, not its drawing, so an enlarged drawing stays open and a focused number stays held; failed: `data-day-one-failed` box with Try again (`onRetryDrawing`) |
 | `DayOneRooms.tsx` | per room (`data-day-one-room`): size, area, perimeter, ceiling, each side's source with its band, a warning when unpinned, the sketch and first-report checks; then its numbered rows (`data-day-one-item`) with "Seen in {n} photos" above 1 |
-| `DayOnePress.tsx` | `data-day-one-press`: the unread panos and views, today's budget, the walk (meter, Stop), the refusals in words |
-| `utils/dayOneModel.ts` | pure, one model for the drawing and the list: `numberedItems(floor, codebook, t)` → `SketchItem[]`; `feet`, `band`, `inches` |
+| `DayOnePress.tsx` | `data-day-one-press`: the unread panos and views, today's budget, the walk (meter, Stop), the refusals in words, and what a part read left ("2 of 6 views could not be read.", said once the walk is over) |
+| `hooks/useDayOne.ts` | the section's data for the open tour (`DayOneSection`, `src/shared/types.ts`): the plan in force (`useLayoutPlan`), each floor's drawing as an object URL through the token (`useDrawingUrls`, `hooks/useImageUrl.ts`; `onRetryDrawing` bumps its attempt), the press (ONE unarmed layout press for the first pano needing a read when the tour opens and the view is shown, none when nothing is left; an armed answer outranks a dry run still out), and what is left to read (`layoutUnread`, `utils/tourModel.ts`) |
+| `hooks/useLayoutPlan.ts` | the tour's `layout` and `dayOne`, unless a newer word of its own stands over them, held only while the detail it was learnt against is the one on screen (a detail read again replaces it): the open's ONE `buildPlan` of a `stale` plan (no model; waits for the view to be shown; `rebuilding` while out; its fault is `trouble`), and `adopt`, the status a layout press answered with |
+| `hooks/useLayoutWalk.ts` | the layout walk, `useTourReader`'s shape over `api.affectedAreas.readLayout`: the panos with a view whose layout is unread or not `current` (`layoutQueue`, capture order), one armed press each, "Reading 3 of 8", Stop after this pano; a refusal ends it, except `views_refused` (passed and counted); two panos in a row whose every view failed (`viewsFailed` with no `viewsRead`: the engine's own `_DEAD_PANOS`; such a pano is `partial`, not refused) end it as `failing`, said "Two panos in a row could not be read at all"; a press with no answer in time (`unreachable`) is pressed again ONCE, the second finding its reads cached; it sends only while the press is on screen (`isShown`: the view in layout, the Tours surface, no pano open — the meter and Stop are nowhere else), so a pano opened mid-walk ends it after the pano in hand and the press offers what is left on return; each answer is handed on (`onAnswer`), and one that carries a `layout` has the root read the tour and the open pano again, quietly |
+| `utils/dayOneModel.ts` | pure, one model for the drawing and the list: `numberedItems(floor, codebook, t)` → `SketchItem[]`; `feet`, `band`, `inches`; `placementNotes(placement, panoRoom, t)`, the pano screen's "Counted in {room}" (the credited room's key AND floor against the pano's) and "Seen in {n} photos" (`RegionList`, `PanoSphere`'s chosen line, a line of its own under the kind) |
 | `dayOne-fake.ts` | `FAKE_DAY_ONE` (Clarence Tse's tour, one entry per state of the section) and `FAKE_DRAWINGS`; imported only by the scaffold probe, 2026-10-26 |
 
 Rules:
@@ -4590,13 +4593,408 @@ Rules:
 - Numbers: the wire numbers areas only (`DayOneArea.number`, from 1 per floor, in the plan's room order). `numberedItems` numbers fixtures and contents after the last area, in the wire's order. The drawing's tab order is the areas by number, then the objects.
 - An area is drawn in `REGION_LOOK` of its member (`regionState`); a fixture or contents in the neutral tone with the light wash.
 - Words never sit on the drawing: a number meets its row in `DayOneRooms`.
-- `DayOnePress` reads `lastAnswer`: the dry run on open, then each armed answer the walk lands. why: its budget lines go stale otherwise.
+- `DayOnePress` reads `lastAnswer`: the dry run on open, then each armed answer the walk lands. why: its budget lines go stale otherwise. A walk's answer replaces the section's status line at once; the tour is read again after each answer that carries a layout, and the floors, the status and the counts follow the plan the press rebuilt.
 - A press on an area or object calls `onOpenPanoAt(panoId, face, regionId)`, `regionId` null for an object; a press on a spot calls `onOpenPano(panoId)`. The Lightbox copy passes spots without `onPress`: inert.
 - The drawing loads as an `<img>`, so it cannot follow the theme: the engine's SVG carries its own white ground. Spots are the one fixed-colour mark on it (MAN-8947); room names clear of the spots: INV-9720.
 - Words: `affectedAreas.dayOne.*` in `src/modules/i18n/locales/en/common.json`, `en` only.
 
-Probes (`.verify/`, git-ignored; run against the real :5183 client, no model call):
+Probes (`.verify/`, git-ignored; run against the real :5183 client, no model call; `lib/day-one-kit.mjs` holds the open-the-tour and verdict plumbing the first two share):
+- `node .verify/affected-areas-day-one.mjs [--tour <id>] [--evidence <dir>]`: Clarence Tse's tour at 390 and 1280 px, pressing nothing armed. Holds the section to the wire (outlines, badges, spots, rooms, the drawing's bytes through the token, the status counts), the dry run (unarmed, for the first pano needing a read, its budget line the answer's numbers), an area on the drawing and in the list opening its pano at its face with its region chosen, a spot opening its pano on 360°; then over a rewritten answer (edited in the browser, nothing written): an object opening its face with no region, a `stale` tour sending ONE rebuild, a drawing that did not arrive and Try again, a region the plan credits to another room saying "Counted in … · Seen in 2 photos" on 360°, on the sphere's chosen line and on its face.
+- `node .verify/affected-areas-day-one-walk.mjs [--tour <id>] [--evidence <dir>]`: the layout walk with every armed press answered inside the browser (never forwarded: nothing is bought), the unarmed dry run going through. Five walks: Stop, a refusal (budget), a press with no answer pressed again once, no answer twice, a pano passed over; the tour's own layout reads on the wire are compared before and after.
 - `node .verify/affected-areas-day-one-scaffold.mjs [--states a,b] [--evidence <dir>]`: mounts `DayOneSketch` over each `FAKE_DAY_ONE` state, photographs 390 and 1280 px in both themes, presses every callback, and exits 1 on a FAIL. Fails when a `partial` or `built` number is less than 80% shown or its middle's press lands elsewhere (light theme).
-- `node .verify/affected-areas-day-one-unchanged.mjs --stage before|after`: the live Tours view's words, element count and class multiset must be equal across the two stages; exits 1 on any difference.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/dayOne-fake.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/DayOnePlan.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/DayOnePress.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/DayOneRooms.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/DayOneSketch.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/utils/dayOneModel.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/affected-areas-day-one-scaffold.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/affected-areas-day-one-unchanged.mjs
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/dayOne-fake.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/DayOnePlan.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/DayOnePress.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/DayOneRooms.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/DayOneSketch.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/hooks/useDayOne.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/hooks/useLayoutPlan.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/hooks/useLayoutWalk.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/utils/dayOneModel.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/affected-areas-day-one.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/affected-areas-day-one-scaffold.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/affected-areas-day-one-walk.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/day-one-kit.mjs
+
+## MAN-9055 — server/modules/companion/tools — house reads: his chats, the resolvers, the roster, a chat's state and activity line
+
+Kaylee's reads of the house. Every read answers from the database and the running server at call time: nothing cached, nothing polling, no usage or spend in any answer (ruling 17).
+
+## `house-reads.ts` — the one door the tool files read the house through
+| Export | Answers |
+|---|---|
+| `listHisChats()` | `HisChat[]` `{ sessionId, name, project, projectPath, updatedAt }`, newest first; `updatedAt` epoch ms, 0 when unreadable. |
+| `chatRows()` | `ChatRow[]` `{ chat, state }`, ONE liveness read for all; ordered waiting, working, live, asleep; recency kept inside a state. |
+| `resolveChat(ref)` | `ChatResolution` `{ ok: true, chat: CompanionSessionRef }` or `{ ok: false, sentence }`. |
+| `listVisibleProjects()` | `HisProject[]` `{ name, path }`: registered, not archived, not in a hidden root; by display name. |
+| `resolveProject(ref)` | `ProjectResolution` `{ ok: true, project }` or `{ ok: false, sentence }`. |
+| `rosterText()` | The body of `<sessions>`; caller `companion-account.ts` (`readRoster`), read at each push. A failed read is logged (`[Companion] the roster could not be read`) and answers one sentence; never throws. |
+| `chatState`, `activityLine`, `ChatState` | Re-exported from `chat-activity.ts`. |
+
+## His chats
+- A row of `sessions` with `isArchived = 0`, in a project that is not archived and not in a hidden root (`visibleProjectPathSql`, the sidebar's own test), whose `provider_session_id` is NULL or differs from `session_id`.
+- `sessions` holds thousands of synced soul transcripts whose session id equals their provider id; none is his chat.
+- `sessions` has no user column: every account sees the same chats, as the sidebar does.
+- Name: `custom_name` folded to one line, else `Untitled Session`. Project: custom name, else the folder basename, folded to one line either way (`projectDisplayName`), else `no project`.
+
+## The hidden fallback
+- A probe chat lives under `/tmp`, a hidden root, so it is never his chat by the test above.
+- `resolveChat` falls back to non-archived app chats of hidden projects only when NONE of his fits, and only by id or exact name.
+- `resolveProject` falls back to a registered, non-archived project of a hidden root only when named by its EXACT path.
+- The roster and both lists never include the fallback pool.
+
+## Resolution rules
+| Ref | Result |
+|---|---|
+| empty | sentence: name the chat/project; `list_sessions` / `list_projects` shows them |
+| chat: id, or exact name (case-insensitive; the roster's entity spelling of a name also matches) | the one match |
+| chat or project: several match | sentence naming each with project and id (chat) or path (project); at most 12 chats shown, then `and N more` |
+| none | sentence; a ref of 3+ characters also names chats/projects that merely contain it in the name |
+| project: display name (case-insensitive) or registered path | the one match |
+
+## `chat-activity.ts` — what a chat is doing now
+`ChatState` = `working` | `waiting` | `live` | `asleep`. `asleep` is still sendable: a message wakes it and resumes where it left off.
+
+`chatStates(sessionIds)` reads `sessionHostLivenessSnapshot()` ONCE for the list. Per chat, first match wins:
+1. `waiting`: `providerRuntimeService.getPendingApprovalsForSession` is non-empty.
+2. `working`: `chatRunRegistry.isProcessing`.
+3. `live`: a session host holds the chat.
+4. `asleep`.
+
+`waiting` beats `working`: a chat blocked on an ask still has its run registered; reading it `working` would hide the ask she exists to notice. Reversing it is one line in `chatStates`.
+
+`activityLine(sessionId, state?)` — ONE line, always (`oneLine` at the single exit):
+| State | Line |
+|---|---|
+| working | last tool call in the run's replay buffer (`describeToolCall`), else the last assistant words cut at 80 code points, else `just started` |
+| waiting | `AskUserQuestion`: `asks "<first question, 100 code points>"` plus ` (and N more)`; `ExitPlanMode`: `a plan is ready and waits for his approval`; else `wants permission: <describeToolCall>`; no ask found: `waiting on him` |
+| live, asleep | `idle just now` / `idle N min` / `idle N h` (under 48 h) / `idle N d`; `idle, no recorded activity` when the row has no time |
+
+Cuts count code points (`cutAt`), so none lands inside an emoji.
+
+## Roster (`rosterText`)
+- One line per working, waiting or live chat: `name · project · state: activity · id <sessionId>`; 20 lines at most, waiting first; `…and N more active; list_sessions with scope active names them.` past 20.
+- No active chat: `None of his chats is working, waiting or live.`
+- Then `Asleep, still sendable: <12 most recent names>` plus `, and N more`.
+
+## Probes
+`.verify/companion-house-reads.mjs` (read-only on the live database, prints resolvers, roster, handler text), `.verify/companion-house-states.mjs` (working, waiting, live on in-process stand-ins), `.verify/companion-view-of.mjs`.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/chat-activity.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/house-reads.ts
+
+## MAN-9056 — server/modules/companion/tools — list_sessions and list_projects: scopes, the phrase search and the first-words read
+
+`sessionTools()` (`session-tools.ts`) returns the SDK `tool()` definitions of `list_sessions` and `list_projects`. Both carry `readOnlyHint` and set neither focus nor her activity. Both read the house through `house-reads.ts` (see the house-reads row).
+
+## Descriptions
+- Each description is `toolLine(name)` (`session/companion-prompt.ts`): the tool's line from the prompt's `TOOLS` section.
+- `toolLine` throws when the prompt has no line for the tool: a tool added without a `TOOLS` line stops the server when the tool list is built.
+
+## `list_sessions(scope)`
+`scope`: string, trimmed, 1–200 characters. A line is `name · project · state · activity · id`.
+| scope | Lists |
+|---|---|
+| `active` | every chat not asleep (working, waiting, live); none: says so and names scope `recent` |
+| `recent` | the 15 most recent asleep chats |
+| anything else | chats whose name, project and first words together hold EVERY word of the phrase (case-insensitive, any order); 10 at most, then `More chats match; narrow the phrase to see the rest.` |
+
+- Order within a scope: waiting, working, live, asleep; recent first inside a state.
+- A chat's first words are read only when its name and project did not already answer, and only until the list is full.
+
+## `list_projects()`
+- One line per visible project: `name · path`, by display name. A path is printed raw: it is what she passes back to `resolveProject`.
+- None registered: `No project is registered yet, so a new session has nowhere to start.`
+
+## Failure
+A failed read is logged (`[Companion] <tool> could not read the house`) and returns `isError` text `… could not read the house just now (<reason>). Try once more; if it fails again, tell him.`
+
+## `chat-first-words.ts` — `firstWordsOf(sessionId)`
+- Up to 400 characters, one line, from the HEAD of the chat's transcript JSONL (`extractFirstValidJsonlData`): the first plain user row of the chat itself (not a sidechain, not `isMeta`, not a row opening with `<`). Gives up after 200 rows.
+- Never `fetchHistory`: it parses a transcript end to end (largest of his: 27 MB) and caches 8, so a search through it thrashes the cache.
+- A compacted chat opens with a seed beginning `This session is being continued from a previous conversation`; the preamble through `Summary:` is stripped and `*`/`#` removed, so the summary names the chat's threads. 2026-10-26: 12 of his 19 chats open this way.
+- Claude chats only (`provider === 'claude'` with a `jsonl_path`); anything else answers `''`. Never throws.
+- A found answer is kept per process; a miss is not (the first message may not have arrived).
+- Best effort: it feeds a search and is never something she says as fact.
+
+## `server/shared/tool-text-result.ts`
+`textResult(text, isError = false)` → `{ content: [{ type: 'text', text }] }` plus `isError: true` on a refusal; the sentence says what to do next. Has an `.oxlintrc.json` boundaries entry; `session-tools.ts` and `draft-tools.ts` answer through it.
+
+`guardedToolResult(toolName, doing, run)` runs one tool's work: a throw is logged `[Companion] <tool> could not <doing>` and answered as `isError` text `<tool> could not <doing> just now (<reason>). Try once more; if it fails again, tell him.` `session-tools.ts` (doing: `read the house`) and `draft-tools.ts` share it.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/chat-first-words.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/session-tools.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/tool-text-result.ts
+
+## MAN-9057 — server/modules/notifications — the session presence store: markPresence, clearPresence, isSessionWatched, isSessionOnScreen, viewOf
+
+`services/session-presence.service.ts` records which session each open browser tab shows. `notifications/index.ts` exports all five functions below.
+
+## Store
+- One in-memory `Map<connection, { userId, sessionId, visible, updatedAt }>`, keyed by the chat websocket connection object itself; the record lives as long as the connection.
+- It lives in notifications, not websocket: the ntfy channel reads it, and importing the websocket barrel there would close the cycle websocket → providers → notifications → websocket.
+- A tab repeats its report every 30 s while visible. `DEFAULT_FRESH_MS` = 90 000: silence past it means gone or asleep.
+- `FORGET_AFTER_MS` = 600 000: `markPresence` drops records this old (a connection that closed without `clearPresence`).
+- A connection whose numeric `readyState` is not OPEN (1) never counts and is deleted by the next read; a key with no `readyState` is judged by freshness alone.
+- User ids compare as strings (a number on one path, a string on another).
+
+## Functions
+| Function | Answers | Caller |
+|---|---|---|
+| `markPresence(connection, { userId, sessionId, visible })` | sets the record, stamps `updatedAt` | chat websocket, each `chat.presence` report |
+| `clearPresence(connection)` | deletes the record | chat websocket, on close |
+| `isSessionWatched(userId, sessionId, { freshMs? })` | does one of THIS user's tabs show the session visibly and fresh; false for a null user or session | ntfy channel: skips the push when true |
+| `isSessionOnScreen(sessionId, { freshMs? })` | the same, whichever user | chat run registry: stamps a finishing on-screen chat read. A run carries no user and `sessions` has no user column |
+| `viewOf(userId)` | `string \| null`: the chat on the account's freshest visible tab | the companion's `<view>` message; 2026-10-26: no caller in `server/` yet |
+
+## `viewOf` rules
+- The FRESHEST visible, live, 90 s-fresh record of the account decides, not any tab: two windows open, the one that reported last is the one he looks at.
+- When that tab shows no chat (home page, a settings screen) the answer is `null`, never an older tab's chat.
+- A hidden tab, a closed socket or a record past 90 s never counts.
+- No `freshMs` option: always `DEFAULT_FRESH_MS`.
+
+## Probe
+`.verify/companion-view-of.mjs`: 13 checks on the real presence store.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notifications/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notifications/services/session-presence.service.ts
+
+## MAN-9058 — server/modules/companion — the door: routes, input limits, refusals, module wiring
+
+Kaylee's HTTP door. Transport only: a route reads who asks, checks the SHAPE of the body, calls one service verb (see the service row) and answers. What a verb means is the service's.
+
+## Wiring
+- `index.ts` exports `createCompanionModule` alone; every other symbol of the folder is private to it.
+- `createCompanionModule({ runtime })` returns `{ router, stop }`: it calls `companionService.attachRuntime(runtime)` BEFORE building the router, so no request reaches a verb with no gateway. `stop` is `companionService.stopAll`.
+- `runtime` is the `ProviderRuntimeGateway` the chat socket uses, so an act of hers is the page's own act.
+- Building the module launches no process: a conversation starts on an account's first message.
+- Mount: `/api/companion` behind `authenticateToken` (the account is `req.user`). 2026-10-26: not mounted in `server/index.ts`; phase `panel-fill` mounts it.
+- Shutdown: the entrypoint awaits `stop()` before it stops anything else.
+
+## Routes (`companion.routes.ts`)
+| Route | Reads | Answers | Verb |
+|---|---|---|---|
+| `GET /` | client id optional | 200 `CompanionPicture` | `picture` |
+| `POST /messages` | client id REQUIRED; `{ text }` 1–8000 | 202 `{ accepted: true }`; her sentences return as frames on the page's socket | `sendText` |
+| `POST /floor` | client id REQUIRED | 204 | `takeFloor` |
+| `PUT /settings` | JSON object, a partial of the settings | 200 `CompanionSettings` | `saveSettings` |
+| `PUT /draft` | `{ text }` 1–20000 | 200 `CompanionDraft` | `editDraft` |
+| `DELETE /draft` | – | 204 | `clearDraft` |
+| `DELETE /notes/:id` | `id` matches `/^[1-9]\d{0,14}$/` | 204 | `dismissNote` |
+| `POST /interrupt` | – | 204 | `interrupt` |
+| `POST /clear` | – | 204 | `clear` |
+
+- No `POST /draft/send` yet; it lands with its verb.
+- An answer is the thing itself, never wrapped (`{ settings }`, `{ data }`).
+- Every route but `/messages` and `/floor` validates the client id header if present and does not need it.
+
+## Input (`companion-input.ts`)
+| Name | Rule |
+|---|---|
+| `x-companion-client` | the page's own id; `/^[A-Za-z0-9._:-]{1,100}$/`; present and malformed = 400, never read as absent |
+| `MESSAGE_TEXT_MAX` | 8000 characters |
+| `DRAFT_TEXT_MAX` | 20000 characters, counted by `characterCount` (code points); the routes and the draft tool (`tools/draft-tools.ts`) share both |
+| `readBodyText` | trims, then 1..max code points (an emoji counts one); the trimmed text is what is stored, so a later equality check on it compares trimmed text |
+| `readBodyObject` | requires `request.is('application/json')` AND an object body; no body or `text/plain` = 400; an explicit `{}` sent as JSON is a legal empty patch. why: `express.json()` leaves `{}` for a missing body, and a save that sent nothing must not answer 200 |
+
+The page's request helper sets `Content-Type: application/json` on every non-FormData call; a script sends it itself.
+
+## Refusals
+Envelope (the entrypoint's `AppError` handler): `{ success: false, error: { code, message, details } }`.
+| Status | `code` | When |
+|---|---|---|
+| 400 | `COMPANION_INPUT_INVALID` | any shape failure above, a settings value past its limit; `message` names the field and its limit; `details.field` names the field |
+| 409 | `COMPANION_NO_DRAFT` | `PUT /draft` while no draft is held |
+| 503 | `COMPANION_STOPPING` | `POST /messages` after `stopAll` |
+
+## Probe
+`.verify/companion-module.mjs`: see the service row.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/companion-input.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/companion.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/companion.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/index.ts
+
+## MAN-9059 — server/modules/companion — the service verbs, one account's wiring, the picture, the tool registry and deps
+
+## `companion.service.ts` — `companionService`
+One `CompanionAccount` per CloudCLI account, made on that account's first call (`accountOf`) and never before. A made account is ASLEEP: no process launches until a message is pushed. Every verb takes the account's id first, so a call cannot reach another account's rows, pages or conversation.
+
+| Verb | Does |
+|---|---|
+| `attachRuntime(gateway)` | stores the gateway and clears the stopped flag; `createCompanionModule` calls it before any verb. An account made with no gateway throws. |
+| `picture(userId)` | `buildPicture` |
+| `takeFloor(userId, client)` | the page holds the floor from now on |
+| `sendText(userId, client, text)` | takes the floor for the typing page, logs the line (`role: 'operator'`, `via: 'typed'`), pushes it to her. 503 `COMPANION_STOPPING` once `stopAll` has run. |
+| `saveSettings(userId, patch)` | stores, emits `companion_settings` to every page, and on a model change calls `session.setModel`. A switch the CLI refuses or does not answer within `CLI_GRACE_MS` (5 s) is a `system` log line; the save and the stored model stand, and her next wake runs on it. |
+| `editDraft(userId, text)` | replaces the held draft's words, keeps its target; 409 `COMPANION_NO_DRAFT` when none is held |
+| `clearDraft`, `dismissNote` | a note already gone is not an error |
+| `interrupt` | stops her own turn; a Stop with no turn does nothing |
+| `clear(userId)` | see Clear |
+| `stopAll()` | sets the stopped flag, then per session `interrupt()` and `close('the server is stopping')`; one failure is logged and does not hold the rest |
+| `alert(userId, event: unknown)`, `runCompleted(sessionId, aborted)` | seams for the house's feeds; no-ops until phase `feeds` fills them |
+
+### Clear
+1. `session.clear()` runs SYNCHRONOUSLY: detaches her process and forgets her CLI conversation. why: a message landing mid-clear wakes a fresh conversation, never a resume.
+2. `store.clearAccount()` wipes log, notes, draft, walk, focus; every page empties at once.
+3. Awaits the old process's wind-down (up to the CLI grace).
+- `relayed_sends` rows stay: they belong to the chats.
+
+### Stop
+- Flag lives in the service; only `sendText` checks it. 2026-10-26: a later pusher (phase `feeds`) must refuse or drop after `stopAll` the same way.
+- `attachRuntime` clears it: a newly built module takes messages again.
+
+## `companion-account.ts` — `createCompanionAccount(userId, runtime)`
+The one place that says which session callback writes which row and sends which frame.
+| Session callback | Effect |
+|---|---|
+| `onSentence` | `kaylee` log line (store sends `companion_sentence`) |
+| `onTurnStarted` / `onTurnEnded` | `companion_turn` frame |
+| `onActivity` | holds the activity, sends `companion_activity` |
+| `onProcess` | `companion_process` frame |
+| `onSystemLine` | `system` log line |
+| `readSettings`, `readState`, `readRoster` (`rosterText`), `readView` | read at push time, never earlier |
+
+- `readView` = the chat on his screen (`viewOf(userId)`), named for her only if `resolveChat` can resolve it.
+- Activity is held here (`currentActivity()`); starts `IDLE_ACTIVITY`.
+
+## `companion-picture.ts` — `buildPicture(account)`
+- Shape: `{ settings, models, process, activity, turnId, focus, draft, walk, notes, log, floor }`; `log` = newest 200 rows (store keeps 400).
+- The catalog is awaited FIRST, everything else read after it in one synchronous run: no frame lands between two fields.
+- Model labels: `COMPANION_MODELS` (`sonnet`, `opus`, `haiku`) matched to `readClaudeModelsDefinition().OPTIONS` by family (`[1m]` suffix ignored); label = the option's `label` as given ("Sonnet 5.5"), else the capitalized family word. why: the catalog has already split the description at ` · `.
+- A catalog read that fails is logged (`[Companion] the CLI model catalog could not be read`) and the picker shows the family words.
+- `readClaudeModelsDefinition` is exported by `server/modules/providers/index.ts` for this reader.
+
+## `tools/companion-tools.ts`
+| Export | Is |
+|---|---|
+| `COMPANION_MCP_SERVER_NAME` | re-export of `session/companion-launch.ts`; the SDK names a tool `mcp__<name>__<tool>` |
+| `COMPANION_TOOL_NAMES` | the thirteen names, `toolNames()` of `session/companion-prompt.ts`: the lines of the prompt's TOOLS section that open `name(` |
+| `buildCompanionTools(deps)` | concatenates each tool file that exists; today `sessionTools()` (`list_sessions`, `list_projects`) and `draftTools(deps)` (`show_note`, `update_draft`, `walk`) |
+| `CompanionToolDeps` | what every tool file is handed |
+| `ToolActivityPhase` | `CompanionPhase` minus `idle`, `thinking` (the turn's own) |
+
+- The session's `init` check (`unexpectedTools`) compares the CLI's tool list against what is built here.
+
+## `tools/tool-deps.ts` — `createToolDeps({ userId, store, runtime, activity })`
+| Dep | Does |
+|---|---|
+| `setFocus(chat)` | writes and announces focus only when the chat moved or was renamed; no focus tool exists |
+| `withActivity(phase, chat, files, run)` | sets her activity for as long as `run` takes; a `walking` phase carries `{ at, total }` of the held walk |
+| `openChatOnFloor(sessionId)` | emits `companion_open_chat` `{ sessionId, floor }`; nothing while no page holds the floor |
+| `refuse(sentence)` | `isError` text saying what to do next; never a throw |
+
+`withActivity` end rule:
+1. Each running tool's activity is kept in `running`, oldest first.
+2. At a tool's end, the activity changes only if the tool's OWN activity is still the standing one. A stopped turn's `idle` stands; a late tool never repaints her busy.
+3. When it changes: to the newest activity still in `running`, else `THINKING_ACTIVITY`.
+- 2026-10-26: a tool left running when its turn is stopped keeps its entry until it ends; a later turn's tool ending in that window can briefly show it.
+
+## Probe
+`.verify/companion-module.mjs`: real `createCompanionModule` router on a loopback express app, curl on every request, a real Haiku conversation; 47 checks (settings, message and frames, a `list_sessions` call, picture, refusals, interrupt, clear, live model change, `stop()` mid-turn in 663 ms on 2026-10-26).
+```
+D=$(mktemp -d /tmp/companion-module.XXXXXX) || exit 1
+sqlite3 -readonly ~/.cloudcli/auth.db ".backup '$D/auth.db'" || exit 1
+DATABASE_PATH=$D/auth.db CERBERUS_DB_PATH=$D/cerberus.db TSX_TSCONFIG_PATH=server/tsconfig.json node --import tsx .verify/companion-module.mjs
+```
+- Refuses unless `DATABASE_PATH` is under `/tmp`.
+- Runs as real account 1: leaves her JSONL under `~/.claude/projects/-home-lyphe--claude-state-companion-1/` (a hidden root).
+- Haiku answered "What chats are working?" from the roster in her message without a tool; the probe asks once by name to prove the tool path.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/companion-account.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/companion-picture.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/companion.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/companion-tools.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/tool-deps.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-module.mjs
+
+## MAN-9061 — server/modules/companion/tools — update_draft, show_note and walk: the draft she keeps, her note cards and the walkthrough cursor
+
+`draftTools(deps)` (`draft-tools.ts`) returns the SDK `tool()` definitions of `show_note`, `update_draft` and `walk`, in that order. Each writes through the account's store, so `companion_note`, `companion_draft` or `companion_walk` reaches his panel when she calls it. None is `readOnlyHint`. Each description is `toolLine(name)`; the argument descriptions carry what the prompt's shorthand leaves out (the prompt's `update_draft(target, …)` is the pair `session` / `project`).
+
+Every handler runs inside `guardedToolResult` (`server/shared/tool-text-result.ts`): a throw is logged `[Companion] <tool> could not <doing>` and answered as `isError` text. A refusal is `deps.refuse(sentence)`.
+
+## `update_draft { session?, project?, text 1–20000 }`
+- Exactly one of `session` / `project` (a blank one counts as absent); both or neither is refused with a sentence saying so.
+- `session` goes through `resolveChat`, `project` through `resolveProject`; their refusal sentences are passed on.
+- `text` is stored EXACTLY as given (no trim): `send_to_session` and `create_session` compare their text with the draft's. A text blank after trim is refused.
+- The limit is `DRAFT_TEXT_MAX` imported from `companion-input.ts` and counted in characters as `PUT /draft` counts them (`characterCount`, code points), so the route and the tool accept the same brief and `<n>` below is that count. The schema carries it as a refinement, not `.max`, which counts UTF-16 units and would refuse text the route accepts.
+- Writes `{ target, text }` (`companion_draft`), THEN a session target becomes the focus (`deps.setFocus`): a write that fails moves nothing. A project target (`kind: 'new'`, `projectPath`, `projectName`) moves no focus.
+- After a compaction `<state>` restates the draft, the names and the walk's items ESCAPED (`&`, `<`, `>` as entities, in `stateEnvelope`): a `</state>` or an `<operator via="typed">` in her text stays words. The stored draft is untouched, so what is sent is exactly what she wrote; only her view of it after a compaction is the escaped spelling (`resolveChat` accepts a name in that spelling).
+- Activity `drafting` with that chat (none for a project) while it runs.
+- Answers `Draft for <name>: <n> characters.` or `Draft for a new chat in <project>: <n> characters.`
+
+## `show_note { title 1–80, text 1–4000 }`
+Both trimmed. One card (`companion_note`); answers `On his panel.` Touches neither draft nor focus.
+
+## `walk { session, items?: 1–60 × 1–120, at: int ≥ 0 }`
+One walk per account, held in the store; `<state>` restates it after a compaction.
+| Call | Result |
+|---|---|
+| `at` 0 | ends the HELD walk whichever chat is named, BEFORE any chat is resolved (the walk's chat may be archived or deleted since and could no longer be named): `companion_walk` null, `Walkthrough of <held chat> ended.` The focus follows the chat named only when it can still be named. None held: plain text, not an error |
+| `at` 1..n with `items` | starts, or replaces the list (also for another chat than the held walk) |
+| `at` 1..n without `items` | moves the held list; a walk held for ANOTHER chat, or none, is refused naming what to do (for another chat: name the held one, give items, or use `at` 0) |
+| `at` > n | refused with the count: `at is 4, but the walkthrough has 3 items: …` |
+- Each item is one line: a line break in an item is refused (`An item is a short title on one line: no line break.`), because the item is restated on one line in `<state>` and in the answer.
+- Answers `Item k of n: <title>.` The chat becomes the focus on every success.
+- The walk is WRITTEN BEFORE `withActivity('walking', …)` is entered: the activity's `{ at, total }` is read from the store when it is set. Ending a walk gives `walking` with `walk: null`.
+- why the `session` and `items` argument descriptions say he may name the items himself and the chat is the one the conversation has been about: measured 2026-10-26 on Haiku, with a chat already in her conversation and without them she asked "which session?" and never called `walk` (2 of 2 runs); with them, `walk` at 1, 2, 1, null.
+
+## Probe
+`.verify/companion-draft-tools.mjs <empty dir under /tmp>`: a probe chat "probe kaylee" made on the live server in `PROBE_PROJECT`, `auth.db` copied after it with `.backup`, the real module on express over the copy, her model set to haiku, then the four typed lines; a direct section calls the tools on the real store for refusals, limits and the cursor. 36 checks on 2026-10-26. Line 1 is typed up to three times until a `companion_draft` frame arrives: Haiku fails it two ways — she passes a part of the name (`"kaylee"` for `probe kaylee`), and, commoner (2 of 4 fresh runs, 2026-10-26), she searches `list_sessions` for "probe kaylee" / "probe" / "kaylee" and never calls `update_draft`, because the probe chat sits in a hidden root that `list_sessions` cannot show while `update_draft` resolves it by its exact name. A turn that never calls the tool is not a defect of the tool.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-envelopes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/draft-tools.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-draft-tools.mjs
+
+## MAN-9062 — src/modules/companion — Kaylee's panel, rail door and Settings section: the views, the shells the fill rewrites, the stance and the fixture
+
+## Parts — `src/modules/companion/`
+
+Three surfaces, each a VIEW that draws every state and a thin SHELL the fill rewrites. No barrel yet (the fill writes it). Nothing in the app mounts any shell yet. Pictures and verbs: `src/shared/companion-types.ts`; server side: MAN-9058, MAN-9059.
+
+| surface | view (all composition) | shell (stand-ins, each line carries a `FILL(...)` marker) | the fill mounts it in |
+|---|---|---|---|
+| her panel | `CompanionPanelView` (`CompanionPanel.tsx`) | `CompanionPanel` | `WorkspaceFrame`, after the floating chat, ALWAYS rendered |
+| her door | `CompanionDoorView` (`CompanionDoorButton.tsx`) | `CompanionDoorButton` | `WorkspaceRail`'s foot, just above the Inbox |
+| her Settings section | `CompanionSettingsView` (`CompanionSettingsSection.tsx`) | `CompanionSettingsSection` | `VoiceSettingsTab`, after its own sections, voice on or off |
+
+- The fill edits shells only; its `diff -u` shows nothing outside them. The fixture mounts the views, so it survives the fill.
+- Marker ids: `FILL(panel-fill)` (picture, open, her name, settings read/save, every panel verb), `FILL(send)` (`targetWorking`, `sendDraft`). `grep -rn "FILL(" src` lists every stand-in; each is deleted when filled.
+- Parts under the panel: `CompanionHeader` (status line, Stop, close, focus, model, Live, Clear), `CompanionLog`, `CompanionWalkStrip`, `CompanionNotes`, `CompanionDraftCard`, `CompanionComposer`, `CompanionSentence` (her sounds as marks), `CompanionSettingsForm`.
+- Hooks: `useFollowNewest` (log follows newest until he scrolls up; `jumpToNewest`), `useGrowingField` (textarea sized to its words, measured only while drawn), `useCardFloor` (draft card's `min-height`).
+- `companion-fake.ts`: fixture pictures (`FAKE_PANEL`, `FAKE_SETTINGS`); only the fixture imports it.
+
+## Stance — `CompanionPanelView`
+
+| viewport | box | layer |
+|---|---|---|
+| `lg`+ | 400px column, `lg:inset-y-3 lg:right-3`, `lg:border-input lg:shadow-lift` | `z-[45]`: over the application layer (40), under the rail (50) and the FAB (60) |
+| below `lg` | `absolute inset-0` sheet, no radius/border/shadow | `z-[61]`: over the sidebar drawer (50, holds the door) and the FAB (60, sits in the sheet's send lane) |
+
+- Positioned inside the workspace shell's fixed box, not the screen: it already clears the status bar, notch and keyboard.
+- Stays MOUNTED while closed (`hidden`): his unsent words and the log's scroll survive. why: render it always, never only when open.
+- The panel is `[container-type:size]`: anything placed inside it portals its overlays (a fixed child resolves against the panel). `ConfirmDialog`, menus and toasts already portal.
+- Escape: inside the panel it closes and is claimed (`preventDefault`, window capture phase); outside it is untouched. why: the chat aborts its turn on any unclaimed Escape.
+- Closing from inside returns focus to `[data-companion-door]` when on screen. Opening on `(pointer: fine)` focuses her composer; on touch it does not (no keyboard).
+- Height: header and composer stand. Composer field grows to 25% of the panel's height, then scrolls. Log keeps 3.5rem. Dock (walk, notes, draft) is `max-h-[max(55%,23rem)]`, gives way last.
+- Dock order of giving way: notes first (floor: first title + ✕ + count), then the draft's field (floor 88px). The dock scrolls only past those floors, the draft card whole inside it.
+- A failed process draws a warn `Banner` under the header (the server's sentence) beside the log's system line.
+
+## Rules the fill and later edits must keep
+
+| rule | why |
+|---|---|
+| The draft card saves his edit when the field blurs and BEFORE any send. | what is sent is what is on screen |
+| `onSendDraft(mode)` rejects with the server's sentence on refusal; the card shows it and keeps everything on screen. | no silent loss |
+| Send steer shows only while `targetWorking` and the draft targets a session; then it leads, Send turn follows. Otherwise Send turn alone. | `targetWorking` stays `false` until `send` fills it |
+| Clear memory, Clear draft and Restore the original register each open a `ConfirmDialog` first. | each destroys work |
+| Model and Live show his choice at once, restore the old value with a toast on a refused save. | a control that snaps back reads as refused |
+| Settings fields save one at a time on blur (inputs also on Enter), trimmed, only when changed and within `LIMITS`. | "Saved as you change them" |
+| The Settings section raising a dialog passes `wrapperClassName="z-[10000]"` to `ConfirmDialog`. why: Settings is a body portal at `z-[9999]`; the default `z-50` opens behind it. | |
+| The draft card's rows stay in normal flow, `flex-col`, `justify-content` start; the dock, the card and its wrapper keep `min-h-0`; `useCardFloor` stays. | the floor is measured from the last in-flow row's bottom; only out-of-flow rows (the field's `sr-only` label) are skipped |
+| `useCardFloor` writes `min-height` on every render and on a width change with no render (`ResizeObserver` acting only when the width moved, a frame later). | `scrollHeight` lost the card's bottom padding once squeezed |
+| The door lights with `RAIL_BUTTON_LIT` and rests with `RAIL_BUTTON_UNLIT` (`src/shared/constants.ts`); `aria-expanded` carries the open state. | one lit look with the views rail (MAN-9006) |
+| Settings text fields take `SETTINGS_FIELD_WIDTH` (`src/shared/constants.ts`). | one width across Settings (MAN-7425) |
+| `SettingsSection` and `SettingsCard` come from `@/shared/ui`, never the settings module. why: settings → companion → settings loops and breaks HMR. | |
+| Text goes through `t('companion.*')` (`en/common.json`); the Settings section reads `voiceSettings.companion.*` in `settings.json`. The door's words carry `defaultValue`s: it stands in the rail before anything else of hers loads. | |
+
+## Open seams for the fill
+
+| seam | state |
+|---|---|
+| Send between `panel-fill` and `send` | does nothing |
+| The settings save's answer | the fill folds it into the picture before the save resolves |
+| `send` | should say whether a send started a turn or folded into one |
+| Talk button | its place is the composer's empty tools cluster before Send (kaylee--talk); draws nothing, takes no room |
+
+## Proof — `.verify/companion-panel-scaffold.mjs`
+
+```bash
+node .verify/companion-panel-scaffold.mjs [--states awakeIdle,dense,...] [--evidence <dir>]
+```
+
+- Gitignored (`.verify/`): exists on disk only. Live client `:5183`. Exits 1 on any FAIL; zero console errors required.
+- Mounts the three views on `companion-fake.ts` pictures through `lib/companion-kit.mjs`: panel in the workspace shell's fixed box (`.pwa-status-clear.fixed`), door in the rail's foot above the Inbox, section in a Settings-modal-width column at `z-9999`. Every press is recorded in `window.__companionKit.events`, none acted on.
+- Photographs 1440×900 and 390×844, light and dark: states `loading asleepEmpty waking awakeIdle thinking readingSession readingCode drafting walking failed longLog draftWorking draftNew walk notes dense closed`, the door lit and unlit, the Settings states.
+- Checks: status line per state; the stance and layers above; no sideways scroll; dock ≤ 55% with the draft whole; Escape claimed inside, ignored outside; draft saved before send; refusals keep words; settings limits; Restore asks first; a short panel (`--keyboard-height` 380px, 390×844) with a draft and a 12-line message cuts nothing; the card keeps its bottom padding, re-checked after narrowing to 320px with no render between.
+- 2026-10-26: 275 of 275 checks, zero console errors.
+- The script is 297 lines (ceiling 300): any new check goes in `lib/companion-kit.mjs`.
+- Fragile against a server restart mid-run.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionComposer.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionDoorButton.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionDraftCard.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/companion-fake.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionHeader.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionLog.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionNotes.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionPanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionSentence.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionSettingsForm.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionSettingsSection.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionWalkStrip.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useCardFloor.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useFollowNewest.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useGrowingField.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-panel-scaffold.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/companion-kit.mjs

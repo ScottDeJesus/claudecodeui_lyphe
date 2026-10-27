@@ -15,6 +15,12 @@ type ConfirmDialogProps = {
   actions: ConfirmDialogAction[];
   /** Escape and a press on the backdrop both land here, so backing out never needs a button. */
   onDismiss: () => void;
+  /**
+   * The dialog's layer, handed to DialogContent's wrapper. A question raised from inside the Settings modal — a body
+   * portal at `z-[9999]` — passes `z-[10000]`, as the Settings tab's own dialogs do; at the default z-50 it would open
+   * behind Settings, unseen. Measured site: the companion module's Settings section (Restore the original).
+   */
+  wrapperClassName?: string;
 };
 
 /**
@@ -23,7 +29,8 @@ type ConfirmDialogProps = {
  *
  * Used by the file-editor module (closing an editor with unsaved changes), the file-manager module
  * (opening another file, or editing in another project, while a file has unsaved changes), the jev
- * module (clearing the replay cache) and the dispatcher module (deleting a plan from the store).
+ * module (clearing the replay cache), the dispatcher module (deleting a plan from the store) and the
+ * companion module (clearing her memory, clearing her draft, restoring her original register).
  * Verve draws it (`Verve Design System.dc.html`, ConfirmDialog), which is why it lives here rather
  * than being composed at each site.
  *
@@ -35,12 +42,12 @@ type ConfirmDialogProps = {
  * Below `md` each answer is 44px tall (Verve's touch minimum) and the row wraps rather than
  * running off a phone screen when three long labels do not fit on one line.
  */
-export function ConfirmDialog({ open, title, message, actions, onDismiss }: ConfirmDialogProps) {
+export function ConfirmDialog({ open, title, message, actions, onDismiss, wrapperClassName }: ConfirmDialogProps) {
   const titleId = useId();
 
   return (
     <Dialog open={open} onOpenChange={(next) => { if (!next) onDismiss(); }}>
-      <DialogContent aria-labelledby={titleId} className="w-[calc(100vw-2rem)] max-w-[380px] px-7 py-[26px]">
+      <DialogContent aria-labelledby={titleId} wrapperClassName={wrapperClassName} className="w-[calc(100vw-2rem)] max-w-[380px] px-7 py-[26px]">
         <DialogTitle id={titleId} className="not-sr-only mb-2.5 font-serif text-2xl font-normal leading-tight">
           {title}
         </DialogTitle>

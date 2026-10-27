@@ -343,6 +343,17 @@ export const FAB_SELECTOR = '.vv-fab';
 
 // ---------------------------
 
+//----------------- SETTINGS TEXT FIELDS ------------
+
+/**
+ * A settings row's text input width. Wider than fits beside SettingRow's 10rem text column on a phone, so the row drops the
+ * field below its label there, where it still fits the row. Used by the settings module's NtfySettingsCard and by the
+ * companion module's Settings section, so the text fields of Settings stand at one width.
+ */
+export const SETTINGS_FIELD_WIDTH = 'w-64 max-w-full';
+
+// ---------------------------
+
 //----------------- THE VIEWS RAIL'S BUTTON ------------
 
 /**
@@ -358,8 +369,22 @@ export const FAB_SELECTOR = '.vv-fab';
 export const RAIL_BUTTON_BASE =
   'group/rail-button relative grid size-11 flex-none place-items-center rounded-lg transition-colors duration-quick focus-visible:z-10 max-md:focus-visible:outline-offset-0 md:size-10';
 
-/** A rail button at rest and under the pointer: muted ink on the rail's canvas, the secondary ground and full ink on hover. Used with `RAIL_BUTTON_BASE` by RailButton (its unlit state) and by AppSwitcherDock's own button. */
+/** A rail button at rest and under the pointer: muted ink on the rail's canvas, the secondary ground and full ink on hover. Used with `RAIL_BUTTON_BASE` by RailButton (its unlit state), by AppSwitcherDock's own button and by the companion module's CompanionDoorButton (its door, while her panel is closed). */
 export const RAIL_BUTTON_UNLIT = 'text-muted-foreground hover:bg-secondary hover:text-foreground';
+
+/**
+ * A lit rail button. Never colour alone: the soft green ground and the deep green ink carry it to the eye, the 2×20px
+ * bar on the rail's left edge carries it to an eye that cannot tell the greens apart, and the button's own ARIA state
+ * carries it to a reader (`aria-current` on a view, `aria-expanded` on a door). The bar sits on the rail's own edge
+ * whatever the button's size: a 40px button in the 48px rail has 4px either side of it, a phone's 44px button 2px.
+ * Forced colours flatten the ground and the bar alike to the canvas, which would leave the button unmarked, so there the
+ * bar takes the system's Highlight — what forced colours draw for a state.
+ *
+ * Used with `RAIL_BUTTON_BASE` by the project-workspace module's RailButton (the view on screen) and by the companion
+ * module's CompanionDoorButton (her panel open), so a lit door and a lit view are one look.
+ */
+export const RAIL_BUTTON_LIT =
+  'bg-accent-soft text-accent-ink hover:bg-accent-soft-hover before:absolute before:-left-0.5 before:top-1/2 before:h-5 before:w-0.5 before:-translate-y-1/2 before:rounded-r-[2px] before:bg-accent-ink forced-colors:before:bg-[Highlight] md:before:-left-1';
 
 // ---------------------------
 

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 
-import { FACES, needsRead } from '@/modules/affected-areas/utils/tourModel';
+import { FACES, needsRead, panosInCaptureOrder } from '@/modules/affected-areas/utils/tourModel';
 import type { PanoEntry, ReadResult } from '@/shared/affected-areas-types';
 import { api } from '@/shared/api';
 import type { TourReaderProgress } from '@/shared/types';
@@ -31,22 +31,10 @@ type WalkAround = {
 
 /**
  * The panos with a view that needs a read (`needsRead`: none yet, or one made under an older contract or model), in the
- * order they were captured: a pano never cut has none read, so it is one. Panos with no capture time come last; panos
- * captured together keep the tour's own order.
+ * order they were captured: a pano never cut has none read, so it is one.
  */
 function unreadInCaptureOrder(panos: PanoEntry[]): PanoEntry[] {
-  const unread = panos.filter((pano) => pano.views.filter((view) => !needsRead(view)).length < FACES.length);
-  return unread
-    .map((pano, position) => ({ pano, position }))
-    .sort((a, b) => {
-      if (a.pano.capturedAt !== b.pano.capturedAt) {
-        if (a.pano.capturedAt === null) return 1;
-        if (b.pano.capturedAt === null) return -1;
-        return a.pano.capturedAt < b.pano.capturedAt ? -1 : 1;
-      }
-      return a.position - b.position;
-    })
-    .map(({ pano }) => pano);
+  return panosInCaptureOrder(panos.filter((pano) => pano.views.filter((view) => !needsRead(view)).length < FACES.length));
 }
 
 /**

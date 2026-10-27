@@ -28,6 +28,9 @@ export {
   isSessionWatched,
   markPresence,
 } from '@/modules/notifications/services/session-presence.service.js';
+// viewOf: used by the companion module's view — the chat on the account's freshest visible tab, named in
+// the message she is pushed so "this one" means the chat he is looking at.
+export { viewOf } from '@/modules/notifications/services/session-presence.service.js';
 // Used by the server entrypoint to mount the public tap-to-answer route at /api/ntfy/act.
 export { createNtfyActionRoutes } from '@/modules/notifications/ntfy-action.routes.js';
 // Used by the Claude runtime the moment an approval resolves, whichever door it came through: the

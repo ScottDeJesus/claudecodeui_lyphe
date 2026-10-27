@@ -25,8 +25,11 @@ type DayOnePressProps = {
   onStop: () => void;
 };
 
-/** The layout read's own refusals, worded for it: its own switch, its own budget, its own model and the room list it is told. */
-const OWN_REFUSALS = ['flag_off', 'budget', 'permanent', 'context_degraded'];
+/**
+ * The layout read's own refusals, worded for it: its own switch, its own budget, its own model and the room list it is told,
+ * and `failing`, the walk's own reason for ending when two panos in a row had every view fail (`useLayoutWalk`).
+ */
+const OWN_REFUSALS = ['flag_off', 'budget', 'permanent', 'context_degraded', 'failing'];
 
 /** Refusals the layout read meets in the same words the reader's press says them in: the house's switch and key, the cut, the lane. */
 const SHARED_REFUSALS = ['no_key', 'gemini_off', 'views_refused', 'unreachable', 'no_secret', 'unreadable', 'gone', 'failed'];
@@ -61,6 +64,18 @@ function refusalWords(reason: string, t: TFunction, budget?: Budget): string {
   return t('affectedAreas.dayOne.refused.other', { reason });
 }
 
+/**
+ * What a part read left behind: "2 of 6 views could not be read.", and when the door's reason is one the screen has words for,
+ * those words after it. A reason of the door the screen has no words for (a timeout, a reply that failed the contract) is not
+ * printed as a code (INV-76): the count says what happened.
+ */
+function partialWords(answer: LayoutReadResult, t: TFunction): string {
+  const known = answer.reason !== null && (OWN_REFUSALS.includes(answer.reason) || SHARED_REFUSALS.includes(answer.reason));
+  // `count` is the total: "1 of 1 view", "1 of 6 views".
+  const count = t('affectedAreas.dayOne.press.partial', { failed: answer.viewsFailed, count: answer.viewsToRead });
+  return known && answer.reason !== null ? `${count} ${refusalWords(answer.reason, t, answer.budget)}.` : count;
+}
+
 /** A warn banner, heard when it mounts: a wall between the person and a read. */
 function Wall({ words }: { words: string }) {
   return (
@@ -78,7 +93,8 @@ function Wall({ words }: { words: string }) {
  * read."; under it, from the latest answer (the dry run on open, then the walk's last), today's budget ("Budget today: 30 of
  * 360 reads on this tour, 42 of 900 across all tours"), or "Working out what a room-layout read would cost…" while the dry run
  * is out; then each wall in words BEFORE the press it refuses — the answer refused (switched off, today's budget spent, no key,
- * Gemini off), the lane's fault, where the walk stopped, the panos it passed over; then Read the room layout. While it walks:
+ * Gemini off), the lane's fault, where the walk stopped (a walk gives up after two panos in a row whose every view failed),
+ * the panos it passed over, and the views of the last pano that could not be read; then Read the room layout. While it walks:
  * "Reading the room layout…" on the press, and
  * "Reading 3 of 8" over a meter with Stop after this pano beside it. While a wall no retry clears today stands, the press
  * drops to outline. It stays in the tab order while busy (`busy`, never `disabled`).
@@ -115,6 +131,8 @@ export function DayOnePress({ lastAnswer, trouble, walk, unreadPanos, unreadView
 
       {trouble !== null && <Wall words={refusalWords(trouble, t)} />}
       {answerRefusal !== null && !oneWall && <Wall words={refusalWords(answerRefusal, t, lastAnswer?.budget)} />}
+      {/* A part read the walk is past: said once it is over, so a pano of failed views is never silent. */}
+      {!walk.running && lastAnswer?.status === 'partial' && <Wall words={partialWords(lastAnswer, t)} />}
       {walkStop !== null && (
         <Wall words={t('affectedAreas.read.stopped', { index: walk.index, total: walk.total, reason: refusalWords(walkStop, t, oneWall ? lastAnswer?.budget : undefined) })} />
       )}
@@ -128,8 +146,6 @@ export function DayOnePress({ lastAnswer, trouble, walk, unreadPanos, unreadView
             className={PRESS}
             busy={walk.running}
             data-day-one-press-read=""
-            // FILL: onReadLayout — the layout walk's start (`hooks/useLayoutWalk.ts`, shaped as `useTourReader`): each pano
-            // whose views need a room-layout read, armed, one at a time in capture order; a refusal ends it in its words.
             onClick={onRead}
           >
             {walk.running ? t('affectedAreas.dayOne.press.reading') : t('affectedAreas.dayOne.press.read')}
@@ -146,7 +162,6 @@ export function DayOnePress({ lastAnswer, trouble, walk, unreadPanos, unreadView
               value={t('affectedAreas.read.walkingShare', { percent: walk.total === 0 ? 0 : Math.round(((walk.index - 1) / walk.total) * 100) })}
             />
           </div>
-          {/* FILL: onStopLayout — the walk ends after the pano in hand, which still lands. */}
           <Button size="sm" variant="outline" className={`flex-none ${PRESS}`} onClick={onStop}>
             {t('affectedAreas.read.stopRest')}
           </Button>

@@ -5,18 +5,20 @@ import { api } from '@/shared/api';
 /** The photos fetched for one list of shas: each sha's object URL, or null where its bytes did not arrive. */
 type Loaded = { key: string; urls: Record<string, string | null> };
 
+/** One sha's bytes from the lane: a view's JPEG (`api.affectedAreas.image`) or a floor's SVG (`api.affectedAreas.planDrawing`). */
+type ReadBytes = (sha: string, options: { signal: AbortSignal }) => Promise<Response>;
+
 /**
- * The photos of a list of views, as object URLs by sha. Each is fetched with the token (`<img>` cannot send one), set
- * as it arrives, revoked when the list changes or the view goes, and aborted when the list changes before it lands.
- * A sha whose bytes did not arrive reads null, which the picture draws as its neutral tile. The browser keeps the bytes
- * a year (`immutable`: the sha IS the content), so a list read again costs no transfer.
+ * The bytes of a list of shas as object URLs by sha, from `readBytes`. Each is fetched with the token (`<img>` cannot send
+ * one), set as it arrives, revoked when the list changes or the view goes, and aborted when the list changes before it
+ * lands. A sha whose bytes did not arrive reads null, which the picture draws as its neutral tile. The browser keeps the
+ * bytes a year (`immutable`: the sha IS the content), so a list read again costs no transfer. `readBytes` must be the same
+ * function on every render (an `api` method), as it is in the effect's dependencies.
  *
  * `attempt` is the list's read: a list is fetched once per key, so a photo that did not arrive would never be asked for
  * again. A Retry bumps it, the key changes, and the same shas are read afresh.
- *
- * Used by the affected-areas module's view root, for the open pano's six photos; `useImageUrl` is its one-photo form.
  */
-export function useImageUrls(shas: string[], attempt = 0): Record<string, string | null> {
+function useObjectUrls(shas: string[], attempt: number, readBytes: ReadBytes): Record<string, string | null> {
   // The photos that arrived, with the list they answer, so a list that changed shows none of the old one's at once
   // (their URLs are revoked by then) without an effect to clear them.
   const [loaded, setLoaded] = useState<Loaded | null>(null);
@@ -33,7 +35,7 @@ export function useImageUrls(shas: string[], attempt = 0): Record<string, string
     for (const sha of shasKey.split(',')) {
       void (async () => {
         try {
-          const response = await api.affectedAreas.image(sha, { signal: controller.signal });
+          const response = await readBytes(sha, { signal: controller.signal });
           if (!response.ok) throw new Error(`Request failed with status ${response.status}`);
           const url = URL.createObjectURL(await response.blob());
           // The list may have changed while the blob was read: the cleanup already ran and would never revoke this one.
@@ -58,9 +60,28 @@ export function useImageUrls(shas: string[], attempt = 0): Record<string, string
       // (the tour screen, shown again after a pano) would find its own old key and draw them, so the record goes.
       setLoaded(null);
     };
-  }, [key, shasKey]);
+  }, [key, shasKey, readBytes]);
 
   return loaded !== null && loaded.key === key ? loaded.urls : {};
+}
+
+/**
+ * The photos of a list of views, as object URLs by sha (`useObjectUrls`).
+ *
+ * Used by the affected-areas module's view root, for the open pano's six photos; `useImageUrl` is its one-photo form.
+ */
+export function useImageUrls(shas: string[], attempt = 0): Record<string, string | null> {
+  return useObjectUrls(shas, attempt, api.affectedAreas.image);
+}
+
+/**
+ * The drawings of a list of floors, as object URLs by the sha the plan names them with (`DayOneFloor.drawingSha`): the same
+ * fetch, revoke and retry as a view's photos, over the plan's SVG.
+ *
+ * Used by the affected-areas module's `useDayOne`, for the open tour's floors.
+ */
+export function useDrawingUrls(shas: string[], attempt = 0): Record<string, string | null> {
+  return useObjectUrls(shas, attempt, api.affectedAreas.planDrawing);
 }
 
 /**

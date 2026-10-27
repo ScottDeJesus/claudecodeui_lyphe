@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { RegionList } from '@/modules/affected-areas/RegionList';
 import { FACES, kindName, listWords } from '@/modules/affected-areas/utils/tourModel';
 import type { Codebook, ViewDetail } from '@/shared/affected-areas-types';
+import type { PanoRoom } from '@/shared/types';
 
 /** The house's section eyebrow (MAN-742): a view's name over its list, as "Panos · 12" stands over the tour's gallery. */
 const EYEBROW = 'text-xs uppercase tracking-[0.14em] text-ink-faint';
@@ -11,6 +12,8 @@ const EYEBROW = 'text-xs uppercase tracking-[0.14em] text-ink-faint';
 type PanoAreasProps = {
   /** The pano's six views with what the reader marked on each, from its detail. */
   views: ViewDetail[];
+  /** The pano's room, handed on to each list: a row the plan credits to another room says so. */
+  panoRoom: PanoRoom;
   /** The chosen area, on any of the six views; null when none is. */
   selectedRegionId: string | null;
   /** The kinds' labels; null until the codebook answers. */
@@ -32,7 +35,7 @@ type PanoAreasProps = {
  *
  * Used by the affected-areas module's `PanoScreen`, in its list column while 360° is shown.
  */
-export function PanoAreas({ views, selectedRegionId, codebook, onSelectRegion }: PanoAreasProps) {
+export function PanoAreas({ views, panoRoom, selectedRegionId, codebook, onSelectRegion }: PanoAreasProps) {
   const { t } = useTranslation();
   // One id for the list of headings: each view's is it with the view after it.
   const headingBase = useId();
@@ -53,13 +56,12 @@ export function PanoAreas({ views, selectedRegionId, codebook, onSelectRegion }:
             <h3 id={headingId} className={EYEBROW}>{faceName}</h3>
             <RegionList
               regions={view.regions}
+              panoRoom={panoRoom}
               selectedId={selectedRegionId}
               kindLabel={(cls) => kindName(cls, codebook)}
               label={t('affectedAreas.pano.listLabel', { face: faceName })}
               // The view's name above names this card, so its own "Marked on this view" title gives way.
               headingId={headingId}
-              // FILL: placement — the pano's room (key and floor) handed on, so each row's meta line says "Counted in {room}" when
-              // its placement credits another room and "Seen in {n} photos" when several photos see its area.
               onSelect={onSelectRegion}
             />
           </div>

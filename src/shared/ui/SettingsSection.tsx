@@ -9,8 +9,14 @@ type SettingsSectionProps = {
   className?: string;
 };
 
-/** Used by the settings module's appearance, browser-use, git, tasks and voice tabs to title a block of settings. */
-export default function SettingsSection({ title, description, children, className }: SettingsSectionProps) {
+/**
+ * Titles a block of settings: the eyebrow heading, an optional sentence under it, then the block.
+ *
+ * Used by the settings module's appearance, browser-use, git, tasks and voice tabs and its ntfy card, and by the
+ * companion module's Settings section, which the voice tab composes but the companion module owns — the second
+ * module is what admits it here.
+ */
+export function SettingsSection({ title, description, children, className }: SettingsSectionProps) {
   return (
     <div className={cn('space-y-3', className)}>
       <div>

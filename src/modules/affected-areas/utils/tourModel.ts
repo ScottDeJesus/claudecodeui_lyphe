@@ -68,6 +68,55 @@ export function tourUnread(panos: PanoEntry[]): { panos: number; views: number }
 }
 
 /**
+ * Whether a view needs a ROOM-LAYOUT read: it has none, or its read is not `current`, which the engine decides
+ * (`LayoutViewState.current`: under today's layout contract and the pinned layout model, so the calibration reads that
+ * draw a plan still need buying). The browser compares no contract or model. Read by `layoutUnread` and `layoutQueue`.
+ */
+function layoutNeedsRead(view: ViewEntry): boolean {
+  return view.layout?.status !== 'read' || view.layout.current !== true;
+}
+
+/** The panos with at least one view still to be read for its room layout: what the layout press would read. */
+function needingLayoutRead(panos: PanoEntry[]): PanoEntry[] {
+  return panos.filter((pano) => pano.views.filter((view) => !layoutNeedsRead(view)).length < FACES.length);
+}
+
+/**
+ * What the layout press would still read on a tour, as `tourUnread` counts the reader's: its panos with a view that needs
+ * a layout read (a pano never cut included, whose views the press cuts) and those views, six for a pano never cut. The
+ * press says both before it spends. Read by the day-one hook.
+ */
+export function layoutUnread(panos: PanoEntry[]): { panos: number; views: number } {
+  const unread = panos
+    .map((pano) => FACES.length - pano.views.filter((view) => !layoutNeedsRead(view)).length)
+    .filter((views) => views > 0);
+  return { panos: unread.length, views: unread.reduce((sum, views) => sum + views, 0) };
+}
+
+/**
+ * A tour's panos in the order they were captured: panos with no capture time come last, and panos captured together keep
+ * the tour's own order. Read by both walks (`useTourReader`, `useLayoutWalk`) and by the layout queue.
+ */
+export function panosInCaptureOrder(panos: PanoEntry[]): PanoEntry[] {
+  return panos
+    .map((pano, position) => ({ pano, position }))
+    .sort((a, b) => {
+      if (a.pano.capturedAt !== b.pano.capturedAt) {
+        if (a.pano.capturedAt === null) return 1;
+        if (b.pano.capturedAt === null) return -1;
+        return a.pano.capturedAt < b.pano.capturedAt ? -1 : 1;
+      }
+      return a.position - b.position;
+    })
+    .map(({ pano }) => pano);
+}
+
+/** The panos the layout press reads, in capture order: the first is the one the dry run asks about, the rest the walk's queue. */
+export function layoutQueue(panos: PanoEntry[]): PanoEntry[] {
+  return panosInCaptureOrder(needingLayoutRead(panos));
+}
+
+/**
  * The tour's name as a person reads it: the job's, else DocuSketch's own name for the tour (a pre-job tour is named
  * there), else its address, else a sentence saying it has none of them. Never its id (INV-76). Read by the picker's
  * rows, the tour screen's title and the pano screen's way back.

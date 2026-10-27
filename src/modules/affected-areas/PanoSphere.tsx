@@ -4,11 +4,12 @@ import { useTranslation } from 'react-i18next';
 
 import { LayerSwitch } from '@/modules/affected-areas/LayerSwitch';
 import { useViewShown } from '@/modules/affected-areas/hooks/useViewShown';
+import { placementNotes } from '@/modules/affected-areas/utils/dayOneModel';
 import { REGION_LOOK, regionState } from '@/modules/affected-areas/utils/regionLook';
 import { cubeFaces, sphereShapes } from '@/modules/affected-areas/utils/sphereFaces';
 import { FACES, areaWords, kindName, panoCounts } from '@/modules/affected-areas/utils/tourModel';
 import type { Codebook, Face, Region, ViewDetail, ViewEntry } from '@/shared/affected-areas-types';
-import type { RegionLayer, SphereLook, SphereTrouble } from '@/shared/types';
+import type { PanoRoom, RegionLayer, SphereLook, SphereTrouble } from '@/shared/types';
 import { Badge, Banner, Button, SphereView } from '@/shared/ui';
 
 type PanoSphereProps = {
@@ -22,6 +23,8 @@ type PanoSphereProps = {
   photos: Record<string, string | null>;
   /** The room in words ("Kitchen"), never its key: the sphere's accessible name. */
   room: string;
+  /** The pano's room as the engine names it: the chosen line says "Counted in {room}" when the plan credits the area to another. */
+  panoRoom: PanoRoom;
   /** What the sphere outlines: every area, or only the ones the engine says stand. The list beside it keeps every area. */
   layer: RegionLayer;
   /** The chosen area, on any of the six views; null when none is. */
@@ -52,6 +55,7 @@ type PanoSphereProps = {
 
 type ChosenAreaProps = {
   region: Region;
+  panoRoom: PanoRoom;
   /** The view the area was marked on: its line names it, and Mark it on opens it. */
   face: Face;
   codebook: Codebook | null;
@@ -61,14 +65,18 @@ type ChosenAreaProps = {
 /**
  * The chosen area's line under the sphere: its number on a badge in its look's tone (as its row draws it), its kind, the view
  * it is on, and Mark it on {view}, the one way from the sphere to a press. The view's name is what tells it from an area of
- * the same number on another view. The group is named "3. Marked with blue tape · Floor"; the badge carries the number.
+ * the same number on another view. The group is named "3. Marked with blue tape · Floor"; the badge carries the number. Once
+ * the plan has placed the area, a line under that phrase says "Counted in Kitchen" when the plan credits it to a room other
+ * than the pano's, and "Seen in 2 photos" when several photos see it.
  */
-function ChosenArea({ region, face, codebook, onMarkOn }: ChosenAreaProps) {
+function ChosenArea({ region, panoRoom, face, codebook, onMarkOn }: ChosenAreaProps) {
   const { t } = useTranslation();
   const look = REGION_LOOK[regionState(region)];
   // The kind the area counts as, a rename applied, as its row and its presses name it.
   const kind = kindName(region.effectiveClass ?? region.class, codebook);
   const view = t(`affectedAreas.faces.${face}`);
+  // "Counted in Kitchen · Seen in 2 photos": where the plan puts the area when that is not simply this photo's room.
+  const placed = placementNotes(region.placement, panoRoom, t).join(' · ');
 
   return (
     <section
@@ -81,12 +89,15 @@ function ChosenArea({ region, face, codebook, onMarkOn }: ChosenAreaProps) {
         <Badge as="span" tone={look.tone} className="min-w-[26px] flex-none justify-center border-tone-dot px-1.5 font-bold tabular-nums">
           {region.ordinal}
         </Badge>
-        {/* One phrase, "Marked with blue tape · Floor": a long kind gives way, never the view that tells two 3s apart. */}
-        <span className="flex min-w-0 items-baseline gap-1 text-sm">
-          <span className="min-w-0 truncate font-semibold text-foreground">{kind}</span>
-          <span className="flex-none text-muted-foreground">· {view}</span>
-          {/* FILL: placement — "· Counted in {room}" when the area's placement credits a room other than the pano's, "· Seen in {n}
-              photos" when `placement.views` > 1: muted after the view, giving way before the view does. */}
+        <span className="flex min-w-0 flex-col gap-0.5">
+          {/* One phrase, "Marked with blue tape · Floor": a long kind gives way, never the view that tells two 3s apart. */}
+          <span className="flex min-w-0 items-baseline gap-1 text-sm">
+            <span className="min-w-0 truncate font-semibold text-foreground">{kind}</span>
+            <span className="flex-none text-muted-foreground">· {view}</span>
+          </span>
+          {/* Where the plan puts the area, on a line of its own as a row's meta is under its kind: beside the view it would
+              either push the phrase off the line or take the kind's letters, and it wraps rather than being cut. */}
+          {placed !== '' && <span className="text-xs text-muted-foreground [overflow-wrap:anywhere]">{placed}</span>}
         </span>
       </div>
       <Button
@@ -134,7 +145,7 @@ function ChosenArea({ region, face, codebook, onMarkOn }: ChosenAreaProps) {
  * Used by the affected-areas module's `PanoScreen`, in its figure while 360° is shown.
  */
 export function PanoSphere({
-  panoId, views, photos, room, layer, selectedRegionId, enlarged, codebook, reading, onLayer, onSelectRegion, look, onLook,
+  panoId, views, photos, room, panoRoom, layer, selectedRegionId, enlarged, codebook, reading, onLayer, onSelectRegion, look, onLook,
   onFullscreen, onMarkOn, onRetryPhotos,
 }: PanoSphereProps) {
   const { t } = useTranslation();
@@ -243,7 +254,7 @@ export function PanoSphere({
             )}
           </div>
         )}
-        {chosen !== null && <ChosenArea region={chosen.region} face={chosen.face} codebook={codebook} onMarkOn={onMarkOn} />}
+        {chosen !== null && <ChosenArea region={chosen.region} panoRoom={panoRoom} face={chosen.face} codebook={codebook} onMarkOn={onMarkOn} />}
       </div>
       <figcaption className="flex min-w-0 flex-col gap-1">
         <div className="flex items-center justify-between gap-3">

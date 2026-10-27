@@ -24,8 +24,12 @@ function inputRecord(toolInput: unknown): Record<string, unknown> {
     : {};
 }
 
-/** One line of `text`: every run of whitespace, line breaks included, becomes a single space. */
-function oneLine(text: string): string {
+/**
+ * One line of `text`: every run of whitespace, line breaks included, becomes a single space, and the ends are
+ * trimmed. Consumed by this file's hints and by the companion's house reads (`tools/house-reads.ts`,
+ * `tools/chat-activity.ts`), which fold a chat's name and its last words to one line the same way.
+ */
+export function oneLine(text: string): string {
   return text.replace(/\s+/g, ' ').trim();
 }
 

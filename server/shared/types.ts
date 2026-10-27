@@ -707,6 +707,15 @@ export type NormalizedMessage = {
    */
   model?: string;
   /**
+   * Set on a user `text` row that came to this chat through Kaylee, the voice companion: the live
+   * echo of a brief she sent carries it, and a history read puts it back on the persisted row by
+   * matching the row's trimmed text (and a time at or after the send) against the chat's
+   * `relayed_sends` records, so the mark survives a reload. The transcript draws it as "Through
+   * Kaylee". Absent on every other row. Kept identical, with this same comment, on the
+   * NormalizedMessage in server/shared/types.ts and in src/shared/types.ts.
+   */
+  spokenVia?: 'kaylee';
+  /**
    * Optional display-oriented metadata used by providers that need to expose
    * richer transcript artifacts without introducing a brand-new message kind.
    *

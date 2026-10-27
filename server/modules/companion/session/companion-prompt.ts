@@ -98,6 +98,34 @@ Before speaking, three yeses or cut: Is the first sentence the point? Would he a
 export const DEFAULT_DELIVERY_NOTE = 'bright, warm, quick, a smile in the voice';
 
 /**
+ * Her prompt's own line for one tool — `list_sessions(scope): the sessions and their state. …` — from the TOOLS
+ * section of `COMPANION_SYSTEM_PROMPT`. The tool's description IS that line, read from the prompt rather than
+ * written a second time, so what the tool list tells her and what her prompt tells her cannot drift apart. A name
+ * the section has no line for throws, so a tool added without its prompt line (or a line renamed) stops the server
+ * at the first build of the tool list rather than shipping a tool with no description. Consumed by every file of
+ * `tools/` that builds a definition (`session-tools.ts` and the ones after it).
+ */
+export function toolLine(name: string): string {
+  const line = toolsSectionLines().find((candidate) => candidate.startsWith(`${name}(`));
+  if (!line) throw new Error(`The system prompt's TOOLS section has no line for the tool "${name}"`);
+  return line;
+}
+
+/** The lines of the prompt's TOOLS section: its heading to the end of the prompt, which is where the section stands. */
+function toolsSectionLines(): string[] {
+  return COMPANION_SYSTEM_PROMPT.slice(COMPANION_SYSTEM_PROMPT.indexOf('\nTOOLS\n')).split('\n');
+}
+
+/**
+ * The names of her tools, in the order the TOOLS section lists them — the lines that open `name(`. The one
+ * list of what she is told she holds, derived from the prompt rather than written beside it, so a tool added
+ * to the prompt is in the list with no second edit. Consumed by `tools/companion-tools.ts` (`COMPANION_TOOL_NAMES`).
+ */
+export function toolNames(): string[] {
+  return toolsSectionLines().flatMap((line) => /^([a-z_]+)\(/.exec(line)?.[1] ?? []);
+}
+
+/**
  * Fills one template's slots in a single pass, so a value that itself contains `{name}` (an operator
  * called "{sound_tags}") is never filled again, and `$` in a value is never a replacement pattern.
  */

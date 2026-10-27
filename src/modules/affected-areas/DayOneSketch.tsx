@@ -134,9 +134,11 @@ export function DayOneSketch({
           </div>
         )}
         <div className={COLUMNS}>
-          {/* Keyed by the floor's drawing, so an enlarged drawing or a scroll of one floor never rides to another. */}
+          {/* Keyed by the floor's own number, so an enlarged drawing or a scroll of one floor never rides to another. Not by its
+              drawing: the drawing's address is its content's hash and moves whenever a rebuild changes it, which would close an
+              enlarged drawing under the person's hands. */}
           <DayOnePlan
-            key={floor.drawingSha}
+            key={floor.floor ?? 'none'}
             floor={floor}
             drawing={drawings[floor.drawingSha]}
             codebook={codebook}
@@ -149,9 +151,8 @@ export function DayOneSketch({
       </>
     );
   } else if (state === 'pending' && rebuilding) {
-    // FILL: rebuild — when `layout.status` is `stale`, the open sends `api.affectedAreas.buildPlan(tourId)` ONCE (no model,
-    // nothing bought) with `rebuilding` true while it is out; its answer's `layout` and `dayOne` are then this section's. A
-    // rebuild that brings no answer says its fault through `pressTrouble` (the press's wall), and the section stays as it was.
+    // The open's one rebuild of a stale plan is out (`useLayoutPlan`) and no plan is yet in force to draw: the drawing's waiting
+    // surface. A rebuild that brings no answer says its fault through `pressTrouble`, and the section stays as it was.
     body = (
       <div aria-busy="true" className="flex min-w-0 flex-col gap-2">
         <div aria-hidden="true" className="vv-skeleton aspect-[4/3] w-full rounded-none [@container(min-width:960px)]:w-3/5" />
@@ -183,14 +184,9 @@ export function DayOneSketch({
         {/* The press stands where the tour's own does: top right, beside what it reads. */}
         <div className="min-w-0 max-w-[420px] flex-[0_1_auto]">
           <DayOnePress
-            // FILL: lastAnswer — on open, ONE unarmed `api.affectedAreas.readLayout(tourId, firstPanoNeedingARead, { armed: false, force: false })`,
-            // which buys nothing (no dry run when nothing is left to read); then each armed answer the walk lands. Its `budget` and refusal make the press's lines.
             lastAnswer={lastAnswer}
-            // FILL: pressTrouble — the lane's fault when the dry run brought no answer.
             trouble={pressTrouble}
-            // FILL: walk — `hooks/useLayoutWalk.ts`, shaped as `useTourReader`; each answer's `layout` replaces this section's.
             walk={walk}
-            // FILL: unreadPanos / unreadViews — counted off each view's `layout` (unread, or `current` false), beside `tourUnread`.
             unreadPanos={unreadPanos}
             unreadViews={unreadViews}
             onRead={onReadLayout}

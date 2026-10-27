@@ -1,6 +1,6 @@
 import { useId } from 'react';
 
-import { RAIL_BUTTON_BASE, RAIL_BUTTON_UNLIT } from '@/shared/constants';
+import { RAIL_BUTTON_BASE, RAIL_BUTTON_LIT, RAIL_BUTTON_UNLIT } from '@/shared/constants';
 import type { AppTab, RailBadge, WorkspaceView } from '@/shared/types';
 import { Tooltip } from '@/shared/ui';
 import { cn } from '@/shared/utils';
@@ -18,14 +18,6 @@ type RailButtonProps = {
   badge?: RailBadge | null;
   onPress: () => void;
 };
-
-// The lit state is never colour alone: the soft green ground and the deep green ink carry it to the eye, the 2×20px
-// bar on the rail's left edge carries it to an eye that cannot tell the greens apart, and `aria-current` to a reader.
-// The bar sits on the rail's own edge whatever the button's size: a 40px button in the 48px rail has 4px either side
-// of it, a phone's 44px button 2px. Forced colours flatten the ground and the bar alike to the canvas, which would
-// leave the lit view unmarked, so there the bar takes the system's Highlight — what forced colours draw for a state.
-const LIT =
-  'bg-accent-soft text-accent-ink hover:bg-accent-soft-hover before:absolute before:-left-0.5 before:top-1/2 before:h-5 before:w-0.5 before:-translate-y-1/2 before:rounded-r-[2px] before:bg-accent-ink forced-colors:before:bg-[Highlight] md:before:-left-1';
 
 /**
  * One button of the views rail: a 20px glyph at stroke 1.75 in a 40px square (44px below md, the touch floor), lit
@@ -64,7 +56,8 @@ export default function RailButton({ label, viewId, icon: Icon, lit = false, bad
         onClick={onPress}
         className={cn(
           RAIL_BUTTON_BASE,
-          lit ? LIT : RAIL_BUTTON_UNLIT,
+          // The lit view says so to a reader with `aria-current`, above; RAIL_BUTTON_LIT carries it to the eye.
+          lit ? RAIL_BUTTON_LIT : RAIL_BUTTON_UNLIT,
         )}
       >
         {Icon ? (

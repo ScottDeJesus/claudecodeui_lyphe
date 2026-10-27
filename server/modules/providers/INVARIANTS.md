@@ -95,3 +95,17 @@ Releases (the only ones; a hold with none of these stays):
 - Never: replace the ids with a count, release a hold on a timer, or clear the set to unstick a chat. The proof of a finished call is the host journal's own `task_notification` frame, never its absence.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-runtime.provider.js
+
+## INV-9787 — sessions.name_given — edits that break it: the mark is written with a person's rename, never by the app, and a merge keeps name and mark together
+
+Behaviour: MAN-9060.
+
+| Edit | Breaks | Why |
+| --- | --- | --- |
+| Rename by a person with `updateSessionCustomName` and `markNameGiven` called apart (`renameSessionById` in `sessions.service.ts`, a new door) | a failure between the two leaves the name he gave stored with `name_given = 0`; the namer replaces it at the chat's next turn | `sessionsDb.renameByPerson` runs both in one transaction |
+| Call `markNameGiven` from the app's own naming (the Codex synchronizer, the namer) | a name the app chose reads as his and is never replaced | the mark means a person typed the name |
+| Write `name_given` back to `0` | a name he typed becomes replaceable | the mark has no undo |
+| Merge the duplicate row in `assignProviderSessionId` with `COALESCE(custom_name, …)` alone, or without `MAX(name_given, …)` | the mark and the name part: the app row reads `name_given = 1` over a name he did not give, or his name is lost | a name travels with its mark |
+| Backfill `name_given = 1` for existing names | every old name, the app's included, is frozen | no name on disk is known to be his; the first rename marks it |
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/migrations.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/sessions.db.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/services/sessions.service.ts

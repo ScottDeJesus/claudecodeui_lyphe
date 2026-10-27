@@ -101,6 +101,33 @@ export function isSessionOnScreen(sessionId: string, options: { freshMs?: number
 }
 
 /**
+ * The chat this account's freshest visible tab shows, within the same 90 s freshness the other reads
+ * use; `null` when no visible tab of the account has reported that recently, or when the freshest
+ * one shows no chat (the home page, a settings screen).
+ *
+ * The FRESHEST visible tab decides, not any tab: with two windows open, the one that reported last is
+ * the one he is looking at, so an older tab's chat is never offered as "this one". A tab that is
+ * hidden or whose socket has closed never counts. The user id is compared as a string, as in
+ * `isSessionWatched`.
+ *
+ * Consumed by the companion's view: it names the chat on his screen in the message she is pushed.
+ */
+export function viewOf(userId: string | number): string | null {
+  const wanted = String(userId);
+  const now = Date.now();
+  let freshest: PresenceRecord | null = null;
+  for (const [connection, record] of presenceByConnection) {
+    if (!isConnectionLive(connection)) {
+      presenceByConnection.delete(connection);
+      continue;
+    }
+    if (!record.visible || String(record.userId) !== wanted || now - record.updatedAt > DEFAULT_FRESH_MS) continue;
+    if (freshest === null || record.updatedAt > freshest.updatedAt) freshest = record;
+  }
+  return freshest?.sessionId ?? null;
+}
+
+/**
  * The shared presence walk behind `isSessionWatched` and `isSessionOnScreen`.
  *
  * `userId` is the only difference between the two questions — a string to

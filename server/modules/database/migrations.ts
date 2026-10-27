@@ -571,6 +571,21 @@ const addSessionEffortColumn = (db: Database): void => {
 };
 
 /**
+ * Adds the `name_given` column: `1` when a person gave the chat its name, `0` when anything else did.
+ *
+ * `custom_name` alone cannot tell "Live mode" typed by him from "Live mode" proposed by the namer,
+ * and a name he typed is never replaced. Existing rows take `0`: no name on disk today is known to be
+ * his, so the namer may still replace an unsayable one at the chat's next turn, and the first
+ * rename after this lands marks it.
+ */
+const addSessionNameGivenColumn = (db: Database): void => {
+  const sessionsTableInfo = getTableInfo(db, 'sessions');
+  const columnNames = sessionsTableInfo.map((column) => column.name);
+
+  addColumnToTableIfNotExists(db, 'sessions', columnNames, 'name_given', 'INTEGER NOT NULL DEFAULT 0');
+};
+
+/**
  * Adds the `permission_mode` column that records the permission mode a session last ran under.
  *
  * Recorded beside `model` and `effort` on every send, so a send the companion relays can run in
@@ -702,6 +717,7 @@ export const runMigrations = (db: Database) => {
     addProviderSessionIdMapping(db);
     addSessionModelColumn(db);
     addSessionEffortColumn(db);
+    addSessionNameGivenColumn(db);
     addSessionPermissionModeColumn(db);
     addForkedFromSessionIdColumn(db);
     addSimpleListAtColumn(db);

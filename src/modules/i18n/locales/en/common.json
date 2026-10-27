@@ -2875,7 +2875,8 @@
       "skipped_one": "{{count}} pano could not be cut into views and was passed over.",
       "skipped_other": "{{count}} panos could not be cut into views and were passed over.",
       "cached": "Nothing new to read: every view was already read.",
-      "partial": "{{failed}} of {{count}} views could not be read. {{reason}}.",
+      "partial_one": "{{failed}} of {{count}} view could not be read. {{reason}}.",
+      "partial_other": "{{failed}} of {{count}} views could not be read. {{reason}}.",
       "refused": {
         "budget": "Today's reading budget is spent",
         "budgetFleet": "Today's reading budget is spent: {{used}} of {{cap}} reads",
@@ -2996,9 +2997,12 @@
         "planning": "Working out what a room-layout read would cost…",
         "budget": "Budget today: {{tourUsed}} of {{tourCap}} reads on this tour, {{fleetUsed}} of {{fleetCap}} across all tours",
         "read": "Read the room layout",
-        "reading": "Reading the room layout…"
+        "reading": "Reading the room layout…",
+        "partial_one": "{{failed}} of {{count}} view could not be read.",
+        "partial_other": "{{failed}} of {{count}} views could not be read."
       },
       "refused": {
+        "failing": "Two panos in a row could not be read at all",
         "flag_off": "Room-layout reading is switched off in shadow-connector",
         "budget": "Today's room-layout budget is spent",
         "budgetTour": "This tour's room-layout budget for today is spent: {{used}} of {{cap}} reads",
@@ -3194,6 +3198,113 @@
       "justNow": "just now",
       "minutesAgo": "{{count}}m ago",
       "hoursAgo": "{{count}}h ago"
+    }
+  },
+  "companion": {
+    "defaultName": "Kaylee",
+    "panel": {
+      "label": "{{name}}",
+      "close": "Close {{name}}",
+      "loading": "Opening {{name}}'s conversation…",
+      "loadingStatus": "Loading…",
+      "failedUnknown": "{{name}} stopped."
+    },
+    "status": {
+      "asleep": "Asleep · your next message wakes her",
+      "waking": "Waking up",
+      "failed": "Stopped · your next message starts her again",
+      "idle": "Idle",
+      "thinking": "Thinking",
+      "readingSession": "Reading <subject/>",
+      "readingAChat": "Reading a chat",
+      "readingCode": "Reading code",
+      "readingFiles": "Reading code · <subject/>",
+      "readingManyFiles": "Reading code · {{count}}\u00a0files",
+      "draftingFor": "Drafting for <subject/>",
+      "draftingNew": "Drafting a new chat",
+      "walking": "Walking <subject/> · item\u00a0{{at}}\u00a0of\u00a0{{total}}",
+      "walkingPlain": "Walking a result"
+    },
+    "focus": "Focus",
+    "model": "Model",
+    "modelRefused": "Her model wasn't changed",
+    "live": "Live",
+    "liveHint": "On: she hears the house's alerts and speaks up without being asked.",
+    "liveOnRefused": "Live wasn't turned on",
+    "liveOffRefused": "Live wasn't turned off",
+    "stop": "Stop",
+    "stopHint": "Stop {{name}}'s answer",
+    "stopRefused": "Her answer didn't stop",
+    "clear": "Clear",
+    "clearLabel": "Clear {{name}}'s memory",
+    "clearTitle": "Clear {{name}}'s memory?",
+    "clearMessage": "She forgets this conversation, her notes, the draft and the walkthrough, and starts fresh. Briefs she already sent stay in their chats.",
+    "clearConfirm": "Clear her memory",
+    "clearRefused": "{{name}}'s memory wasn't cleared",
+    "cancel": "Cancel",
+    "log": {
+      "label": "Conversation with {{name}}",
+      "you": "You",
+      "typed": "typed",
+      "spoken": "spoken",
+      "alert": "Alert",
+      "systemPrefix": "Notice:",
+      "speaking": "{{name}} is answering",
+      "newest": "Newest",
+      "emptyTitle": "Nothing said yet",
+      "emptyMessage": "Type to {{name}} below. She keeps track of every chat you're running, drafts what to tell one, and sends only on your word."
+    },
+    "walk": {
+      "title": "Walkthrough",
+      "of": "Item\u00a0{{at}}\u00a0of\u00a0{{total}}",
+      "notBegun_one": "{{count}} item · not started",
+      "notBegun_other": "{{count}} items · not started"
+    },
+    "notes": {
+      "label": "Notes from {{name}}",
+      "count_one": "{{count}} note",
+      "count_other": "{{count}} notes",
+      "dismiss": "Dismiss “{{title}}”",
+      "dismissRefused": "“{{title}}” wasn't dismissed"
+    },
+    "draft": {
+      "title": "Draft",
+      "forChat": "For {{chat}}",
+      "newChat": "New chat in {{project}}",
+      "updated": "Updated {{when}}",
+      "working": "Working now",
+      "aboutChat": "for {{chat}}",
+      "aboutNew": "for a new chat in {{project}}",
+      "fieldLabel": "Draft {{about}}",
+      "sendTurn": "Send turn",
+      "sendSteer": "Send steer",
+      "steerHint": "Folds it into the turn running now",
+      "clear": "Clear",
+      "clearLabel": "Clear the draft",
+      "clearTitle": "Clear the draft?",
+      "clearMessage": "The brief {{about}} is discarded. {{name}} starts a new one when you ask.",
+      "clearConfirm": "Clear the draft",
+      "clearRefused": "The draft wasn't cleared",
+      "theirsChanged": "{{name}} changed the draft while you were editing.",
+      "useTheirs": "Use hers",
+      "sendRefused": "Not sent: {{reason}}",
+      "sendRefusedPlain": "Not sent. Try again.",
+      "saveRefused": "Your edit wasn't saved: {{reason}}",
+      "saveRefusedPlain": "Your edit wasn't saved. It is still here."
+    },
+    "composer": {
+      "placeholder": "Message {{name}}…",
+      "label": "Message {{name}}",
+      "send": "Send",
+      "refused": "Couldn't reach {{name}}. Your message is back in the box; send it again."
+    },
+    "door": {
+      "label": "Talk to {{name}}"
+    },
+    "palette": {
+      "group": "{{name}}",
+      "talk": "Talk to {{name}}",
+      "keywords": "kaylee companion voice assistant talk draft brief"
     }
   }
 }

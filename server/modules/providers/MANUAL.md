@@ -876,3 +876,41 @@ What a chat's rate-limit events and limit notices belong to: the account the cha
 Measured 2026-10-21, live dev API :3011, two Haiku turns in a scratch project: launch record `{account:"f9caa612", slug:"scottdejesus", why:"new"}`; `readings.newest("f9caa612")` → `source='chat'`, `at` = the turn's time; the second turn's identical windows filed nothing; `limit-memory.json` gained a `scottdejesus` key carrying the chat's `five_hour` window.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-chat-readings.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-limit-memory.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-runtime-signals.ts
+
+## MAN-9060 — sessions.name_given — the mark on a chat name: who writes it, who reads it, how the duplicate merge carries it
+
+`sessions.name_given` INTEGER NOT NULL DEFAULT 0: `1` when a person gave the chat its `custom_name` (the sidebar rename), `0` for every other writer. why: `custom_name` alone cannot tell a name he typed from one the app proposed, and a name he typed is never replaced.
+
+| fact | value |
+| --- | --- |
+| declared | `addSessionNameGivenColumn` (`migrations.ts`, after `addSessionEffortColumn`); not in `schema.ts` — a fresh database gets it from the migration run |
+| existing rows | `0`: no name on disk is known to be his |
+| row type | `name_given: number` in `SessionRow`; named in `SESSION_ROW_COLUMNS` (`sessions.db.ts`) |
+| undo | none: nothing writes it back to `0` |
+| read it | `sqlite3 ~/.cloudcli/auth.db "select session_id, custom_name, name_given from sessions where name_given = 1"` |
+
+## Doors (`sessionsDb`, `sessions.db.ts`)
+
+| door | does | caller |
+| --- | --- | --- |
+| `renameByPerson(sessionId, customName)` | `updateSessionCustomName` then `markNameGiven`, in one `db.transaction` | `sessionsService.renameSessionById`, reached by `PUT /api/providers/sessions/:sessionId` (`provider.routes.ts`): the sidebar's rename |
+| `markNameGiven(sessionId)` | `name_given = 1` | `renameByPerson` only |
+| `updateSessionCustomName(sessionId, customName)` | writes the name, never the mark | a title the app derives: `codex-session-synchronizer.provider.ts` (the Codex thread name) |
+| `nameFactsOf(sessionId)` | `{ customName, nameGiven, appCreated, isArchived }`, or `null` when no row has the id | 2026-10-26: no caller yet |
+
+`appCreated` = `provider_session_id IS NULL OR session_id <> provider_session_id`: the app allocated the id. A chat discovered on disk holds one id in both columns.
+
+2026-10-26: the companion prompt names `rename_session`; no handler for it exists in `server/modules/companion/tools/`.
+
+## The duplicate merge — `assignProviderSessionId`
+
+The watcher's row (keyed by the provider id) merges into the app row. A name travels with its mark.
+
+| duplicate's `name_given` | app row's `name_given` | `custom_name` after | `name_given` after |
+| --- | --- | --- | --- |
+| `1` | `0` | the duplicate's (the app row's when the duplicate has none) | `1` |
+| any other pair | | the app row's (the duplicate's when the app row has none) | the larger of the two |
+
+The UPDATE's right-hand sides read the app row as it was before the statement, so the `CASE` sees the app row's own mark, not the one `MAX` writes.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/migrations.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/sessions.db.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/provider.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/services/sessions.service.ts

@@ -92,7 +92,8 @@
           "server/shared/shadow-connector-lane.ts",
           "server/shared/shadow-connector-lane-router.ts",
           "server/shared/prompt-stream.ts",
-          "server/shared/tool-call-hint.ts"
+          "server/shared/tool-call-hint.ts",
+          "server/shared/tool-text-result.ts"
         ],
         "mode": "file"
       },

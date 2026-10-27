@@ -3,7 +3,7 @@ import type { TFunction } from 'i18next';
 import type { ComponentType, HTMLAttributes, ReactNode } from 'react';
 import type { NavigateFunction } from 'react-router-dom';
 
-import type { Face, QueueItem, ReadResult, Region } from '@/shared/affected-areas-types';
+import type { DayOneFloor, Face, LayoutReadResult, LayoutStatus, QueueItem, ReadResult, Region } from '@/shared/affected-areas-types';
 import type { AppEntry } from '@/shared/app-types';
 import type { CerberusNodeView, CerberusServiceView, CerberusStatus } from '@/shared/cerberus-types';
 
@@ -534,6 +534,8 @@ export type ChatMessage = {
   files?: ChatAttachment[];
   /** The model id that produced this assistant turn, when the provider records one; the transcript resolves it to a catalog label so a raw id never reaches the screen. */
   model?: string;
+  /** Set on a user turn that came to the chat through Kaylee; the user bubble draws a "Through Kaylee" mark beside its copy control. Carried from `NormalizedMessage.spokenVia`. */
+  spokenVia?: 'kaylee';
   /**
    * The provider's identifier for the transcript row behind this message, when
    * the provider has stable per-row identity. Present on user turns from
@@ -756,6 +758,15 @@ export type NormalizedMessage = {
    * on the server's own NormalizedMessage in server/shared/types.ts.
    */
   model?: string;
+  /**
+   * Set on a user `text` row that came to this chat through Kaylee, the voice companion: the live
+   * echo of a brief she sent carries it, and a history read puts it back on the persisted row by
+   * matching the row's trimmed text (and a time at or after the send) against the chat's
+   * `relayed_sends` records, so the mark survives a reload. The transcript draws it as "Through
+   * Kaylee". Absent on every other row. Kept identical, with this same comment, on the
+   * NormalizedMessage in server/shared/types.ts and in src/shared/types.ts.
+   */
+  spokenVia?: 'kaylee';
   /**
    * Mirrors optional transcript metadata from the server.
    *
@@ -2866,6 +2877,35 @@ export type PanoPress = {
  * `ReadControl` on the tour screen and the pano screen alike.
  */
 export type TourReaderProgress = { running: boolean; index: number; total: number; lastRefusal: string | null; skipped: number };
+
+/**
+ * A pano's room as the engine names it: the key and the floor a region's placement is compared with, to say "Counted in
+ * {room}" when the plan credits the region to another room. Handed down from the pano screen to the region lists and to the
+ * 360° chosen-area line.
+ */
+export type PanoRoom = { roomKey: string | null; floor: number | null };
+
+/**
+ * What the day-one sketch is handed for the open tour (`useDayOne`, drawn by `DayOneSketch` on the tour screen): the plan's
+ * floors and the layout status as they stand now (the tour's own, or a newer answer of the open's rebuild or of the walk),
+ * each floor's drawing as a URL by its sha (absent while its bytes load, null where they did not arrive), the press's latest
+ * answer and lane fault, the layout walk, what is left to read, and the verbs of the press and the drawing's Try again. The
+ * verbs that open a pano are the view root's, so they are not here.
+ */
+export type DayOneSection = {
+  floors: DayOneFloor[];
+  layout: LayoutStatus | null;
+  drawings: Record<string, string | null>;
+  rebuilding: boolean;
+  lastAnswer: LayoutReadResult | null;
+  pressTrouble: AffectedAreasTrouble | null;
+  walk: TourReaderProgress;
+  unreadPanos: number;
+  unreadViews: number;
+  onRetryDrawing: () => void;
+  onReadLayout: () => void;
+  onStopLayout: () => void;
+};
 
 /**
  * The Tours view's three screens, in the order its sub-switch offers them: the tours (picker, tour, pano), the Mark

@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next';
 
-import { DarkModeToggle, Select, SettingRow, Stepper } from '@/shared/ui';
+import { DarkModeToggle, Select, SettingRow, SettingsCard, SettingsSection, Stepper } from '@/shared/ui';
 import type { AgentSettingsProject, ProjectSortOrder } from '@/shared/types';
 import { LanguageSelector } from '@/modules/i18n';
 import { useTasksSettings } from '@/modules/task-master';
@@ -9,8 +9,6 @@ import { useTheme } from '@/shared/context/ThemeContext';
 import { useChatFontSize } from '@/shared/hooks/useChatFontSize';
 import { useSimpleChatListPreferences } from '@/shared/hooks/useSimpleChatListPreferences';
 import { projectNameHints } from '@/shared/projectNameHints';
-import SettingsCard from '@/modules/settings/SettingsCard';
-import SettingsSection from '@/modules/settings/SettingsSection';
 import SettingsToggle from '@/modules/settings/SettingsToggle';
 
 type AppearanceSettingsTabProps = {

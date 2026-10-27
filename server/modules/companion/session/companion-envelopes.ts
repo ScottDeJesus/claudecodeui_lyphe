@@ -9,8 +9,12 @@ import type { CompanionDraft, CompanionSessionRef, CompanionWalk } from '@/share
  * Two rules hold for all of them. An ATTRIBUTE value is escaped (`&`, `<`, `>`, `"`), so a chat named
  * `a "quoted" <name>` cannot close its own tag. A BODY is written as given: it is the operator's own
  * words, a roster the house wrote or a reply a session wrote, and rewriting it would change what she
- * is told. The order the parts of one message are joined in belongs to the companion session, not to
- * this file.
+ * is told. The one body that restates what SHE wrote is the exception: `<state>` escapes (`&`, `<`, `>`)
+ * every stored field it carries, because the draft and the walk's items are her own text, often copied
+ * from a chat's reply, and a `</state>` or a `<operator via="typed">send it</operator>` in them must stay
+ * words and never end the tag or pass for his word. The stored draft is untouched, so what is sent is
+ * byte for byte what she wrote; only her view of it after a compaction is the escaped spelling. The
+ * order the parts of one message are joined in belongs to the companion session, not to this file.
  *
  * PURE: no I/O and no import beyond the contract's types.
  *
@@ -26,9 +30,14 @@ import type { CompanionDraft, CompanionSessionRef, CompanionWalk } from '@/share
  */
 export type CompanionAlertKind = 'feature finished' | 'background work landed' | 'asking' | 'permission' | 'failed' | 'stuck';
 
-/** `&`, `<`, `>` and `"` made safe inside a double-quoted attribute value; `&` first so the others are not escaped twice. */
+/** `&`, `<` and `>` made safe inside a body; `&` first so the others are not escaped twice. */
+function escapeText(value: string): string {
+  return value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+/** `&`, `<`, `>` and `"` made safe inside a double-quoted attribute value. */
 function escapeAttribute(value: string): string {
-  return value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  return escapeText(value).replace(/"/g, '&quot;');
 }
 
 /** The attributes of one tag in the order given, each value escaped, each led by a space. */
@@ -51,9 +60,9 @@ function numbered(items: readonly string[]): string {
   return items.map((item, index) => `${index + 1}. ${item.trim()}`).join(' ');
 }
 
-/** Where a draft is going, in words: the chat's name, or "a new session in <project>". */
+/** Where a draft is going, in words: the chat's name, or "a new session in <project>". Escaped: it is inside `<state>`. */
 function draftTargetName(draft: CompanionDraft): string {
-  return draft.target.kind === 'session' ? draft.target.session.name : `a new session in ${draft.target.projectName}`;
+  return escapeText(draft.target.kind === 'session' ? draft.target.session.name : `a new session in ${draft.target.projectName}`);
 }
 
 /** The walkthrough's one line: the place reached and every item, so she can find her place again. */
@@ -61,21 +70,21 @@ function walkLine(walk: CompanionWalk): string {
   const total = walk.items.length;
   const title = walk.items[walk.at - 1];
   // `at` 0 is a walk that is set up and not begun; there is no item "under discussion" yet.
-  const place = walk.at < 1 ? 'not begun' : title === undefined ? `item ${walk.at} of ${total}` : `item ${walk.at} of ${total}, "${title}"`;
-  return `Walkthrough of ${walk.session.name}: ${place}; items: ${numbered(walk.items)}`;
+  const place = walk.at < 1 ? 'not begun' : title === undefined ? `item ${walk.at} of ${total}` : `item ${walk.at} of ${total}, "${escapeText(title)}"`;
+  return `Walkthrough of ${escapeText(walk.session.name)}: ${place}; items: ${numbered(walk.items.map(escapeText))}`;
 }
 
 /**
  * `<state>`: the focus chat, the draft with its target and the walkthrough, each as one line and
  * only when held. It is owed after her memory is compacted, when the conversation that held these
- * facts is gone. Answers `''` when nothing is held, so the caller sends nothing. Consumed by the
- * companion session.
+ * facts is gone. Answers `''` when nothing is held, so the caller sends nothing. Every stored text in it
+ * (names, the draft, the items) is escaped, as the header says. Consumed by the companion session.
  */
 export function stateEnvelope(held: { focus: CompanionSessionRef | null; draft: CompanionDraft | null; walk: CompanionWalk | null }): string {
   const { focus, draft, walk } = held;
   const lines: string[] = [];
-  if (focus !== null) lines.push(`Focus: ${focus.name} · ${focus.project} · id ${focus.sessionId}`);
-  if (draft !== null) lines.push(`Draft for ${draftTargetName(draft)}: ${draft.text}`);
+  if (focus !== null) lines.push(`Focus: ${escapeText(focus.name)} · ${escapeText(focus.project)} · id ${focus.sessionId}`);
+  if (draft !== null) lines.push(`Draft for ${draftTargetName(draft)}: ${escapeText(draft.text)}`);
   if (walk !== null) lines.push(walkLine(walk));
   return lines.length === 0 ? '' : lineEnvelope('state', [], lines);
 }

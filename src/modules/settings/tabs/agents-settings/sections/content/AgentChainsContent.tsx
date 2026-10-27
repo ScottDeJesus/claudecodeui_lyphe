@@ -4,8 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { ErrorBoundary } from 'react-error-boundary';
 
 import { AgentLaunchPanel } from '@/modules/agent-launch';
-import SettingsCard from '@/modules/settings/SettingsCard';
-import { Banner, Button, Dialog, DialogContent, DialogTrigger, SettingRow, Spinner } from '@/shared/ui';
+import { Banner, Button, Dialog, DialogContent, DialogTrigger, SettingRow, SettingsCard, Spinner } from '@/shared/ui';
 
 /**
  * The window's own chrome for the stretch when the panel is not there — its chunk still loading, or

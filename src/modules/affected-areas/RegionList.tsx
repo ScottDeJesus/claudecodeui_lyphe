@@ -2,14 +2,18 @@ import type { TFunction } from 'i18next';
 import { useEffect, useId, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { placementNotes } from '@/modules/affected-areas/utils/dayOneModel';
 import { REGION_LOOK, regionState } from '@/modules/affected-areas/utils/regionLook';
 import type { Region } from '@/shared/affected-areas-types';
+import type { PanoRoom } from '@/shared/types';
 import { Badge, Card } from '@/shared/ui';
 import { cn } from '@/shared/utils';
 
 type RegionListProps = {
   /** The shown face's regions, in their badge order. */
   regions: Region[];
+  /** The pano's room: a region the plan credits to another room says so in its line. */
+  panoRoom: PanoRoom;
   selectedId: string | null;
   /** A kind's label from the codebook ("Material removed"); the kind's key spoken as it is until the codebook answers. */
   kindLabel: (cls: string) => string;
@@ -35,14 +39,17 @@ function isStacked(list: HTMLElement): boolean {
   return false;
 }
 
-/** "Proposed · 95% sure · seen in the photo": where the region stands, how sure the reader was, and on what ground. */
-function regionMeta(region: Region, t: TFunction): string {
+/**
+ * "Proposed · 95% sure · seen in the photo · Counted in Kitchen · Seen in 2 photos": where the region stands, how sure the
+ * reader was, on what ground, and, when the plan has placed it, the room it is counted in (when not its photo's) and how many
+ * photos see its area.
+ */
+function regionMeta(region: Region, panoRoom: PanoRoom, t: TFunction): string {
   return [
     t(REGION_LOOK[regionState(region)].wordKey),
     region.confidence === null ? null : t('affectedAreas.region.sure', { percent: Math.round(region.confidence * 100) }),
     t(`affectedAreas.region.basis.${region.basis}`),
-    // FILL: placement — "Counted in {room}" (`affectedAreas.dayOne.countedIn`) when `region.placement` credits a room other than the
-    // pano's (its key and floor against the pano's), and "Seen in {n} photos" (`affectedAreas.dayOne.seenIn`) when `placement.views` > 1.
+    ...placementNotes(region.placement, panoRoom, t),
   ].filter((part) => part !== null).join(' · ');
 }
 
@@ -51,15 +58,17 @@ function regionMeta(region: Region, t: TFunction): string {
  * ones set aside alike (unsure, or marked not a change), each saying which it is, so the list, the badges and the
  * caption's "3 areas · 2 set aside" always add up. Each row: the region's number in its look's tone, the kind's label
  * (the codebook's words, never a colour: tone is by judgment), the reader's own label for it, the visible evidence in
- * the reader's words, and where it stands, how sure the reader was and on what ground.
+ * the reader's words, and where it stands, how sure the reader was and on what ground; once the plan has placed it, the room it
+ * is counted in when that is not its photo's ("Counted in Kitchen") and "Seen in 2 photos" when several photos see its area.
  *
  * Selecting a row selects its region on the photo and the photo's selects its row: the chosen row wears the
  * house's chosen-row mark (the canvas ground and an accent bar, `aria-current`), and is brought into view when the
  * photo chose it.
  *
- * Used by the affected-areas module's `PanoScreen`, which draws it beside the face while the face has regions.
+ * Used by the affected-areas module's `PanoScreen`, which draws it beside the face while the face has regions, and by `PanoAreas`,
+ * which draws one under each view's name on 360°.
  */
-export function RegionList({ regions, selectedId, kindLabel, label, headingId, onSelect }: RegionListProps) {
+export function RegionList({ regions, panoRoom, selectedId, kindLabel, label, headingId, onSelect }: RegionListProps) {
   const { t } = useTranslation();
   const ownHeadingId = useId();
   // The list's box: the chosen row is found in it and brought into view.
@@ -105,7 +114,7 @@ export function RegionList({ regions, selectedId, kindLabel, label, headingId, o
                   {region.evidence !== null && region.evidence !== '' && (
                     <span className="text-[12.5px] text-muted-foreground [overflow-wrap:anywhere]">“{region.evidence}”</span>
                   )}
-                  <span className="text-xs text-muted-foreground">{regionMeta(region, t)}</span>
+                  <span className="text-xs text-muted-foreground">{regionMeta(region, panoRoom, t)}</span>
                 </span>
               </button>
             </li>
