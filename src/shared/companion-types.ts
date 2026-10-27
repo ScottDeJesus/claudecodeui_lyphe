@@ -21,6 +21,24 @@
 export type CompanionModel = 'sonnet' | 'opus' | 'haiku';
 
 /**
+ * The key or mouse button that presses Kaylee's talk button, bound in Settings > Voice > Companion and
+ * caught while CloudCLI has focus (the main window, or the floating chat's picture-in-picture window).
+ * Stored as `CompanionSettings.talkBinding`, so it reaches every page of the account.
+ *
+ * A `key` binding names the physical key by `KeyboardEvent.code` (`F8`, `Space`, `KeyK`; 1-40
+ * characters of letters and digits) and the four modifiers that must be held with it, exactly. It is
+ * accepted when `code` is a function key (`F1`-`F24`) or when `ctrl`, `alt` or `meta` is held: a
+ * plain typing key would fire on every word he types. A `mouse` binding names the button by
+ * `MouseEvent.button`: `1` middle, `3` back or `4` forward (the left button is every click, the
+ * right one is the context menu). `label` is what Settings shows (`F8`, `Ctrl+Space`, `Mouse back`),
+ * 1-40 characters with no line break; it is written once, when the binding is made, by the page's
+ * `talkBindingFromEvent`, and the server stores the label it is sent, trimmed.
+ */
+export type TalkBinding =
+  | { kind: 'key'; code: string; ctrl: boolean; alt: boolean; shift: boolean; meta: boolean; label: string }
+  | { kind: 'mouse'; button: 1 | 3 | 4; label: string };
+
+/**
  * Everything the operator can set about Kaylee, held as the account's `companion` preference. The
  * server applies the defaults on read, so a page always receives every field. `name` fills the
  * register's `{name}` and is 1-40 characters with no line break (default `Kaylee`); `operatorName`
@@ -29,9 +47,10 @@ export type CompanionModel = 'sonnet' | 'opus' | 'haiku';
  * characters (it rides inside `<register>` with every message and is never part of the system
  * prompt); `deliveryNote` is a few words that fill `{delivery_note}`, 0-120 characters with no line
  * break; `model` defaults to `sonnet`; `live` defaults to `false` and, while true, lets house alerts
- * reach her. Read by `GET /api/companion`, written by `PUT /api/companion/settings` (a partial
- * body; `register: null` restores the default template) and announced to every page by
- * `companion_settings`.
+ * reach her; `talkBinding` is the key or mouse button that presses her talk button (default `null`: none
+ * bound). Read by `GET /api/companion`, written by `PUT /api/companion/settings` (a partial
+ * body; `register: null` restores the default template and `talkBinding: null` unbinds the talk button)
+ * and announced to every page by `companion_settings`.
  */
 export type CompanionSettings = {
   name: string;
@@ -40,6 +59,7 @@ export type CompanionSettings = {
   deliveryNote: string;
   model: CompanionModel;
   live: boolean;
+  talkBinding: TalkBinding | null;
 };
 
 /**
@@ -179,8 +199,10 @@ export type CompanionPicture = {
  * value of the matching picture field (`null` clears the focus, draft or walk); `companion_note` adds
  * a card and `companion_note_removed` withdraws one by `id`; `companion_settings` carries the new
  * settings; `companion_open_chat` tells the page whose client id equals `floor` to open the chat
- * `sessionId`; `companion_cleared` says the account's log and notes were cleared, with her memory,
- * and the panel empties.
+ * `sessionId`; `companion_floor` says the floor moved: `floor` is the client id of the page that holds it
+ * now, so the page whose own id equals it may play her voice and every other page shows the text only
+ * (sent on every write of the floor, whether or not the holder changed); `companion_cleared` says the
+ * account's log and notes were cleared, with her memory, and the panel empties.
  */
 export type CompanionFrame =
   | { kind: 'companion_log'; entry: CompanionLogEntry }
@@ -195,4 +217,5 @@ export type CompanionFrame =
   | { kind: 'companion_settings'; settings: CompanionSettings }
   | { kind: 'companion_process'; process: CompanionProcess }
   | { kind: 'companion_open_chat'; sessionId: string; floor: string }
+  | { kind: 'companion_floor'; floor: string }
   | { kind: 'companion_cleared' };

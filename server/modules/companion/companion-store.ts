@@ -18,7 +18,7 @@ import { isList, isRecord, isText, isWholeFrom } from '@/shared/document-fields.
  * This file maps a row to the wire contract (`CompanionSessionRef`, `CompanionDraft`,
  * `CompanionWalk`, `CompanionLogEntry`, `CompanionNote`) and back, and does the one thing a bare
  * repository cannot: every write goes to THIS account's pages as the matching `companion_*` frame,
- * through `sendToUser`, and to no other account's. The page folds frames into its picture, so a
+ * through `sendToUser`, and to no other account's (the floor's, `companion_floor`, included). The page folds frames into its picture, so a
  * write that sent none would leave it stale.
  *
  * The store is made for one account and closes over its id, so a call cannot reach another
@@ -92,7 +92,7 @@ export type CompanionStore = {
   readState(): CompanionStoredState;
   /** Her CLI conversation, `null` after Clear. No frame: a page has no use for it. */
   setProviderSessionId(providerSessionId: string | null): void;
-  /** The client id holding the floor. No frame: a page learns it with the picture and from `companion_open_chat`. */
+  /** The client id holding the floor. `companion_floor` for a client id, on every write (a page learns the rest with the picture); a cleared floor (`null`) sends nothing. */
   setFloor(floor: string | null): void;
   /** `companion_focus`. */
   setFocus(focus: CompanionSessionRef | null): void;
@@ -102,6 +102,8 @@ export type CompanionStore = {
   setWalk(walk: CompanionWalkInput | null): CompanionWalk | null;
   /** `companion_sentence` for her own sentences (`role: 'kaylee'`), `companion_log` for every other line. Answers the stored line. */
   appendLog(entry: CompanionLogLineInput): CompanionLogEntry;
+  /** Her sentence `index` of the turn `turnId`, or `null` when the log holds none (an unknown turn or index, or a log that was cleared). No frame. */
+  readSentence(turnId: string, index: number): CompanionLogEntry | null;
   /** The newest `limit` lines, oldest first. */
   readLog(limit: number): CompanionLogEntry[];
   /** `companion_note`. */
@@ -199,6 +201,8 @@ export function createCompanionStore(userId: number): CompanionStore {
 
     setFloor(floor) {
       companionDb.writeState(userId, { floor });
+      // Every write, not only a change: a page that missed the move (a socket that reconnected) hears it again the next time anyone speaks to her.
+      if (floor !== null) send({ kind: 'companion_floor', floor });
     },
 
     setFocus(focus) {
@@ -237,6 +241,11 @@ export function createCompanionStore(userId: number): CompanionStore {
     },
 
     readLog: (limit) => companionDb.readLog(userId, limit).map((row) => toLogEntry(userId, row)),
+
+    readSentence(turnId, index) {
+      const row = companionDb.readSentence(userId, turnId, index);
+      return row === null ? null : toLogEntry(userId, row);
+    },
 
     addNote(input) {
       const note = toNote(companionDb.addNote(userId, input));

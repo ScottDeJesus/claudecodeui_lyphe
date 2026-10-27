@@ -14,11 +14,11 @@
  * It lives in `server/shared/` rather than beside either caller because it has two, and a second
  * queue would be a second answer to the one question of when the CLI sees EOF: the Claude runtime
  * reads it through `providers/list/claude/chat-process.ts` (which re-exports it, so the runtime's
- * import never moved), and the companion module's session will hold its one streaming-input query
+ * import never moved), and the companion module's process holds her one streaming-input query
  * open on the same queue and the same closer without importing the Claude provider.
  *
  * consumer: server/modules/providers/list/claude/chat-process.ts (for claude-runtime.provider.js),
- * server/modules/companion/session/companion-session.ts
+ * server/modules/companion/session/companion-process.ts
  */
 
 import type { SDKUserMessage } from '@anthropic-ai/claude-agent-sdk';

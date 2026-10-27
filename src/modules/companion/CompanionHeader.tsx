@@ -2,10 +2,11 @@ import { AudioLines, Crosshair, Square, X } from 'lucide-react';
 import { useState } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
 
+import { CompanionVoiceSwitch } from '@/modules/companion/CompanionVoiceSwitch';
 import { errorMessage } from '@/shared/api';
 import type { CompanionModel, CompanionPicture } from '@/shared/companion-types';
 import { useToast } from '@/shared/context/ToastContext';
-import type { Tone } from '@/shared/types';
+import type { CompanionPageState, CompanionVoice, Tone } from '@/shared/types';
 import { Button, ConfirmDialog, Select, Switch, Tooltip } from '@/shared/ui';
 import { cn } from '@/shared/utils';
 
@@ -14,6 +15,16 @@ type CompanionHeaderProps = {
   name: string;
   /** Null while the picture loads: the status line says so and every control waits. */
   picture: CompanionPicture | null;
+  /**
+   * The page's own state, already resolved in its order (cut > listening > transcribing > speaking): the status line
+   * reads Cut, Listening, Transcribing or Speaking in place of her own state. Absent or null, the line is hers alone.
+   */
+  pageState?: CompanionPageState | null;
+  /**
+   * This page's voice switch: drawn in a row of its own under the controls, "Voice on this device". Absent, there is no
+   * row.
+   */
+  voice?: Pick<CompanionVoice, 'on' | 'setOn'>;
   onModelChange: (model: CompanionModel) => Promise<void>;
   onLiveChange: (live: boolean) => Promise<void>;
   onInterrupt: () => Promise<void>;
@@ -23,9 +34,10 @@ type CompanionHeaderProps = {
 
 /**
  * The status line: the key of its words and their numbers, the part of them that may give way (`subject`, the chat's name
- * or the files', drawn in the words' `<subject/>` slot), the tone of its dot, and whether the dot breathes.
+ * or the files', drawn in the words' `<subject/>` slot), the tone of its dot, whether the dot breathes, and the English
+ * words (`fallback`) for a key a locale may not carry yet.
  */
-type Status = { key: string; values?: Record<string, number>; subject?: string; tone: Tone; moving: boolean };
+type Status = { key: string; values?: Record<string, number>; subject?: string; tone: Tone; moving: boolean; fallback?: string };
 
 /** At most this many file names ride the "Reading code" line; more are counted instead. */
 const FILES_NAMED = 2;
@@ -40,8 +52,19 @@ const baseName = (path: string): string => path.split(/[\\/]/).filter(Boolean).p
  * are amber, never red). The words carry the state on their own, so the dot is never the whole signal. A failed process
  * says "Stopped": she fails after starting too (her process ending mid-conversation, a turn breaking), and the line
  * claims no cause — the Banner under the header carries the server's sentence.
+ *
+ * THE PAGE SPEAKS BEFORE ALL OF IT, its state resolved by the panel in one order. While his talk press is out the line is
+ * Listening (green, breathing: the mic is open, so it wins even over a picture still loading or a process asleep or
+ * failed) or Transcribing (blue, breathing, like her own work); while this page's player sounds her voice it is Speaking
+ * (blue, breathing). A press that cuts her off mid-sentence reads Cut for a breath (900 ms; grey and still, her voice just
+ * stopped) before Listening takes the line: the talk button below is lit the whole time, so the open mic is never unshown.
+ * Her own state comes back the moment the page has none.
  */
-function statusOf(picture: CompanionPicture | null): Status {
+function statusOf(picture: CompanionPicture | null, pageState: CompanionPageState | null): Status {
+  if (pageState === 'cut') return { key: 'companion.status.cut', fallback: 'Cut', tone: 'neutral', moving: false };
+  if (pageState === 'listening') return { key: 'companion.status.listening', fallback: 'Listening', tone: 'positive', moving: true };
+  if (pageState === 'transcribing') return { key: 'companion.status.transcribing', fallback: 'Transcribing', tone: 'info', moving: true };
+  if (pageState === 'speaking') return { key: 'companion.status.speaking', fallback: 'Speaking', tone: 'info', moving: true };
   if (picture === null) return { key: 'companion.panel.loadingStatus', tone: 'neutral', moving: true };
   const { process, activity } = picture;
   if (process.state === 'failed') return { key: 'companion.status.failed', tone: 'warn', moving: false };
@@ -75,16 +98,20 @@ function statusOf(picture: CompanionPicture | null): Status {
  * The top of her panel, in the order the eye wants it: who and what she is doing, the chat "it" means, then the
  * controls. Drawn by this module's CompanionPanel.
  *
- * ROW ONE: her mark, her name, and the status line under it (`role="status"`, so a change is announced); at the far
- * end Stop — only while her turn runs, the one urgent press, so it stands beside the way out — and the panel's own
- * close. ROW TWO, only while she holds one: the focus chat, "Focus · Kanban lanes · its project", the chat "it" and
- * "this" mean in what she says. ROW THREE: the model picker, the Live switch, and Clear behind its question.
+ * ROW ONE: her mark, her name, and the status line under it (`role="status"`, so a change is announced; the page's own
+ * state, `pageState`, folds over it); at the far end Stop — only while her turn runs, the one urgent press, so it stands
+ * beside the way out — and the panel's own close. ROW TWO, only while she holds one: the focus chat, "Focus · Kanban
+ * lanes · its project", the chat "it" and "this" mean in what she says. ROW THREE: the model picker, the Live switch, and
+ * Clear behind its question. ROW FOUR, given `voice`: "Voice on this device" (CompanionVoiceSwitch), its switch under
+ * Clear. A row of its own because the third has no width to give a labelled switch (measured: 50px spare on the 400px
+ * column, none at 320px), and because it is this device's where the third row's are hers, on every device.
  *
  * A model or Live choice shows at once and holds while its save is out: the picture keeps the old value until the
  * server's settings come back, and a control that snapped back meanwhile would read as refused. A refused save puts
- * the old value back and says so in a toast; so does a Stop or a Clear that fails.
+ * the old value back and says so in a toast; so does a Stop or a Clear that fails. The voice switch is the page's own and
+ * answers at once.
  */
-export function CompanionHeader({ name, picture, onModelChange, onLiveChange, onInterrupt, onClear, onClose }: CompanionHeaderProps) {
+export function CompanionHeader({ name, picture, pageState = null, voice, onModelChange, onLiveChange, onInterrupt, onClear, onClose }: CompanionHeaderProps) {
   const { t } = useTranslation();
   const pushToast = useToast();
   // The model he just chose, shown until its save settles; null when none is out. Needed because the picture only
@@ -99,7 +126,7 @@ export function CompanionHeader({ name, picture, onModelChange, onLiveChange, on
   // Stop is out: the button is busy until her turn has stopped or the stop is refused.
   const [stopping, setStopping] = useState(false);
 
-  const status = statusOf(picture);
+  const status = statusOf(picture, pageState);
   const ready = picture !== null;
   const model = pendingModel ?? picture?.settings.model ?? null;
   const live = pendingLive ?? picture?.settings.live ?? false;
@@ -151,7 +178,7 @@ export function CompanionHeader({ name, picture, onModelChange, onLiveChange, on
             {status.subject === undefined ? (
               // No subject to give way ("Stopped · your next message starts her again"): the words wrap to a second line
               // on a narrow phone rather than lose their end, which is the next step.
-              <span className="line-clamp-2 min-w-0 break-words">{t(status.key, status.values)}</span>
+              <span className="line-clamp-2 min-w-0 break-words">{t(status.key, { ...status.values, defaultValue: status.fallback })}</span>
             ) : (
               // One line in which only the subject gives way: the verb and "· item 2 of 5" are runs of text that keep their
               // width (`whitespace-pre`), and the chat's name, carried as the slot's own child so a name holding "<" reads as
@@ -237,6 +264,14 @@ export function CompanionHeader({ name, picture, onModelChange, onLiveChange, on
           {t('companion.clear')}
         </Button>
       </div>
+
+      {voice && (
+        // Under the controls, its switch closing the row as Clear closes the one above. On a touch screen the switch's
+        // 44px label is the row's height, so the row adds no padding of its own there.
+        <div data-companion-voice-row="" className="flex items-center border-t border-border px-3 py-1.5 [@media(pointer:coarse)]:py-0">
+          <CompanionVoiceSwitch on={voice.on} onChange={voice.setOn} />
+        </div>
+      )}
 
       <ConfirmDialog
         open={confirmingClear}

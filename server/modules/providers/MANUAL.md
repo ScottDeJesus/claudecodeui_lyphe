@@ -928,7 +928,7 @@ A steer is one user message pushed into the turn a Claude process is running, so
 | --- | --- |
 | the handle's `steer(content)` (`claude-runtime.provider.js`) | pushes ONE uuid-stamped `SDKUserMessage` into the process's queue, opens NO turn, touches the idle closer. `false` when the process is closing, has no queue or has no pending turn (`pendingTurn === null`). The uuid is remembered in `steeredUuids`. |
 | `steerClaudeSession(sessionId, content)` | `getSession(id)?.process`; none, closing or a false `steer` is `'not_running'`, else `'folded'`. Also `claudeRuntime.steer`. |
-| `providerRuntimeService.steer(provider, id, content)` | a provider whose runtime has no `steer` (or throws) answers `'not_running'`. The compaction decorator answers `'not_running'` while `flightOf(id)` holds a compaction of a Claude chat. |
+| `providerRuntimeService.steer(provider, id, content)` | the gateway's `steer` (`ProviderRuntimeGateway.steer`, typed in `chat-websocket.service.ts`). Claude goes to `claudeRuntime.steer`; a provider whose runtime has no `steer` (or throws; logged `[provider-runtime] could not steer …`) answers `'not_running'`. The compaction decorator (`withChatCompaction`, its inner runtime type carries `steer`) answers `'not_running'` while `flightOf(id)` holds a compaction of a Claude chat. why: a message pushed into that process would land in the summarized turn, or between the guard and the seed. |
 | `steerChatRun(id, content, echo, deps)` (`chat-run-verbs.service.ts`) | no running run → `'not_running'`; `'folded'` writes `echo` onto that run's writer. The caller starts a turn instead on `'not_running'`. |
 
 - THE MISS IS NOT A RARE RACE (measured by Athena, 2026-10-27, Haiku). The CLI takes a pushed message only at a TOOL-RESULT BOUNDARY. A steer sent into a turn that makes no further tool call (a text-only turn, the final reply, a long closing summary) is never taken by it: `steer()` answers `folded` and the steer runs as the CLI's next turn after the turn's `complete`. So `folded` means "pushed", not "the turn changed course", and the sentence she tells him says so ("Sent to X while it works. It takes the brief at its next tool step, or as its own turn right after it finishes"). At the `result` that ends the pending turn without listing a remembered steer uuid in `user_message_uuids`, the runtime logs `[Claude SDK] A steer for session <id> missed its turn and runs as a turn of its own` and remembers the uuid in `missedSteers`; the steer's own turn is the next result that LISTS that uuid, and it is logged (`… that missed its turn has finished its own`) and kept out of the background-work branch (no `notifyBackgroundWorkCompleted`, no deferred-tool hold released). A `result` with no `user_message_uuids` says nothing either way and logs nothing.
@@ -941,3 +941,97 @@ A steer is one user message pushed into the turn a Claude process is running, so
 Shown by `.verify/companion-send.mjs` (`.verify/companion-send-scratch.sh` on a scratch stack: the live box has one Kaylee shared by everyone at work).
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/compaction/compaction-runtime.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/companion-send.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-queued-prompt.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-runtime.provider.js, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-sessions.provider.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/services/provider-runtime.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/websocket/services/chat-run-verbs.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-send.mjs
+
+## MAN-9078 — server/shared/prompt-stream.ts — the prompt queue and the idle closer: the two rules, the two consumers, where they live
+
+`server/shared/prompt-stream.ts` holds the input stream a long-lived Claude CLI conversation is fed through and the clock that closes it. Moved byte for byte out of `list/claude/chat-process.ts`; no behaviour changed.
+
+## Exports
+| export | is |
+|---|---|
+| `DEFAULT_IDLE_CLOSE_MS` | 2 h, the operator's ruling |
+| `PromptQueue`, `createPromptQueue(initial)` | the CLI's input for the life of the process: yields what was pushed, parks while empty, returns only after `end()`. `push` answers false once ended |
+| `resolveIdleCloseMs(requested)` | the per-turn request (a probe shortens it), else `CLAUDE_CHAT_IDLE_CLOSE_MS`, else 2 h. Under 5 s → the default; never above the default |
+| `IdleCloser`, `createIdleCloser({ idleMs, isBusy, close, onBusy? })` | `touch(idleMs?)` restarts the clock, `cancel()` stops it |
+
+## The two rules
+1. The queue never ends on its own. why: the SDK closes the CLI's stdin when its input iterable is exhausted and the CLI reads that EOF as "wind down". It parks between messages and ends only on `end()`.
+2. The idle clock measures silence since the last MESSAGE (`touch`, on every message and only then), not since a turn ended. It never closes a busy process: a turn in flight, a background task, a watcher. Busy is re-asked every `BUSY_RECHECK_MS` = 60 s and the process closes only once it clears. The timer is `unref`'d: it never keeps the API alive.
+
+## Where they live
+| consumer | reaches them by |
+|---|---|
+| `claude-runtime.provider.js` (`createPromptQueue(initialMessages)`, `createIdleCloser`, `resolveIdleCloseMs`) | `./chat-process.js`, which re-exports all of them and the two types from `@/shared/prompt-stream.js`; the runtime's import is unchanged |
+| `companion/session/companion-process.ts` (her one streaming-input query) | `@/shared/prompt-stream.js` directly |
+- why shared: a second queue is a second answer to when the CLI sees EOF, and the companion must not import the Claude provider.
+- `chat-process.ts` keeps its own rule: which settings the SDK applies live and which force a fresh process.
+
+## Proof
+- `grep -rn --include=*.ts --include=*.js "export function createPromptQueue\|export function createIdleCloser" server` prints two lines, both in `server/shared/prompt-stream.ts`.
+- `.verify/prompt-stream-join.mjs`: a Haiku chat in `PROBE_PROJECT` is sent two messages; the journal line `Message joined the running process` appears for the second. Filter the journal by the chat's id (the dev app is shared).
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/chat-process.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/prompt-stream.ts
+
+## MAN-9084 — "Through Kaylee" — markRelayedSends in fetchHistory, the text match behind the mark, spokenVia on the wire and the bubble
+
+A user message that came to a chat through Kaylee wears a small "Through Kaylee" mark, live and after a reload.
+
+## The record and the live row
+- `companion-send.ts` records every send: `relayedSendsDb.record(sessionId, 'turn' | 'steer', words)` (table: MAN-9082). The text is stored trimmed.
+- Live echo: a user `text` row with id `local_kaylee_<uuid>`, `spokenVia: 'kaylee'`, written by the send (MAN-9072). A steer's echo is the only live row: the SDK stream replays no `user` row for a steer (MAN-9068).
+- Persisted row: the history read marks it again. A steer's persisted row is the `queued_command` attachment drawn as a user row (`claude-queued-prompt.ts`, MAN-9068); without it there is nothing to mark.
+
+## `markRelayedSends(sessionId, messages)` (`providers/services/session-relayed-sends.ts`)
+`sessionsService.fetchHistory` applies it to EVERY page it returns, after the page is cut, cached or read directly. The mark rides the same REST payload as the row.
+A user row gets `spokenVia: 'kaylee'` when ALL hold:
+| test | rule |
+|---|---|
+| shape | `kind === 'text'`, `role === 'user'`, `content` a string |
+| words | `content.trim()` is not empty and equals the trimmed text of one of this chat's `relayed_sends` |
+| time | the row's `timestamp` is at or after that send's `sent_at` minus `SEND_CLOCK_SKEW_MS` = 5000 |
+- Matched by TEXT, not by transcript uuid, on purpose: `claude-runtime.provider.js` stays untouched by this feature.
+- Per text, the earliest threshold of any send of it decides: a brief sent twice marks both of its rows.
+- Never marks: a blank row (a picture-only row has `content: ''`; blank never matches blank), a row whose timestamp does not parse, a send whose `sent_at` does not parse or whose text is empty. `SEND_CLOCK_SKEW_MS` exists because the row's time is the CLI's clock and `sent_at` is this server's.
+- The same words typed by hand AFTER a send also wear the mark (designed, INV-9854).
+- A row it marks is a copy; every other row is the object it was given; the input is never mutated, because `fetchHistory` hands it rows the full-history cache also holds.
+- Reads `relayed_sends` once per call. A chat with none, or a read that throws, returns `messages` itself; the throw is logged `[relayed-sends] could not read the relayed sends of session <id>; the page goes out unmarked` and never fails the page.
+
+## On the wire and in the bubble
+| where | what |
+|---|---|
+| `NormalizedMessage.spokenVia?: 'kaylee'` | `server/shared/types.ts` and `src/shared/types.ts`, same comment on both |
+| `ChatMessage.spokenVia?: 'kaylee'` | `src/shared/types.ts`; `normalizedToChatMessages` (`useChatMessages.ts`) carries it |
+| `MessageComponent` user bubble | `AudioLinesIcon` + `t('message.throughKaylee', { defaultValue: 'Through Kaylee' })`, left of the bubble's controls (`mr-auto`) so the copy button keeps the right edge; always visible; drawn in an export too: it says where the message came from, not a control |
+
+## Proof
+`.verify/kaylee-through-mark.mjs`: one Haiku chat in `PROBE_PROJECT`, three turns from the composer: A the brief's words before any record exists, B the same words after `relayedSendsDb.record`, C different words after it. REST: only B carries `spokenVia`; after a reload only B's bubble draws the mark.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/services/session-relayed-sends.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/transcript/MessageComponent.tsx
+
+## MAN-9085 — sessions.permission_mode — the column, who writes it on every send, who reads it, and why
+
+`sessions.permission_mode TEXT` records the permission mode a chat last ran under, beside `model` and `effort`. why: a send the companion relays carries no composer, and an option left empty launches in `default`; on a live process that flips a bypass chat into asking for every tool.
+
+## The column
+- Added by `addSessionPermissionModeColumn` (`database/migrations.ts`) through `addColumnToTableIfNotExists`. Nullable. A chat nobody has sent on since the column landed holds NULL.
+- `SessionRow.permission_mode: string | null`.
+
+## Written — `dispatchRun` (`websocket/services/chat-websocket.service.ts`)
+| step | does |
+|---|---|
+| 1 | beside `setSessionModel` and `setSessionEffort`, when `clientOptions.permissionMode` is a string that is not blank after trim |
+| 2 | `providerModelsService.setSessionPermissionMode(provider, sessionId, mode)` |
+| 3 | the service trims both; blank → `null`; a session id with no row yet → `null` and nothing written (the next send records it once the row exists) |
+| 4 | `sessionsDb.setSessionPermissionMode(sessionId, mode)`: `UPDATE sessions SET permission_mode = ? WHERE session_id = ?`. Answers `{ provider, sessionId, permissionMode, source: 'session' }` |
+- Every send from the page that carries a mode records it, so the value is the composer's chip at the last send.
+- A send with no `permissionMode` option writes nothing: the stored mode stays.
+
+## Read — `sessionsDb.latestPermissionMode(provider?)`
+- The most recent NON-NULL `permission_mode`, ordered by `julianday(COALESCE(updated_at, created_at)) DESC, rowid DESC`. why `julianday`: `updated_at` is written in two spellings (SQLite's `CURRENT_TIMESTAMP` and the watcher's ISO), which do not sort as text.
+- `provider` narrows it to that provider's chats: a mode is a provider's own word. `null` when no chat has one.
+- Caller: `tools/send-options.ts` (`sendOptionsFor`) for a NEW chat. For an existing chat the send reads that row's own `permission_mode` and leaves the option out when it holds none (MAN-9072 §Options). `latestModelChoice(provider?)` is its sibling for model and effort.
+
+## Proof
+`.verify/companion-permission-mode.mjs`: a scratch chat in `PROBE_PROJECT`, on Haiku through the composer's own chip; `sqlite3 -readonly` shows `permission_mode` NULL before the first send and the composer's mode after one typed send (Enter); the chat is deleted at the end. `.verify/companion-storage.ts` runs `latestPermissionMode` before and after a session is given one.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/sessions.db.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/services/provider-models.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/websocket/services/chat-websocket.service.ts

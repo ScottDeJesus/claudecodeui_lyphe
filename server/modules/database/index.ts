@@ -66,6 +66,8 @@ export type {
 } from '@/modules/database/repositories/cerberus-updates.db.js';
 export { apiKeysDb } from '@/modules/database/repositories/api-keys.js';
 export { appConfigDb } from '@/modules/database/repositories/app-config.js';
+// credentialsDb: used by the settings module's credentials routes and by the voice module, which keeps the account's one
+// Gemini key here (credential_type 'gemini_api_key').
 export { credentialsDb } from '@/modules/database/repositories/credentials.js';
 // cronJobsDb: the cron registry's own tables — read by the schedules module's read service, written
 // by its sync service and by the module's CLI door (add / remove / list / sync).
@@ -156,7 +158,8 @@ export { simpleListDb } from '@/modules/database/repositories/simple-list.db.js'
 export type { SimpleListFolderRow, SimpleListMoveVerdict } from '@/modules/database/repositories/simple-list.db.js';
 export type { SimpleListLadderEntry, SimpleListLadderItem } from '@/modules/database/repositories/simple-list-ladder.db.js';
 export { userDb } from '@/modules/database/repositories/users.js';
-// userPreferencesDb: used by the User module to persist the settings that used to live in browser localStorage.
+// userPreferencesDb: used by the User module to persist the settings that used to live in browser localStorage, by the
+// companion for her settings, and by the voice module for the account's voice settings (the `voice` key).
 export { userPreferencesDb } from '@/modules/database/repositories/user-preferences.db.js';
 export { vapidKeysDb } from '@/modules/database/repositories/vapid-keys.js';
 export { scheduledMessagesDb } from './repositories/scheduled-messages.db.js';

@@ -4,9 +4,10 @@ import type {
 } from '@/shared/companion-types';
 
 /*
- * FAKE COMPANION PICTURES, for the scaffold's fixture only: every state of her panel and her Settings section, typed by
+ * FAKE COMPANION PICTURES, for the scaffolds' fixtures only: every state of her panel and her Settings section, typed by
  * the wire's mirror, so each can be mounted and photographed before the module's routes exist. Nothing in the app
- * imports this file; `.verify/companion-panel-scaffold.mjs` does.
+ * imports this file; `.verify/companion-panel-scaffold.mjs`, `.verify/kaylee-talk-scaffold.mjs` (its talk presses,
+ * `heard`) and `.verify/kaylee-voice-scaffold.mjs` (her voice, `spoken`) do.
  *
  * The chats are named the way the operator names his (Kanban lanes, the migration chat) and the sentences are cut and
  * marked the way the server's `parseExpression` cuts and marks them: mood brackets lifted, a sound's `at` the length of
@@ -37,7 +38,7 @@ const REGISTER = [
 
 export const FAKE_SETTINGS: CompanionSettings = {
   name: 'Kaylee', operatorName: 'Scott', register: REGISTER,
-  deliveryNote: 'bright, warm, quick, a smile in the voice', model: 'sonnet', live: false,
+  deliveryNote: 'bright, warm, quick, a smile in the voice', model: 'sonnet', live: false, talkBinding: null,
 };
 
 const KANBAN: CompanionSessionRef = { sessionId: 'fx-kanban', name: 'Kanban lanes', project: 'claudecodeui_lyphe' };
@@ -130,6 +131,28 @@ function longLog(): CompanionLogEntry[] {
 
 const LONG = longLog();
 
+/** His talk presses: one that carried words, then one that carried none, each answered (if only with a word). */
+const HEARD = [
+  ...HELLO,
+  he(40, 'What chats are working?', 'spoken'),
+  she(36, 't-heard', 0, 'Two are: Kanban lanes and the migration chat.'),
+  she(35, 't-heard', 1, 'The migration chat is copying its fourth table.'),
+  he(12, '', 'spoken'),
+  she(9, 't-empty', 0, 'Yes?'),
+];
+
+/**
+ * A turn whose words are all in while her voice is still on them, as it is for most of a spoken answer (the text streams
+ * faster than she speaks): the voice fixtures mark its third sentence, which wraps on a phone and holds a sound.
+ */
+const SPOKEN = [
+  ...ASKED,
+  she(20, 't-spoken', 0, 'Okay so the kanban chat just finished its turn.'),
+  she(19, 't-spoken', 1, 'It fixed the lane drag and changed three files.'),
+  she(18, 't-spoken', 2, 'Oh and it left five findings for you, the first about a card that lands one lane over.', [{ tag: 'gasp', at: 2 }]),
+  she(18, 't-spoken', 3, 'Want to walk them now?'),
+];
+
 const IDLE: CompanionActivity = { phase: 'idle', session: null, files: null, walk: null };
 const AWAKE: CompanionProcess = { state: 'awake', error: null };
 const FAILED_SENTENCE = "Kaylee couldn't start: the Claude login on this box has expired. Sign in again from Settings > Account.";
@@ -173,4 +196,6 @@ export const FAKE_PANEL: Record<string, FakePanelState> = {
     settings: { ...FAKE_SETTINGS, live: true, model: 'opus' }, activity: { ...IDLE, phase: 'thinking' },
   }, true),
   closed: state({ log: HELLO }, false, false),
+  heard: state({ log: HEARD }),
+  spoken: state({ log: SPOKEN, focus: KANBAN }),
 };

@@ -275,7 +275,7 @@ export default function ChatComposer({
 
   // Voice state is hosted here (not in the mic button) so the main Send button can stop
   // recording and send the transcript in one tap, the way the mic button drops it in the box.
-  const voiceAvailable = useVoiceAvailable();
+  const voiceAvailable = useVoiceAvailable('dictate');
   const [voiceError, setVoiceError] = useState<string | null>(null);
   const handleVoiceError = useCallback((msg: string) => setVoiceError(msg), []);
   // The notice clears itself. An effect keyed on the window, not a timer armed once in the handler: a

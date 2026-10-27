@@ -6545,7 +6545,10 @@ owns the fan-out:
    for every event the orchestrator is handed, a `background` one that is off for pushes included,
    repeats included. A listener keeps its own dedupe and cannot consume a push's slot; each is
    called inside its own guard, so one that throws (or rejects) is logged and costs no push and no
-   other listener. The only subscriber today is the companion's alert feed, which turns the codes
+   other listener. `onNotification(listener)` (exported by the notifications barrel) returns an
+   idempotent unsubscribe; a listener that subscribes or unsubscribes while it runs changes the NEXT
+   announcement, not this one. A listener is called synchronously and returns quickly; anything slow
+   is its to start. The only subscriber today is the companion's alert feed, which turns the codes
    Kaylee says unasked into `<alert>`s while his Live is on (see the companion manual).
 1. **Event preference.** The event's `kind` maps to one switch in the user's notification
    preferences (`KIND_TO_PREF_KEY`): `action_required` → `events.actionRequired`, `stop` →
@@ -10711,7 +10714,7 @@ Types in `src/shared/types.ts`: `HostWindowValue` = `{ hostWindow: Window; subsc
 | `DockableFab`, `usePointerDrag`, `SplitPane` | live in the opener, around the chat |
 | `KanbanLane`, `KanbanCard` | the board's own code |
 | `pinnedDismissals` `storage` listener | `storage` is `localStorage`'s news, the opener's |
-| `useVoiceAvailable` | listens for an event settings dispatches on the opener's `window` |
+| `useVoiceAvailable`, `useVoiceProvider` | listen for an event settings dispatches on the opener's `window` |
 | `widgetBridgeScript.ts` | runs inside the widget's own frame |
 | the websocket, `SessionProtectionContext`, `ToastContext`, the Jev switch stores | one per page; toasts draw in the opener's tab |
 | `ThemeContext` | writes the opener's `<body>`; the window mirrors it (MAN-7490) |

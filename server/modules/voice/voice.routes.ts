@@ -3,10 +3,15 @@ import { Readable } from 'node:stream';
 import express from 'express';
 
 import type { VoiceRequestOverrides, VoiceService, VoiceServiceResult } from '@/shared/types.js';
-import { asyncHandler } from '@/shared/utils.js';
+import { asyncHandler, readAuthenticatedUserId } from '@/shared/utils.js';
+
+import { clearGeminiKey, geminiKeyStatus, saveGeminiKey } from './gemini-key.js';
+import type { createVoiceProvider } from './voice-provider.js';
+import { readVoiceSettings, saveVoiceSettings } from './voice-settings.js';
 
 type VoiceRouterDependencies = {
   voiceService: VoiceService;
+  voiceProvider: ReturnType<typeof createVoiceProvider>;
   parseAudioUpload: express.RequestHandler;
 };
 
@@ -39,16 +44,41 @@ function sendFailure<TValue>(
 }
 
 /**
- * Creates the transport-only router used by the Voice composition root. It is
- * exported for Voice route tests; other modules consume only the composed
- * router exposed from the Voice barrel.
+ * Creates the transport-only router for the Voice composition root (`voice.module.ts`), which hands it the proxy
+ * service, the provider decision and the upload parser. Other modules consume only the composed router exposed
+ * from the Voice barrel.
  */
 export function createVoiceRouter(dependencies: VoiceRouterDependencies): express.Router {
   const router = express.Router();
 
+  // The OpenAI-compatible proxy's own answer, whatever the account's provider: read-aloud draws its speaker from it.
   router.get('/health', (_request, response) => {
     response.json(dependencies.voiceService.getHealth());
   });
+
+  // The account's voice settings and its one Gemini key. The key is never answered, only its status: where it
+  // comes from and, for a stored key, its last four characters.
+  router.get('/settings', asyncHandler(async (request, response) => {
+    const userId = readAuthenticatedUserId(request);
+    response.json({ settings: readVoiceSettings(userId), key: geminiKeyStatus(userId) });
+  }));
+
+  router.put('/settings', asyncHandler(async (request, response) => {
+    const userId = readAuthenticatedUserId(request);
+    const settings = saveVoiceSettings(userId, request.body);
+    response.json({ settings, key: geminiKeyStatus(userId) });
+  }));
+
+  router.put('/gemini-key', asyncHandler(async (request, response) => {
+    const userId = readAuthenticatedUserId(request);
+    // A body without a string `key` is handed on as an empty one, which the save refuses naming `key`.
+    const key: unknown = request.body?.key;
+    response.json({ key: saveGeminiKey(userId, typeof key === 'string' ? key : '') });
+  }));
+
+  router.delete('/gemini-key', asyncHandler(async (request, response) => {
+    response.json({ key: clearGeminiKey(readAuthenticatedUserId(request)) });
+  }));
 
   router.post('/transcribe', (request, response, next) => {
     dependencies.parseAudioUpload(request, response, (uploadError?: unknown) => {
@@ -66,14 +96,16 @@ export function createVoiceRouter(dependencies: VoiceRouterDependencies): expres
           return;
         }
 
-        const result = await dependencies.voiceService.transcribe({
-          audio: {
+        // Which backend hears the clip is the account's provider setting; the x-voice-* headers matter only on the OpenAI-compatible branch.
+        const result = await dependencies.voiceProvider.transcribeForChat(
+          readAuthenticatedUserId(request),
+          {
             bytes: request.file.buffer,
             mimeType: request.file.mimetype || 'audio/webm',
             fileName: request.file.originalname || 'recording.webm',
           },
-          overrides: parseVoiceOverrides(request),
-        });
+          parseVoiceOverrides(request),
+        );
 
         if (sendFailure(response, result)) {
           return;

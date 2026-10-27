@@ -17,10 +17,11 @@ import { sessionTools } from './session-tools.js';
  * The registry of her tools: the one place that says what she holds and what every tool file is handed.
  *
  * She has thirteen tools, named in her prompt's TOOLS section and in that order (`COMPANION_TOOL_NAMES`). The
- * definitions live in the tool files beside this one, each built with the SDK's `tool()` and zod, and
- * `buildCompanionTools` concatenates the files that exist — a later phase adds its file's line to it, and the
- * session's `init` check (`unexpectedTools`) compares the CLI's list against what is built here, so a tool
- * built and not listed, or listed and not built, is not hers to hold.
+ * definitions live in the four tool files beside this one, each built with the SDK's `tool()` and zod, and
+ * `buildCompanionTools` concatenates them. A tool built without its line in the prompt's TOOLS section fails that
+ * account's first use (`toolLine` throws inside `createCompanionAccount`, and the account is not stored), and the
+ * session's `init` check (`unexpectedTools`) ends a launch
+ * whose CLI lists a tool that is not built here, so what she holds is exactly what is built.
  *
  * WHAT THE DEPS ARE FOR. A tool file takes the account, its store, the runtime gateway and three helpers the
  * harness supplies rather than each tool doing for itself, so every tool behaves the same way:
@@ -77,12 +78,10 @@ export type CompanionToolDeps = {
 };
 
 /**
- * Her tools for one account: the definitions of every tool file that exists. Today that is `sessionTools()`
- * (`list_sessions`, `list_projects`), which names no chat and so needs no deps, `draftTools(deps)`
- * (`show_note`, `update_draft`, `walk`), `readTools(deps)` (`read_session`, `list_followups`, `ask_dactyl`)
- * and `actTools(deps)` (`stop_session`, `rename_session`, `answer_session`); each later tool file adds a line here
- * and takes `deps`. Consumed by `companion-account.ts`,
- * once per account.
+ * Her thirteen tools for one account: `sessionTools()` (`list_sessions`, `list_projects`), which names no chat and
+ * so needs no deps, `readTools(deps)` (`read_session`, `list_followups`, `ask_dactyl`), `draftTools(deps)`
+ * (`show_note`, `update_draft`, `walk`, `send_to_session`, `create_session`) and `actTools(deps)` (`stop_session`,
+ * `rename_session`, `answer_session`). Consumed by `companion-account.ts`, once per account.
  */
 export function buildCompanionTools(deps: CompanionToolDeps): Array<SdkMcpToolDefinition<any>> {
   return [...sessionTools(), ...readTools(deps), ...draftTools(deps), ...actTools(deps)];

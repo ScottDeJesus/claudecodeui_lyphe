@@ -1,15 +1,16 @@
 import { randomUUID } from 'node:crypto';
 
-import type { SDKMessage, SDKUserMessage, SdkMcpToolDefinition } from '@anthropic-ai/claude-agent-sdk';
+import type { SDKMessage, SDKUserMessage } from '@anthropic-ai/claude-agent-sdk';
 
-import type { CompanionModel, CompanionProcess } from '@/shared/companion-types.js';
+import type { CompanionProcess } from '@/shared/companion-types.js';
 
-import { operatorEnvelope } from './companion-envelopes.js';
+import { emptyPressEnvelope, operatorEnvelope } from './companion-envelopes.js';
 import { failureSentence, readLoopEvent, type CompanionLoopEvent } from './companion-events.js';
 import { resumableSessionId, unexpectedTools } from './companion-launch.js';
-import { createMessageAssembler, type MessageReaders } from './companion-message.js';
+import { createMessageAssembler } from './companion-message.js';
 import { launchCompanionCli, type CompanionCli } from './companion-process.js';
-import { createTurnTracker, type TurnSink } from './companion-turns.js';
+import type { CompanionSession, CompanionSessionDeps } from './companion-session-types.js';
+import { createTurnTracker } from './companion-turns.js';
 import { guarded } from './guarded-callback.js';
 
 /**
@@ -27,48 +28,6 @@ import { guarded } from './guarded-callback.js';
  * Consumers: `companion.service.ts` (one session per account, behind the routes and the feeds) and the voice.
  */
 
-/**
- * Everything one account's session needs from the house, so the session reads nothing itself: the
- * account (`userId` names her working directory), her `tools` (the definitions her MCP server carries;
- * none is valid), the held CLI session id with its writer, the readers every message is assembled from
- * (`MessageReaders`) and the callbacks that tell the house what she did (`TurnSink`, `onProcess` for the
- * process's condition, `onSystemLine` for a line the panel shows in its own tone). A callback that
- * throws is logged and the conversation goes on. Consumed by `companion.service.ts`, which fills it.
- */
-export type CompanionSessionDeps = MessageReaders &
-  TurnSink & {
-    userId: number;
-    tools: Array<SdkMcpToolDefinition<any>>;
-    readProviderSessionId(): string | null;
-    writeProviderSessionId(id: string | null): void;
-    onProcess(process: CompanionProcess): void;
-    onSystemLine(text: string): void;
-  };
-
-/**
- * The surface of her conversation. The three pushes each assemble and push ONE message, start a turn
- * when she is idle and wake a closed process; `warm` starts the process of a closed one ahead of its first
- * message and pushes nothing (the CLI takes about a second to come up, which a caller that knows a push is
- * coming in seconds spends in parallel); `oweCut` stores the cut the next message opens with;
- * `interrupt` stops her turn (her Stop, or the voice's cut); `setModel` applies a model change to a
- * running process (a closed one launches on the stored model); `clear` interrupts, closes and forgets
- * the held session id; `close` ends the input and the process. `process` is the condition the panel
- * shows and `turnId` the turn in flight (`null` when idle). Consumed by `companion.service.ts` and the voice.
- */
-export type CompanionSession = {
-  pushOperator(text: string, via: 'typed' | 'spoken'): void;
-  pushAlerts(blocks: string[]): void;
-  pushFocusNews(envelope: string): void;
-  warm(): void;
-  oweCut(heardSentence: string | null): void;
-  interrupt(): Promise<void>;
-  setModel(model: CompanionModel): Promise<void>;
-  clear(): Promise<void>;
-  close(reason: string): Promise<void>;
-  readonly process: CompanionProcess;
-  readonly turnId: string | null;
-};
-
 /** One launch and what the conversation has learned of it: whether its first `init` has been seen (the process is up), whether the CLI refused its `resume`, and whether it holds a message yet (a `warm` launch does not). */
 type Launch = { cli: CompanionCli; initSeen: boolean; resumeRefused: boolean; messaged: boolean };
 
@@ -78,12 +37,16 @@ export function createCompanionSession(deps: CompanionSessionDeps): CompanionSes
   const onProcess = guarded('process', userId, deps.onProcess);
   const onSystemLine = guarded('system line', userId, deps.onSystemLine);
   const writeProviderSessionId = guarded('session id writer', userId, deps.writeProviderSessionId);
-  const turns = createTurnTracker({
-    onSentence: guarded('sentence', userId, deps.onSentence),
-    onTurnStarted: guarded('turn start', userId, deps.onTurnStarted),
-    onTurnEnded: guarded('turn end', userId, deps.onTurnEnded),
-    onActivity: guarded('activity', userId, deps.onActivity),
-  });
+  const turns = createTurnTracker(
+    {
+      onSentence: guarded('sentence', userId, deps.onSentence),
+      onTurnStarted: guarded('turn start', userId, deps.onTurnStarted),
+      onTurnEnded: guarded('turn end', userId, deps.onTurnEnded),
+      onActivity: guarded('activity', userId, deps.onActivity),
+    },
+    // The account's sound-tag list, read each time a turn begins: that turn's sentences are parsed by it.
+    deps.readSoundTags,
+  );
   const assembler = createMessageAssembler(deps);
 
   let live: Launch | null = null;
@@ -272,6 +235,9 @@ export function createCompanionSession(deps: CompanionSessionDeps): CompanionSes
     pushOperator(text, via) {
       push(operatorEnvelope(text, via));
     },
+    pushOperatorEmpty() {
+      push(emptyPressEnvelope());
+    },
     pushAlerts(blocks) {
       if (blocks.length > 0) push(blocks.join('\n'));
     },
@@ -279,8 +245,8 @@ export function createCompanionSession(deps: CompanionSessionDeps): CompanionSes
       push(envelope);
     },
     warm,
-    oweCut(heardSentence) {
-      assembler.oweCut(heardSentence);
+    oweCut(heard, interrupted) {
+      assembler.oweCut(heard, interrupted);
     },
     interrupt,
     async setModel(model) {

@@ -1,10 +1,13 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 
+import { useTalkBinding } from '@/modules/companion/hooks/useTalkBinding';
+import { useTalkPress } from '@/modules/companion/hooks/useTalkPress';
 import { isCompanionPicture, reduceCompanion } from '@/modules/companion/utils/companionReducer';
 import { api, refusalSentence } from '@/shared/api';
 import type { CompanionFrame, CompanionPicture, CompanionSettings } from '@/shared/companion-types';
 import { useWebSocket } from '@/shared/context/WebSocketContext';
+import type { TalkPress } from '@/shared/types';
 import { companionClientId } from '@/shared/utils';
 
 type CompanionContextValue = {
@@ -31,6 +34,12 @@ type CompanionContextValue = {
   interrupt: () => Promise<void>;
   /** Wipes her conversation and everything she keeps. */
   clear: () => Promise<void>;
+  /**
+   * This page's ONE talk press: the panel's talk button, the bound key or mouse button and her status line all read it here,
+   * and so will the voice player and the avatar's presence. `state` runs idle → listening → transcribing → idle; `toggle` is
+   * one press; `error` is what failed on the page itself (the mic refused, the clip not sent).
+   */
+  talk: TalkPress;
 };
 
 const CompanionContext = createContext<CompanionContextValue | null>(null);
@@ -71,6 +80,10 @@ const isCompanionFrame = (event: { kind?: string }): boolean => typeof event.kin
  *
  * A chat is opened only on a `companion_open_chat` whose `floor` is this page's client id. Every other page of the account
  * hears the frame too and ignores it, so she opens a chat where he is, not on every screen he has open.
+ *
+ * THE PAGE'S ONE TALK PRESS lives here: `useTalkPress` is called once, and `useTalkBinding` beside it binds the account's
+ * `talkBinding` (from the picture's settings, so a re-bind on any page reaches every page by its settings frame) to that press.
+ * A press never opens her panel; the press route takes the floor itself.
  */
 export function CompanionProvider({ onOpenChat, children }: { onOpenChat: (sessionId: string) => void; children: ReactNode }) {
   const { subscribe } = useWebSocket();
@@ -80,6 +93,9 @@ export function CompanionProvider({ onOpenChat, children }: { onOpenChat: (sessi
   const [open, setOpenState] = useState(false);
   // This page's name for itself, read once so it cannot change under a conversation; the floor and every frame addressed to a page use it.
   const [clientId] = useState(companionClientId);
+  // The page's one press, and the key or mouse button he bound to it. The press is not state of the picture: it is this page's mic.
+  const talk = useTalkPress();
+  useTalkBinding(picture?.settings.talkBinding ?? null, talk.toggle);
 
   // Whether a read of the picture is out, so a second request waits for it rather than racing it.
   const seedingRef = useRef(false);
@@ -237,8 +253,8 @@ export function CompanionProvider({ onOpenChat, children }: { onOpenChat: (sessi
   }, []);
 
   const value = useMemo<CompanionContextValue>(
-    () => ({ picture, open, clientId, setOpen, sendText, saveSettings, editDraft, sendDraft, clearDraft, dismissNote, interrupt, clear }),
-    [picture, open, clientId, setOpen, sendText, saveSettings, editDraft, sendDraft, clearDraft, dismissNote, interrupt, clear],
+    () => ({ picture, open, clientId, setOpen, sendText, saveSettings, editDraft, sendDraft, clearDraft, dismissNote, interrupt, clear, talk }),
+    [picture, open, clientId, setOpen, sendText, saveSettings, editDraft, sendDraft, clearDraft, dismissNote, interrupt, clear, talk],
   );
 
   return <CompanionContext.Provider value={value}>{children}</CompanionContext.Provider>;

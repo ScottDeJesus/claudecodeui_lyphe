@@ -39,7 +39,7 @@ The page's own stop and tool-approval answer as callable verbs (`chat-run-verbs.
 8. `startRunStallWatchdog()`
 Starts the sweep that turns a silent run into one `session.stuck` notification, and returns the function that stops it. Called once by `server/index.ts` inside the `listen` callback and stopped on shutdown, for the same reason the plan runner is: the notification is about runs this process is only now able to host. It lives in this module because the registry it reads owns runs — no provider knows it exists. What counts as silence, and which runs are deliberately never announced, is [docs/MANUAL.md (notifications)](../../../docs/MANUAL.md) §"A silent run is noticed from outside".
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/websocket/index.ts
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/websocket/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/websocket/services/chat-run-verbs.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/websocket/services/websocket-state.service.ts
 
 ## MAN-711 — Why Dependency Injection Is Used
 section: README/002 Why Dependency Injection Is Used
@@ -168,9 +168,9 @@ flowchart TD
 
   D -->|chat.send| E[resolve session row -> startRun -> providerRuntimeService.run]
   D -->|chat.edit-send| J[history_truncated -> rewind at anchor -> dispatch]
-  D -->|chat.abort| F[providerRuntimeService.abort + synthetic complete]
+  D -->|chat.abort| F[abortChatRun - runtime abort then completeRunIfCurrent]
   D -->|chat.subscribe| G[chat_subscribed ack + attach socket + replay events seq > lastSeq]
-  D -->|chat.permission-response| H[providerRuntimeService.resolveToolApproval]
+  D -->|chat.permission-response| H[answerChatPermission - resolveToolApproval]
   D -->|chat.presence| K[markPresence for this socket]
   D -->|other| I[send kind:protocol_error]
 ```
@@ -316,6 +316,8 @@ Broadcasts `kind: simple_list_changed` after a simple-list folder is made, renam
 Broadcasts `kind: session_host_liveness` when a chat gains its first or loses its last session host, reaching this set through `modules/websocket/index.js`; `handleChatConnection` also sends the same kind, as a snapshot, to each socket that joins the set, once the keepalive hosts are re-adopted (`whenHostsReadopted`). The ids ride a `sessionIds` array, never a `sessionId` key (session-host, MAN-695).
 
 This design centralizes cross-module realtime fanout without requiring route-local references to WebSocket internals.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/websocket/services/websocket-state.service.ts
 
 ## MAN-724 — Writer Adapter (`WebSocketWriter`)
 section: README/015 Writer Adapter (`WebSocketWriter`)

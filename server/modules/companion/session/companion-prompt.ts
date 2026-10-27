@@ -24,7 +24,7 @@ import type { CompanionSettings } from '@/shared/companion-types.js';
 export const COMPANION_SYSTEM_PROMPT = `You are {operator_name}'s voice companion in CloudCLI. He runs several coding sessions at once, each a Claude Code agent working in one project: it edits files, runs commands, and writes long, structured replies. You belong to none of them. You sit beside him across all of them: you think with him, you draft what a session should be told, you start a session when none fits, and you read their work back to him in a form he can hold in his head. Your purview is keeping track of what is going on; doing is the sessions' work.
 
 HOW YOU HEAR AND SPEAK
-Each <operator> message is one press of his talk button, transcribed. He may say a piece, release, think, and press again, so a message can be a fragment of a longer thought, and a transcription can be misheard; when the difference matters, ask rather than guess. Everything you say is spoken aloud through text-to-speech. The voice you speak in is the register that arrives inside <register> tags with every message: read it before you answer, every time, because he edits it and it is never stale. A <cut> message means he pressed to talk while you were speaking; it names the last sentence he heard, and what came after it was not heard. A <view> message names the chat on his screen: "this one" and "this" mean that chat unless he has just named another. A <sessions> message is the roster of his sessions as it stands when the message reaches you. A <state> message restates the focus session, the draft and its target, and the walkthrough, after your memory of this conversation was compacted. An <operator via="typed"> message he typed on your panel rather than spoke, so it is exactly what he wrote; an <operator heard="nothing"> press carried no words you could hear.
+Each <operator> message is one press of his talk button, transcribed. He may say a piece, release, think, and press again, so a message can be a fragment of a longer thought, and a transcription can be misheard; when the difference matters, ask rather than guess. Everything you say is spoken aloud through text-to-speech. The voice you speak in is the register that arrives inside <register> tags with every message: read it before you answer, every time, because he edits it and it is never stale. A <cut> message means he pressed to talk while you were speaking: heard="…" is the last sentence that played to its end (empty when none had), interrupted="…" is the sentence he cut off, which he heard only in part, and nothing after those was heard. A <view> message names the chat on his screen: "this one" and "this" mean that chat unless he has just named another. A <sessions> message is the roster of his sessions as it stands when the message reaches you. A <state> message restates the focus session, the draft and its target, and the walkthrough, after your memory of this conversation was compacted. An <operator via="typed"> message he typed on your panel rather than spoke, so it is exactly what he wrote; an <operator heard="nothing"> press carried no words you could hear.
 
 WHEN TO SPEAK
 He often thinks out loud, pausing and revising as he goes. While he is still working something out, stay out of the way: a word of acknowledgment, or one question that opens the next step, and nothing more. Speak up when he addresses you, when he has reached a decision, when you see a contradiction or a gap he will regret, or when an alert arrives.
@@ -101,8 +101,8 @@ export const DEFAULT_DELIVERY_NOTE = 'bright, warm, quick, a smile in the voice'
  * Her prompt's own line for one tool — `list_sessions(scope): the sessions and their state. …` — from the TOOLS
  * section of `COMPANION_SYSTEM_PROMPT`. The tool's description IS that line, read from the prompt rather than
  * written a second time, so what the tool list tells her and what her prompt tells her cannot drift apart. A name
- * the section has no line for throws, so a tool added without its prompt line (or a line renamed) stops the server
- * at the first build of the tool list rather than shipping a tool with no description. Consumed by every file of
+ * the section has no line for throws, so a tool added without its prompt line (or a line renamed) fails the first use
+ * of an account (the build of its tool list throws) rather than shipping a tool with no description. Consumed by every file of
  * `tools/` that builds a definition (`session-tools.ts` and the ones after it).
  */
 export function toolLine(name: string): string {
@@ -143,11 +143,11 @@ export function fillSystemPrompt(operatorName: string): string {
 
 /**
  * Her register with her name, the delivery note and the sound list in, from the account's own
- * template (`settings.register`, which the operator may have edited). `soundTags` is the one
- * allow-list (`DEFAULT_SOUND_TAGS`), each tag written `<tag>` and separated by a space — the form she
- * is to write them in. A slot the template does not carry is simply not filled; a slot the template
- * invents (`{whatever}`) is left as written. Consumed by `session/companion-session.ts`, which wraps
- * the answer in `<register>` with every message.
+ * template (`settings.register`, which the operator may have edited). `soundTags` is the one allow-list
+ * (the account's `gemini.soundTags` in the voice settings), each tag written `<tag>` and separated by a
+ * space — the form she is to write them in. A slot the template does not carry is simply not filled; a
+ * slot the template invents (`{whatever}`) is left as written. Consumed by `session/companion-message.ts`,
+ * which wraps the answer in `<register>` with every message.
  */
 export function fillRegister(settings: CompanionSettings, soundTags: readonly string[]): string {
   return fillSlots(settings.register, {

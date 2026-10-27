@@ -20,8 +20,10 @@ type CompanionDoorViewProps = {
  * "Through Kaylee" in a chat. Lit while her panel is open, in the rail's one lit look (`RAIL_BUTTON_LIT`); the open
  * state reaches a reader as `aria-expanded`, since the door opens a panel and is no page of the rail.
  *
- * Its name is "Talk to Kaylee" with her name as he set it: every word is a `t()` with a default, because the door
- * stands in the rail before anything else of hers loads. The name rides the kit Tooltip on hover and keyboard focus.
+ * Its name is hers, "Kaylee" as he set it, with `aria-expanded`: a door that opens and closes her panel is named for
+ * what it shows, as the rail's views are, never for an action ("Talk to Kaylee" is her panel's talk button, which opens
+ * the mic). Every word is a `t()` with a default, because the door stands in the rail before anything else of hers
+ * loads. The name rides the kit Tooltip on hover and keyboard focus.
  * `data-companion-door` is what her panel hands focus back to when it closes from the keyboard.
  *
  * Exported for this file's CompanionDoorButton and for `.verify/companion-panel-scaffold.mjs`, which draws it lit and
@@ -30,7 +32,7 @@ type CompanionDoorViewProps = {
 export function CompanionDoorView({ open, name, onPress }: CompanionDoorViewProps) {
   const { t } = useTranslation();
   const her = name ?? t('companion.defaultName', { defaultValue: 'Kaylee' });
-  const label = t('companion.door.label', { defaultValue: 'Talk to {{name}}', name: her });
+  const label = t('companion.door.label', { defaultValue: '{{name}}', name: her });
 
   return (
     <Tooltip position="right" showOnFocus content={label}>

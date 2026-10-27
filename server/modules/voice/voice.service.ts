@@ -109,9 +109,10 @@ function createTranscriptionFormData(audio: VoiceAudioUpload, sttModel: string):
 }
 
 /**
- * Creates the Voice application service used by the Voice composition root and
- * its unit tests. The outbound request function and server configuration are
- * required so the service never reads globals or creates production defaults.
+ * Creates the OpenAI-compatible voice service for the Voice composition root
+ * (`voice.module.ts`), which hands it to the provider decision and the router.
+ * The outbound request function and server configuration are required so the
+ * service never reads globals or creates production defaults.
  */
 export function createVoiceService(dependencies: VoiceServiceDependencies): VoiceService {
   return {

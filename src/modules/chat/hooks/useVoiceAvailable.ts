@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 
+import { useVoiceProvider } from '@/modules/chat/hooks/useVoiceProvider';
 import { api } from '@/shared/api';
 import { useUiPreferences } from '@/shared/context/UiPreferencesContext';
 import { readVoiceConfig, VOICE_CONFIG_SYNC_EVENT } from '@/shared/voiceConfig';
@@ -23,11 +24,21 @@ function checkVoiceHealth(): Promise<boolean> {
   return request;
 }
 
-export function useVoiceAvailable(): boolean {
+/**
+ * Whether the voice control for `purpose` should be drawn: 'speak' is read-aloud (the default, MessageSpeakControl) and
+ * 'dictate' is the composer's mic (ChatComposer).
+ *
+ * Read-aloud needs the OpenAI-compatible backend, so its answer is the browser's base URL or the server's health. The mic
+ * follows the account's provider: on Gemini the server transcribes on its own key, so the browser needs no backend and the
+ * mic is drawn whenever voice input is on. On the OpenAI-compatible provider the mic's answer is read-aloud's, as before.
+ */
+export function useVoiceAvailable(purpose: 'speak' | 'dictate' = 'speak'): boolean {
   // Read through the shared preferences owner. This used to re-parse the
   // preferences blob and register its own storage + sync listeners, once per
   // assistant message row.
   const { voiceEnabled: enabled } = useUiPreferences();
+  // Only the composer's mic reads the provider, and only while voice is on: read-aloud and a page with voice off ask nothing.
+  const provider = useVoiceProvider(enabled && purpose === 'dictate');
   const [available, setAvailable] = useState(false);
 
   useEffect(() => {
@@ -60,5 +71,6 @@ export function useVoiceAvailable(): boolean {
     };
   }, [enabled]);
 
+  if (purpose === 'dictate' && provider === 'gemini') return enabled;
   return enabled && available;
 }

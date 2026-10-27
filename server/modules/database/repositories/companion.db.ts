@@ -15,7 +15,7 @@ import { getConnection } from '@/modules/database/connection.js';
  * keeps the newest `COMPANION_LOG_KEEP` rows per account and deletes the rest in the same
  * transaction as the insert, so the table never holds more than that for one account.
  *
- * Consumers: `server/modules/companion/companion-store.ts` — the lane's reader and writer — and
+ * Consumers: `server/modules/companion/companion-store.ts` — the lane's reader and writer, `readSentence` included — and
  * `companion.service.ts`, which asks `userIdsFocusedOn` which accounts a finished run is news to.
  * Reach it through `@/modules/database/index.js`. Every statement runs on the caller's
  * connection; only `appendLog` and `clearAccount` open a transaction of their own, so each lands
@@ -204,6 +204,24 @@ export const companionDb = {
          ) ORDER BY id`
       )
       .all(userId, bounded) as CompanionLogRow[];
+  },
+
+  /**
+   * Her sentence `turnIndex` of the turn `turnId`, or `null` when the account has no such sentence (an unknown turn or index,
+   * a log row pruned past the keep window, or a log that Clear emptied). Only `kaylee` rows carry a turn and an index, so the
+   * role is part of the match; the newest row wins should a turn ever hold two of one index. The speech door reads it to
+   * rebuild the text a voice is asked to say.
+   */
+  readSentence(userId: number, turnId: string, turnIndex: number): CompanionLogRow | null {
+    const row = getConnection()
+      .prepare(
+        `SELECT ${LOG_COLUMNS} FROM companion_log
+         WHERE user_id = ? AND role = 'kaylee' AND turn_id = ? AND turn_index = ?
+         ORDER BY id DESC LIMIT 1`
+      )
+      .get(userId, turnId, turnIndex) as CompanionLogRow | undefined;
+
+    return row ?? null;
   },
 
   /** Inserts one card for the account, stamped now, and answers the row as stored. */

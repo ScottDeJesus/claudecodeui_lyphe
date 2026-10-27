@@ -3,14 +3,14 @@ import {
   getStoredAuthToken,
   storeAuthToken,
 } from '@/shared/authToken';
-import type { AuthTraceEvent, CerberusEnrollInput, CerberusLabelInput, CerberusMuteInput, CerberusPromoteInput, ClaudeApiKeySave, DeepseekRange, DispatcherAsk, DispatcherEpicsWord, DispatcherModelChoice, DispatcherQueueMove, FileLinePatch, JevRange, NoteInput, NtfySettingsInput, SimpleListItemRef, SimpleListPosition, SubagentTranscriptResult, WriteAttempt } from '@/shared/types';
+import type { AuthTraceEvent, CerberusEnrollInput, CerberusLabelInput, CerberusMuteInput, CerberusPromoteInput, ClaudeApiKeySave, DeepseekRange, DispatcherAsk, DispatcherEpicsWord, DispatcherModelChoice, DispatcherQueueMove, FileLinePatch, JevRange, NoteInput, NtfySettingsInput, SimpleListItemRef, SimpleListPosition, SubagentTranscriptResult, VoiceProvider, VoiceSettingsPatch, WriteAttempt } from '@/shared/types';
 import type { AgentLaunchDefaultsChange, AgentLaunchRowChange } from '@/shared/agent-launch-types';
 import type { MarkRequest, MissedRequest, Queue, ReadRequest, ThresholdRequest, UnderstandingMarkRequest } from '@/shared/affected-areas-types';
 import type { CerberusCatalogEntryInput } from '@/shared/cerberus-types';
 import type { CompanionSettings } from '@/shared/companion-types';
 import type { ClaudeUpdateApplyRequest } from '@/shared/claude-update-types';
 import type { RoadmapWriteBody } from '@/shared/roadmap-types';
-import { IS_PLATFORM, companionClientId } from '@/shared/utils';
+import { IS_PLATFORM, companionClientId, recordingFileName } from '@/shared/utils';
 import { readVoiceConfig, voiceConfigHeaders } from '@/shared/voiceConfig';
 
 // Headers are a plain record rather than the full `HeadersInit` union so the
@@ -829,6 +829,13 @@ export const api = {
         body: formData,
       }),
     tts: (text: string, options: ApiRequestOptions = {}) => post('/api/voice/tts', { text }, options),
+    // The account's chat-mic provider and Gemini transcription model, with the status of its one Gemini key:
+    // `{ settings: VoiceSettings, key: GeminiKeyStatus }`. A save answers the same shape; the key calls answer `{ key }`.
+    // The key goes out on its save and never comes back, only its status. A refusal is a 400 `VOICE_SETTINGS_INVALID`.
+    settings: () => get('/api/voice/settings'),
+    saveSettings: (patch: VoiceSettingsPatch) => put('/api/voice/settings', patch),
+    saveGeminiKey: (key: string) => put('/api/voice/gemini-key', { key }),
+    clearGeminiKey: () => del('/api/voice/gemini-key'),
   },
 
   // Kaylee, the voice companion. Every call names THIS page to her in `x-companion-client`: the page that last typed or
@@ -852,6 +859,16 @@ export const api = {
     interrupt: () => post('/api/companion/interrupt', undefined, companionOptions()),
     // Wipes her conversation, log, notes, draft, walk and focus. The wind-down of her process is awaited, so it can take a while.
     clear: () => post('/api/companion/clear', undefined, { ...companionOptions(), timeoutMs: 90_000 }),
+    // His talk press: the clip as multipart `audio` (named by its type, as the chat's mic names its upload) and the recorder's own
+    // `durationMs` for it. Takes the floor for this page and answers 202 `{ text }` once the press has been heard and pushed to her;
+    // a hearing that came to nothing is a 409 `COMPANION_SPEECH_REFUSED` or a 502 `COMPANION_SPEECH_FAILED` carrying the sentence,
+    // and the system line in her log. An upload has no deadline of its own (see `timeoutSignal`).
+    press: (blob: Blob, mimeType: string, durationMs: number) => {
+      const body = new FormData();
+      body.append('audio', blob, recordingFileName(mimeType));
+      body.append('durationMs', String(Math.round(durationMs)));
+      return authenticatedFetch('/api/companion/press', { method: 'POST', body, ...companionOptions() });
+    },
   },
 
   system: {
@@ -1462,13 +1479,21 @@ export function voiceConfigSignature(): string {
 }
 
 /**
- * Transcribes recorded audio, posting directly to the user's configured OpenAI-compatible
- * endpoint when one is set and otherwise going through the CloudCLI voice proxy.
+ * Transcribes recorded audio. With the 'openai' provider (the default), it posts directly to the user's configured
+ * OpenAI-compatible endpoint when one is set and otherwise goes through the CloudCLI voice proxy. With 'gemini' it
+ * always goes through the proxy, which transcribes on the server's Gemini key: the browser's own endpoint is never
+ * reached and none of its `x-voice-*` headers (its OpenAI-compatible key and model) ride along. Callers pass the
+ * account's provider from the chat module's `useVoiceProvider`.
  */
-export function transcribeVoice(blob: Blob, filename: string): Promise<Response> {
-  const config = readVoiceConfig();
+export function transcribeVoice(blob: Blob, filename: string, provider: VoiceProvider = 'openai'): Promise<Response> {
   const body = new FormData();
 
+  if (provider === 'gemini') {
+    body.append('audio', blob, filename);
+    return api.voice.transcribe(body);
+  }
+
+  const config = readVoiceConfig();
   if (config.baseUrl.trim()) {
     body.append('file', blob, filename);
     body.append('model', config.sttModel || 'whisper-1');

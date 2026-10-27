@@ -1,5 +1,6 @@
 import multer from 'multer';
 
+import { createVoiceProvider } from './voice-provider.js';
 import { createVoiceRouter } from './voice.routes.js';
 import { createVoiceService } from './voice.service.js';
 
@@ -43,5 +44,6 @@ const audioUpload = multer({
 /** Voice router assembled for the server entrypoint. */
 export const voiceRoutes = createVoiceRouter({
   voiceService,
+  voiceProvider: createVoiceProvider(voiceService),
   parseAudioUpload: audioUpload.single('audio'),
 });

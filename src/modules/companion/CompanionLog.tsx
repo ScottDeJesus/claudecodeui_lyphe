@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next';
 import { CompanionSentence } from '@/modules/companion/CompanionSentence';
 import { useFollowNewest } from '@/modules/companion/hooks/useFollowNewest';
 import type { CompanionLogEntry } from '@/shared/companion-types';
+import type { CompanionSentenceRef } from '@/shared/types';
 import { Button, EmptyState, ScrollArea } from '@/shared/ui';
 
 type CompanionLogProps = {
@@ -17,7 +18,19 @@ type CompanionLogProps = {
   turnId: string | null;
   /** Whether the panel is drawn: a closed panel stays mounted, and is put back at the newest line when it opens. */
   visible: boolean;
+  /** The sentence this page's player is sounding: marked in her paragraph. Absent or null, no sentence is marked. */
+  speaking?: CompanionSentenceRef | null;
 };
+
+/**
+ * The sentence being spoken, as read-aloud marks it: a highlighter's band in the info tone (the status line's Speaking),
+ * its ink at a fifth, widened by a ring of the same band so the words keep their places (a ring takes no room; padding
+ * would re-wrap the paragraph each time the mark moves), and cloned onto every line it wraps over. The band is the mark's
+ * shape as well as its hue: 1.32:1 against the canvas in light and 1.51:1 in dark, where the tone's own soft ground
+ * measured 1.07:1 and vanished in light; the words on it keep 12.6:1 and 11.0:1. An underline was tried and read as a
+ * link. Forced colours drop every ground, so there the words are underlined instead.
+ */
+const SPEAKING_MARK = 'rounded-sm bg-tone-ink/20 ring-2 ring-tone-ink/20 box-decoration-clone forced-colors:underline';
 
 /**
  * What the log draws, one block per row: his line; her turn, every sentence of one turn joined into one paragraph; an
@@ -76,17 +89,21 @@ function SpeakingDots({ label }: { label: string }) {
  * Her exchange with him, newest last. Drawn by this module's CompanionPanel, between the header and the dock.
  *
  * HIS LINES stand on the right in the secondary ground, captioned "You · typed" or "You · spoken" with the glyph of the
- * way they came (a keyboard, a mic), as the chat draws his turn. HER TURN is a paragraph on the left: the sentences of
- * one turn joined, her mood brackets already lifted by the server, each sound a small mark at its offset
- * (CompanionSentence). AN ALERT is a row in the info tone with a bell, the house's news in its own words. A SYSTEM LINE
- * is her harness speaking — her own failures among them, which she never says herself — small, in the warn tone, with
- * the ▲ mark. Colour is never the whole signal: every kind has its glyph or its caption too.
+ * way they came (a keyboard, a mic), as the chat draws his turn. A spoken line with no words (a press that carried none,
+ * still a turn she answers) keeps that place and caption and reads "Nothing heard" in the muted ink on an outline, so it
+ * is never taken for words he said. HER TURN is a paragraph on the left: the sentences of one turn joined, her mood
+ * brackets already lifted by the server, each sound a small mark at its offset (CompanionSentence). While this page's
+ * player sounds one of her sentences (`speaking`), that sentence stands on a band of the info tone, as read-aloud marks
+ * it, and the band moves on with her voice; nothing else about the paragraph changes, so its lines never re-wrap under
+ * him. AN ALERT is a row in the info tone with a bell, the house's news in its own words. A SYSTEM LINE is her harness
+ * speaking — her own failures among them, which she never says herself — small, in the warn tone, with the ▲ mark.
+ * Colour is never the whole signal: every kind has its glyph or its caption too.
  *
  * It is a `role="log"` region, so a screen reader hears each new line as it lands. The scroller follows the newest
  * line until he scrolls up; then "Newest" stands at its foot and brings him back (`useFollowNewest`). Before her first
  * hello it is an empty state that says what she is for.
  */
-export function CompanionLog({ entries, name, turnId, visible }: CompanionLogProps) {
+export function CompanionLog({ entries, name, turnId, visible, speaking = null }: CompanionLogProps) {
   const { t } = useTranslation();
   const last = entries[entries.length - 1];
   // A new row, a sentence growing, or a turn starting or ending all change what stands at the end.
@@ -113,12 +130,17 @@ export function CompanionLog({ entries, name, turnId, visible }: CompanionLogPro
         <div key={block.key} data-companion-entry="kaylee" className="flex flex-col gap-1">
           <div className={CAPTION}>{name} · {clockOf(block.at)}</div>
           <div className="break-words text-sm leading-relaxed text-foreground">
-            {block.sentences.map((sentence, index) => (
-              <Fragment key={sentence.id}>
-                {index > 0 && ' '}
-                <CompanionSentence text={sentence.text} sounds={sentence.sounds} />
-              </Fragment>
-            ))}
+            {block.sentences.map((sentence, index) => {
+              const spoken = speaking !== null && block.turnId === speaking.turnId && sentence.index === speaking.index;
+              const words = <CompanionSentence text={sentence.text} sounds={sentence.sounds} />;
+              return (
+                <Fragment key={sentence.id}>
+                  {index > 0 && ' '}
+                  {/* Only the sentence being spoken gets a wrapper: with none spoken, the paragraph is its bare words. */}
+                  {spoken ? <span data-companion-speaking-sentence="" data-tone="info" className={SPEAKING_MARK}>{words}</span> : words}
+                </Fragment>
+              );
+            })}
             {block.turnId !== null && block.turnId === turnId && <SpeakingDots label={speakingWords} />}
           </div>
         </div>
@@ -128,8 +150,16 @@ export function CompanionLog({ entries, name, turnId, visible }: CompanionLogPro
     if (block.kind === 'operator') {
       const spoken = entry.via === 'spoken';
       const Via = spoken ? Mic : Keyboard;
+      // A press that carried no words is still his turn: the log says so, in words he could not have said.
+      const nothingHeard = spoken && entry.text.trim().length === 0;
       return (
-        <div key={block.key} data-companion-entry="operator" data-via={entry.via ?? undefined} className="flex flex-col items-end gap-1">
+        <div
+          key={block.key}
+          data-companion-entry="operator"
+          data-via={entry.via ?? undefined}
+          data-heard={nothingHeard ? 'nothing' : undefined}
+          className="flex flex-col items-end gap-1"
+        >
           {/* Typed or spoken is a state, so its glyph and word take the muted ink; the faint eyebrow ink only names and dates. */}
           <div className={CAPTION}>
             {t('companion.log.you')} ·
@@ -139,9 +169,15 @@ export function CompanionLog({ entries, name, turnId, visible }: CompanionLogPro
             </span>
             · {clockOf(entry.at)}
           </div>
-          <div className="max-w-[85%] whitespace-pre-wrap break-words rounded-xl bg-secondary px-3 py-2 text-sm leading-relaxed text-foreground">
-            {entry.text}
-          </div>
+          {nothingHeard ? (
+            <div className="max-w-[85%] rounded-xl border border-dashed border-border px-3 py-2 text-sm leading-relaxed text-muted-foreground">
+              {t('companion.log.nothingHeard', { defaultValue: 'Nothing heard' })}
+            </div>
+          ) : (
+            <div className="max-w-[85%] whitespace-pre-wrap break-words rounded-xl bg-secondary px-3 py-2 text-sm leading-relaxed text-foreground">
+              {entry.text}
+            </div>
+          )}
         </div>
       );
     }

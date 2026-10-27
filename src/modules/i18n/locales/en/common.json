@@ -3223,7 +3223,11 @@
       "draftingFor": "Drafting for <subject/>",
       "draftingNew": "Drafting a new chat",
       "walking": "Walking <subject/> · item\u00a0{{at}}\u00a0of\u00a0{{total}}",
-      "walkingPlain": "Walking a result"
+      "walkingPlain": "Walking a result",
+      "listening": "Listening",
+      "transcribing": "Transcribing",
+      "speaking": "Speaking",
+      "cut": "Cut"
     },
     "focus": "Focus",
     "model": "Model",
@@ -3250,6 +3254,7 @@
       "alert": "Alert",
       "systemPrefix": "Notice:",
       "speaking": "{{name}} is answering",
+      "nothingHeard": "Nothing heard",
       "newest": "Newest",
       "emptyTitle": "Nothing said yet",
       "emptyMessage": "Type to {{name}} below. She keeps track of every chat you're running, drafts what to tell one, and sends only on your word."
@@ -3298,8 +3303,16 @@
       "send": "Send",
       "refused": "Couldn't reach {{name}}. Your message is back in the box; send it again."
     },
+    "talk": {
+      "start": "Talk to {{name}}",
+      "stop": "Stop and send",
+      "transcribing": "Transcribing · press to talk again"
+    },
+    "voice": {
+      "label": "Voice on this device"
+    },
     "door": {
-      "label": "Talk to {{name}}"
+      "label": "{{name}}"
     },
     "palette": {
       "group": "{{name}}",

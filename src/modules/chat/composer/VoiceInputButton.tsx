@@ -29,7 +29,11 @@ export default function VoiceInputButton({ state, onToggle, errorMsg }: Props) {
   return (
     <span className="relative inline-flex">
       {errorMsg && (
-        <span className="absolute bottom-full left-1/2 mb-1 -translate-x-1/2 whitespace-nowrap rounded bg-red-600 px-2 py-1 text-xs text-white shadow-lg">
+        // Anchored to the mic's left edge and wrapped: the mic sits at the left of a phone's footer, where a bubble centered on it ran off
+        // the screen, and a Gemini refusal is a whole sentence. `w-max` keeps a short message on one line inside the button's narrow box.
+        // Where a pointer hovers, "Voice input" stands over the mic as its tooltip (the pointer is still on the mic that was just pressed)
+        // and covered the sentence's first words, so the bubble rises above it there; touch has no tooltip and keeps the bubble close.
+        <span className="absolute bottom-full left-0 mb-1 w-max max-w-[min(18rem,calc(100vw-4.5rem))] rounded bg-red-600 px-2 py-1 text-xs text-white shadow-lg [@media(hover:hover)]:mb-11">
           {errorMsg}
         </span>
       )}

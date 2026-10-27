@@ -4,6 +4,8 @@ import type { CompanionDraft, CompanionPicture, CompanionSessionRef, CompanionSe
 import { AppError } from '@/shared/utils.js';
 
 import { createCompanionAccount, type CompanionAccount } from './companion-account.js';
+import { createPress } from './companion-press.js';
+import { createSpeech } from './companion-speech.js';
 import type { DraftSendOutcome } from './companion-send.js';
 import { buildPicture } from './companion-picture.js';
 import { readCompanionSettings, saveCompanionSettings, type CompanionSettingsPatch } from './companion-settings.js';
@@ -12,33 +14,29 @@ import { focusNewsEnvelope, readRunReply } from './feeds/focus-feed.js';
 
 /**
  * Kaylee, per account. The service holds one `CompanionAccount` (her store, her live conversation, her activity)
- * for each CloudCLI account that has used her, made on the account's first call and never before: an account that
- * never opens her panel costs nothing, and a made account is still ASLEEP until a message is pushed — creating
- * one launches no process.
+ * for each CloudCLI account that has used her, made on the account's first call and never before; a made account is
+ * still ASLEEP until a message is pushed — creating one launches no process.
  *
- * Every verb here backs one route (`companion.routes.ts`) or one feed, and takes the account's id first, so a
- * call cannot reach another account's rows, pages or conversation. The routes only parse and answer; what a
- * verb means is decided here:
+ * Every verb here backs one route (`companion.routes.ts`) or one feed, and takes the account's id first, so a call
+ * cannot reach another account's rows, pages or conversation. The routes only parse and answer; the verbs decide:
  *   - `sendText` takes the floor for the page that typed, logs his line and pushes it to her;
  *   - `saveSettings` stores the patch, tells every page, and applies a model change to her running process
  *     with her memory kept (`setModel`);
+ *   - `press` is a press of the talk button (`companion-press.ts`): the page takes the floor, the clip is heard, and
+ *     his words (or the empty press) are logged and pushed in arrival order; a hearing that fails pushes nothing;
  *   - `sendDraft` is the panel's Send: the draft goes to its target (a turn, or folded into the running one) and the
  *     pressing page takes the floor, so the chat opens where he pressed;
- *   - `clear` wipes her: process, CLI conversation, log, notes, draft, walk and focus. What chats were sent
- *     through her (`relayed_sends`) stays, because those rows belong to the chats;
- *   - `stopAll` winds every conversation down for shutdown and from then on refuses a message with a 503: the
- *     HTTP drain comes after it, and a process woken then would have nothing left to end it;
- *   - `alert`, `runFailed` and `runCompleted` are the verbs the house's feeds call. `alert` takes the alerts the
- *     alert feed gathered (it has already judged Live, the page and the repeat), logs each as an `alert` row on her
- *     panel and pushes them to her as one message. `runFailed` is the alert feed telling the service a chat's run
- *     just failed (the runtime raises `run.failed` and the like, then still sends `complete` with no `error` row).
- *     `runCompleted` is a chat's run that ended: for each live account whose focus the chat is, it builds the
- *     `<session event="finished">` news and pushes it, unless the run was aborted or failed. `alert` and the focus
- *     push refuse once `stopAll` has run, for the reason a message does.
+ *   - `speech` and `cut` are her voice (`companion-speech.ts`): the audio of one sentence for the floor page, and the
+ *     press that stops her while she speaks and owes her next message a `<cut>`;
+ *   - `clear` wipes her: process, CLI conversation, log, notes, draft, walk, focus and the turn's audio. What chats
+ *     were sent through her (`relayed_sends`) stays, because those rows belong to the chats;
+ *   - `stopAll` winds every conversation and every synthesis down for shutdown and from then on refuses a message with a
+ *     503: the HTTP drain comes after it, and a process woken then would have nothing left to end it;
+ *   - `alert`, `runFailed` and `runCompleted` are the verbs the house's feeds call (each is explained at its verb);
+ *     `alert` and the focus push refuse once `stopAll` has run, for the reason a message does.
  *
- * THE RUNTIME is the gateway her tools stop, answer and send through. It is not known when this file loads
- * (the module is built by the entrypoint, which owns it), so `createCompanionModule` attaches it before
- * anything can call a verb; an account made before that would have tools with no gateway, so it is refused.
+ * THE RUNTIME is the gateway her tools stop, answer and send through. The module is built by the entrypoint, which owns
+ * it, so `createCompanionModule` attaches it before anything can call a verb; an account made before that is refused.
  *
  * Consumers: `companion.routes.ts` (every verb but the feeds'), `companion.module.ts` (`attachRuntime`, `stopAll`)
  * and the alert and focus feeds (`alert`, `runFailed`, `runCompleted`).
@@ -46,8 +44,7 @@ import { focusNewsEnvelope, readRunReply } from './feeds/focus-feed.js';
 
 /**
  * How long a chat's failed-run mark stands. The runtime raises the failure and sends the run's `complete` in the same
- * handler, so the two are milliseconds apart; the bound only keeps a mark whose `complete` never came (a failure
- * raised for a chat with no run) from silencing that chat's NEXT finished run.
+ * handler, milliseconds apart; the bound only keeps a mark whose `complete` never came from silencing that chat's NEXT finished run.
  */
 const FAILED_RUN_MARK_MS = 30_000;
 
@@ -66,15 +63,14 @@ function createCompanionService() {
   let stopped = false;
   // Chat id → when the alert feed heard its run fail; read and cleared by `runCompleted`, so a failed run is not also told as finished.
   const failedRuns = new Map<string, number>();
+  const press = createPress({ accountOf, refuseWhileStopping: () => { if (stopped) throw stopping(); } });
+  const speech = createSpeech({ accountOf });
 
-  /**
-   * Builds the news of a finished focus chat and pushes it to her. A digest can take a dactyl's whole bound, so a
-   * server that began to stop meanwhile must not have a process woken by it; a failure is this account's alone.
-   */
+  /** Builds the news of a finished focus chat and pushes it to her; a failure is this account's alone, and a server that began to stop meanwhile wakes nothing. */
   async function deliverFocusNews(userId: number, focus: CompanionSessionRef, reply: string): Promise<void> {
     try {
       const envelope = await focusNewsEnvelope(userId, focus, reply);
-      // The digest can take a while: he may have switched Live off, or the server begun to stop, meanwhile.
+      // A digest can take a dactyl's whole bound: he may have switched Live off, or the server begun to stop, meanwhile.
       if (stopped || !readCompanionSettings(userId).live) return;
       accountOf(userId).session.pushFocusNews(envelope);
     } catch (error) {
@@ -118,6 +114,14 @@ function createCompanionService() {
       store.appendLog({ role: 'operator', via: 'typed', text });
       session.pushOperator(text, 'typed');
     },
+
+    /** A press of the talk button: the page `client` takes the floor, the clip is heard, and what he said (`''` for the empty press) is answered once it has been pushed. */
+    press,
+
+    /** One sentence of her current turn as streamed PCM for the floor page; an `AppError` refusal comes before the first byte (`companion-speech.ts`). */
+    speech: speech.speak,
+    /** The press while she speaks: stops the turn's syntheses and her turn, and owes her next message a `<cut>` (`companion-speech.ts`). */
+    cut: speech.cut,
 
     /**
      * Stores `patch`, tells every page the settings as they now read, and applies a model change to her running
@@ -183,6 +187,7 @@ function createCompanionService() {
      */
     async clear(userId: number): Promise<void> {
       const account = accountOf(userId);
+      account.speechCache.end();
       const windingDown = account.session.clear();
       account.store.clearAccount();
       await windingDown;
@@ -271,7 +276,9 @@ function createCompanionService() {
     async stopAll(): Promise<void> {
       stopped = true;
       await Promise.all(
-        [...accounts.values()].map(async ({ userId, session }) => {
+        [...accounts.values()].map(async ({ userId, session, speechCache }) => {
+          // A sentence streaming to a page would hold the HTTP drain open for as long as Gemini kept speaking.
+          speechCache.end();
           try {
             await Promise.all([session.interrupt(), session.close('the server is stopping')]);
           } catch (error) {

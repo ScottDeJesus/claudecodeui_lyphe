@@ -93,12 +93,14 @@ export function stateEnvelope(held: { focus: CompanionSessionRef | null; draft: 
 }
 
 /**
- * `<cut heard="…"/>`: he pressed to talk while she was speaking, and `heard` is the last sentence
- * that reached him; what came after it was not heard. Consumed by the companion session, which owes
- * it with his next message.
+ * `<cut heard="…" interrupted="…"/>`: he pressed to talk while she was speaking. `heard` is the last
+ * sentence that played to its end and `interrupted` the one playing at the press, which he heard only
+ * in part; everything after them was not heard. Each is the sentence's display text, escaped as an
+ * attribute, and `''` when there is none (nothing had ended yet, or nothing was playing). Consumed by
+ * the message assembler, which owes it with the next message she answers.
  */
-export function cutEnvelope(heard: string): string {
-  return `<cut${attributesText([['heard', heard]])}/>`;
+export function cutEnvelope(heard: string, interrupted: string): string {
+  return `<cut${attributesText([['heard', heard], ['interrupted', interrupted]])}/>`;
 }
 
 /**
@@ -130,7 +132,8 @@ export function operatorEnvelope(text: string, via: 'typed' | 'spoken'): string 
 
 /**
  * `<operator via="spoken" heard="nothing"></operator>`: a press of the talk button that carried no
- * words she could hear. Consumed by the voice's talk button, through the companion session.
+ * words she could hear. Consumed by the companion session's `pushOperatorEmpty`, which the press door
+ * (`companion-press.ts`) calls for a clip too short to hold words or one Gemini heard nothing in.
  */
 export function emptyPressEnvelope(): string {
   return `${openTag('operator', [['via', 'spoken'], ['heard', 'nothing']])}</operator>`;

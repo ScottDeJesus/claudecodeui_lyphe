@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 
 import type { CompanionActivity, CompanionSound, CompanionTurnOutcome } from '@/shared/companion-types.js';
 
-import { createSentenceStream, DEFAULT_SOUND_TAGS, parseExpression } from './sentence-stream.js';
+import { createSentenceStream, parseExpression } from './sentence-stream.js';
 
 /**
  * Her turns: when one starts, which sentences are its own, and which `result` ends it.
@@ -21,7 +21,8 @@ import { createSentenceStream, DEFAULT_SOUND_TAGS, parseExpression } from './sen
  * A result that lists no uuid at all (the CLI's startup failures) is read as the turn in flight's.
  *
  * Each sentence carries its turn's id and its index in the turn, counting only sentences that had
- * something to show (`parseExpression` answers null for the rest). A turn that is stopped or failed
+ * something to show (`parseExpression` answers null for the rest). The sounds a sentence may keep are the
+ * account's list as it stood when the turn STARTED: read once there, so one turn is parsed by one list. A turn that is stopped or failed
  * drops the half-sentence it had buffered: what she had not finished saying was never said.
  *
  * Consumers: `session/companion-session.ts`, which owns one tracker per account.
@@ -47,7 +48,7 @@ export type CompanionSentence = {
  * `onTurnEnded` bracket a turn (`error` is the sentence for the panel when the outcome is `failed`,
  * `null` otherwise); `onActivity` gets `thinking` when the turn starts and `idle` when it ends. A
  * callback that throws is the caller's to guard — the session wraps each, so one can never break her
- * loop. Consumed by `companion-session.ts`, whose `CompanionSessionDeps` includes this type.
+ * loop. Consumed by `companion-session.ts`, which builds on it; `companion-session-types.ts`'s `CompanionSessionDeps` includes this type.
  */
 export type TurnSink = {
   onSentence(sentence: CompanionSentence): void;
@@ -81,23 +82,24 @@ export const THINKING_ACTIVITY: CompanionActivity = { phase: 'thinking', session
 /** The activity of no turn at all: what the panel shows before her first one and after each ends. Consumed by `companion-account.ts`. */
 export const IDLE_ACTIVITY: CompanionActivity = { phase: 'idle', session: null, files: null, walk: null };
 
-type Turn = { id: string; nextIndex: number; stream: ReturnType<typeof createSentenceStream> };
+type Turn = { id: string; nextIndex: number; soundTags: readonly string[]; stream: ReturnType<typeof createSentenceStream> };
 
-/** Consumed by `companion-session.ts`: one tracker per account's conversation. */
-export function createTurnTracker(sink: TurnSink): TurnTracker {
+/** Consumed by `companion-session.ts`: one tracker per account's conversation. `readSoundTags` is the account's sound-tag list, asked for each time a turn begins. */
+export function createTurnTracker(sink: TurnSink, readSoundTags: () => readonly string[]): TurnTracker {
   let current: Turn | null = null;
   // Every message of ours that no result has consumed yet, with the turn it was pushed into.
   const owners = new Map<string, Turn>();
 
   const speak = (turn: Turn, raw: string): void => {
-    const parsed = parseExpression(raw, DEFAULT_SOUND_TAGS);
+    const parsed = parseExpression(raw, turn.soundTags);
     if (parsed === null) return;
     sink.onSentence({ turnId: turn.id, index: turn.nextIndex, ...parsed });
     turn.nextIndex += 1;
   };
 
   const begin = (): Turn => {
-    const turn: Turn = { id: randomUUID(), nextIndex: 0, stream: createSentenceStream((raw) => speak(turn, raw)) };
+    // Read before `current` is set, so a reader that throws leaves no half-begun turn behind.
+    const turn: Turn = { id: randomUUID(), nextIndex: 0, soundTags: readSoundTags(), stream: createSentenceStream((raw) => speak(turn, raw)) };
     current = turn;
     sink.onTurnStarted(turn.id);
     sink.onActivity(THINKING_ACTIVITY);

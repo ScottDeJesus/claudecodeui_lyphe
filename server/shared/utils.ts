@@ -215,6 +215,14 @@ const FLAG_TRIM = new RegExp(
   'g',
 );
 
+/**
+ * Python's `str.strip()` on a string, by the set `FLAG_TRIM` spells out. Consumed by the voice module's env-file
+ * reader (`gemini-key.ts`), which must read the house `.env` line for line as `~/.claude/scripts/gemini-image` does.
+ */
+export function pythonStrip(text: string): string {
+  return text.replace(FLAG_TRIM, '');
+}
+
 /** The ONE leading BOM the Python side's `utf-8-sig` decode takes off, and no other: a BOM anywhere else stays in the word, as it does there. */
 const LEADING_BOM = /^\uFEFF/;
 

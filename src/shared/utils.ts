@@ -699,3 +699,18 @@ export function companionClientId(): string {
   }
   return companionClientIdInMemory;
 }
+
+// ---------------------------
+
+//----------------- A RECORDED CLIP'S FILE NAME ------------
+
+/**
+ * The name a recorded clip is uploaded under, by its MIME type: `recording.m4a` for mp4 audio, `recording.ogg` for ogg,
+ * `recording.webm` otherwise (what the mic's recorder makes on Chromium and Firefox). The server types the clip by this
+ * extension, so every upload of the mic names it the same way. Used by `useVoiceInput` (the chat's mic) and
+ * `api.companion.press` (the talk button's clip).
+ */
+export function recordingFileName(mimeType: string): string {
+  const extension = mimeType.includes('mp4') ? 'm4a' : mimeType.includes('ogg') ? 'ogg' : 'webm';
+  return `recording.${extension}`;
+}

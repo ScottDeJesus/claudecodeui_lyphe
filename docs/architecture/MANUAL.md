@@ -984,8 +984,9 @@ Four things in that picture are easy to get backwards:
   message into the CLI already running for that conversation and settles when THAT turn's
   `result` lands, matched by the uuid stamped on the user message; the process stays up for
   the next message and closes only after two hours without one, never while a background
-  task or watcher is running in it (`chat-process.ts`). A model, effort or permission-mode
-  change is applied to the running query, and so is a GROWN allowed-tool list; a changed
+  task or watcher is running in it (`server/shared/prompt-stream.ts`). A model, effort or permission-mode
+  change is applied to the running query (the live-versus-launch split is `planLiveChanges` in
+  `list/claude/chat-process.ts`), and so is a GROWN allowed-tool list; a changed
   working directory, MCP configuration, an edited message (`resumeAnchorId`), a conversation
   restarted from scratch, any change to the disallowed list or a tool REMOVED from the allowed
   list (both are launch arguments the CLI resolves before ever asking the callback), and the

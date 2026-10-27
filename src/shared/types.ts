@@ -978,6 +978,97 @@ export type VoicePlayState = 'idle' | 'loading' | 'playing';
 
 // ---------------------------
 
+//----------------- CHAT MIC PROVIDER AND GEMINI VOICE SETTINGS ------------
+
+/**
+ * Which speech-to-text backend the chat composer's mic uses for the account: 'openai' (the OpenAI-compatible backend,
+ * today's behavior and the default) or 'gemini' (Gemini on the server's key, with no key or header from the browser).
+ * Client mirror of the server's `VoiceProvider`. Read by the settings module's provider picker and voice-settings hook, and
+ * by the chat module's provider hook and `transcribeVoice`, which routes the clip on it. It governs the chat's mic alone:
+ * read-aloud stays on the OpenAI-compatible backend.
+ */
+export type VoiceProvider = 'openai' | 'gemini';
+
+/**
+ * The account's voice settings as `GET /api/voice/settings` answers them: the chat mic's `provider` and the Gemini choices
+ * (`gemini.transcriptionModel` and `gemini.speechModel`, 1-80 characters of letters, digits, `.`, `_` and `-`; `gemini.voice`,
+ * 1-40 characters of letters, digits, `_` and `-`; `gemini.soundTags`, the one list of sounds Kaylee may make: 1-30 tags, each 1-24
+ * lower-case letters with single spaces between words). Client mirror of the server's `VoiceSettings`. Read and saved by the
+ * settings module's `useVoiceSettings`; a save sends a `VoiceSettingsPatch`.
+ */
+export type VoiceSettings = {
+  provider: VoiceProvider;
+  gemini: { transcriptionModel: string; speechModel: string; voice: string; soundTags: string[] };
+};
+
+/**
+ * What `PUT /api/voice/settings` takes: any subset of `VoiceSettings`, the nested `gemini` object included, merged field by
+ * field. `gemini.soundTags: null` drops the account's own list, so Google's set (the server's `DEFAULT_SOUND_TAGS`) applies again.
+ * Sent by the settings module's `useVoiceSettings` through `api.voice.saveSettings`.
+ */
+export type VoiceSettingsPatch = {
+  provider?: VoiceProvider;
+  gemini?: Partial<Omit<VoiceSettings['gemini'], 'soundTags'>> & { soundTags?: string[] | null };
+};
+
+/**
+ * Which Gemini key the account's calls use, and the only part of it the page ever sees: 'stored' is his own (`last4` its
+ * last four characters), 'house' is the server's (`last4` null: the house's key is never shown, even in part) and 'none'
+ * means neither exists. Client mirror of the server's `GeminiKeyStatus`. Answered by every voice-settings call, held by
+ * the settings module's `useVoiceSettings` and drawn by its `GeminiVoiceSection`'s `keyStatus` prop.
+ */
+export type GeminiKeyStatus = { source: 'stored' | 'house' | 'none'; last4: string | null };
+
+// ---------------------------
+
+//----------------- COMPANION TALK PRESS ------------
+
+/**
+ * Where the page's one talk press to Kaylee stands: 'idle' (the mic closed), 'listening' (the first press opened the mic
+ * and it is recording) or 'transcribing' (the second press sent the clip and its words are not back yet). A press while a
+ * clip is transcribing records again at once, so 'listening' can follow 'transcribing'. Drawn by the companion module's
+ * talk button and folded over her status line, where Listening and Transcribing win over her activity.
+ */
+export type TalkPressState = 'idle' | 'listening' | 'transcribing';
+
+/**
+ * The page's one talk press as her panel draws it: its `state`, `toggle` (one press: open the mic, or stop it and send the
+ * clip) and `error`, the sentence for what failed on the page itself (the mic refused, the upload failed), null when
+ * nothing did. A refused transcription is her harness's system line in the log, never this. Handed by the companion
+ * module's CompanionPanel to its view, which folds `state` into the status line and hands the press to the composer.
+ */
+export type TalkPress = { state: TalkPressState; toggle: () => void; error: string | null };
+
+// ---------------------------
+
+//----------------- COMPANION VOICE ON THE PAGE ------------
+
+/**
+ * One sentence of Kaylee's by its place: the turn it belongs to and its index in that turn (0 first), as her log's entries
+ * and the speech route name it. Used for the sentence this page's player is sounding (`CompanionVoice.speaking`), which
+ * the companion module's CompanionLog marks.
+ */
+export type CompanionSentenceRef = { turnId: string; index: number };
+
+/**
+ * The page's own state as her status line reads it, ahead of the server's activity, in one fixed order: 'cut' (for a
+ * breath, 900 ms, after a talk press stopped her voice mid-sentence) > 'listening' > 'transcribing' (the talk press,
+ * `TalkPressState`) > 'speaking' (this page's player is sounding one of her sentences). Resolved by the companion
+ * module's CompanionPanel from the page's press and voice, and drawn by its CompanionHeader's status line.
+ */
+export type CompanionPageState = 'cut' | 'listening' | 'transcribing' | 'speaking';
+
+/**
+ * This page's voice as her panel draws it. `on` is the page's own switch, stored per device and on by default; `setOn`
+ * turns it, and off, the page neither plays nor fetches her speech while her text still streams. `speaking` is the
+ * sentence this page's player is sounding, null when it is silent; `cut` is true for the breath after a talk press
+ * stopped her mid-sentence. Handed by the companion module's CompanionPanel to its view: the header draws the switch and
+ * folds Speaking and Cut into the status line, the log marks the sentence.
+ */
+export type CompanionVoice = { on: boolean; setOn: (on: boolean) => void; speaking: CompanionSentenceRef | null; cut: boolean };
+
+// ---------------------------
+
 //----------------- CHAT STREAM FLUSH ------------
 
 /** The one pending stream flush of a live chat: the timer's id, the window it was armed on (a timer id means something only to the window that issued it, so it must be cleared there), and the timer's own body, kept so a move of the chat between hosts can run it at once instead of losing it with a closing window. Held in a ref by the chat interface and read by the realtime handlers through `armStreamFlush`, `clearStreamFlush` and `flushStreamNow`. */
