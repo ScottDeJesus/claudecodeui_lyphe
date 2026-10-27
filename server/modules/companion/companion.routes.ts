@@ -1,14 +1,14 @@
 import express from 'express';
 import type { Request, Response, Router } from 'express';
 
-import { asyncHandler, readAuthenticatedUserId, readPathParam } from '@/shared/utils.js';
+import { AppError, asyncHandler, readAuthenticatedUserId, readPathParam } from '@/shared/utils.js';
 
 import { DRAFT_TEXT_MAX, MESSAGE_TEXT_MAX, inputInvalid, readBodyObject, readBodyText, readClientId, requireClientId } from './companion-input.js';
 import { type CompanionSettingsPatch } from './companion-settings.js';
 import type { CompanionService } from './companion.service.js';
 
 /**
- * Her door for the page: every route of the companion's table except `POST /draft/send`, which lands with its verb.
+ * Her door for the page: every route of the companion's table.
  * Mounted at `/api/companion` behind `authenticateToken` by the server entrypoint.
  *
  * ONLY TRANSPORT. A route here reads who is asking (`req.user`, which is her account) and which page (the
@@ -81,6 +81,21 @@ export function createCompanionRoutes(service: CompanionService): Router {
       readClientId(request);
       const userId = readAuthenticatedUserId(request);
       response.json(service.editDraft(userId, readBodyText(readBodyObject(request), 'text', DRAFT_TEXT_MAX)));
+    }),
+  );
+
+  // Sends the draft as it stands. A refused send is a 409 carrying the sentence the card shows; the answer of a send is
+  // what happened — a turn started, or the brief folded into the running one.
+  router.post(
+    '/draft/send',
+    asyncHandler(async (request: Request, response: Response) => {
+      const userId = readAuthenticatedUserId(request);
+      const client = requireClientId(request);
+      const { mode } = readBodyObject(request);
+      if (mode !== 'turn' && mode !== 'steer') throw inputInvalid('mode must be "turn" or "steer".', 'mode');
+      const sent = await service.sendDraft(userId, client, mode);
+      if (sent.outcome === 'refused') throw new AppError(sent.sentence, { code: 'COMPANION_SEND_REFUSED', statusCode: 409 });
+      response.json({ outcome: sent.outcome });
     }),
   );
 

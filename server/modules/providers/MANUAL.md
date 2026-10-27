@@ -879,7 +879,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/cl
 
 ## MAN-9060 — sessions.name_given — the mark on a chat name: who writes it, who reads it, how the duplicate merge carries it
 
-`sessions.name_given` INTEGER NOT NULL DEFAULT 0: `1` when a person gave the chat its `custom_name` (the sidebar rename), `0` for every other writer. why: `custom_name` alone cannot tell a name he typed from one the app proposed, and a name he typed is never replaced.
+`sessions.name_given` INTEGER NOT NULL DEFAULT 0: `1` when a person gave the chat its `custom_name` (the sidebar's rename, Kaylee's `rename_session`), `0` for every other writer. why: `custom_name` alone cannot tell a name he typed from one the app proposed, and a name he typed is never replaced.
 
 | fact | value |
 | --- | --- |
@@ -893,14 +893,19 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/cl
 
 | door | does | caller |
 | --- | --- | --- |
-| `renameByPerson(sessionId, customName)` | `updateSessionCustomName` then `markNameGiven`, in one `db.transaction` | `sessionsService.renameSessionById`, reached by `PUT /api/providers/sessions/:sessionId` (`provider.routes.ts`): the sidebar's rename |
+| `renameByPerson(sessionId, customName)` | `updateSessionCustomName` then `markNameGiven`, in one `db.transaction` | `sessionsService.renameSessionById`, reached by `PUT /api/providers/sessions/:sessionId` (`provider.routes.ts`: the sidebar's rename) and by `rename_session` (`companion/tools/act-tools.ts`: Kaylee's rename) |
 | `markNameGiven(sessionId)` | `name_given = 1` | `renameByPerson` only |
-| `updateSessionCustomName(sessionId, customName)` | writes the name, never the mark | a title the app derives: `codex-session-synchronizer.provider.ts` (the Codex thread name) |
-| `nameFactsOf(sessionId)` | `{ customName, nameGiven, appCreated, isArchived }`, or `null` when no row has the id | 2026-10-26: no caller yet |
+| `updateSessionCustomName(sessionId, customName)` | writes the name, never the mark | a name the app derives: `codex-session-synchronizer.provider.ts` (the Codex thread name), `companion-send.ts` `sendToNewChat` (Kaylee's `create_session` title), `chat-namer.service.ts` (Haiku's name) |
+| `nameFactsOf(sessionId)` | `{ customName, nameGiven, appCreated, isArchived }`, or `null` when no row has the id | `chat-namer.service.ts` (chat-names module, MAN-9067): questions 1 to 3 of the naming pass (`appCreated` + `isArchived`; `nameGiven`; `customName`) and the re-read before its write |
 
 `appCreated` = `provider_session_id IS NULL OR session_id <> provider_session_id`: the app allocated the id. A chat discovered on disk holds one id in both columns.
 
-2026-10-26: the companion prompt names `rename_session`; no handler for it exists in `server/modules/companion/tools/`.
+## Kaylee's two doors
+
+| tool | write | `name_given` after |
+| --- | --- | --- |
+| `rename_session` (`act-tools.ts`) | `sessionsService.renameSessionById`, then `broadcastSessionUpserted` | `1`: it is his word |
+| `create_session` title (`companion-send.ts`, `sendToNewChat`) | `sessionsDb.updateSessionCustomName` after `sessionsService.createAppSession`, then `broadcastSessionUpserted` | `0`: her title is not a name he gave; the namer replaces it when it fails `isSayableName` |
 
 ## The duplicate merge — `assignProviderSessionId`
 
@@ -913,4 +918,26 @@ The watcher's row (keyed by the provider id) merges into the app row. A name tra
 
 The UPDATE's right-hand sides read the app row as it was before the statement, so the `CASE` sees the app row's own mark, not the one `MAX` writes.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/migrations.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/sessions.db.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/provider.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/services/sessions.service.ts
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/companion-send.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/act-tools.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/migrations.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/sessions.db.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/provider.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/services/sessions.service.ts
+
+## MAN-9068 — A steer — folding a message into the turn a Claude process is running: the verb, the miss, the transcript shape and the history row
+
+A steer is one user message pushed into the turn a Claude process is running, so a correction reaches the session while it works instead of queueing behind the turn going the wrong way. The SDK folds a message queued mid-turn into the turn in flight.
+
+| piece | what it is |
+| --- | --- |
+| the handle's `steer(content)` (`claude-runtime.provider.js`) | pushes ONE uuid-stamped `SDKUserMessage` into the process's queue, opens NO turn, touches the idle closer. `false` when the process is closing, has no queue or has no pending turn (`pendingTurn === null`). The uuid is remembered in `steeredUuids`. |
+| `steerClaudeSession(sessionId, content)` | `getSession(id)?.process`; none, closing or a false `steer` is `'not_running'`, else `'folded'`. Also `claudeRuntime.steer`. |
+| `providerRuntimeService.steer(provider, id, content)` | a provider whose runtime has no `steer` (or throws) answers `'not_running'`. The compaction decorator answers `'not_running'` while `flightOf(id)` holds a compaction of a Claude chat. |
+| `steerChatRun(id, content, echo, deps)` (`chat-run-verbs.service.ts`) | no running run → `'not_running'`; `'folded'` writes `echo` onto that run's writer. The caller starts a turn instead on `'not_running'`. |
+
+- THE MISS IS NOT A RARE RACE (measured by Athena, 2026-10-27, Haiku). The CLI takes a pushed message only at a TOOL-RESULT BOUNDARY. A steer sent into a turn that makes no further tool call (a text-only turn, the final reply, a long closing summary) is never taken by it: `steer()` answers `folded` and the steer runs as the CLI's next turn after the turn's `complete`. So `folded` means "pushed", not "the turn changed course", and the sentence she tells him says so ("Sent to X while it works. It takes the brief at its next tool step, or as its own turn right after it finishes"). At the `result` that ends the pending turn without listing a remembered steer uuid in `user_message_uuids`, the runtime logs `[Claude SDK] A steer for session <id> missed its turn and runs as a turn of its own` and remembers the uuid in `missedSteers`; the steer's own turn is the next result that LISTS that uuid, and it is logged (`… that missed its turn has finished its own`) and kept out of the background-work branch (no `notifyBackgroundWorkCompleted`, no deferred-tool hold released). A `result` with no `user_message_uuids` says nothing either way and logs nothing.
+- STOP AND A PENDING STEER. The same boundary rule means a steer pushed and not yet taken sits in the CLI's queue, and the interrupt a Stop sends makes the CLI dequeue it and answer it as a turn of its own — after the Stop, with nobody watching, in whatever permission mode the chat runs. So `abortClaudeSDKSession` reads `hasPendingSteer` (a steer remembered in `steeredUuids`, i.e. not yet accounted for by a result) at the press and, when it is true, KILLS the process WITHOUT sending the interrupt first (measured: kill-after-interrupt FAILS — the interrupt is what makes the CLI dequeue the steer and start answering it, and the CLI went on answering after the SIGTERM), outranking "keep the process for background work" and "end stdin"; `steer()` answers false once a Stop has marked the instance (`abortedInstances`). Conservative: a steer already taken stays remembered until the turn's result, and a Stop in that stretch also ends the process (the next message spawns a fresh one on the transcript).
+- A MISSED STEER'S TURN HAS NO RUN. The turn the CLI runs for a steer that missed is invisible to the run registry (the run ended with the turn it missed, and the registry drops a second `complete`), but not to the runtime, which reports it busy (`activity`: "a turn is in flight"). So `abortChatRun` with no running run asks the runtime (`abortUnregisteredTurn`): a process mid-turn is stopped through `runtime.abort`, answer `stopped`; background work alone is not a turn and stays `not_running`. The same door serves a background task's wake-up turn. Her `stop_session` and the page's `chat.abort` ride it. The end of that turn is announced as a run's end (`notifyRunStopped`, the "finished" notification), in the runtime's result branch (`ownSteers`), and never as background work. What it still lacks is a registry run: no `complete` frame, no unread mark, no run-completed listener (the focus feed) — opening a run for a missed steer is a websocket/registry design change, a follow-up.
+- THE TRANSCRIPT SHAPE (measured 2026-10-27, CLI 2.1.x, a steer five seconds into a `seq 1 20` Bash loop on Haiku): the CLI does NOT write the folded message as a `user` row. It writes `{ type: 'attachment', attachment: { type: 'queued_command', commandMode: 'prompt', prompt, source_uuid, delivery_id } }` at the point it was folded in (between the loop's tool result and the reply), with `queue-operation` rows (`enqueue`, then `remove` with `reason: 'absorbed_mid_turn'`) and an `api-request-blob` quoting it ("The user sent a new message while you were working"). The run shows exactly one `complete` and the reply obeys the steer.
+- THE HISTORY ROW. `claude-queued-prompt.ts` (`queuedPromptAsUserRow`) gives a `queued_command` / `prompt` attachment the shape of a user row, so `normalizeMessage` draws it as a user text turn; every other attachment keeps meaning nothing. It carries NO `transcriptAnchorId` (an attachment is not a resume point). Before this row existed a message folded into a running turn was missing from the chat after a reload and nothing could mark it "Through Kaylee".
+- ONE LIVE ROW. The SDK stream replays no `user` row for the steer, so the echo (`local_kaylee_<uuid>`, `spokenVia: 'kaylee'`) is the only live row; the page's reconcile swaps it for the history row once that exists.
+
+Shown by `.verify/companion-send.mjs` (`.verify/companion-send-scratch.sh` on a scratch stack: the live box has one Kaylee shared by everyone at work).
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/compaction/compaction-runtime.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/companion-send.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-queued-prompt.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-runtime.provider.js, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-sessions.provider.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/services/provider-runtime.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/websocket/services/chat-run-verbs.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-send.mjs

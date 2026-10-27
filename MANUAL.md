@@ -3300,7 +3300,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/affected-areas/af
 
 ## MAN-8575 — The Tours view — src/modules/affected-areas: where state lives, what the counts mean, the reads and the presses
 
-The Tours view: a DocuSketch tour's affected areas drawn on a view's photo, or on the pano's six views as one 360° sphere. Three screens, one at a time: `TourPicker` → `TourScreen` → `PanoScreen`. Data is `api.affectedAreas` (wire MAN-8558, lane MAN-8559, routes MAN-8540). Drawn with the library's `RegionImage`, `Gallery` (MAN-8579) and `SphereView` (MAN-8943); the 360° screen's pieces, rules and proof: MAN-8956. A switch at the view's top (`ToursSwitch`: Tours · Mark · Tables) chooses the surface: Tours is that walk; the Tables screen (`TablesScreen`, how right the reader is per kind) is beside it, not a step of it: MAN-8581; the marks (the mark bar, Missed one, the Mark screen, the understanding mark) judge what the walk draws: MAN-8582, rules MAN-8583.
+The Tours view: a DocuSketch tour's affected areas drawn on a view's photo, or on the pano's six views as one 360° sphere. Three screens, one at a time: `TourPicker` → `TourScreen` → `PanoScreen`. `TourScreen` carries the DAY-ONE SKETCH between its room list and its panos: the engine's plan drawn with each pano's spot, each area and each fixture laid on it, a list by room beside the job's sketch and first drying report, the scale and pin lines, and "Read the room layout", the layout press and its walk (MAN-9038; the walk: MAN-8576). A region on the pano screen says where it is counted (`placementNotes`, MAN-9038). Data is `api.affectedAreas` (wire MAN-8558, lane MAN-8559, routes MAN-8540). Drawn with the library's `RegionImage`, `Gallery` (MAN-8579) and `SphereView` (MAN-8943); the 360° screen's pieces, rules and proof: MAN-8956. A switch at the view's top (`ToursSwitch`: Tours · Mark · Tables) chooses the surface: Tours is that walk; the Tables screen (`TablesScreen`, how right the reader is per kind) is beside it, not a step of it: MAN-8581; the marks (the mark bar, Missed one, the Mark screen, the understanding mark) judge what the walk draws: MAN-8582, rules MAN-8583.
 
 ## State of the module
 | fact | value |
@@ -4618,7 +4618,8 @@ Kaylee's reads of the house. Every read answers from the database and the runnin
 | `listVisibleProjects()` | `HisProject[]` `{ name, path }`: registered, not archived, not in a hidden root; by display name. |
 | `resolveProject(ref)` | `ProjectResolution` `{ ok: true, project }` or `{ ok: false, sentence }`. |
 | `rosterText()` | The body of `<sessions>`; caller `companion-account.ts` (`readRoster`), read at each push. A failed read is logged (`[Companion] the roster could not be read`) and answers one sentence; never throws. |
-| `chatState`, `activityLine`, `ChatState` | Re-exported from `chat-activity.ts`. |
+| `chatNameOf(sessionId)` | The name the sidebar shows for ANY chat row (archived, hidden-root, or one the resolvers would not offer), one line, else `Untitled Session`. `list_followups` names a follow-up's chat by it: an item outlives the sidebar entry it came from. |
+| `chatState`, `activityLine`, `askLine`, `pendingAsksOf`, `ChatState` | Re-exported from `chat-activity.ts`. |
 
 ## His chats
 - A row of `sessions` with `isArchived = 0`, in a project that is not archived and not in a hidden root (`visibleProjectPathSql`, the sidebar's own test), whose `provider_session_id` is NULL or differs from `session_id`.
@@ -4660,6 +4661,8 @@ Kaylee's reads of the house. Every read answers from the database and the runnin
 | live, asleep | `idle just now` / `idle N min` / `idle N h` (under 48 h) / `idle N d`; `idle, no recorded activity` when the row has no time |
 
 Cuts count code points (`cutAt`), so none lands inside an emoji.
+
+`pendingAsksOf(sessionId)` is the gateway's list of the asks a chat is blocked on, oldest first. `askLine(ask, detailed = false)` is the waiting line above for ONE ask; `detailed` is the line she decides on: with exactly one question, ` Options: A | B | C` (the option labels) follows, and a permission carries what it would run in full (`describeToolInput`: a Bash command whole up to 600 characters, a count of what was cut) with the rule an "always" would store. Without it a Bash command is cut at 60 characters, as a roster line is scanned. `activityLine` uses it for the oldest ask undetailed; `read_session`'s `pending_ask` uses it for every ask detailed.
 
 ## Roster (`rosterText`)
 - One line per working, waiting or live chat: `name · project · state: activity · id <sessionId>`; 20 lines at most, waiting first; `…and N more active; list_sessions with scope active names them.` past 20.
@@ -4706,9 +4709,9 @@ A failed read is logged (`[Companion] <tool> could not read the house`) and retu
 - Best effort: it feeds a search and is never something she says as fact.
 
 ## `server/shared/tool-text-result.ts`
-`textResult(text, isError = false)` → `{ content: [{ type: 'text', text }] }` plus `isError: true` on a refusal; the sentence says what to do next. Has an `.oxlintrc.json` boundaries entry; `session-tools.ts` and `draft-tools.ts` answer through it.
+`textResult(text, isError = false)` → `{ content: [{ type: 'text', text }] }` plus `isError: true` on a refusal; the sentence says what to do next. Has an `.oxlintrc.json` boundaries entry; `session-tools.ts`, `draft-tools.ts` and `act-tools.ts` answer through it.
 
-`guardedToolResult(toolName, doing, run)` runs one tool's work: a throw is logged `[Companion] <tool> could not <doing>` and answered as `isError` text `<tool> could not <doing> just now (<reason>). Try once more; if it fails again, tell him.` `session-tools.ts` (doing: `read the house`) and `draft-tools.ts` share it.
+`guardedToolResult(toolName, doing, run)` runs one tool's work: a throw is logged `[Companion] <tool> could not <doing>` and answered as `isError` text `<tool> could not <doing> just now (<reason>). Try once more; if it fails again, tell him.` `session-tools.ts` (doing: `read the house`), `draft-tools.ts` and `act-tools.ts` (doing: `stop the chat`, `rename the chat`, `answer the chat`) share it.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/chat-first-words.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/session-tools.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/tool-text-result.ts
 
@@ -4753,7 +4756,7 @@ Kaylee's HTTP door. Transport only: a route reads who asks, checks the SHAPE of 
 - `createCompanionModule({ runtime })` returns `{ router, stop }`: it calls `companionService.attachRuntime(runtime)` BEFORE building the router, so no request reaches a verb with no gateway. `stop` is `companionService.stopAll`.
 - `runtime` is the `ProviderRuntimeGateway` the chat socket uses, so an act of hers is the page's own act.
 - Building the module launches no process: a conversation starts on an account's first message.
-- Mount: `/api/companion` behind `authenticateToken` (the account is `req.user`). 2026-10-26: not mounted in `server/index.ts`; phase `panel-fill` mounts it.
+- Mount: `/api/companion` behind `authenticateToken` (the account is `req.user`). Mounted in `server/index.ts` (`app.use('/api/companion', authenticateToken, companion.router)`).
 - Shutdown: the entrypoint awaits `stop()` before it stops anything else.
 
 ## Routes (`companion.routes.ts`)
@@ -4768,10 +4771,11 @@ Kaylee's HTTP door. Transport only: a route reads who asks, checks the SHAPE of 
 | `DELETE /notes/:id` | `id` matches `/^[1-9]\d{0,14}$/` | 204 | `dismissNote` |
 | `POST /interrupt` | – | 204 | `interrupt` |
 | `POST /clear` | – | 204 | `clear` |
+| `POST /draft/send` | client id REQUIRED; `{ mode: 'turn' \| 'steer' }` (anything else is a 400 `COMPANION_INPUT_INVALID`) | 200 `{ outcome: 'started' \| 'folded' }`; a refused send is a 409 `COMPANION_SEND_REFUSED` whose message is the sentence the draft card shows | `sendDraft` (takes the floor first: the chat opens on the page that pressed) |
 
-- No `POST /draft/send` yet; it lands with its verb.
+- The send itself is `companion-send.ts`, shared with `send_to_session` and `create_session`: checks, fold or turn, options, new chat, what clears — MAN-9072. The route adds the floor only (`sendDraft` takes it first).
 - An answer is the thing itself, never wrapped (`{ settings }`, `{ data }`).
-- Every route but `/messages` and `/floor` validates the client id header if present and does not need it.
+- `POST /messages`, `/floor` and `/draft/send` REQUIRE the client id header (the page that pressed takes the floor); every other route validates it if present and does not need it.
 
 ## Input (`companion-input.ts`)
 | Name | Rule |
@@ -4790,6 +4794,7 @@ Envelope (the entrypoint's `AppError` handler): `{ success: false, error: { code
 |---|---|---|
 | 400 | `COMPANION_INPUT_INVALID` | any shape failure above, a settings value past its limit; `message` names the field and its limit; `details.field` names the field |
 | 409 | `COMPANION_NO_DRAFT` | `PUT /draft` while no draft is held |
+| 409 | `COMPANION_SEND_REFUSED` | `POST /draft/send` when the send is refused (no draft, an empty draft, the chat gone, a send already going out, a new chat in a folder that is gone, a chat that did not take the brief — the door refused it); `message` is the sentence the draft card shows |
 | 503 | `COMPANION_STOPPING` | `POST /messages` after `stopAll` |
 
 ## Probe
@@ -4814,7 +4819,10 @@ One `CompanionAccount` per CloudCLI account, made on that account's first call (
 | `interrupt` | stops her own turn; a Stop with no turn does nothing |
 | `clear(userId)` | see Clear |
 | `stopAll()` | sets the stopped flag, then per session `interrupt()` and `close('the server is stopping')`; one failure is logged and does not hold the rest |
-| `alert(userId, event: unknown)`, `runCompleted(sessionId, aborted)` | seams for the house's feeds; no-ops until phase `feeds` fills them |
+| `warm(userId)` | starts her process with nothing pushed (`session.warm()`); the alert feed calls it when a gather window opens. Refused silently once stopped. |
+| `alert(userId, alerts)` | the alerts the alert feed let through: one `alert` log line each (`CompanionAlert.line`), then ONE `pushAlerts` message of their envelopes. A row that cannot be written is logged and costs no push. Refused silently once stopped. |
+| `runFailed(sessionId)` | the alert feed heard `run.failed`/`run.limit`/`api.error`/`login.expired` for this chat, whatever its gates decided: marks the chat for 30 s. why: the runtime raises the failure and then still sends `complete` (exit 0) with NO `error` row, so without the mark a failed run was told twice, `failed` and then "finished". |
+| `runCompleted(sessionId, aborted)` | a chat's run ended. Returns at once. Takes (and clears) the chat's failed-run mark first; skips an aborted or failed run. For each account whose stored focus is the chat (`companionDb.userIdsFocusedOn`, so an account not touched since boot is found) and whose Live is on, reads the run's reply BEFORE awaiting anything (`readRunReply`), then builds the `<session event="finished">` (`focusNewsEnvelope`) and pushes it (`pushFocusNews`); after the build (a dactyl can take up to 180 s) Live is read again and a stopped server drops it. |
 
 ### Clear
 1. `session.clear()` runs SYNCHRONOUSLY: detaches her process and forgets her CLI conversation. why: a message landing mid-clear wakes a fresh conversation, never a resume.
@@ -4823,10 +4831,56 @@ One `CompanionAccount` per CloudCLI account, made on that account's first call (
 - `relayed_sends` rows stay: they belong to the chats.
 
 ### Stop
-- Flag lives in the service; only `sendText` checks it. 2026-10-26: a later pusher (phase `feeds`) must refuse or drop after `stopAll` the same way.
+- Flag lives in the service; `sendText`, `warm`, `alert` and the focus push (`runCompleted`, after its build, with Live) check it.
 - `attachRuntime` clears it: a newly built module takes messages again.
+- `module.stop()` unsubscribes both feeds BEFORE `stopAll`.
 
-## `companion-account.ts` — `createCompanionAccount(userId, runtime)`
+## `feeds/` — what she hears unasked
+Both feeds start in `createCompanionModule` and are subscriptions to events the house already raises; nothing polls.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/companion-account.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/companion-picture.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/companion.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/companion-tools.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/tool-deps.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-module.mjs
+
+## MAN-9069 — server/modules/companion — the service verbs, one account's wiring, the picture — `alert-feed.ts` — `startAlertFeed(service)`
+section: server/modules/companion — the service verbs, one account's wiring, the picture, the tool registry and deps/001 `alert-feed.ts` — `startAlertFeed(service)`
+
+`onNotification` (notifications module) hears every event the orchestrator is handed after the session is normalized and BEFORE the push preference and the push dedupe (a `background` event is off for pushes by default and would never arrive behind that gate; a shared dedupe would let a push and her consume each other's slot). A listener that throws costs no push.
+An event is dropped unless ALL hold, checked cheapest first: its code is in `ALERT_KIND_BY_CODE`; his Live is on; a page of his is connected (`isUserConnected`); not a repeat by the feed's own 20 s dedupe keyed `<user>:<dedupeKey or provider:kind:code:session>` (checked last, so a dropped event does not use up its slot).
+| Code | `<alert kind>` |
+|---|---|
+| `dispatcher.finished`, `dispatcher.epic_finished` | feature finished |
+| `run.background_completed` | background work landed |
+| `agent.notification` | asking |
+| `permission.required` | permission |
+| `run.failed`, `run.limit`, `api.error`, `login.expired` | failed |
+| `session.stuck` | stuck |
+Nothing else is an alert: never `limit.*`, `push.enabled`, `run.stopped`, `dispatcher.paused`/`limit_paused`/`relaunched` (ruling 17).
+- Survivors of one account gather in a one-shot 3 s window opened by the first; at its close Live is read again, each alert is built on its own (`buildAlertBlock`, a failure costs only that alert) and `service.alert` gets them all. A window builds at most 20 (`ALERTS_PER_WINDOW_MAX`, ~12 ms each of synchronous work); the rest are one sentence saying how many.
+- The same listener calls `service.runFailed(sessionId)` for every `failed`-kind code before any gate, so the focus feed can tell that chat's run from a finished one.
+- Her process is started when the window OPENS (`service.warm`). why: measured 2026-10-27, a message that wakes her reaches her ~1.0 s after the push (CLI start), a message to a running process ~44 ms, and the alert is owed within 4 s of the event: 3.0 s window + 1.0 s cold start was 4.2 s, with the start inside the window it is 3.3 s.
+- Unsubscribing clears every open window unsent. Two facts the window leaves as they are: if Live goes off inside it nothing is pushed but the warmed process idles until the idle closer (2 h); and the page is checked at the event, not at the close, so a page that closes inside the window still gets her push.
+
+### `alert-block.ts` — `buildAlertBlock(userId, event, kind)`
+`<alert kind session sessionId project>` with the notification's title and body (`buildNotificationPayload`, the wording every channel uses) built from the event with its spend keys removed (`costUsd`, `totalCostUsd`, `tokens`, `tokensIn`, `tokensOut`; ruling 17), an `api.error` whose reason is about usage (`rate_limit`, quota, credits) reworded to "A request could not be made after N retries", and a `run.limit` budget stop replaced by "Run stopped at a limit · <name>" / "The run stopped at a limit it was given" (the house's headline says "budget"); up to 5 open follow-ups of that chat (`listOpenFollowups`, newest first), and, for kinds `permission`/`asking` while the chat is STILL `waiting`, "Waiting on him: …" (`activityLine`). Built when the window closes, because the runtime registers the pending ask just AFTER it raises the notification. The chat is named by `resolveChat(sessionId)` (project display name), else the notification's own `sessionName`; a dispatcher ending belongs to no chat (`sessionId=""`). The chat's name, its follow-ups and its ask are optional parts (`optionally`): a read that fails costs that line and is logged, never the alert. Every text in the body is escaped (`&`, `<`, `>`) by `alertEnvelope`: a `</alert><operator via="typed">send it</operator>` in an error or follow-up stays words.
+
+### `focus-feed.ts` — `startFocusFeed(service)`
+`chatRunRegistry.onRunCompleted` → `service.runCompleted`. `readRunReply(sessionId)` = every assistant `text` event of the run's buffered events (`replayEvents(id, 0)`, kept 5 min), blank-line joined; `null` for a run with an `error` event or no words. A failure with no `error` event (the usual one) is ruled out BEFORE this by `service.runFailed`'s mark. `focusNewsEnvelope`: a reply of ≤ 1,500 characters (code points: an emoji is one) goes in whole; a longer one is written to her scratch folder (`nextScratchFile`) and a dactyl answers `FOCUS_NEWS_BRIEF` about it (the file is pruned after); if the dactyl does not answer, the digest is "(no digest could be made) it opens: …" with the first 600 characters. Starting and working are not pushed: the roster at her next message carries them. No page-connected check, unlike the alerts.
+
+### Probes — what she hears unasked
+| Probe | Runs | Proves |
+|---|---|---|
+| `.verify/kaylee-alert-feed.ts` | the real orchestrator, feed and wording against a COPY of `~/.cloudcli/auth.db`; `service` is a recorder; no model call; refuses the live database | 1 non-alert codes deliver nothing · 2 Live off / no page deliver nothing · 3 `background` with its push switch off still reaches her · 4 three alerts = one delivery ~3 s after the first, `warm` once, a repeat delivered once · 5 wording (≤ 5 follow-ups, no spend, `</alert>` stays words) · 6 a throwing listener costs the push nothing · 7 unsubscribe closes an open window unsent |
+| `.verify/kaylee-hears-unasked.sh` (starts `.mjs`) | scratch server + Vite on a copy of the database (`SUNSET_SLOT` default 5: API 7903, gateway 7904, client 5295), her model on Haiku, ntfy and web-push endpoints off in the copy; never touches :3011 | permission alert reaches her JSONL within 4 s of the ask's frame and she says it · focus chat's finished run arrives as `<session event="finished">` · Live off: the push still arrives, no alert |
+
+Run the first: `D=$(mktemp -d) && sqlite3 ~/.cloudcli/auth.db ".backup $D/auth.db" && DATABASE_PATH=$D/auth.db TSX_TSCONFIG_PATH=server/tsconfig.json node --import tsx .verify/kaylee-alert-feed.ts`. Run the second: `bash .verify/kaylee-hears-unasked.sh`.
+- Why a scratch stack: :3011 restarts on every `server/` save by any session, and the dev account's Kaylee is shared by every probe; a run on them is cut short or cleared.
+- Trap: "Run date in Bash." raises NO `permission.required` on this box (`~/.claude/settings.json` allows `Bash(*)`); the `.mjs` makes its own project (`<PROBE_PROJECT>-hears`) with a project-level `ask` rule on `Bash(date:*)`.
+- Not covered live: the ntfy channel, and the 20 s dedupe (feed probe only).
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/companion-account.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/companion.module.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/companion-picture.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/companion.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/feeds/alert-block.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/feeds/alert-feed.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/feeds/focus-feed.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/companion-tools.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/tool-deps.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-module.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-alert-feed.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-hears-unasked.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-hears-unasked.sh
+
+## MAN-9070 — server/modules/companion — the service verbs, one account's wiring, the picture — `companion-account.ts` — `createCompanionAccount(userId, runtime)`
+section: server/modules/companion — the service verbs, one account's wiring, the picture, the tool registry and deps/002 `companion-account.ts` — `createCompanionAccount(userId, runtime)`
+
 The one place that says which session callback writes which row and sends which frame.
 | Session callback | Effect |
 |---|---|
@@ -4852,7 +4906,7 @@ The one place that says which session callback writes which row and sends which 
 |---|---|
 | `COMPANION_MCP_SERVER_NAME` | re-export of `session/companion-launch.ts`; the SDK names a tool `mcp__<name>__<tool>` |
 | `COMPANION_TOOL_NAMES` | the thirteen names, `toolNames()` of `session/companion-prompt.ts`: the lines of the prompt's TOOLS section that open `name(` |
-| `buildCompanionTools(deps)` | concatenates each tool file that exists; today `sessionTools()` (`list_sessions`, `list_projects`) and `draftTools(deps)` (`show_note`, `update_draft`, `walk`) |
+| `buildCompanionTools(deps)` | concatenates each tool file that exists; today `sessionTools()` (`list_sessions`, `list_projects`), `readTools(deps)` (`read_session`, `list_followups`, `ask_dactyl`), `draftTools(deps)` (`show_note`, `update_draft`, `walk`) and `actTools(deps)` (`stop_session`, `rename_session`, `answer_session`) |
 | `CompanionToolDeps` | what every tool file is handed |
 | `ToolActivityPhase` | `CompanionPhase` minus `idle`, `thinking` (the turn's own) |
 
@@ -4872,7 +4926,11 @@ The one place that says which session callback writes which row and sends which 
 3. When it changes: to the newest activity still in `running`, else `THINKING_ACTIVITY`.
 - 2026-10-26: a tool left running when its turn is stopped keeps its entry until it ends; a later turn's tool ending in that window can briefly show it.
 
-## Probe
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/companion-account.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/companion-picture.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/companion.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/companion-tools.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/tool-deps.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-module.mjs
+
+## MAN-9071 — server/modules/companion — the service verbs, one account's wiring, the picture — Probe
+section: server/modules/companion — the service verbs, one account's wiring, the picture, the tool registry and deps/003 Probe
+
 `.verify/companion-module.mjs`: real `createCompanionModule` router on a loopback express app, curl on every request, a real Haiku conversation; 47 checks (settings, message and frames, a `list_sessions` call, picture, refusals, interrupt, clear, live model change, `stop()` mid-turn in 663 ms on 2026-10-26).
 ```
 D=$(mktemp -d /tmp/companion-module.XXXXXX) || exit 1
@@ -4926,7 +4984,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session
 
 ## Parts — `src/modules/companion/`
 
-Three surfaces, each a VIEW that draws every state and a thin SHELL the fill rewrites. No barrel yet (the fill writes it). Nothing in the app mounts any shell yet. Pictures and verbs: `src/shared/companion-types.ts`; server side: MAN-9058, MAN-9059.
+Three surfaces, each a VIEW that draws every state and a thin SHELL the fill rewrites. The barrel (`index.ts`) and the mounting are in place: the project-workspace shell holds the provider, its frame draws the panel, its rail the door. Pictures and verbs: `src/shared/companion-types.ts`; server side: MAN-9058, MAN-9059.
 
 | surface | view (all composition) | shell (stand-ins, each line carries a `FILL(...)` marker) | the fill mounts it in |
 |---|---|---|---|
@@ -4935,7 +4993,7 @@ Three surfaces, each a VIEW that draws every state and a thin SHELL the fill rew
 | her Settings section | `CompanionSettingsView` (`CompanionSettingsSection.tsx`) | `CompanionSettingsSection` | `VoiceSettingsTab`, after its own sections, voice on or off |
 
 - The fill edits shells only; its `diff -u` shows nothing outside them. The fixture mounts the views, so it survives the fill.
-- Marker ids: `FILL(panel-fill)` (picture, open, her name, settings read/save, every panel verb), `FILL(send)` (`targetWorking`, `sendDraft`). `grep -rn "FILL(" src` lists every stand-in; each is deleted when filled.
+- Marker ids: none left for the panel (`FILL(panel-fill)` and `FILL(send)` are filled). `grep -rn "FILL(" src` lists every stand-in that remains; each is deleted when filled.
 - Parts under the panel: `CompanionHeader` (status line, Stop, close, focus, model, Live, Clear), `CompanionLog`, `CompanionWalkStrip`, `CompanionNotes`, `CompanionDraftCard`, `CompanionComposer`, `CompanionSentence` (her sounds as marks), `CompanionSettingsForm`.
 - Hooks: `useFollowNewest` (log follows newest until he scrolls up; `jumpToNewest`), `useGrowingField` (textarea sized to its words, measured only while drawn), `useCardFloor` (draft card's `min-height`).
 - `companion-fake.ts`: fixture pictures (`FAKE_PANEL`, `FAKE_SETTINGS`); only the fixture imports it.
@@ -4962,7 +5020,7 @@ Three surfaces, each a VIEW that draws every state and a thin SHELL the fill rew
 |---|---|
 | The draft card saves his edit when the field blurs and BEFORE any send. | what is sent is what is on screen |
 | `onSendDraft(mode)` rejects with the server's sentence on refusal; the card shows it and keeps everything on screen. | no silent loss |
-| Send steer shows only while `targetWorking` and the draft targets a session; then it leads, Send turn follows. Otherwise Send turn alone. | `targetWorking` stays `false` until `send` fills it |
+| Send steer shows only while `targetWorking` and the draft targets a session; then it leads, Send turn follows. Otherwise Send turn alone. | `targetWorking` is `CompanionPanel`'s read of the page's busy-session set (`useBusySessionIdSet`) for the draft's target chat; a send to a working chat folds whatever button was pressed, so the card's two buttons differ in what they SAY |
 | Clear memory, Clear draft and Restore the original register each open a `ConfirmDialog` first. | each destroys work |
 | Model and Live show his choice at once, restore the old value with a toast on a refused save. | a control that snaps back reads as refused |
 | Settings fields save one at a time on blur (inputs also on Enter), trimmed, only when changed and within `LIMITS`. | "Saved as you change them" |
@@ -4978,9 +5036,8 @@ Three surfaces, each a VIEW that draws every state and a thin SHELL the fill rew
 
 | seam | state |
 |---|---|
-| Send between `panel-fill` and `send` | does nothing |
 | The settings save's answer | the fill folds it into the picture before the save resolves |
-| `send` | should say whether a send started a turn or folded into one |
+| The send's answer | `sendDraft(mode)` resolves with `'started'` or `'folded'`; the card needs no more (the draft clears and the chat opens by their own frames) and shows a refusal's sentence |
 | Talk button | its place is the composer's empty tools cluster before Send (kaylee--talk); draws nothing, takes no room |
 
 ## Proof — `.verify/companion-panel-scaffold.mjs`
@@ -4998,3 +5055,274 @@ node .verify/companion-panel-scaffold.mjs [--states awakeIdle,dense,...] [--evid
 - Fragile against a server restart mid-run.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionComposer.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionDoorButton.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionDraftCard.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/companion-fake.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionHeader.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionLog.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionNotes.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionPanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionSentence.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionSettingsForm.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionSettingsSection.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionWalkStrip.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useCardFloor.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useFollowNewest.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useGrowingField.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-panel-scaffold.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/companion-kit.mjs
+
+## MAN-9065 — server/modules/companion/tools — stop_session, rename_session and answer_session: acting on a chat through the house's own verbs
+
+`actTools(deps)` (`act-tools.ts`) returns the SDK `tool()` definitions of `stop_session`, `rename_session` and `answer_session`, in the order her prompt lists them. Each does what its page door does, through the house's own verb, so an act of hers and one of his hand leave the same marks. None is `readOnlyHint`; each description is `toolLine(name)`. Each names a chat: it is resolved with `resolveChat` (its refusal sentence is passed on), and after the act it becomes her focus (`deps.setFocus`; a rename carries the NEW name). None sets an activity: each is over in a moment and no `CompanionPhase` says "acting". Every handler runs inside `guardedToolResult`; a refusal is `deps.refuse(sentence)`.
+
+## `stop_session { session }`
+`abortChatRun(sessionId, { runtime })` from the websocket barrel — the very verb `chat.abort` calls. `'stopped'` → "Stopped <name>; it is still there."; `'not_running'` → "<name> was not running." The chat stays alive: the run ends aborted, the sidebar spinner drops, the row is not archived.
+
+## `rename_session { session, name 1–60, one line }`
+`sessionsService.renameSessionById` (the sidebar's rename door: stores the name and marks it `name_given`, so the namer never replaces it) then `broadcastSessionUpserted`, which draws the name on every open page with no reload. A broadcast that fails is logged and does not fail the rename: the name is stored. What she holds of the chat follows the name: the focus, the draft's target and the walkthrough (`carryRename`), so the panel's draft card and `<state>` never name a chat that `resolveChat` no longer finds by that name. A name another chat of his already carries is stored all the same, and the answer says so, with both chats' ids: `resolveChat` refuses a name two chats share ("fits 2 chats"), so she is told to use ids.
+
+## `answer_session { session, answer 1–2000 }`
+Answers the OLDEST pending approval of the chat (`getPendingApprovalsForSession`, by `receivedAt`; the others are counted in the sentence) through `answerChatPermission` — the verb `chat.permission-response` calls. With nothing pending: an `isError` sentence that says so. What the ask would run is shown to her IN FULL where she decides on it — `read_session pending_ask` and `answer_session`'s own sentences (`describeToolInput` in `server/shared/tool-call-hint.ts`: a Bash command whole, a file tool's whole path, any other input as JSON; 600 characters, then a count of what was cut; a line break shows as ` ↵ `) — and `pending_ask` adds the rule an "always" would store. The 60-character `describeToolCall` hint stays for the roster, where a line is scanned. What an answer means to each ask is `ask-decision.ts`'s, and every decision is the page's own:
+
+| ask | answer | decision |
+|---|---|---|
+| a permission (any tool) | `allow` | `{ allow: true }` |
+| | `deny` | `{ allow: false, message: 'User denied tool use' }` |
+| | `always` | `{ allow: true, rememberEntry }` and the entry merged into `claudePermissions` |
+| `AskUserQuestion`, one question | an option's label, matched case-insensitively (the option's own spelling is sent), else her words; `allow`, `deny` and `always` are refused unless an option is called that, because an answer sent to the chat cannot be taken back | `{ allow: true, updatedInput: { ...input, answers: { [question]: answer } } }` (`AskUserQuestionPanel.tsx`, `handleSubmit`) |
+| `AskUserQuestion`, several | — | refused: "answer it in the chat"; the resolver is not called |
+| `ExitPlanMode` / `exit_plan_mode` | `allow` | `{ allow: true }` |
+| | `deny` | `{ allow: false, message: 'User asked to revise the plan' }` (`PlanDisplay.tsx`) |
+
+Any other word on a permission or a plan is refused with the words that are accepted; a permission's refusal also names the entry `always` would store. `always` on a plan or a question is not an answer.
+
+### "always" is what the page's "Allow and remember" is
+- The entry is `buildClaudeToolPermissionEntry(toolName, input)` (`providers/list/claude/claude-tool-permission-entry.ts`, exported by the providers barrel): the tool's name, or `Bash(<first word>:*)`, `Bash(git <sub>:*)`. It is a PORT of the page's `buildClaudeToolPermissionEntry` (`src/modules/chat/utils/chatPermissions.ts`) written beside the runtime's grammar matcher (`matchesToolPermission`, `claude-runtime.provider.js`): the two must stay one rule, so a rule the page wrote and one she wrote are the same string.
+- `rememberAllowedTool` (`act-tools.ts`) writes it into the account's `claudePermissions` through `userPreferencesDb`: added to `allowedTools`, removed from `disallowedTools`, every other key of the preference kept (`permissionMode`, `skipPermissions`). A second call for an entry already allowed and not denied writes nothing. Read and write share no `await`, so two chats answered "always" in one tick both land.
+- The write comes FIRST and the answer after, as the page does (`handleGrantToolPermission` then `handlePermissionDecision`): a write that fails leaves the ask unanswered and the call can be made again. The decision's `rememberEntry` is what the runtime pushes into the LIVE run's `allowedTools` (`canUseTool`).
+- The page reads its preferences once, at sign-in (`hydrateUserPreferences`), and sends its own copy as `toolsSettings` with every turn: a page open before she answered "always" does not know the entry until it reloads, and a Settings save from it writes the preference whole. Her "always" receipt says so: "a page that was already open keeps its old list until it reloads."
+
+## Showing
+`.verify/companion-act-direct.mjs <empty dir under /tmp>` (no model call, a copy of `auth.db`): 23 checks on 2026-10-27 — the nothing-pending refusal, the merge over a `disallowedTools` entry with the other keys kept, the no-op second call, two parallel "always", the oldest-ask rule, the two-question refusal, the free answer, both plan decisions, `abortChatRun` on an idle chat, the rename's stored mark and the focus's new name, the zod limits.
+`.verify/companion-act-tools-scratch.sh` (`LEGS=` picks legs): Haiku probe chats in permission mode `default`, her model on Haiku, her turns typed in the real panel, her JSONL read back. All five legs passed on 2026-10-27: "Allow it." (the turn finishes), "Always allow it." (`Bash(uname:*)` in `claudePermissions.allowedTools`, then removed through the page's Settings, the row back to what it was), "Answer it: tea." (the reply is "Tea."), "Stop it." five seconds into the seq loop (an aborted `complete` 1.6 s after, the spinner dropped, the row kept), "Call that chat probe acts." (a `session_upserted` carrying the name, the row `probe acts|1`, the name drawn on the page without a reload).
+
+## Gotchas a probe meets
+- **This box asks about nothing.** `~/.claude/settings.json` allows `Bash(*)` and the runtime loads the `user`, `project` and `local` setting sources, so "Run date in Bash." raises no permission. An `ask` rule outranks an `allow` rule, so the probe writes `.claude/settings.json` with `ask: ["Bash(date:*)", "Bash(uname:*)"]` in a project of its own. A project's settings apply to EVERY chat launched there: written into the shared `PROBE_PROJECT` it made another session's `date` chat start asking (measured 2026-10-27), so the probe's project is `${PROBE_PROJECT}-act`, removed by unlink and rmdir after.
+- **Account 1 has one Kaylee.** Lines typed by two probes on the live server land in one conversation, and her "Stop it." stopped a chat that was not the typist's (her log: "The probe long chat is halted"). The scratch runner gives the probe its own server over a database copy (`scripts/sunset-probe.sh`, slot 6) and a scratch Vite; `/clear` on the copy forgets the live conversation id first, so she never resumes the live JSONL.
+- **A plan-runner child's environment reaches the chats.** The scratch server starts every probe chat's CLI with its own environment, and `hooks/runner_never_stop.py` refuses `AskUserQuestion` in any process with `PLAN_RUNNER_CHILD=1`: the ask leg's chat was refused and filed a followup instead of asking. The runner unsets the plan-runner and session-identity variables before it starts the server.
+- **A session host outlives its server.** Each chat that raised an ask leaves a keepalive `session-host/host.js <host id> <sessions dir>` with a live Haiku CLI child after the scratch server stops (measured 2026-10-27). The runner ends the slot's hosts (SIGTERM, matched on the slot's own sessions dir as a whole word) before it stops the server.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/act-tools.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/ask-decision.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-tool-permission-entry.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-act-direct.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-act-tools.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-act-tools-scratch.sh
+
+## MAN-9066 — server/modules/companion/tools — read_session, list_followups and ask_dactyl: the scopes, the turn windows and the dactyl path rules
+
+`readTools(deps)` (`read-tools.ts`) returns the SDK `tool()` definitions of `read_session`, `list_followups` and `ask_dactyl`, in that order, after `list_sessions` and `list_projects`. All three carry `readOnlyHint`. Each description is `toolLine(name)`. Every handler runs inside `guardedToolResult` (a throw is logged and answered as `isError` text); a refusal is `deps.refuse(sentence)`. No usage or spend is in any answer (ruling 17).
+
+## `read_session { session, scope }` (both 1–200 characters)
+The chat goes through `resolveChat` (an unknown one: its sentence). It becomes her FOCUS, and her activity is `reading_session` with that chat while the tool runs. `scope` is matched without regard to case for `last_turn`, `recent` and `pending_ask`; any other string is a PHRASE.
+| scope | Answers |
+|---|---|
+| `last_turn` | `"<name>", its last turn (<UTC time>):` then `He said:`, `Its reply:` (the reply's text blocks, tool-call lines left out) and `Tool calls in this turn: N`; a running chat adds that the reply may grow. Over 6,000 characters (counted as code points) the turn is rendered alone and a dactyl digest answers instead (`LAST_TURN_DIGEST_BRIEF`). No turn in the history: a chat that never ran says nothing has been said; one with a conversation of its own whose transcript reads empty (file gone) says no turn can be read and to say nothing about what it did. |
+| `recent` | the last 10 turns rendered, then a digest (`RECENT_DIGEST_BRIEF`) |
+| `pending_ask` | `1. <askLine>` per ask, oldest first, with the first question's option labels (single-question asks); none: `Nothing is waiting on him in "<name>".` |
+| a phrase | the turns whose text holds it (case-insensitive, whitespace folded), each with one turn either side, rendered, then a digest (`phraseDigestBrief`); none: `The transcript of "<name>" does not mention "<phrase>".` |
+- History is `sessionsService.fetchHistory(id, { limit: null })`, grouped by `groupTurns`.
+- A rendered file is the next NUMBERED file of her scratch folder (`0004-last-turn.md`, one past the highest number there, taken in the same tick it is written), then `pruneScratch` keeps the newest 20. The answer ends with the file's path, so a sharper question can go to `ask_dactyl` (her scratch is an allowed root). Its turns carry the CHAT's own numbers (`renderTurnWindow`: `## Turn 8`, the title `10 of 129 turns`), and a gap between non-adjacent windows is marked (`(turns 5 to 7 are not shown here)`).
+- What one dactyl takes is bounded: `newestThatFit` weighs each turn as `dactyl` does (UTF-8 bytes + 7 per line) against 300,000 of its 327,680-byte gate (room for the brief and the title). A window over it keeps the NEWEST turns that fit, and the answer says how many older ones were left out and how to reach them. A turn that is over the budget ALONE is set aside by number ("Turn 10 is more than one reader takes and is left out.") and the older turns are still digested; only when EVERY turn of the window is that long does she get an `isError` that there is nothing to digest. The dactyl's own "Read a range of it yourself" refusal therefore never reaches her.
+- A chat still running adds "It is still working, so what it has written may grow." to a digest as it does to an inline last turn.
+- The dactyl is stopped with the call: both `read_session` and `ask_dactyl` pass the handler's `extra.signal` to `runDactylRead`, which sends SIGTERM (SIGKILL after 5 s) when it fires and answers "The reader was stopped: the call was cancelled."
+- A digest that fails answers the dactyl's own sentence plus the file's path; the render is not lost.
+
+## Turn windows (`transcript-turns.ts`)
+A turn opens at his text message and holds the reply rows after it; a `<task-notification>` row joins the turn it belongs to, labelled, and is no turn of his. A window of turns is chosen in `transcript-turns.ts` and written by `renderTurnWindow`. `renderTurns` (the whole history under its own numbers) has no tool caller; only `.verify/probe-companion-reads.mjs` calls it. The focus feed writes its reply with `nextScratchFile`. A phrase is searched in his words, the reply's words and its tool-call lines — never the file's headings ("He said", "Tool calls"). `.verify/companion-turn-windows.mjs` runs `groupTurns`/`turnsAround` on real strings; it is pure and touches no file.
+
+## `list_followups { session? }`
+`resolveChat` for a given session (it names a chat but moves neither focus nor activity), through the barrel's `listOpenFollowups`. One line each, newest first: `<chat name> · next|gap · <text>`; the text is `Followup.text` untouched, which is what the Next steps widget shows. A named chat is listed whole, as the widget shows it (up to the service's own ceiling of 200, then "These are the newest 200"). Every chat together are cut at 20 (the service is asked for 21 to know), and the last line then says to name one chat. A chat's name is `chatNameOf` (any chat row, archived or hidden too).
+
+## `ask_dactyl { files 1–8, brief 1–4000, context? }`
+Every file and the context go through `resolveDactylFiles` (`dactyl-paths.ts`) BEFORE any dactyl starts; one refusal sentence names every file refused, and nothing runs. Her activity is `reading_code` with the real paths. `runDactylRead` runs `dactyl --read <files> --brief - [--context <file>]`; exit 2 or 3 answers its own line as the error; the answer is its stdout (spend lines removed).
+**Path rules.** A file must resolve through `realpath` to a regular file under a visible project's path, `~/.claude` or her scratch, and must not be denied. Denied: any path segment (case-insensitive) that starts with `.env`, `credentials`, `secrets`, `id_rsa` or `.claude.json`; ends in `.env`, `.pem`, `.key`, `.p12`, `.pfx`, `.db`, `.token` or `_history`; holds `.sqlite`; is an SSH key name (`id_dsa*`, `id_ecdsa*`, `id_ed25519*`, or any `id_*` with no extension); is one of `.git-credentials`, `.netrc`, `.npmrc`, `.pgpass`, `.pypirc`, `.htpasswd`, `hosts.yml`, `hosts.yaml`, `.ssh`, `.aws`, `.gnupg`, `.kube`, `.docker`; anything under `~/.claude/state/claude_account`; `~/.claude/.credentials.json`; and, by PLACE, anything in a home dot-folder or dotfile other than `~/.claude` (`~/.cloudcli`, `~/.codex`, `~/.openclaw`, `~/.config`, `~/.vscode-server`, …). The place rule is the cure for the shape the names kept missing: applications keep tokens and keys in `~/.<app>/` under names no list predicts (`auth.json`, `agent-host-token`, `device.json`, `openclaw.json` were all reachable 2026-10-27 after the names were widened once). No registered project lives in a home dot-folder, and `~/.claude` stays whole. The name rules remain a net for the other roots (`/home/lyphe` itself and `/opt` are registered projects): the first widening followed a review that found `~/.git-credentials`, `~/.npmrc`, `~/.pgpass`, `gh/hosts.yml`, a `*.env` file, `secrets.local.json`, `~/.bash_history` and `~/.claude.json` reachable. `id_*` is not blanket (an `id_utils.py` passes) because the key names and the extensionless form are what keys are called, and `.ssh` is denied whole. The name is judged FIRST, whether or not the file exists (a missing `.env` is refused as a `.env`), and the resolved path again, so a link named `notes.txt` that points at a `.env` is refused with `(which is …)`. `~/` is the home folder; a name that is not a full path (`server/shared/prompt-stream.ts`) is looked for under the visible projects — one holder is the file, none or several is a sentence. The files handed to the dactyl are the REAL paths that were judged. The argument description says nothing about secrets on purpose: measured 2026-10-27, with "refused by name" in it Haiku declined the `.env` itself and never called the tool; without it she calls, and the tool's refusal (naming `.env`, "no dactyl was started") is what she relays.
+
+## Probes
+`.verify/companion-read-tools.mjs <empty dir under /tmp>`: two Haiku probe chats in `PROBE_PROJECT` ("probe long": a short turn then 120 lines; "probe kaylee": one short turn and one follow-up through the command door), her panel opened on :5183 on Haiku, the four typed lines with the status words, tool calls and results read from her JSONL, the `dactyl --session-status` hand count around the `.env` line; then every scope and the path-rule matrix called directly on a snapshot of `auth.db`. 57 checks passed on 2026-10-27 before the review fixes added matrix names and changed the long-turn check; it has not been re-run live since. Chats are made just before their first turn and remade (up to 3 times) when the CLI answers "No conversation found": a chat that completes with `provider_session_id` equal to its own id never reached the provider, measured twice right after a server handover; and `resolveChat` then cannot find it (his chats exclude `session_id = provider_session_id`). A long reply is asked as numbered lines: "the word lorem repeated 1500 times" did not finish in 170 s on Haiku. Account 1 (`verve`) is the dev account every live probe types to, so another soul's probe can write into her conversation, draft and model mid-run (measured 2026-10-27: a `send_to_session` to another probe's chat came out of this one's turn); the probe prints CONTAMINATED when an operator line in her log is not its own.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/dactyl-paths.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/read-tools.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/transcript-render.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/transcript-turns.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-read-tools.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-turn-windows.mjs
+
+## MAN-9067 — server/modules/chat-names — the naming pass: the trigger, the five questions, the write, the Haiku call, the sayable rule
+
+Gives an app chat a name a person could say aloud, once a turn of it has ended. Writes `sessions.custom_name`, never `name_given` (MAN-9060, INV-9787). Edits that break it: INV-9817. `server/index.ts` builds it (`createChatNamer()`), calls `chatNamer.start()` in the listen callback after `startRunStallWatchdog()`, and `await chatNamer.stop()` in `shutdownRuntimeServices`.
+
+## Files
+| file | owns |
+| --- | --- |
+| `index.ts` | exports `createChatNamer` only |
+| `chat-namer.service.ts` | `createChatNamer(): { start(): void; stop(): Promise<void> }` — the trigger, the five questions, the write |
+| `first-exchange.ts` | `readFirstExchange(sessionId)` → `ChatFirstExchange { ask, reply }` or `null` |
+| `haiku-name.ts` | `askHaikuForName(exchange, signal)` → a cleaned name or `null`; never rejects |
+| `sayable-name.ts` | `isSayableName(name)` — one rule, applied to the chat's current name and to Haiku's answer |
+
+## Trigger — `chatRunRegistry.onRunCompleted`
+No timer, no boot sweep: a chat that already holds an unsayable name is named at its next turn. why: the house names its events, it does not poll.
+
+| completion | the namer |
+| --- | --- |
+| `aborted` (Stop pressed) | skips |
+| `alreadyRecorded` (a re-adopted host whose turn ended before this process began) | skips: a boot or a handover names nothing |
+| any other | `considerChat` on a microtask; the listener answers synchronously and never holds a completion |
+
+`start()` twice is a no-op. `stop()` unsubscribes, aborts every pass in flight (the Haiku child ends with it) and awaits them with `Promise.allSettled`.
+
+## The five questions — cheapest first; Haiku is asked only when all pass
+| # | question | read from |
+| --- | --- | --- |
+| 1 | an app chat, not archived | `sessionsDb.nameFactsOf`: `appCreated`, `isArchived`; `null` (no row) stops |
+| 2 | `name_given` still 0 | `nameFactsOf.nameGiven` |
+| 3 | the current name fails `isSayableName` | `nameFactsOf.customName` |
+| 4 | neither in flight nor already tried by this process | `inFlight` (`Map<sessionId, Promise<void>>`), `attempted` (`Set`) |
+| 5 | the transcript holds a first exchange | `readFirstExchange` non-`null` |
+
+- Questions 1 to 4 are synchronous and claim the chat in one step (`inFlight.set`), so two completions never start two passes.
+- A project's visibility is no question: a probe chat in `PROBE_PROJECT` (a hidden root under `/tmp`) is named like any other.
+- `attempted` is filled at question 5's yes: one Haiku try per chat per process, whatever the answer; a restart allows one more. A chat with nothing to read yet is asked again at its next turn.
+
+## The write
+1. `askHaikuForName` → `null`: log `[Chat names] <id> was not named this time; it keeps "<name>"`, write nothing.
+2. Re-read `nameFactsOf`, no `await` between this read and step 3:
+   - `null`: log `was deleted while Haiku was answering; "<name>" is not written`.
+   - `nameGiven` set or `customName` no longer the name that failed question 3: log `was renamed while Haiku was answering; "<name>" is not written`.
+3. `sessionsDb.updateSessionCustomName(id, name)` — never `renameByPerson`. Log `[Chat names] named <id> "<name>" (was "<old>")`.
+4. `broadcastSessionUpserted(id)` — the frame the sidebar, the simple list, the floating chat's picker, the notifications and Kaylee's roster redraw on. A send failure is logged; the name stays written.
+
+A pass that throws logs `the pass for <id> failed; the chat keeps its name: <reason>`.
+Read the log: `journalctl -u cloudcli-server-dev | grep '\[Chat names\]'`. Every line carries the session id.
+
+## `readFirstExchange`
+Reads `sessionsService.fetchHistory(id, { limit: null })` — the rows the person sees. Rejects when the chat is gone or its transcript cannot be read.
+
+| side | taken |
+| --- | --- |
+| `ask` | the first user `text` row he wrote: non-empty, not starting `<system-reminder>` or `<task-notification>`; a slash command he typed counts |
+| `reply` | the first assistant `text` row after it: non-empty, not `isCompactSummary`, not `isLocalCommandStdout`, not `model === '<synthetic>'` |
+
+Each side is cut to 2,000 characters (`MOST_CHARACTERS_PER_SIDE`) without splitting a surrogate pair. `null` when the transcript holds no such pair.
+
+## `askHaikuForName`
+One `query()`, one turn, no session of its own.
+
+| option | value |
+| --- | --- |
+| `model` | `'haiku'` |
+| `systemPrompt` | `NAMING_SYSTEM_PROMPT`, verbatim below |
+| `tools` / `settingSources` / `strictMcpConfig` | `[]` / `[]` / `true` |
+| `settings` | `{ autoMemoryEnabled: false }` |
+| `persistSession` / `maxTurns` | `false` / `1` |
+| `cwd` | `~/.claude/state/chat-names`, made on demand: a hidden root, so a stray launch is in no project list |
+| `env` | `userFacingEnv()` plus `launchAccountEnv().env` |
+| `pathToClaudeCodeExecutable` | `resolveClaudeCodeExecutablePath(process.env.CLAUDE_CLI_PATH)`, passed when it resolves |
+| prompt | `FIRST MESSAGE:\n<ask>\n\nFIRST REPLY:\n<reply>` |
+| bound | `NAMING_TIMEOUT_MS` = 30 s, and the namer's `signal` |
+| init check | the CLI's `system`/`init` message lists its `tools`; any entry ends the pass with `null` |
+
+`NAMING_SYSTEM_PROMPT`, verbatim:
+```text
+You name a chat session for a person who refers to it aloud. Read the session's first message and first reply, and answer with a name of two to four plain words saying what the chat is about, the way a person would call it in conversation, for example Kanban board, Login fix, Estimate drafts. No punctuation, no quotes, no emoji, no file names, no paths, no slash commands. Reply with the name only.
+```
+
+Returns `null` and writes nothing, each with one `[Chat names]` line, when: the SDK fails; 30 s pass; `signal` fires; the CLI's init message lists any tool; the result is not `subtype === 'success'` or has `is_error`; the cleaned reply fails the check.
+
+`cleanedName(reply)`:
+1. refuse a reply of several lines or holding an emoji (`\p{Extended_Pictographic}`);
+2. drop outer quote marks and trailing punctuation, repeatedly; collapse spaces; capitalize the first letter;
+3. accept only 2 to 4 words (`FEWEST_NAME_WORDS`, `MOST_NAME_WORDS`) that pass `isSayableName`.
+
+A reply in a language written without spaces counts as one word and is refused: the chat keeps its name.
+
+## `isSayableName(name)` — true when, after `trim()`, all six hold
+1. 1 to 5 words (whitespace split);
+2. at most 40 characters;
+3. the first character is a letter or a digit (`\p{L}`, `\p{N}`);
+4. none of `/ # \ < > { } [ ] | * _ ~`, a backtick or `"`;
+5. not matching `/^untitled\b/i`;
+6. not UUID-shaped (`8-4-4-4-12` hex digits).
+
+`null`, `undefined` and `""` are not sayable. why: the names he gave pass; slash commands, placeholders and prompts fail. A new chat is named with its first message's first four words (`buildCloudCliSessionName`, `sessions.service.ts`), so "Help me plan a" passes: the rule asks whether the name can be spoken, not whether it says anything.
+
+2026-10-27, under `tsx`, strings read from the live `sessions.custom_name`:
+
+| name | verdict | fails |
+| --- | --- | --- |
+| `Live mode` | true | |
+| `PM flow` | true | |
+| `Fix every broken sign-in` | true | |
+| `Photo Evidence Cooberator` | true | |
+| `Help me plan a` | true | |
+| `/git` | false | 3, 4 |
+| `/upload STEVEN KENDALL` | false | 3, 4 |
+| `Untitled Session` | false | 5 |
+| `# day-one-sketch-from-panos — phase 3: …` (120 characters, 19 words) | false | 1, 2, 3, 4 |
+| ``TASK: reply with exactly one line: `claude answered`. Nothing else, no tools.`` (12 words, 77 characters) | false | 1, 2, 4 |
+
+## Prove it
+`node .verify/chat-namer-live.mjs` → `ALL PASS`. Every turn is on Haiku in `PROBE_PROJECT` (under `/tmp`, a hidden root), chats deleted after.
+
+| leg | shows |
+| --- | --- |
+| A | first turn: "Untitled Session" becomes a name, `name_given` 0, unchanged 10 s later; renamed by hand: `name_given` 1, a second turn leaves it and logs no `[Chat names]` line |
+| B | a sayable `initialMessage`: no `[Chat names]` line for the id |
+| C | a rename sent at `complete` wins: `was renamed while Haiku was answering` |
+
+A probe chat is in no sidebar list (`visibleProjectPathSql` leaves a hidden root out) and its `session_upserted` frame carries `project: null`, which the page's project store drops: the leg reads the frame off the page's websocket instead.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/chat-names/chat-namer.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/chat-names/first-exchange.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/chat-names/haiku-name.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/chat-names/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/chat-names/sayable-name.ts
+
+## MAN-9072 — server/modules/companion — the send: `companion-send.ts` and `tools/send-options.ts`, what a draft checks, runs, records and clears
+
+The one place a draft goes out. Callers: the panel's Send (`POST /draft/send` → `companionService.sendDraft` → `account.sendDraft`), her `send_to_session` and `create_session` (`tools/draft-tools.ts`). The DRAFT is the only thing sent. One sender per account: `createDraftSender({ userId, store, runtime, setFocus, openChatOnFloor })`, built in `tools/tool-deps.ts`.
+
+## Request and answer
+| name | shape |
+|---|---|
+| `DraftSendRequest` | `{ mode: 'turn' \| 'steer', text?, chat?, newChat?: { projectPath, title } }` |
+| `DraftSendOutcome` | `{ outcome: 'started' \| 'folded' \| 'refused', sentence }`; `sentence` is what she tells him, or the card shows |
+
+A refusal keeps the draft. `send_to_session` passes `text` and `chat`; `create_session` passes `text` and `newChat` with `mode: 'turn'`; the panel passes `mode` alone.
+
+## Checks, in order (each a `refused`)
+1. A send already going out for this account (`sending`): one at a time. why: she calls tools in parallel and two pages can press Send; a second read of the draft before the first cleared it would send it twice.
+2. No draft held; a draft blank after trim.
+3. `text` given and not the draft's words, trimmed.
+4. `chat` given and the draft is not for that session.
+5. `newChat` given and the draft is not for a new chat in that `projectPath`.
+
+Refusals 3 to 5 name the draft: its target and its first 160 code points, on one line (`describeDraft`). Nothing reaches a chat that was not on his screen first.
+
+## To a chat (`sendToChat`)
+| when | does | outcome |
+|---|---|---|
+| the row is missing or archived | nothing sent | `refused` |
+| `chatRunRegistry.isProcessing` and `steerChatRun` answers `'folded'` | folds the brief into the running turn, whichever `mode` was asked; the echo goes onto that run's writer | `folded` |
+| idle, or the fold found no turn | `runDetachedChatTurn` with `sendOptionsFor`; its `beforeRun` hook writes the echo; the verb waits for the run to have STARTED, never for the turn | `started`; `refused` when the door refused or the hook never ran |
+
+- `folded` means pushed, not "the turn changed course": MAN-9068. The sentence says the brief is taken at the next tool step or runs as its own turn after the turn finishes.
+- A `steer` to an idle chat starts a turn; its sentence says so.
+- Echo: a user text row `local_kaylee_<uuid>`, `spokenVia: 'kaylee'`; the page swaps it for the persisted row, which the history read marks again.
+- Every send is recorded: `relayedSendsDb.record(sessionId, 'turn' \| 'steer', words)`. A failed write is logged (`[Companion] a send could not be recorded…`) and never costs the send.
+
+## To a new chat (`sendToNewChat`)
+1. Unless the project belongs to a node (`projectsDb.nodeForPath` non-null), `diagnoseProjectFolder`: a folder that is gone or not a folder is a `refused` BEFORE anything is made.
+2. `sessionsService.createAppSession('claude', projectPath, words, true)`: on the simple list, as the page's New chat makes one.
+3. With a title, `sessionsDb.updateSessionCustomName` alone: `name_given` stays 0, the namer may replace it (INV-9787).
+4. `broadcastSessionUpserted`; a failure is logged and the send goes on.
+5. `sendOptionsFor(userId, null, 'claude', { focusSessionId, name })`, then the turn. A first message that did not start is a `refused` that says the chat exists.
+
+## After a send
+- The draft clears only if `draft.updatedAt` is still the one that went: a rewrite made while the send was out is the next brief.
+- The chat becomes her focus (`setFocus`) and the page that holds the floor opens it (`openChatOnFloor`: the `companion_open_chat` frame, to the floor's client id only).
+
+## Options — `sendOptionsFor(userId, sessionId, provider, newChat?)` → `ChatSendOptions`
+Read as the chat's own composer would read them. An option the source records none of is LEFT OUT, never defaulted.
+| option | existing chat | new chat (`sessionId` null) |
+|---|---|---|
+| `model`, `effort` | the row's, when it records a model and its `provider` equals this one | the focus chat's (`NewChatBasis.focusSessionId`, same provider, has a model), else `sessionsDb.latestModelChoice(provider)` |
+| `permissionMode` | the row's `permission_mode`; none recorded → left out, the chat runs on the default | `sessionsDb.latestPermissionMode(provider)` |
+| `toolsSettings`, `skipPermissions` | `userPreferencesDb.getPreferences(userId)[`${provider}Permissions`]` read AT THE SEND; not a record → `{ allowedTools: [], disallowedTools: [], skipPermissions: false }` | same |
+| `sessionSummary` | the row's `custom_name`, else `''` | the title, else the name `createAppSession` gave |
+
+- A permission mode is never borrowed for a chat that exists. why: a probe chat whose chip reads "Ask before every edit" ran in bypass when the last chat he used had bypass.
+- `latestModelChoice` and `latestPermissionMode` narrow to the provider. why: a model id or mode is a provider's own word; a Codex model handed to a Claude chat fails its first turn.
+- Measured 2026-10-27 (scratch copy): a new chat recorded `bypassPermissions` (the newest chat's) while its composer chip read "Ask before every edit"; they agree after his first typed send.
+
+## Open (operator rulings pending)
+- A new chat takes the newest chat's permission mode and model across accounts (`sessions` has no user column).
+- A refused panel press still takes the floor (`companionService.sendDraft` takes it before the send).
+- `POST /draft/send` carries no `updatedAt`: it sends the draft held at the press.
+
+## Probe
+`.verify/companion-send.mjs` legs `steer,idle,create,mismatch,panel`; `.verify/companion-send-scratch.sh` runs them on a scratch server over a copy of the database (the live box has one Kaylee shared by everyone at work).
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/companion-send.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/send-options.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-send.mjs

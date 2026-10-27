@@ -1,6 +1,7 @@
 import type { InputHTMLAttributes } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { CompanionSettingsSection } from '@/modules/companion';
 import SettingsToggle from '@/modules/settings/SettingsToggle';
 import { useUiPreferences, useSetUiPreference } from '@/shared/context/UiPreferencesContext';
 import { useVoiceConfig } from '@/modules/settings/hooks/useVoiceConfig';
@@ -87,6 +88,9 @@ export default function VoiceSettingsTab() {
           </div>
         </SettingsSection>
       )}
+
+      {/* Kaylee's own section, whether or not voice is on: she is typed to as much as she is spoken to, and it reads and saves for itself. */}
+      <CompanionSettingsSection />
     </div>
   );
 }

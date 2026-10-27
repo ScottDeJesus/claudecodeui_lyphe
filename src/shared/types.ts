@@ -1788,6 +1788,22 @@ export type PaletteNavRow = {
   run: () => void;
 };
 
+/**
+ * A group of the command palette that is not a list the palette builds itself: a `heading` and its rows, each a full `label`
+ * (drawn as given, with no "Go to"), the `keywords` the search also matches, the `icon` drawn before it and the act `run` when
+ * chosen. The workspace hands the palette Kaylee's group this way, so the palette knows nothing of what she is or what opening her does.
+ */
+export type PaletteGroup = {
+  heading: string;
+  rows: Array<{
+    key: string;
+    label: string;
+    keywords: string;
+    icon: ComponentType<{ className?: string }>;
+    run: () => void;
+  }>;
+};
+
 /** One view's badge on the workspace rail: `count` is the figure the badge draws (above zero — a zero is no badge at all), `words` the sentence a screen reader hears for it through the button's `aria-describedby`, since the drawn figure is hidden from it. `useRailBadges` builds them; RailButton draws them. */
 export type RailBadge = {
   count: number;

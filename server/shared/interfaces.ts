@@ -58,6 +58,13 @@ export interface IProviderRuntime {
    * which the toolsets service calls after a switch.
    */
   syncToolsets?(appSessionId: string): Promise<ToolsetSyncOutcome>;
+  /**
+   * OPTIONAL — only a runtime that keeps a live process per chat has one. Folds `content` into the turn that process is
+   * running now, as one more user message of that turn (it opens no turn of its own), and answers `'folded'`; answers
+   * `'not_running'` when the chat has no process, the process is closing or no turn is pending. Read by
+   * `providerRuntimeService.steer`, which the chat gateway's `steerChatRun` calls for the companion's send.
+   */
+  steer?(appSessionId: string, content: string): 'folded' | 'not_running';
 }
 
 /**

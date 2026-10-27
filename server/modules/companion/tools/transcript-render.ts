@@ -4,13 +4,15 @@ import os from 'node:os';
 import path from 'node:path';
 
 import { userFacingEnv } from '@/shared/child-env.js';
-import { describeToolCall } from '@/shared/tool-call-hint.js';
 import type { NormalizedMessage } from '@/shared/types.js';
+
+import { groupTurns, renderTurn, type NumberedTurn } from './transcript-turns.js';
 
 /**
  * How the companion reads anything longer than one turn: a chat's turns are rendered to a markdown file under her
  * scratch and a dactyl answers one fixed brief about it. The dactyl numbers the lines it is handed, so its `L<n>` is
- * a line of the file written here; its 16,000-byte budget and quote lines pass through untouched.
+ * a line of the file written here; its 16,000-byte budget and quote lines pass through untouched. What a turn is, and
+ * which turns a question is about, lives in `transcript-turns.ts`.
  * Consumers: `read-tools.ts` (`read_session`, `ask_dactyl`) and `feeds/focus-feed.ts`, in the companion module.
  */
 
@@ -45,86 +47,14 @@ export function phraseDigestBrief(phrase: string): string {
 
 //----------------- RENDERING TURNS TO A FILE ------------
 
-/** One turn on its way to the file: his message, then what the reply said and did, in order. */
-type RenderedTurn = {
-  at: string | null;
-  /** `null` when the rows begin mid-turn (a page of history cut before his message). */
-  said: string | null;
-  reply: Array<{ kind: 'text'; text: string } | { kind: 'call'; line: string }>;
-  calls: number;
-};
-
-/** A transcript's text as one safe block: CRLF folded to LF, NUL dropped (the dactyl refuses a file with one as binary). */
-const cleanText = (text: string): string => text.replace(/\u0000/g, '').replace(/\r\n?/g, '\n').trim();
-
-/** A row's time as `YYYY-MM-DD HH:MM UTC`, or `null` when the row carries none that parses. */
-function stampOf(timestamp: string | undefined): string | null {
-  const parsed = timestamp ? new Date(timestamp) : null;
-  return parsed && !Number.isNaN(parsed.getTime()) ? `${parsed.toISOString().slice(0, 16).replace('T', ' ')} UTC` : null;
-}
-
-/** The opening of the notice the CLI injects as a "user" row when a background command finishes: its words, not his. */
-const BACKGROUND_NOTICE_PREFIX = '<task-notification>';
-
-/**
- * Groups rows into turns: one opens at his text message and holds every reply row until the next (other kinds are
- * neither said nor done). A background-task notice is no message of his: it joins the turn it belongs to, labelled,
- * so the turns counted are his messages and a digest never reads it as his words.
- */
-function groupTurns(rows: NormalizedMessage[]): RenderedTurn[] {
-  const turns: RenderedTurn[] = [];
-  let current: RenderedTurn | null = null;
-
-  const turnFor = (row: NormalizedMessage): RenderedTurn => {
-    if (current === null) {
-      current = { at: stampOf(row.timestamp), said: null, reply: [], calls: 0 };
-      turns.push(current);
-    }
-    return current;
-  };
-
-  for (const row of rows) {
-    const notice = row.kind === 'text' && row.role === 'user' && (row.content ?? '').trimStart().startsWith(BACKGROUND_NOTICE_PREFIX);
-    if (row.kind === 'text' && row.role === 'user' && !notice) {
-      current = { at: stampOf(row.timestamp), said: cleanText(row.content ?? ''), reply: [], calls: 0 };
-      turns.push(current);
-    } else if (row.kind === 'text' && (row.role === 'assistant' || notice)) {
-      const text = cleanText(row.content ?? '');
-      if (!text) continue;
-      const label = notice ? '(a background task notice, not his words)\n' : row.isCompactSummary === true ? '(the conversation was compacted here; its summary)\n' : '';
-      turnFor(row).reply.push({ kind: 'text', text: label + text });
-    } else if (row.kind === 'tool_use') {
-      const turn = turnFor(row);
-      turn.reply.push({ kind: 'call', line: describeToolCall(row.toolName ?? 'tool', row.toolInput) });
-      turn.calls += 1;
-    }
-  }
-  return turns;
-}
-
-/** The reply in order: a blank line between blocks of text, and a run of tool calls kept together, one per line. */
-function replyBlocks(reply: RenderedTurn['reply']): string {
-  return reply.reduce((out, part, index) => {
-    const joiner = index === 0 ? '' : part.kind === 'call' && reply[index - 1].kind === 'call' ? '\n' : '\n\n';
-    return out + joiner + (part.kind === 'call' ? part.line : part.text);
-  }, '');
-}
-
-/** One turn as markdown: a heading, what he said, the reply in order, and the count of tool calls. */
-function renderTurn(turn: RenderedTurn, number: number): string {
-  const heading = turn.at ? `## Turn ${number} — ${turn.at}` : `## Turn ${number}`;
-  const said = turn.said === null ? '(before this window)' : turn.said || '(no text — attachments only)';
-  const reply = replyBlocks(turn.reply) || '(none)';
-  return `${heading}\n\nHe said:\n${said}\n\nReply:\n${reply}\n\nTool calls: ${turn.calls}\n`;
-}
-
 /**
  * Writes `rows` — as `sessionsService.fetchHistory` answers them — to `file` as markdown and answers how many turns
  * it holds: a heading per turn, his text and the reply's text in full, each tool call as one line
  * (`<tool> <short hint>`), the turn's calls counted. It ends with the newline the dactyl's line numbers count against.
  * Synchronous on purpose (a few kilobytes, handed straight to `runDactylRead`); the folder must exist
  * (`companionScratchDir`); zero turns still writes a file, so the caller judges the count.
- * Consumers: `read-tools.ts` (`read_session`) and `feeds/focus-feed.ts`.
+ * Consumer: `.verify/probe-companion-reads.mjs`; `read-tools.ts` (`read_session`) renders a window of turns through
+ * `renderTurnWindow`, and `feeds/focus-feed.ts` writes a reply with `nextScratchFile` and `writeFileSync`.
  */
 export function renderTurns(sessionId: string, rows: NormalizedMessage[], file: string): number {
   const turns = groupTurns(rows);
@@ -132,6 +62,24 @@ export function renderTurns(sessionId: string, rows: NormalizedMessage[], file: 
   const body = turns.map((turn, index) => renderTurn(turn, index + 1));
   writeFileSync(file, [title, ...body].join('\n'), 'utf8');
   return turns.length;
+}
+
+/**
+ * Writes a WINDOW of a chat's turns to `file` as markdown, each under the number the chat itself gives it, so a
+ * digest that says "turn 8" means the chat's eighth. The title says how many of the `total` are here; where the window
+ * skips turns (a phrase's matches are not neighbours) a line says which, so two separated windows never read as one.
+ * Same layout as `renderTurns` otherwise. Synchronous, folder must exist. Consumer: `read-tools.ts` (`read_session`
+ * digests: `recent`, a phrase, a long `last_turn`).
+ */
+export function renderTurnWindow(sessionId: string, window: NumberedTurn[], total: number, file: string): void {
+  const whole = window.length === total && window.every((picked, index) => picked.number === index + 1);
+  const count = whole ? `${total} ${total === 1 ? 'turn' : 'turns'}` : `${window.length} of ${total} turns`;
+  const body = window.flatMap((picked, index) => {
+    const skipped = index === 0 ? 0 : picked.number - window[index - 1].number - 1;
+    const gap = skipped > 0 ? [`(${skipped === 1 ? `turn ${picked.number - 1} is` : `turns ${picked.number - skipped} to ${picked.number - 1} are`} not shown here)\n`] : [];
+    return [...gap, renderTurn(picked.turn, picked.number)];
+  });
+  writeFileSync(file, [`# Session ${sessionId.replace(/\s+/g, ' ').trim()} — ${count}\n`, ...body].join('\n'), 'utf8');
 }
 
 //----------------- THE DACTYL ------------
@@ -172,12 +120,17 @@ const failureLines = (stdout: string): string =>
  * - Exit 2 or 3: it refused before reading anything; the error is its own `✗` line.
  * - Exit 1: some file was not answered. Stdout holds a `✓` block per answered file and a `✗` block per other, so
  *   with any answer in it the stdout is returned whole; with none, the `✗` lines are the error.
- * - Past the bound it is stopped (SIGTERM, which it hands to its children; SIGKILL after 5 s); a failed spawn
- *   is told. Both answer a sentence. Paths are made absolute, so a name is never read as one of its options.
- * Consumers: `read-tools.ts` (`read_session` digests, `ask_dactyl`) and `feeds/focus-feed.ts`.
+ * - Past the bound, or when `signal` fires (the tool call was cancelled: she was stopped), it is stopped (SIGTERM,
+ *   which it hands to its children; SIGKILL after 5 s); a failed spawn is told. Each answers a sentence. Paths are
+ *   made absolute, so a name is never read as one of its options.
+ * Consumers: `read-tools.ts` (`read_session` digests, `ask_dactyl`, which pass the call's signal) and `feeds/focus-feed.ts`.
  */
-export function runDactylRead(files: string[], brief: string, context?: string): Promise<DactylReadResult> {
+export function runDactylRead(files: string[], brief: string, context?: string, signal?: AbortSignal): Promise<DactylReadResult> {
   return new Promise((resolve) => {
+    if (signal?.aborted) {
+      resolve({ ok: false, error: 'The reader was not started: the call was cancelled.' });
+      return;
+    }
     const args = ['--read', ...files.map((file) => path.resolve(file)), '--brief', '-'];
     if (context) args.push('--context', path.resolve(context));
 
@@ -191,23 +144,32 @@ export function runDactylRead(files: string[], brief: string, context?: string):
 
     const stdout: Buffer[] = [];
     const stderr: Buffer[] = [];
-    let timedOut = false;
+    // Why the dactyl was told to stop, if it was: the bound ran out, or the call was cancelled.
+    let stopWhy: 'time' | 'cancel' | null = null;
     let settled = false;
     let killTimer: NodeJS.Timeout | undefined;
-    const timedOutResult = (): DactylReadResult => ({ ok: false, error: `The reader took longer than ${DACTYL_TIMEOUT_MS / 1000} seconds and was stopped.` });
+    const stoppedResult = (): DactylReadResult =>
+      stopWhy === 'cancel'
+        ? { ok: false, error: 'The reader was stopped: the call was cancelled.' }
+        : { ok: false, error: `The reader took longer than ${DACTYL_TIMEOUT_MS / 1000} seconds and was stopped.` };
     const finish = (result: DactylReadResult) => {
       if (settled) return;
       settled = true;
       clearTimeout(stopTimer);
       clearTimeout(killTimer);
+      signal?.removeEventListener('abort', onCancel);
       resolve(result);
     };
 
-    const stopTimer = setTimeout(() => {
-      timedOut = true;
+    const stop = (why: 'time' | 'cancel') => {
+      if (stopWhy !== null || settled) return;
+      stopWhy = why;
       child.kill('SIGTERM');
       killTimer = setTimeout(() => child.kill('SIGKILL'), DACTYL_KILL_GRACE_MS);
-    }, DACTYL_TIMEOUT_MS);
+    };
+    const stopTimer = setTimeout(() => stop('time'), DACTYL_TIMEOUT_MS);
+    const onCancel = () => stop('cancel');
+    signal?.addEventListener('abort', onCancel, { once: true });
 
     child.stdout?.on('data', (chunk: Buffer) => stdout.push(chunk));
     child.stderr?.on('data', (chunk: Buffer) => stderr.push(chunk));
@@ -218,7 +180,7 @@ export function runDactylRead(files: string[], brief: string, context?: string):
     // `close` waits for the stdio pipes, which a descendant of the dactyl can hold open past the stop; the bound
     // must not wait on them, so a stopped call is answered when the dactyl itself has exited (`exit` comes first).
     child.on('exit', () => {
-      if (timedOut) finish(timedOutResult());
+      if (stopWhy !== null) finish(stoppedResult());
     });
 
     child.on('close', (code, signal) => {
@@ -250,6 +212,21 @@ export function companionScratchDir(userId: string | number): string {
   const dir = path.join(os.homedir(), '.claude', 'state', 'companion', id, 'scratch');
   mkdirSync(dir, { recursive: true });
   return dir;
+}
+
+/**
+ * The path of the next numbered file of `dir`: `0001-last-turn.md`, one more than the highest number any file there
+ * carries, so the dactyl's `L<n>` and her own talk of "the third file" never name two files. Synchronous, and the
+ * caller writes the file in the same tick, so two renders in one process never take one number. `label` is a plain
+ * word of the caller's. Consumers: `read-tools.ts` (once per render) and `feeds/focus-feed.ts` (its digest file).
+ */
+export function nextScratchFile(dir: string, label: string): string {
+  let highest = 0;
+  for (const name of readdirSync(dir)) {
+    const number = /^(\d+)-/.exec(name)?.[1];
+    if (number !== undefined) highest = Math.max(highest, Number(number));
+  }
+  return path.join(dir, `${String(highest + 1).padStart(4, '0')}-${label}.md`);
 }
 
 /**

@@ -10,6 +10,7 @@ import { resumableSessionId, unexpectedTools } from './companion-launch.js';
 import { createMessageAssembler, type MessageReaders } from './companion-message.js';
 import { launchCompanionCli, type CompanionCli } from './companion-process.js';
 import { createTurnTracker, type TurnSink } from './companion-turns.js';
+import { guarded } from './guarded-callback.js';
 
 /**
  * One account's live conversation with her: a single streaming-input `query()` held open (the CLI
@@ -46,7 +47,9 @@ export type CompanionSessionDeps = MessageReaders &
 
 /**
  * The surface of her conversation. The three pushes each assemble and push ONE message, start a turn
- * when she is idle and wake a closed process; `oweCut` stores the cut the next message opens with;
+ * when she is idle and wake a closed process; `warm` starts the process of a closed one ahead of its first
+ * message and pushes nothing (the CLI takes about a second to come up, which a caller that knows a push is
+ * coming in seconds spends in parallel); `oweCut` stores the cut the next message opens with;
  * `interrupt` stops her turn (her Stop, or the voice's cut); `setModel` applies a model change to a
  * running process (a closed one launches on the stored model); `clear` interrupts, closes and forgets
  * the held session id; `close` ends the input and the process. `process` is the condition the panel
@@ -56,6 +59,7 @@ export type CompanionSession = {
   pushOperator(text: string, via: 'typed' | 'spoken'): void;
   pushAlerts(blocks: string[]): void;
   pushFocusNews(envelope: string): void;
+  warm(): void;
   oweCut(heardSentence: string | null): void;
   interrupt(): Promise<void>;
   setModel(model: CompanionModel): Promise<void>;
@@ -65,19 +69,8 @@ export type CompanionSession = {
   readonly turnId: string | null;
 };
 
-/** One launch and what the conversation has learned of it: whether its first `init` has been seen (the process is up) and whether the CLI refused its `resume`. */
-type Launch = { cli: CompanionCli; initSeen: boolean; resumeRefused: boolean };
-
-/** A callback that throws is logged with its account and swallowed: a store error must not end her conversation. */
-function guarded<Args extends unknown[]>(label: string, userId: number, callback: (...args: Args) => void): (...args: Args) => void {
-  return (...args) => {
-    try {
-      callback(...args);
-    } catch (error) {
-      console.error(`[Companion] account ${userId}: the ${label} callback threw`, error);
-    }
-  };
-}
+/** One launch and what the conversation has learned of it: whether its first `init` has been seen (the process is up), whether the CLI refused its `resume`, and whether it holds a message yet (a `warm` launch does not). */
+type Launch = { cli: CompanionCli; initSeen: boolean; resumeRefused: boolean; messaged: boolean };
 
 /** Consumed by `companion.service.ts`: one call per account, made lazily on the account's first use. */
 export function createCompanionSession(deps: CompanionSessionDeps): CompanionSession {
@@ -196,6 +189,7 @@ export function createCompanionSession(deps: CompanionSessionDeps): CompanionSes
       }),
       initSeen: false,
       resumeRefused: false,
+      messaged: initial.length > 0,
     };
     setCondition({ state: 'waking', error: null });
     return launch;
@@ -222,21 +216,37 @@ export function createCompanionSession(deps: CompanionSessionDeps): CompanionSes
     await detach(reason)?.cli.close();
   }
 
-  /** Assembles one message around `body` and pushes it: the turn starts if she is idle, the process wakes if it is closed. */
-  function push(body: string): void {
-    const woke = live === null;
-    // Read and assembled before anything is started, so a reader that throws leaves no half-woken process or turn behind.
-    const held = woke ? deps.readProviderSessionId() : null;
+  /** The CLI conversation a new launch continues: the held id when it is a UUID, else none (she starts fresh, and it is said). */
+  function resumeForLaunch(): string | null {
+    const held = deps.readProviderSessionId();
     const resume = resumableSessionId(held);
     if (held !== null && resume === null) console.warn(`[Companion] account ${userId}: the held session id is not a UUID; she starts fresh`);
+    return resume;
+  }
+
+  /** Assembles one message around `body` and pushes it: the turn starts if she is idle, the process wakes if it is closed. */
+  function push(body: string): void {
+    // A process started ahead of its first message (`warm`) is woken for that message's sake: it carries the roster and the view like any wake.
+    const woke = live === null || !live.messaged;
+    // Read and assembled before anything is started, so a reader that throws leaves no half-woken process or turn behind.
+    const resume = live === null ? resumeForLaunch() : null;
     const content = assembler.assemble(body, woke);
     // The uuid is how the CLI's `result` tells us which of our messages it answered (`companion-turns.ts`).
     const uuid = randomUUID();
     const message: SDKUserMessage = { type: 'user', message: { role: 'user', content }, parent_tool_use_id: null, uuid };
     unanswered.set(uuid, message);
     turns.admit(uuid);
-    if (live === null) live = open([message], resume);
-    else live.cli.push(message);
+    if (live === null) {
+      live = open([message], resume);
+    } else {
+      live.cli.push(message);
+      live.messaged = true;
+    }
+  }
+
+  /** Starts her process if it is closed, with nothing in it: the idle closer is armed with the launch, so a message that never comes costs a process until the window ends. */
+  function warm(): void {
+    if (live === null) live = open([], resumeForLaunch());
   }
 
   async function interrupt(): Promise<void> {
@@ -268,6 +278,7 @@ export function createCompanionSession(deps: CompanionSessionDeps): CompanionSes
     pushFocusNews(envelope) {
       push(envelope);
     },
+    warm,
     oweCut(heardSentence) {
       assembler.oweCut(heardSentence);
     },

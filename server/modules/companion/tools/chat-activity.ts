@@ -1,7 +1,7 @@
 import { sessionsDb } from '@/modules/database/index.js';
-import { providerRuntimeService, sessionHostLivenessSnapshot } from '@/modules/providers/index.js';
+import { buildClaudeToolPermissionEntry, providerRuntimeService, sessionHostLivenessSnapshot } from '@/modules/providers/index.js';
 import { chatRunRegistry } from '@/modules/websocket/index.js';
-import { describeToolCall, oneLine } from '@/shared/tool-call-hint.js';
+import { describeToolCall, describeToolInput, oneLine } from '@/shared/tool-call-hint.js';
 
 /**
  * What a chat is doing at this moment, read from the running server and nothing else: its state, and one line
@@ -9,8 +9,8 @@ import { describeToolCall, oneLine } from '@/shared/tool-call-hint.js';
  * in either (ruling 17). Split from `house-reads.ts` by cohesion: that file knows which chats are his and how to
  * find one by name, this one knows what a given chat is up to.
  *
- * Consumers: `house-reads.ts`, which re-exports `chatState`, `activityLine` and `ChatState` as part of the one
- * door the tool files read the house through.
+ * Consumers: `house-reads.ts`, which re-exports `chatState`, `activityLine`, `askLine` and `pendingAsksOf` as
+ * part of the one door the tool files read the house through.
  */
 
 /** What a chat is doing right now. `asleep` is still sendable: a message wakes it and resumes where it left off. */
@@ -42,18 +42,39 @@ export function chatState(sessionId: string): ChatState {
 /** The first `max` characters of `text`, counted by code points so a cut never lands inside an emoji and leaves half of it. */
 const cutAt = (text: string, max: number): string => Array.from(text).slice(0, max).join('');
 
-type PendingAsk = { toolName?: string; input?: { questions?: Array<{ question?: string }>; plan?: string } };
+/** One ask a chat is blocked on, as its permission gateway lists it: the tool that wants an answer and that tool's input. */
+type ListedAsk = { toolName?: string; input?: { questions?: Array<{ question?: string; options?: Array<{ label?: string }> }>; plan?: string } };
 
-/** The oldest ask of a waiting chat in one line: what it wants to run, what it asks, or that a plan waits on his word. */
-function waitingLine(sessionId: string): string {
-  const [ask] = providerRuntimeService.getPendingApprovalsForSession(sessionId) as PendingAsk[];
-  if (!ask) return 'waiting on him';
+/** The asks a chat is blocked on, oldest first (the order the gateway holds them). Consumed by `read-tools.ts`'s `pending_ask` and by the line below. */
+export function pendingAsksOf(sessionId: string): ListedAsk[] {
+  return providerRuntimeService.getPendingApprovalsForSession(sessionId) as ListedAsk[];
+}
+
+/**
+ * One ask in one line: what it wants to run, what it asks, or that a plan waits on his word. `detailed` is the line she
+ * DECIDES on, read by `read-tools.ts`'s `pending_ask`: a question carries its option labels (when it is the only one), so she can
+ * offer them, and a permission carries what it would run in full (`describeToolInput`, up to 600 characters, a count of what was
+ * cut) and the rule an answer of "always" would store for every later chat of his. Without it the line is a scan of the roster
+ * (the activity line below), where a Bash command is cut at 60 characters.
+ */
+export function askLine(ask: ListedAsk, detailed = false): string {
   if (ask.toolName === 'AskUserQuestion') {
     const questions = ask.input?.questions ?? [];
-    return `asks "${cutAt(oneLine(questions[0]?.question ?? ''), 100)}"${questions.length > 1 ? ` (and ${questions.length - 1} more)` : ''}`;
+    const labels = detailed && questions.length === 1 ? (questions[0].options ?? []).map((option) => oneLine(option.label ?? '')).filter(Boolean) : [];
+    const options = labels.length > 0 ? ` Options: ${labels.join(' | ')}` : '';
+    return `asks "${cutAt(oneLine(questions[0]?.question ?? ''), 100)}"${questions.length > 1 ? ` (and ${questions.length - 1} more)` : ''}${options}`;
   }
   if (ask.toolName === 'ExitPlanMode') return 'a plan is ready and waits for his approval';
-  return `wants permission: ${describeToolCall(ask.toolName ?? 'a tool', ask.input)}`;
+  const toolName = ask.toolName ?? 'a tool';
+  if (!detailed) return `wants permission: ${describeToolCall(toolName, ask.input)}`;
+  const entry = buildClaudeToolPermissionEntry(toolName, ask.input);
+  return `wants permission: ${describeToolInput(toolName, ask.input)}${entry === null ? '' : ` (answering "always" would store ${entry} as a standing rule for every later chat of his)`}`;
+}
+
+/** The oldest ask of a waiting chat in one line. */
+function waitingLine(sessionId: string): string {
+  const [ask] = pendingAsksOf(sessionId);
+  return ask ? askLine(ask) : 'waiting on him';
 }
 
 /** The tail of a running chat's own replay buffer: its last tool call, else the last words it wrote. */

@@ -167,6 +167,19 @@ export function createProviderRuntimeService(
       }
     },
 
+    // Folds `content` into the turn the chat's process is running now. A provider whose runtime keeps no such process
+    // (or throws when asked) answers 'not_running', which the caller makes good by starting a turn instead.
+    async steer(providerName: LLMProvider, appSessionId: string, content: string): Promise<'folded' | 'not_running'> {
+      try {
+        // Called as a method, so the runtime's `this` holds.
+        const runtime = dependencies.resolveProvider(providerName).runtime;
+        return runtime.steer?.(appSessionId, content) ?? 'not_running';
+      } catch (error) {
+        console.warn(`[provider-runtime] could not steer ${providerName} session ${appSessionId}:`, error);
+        return 'not_running';
+      }
+    },
+
     hasRuntime(providerName: string): boolean {
       try {
         return Boolean(dependencies.resolveProvider(providerName).runtime);

@@ -14,6 +14,7 @@ import type {
   SubagentInfo,
 } from '@/shared/types.js';
 import { parseFilesInputTag } from '@/shared/image-attachments.js';
+import { queuedPromptAsUserRow } from '@/modules/providers/list/claude/claude-queued-prompt.js';
 import { liftToolResultImages, readImageBlockDataUrl, storeToolResultImages } from '@/modules/providers/list/claude/claude-image-blocks.js';
 import {
   isCompactionRow,
@@ -904,7 +905,8 @@ export class ClaudeSessionsProvider implements IProviderSessions {
     // A synthesized id is useless as an anchor — it changes on every read — so
     // a row without its own uuid produces messages with no anchor at all.
     const raw = readObjectRecord(rawMessage);
-    const anchorId = typeof raw?.uuid === 'string' && raw.uuid ? raw.uuid : null;
+    // A queued prompt (`claude-queued-prompt.ts`) is an attachment row: it shows as a user turn but is no resume point.
+    const anchorId = raw?.type !== 'attachment' && typeof raw?.uuid === 'string' && raw.uuid ? raw.uuid : null;
     if (anchorId) {
       for (const message of messages) {
         if (message.role === 'user') {
@@ -917,10 +919,12 @@ export class ClaudeSessionsProvider implements IProviderSessions {
   }
 
   private normalizeMessageRows(rawMessage: unknown, sessionId: string | null): NormalizedMessage[] {
-    const raw = readObjectRecord(rawMessage);
-    if (!raw) {
+    const record = readObjectRecord(rawMessage);
+    if (!record) {
       return [];
     }
+    // A message folded into a running turn is filed as an attachment; it reads as the user turn it is.
+    const raw = queuedPromptAsUserRow(record) ?? record;
 
     if (isCompactionRow(raw)) {
       return normalizeCompactionRow(raw, sessionId);

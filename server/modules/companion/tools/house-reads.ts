@@ -1,6 +1,6 @@
 import path from 'node:path';
 
-import { getConnection, projectsDb } from '@/modules/database/index.js';
+import { getConnection, projectsDb, sessionsDb } from '@/modules/database/index.js';
 import type { CompanionSessionRef } from '@/shared/companion-types.js';
 import { isHiddenProjectPath, visibleProjectPathSql } from '@/shared/hidden-project-paths.js';
 import { oneLine } from '@/shared/tool-call-hint.js';
@@ -9,7 +9,7 @@ import { activityLine, chatStates, type ChatState } from './chat-activity.js';
 
 // One door for the tool files: a chat's state and its activity line are read here with everything else about a
 // chat, though `chat-activity.ts` holds them (the cut that keeps both files small).
-export { activityLine, chatState } from './chat-activity.js';
+export { activityLine, askLine, chatState, pendingAsksOf } from './chat-activity.js';
 export type { ChatState } from './chat-activity.js';
 
 /**
@@ -92,6 +92,15 @@ function chatsInRoots(scope: 'visible' | 'hidden'): HisChat[] {
 /** Every chat of his, most recently updated first. Consumed by `session-tools.ts`'s phrase search and by the resolvers below. */
 export function listHisChats(): HisChat[] {
   return chatsInRoots('visible');
+}
+
+/**
+ * The name a chat shows in the sidebar, for ANY chat row — an archived chat, one of a hidden project, one the
+ * resolvers above would not offer — because a follow-up outlives the sidebar entry it was filed from. The same
+ * fallback (`Untitled Session`) and the same one-line fold as the lists. Consumed by `read-tools.ts`'s `list_followups`.
+ */
+export function chatNameOf(sessionId: string): string {
+  return oneLine(sessionsDb.getSessionById(sessionId)?.custom_name ?? '') || UNTITLED_CHAT;
 }
 
 /**

@@ -2,6 +2,7 @@ import type { ProviderRuntimeGateway } from '@/modules/websocket/index.js';
 import type { CompanionActivity, CompanionSessionRef, CompanionWalk } from '@/shared/companion-types.js';
 import { textResult } from '@/shared/tool-text-result.js';
 
+import { createDraftSender } from '../companion-send.js';
 import type { CompanionStore } from '../companion-store.js';
 import { THINKING_ACTIVITY } from '../session/companion-turns.js';
 
@@ -17,7 +18,8 @@ import type { CompanionToolDeps } from './companion-tools.js';
  *   - `openChatOnFloor`: "the app focuses that chat" is told to the page that holds the floor ALONE
  *     (`companion_open_chat` carries its client id; every other page ignores it), and to nobody while no page
  *     holds the floor;
- *   - `refuse`: a refusal is `isError` text that says what to do next, never a throw.
+ *   - `refuse`: a refusal is `isError` text that says what to do next, never a throw;
+ *   - `sendDraft`: the one door the draft goes out by (`companion-send.ts`), built on the two helpers above.
  *
  * ACTIVITY has two writers, and they must not undo each other. The turn sets `thinking` as it starts and
  * `idle` as it ends; a tool sets its own while it runs. A tool changes the activity at its end ONLY when its own
@@ -54,13 +56,20 @@ export function createToolDeps(input: {
   const { userId, store, runtime, activity } = input;
   // The activities of the tools still running, oldest first: what the status line goes back to when the one standing ends.
   const running: CompanionActivity[] = [];
+  const setFocus = (chat: CompanionSessionRef): void => {
+    if (!sameRef(chat, store.readState().focus)) store.setFocus(chat);
+  };
+  const openChatOnFloor = (sessionId: string): void => {
+    const { floor } = store.readState();
+    if (floor !== null) store.emit({ kind: 'companion_open_chat', sessionId, floor });
+  };
   return {
     userId,
     store,
     runtime,
-    setFocus(chat) {
-      if (!sameRef(chat, store.readState().focus)) store.setFocus(chat);
-    },
+    setFocus,
+    openChatOnFloor,
+    sendDraft: createDraftSender({ userId, store, runtime, setFocus, openChatOnFloor }),
     async withActivity(phase, chat, files, run) {
       const mine: CompanionActivity = { phase, session: chat, files, walk: phase === 'walking' ? placeOf(store.readState().walk) : null };
       running.push(mine);
@@ -71,10 +80,6 @@ export function createToolDeps(input: {
         running.splice(running.indexOf(mine), 1);
         if (activity.current() === mine) activity.set(running.at(-1) ?? THINKING_ACTIVITY);
       }
-    },
-    openChatOnFloor(sessionId) {
-      const { floor } = store.readState();
-      if (floor !== null) store.emit({ kind: 'companion_open_chat', sessionId, floor });
     },
     refuse: (sentence) => textResult(sentence, true),
   };

@@ -24,6 +24,7 @@ import {
 import type {
   AnyRecord,
   AuthenticatedWebSocketRequest,
+  ChatProcessActivity,
   LLMProvider,
   ProviderPermissionDecision,
   ProviderRuntimeWriter,
@@ -82,6 +83,10 @@ export type ProviderRuntimeGateway = {
     writer: ProviderRuntimeWriter,
   ): Promise<unknown>;
   abort(provider: LLMProvider, sessionId: string): Promise<boolean>;
+  /** Folds `content` into the turn the session is running now; `'not_running'` when it has none to fold into. Consumed by `steerChatRun`. */
+  steer(provider: LLMProvider, sessionId: string, content: string): Promise<'folded' | 'not_running'>;
+  /** What the session's process is doing right now (`not live` when it has none). Consumed by `abortChatRun`, to reach a turn no run is registered for. */
+  activity(provider: LLMProvider, sessionId: string): ChatProcessActivity;
   resolveToolApproval(requestId: string, payload: ProviderPermissionDecision): void;
   getPendingApprovalsForSession(sessionId: string): unknown[];
 };

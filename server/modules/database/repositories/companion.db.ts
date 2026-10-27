@@ -15,7 +15,8 @@ import { getConnection } from '@/modules/database/connection.js';
  * keeps the newest `COMPANION_LOG_KEEP` rows per account and deletes the rest in the same
  * transaction as the insert, so the table never holds more than that for one account.
  *
- * Consumers: `server/modules/companion/companion-store.ts` — the lane's only reader and writer.
+ * Consumers: `server/modules/companion/companion-store.ts` — the lane's reader and writer — and
+ * `companion.service.ts`, which asks `userIdsFocusedOn` which accounts a finished run is news to.
  * Reach it through `@/modules/database/index.js`. Every statement runs on the caller's
  * connection; only `appendLog` and `clearAccount` open a transaction of their own, so each lands
  * whole or not at all.
@@ -104,6 +105,24 @@ export const companionDb = {
       .get(userId) as CompanionStateRow | undefined;
 
     return row ?? null;
+  },
+
+  /**
+   * The accounts whose focus is the chat `sessionId` (an app session id), ascending. Read straight from the rows,
+   * so an account whose Kaylee has not been touched since the server booted is found too. A `focus_json` that is
+   * not JSON (a hand edit) names no one rather than failing the read for every account: `json_extract` would
+   * throw on it, and SQLite does not promise to evaluate `json_valid` first inside an `AND`, so the guard is a `CASE`.
+   */
+  userIdsFocusedOn(sessionId: string): number[] {
+    const rows = getConnection()
+      .prepare(
+        `SELECT user_id FROM companion_state
+         WHERE CASE WHEN json_valid(focus_json) THEN json_extract(focus_json, '$.sessionId') END = ?
+         ORDER BY user_id`
+      )
+      .all(sessionId) as Array<{ user_id: number }>;
+
+    return rows.map((row) => row.user_id);
   },
 
   /**

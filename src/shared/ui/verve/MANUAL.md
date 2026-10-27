@@ -177,9 +177,9 @@ section: README/002 The library those tokens paint/002 Import from the barrel, `
 
    | import | sheet | opened | lines | also holds |
    |---|---|---|---|---|
-   | 1 | `controls.css` | 1st | 510 | past its stated ceiling (the headers of `surfaces.css` and `panels.css` say so) |
-   | 2 | `feedback.css` | 2nd | 440 | — |
-   | 3 | [`surfaces.css`](surfaces.css) | 4th | 402 | the `body.vv-dragging` / `vv-drag-fab` / `vv-drag-split` / `vv-drag-resize` classes a drag of any piece sets for its length (why a new file: that sheet's own header); `[data-hold-lift]` (a hold-lift handle's callout, selection and native drag, off on touch screens from the first touch), and `[data-carried]` (an item in a hand: `--shadow-lift` and a `--border-strong` hairline) |
+   | 1 | `controls.css` | 1st | 529 (2026-10-27) | past its stated ceiling (the headers of `surfaces.css` and `panels.css` say so) |
+   | 2 | `feedback.css` | 2nd | 349 (2026-10-27) | — |
+   | 3 | [`surfaces.css`](surfaces.css) | 4th | 391 (2026-10-27) | the `body.vv-dragging` / `vv-drag-fab` / `vv-drag-split` / `vv-drag-resize` classes a drag of any piece sets for its length (why a new file: that sheet's own header); `[data-hold-lift]` (a hold-lift handle's callout, selection and native drag, off on touch screens from the first touch), and `[data-carried]` (an item in a hand: `--shadow-lift` and a `--border-strong` hairline) |
    | 4 | [`panels.css`](panels.css) | 5th | 341 | `.vv-input`'s colours and ground said back over `src/index.css`'s `!important` pins on every bare `textarea` (the piece's own header says why) |
    | 5 | [`media.css`](media.css) | 6th | 281 (2026-10-26) | a literal-colour exception: the gallery tag's and count's near-black scrim and white ink, which sit on a photograph and must not flip with the theme (the sheet's own header says why) |
    | 6 | [`spots.css`](spots.css) | 8th | 86 (2026-10-26) | `RegionImage`'s spots (`.vv-region-spot`), opened when `media.css` stood at 280 lines and the spot paint would carry it past 300; the second literal-colour exception, the spot's near-black disc in a white ring, which sits on a picture and must not flip with the theme (the sheet's own header says why) |

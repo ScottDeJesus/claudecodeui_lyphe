@@ -4,6 +4,7 @@ import { notificationPreferencesDb, pushSubscriptionsDb, sessionsDb } from '@/mo
 import { sendDesktopNotification as sendDesktopNotificationToClients } from '@/modules/notifications/services/desktop-notification-clients.service.js';
 import { buildNotificationText } from '@/modules/notifications/services/notification-copy.service.js';
 import { landingPathOf } from '@/modules/notifications/services/notification-landing.service.js';
+import { announceToListeners } from '@/modules/notifications/services/notification-listeners.service.js';
 import { ntfyChannel } from '@/modules/notifications/services/ntfy-channel.service.js';
 
 const KIND_TO_PREF_KEY = {
@@ -220,6 +221,7 @@ function notifyUserIfEnabled({ userId, event }) {
   }
 
   const normalizedEvent = normalizeNotificationSession(event);
+  announceToListeners(userId, normalizedEvent);
   const preferences = notificationPreferencesDb.getPreferences(userId);
   if (!isNotificationEventEnabled(preferences, normalizedEvent)) {
     return;

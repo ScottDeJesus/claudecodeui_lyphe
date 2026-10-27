@@ -21,7 +21,7 @@ export function textResult(text: string, isError = false): ToolTextResult {
  * verb phrase the sentence completes ("keep the draft" → "update_draft could not keep the draft just now (…)").
  * A refusal the tool means to make is `textResult(sentence, true)` returned from `run`, not a throw. Consumed by the
  * companion's tool files (`server/modules/companion/tools/`: `session-tools.ts` for its reads, `draft-tools.ts`
- * for its writes), so every tool fails the same way.
+ * and `act-tools.ts` for its writes), so every tool fails the same way.
  */
 export async function guardedToolResult(
   toolName: string,

@@ -7,7 +7,9 @@ import { CompanionHeader } from '@/modules/companion/CompanionHeader';
 import { CompanionLog } from '@/modules/companion/CompanionLog';
 import { CompanionNotes } from '@/modules/companion/CompanionNotes';
 import { CompanionWalkStrip } from '@/modules/companion/CompanionWalkStrip';
+import { useCompanion } from '@/modules/companion/context/CompanionContext';
 import type { CompanionModel, CompanionPicture } from '@/shared/companion-types';
+import { useBusySessionIdSet } from '@/shared/context/SessionProtectionContext';
 import { Banner, Card, Spinner } from '@/shared/ui';
 import { cn } from '@/shared/utils';
 
@@ -189,37 +191,28 @@ export function CompanionPanelView({
  * state and the verbs from the companion's provider and hands them to CompanionPanelView, which draws every state.
  */
 export function CompanionPanel() {
-  // FILL(panel-fill): picture and open — `const { picture, open, setOpen, sendText, saveSettings, editDraft, clearDraft, dismissNote, interrupt, clear } = useCompanion();` replaces these two stand-ins.
-  const picture: CompanionPicture | null = null;
-  const open = false;
-  // FILL(send): targetWorking — whether the draft's target chat is working right now (the page's busy-session set), with `sendDraft` from useCompanion().
-  const targetWorking = false;
+  const { picture, open, setOpen, sendText, saveSettings, editDraft, sendDraft, clearDraft, dismissNote, interrupt, clear } = useCompanion();
+  // The page's own set of chats with a turn running: Send steer shows while the draft's target is in it, because only then is there a turn to fold into.
+  const busySessionIds = useBusySessionIdSet();
+  const target = picture?.draft?.target;
+  const targetWorking = target?.kind === 'session' && busySessionIds.has(target.session.sessionId);
 
   return (
     <CompanionPanelView
       picture={picture}
       open={open}
       targetWorking={targetWorking}
-      // FILL(panel-fill): close — setOpen(false)
-      onClose={() => {}}
-      // FILL(panel-fill): send text — sendText(text)
-      onSendText={async () => {}}
-      // FILL(panel-fill): save settings — saveSettings({ model })
-      onModelChange={async () => {}}
-      // FILL(panel-fill): save settings — saveSettings({ live })
-      onLiveChange={async () => {}}
-      // FILL(panel-fill): interrupt — interrupt()
-      onInterrupt={async () => {}}
-      // FILL(panel-fill): clear — clear()
-      onClear={async () => {}}
-      // FILL(panel-fill): edit draft — editDraft(text)
-      onEditDraft={async () => {}}
-      // FILL(send): sendDraft(mode) — Send turn and Send steer; a refused send rejects with the server's sentence, which the card shows.
-      onSendDraft={async () => {}}
-      // FILL(panel-fill): clear draft — clearDraft()
-      onClearDraft={async () => {}}
-      // FILL(panel-fill): dismiss note — dismissNote(id)
-      onDismissNote={async () => {}}
+      onClose={() => setOpen(false)}
+      onSendText={sendText}
+      onModelChange={(model) => saveSettings({ model })}
+      onLiveChange={(live) => saveSettings({ live })}
+      onInterrupt={interrupt}
+      onClear={clear}
+      onEditDraft={editDraft}
+      // A refused send rejects with the server's sentence, which the card shows under its sends.
+      onSendDraft={async (mode) => { await sendDraft(mode); }}
+      onClearDraft={clearDraft}
+      onDismissNote={dismissNote}
     />
   );
 }

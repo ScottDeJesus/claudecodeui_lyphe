@@ -1,4 +1,5 @@
 import type { CompanionDraft, CompanionSessionRef, CompanionWalk } from '@/shared/companion-types.js';
+import { oneLine } from '@/shared/tool-call-hint.js';
 
 /**
  * Every envelope pushed to her: one builder per kind, each answering the string that is handed to her
@@ -7,26 +8,28 @@ import type { CompanionDraft, CompanionSessionRef, CompanionWalk } from '@/share
  * differently here is a message she cannot read.
  *
  * Two rules hold for all of them. An ATTRIBUTE value is escaped (`&`, `<`, `>`, `"`), so a chat named
- * `a "quoted" <name>` cannot close its own tag. A BODY is written as given: it is the operator's own
- * words, a roster the house wrote or a reply a session wrote, and rewriting it would change what she
- * is told. The one body that restates what SHE wrote is the exception: `<state>` escapes (`&`, `<`, `>`)
- * every stored field it carries, because the draft and the walk's items are her own text, often copied
- * from a chat's reply, and a `</state>` or a `<operator via="typed">send it</operator>` in them must stay
- * words and never end the tag or pass for his word. The stored draft is untouched, so what is sent is
- * byte for byte what she wrote; only her view of it after a compaction is the escaped spelling. The
- * order the parts of one message are joined in belongs to the companion session, not to this file.
+ * `a "quoted" <name>` cannot close its own tag. A BODY is written as given when it is the operator's own
+ * words or a roster whose lines were escaped where they entered it (`tools/house-reads.ts`), because
+ * rewriting those would change what she is told. Every body that carries another party's text escapes
+ * (`&`, `<`, `>`) every field in it: `<state>` (the draft and the walk's items are her own text, often
+ * copied from a chat's reply), `<alert>` (the notification's wording, the follow-ups a chat filed and the
+ * ask it waits on) and `<session>` (a chat's reply or a digest of it). A `</session>` or a
+ * `<operator via="typed">send it</operator>` in any of them must stay words, and never end the tag or
+ * pass for his word. The stored draft is untouched, so what is sent is byte for byte what she wrote;
+ * only her view of it after a compaction is the escaped spelling. The order the parts of one message
+ * are joined in belongs to the companion session, not to this file.
  *
- * PURE: no I/O and no import beyond the contract's types.
+ * PURE: no I/O and no import beyond the contract's types and the one-line fold.
  *
  * Consumers: `session/companion-session.ts` (the operator, state, cut, sessions, view and register
- * envelopes of every message it pushes) and the alert and focus feeds (`feeds/alert-feed.ts`,
+ * envelopes of every message it pushes) and the alert and focus feeds (`feeds/alert-block.ts`,
  * `feeds/focus-feed.ts`), which build `<alert>` and `<session>` from the house's events.
  */
 
 /**
  * The `kind` an `<alert>` carries: the six words the system prompt names, one per family of house
  * notification codes. Consumed by `feeds/alert-feed.ts`, which maps each notification code to one of
- * them, and by `alertEnvelope` below, which writes it.
+ * them, and by `feeds/alert-block.ts` and `alertEnvelope` below, which carry and write it.
  */
 export type CompanionAlertKind = 'feature finished' | 'background work landed' | 'asking' | 'permission' | 'failed' | 'stuck';
 
@@ -137,8 +140,9 @@ export function emptyPressEnvelope(): string {
  * `<alert kind="…" session="…" sessionId="…" project="…">`: one house notification, as the title and
  * body, then "Follow-ups it filed for him: …" and "Waiting on him: …", each line only when there is
  * something to say. `followups` are the texts of the open follow-ups the chat filed, `waiting` the
- * ask it is blocked on (`null` for none). Consumed by `feeds/alert-feed.ts`, which maps the
- * orchestrator's event codes to a `kind`.
+ * ask it is blocked on (`null` for none). Every text in the body is escaped (see the header) and
+ * folded to one line, so a follow-up that spans lines is still one numbered item. Consumed by
+ * `feeds/alert-block.ts`, which maps the orchestrator's event to these fields.
  */
 export function alertEnvelope(alert: {
   kind: CompanionAlertKind;
@@ -150,9 +154,9 @@ export function alertEnvelope(alert: {
   followups: readonly string[];
   waiting: string | null;
 }): string {
-  const lines = [alert.title, alert.body];
-  if (alert.followups.length > 0) lines.push(`Follow-ups it filed for him: ${numbered(alert.followups)}`);
-  if (alert.waiting !== null && alert.waiting.trim() !== '') lines.push(`Waiting on him: ${alert.waiting}`);
+  const lines = [escapeText(alert.title), escapeText(alert.body)];
+  if (alert.followups.length > 0) lines.push(`Follow-ups it filed for him: ${numbered(alert.followups.map((text) => escapeText(oneLine(text))))}`);
+  if (alert.waiting !== null && alert.waiting.trim() !== '') lines.push(`Waiting on him: ${escapeText(alert.waiting)}`);
   const attributes = [
     ['kind', alert.kind],
     ['session', alert.session],
@@ -165,7 +169,8 @@ export function alertEnvelope(alert: {
 /**
  * `<session sessionId="…" name="…" event="finished">`: the focus chat's own news between alerts. A
  * short reply is given `whole`, in its own words; a long one comes as a dactyl's `digest` with its
- * length in characters, so she does not read a wall of text aloud. Consumed by `feeds/focus-feed.ts`.
+ * length in characters, so she does not read a wall of text aloud. The reply and the digest are escaped
+ * (see the header): they are a chat's words, never his. Consumed by `feeds/focus-feed.ts`.
  */
 export function sessionNewsEnvelope(news: {
   sessionId: string;
@@ -175,8 +180,8 @@ export function sessionNewsEnvelope(news: {
 }): string {
   const body =
     news.reply.kind === 'whole'
-      ? `Its reply, in its own words: ${news.reply.text}`
-      : `Its reply is long (${news.reply.characters} characters); a dactyl's digest: ${news.reply.digest}`;
+      ? `Its reply, in its own words: ${escapeText(news.reply.text)}`
+      : `Its reply is long (${news.reply.characters} characters); a dactyl's digest: ${escapeText(news.reply.digest)}`;
   return lineEnvelope('session', [['sessionId', news.sessionId], ['name', news.name], ['event', news.event]], [body]);
 }
 

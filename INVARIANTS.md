@@ -1012,96 +1012,6 @@ probe-key: 6e6c997d5ea86ba47d757da883492a08e838562f
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/de/common.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/common.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/es/common.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/fr/common.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/it/common.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/ja/common.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/ko/common.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/ru/common.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/tr/common.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/zh-CN/common.json, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/zh-TW/common.json, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts
 
-## INV-6065 — probe — `npm run lint` reads exit 1 (three errors, 175 warnings); same foreign files, target files clean
-
-`npm run lint` reads exit 1 (three errors, 175 warnings); same foreign files, target files clean
-
-```probe
-cd /home/lyphe/.claude/claudecodeui_lyphe && npm run lint 2>&1 | sed 's/\x1b\[[0-9;]*m//g' | grep -E ': error ' | sed 's/:.*//' | sort -u; npm run lint:client >/dev/null 2>&1; echo "client lint exit:$?"; npm run lint 2>&1 | sed 's/\x1b\[[0-9;]*m//g' | grep -cE '^src/shared/(api|types)\.ts'
-expect: exactly the three files above; `client lint exit:0`; and `0` lines naming either target file
-```
-
-measured 2026-09-30 by chain chain-simple-chat-folders--contract-20260930-104835-68a5, finding M2, MEDIUM
-probe-key: 8e9f1db80c3fdab48bd771bceb87943211425938
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-simple-list-contract.mjs
-
-## INV-6066 — probe — the standing proof reds on the POST status the route table promises
-
-the standing proof reds on the POST status the route table promises
-
-```probe
-cd /home/lyphe/.claude/claudecodeui_lyphe && python3 - <<'PY'
-src = open('.verify/probe-simple-list-contract.mjs').read()
-old = """    await route.fulfill({
-      status: 200,"""
-new = """    await route.fulfill({
-      status: request.method() === 'POST' ? 201 : 200,"""
-assert src.count(old) == 1
-open('.verify/athena-probe-copy-201.mjs', 'w').write(src.replace(old, new))
-PY
-node .verify/athena-probe-copy-201.mjs | tail -3; rm .verify/athena-probe-copy-201.mjs
-expect: C1–C5 PASS, then `[FAIL] C6 all four calls read their answer back — {"createFolder":201,…}` and `SIMPLE-LIST-CONTRACT FAIL (1)`; delete the copy in the same breath
-```
-
-measured 2026-09-30 by chain chain-simple-chat-folders--contract-20260930-104835-68a5, finding L1, LOW
-probe-key: 16268f4bbdc480b0583367a1e96ba7064fac5fd1
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-simple-list-contract.mjs
-
-## INV-6069 — probe — The last-job hold forgets the moment any later job replaces `job.json`: a rolled-back (or failed) release is reinstalled automatically
-
-The last-job hold forgets the moment any later job replaces `job.json`: a rolled-back (or failed) release is reinstalled automatically
-
-```probe
-cd /home/lyphe/.claude/claudecodeui_lyphe && F=$(mktemp /tmp/athena-probe-cascade-XXXXXX.mts) && cat > "$F" <<'X'
-import { createAutoInstall } from '/home/lyphe/.claude/claudecodeui_lyphe/server/modules/claude-updates/update-auto-install.service.ts';
-const pkg = (key: string, label: string, installed: string, latest: string) => ({ key, label, name: key, installed, loaded: null, latest, updateAvailable: installed !== latest, updatable: true, reason: null, notes: [], notesReason: null, changelogUrl: '' });
-const job = (kind: string, state: string, key: string, from: string, to: string) => ({ id: 'j', kind, state, steps: [{ key, from, to, state: 'done' }], logTail: [] });
-let last: any = job('rollback', 'done', 'sdk', '0.3.285', '0.3.284'); let cli = '2.1.285'; const calls: unknown[] = []; console.log = () => {};
-const svc = createAutoInstall({ config: { get: () => null, set: () => {} }, readActivity: async () => ({ busy: false, reasons: [] }),
-  readReadings: async () => ({ checkedAt: 1, checking: false, checkError: null, nextCheckAt: 2, supervised: true, job: last, packages: [pkg('cli', 'Claude Code', cli, '2.1.286'), pkg('sdk', 'Claude Agent SDK', '0.3.284', '0.3.285')] }) as any,
-  applyUpdate: async (t) => { calls.push(t); if ((t as any).cli) { last = job('update', 'done', 'cli', '2.1.285', '2.1.286'); cli = '2.1.286'; } return { ok: true } as any; } });
-await svc.tick(); await svc.tick(); process.stdout.write(JSON.stringify(calls) + '\n'); process.exit(0);
-X
-timeout 60 node_modules/.bin/tsx --tsconfig server/tsconfig.json "$F"; case "$F" in /tmp/athena-probe-cascade-*) rm -f "$F";; esac
-expect: [{"cli":"2.1.286"}] only — the rolled-back SDK 0.3.285 must not be offered again; measured: [{"cli":"2.1.286"},{"sdk":"0.3.285"}]
-```
-
-measured 2026-09-30 by chain chain-claude-updates-auto-install-20260930-110043-48df, finding M1, MEDIUM
-probe-key: 8a8701ac557bab28972d95adecfe31cf7329fc20
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/claude-activity/claude-activity.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/claude-updates/update-auto-install.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/claude-updates/update-held-versions.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/claude-activity-types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/claude-updates/ClaudeUpdatesSettingsTab.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/claude-updates/hooks/useClaudeUpdates.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/claude-updates-auto-install.mjs
-
-## INV-6070 — probe — A report without `autoInstall` blanks the whole Updates tab: permanent spinner, and the manual "Update and restart" is gone
-
-A report without `autoInstall` blanks the whole Updates tab: permanent spinner, and the manual "Update and restart" is gone
-
-```probe
-cd /home/lyphe/.claude/claudecodeui_lyphe && F=$(mktemp /tmp/athena-probe-old-XXXXXX.mjs) && cat > "$F" <<'X'
-import { chromium } from '/home/lyphe/.claude/claudecodeui_lyphe/node_modules/playwright/index.mjs';
-import { HARNESS_PREFERENCES, pinPreferences } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/prefs-pin.mjs';
-const token = (await (await fetch('http://127.0.0.1:3011/api/auth/login', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ username: 'verve', password: 'verve-dev-2026' }) })).json()).token;
-const browser = await chromium.launch(); const context = await browser.newContext({ viewport: { width: 1280, height: 900 }, serviceWorkers: 'block' });
-await context.addInitScript((v) => localStorage.setItem('auth-token', v), token);
-await pinPreferences(context, { ...HARNESS_PREFERENCES, theme: 'light', themeFollowsSun: false }, { writes: 'abort' });
-const page = await context.newPage(); await page.route(/api\.github\.com/, (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{}' }));
-await page.route((u) => u.pathname === '/api/claude-updates', async (route) => { if (route.request().method() !== 'GET') return route.fallback(); const r = await route.fetch(); const b = await r.json(); delete b.autoInstall; await route.fulfill({ response: r, body: JSON.stringify(b) }); });
-await page.goto('http://localhost:5183', { waitUntil: 'domcontentloaded' });
-const s = page.locator('button[aria-label="Settings"]:visible, button:has-text("Settings"):visible').first(); await s.waitFor({ state: 'visible', timeout: 45000 }); await s.click();
-await page.getByRole('button', { name: 'Updates', exact: true }).click(); await page.waitForTimeout(4000);
-const text = await page.locator('.modal-backdrop').innerText();
-console.log(JSON.stringify({ updateAndRestartButton: /Update and restart/.test(text), stuckOnSpinner: /Reading the update report/.test(text) })); await browser.close(); process.exit(0);
-X
-timeout 120 node "$F"; case "$F" in /tmp/athena-probe-old-*) rm -f "$F";; esac
-expect: {"updateAndRestartButton":true,"stuckOnSpinner":false} — measured: {"updateAndRestartButton":false,"stuckOnSpinner":true}
-```
-
-measured 2026-09-30 by chain chain-claude-updates-auto-install-20260930-110043-48df, finding L1, LOW
-probe-key: 4315f9fdb9d338748c32a9bf073de83aea1dc40c
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/claude-activity/claude-activity.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/claude-updates/update-auto-install.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/claude-updates/update-held-versions.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/claude-activity-types.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/claude-updates/ClaudeUpdatesSettingsTab.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/claude-updates/hooks/useClaudeUpdates.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/claude-updates-auto-install.mjs
-
 ## INV-6071 — probe — `.verify/claude-updates-auto-install.mjs` leaves the operator's LIVE switch OFF when a cell fails between its two presses, and its header says it does not
 
 `.verify/claude-updates-auto-install.mjs` leaves the operator's LIVE switch OFF when a cell fails between its two presses, and its header says it does not
@@ -1115,34 +1025,6 @@ measured 2026-09-30 by chain chain-claude-updates-auto-install-20260930-110043-4
 probe-key: ee261bd85314737e61744922604d0d610f5fa454
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/claude-updates-auto-install.mjs
-
-## INV-6074 — probe — two `removeLocal` calls in one tick lose the first removal, while both `total` decrements land
-
-two `removeLocal` calls in one tick lose the first removal, while both `total` decrements land
-
-```probe
-node /tmp/athena-feed-probe.TVw6LK/athena-feed-hook5.mjs   # dev app on 5183 + API on 3011; mounts two live instances of the real hook
-expect: "[NOTE] two removeLocal calls in one tick: <id> still held: true; <id> still held: false" and "(before: a held true, b held true; total 11 -> 9)" — the first chat survives its own removal while both total decrements stand.
-```
-
-measured 2026-09-30 by chain chain-simple-chat-folders--feed-20260930-115952-45b5, finding L1, LOW
-probe-key: 7175afb920515f8679c505c592a216f802f3b0e3
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/hooks/useSimpleChatList.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/SidebarSimpleList.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-simple-feed.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-simple-reorder.mjs
-
-## INV-6075 — probe — MEDIUM — the last drawn chat cannot be dropped at the end: a release past every row is read as its own place and prints nothing
-
-MEDIUM — the last drawn chat cannot be dropped at the end: a release past every row is read as its own place and prints nothing
-
-```probe
-node .verify/athena-carry-endzone.mjs
-expect: `END-ZONE: the last chat of the last open folder, released below the last block -> target={"at":"end"} endLine=true edge=[] moves=[{"item":{"kind":"chat","id":"e1"},"position":{"folderId":null,"after":{"kind":"folder","id":"f2"}}}]` — today it prints `target={"at":"row","item":{"kind":"chat","id":"e1"},"edge":"before"} endLine=false edge=["e1:before"] moves=[]`, and the same probe's controls (`R1`/`R2`/`G2` quiet, `R4` end + one move, `G3` the top-level slot after the first folder reachable) must keep holding
-```
-
-measured 2026-09-30 by chain chain-simple-chat-folders--carry-20260930-115952-5297, finding M1, MEDIUM
-probe-key: cf07cd9ea7e3e39fdbdbc5a2917648fe4c002018
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/hooks/useSimpleChatDrag.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-simple-drag.mjs
 
 ## INV-6076 — probe — `.verify/probe-simple-folders.mjs`'s live-list chrome gate is stale, and no brief item schedules it
 
@@ -1170,21 +1052,6 @@ expect: copy 12:45:07 vs sources 11:26–12:23 (all before the 12:45:02 dispatch
 
 measured 2026-09-30 by chain chain-simple-chat-folders--list-20260930-124502-46be, finding L2, LOW
 probe-key: bda06115c0a506556bba83f48348409debe638ce
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/hooks/useSimpleChatDrag.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/hooks/useSimpleChatFolders.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/SidebarSimpleList.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-simple-folder-composer.mjs
-
-## INV-6079 — probe — the walk probe prints its selection claim but never gates it, and never observes the app's `scrollIntoView`
-
-the walk probe prints its selection claim but never gates it, and never observes the app's `scrollIntoView`
-
-```probe
-sed -n '275,281p;307,310p' .verify/probe-simple-folder-composer.mjs
-node /tmp/athena-folders-verbs/verbs.mjs   # S8, same ground
-expect: sed shows the print at 281 and the pass at 307-310 with no selectionStart/End in it; S8 PASS — `selected 0…10 of 10`, one scrollIntoView (block nearest), first keystroke replaces the name
-```
-
-measured 2026-09-30 by chain chain-simple-chat-folders--list-20260930-124502-46be, finding L3, LOW
-probe-key: 8bd45923c90a0a792d9f584ef06d5cb7dca43e1a
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/hooks/useSimpleChatDrag.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/hooks/useSimpleChatFolders.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/SidebarSimpleList.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-simple-folder-composer.mjs
 
@@ -13305,116 +13172,6 @@ probe-key: 4b7a47440c876fef188228cd41576b5d89c574db
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-storage.ts
 
-## INV-9754 — probe — LOW — `runDactylRead` settles only on `close`, so a descendant that holds the dactyl's stdout keeps a call pending past its 180 s bound
-
-LOW — `runDactylRead` settles only on `close`, so a descendant that holds the dactyl's stdout keeps a call pending past its 180 s bound
-
-```probe
-D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
-cat > "$D/p.sh" <<'EOF'
-D="$1"
-R=/home/lyphe/.claude/claudecodeui_lyphe
-mkdir -p "$D/home/.claude/scripts" || exit 1
-printf '#!/bin/bash\nsleep 305 &\necho $! > "%s/pid"\nwait\n' "$D" > "$D/home/.claude/scripts/dactyl"
-chmod 755 "$D/home/.claude/scripts/dactyl"
-sed 's/180_000/2000/; s/DACTYL_KILL_GRACE_MS = 5_000/DACTYL_KILL_GRACE_MS = 1_000/' "$R/server/modules/companion/tools/transcript-render.ts" > "$D/tr.ts"
-echo '# x' > "$D/f.md"
-cat > "$D/run.mts" <<'INNER'
-const D = process.argv[2];
-const { runDactylRead } = await import(`${D}/tr.ts`);
-const t = Date.now();
-const r = await Promise.race([runDactylRead([`${D}/f.md`], 'x').then((x: any) => `resolved after ${Date.now() - t} ms: ${JSON.stringify(x)}`), new Promise((res) => setTimeout(() => res('PENDING 8 s after a 2 s bound'), 8000))]);
-console.log(r);
-process.exit(0);
-INNER
-( cd "$R" && HOME="$D/home" TSX_TSCONFIG_PATH=server/tsconfig.json timeout 60 node --import tsx "$D/run.mts" "$D" 2>&1 | tail -3 )
-P=$(cat "$D/pid" 2>/dev/null)
-case "$P" in ''|*[!0-9]*|0|1) ;; *) [ "$(ps -o comm= -p "$P" 2>/dev/null)" = sleep ] && kill "$P";; esac
-EOF
-bash "$D/p.sh" "$D"
-cd /tmp && case "$D" in /tmp/athena-probe.??????) rm -r "$D";; esac
-# expect: today "PENDING 8 s after a 2 s bound"; cured: a line starting "resolved after" with `ok":false` and "took longer than 2 seconds"
-```
-
-measured 2026-10-26 by chain chain-kaylee--companion--render-20261026-152329-cd93, finding L1, LOW
-probe-key: 52c0b8ab15b26a0e95144c927a519f829c9d989e
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/.oxlintrc.json, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/transcript-render.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/followups.db.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/followups/followups.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/followups/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/tool-call-hint.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-companion-reads.mjs
-
-## INV-9755 — probe — LOW — the digest handed to her carries the dactyl's spend line (tokens, seconds), which Ruling 17 keeps out of her mouth
-
-LOW — the digest handed to her carries the dactyl's spend line (tokens, seconds), which Ruling 17 keeps out of her mouth
-
-```probe
-D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
-cat > "$D/p.sh" <<'EOF'
-D="$1"
-R=/home/lyphe/.claude/claudecodeui_lyphe
-mkdir -p "$D/home/.claude/scripts" || exit 1
-cat > "$D/home/.claude/scripts/dactyl" <<'STUB'
-#!/bin/bash
-cat > /dev/null
-printf '✓ dactyl --read /tmp/x.md — 150 lines\n  claude-haiku-5-5 (served claude-haiku-5-5) · xhigh · 1 turns · 12s · 5.5k in · 2.3k out\n**Got done**\n- L150: it landed\n  quotes: 1 checked, all found\n'
-STUB
-chmod 755 "$D/home/.claude/scripts/dactyl"
-echo '# x' > "$D/f.md"
-cat > "$D/run.mts" <<'INNER'
-const D = process.argv[2];
-const { runDactylRead } = await import('@/modules/companion/tools/transcript-render.js');
-const r: any = await runDactylRead([`${D}/f.md`], 'x');
-console.log('spend line in the text she is handed:', /· \d+(\.\d+)?k? in · \d+(\.\d+)?k? out/.test(r.text ?? ''), '| quote line kept:', /quotes: 1 checked/.test(r.text ?? ''));
-process.exit(0);
-INNER
-( cd "$R" && HOME="$D/home" TSX_TSCONFIG_PATH=server/tsconfig.json timeout 60 node --import tsx "$D/run.mts" "$D" 2>&1 | tail -3 )
-EOF
-bash "$D/p.sh" "$D"
-cd /tmp && case "$D" in /tmp/athena-probe.??????) rm -r "$D";; esac
-# expect: today "spend line in the text she is handed: true | quote line kept: true"; cured: "false | quote line kept: true"
-```
-
-measured 2026-10-26 by chain chain-kaylee--companion--render-20261026-152329-cd93, finding L2, LOW
-probe-key: 7fba4856221c94f9231972aa7c3c7f7354fc9bfb
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/.oxlintrc.json, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/transcript-render.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/followups.db.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/followups/followups.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/followups/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/tool-call-hint.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-companion-reads.mjs
-
-## INV-9756 — probe — LOW — a background-task notice is rendered as a turn he "said"
-
-LOW — a background-task notice is rendered as a turn he "said"
-
-```probe
-D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
-cat > "$D/p.sh" <<'EOF'
-D="$1"
-R=/home/lyphe/.claude/claudecodeui_lyphe
-cat > "$D/run.mts" <<'INNER'
-import fs from 'node:fs';
-const D = process.argv[2];
-const { renderTurns } = await import('@/modules/companion/tools/transcript-render.js');
-const note = '<task-notification>\n<task-id>bwi4ett4h</task-id>\n<status>completed</status>\n<summary>Background command "load test" completed (exit code 0)</summary>\n</task-notification>';
-const rows: any[] = [
-  { kind: 'text', role: 'user', content: 'run the load test in the background', timestamp: '2026-10-26T10:00:00Z' },
-  { kind: 'text', role: 'assistant', content: 'Started it.' },
-  { kind: 'text', role: 'user', content: note, timestamp: '2026-10-26T10:05:00Z' },
-  { kind: 'text', role: 'assistant', content: 'It passed.' },
-];
-const turns = renderTurns('s', rows, `${D}/o.md`);
-const lines = fs.readFileSync(`${D}/o.md`, 'utf8').split('\n');
-const at = lines.findIndex((l) => l.startsWith('<task-notification>'));
-console.log(`turns: ${turns}; the notice sits under: ${JSON.stringify(lines[at - 1])}`);
-process.exit(0);
-INNER
-( cd "$R" && TSX_TSCONFIG_PATH=server/tsconfig.json timeout 60 node --import tsx "$D/run.mts" "$D" 2>&1 | tail -3 )
-EOF
-bash "$D/p.sh" "$D"
-cd /tmp && case "$D" in /tmp/athena-probe.??????) rm -r "$D";; esac
-# expect: today `turns: 2; the notice sits under: "He said:"`; cured: the line above the notice is no longer "He said:"
-```
-
-measured 2026-10-26 by chain chain-kaylee--companion--render-20261026-152329-cd93, finding L3, LOW
-probe-key: 10c925208fe3e24e402f5348481d861bfc7cb104
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/.oxlintrc.json, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/transcript-render.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/followups.db.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/followups/followups.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/followups/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/tool-call-hint.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-companion-reads.mjs
-
 ## INV-9757 — probe — (LOW) — the "comparison sign" exception the builder added deletes words when a letter follows `<`
 
 (LOW) — the "comparison sign" exception the builder added deletes words when a letter follows `<`
@@ -14821,3 +14578,1347 @@ measured 2026-10-26 by chain chain-day-one-sketch-from-panos--screen-fill-202610
 probe-key: b7d81fa6bd49fa6dcf4a9dfa12a02aa603b3a2a4
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/hooks/useDayOne.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/hooks/useLayoutPlan.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/hooks/useLayoutWalk.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/hooks/useTourReader.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/affected-areas/utils/tourModel.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/affected-areas-day-one.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/affected-areas-day-one-walk.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/day-one-kit.mjs
+
+## INV-9798 — probe — The 390 px photograph is a speck with badges piled on it, and the report says nothing of it (S12)
+
+The 390 px photograph is a speck with badges piled on it, and the report says nothing of it (S12)
+
+```probe
+cat > /tmp/athena-probe-m1.sh <<'EOF'
+set -a; . /opt/shadow-connector/.env; set +a
+curl -s -H "X-Internal-Secret: $EIS_INTERNAL_SECRET" http://127.0.0.1:8001/api/affected-areas/tours/6ad29b4c93d5140395dcaa76 \
+ | python3 -c "
+import json,sys
+d=json.load(sys.stdin)['dayOne'][0]
+k=[r for r in d['rooms'] if r['roomName']=='Kitchen'][0]
+x0,y0,x1,y1=k['rect']
+ka=[a for a in d['areas'] if a['roomKey']==k['roomKey']]
+print('frame ft',d['widthFt'],d['lengthFt'],'| kitchen px at 358 wide:',round((x1-x0)*358,1),'x',round((y1-y0)*358*d['lengthFt']/d['widthFt'],1),'| areas credited to the kitchen:',len(ka))
+"
+EOF
+bash /tmp/athena-probe-m1.sh; rm -f /tmp/athena-probe-m1.sh
+# expect: kitchen px at 358 wide: 21.1 x 23.1 with 8 areas credited to the kitchen (a cured plan prints a kitchen wider than ~60 px at 358, or fewer badges on it)
+```
+
+measured 2026-10-27 by chain chain-day-one-sketch-from-panos--join-20261027-035929-faea, finding M1, MEDIUM
+probe-key: 63e7944ada9551c72de6980a922e577f0a058034
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/affected-areas-day-one-join.mjs
+
+## INV-9799 — probe — The printed dry-run answer and its "planned and bought nothing" verdict are not tied to Clarence's tour; the page's open sent a second press on another tour the output never names (S2)
+
+The printed dry-run answer and its "planned and bought nothing" verdict are not tied to Clarence's tour; the page's open sent a second press on another tour the output never names (S2)
+
+```probe
+bash -c 'grep -n "POST /tours/" /home/lyphe/.claude/claudecodeui_lyphe/.verify/shots/day-one-join/join-run.txt | cut -c1-90 || echo none'
+# expect: two POST lines naming two different tour ids (6ada37fe… first, 6ad29b4c… second); a fixed join prints one, or labels each answer with its tour
+```
+
+measured 2026-10-27 by chain chain-day-one-sketch-from-panos--join-20261027-035929-faea, finding L1, LOW
+probe-key: 26681e213107352d1e59ad26893d9e9d3429b6cf
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/affected-areas-day-one-join.mjs
+
+## INV-9800 — probe — The armed-press abort is anchored with `$` and fails open on a URL it does not match (S1)
+
+The armed-press abort is anchored with `$` and fails open on a URL it does not match (S1)
+
+```probe
+cat > /tmp/athena-probe-l2.mjs <<'EOF'
+const re = new RegExp('/api/affected-areas/tours/[0-9a-f]{24}/panos/[0-9a-f]{24}/layout$');
+const base = 'http://127.0.0.1:5184/api/affected-areas/tours/6ad29b4c93d5140395dcaa76/panos/6ad29b4c12f14e4d72c81901/layout';
+for (const u of [base, base + '?x=1', base + '/']) console.log(re.test(u), u.slice(base.length) || '(exact)');
+EOF
+node /tmp/athena-probe-l2.mjs; rm -f /tmp/athena-probe-l2.mjs
+# expect: true (exact), false ?x=1, false / — the last two are armed presses the guard would let through; a prefix match that decides on the body prints true for all three
+```
+
+measured 2026-10-27 by chain chain-day-one-sketch-from-panos--join-20261027-035929-faea, finding L2, LOW
+probe-key: 66b8c374232eff949c35f789858439fe8efd39fd
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/affected-areas-day-one-join.mjs
+
+## INV-9801 — probe — The summary the operator reads does not say the Xactimate sketch is the mapping run on a job the forge would never seed (S20)
+
+The summary the operator reads does not say the Xactimate sketch is the mapping run on a job the forge would never seed (S20)
+
+```probe
+cat > /tmp/athena-probe-l3.sh <<'EOF'
+set -a; . /opt/shadow-connector/.env; set +a
+PGPASSWORD="$PG_PASS" psql -h 192.168.1.95 -p 5433 -U postgres -d postgres -At -c "select tour_id, floorplan_status from docusketch_tours where tour_id='6ad29b4c93d5140395dcaa76'"
+grep -c "stands down" /home/lyphe/.claude/state/dispatch-souls/dispatch-hephaestus-20261027-035935-2816/result.md || true
+EOF
+bash /tmp/athena-probe-l3.sh; rm -f /tmp/athena-probe-l3.sh
+# expect: `6ad29b4c93d5140395dcaa76|DONE` then 0 (the result says nothing of the stand-down); a corrected report prints a nonzero count
+```
+
+measured 2026-10-27 by chain chain-day-one-sketch-from-panos--join-20261027-035929-faea, finding L3, LOW
+probe-key: 9d0f95df9a49bb151e82ac19250748e5c3661ba2
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/affected-areas-day-one-join.mjs
+
+## INV-9802 — probe — The "no client input newer than the build" gate leaves out the file that sends the day-one's requests (S10)
+
+The "no client input newer than the build" gate leaves out the file that sends the day-one's requests (S10)
+
+```probe
+bash -c 'cd /home/lyphe/.claude/claudecodeui_lyphe && echo "gate lists api.ts: $(grep -c "src/shared/api.ts" .verify/affected-areas-day-one-join.mjs) | api.ts day-one lines: $(grep -c "affected-areas/tours\|layout-drawings" src/shared/api.ts)"'
+# expect: `gate lists api.ts: 0 | api.ts day-one lines: 3` (or more); a fixed gate prints 1 or more for the first count
+```
+
+measured 2026-10-27 by chain chain-day-one-sketch-from-panos--join-20261027-035929-faea, finding L4, LOW
+probe-key: e493938a11612bf5d9b43453cfb22a8b8ae75cc9
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/affected-areas-day-one-join.mjs
+
+## INV-9803 — probe — MEDIUM — one frame or one seed answer the provider cannot read blanks the whole app
+
+MEDIUM — one frame or one seed answer the provider cannot read blanks the whole app
+
+```probe
+D=$(mktemp -d /tmp/athena-p1.XXXXXX)
+cat > "$D/p.mjs" <<'EOF'
+import { openConsole } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/console.mjs';
+import { HARNESS_PREFERENCES } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/prefs-pin.mjs';
+const s = await openConsole({ preferences: { ...HARNESS_PREFERENCES, theme: 'light' } });
+const page = s.page;
+await page.addInitScript(() => { const N = window.WebSocket; window.__sockets = []; window.WebSocket = new Proxy(N, { construct(t, a) { const k = new t(...a); window.__sockets.push(k); return k; } }); });
+const blank = () => page.evaluate(() => document.body.innerText.includes('CloudCLI hit an error'));
+try {
+  for (const [name, body] of [['seed {}', '{}'], ['seed with log:null', null]]) {
+    await page.unroute('**/api/companion').catch(() => {});
+    await page.route('**/api/companion', async (r) => {
+      if (r.request().method() !== 'GET') return r.continue();
+      if (body === null) { const resp = await r.fetch(); const j = await resp.json(); j.log = null; return r.fulfill({ response: resp, body: JSON.stringify(j) }); }
+      return r.fulfill({ status: 200, contentType: 'application/json', body });
+    });
+    await page.reload({ waitUntil: 'networkidle' }); await page.waitForTimeout(2500);
+    console.log(`${name}: boundary=${await blank()}`);
+  }
+  await page.unroute('**/api/companion').catch(() => {});
+  await page.reload({ waitUntil: 'networkidle' }); await page.locator('button[data-companion-door]:visible').first().waitFor({ timeout: 60000 }); await page.waitForTimeout(1500);
+  await page.evaluate(() => window.__sockets.filter((k) => k.readyState === 1).at(-1).dispatchEvent(new MessageEvent('message', { data: JSON.stringify({ kind: 'companion_sentence' }) })));
+  await page.waitForTimeout(1500);
+  console.log(`frame {kind:companion_sentence} with no entry: boundary=${await blank()}`);
+} finally { await s.browser.close(); }
+EOF
+cat > "$D/p.sh" <<'EOF'
+cd /home/lyphe/.claude/claudecodeui_lyphe && node "$1"
+EOF
+bash "$D/p.sh" "$D/p.mjs"
+# expect: three lines, each ending boundary=true today; boundary=false on all three once the provider tolerates a malformed seed or frame
+```
+
+measured 2026-10-27 by chain chain-kaylee--companion--panel-fill-20261027-035941-15be, finding M1, MEDIUM
+probe-key: cf83f7433f7265995cb2e9b266abbba9aab014ff
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/context/CompanionContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/companionReducer.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-lands.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-lands-page.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-reducer.mjs
+
+## INV-9804 — probe — MEDIUM — a chat she opens while an application is in front is selected behind it
+
+MEDIUM — a chat she opens while an application is in front is selected behind it
+
+```probe
+D=$(mktemp -d /tmp/athena-p2.XXXXXX)
+cat > "$D/p.mjs" <<'EOF'
+import { openConsole } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/console.mjs';
+import { HARNESS_PREFERENCES } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/prefs-pin.mjs';
+import { createScratchChat, deleteScratchChat } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/scratch-chat.mjs';
+import { chrome, frameFromDrawer } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/whole-check-kit.mjs';
+const s = await openConsole({ preferences: { ...HARNESS_PREFERENCES, theme: 'light' } });
+const page = s.page;
+await page.context().addInitScript(() => { const N = window.WebSocket; window.__sockets = []; window.WebSocket = new Proxy(N, { construct(t, a) { const k = new t(...a); window.__sockets.push(k); return k; } }); });
+let chatId = null;
+try {
+  chatId = await createScratchChat(s);
+  await page.reload({ waitUntil: 'networkidle' });
+  await page.locator('button[data-companion-door]:visible').first().waitFor({ timeout: 60000 });
+  await frameFromDrawer(page, chrome(page), 'ArchPulse');
+  const me = await page.evaluate(() => sessionStorage.getItem('companion-client-id'));
+  await page.evaluate(([id, floor]) => window.__sockets.filter((k) => k.readyState === 1).at(-1).dispatchEvent(new MessageEvent('message', { data: JSON.stringify({ kind: 'companion_open_chat', sessionId: id, floor }) })), [chatId, me]);
+  await page.waitForTimeout(2500);
+  const r = await page.evaluate(() => {
+    const ta = [...document.querySelectorAll('textarea')].filter((t) => !t.closest('[data-companion-panel]') && t.offsetParent !== null)[0];
+    if (!ta) return { path: location.pathname.slice(0, 9), composer: 'none' };
+    const b = ta.getBoundingClientRect(); const top = document.elementFromPoint(b.x + b.width / 2, b.y + b.height / 2);
+    return { path: location.pathname.slice(0, 9), composer: 'in DOM', topTag: top ? top.tagName : 'none' };
+  });
+  console.log(JSON.stringify(r));
+} finally { if (chatId) await deleteScratchChat(s, chatId).catch(() => false); await s.browser.close(); }
+EOF
+cat > "$D/p.sh" <<'EOF'
+cd /home/lyphe/.claude/claudecodeui_lyphe && node "$1"
+EOF
+bash "$D/p.sh" "$D/p.mjs"
+# expect: {"path":"/session/","composer":"in DOM","topTag":"IFRAME"} today (the application covers the chat); topTag TEXTAREA once the chat is brought in front of the application
+```
+
+measured 2026-10-27 by chain chain-kaylee--companion--panel-fill-20261027-035941-15be, finding M2, MEDIUM
+probe-key: 3531f8c935a44ccd55efc199784b392d7bfb792e
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/context/CompanionContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/companionReducer.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-lands.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-lands-page.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-reducer.mjs
+
+## INV-9805 — probe — LOW — every write verb draws from the socket frame, so a late or missing frame snaps a control back
+
+LOW — every write verb draws from the socket frame, so a late or missing frame snaps a control back
+
+```probe
+D=$(mktemp -d /tmp/athena-p3.XXXXXX)
+cat > "$D/p.mjs" <<'EOF'
+import { openConsole } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/console.mjs';
+import { HARNESS_PREFERENCES } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/prefs-pin.mjs';
+const s = await openConsole({ preferences: { ...HARNESS_PREFERENCES, theme: 'light' } });
+const page = s.page; const SW = '[data-companion-panel] [data-companion-header] button[role="switch"]';
+try {
+  await page.routeWebSocket(/\/ws(\?|$)/, (ws) => { const up = ws.connectToServer(); up.onMessage((m) => setTimeout(() => ws.send(m), 1200)); ws.onMessage((m) => up.send(m)); up.onClose((c, r) => ws.close({ code: c, reason: r })); });
+  await page.reload({ waitUntil: 'networkidle' });
+  await page.locator('button[data-companion-door]:visible').first().click(); await page.waitForTimeout(2500);
+  await page.evaluate((sel) => { window.__seq = []; const tick = () => { const el = document.querySelector(sel); const v = el && el.getAttribute('aria-checked'); if (v !== null && window.__seq.at(-1) !== v) window.__seq.push(v); requestAnimationFrame(tick); }; tick(); }, SW);
+  await page.locator(SW).first().click(); await page.waitForTimeout(3000);
+  console.log('Live switch aria-checked over time:', JSON.stringify(await page.evaluate(() => window.__seq)));
+} finally {
+  await s.api('/api/companion/settings', { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ live: false }) });
+  await s.browser.close();
+}
+EOF
+cat > "$D/p.sh" <<'EOF'
+cd /home/lyphe/.claude/claudecodeui_lyphe && node "$1"
+EOF
+bash "$D/p.sh" "$D/p.mjs"
+# expect: ["false","true","false","true"] today (the switch snaps back for the frame's delay); ["false","true"] once the answer is folded in
+```
+
+measured 2026-10-27 by chain chain-kaylee--companion--panel-fill-20261027-035941-15be, finding L1, LOW
+probe-key: eb5bb0570436acbade4f919e1f81b3b6aaa9d01e
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/context/CompanionContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/companionReducer.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-lands.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-lands-page.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-reducer.mjs
+
+## INV-9806 — probe — LOW — a seed that keeps failing leaves "Opening Kaylee's conversation…" with no failure line and no retry
+
+LOW — a seed that keeps failing leaves "Opening Kaylee's conversation…" with no failure line and no retry
+
+```probe
+D=$(mktemp -d /tmp/athena-p4.XXXXXX)
+cat > "$D/p.mjs" <<'EOF'
+import { openConsole } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/console.mjs';
+import { HARNESS_PREFERENCES } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/prefs-pin.mjs';
+const s = await openConsole({ preferences: { ...HARNESS_PREFERENCES, theme: 'light' } });
+const page = s.page;
+try {
+  await page.route('**/api/companion', (r) => (r.request().method() === 'GET' ? r.fulfill({ status: 500, contentType: 'application/json', body: '{"success":false,"error":{"code":"X","message":"the database is locked"}}' }) : r.continue()));
+  await page.reload({ waitUntil: 'networkidle' });
+  await page.locator('button[data-companion-door]:visible').first().click(); await page.waitForTimeout(6000);
+  const text = (await page.locator('[data-companion-panel]').innerText()).replace(/\s+/g, ' ').slice(0, 90);
+  const retry = await page.locator('[data-companion-panel] button').evaluateAll((bs) => bs.filter((b) => /try again|retry|reload/i.test((b.getAttribute('aria-label') || '') + b.textContent)).length);
+  console.log(`panel text: "${text}" | retry controls: ${retry} | names the failure: ${/could not|couldn't|failed|unable|locked/i.test(text)}`);
+} finally { await s.browser.close(); }
+EOF
+cat > "$D/p.sh" <<'EOF'
+cd /home/lyphe/.claude/claudecodeui_lyphe && node "$1"
+EOF
+bash "$D/p.sh" "$D/p.mjs"
+# expect: today `retry controls: 0 | names the failure: false` (text "Opening Kaylee's conversation…"); a failure sentence or a retry control once the panel can show a failed read
+```
+
+measured 2026-10-27 by chain chain-kaylee--companion--panel-fill-20261027-035941-15be, finding L2, LOW
+probe-key: e15fe305b4d166e917d57463ad242938a084d1c5
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/context/CompanionContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/companionReducer.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-lands.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-lands-page.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-reducer.mjs
+
+## INV-9807 — probe — LOW — `await companion.stop()` first costs the supervisor's whole window when her CLI does not answer (wiring in `server/index.ts`, outside the five target files)
+
+LOW — `await companion.stop()` first costs the supervisor's whole window when her CLI does not answer (wiring in `server/index.ts`, outside the five target files)
+
+```probe
+D=$(mktemp -d /tmp/athena-p5.XXXXXX)
+cat > "$D/p.sh" <<'EOF'
+cd /home/lyphe/.claude/claudecodeui_lyphe
+echo "shutdown order (line: call):"; awk '/const shutdownRuntimeServices/{f=1} f && /await companion\.stop\(\)|cerberus\.stop\(\)|drainHttpServer\(\)/{print NR": "$0} /^\s*};\s*$/ && f && NR>800{exit}' server/index.ts | head -6
+echo "her wind-down bounds:"; grep -n "const CLI_GRACE_MS" server/modules/companion/session/companion-process.ts
+grep -n "async stopAll" -A8 server/modules/companion/companion.service.ts | grep -E "interrupt\(\)|close\("
+EOF
+bash "$D/p.sh"
+# expect: companion.stop() on a line before cerberus.stop() and drainHttpServer(); CLI_GRACE_MS = 5_000; both interrupt() and close() awaited in stopAll (two 5 s bounds back to back, 10 s against the supervisor's 10 s SIGKILL)
+```
+
+measured 2026-10-27 by chain chain-kaylee--companion--panel-fill-20261027-035941-15be, finding L3, LOW
+probe-key: f899846af40571068162f915898752f4d0a05410
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/index.ts
+
+## INV-9808 — probe — LOW — `companion-lands-page.mjs` says it proves the Voice section renders with voice off, and never reads the voice switch
+
+LOW — `companion-lands-page.mjs` says it proves the Voice section renders with voice off, and never reads the voice switch
+
+```probe
+D=$(mktemp -d /tmp/athena-p6.XXXXXX)
+cat > "$D/p.sh" <<'EOF'
+cd /home/lyphe/.claude/claudecodeui_lyphe
+echo "label the proof script looks for:"; grep -n 'aria-label="Enable voice' .verify/companion-lands-page.mjs | cut -c1-140
+echo "label the Voice tab draws:"; node -e 'console.log(JSON.stringify(require("./src/modules/i18n/locales/en/settings.json").voiceSettings.enable))'
+echo "checks that read the voice switch's value (voiceOn):"; grep -n "voiceOn" .verify/companion-lands-page.mjs | cut -c1-150
+EOF
+bash "$D/p.sh"
+# expect: the script's label ends "input" and the tab's is "Enable voice"; voiceOn appears only in the line that reads it and in the evidence detail of one check, never in an assertion; after a fix the two labels match and a check asserts aria-checked
+```
+
+measured 2026-10-27 by chain chain-kaylee--companion--panel-fill-20261027-035941-15be, finding L4, LOW
+probe-key: 00754bc5f631665bc3d188a20b23ea8e8200f922
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/context/CompanionContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/companionReducer.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-lands.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-lands-page.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-reducer.mjs
+
+## INV-9809 — probe — LOW — the proof opens the operator's own account's panel, which writes a row to it
+
+LOW — the proof opens the operator's own account's panel, which writes a row to it
+
+```probe
+D=$(mktemp -d /tmp/athena-p7.XXXXXX)
+cat > "$D/p.sh" <<'EOF'
+echo "the operator's own account companion_state row:"
+sqlite3 -readonly ~/.cloudcli/auth.db "select user_id, substr(floor,1,8), updated_at from companion_state where user_id = (select id from users where username='scott')" || echo none
+EOF
+bash "$D/p.sh"
+# expect: today one row `2|f00464fc|2026-10-27T11:16:51.148Z` (written by the proof's press of her door as scott); the operator's own later use overwrites it, so a different floor or a later time is also a row written by a real page, not this script
+```
+
+measured 2026-10-27 by chain chain-kaylee--companion--panel-fill-20261027-035941-15be, finding L5, LOW
+probe-key: 8085f03c308c0e80160525568ba0e1cf6f1cef0f
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/context/CompanionContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/companionReducer.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-lands.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-lands-page.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-reducer.mjs
+
+## INV-9810 — probe — LOW — with a draft held, "Send turn" is live, accepts the press and does nothing
+
+LOW — with a draft held, "Send turn" is live, accepts the press and does nothing
+
+```probe
+D=$(mktemp -d /tmp/athena-p8.XXXXXX)
+cat > "$D/p.sh" <<'EOF'
+cd /home/lyphe/.claude/claudecodeui_lyphe
+grep -n "onSendDraft" src/modules/companion/CompanionPanel.tsx | sed -n 1,6p
+EOF
+bash "$D/p.sh"
+# expect: the passed prop reads onSendDraft={async () => {}} today (resolves and sends nothing); a rejection with a sentence, or the buttons absent, once the stand-in says what it does
+```
+
+measured 2026-10-27 by chain chain-kaylee--companion--panel-fill-20261027-035941-15be, finding L6, LOW
+probe-key: 583945116295861399d584d723da1ac13104b3f9
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/context/CompanionContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/companionReducer.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-lands.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-lands-page.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-reducer.mjs
+
+## INV-9817 — chat-names — edits that break it: the pass runs at a turn, claims a chat in one step, writes only over the name it read, and trusts nothing Haiku says
+
+Behaviour: MAN-9067. The mark: INV-9787.
+
+| Edit | Breaks | Why |
+| --- | --- | --- |
+| Name chats from a boot pass, a timer or a sweep | chats are named with no turn typed; a handover renames the house | the trigger is a run's end; the house names its events, it does not poll |
+| Drop the `alreadyRecorded` skip in the `onRunCompleted` listener | a re-adopted host's old completion names an idle chat at every boot | that completion is no turn |
+| Put an `await` between the re-read (`nameFactsOf`) and `updateSessionCustomName` | a rename made in the gap is overwritten | with no `await`, nothing in this process can rename the chat between the two |
+| Write with `renameByPerson` or call `markNameGiven` | the app's name reads as his and is never replaced | the mark means a person typed the name |
+| Put an `await` in questions 1 to 4 of `considerChat`, or `inFlight.set` after one | two completions start two passes: two Haiku calls, two writes | the questions claim the chat in one synchronous step |
+| Add a project-visibility question to `considerChat` | probe chats in `PROBE_PROJECT` (a hidden root) are never named, and the live proof cannot show a name | the pass names every app chat; visibility is no question |
+| Fill `attempted` before question 5 | a chat whose first exchange is not yet readable is never named | a chat with nothing to read is asked again at its next turn |
+| Clear `attempted` on a timer or per completion | a chat Haiku cannot name costs a call at every turn | one try per chat per process |
+| Give the Haiku launch tools, `persistSession: true`, `settingSources`, the auto-memory setting on, or a visible `cwd` | it can act, write a transcript that shows as a chat, or read and write the operator's memory | `tools: []`, `persistSession: false`, `autoMemoryEnabled: false`, `~/.claude/state/chat-names` |
+| Write Haiku's reply without `cleanedName`, or accept a result with `is_error` | an API error text ("Prompt is too long") or a sentence becomes the chat's name | an `is_error` turn arrives as `subtype: 'success'` with the error in `result` |
+| Skip `broadcastSessionUpserted` after the write | every sidebar surface keeps the old name until a reload | it is the frame they redraw on |
+| Drop `await chatNamer.stop()` from `shutdownRuntimeServices` | a Haiku child outlives the server | `stop()` aborts the passes and waits for them |
+| Let `readFirstExchange` take an injected `<system-reminder>` / `<task-notification>` turn, a compaction summary or a `<synthetic>` row | a chat is named from text no one wrote | those rows say nothing of what the chat is about |
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/chat-names/chat-namer.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/chat-names/first-exchange.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/chat-names/haiku-name.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/chat-names/sayable-name.ts
+
+## INV-9818 — probe — LOW — a handover boot's re-adoption names an idle unsayable chat with no turn typed
+
+LOW — a handover boot's re-adoption names an idle unsayable chat with no turn typed
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+D="$1"
+export PROBE_PORT=7898
+. scripts/apps-probe-env.sh
+cat > "$D/stub.sh" <<'STUB'
+#!/bin/sh
+case "$PWD" in
+  */.claude/state/chat-names) echo "naming call" >> "$NAMING_CALLS_LOG"; echo "stub: no naming today" >&2; exit 1 ;;
+esac
+exec /home/lyphe/.npm-global/bin/claude "$@"
+STUB
+chmod +x "$D/stub.sh"
+cat > "$D/chat.mjs" <<'JS'
+import { createRequire } from 'node:module';
+const WebSocket = createRequire('/home/lyphe/.claude/claudecodeui_lyphe/package.json')('ws');
+const [, , mode, existing] = process.argv;
+const API = process.env.API;
+const H = { authorization: `Bearer ${process.env.TOKEN}`, 'content-type': 'application/json' };
+if (mode === 'rm') { console.log('removed', (await fetch(`${API}/api/providers/sessions/${existing}?force=true`, { method: 'DELETE', headers: H })).status); process.exit(0); }
+const made = await fetch(`${API}/api/providers/sessions`, { method: 'POST', headers: H, body: JSON.stringify({ provider: 'claude', projectPath: '/tmp/cloudcli-probe-chat', initialMessage: '' }) });
+const id = (await made.json())?.data?.sessionId;
+if (!id) { console.error('no chat', made.status); process.exit(1); }
+const ws = new WebSocket(`${API.replace(/^http/, 'ws')}/ws?token=${encodeURIComponent(process.env.TOKEN)}`);
+const done = new Promise((resolve) => { ws.on('message', (d) => { for (const l of d.toString().split('\n')) { try { const f = JSON.parse(l); if (f.sessionId === id && f.kind === 'complete') resolve(); } catch {} } }); setTimeout(resolve, 100000); });
+ws.on('open', () => {
+  ws.send(JSON.stringify({ type: 'chat.subscribe', sessions: [{ sessionId: id, lastSeq: 0 }] }));
+  ws.send(JSON.stringify({ type: 'chat.send', sessionId: id, content: 'Help me plan a birthday dinner menu for six people, reply in one line.', options: { cwd: '/tmp/cloudcli-probe-chat', model: 'haiku', toolsSettings: { allowedTools: [], disallowedTools: [], skipPermissions: true } } }));
+});
+await done; await new Promise((r) => setTimeout(r, 6000)); ws.close(); console.log(id);
+JS
+cat > "$D/boot-successor.mjs" <<'JS'
+// Boots the API as the dev supervisor boots a successor (IPC channel, CLOUDCLI_SUPERVISED=1, CLOUDCLI_HANDOVER=1), waits for READY,
+// counts the naming calls, sends `takeover`, waits 15 s, counts again. The server stays up; its pid is written to argv[3].
+import { spawn } from 'node:child_process';
+import { openSync, readFileSync, writeFileSync, existsSync } from 'node:fs';
+const [, , repo, log, pidFile] = process.argv;
+const calls = () => (existsSync(process.env.NAMING_CALLS_LOG) ? readFileSync(process.env.NAMING_CALLS_LOG, 'utf8').split('\n').filter(Boolean).length : 0);
+const fd = openSync(log, 'w');
+const child = spawn(`${repo}/node_modules/.bin/tsx`, ['--tsconfig', 'server/tsconfig.json', 'server/index.ts'], { cwd: repo, detached: true, stdio: ['ignore', fd, fd, 'ipc'], env: { ...process.env, CLOUDCLI_SUPERVISED: '1', CLOUDCLI_HANDOVER: '1' } });
+const ready = await new Promise((resolve) => { const to = setTimeout(() => resolve(false), 90000); child.on('message', (m) => { if (m?.type === 'ready') { clearTimeout(to); resolve(true); } }); child.on('exit', () => resolve(false)); });
+if (!ready) { console.log('successor never reported READY'); process.exit(1); }
+writeFileSync(pidFile, String(child.pid));
+await new Promise((r) => setTimeout(r, 3000));
+const before = calls();
+child.send({ type: 'takeover' });
+await new Promise((r) => setTimeout(r, 15000));
+console.log(`SUCCESSOR naming calls: before takeover ${before}, after takeover ${calls()}`);
+child.unref(); process.exit(0);
+JS
+export CLAUDE_CLI_PATH="$D/stub.sh" NAMING_CALLS_LOG="$D/calls.log" TOKEN="$(mint_token)"
+: > "$NAMING_CALLS_LOG"
+boot_probe_server || exit 1
+export API="http://127.0.0.1:$PROBE_PORT"
+ID=$(node "$D/chat.mjs" new) || { stop_probe_server; exit 1; }
+echo "A: chat $ID, one typed turn, naming calls $(wc -l < "$NAMING_CALLS_LOG") (1 = its pass ran; 0 = the turn's id mapping hit a locked database, run again)"
+PID=$(cat "$APPS_PID_FILE")
+case "$PID" in ''|*[!0-9]*|0|1|0[0-9]*) echo "bad pid '$PID'"; stop_probe_server; exit 1 ;; esac
+kill -TERM "$PID"; timeout 40 bash -c 'while kill -0 "$0" 2>/dev/null; do sleep 0.2; done' "$PID"
+rm -f "$APPS_PID_FILE"
+export SERVER_PORT="$PROBE_PORT" CLOUDCLI_LOCAL_SERVER_MARKER="$APPS_MARKER" CLOUDCLI_SESSIONS_DIR="$APPS_SESSIONS_DIR" CERBERUS_DB_PATH="$APPS_CERBERUS_DB" CERBERUS_KEY_PATH="$APPS_CERBERUS_KEY" CERBERUS_LISTEN="127.0.0.1:0"
+node "$D/boot-successor.mjs" "$PWD" "$APPS_LOG" "$APPS_PID_FILE"
+grep -E "taking over|re-adopted [0-9]+ host|Chat names" "$APPS_LOG" | cut -c1-160
+node "$D/chat.mjs" rm "$ID"
+stop_probe_server
+EOF
+bash "$D/p.sh" "$D" 2>&1 | tail -12
+cd /tmp && case "$D" in /tmp/athena-probe.??????) rm -r "$D";; esac
+# expect: with A's naming calls 1, the successor line reads "before takeover 1, after takeover 2" and the log shows "taking over" and "re-adopted 1 host(s)" (one Haiku call on a handover boot with no turn typed); cured when it reads "before takeover 1, after takeover 1"
+```
+
+measured 2026-10-27 by chain chain-kaylee--names--namer-20261027-041926-6f4b, finding L1, LOW
+probe-key: 4cf785852a7fbc3cc7a509b79770f8b5c5f8fe98
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/chat-names/chat-namer.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/chat-names/index.ts
+
+## INV-9819 — probe — LOW — a chat deleted while Haiku answers is logged as "renamed"
+
+LOW — a chat deleted while Haiku answers is logged as "renamed"
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+D="$1"
+export PROBE_PORT=7898
+. scripts/apps-probe-env.sh
+cat > "$D/stub.sh" <<'STUB'
+#!/bin/sh
+case "$PWD" in */.claude/state/chat-names) sleep 4 ;; esac
+exec /home/lyphe/.npm-global/bin/claude "$@"
+STUB
+chmod +x "$D/stub.sh"
+cat > "$D/chat.mjs" <<'JS'
+import { createRequire } from 'node:module';
+const WebSocket = createRequire('/home/lyphe/.claude/claudecodeui_lyphe/package.json')('ws');
+const API = process.env.API;
+const H = { authorization: `Bearer ${process.env.TOKEN}`, 'content-type': 'application/json' };
+const made = await fetch(`${API}/api/providers/sessions`, { method: 'POST', headers: H, body: JSON.stringify({ provider: 'claude', projectPath: '/tmp/cloudcli-probe-chat', initialMessage: '' }) });
+const id = (await made.json())?.data?.sessionId;
+if (!id) { console.error('no chat', made.status); process.exit(1); }
+const ws = new WebSocket(`${API.replace(/^http/, 'ws')}/ws?token=${encodeURIComponent(process.env.TOKEN)}`);
+const done = new Promise((resolve) => { ws.on('message', (d) => { for (const l of d.toString().split('\n')) { try { const f = JSON.parse(l); if (f.sessionId === id && f.kind === 'complete') resolve(); } catch {} } }); setTimeout(resolve, 100000); });
+ws.on('open', () => {
+  ws.send(JSON.stringify({ type: 'chat.subscribe', sessions: [{ sessionId: id, lastSeq: 0 }] }));
+  ws.send(JSON.stringify({ type: 'chat.send', sessionId: id, content: 'Help me plan a birthday dinner menu for six people, reply in one line.', options: { cwd: '/tmp/cloudcli-probe-chat', model: 'haiku', toolsSettings: { allowedTools: [], disallowedTools: [], skipPermissions: true } } }));
+});
+await done;
+await new Promise((r) => setTimeout(r, 1500));
+const del = await fetch(`${API}/api/providers/sessions/${id}?force=true`, { method: 'DELETE', headers: H });
+await new Promise((r) => setTimeout(r, 12000));
+ws.close(); console.log(id, del.status);
+JS
+export CLAUDE_CLI_PATH="$D/stub.sh" TOKEN="$(mint_token)"
+trap stop_probe_server EXIT
+boot_probe_server || exit 1
+export API="http://127.0.0.1:$PROBE_PORT"
+read -r ID STATUS < <(node "$D/chat.mjs") || exit 1
+echo "chat $ID deleted mid-pass (DELETE answered $STATUS); the pass's journal line for it:"
+grep -F '[Chat names]' "$APPS_LOG" | grep -F "$ID" | cut -c1-200 || echo "(no line for this id)"
+EOF
+bash "$D/p.sh" "$D" 2>&1 | tail -6
+cd /tmp && case "$D" in /tmp/athena-probe.??????) rm -r "$D";; esac
+# expect: the line reads "was renamed while Haiku was answering; "<name>" is not written" for a chat that was DELETED, never renamed; cured when the line says the chat is gone (it no longer says "renamed")
+```
+
+measured 2026-10-27 by chain chain-kaylee--names--namer-20261027-041926-6f4b, finding L2, LOW
+probe-key: 1f0e27224a8582fb182994862df5c78a83603a3d
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/chat-names/chat-namer.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/chat-names/index.ts
+
+## INV-9820 — probe — LOW — a chat whose first exchange is not in a whitespace-spaced language stays unnamed for the life of the process
+
+LOW — a chat whose first exchange is not in a whitespace-spaced language stays unnamed for the life of the process
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+D="$1"
+export PROBE_PORT=7898
+. scripts/apps-probe-env.sh
+cat > "$D/chat.mjs" <<'JS'
+import { createRequire } from 'node:module';
+const WebSocket = createRequire('/home/lyphe/.claude/claudecodeui_lyphe/package.json')('ws');
+const API = process.env.API;
+const H = { authorization: `Bearer ${process.env.TOKEN}`, 'content-type': 'application/json' };
+const made = await fetch(`${API}/api/providers/sessions`, { method: 'POST', headers: H, body: JSON.stringify({ provider: 'claude', projectPath: '/tmp/cloudcli-probe-chat', initialMessage: '' }) });
+const id = (await made.json())?.data?.sessionId;
+if (!id) { console.error('no chat', made.status); process.exit(1); }
+const ws = new WebSocket(`${API.replace(/^http/, 'ws')}/ws?token=${encodeURIComponent(process.env.TOKEN)}`);
+const done = new Promise((resolve) => { ws.on('message', (d) => { for (const l of d.toString().split('\n')) { try { const f = JSON.parse(l); if (f.sessionId === id && f.kind === 'complete') resolve(); } catch {} } }); setTimeout(resolve, 100000); });
+ws.on('open', () => {
+  ws.send(JSON.stringify({ type: 'chat.subscribe', sessions: [{ sessionId: id, lastSeq: 0 }] }));
+  ws.send(JSON.stringify({ type: 'chat.send', sessionId: id, content: '誕生日の夕食のメニューを6人分考えて。一行で答えて。', options: { cwd: '/tmp/cloudcli-probe-chat', model: 'haiku', toolsSettings: { allowedTools: [], disallowedTools: [], skipPermissions: true } } }));
+});
+await done;
+await new Promise((r) => setTimeout(r, 20000));
+ws.close(); console.log(id);
+JS
+export TOKEN="$(mint_token)"
+trap stop_probe_server EXIT
+boot_probe_server || exit 1
+export API="http://127.0.0.1:$PROBE_PORT"
+ID=$(node "$D/chat.mjs") || exit 1
+echo "row after the first Japanese turn: $(sqlite3 -readonly ~/.cloudcli/auth.db "select custom_name, name_given from sessions where session_id='$ID'")"
+grep -F '[Chat names]' "$APPS_LOG" | cut -c1-160
+curl -s -o /dev/null -w "removed: %{http_code}\n" -X DELETE -H "authorization: Bearer $TOKEN" "$API/api/providers/sessions/$ID?force=true"
+EOF
+bash "$D/p.sh" "$D" 2>&1 | tail -6
+cd /tmp && case "$D" in /tmp/athena-probe.??????) rm -r "$D";; esac
+# expect: the row stays "Untitled Session|0" and a `[Chat names] Haiku's answer is not a name a person could say (...)` line follows, then `was not named this time` (3 of 3 Japanese first turns on 2026-10-27 stayed unnamed: "誕生日ディナー", "誕生日の夕食メニュー", "Maintaining a six-person birthday dinner menu"); cured when the chat holds a name
+```
+
+measured 2026-10-27 by chain chain-kaylee--names--namer-20261027-041926-6f4b, finding L3, LOW
+probe-key: 0ec3f92f253cee3ad3f3030fe03a7a04c234dffa
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/chat-names/chat-namer.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/chat-names/index.ts
+
+## INV-9821 — probe — The ask she answers "on her own judgment" is shown to her cut at 60 characters; the page shows the whole input
+
+The ask she answers "on her own judgment" is shown to her cut at 60 characters; the page shows the whole input
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+# Probe: what answer_session's own sentences show of a long Bash ask, and what allow / always do with the odd cases.
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.mts" <<'EOT'
+import { answerFor } from '/home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/ask-decision.ts';
+const show = (label: string, r: any) => console.log(label.padEnd(26), r.ok ? `ok decision=${JSON.stringify(r.decision).slice(0, 110)} remember=${r.remember} | ${r.told}` : `refused: ${r.sentence}`);
+const long = 'cd /home/lyphe/.claude/claudecodeui_lyphe && npm run build && rsync -a --delete dist/ prod:/srv/app/';
+show('long command, bad word', answerFor({ requestId: 'r', toolName: 'Bash', input: { command: long } }, 'maybe', 'chat'));
+console.log('rsync --delete starts at char', long.indexOf('rsync'), 'of', long.length);
+show('allow on a question', answerFor({ requestId: 'r', toolName: 'AskUserQuestion', input: { questions: [{ question: 'Tea or coffee?', options: [{ label: 'Tea' }, { label: 'Coffee' }] }] } }, 'allow', 'chat'));
+show('always, compound command', answerFor({ requestId: 'r', toolName: 'Bash', input: { command: 'cd /tmp && rm -rf x' } }, 'always', 'chat'));
+show('always, no command', answerFor({ requestId: 'r', toolName: 'Bash', input: {} }, 'always', 'chat'));
+show('always, sudo', answerFor({ requestId: 'r', toolName: 'Bash', input: { command: 'sudo systemctl restart x' } }, 'always', 'chat'));
+EOT
+# the providers barrel this file imports opens the database module: point it at a path inside the scratch folder
+DATABASE_PATH="$D/auth.db" CERBERUS_DB_PATH="$D/cerberus.db" TSX_TSCONFIG_PATH=server/tsconfig.json timeout 90 node --import tsx "$D/p.mts" 2>&1 | grep -vE "^(Database|Migrated|  from|  to|\{|\})"
+cd / && case "$D" in /tmp/athena-probe.*) rm -rf "$D";; esac
+EOF
+bash "$D/p.sh"
+cd / && case "$D" in /tmp/athena-probe.*) rm -rf "$D";; esac
+# expect: the first line is a refusal ending "Bash cd /home/lyphe/.claude/claudecodeui_lyphe && npm run build &…." with `rsync --delete` (char 62 of 100) absent from it
+```
+
+measured 2026-10-27 by chain chain-kaylee--companion--acts-20261027-050822-c4f5, finding M1, MEDIUM
+probe-key: 3222030e3d50c4a2af8f8cda80e2e5aa85b09be4
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/act-tools.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/ask-decision.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-tool-permission-entry.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-act-direct.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-act-tools.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-act-tools-scratch.sh
+
+## INV-9822 — probe — The permission words, said to a question, become the answer
+
+The permission words, said to a question, become the answer
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.mts" <<'EOT'
+import { answerFor } from '/home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/ask-decision.ts';
+const q = { requestId: 'r', toolName: 'AskUserQuestion', input: { questions: [{ question: 'Tea or coffee?', options: [{ label: 'Tea' }, { label: 'Coffee' }] }] } };
+for (const word of ['allow', 'deny', 'always']) {
+  const r: any = answerFor(q, word, 'chat');
+  console.log(word.padEnd(7), r.ok ? `delivered as the answer: ${JSON.stringify(r.decision.updatedInput.answers)}` : `refused: ${r.sentence}`);
+}
+EOT
+DATABASE_PATH="$D/auth.db" CERBERUS_DB_PATH="$D/cerberus.db" TSX_TSCONFIG_PATH=server/tsconfig.json timeout 90 node --import tsx "$D/p.mts" 2>&1 | grep -E "^(allow|deny|always)"
+cd / && case "$D" in /tmp/athena-probe.*) rm -rf "$D";; esac
+EOF
+bash "$D/p.sh"
+cd / && case "$D" in /tmp/athena-probe.*) rm -rf "$D";; esac
+# expect: three lines `delivered as the answer: {"Tea or coffee?":"allow"}` (and "deny", "always"); cured, each reads `refused: …`
+```
+
+measured 2026-10-27 by chain chain-kaylee--companion--acts-20261027-050822-c4f5, finding L1, LOW
+probe-key: 9bac2b9eba499da9e70bc848bd647542996d33d5
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/act-tools.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/ask-decision.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-tool-permission-entry.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-act-direct.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-act-tools.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-act-tools-scratch.sh
+
+## INV-9823 — probe — After a rename, what she holds names the old name; a duplicate name is silent
+
+After a rename, what she holds names the old name; a duplicate name is silent
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+sqlite3 -readonly ~/.cloudcli/auth.db ".backup '$D/auth.db'" || exit 1
+cat > "$D/p.mts" <<'EOT'
+const db = await import('@/modules/database/index.js'); await db.initializeDatabase();
+db.sessionsDb.createAppSession('ath-1', 'claude', '/tmp/cloudcli-probe-chat', 'ath one');
+db.sessionsDb.createAppSession('ath-2', 'claude', '/tmp/cloudcli-probe-chat', 'ath two');
+const { createCompanionStore } = await import('@/modules/companion/companion-store.js');
+const { createToolDeps } = await import('@/modules/companion/tools/tool-deps.js');
+const { actTools } = await import('@/modules/companion/tools/act-tools.js');
+const store = createCompanionStore(1);
+const runtime: any = { hasRuntime: () => true, run: async () => undefined, abort: async () => true, resolveToolApproval: () => undefined, getPendingApprovalsForSession: () => [] };
+let act: any = { phase: 'idle', session: null, files: null, walk: null };
+const tools = actTools(createToolDeps({ userId: 1, store, runtime, activity: { current: () => act, set: (a: any) => { act = a; } } }));
+const call = (n: string, a: unknown) => tools.find((t) => t.name === n)!.handler(a as never, {} as never);
+const txt = (r: any) => r.content.map((c: any) => c.text).join(' ');
+const ref = { sessionId: 'ath-1', name: 'ath one', project: 'cloudcli-probe-chat' };
+store.setDraft({ target: { kind: 'session', session: ref }, text: 'brief' });
+store.setWalk({ session: ref, items: ['a', 'b'], at: 1 });
+console.log(txt(await call('rename_session', { session: 'ath-1', name: 'renamed one' })));
+const st = store.readState();
+console.log(`focus=${st.focus?.name} | draft target=${(st.draft?.target as any)?.session?.name} | walk=${st.walk?.session?.name}`);
+console.log(txt(await call('rename_session', { session: 'ath-2', name: 'renamed one' })));
+console.log(txt(await call('stop_session', { session: 'renamed one' })));
+process.exit(0);
+EOT
+DATABASE_PATH="$D/auth.db" CERBERUS_DB_PATH="$D/cerberus.db" TSX_TSCONFIG_PATH=server/tsconfig.json timeout 120 node --import tsx "$D/p.mts" 2>&1 | grep -v "^Database"
+cd / && case "$D" in /tmp/athena-probe.*) rm -rf "$D";; esac
+EOF
+bash "$D/p.sh"
+cd / && case "$D" in /tmp/athena-probe.*) rm -rf "$D";; esac
+# expect: `focus=renamed one | draft target=ath one | walk=ath one`, then the second rename succeeds with no word about the clash, then stop_session on "renamed one" reads `"renamed one" fits 2 chats: …`
+```
+
+measured 2026-10-27 by chain chain-kaylee--companion--acts-20261027-050822-c4f5, finding L3, LOW
+probe-key: e9d31d2d1d1660c78a878e3ae7d43d9b5413a256
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/act-tools.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/ask-decision.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-tool-permission-entry.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-act-direct.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-act-tools.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-act-tools-scratch.sh
+
+## INV-9824 — probe — A stale page erases her remembered entry (the builder flagged this; it is not cured)
+
+A stale page erases her remembered entry (the builder flagged this; it is not cured)
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+sqlite3 -readonly ~/.cloudcli/auth.db ".backup '$D/auth.db'" || exit 1
+cat > "$D/p.mts" <<'EOT'
+const db = await import('@/modules/database/index.js'); await db.initializeDatabase();
+db.sessionsDb.createAppSession('ath-1', 'claude', '/tmp/cloudcli-probe-chat', 'ath one');
+const { createCompanionStore } = await import('@/modules/companion/companion-store.js');
+const { createToolDeps } = await import('@/modules/companion/tools/tool-deps.js');
+const { actTools } = await import('@/modules/companion/tools/act-tools.js');
+const { userPreferencesDb } = db;
+const asks = [{ requestId: 'r1', toolName: 'Bash', input: { command: 'uname -a' }, sessionId: 'ath-1', receivedAt: new Date() }];
+const runtime: any = { hasRuntime: () => true, run: async () => undefined, abort: async () => true, resolveToolApproval: () => undefined, getPendingApprovalsForSession: () => asks };
+let act: any = { phase: 'idle', session: null, files: null, walk: null };
+const tools = actTools(createToolDeps({ userId: 1, store: createCompanionStore(1), runtime, activity: { current: () => act, set: (a: any) => { act = a; } } }));
+const stored = () => JSON.stringify((userPreferencesDb.getPreferences(1) as any).claudePermissions?.allowedTools);
+const stalePage = (userPreferencesDb.getPreferences(1) as any).claudePermissions;   // what a page hydrated at sign-in holds
+console.log('before            ', stored());
+await tools.find((t) => t.name === 'answer_session')!.handler({ session: 'ath-1', answer: 'always' } as never, {} as never);
+console.log('after her always  ', stored());
+userPreferencesDb.savePreferences(1, { claudePermissions: { ...stalePage, allowedTools: [...(stalePage?.allowedTools ?? []), 'WebFetch'] } });
+console.log('after page write  ', stored());
+process.exit(0);
+EOT
+DATABASE_PATH="$D/auth.db" CERBERUS_DB_PATH="$D/cerberus.db" TSX_TSCONFIG_PATH=server/tsconfig.json timeout 90 node --import tsx "$D/p.mts" 2>&1 | grep -E "^(before|after)"
+cd / && case "$D" in /tmp/athena-probe.*) rm -rf "$D";; esac
+EOF
+bash "$D/p.sh"
+cd / && case "$D" in /tmp/athena-probe.*) rm -rf "$D";; esac
+# expect: `before []`, `after her always ["Bash(uname:*)"]`, `after page write ["WebFetch"]` (her entry is gone); cured, the last line still holds `Bash(uname:*)`
+```
+
+measured 2026-10-27 by chain chain-kaylee--companion--acts-20261027-050822-c4f5, finding L4, LOW
+probe-key: 96de575752e30bec6cee571b5946cd95610cb478
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/act-tools.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/ask-decision.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-tool-permission-entry.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-act-direct.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-act-tools.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-act-tools-scratch.sh
+
+## INV-9825 — probe — The rename leg of the driver fails whenever Haiku capitalises the name
+
+The rename leg of the driver fails whenever Haiku capitalises the name
+
+```probe
+cd /home/lyphe/.claude/claudecodeui_lyphe && grep -n "=== 'probe acts" .verify/companion-act-tools.mjs || echo none
+# expect: two lines (322 and 325) compare with exact case; cured, they compare case-insensitively (a run on 2026-10-27 printed both FAIL with `Probe acts|1` in the row)
+```
+
+measured 2026-10-27 by chain chain-kaylee--companion--acts-20261027-050822-c4f5, finding L5, LOW
+probe-key: 319636f0d9bde1b2e4bc26965599f23c9184489d
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/act-tools.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/ask-decision.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-tool-permission-entry.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-act-direct.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-act-tools.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-act-tools-scratch.sh
+
+## INV-9826 — probe — The scratch runner leaves the legs' session hosts alive after its server and chats are gone
+
+The scratch runner leaves the legs' session hosts alive after its server and chats are gone
+
+```probe
+pgrep -af "session-host/host.js .* /tmp/sunset[0-9]-sessions" | cut -c1-30,100-230 || echo none
+# expect: after a run of the scratch runner, a host line per leg that raised an ask (perm, always, ask) remains for its slot, each with a `claude --model=haiku` child
+```
+
+measured 2026-10-27 by chain chain-kaylee--companion--acts-20261027-050822-c4f5, finding L6, LOW
+probe-key: 7c9ad3e245093b71555557f603ec97b25ae0b720
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/act-tools.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/ask-decision.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-tool-permission-entry.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-act-direct.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-act-tools.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-act-tools-scratch.sh
+
+## INV-9827 — probe — MEDIUM — real credential files still reach a dactyl: the list is a net, and the roots still hold files it does not name
+
+MEDIUM — real credential files still reach a dactyl: the list is a net, and the roots still hold files it does not name
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+D="$1"
+R=/home/lyphe/.claude/claudecodeui_lyphe
+sqlite3 -readonly /home/lyphe/.cloudcli/auth.db ".backup '$D/auth.db'" || exit 1
+cat > "$D/run.mts" <<'INNER'
+import fs from 'node:fs';
+const { initializeDatabase } = await import('@/modules/database/index.js');
+await initializeDatabase();
+const { resolveDactylFiles } = await import('@/modules/companion/tools/dactyl-paths.js');
+const names = ['/home/lyphe/.codex/auth.json', '/home/lyphe/.openclaw/openclaw.json', '/home/lyphe/.openclaw/identity/device.json', '/home/lyphe/.config/opencode/opencode.json', '/home/lyphe/.vscode-server/cli/agent-host-token'];
+for (const name of names) {
+  if (!fs.existsSync(name)) { console.log('absent  ', name); continue; }
+  console.log(resolveDactylFiles(2, [name]).ok ? 'REACHES A DACTYL' : 'refused         ', name);
+}
+process.exit(0);
+INNER
+( cd "$R" && CERBERUS_DB_PATH="$D/cerberus.db" DATABASE_PATH="$D/auth.db" TSX_TSCONFIG_PATH=server/tsconfig.json timeout 90 node --import tsx "$D/run.mts" 2>&1 | grep -v '^Database' | tail -6 )
+EOF
+bash "$D/p.sh" "$D"
+cd /tmp && case "$D" in /tmp/athena-probe.??????) rm -r "$D";; esac
+echo "[probe exit $?]"
+# expect: today `REACHES A DACTYL` on every file listed that exists (~/.codex/auth.json holds OAuth tokens, ~/.openclaw/openclaw.json a gateway token, identity/device.json a privateKeyPem, opencode.json an MCP token, agent-host-token a 36-byte token); cured: `refused` on all of them
+```
+
+measured 2026-10-27 by chain chain-kaylee--companion--reads-20261027-050821-02e8, finding M1, MEDIUM
+probe-key: 1db53b988b2b9edd6b97dfa4444f6fb6c9401e2e
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/dactyl-paths.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/read-tools.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/transcript-render.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/transcript-turns.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-read-tools.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-turn-windows.mjs
+
+## INV-9828 — probe — LOW — a window whose newest turn is over one reader's gate answers "tell him it is too long" though the older turns could be digested
+
+LOW — a window whose newest turn is over one reader's gate answers "tell him it is too long" though the older turns could be digested
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+D="$1"
+R=/home/lyphe/.claude/claudecodeui_lyphe
+mkdir -p "$D/home/.claude/scripts" "$D/home/.claude/state"
+sqlite3 -readonly /home/lyphe/.cloudcli/auth.db ".backup '$D/auth.db'" || exit 1
+printf '#!/bin/bash\ncat > /dev/null\necho "✓ dactyl --read stub — 1 lines"\necho "quotes: 0 found, 0 not found"\n' > "$D/home/.claude/scripts/dactyl"
+chmod +x "$D/home/.claude/scripts/dactyl"
+cat > "$D/run.mts" <<'INNER'
+import fs from 'node:fs';
+import { execFileSync } from 'node:child_process';
+const D = process.argv[2];
+const { initializeDatabase } = await import('@/modules/database/index.js');
+await initializeDatabase();
+const { buildCompanionTools } = await import('@/modules/companion/tools/companion-tools.js');
+const { createCompanionStore } = await import('@/modules/companion/companion-store.js');
+const { createToolDeps } = await import('@/modules/companion/tools/tool-deps.js');
+const { providerRuntimeService } = await import('@/modules/providers/index.js');
+const store = createCompanionStore(2);
+let activity: any = { phase: 'idle', session: null, files: null, walk: null };
+const deps = createToolDeps({ userId: 2, store, runtime: providerRuntimeService as any, activity: { current: () => activity, set: (n: any) => { activity = n; } } });
+const tool = buildCompanionTools(deps).find((t: any) => t.name === 'read_session') as any;
+const sid = 'ath00000-0000-4000-8000-000000000601', pid = 'ath00000-0000-4000-8000-000000000602';
+// ten turns: nine small, then a newest turn of 400 KB (his own paste of a log, say)
+const replies = [...Array.from({ length: 9 }, (_, k) => `small reply ${k + 1}`), ' harbor log line of padding text\n'.repeat(13000)];
+const rows: any[] = [];
+replies.forEach((rep, k) => {
+  const ts = new Date(Date.UTC(2026, 9, 20, 10, 0, 0) + k * 60000).toISOString();
+  rows.push({ type: 'user', sessionId: pid, uuid: crypto.randomUUID(), timestamp: ts, message: { role: 'user', content: `question ${k + 1}` } });
+  rows.push({ type: 'assistant', sessionId: pid, uuid: crypto.randomUUID(), timestamp: ts, message: { role: 'assistant', content: [{ type: 'text', text: rep }] } });
+});
+fs.writeFileSync(`${D}/c.jsonl`, rows.map((r) => JSON.stringify(r)).join('\n') + '\n');
+execFileSync('sqlite3', [`${D}/auth.db`, `insert into sessions (session_id, provider, provider_session_id, custom_name, project_path, jsonl_path, isArchived) values ('${sid}','claude','${pid}','athena huge newest','/home/lyphe/.claude','${D}/c.jsonl',0)`]);
+const r = await tool.handler({ session: 'athena huge newest', scope: 'recent' }, {});
+console.log(`recent of 10 turns, nine of them tiny: isError=${r.isError === true}\n${(r.content[0].text as string).slice(0, 200).replace(/\n/g, ' ')}`);
+process.exit(0);
+INNER
+( cd "$R" && HOME="$D/home" CERBERUS_DB_PATH="$D/cerberus.db" DATABASE_PATH="$D/auth.db" TSX_TSCONFIG_PATH=server/tsconfig.json timeout 90 node --import tsx "$D/run.mts" "$D" 2>&1 | grep -v '^Database' | tail -4 )
+EOF
+bash "$D/p.sh" "$D"
+cd /tmp && case "$D" in /tmp/athena-probe.??????) rm -r "$D";; esac
+echo "[probe exit $?]"
+# expect: today `isError=true` and "the newest turn alone is more than one reader takes … Tell him it is too long to go through aloud." although nine small turns could be digested; cured: `isError=false`, a digest of the turns that fit with a note that the newest was left out
+```
+
+measured 2026-10-27 by chain chain-kaylee--companion--reads-20261027-050821-02e8, finding L1, LOW
+probe-key: e4435816ed95026bda8f39abf516c9d4994906d4
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/dactyl-paths.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/read-tools.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/transcript-render.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/transcript-turns.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-read-tools.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-turn-windows.mjs
+
+## INV-9829 — probe — MEDIUM — a failed Claude run is announced twice: a `failed` alert, then `<session event="finished">` with its partial text
+
+MEDIUM — a failed Claude run is announced twice: a `failed` alert, then `<session event="finished">` with its partial text
+
+```probe
+D=$(mktemp -d /tmp/athena-pf.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'OUTER'
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+sqlite3 ~/.cloudcli/auth.db ".backup '$D/auth.db'" || exit 1
+sqlite3 "$D/auth.db" "INSERT INTO users(id,username,password_hash,git_name) VALUES (987,'athena-a','x','ScottDeJesus')"
+mkdir -p "$D/home/.claude/scripts"
+printf '#!/bin/bash\nwhile IFS= read -r line; do echo "[$(date -u +%%H:%%M:%%S.%%3N)] $PWD $line" >> "$STUB_LOG"; done\n' > "$D/stub-claude"; chmod 755 "$D/stub-claude"
+printf '#!/bin/bash\ncat > /dev/null\nsleep 6\necho "✓ dactyl --read x — 9 lines"\necho "- L3: a digest"\necho "  quotes: 1 checked, all found"\n' > "$D/home/.claude/scripts/dactyl"; chmod 755 "$D/home/.claude/scripts/dactyl"
+cat > "$D/kit.mts" <<'EOF'
+import fs from 'node:fs';
+const R = '/home/lyphe/.claude/claudecodeui_lyphe/server/modules';
+const { createCompanionModule } = await import(`${R}/companion/index.ts`);
+const { providerRuntimeService } = await import(`${R}/providers/index.ts`);
+const { connectedClients, chatRunRegistry } = await import(`${R}/websocket/index.ts`);
+const { registerSocketUser } = await import(`${R}/websocket/services/websocket-state.service.ts`);
+const N = await import(`${R}/notifications/index.ts`);
+const { saveCompanionSettings } = await import(`${R}/companion/companion-settings.ts`);
+const DB = await import(`${R}/database/index.ts`);
+const { createNormalizedMessage } = await import('/home/lyphe/.claude/claudecodeui_lyphe/server/shared/utils.ts');
+export { DB, N, chatRunRegistry };
+export const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+export const A = 'aaaaaaaa-0000-4000-8000-0000000000a1';
+export const page = () => { const ws: any = { readyState: 1, send() {} }; registerSocketUser(ws, 987); connectedClients.add(ws); return ws; };
+export const chat = (id: string, name: string) => {
+  const db = DB.getConnection();
+  db.prepare('INSERT OR IGNORE INTO projects (project_id, project_path) VALUES (?, ?)').run('p-x', '/opt/athena-probe-proj');
+  db.prepare("INSERT INTO sessions (session_id, provider, project_path, custom_name, isArchived, created_at, updated_at) VALUES (?, 'claude', '/opt/athena-probe-proj', ?, 0, '2026-10-26T10:00:00Z', '2026-10-26T10:00:00Z')").run(id, name);
+};
+export const ev = (code: string, kind: string, over: Record<string, unknown> = {}) => N.createNotificationEvent({ provider: 'claude', kind, code, ...over });
+export const notify = (event: object) => N.notifyUserIfEnabled({ userId: 987, event });
+export const live = (on = true) => saveCompanionSettings(987, { live: on });
+export const focus = (id: string, name: string) => DB.companionDb.writeState(987, { focus_json: JSON.stringify({ sessionId: id, name, project: 'athena-probe-proj' }) });
+export const reply = (id: string, text: string, code?: [string, string, object]) => {
+  const run: any = chatRunRegistry.startRun({ appSessionId: id, provider: 'claude', providerSessionId: null, connection: null, userId: 987 });
+  run.writer.send(createNormalizedMessage({ provider: 'claude', sessionId: id, kind: 'text', role: 'assistant', content: text }));
+  if (code) notify(ev(code[0], code[1], { sessionId: id, dedupeKey: 'k-' + code[0], meta: code[2] }));
+  chatRunRegistry.completeRun(id, { exitCode: 0 });
+};
+export const pushed = () => (fs.existsSync(process.env.STUB_LOG!) ? fs.readFileSync(process.env.STUB_LOG!, 'utf8').split('\n').filter((l) => l.includes('"type":"user"')).map((l) => JSON.parse(l.replace(/^\[[\d:.]+\] \S+ /, '')).message.content as string) : []);
+export const companion = createCompanionModule({ runtime: providerRuntimeService });
+EOF
+cat > "$D/d.mts" <<'EOF'
+import { DB, N, A, sleep, page, chat, ev, notify, live, focus, reply, pushed, companion, chatRunRegistry } from './kit.mts';
+chat(A, 'probe kaylee'); live(); focus(A, 'probe kaylee'); page();
+reply(A, 'partial work before the failure', ['run.failed', 'error', { error: 'error_during_execution' }]);   // what the Claude runtime does for a failed result: raises run.failed, then sends complete(0) with no error row
+await sleep(4500);
+const t = pushed().join('\n'); const n = (re: RegExp) => (t.match(re) ?? []).length;
+console.log('one failed run -> failed alerts', n(/kind="failed"/g), '| finished news', n(/event="finished"/g));
+await companion.stop(); process.exit(0);
+EOF
+( cd /home/lyphe/.claude/claudecodeui_lyphe && env -i HOME="$D/home" PATH="$PATH" STUB_LOG="$D/stub.log" CLAUDE_CLI_PATH="$D/stub-claude" DATABASE_PATH="$D/auth.db" TSX_TSCONFIG_PATH=server/tsconfig.json timeout 100 node --import tsx "$D/d.mts" 2>&1 | grep -v "^\s*at \|^\[Companion\]\|^\[Notifications\]\|^  [a-z]*: \|^}" | tail -12 )
+case "$D" in /tmp/athena-probe.*) cd /tmp && rm -r "$D" ;; esac
+OUTER
+bash "$D/p.sh"
+case "$D" in /tmp/athena-pf.*) cd /tmp && rm -r "$D" ;; esac
+# expect: one failed run -> failed alerts 1 | finished news 1 (today: the same failed run is told twice); "finished news 0" once the focus feed can tell a failed run from a finished one
+```
+
+measured 2026-10-27 by chain chain-kaylee--companion--feeds-20261027-050823-21ab, finding M1, MEDIUM
+probe-key: 18d42fb58b3d70eb4e6ca172c384625c6cf2ccce
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/feeds/alert-block.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/feeds/alert-feed.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/feeds/focus-feed.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notifications/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-alert-feed.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-hears-unasked.mjs
+
+## INV-9830 — probe — LOW — ruling 17: the alerts still say "budget" and "rate_limit"
+
+LOW — ruling 17: the alerts still say "budget" and "rate_limit"
+
+```probe
+D=$(mktemp -d /tmp/athena-pf.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'OUTER'
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+sqlite3 ~/.cloudcli/auth.db ".backup '$D/auth.db'" || exit 1
+sqlite3 "$D/auth.db" "INSERT INTO users(id,username,password_hash,git_name) VALUES (987,'athena-a','x','ScottDeJesus')"
+mkdir -p "$D/home/.claude/scripts"
+printf '#!/bin/bash\nwhile IFS= read -r line; do echo "[$(date -u +%%H:%%M:%%S.%%3N)] $PWD $line" >> "$STUB_LOG"; done\n' > "$D/stub-claude"; chmod 755 "$D/stub-claude"
+printf '#!/bin/bash\ncat > /dev/null\nsleep 6\necho "✓ dactyl --read x — 9 lines"\necho "- L3: a digest"\necho "  quotes: 1 checked, all found"\n' > "$D/home/.claude/scripts/dactyl"; chmod 755 "$D/home/.claude/scripts/dactyl"
+cat > "$D/kit.mts" <<'EOF'
+import fs from 'node:fs';
+const R = '/home/lyphe/.claude/claudecodeui_lyphe/server/modules';
+const { createCompanionModule } = await import(`${R}/companion/index.ts`);
+const { providerRuntimeService } = await import(`${R}/providers/index.ts`);
+const { connectedClients, chatRunRegistry } = await import(`${R}/websocket/index.ts`);
+const { registerSocketUser } = await import(`${R}/websocket/services/websocket-state.service.ts`);
+const N = await import(`${R}/notifications/index.ts`);
+const { saveCompanionSettings } = await import(`${R}/companion/companion-settings.ts`);
+const DB = await import(`${R}/database/index.ts`);
+const { createNormalizedMessage } = await import('/home/lyphe/.claude/claudecodeui_lyphe/server/shared/utils.ts');
+export { DB, N, chatRunRegistry };
+export const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+export const A = 'aaaaaaaa-0000-4000-8000-0000000000a1';
+export const page = () => { const ws: any = { readyState: 1, send() {} }; registerSocketUser(ws, 987); connectedClients.add(ws); return ws; };
+export const chat = (id: string, name: string) => {
+  const db = DB.getConnection();
+  db.prepare('INSERT OR IGNORE INTO projects (project_id, project_path) VALUES (?, ?)').run('p-x', '/opt/athena-probe-proj');
+  db.prepare("INSERT INTO sessions (session_id, provider, project_path, custom_name, isArchived, created_at, updated_at) VALUES (?, 'claude', '/opt/athena-probe-proj', ?, 0, '2026-10-26T10:00:00Z', '2026-10-26T10:00:00Z')").run(id, name);
+};
+export const ev = (code: string, kind: string, over: Record<string, unknown> = {}) => N.createNotificationEvent({ provider: 'claude', kind, code, ...over });
+export const notify = (event: object) => N.notifyUserIfEnabled({ userId: 987, event });
+export const live = (on = true) => saveCompanionSettings(987, { live: on });
+export const focus = (id: string, name: string) => DB.companionDb.writeState(987, { focus_json: JSON.stringify({ sessionId: id, name, project: 'athena-probe-proj' }) });
+export const reply = (id: string, text: string, code?: [string, string, object]) => {
+  const run: any = chatRunRegistry.startRun({ appSessionId: id, provider: 'claude', providerSessionId: null, connection: null, userId: 987 });
+  run.writer.send(createNormalizedMessage({ provider: 'claude', sessionId: id, kind: 'text', role: 'assistant', content: text }));
+  if (code) notify(ev(code[0], code[1], { sessionId: id, dedupeKey: 'k-' + code[0], meta: code[2] }));
+  chatRunRegistry.completeRun(id, { exitCode: 0 });
+};
+export const pushed = () => (fs.existsSync(process.env.STUB_LOG!) ? fs.readFileSync(process.env.STUB_LOG!, 'utf8').split('\n').filter((l) => l.includes('"type":"user"')).map((l) => JSON.parse(l.replace(/^\[[\d:.]+\] \S+ /, '')).message.content as string) : []);
+export const companion = createCompanionModule({ runtime: providerRuntimeService });
+EOF
+cat > "$D/d.mts" <<'EOF'
+import { DB, N, A, sleep, page, chat, ev, notify, live, focus, reply, pushed, companion, chatRunRegistry } from './kit.mts';
+chat(A, 'probe kaylee'); live(); page();
+notify(ev('run.limit', 'error', { sessionId: A, dedupeKey: 'l1', meta: { limit: 'budget', totalCostUsd: 2.5, sessionName: 'probe kaylee' } }));
+notify(ev('api.error', 'error', { sessionId: A, dedupeKey: 'l3', meta: { reason: 'rate_limit', attempts: 3, sessionName: 'probe kaylee' } }));
+await sleep(4500);
+const t = pushed().flatMap((m) => m.match(/<alert [\s\S]*?<\/alert>/g) ?? []).join('\n');
+console.log('spend or usage words in the <alert> blocks she is pushed:', JSON.stringify([...new Set(t.match(/\bbudget\b|rate_limit|\$\s?\d|\btokens?\b|\busage\b/gi) ?? [])]));
+await companion.stop(); process.exit(0);
+EOF
+( cd /home/lyphe/.claude/claudecodeui_lyphe && env -i HOME="$D/home" PATH="$PATH" STUB_LOG="$D/stub.log" CLAUDE_CLI_PATH="$D/stub-claude" DATABASE_PATH="$D/auth.db" TSX_TSCONFIG_PATH=server/tsconfig.json timeout 100 node --import tsx "$D/d.mts" 2>&1 | grep -v "^\s*at \|^\[Companion\]\|^\[Notifications\]\|^  [a-z]*: \|^}" | tail -12 )
+case "$D" in /tmp/athena-probe.*) cd /tmp && rm -r "$D" ;; esac
+OUTER
+bash "$D/p.sh"
+case "$D" in /tmp/athena-pf.*) cd /tmp && rm -r "$D" ;; esac
+# expect: ["budget","rate_limit"] today; [] once the alert wording stops naming a budget or a rate limit
+```
+
+measured 2026-10-27 by chain chain-kaylee--companion--feeds-20261027-050823-21ab, finding L1, LOW
+probe-key: 155f4be33606c669c0afd151bec031ed0112f43d
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/feeds/alert-block.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/feeds/alert-feed.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/feeds/focus-feed.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notifications/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-alert-feed.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-hears-unasked.mjs
+
+## INV-9831 — probe — LOW — an optional enrichment's fault costs the alert itself
+
+LOW — an optional enrichment's fault costs the alert itself
+
+```probe
+D=$(mktemp -d /tmp/athena-pf.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'OUTER'
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+sqlite3 ~/.cloudcli/auth.db ".backup '$D/auth.db'" || exit 1
+sqlite3 "$D/auth.db" "INSERT INTO users(id,username,password_hash,git_name) VALUES (987,'athena-a','x','ScottDeJesus')"
+mkdir -p "$D/home/.claude/scripts"
+printf '#!/bin/bash\nwhile IFS= read -r line; do echo "[$(date -u +%%H:%%M:%%S.%%3N)] $PWD $line" >> "$STUB_LOG"; done\n' > "$D/stub-claude"; chmod 755 "$D/stub-claude"
+printf '#!/bin/bash\ncat > /dev/null\nsleep 6\necho "✓ dactyl --read x — 9 lines"\necho "- L3: a digest"\necho "  quotes: 1 checked, all found"\n' > "$D/home/.claude/scripts/dactyl"; chmod 755 "$D/home/.claude/scripts/dactyl"
+cat > "$D/kit.mts" <<'EOF'
+import fs from 'node:fs';
+const R = '/home/lyphe/.claude/claudecodeui_lyphe/server/modules';
+const { createCompanionModule } = await import(`${R}/companion/index.ts`);
+const { providerRuntimeService } = await import(`${R}/providers/index.ts`);
+const { connectedClients, chatRunRegistry } = await import(`${R}/websocket/index.ts`);
+const { registerSocketUser } = await import(`${R}/websocket/services/websocket-state.service.ts`);
+const N = await import(`${R}/notifications/index.ts`);
+const { saveCompanionSettings } = await import(`${R}/companion/companion-settings.ts`);
+const DB = await import(`${R}/database/index.ts`);
+const { createNormalizedMessage } = await import('/home/lyphe/.claude/claudecodeui_lyphe/server/shared/utils.ts');
+export { DB, N, chatRunRegistry };
+export const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+export const A = 'aaaaaaaa-0000-4000-8000-0000000000a1';
+export const page = () => { const ws: any = { readyState: 1, send() {} }; registerSocketUser(ws, 987); connectedClients.add(ws); return ws; };
+export const chat = (id: string, name: string) => {
+  const db = DB.getConnection();
+  db.prepare('INSERT OR IGNORE INTO projects (project_id, project_path) VALUES (?, ?)').run('p-x', '/opt/athena-probe-proj');
+  db.prepare("INSERT INTO sessions (session_id, provider, project_path, custom_name, isArchived, created_at, updated_at) VALUES (?, 'claude', '/opt/athena-probe-proj', ?, 0, '2026-10-26T10:00:00Z', '2026-10-26T10:00:00Z')").run(id, name);
+};
+export const ev = (code: string, kind: string, over: Record<string, unknown> = {}) => N.createNotificationEvent({ provider: 'claude', kind, code, ...over });
+export const notify = (event: object) => N.notifyUserIfEnabled({ userId: 987, event });
+export const live = (on = true) => saveCompanionSettings(987, { live: on });
+export const focus = (id: string, name: string) => DB.companionDb.writeState(987, { focus_json: JSON.stringify({ sessionId: id, name, project: 'athena-probe-proj' }) });
+export const reply = (id: string, text: string, code?: [string, string, object]) => {
+  const run: any = chatRunRegistry.startRun({ appSessionId: id, provider: 'claude', providerSessionId: null, connection: null, userId: 987 });
+  run.writer.send(createNormalizedMessage({ provider: 'claude', sessionId: id, kind: 'text', role: 'assistant', content: text }));
+  if (code) notify(ev(code[0], code[1], { sessionId: id, dedupeKey: 'k-' + code[0], meta: code[2] }));
+  chatRunRegistry.completeRun(id, { exitCode: 0 });
+};
+export const pushed = () => (fs.existsSync(process.env.STUB_LOG!) ? fs.readFileSync(process.env.STUB_LOG!, 'utf8').split('\n').filter((l) => l.includes('"type":"user"')).map((l) => JSON.parse(l.replace(/^\[[\d:.]+\] \S+ /, '')).message.content as string) : []);
+export const companion = createCompanionModule({ runtime: providerRuntimeService });
+EOF
+cat > "$D/d.mts" <<'EOF'
+import { DB, N, A, sleep, page, chat, ev, notify, live, focus, reply, pushed, companion, chatRunRegistry } from './kit.mts';
+chat(A, 'probe kaylee'); live(); page();
+const fire = (k: string) => notify(ev('run.failed', 'error', { sessionId: A, dedupeKey: k, meta: { error: 'it broke' } }));
+fire('ok-1'); await sleep(4500); console.log('followups table present: pushed', pushed().length);
+DB.getConnection().exec('DROP TABLE followups');          // only the optional "Follow-ups it filed" line cannot be read now
+fire('ok-2'); await sleep(4500); console.log('followups table gone  : pushed', pushed().length, '(1 = the second alert never reached her)');
+DB.getConnection().exec("CREATE TRIGGER athena_fault BEFORE INSERT ON companion_log BEGIN SELECT RAISE(ABORT, 'athena fault'); END");   // only her panel's log row cannot be written
+fire('ok-3'); await sleep(4500); console.log('panel row unwritable   : pushed', pushed().length, '(1 = the third alert never reached her)');
+await companion.stop(); process.exit(0);
+EOF
+( cd /home/lyphe/.claude/claudecodeui_lyphe && env -i HOME="$D/home" PATH="$PATH" STUB_LOG="$D/stub.log" CLAUDE_CLI_PATH="$D/stub-claude" DATABASE_PATH="$D/auth.db" TSX_TSCONFIG_PATH=server/tsconfig.json timeout 100 node --import tsx "$D/d.mts" 2>&1 | grep -v "^\s*at \|^\[Companion\]\|^\[Notifications\]\|^  [a-z]*: \|^}" | tail -12 )
+case "$D" in /tmp/athena-probe.*) cd /tmp && rm -r "$D" ;; esac
+OUTER
+bash "$D/p.sh"
+case "$D" in /tmp/athena-pf.*) cd /tmp && rm -r "$D" ;; esac
+# expect: "followups table gone  : pushed 1" and "panel row unwritable   : pushed 1" today (the count is cumulative: the second and third alerts never reached her); 2 and then 3 once an enrichment's fault no longer costs the alert
+```
+
+measured 2026-10-27 by chain chain-kaylee--companion--feeds-20261027-050823-21ab, finding L2, LOW
+probe-key: b7f9a207673f4cf73f3ac63e0f99520d755cb37f
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/feeds/alert-block.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/feeds/alert-feed.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/feeds/focus-feed.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notifications/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-alert-feed.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-hears-unasked.mjs
+
+## INV-9832 — probe — LOW — Live switched off while a digest is out still speaks
+
+LOW — Live switched off while a digest is out still speaks
+
+```probe
+D=$(mktemp -d /tmp/athena-pf.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'OUTER'
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+sqlite3 ~/.cloudcli/auth.db ".backup '$D/auth.db'" || exit 1
+sqlite3 "$D/auth.db" "INSERT INTO users(id,username,password_hash,git_name) VALUES (987,'athena-a','x','ScottDeJesus')"
+mkdir -p "$D/home/.claude/scripts"
+printf '#!/bin/bash\nwhile IFS= read -r line; do echo "[$(date -u +%%H:%%M:%%S.%%3N)] $PWD $line" >> "$STUB_LOG"; done\n' > "$D/stub-claude"; chmod 755 "$D/stub-claude"
+printf '#!/bin/bash\ncat > /dev/null\nsleep 6\necho "✓ dactyl --read x — 9 lines"\necho "- L3: a digest"\necho "  quotes: 1 checked, all found"\n' > "$D/home/.claude/scripts/dactyl"; chmod 755 "$D/home/.claude/scripts/dactyl"
+cat > "$D/kit.mts" <<'EOF'
+import fs from 'node:fs';
+const R = '/home/lyphe/.claude/claudecodeui_lyphe/server/modules';
+const { createCompanionModule } = await import(`${R}/companion/index.ts`);
+const { providerRuntimeService } = await import(`${R}/providers/index.ts`);
+const { connectedClients, chatRunRegistry } = await import(`${R}/websocket/index.ts`);
+const { registerSocketUser } = await import(`${R}/websocket/services/websocket-state.service.ts`);
+const N = await import(`${R}/notifications/index.ts`);
+const { saveCompanionSettings } = await import(`${R}/companion/companion-settings.ts`);
+const DB = await import(`${R}/database/index.ts`);
+const { createNormalizedMessage } = await import('/home/lyphe/.claude/claudecodeui_lyphe/server/shared/utils.ts');
+export { DB, N, chatRunRegistry };
+export const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+export const A = 'aaaaaaaa-0000-4000-8000-0000000000a1';
+export const page = () => { const ws: any = { readyState: 1, send() {} }; registerSocketUser(ws, 987); connectedClients.add(ws); return ws; };
+export const chat = (id: string, name: string) => {
+  const db = DB.getConnection();
+  db.prepare('INSERT OR IGNORE INTO projects (project_id, project_path) VALUES (?, ?)').run('p-x', '/opt/athena-probe-proj');
+  db.prepare("INSERT INTO sessions (session_id, provider, project_path, custom_name, isArchived, created_at, updated_at) VALUES (?, 'claude', '/opt/athena-probe-proj', ?, 0, '2026-10-26T10:00:00Z', '2026-10-26T10:00:00Z')").run(id, name);
+};
+export const ev = (code: string, kind: string, over: Record<string, unknown> = {}) => N.createNotificationEvent({ provider: 'claude', kind, code, ...over });
+export const notify = (event: object) => N.notifyUserIfEnabled({ userId: 987, event });
+export const live = (on = true) => saveCompanionSettings(987, { live: on });
+export const focus = (id: string, name: string) => DB.companionDb.writeState(987, { focus_json: JSON.stringify({ sessionId: id, name, project: 'athena-probe-proj' }) });
+export const reply = (id: string, text: string, code?: [string, string, object]) => {
+  const run: any = chatRunRegistry.startRun({ appSessionId: id, provider: 'claude', providerSessionId: null, connection: null, userId: 987 });
+  run.writer.send(createNormalizedMessage({ provider: 'claude', sessionId: id, kind: 'text', role: 'assistant', content: text }));
+  if (code) notify(ev(code[0], code[1], { sessionId: id, dedupeKey: 'k-' + code[0], meta: code[2] }));
+  chatRunRegistry.completeRun(id, { exitCode: 0 });
+};
+export const pushed = () => (fs.existsSync(process.env.STUB_LOG!) ? fs.readFileSync(process.env.STUB_LOG!, 'utf8').split('\n').filter((l) => l.includes('"type":"user"')).map((l) => JSON.parse(l.replace(/^\[[\d:.]+\] \S+ /, '')).message.content as string) : []);
+export const companion = createCompanionModule({ runtime: providerRuntimeService });
+EOF
+cat > "$D/d.mts" <<'EOF'
+import { DB, N, A, sleep, page, chat, ev, notify, live, focus, reply, pushed, companion, chatRunRegistry } from './kit.mts';
+chat(A, 'probe kaylee'); live(); focus(A, 'probe kaylee'); page();
+reply(A, 'z'.repeat(2500));                               // long: goes to the dactyl, which takes 6 s here
+await sleep(2000); live(false);                           // he switches Live off while the digest is out
+await sleep(7500);
+console.log('Live off while the digest was out: pushed', pushed().length, '(0 expected)');
+await companion.stop(); process.exit(0);
+EOF
+( cd /home/lyphe/.claude/claudecodeui_lyphe && env -i HOME="$D/home" PATH="$PATH" STUB_LOG="$D/stub.log" CLAUDE_CLI_PATH="$D/stub-claude" DATABASE_PATH="$D/auth.db" TSX_TSCONFIG_PATH=server/tsconfig.json timeout 100 node --import tsx "$D/d.mts" 2>&1 | grep -v "^\s*at \|^\[Companion\]\|^\[Notifications\]\|^  [a-z]*: \|^}" | tail -12 )
+case "$D" in /tmp/athena-probe.*) cd /tmp && rm -r "$D" ;; esac
+OUTER
+bash "$D/p.sh"
+case "$D" in /tmp/athena-pf.*) cd /tmp && rm -r "$D" ;; esac
+# expect: Live off while the digest was out: pushed 1 (today); 0 once Live is read again after the dactyl returns
+```
+
+measured 2026-10-27 by chain chain-kaylee--companion--feeds-20261027-050823-21ab, finding L3, LOW
+probe-key: bf27dbea03407c1253f31f41563915108bb92039
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/feeds/alert-block.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/feeds/alert-feed.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/feeds/focus-feed.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notifications/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-alert-feed.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-hears-unasked.mjs
+
+## INV-9833 — probe — LOW — the inline line is drawn in UTF-16 units, and the digest header misstates the length
+
+LOW — the inline line is drawn in UTF-16 units, and the digest header misstates the length
+
+```probe
+D=$(mktemp -d /tmp/athena-pf.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'OUTER'
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+sqlite3 ~/.cloudcli/auth.db ".backup '$D/auth.db'" || exit 1
+sqlite3 "$D/auth.db" "INSERT INTO users(id,username,password_hash,git_name) VALUES (987,'athena-a','x','ScottDeJesus')"
+mkdir -p "$D/home/.claude/scripts"
+printf '#!/bin/bash\nwhile IFS= read -r line; do echo "[$(date -u +%%H:%%M:%%S.%%3N)] $PWD $line" >> "$STUB_LOG"; done\n' > "$D/stub-claude"; chmod 755 "$D/stub-claude"
+printf '#!/bin/bash\ncat > /dev/null\nsleep 6\necho "✓ dactyl --read x — 9 lines"\necho "- L3: a digest"\necho "  quotes: 1 checked, all found"\n' > "$D/home/.claude/scripts/dactyl"; chmod 755 "$D/home/.claude/scripts/dactyl"
+cat > "$D/kit.mts" <<'EOF'
+import fs from 'node:fs';
+const R = '/home/lyphe/.claude/claudecodeui_lyphe/server/modules';
+const { createCompanionModule } = await import(`${R}/companion/index.ts`);
+const { providerRuntimeService } = await import(`${R}/providers/index.ts`);
+const { connectedClients, chatRunRegistry } = await import(`${R}/websocket/index.ts`);
+const { registerSocketUser } = await import(`${R}/websocket/services/websocket-state.service.ts`);
+const N = await import(`${R}/notifications/index.ts`);
+const { saveCompanionSettings } = await import(`${R}/companion/companion-settings.ts`);
+const DB = await import(`${R}/database/index.ts`);
+const { createNormalizedMessage } = await import('/home/lyphe/.claude/claudecodeui_lyphe/server/shared/utils.ts');
+export { DB, N, chatRunRegistry };
+export const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+export const A = 'aaaaaaaa-0000-4000-8000-0000000000a1';
+export const page = () => { const ws: any = { readyState: 1, send() {} }; registerSocketUser(ws, 987); connectedClients.add(ws); return ws; };
+export const chat = (id: string, name: string) => {
+  const db = DB.getConnection();
+  db.prepare('INSERT OR IGNORE INTO projects (project_id, project_path) VALUES (?, ?)').run('p-x', '/opt/athena-probe-proj');
+  db.prepare("INSERT INTO sessions (session_id, provider, project_path, custom_name, isArchived, created_at, updated_at) VALUES (?, 'claude', '/opt/athena-probe-proj', ?, 0, '2026-10-26T10:00:00Z', '2026-10-26T10:00:00Z')").run(id, name);
+};
+export const ev = (code: string, kind: string, over: Record<string, unknown> = {}) => N.createNotificationEvent({ provider: 'claude', kind, code, ...over });
+export const notify = (event: object) => N.notifyUserIfEnabled({ userId: 987, event });
+export const live = (on = true) => saveCompanionSettings(987, { live: on });
+export const focus = (id: string, name: string) => DB.companionDb.writeState(987, { focus_json: JSON.stringify({ sessionId: id, name, project: 'athena-probe-proj' }) });
+export const reply = (id: string, text: string, code?: [string, string, object]) => {
+  const run: any = chatRunRegistry.startRun({ appSessionId: id, provider: 'claude', providerSessionId: null, connection: null, userId: 987 });
+  run.writer.send(createNormalizedMessage({ provider: 'claude', sessionId: id, kind: 'text', role: 'assistant', content: text }));
+  if (code) notify(ev(code[0], code[1], { sessionId: id, dedupeKey: 'k-' + code[0], meta: code[2] }));
+  chatRunRegistry.completeRun(id, { exitCode: 0 });
+};
+export const pushed = () => (fs.existsSync(process.env.STUB_LOG!) ? fs.readFileSync(process.env.STUB_LOG!, 'utf8').split('\n').filter((l) => l.includes('"type":"user"')).map((l) => JSON.parse(l.replace(/^\[[\d:.]+\] \S+ /, '')).message.content as string) : []);
+export const companion = createCompanionModule({ runtime: providerRuntimeService });
+EOF
+cat > "$D/d.mts" <<'EOF'
+import { DB, N, A, sleep, page, chat, ev, notify, live, focus, reply, pushed, companion, chatRunRegistry } from './kit.mts';
+chat(A, 'probe kaylee'); live(); focus(A, 'probe kaylee'); page();
+reply(A, '🍵'.repeat(800));                               // 800 characters as a person counts them; 1,600 UTF-16 units
+await sleep(8500);
+const t = pushed().join('\n');
+console.log('800 emoji ->', t.includes('in its own words') ? 'INLINE (whole)' : t.includes("dactyl's digest") ? 'DIGEST via the dactyl' : 'nothing pushed', '|', (t.match(/Its reply is long \(\d+ characters\)/) ?? ['no length line'])[0]);
+await companion.stop(); process.exit(0);
+EOF
+( cd /home/lyphe/.claude/claudecodeui_lyphe && env -i HOME="$D/home" PATH="$PATH" STUB_LOG="$D/stub.log" CLAUDE_CLI_PATH="$D/stub-claude" DATABASE_PATH="$D/auth.db" TSX_TSCONFIG_PATH=server/tsconfig.json timeout 100 node --import tsx "$D/d.mts" 2>&1 | grep -v "^\s*at \|^\[Companion\]\|^\[Notifications\]\|^  [a-z]*: \|^}" | tail -12 )
+case "$D" in /tmp/athena-probe.*) cd /tmp && rm -r "$D" ;; esac
+OUTER
+bash "$D/p.sh"
+case "$D" in /tmp/athena-pf.*) cd /tmp && rm -r "$D" ;; esac
+# expect: 800 emoji -> DIGEST via the dactyl | Its reply is long (1600 characters) today; "INLINE (whole)" once the line is drawn in characters
+```
+
+measured 2026-10-27 by chain chain-kaylee--companion--feeds-20261027-050823-21ab, finding L4, LOW
+probe-key: 4920e59f977fb5827245e6e2feb7f80d2fedfd4f
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/feeds/alert-block.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/feeds/alert-feed.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/feeds/focus-feed.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notifications/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-alert-feed.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-hears-unasked.mjs
+
+## INV-9834 — probe — LOW — a window's batch has no bound: ~12 ms of synchronous work per alert in one timer callback
+
+LOW — a window's batch has no bound: ~12 ms of synchronous work per alert in one timer callback
+
+```probe
+D=$(mktemp -d /tmp/athena-pf.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'OUTER'
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+sqlite3 ~/.cloudcli/auth.db ".backup '$D/auth.db'" || exit 1
+sqlite3 "$D/auth.db" "INSERT INTO users(id,username,password_hash,git_name) VALUES (987,'athena-a','x','ScottDeJesus')"
+mkdir -p "$D/home/.claude/scripts"
+printf '#!/bin/bash\nwhile IFS= read -r line; do echo "[$(date -u +%%H:%%M:%%S.%%3N)] $PWD $line" >> "$STUB_LOG"; done\n' > "$D/stub-claude"; chmod 755 "$D/stub-claude"
+printf '#!/bin/bash\ncat > /dev/null\nsleep 6\necho "✓ dactyl --read x — 9 lines"\necho "- L3: a digest"\necho "  quotes: 1 checked, all found"\n' > "$D/home/.claude/scripts/dactyl"; chmod 755 "$D/home/.claude/scripts/dactyl"
+cat > "$D/kit.mts" <<'EOF'
+import fs from 'node:fs';
+const R = '/home/lyphe/.claude/claudecodeui_lyphe/server/modules';
+const { createCompanionModule } = await import(`${R}/companion/index.ts`);
+const { providerRuntimeService } = await import(`${R}/providers/index.ts`);
+const { connectedClients, chatRunRegistry } = await import(`${R}/websocket/index.ts`);
+const { registerSocketUser } = await import(`${R}/websocket/services/websocket-state.service.ts`);
+const N = await import(`${R}/notifications/index.ts`);
+const { saveCompanionSettings } = await import(`${R}/companion/companion-settings.ts`);
+const DB = await import(`${R}/database/index.ts`);
+const { createNormalizedMessage } = await import('/home/lyphe/.claude/claudecodeui_lyphe/server/shared/utils.ts');
+export { DB, N, chatRunRegistry };
+export const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+export const A = 'aaaaaaaa-0000-4000-8000-0000000000a1';
+export const page = () => { const ws: any = { readyState: 1, send() {} }; registerSocketUser(ws, 987); connectedClients.add(ws); return ws; };
+export const chat = (id: string, name: string) => {
+  const db = DB.getConnection();
+  db.prepare('INSERT OR IGNORE INTO projects (project_id, project_path) VALUES (?, ?)').run('p-x', '/opt/athena-probe-proj');
+  db.prepare("INSERT INTO sessions (session_id, provider, project_path, custom_name, isArchived, created_at, updated_at) VALUES (?, 'claude', '/opt/athena-probe-proj', ?, 0, '2026-10-26T10:00:00Z', '2026-10-26T10:00:00Z')").run(id, name);
+};
+export const ev = (code: string, kind: string, over: Record<string, unknown> = {}) => N.createNotificationEvent({ provider: 'claude', kind, code, ...over });
+export const notify = (event: object) => N.notifyUserIfEnabled({ userId: 987, event });
+export const live = (on = true) => saveCompanionSettings(987, { live: on });
+export const focus = (id: string, name: string) => DB.companionDb.writeState(987, { focus_json: JSON.stringify({ sessionId: id, name, project: 'athena-probe-proj' }) });
+export const reply = (id: string, text: string, code?: [string, string, object]) => {
+  const run: any = chatRunRegistry.startRun({ appSessionId: id, provider: 'claude', providerSessionId: null, connection: null, userId: 987 });
+  run.writer.send(createNormalizedMessage({ provider: 'claude', sessionId: id, kind: 'text', role: 'assistant', content: text }));
+  if (code) notify(ev(code[0], code[1], { sessionId: id, dedupeKey: 'k-' + code[0], meta: code[2] }));
+  chatRunRegistry.completeRun(id, { exitCode: 0 });
+};
+export const pushed = () => (fs.existsSync(process.env.STUB_LOG!) ? fs.readFileSync(process.env.STUB_LOG!, 'utf8').split('\n').filter((l) => l.includes('"type":"user"')).map((l) => JSON.parse(l.replace(/^\[[\d:.]+\] \S+ /, '')).message.content as string) : []);
+export const companion = createCompanionModule({ runtime: providerRuntimeService });
+EOF
+cat > "$D/d.mts" <<'EOF'
+import { DB, N, A, sleep, page, chat, ev, notify, live, focus, reply, pushed, companion, chatRunRegistry } from './kit.mts';
+chat(A, 'probe kaylee'); live(); page();
+const n = 300, ids = Array.from({ length: n }, (_, i) => `f${String(i).padStart(7, '0')}-0000-4000-8000-000000000001`);
+ids.forEach((id, i) => chat(id, `chat number ${i}`));
+ids.forEach((id, i) => notify(ev('run.failed', 'error', { sessionId: id, dedupeKey: 'flood-' + i, meta: { error: 'it broke' } })));
+let last = Date.now(), stall = 0; const tick = setInterval(() => { stall = Math.max(stall, Date.now() - last); last = Date.now(); }, 5);
+await sleep(9500); clearInterval(tick);
+const p = pushed();
+console.log(`${n} alerts inside one window -> messages`, p.length, '| alerts in the first', (p[0]?.match(/<alert /g) ?? []).length, '| bytes', p[0]?.length ?? 0, '| longest event-loop stall (ms)', stall);
+await companion.stop(); process.exit(0);
+EOF
+( cd /home/lyphe/.claude/claudecodeui_lyphe && env -i HOME="$D/home" PATH="$PATH" STUB_LOG="$D/stub.log" CLAUDE_CLI_PATH="$D/stub-claude" DATABASE_PATH="$D/auth.db" TSX_TSCONFIG_PATH=server/tsconfig.json timeout 100 node --import tsx "$D/d.mts" 2>&1 | grep -v "^\s*at \|^\[Companion\]\|^\[Notifications\]\|^  [a-z]*: \|^}" | tail -12 )
+case "$D" in /tmp/athena-probe.*) cd /tmp && rm -r "$D" ;; esac
+OUTER
+bash "$D/p.sh"
+case "$D" in /tmp/athena-pf.*) cd /tmp && rm -r "$D" ;; esac
+# expect: 300 alerts inside one window -> messages 1 | alerts in the first 300 | bytes ~56000 | longest event-loop stall (ms) in the thousands today (about 12 ms per alert, on a quiet box ~3600); a small stall, or several smaller messages, once a window's batch is bounded
+```
+
+measured 2026-10-27 by chain chain-kaylee--companion--feeds-20261027-050823-21ab, finding L5, LOW
+probe-key: 48bc8f9163237cd60b040596f2c8517d9c5ca15d
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/feeds/alert-block.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/feeds/alert-feed.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/feeds/focus-feed.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/notifications/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-alert-feed.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-hears-unasked.mjs
+
+## INV-9835 — probe — a steer that misses its turn runs as a turn nobody can see, stop, or hear finish
+
+a steer that misses its turn runs as a turn nobody can see, stop, or hear finish
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+# One Haiku chat: a steer sent 0.7 s into a text-only turn is answered "folded"; it then runs as the CLI's own turn that the page, the registry and Stop cannot see.
+W=$(mktemp -d /tmp/athena-probe-w.XXXXXX) || exit 1
+sqlite3 -readonly ~/.cloudcli/auth.db ".backup '$W/auth.db'" || exit 1
+sqlite3 "$W/auth.db" "INSERT INTO users(id,username,password_hash,git_name) VALUES (987,'athena-a','x','ScottDeJesus')" || exit 1
+mkdir -p /tmp/cloudcli-probe-chat
+cat > "$W/p.mts" <<'JS'
+const R = '/home/lyphe/.claude/claudecodeui_lyphe/server';
+const { withChatCompaction } = await import(`${R}/modules/compaction/index.ts`);
+const { providerRuntimeService, sessionsService } = await import(`${R}/modules/providers/index.ts`);
+const ws = await import(`${R}/modules/websocket/index.ts`);
+const { createCompanionStore } = await import(`${R}/modules/companion/companion-store.ts`);
+const { createToolDeps } = await import(`${R}/modules/companion/tools/tool-deps.ts`);
+const { sessionsDb, getConnection } = await import(`${R}/modules/database/index.ts`);
+const runtime = withChatCompaction(providerRuntimeService);
+const store = createCompanionStore(987);
+let act: any = { phase: 'idle', session: null, files: null, walk: null };
+const deps = createToolDeps({ userId: 987, store, runtime, activity: { current: () => act, set: (a: any) => { act = a; } } });
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+const c = sessionsService.createAppSession('claude', '/tmp/cloudcli-probe-chat', '', true);
+sessionsDb.updateSessionCustomName(c.sessionId, 'probe unseen');
+getConnection().prepare("update sessions set model='haiku', permission_mode='bypassPermissions' where session_id=?").run(c.sessionId);
+const opts = { model: 'haiku', permissionMode: 'bypassPermissions', toolsSettings: { allowedTools: [], disallowedTools: [], skipPermissions: false }, skipPermissions: false };
+const idle = async () => { while (ws.chatRunRegistry.isProcessing(c.sessionId)) await sleep(250); };
+void ws.runDetachedChatTurn({ sessionId: c.sessionId, userId: 987, content: 'Reply with the word READY.', options: opts }, { runtime });
+await sleep(500); await idle(); await sleep(1500);
+void ws.runDetachedChatTurn({ sessionId: c.sessionId, userId: 987, content: 'Reply with the words ONE TWO THREE.', options: opts }, { runtime });
+await sleep(700);
+const STEER = 'Run `timeout 25 tail -f /dev/null; echo LATE` in Bash, then reply with the word LATEDONE.';
+store.setDraft({ target: { kind: 'session', session: { sessionId: c.sessionId, name: 'probe unseen', project: 'p' } }, text: STEER });
+const sent = await deps.sendDraft({ mode: 'steer', text: STEER });
+await sleep(6000);
+const busy = JSON.stringify(runtime.activity('claude', c.sessionId));
+const processing = ws.chatRunRegistry.isProcessing(c.sessionId);
+const stop = await ws.abortChatRun(c.sessionId, { runtime });
+await sleep(30000);
+const done = ws.chatRunRegistry.replayEvents(c.sessionId, 0).some((m: any) => m.kind === 'text' && m.role === 'assistant' && String(m.content).includes('LATEDONE'));
+console.log(`RESULT answer ${sent.outcome} | 6 s later the runtime says ${busy} but the registry's isProcessing is ${processing} | Stop answers ${stop} | the steer's turn finished anyway (LATEDONE seen): ${done}`);
+await providerRuntimeService.abort('claude', c.sessionId).catch(() => false);
+process.exit(0);
+JS
+( cd /home/lyphe/.claude/claudecodeui_lyphe && env -i HOME="$HOME" PATH="$PATH" CLAUDE_CLI_PATH=/home/lyphe/.npm-global/bin/claude DATABASE_PATH="$W/auth.db" TSX_TSCONFIG_PATH=server/tsconfig.json timeout 100 node --import tsx "$W/p.mts" 2>&1 | grep '^RESULT' || echo "RESULT none" )
+case "$W" in /tmp/athena-probe-w.*) cd /tmp && rm -r "$W" ;; esac
+EOF
+bash "$D/p.sh"
+case "$D" in /tmp/athena-probe.*) cd /tmp && rm -r "$D" ;; esac
+echo "[probe exit $?]"
+# expect: `RESULT answer folded | 6 s later the runtime says {"live":true,"busy":true,"why":"a turn is in flight"} but the registry's isProcessing is false | Stop answers not_running | the steer's turn finished anyway (LATEDONE seen): true` while the defect stands; cured when Stop answers `stopped` or the registry reports the chat processing
+```
+
+measured 2026-10-27 by chain chain-kaylee--companion--send-20261027-050821-a517, finding M1, MEDIUM
+probe-key: b3bedbd626e75f36b0f49130c4459b3c19876508
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/companion-send.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/house-reads.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/send-options.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-queued-prompt.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-send.mjs
+
+## INV-9836 — probe — MAN-9068 (and its export in `providers/MANUAL.md`) describes the cure that was measured to fail
+
+MAN-9068 (and its export in `providers/MANUAL.md`) describes the cure that was measured to fail
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+echo "MAN-9068 says kill-after-interrupt: $(docstore get MAN-9068 | grep -c 'KILLS the process after the interrupt') | the code sends no interrupt first: $(grep -c 'const interrupting = steerPendingAtPress ? null' server/modules/providers/list/claude/claude-runtime.provider.js) | MANUAL.md export lines saying it: $(grep -c 'KILLS the process after the interrupt' server/modules/providers/MANUAL.md)"
+EOF
+bash "$D/p.sh"
+case "$D" in /tmp/athena-probe.*) cd /tmp && rm -r "$D" ;; esac
+echo "[probe exit $?]"
+# expect: `MAN-9068 says kill-after-interrupt: 1 | the code sends no interrupt first: 1 | MANUAL.md export lines saying it: 1` while the defect stands; cured when the first and third numbers are 0
+```
+
+measured 2026-10-27 by chain chain-kaylee--companion--send-20261027-050821-a517, finding L1, LOW
+probe-key: ef248d016d5494c467fe36a9f6f2095cb08e8038
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/providers/MANUAL.md
+
+## INV-9837 — probe — `house-reads.ts` re-exports `sendOptionsFor` and `ChatSendOptions` for a consumer that does not exist
+
+`house-reads.ts` re-exports `sendOptionsFor` and `ChatSendOptions` for a consumer that does not exist
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+n=$(grep -rn "house-reads" server --include=*.ts | grep -E "sendOptionsFor|ChatSendOptions" | grep -vc "^server/modules/companion/tools/house-reads.ts")
+echo "files importing sendOptionsFor/ChatSendOptions through house-reads: $n | the re-export lines still present: $(grep -c "from './send-options.js'" server/modules/companion/tools/house-reads.ts) | companion-send.ts imports them from: $(grep -o "from './tools/send-options.js'" server/modules/companion/companion-send.ts)"
+EOF
+bash "$D/p.sh"
+case "$D" in /tmp/athena-probe.*) cd /tmp && rm -r "$D" ;; esac
+echo "[probe exit $?]"
+# expect: `files importing sendOptionsFor/ChatSendOptions through house-reads: 0 | the re-export lines still present: 2 | companion-send.ts imports them from: from './tools/send-options.js'` while the defect stands; cured when the second number is 0
+```
+
+measured 2026-10-27 by chain chain-kaylee--companion--send-20261027-050821-a517, finding L2, LOW
+probe-key: bbbef54af4c12f819286590968b1927b0d8b902f
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/companion-send.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/house-reads.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/send-options.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-queued-prompt.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-send.mjs
+
+## INV-9838 — probe — stale comment and doc nits the fix-pass left
+
+stale comment and doc nits the fix-pass left
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+echo "header says the steer is a user row: $(sed -n 12,13p .verify/companion-send.mjs | grep -c 'as a user row') | the leg's own check reads queued_command: $(grep -c "type === 'queued_command'" .verify/companion-send.mjs)"
+EOF
+bash "$D/p.sh"
+case "$D" in /tmp/athena-probe.*) cd /tmp && rm -r "$D" ;; esac
+echo "[probe exit $?]"
+# expect: `header says the steer is a user row: 1 | the leg's own check reads queued_command: 1` while the defect stands; cured when the first number is 0
+```
+
+measured 2026-10-27 by chain chain-kaylee--companion--send-20261027-050821-a517, finding L3, LOW
+probe-key: 45cdf39344cd3e1c32aa6e5106169a05cc3b89aa
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/companion-send.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/house-reads.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/send-options.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/list/claude/claude-queued-prompt.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-send.mjs

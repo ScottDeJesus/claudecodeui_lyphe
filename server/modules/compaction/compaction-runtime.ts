@@ -1,6 +1,6 @@
 import { sessionCompactionsDb } from '@/modules/database/index.js';
 import type { ProviderRuntimeGateway } from '@/modules/websocket/index.js';
-import type { AnyRecord, ChatCompactionHooks, ChatProcessActivity, CompactionFacts, LLMProvider } from '@/shared/types.js';
+import type { AnyRecord, ChatCompactionHooks, CompactionFacts, LLMProvider } from '@/shared/types.js';
 
 import { createAutoTrigger } from './auto-trigger.js';
 import { completeFrame } from './compaction-frames.js';
@@ -17,7 +17,6 @@ import { flightOf, lastTurnContext, stopFlightsBeforeSeed } from './compaction-r
  */
 export type CompactionInnerRuntime = ProviderRuntimeGateway & {
   useChatCompaction(hooks: ChatCompactionHooks): void;
-  activity(provider: LLMProvider, appSessionId: string): ChatProcessActivity;
   markIdleCheck(provider: LLMProvider, appSessionId: string, tries: number): boolean;
 };
 
@@ -150,6 +149,13 @@ export function withChatCompaction<Inner extends CompactionInnerRuntime>(inner: 
       // wait ends, the verb's child gets SIGTERM, or the seed append's run is aborted like any run.
       const flight = provider === 'claude' ? flightOf(sessionId) : undefined;
       return flight ? flight.stop() : inner.abort(provider, sessionId);
+    },
+
+    async steer(provider: LLMProvider, sessionId: string, content: string): Promise<'folded' | 'not_running'> {
+      // A compaction in flight owns the chat: a message pushed into its process would land in the summarized turn
+      // (or between the guard and the seed), so a steer answers 'not_running' and the caller runs a turn after it.
+      if (provider === 'claude' && flightOf(sessionId)) return 'not_running';
+      return inner.steer(provider, sessionId, content);
     },
   };
 

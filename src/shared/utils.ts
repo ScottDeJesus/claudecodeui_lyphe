@@ -661,3 +661,41 @@ export async function troubleOfResponse(response: Response): Promise<AffectedAre
 export function troubleOfFailure(failure: unknown): AffectedAreasTrouble {
   return failure instanceof SyntaxError ? 'unreadable' : 'unreachable';
 }
+
+// ---------------------------
+
+//----------------- THE COMPANION'S NAME FOR THIS PAGE ------------
+
+/** The sessionStorage key one tab keeps its companion client id under. */
+const COMPANION_CLIENT_STORAGE_KEY = 'companion-client-id';
+
+/** The id held in memory when sessionStorage is unavailable (a locked-down browser), so a page still keeps one name for its life. */
+let companionClientIdInMemory: string | null = null;
+
+/**
+ * The name Kaylee knows THIS page by: minted on first use and kept in the tab's sessionStorage, so a reload keeps it and a
+ * second tab gets its own. It rides every companion call as `x-companion-client`, and the page that last typed to her or
+ * opened her panel holds the floor — the one page a `companion_open_chat` frame is addressed to.
+ *
+ * Minted with `crypto.getRandomValues`, not `randomUUID`: the app is reached over plain HTTP on a tailnet address, which is
+ * not a secure context, and `randomUUID` does not exist there. Used by `api.companion` (the header) and the companion
+ * module's provider (to tell which page a frame is for).
+ */
+export function companionClientId(): string {
+  try {
+    const stored = window.sessionStorage.getItem(COMPANION_CLIENT_STORAGE_KEY);
+    if (stored) return stored;
+  } catch {
+    // sessionStorage refused the read; the in-memory id below stands in for the page's life.
+  }
+  if (companionClientIdInMemory === null) {
+    const bytes = crypto.getRandomValues(new Uint8Array(16));
+    companionClientIdInMemory = Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
+    try {
+      window.sessionStorage.setItem(COMPANION_CLIENT_STORAGE_KEY, companionClientIdInMemory);
+    } catch {
+      // Kept in memory only: a reload will be a new page to her, which is the honest answer when the tab cannot remember.
+    }
+  }
+  return companionClientIdInMemory;
+}

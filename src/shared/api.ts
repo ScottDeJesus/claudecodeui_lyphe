@@ -7,9 +7,10 @@ import type { AuthTraceEvent, CerberusEnrollInput, CerberusLabelInput, CerberusM
 import type { AgentLaunchDefaultsChange, AgentLaunchRowChange } from '@/shared/agent-launch-types';
 import type { MarkRequest, MissedRequest, Queue, ReadRequest, ThresholdRequest, UnderstandingMarkRequest } from '@/shared/affected-areas-types';
 import type { CerberusCatalogEntryInput } from '@/shared/cerberus-types';
+import type { CompanionSettings } from '@/shared/companion-types';
 import type { ClaudeUpdateApplyRequest } from '@/shared/claude-update-types';
 import type { RoadmapWriteBody } from '@/shared/roadmap-types';
-import { IS_PLATFORM } from '@/shared/utils';
+import { IS_PLATFORM, companionClientId } from '@/shared/utils';
 import { readVoiceConfig, voiceConfigHeaders } from '@/shared/voiceConfig';
 
 // Headers are a plain record rather than the full `HeadersInit` union so the
@@ -255,6 +256,9 @@ const post = withBody('POST');
 const put = withBody('PUT');
 const patch = withBody('PATCH');
 const del = withBody('DELETE');
+
+/** The request options every companion call carries: this page's name for her, in the header she reads it from. */
+const companionOptions = (): ApiRequestOptions => ({ headers: { 'x-companion-client': companionClientId() } });
 
 // ─── URL builders ───────────────────────────────────────────────────────────
 // Exported for the consumers that cannot go through `authenticatedFetch`:
@@ -825,6 +829,29 @@ export const api = {
         body: formData,
       }),
     tts: (text: string, options: ApiRequestOptions = {}) => post('/api/voice/tts', { text }, options),
+  },
+
+  // Kaylee, the voice companion. Every call names THIS page to her in `x-companion-client`: the page that last typed or
+  // opened her panel holds the floor, and a chat she opens is opened on that page alone. A refusal is the app's own
+  // envelope, so `refusalSentence` reads the words the panel shows. Her sentences, draft and notes come back as
+  // `companion_*` frames on the socket, not as answers here; the answers carry only what the caller folds in itself.
+  companion: {
+    // Her whole picture: the settings, the models, the process, the activity, the draft, the walk, the notes, the log.
+    picture: () => get('/api/companion', companionOptions()),
+    sendText: (text: string) => post('/api/companion/messages', { text }, companionOptions()),
+    // The panel opened on this page: she acts on it from now on.
+    floor: () => post('/api/companion/floor', undefined, companionOptions()),
+    // A partial of her settings; `register: null` restores the original register. Answers the settings as they now read.
+    saveSettings: (patch: Partial<CompanionSettings> | { register: null }) => put('/api/companion/settings', patch, companionOptions()),
+    editDraft: (text: string) => put('/api/companion/draft', { text }, companionOptions()),
+    clearDraft: () => del('/api/companion/draft', undefined, companionOptions()),
+    // Sends the draft as it stands. Answers `{ outcome: 'started' | 'folded' }`; a refused send is a 409 carrying the reason.
+    sendDraft: (mode: 'turn' | 'steer') => post('/api/companion/draft/send', { mode }, companionOptions()),
+    dismissNote: (id: number) => del(`/api/companion/notes/${id}`, undefined, companionOptions()),
+    // Stops her own turn; the chat sessions she talks about are not touched.
+    interrupt: () => post('/api/companion/interrupt', undefined, companionOptions()),
+    // Wipes her conversation, log, notes, draft, walk and focus. The wind-down of her process is awaited, so it can take a while.
+    clear: () => post('/api/companion/clear', undefined, { ...companionOptions(), timeoutMs: 90_000 }),
   },
 
   system: {

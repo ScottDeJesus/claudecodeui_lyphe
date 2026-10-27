@@ -1,6 +1,7 @@
 import { useTranslation } from 'react-i18next';
 
 import { CompanionSettingsForm } from '@/modules/companion/CompanionSettingsForm';
+import { useCompanionSettings } from '@/modules/companion/hooks/useCompanionSettings';
 import type { CompanionSettings } from '@/shared/companion-types';
 import { Banner, Button, SettingsCard, SettingsSection, Spinner } from '@/shared/ui';
 
@@ -55,19 +56,7 @@ export function CompanionSettingsView({ settings, loadFailed, onRetry, onSave }:
  * both to CompanionSettingsView.
  */
 export function CompanionSettingsSection() {
-  // FILL(panel-fill): the section's own read — `GET /api/companion` on mount, its `settings`; null while it loads. Replaces this stand-in.
-  const settings: CompanionSettings | null = null;
-  // FILL(panel-fill): the read failed — true once that GET has failed, false again while Try again reads.
-  const loadFailed = false;
+  const { settings, loadFailed, retry, save } = useCompanionSettings();
 
-  return (
-    <CompanionSettingsView
-      settings={settings}
-      loadFailed={loadFailed}
-      // FILL(panel-fill): read again — the same GET, after a read that failed.
-      onRetry={() => {}}
-      // FILL(panel-fill): save settings — `PUT /api/companion/settings` with the patch; its answer becomes `settings`, and a refusal rejects with the server's sentence.
-      onSave={async () => {}}
-    />
-  );
+  return <CompanionSettingsView settings={settings} loadFailed={loadFailed} onRetry={retry} onSave={save} />;
 }

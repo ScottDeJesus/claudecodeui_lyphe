@@ -1617,3 +1617,17 @@ export function humanizeTokens(n: number): string {
   if (n < 999_950) return `${(n / 1e3).toFixed(1).replace(/\.0$/, '')}k`;   // the same cut
   return `${(n / 1e6).toFixed(1).replace(/\.0$/, '')}M`;
 }
+
+
+// ---------------------------
+//----------------- ERROR WORDS ------------
+
+/**
+ * The words of whatever a `catch` caught, for a log line: an `Error`'s message, any other thrown value as a string.
+ *
+ * Consumed by the chat-names module (`chat-namer.service.ts`, `haiku-name.ts`), which logs why a naming pass could not run. Never throws,
+ * and says nothing about the stack: a log line that needs one logs the error itself.
+ */
+export function errorReason(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}

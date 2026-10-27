@@ -2625,3 +2625,47 @@ export type ClaudeApiPicture = {
 
 /** The door's answer when its picture cannot be read: the card draws "unknown" in words, never "not set", and offers the retry. */
 export type ClaudeApiUnreadable = { unreadable: true };
+
+// ---------------------------
+
+//----------------- CHAT NAMES: what the naming pass reads of a chat ------------
+
+/**
+ * A chat's first exchange as the naming pass reads it from the transcript: `ask` is the first message the person wrote himself,
+ * `reply` the first answer the model gave after it, each trimmed and cut to 2,000 characters. Both are non-empty — a chat that has
+ * no such pair yet has no `ChatFirstExchange` at all (`readFirstExchange` answers `null`). Read-only prose handed to a model as data,
+ * never as instructions. Consumed by the chat-names module: `first-exchange.ts` builds it, `haiku-name.ts` asks Haiku about it.
+ */
+export type ChatFirstExchange = {
+  ask: string;
+  reply: string;
+};
+
+// ---------------------------
+
+//----------------- NOTIFICATION EVENTS ------------
+
+/**
+ * One house notification, the shape `createNotificationEvent` builds and the orchestrator is handed: what happened
+ * (`code`, ranked by `kind` and `severity`), to whom it belongs (`provider`, `sessionId`), the facts its wording is
+ * made from (`meta`) and the key that collapses a repeat (`dedupeKey`, `null` for the composite default of
+ * provider, kind, code and session). `provider` is a runtime's name or `'system'` for the house's own (the dispatcher,
+ * the stall watchdog); `kind` is one of `action_required`, `stop`, `error`, `limit`, `background` or `info` (the
+ * push preference it falls under); `severity` is `info`, `warning` or `error`. `sessionId` is the app session id
+ * once the orchestrator has normalized it, `null` for an event that belongs to no chat. `createdAt` is ISO-8601 UTC.
+ *
+ * The orchestrator is JavaScript and builds this by hand; the type states the contract it keeps. A reader of an event
+ * (a listener) takes it as read-only. Consumed by the notifications module (`notification-listeners.service.ts`, whose
+ * listeners are handed one) and by the companion module's alert feed, which maps `code` to what it tells her.
+ */
+export type NotificationEvent = {
+  provider: string;
+  sessionId: string | null;
+  kind: string;
+  code: string;
+  meta: Record<string, unknown>;
+  severity: string;
+  requiresUserAction: boolean;
+  dedupeKey: string | null;
+  createdAt: string;
+};

@@ -234,12 +234,14 @@ function recordProviderSessionId(run: ChatRun, providerSessionId: string): void 
  * re-adopted chat whose turn finished before the restart): the listeners still
  * hear the session is idle, but the completion stamp is not rewritten. Stamping
  * it again was what brought an unread dot back on every server restart, over a
- * read the reader had already made, for a turn with no new activity.
+ * read the reader had already made, for a turn with no new activity. The same
+ * fact reaches each listener as `alreadyRecorded`, for one whose work follows a
+ * turn that just ended and has none to do for a turn that ended before the restart.
  */
 function recordRunCompletion(appSessionId: string, aborted: boolean, stamp: boolean): void {
   for (const listener of runCompletedListeners) {
     try {
-      listener(appSessionId, { aborted });
+      listener(appSessionId, { aborted, alreadyRecorded: !stamp });
     } catch (error) {
       console.error('[ChatRunRegistry] Run-completed listener failed', {
         appSessionId,
@@ -269,7 +271,7 @@ function recordRunCompletion(appSessionId: string, aborted: boolean, stamp: bool
   }
 }
 
-type RunCompletedListener = (appSessionId: string, outcome: { aborted: boolean }) => void;
+type RunCompletedListener = (appSessionId: string, outcome: { aborted: boolean; alreadyRecorded: boolean }) => void;
 
 /** Called once per run, as its terminal `complete` is recorded. */
 const runCompletedListeners = new Set<RunCompletedListener>();
@@ -285,7 +287,9 @@ const runCompletedListeners = new Set<RunCompletedListener>();
 export const chatRunRegistry = {
   /**
    * Subscribes to run completion; returns the unsubscribe. The queued-message dispatcher uses it
-   * to send the next turn the moment a session goes idle rather than on its next poll.
+   * to send the next turn the moment a session goes idle rather than on its next poll, and the
+   * chat-names module's naming pass (which skips `alreadyRecorded` completions: a re-adopted chat
+   * whose turn ended before the restart has had no new turn).
    */
   onRunCompleted(listener: RunCompletedListener): () => void {
     runCompletedListeners.add(listener);

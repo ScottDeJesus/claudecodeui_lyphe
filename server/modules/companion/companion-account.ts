@@ -2,6 +2,7 @@ import { viewOf } from '@/modules/notifications/index.js';
 import type { ProviderRuntimeGateway } from '@/modules/websocket/index.js';
 import type { CompanionActivity } from '@/shared/companion-types.js';
 
+import type { DraftSender } from './companion-send.js';
 import { createCompanionStore, type CompanionStore } from './companion-store.js';
 import { readCompanionSettings } from './companion-settings.js';
 import { createCompanionSession, type CompanionSession } from './session/companion-session.js';
@@ -35,6 +36,8 @@ export type CompanionAccount = {
   readonly session: CompanionSession;
   /** What the pages were last told she is doing. */
   currentActivity(): CompanionActivity;
+  /** Sends the held draft (`companion-send.ts`): the panel's Send reaches it through the service; her tools hold the same one. */
+  readonly sendDraft: DraftSender;
 };
 
 /**
@@ -87,5 +90,6 @@ export function createCompanionAccount(userId: number, runtime: ProviderRuntimeG
     store,
     session,
     currentActivity: () => activity,
+    sendDraft: toolDeps.sendDraft,
   };
 }

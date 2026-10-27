@@ -11,22 +11,25 @@ import type { CompanionToolDeps } from './companion-tools.js';
 import { resolveChat, resolveProject } from './house-reads.js';
 
 /**
- * The three tools that put her work on his screen: `update_draft` (the one brief she keeps, with its target),
- * `show_note` (a card, for what is better seen than heard) and `walk` (the walkthrough's cursor). Each writes
- * through the account's store, so the matching frame (`companion_draft`, `companion_note`, `companion_walk`)
- * reaches his panel the moment she calls it, and the answer is one plain sentence.
+ * The five tools that put her work on his screen and send it: `update_draft` (the one brief she keeps, with its
+ * target), `show_note` (a card, for what is better seen than heard), `walk` (the walkthrough's cursor), and
+ * `send_to_session` / `create_session` (the draft going out). The first three write through the account's store, so
+ * the matching frame (`companion_draft`, `companion_note`, `companion_walk`) reaches his panel the moment she calls
+ * it, and the answer is one plain sentence.
  *
  * THE DRAFT IS THE ONLY THING SENT. There is one draft at a time, addressed to a chat or to a new chat in a
- * project; `send_to_session` and `create_session` send it as it stands, and their text must equal it. So the
- * draft is replaced whole, never patched, and he sees the very words that will go.
+ * project; `send_to_session` and `create_session` send it as it stands, and their text must equal it, trimmed.
+ * So the draft is replaced whole, never patched, and he sees the very words that will go. The sending itself is
+ * `deps.sendDraft` (`companion-send.ts`), the same verb as the panel's Send: these two tools only name what they
+ * mean to send and say what happened. A mismatch is refused, and the refusal names the draft.
  *
  * THE WALK'S CURSOR lives in the store, because her memory of it does not survive her own compaction or a turn
  * to another chat: `walk` carries the cursor, the store holds it, and `<state>` restates it after a compaction.
  * One walk per account; a call that would MOVE it by naming another chat without `items` is refused rather
  * than guessed at, while `at` 0 ends the held walk whichever chat is named (its own chat may be gone).
  *
- * A tool that names a chat makes it her focus (`update_draft` for a chat, and `walk`), and sets her activity
- * while it runs (`drafting`, `walking`) through the harness's `withActivity`. A refusal is `isError` text that
+ * A tool that names a chat makes it her focus (`update_draft` for a chat, `walk`, and a send once it has gone), and
+ * sets her activity while it runs (`drafting`, `walking`) through the harness's `withActivity`. A refusal is `isError` text that
  * says what to do next (`deps.refuse`); a write that throws is logged and answered the same way
  * (`guardedToolResult`).
  *
@@ -34,7 +37,7 @@ import { resolveChat, resolveProject } from './house-reads.js';
  * system prompt says are one text; the arguments' own descriptions say what the prompt's shorthand leaves out
  * (the prompt's `update_draft(target, …)` is the pair `session` / `project` here).
  *
- * Consumer: `tools/companion-tools.ts`, which adds these three to the thirteen it builds.
+ * Consumer: `tools/companion-tools.ts`, which adds these five to the thirteen it builds.
  */
 
 /**
@@ -46,6 +49,14 @@ const NOTE_TITLE_MAX = 80;
 const NOTE_TEXT_MAX = 4_000;
 const WALK_ITEMS_MAX = 60;
 const WALK_ITEM_MAX = 120;
+const CHAT_TITLE_MAX = 60;
+
+/** The words of a send, which must be the draft's own: counted in characters as `PUT /draft` counts them. */
+const sentText = z
+  .string()
+  .min(1)
+  .refine((text) => characterCount(text) <= DRAFT_TEXT_MAX, `The text is over ${DRAFT_TEXT_MAX} characters; the draft cannot be that long.`)
+  .describe('The draft\'s text exactly as update_draft last stored it. A text that differs from the draft is refused, and the refusal shows the draft.');
 
 /** Where `update_draft` was asked to aim, resolved: the target to store, the chat it names (none for a new chat) and how the answer names it. */
 type DraftAim = { target: CompanionDraftTarget; chat: CompanionSessionRef | null; label: string };
@@ -155,8 +166,38 @@ function walk(deps: CompanionToolDeps, args: { session: string; items?: string[]
   });
 }
 
+/** What a send answers: the sentence of a send that went, or the refusal that says what to do next. */
+const answerSend = (deps: CompanionToolDeps, sent: { outcome: string; sentence: string }): ToolTextResult =>
+  sent.outcome === 'refused' ? deps.refuse(sent.sentence) : textResult(sent.sentence);
+
 /**
- * The definitions of `show_note`, `update_draft` and `walk` (the order her prompt lists them), built with the SDK's
+ * `send_to_session`: sends the draft to the chat she names, as `mode` asks. The draft must be for that chat and the
+ * text must equal it; a chat that is working takes the brief into its running turn whichever mode was asked.
+ */
+function sendToSession(deps: CompanionToolDeps, args: { session: string; text: string; mode: 'turn' | 'steer' }): Promise<ToolTextResult> {
+  return guardedToolResult('send_to_session', 'send the brief', async () => {
+    const found = resolveChat(args.session);
+    if (!found.ok) return deps.refuse(found.sentence);
+    const { chat } = found;
+    return deps.withActivity('drafting', chat, null, async () => answerSend(deps, await deps.sendDraft({ mode: args.mode, text: args.text, chat })));
+  });
+}
+
+/**
+ * `create_session`: starts a new chat in `project` with the draft as its first message, named `title`. The draft must be
+ * for a new chat in that project and the text must equal it. The new chat becomes her focus and opens on his screen.
+ */
+function createSession(deps: CompanionToolDeps, args: { project: string; text: string; title: string }): Promise<ToolTextResult> {
+  return guardedToolResult('create_session', 'start the chat', async () => {
+    const found = resolveProject(args.project);
+    if (!found.ok) return deps.refuse(found.sentence);
+    const newChat = { projectPath: found.project.path, title: args.title };
+    return deps.withActivity('drafting', null, null, async () => answerSend(deps, await deps.sendDraft({ mode: 'turn', text: args.text, newChat })));
+  });
+}
+
+/**
+ * The definitions of `show_note`, `update_draft`, `walk`, `send_to_session` and `create_session` (the order her prompt lists them, the sends last), built with the SDK's
  * `tool()` and zod. None is read-only (each writes what he sees), so none carries `readOnlyHint`; the CLI asks no
  * permission for them regardless, because `allowedTools` names every tool of hers.
  */
@@ -205,6 +246,32 @@ export function draftTools(deps: CompanionToolDeps): Array<SdkMcpToolDefinition<
         at: z.number().int().min(0).describe('The item now under discussion, counted from 1; 0 ends the walkthrough.'),
       },
       (args) => walk(deps, args)
+    ),
+    tool(
+      'send_to_session',
+      toolLine('send_to_session'),
+      {
+        session: z.string().trim().min(1).max(200).describe('The chat the draft is for, by its id or its whole name. The draft must be addressed to it.'),
+        text: sentText,
+        mode: z.enum(['turn', 'steer']).describe('turn starts a turn; steer folds the brief into the turn the chat is running now. A chat that is working takes it as a steer whichever you say; a steer to an idle chat starts a turn.'),
+      },
+      (args) => sendToSession(deps, args)
+    ),
+    tool(
+      'create_session',
+      toolLine('create_session'),
+      {
+        project: z.string().trim().min(1).max(1000).describe('The project the new chat starts in, by its display name or path. The draft must be addressed to a new chat in it.'),
+        text: sentText,
+        title: z
+          .string()
+          .trim()
+          .min(1)
+          .max(CHAT_TITLE_MAX)
+          .regex(/^[^\r\n\u2028\u2029]+$/, 'A title is one line: no line break.')
+          .describe(`The new chat's name in his list: a few words, up to ${CHAT_TITLE_MAX} characters.`),
+      },
+      (args) => createSession(deps, args)
     ),
   ];
 }

@@ -4,10 +4,13 @@ import type { ProviderRuntimeGateway } from '@/modules/websocket/index.js';
 import type { CompanionPhase, CompanionSessionRef } from '@/shared/companion-types.js';
 import type { ToolTextResult } from '@/shared/tool-text-result.js';
 
+import type { DraftSender } from '../companion-send.js';
 import type { CompanionStore } from '../companion-store.js';
 import { toolNames } from '../session/companion-prompt.js';
 
+import { actTools } from './act-tools.js';
 import { draftTools } from './draft-tools.js';
+import { readTools } from './read-tools.js';
 import { sessionTools } from './session-tools.js';
 
 /**
@@ -69,14 +72,18 @@ export type CompanionToolDeps = {
   withActivity<T>(phase: ToolActivityPhase, chat: CompanionSessionRef | null, files: string[] | null, run: () => Promise<T>): Promise<T>;
   openChatOnFloor(sessionId: string): void;
   refuse(sentence: string): ToolTextResult;
+  /** Sends the held draft as it stands (`companion-send.ts`): the one door `send_to_session` and `create_session` go through. */
+  sendDraft: DraftSender;
 };
 
 /**
  * Her tools for one account: the definitions of every tool file that exists. Today that is `sessionTools()`
- * (`list_sessions`, `list_projects`), which names no chat and so needs no deps, and `draftTools(deps)`
- * (`show_note`, `update_draft`, `walk`); each later tool file adds a line here and takes `deps`. Consumed by
- * `companion-account.ts`, once per account.
+ * (`list_sessions`, `list_projects`), which names no chat and so needs no deps, `draftTools(deps)`
+ * (`show_note`, `update_draft`, `walk`), `readTools(deps)` (`read_session`, `list_followups`, `ask_dactyl`)
+ * and `actTools(deps)` (`stop_session`, `rename_session`, `answer_session`); each later tool file adds a line here
+ * and takes `deps`. Consumed by `companion-account.ts`,
+ * once per account.
  */
 export function buildCompanionTools(deps: CompanionToolDeps): Array<SdkMcpToolDefinition<any>> {
-  return [...sessionTools(), ...draftTools(deps)];
+  return [...sessionTools(), ...readTools(deps), ...draftTools(deps), ...actTools(deps)];
 }

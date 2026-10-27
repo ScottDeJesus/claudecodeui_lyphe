@@ -510,20 +510,42 @@ export const sessionsDb = {
   /**
    * The permission mode of the most recently active session that has one recorded, or `null` when
    * no session does. Ordered by `julianday` because `updated_at` is written in two spellings (SQLite's
-   * `CURRENT_TIMESTAMP` and the watcher's ISO), which do not sort as text.
+   * `CURRENT_TIMESTAMP` and the watcher's ISO), which do not sort as text. `provider` narrows it to that provider's chats:
+   * a mode is a provider's own word, so a chat of one provider never takes another's.
    */
-  latestPermissionMode(): string | null {
+  latestPermissionMode(provider?: string): string | null {
     const db = getConnection();
     const row = db
       .prepare(
         `SELECT permission_mode FROM sessions
-         WHERE permission_mode IS NOT NULL
+         WHERE permission_mode IS NOT NULL AND (? IS NULL OR provider = ?)
          ORDER BY julianday(COALESCE(updated_at, created_at)) DESC, rowid DESC
          LIMIT 1`
       )
-      .get() as { permission_mode: string } | undefined;
+      .get(provider ?? null, provider ?? null) as { permission_mode: string } | undefined;
 
     return row?.permission_mode ?? null;
+  },
+
+  /**
+   * The model and effort of the most recently active session that has a model recorded, or `null` when no
+   * session does. Read by the companion's send for a NEW chat that has no focus chat to take its choice from: a
+   * chat with none recorded runs on the catalog's default, which is not what he has been working with. Ordered like
+   * `latestPermissionMode`, for the same reason. `provider` narrows it to that provider's chats: a model id is a
+   * provider's own word, and a Codex model handed to a Claude chat fails its first turn.
+   */
+  latestModelChoice(provider?: string): { model: string; effort: string | null } | null {
+    const db = getConnection();
+    const row = db
+      .prepare(
+        `SELECT model, effort FROM sessions
+         WHERE model IS NOT NULL AND model <> '' AND (? IS NULL OR provider = ?)
+         ORDER BY julianday(COALESCE(updated_at, created_at)) DESC, rowid DESC
+         LIMIT 1`
+      )
+      .get(provider ?? null, provider ?? null) as { model: string; effort: string | null } | undefined;
+
+    return row ?? null;
   },
 
   updateSessionCustomName(sessionId: string, customName: string): void {

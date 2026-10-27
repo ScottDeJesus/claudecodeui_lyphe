@@ -1,6 +1,7 @@
 import { AudioLines } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
+import { useCompanion } from '@/modules/companion/context/CompanionContext';
 import { RAIL_BUTTON_BASE, RAIL_BUTTON_LIT, RAIL_BUTTON_UNLIT } from '@/shared/constants';
 import { Tooltip } from '@/shared/ui';
 import { cn } from '@/shared/utils';
@@ -52,16 +53,7 @@ export function CompanionDoorView({ open, name, onPress }: CompanionDoorViewProp
  * name from the companion's provider and toggles the panel; CompanionDoorView draws it.
  */
 export function CompanionDoorButton() {
-  // FILL(panel-fill): open and her name — `const { picture, open, setOpen } = useCompanion();` replaces these stand-ins, the name being `picture?.settings.name ?? null`.
-  const open = false;
-  const name: string | null = null;
+  const { picture, open, setOpen } = useCompanion();
 
-  return (
-    <CompanionDoorView
-      open={open}
-      name={name}
-      // FILL(panel-fill): the door's press — setOpen(!open)
-      onPress={() => {}}
-    />
-  );
+  return <CompanionDoorView open={open} name={picture?.settings.name ?? null} onPress={() => setOpen(!open)} />;
 }

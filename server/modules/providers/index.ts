@@ -15,6 +15,10 @@ export { readClaudeCommandCatalog } from './list/claude/claude-command-catalog.j
 // Claude CLI's own catalog ("Sonnet 5.5"), so a label names the generation the CLI runs and goes stale with no release.
 export { readClaudeModelsDefinition } from './list/claude/claude-model-catalog.js';
 
+// buildClaudeToolPermissionEntry: used by the companion module's `answer_session`, which answers "always" with the
+// entry the runtime's grammar matcher accepts for the ask — the same string the chat page's "Allow and remember" writes.
+export { buildClaudeToolPermissionEntry } from './list/claude/claude-tool-permission-entry.js';
+
 // launchAccountEnv: used by the Cerberus diagnosis agent and its summary audit, whose own CLI starts
 // ride the account the house chose exactly as a chat's process does.
 export { launchAccountEnv } from './list/claude/claude-launch-account.js';
