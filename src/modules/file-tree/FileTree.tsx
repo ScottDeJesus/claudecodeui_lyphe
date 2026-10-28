@@ -13,6 +13,8 @@ import { useFileTreeViewMode } from '@/modules/file-tree/hooks/useFileTreeViewMo
 import { useFileTreeUpload } from '@/modules/file-tree/hooks/useFileTreeUpload';
 import type { FileTreeNode,Project } from '@/shared/types';
 import { formatRelativeTime } from '@/modules/file-tree/utils/fileTreeUtils';
+import { PAGE_ANCHOR } from '@/shared/constants';
+import { usePageAnchor } from '@/shared/context/PageAnchorsContext';
 import { useToast } from '@/shared/context/ToastContext';
 import { ScrollArea, Input } from '@/shared/ui';
 import FileTreeBody from '@/modules/file-tree/FileTreeBody';
@@ -63,6 +65,19 @@ export default function FileTree({ selectedProject, onFileOpen }: FileTreeProps)
     showToast,
   });
   const operationLoading = operations.operationLoading || upload.operationLoading;
+
+  // The tree's root is an anchor a floating guide can point at while dactyls read code. One element takes two refs (the
+  // upload's own, which tells a drag leaving the tree from one crossing between its rows, and the anchor's), so one
+  // function hands the node to both. It is memoised: a new function per render would detach and re-attach both refs on
+  // every render of the tree.
+  const anchorRef = usePageAnchor(PAGE_ANCHOR.filesView);
+  const setTreeRoot = useCallback(
+    (node: HTMLDivElement | null) => {
+      treeRef.current = node;
+      anchorRef(node);
+    },
+    [treeRef, anchorRef],
+  );
 
   // Folder-targeted uploads (context menu / hover button) share one hidden
   // input; the target path is remembered until the user picks the files.
@@ -132,7 +147,7 @@ export default function FileTree({ selectedProject, onFileOpen }: FileTreeProps)
 
   return (
     <div
-      ref={treeRef}
+      ref={setTreeRoot}
       className="relative flex h-full flex-col bg-background"
       onDragEnter={upload.handleDragEnter}
       onDragOver={upload.handleDragOver}

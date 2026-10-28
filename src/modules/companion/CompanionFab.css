@@ -1,0 +1,61 @@
+/*
+ * Kaylee's disc (CompanionFab.tsx): the layer that carries her glide and her hop. The disc itself is the kit's DockableFab
+ * and is drawn by surfaces.css; nothing here restyles it.
+ *
+ * THE GLIDE is the layer's `translate`: none at rest, the target less the rest on a look, so going and coming home are one
+ * property easing between two values. 450 ms on Verve's ease-out curve (`--ease-enter`, what lifts and entries use):
+ * fast away, gentle into place. `translate`, not `transform`, so the hop below animates `transform` without fighting it.
+ * Only a new look and the way home glide: once she has landed (`data-tracking`), new measurements of the same look — the
+ * list scrolling under her — apply at once, so she stays on her anchor instead of easing after it.
+ *
+ * THE HOP is a keyframe on arrival, set by the layer's `data-landing` for its one run: a lift of a few pixels, fast up and
+ * falling back, on `--dur-quick` (200 ms).
+ *
+ * REDUCED MOTION jumps: no transition, so no glide, and no transition's end, so no hop. The hop is only ever declared
+ * under `no-preference` besides, so no rule can turn it on there.
+ */
+
+.companion-fab {
+  transition: translate 450ms var(--ease-enter);
+}
+
+/* The layer covers the viewport and passes every pointer through; the disc takes its own back. */
+.companion-fab > .vv-fab {
+  pointer-events: auto;
+}
+
+/* A drag in hand moves the disc under the finger: no glide may trail it. */
+.companion-fab[data-dragging] {
+  transition: none;
+}
+
+/* Landed: she follows her anchor frame for frame. */
+.companion-fab[data-tracking] {
+  transition: none;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .companion-fab[data-landing] {
+    animation: companion-fab-hop var(--dur-quick);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .companion-fab {
+    transition: none;
+  }
+}
+
+@keyframes companion-fab-hop {
+  0% {
+    transform: none;
+    animation-timing-function: ease-out;
+  }
+  45% {
+    transform: translateY(-5px);
+    animation-timing-function: ease-in;
+  }
+  100% {
+    transform: none;
+  }
+}

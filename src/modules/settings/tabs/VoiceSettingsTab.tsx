@@ -123,12 +123,13 @@ export default function VoiceSettingsTab() {
         onSaveKey={saveKey}
         onClearKey={clearKey}
         onTranscriptionModel={(model) => saveSettings({ gemini: { transcriptionModel: model } })}
-        // FILL(fill): speech model read — `speechModel={voiceSettings?.gemini.speechModel}`: the stored name; undefined while the settings are unread, so no row stands over a value the page cannot see.
-        // FILL(fill): speech model save — `onSpeechModel={(model) => saveSettings({ gemini: { speechModel: model } })}`.
-        // FILL(fill): voice read — `voice={voiceSettings?.gemini.voice}`, Kore until he picks another.
-        // FILL(fill): voice save — `onVoice={(name) => saveSettings({ gemini: { voice: name } })}`.
-        // FILL(fill): sound tags read — `soundTags={voiceSettings?.gemini.soundTags}`: the server's list in its order; the page keeps no copy of Google's set.
-        // FILL(fill): sound tags save — `onSoundTags={(tags) => saveSettings({ gemini: { soundTags: tags } })}`, straight through: `saving` turns true in the same press (useVoiceSettings' queue does), which the add field reads to keep his word until the answer; `null` restores Google's set.
+        speechModel={voiceSettings?.gemini.speechModel}
+        onSpeechModel={(model) => saveSettings({ gemini: { speechModel: model } })}
+        voice={voiceSettings?.gemini.voice}
+        onVoice={(name) => saveSettings({ gemini: { voice: name } })}
+        soundTags={voiceSettings?.gemini.soundTags}
+        // `null` restores Google's set; `saving` turns true in the same press, which the add field reads to keep his word until the answer.
+        onSoundTags={(tags) => saveSettings({ gemini: { soundTags: tags } })}
         onRetry={retry}
       />
 

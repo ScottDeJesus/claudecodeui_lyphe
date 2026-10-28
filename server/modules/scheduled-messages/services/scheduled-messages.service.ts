@@ -1,5 +1,7 @@
 import { scheduledMessagesDb, sessionsDb } from '@/modules/database/index.js';
 import type { ScheduledMessageRow } from '@/modules/database/index.js';
+import { WS_OPEN_STATE, connectedClients } from '@/modules/websocket/index.js';
+import type { ScheduledMessagesChangedEvent } from '@/shared/types.js';
 import { AppError } from '@/shared/utils.js';
 
 /** How far ahead a message may be scheduled. Beyond this it is almost certainly a mistake. */
@@ -27,6 +29,44 @@ function readOptions(raw: string): Record<string, unknown> {
     // A corrupt options blob must not stop the message from being sent.
     return {};
   }
+}
+
+/**
+ * Puts one `scheduled_messages_changed` frame on every open gateway socket, naming the chat whose
+ * scheduled messages moved, so a composer showing that chat's banner reads its list again.
+ *
+ * Called AFTER each change landed — scheduled, cancelled or dismissed, claimed by the dispatcher
+ * as its turn starts, failed — never before it, so a write that refused told no client it happened.
+ * Without it the banner was read only when a chat opened: a message the dispatcher had sent stayed
+ * on screen as still scheduled until a reload, and so did one scheduled or cancelled in another tab.
+ *
+ * The frame names the chat and carries no message: each client reads the list through the
+ * authenticated per-user GET, so no text travels over the broadcast, and a composer on another chat
+ * ignores it. The fan-out copies `followups.service.ts`: stringify once, skip a client whose
+ * `readyState` is not open, catch PER CLIENT so one dead socket does not cost the rest their frame.
+ * Never throws — the dispatcher calls it right after claiming messages it still has to send.
+ *
+ * Exported for the dispatcher beside this file, which claims and fails messages from a timer with
+ * no request to answer.
+ */
+export function announceScheduledMessagesChanged(sessionId: string): void {
+  const message = JSON.stringify({
+    kind: 'scheduled_messages_changed',
+    sessionId,
+    at: Date.now(),
+  } satisfies ScheduledMessagesChangedEvent);
+
+  connectedClients.forEach((client) => {
+    if (client.readyState !== WS_OPEN_STATE) return;
+
+    try {
+      client.send(message);
+    } catch (error) {
+      console.error(
+        `[ScheduledMessages] could not send a scheduled_messages_changed frame to a client: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+  });
 }
 
 export function toScheduledMessage(row: ScheduledMessageRow): ScheduledMessage {
@@ -92,13 +132,15 @@ export const scheduledMessagesService = {
       });
     }
 
-    return toScheduledMessage(scheduledMessagesDb.create({
+    const scheduled = toScheduledMessage(scheduledMessagesDb.create({
       userId: input.userId,
       sessionId: input.sessionId,
       content,
       options: input.options ?? {},
       scheduledFor,
     }));
+    announceScheduledMessagesChanged(scheduled.sessionId);
+    return scheduled;
   },
 
   listForSession(userId: number, sessionId: string): ScheduledMessage[] {
@@ -111,11 +153,13 @@ export const scheduledMessagesService = {
 
   /** Cancels a pending message, or dismisses a failed one. */
   cancel(userId: number, id: string): void {
-    if (!scheduledMessagesDb.cancel(userId, id)) {
+    const sessionId = scheduledMessagesDb.cancel(userId, id);
+    if (!sessionId) {
       throw new AppError('That message has already been sent or cancelled.', {
         code: 'SCHEDULED_MESSAGE_NOT_PENDING',
         statusCode: 409,
       });
     }
+    announceScheduledMessagesChanged(sessionId);
   },
 };

@@ -1,13 +1,14 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 
+import { useCompanionVoice } from '@/modules/companion/hooks/useCompanionVoice';
 import { useTalkBinding } from '@/modules/companion/hooks/useTalkBinding';
 import { useTalkPress } from '@/modules/companion/hooks/useTalkPress';
 import { isCompanionPicture, reduceCompanion } from '@/modules/companion/utils/companionReducer';
 import { api, refusalSentence } from '@/shared/api';
 import type { CompanionFrame, CompanionPicture, CompanionSettings } from '@/shared/companion-types';
 import { useWebSocket } from '@/shared/context/WebSocketContext';
-import type { TalkPress } from '@/shared/types';
+import type { CompanionVoice, TalkPress } from '@/shared/types';
 import { companionClientId } from '@/shared/utils';
 
 type CompanionContextValue = {
@@ -35,18 +36,30 @@ type CompanionContextValue = {
   /** Wipes her conversation and everything she keeps. */
   clear: () => Promise<void>;
   /**
-   * This page's ONE talk press: the panel's talk button, the bound key or mouse button and her status line all read it here,
-   * and so will the voice player and the avatar's presence. `state` runs idle → listening → transcribing → idle; `toggle` is
-   * one press; `error` is what failed on the page itself (the mic refused, the clip not sent).
+   * This page's ONE talk press: the panel's talk button and the bound key or mouse button read it here, and
+   * `useCompanionPresence` reads its `state` into the one state her status line draws. `state` runs idle → listening → transcribing → idle; `toggle` is one press, which
+   * cuts her off first when this page's player is sounding; `error` is what failed on the page itself (the mic refused, the
+   * clip not sent).
    */
   talk: TalkPress;
+  /**
+   * This page's voice: `on` / `setOn` its switch (this device's, `companion-voice` in localStorage, on by default), `speaking`
+   * the sentence its player is sounding, `cut` true for the 900 ms after a press cut her off. Only the page that holds the
+   * floor plays, and only while the switch is on; `useCompanionPresence` reads `speaking` and `cut` with the press into her status line's state.
+   */
+  voice: CompanionVoice;
+  /**
+   * The id of the chat she sent a draft to in the last four seconds (counted from the `companion_open_chat` frame this page
+   * heard), else null. `useAvatarTarget` points the button at that chat's composer while it is set.
+   */
+  recentSend: string | null;
 };
 
 const CompanionContext = createContext<CompanionContextValue | null>(null);
 
 /**
- * Used by this module's panel and door, and through the barrel by the project-workspace module's command palette: what
- * Kaylee's provider holds for this page. Throws outside CompanionProvider, so a consumer placed wrong fails at once.
+ * Used by this module's panel, door and `useAvatarTarget`, and through the barrel by the project-workspace module's command
+ * palette: what Kaylee's provider holds for this page. Throws outside CompanionProvider, so a consumer placed wrong fails at once.
  */
 export function useCompanion(): CompanionContextValue {
   const context = useContext(CompanionContext);
@@ -59,6 +72,9 @@ async function ensureOk(response: Response): Promise<Response> {
   if (response.ok) return response;
   throw new Error((await refusalSentence(response)) ?? `Request failed (${response.status})`);
 }
+
+/** How long after a send the page counts it as recent: the time her button keeps looking at the composer the send went to. */
+const RECENT_SEND_MS = 4000;
 
 /** Whether a frame off the socket is one of hers. */
 const isCompanionFrame = (event: { kind?: string }): boolean => typeof event.kind === 'string' && event.kind.startsWith('companion_');
@@ -79,11 +95,16 @@ const isCompanionFrame = (event: { kind?: string }): boolean => typeof event.kin
  * it drops the queue and discards a read that was out, because the read that follows it is the one that counts.
  *
  * A chat is opened only on a `companion_open_chat` whose `floor` is this page's client id. Every other page of the account
- * hears the frame too and ignores it, so she opens a chat where he is, not on every screen he has open.
+ * hears the frame too and does not open it, so she opens a chat where he is, not on every screen he has open; every page
+ * does note the send (`recentSend`), which is what the button's look reads.
  *
  * THE PAGE'S ONE TALK PRESS lives here: `useTalkPress` is called once, and `useTalkBinding` beside it binds the account's
  * `talkBinding` (from the picture's settings, so a re-bind on any page reaches every page by its settings frame) to that press.
  * A press never opens her panel; the press route takes the floor itself.
+ *
+ * THE PAGE'S ONE VOICE lives here too (`useCompanionVoice`): the player, the switch, and the pull that plays her sentences while
+ * the picture's `floor` is this page's client id. The press is handed the voice, so it can cut her off. The player is unlocked in
+ * the first gesture: opening her panel, typing to her, or a talk press. A Stop and a Clear silence the page's voice as well as her turn.
  */
 export function CompanionProvider({ onOpenChat, children }: { onOpenChat: (sessionId: string) => void; children: ReactNode }) {
   const { subscribe } = useWebSocket();
@@ -93,8 +114,16 @@ export function CompanionProvider({ onOpenChat, children }: { onOpenChat: (sessi
   const [open, setOpenState] = useState(false);
   // This page's name for itself, read once so it cannot change under a conversation; the floor and every frame addressed to a page use it.
   const [clientId] = useState(companionClientId);
+  // The chat she sent to inside the last four seconds. State, not a ref: the button's look starts from it, and the window's end must render the button again.
+  const [recentSend, setRecentSend] = useState<string | null>(null);
+  // The timer that ends the window above, so a second send restarts the four seconds instead of being cut short by the first's.
+  const recentSendTimerRef = useRef(0);
+  // The page's one voice: it plays her sentences while the picture says this page holds the floor, and its switch is on.
+  const speech = useCompanionVoice({ picture, clientId });
+  // Stable for the page's life (unlike `speech`, which moves with every sentence), so the callbacks below keep their identity.
+  const { unlock: unlockVoice, silence: silenceVoice } = speech;
   // The page's one press, and the key or mouse button he bound to it. The press is not state of the picture: it is this page's mic.
-  const talk = useTalkPress();
+  const talk = useTalkPress(speech);
   useTalkBinding(picture?.settings.talkBinding ?? null, talk.toggle);
 
   // Whether a read of the picture is out, so a second request waits for it rather than racing it.
@@ -164,12 +193,14 @@ export function CompanionProvider({ onOpenChat, children }: { onOpenChat: (sessi
       // Never replayed over a fresh read: what was queued predates the clear, and the read that follows it is the one that counts.
       queuedRef.current = [];
       applyFrame(frame);
+      // Her conversation is gone: what she was saying goes with it.
+      silenceVoice();
       void seed();
       return;
     }
     if (seedingRef.current) queuedRef.current.push(frame);
     applyFrame(frame);
-  }, [seed, applyFrame]);
+  }, [seed, applyFrame, silenceVoice]);
 
   useEffect(() => {
     aliveRef.current = true;
@@ -179,6 +210,9 @@ export function CompanionProvider({ onOpenChat, children }: { onOpenChat: (sessi
     };
   }, [seed]);
 
+  // A window still open when the provider goes would set state on nothing.
+  useEffect(() => () => window.clearTimeout(recentSendTimerRef.current), []);
+
   useEffect(() => subscribe((event) => {
     if (event.kind === 'websocket_reconnected') {
       void seed();
@@ -187,6 +221,12 @@ export function CompanionProvider({ onOpenChat, children }: { onOpenChat: (sessi
     if (!isCompanionFrame(event)) return;
     const frame = event as unknown as CompanionFrame;
     if (frame.kind === 'companion_open_chat') {
+      // Every page notes the send, floor or not: her activity is the account's and the button on every page follows it, so the
+      // button on every page follows the send too. Only the floor's page opens the chat. The window's end is a deadline this
+      // frame sets, not a clock that checks.
+      setRecentSend(frame.sessionId);
+      window.clearTimeout(recentSendTimerRef.current);
+      recentSendTimerRef.current = window.setTimeout(() => setRecentSend(null), RECENT_SEND_MS);
       if (frame.floor === clientId) onOpenChatRef.current(frame.sessionId);
       return;
     }
@@ -201,15 +241,19 @@ export function CompanionProvider({ onOpenChat, children }: { onOpenChat: (sessi
   const setOpen = useCallback((next: boolean) => {
     setOpenState(next);
     if (!next) return;
+    // Opening her is a gesture: the page's audio is unlocked now, so her first sentence can sound.
+    unlockVoice();
     // Opening her is the page saying "act on me": the floor moves here.
     api.companion.floor().then(ensureOk).catch((error: unknown) => {
       console.warn('[Companion] Could not take the floor:', error);
     });
-  }, []);
+  }, [unlockVoice]);
 
   const sendText = useCallback(async (text: string) => {
+    // Typing to her is a gesture too, and unlocking comes before the first await.
+    unlockVoice();
     await ensureOk(await api.companion.sendText(text));
-  }, []);
+  }, [unlockVoice]);
 
   // Every write is announced to this page by the frame its route sends, in the same tick as the write. The two writes that
   // ANSWER with the thing itself (the settings, the draft) fold that answer in as well, so a control never shows the old value
@@ -244,17 +288,19 @@ export function CompanionProvider({ onOpenChat, children }: { onOpenChat: (sessi
     await ensureOk(await api.companion.dismissNote(id));
   }, []);
 
+  // Stop stops her turn, and her voice with it: a sentence already queued in the player would otherwise finish after the word.
   const interrupt = useCallback(async () => {
+    silenceVoice();
     await ensureOk(await api.companion.interrupt());
-  }, []);
+  }, [silenceVoice]);
 
   const clear = useCallback(async () => {
     await ensureOk(await api.companion.clear());
   }, []);
 
   const value = useMemo<CompanionContextValue>(
-    () => ({ picture, open, clientId, setOpen, sendText, saveSettings, editDraft, sendDraft, clearDraft, dismissNote, interrupt, clear, talk }),
-    [picture, open, clientId, setOpen, sendText, saveSettings, editDraft, sendDraft, clearDraft, dismissNote, interrupt, clear, talk],
+    () => ({ picture, open, clientId, setOpen, sendText, saveSettings, editDraft, sendDraft, clearDraft, dismissNote, interrupt, clear, talk, voice: speech.voice, recentSend }),
+    [picture, open, clientId, setOpen, sendText, saveSettings, editDraft, sendDraft, clearDraft, dismissNote, interrupt, clear, talk, speech.voice, recentSend],
   );
 
   return <CompanionContext.Provider value={value}>{children}</CompanionContext.Provider>;

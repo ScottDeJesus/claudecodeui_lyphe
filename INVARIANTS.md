@@ -15776,15 +15776,15 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-talk-whole.mjs
 
 | rule | why |
 |---|---|
-| Add no `admit`, no `record` and no budget name to `gemini-transcribe.ts`, `gemini-speech.ts`, `voice-provider.ts` or `companion-press.ts` | the operator's ruling; the chat mic on Gemini rides the same door and is not counted either |
+| Add no `admit`, no `record` and no budget name to `gemini-transcribe.ts`, `gemini-speech.ts`, `voice-provider.ts`, `companion-press.ts` or `companion-speech.ts` | the operator's ruling; the chat mic on Gemini rides the same door and is not counted either |
 | The key goes in the `x-goog-api-key` header only, and every sentence the door returns passes `redactKey` (`gemini-errors.ts`) | a key in a URL, a log line or a sentence is a leaked key |
 | Keep `resolveGeminiKey` out of the voice barrel | the raw key leaves the module nowhere |
-| A probe of this door makes no Gemini call where the code allows it (the refusal is proven on a server with no key in reach), and otherwise ONE call on `gemini-3.8-flash` | the standing Gemini budget constraint binds a builder's proof even though this door is not counted |
+| A probe of this door makes no Gemini call where the code allows it (the refusal is proven on a server with no key in reach), and otherwise ONE call: on `gemini-3.8-flash` for the transcribing door, on `gemini-3.8-flash-lite-tts` with one short sentence for the speech door | the standing Gemini budget constraint binds a builder's proof even though this door is not counted |
 | A change to `KEY_PATTERN` (`gemini-key.ts`) or `MODEL_PATTERN` (`voice-settings.ts`) is made with the page's `KEY_SHAPE` and `MODEL_SHAPE` (`GeminiVoiceSection.tsx`) | the page checks before it sends; the server's limit is the one that counts (MAN-9094) |
 
 Detail: MAN-9098 (settings, key, routes), MAN-9099 (the call).
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/companion-press.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/gemini-errors.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/gemini-key.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/gemini-speech.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/gemini-transcribe.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/voice-provider.ts
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/companion-press.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/companion-speech.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/gemini-errors.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/gemini-key.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/gemini-speech.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/gemini-transcribe.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/voice-provider.ts
 
 ## INV-9914 — probe — MEDIUM — the hook does not serve the rows that say what landed, for 12 of the 21 code files this phase documents
 
@@ -15945,209 +15945,826 @@ probe-key: a11d243ace7bd71595524be4d7d30a3ea6ca2248
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/
 
-## INV-9921 — probe — `level()` is not 0 for up to 43 ms after `stop()`, and the type comment says "0 when nothing sounds"
+## INV-9935 — probe — the "no gap" demonstration is not met, and nothing in the proof asserts a gap (a decision for the caller, as the builder said)
 
-`level()` is not 0 for up to 43 ms after `stop()`, and the type comment says "0 when nothing sounds"
-
-```probe
-D=$(mktemp -d /tmp/athena-probe-XXXXXX) || exit 1
-cat > "$D/p.sh" <<'EOF'
-D=$(dirname "$0")
-cat > "$D/p.mjs" <<'JS'
-import pw from '/opt/shadow-connector/node_modules/playwright/index.js';
-const b = await pw.chromium.launch(); const p = await b.newPage();
-await p.goto('http://localhost:5183/src/modules/companion/utils/pcmPlayer.ts');
-const r = await p.evaluate(async () => {
-  const { createPcmPlayer } = await import('/src/modules/companion/utils/pcmPlayer.ts');
-  const P = createPcmPlayer(); await P.unlock();
-  const bytes = new Uint8Array(48000); const v = new DataView(bytes.buffer);
-  for (let i = 0; i < 24000; i++) v.setInt16(i * 2, Math.round(Math.sin(2 * Math.PI * 440 * i / 24000) * 16000), true);
-  P.enqueue('p', 0, new ReadableStream({ start(c) { c.enqueue(bytes); c.close(); } }));
-  await new Promise((res) => setTimeout(res, 300));
-  const before = P.level(); P.stop(); const atStop = P.level();
-  await new Promise((res) => setTimeout(res, 100));
-  return { playingAfterStop: P.playing(), levelBeforeStop: +before.toFixed(3), levelInSameCallAsStop: +atStop.toFixed(3), levelAt100ms: P.level() };
-});
-console.log(JSON.stringify(r)); await b.close();
-JS
-node "$D/p.mjs"
-EOF
-bash "$D/p.sh"
-# expect: while the defect stands levelInSameCallAsStop equals levelBeforeStop (about 0.345) with playingAfterStop null and levelAt100ms 0; cured, levelInSameCallAsStop is 0
-```
-
-measured 2026-10-27 by chain chain-kaylee--voice--player-20261027-133640-f16d, finding L1, LOW
-probe-key: f431a9c22a9857d418c7f0710fa1388f56a888ae
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/pcmPlayer.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-voice-pcm-player.mjs
-
-## INV-9922 — probe — a sentence that sounded nothing still becomes `lastEnded()`, so a cut's `heard` can name a sentence nobody heard
-
-a sentence that sounded nothing still becomes `lastEnded()`, so a cut's `heard` can name a sentence nobody heard
-
-```probe
-D=$(mktemp -d /tmp/athena-probe-XXXXXX) || exit 1
-cat > "$D/p.sh" <<'EOF'
-D=$(dirname "$0")
-cat > "$D/p.mjs" <<'JS'
-import pw from '/opt/shadow-connector/node_modules/playwright/index.js';
-const b = await pw.chromium.launch(); const p = await b.newPage();
-await p.goto('http://localhost:5183/src/modules/companion/utils/pcmPlayer.ts');
-const r = await p.evaluate(async () => {
-  const { createPcmPlayer } = await import('/src/modules/companion/utils/pcmPlayer.ts');
-  const P = createPcmPlayer(); await P.unlock();
-  const events = []; P.onSentence((e) => events.push(`${e.index}${e.phase}`));
-  const tone = new Uint8Array(4800); const v = new DataView(tone.buffer);
-  for (let i = 0; i < 2400; i++) v.setInt16(i * 2, Math.round(Math.sin(2 * Math.PI * 440 * i / 24000) * 16000), true);
-  P.enqueue('x', 0, new ReadableStream({ start(c) { c.enqueue(tone); c.close(); } }));
-  P.enqueue('x', 1, new ReadableStream({ start(c) { c.error(new Error('socket reset before the first byte')); } }));
-  P.enqueue('x', 2, new ReadableStream({ start(c) { c.close(); } }));
-  await new Promise((res) => setTimeout(res, 800));
-  return { events: events.join(), lastEnded: P.lastEnded() };
-});
-console.log(JSON.stringify(r)); await b.close();
-JS
-node "$D/p.mjs" 2>&1 | cut -c1-300
-EOF
-bash "$D/p.sh"
-# expect: while the defect stands lastEnded is {"turnId":"x","index":2}; cured, it is {"turnId":"x","index":0} (the events line stays 0start,0end,1start,1end,2start,2end)
-```
-
-measured 2026-10-27 by chain chain-kaylee--voice--player-20261027-133640-f16d, finding L2, LOW
-probe-key: 85958dfe6f22b29621265628fca82153042a1d85
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/pcmPlayer.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-voice-pcm-player.mjs
-
-## INV-9923 — probe — `enqueue()` throws synchronously for a body it cannot read (a locked stream, or a `null` `response.body`)
-
-`enqueue()` throws synchronously for a body it cannot read (a locked stream, or a `null` `response.body`)
-
-```probe
-D=$(mktemp -d /tmp/athena-probe-XXXXXX) || exit 1
-cat > "$D/p.sh" <<'EOF'
-D=$(dirname "$0")
-cat > "$D/p.mjs" <<'JS'
-import pw from '/opt/shadow-connector/node_modules/playwright/index.js';
-const b = await pw.chromium.launch(); const p = await b.newPage();
-await p.goto('http://localhost:5183/src/modules/companion/utils/pcmPlayer.ts');
-const r = await p.evaluate(async () => {
-  const { createPcmPlayer } = await import('/src/modules/companion/utils/pcmPlayer.ts');
-  const P = createPcmPlayer();
-  const locked = new ReadableStream({ start(c) { c.close(); } }); locked.getReader();
-  const out = {};
-  for (const [name, body] of [['locked', locked], ['null (a 204 response.body)', null]]) {
-    try { P.enqueue('n', 0, body); out[name] = 'no throw'; } catch (e) { out[name] = `threw ${e.constructor.name}`; }
-  }
-  return out;
-});
-console.log(JSON.stringify(r)); await b.close();
-JS
-node "$D/p.mjs"
-EOF
-bash "$D/p.sh"
-# expect: while the defect stands both entries read "threw TypeError"; cured, both read "no throw"
-```
-
-measured 2026-10-27 by chain chain-kaylee--voice--player-20261027-133640-f16d, finding L3, LOW
-probe-key: 327e16ec8b82378af9c050e460fb650481a9a6b9
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/pcmPlayer.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-voice-pcm-player.mjs
-
-## INV-9924 — probe — MEDIUM — the showing's own words check cannot pass, and the script ships red
-
-MEDIUM — the showing's own words check cannot pass, and the script ships red
+the "no gap" demonstration is not met, and nothing in the proof asserts a gap (a decision for the caller, as the builder said)
 
 ```probe
 D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.mjs" <<'EOF'
+import { openConsole } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/console.mjs';
+import { PREFERENCES } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/talk-probe.mjs';
+import { instrumentation, sentencesOf, until, sleep } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/voice-whole-kit.mjs';
+const tone = (seconds) => { const n = Math.round(24000 * seconds); const b = Buffer.alloc(n * 2); for (let i = 0; i < n; i += 1) b.writeInt16LE(Math.round(Math.sin(2 * Math.PI * 440 * i / 24000) * 6000), i * 2); return b; };
+const AUDIO = 'audio/l16; rate=24000; channels=1';
+const opened = await openConsole({ preferences: PREFERENCES, viewport: { width: 1440, height: 900 }, launchOptions: { args: ['--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream'] }, contextOptions: { permissions: ['microphone'] } });
+const { page } = opened;
+await page.context().addInitScript(instrumentation);
+await page.reload({ waitUntil: 'networkidle' });
+await page.locator('button[data-companion-door]:visible').first().click();
+await page.locator('[data-companion-panel]').waitFor({ state: 'visible', timeout: 10000 });
+await page.waitForFunction(() => !document.querySelector('[data-companion-log="loading"]'), null, { timeout: 15000 });
+const floorIsMine = () => page.evaluate(async () => { const id = sessionStorage.getItem('companion-client-id'); const r = await fetch('/api/companion', { headers: { Authorization: `Bearer ${localStorage.getItem('auth-token')}`, 'x-companion-client': id } }); return (await r.json()).floor === id; });
+await until('the floor', floorIsMine, 15000);
+const ask = async (text) => { const field = page.locator('[data-companion-panel] [data-companion-composer-field]'); await field.fill(text); await field.press('Enter'); };
+// A speech door that needs 1200 ms for a 900 ms sentence: the silence after each sentence is the difference.
+await page.route('**/api/companion/speech/**', async (route) => { await sleep(1200); await route.fulfill({ status: 200, contentType: AUDIO, body: tone(0.9) }); });
+await ask('Count from one to four, one number per sentence.');
+await until('four sentences started', () => page.evaluate(() => window.__heph.buffers.filter((b) => b.samples === 1).length >= 4), 60000);
+await sleep(1500);
+const seen = await page.evaluate(() => window.__heph);
+console.log('silence after each sentence, ms (synthesis 1200, sentence 900):', sentencesOf(seen).slice(0, -1).map((s) => Math.round(s.gapAfter * 1000)).join(' '));
+await opened.browser.close();
+EOF
 cat > "$D/p.sh" <<'EOF'
-T=/tmp/heph-voice-proof.qv9IwK/transcript.json
-S=/home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-voice-speech.mjs
-grep -n "the words say the build is green" "$S" | cut -c1-140
-if [ -f "$T" ]; then
-  python3 -I -c 'import json,re,sys; t=json.load(open(sys.argv[1])); x=t.get("text","")
-print("heard:", repr(x), "| script check passes:", bool(re.search("build", x, re.I) and re.search("green", x, re.I)))' "$T"
-else
-  echo "stored transcript gone: no verdict on this probe"
-fi
+cd /home/lyphe/.claude/claudecodeui_lyphe && timeout 200 node "$(dirname "$0")/p.mjs" 2>&1 | tail -3
 EOF
 bash "$D/p.sh"
-case "$D" in /tmp/athena-probe.??????) cd /tmp && rm -r "$D" ;; esac
-# expect: `script check passes: False` (heard "Okay, so, the middle's green!") while the defect stands; `True` once the showing is re-recorded or the check is changed. Printed `stored transcript gone` when the proof folder has been cleared.
+# expect: three numbers, each near 360 (cured: each under 50): the silence after a one-word sentence is the synthesis time minus its length
 ```
 
-measured 2026-10-27 by chain chain-kaylee--voice--speech-20261027-133639-e691, finding M1, MEDIUM
-probe-key: a13c4252428e7d9bcb21b13b7fa897b66533357f
+measured 2026-10-27 by chain chain-kaylee--voice--fill-20261027-145634-7a1c, finding L1, LOW
+probe-key: 4cac93ebe834cfb5b1715b3f2a2e1b7ffa312a6a
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/gemini-errors.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/gemini-speech.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/voice-settings.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-voice-speech.mjs
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useCompanionVoice.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-voice-whole.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/voice-whole-edges.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/voice-whole-kit.mjs
 
-## INV-9925 — probe — LOW — an `ok: true` answer holds its request only from its first read: an abort before it still yields a chunk, and an unread `return()` leaves the request open for 60 s with no log line
+## INV-9938 — server/modules/voice — the sound-tag list has ONE home, `DEFAULT_SOUND_TAGS`, read by the companion's filter and by her register
 
-LOW — an `ok: true` answer holds its request only from its first read: an abort before it still yields a chunk, and an unread `return()` leaves the request open for 60 s with no log line
+The sounds she may make are the account's `gemini.soundTags` (`readVoiceSettings(userId).gemini.soundTags`, MAN-9102). `DEFAULT_SOUND_TAGS` (`voice-settings.ts`) is the list an account holds until it saves its own and the one `soundTags: null` restores. Detail: MAN-9081 (the filter), MAN-9080 (the register).
+
+| rule | why |
+|---|---|
+| `DEFAULT_SOUND_TAGS` is written in `server/modules/voice/voice-settings.ts` and nowhere else: no copy in the companion or the page. The one other copy is the Settings fixture's `GOOGLE_TEN` (rule 5), which a check keeps equal to it | a second list drifts, and she is taught a sound the filter then deletes |
+| The companion reads the account's list through ONE reader, wired in `companion-account.ts` (`readSoundTags`); `parseExpression` (turn start, `companion-turns.ts`) and `fillRegister` (each push) both take it from there | one list feeds what she is taught and what survives the filter |
+| The voice barrel exports `DEFAULT_SOUND_TAGS` for the probe that proves the parse against the shipped set (`.verify/companion-wire-contract.mjs`); live code calls `readVoiceSettings` | the barrel's consumer is named; a live reader of the default alone would ignore the account's own list |
+| The page holds no copy of Google's set: Settings' "Restore Google's set" saves `soundTags: null`, and the chips redraw from the server's answer | the server holds the set; the page's `TAG_SHAPE`, `MAX_TAGS` and `MAX_TAG_CHARS` mirror `checkSoundTags` and are edited with it (MAN-9094) |
+| A fixture's copy of the ten (`GOOGLE_TEN` in `.verify/lib/voice-kit.mjs`) is checked against `DEFAULT_SOUND_TAGS` by `.verify/lib/voice-fixtures-settings.mjs` | MAN-9106 |
+| A tag added reaches the register at the next push and the filter at the next turn; a turn is parsed by the list read when it started | one turn, one list |
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/companion-account.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-prompt.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-turns.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/sentence-stream.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/voice-settings.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/voice-settings/sections/SoundTagsField.tsx
+
+## INV-9939 — server/modules/companion — her voice reaches only the floor page, and only a pull spends: the speech door's rules
+
+The door: MAN-9110. The cache and the cut: MAN-9111.
+
+| rule | why |
+|---|---|
+| `GET /speech/:turnId/:index` answers only the page whose client id is `companion_state.floor` (409 `COMPANION_NOT_FLOOR` for any other) and is checked FIRST | two open pages cannot both spend |
+| A synthesis starts only inside a `GET` that asks for it: no prefetch, no push, and a `HEAD` is 405 | a muted page, a page without the floor and a page nobody opened spend nothing |
+| The door and `synthesizeSentence` ask no Gemini budget: no `admit`, no `record`, no budget name (INV-9908) | the operator, 2026-10-26: "Kaylee doesn't count for the budget" |
+| A request that leaves aborts its synthesis when it was the last follower and the sentence had not finished; the cache keeps no half sentence | a cut or a closed page costs at most the sentence in flight and the one ahead |
+| `speechCache.startTurn(turnId)` runs BEFORE the `companion_turn` frame is sent | a page pulls sentence 0 the moment its frame arrives |
+| `cut` aborts the turn's syntheses, THEN owes the cut, THEN awaits the interrupt | the press's own message can arrive while she is stopping and must carry the cut |
+| `end()` runs on Clear and on `stopAll` | a sentence streaming to a page would hold the HTTP drain open |
+| The ten-minute expiry frees audio and never the current turn | a long turn is not made unspeakable under the page still listening |
+| Her sentence is rebuilt from its log row (`readSentence`), never held in memory | the cache holds audio only |
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/companion-account.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/companion.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/companion-speech-cache.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/companion-speech.ts
+
+## INV-9940 — src/modules/companion — her voice on the page: the rules later edits keep
+
+The page's side: MAN-9113 (pull, switch, cut, state), MAN-9112 (player).
+
+| rule | why |
+|---|---|
+| A page pulls only while `picture.floor === clientId` and its switch is on; it makes no speech request otherwise | only the floor page plays and pays |
+| The switch is `localStorage['companion-voice']`, per device, ON unless it reads `'off'` | one device's mute is not another's |
+| The player is private to the companion module (`utils/pcmPlayer.ts`, not in `index.ts`) and is made once per page, by `useCompanionVoice` | a second player is a second AudioContext and a second queue |
+| `unlock()` is the first statement of its gesture handler, before any `await` | a browser plays nothing before a gesture; it lets `resume()` run inside the activation |
+| `PcmPlayer.stop()` stays synchronous and leaves no event behind | the cut is silent within a tenth of a second |
+| Events go out through `drain()` only, in enqueue order | the pull frees the next sentence on `start`; out of order it would ask twice or never |
+| The pull never asks more than one ahead: a request stays `pending` until its sentence STARTS | a cut costs at most the sentence in flight and the one ahead |
+| The press that opens the mic holds the pull until the press that ends it | her voice never enters his clip |
+| The cut request settles before the press's clip is uploaded | the cut is owed before the press is pushed, so its message carries `<cut>` |
+| `speaking` is never `null` between two sentences; the status line's order is `cut` > `listening` > `transcribing` > `speaking` | the band and the words must not blink at every join |
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useCompanionVoice.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useTalkPress.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/pcmPlayer.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/speechPull.ts
+
+## INV-9941 — probe — MEDIUM — the first touch of `useCompanionVoice.ts` serves three probe notes and no row that says what landed
+
+MEDIUM — the first touch of `useCompanionVoice.ts` serves three probe notes and no row that says what landed
+
+```probe
+~/.claude/scripts/docstore govern /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useCompanionVoice.ts --touch read --limit 3 --text | cut -d' ' -f1 | tr '\n' ' '; echo
+# expect: INV-9933, INV-9934 and INV-9935 (in any order) — three probe notes and neither INV-9940 nor MAN-9113 (cured: INV-9940 is among the three)
+```
+
+measured 2026-10-27 by chain chain-kaylee--voice--docs-20261027-161540-497c, finding M1, MEDIUM
+probe-key: a4dc58051c873736115d981eb9003ea6f3b3238f
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/
+
+## INV-9942 — probe — LOW — MAN-9110 names a stderr line the door does not write for a stream that fails after its first byte
+
+LOW — MAN-9110 names a stderr line the door does not write for a stream that fails after its first byte
 
 ```probe
 D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
-cat > "$D/p.sh" <<'EOF'
-S=$(mktemp -d /tmp/athena-probe-run.XXXXXX) || exit 1
-sqlite3 -readonly ~/.cloudcli/auth.db ".backup '$S/auth.db'" || exit 1
-cat > "$S/p.mjs" <<'JS'
-const { synthesizeSentence } = await import('/home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/index.ts');
-const enc = new TextEncoder();
-const lines = [];
-console.log = (...args) => { const text = args.join(' '); if (text.startsWith('[voice] gemini speech')) lines.push(text); };
-const ev = (name, data) => `event: ${name}\ndata: ${JSON.stringify({ event_type: name, ...data })}\n\n`;
-const audio = ev('step.delta', { delta: { type: 'audio', data: Buffer.from(new Uint8Array(new Int16Array(2400).fill(500).buffer)).toString('base64') } });
-let requestSignal = null;
-globalThis.fetch = async (url, init) => {
-  requestSignal = init.signal;
-  const parts = [audio, audio, audio + ev('interaction.completed', {})];
-  let at = 0;
-  return new Response(new ReadableStream({ async pull(c) { if (at < parts.length) { if (at > 0) await new Promise((r) => setTimeout(r, 300)); c.enqueue(enc.encode(parts[at++])); } else c.close(); } }), { status: 200 });
-};
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-{
-  const ac = new AbortController();
-  const answer = await synthesizeSentence(2, { text: 'Hello there.', style: 'warm', signal: ac.signal });
-  ac.abort(); await sleep(30);
-  const first = await answer.chunks[Symbol.asyncIterator]().next();
-  process.stdout.write(`A abort-before-first-read: first read done=${first.done} bytes=${first.value?.length ?? 0}\n`);
-}
-{
-  lines.length = 0;
-  const answer = await synthesizeSentence(2, { text: 'Hello there.', style: 'warm', signal: new AbortController().signal });
-  await answer.chunks[Symbol.asyncIterator]().return(undefined); await sleep(200);
-  process.stdout.write(`B return-before-first-read: requestAborted=${requestSignal.aborted} logLines=${lines.length}\n`);
-}
+cat > "$D/p.mts" <<'EOF'
+// A synthesis that fails AFTER its first audio byte: which stderr line does the door write, and what does the response see?
+const R = '/home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/';
+const { createSpeech } = await import(R + 'companion-speech.ts');
+const { createSpeechCache } = await import(R + 'companion-speech-cache.ts');
+const errs: string[] = [];
+console.error = (...a: unknown[]) => { errs.push(a.map(String).join(' ').slice(0, 160)); };
+const realLog = console.log; console.log = () => {};
+const sse = (obj: unknown) => `event: step.delta\ndata: ${JSON.stringify(obj)}\n\n`;
+globalThis.fetch = (async () => {
+  const body = new ReadableStream({ start(c) { c.enqueue(new TextEncoder().encode(sse({ event_type: 'step.delta', delta: { type: 'audio', data: Buffer.alloc(4800).toString('base64') } }))); c.close(); } });
+  return new Response(body, { status: 200, headers: { 'content-type': 'text/event-stream' } });
+}) as typeof fetch;
+const speechCache = createSpeechCache(); speechCache.startTurn('T1');
+const account = { userId: 2, speechCache, store: { readState: () => ({ floor: 'A' }), readSentence: () => ({ text: 'Hello there.', mood: null, sounds: [] }), appendLog: () => {} }, session: { oweCut() {}, async interrupt() {} } };
+const { speak } = createSpeech({ accountOf: () => account as never });
+const reply = await speak(2, 'A', { turnId: 'T1', index: 0 }, new AbortController().signal);
+let bytes = 0;
+if (reply.kind === 'audio') { for await (const c of reply.chunks) bytes += c.length; }
+await new Promise((r) => setTimeout(r, 100));
+console.log = realLog;
+console.log(`bytesStreamed=${bytes}; documented line written: ${errs.some((e) => e.includes('the audio stream stopped before its end'))}; real line written: ${errs.some((e) => e.includes('the audio stopped early'))}`);
 process.exit(0);
-JS
-cd /home/lyphe/.claude/claudecodeui_lyphe && env DATABASE_PATH="$S/auth.db" CERBERUS_DB_PATH="$S/cerberus.db" GEMINI_API_KEY=AIzaSyATHENAFAKEKEY0123456789abcdefghij TSX_TSCONFIG_PATH=server/tsconfig.json timeout 60 node --import tsx "$S/p.mjs" 2>&1 | grep '^[AB] '
-cd /tmp && case "$S" in /tmp/athena-probe-run.??????) rm -r "$S";; esac
+EOF
+cat > "$D/p.sh" <<'EOF'
+D=$(dirname "$0")
+S=$(mktemp -d /tmp/athena-fa-run.XXXXXX) || exit 1
+sqlite3 -readonly ~/.cloudcli/auth.db ".backup '$S/auth.db'" || exit 1
+cd /home/lyphe/.claude/claudecodeui_lyphe && env GEMINI_API_KEY=AIzaFAKEFAKEFAKEFAKEFAKEFAKE12345 GEMINI_ENV_FILE=/dev/null DATABASE_PATH="$S/auth.db" CERBERUS_DB_PATH="$S/cerberus.db" TSX_TSCONFIG_PATH=server/tsconfig.json timeout 60 node --import tsx "$D/p.mts" 2>&1 | tail -3
+cd /tmp && case "$S" in /tmp/athena-fa-run.??????) rm -r "$S";; esac
 EOF
 bash "$D/p.sh"
-case "$D" in /tmp/athena-probe.??????) cd /tmp && rm -r "$D" ;; esac
-# expect: `A abort-before-first-read: first read done=false bytes=4800` and `B return-before-first-read: requestAborted=false logLines=0` while the defect stands; `done=true bytes=0` and `requestAborted=true logLines=1` once cured.
+# expect: `bytesStreamed=4800; documented line written: false; real line written: true` (cured: the row names the line the door writes, `[companion] speech <turn>/<index>: the audio stopped early: …`; the probe's two booleans are the code's, not the row's)
 ```
 
-measured 2026-10-27 by chain chain-kaylee--voice--speech-20261027-133639-e691, finding L1, LOW
-probe-key: 5e720aee873368f6aa7a019a3e3e8308591916ab
+measured 2026-10-27 by chain chain-kaylee--voice--docs-20261027-161540-497c, finding L1, LOW
+probe-key: 7013d1f37854bc7d58d9620228f90771625b7622
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/gemini-errors.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/gemini-speech.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/voice-settings.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-voice-speech.mjs
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/companion-input.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/companion.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/companion-speech.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/companion-utterance.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-speech-door-live.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-speech-door.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-speech-door.sh
 
-## INV-9926 — probe — LOW — a sentence this phase makes false is left in `gemini-key.ts`
+## INV-9943 — probe — LOW — two rows name a consumer that does not exist (the avatar)
 
-LOW — a sentence this phase makes false is left in `gemini-key.ts`
+LOW — two rows name a consumer that does not exist (the avatar)
+
+```probe
+echo "level() callers outside the player: $(grep -rn '\.level()' /home/lyphe/.claude/claudecodeui_lyphe/src --include=*.ts --include=*.tsx | grep -v 'utils/pcmPlayer.ts' | wc -l)"; echo "MAN-9112 + MAN-9113 lines naming the avatar: $(~/.claude/scripts/docstore get MAN-9112 --text | grep -c -i avatar) + $(~/.claude/scripts/docstore get MAN-9113 --text | grep -c -i avatar)"
+# expect: `level() callers outside the player: 0` and `lines naming the avatar: 1 + 1` (cured: the rows name only callers that exist, `… 0 + 0`)
+```
+
+measured 2026-10-27 by chain chain-kaylee--voice--docs-20261027-161540-497c, finding L2, LOW
+probe-key: 7b4926660ba9b50c4a42d70e13972545bc07c75f
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionPanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionVoiceSwitch.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/context/CompanionContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useCompanionVoice.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useTalkPress.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/pcmPlayer.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/speechPull.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-voice-pcm-player.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-voice-whole.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/voice-whole-edges.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/voice-whole-kit.mjs
+
+## INV-9944 — probe — LOW — MAN-9112 mislabels the player's callers and overstates what `enqueue` logs and cancels
+
+LOW — MAN-9112 mislabels the player's callers and overstates what `enqueue` logs and cancels
+
+```probe
+echo "speechPull subscribes: $(grep -c 'player.onSentence' /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/speechPull.ts); useCompanionVoice subscribes: $(grep -c 'player.onSentence' /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useCompanionVoice.ts)"; ~/.claude/scripts/docstore get MAN-9112 --text | grep -n 'speechPull.ts. | '
+# expect: `speechPull subscribes: 0; useCompanionVoice subscribes: 1` and the table row `utils/speechPull.ts | enqueue, onSentence, playing, lastEnded, stop` (cured: onSentence moves to the useCompanionVoice row)
+```
+
+measured 2026-10-27 by chain chain-kaylee--voice--docs-20261027-161540-497c, finding L3, LOW
+probe-key: 084d2da79629a995854f73b384f56aee57c4ace9
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/pcmPlayer.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-voice-pcm-player.mjs
+
+## INV-9945 — probe — LOW — MAN-9093 still says the provider calls `useTalkPress()`
+
+LOW — MAN-9093 still says the provider calls `useTalkPress()`
+
+```probe
+~/.claude/scripts/docstore get MAN-9093 --text | grep -n 'useTalkPress()' || echo none
+# expect: `61:| `CompanionProvider` | calls `useTalkPress()` once …` (cured: `none`, the line says `useTalkPress(speech)`)
+```
+
+measured 2026-10-27 by chain chain-kaylee--voice--docs-20261027-161540-497c, finding L4, LOW
+probe-key: 81d6a78f547d15cc4cb22f9f81336388f8c4e59e
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionTalkButton.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/TalkBindingField.tsx
+
+## INV-9946 — probe — LOW — MAN-9106 keeps facts it knows are false under a "stale" banner, and the proof it documents is red
+
+LOW — MAN-9106 keeps facts it knows are false under a "stale" banner, and the proof it documents is red
+
+```probe
+grep -n 'voiceRow === 0' /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/voice-live.mjs | cut -c1-120; ~/.claude/scripts/docstore get MAN-9106 --text | grep -c 'stale since'
+# expect: line 64 `facts.voiceRow === 0 && …` and `1` (cured: the live half asserts the wired panel and the row carries no stale marker, `0`)
+```
+
+measured 2026-10-27 by chain chain-kaylee--voice--docs-20261027-161540-497c, finding L5, LOW
+probe-key: de05727e1da257b7331e5cc94051f2265df4ad13
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-voice-scaffold.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-voice-scaffold.sh, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/vite-scratch-before.config.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/voice-fixtures-panel.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/voice-fixtures-settings.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/voice-kit.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/voice-live.mjs
+
+## INV-9947 — probe — LOW — two rule rows say a thing the rows beside them contradict
+
+LOW — two rule rows say a thing the rows beside them contradict
+
+```probe
+~/.claude/scripts/docstore get INV-9908 --text | grep -n 'ONE call on' | cut -c1-200; ~/.claude/scripts/docstore get INV-9938 --text | grep -c -E 'or a probe|GOOGLE_TEN'
+# expect: the INV-9908 rule 4 line naming `gemini-3.8-flash` and `2` (cured: rule 4 names `gemini-3.8-flash-lite-tts` for the speech door and rules 1/5 agree)
+```
+
+measured 2026-10-27 by chain chain-kaylee--voice--docs-20261027-161540-497c, finding L6, LOW
+probe-key: 19644d8db441cc22bca5dff822aee8380007c0b3
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/companion-account.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/companion-press.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/companion-speech.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-prompt.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/companion-turns.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/sentence-stream.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/gemini-errors.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/gemini-key.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/gemini-speech.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/gemini-transcribe.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/voice-provider.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/voice-settings.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/settings/tabs/voice-settings/sections/SoundTagsField.tsx
+
+## INV-9951 — probe — (MEDIUM) — the registry hands out elements it holds but are not drawn, and nowhere says so
+
+(MEDIUM) — the registry hands out elements it holds but are not drawn, and nowhere says so
+
+```probe
+D=$(mktemp -d /tmp/athena-anchors-probe.XXXXXX) || exit 1
+cat > "$D/p.mjs" <<'EOF'
+import { openConsole } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/console.mjs';
+import { pinPreferences, HARNESS_PREFERENCES } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/prefs-pin.mjs';
+const s = await openConsole({ dark: false, viewport: { width: 1440, height: 900 } });
+const { page } = s;
+const box = (sel) => page.evaluate((q) => { const e = document.querySelector(q); if (!e) return 'none'; const b = e.getBoundingClientRect(); return `${Math.round(b.width)}x${Math.round(b.height)} at ${Math.round(b.x)},${Math.round(b.y)}`; }, sel);
+try {
+  await pinPreferences(page.context(), { ...HARNESS_PREFERENCES, simpleChatList: true }, { writes: 'drop' });
+  await page.reload({ waitUntil: 'networkidle' });
+  await page.waitForSelector('[data-testid="simple-chat-row"]', { timeout: 30000 });
+  await page.click('[data-testid="simple-chat-row"]');
+  await page.waitForSelector('[data-page-anchor^="composer:"]', { timeout: 30000 });
+  await page.click('nav[aria-label="Views"] button[data-view-id="files"]');
+  await page.waitForSelector('[data-page-anchor="files-view"]', { timeout: 30000 });
+  console.log('1440x900, Files open, composer anchor:', await box('[data-page-anchor^="composer:"]'));
+  const below = await page.evaluate(() => [...document.querySelectorAll('[data-page-anchor^="chat-row:"]')].filter((e) => e.getBoundingClientRect().top > window.innerHeight).length);
+  console.log('1440x900, chat-row anchors wholly below the viewport:', below);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.waitForTimeout(1500);
+  console.log('390x844, drawer closed, rail:files anchor:', await box('[data-page-anchor="rail:files"]'));
+} catch (e) { console.log('probe could not run:', e.message.split('\n')[0]); }
+finally { await s.browser.close(); }
+EOF
+cat > "$D/p.sh" <<'SH'
+#!/usr/bin/env bash
+D=$(cd "$(dirname "$0")" && pwd)
+node "$D/p.mjs" 2>&1 | cut -c1-300
+echo "doc says anything about undrawn anchors:"
+grep -n -i "undrawn\|not drawn\|hidden\|off-screen\|offscreen\|display" /home/lyphe/.claude/claudecodeui_lyphe/src/shared/context/PageAnchorsContext.tsx || echo "none"
+SH
+( cd "$D" && bash "$D/p.sh" )
+cd /tmp && case "$D" in /tmp/athena-anchors-probe.??????) rm -r "$D";; esac
+# expect: composer anchor reads `0x0 at 0,0`, ≥ 1 chat-row below the viewport, rail:files at a negative x (`44x44 at -329,114`), and the doc grep prints `none`
+```
+
+measured 2026-10-27 by chain chain-kaylee--avatar--anchors-20261027-165000-65d9, finding M1, MEDIUM
+probe-key: 29ef5c24201f7d22af622f3638d2f7fa9d71cbf1
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/shared/context/PageAnchorsContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/page-anchors-live.mjs
+
+## INV-9952 — probe — (LOW) — `.verify/page-anchors-live.mjs:208` can never fail
+
+(LOW) — `.verify/page-anchors-live.mjs:208` can never fail
+
+```probe
+D=$(mktemp -d /tmp/athena-anchors-probe.XXXXXX) || exit 1
+cat > "$D/p.mjs" <<'EOF'
+import { readFileSync } from 'node:fs';
+const src = readFileSync('/home/lyphe/.claude/claudecodeui_lyphe/.verify/page-anchors-live.mjs', 'utf8').split('\n');
+const line = src.findIndex((l) => l.includes('no simple-list row stays registered'));
+console.log(line < 0 ? 'the stays-registered assertion: none' : `line ${line + 1}: ${src[line].trim().slice(0, 190)}`);
+for (const [treeKeys, simpleKeys] of [[['chat-row:a', 'chat-row:z'], ['chat-row:z']], [['chat-row:a'], ['chat-row:z']], [[], ['chat-row:z']]]) {
+  const tree = { keys: treeKeys }; const simple = { keys: simpleKeys };
+  const rows = tree.keys.filter((key) => key.startsWith('chat-row:'));
+  const holds = !tree.keys.some((key) => key.startsWith('chat-row:') && simple.keys.includes(key) && !rows.includes(key));
+  console.log(`tree ${JSON.stringify(treeKeys)} simple ${JSON.stringify(simpleKeys)} -> assertion holds: ${holds}`);
+}
+EOF
+cat > "$D/p.sh" <<'SH'
+#!/usr/bin/env bash
+D=$(cd "$(dirname "$0")" && pwd)
+node "$D/p.mjs"
+SH
+bash "$D/p.sh"
+cd /tmp && case "$D" in /tmp/athena-anchors-probe.??????) rm -r "$D";; esac
+# expect: the line 208 text prints, then `assertion holds: true` on all three shapes, the first one a stale simple row inside the tree's keys
+```
+
+measured 2026-10-27 by chain chain-kaylee--avatar--anchors-20261027-165000-65d9, finding L1, LOW
+probe-key: 83a72018390c50844f7aaf5fbb8ca58d57a1ec4a
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/page-anchors-live.mjs
+
+## INV-9953 — probe — (LOW) — `.verify/page-anchors-live.mjs:210` drops every console error whose text names `file-tree`
+
+(LOW) — `.verify/page-anchors-live.mjs:210` drops every console error whose text names `file-tree`
+
+```probe
+D=$(mktemp -d /tmp/athena-anchors-probe.XXXXXX) || exit 1
+cat > "$D/p.mjs" <<'EOF'
+import { readFileSync } from 'node:fs';
+const src = readFileSync('/home/lyphe/.claude/claudecodeui_lyphe/.verify/page-anchors-live.mjs', 'utf8').split('\n');
+const mask = src.findIndex((l) => l.includes("includes('file-tree')"));
+console.log(mask < 0 ? 'console-error filter: no file-tree mask' : `line ${mask + 1}: the console-error filter drops any error whose text names file-tree`);
+const sample = 'authenticated light 1440x900: Warning: Function components cannot be given refs.\n    at FileTree (http://127.0.0.1:5183/src/modules/file-tree/FileTree.tsx:42:3)';
+console.log('a FileTree warning is counted by that filter:', [sample].filter((e) => e.startsWith('authenticated') && !e.includes('Failed to fetch') && !(mask >= 0 && e.includes('file-tree'))).length === 1);
+EOF
+cat > "$D/p.sh" <<'SH'
+#!/usr/bin/env bash
+D=$(cd "$(dirname "$0")" && pwd)
+node "$D/p.mjs"
+SH
+bash "$D/p.sh"
+cd /tmp && case "$D" in /tmp/athena-anchors-probe.??????) rm -r "$D";; esac
+# expect: `line 210: the console-error filter drops any error whose text names file-tree` and `a FileTree warning is counted by that filter: false`
+```
+
+measured 2026-10-27 by chain chain-kaylee--avatar--anchors-20261027-165000-65d9, finding L2, LOW
+probe-key: ae0fd67e72df5f4176b5935843abdde29a23a9de
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/page-anchors-live.mjs
+
+## INV-9956 — probe — MEDIUM — The status line and the presence disagree in four states, and the hook's own comment says they can never
+
+MEDIUM — The status line and the presence disagree in four states, and the hook's own comment says they can never
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.mjs" <<'EOF'
+import { openConsole } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/console.mjs';
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const s = await openConsole({ viewport: { width: 1440, height: 900 } });
+const { page } = s;
+const sockets = [];
+await page.routeWebSocket(/\/ws(\?|$)/, (ws) => { sockets.push(ws); ws.connectToServer(); });
+await page.reload({ waitUntil: 'networkidle' });
+await page.locator('button[data-companion-door]:visible').first().click();
+await page.locator('[data-companion-panel]').waitFor({ state: 'visible', timeout: 15000 });
+await page.waitForFunction(() => !document.querySelector('[data-companion-log="loading"]'), null, { timeout: 20000 });
+const send = (f) => { for (const ws of sockets) { try { ws.send(JSON.stringify(f)); } catch { /* closed */ } } };
+const read = () => page.evaluate(() => {
+  const line = document.querySelector('[data-companion-status]').textContent.trim();
+  const root = document.querySelector('[data-companion-panel]');
+  let x = root[Object.keys(root).find((k) => k.startsWith('__reactFiber$'))]; while (x.return) x = x.return;
+  const stack = [x.stateNode.current]; let state = 'no-fiber';
+  while (stack.length) {
+    const f = stack.pop();
+    if (typeof f.type === 'function' && f.type.name === 'CompanionPanel') {
+      for (let h = f.memoizedState; h; h = h.next) { const m = h.memoizedState; if (Array.isArray(m) && m.length === 2 && m[0] && typeof m[0] === 'object' && 'walk' in m[0] && 'state' in m[0]) state = m[0].state; }
+      break;
+    }
+    if (f.sibling) stack.push(f.sibling); if (f.child) stack.push(f.child);
+  }
+  return { line, state };
+});
+send({ kind: 'companion_activity', activity: { phase: 'idle', session: null, files: null, walk: null } });
+for (const process of [{ state: 'asleep' }, { state: 'waking' }, { state: 'failed', error: 'boom' }, { state: 'awake' }]) {
+  send({ kind: 'companion_process', process });
+  await sleep(400);
+  const r = await read();
+  console.log(`process ${process.state.padEnd(6)} -> line "${r.line}" | presence.state ${r.state}`);
+}
+await s.browser.close();
+EOF
+cat > "$D/p.sh" <<'EOF'
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+echo "claims 'never disagree' in the hook's doc: $(grep -c 'never disagree' src/modules/companion/hooks/useCompanionPresence.ts)"
+cd /tmp && timeout 120 node "$(dirname "$0")/p.mjs" 2>&1 | tail -6
+EOF
+bash "$D/p.sh"
+# expect: while the defect stands, `claims 'never disagree' … : 1` and the line `Asleep · your next message wakes her | presence.state idle` (and `Waking up` / `Stopped…` with `idle`); cured when the comment no longer claims it or the state carries the process.
+```
+
+measured 2026-10-27 by chain chain-kaylee--avatar--presence-20261027-165001-35a6, finding M1, MEDIUM
+probe-key: a17cf7fc4dfc956a60b670411c3cdda06277acfa
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useCompanionPresence.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-presence-whole.mjs
+
+## INV-9957 — probe — LOW — Three rows still name the status line as a reader of `talk` / `voice`
+
+LOW — Three rows still name the status line as a reader of `talk` / `voice`
 
 ```probe
 D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
 cat > "$D/p.sh" <<'EOF'
-grep -n "Consumed by .gemini-transcribe.ts. only" /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/gemini-key.ts || echo "none: sentence cured"
-grep -c "resolveGeminiKey" /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/gemini-speech.ts
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+echo "rows still naming the status line as a reader of talk or voice: $(grep -cE "Readers: the panel's talk button, the status line|Readers: the panel \(the switch, the status line" MANUAL.md)"
 EOF
 bash "$D/p.sh"
-case "$D" in /tmp/athena-probe.??????) cd /tmp && rm -r "$D" ;; esac
-# expect: line 65 printed and then `2` while the sentence stands; `none: sentence cured` then `2` once corrected.
+# expect: `rows still naming the status line as a reader of talk or voice: 3` while it stands; 0 when the three rows name `useCompanionPresence` (or `presence`).
 ```
 
-measured 2026-10-27 by chain chain-kaylee--voice--speech-20261027-133639-e691, finding L2, LOW
-probe-key: cbac407c36e2115de88a142e7e85ecf74a0cc287
+measured 2026-10-27 by chain chain-kaylee--avatar--presence-20261027-165001-35a6, finding L1, LOW
+probe-key: 5c38f6e516af0bcdfa4ebf09555f79ad2f6d4933
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/gemini-errors.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/gemini-speech.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/voice/voice-settings.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-voice-speech.mjs
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useCompanionPresence.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-presence-whole.mjs
+
+## INV-9958 — probe — LOW — The recorder asserts less than the row that cites it says, and its Gemini check is `>= 1`
+
+LOW — The recorder asserts less than the row that cites it says, and its Gemini check is `>= 1`
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+echo "Transcribing named in the recorder: $(grep -c 'Transcribing' .verify/kaylee-presence-whole.mjs)"
+grep -n "one speech call went out" .verify/kaylee-presence-whole.mjs | cut -c1-170
+EOF
+bash "$D/p.sh"
+# expect: `Transcribing named in the recorder: 0` and the `>= 1` line while it stands; cured when the recorder asserts `Transcribing` after `Listening` and `=== 1` (or the label says "at least one").
+```
+
+measured 2026-10-27 by chain chain-kaylee--avatar--presence-20261027-165001-35a6, finding L2, LOW
+probe-key: bc71456c407d1a6acd1612d8e0cb2a0dd7dd9297
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useCompanionPresence.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-presence-whole.mjs
+
+## INV-9959 — probe — LOW — The recorder leaves her focus on the chat it deleted
+
+LOW — The recorder leaves her focus on the chat it deleted
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.mjs" <<'EOF'
+import { openConsole } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/console.mjs';
+const s = await openConsole({ viewport: { width: 1440, height: 900 } });
+const pic = (await s.api('/api/companion')).body;
+if (pic.focus === null) console.log('focus: none');
+else {
+  const lookup = await s.api(`/api/providers/sessions/${encodeURIComponent(pic.focus.sessionId)}`);
+  console.log(`focus: "${pic.focus.name}" in ${pic.focus.project}; looking the chat up answers ${lookup.status}`);
+}
+await s.browser.close();
+EOF
+cat > "$D/p.sh" <<'EOF'
+cd /tmp && timeout 100 node "$(dirname "$0")/p.mjs" 2>&1 | tail -2
+EOF
+bash "$D/p.sh"
+# expect: `focus: "presence probe …" … answers 404` while it stands; `focus: none` once something clears it.
+```
+
+measured 2026-10-27 by chain chain-kaylee--avatar--presence-20261027-165001-35a6, finding L3, LOW
+probe-key: 1b897fe80cd6874cb8eeeda29c951a8a0f3f878d
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useCompanionPresence.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-presence-whole.mjs
+
+## INV-9960 — probe — LOW — A repeated `companion_activity` frame mints a new presence object
+
+LOW — A repeated `companion_activity` frame mints a new presence object
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.mjs" <<'EOF'
+import { openConsole } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/console.mjs';
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const s = await openConsole({ viewport: { width: 1440, height: 900 } });
+const { page } = s;
+const sockets = [];
+await page.routeWebSocket(/\/ws(\?|$)/, (ws) => { sockets.push(ws); ws.connectToServer(); });
+await page.reload({ waitUntil: 'networkidle' });
+await page.locator('button[data-companion-door]:visible').first().click();
+await page.locator('[data-companion-panel]').waitFor({ state: 'visible', timeout: 15000 });
+await page.waitForFunction(() => !document.querySelector('[data-companion-log="loading"]'), null, { timeout: 20000 });
+const send = (f) => { for (const ws of sockets) { try { ws.send(JSON.stringify(f)); } catch { /* closed */ } } };
+const objectId = () => page.evaluate(() => {
+  const root = document.querySelector('[data-companion-panel]');
+  let x = root[Object.keys(root).find((k) => k.startsWith('__reactFiber$'))]; while (x.return) x = x.return;
+  const stack = [x.stateNode.current];
+  while (stack.length) {
+    const f = stack.pop();
+    if (typeof f.type === 'function' && f.type.name === 'CompanionPanel') {
+      for (let h = f.memoizedState; h; h = h.next) {
+        const m = h.memoizedState;
+        if (Array.isArray(m) && m.length === 2 && m[0] && typeof m[0] === 'object' && 'walk' in m[0] && 'state' in m[0]) {
+          window.__ids ??= new WeakMap(); window.__n ??= 0;
+          if (!window.__ids.has(m[0])) window.__ids.set(m[0], ++window.__n);
+          return window.__ids.get(m[0]);
+        }
+      }
+      return 'no-memo';
+    }
+    if (f.sibling) stack.push(f.sibling); if (f.child) stack.push(f.child);
+  }
+  return 'no-fiber';
+});
+send({ kind: 'companion_process', process: { state: 'awake' } });
+const idle = { phase: 'idle', session: null, files: null, walk: null };
+const ids = [];
+for (let i = 0; i < 3; i += 1) { send({ kind: 'companion_activity', activity: idle }); await sleep(400); ids.push(await objectId()); }
+const before = await objectId();
+for (let i = 0; i < 30; i += 1) send({ kind: 'companion_log', entry: { id: 950000 + i, at: new Date().toISOString(), role: 'system', via: null, turnId: null, index: null, text: `line ${i}`, mood: null, sounds: [] } });
+await sleep(500);
+console.log(`presence object after three identical idle frames: ${ids.join(' ')} (one object means a repeat changes nothing); after 30 log lines: ${before} -> ${await objectId()}`);
+await s.browser.close();
+EOF
+cat > "$D/p.sh" <<'EOF'
+cd /tmp && timeout 120 node "$(dirname "$0")/p.mjs" 2>&1 | tail -3
+EOF
+bash "$D/p.sh"
+# expect: `presence object after three identical idle frames: 1 2 3 … after 30 log lines: 3 -> 3` while it stands; `1 1 1` once the memo keys on the activity's value.
+```
+
+measured 2026-10-27 by chain chain-kaylee--avatar--presence-20261027-165001-35a6, finding L4, LOW
+probe-key: a2e9c8cb1ce2bbf9b9b3e689ca33145dbf07b6e6
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useCompanionPresence.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-presence-whole.mjs
+
+## INV-9961 — probe — MEDIUM — Proof 1's transcript half is a coin flip, and the artifacts the brief asked for record the losing side
+
+MEDIUM — Proof 1's transcript half is a coin flip, and the artifacts the brief asked for record the losing side
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+R=/home/lyphe/.claude/claudecodeui_lyphe
+mkdir -p "$1/v" && cp -r "$R/.verify/lib" "$1/v/lib" && cp "$R/.verify/upstream-1376-scheduled-loadmore.mjs" "$1/v/" || exit 1
+cd "$1/v" && timeout 300 node upstream-1376-scheduled-loadmore.mjs --only banner --no-before 2>&1 | grep -E "after re-entering|^(PASS|FAIL) —" | cut -c1-150
+EOF
+bash "$D/p.sh" "$D"
+cd /tmp; case "$D" in /tmp/athena-probe.??????) rm -r "$D";; esac
+echo "[probe exit $?]"
+# expect: spends the script's own one Haiku turn, ~3 min. Four `after re-entering the chat` lines and the tally; measured 2026-10-28: builder's run 4 × [FAIL] (`44 ok, 4 failed` with the old client), Athena's run 4 × [OK] (`32 ok, 0 failed`). Defect stands while the same script answers differently run to run; cured when it answers the same four verdicts every time
+```
+
+measured 2026-10-27 by chain chain-upstream-1376-scheduled-loadmore-20261027-155615-40ad, finding M1, MEDIUM
+probe-key: 72e762326f1243c53f2d38a1ce670401aad28fd8
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/load-more-leg.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/read-only-page.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/scheduled-banner-leg.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/upstream-1376-scheduled-loadmore.mjs
+
+## INV-9962 — probe — LOW — the "before" client is git HEAD, so the script's old-client checks turn false the moment this change is committed
+
+LOW — the "before" client is git HEAD, so the script's old-client checks turn false the moment this change is committed
+
+```probe
+cd /home/lyphe/.claude/claudecodeui_lyphe || exit 1
+git diff --quiet HEAD -- src/modules/chat/composer/useScheduledMessages.ts src/modules/chat/ChatInterface.tsx src/modules/chat/hooks/useChatRealtimeHandlers.ts src/modules/project-workspace/hooks/useProjectsState.ts src/modules/sidebar/hooks/useSidebarController.ts; echo "BEFORE_FILES differ from HEAD (1 = the change is still uncommitted): $?"
+echo "script pins BEFORE to a snapshot or sha (PNH_BEFORE_DIR mentions): $(grep -c 'PNH_BEFORE_DIR' .verify/upstream-1376-scheduled-loadmore.mjs)"
+echo "[probe exit $?]"
+# expect: `1` then `0` today. After the commit the first line reads `0` (HEAD already holds the fix, so "before" = "after"); cured when the second line is nonzero (a snapshot taken before the first edit, or a named parent commit)
+```
+
+measured 2026-10-27 by chain chain-upstream-1376-scheduled-loadmore-20261027-155615-40ad, finding L1, LOW
+probe-key: 169f99400a8dc51b68fd63e958aa863b670e9e1f
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/load-more-leg.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/read-only-page.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/scheduled-banner-leg.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/upstream-1376-scheduled-loadmore.mjs
+
+## INV-9975 — probe — MEDIUM — a value left in `--kaylee-mouth` opens her mouth in EVERY state, not just speaking (the report says the face needs no gating)
+
+MEDIUM — a value left in `--kaylee-mouth` opens her mouth in EVERY state, not just speaking (the report says the face needs no gating)
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+export D
+cat > "$D/p.sh" <<'EOF'
+#!/bin/bash
+cat > "$D/p.mjs" <<'EOF2'
+import { openConsole } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/console.mjs';
+import { installReactHarness } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/mountReact.mjs';
+const s = await openConsole({ contextOptions: { reducedMotion: 'no-preference' } });
+await installReactHarness(s.page);
+const out = await s.page.evaluate(async () => {
+  const m = window.__mountReact; const { CompanionAvatar } = await m.importModule('/src/modules/companion/CompanionAvatar.tsx');
+  const none = { session: null, files: null, walk: null }; const res = {};
+  for (const state of ['idle', 'listening', 'reading_code', 'walking']) {
+    await m.mount('p', m.h(CompanionAvatar, { presence: { state, ...none }, level: () => 0, size: 96 }), 'position:fixed;left:20px;top:20px');
+    const svg = document.querySelector('#p svg'); svg.style.setProperty('--kaylee-mouth', '0.6'); await new Promise((r) => setTimeout(r, 250));
+    const cs = getComputedStyle(svg.querySelector('.kaylee__mouth-open')); res[state] = { openMouthOpacity: cs.opacity, scale: cs.scale };
+    m.unmount('p');
+  }
+  return res;
+});
+console.log('stale --kaylee-mouth 0.6 on a face that is NOT speaking:', JSON.stringify(out));
+await s.browser.close();
+EOF2
+node "$D/p.mjs" 2>&1 | tail -3
+EOF
+bash "$D/p.sh"
+# expect: every state prints "openMouthOpacity":"1" (cured: "0" for idle, listening, reading_code, walking)
+```
+
+measured 2026-10-27 by chain chain-kaylee--avatar--face-20261027-183630-d0fd, finding M1, MEDIUM
+probe-key: 53bb56b7baa88e27dd45322a0fb07607644be0e4
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionAvatar.css, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionAvatar.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/common.json, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-avatar-states.mjs
+
+## INV-9976 — probe — LOW — the walking face's halo is hidden in reduced motion and shown in full motion: the look is not kept
+
+LOW — the walking face's halo is hidden in reduced motion and shown in full motion: the look is not kept
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+export D
+cat > "$D/p.sh" <<'EOF'
+#!/bin/bash
+cat > "$D/p.mjs" <<'EOF2'
+import { openConsole } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/console.mjs';
+import { installReactHarness } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/mountReact.mjs';
+const s = await openConsole();
+await installReactHarness(s.page);
+await s.page.evaluate(async () => { const m = window.__mountReact; const { CompanionAvatar } = await m.importModule('/src/modules/companion/CompanionAvatar.tsx');
+  await m.mount('p', m.h(CompanionAvatar, { presence: { state: 'walking', session: null, files: null, walk: { at: 2, total: 5 } }, level: () => 0, size: 96 }), 'position:fixed;left:20px;top:20px'); });
+for (const mode of ['no-preference', 'reduce']) {
+  await s.page.emulateMedia({ reducedMotion: mode }); await s.page.waitForTimeout(500);
+  console.log('walking halo opacity, motion', mode, '=>', await s.page.evaluate(() => getComputedStyle(document.querySelector('#p .kaylee__halo')).opacity));
+}
+await s.browser.close();
+EOF2
+node "$D/p.mjs" 2>&1 | tail -3
+EOF
+bash "$D/p.sh"
+# expect: both lines print the same opacity (today: 0.758034 with motion, 0 with reduce)
+```
+
+measured 2026-10-27 by chain chain-kaylee--avatar--face-20261027-183630-d0fd, finding L1, LOW
+probe-key: dda79c9365905910528c549f35a2cb95dac669e5
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionAvatar.css, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionAvatar.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/common.json, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-avatar-states.mjs
+
+## INV-9977 — probe — LOW — the ring's numbers have no floor: unreadable at four digits, a negative width and a console error at five
+
+LOW — the ring's numbers have no floor: unreadable at four digits, a negative width and a console error at five
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+export D
+cat > "$D/p.sh" <<'EOF'
+#!/bin/bash
+cat > "$D/p.mjs" <<'EOF2'
+import { openConsole } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/console.mjs';
+import { installReactHarness } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/mountReact.mjs';
+const s = await openConsole({ contextOptions: { reducedMotion: 'reduce' } });
+await installReactHarness(s.page);
+const rows = await s.page.evaluate(async () => { const m = window.__mountReact; const { CompanionAvatar } = await m.importModule('/src/modules/companion/CompanionAvatar.tsx'); const out = [];
+  for (const [at, total] of [[100, 100], [1391, 1391], [12345, 12345]]) {
+    await m.mount('p', m.h(CompanionAvatar, { presence: { state: 'walking', session: null, files: null, walk: { at, total } }, level: () => 0, size: 96 }), 'position:fixed;left:20px;top:20px');
+    const svg = document.querySelector('#p svg'); const t = svg.querySelector('text'); const rect = svg.querySelector('.kaylee__count rect'); const tb = t.getBoundingClientRect(), sb = svg.getBoundingClientRect();
+    out.push(`${at}/${total}: font ${(parseFloat(getComputedStyle(t).fontSize) * sb.width / 100).toFixed(1)}px at 96, pill width ${(+rect.getAttribute('width')).toFixed(1)}, text inside face ${tb.left >= sb.left && tb.right <= sb.right}`);
+    m.unmount('p'); } return out; });
+console.log(rows.join(' | '));
+console.log('console errors from the face:', s.errors.filter((e) => e.startsWith('authenticated') && /rect/.test(e)).length);
+await s.browser.close();
+EOF2
+node "$D/p.mjs" 2>&1 | tail -3
+EOF
+bash "$D/p.sh"
+# expect: the 1391/1391 line reads a font of at least 8px, and the 12345/12345 line has a positive pill width, text inside the face true, and "console errors from the face: 0" (today: 3.8px, -0.1, false, 1)
+```
+
+measured 2026-10-27 by chain chain-kaylee--avatar--face-20261027-183630-d0fd, finding L2, LOW
+probe-key: aaa0b59aaa4a773b436850d9b9ff08779446fceb
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionAvatar.css, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionAvatar.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/common.json, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-avatar-states.mjs
+
+## INV-9978 — probe — LOW — the fixture's reduced-motion proof cannot fail on the face's own gate
+
+LOW — the fixture's reduced-motion proof cannot fail on the face's own gate
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+export D
+cat > "$D/p.sh" <<'EOF'
+#!/bin/bash
+cat > "$D/p.mjs" <<'EOF2'
+import { openConsole } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/console.mjs';
+import { installReactHarness } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/mountReact.mjs';
+const s = await openConsole({ contextOptions: { reducedMotion: 'reduce' } });
+// MUTATION: the face's own "movement only under no-preference" gate is removed from its stylesheet (served through the page, the file untouched)
+await s.page.route(/CompanionAvatar\.css/, async (r) => { const res = await r.fetch(); const body = (await res.text()).split('(prefers-reduced-motion: no-preference)').join('(min-width: 0px)'); await r.fulfill({ response: res, body }); });
+await installReactHarness(s.page);
+await s.page.evaluate(async () => { const m = window.__mountReact; const { CompanionAvatar } = await m.importModule('/src/modules/companion/CompanionAvatar.tsx');
+  await m.mount('p', m.h(CompanionAvatar, { presence: { state: 'idle', session: null, files: null, walk: null }, level: () => 0, size: 96 }), 'position:fixed;left:20px;top:20px'); });
+await s.page.waitForTimeout(600);
+console.log(JSON.stringify(await s.page.evaluate(() => ({ breathAnimationName: getComputedStyle(document.querySelector('#p .kaylee__body')).animationName, runningAnimationsTheFixtureCounts: document.querySelector('#p svg').getAnimations({ subtree: true }).length }))));
+await s.browser.close();
+EOF2
+node "$D/p.mjs" 2>&1 | tail -3
+EOF
+bash "$D/p.sh"
+# expect: breathAnimationName is "kaylee-breath" while runningAnimationsTheFixtureCounts is 0 — the fixture reads the second number (cured: the fixture reads animation-name, and a gate-less face fails it)
+```
+
+measured 2026-10-27 by chain chain-kaylee--avatar--face-20261027-183630-d0fd, finding L3, LOW
+probe-key: d49f40824baf68a47be9523faeb3f7aa8279d01f
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionAvatar.css, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionAvatar.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/common.json, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-avatar-states.mjs
+
+## INV-9979 — probe — LOW — the face has no ground of its own and nearly vanishes on the FAB's existing ground
+
+LOW — the face has no ground of its own and nearly vanishes on the FAB's existing ground
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+export D
+cat > "$D/p.sh" <<'EOF'
+#!/bin/bash
+cat > "$D/p.mjs" <<'EOF2'
+import { openConsole } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/console.mjs';
+import { installReactHarness } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/mountReact.mjs';
+const lum = (c) => { const f = (v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; }; return 0.2126 * f(c[0]) + 0.7152 * f(c[1]) + 0.0722 * f(c[2]); };
+const ratio = (a, b) => { const [x, y] = [lum(a), lum(b)].sort((p, q) => q - p); return +((x + 0.05) / (y + 0.05)).toFixed(2); };
+const s = await openConsole({ contextOptions: { reducedMotion: 'reduce' } });   // light theme
+await installReactHarness(s.page);
+for (const ground of ['--surface', '--accent']) {
+  await s.page.evaluate(async (ground) => { const m = window.__mountReact; const { CompanionAvatar } = await m.importModule('/src/modules/companion/CompanionAvatar.tsx');
+    await m.mount('p', m.h(CompanionAvatar, { presence: { state: 'idle', session: null, files: null, walk: null }, level: () => 0, size: 200 }), `position:fixed;left:20px;top:20px;background:var(${ground})`); }, ground);
+  await s.page.waitForTimeout(300);
+  const png = await s.page.locator('#p svg').screenshot();
+  const px = await s.page.evaluate(async (b64) => { const im = new Image(); im.src = 'data:image/png;base64,' + b64; await im.decode(); const c = document.createElement('canvas'); c.width = im.width; c.height = im.height; const g = c.getContext('2d'); g.drawImage(im, 0, 0);
+    const at = (fx, fy) => [...g.getImageData(Math.round(im.width * fx), Math.round(im.height * fy), 1, 1).data.slice(0, 3)]; return { ground: at(0.01, 0.01), edge: at(0.135, 0.5), chin: at(0.5, 0.84) }; }, png.toString('base64'));
+  console.log(`light, face on ${ground}: head edge vs ground ${ratio(px.edge, px.ground)}:1, chin vs ground ${ratio(px.chin, px.ground)}:1`);
+  await s.page.evaluate(() => window.__mountReact.unmount('p'));
+}
+await s.browser.close();
+EOF2
+node "$D/p.mjs" 2>&1 | tail -3
+EOF
+bash "$D/p.sh"
+# expect: both lines print an edge ratio of at least 3:1 (today: 3.37:1 on --surface, 1.12:1 on --accent)
+```
+
+measured 2026-10-27 by chain chain-kaylee--avatar--face-20261027-183630-d0fd, finding L4, LOW
+probe-key: 1bc5cef3388f5e187d9a831392bd8a59ab88e2c1
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionAvatar.css, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionAvatar.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/i18n/locales/en/common.json, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-avatar-states.mjs
+
+## INV-9980 — probe — MEDIUM — the row placement cannot meet the plan's own measure, and the placement proof cannot fail on it
+
+MEDIUM — the row placement cannot meet the plan's own measure, and the placement proof cannot fail on it
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+cd /home/lyphe/.claude/claudecodeui_lyphe && node --import tsx --input-type=module -e "
+const { avatarPlacement } = await import('./src/modules/companion/utils/avatarPlacement.ts');
+const row = { left: 80, top: 283, right: 322, bottom: 337, width: 242, height: 54, x: 80, y: 283 };
+const p = avatarPlacement(row, 28, { width: 1440, height: 900 });
+console.log('disc centre to row right edge, px:', p.left + 14 - row.right);
+"
+EOF
+bash "$D/p.sh"
+```
+
+measured 2026-10-27 by chain chain-kaylee--avatar--target-20261027-185010-b274, finding M1, MEDIUM
+probe-key: 0e9b3925023cec5f47d3e30714029c349e7b3048
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useAvatarTarget.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/avatarPlacement.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-avatar-placement.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-avatar-target.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/avatar-target-kit.mjs
+
+## INV-9981 — probe — LOW — a non-finite viewport or safe inset comes back as NaN
+
+LOW — a non-finite viewport or safe inset comes back as NaN
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/p.sh" <<'EOF'
+cd /home/lyphe/.claude/claudecodeui_lyphe && node --import tsx --input-type=module -e "
+const { avatarPlacement } = await import('./src/modules/companion/utils/avatarPlacement.ts');
+const row = { left: 80, top: 283, right: 322, bottom: 337, width: 242, height: 54, x: 80, y: 283 };
+const a = avatarPlacement(row, 28, { width: NaN, height: NaN });
+const b = avatarPlacement(row, 28, { width: 1440, height: 900, safe: { top: NaN, right: NaN, bottom: NaN, left: NaN } });
+console.log('NaN viewport ->', String(a.left), String(a.top), '| NaN insets ->', String(b.left), String(b.top));
+"
+EOF
+bash "$D/p.sh"
+```
+
+measured 2026-10-27 by chain chain-kaylee--avatar--target-20261027-185010-b274, finding L1, LOW
+probe-key: 7d0ed95d40c5d9457c7795a02df8903236593a55
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useAvatarTarget.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/avatarPlacement.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-avatar-placement.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-avatar-target.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/avatar-target-kit.mjs
+
+## INV-9982 — probe — LOW — beside the rail button, and at the file tree's corner, the disc's catch lies over real controls
+
+LOW — beside the rail button, and at the file tree's corner, the disc's catch lies over real controls
+
+```probe
+D=$(mktemp -d /tmp/athena-probe.XXXXXX) || exit 1
+cat > "$D/scan.mjs" <<'EOS'
+import { openConsole } from '/home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/console.mjs';
+import { avatarPlacement } from '/home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/avatarPlacement.ts';
+const s = await openConsole({ viewport: { width: 1440, height: 900 } });
+const { page } = s;
+await page.waitForTimeout(1500);
+const scan = async (key) => {
+  const r = await page.evaluate((k) => { const b = document.querySelector(`[data-page-anchor="${k}"]`)?.getBoundingClientRect(); return b ? { left: b.left, top: b.top, right: b.right, bottom: b.bottom, width: b.width, height: b.height } : null; }, key);
+  if (!r) return 'anchor absent';
+  const p = avatarPlacement(r, 28, { width: 1440, height: 900 });
+  return page.evaluate(({ p }) => {
+    const cx = p.left + 14, cy = p.top + 14, seen = new Set();
+    for (let x = cx - 22; x <= cx + 22; x += 3) for (let y = cy - 22; y <= cy + 22; y += 3) {
+      if (Math.hypot(x - cx, y - cy) > 22) continue;
+      const b = document.elementFromPoint(x, y)?.closest('button,a,[role=button],[role=tab]');
+      if (b) seen.add((b.getAttribute('aria-label') || b.title || b.textContent || b.tagName).trim().slice(0, 24));
+    }
+    return [...seen];
+  }, { p });
+};
+console.log('controls under her 44px catch beside rail:files ->', JSON.stringify(await scan('rail:files')));
+await page.locator('[data-page-anchor="rail:files"]').click();
+await page.waitForTimeout(1500);
+console.log('controls under her 44px catch at the file tree corner ->', JSON.stringify(await scan('files-view')));
+await s.browser.close();
+EOS
+cat > "$D/p.sh" <<EOF
+cd /home/lyphe/.claude/claudecodeui_lyphe && node --import tsx $D/scan.mjs
+EOF
+bash "$D/p.sh"
+```
+
+measured 2026-10-27 by chain chain-kaylee--avatar--target-20261027-185010-b274, finding L2, LOW
+probe-key: dff5f681cd1ce1a0eb4df2e8ca7872d27d7bc470
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useAvatarTarget.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/avatarPlacement.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-avatar-placement.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-avatar-target.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/avatar-target-kit.mjs

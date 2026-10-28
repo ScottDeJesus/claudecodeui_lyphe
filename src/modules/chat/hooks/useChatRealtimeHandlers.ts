@@ -281,6 +281,12 @@ export function useChatRealtimeHandlers({
         case 'universe_activity':
           return;
 
+        // Owned by `useScheduledMessages`, which reads the composer banner's list again. Not a
+        // box-wide frame like the three above: it names a session, so it is listed on its own
+        // to keep it out of the provider path below.
+        case 'scheduled_messages_changed':
+          return;
+
         default:
           break;
       }

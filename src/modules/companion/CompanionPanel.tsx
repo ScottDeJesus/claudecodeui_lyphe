@@ -8,9 +8,10 @@ import { CompanionLog } from '@/modules/companion/CompanionLog';
 import { CompanionNotes } from '@/modules/companion/CompanionNotes';
 import { CompanionWalkStrip } from '@/modules/companion/CompanionWalkStrip';
 import { useCompanion } from '@/modules/companion/context/CompanionContext';
+import { useCompanionPresence } from '@/modules/companion/hooks/useCompanionPresence';
 import type { CompanionModel, CompanionPicture } from '@/shared/companion-types';
 import { useBusySessionIdSet } from '@/shared/context/SessionProtectionContext';
-import type { CompanionPageState, CompanionVoice, TalkPress } from '@/shared/types';
+import type { CompanionPresence, CompanionVoice, TalkPress } from '@/shared/types';
 import { Banner, Card, Spinner } from '@/shared/ui';
 import { cn } from '@/shared/utils';
 
@@ -21,15 +22,11 @@ type CompanionPanelViewProps = {
   open: boolean;
   /** Whether the draft's target chat is working right now. */
   targetWorking: boolean;
-  /**
-   * The page's one talk press: Listening and Transcribing win over her activity on the status line, and the composer's
-   * talk button draws and presses it. Absent, the status line is hers alone and the composer has no talk button.
-   */
+  /** What she is doing on this page (`useCompanionPresence`): the header's status line draws it. */
+  presence: CompanionPresence;
+  /** The page's one talk press: the composer's talk button draws and presses it. Absent, the composer has no talk button. */
   talk?: TalkPress;
-  /**
-   * This page's voice: the header draws its switch, Speaking and Cut take the status line in the page's order, and the
-   * log marks the sentence being spoken. Absent, none of it is drawn.
-   */
+  /** This page's voice: the header draws its switch and the log marks the sentence being spoken. Absent, neither is drawn. */
   voice?: CompanionVoice;
   onClose: () => void;
   onSendText: (text: string) => Promise<void>;
@@ -43,25 +40,18 @@ type CompanionPanelViewProps = {
   onDismissNote: (id: number) => Promise<void>;
 };
 
-/** The door in the rail, the panel's way back when it closes from the keyboard. */
-const DOOR_SELECTOR = '[data-companion-door]';
-
 /**
- * The page's own state for her status line, in its one order: a cut's breath, then his press (listening, transcribing),
- * then her voice sounding here; null when none holds, and the line is hers.
+ * Her door, the panel's way back when it closes from the keyboard: the rail's door where it is drawn, else her disc (the
+ * kit's button in CompanionFab's layer), which is the door while it is seated and the rail's cell draws none. The rail's
+ * door comes first in the document, so it wins wherever both stand.
  */
-function pageStateOf(talk: TalkPress | undefined, voice: CompanionVoice | undefined): CompanionPageState | null {
-  if (voice?.cut) return 'cut';
-  if (talk !== undefined && talk.state !== 'idle') return talk.state;
-  if (voice?.speaking) return 'speaking';
-  return null;
-}
+const DOOR_SELECTOR = '[data-companion-door], [data-companion-fab] > .vv-fab';
 
 /**
  * HER PANEL, drawn: Kaylee beside every chat, tied to none. Exported for this file's CompanionPanel, which hands it the
  * page's picture and verbs, and for `.verify/companion-panel-scaffold.mjs`, `.verify/kaylee-talk-scaffold.mjs` and
- * `.verify/kaylee-voice-scaffold.mjs`, which mount it on fixture pictures (the second with a talk press, the third with
- * a voice too).
+ * `.verify/kaylee-voice-scaffold.mjs`, which mount it on fixture pictures, each with the `presence` its fixture's activity,
+ * press and voice resolve to (the second with a talk press, the third with a voice too).
  *
  * WHERE IT STANDS. It floats over whatever view or application is up — never a view, so the chat and the application
  * stay in sight beside her. From lg it is a 400px column at the right edge, 12px in, at the floating chat's level (z-45:
@@ -76,8 +66,8 @@ function pageStateOf(talk: TalkPress | undefined, voice: CompanionVoice | undefi
  * floating chat at 45 — would open under the sheet anyway; dialogs, menus and toasts are portalled and stay above it.
  *
  * TOP TO BOTTOM: the header (who, what she is doing, the focus, the controls, and this device's voice switch given
- * `voice`; the page's own state wins over her activity on its status line, in one order: Cut for a breath after a press
- * that stopped her voice, then his press, Listening or Transcribing, then Speaking while this page sounds her); a warn
+ * `voice`; its status line draws `presence`, in which the page's own state wins over her activity: Cut for a breath after
+ * a press that stopped her voice, then his press, Listening or Transcribing, then Speaking while this page sounds her); a warn
  * Banner while her process has failed — the server's sentence, pinned where the eye lands, while the log keeps the
  * system line as history and the status line says the next message starts her again; the log, marking the sentence
  * being spoken; the dock — the walkthrough, her notes, the draft; the composer, with the talk button before send.
@@ -99,11 +89,11 @@ function pageStateOf(talk: TalkPress | undefined, voice: CompanionVoice | undefi
  * KEYS. Escape pressed inside the panel closes it, and is claimed on the way (`preventDefault` in the window's capture
  * phase): the chat stops its running turn on any Escape nobody claimed, and a key pressed in her composer is not his
  * chat's. Opened on a desktop it puts the cursor in her composer; on a touch screen it does not, so opening her to read
- * the draft does not raise the keyboard. Closed from inside, it hands focus back to the rail's door when the door is on
- * screen.
+ * the draft does not raise the keyboard. Closed from inside, it hands focus back to her door when it is on screen: the
+ * rail's door, or her disc while it sits in the rail's cell in the door's place.
  */
 export function CompanionPanelView({
-  picture, open, targetWorking, talk, voice, onClose, onSendText, onModelChange, onLiveChange, onInterrupt, onClear,
+  picture, open, targetWorking, presence, talk, voice, onClose, onSendText, onModelChange, onLiveChange, onInterrupt, onClear,
   onEditDraft, onSendDraft, onClearDraft, onDismissNote,
 }: CompanionPanelViewProps) {
   const { t } = useTranslation();
@@ -152,7 +142,7 @@ export function CompanionPanelView({
       <CompanionHeader
         name={name}
         picture={picture}
-        pageState={pageStateOf(talk, voice)}
+        presence={presence}
         voice={voice}
         onModelChange={onModelChange}
         onLiveChange={onLiveChange}
@@ -216,11 +206,13 @@ export function CompanionPanelView({
 
 /**
  * Her panel on the page: what WorkspaceFrame renders after the floating chat. It reads the page's picture, the open
- * state and the verbs from the companion's provider and hands them to CompanionPanelView, which draws every state.
+ * state and the verbs from the companion's provider, and what she is doing from `useCompanionPresence`, and hands them to
+ * CompanionPanelView, which draws every state.
  */
 export function CompanionPanel() {
-  const { picture, open, setOpen, sendText, saveSettings, editDraft, sendDraft, clearDraft, dismissNote, interrupt, clear, talk } = useCompanion();
-  // FILL(fill): voice read — `const { voice } = useCompanion();`, the page's CompanionVoice held by CompanionProvider: `on` / `setOn` the switch (localStorage `companion-voice`, on by default; off stops the player and the pull at once), `speaking` the sentence the player is sounding (its onSentence start, null at its end), `cut` true for 900 ms after a press that cut her off.
+  // `voice` is the switch and the sentence sounding, for the header's switch and the log's mark; the status line reads `presence` instead.
+  const { picture, open, setOpen, sendText, saveSettings, editDraft, sendDraft, clearDraft, dismissNote, interrupt, clear, talk, voice } = useCompanion();
+  const presence = useCompanionPresence();
   // The page's own set of chats with a turn running: Send steer shows while the draft's target is in it, because only then is there a turn to fold into.
   const busySessionIds = useBusySessionIdSet();
   const target = picture?.draft?.target;
@@ -231,6 +223,7 @@ export function CompanionPanel() {
       picture={picture}
       open={open}
       targetWorking={targetWorking}
+      presence={presence}
       onClose={() => setOpen(false)}
       onSendText={sendText}
       onModelChange={(model) => saveSettings({ model })}
@@ -243,7 +236,7 @@ export function CompanionPanel() {
       onClearDraft={clearDraft}
       onDismissNote={dismissNote}
       talk={talk}
-      // FILL(fill): voice — `voice={voice}`: the header's "Voice on this device" row and its Speaking and Cut, and the log's mark on the sentence being spoken.
+      voice={voice}
     />
   );
 }

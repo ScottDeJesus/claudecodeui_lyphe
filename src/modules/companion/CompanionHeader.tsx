@@ -6,7 +6,7 @@ import { CompanionVoiceSwitch } from '@/modules/companion/CompanionVoiceSwitch';
 import { errorMessage } from '@/shared/api';
 import type { CompanionModel, CompanionPicture } from '@/shared/companion-types';
 import { useToast } from '@/shared/context/ToastContext';
-import type { CompanionPageState, CompanionVoice, Tone } from '@/shared/types';
+import type { CompanionPresence, CompanionVoice, Tone } from '@/shared/types';
 import { Button, ConfirmDialog, Select, Switch, Tooltip } from '@/shared/ui';
 import { cn } from '@/shared/utils';
 
@@ -16,10 +16,10 @@ type CompanionHeaderProps = {
   /** Null while the picture loads: the status line says so and every control waits. */
   picture: CompanionPicture | null;
   /**
-   * The page's own state, already resolved in its order (cut > listening > transcribing > speaking): the status line
-   * reads Cut, Listening, Transcribing or Speaking in place of her own state. Absent or null, the line is hers alone.
+   * What she is doing on this page, from `useCompanionPresence` (the only reader of her activity, the page's press and its
+   * player): the status line's words for her state, the chat and the files they name, and the walk's place.
    */
-  pageState?: CompanionPageState | null;
+  presence: CompanionPresence;
   /**
    * This page's voice switch: drawn in a row of its own under the controls, "Voice on this device". Absent, there is no
    * row.
@@ -46,33 +46,33 @@ const FILES_NAMED = 2;
 const baseName = (path: string): string => path.split(/[\\/]/).filter(Boolean).pop() ?? path;
 
 /**
- * Her state as one line. The process speaks first — asleep, waking and failed say nothing about a turn — and an awake
- * process is its activity: Idle, Thinking, Reading <chat>, Reading code, Drafting for <chat>, Walking <chat> · item k of
- * n. The dot's tone is the line's colour word: grey asleep, green idle (ready), blue while she works, amber failed (errors
- * are amber, never red). The words carry the state on their own, so the dot is never the whole signal. A failed process
- * says "Stopped": she fails after starting too (her process ending mid-conversation, a turn breaking), and the line
- * claims no cause — the Banner under the header carries the server's sentence.
+ * Her state as one line. THE PRESENCE'S PAGE STATES SPEAK FIRST, then the process, then her activity. While his talk press
+ * is out the line is Listening (green, breathing: the mic is open, so it wins even over a picture still loading or a process
+ * asleep or failed) or Transcribing (blue, breathing, like her own work); while this page's player sounds her voice it is
+ * Speaking (blue, breathing). A press that cuts her off mid-sentence reads Cut for a breath (900 ms; grey and still, her
+ * voice just stopped) before Listening takes the line: the talk button below is lit the whole time, so the open mic is never
+ * unshown. Her own state comes back the moment the page has none.
  *
- * THE PAGE SPEAKS BEFORE ALL OF IT, its state resolved by the panel in one order. While his talk press is out the line is
- * Listening (green, breathing: the mic is open, so it wins even over a picture still loading or a process asleep or
- * failed) or Transcribing (blue, breathing, like her own work); while this page's player sounds her voice it is Speaking
- * (blue, breathing). A press that cuts her off mid-sentence reads Cut for a breath (900 ms; grey and still, her voice just
- * stopped) before Listening takes the line: the talk button below is lit the whole time, so the open mic is never unshown.
- * Her own state comes back the moment the page has none.
+ * Under those, the process speaks first — asleep, waking and failed say nothing about a turn — and an awake process is its
+ * activity as the presence carries it: Idle, Thinking, Reading <chat>, Reading code, Drafting for <chat>, Walking <chat> ·
+ * item k of n. The dot's tone is the line's colour word: grey asleep, green idle (ready), blue while she works, amber failed
+ * (errors are amber, never red). The words carry the state on their own, so the dot is never the whole signal. A failed
+ * process says "Stopped": she fails after starting too (her process ending mid-conversation, a turn breaking), and the line
+ * claims no cause — the Banner under the header carries the server's sentence.
  */
-function statusOf(picture: CompanionPicture | null, pageState: CompanionPageState | null): Status {
-  if (pageState === 'cut') return { key: 'companion.status.cut', fallback: 'Cut', tone: 'neutral', moving: false };
-  if (pageState === 'listening') return { key: 'companion.status.listening', fallback: 'Listening', tone: 'positive', moving: true };
-  if (pageState === 'transcribing') return { key: 'companion.status.transcribing', fallback: 'Transcribing', tone: 'info', moving: true };
-  if (pageState === 'speaking') return { key: 'companion.status.speaking', fallback: 'Speaking', tone: 'info', moving: true };
+function statusOf(picture: CompanionPicture | null, presence: CompanionPresence): Status {
+  if (presence.state === 'cut') return { key: 'companion.status.cut', fallback: 'Cut', tone: 'neutral', moving: false };
+  if (presence.state === 'listening') return { key: 'companion.status.listening', fallback: 'Listening', tone: 'positive', moving: true };
+  if (presence.state === 'transcribing') return { key: 'companion.status.transcribing', fallback: 'Transcribing', tone: 'info', moving: true };
+  if (presence.state === 'speaking') return { key: 'companion.status.speaking', fallback: 'Speaking', tone: 'info', moving: true };
   if (picture === null) return { key: 'companion.panel.loadingStatus', tone: 'neutral', moving: true };
-  const { process, activity } = picture;
+  const { process } = picture;
   if (process.state === 'failed') return { key: 'companion.status.failed', tone: 'warn', moving: false };
   if (process.state === 'asleep') return { key: 'companion.status.asleep', tone: 'neutral', moving: false };
   if (process.state === 'waking') return { key: 'companion.status.waking', tone: 'info', moving: true };
   const working = { tone: 'info', moving: true } as const;
-  const chat = activity.session?.name;
-  switch (activity.phase) {
+  const chat = presence.session?.name;
+  switch (presence.state) {
     case 'idle':
       return { key: 'companion.status.idle', tone: 'positive', moving: false };
     case 'thinking':
@@ -80,7 +80,7 @@ function statusOf(picture: CompanionPicture | null, pageState: CompanionPageStat
     case 'reading_session':
       return chat ? { key: 'companion.status.readingSession', subject: chat, ...working } : { key: 'companion.status.readingAChat', ...working };
     case 'reading_code': {
-      const files = activity.files ?? [];
+      const files = presence.files ?? [];
       if (files.length === 0) return { key: 'companion.status.readingCode', ...working };
       if (files.length <= FILES_NAMED) return { key: 'companion.status.readingFiles', subject: files.map(baseName).join(', '), ...working };
       return { key: 'companion.status.readingManyFiles', values: { count: files.length }, ...working };
@@ -88,8 +88,8 @@ function statusOf(picture: CompanionPicture | null, pageState: CompanionPageStat
     case 'drafting':
       return chat ? { key: 'companion.status.draftingFor', subject: chat, ...working } : { key: 'companion.status.draftingNew', ...working };
     case 'walking':
-      return chat && activity.walk
-        ? { key: 'companion.status.walking', subject: chat, values: { at: activity.walk.at, total: activity.walk.total }, ...working }
+      return chat && presence.walk
+        ? { key: 'companion.status.walking', subject: chat, values: { at: presence.walk.at, total: presence.walk.total }, ...working }
         : { key: 'companion.status.walkingPlain', ...working };
   }
 }
@@ -98,9 +98,9 @@ function statusOf(picture: CompanionPicture | null, pageState: CompanionPageStat
  * The top of her panel, in the order the eye wants it: who and what she is doing, the chat "it" means, then the
  * controls. Drawn by this module's CompanionPanel.
  *
- * ROW ONE: her mark, her name, and the status line under it (`role="status"`, so a change is announced; the page's own
- * state, `pageState`, folds over it); at the far end Stop — only while her turn runs, the one urgent press, so it stands
- * beside the way out — and the panel's own close. ROW TWO, only while she holds one: the focus chat, "Focus · Kanban
+ * ROW ONE: her mark, her name, and the status line under it (`role="status"`, so a change is announced; it draws what she
+ * is doing from `presence` alone, and whether she is awake from the picture's process); at the far end Stop — only while
+ * her turn runs, the one urgent press, so it stands beside the way out — and the panel's own close. ROW TWO, only while she holds one: the focus chat, "Focus · Kanban
  * lanes · its project", the chat "it" and "this" mean in what she says. ROW THREE: the model picker, the Live switch, and
  * Clear behind its question. ROW FOUR, given `voice`: "Voice on this device" (CompanionVoiceSwitch), its switch under
  * Clear. A row of its own because the third has no width to give a labelled switch (measured: 50px spare on the 400px
@@ -111,7 +111,7 @@ function statusOf(picture: CompanionPicture | null, pageState: CompanionPageStat
  * the old value back and says so in a toast; so does a Stop or a Clear that fails. The voice switch is the page's own and
  * answers at once.
  */
-export function CompanionHeader({ name, picture, pageState = null, voice, onModelChange, onLiveChange, onInterrupt, onClear, onClose }: CompanionHeaderProps) {
+export function CompanionHeader({ name, picture, presence, voice, onModelChange, onLiveChange, onInterrupt, onClear, onClose }: CompanionHeaderProps) {
   const { t } = useTranslation();
   const pushToast = useToast();
   // The model he just chose, shown until its save settles; null when none is out. Needed because the picture only
@@ -126,7 +126,7 @@ export function CompanionHeader({ name, picture, pageState = null, voice, onMode
   // Stop is out: the button is busy until her turn has stopped or the stop is refused.
   const [stopping, setStopping] = useState(false);
 
-  const status = statusOf(picture, pageState);
+  const status = statusOf(picture, presence);
   const ready = picture !== null;
   const model = pendingModel ?? picture?.settings.model ?? null;
   const live = pendingLive ?? picture?.settings.live ?? false;

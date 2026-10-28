@@ -317,8 +317,8 @@ export const CHAT_TOGGLE_KEY = '.';
  * its label geometry from, and the size the floating chat's rest anchor stands as. The stylesheet's variable
  * is what draws; keep the two equal (the radial's proof measures a disc against the FAB itself).
  *
- * Used by the DockableFab kit piece, the app-switcher module's radial layout and labels, and the chat-host
- * module's floating panel.
+ * Used by the DockableFab kit piece, the app-switcher module's radial layout and labels, the chat-host module's
+ * floating panel, and the companion module's disc (the square her face is drawn in).
  */
 export const FAB_SIZE_PX = 28;
 
@@ -328,7 +328,8 @@ export const FAB_SIZE_PX = 28;
  * catch, so a finger lands on either. The JS twin of `--vv-fab-catch` in surfaces.css.
  *
  * Used by the app-switcher module's radial layout (the room an item is given) and label plan (what a label
- * keeps clear of).
+ * keeps clear of), and by the companion module's disc (her phone corner stands one catch above the applications
+ * button, so the two catches meet without overlapping).
  */
 export const FAB_CATCH_PX = 44;
 
@@ -364,12 +365,13 @@ export const SETTINGS_FIELD_WIDTH = 'w-64 max-w-full';
  * the rail button's own.
  *
  * Used by the project-workspace module's RailButton, and by the app-switcher module's AppSwitcherDock, whose own button
- * stands in the rail's disc cell while the disc is out of its dock, so the two can never part in size or in feel.
+ * stands in the rail's disc cell while the disc is out of its dock, so the two can never part in size or in feel; and by
+ * the companion module's dock cell (CompanionDockView), whose size and shape are the door's it draws.
  */
 export const RAIL_BUTTON_BASE =
   'group/rail-button relative grid size-11 flex-none place-items-center rounded-lg transition-colors duration-quick focus-visible:z-10 max-md:focus-visible:outline-offset-0 md:size-10';
 
-/** A rail button at rest and under the pointer: muted ink on the rail's canvas, the secondary ground and full ink on hover. Used with `RAIL_BUTTON_BASE` by RailButton (its unlit state), by AppSwitcherDock's own button and by the companion module's CompanionDoorButton (its door, while her panel is closed). */
+/** A rail button at rest and under the pointer: muted ink on the rail's canvas, the secondary ground and full ink on hover. Used with `RAIL_BUTTON_BASE` by RailButton (its unlit state), by AppSwitcherDock's own button and by the companion module's door (CompanionDock.tsx's CompanionDoorView, while her panel is closed). */
 export const RAIL_BUTTON_UNLIT = 'text-muted-foreground hover:bg-secondary hover:text-foreground';
 
 /**
@@ -381,7 +383,8 @@ export const RAIL_BUTTON_UNLIT = 'text-muted-foreground hover:bg-secondary hover
  * bar takes the system's Highlight — what forced colours draw for a state.
  *
  * Used with `RAIL_BUTTON_BASE` by the project-workspace module's RailButton (the view on screen) and by the companion
- * module's CompanionDoorButton (her panel open), so a lit door and a lit view are one look.
+ * module's door (CompanionDock.tsx's CompanionDoorView, her panel open); and on its own by the companion module's
+ * dock cell (CompanionDockView: her disc seated, her panel open). So a lit door, a lit seat and a lit view are one look.
  */
 export const RAIL_BUTTON_LIT =
   'bg-accent-soft text-accent-ink hover:bg-accent-soft-hover before:absolute before:-left-0.5 before:top-1/2 before:h-5 before:w-0.5 before:-translate-y-1/2 before:rounded-r-[2px] before:bg-accent-ink forced-colors:before:bg-[Highlight] md:before:-left-1';
@@ -552,3 +555,22 @@ export const MIN_REGION_AREA = 1e-4;
  * `MarkRefusal` (a mark, missed area or understanding press that brought none).
  */
 export const AFFECTED_AREAS_LANE_FAULTS: readonly AffectedAreasTrouble[] = ['no_secret', 'unreachable', 'unreadable'];
+
+// ---------------------------
+
+//----------------- PAGE ANCHORS ------------
+
+/**
+ * The keys the page's anchors are registered under (`PageAnchorsContext`), each a stable name for one element a floating
+ * guide can point at: `chatRow(id)` is a chat's row in the sidebar, `composer(id)` that chat's composer, `filesView` the
+ * file tree while it is drawn and `railFiles` the rail's Files button. The registering modules (the sidebar's rows,
+ * chat's composer, the file tree and project-workspace's rail) spell their key here, and the companion's button reads
+ * the same spelling, so neither side names a module of the other. A key is also what the provider stamps on the element
+ * as `data-page-anchor`.
+ */
+export const PAGE_ANCHOR = {
+  chatRow: (id: string) => `chat-row:${id}`,
+  composer: (id: string) => `composer:${id}`,
+  filesView: 'files-view',
+  railFiles: 'rail:files',
+} as const;

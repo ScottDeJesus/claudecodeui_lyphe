@@ -64,6 +64,7 @@ export function isCompanionPicture(value: unknown): value is CompanionPicture {
     && isProcess(value.process)
     && isActivity(value.activity)
     && orNull(isText)(value.turnId)
+    && orNull(isText)(value.floor)
     && orNull(isSessionRef)(value.focus)
     && orNull(isDraft)(value.draft)
     && orNull(isWalk)(value.walk)
@@ -134,6 +135,9 @@ export function reduceCompanion(picture: CompanionPicture, frame: CompanionFrame
       return isSettings(frame.settings) ? { ...picture, settings: frame.settings } : picture;
     case 'companion_process':
       return isProcess(frame.process) ? { ...picture, process: frame.process } : picture;
+    // The floor moved (or was written again by its holder): the page whose client id it is plays her voice, every other shows the text.
+    case 'companion_floor':
+      return isText(frame.floor) && frame.floor !== picture.floor ? { ...picture, floor: frame.floor } : picture;
     case 'companion_cleared':
       return {
         ...picture,

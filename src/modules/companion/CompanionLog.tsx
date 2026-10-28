@@ -25,12 +25,16 @@ type CompanionLogProps = {
 /**
  * The sentence being spoken, as read-aloud marks it: a highlighter's band in the info tone (the status line's Speaking),
  * its ink at a fifth, widened by a ring of the same band so the words keep their places (a ring takes no room; padding
- * would re-wrap the paragraph each time the mark moves), and cloned onto every line it wraps over. The band is the mark's
- * shape as well as its hue: 1.32:1 against the canvas in light and 1.51:1 in dark, where the tone's own soft ground
- * measured 1.07:1 and vanished in light; the words on it keep 12.6:1 and 11.0:1. An underline was tried and read as a
- * link. Forced colours drop every ground, so there the words are underlined instead.
+ * would re-wrap the paragraph each time the mark moves), with a 2px bar of the tone's full ink in the ring's left edge,
+ * and all of it cloned onto every line the sentence wraps over. The bar is what meets the house's 3:1 floor for a mark:
+ * 5.3:1 against the canvas in light and 10.3:1 in dark, 4.3:1 and 6.8:1 against the band beside it, where the band alone
+ * measures 1.32:1 and 1.51:1 (the tone's own soft ground, 1.07:1, vanished in light); the words on the band keep 12.6:1
+ * and 11.0:1. The bar is a shadow, as the ring is, so it too takes no room; drawn under the ring's fifth of the same ink,
+ * it reads as the full ink. An underline was tried and read as a link. Forced colours drop every ground and shadow, so
+ * there the words are underlined instead.
  */
-const SPEAKING_MARK = 'rounded-sm bg-tone-ink/20 ring-2 ring-tone-ink/20 box-decoration-clone forced-colors:underline';
+const SPEAKING_MARK =
+  'rounded-sm bg-tone-ink/20 ring-2 ring-tone-ink/20 shadow-[-2px_0_0_0] shadow-tone-ink box-decoration-clone forced-colors:underline';
 
 /**
  * What the log draws, one block per row: his line; her turn, every sentence of one turn joined into one paragraph; an
@@ -94,8 +98,8 @@ function SpeakingDots({ label }: { label: string }) {
  * is never taken for words he said. HER TURN is a paragraph on the left: the sentences of one turn joined, her mood
  * brackets already lifted by the server, each sound a small mark at its offset (CompanionSentence). While this page's
  * player sounds one of her sentences (`speaking`), that sentence stands on a band of the info tone, as read-aloud marks
- * it, and the band moves on with her voice; nothing else about the paragraph changes, so its lines never re-wrap under
- * him. AN ALERT is a row in the info tone with a bell, the house's news in its own words. A SYSTEM LINE is her harness
+ * it, a bar of its ink at each line's start, and the band moves on with her voice; nothing else about the paragraph
+ * changes, so its lines never re-wrap under him. AN ALERT is a row in the info tone with a bell, the house's news in its own words. A SYSTEM LINE is her harness
  * speaking — her own failures among them, which she never says herself — small, in the warn tone, with the ▲ mark.
  * Colour is never the whole signal: every kind has its glyph or its caption too.
  *

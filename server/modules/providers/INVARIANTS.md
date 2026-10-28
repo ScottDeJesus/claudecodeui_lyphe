@@ -110,3 +110,30 @@ Behaviour: MAN-9060.
 | Backfill `name_given = 1` for existing names | every old name, the app's included, is frozen | no name on disk is known to be his; the first rename marks it |
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/companion-send.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/tools/act-tools.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/migrations.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/sessions.db.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/services/sessions.service.ts
+
+## INV-9931 — chokidar v4 `ignored` matches no glob — the watcher passes a function
+
+chokidar v4 (4.0.3) takes a path, a `RegExp` or a function in `ignored`; a glob string matches nothing and is dropped silently.
+
+- symptom: a glob list such as `**/subagents/**` left every file and directory under every root watched; the serving API held 22,161 inotify watches.
+- fix: `ignored: createWatcherIgnoredMatcher(rootPath)` in `sessions-watcher.service.ts`; the ignored set is in MAN-348.
+- measured 2026-10-27: 22,161 → 14,441 watches on the serving API.
+- the matcher judges only the path below `rootPath`, so a root that sits under a `build/` or `dist/` directory is still watched; segments match whole (`subagents.jsonl`, `..archive` stay watched).
+- an edit to the ignored set: measure the watch count after the handover (`/proc/<pid>/fdinfo` inotify entries), never trust the list.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/services/sessions-watcher.service.ts
+
+## INV-9932 — probe — LOW — a row that parses to JSON `null` still drops the rest of the file in `buildLookupMap`
+
+LOW — a row that parses to JSON `null` still drops the rest of the file in `buildLookupMap`
+
+```probe
+cd /home/lyphe/.claude/claudecodeui_lyphe && TSX_TSCONFIG_PATH=server/tsconfig.json timeout 90 node --import tsx /home/lyphe/.claude/state/pipeline-reviews/upstream-1376-watcher-lookup/athena-probes/null-row.mts
+echo "[probe exit $?]"
+# expect: `half-written row between rows a and c -> [["a","1"],["c","3"]]`, `null row … -> [["a","1"]]` (c lost) while the defect stands; cured when the `null row` line also reads `[["a","1"],["c","3"]]`
+```
+
+measured 2026-10-27 by chain chain-upstream-1376-watcher-lookup-20261027-153824-5545, finding L1, LOW
+probe-key: ab8c02e137d29122f8f1719e05081504ed853815
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/services/sessions-watcher.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/shared/utils.ts

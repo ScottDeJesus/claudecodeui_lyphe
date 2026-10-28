@@ -245,7 +245,8 @@ export const useFileTreeUpload = ({
   const [dropTarget, setDropTarget] = useState<string | null>(null);
   const [operationLoading, setOperationLoading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<FileTreeUploadProgressState | null>(null);
-  const treeRef = useRef<HTMLDivElement>(null);
+  // Mutable (`| null`), not a read-only ref object: FileTree's root hands its node to this ref and to its page anchor from one callback.
+  const treeRef = useRef<HTMLDivElement | null>(null);
   const clearProgressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const clearProgressTimer = useCallback(() => {

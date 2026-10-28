@@ -447,7 +447,7 @@ function ChatInterface({
   }, [onNavigateToSession, selectedSession?.id]);
 
   const { scheduledMessages, schedule: scheduleMessage, cancel: cancelScheduledMessage } =
-    useScheduledMessages(currentSessionId || selectedSession?.id || null);
+    useScheduledMessages(currentSessionId || selectedSession?.id || null, subscribe);
 
   /**
    * Hands the composer's current text to the server to send later, and clears
@@ -666,6 +666,7 @@ function ChatInterface({
           )}
 
           <ChatComposer
+            sessionId={openSessionId}
             exportSurface={exportSurface}
           pinnedAgents={stripClaimed ? null : <PinnedSubagents messages={agentMessages} soulLaunchIds={soulLaunchIds} sessionId={selectedSession?.id ?? null} cliSessionId={cliSessionId} />}
           pendingPermissionRequests={pendingPermissionRequests}

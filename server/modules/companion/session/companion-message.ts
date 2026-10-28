@@ -42,7 +42,7 @@ export type MessageReaders = {
 type MessageAssembler = {
   /** Her memory was compacted: the next message restates the focus, the draft and the walk. */
   oweState(): void;
-  /** He cut her off: the next message opens with `<cut>`, naming the last sentence he heard to its end and the one playing at the press (`null` for none). */
+  /** He cut her off: the next message opens with `<cut>`, naming the last sentence he heard to its end and the one playing at the press (`null` for none). A later cut replaces one no message has carried yet. */
   oweCut(heard: string | null, interrupted: string | null): void;
   /** The text of one message: the owed parts, the roster and view when due, `body`, and the register. */
   assemble(body: string, woke: boolean): string;

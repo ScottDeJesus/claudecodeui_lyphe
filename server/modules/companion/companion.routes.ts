@@ -155,6 +155,11 @@ export function createCompanionRoutes(service: CompanionService): Router {
     }),
   );
 
+  // Express would answer a HEAD with the GET below, which would start a synthesis (and spend) for a response that carries no audio.
+  router.head('/speech/:turnId/:index', (_request: Request, response: Response) => {
+    response.set('Allow', 'GET').status(405).end();
+  });
+
   // One of her sentences, as raw PCM, for the page that holds the floor. The page pulls: it asks for sentence k when k's frame has arrived.
   router.get(
     '/speech/:turnId/:index',
@@ -174,11 +179,14 @@ export function createCompanionRoutes(service: CompanionService): Router {
       }
       response.status(200).setHeader('Content-Type', SPEECH_CONTENT_TYPE);
       response.setHeader('Cache-Control', 'no-store');
+      // Behind a buffering proxy the first sentence would arrive only when it was finished, which is what streaming is there to avoid.
+      response.setHeader('X-Accel-Buffering', 'no');
       await streamPcm(response, reply.chunks);
     }),
   );
 
-  // The press of the talk button while she speaks: the page stopped its player; this stops the rest.
+  // The press of the talk button while she speaks: the page stopped its player; this stops the rest. The 204 waits for her turn to
+  // be interrupted (seconds, when her process is slow to answer), so the page records at once and does not wait on it.
   router.post(
     '/cut',
     asyncHandler(async (request: Request, response: Response) => {

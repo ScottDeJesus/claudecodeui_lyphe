@@ -5,10 +5,11 @@ import { AppSwitcherProvider } from '@/modules/app-switcher';
 import { ChatHostProvider } from '@/modules/chat-host';
 import { useProjectChatState } from '@/modules/project-workspace/context/ProjectsStateContext';
 import CompanionHost from '@/modules/project-workspace/CompanionHost';
+import { PageAnchorsProvider } from '@/shared/context/PageAnchorsContext';
 import type { ProjectWorkspaceShellProps } from '@/shared/types';
 import WorkspaceFrame from '@/modules/project-workspace/WorkspaceFrame';
 
-/** Rendered by ProjectWorkspaceRoute to lay out the workspace sidebar, main region and global overlays, inside the providers they share (the chat's host, the application switcher, the account panel's state, Kaylee's picture). */
+/** Rendered by ProjectWorkspaceRoute to lay out the workspace sidebar, main region and global overlays, inside the providers they share (the page's anchors, the chat's host, the application switcher, the account panel's state, Kaylee's picture). */
 function ProjectWorkspaceShell({
   isMobile,
   ws,
@@ -20,17 +21,21 @@ function ProjectWorkspaceShell({
   const { projectChoices } = useProjectChatState();
 
   return (
-    <ChatHostProvider>
-      <AppSwitcherProvider projects={projectChoices}>
-        {/* The account panel's one source, above the views rail's button and the chat's Accounts widget alike. */}
-        <AccountsProvider>
-          {/* Kaylee's one picture, above her door, her panel and the palette's row. She knows nothing of routes: the chat she opens is this module's to bring forward. */}
-          <CompanionHost navigate={navigate}>
-            <WorkspaceFrame isMobile={isMobile} ws={ws} sendMessage={sendMessage} navigate={navigate} />
-          </CompanionHost>
-        </AccountsProvider>
-      </AppSwitcherProvider>
-    </ChatHostProvider>
+    // The page's anchors, outermost: the sidebar's rows, the chat's composer, the file tree and the rail register in it,
+    // and the companion's button below reads it, so it stands above every one of them.
+    <PageAnchorsProvider>
+      <ChatHostProvider>
+        <AppSwitcherProvider projects={projectChoices}>
+          {/* The account panel's one source, above the views rail's button and the chat's Accounts widget alike. */}
+          <AccountsProvider>
+            {/* Kaylee's one picture, above her door, her panel and the palette's row. She knows nothing of routes: the chat she opens is this module's to bring forward. */}
+            <CompanionHost navigate={navigate}>
+              <WorkspaceFrame isMobile={isMobile} ws={ws} sendMessage={sendMessage} navigate={navigate} />
+            </CompanionHost>
+          </AccountsProvider>
+        </AppSwitcherProvider>
+      </ChatHostProvider>
+    </PageAnchorsProvider>
   );
 }
 

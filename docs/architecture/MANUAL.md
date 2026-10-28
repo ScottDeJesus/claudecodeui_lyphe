@@ -1918,8 +1918,10 @@ by the provider id until the app claims them.**
 
 `sessions-watcher.service.ts` watches four provider directories with chokidar on native file
 events (inotify, one watch per file and directory; `depth: 6`, `ignoreInitial`) — never polling,
-whose one stat watcher per entry stalled a freshly booted API for seconds while it armed — keeps
-only `*.jsonl` files —
+whose one stat watcher per entry stalled a freshly booted API for seconds while it armed — never
+descends into or reports what `createWatcherIgnoredMatcher(rootPath)` ignores (below the root only:
+`.DS_Store`, names ending `.tmp` / `.swp`, any whole path segment `node_modules`, `.git`, `dist`,
+`build`, `subagents`, `tool-results`), keeps only `*.jsonl` files —
 `opencode.db` for OpenCode — and calls `sessionSynchronizerService.synchronizeProviderFile`.
 Indexed ids are queued and flushed with a 500 ms debounce and a 2 s maximum wait
 (`PROJECTS_UPDATE_DEBOUNCE_MS`, `PROJECTS_UPDATE_MAX_WAIT_MS`), then handed to

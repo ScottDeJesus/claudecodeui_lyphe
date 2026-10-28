@@ -12,7 +12,9 @@ import type {
 } from 'react';
 import { PaperclipIcon, PencilRulerIcon, XIcon, Loader2, ArrowUpIcon, PencilIcon } from 'lucide-react';
 
+import { PAGE_ANCHOR } from '@/shared/constants';
 import { useHostWindow } from '@/shared/context/HostWindowContext';
+import { usePageAnchor } from '@/shared/context/PageAnchorsContext';
 import { useDeviceSettings } from '@/shared/hooks/useDeviceSettings';
 import {
   Chip,
@@ -49,6 +51,8 @@ type MentionableFile = {
 };
 
 type ChatComposerProps = {
+  /** The chat this composer writes into, or null before it has one: the key its input box is registered under as a page anchor. */
+  sessionId: string | null;
   pendingPermissionRequests: PendingPermissionRequest[];
   handlePermissionDecision: (
     requestIds: string | string[],
@@ -151,6 +155,7 @@ const LONG_PRESS_MS = 500;
  * model/permission popovers that drive the next turn.
  */
 export default function ChatComposer({
+  sessionId,
   pendingPermissionRequests,
   handlePermissionDecision,
   handleGrantToolPermission,
@@ -221,6 +226,8 @@ export default function ChatComposer({
   isTextareaExpanded,
 }: ChatComposerProps) {
   const { t } = useTranslation('chat');
+  // The input box is an anchor a floating guide can point at while this chat is the one being drafted for. A composer with no chat yet registers nothing.
+  const anchorRef = usePageAnchor(sessionId === null ? null : PAGE_ANCHOR.composer(sessionId));
   // 640px is Tailwind's `sm`, which is the breakpoint every other rule in this footer reads.
   // Below it the model menu carries the edit mode and the permission chip is not rendered at
   // all — a CSS-hidden second chip would still mount a second popover for the same choice.
@@ -342,7 +349,7 @@ export default function ChatComposer({
   const canQueueDraft = isLoading && Boolean(input.trim() || attachedFiles.length > 0);
   const submitAriaLabel = canQueueDraft
     ? hasQueuedDraft
-      ? t('input.queue.update', { defaultValue: 'Update queued message' })
+      ? t('input.queue.append', { defaultValue: 'Add to queued message' })
       : t('input.queue.sendNext', { defaultValue: 'Queue next message' })
     : isLoading
       ? t('input.stop')
@@ -408,7 +415,9 @@ export default function ChatComposer({
         />
       )}
 
-      <div className="relative mx-auto max-w-[54.25rem]">
+      {/* The anchor is the input box's own column, not the shell: the shell also holds the pinned agents' strip and the
+          activity tab, which would carry a guide's centre away from the box she is looking at. */}
+      <div ref={anchorRef} className="relative mx-auto max-w-[54.25rem]">
         {showFileDropdown && filteredFiles.length > 0 && (
           <div
             ref={fileDropdownRef}

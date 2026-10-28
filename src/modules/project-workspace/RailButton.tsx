@@ -1,6 +1,7 @@
 import { useId } from 'react';
 
 import { RAIL_BUTTON_BASE, RAIL_BUTTON_LIT, RAIL_BUTTON_UNLIT } from '@/shared/constants';
+import { usePageAnchor } from '@/shared/context/PageAnchorsContext';
 import type { AppTab, RailBadge, WorkspaceView } from '@/shared/types';
 import { Tooltip } from '@/shared/ui';
 import { cn } from '@/shared/utils';
@@ -10,6 +11,8 @@ type RailButtonProps = {
   label: string;
   /** The view this button opens, stamped as `data-view-id` so the rail can find one button without matching its translated name; absent for Settings. */
   viewId?: AppTab;
+  /** The key this button is registered under as a page anchor (`PAGE_ANCHOR`), for a floating guide to point at; absent registers nothing. */
+  anchorKey?: string;
   /** The view's glyph, or null for a plugin view, which draws its label's first letter on a disc instead. */
   icon: WorkspaceView['icon'];
   /** The view on screen — the rail's one lit glyph. */
@@ -41,13 +44,15 @@ type RailButtonProps = {
  *
  * Drawn by this module's WorkspaceRail, once per view and once for Settings.
  */
-export default function RailButton({ label, viewId, icon: Icon, lit = false, badge = null, onPress }: RailButtonProps) {
+export default function RailButton({ label, viewId, anchorKey, icon: Icon, lit = false, badge = null, onPress }: RailButtonProps) {
   const wordsId = useId();
+  const anchorRef = usePageAnchor(anchorKey ?? null);
   const figure = badge === null ? null : badge.count > 99 ? '99+' : String(badge.count);
 
   return (
     <Tooltip position="right" showOnFocus content={label}>
       <button
+        ref={anchorRef}
         type="button"
         aria-label={label}
         data-view-id={viewId}

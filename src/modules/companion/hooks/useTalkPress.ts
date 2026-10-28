@@ -13,13 +13,28 @@ const UPLOAD_FAILED = 'Your recording could not be sent.';
 type MicClip = { blob: Blob; mimeType: string; durationMs: number };
 
 /**
- * Used by this module's CompanionProvider, which calls it ONCE per page: the one press state that the panel's talk button, the
- * bound key or mouse button (`useTalkBinding`) and her status line all read, and that the voice and avatar features read from
- * the context's `talk`. A second call would be a second mic and a second state.
+ * What a press asks of her voice on this page, handed in by CompanionProvider from `useCompanionVoice`. `unlock` opens the
+ * page's audio inside the press (a browser plays nothing before a gesture). `cutOff` is asked by the press that opens his mic:
+ * it holds her voice while he records, and when she is sounding or a sentence is on its way it stops them all and sends the cut,
+ * answering the request's settling (never rejecting); otherwise null. `release` is asked when the recording is over.
+ */
+type TalkVoice = { unlock: () => void; cutOff: () => Promise<void> | null; release: () => void };
+
+/**
+ * Used by this module's CompanionProvider, which calls it ONCE per page: the one press state that the panel's talk button and
+ * the bound key or mouse button (`useTalkBinding`) read, and that `useCompanionPresence` reads from the context's `talk` into
+ * her status line's state. A second call would be a second mic and a second state.
  *
  * TAP TO TALK. The first `toggle()` opens the mic and records; the second stops it and uploads the clip with its duration
  * through `api.companion.press`. The state runs idle → listening → transcribing → idle. The mic is open only while recording
  * (`listening`): `useMicRecorder` closes its tracks on stop, and a press is the only thing that opens it again.
+ *
+ * THE CUT. The press that opens the mic asks her voice first (`voice.cutOff`). It holds her voice for as long as he records
+ * (nothing is asked for, so a turn she is still thinking through does not speak into his clip), and if this page's player is
+ * sounding or a sentence is queued, the same press stops the player and sends the cut (`POST /api/companion/cut`), shows Cut,
+ * and goes on to its own work: the mic never waits on the cut. The press that ends the recording, a mic that never opened and a
+ * device that went away each `release` her voice. The clip's upload waits for the cut's request to settle (answered or failed),
+ * so the cut is owed to her before the press is pushed.
  *
  * LISTENING WINS. A press while an earlier clip is still being heard starts a new recording at once, and the state reads
  * `listening` until it is stopped; `transcribing` returns if a clip is still out. The server settles presses in arrival order
@@ -35,7 +50,8 @@ type MicClip = { blob: Blob; mimeType: string; durationMs: number };
  * that was refused or failed (no Gemini key, a refused key, a failed call) is the server's system line in her log, so the
  * state just goes back to idle. The error stays until the next press.
  */
-export function useTalkPress(): TalkPress {
+export function useTalkPress(voice: TalkVoice): TalkPress {
+  const { unlock, cutOff, release } = voice;
   // How many clips are between the stop press and the server's answer. A count, not a flag: a press that starts a new
   // recording while an earlier clip is out leaves that one in flight, and the state must still return to idle exactly once.
   const [hearing, setHearing] = useState(0);
@@ -52,6 +68,8 @@ export function useTalkPress(): TalkPress {
   const turnRef = useRef<Promise<void>>(Promise.resolve());
   // False once the page's provider is gone: an answer that lands then sets nothing.
   const aliveRef = useRef(true);
+  // The cut the last press owed, settled or not; a clip's upload waits behind it. Never rejects.
+  const cutOwedRef = useRef<Promise<void>>(Promise.resolve());
 
   useEffect(() => {
     aliveRef.current = true;
@@ -63,6 +81,7 @@ export function useTalkPress(): TalkPress {
   /** Sends one clip and settles the count. A refused or failed hearing is the server's line in her log, not an error here. */
   const sendClip = useCallback(async (clip: MicClip) => {
     try {
+      await cutOwedRef.current;
       const response = await api.companion.press(clip.blob, clip.mimeType, clip.durationMs);
       if (response.ok) return;
       if (LOGGED_REFUSALS.has((await refusalCode(response)) ?? '')) return;
@@ -78,9 +97,10 @@ export function useTalkPress(): TalkPress {
   // A recording whose device went away stops by itself and nobody awaits its clip: it is the second press, made for him.
   const sendEndedClip = useCallback((clip: MicClip) => {
     wantedRef.current = false;
+    release();
     setHearing((count) => count + 1);
     void sendClip(clip);
-  }, [sendClip]);
+  }, [sendClip, release]);
 
   const mic = useMicRecorder(sendEndedClip);
   const { start: startMic, stop: stopMic } = mic;
@@ -108,6 +128,18 @@ export function useTalkPress(): TalkPress {
   }, [inTurn, stopMic, sendClip]);
 
   const toggle = useCallback(() => {
+    // Inside the press's gesture, before anything else: the browser unlocks the page's audio only here.
+    unlock();
+    if (wantedRef.current) {
+      // The press that ends his recording: her voice may be asked for again.
+      release();
+    } else {
+      const owed = cutOff();
+      if (owed !== null) {
+        const earlier = cutOwedRef.current;
+        cutOwedRef.current = earlier.then(() => owed);
+      }
+    }
     pressCountRef.current += 1;
     const press = pressCountRef.current;
     if (wantedRef.current) {
@@ -123,11 +155,14 @@ export function useTalkPress(): TalkPress {
       } catch (failure) {
         // The mic could not be opened: nothing is recording. The next press starts afresh unless a press has landed since,
         // which has already said what it wants.
-        if (pressCountRef.current === press) wantedRef.current = false;
+        if (pressCountRef.current === press) {
+          wantedRef.current = false;
+          release();
+        }
         if (aliveRef.current) setError(failure instanceof Error ? failure.message : String(failure));
       }
     });
-  }, [finish, inTurn, startMic]);
+  }, [unlock, cutOff, release, finish, inTurn, startMic]);
 
   const state = mic.state === 'recording' ? 'listening' : hearing > 0 ? 'transcribing' : 'idle';
   // One object per change, so the provider's context value moves only when the press does.

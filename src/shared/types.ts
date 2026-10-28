@@ -6,6 +6,7 @@ import type { NavigateFunction } from 'react-router-dom';
 import type { DayOneFloor, Face, LayoutReadResult, LayoutStatus, QueueItem, ReadResult, Region } from '@/shared/affected-areas-types';
 import type { AppEntry } from '@/shared/app-types';
 import type { CerberusNodeView, CerberusServiceView, CerberusStatus } from '@/shared/cerberus-types';
+import type { CompanionSessionRef } from '@/shared/companion-types';
 
 //----------------- LLM PROVIDER MODEL CATALOG ------------
 
@@ -252,8 +253,9 @@ export type RunningSessionListItem = {
  * One frame received from the chat websocket. The server guarantees every
  * frame carries a `kind` (provider message kinds plus gateway kinds such as
  * `chat_subscribed`, `session_upserted`, `loading_progress`,
- * `protocol_error`). The synthetic `websocket_reconnected` kind is injected
- * client-side when the socket re-opens after a drop.
+ * `scheduled_messages_changed`, `protocol_error`). The synthetic
+ * `websocket_reconnected` kind is injected client-side when the socket
+ * re-opens after a drop.
  */
 export type ServerEvent = {
   kind?: string;
@@ -915,9 +917,9 @@ export type CommandModalPayload = {
 /** A composer message queued while its session is still busy, holding the text, the in-memory and already-uploaded attachments and the send options snapshotted at queue time so it can be auto-sent unchanged once the session goes idle. */
 export type QueuedDraft = {
   /**
-   * Minted once when the message is queued, and kept through every save. The server remembers the
-   * id it last sent per session and ignores a save that brings it back, so a retried or stale save
-   * cannot send the message twice — while queueing the same text again, a new id, still works.
+   * Minted once when the message is queued. The server keeps it on the queued message — a message
+   * merged into a waiting one carries its newest member's id. Queueing does not look at it: the
+   * same id queued twice is two messages.
    */
   id?: string;
   content: string;
@@ -1027,7 +1029,7 @@ export type GeminiKeyStatus = { source: 'stored' | 'house' | 'none'; last4: stri
  * Where the page's one talk press to Kaylee stands: 'idle' (the mic closed), 'listening' (the first press opened the mic
  * and it is recording) or 'transcribing' (the second press sent the clip and its words are not back yet). A press while a
  * clip is transcribing records again at once, so 'listening' can follow 'transcribing'. Drawn by the companion module's
- * talk button and folded over her status line, where Listening and Transcribing win over her activity.
+ * talk button, and read by `useCompanionPresence`, which puts Listening and Transcribing ahead of her activity.
  */
 export type TalkPressState = 'idle' | 'listening' | 'transcribing';
 
@@ -1035,7 +1037,8 @@ export type TalkPressState = 'idle' | 'listening' | 'transcribing';
  * The page's one talk press as her panel draws it: its `state`, `toggle` (one press: open the mic, or stop it and send the
  * clip) and `error`, the sentence for what failed on the page itself (the mic refused, the upload failed), null when
  * nothing did. A refused transcription is her harness's system line in the log, never this. Handed by the companion
- * module's CompanionPanel to its view, which folds `state` into the status line and hands the press to the composer.
+ * module's CompanionPanel to its view, which hands the press to the composer; the status line reads `state` through
+ * `CompanionPresence`, never from here.
  */
 export type TalkPress = { state: TalkPressState; toggle: () => void; error: string | null };
 
@@ -1051,21 +1054,54 @@ export type TalkPress = { state: TalkPressState; toggle: () => void; error: stri
 export type CompanionSentenceRef = { turnId: string; index: number };
 
 /**
- * The page's own state as her status line reads it, ahead of the server's activity, in one fixed order: 'cut' (for a
- * breath, 900 ms, after a talk press stopped her voice mid-sentence) > 'listening' > 'transcribing' (the talk press,
- * `TalkPressState`) > 'speaking' (this page's player is sounding one of her sentences). Resolved by the companion
- * module's CompanionPanel from the page's press and voice, and drawn by its CompanionHeader's status line.
- */
-export type CompanionPageState = 'cut' | 'listening' | 'transcribing' | 'speaking';
-
-/**
  * This page's voice as her panel draws it. `on` is the page's own switch, stored per device and on by default; `setOn`
  * turns it, and off, the page neither plays nor fetches her speech while her text still streams. `speaking` is the
- * sentence this page's player is sounding, null when it is silent; `cut` is true for the breath after a talk press
- * stopped her mid-sentence. Handed by the companion module's CompanionPanel to its view: the header draws the switch and
- * folds Speaking and Cut into the status line, the log marks the sentence.
+ * sentence this page's player is sounding, held from its start until the next one starts and null only when the player
+ * falls silent (never between two sentences); `cut` is true for the breath after a talk press stopped her mid-sentence.
+ * Handed by the companion module's CompanionPanel to its view: the header draws the switch, the log marks the sentence.
+ * `useCompanionPresence` reads `speaking` and `cut` as Speaking and Cut.
  */
 export type CompanionVoice = { on: boolean; setOn: (on: boolean) => void; speaking: CompanionSentenceRef | null; cut: boolean };
+
+// ---------------------------
+
+//----------------- COMPANION PRESENCE ON THE PAGE ------------
+
+/**
+ * What Kaylee is doing on this page right now, as the one word for her activity, her talk press and her player together.
+ * It has no word for her process (asleep, waking, failed) or a picture still loading: the status line takes those words
+ * from the picture, and here the state is what her activity says ('idle' at rest). The first three beat everything else,
+ * in this order, because they are the page's own: 'cut' (the 900 ms breath after a talk press stopped her voice
+ * mid-sentence) > 'listening' > 'transcribing' (his talk press) > 'speaking' (this page's player is sounding a sentence of
+ * hers). Below them it is her activity's phase, named as it is: 'reading_code' > 'reading_session' > 'drafting' >
+ * 'walking' > 'thinking' > 'idle'. Produced only by the companion module's `useCompanionPresence`.
+ */
+export type CompanionPresenceState =
+  | 'idle'
+  | 'listening'
+  | 'transcribing'
+  | 'thinking'
+  | 'speaking'
+  | 'reading_session'
+  | 'reading_code'
+  | 'drafting'
+  | 'walking'
+  | 'cut';
+
+/**
+ * Kaylee's presence on this page: the `state` and what it concerns, all taken from her server-held activity. `session` is
+ * the chat a read, a draft or a walk is about, `files` the file names a code read has open and `walk` the walkthrough's
+ * place (`at` of `total`, 1-based; `0` when it is set up and not begun); each is null when her activity names none. They
+ * are carried whatever the `state`, so a page-owned state such as 'listening' still knows where she was looking. One value
+ * per change of its parts, so a consumer that memoizes on it redraws only when she does. Built by the companion module's
+ * `useCompanionPresence` and drawn by its CompanionHeader, whose status line CompanionPanel hands it to.
+ */
+export type CompanionPresence = {
+  state: CompanionPresenceState;
+  session: CompanionSessionRef | null;
+  files: string[] | null;
+  walk: { at: number; total: number } | null;
+};
 
 // ---------------------------
 

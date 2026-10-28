@@ -641,9 +641,13 @@ export const api = {
     savePreferences: (updates: Record<string, unknown>) =>
       patch('/api/user/preferences', updates),
     drafts: () => get('/api/user/drafts'),
-    /** Writes only the parts given; an absent part is left as the server has it. */
-    saveDraft: (scope: string, draft: { text?: string; queuedMessage?: unknown }) =>
+    /** Writes only the text; the scope's stored queued message is left as the server has it. */
+    saveDraft: (scope: string, draft: { text: string }) =>
       put('/api/user/drafts', { scope, ...draft }),
+    /** Appends to the scope's queued message on the server and answers the message that is now queued. */
+    appendQueuedMessage: (scope: string, queuedMessage: unknown) =>
+      post('/api/user/drafts/queued-message', { scope, queuedMessage }),
+    clearQueuedMessage: (scope: string) => del('/api/user/drafts/queued-message', { scope }),
   },
 
   // Server-side settings: API keys, stored credentials, notifications, web push
@@ -869,6 +873,17 @@ export const api = {
       body.append('durationMs', String(Math.round(durationMs)));
       return authenticatedFetch('/api/companion/press', { method: 'POST', body, ...companionOptions() });
     },
+    // One of her sentences as raw PCM (24 kHz, mono, signed 16-bit little-endian), asked by the page that holds the floor. Answers the
+    // Response itself, its body still arriving, for the player to read: 200 audio, 204 nothing to say, 404 `COMPANION_NO_SENTENCE`,
+    // 409 `COMPANION_NOT_FLOOR` or `COMPANION_SPEECH_REFUSED` (Google's refusal in a sentence; the server has written the panel's line),
+    // 502 `COMPANION_SPEECH_FAILED`. `signal` is the request's only deadline (a sentence streams for as long as it is spoken): aborting
+    // it hangs up, which stops the synthesis when no other request is reading it.
+    speech: (turnId: string, index: number, signal: AbortSignal) =>
+      get(`/api/companion/speech/${encodeURIComponent(turnId)}/${index}`, { ...companionOptions(), signal }),
+    // The talk press while she sounds: `heard` is the last sentence of the turn whose playback ended and `interrupted` the one playing
+    // at the press (`null` for none). Answers 204 once her turn has been stopped, which can take seconds; her next message opens with `<cut>`.
+    cut: (input: { turnId: string; heard: number | null; interrupted: number | null }) =>
+      post('/api/companion/cut', input, companionOptions()),
   },
 
   system: {

@@ -3229,6 +3229,23 @@
       "speaking": "Speaking",
       "cut": "Cut"
     },
+    "avatar": {
+      "idle": "{{name}}, ready",
+      "listening": "{{name}}, listening",
+      "transcribing": "{{name}}, transcribing",
+      "thinking": "{{name}}, thinking",
+      "speaking": "{{name}}, speaking",
+      "readingSession": "{{name}}, reading {{chat}}",
+      "readingAChat": "{{name}}, reading a chat",
+      "readingCode": "{{name}}, reading code",
+      "readingFiles": "{{name}}, reading {{files}}",
+      "readingManyFiles": "{{name}}, reading {{count}} files",
+      "draftingFor": "{{name}}, drafting for {{chat}}",
+      "draftingNew": "{{name}}, drafting a new chat",
+      "walking": "{{name}}, walking {{chat}}, item {{at}} of {{total}}",
+      "walkingPlain": "{{name}}, walking a result",
+      "cut": "{{name}}, stopped talking"
+    },
     "focus": "Focus",
     "model": "Model",
     "modelRefused": "Her model wasn't changed",

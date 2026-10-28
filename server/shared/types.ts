@@ -222,6 +222,7 @@ export type GatewayEventKind =
   | 'kanban_event'
   | 'notes_changed'
   | 'followups_changed'
+  | 'scheduled_messages_changed'
   | 'cerberus_changed'
   | 'cerberus_run_output'
   | 'cerberus_diag_step'
@@ -345,6 +346,9 @@ export type NotesChangedEvent = { kind: 'notes_changed'; at: number };
 
 /** Sent to every open socket after a followup is filed, closed or reopened. It names the chat by its APP session id under `appSessionId` — deliberately NOT `sessionId`: the workspace flags a chat for attention (the unread mark) when any frame carries a `sessionId` that is not the one on screen (`useProjectsState`), and a chat's items moving is no news in the transcript. A widget re-reads when the id is its own chat's and ignores the frame otherwise. It carries no `seq`, so it can never become a transcript row. */
 export type FollowupsChangedEvent = { kind: 'followups_changed'; appSessionId: string; at: number };
+
+/** Sent to every open socket after a chat's scheduled messages changed: one was scheduled, cancelled or dismissed, claimed by the dispatcher as its turn starts, or failed to send. It names the chat by its APP session id under `sessionId` and nothing else — no message and no text — so a composer showing that chat re-reads the list through the authenticated per-user GET and every other composer ignores the frame. Because it carries `sessionId`, the workspace's unread mark (`useProjectsState`) and the transcript handler (`useChatRealtimeHandlers`) each name this kind and leave it alone; it carries no `seq`, so it can never become a transcript row. */
+export type ScheduledMessagesChangedEvent = { kind: 'scheduled_messages_changed'; sessionId: string; at: number };
 
 // ---------------------------
 //----------------- DISPATCHER: the store's one status document, mirrored key for key ------------
@@ -2725,6 +2729,39 @@ export type ChatFirstExchange = {
   ask: string;
   reply: string;
 };
+
+// ---------------------------
+
+//----------------- CHAT DRAFT QUEUE: the message waiting behind a running turn ------------
+
+/**
+ * A chat message queued to be sent when its session is next idle, in the shape the composer submits it and
+ * `session_drafts.queued_message` stores it. `content` is the message text, `attachments` the JSON-safe descriptors
+ * `POST /api/assets/files` returned, `options` the composer's send options (model, effort, permission mode, ...)
+ * captured when it was queued, and `id` the composer-minted id of the newest message in it. A session holds at
+ * most one: a message queued while another waits is merged into it by the drafts repository, never replacing it. Consumed by
+ * the user module (accepts it), the database module's drafts repository (stores and merges it) and the
+ * scheduled-messages dispatcher (sends it, read through `readQueuedChatMessage`).
+ */
+export type QueuedChatMessage = {
+  id?: string;
+  content: string;
+  options?: Record<string, unknown>;
+  attachments: unknown[];
+};
+
+/**
+ * What `sessionDraftsDb.appendQueuedMessage` did with a message the composer asked to queue: `queued` stored it
+ * (`queuedMessage` is what the scope now holds, `appended` whether it was merged into a waiting message rather than
+ * stored alone), `not-combinable` refused it because it or the waiting message is a slash command, and `too-long`
+ * refused it because the merged text would pass the ceiling the caller named. A refusal stores nothing. Consumed by
+ * the database module's drafts repository (builds it) and the user module's service (turns a refusal into its
+ * 409 / 413 answer).
+ */
+export type QueuedAppendResult =
+  | { outcome: 'queued'; queuedMessage: QueuedChatMessage; appended: boolean }
+  | { outcome: 'not-combinable' }
+  | { outcome: 'too-long' };
 
 // ---------------------------
 

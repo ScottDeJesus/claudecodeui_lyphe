@@ -145,7 +145,8 @@
     "scrollToBottom": "Scroll to bottom",
     "queue": {
       "sendNext": "Queue next message",
-      "update": "Update queued message",
+      "append": "Add to queued message",
+      "notCombinable": "Failed to queue message: A slash command runs as a turn of its own, so it cannot be combined with the queued message. Send it after the queued message has gone.",
       "label": "Queued",
       "willSend": "Will send when this finishes",
       "edit": "Edit queued message",

@@ -600,10 +600,8 @@ const addSessionPermissionModeColumn = (db: Database): void => {
 };
 
 /**
- * Adds `session_drafts.last_claimed_queue_id`: the id of the queued message the dispatcher last
- * sent for a scope. A save that carries that id again — a browser retrying a request whose response
- * was lost, after the server had stored, claimed and sent it — is ignored instead of sending the
- * message twice. NULL for existing rows, which have no ids.
+ * Adds `session_drafts.last_claimed_queue_id`. Nothing reads or writes it any more; the column
+ * stays until a migration drops it.
  */
 const addLastClaimedQueueIdColumn = (db: Database): void => {
   const columnNames = getTableInfo(db, 'session_drafts').map((column) => column.name);

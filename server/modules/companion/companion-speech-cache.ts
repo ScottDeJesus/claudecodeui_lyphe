@@ -7,12 +7,17 @@ import type { AppError } from '@/shared/utils.js';
  * `Map<turnId, Map<index, SpeechEntry>>`, with three bounds:
  *   - at most `SPEECH_CACHE_MAX_BYTES` (4 MB, about 87 s of audio) per account: past it the oldest FINISHED sentence goes
  *     first; a sentence still being synthesized is never dropped for room, because someone is listening to it;
- *   - freed when the next turn starts (`startTurn`) and when `SPEECH_CACHE_TTL_MS` (ten minutes) have passed since a
- *     sentence was last added: one timer, set when a sentence is added and cancelled when the cache is freed, so it is an
- *     expiry and not a poll;
- *   - freed by `end` when the account is cleared or the server stops.
- * The CURRENT turn is the one `startTurn` named last; a sentence of any other turn is not speakable, which is how a turn
- * "already cleared" reads as unknown and how a page cannot spend on a turn that is over.
+ *   - the AUDIO is freed when the next turn starts (`startTurn`) and when `SPEECH_CACHE_TTL_MS` (ten minutes) have passed
+ *     since a sentence was last added: one timer, set when a sentence is added and cancelled when the audio is freed, so it
+ *     is an expiry and not a poll. The expiry frees audio and nothing else: the turn stays hers, so a sentence asked for
+ *     after a long gap inside one running turn is synthesized again;
+ *   - freed by `end` when the account is cleared or the server stops, which also retires the turn.
+ * The CURRENT turn is the one `startTurn` named last (until `end`); a sentence of any other turn is not speakable, which is
+ * how a turn "already cleared" reads as unknown and how a page cannot spend on a turn that is over.
+ *
+ * A sentence still being synthesized when its audio is freed is not stopped: it finishes for the page that holds it. It
+ * is kept as an ORPHAN (outside `turns`, so no new request finds it) for as long as it runs, so that a cut naming its turn
+ * and `end` still reach it and stop the spend.
  *
  * An entry is a sentence's life: `pcm` is the audio so far, `done` is true once no more will come (finished, failed or
  * aborted), and `abort` stops the synthesis underneath. `opened` settles when the first audio arrives (`null`) or when the
@@ -48,7 +53,7 @@ export type SpeechEntry = {
 
 /** What `createSpeechCache` answers; the account holds one. Consumed by `companion-speech.ts`, `companion-account.ts` and `companion.service.ts`. */
 export type SpeechCache = {
-  /** A new turn began: everything of the old one is forgotten, and `turnId` is now the only speakable turn. A sentence still being sent to a page finishes for that page. */
+  /** A new turn began: the audio of the old one is forgotten, and `turnId` is now the only speakable turn. A sentence still being sent to a page finishes for that page, and a cut naming the old turn or `end` still stops it. */
   startTurn(turnId: string): void;
   /** Whether `turnId` is the turn whose sentences may be spoken. */
   isCurrent(turnId: string): boolean;
@@ -59,9 +64,9 @@ export type SpeechCache = {
   remove(turnId: string, index: number, entry: SpeechEntry): void;
   /** Keeps the cache within its byte bound, dropping the oldest finished sentences first. Called after each chunk lands. */
   trim(): void;
-  /** The cut: stops every synthesis of `turnId` still in flight, so nothing more is spent; finished sentences stay. Answers how many it stopped. */
+  /** The cut: stops every synthesis of `turnId` still in flight, those of a superseded turn included, so nothing more is spent; finished sentences stay. Answers how many it stopped. */
   abortTurn(turnId: string): number;
-  /** Stops every synthesis and forgets everything, the current turn too: Clear, and the server stopping. */
+  /** Stops every synthesis, orphans included, and forgets everything, the current turn too: Clear, and the server stopping. */
   end(): void;
   /** True the first time it is asked for `turnId`: the turn's one "I could not speak" line is written then and not again. */
   claimRefusalLine(turnId: string): boolean;
@@ -150,13 +155,30 @@ export function createSpeechCache(): SpeechCache {
   let current: string | null = null;
   let refusalLineTurn: string | null = null;
   let expiry: NodeJS.Timeout | null = null;
+  // Syntheses still running whose turn's audio was freed (entry → the turn it was for). Finished ones are dropped whenever the cache is touched.
+  const orphans = new Map<SpeechEntry, string>();
 
-  /** Forgets every entry and the current turn. A synthesis in flight is not aborted: its requests still hold it, and it stops when the last leaves. */
-  function forget(): void {
-    turns.clear();
-    current = null;
+  function dropFinishedOrphans(): void {
+    for (const entry of orphans.keys()) {
+      if (entry.done) orphans.delete(entry);
+    }
+  }
+
+  function stopTimer(): void {
     if (expiry !== null) clearTimeout(expiry);
     expiry = null;
+  }
+
+  /** Frees the audio: every entry leaves `turns`, and the current turn stays. A synthesis in flight is not aborted: its requests still hold it, it becomes an orphan, and it stops when the last leaves (or on a cut or `end`). */
+  function freeAudio(): void {
+    dropFinishedOrphans();
+    for (const [turnId, entries] of turns) {
+      for (const entry of entries.values()) {
+        if (!entry.done) orphans.set(entry, turnId);
+      }
+    }
+    turns.clear();
+    stopTimer();
   }
 
   function abortUnfinished(entries: Iterable<SpeechEntry>): void {
@@ -167,18 +189,19 @@ export function createSpeechCache(): SpeechCache {
 
   return {
     startTurn(turnId) {
-      forget();
+      freeAudio();
       current = turnId;
     },
     isCurrent: (turnId) => current === turnId,
     find: (turnId, index) => turns.get(turnId)?.get(index),
     put(turnId, index, entry) {
+      dropFinishedOrphans();
       const entries = turns.get(turnId) ?? new Map<number, SpeechEntry>();
       entries.set(index, entry);
       turns.set(turnId, entries);
       // Ten minutes from the LAST sentence added: a long turn is not freed under the page that is still listening to it.
-      if (expiry !== null) clearTimeout(expiry);
-      expiry = setTimeout(forget, SPEECH_CACHE_TTL_MS);
+      stopTimer();
+      expiry = setTimeout(freeAudio, SPEECH_CACHE_TTL_MS);
       expiry.unref();
     },
     remove(turnId, index, entry) {
@@ -201,21 +224,30 @@ export function createSpeechCache(): SpeechCache {
       }
     },
     abortTurn(turnId) {
-      const entries = turns.get(turnId);
-      if (entries === undefined) return 0;
       let stopped = 0;
-      for (const [index, entry] of entries) {
+      const entries = turns.get(turnId);
+      for (const [index, entry] of entries ?? []) {
         if (entry.done) continue;
         entry.abort.abort();
-        entries.delete(index);
+        entries?.delete(index);
         stopped += 1;
       }
-      if (entries.size === 0) turns.delete(turnId);
+      if (entries?.size === 0) turns.delete(turnId);
+      for (const [entry, owner] of orphans) {
+        if (owner !== turnId || entry.done) continue;
+        entry.abort.abort();
+        orphans.delete(entry);
+        stopped += 1;
+      }
       return stopped;
     },
     end() {
       for (const entries of turns.values()) abortUnfinished(entries.values());
-      forget();
+      abortUnfinished(orphans.keys());
+      turns.clear();
+      orphans.clear();
+      current = null;
+      stopTimer();
     },
     claimRefusalLine(turnId) {
       if (refusalLineTurn === turnId) return false;
