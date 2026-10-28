@@ -1097,20 +1097,6 @@ probe-key: 8cf24c6327736f004c14f6df80e827895b99764a
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/shots/p9-page-a-step2-light.png, /home/lyphe/.claude/claudecodeui_lyphe/.verify/shots/p9-page-b-step3-light.png
 
-## INV-6093 — probe — the ladder's two consumer lists are still short, in the same class this phase fixed
-
-the ladder's two consumer lists are still short, in the same class this phase fixed
-
-```probe
-grep -n "NEXT_TOP_SIMPLE_LIST_RANK_SQL\|renumberLadder" server/modules/database/repositories/simple-list.db.ts server/modules/database/repositories/simple-list-ladder.db.ts
-expect: consumers at simple-list.db.ts:77 (createFolder) and :148 (deleteFolder) — neither named by the ladder's docblocks at :41 and :174
-```
-
-measured 2026-09-30 by chain chain-simple-chat-folders--old-door-20260930-133741-c3a2, finding L2, LOW
-probe-key: 9deb5ad49393aee36e155aeb108c00c231a5044c
-
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/session-user-state.db.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/repositories/simple-list-ladder.db.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/services/session-user-state.service.ts, /home/lyphe/.claude/claudecodeui_lyphe/server/modules/providers/session-user-state.routes.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/api.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-sidebar-state-api.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/probe-simple-reorder.mjs
-
 ## INV-6094 — probe — the A7/A8 repair is justified, but it steps aside from the suite's only feed-unread gate, and that gate cannot pass
 
 the A7/A8 repair is justified, but it steps aside from the suite's only feed-unread gate, and that gate cannot pass
