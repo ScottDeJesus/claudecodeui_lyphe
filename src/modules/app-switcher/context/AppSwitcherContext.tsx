@@ -9,11 +9,11 @@ import {
   readAppSwitcherRecord,
   writeAppSwitcherRecord,
 } from '@/modules/app-switcher/utils/appSwitcherStorage';
-import { dockableRect, sameRect } from '@/modules/app-switcher/utils/dockRect';
 import { EMPTY_SLOT, loneAppOnTheLeft } from '@/modules/app-switcher/utils/paneSlots';
 import type { AppEntry, RegistryRow } from '@/shared/app-types';
 import type { DockPress, PaneSide, PaneSlot, ProjectChoice } from '@/shared/types';
 import type { DockableFabPosition } from '@/shared/ui';
+import { dockableRect, sameRect } from '@/shared/utils';
 
 type AppSwitcherValue = {
   /** The registry, in file order. A failed read keeps the last good list beside the error. */

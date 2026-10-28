@@ -154,10 +154,11 @@ export function watchServerDir(dir, onChange) {
                     if (IGNORED_DIRECTORIES.includes(name)) return;
                     // A directory that appeared — new, renamed in, or recreated where one was
                     // removed — with whatever it already holds: its files were written before its
-                    // watch existed, so the walk speaks for them. Any watch left from a previous
-                    // directory at this path is dead (a watch follows the inode, not the name).
+                    // watch existed, so the scan after the watch speaks for them. Any watch left
+                    // from a previous directory at this path is dead (a watch follows the inode,
+                    // not the name).
                     unwatchTree(absolute);
-                    for (const subdirectory of walkDirectories(absolute)) watchDirectory(subdirectory);
+                    watchTree(absolute);
                     const firstFile = findWatchedFile(absolute, dir);
                     if (firstFile) settle(firstFile);
                     return;
@@ -179,7 +180,28 @@ export function watchServerDir(dir, onChange) {
         watchers.set(directory, watcher);
     };
 
-    for (const directory of walkDirectories(dir)) watchDirectory(directory);
+    /**
+     * Watches `directory` and every directory under it, each one's watch ARMED BEFORE IT IS LISTED. A
+     * subdirectory born while this runs is then in the listing (born before it) or reported by its
+     * parent's watch (born after the watch armed) or both, and `watchDirectory` takes the same
+     * directory twice as once. The other order, listing the whole tree and arming afterwards, leaves
+     * a gap in which a subdirectory is born into neither: measured 2026-10-28, `server/modules/companion/session/`
+     * was created 1 ms after its parent, fell in that gap, and no save to its files restarted the API for two days.
+     */
+    const watchTree = (directory) => {
+        watchDirectory(directory);
+        let entries;
+        try {
+            entries = fs.readdirSync(directory, { withFileTypes: true });
+        } catch {
+            return;
+        }
+        for (const entry of entries) {
+            if (entry.isDirectory() && !IGNORED_DIRECTORIES.includes(entry.name)) watchTree(path.join(directory, entry.name));
+        }
+    };
+
+    watchTree(dir);
     console.log(`[supervisor] watching ${watchers.size} directories under ${dir}`);
 
     return () => {

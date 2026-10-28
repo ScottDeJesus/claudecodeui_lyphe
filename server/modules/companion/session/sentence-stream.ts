@@ -3,13 +3,16 @@ import type { CompanionSound } from '@/shared/companion-types.js';
 /**
  * Her words, cut into sentences and read once. The model streams text a few characters at a time;
  * `createSentenceStream` finds where each sentence ends, and `parseExpression` turns one raw sentence
- * into the three things the rest of the house wants: the `display` text the panel draws (with her
- * `sounds` as marks at their offsets), the `speech` text a voice synthesizes, and the leading `mood`.
+ * into the three things the rest of the house wants: the leading `mood`, the `display` text the panel
+ * draws, and her `sounds` as offsets into it.
  *
  * Both are PURE: no I/O and no import beyond the contract's types, so they are proven on real
  * strings under `tsx`. The sentence cut depends on the text alone, never on how the deltas happened
  * to be sized — the same paragraph pushed a character at a time or all at once yields the same
- * sentences.
+ * sentences. A sentence ends where the next one can begin: after a terminator run (`.` `!` `?` `…`
+ * and any closing quote) and its whitespace, a lowercase letter carries her sentence on, because she
+ * never begins one in lowercase — so a quotation inside a sentence stays one breath, and a wrong join
+ * costs a little latency and no words.
  *
  * The sounds the parse keeps are the caller's list, never one of its own: the account's `gemini.soundTags`
  * (the voice module's settings), which `session/companion-turns.ts` hands it for every sentence of a turn and
@@ -25,7 +28,7 @@ const MAX_SENTENCE_CHARS = 300;
 
 const TERMINATORS = new Set(['.', '!', '?', '…']);
 
-/** Characters that may close a quotation or parenthesis right after the terminator: `He said "no."` ends at the quote. */
+/** Characters that may close a quotation or parenthesis right after the terminator: `He said "no." Then…` ends at the quote. */
 const CLOSERS = new Set(['"', "'", ')', '”', '’']);
 
 /**
@@ -39,6 +42,8 @@ const ABBREVIATIONS = new Set(['e.g.', 'i.e.', 'etc.', 'vs.', 'mr.', 'mrs.', 'ms
 const LEADING_LIST_NUMBER = /^\s*(?:[-*•]\s+)?\d+\.$/;
 
 type Cut = { end: number; next: number };
+/** A sentence end whose whitespace runs to the buffer's end, so what follows it has not arrived: `waitingEnd` is where it would fall. */
+type WaitingCut = { waitingEnd: number };
 
 /** Whether the text ending at `terminatorIndex` (a `.`) ends in an abbreviation, a list number, or neither. */
 function dotDoesNotEndSentence(text: string, terminatorIndex: number): boolean {
@@ -51,16 +56,42 @@ function dotDoesNotEndSentence(text: string, terminatorIndex: number): boolean {
 }
 
 /**
- * The first sentence end in `text` that is already decided, or null. A terminator is decided only by
- * the character AFTER it: whitespace ends the sentence, anything else (a digit of "3.5", a letter of
- * "e.g.") does not, and the end of the buffer decides nothing yet — so a delta that splits a
- * terminator from its neighbour changes nothing. A newline always ends a sentence.
+ * What the whitespace after a terminator run says, read from `gapStart` (its first character): the
+ * sentence `'ends'` when the gap holds a newline or the next character is not a lowercase letter, it
+ * `'goes-on'` when a lowercase letter follows (she never begins a sentence in lowercase, so that
+ * letter carries the one before it on), and it is `'undecided'` while the buffer ends inside the gap.
+ * A gap of more than 300 whitespace characters ends the sentence without waiting for what follows it,
+ * so a flood of spaces cannot hold the buffer open and be rescanned at every push.
  */
-function findCut(text: string): Cut | null {
+function readGapAfterTerminator(text: string, gapStart: number): 'ends' | 'goes-on' | 'undecided' {
+  let at = gapStart;
+  for (; at < text.length && /\s/.test(text[at]); at += 1) {
+    if (text[at] === '\n' || at - gapStart >= MAX_SENTENCE_CHARS) return 'ends';
+  }
+  if (at === text.length) return 'undecided';
+  // A lowercase letter outside the BMP is a surrogate pair a delta may have split: its first half alone decides nothing.
+  if (at + 1 === text.length && /[\uD800-\uDBFF]/.test(text[at])) return 'undecided';
+  return /^\p{Ll}/u.test(text.slice(at, at + 2)) ? 'goes-on' : 'ends';
+}
+
+/**
+ * The first sentence end in `text` that is already decided, or null. A terminator run (`.` `!` `?` `…`
+ * with any closing quote or bracket after it) is decided only by what comes AFTER it: no whitespace (a
+ * digit of "3.5", a letter of "e.g.") does not end the sentence; whitespace holding a newline ends it;
+ * whitespace and then a lowercase letter does not, so a quotation inside her sentence (`I've drafted
+ * "Reply with PONG." for that chat`) and "3 p.m. today" stay one sentence, while any other character
+ * after the whitespace ends it. The end of the buffer right after the run decides nothing (null); inside
+ * its whitespace it answers a `WaitingCut`, so a delta that splits a terminator from its neighbour
+ * changes nothing and the run-on cut can tell an end still arriving from none. A newline always ends a sentence.
+ */
+function findCut(text: string): Cut | WaitingCut | null {
   // The last terminator of the run just walked ("?!", "...", `."`), -1 when the characters behind
   // this one are not such a run. A closer keeps the run alive; any other character ends it.
   let terminatorIndex = -1;
-  for (let index = 0; index < text.length; index += 1) {
+  // A cut past 300 characters is replaced by the run-on cut, so nothing further is read: one large push
+  // then costs each piece a bounded scan, not a walk of everything still pending.
+  const scanEnd = Math.min(text.length, MAX_SENTENCE_CHARS + 1);
+  for (let index = 0; index < scanEnd; index += 1) {
     const char = text[index];
     if (char === '\n') return { end: index, next: index + 1 };
     if (TERMINATORS.has(char)) terminatorIndex = index;
@@ -70,6 +101,9 @@ function findCut(text: string): Cut | null {
     if (following === undefined) return null; // undecided: the next delta says what follows
     if (!/\s/.test(following)) continue;
     if (text[terminatorIndex] === '.' && dotDoesNotEndSentence(text, terminatorIndex)) continue;
+    const gap = readGapAfterTerminator(text, index + 1);
+    if (gap === 'undecided') return { waitingEnd: index + 1 }; // the buffer ends inside the whitespace: the next delta says what follows it
+    if (gap === 'goes-on') continue;
     return { end: index + 1, next: index + 1 };
   }
   return null;
@@ -108,7 +142,10 @@ function findRunOnCut(text: string): Cut {
 /**
  * Turns streamed text into sentences. `push` takes the next delta — it may split a word, a tag or a
  * terminator anywhere — and calls `onSentence` once for each sentence the text now settles: a `.`,
- * `!`, `?` or `…` followed by whitespace, or a newline. Abbreviations ("e.g.", "Dr."), decimal
+ * `!`, `?` or `…` (with any closing quote after it) followed by whitespace and then anything but a
+ * lowercase letter, or a newline. A lowercase letter after the whitespace carries the sentence on
+ * (`I've drafted "Reply with PONG." for that chat` is one sentence), and while the buffer ends inside
+ * that whitespace nothing is emitted yet. Abbreviations ("e.g.", "Dr."), decimal
  * numbers ("3.5") and a leading list number ("1.") stay whole, and a run-on past 300 characters is
  * cut at its last comma or space. `flush` emits what is left, and is called at the end of EACH text
  * block of a turn, not only at the turn's end: a block ends with no whitespace after its last
@@ -128,7 +165,10 @@ export function createSentenceStream(onSentence: (raw: string) => void): { push(
     for (;;) {
       pending = pending.replace(/^\s+/, '');
       if (pending === '') return;
-      const cut = findCut(pending);
+      const found = findCut(pending);
+      // An end within 300 that waits on the character after its whitespace holds the run-on cut off: the whole text keeps that sentence whole.
+      if (found !== null && 'waitingEnd' in found && found.waitingEnd <= MAX_SENTENCE_CHARS) return;
+      const cut = found !== null && 'end' in found ? found : null;
       // A sentence that will certainly pass 300 characters is cut now, whether or not its end has arrived.
       const needsRunOnCut = pending.length > MAX_SENTENCE_CHARS && (cut === null || cut.end > MAX_SENTENCE_CHARS);
       const chosen = needsRunOnCut ? findRunOnCut(pending) : cut;
@@ -170,7 +210,7 @@ function stripLeadingMarker(text: string): string {
  * What follows the `<` of a comparison rather than a tag: whitespace or `=` (`x < y`, `a <= b`). A tag
  * has its name right against the `<` (`<whisper>`, `</whisper>`, `<br/>`, `<1>`), so every span that
  * does not open this way is a tag and is dropped — which keeps the words between two comparison signs
- * (`if x < y then keep it, but z > w`) and keeps every `<…>` that survives into `speech` a sound.
+ * (`if x < y then keep it, but z > w`).
  */
 const COMPARISON_OPENING = /^[\s=]/;
 
@@ -245,16 +285,16 @@ function buildDisplay(norm: string, tags: readonly string[]): { display: string;
 /**
  * Reads one raw sentence of hers. A leading `[mood]` of one to three words is the `mood`; every
  * other square-bracket span is dropped. An angle tag whose text is on `soundTags` (compared lower
- * case) is a sound: it stays in `speech` as `<tag>` where it stood, is removed from `display` and
- * is listed in `sounds` with its offset into `display`; every other angle tag is dropped and the
- * words inside it stay (`<whisper>secret</whisper>` is "secret"). Markdown residue goes, whitespace
- * collapses and both texts are trimmed. The answer is null when there is nothing to show or say: an
- * empty `display` and no sounds. Consumed by the companion session for every sentence she says.
+ * case) is a sound: it is removed from `display` and listed in `sounds` with its offset into
+ * `display`; every other angle tag is dropped and the words inside it stay (`<whisper>secret</whisper>`
+ * is "secret"). Markdown residue goes, whitespace collapses and the text is trimmed. The answer is
+ * null when there is nothing to show: an empty `display` and no sounds. Consumed by the companion
+ * session for every sentence she says.
  */
 export function parseExpression(
   raw: string,
   soundTags: readonly string[]
-): { mood: string | null; speech: string; display: string; sounds: CompanionSound[] } | null {
+): { mood: string | null; display: string; sounds: CompanionSound[] } | null {
   const allowed = new Set(soundTags.map((tag) => tag.trim().replace(/\s+/g, ' ').toLowerCase()));
   // The mark is the parse's own private-use character; one in her text would read as a sound with no tag.
   const input = raw.replace(SOUND_MARK_PATTERN, '');
@@ -269,7 +309,5 @@ export function parseExpression(
     .trim();
   const { display, sounds } = buildDisplay(norm, angles.tags);
   if (display === '' && sounds.length === 0) return null;
-  let nextTag = 0;
-  const speech = norm.replace(SOUND_MARK_PATTERN, () => `<${angles.tags[nextTag++]}>`);
-  return { mood, speech, display, sounds };
+  return { mood, display, sounds };
 }

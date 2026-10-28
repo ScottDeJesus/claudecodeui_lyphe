@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 
+import { useCompanionFab } from '@/modules/companion/hooks/useCompanionFab';
 import { useCompanionVoice } from '@/modules/companion/hooks/useCompanionVoice';
 import { useTalkBinding } from '@/modules/companion/hooks/useTalkBinding';
 import { useTalkPress } from '@/modules/companion/hooks/useTalkPress';
@@ -9,6 +10,7 @@ import { api, refusalSentence } from '@/shared/api';
 import type { CompanionFrame, CompanionPicture, CompanionSettings } from '@/shared/companion-types';
 import { useWebSocket } from '@/shared/context/WebSocketContext';
 import type { CompanionVoice, TalkPress } from '@/shared/types';
+import type { DockableFabPosition } from '@/shared/ui';
 import { companionClientId } from '@/shared/utils';
 
 type CompanionContextValue = {
@@ -53,12 +55,30 @@ type CompanionContextValue = {
    * heard), else null. `useAvatarTarget` points the button at that chat's composer while it is set.
    */
   recentSend: string | null;
+  /**
+   * Where her disc rests, as he left it (`companion-fab` in localStorage): docked in the rail's cell, or a point. On a phone,
+   * where the rail is tucked away, docked rests in her corner. Read by `CompanionFab`, which draws the disc there, and by
+   * `CompanionDock`, which seats the disc only while it is docked.
+   */
+  fabPosition: DockableFabPosition;
+  /** Sets and stores her rest: the release of a drag, docked or the point where he let go. */
+  moveFab: (next: DockableFabPosition) => void;
+  /** The rail cell's rect while the rail is docked (md and up) and the rect is on screen, else null: the place the disc docks to. */
+  dockRect: DOMRect | null;
+  /** The cell's report of its rect (null as it leaves, or below md); believed only while the rect is on screen. Stable for the page's life. */
+  registerDock: (rect: DOMRect | null) => void;
+  /** Whether a look holds her disc away from its seat (gliding to a chat or the file tree, resting there, gliding home): the cell shows its mark. */
+  fabAway: boolean;
+  /** Set by `CompanionFab`, which knows the look; read by `CompanionDock`. Stable for the page's life. */
+  setFabAway: (away: boolean) => void;
+  /** The page player's `level()`, 0..1: what her face's mouth follows while she speaks. Stable for the page's life. */
+  level: () => number;
 };
 
 const CompanionContext = createContext<CompanionContextValue | null>(null);
 
 /**
- * Used by this module's panel, door and `useAvatarTarget`, and through the barrel by the project-workspace module's command
+ * Used by this module's panel, dock, disc and `useAvatarTarget`, and through the barrel by the project-workspace module's command
  * palette: what Kaylee's provider holds for this page. Throws outside CompanionProvider, so a consumer placed wrong fails at once.
  */
 export function useCompanion(): CompanionContextValue {
@@ -80,7 +100,7 @@ const RECENT_SEND_MS = 4000;
 const isCompanionFrame = (event: { kind?: string }): boolean => typeof event.kind === 'string' && event.kind.startsWith('companion_');
 
 /**
- * Used by the project-workspace module's shell, which holds it above the whole workspace, so her door, her panel and the command palette's
+ * Used by the project-workspace module's shell, which holds it above the whole workspace, so her disc, her cell in the rail, her panel and the command palette's
  * "Talk to Kaylee" share one picture. She is box-wide, tied to no chat, route or project: the one thing she asks of the page
  * is to open a chat, and she does it through `onOpenChat`, which the composition root answers with its own navigation.
  *
@@ -120,6 +140,8 @@ export function CompanionProvider({ onOpenChat, children }: { onOpenChat: (sessi
   const recentSendTimerRef = useRef(0);
   // The page's one voice: it plays her sentences while the picture says this page holds the floor, and its switch is on.
   const speech = useCompanionVoice({ picture, clientId });
+  // Her disc and her rail cell meet here: where she rests, the cell's rect, and whether a look holds her off the seat.
+  const { fabPosition, moveFab, dockRect, registerDock, fabAway, setFabAway } = useCompanionFab();
   // Stable for the page's life (unlike `speech`, which moves with every sentence), so the callbacks below keep their identity.
   const { unlock: unlockVoice, silence: silenceVoice } = speech;
   // The page's one press, and the key or mouse button he bound to it. The press is not state of the picture: it is this page's mic.
@@ -299,8 +321,14 @@ export function CompanionProvider({ onOpenChat, children }: { onOpenChat: (sessi
   }, []);
 
   const value = useMemo<CompanionContextValue>(
-    () => ({ picture, open, clientId, setOpen, sendText, saveSettings, editDraft, sendDraft, clearDraft, dismissNote, interrupt, clear, talk, voice: speech.voice, recentSend }),
-    [picture, open, clientId, setOpen, sendText, saveSettings, editDraft, sendDraft, clearDraft, dismissNote, interrupt, clear, talk, speech.voice, recentSend],
+    () => ({
+      picture, open, clientId, setOpen, sendText, saveSettings, editDraft, sendDraft, clearDraft, dismissNote, interrupt, clear, talk,
+      voice: speech.voice, recentSend, fabPosition, moveFab, dockRect, registerDock, fabAway, setFabAway, level: speech.level,
+    }),
+    [
+      picture, open, clientId, setOpen, sendText, saveSettings, editDraft, sendDraft, clearDraft, dismissNote, interrupt, clear, talk,
+      speech.voice, recentSend, fabPosition, moveFab, dockRect, registerDock, fabAway, setFabAway, speech.level,
+    ],
   );
 
   return <CompanionContext.Provider value={value}>{children}</CompanionContext.Provider>;

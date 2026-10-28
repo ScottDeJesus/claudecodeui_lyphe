@@ -1,10 +1,10 @@
 import type { CompanionLogEntry } from '@/shared/companion-types.js';
 
 /**
- * What a voice is asked to say for one of her sentences, rebuilt from the log row of that sentence. The log keeps the
- * `display` text (no sounds in it), the `mood` and the `sounds` as offsets into the display, which is everything
- * `parseExpression` made except the `speech` text itself; writing each sound back as `<tag>` at its offset gives that text
- * again, up to the spacing around a tag (which the parse had already collapsed to single spaces).
+ * What a voice is asked to say for one of her sentences, rebuilt from the log row of that sentence. The row holds the
+ * `display` text (no sounds in it), the `mood` and the `sounds` as offsets into the display, and it is the one record the
+ * panel draws and the voice speaks. `utteranceOf` writes each sound back into the display as `<tag>` at its offset, so
+ * what he reads and what he hears cannot drift apart.
  *
  * PURE: no I/O and no import beyond the contract's types, so it is proven on real strings under `tsx`.
  *

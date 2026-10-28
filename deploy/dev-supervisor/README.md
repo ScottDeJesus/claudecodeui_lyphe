@@ -205,6 +205,13 @@ handed over at once. A directory watch reports its children by name whatever the
 cannot recur. The journal says how many directories are watched on start:
 `[supervisor] watching <n> directories under …/server`.
 
+Each directory's watch is armed BEFORE it is listed (`watchTree`): a subdirectory born during the
+walk is then in the listing, or reported by its parent's watch, or both — never neither. The other
+order (list the tree, arm afterwards) loses a directory born in between for good; measured
+2026-10-28, `server/modules/companion/session/` was created 1 ms after its parent and no save to
+its files restarted the API for two days. The count in that journal line should equal the number
+of directories under `server/` (node_modules aside).
+
 One rough edge: a connection already queued on the retiring listener's accept queue when it closes
 can see a reset instead of being served. The host-level cure is `net.ipv4.tcp_migrate_req=1`, which
 migrates queued connections to a surviving listener. **This plan does not set it** — it is a

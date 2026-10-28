@@ -3244,7 +3244,11 @@
       "draftingNew": "{{name}}, drafting a new chat",
       "walking": "{{name}}, walking {{chat}}, item {{at}} of {{total}}",
       "walkingPlain": "{{name}}, walking a result",
-      "cut": "{{name}}, stopped talking"
+      "cut": "{{name}}, stopped talking",
+      "loading": "{{name}}, loading",
+      "failed": "{{name}}, stopped",
+      "asleep": "{{name}}, asleep",
+      "waking": "{{name}}, waking up"
     },
     "focus": "Focus",
     "model": "Model",

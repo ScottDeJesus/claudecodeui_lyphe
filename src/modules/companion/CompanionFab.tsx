@@ -1,10 +1,15 @@
-import { AudioLines } from 'lucide-react';
-import { useRef, useState, useSyncExternalStore } from 'react';
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import type { AnimationEvent, ReactNode, TransitionEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { CompanionAvatar } from '@/modules/companion/CompanionAvatar';
 import '@/modules/companion/CompanionFab.css';
-import { FAB_CATCH_PX, FAB_SIZE_PX } from '@/shared/constants';
+import { useCompanion } from '@/modules/companion/context/CompanionContext';
+import { useAvatarTarget } from '@/modules/companion/hooks/useAvatarTarget';
+import { useCompanionPresence } from '@/modules/companion/hooks/useCompanionPresence';
+import { avatarPlacement } from '@/modules/companion/utils/avatarPlacement';
+import { presenceWords } from '@/modules/companion/utils/presenceWords';
+import { FAB_CATCH_PX, FAB_DEFAULT_INSET_X, FAB_DEFAULT_INSET_Y, FAB_SIZE_PX } from '@/shared/constants';
 import { DockableFab } from '@/shared/ui';
 import type { DockableFabPosition } from '@/shared/ui';
 
@@ -20,21 +25,25 @@ const FACE_PX = FAB_SIZE_PX - 2;
 /**
  * Her own corner on a phone, as the inset from the window's bottom-right corner to the disc's top-left: on the applications
  * button's line, one catch to its left. The applications button's phone default stands at (72, 112)
- * (`FAB_DEFAULT_INSET_X`/`_Y`, app-switcher's appSwitcherStorage.ts), so the two discs share a row and their 44px catches
- * meet edge to edge without overlapping; she also clears the kit's own resting corner, where the applications button sits
- * when its record is docked and the rail is tucked away.
+ * (`FAB_DEFAULT_INSET_X`/`_Y`, shared constants), so at the height the page loaded at the two discs
+ * share a row and their 44px catches meet edge to edge without overlapping; she also clears the kit's own resting corner,
+ * where the applications button sits when its record is docked and the rail is tucked away.
  *
- * WHAT SHE COVERS THERE, measured at 390x844 on a chat: the right part of the composer's first line, beside the
- * applications button, which already covers the line's end — the same trade the house made for that button, and
- * nothing of the conversation.
+ * WHAT SHE COVERS THERE, measured at 390x844 on a chat: none of the conversation, and about four characters of one line
+ * of his text, beside the four the applications button already hides at that line's end. Typed, "navigate away from
+ * the" reads "navigate aw[her]ro[applications]e": her disc hides "ay f", the applications button "m th"; empty, the
+ * placeholder loses the same span. That line is a short message's only line; once the composer holds more, it is the
+ * line before the one he is typing. With the keyboard up where the window resizes for it (Android), she rides up with
+ * the window and stays on the field, while the applications button's stored point is clamped to the window's new foot,
+ * so the two part (at 390x508: she at y 396 on the field, the applications button at y 472).
  *
  * WHY NOT ABOVE IT, where the design first drew her: one catch up is the conversation's newest lines (the last reply's
  * time and menu) and the lane a thumb starts its scroll in, and a scroll that starts on a catch drags the disc
  * (`touch-action: none`) — the house keeps a FAB's catch off the conversation's scroll for exactly that
- * (appSwitcherStorage.ts, FAB_DEFAULT_INSET_X). Nor high in that column under the header: the Files view's folder chips
+ * (`FAB_DEFAULT_INSET_X`). Nor high in that column under the header: the Files view's folder chips
  * and the Git view's tabs stand there, and a press meant for them would open her panel.
  */
-const CORNER_INSET: FabPoint = { x: 72 + FAB_CATCH_PX, y: 112 };
+const CORNER_INSET: FabPoint = { x: FAB_DEFAULT_INSET_X + FAB_CATCH_PX, y: FAB_DEFAULT_INSET_Y };
 
 /** The window's resize, heard only while she rests in her corner: nowhere else does the window's size place her. */
 function listenToResize(listener: () => void): () => void {
@@ -102,11 +111,13 @@ type CompanionFabViewProps = {
  * A DRAG CANCELS ANY MOTION. From the first move the offset drops at once, with no glide to trail the finger, and the
  * look in hand is set aside until another begins, so the drop is where she stays. The drop sets her new rest.
  *
- * STACKING. One rung under the applications button's 60 in the workspace shell's stacking context: over every
- * application (40), the floating chat and her own desktop panel (45) — the disc is how that panel closes — and the
- * sidebar's drawer and rail (50), so she docks over the drawer's rail on a phone. Under the applications button and the
- * radial it fans out (60), which stay on top wherever the two meet. Below lg her panel is a sheet at 61 that covers both
- * discs and carries its own close.
+ * STACKING, in the workspace shell's stacking context. From md up, z 59, one rung under the applications button's 60:
+ * over every application (40), the floating chat and her own desktop panel (45) — the disc is how that panel closes — and
+ * the docked rail (`relative z-50`), where she sits in her cell. Under the applications button and the radial it fans out
+ * (60), which stay on top wherever the two meet. Below md and at rest, z 49: still over the floating chat and the
+ * applications, but under the sidebar's drawer (50), so an open drawer covers her corner — its cell draws her door — and
+ * the controls of its rows stay his to press. While a look holds her she is at 59 at every width, so a look into the open
+ * drawer is drawn over it. Below lg her panel is a sheet at 61 that covers both discs and carries its own close.
  */
 export function CompanionFabView({ label, face, position, dockRect, active, target, onPress, onPositionChange, onRestChange }: CompanionFabViewProps) {
   const layerRef = useRef<HTMLDivElement>(null);
@@ -187,7 +198,7 @@ export function CompanionFabView({ label, face, position, dockRect, active, targ
       data-dragging={dragging ? '' : undefined}
       data-landing={landed?.hopping ? '' : undefined}
       data-tracking={tracking ? '' : undefined}
-      className="companion-fab pointer-events-none fixed inset-0 z-[59]"
+      className="companion-fab pointer-events-none fixed inset-0 z-[49] data-[target]:z-[59] md:z-[59]"
       style={{ translate: `${offset.x}px ${offset.y}px` }}
       onTransitionEnd={handleTransitionEnd}
       onAnimationEnd={handleAnimationEnd}
@@ -211,38 +222,83 @@ export function CompanionFabView({ label, face, position, dockRect, active, targ
 }
 
 /**
+ * The notch, the status bar and the home indicator, in px per edge, as `env(safe-area-inset-*)` says them. CSS alone knows
+ * them, so a hidden probe element wears them as padding and the computed style hands them back; where the screen has no
+ * notch `env()` falls to its 0px.
+ */
+function readSafeInsets() {
+  const probe = document.createElement('div');
+  probe.style.cssText =
+    'position:fixed;visibility:hidden;pointer-events:none;padding:env(safe-area-inset-top,0px) env(safe-area-inset-right,0px) env(safe-area-inset-bottom,0px) env(safe-area-inset-left,0px)';
+  document.body.appendChild(probe);
+  const style = getComputedStyle(probe);
+  const insets = {
+    top: parseFloat(style.paddingTop),
+    right: parseFloat(style.paddingRight),
+    bottom: parseFloat(style.paddingBottom),
+    left: parseFloat(style.paddingLeft),
+  };
+  probe.remove();
+  return insets;
+}
+
+/**
  * Her disc on the page: what WorkspaceFrame renders after AppSwitcherFab. It reads her rest, the dock, the open state, her
  * presence and her look from the companion's provider, stores the rest a drag leaves her at, hands her rest's box to her
  * look, and toggles the panel; CompanionFabView draws it.
+ *
+ * THE LABEL is her name and her presence in words, the sentence her face carries as its own accessible name
+ * (`presenceWords`); her name is the one he set, the default while the page has not read it. Her face is told the page
+ * player's `level` and nothing else of the voice.
+ *
+ * THE LOOK'S PLACE. `useAvatarTarget` picks the anchor and measures it; `avatarPlacement` says where beside it she stands,
+ * clamped inside the window's safe area. Both depend on the window's size, which the placement reads, so the size is
+ * subscribed to only while a look holds her: a resize with no look standing moves nothing here. The cell in the rail is told
+ * that a look holds her (`setFabAway`) so it keeps her place marked while she is out.
  */
 export function CompanionFab() {
   const { t } = useTranslation();
-  // FILL(fill): position store — her rest from the companion context, kept in localStorage under `companion-fab`
-  const position: DockableFabPosition = { docked: true };
-  // FILL(fill): dock rect — the rect CompanionDock registers through the context's `registerDock`, believed only while it is on screen
-  const dockRect: DOMRect | null = null;
-  // FILL(fill): active — her panel is open, `useCompanion().open`
-  const active = false;
-  // FILL(fill): presence label — "Kaylee, " plus `useCompanionPresence()` in words, the words her face says for the same state
-  const label = t('companion.avatar.idle', { name: t('companion.defaultName', { defaultValue: 'Kaylee' }), defaultValue: '{{name}}, ready' });
-  // FILL(fill): target offset — `useAvatarTarget(presence, buttonRect)` placed by `avatarPlacement(rect, FAB_SIZE_PX, viewport)`: `{ key, left, top }`, or null at rest
-  const target: CompanionFabTarget | null = null;
+  const { picture, open, setOpen, fabPosition, moveFab, dockRect, setFabAway, level } = useCompanion();
+  const presence = useCompanionPresence();
+  const name = picture?.settings.name ?? t('companion.defaultName', { defaultValue: 'Kaylee' });
+
+  // Her rest's box, as the view reports it: `useAvatarTarget` skips an anchor she already stands on. State because the
+  // look is chosen from it, and the view is the only one that knows where the kit placed her.
+  const [restRect, setRestRect] = useState<DOMRect | null>(null);
+  const look = useAvatarTarget(presence, restRect);
+  const holding = look !== null;
+
+  const viewportWidth = useSyncExternalStore(holding ? listenToResize : listenToNothing, readViewportWidth);
+  const viewportHeight = useSyncExternalStore(holding ? listenToResize : listenToNothing, readViewportHeight);
+  // The window as the placement reads it: its size and its safe-area insets, taken once per hold and again only when the
+  // window's size changes (an orientation turn moves the insets). The insets' read builds and removes a node, so a
+  // re-measure of the same look (a scroll frame) must not repeat it.
+  const viewport = useMemo(
+    () => (holding ? { width: viewportWidth, height: viewportHeight, safe: readSafeInsets() } : null),
+    [holding, viewportWidth, viewportHeight],
+  );
+  const target = useMemo<CompanionFabTarget | null>(() => {
+    if (look === null || viewport === null) return null;
+    return { key: look.key, ...avatarPlacement(look.rect, FAB_SIZE_PX, viewport) };
+  }, [look, viewport]);
+
+  useEffect(() => {
+    setFabAway(holding);
+    // Gone, she is no longer out on a look: the cell must not keep marking a place nobody left.
+    return () => setFabAway(false);
+  }, [holding, setFabAway]);
 
   return (
     <CompanionFabView
-      label={label}
-      // FILL(fill): icon — <CompanionAvatar presence={presence} level={player.level} size={FACE_PX} />
-      face={<AudioLines aria-hidden="true" width={FACE_PX} height={FACE_PX} className="p-1.5 text-accent-ink" strokeWidth={2} />}
-      position={position}
+      label={presenceWords(t, name, presence)}
+      face={<CompanionAvatar presence={presence} level={level} size={FACE_PX} name={name} />}
+      position={fabPosition}
       dockRect={dockRect}
-      active={active}
+      active={open}
       target={target}
-      // FILL(fill): press — setOpen(!open), which takes the floor
-      onPress={() => {}}
-      // FILL(fill): position store — store the rest the drag left her at, under `companion-fab`
-      onPositionChange={() => {}}
-      // FILL(fill): button rect — her rest's box, held for `useAvatarTarget(presence, buttonRect)`'s fourth in-sight test
-      onRestChange={() => {}}
+      onPress={() => setOpen(!open)}
+      onPositionChange={moveFab}
+      onRestChange={setRestRect}
     />
   );
 }

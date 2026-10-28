@@ -1015,6 +1015,7 @@ which is what earns a component in this house. Every screen composes them; none 
   where the bare rect says 29.68, so a panel standing off the FAB does not twitch on hover. The latest
   callback is read through a ref, so a new function identity each render neither re-binds the resize
   listener nor re-reports. The node is still never remounted.
+  Sites (MAN-569): `AppSwitcherFab` (MAN-486) and `CompanionFab` (MAN-9125) compose it unchanged; the second site added no prop. `onDragStart` and `onRectChange` have both as sites; `indicator` only the first.
 - **`SplitPane.tsx`** — two panes and a draggable seam, or one pane filling the row. The seam is
   its own narrow gutter BESIDE the panes rather than over them: a grab area laid over a pane would
   steal the clicks of whatever that application draws flush against its edge. It carries
@@ -1100,7 +1101,7 @@ section: applications/013 The switcher's own files/001 `context/AppSwitcherConte
 
 | File | What |
 |---|---|
-| `context/AppSwitcherContext.tsx` | The one state home: the registry, the two panes, dual, the ratio, the FAB position, the dock rect, the dock's press override (`dockPress`, with its stable `setDockPress`: MAN-9014), the drawer's open flag, `projects` (`ProjectChoice[]`, handed in by the shell: the one outside list the switcher reads), `frontSide`, `closePane`, `openInDualScreen` (dual-on-and-filled in one update) — and `refresh()` on every drawer open. Once a registry read has landed it clears, in the render that sees it, any pane whose row the registry no longer holds; a failed read keeps the last good list, so a refusal never empties a pane. |
+| `context/AppSwitcherContext.tsx` | The one state home: the registry, the two panes, dual, the ratio, the FAB position, the dock rect (`registerDock` believes a measured rect only through `dockableRect` and `sameRect`, imported from `src/shared/utils.ts`: MAN-9010), the dock's press override (`dockPress`, with its stable `setDockPress`: MAN-9014), the drawer's open flag, `projects` (`ProjectChoice[]`, handed in by the shell: the one outside list the switcher reads), `frontSide`, `closePane`, `openInDualScreen` (dual-on-and-filled in one update) — and `refresh()` on every drawer open. Once a registry read has landed it clears, in the render that sees it, any pane whose row the registry no longer holds; a failed read keeps the last good list, so a refusal never empties a pane. |
 | `AppSwitcherDock.tsx` | `AppSwitcherDock({ unreadBadgeHidden?, pressOverride? })`: the empty 28px box in the top cell of the sidebar's views rail (project-workspace's `WorkspaceRail` mounts it), which holds the space open and reports its rect, and never unmounts on a collapse of the chat list. `pressOverride` (`DockPress`), the dock's own button for a disc dragged out and the focus move: MAN-9014. |
 | `AppSwitcherFab.tsx` · `AppDrawer.tsx` | The kit's FAB wearing the app logo. A tap collapses a floating chat, else (seated with a `dockPress`) runs the rail's override, else opens `AppSwitcherRadial` beside it (drawing only the acts that can run), whose Applications act opens `AppDrawer` (MAN-7475). `AppSwitcherFab({ chatDoor: ChatDoor, onAnchorChange: (rect: DOMRect \| null) => void })` passes the kit's rect report on and reports `null` when it unmounts; it draws the dot while `chatDoor.unread`, the chat is not floating and the disc is not seated in the rail (or is seated with the rail's Chat badge scrolled out of sight: `dockBadgeHidden`) (MAN-486); the module imports nothing of chat-host (MAN-7478). |
 | `AppSwitcherRadial.tsx` · `utils/radialLabels.ts` | The acts that can run drawn on the arc as `role="menuitem"` discs with label pills, and the plan that puts each label on a side of its disc. Not in the barrel; mounted only by `AppSwitcherFab`. Rules, seams, proof: MAN-7475. |
@@ -1127,12 +1128,18 @@ section: applications/013 The switcher's own files/002 `hooks/useFrontPane.ts`
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/AppRowProjectLink.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/AppSwitcherFab.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/AppSwitcherRadial.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/context/AppSwitcherContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/hooks/useCurrentApplication.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/hooks/useFrontPane.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/hooks/useSwitcherActions.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/index.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/utils/paneSlots.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/utils/radialLayout.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/utils/registryRequests.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/ProjectWorkspaceShell.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/WorkspaceFrame.tsx
 
-## MAN-9010 — The switcher's own files — `utils/resolveAppUrl.ts` · `utils/appSwitcherStorage.ts` · `utils/dockRect.ts`
-section: applications/013 The switcher's own files/003 `utils/resolveAppUrl.ts` · `utils/appSwitcherStorage.ts` · `utils/dockRect.ts`
+## MAN-9010 — The switcher's own files — `utils/resolveAppUrl.ts` · `utils/appSwitcherStorage.ts`
+section: applications/013 The switcher's own files/003 `utils/resolveAppUrl.ts` · `utils/appSwitcherStorage.ts`
 
 | File | What |
 |---|---|
-| `utils/resolveAppUrl.ts` · `utils/appSwitcherStorage.ts` · `utils/dockRect.ts` | The pure functions of §"`{host}`…", the `localStorage` record, and the two rules (`dockableRect`, `sameRect`) a measured dock rect passes before the provider believes it. |
+| `utils/resolveAppUrl.ts` · `utils/appSwitcherStorage.ts` | The pure functions of §"`{host}`…" and the `localStorage` record. |
+
+Shared with the companion module, so neither lives here:
+| What | Where | Read by |
+|---|---|---|
+| `dockableRect(rect)`, `sameRect(a, b)`: the two rules a measured dock rect passes before a provider believes it (non-empty and on screen; the same place keeps the object it found) | `src/shared/utils.ts` | `registerDock` of `AppSwitcherContext.tsx` and of the companion's `useCompanionFab` (MAN-9125) |
+| `FAB_DEFAULT_INSET_X` = 72, `FAB_DEFAULT_INSET_Y` = 112: the floating default's inset from the window's bottom-right corner to the disc's top-left | `src/shared/constants.ts` | `appSwitcherStorage.ts` (a reader who never moved the button, on a phone) and `CompanionFab` (her phone corner is one `FAB_CATCH_PX` left of it: change the 72 and the two catches overlap) |
 
 Types live in `src/shared/types.ts`, group `APPLICATION SWITCHER`: `PaneSide`, `PaneSlot`, `CurrentApplication`, `DockPress`, `ChatDoor` (`{ floating, unread, toggle, collapse }`, built by project-workspace's `useChatDoor`: MAN-7478) and `SwitcherAction` (`{ key, label, keywords, icon, disabled, shortcut, run }`).
 
@@ -1145,10 +1152,10 @@ Types live in `src/shared/types.ts`, group `APPLICATION SWITCHER`: `PaneSide`, `
 
 The context lives in `context/` and no file here ends in `Provider.tsx`, which is what the frontend
 standard asks for and what the ten contexts already in this repo do. The provider is mounted by
-`src/modules/project-workspace/ProjectWorkspaceShell.tsx`, whose tree is `ChatHostProvider` →
-`AppSwitcherProvider` → `WorkspaceFrame`. The layer and the FAB are mounted by
+`src/modules/project-workspace/ProjectWorkspaceShell.tsx`, whose tree is `PageAnchorsProvider` →
+`ChatHostProvider` → `AppSwitcherProvider` → `AccountsProvider` → `CompanionHost` → `WorkspaceFrame`. The layer and the FAB are mounted by
 `src/modules/project-workspace/WorkspaceFrame.tsx`: it gives its main-region wrapper the `relative`
-the layer needs, renders the layer as that wrapper's last child and the FAB as the container's last child, after the command
+the layer needs, renders the layer as that wrapper's last child and the FAB as the container's last child but one (Kaylee's disc, `CompanionFab`, is the last: MAN-9125), after the command
 palette and `ChatHostFloating` (MAN-7478) — outside the main region, so the button floats over an open application
 instead of being covered by it. It builds the one `door` (`useChatDoor`), hands it to the FAB and to `ProjectCommandPalette` as `chatDoor={door}` and to the hotkey as `door.toggle`, and reports `useCurrentApplication() !== null` to chat-host's `reportCovered` in a layout effect (MAN-7464).
 
@@ -14122,7 +14129,7 @@ What a press on the switcher's disc (the FAB, MAN-486) does while it sits in the
 ## The focus move
 A focused button that unmounts leaves focus on `<body>` and fires no event anyone hears. The hide button of the list unmounts with the collapse it ran, so the dock moves focus itself.
 - It moves only when the override's presence CHANGES (`hadOverride` starts as the mount's value), `document.activeElement` is the body, and the last element that held focus (`focusin` is remembered) is no longer connected.
-- Arrival: focus goes to the seated disc (`FAB_SELECTOR` = `.vv-fab`), or to the dock's own button when the disc is out (`seatedRef`, read at the arrival so a later drag does not re-run it).
+- Arrival: focus goes to the seated disc (`FAB_SELECTOR` = `.vv-fab:not([data-companion-fab] .vv-fab)`, `src/shared/constants.ts`: the kit's FAB less Kaylee's, which is the same kit piece inside her layer, MAN-9125), or to the dock's own button when the disc is out (`seatedRef`, read at the arrival so a later drag does not re-run it).
 - Departure (the dock's own button was pressed to show the list and unmounts): focus goes to the disc.
 - A page that loads with the list collapsed, or a collapsed preference that arrives after load or from another tab, has no such element and moves nothing.
 

@@ -803,7 +803,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/hooks/useChatRe
 
 ## Tree
 
-`ProjectWorkspaceShell` → `ChatHostProvider` → `AppSwitcherProvider` → `WorkspaceFrame` (`src/modules/project-workspace/`; MAN-491). `WorkspaceMain` wraps `ChatInterface` in `ChatHostSlot`, inside `ChatGutterLayout`; `WorkspaceFrame` mounts `ChatHostFloating` before the FAB.
+`ProjectWorkspaceShell` → `PageAnchorsProvider` (MAN-9131) → `ChatHostProvider` → `AppSwitcherProvider` → `AccountsProvider` → `CompanionHost` (MAN-9083) → `WorkspaceFrame` (`src/modules/project-workspace/`; MAN-491). `WorkspaceMain` wraps `ChatInterface` in `ChatHostSlot`, inside `ChatGutterLayout`; `WorkspaceFrame` mounts `ChatHostFloating` before the FAB.
 
 ## Files
 
@@ -1068,18 +1068,24 @@ The switcher's radial: the acts that can run drawn on an arc around the FAB, eac
 | `utils/radialLabels.ts` | `estimateLabelWidth(label, shortcut, textClip = Infinity)`, `planRadialLabels(points, labels, viewport, centre)` → `RadialLabelPlan` (`{ sides, textClip }`), `labelTranslate(side, point)`, type `RadialLabelSide` (`right` \| `left` \| `above` \| `below`) |
 | `AppSwitcherFab.tsx` | mounts the radial as a sibling of `DockableFab`, never its parent: the FAB is one node for life, and a radial inside it would unmount it and the drag's pointer capture. Owns `radialOpenedBy: 'pointer' \| 'keyboard' \| null` (the input that opened it), `acts = useSwitcherActions(chatDoor)` less its `disabled` acts, `drawnActs` (those acts as last drawn while open; the close fades from them, so Close app, which takes the application down in the press that closes the radial, leaves the fading arc as it was), `points = radialLayout(fabRect, viewport, drawn count)` and `origin` from the rect the kit reports, and `open = radialOpenedBy !== null && !chatDoor.floating` |
 
-## Open and close
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/AppSwitcherFab.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/AppSwitcherRadial.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/utils/radialLabels.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/radial-fab-chrome.mjs
+
+## MAN-9126 — app-switcher radial — AppSwitcherRadial, radialLabels and the fixture that — Open and close
+section: app-switcher radial — AppSwitcherRadial, radialLabels and the fixture that photographs them/001 Open and close
 
 1. `DockableFab` `onPress({ keyboard })`: chat floating → `chatDoor.collapse()`, no radial; else the press toggles `radialOpenedBy` (`'keyboard'` when `keyboard`, else `'pointer'`). The FAB's `active` (`aria-expanded`) is on while the radial or the drawer is up.
 2. The radial closes on: a second FAB press; `onDragStart`; the chat starting to float; Escape; a `pointerdown` outside the shell and the FAB; focus moving into an application's frame; Tab; an item's press.
 3. The chat starting to float is dropped in the render that finds `chatDoor.floating` (`setRadialOpenedBy(null)` during render), so no frame draws both. why: the radial would go on offering Chat for a chat already out.
 4. Escape: window capture listener, `preventDefault()`, `OWNS_ESCAPE` spread while open, focus back to the FAB. why: ChatInterface's Escape stops a running turn and reads `defaultPrevented`; a running turn survives it.
-5. A `pointerdown` on the FAB is excluded from the outside press. why: the FAB's own press toggles; closing on the pointerdown lets the click reopen it. The radial finds the FAB with `FAB_SELECTOR = '.vv-fab'` (React 18 has no ref-as-prop; there is one FAB).
+5. A `pointerdown` on the FAB is excluded from the outside press. why: the FAB's own press toggles; closing on the pointerdown lets the click reopen it. The radial finds the FAB with `FAB_SELECTOR = '.vv-fab:not([data-companion-fab] .vv-fab)'` (React 18 has no ref-as-prop; Kaylee's disc is the same kit piece inside her layer and is left out, so the match is the applications button whatever order the two mount in).
 6. Focus into a frame: window `blur` with `document.activeElement.tagName === 'IFRAME'`. why: a cross-origin frame never sends this page a `pointerdown`.
 7. Item `onClick`: `if (!open) return;`, then `act.run()`, `onClose()`; a keyboard click (`event.detail === 0`) gives the FAB its focus back. why `!open`: items stay hit-testable through the close fade (`visibility` waits `FADE_MS`), and a second click ran Reload and Open in a new tab twice. why FAB focus: the item is about to hide, and the drawer's close restores focus to what held it when it opened.
 8. Keyboard: items found with `querySelectorAll('[role="menuitem"]')` on the container ref, no per-item refs. ArrowDown/ArrowRight forward, ArrowUp/ArrowLeft back, over the drawn items, wrapping; from focus off an item, forward starts at the first and back at the last. Enter and Space are the focused item's click; a repeat of either (`event.repeat`) is ignored. why: a held Enter on the first item toggled Chat over and over.
 
-## `AppSwitcherRadial` rules
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/AppSwitcherFab.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/AppSwitcherRadial.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/utils/radialLabels.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/radial-fab-chrome.mjs
+
+## MAN-9127 — app-switcher radial — AppSwitcherRadial, radialLabels and the fixture that — `AppSwitcherRadial` rules
+section: app-switcher radial — AppSwitcherRadial, radialLabels and the fixture that photographs them/002 `AppSwitcherRadial` rules
 
 1. Shell: `div[data-app-switcher-radial=open|closed]`, `pointer-events-none fixed inset-0 z-[60]`. Items are `pointer-events-auto`, so the FAB, the chat panel and the application stay pressable between them.
 2. `z-[60]` is the FAB's own level, later in the tree: over the application layer (40) and the floating chat's panel (45); dialogs and menus portal above it. Seventh neighbour in the note above `.vv-fab` in `src/shared/ui/verve/surfaces.css`.
@@ -1099,7 +1105,10 @@ The switcher's radial: the acts that can run drawn on an arc around the FAB, eac
 5. Whole words first; then `CLIPPED_TEXT_STEPS_PX = [64, 48]` in order. Stops at cost 0. A cut is kept only if it covers STRICTLY less than the plan before it. A cut word is `truncate` with `maxWidth: textClip`; the chip is never cut and the button's name stays the whole word.
 6. `labelTranslate` returns a CSS `transform` whose `clamp()` holds the pill `LABEL_EDGE_PX` inside the viewport walls; no measurement, no resize listener.
 
-## Words
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/AppSwitcherFab.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/AppSwitcherRadial.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/app-switcher/utils/radialLabels.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/radial-fab-chrome.mjs
+
+## MAN-9128 — app-switcher radial — AppSwitcherRadial, radialLabels and the fixture that — Words
+section: app-switcher radial — AppSwitcherRadial, radialLabels and the fixture that photographs them/003 Words
 
 Keys under `applications` in `src/modules/i18n/locales/<lang>/common.json`, all 11 locales: `actChat`, `actCollapseChat`, `actApplications`, `actReload`, `actClose`, `actOpenInTab` (the act labels; en: Chat, Collapse chat, Apps, Reload app, Close app, Open in tab), `fabLabelMenu`, `fabLabelCollapse`, `radialLabel` (en: Quick actions), `fabUnread`. The FAB's label is `fabLabelCollapse` while the chat floats, else `fabLabelMenu`; while the dot shows, `<label> — <fabUnread>`. The label is the tooltip.
 
@@ -1224,7 +1233,7 @@ The scratch chat is deleted at the end; the 2 console errors while signed in (me
 Not run against the 28px discs and the 34° step (its dot leg sends one Haiku turn): the two-item opening and the close-fade check, which compares each item's `left`/`top` style, since the drawn box shrinks by design, have no live reading.
 Not proven live: a `permission_request` raised by a real permission-asking run (the frame is injected through the real socket client); the Escape check has no control run without the radial.
 
-`.verify/lib/switcher.mjs` exports `FAB` (`button.vv-fab`; its label says what a press does, so it is never the selector) and `openDrawerFromFab(page)` (tap the FAB, then the Applications item). Every probe that wants the drawer goes through it: `app-drawer-link-project`, `app-row-project-link`, `app-rows-thin`, `app-rows-escape`, `chat-floats-panel`.
+`.verify/lib/switcher.mjs` exports `FAB` (`button.vv-fab:not([data-companion-fab] .vv-fab)`: the applications button, since Kaylee's disc is a second `button.vv-fab`; its label says what a press does, so it is never the selector) and `openDrawerFromFab(page)` (tap the FAB, then the Applications item). Every probe that wants the drawer goes through it: `app-drawer-link-project`, `app-row-project-link`, `app-rows-thin`, `app-rows-escape`, `chat-floats-panel`.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/fab-radial-door.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/switcher.mjs
 
@@ -5039,10 +5048,10 @@ Three surfaces. Each is a VIEW that draws every state from props and a thin wrap
 | surface | view (all composition) | wrapper | mounted by |
 |---|---|---|---|
 | her panel | `CompanionPanelView` (`CompanionPanel.tsx`) | `CompanionPanel`: reads `useCompanion()`; `targetWorking` = the draft's target chat is in the page's busy set (`useBusySessionIdSet`) | `WorkspaceFrame`, after the floating chat, ALWAYS rendered |
-| her door | `CompanionDoorView` (`CompanionDoorButton.tsx`) | `CompanionDoorButton` | `WorkspaceRail`'s foot, above the Inbox |
+| her door | `CompanionDoorView` (`CompanionDock.tsx`) | `CompanionDock`: draws it in her rail cell whenever her disc is out of its seat; the door's press is the disc's own (MAN-9125, MAN-9129) | `WorkspaceRail`'s foot, after `UsageRings`, above the Inbox |
 | her Settings section | `CompanionSettingsView` (`CompanionSettingsSection.tsx`) | `CompanionSettingsSection`: `useCompanionSettings` fetches `GET /api/companion`, saves `PUT /api/companion/settings`; `useTalkBindingCapture` takes the next key or mouse button when Bind is pressed and saves it as `talkBinding` (MAN-9101) | `VoiceSettingsTab`, after its own sections, voice on or off |
 
-- Parts under the panel: `CompanionHeader` (status line, Stop, close, focus, model `Select`, Live `Switch`, Clear behind a `ConfirmDialog`; given `voice`, a row of its own under them, `CompanionVoiceSwitch`: "Voice on this device", the kit `Switch` closing the row under Clear, a `Volume2` / `VolumeX` glyph following it, the whole row its label), `CompanionLog` (entries newest last; alerts and system lines in their tone; given `speaking`, that sentence alone wrapped in `[data-companion-speaking-sentence][data-tone=info]`: a band `bg-tone-ink/20` widened by `ring-2 ring-tone-ink/20`, a 2px bar of the full ink in the ring's left edge (`shadow-[-2px_0_0_0] shadow-tone-ink`, the mark's 3:1: 5.3:1 light, 10.3:1 dark against the canvas, where the band alone is 1.32:1 / 1.51:1), `box-decoration-clone`, `forced-colors:underline`; ring and bar are shadows, so no word moves), `CompanionWalkStrip`, `CompanionNotes`, `CompanionDraftCard` (target, editable `TextArea`, Send turn, Send steer, Clear), `CompanionComposer` (`PromptInput`, Enter sends), `CompanionSentence` (her sounds drawn as marks at their offsets), `CompanionSettingsForm` (her name, his name, the register in a monospace `TextArea` with "Restore the original", the delivery note).
+- Parts under the panel: `CompanionHeader` (status line, Stop, close, focus, model `Select`, Live `Switch`, Clear behind a `ConfirmDialog`; given `voice`, a row of its own under them, `CompanionVoiceSwitch`: "Voice on this device", the kit `Switch` closing the row under Clear, a `Volume2` / `VolumeX` glyph following it, the whole row its label), `CompanionLog` (entries newest last; alerts and system lines in their tone; given `speaking`, the one sentence whose `turnId` and `index` both equal `speaking`'s alone wrapped in `[data-companion-speaking-sentence][data-tone=info]`: a band `bg-tone-ink/20` widened by `ring-2 ring-tone-ink/20`, a 2px bar of the full ink in the ring's left edge (`shadow-[-2px_0_0_0] shadow-tone-ink`, the mark's 3:1: 5.3:1 light, 10.3:1 dark against the canvas, where the band alone is 1.32:1 / 1.51:1), `box-decoration-clone`, `forced-colors:underline`; ring and bar are shadows, so no word moves), `CompanionWalkStrip`, `CompanionNotes`, `CompanionDraftCard` (target, editable `TextArea`, Send turn, Send steer, Clear), `CompanionComposer` (`PromptInput`, Enter sends), `CompanionSentence` (her sounds drawn as marks at their offsets), `CompanionSettingsForm` (her name, his name, the register in a monospace `TextArea` with "Restore the original", the delivery note).
 - Hooks: `useFollowNewest` (the log follows the newest line until he scrolls up; `jumpToNewest`), `useGrowingField` (textarea sized to its words, measured only while drawn), `useCardFloor` (the draft card's `min-height`), `useTalkBinding(binding, toggle)` (below).
 - The talk button's binding (`TalkBinding`, MAN-9086; stored as `CompanionSettings.talkBinding`, MAN-9087):
   - `utils/talkBinding.ts` is the one pure rule, importing nothing but the type. `talkBindingFromEvent(event)` answers `{ binding }`, `{ refusal }` (a sentence that says why) or `null` (a modifier on its own, which starts a chord; a key with no nameable `code`; a mouse button past forward); `matchesTalkBinding(binding, event)` matches a keydown on `code` and all four modifiers exactly, never a `repeat`, and a mousedown on `button`; `isTalkBindingRepeat(binding, event)` is true for the auto-repeat of the bound chord held down; the label is the modifiers in the order Ctrl, Alt, Shift, Meta joined to the key by `+` (`KeyK` → `K`, `Digit1` → `1`; `Space` and `F8` as they are), or `Mouse middle`, `Mouse back`, `Mouse forward`. A change to what may be bound is an edit there (and in the server's `checkTalkBinding`, MAN-9087).
@@ -5050,34 +5059,37 @@ Three surfaces. Each is a VIEW that draws every state from props and a thin wrap
   - Proof: `.verify/kaylee-talk-binding-rule.ts` (the rule under `node --import tsx`) and `.verify/kaylee-talk-binding-hook.mjs` (the hook, mounted on :5183 with trusted key presses and a CDP back button, in the main window and in the picture-in-picture window).
 - The talk press: `CompanionTalkButton` (composer slot), `TalkBindingField` (Settings row), `TalkPress` / `TalkPressState` (`src/shared/types.ts`), the status line's Listening and Transcribing, the log's "Nothing heard": MAN-9093. `useTalkPress`, `talk` on the context and the capture: MAN-9101. Proof: MAN-9095, and the whole plan on the live page, MAN-9100.
 - `CompanionAvatar` (her drawn face, one SVG keyed by `data-state`, the `--kaylee-mouth` variable): MAN-9124.
+- Her disc and her rail cell (`CompanionFab.tsx`, `CompanionDock.tsx`): MAN-9125; what they read from the provider: MAN-9129; proof on the live page: MAN-9130.
 - `companion-fake.ts`: fixture pictures (`FAKE_PANEL`, `FAKE_SETTINGS`); only the fixtures import it.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionComposer.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionDoorButton.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionDraftCard.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/companion-fake.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionHeader.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionLog.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionNotes.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionPanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionSentence.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionSettingsForm.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionSettingsSection.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionVoiceSwitch.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionWalkStrip.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useCardFloor.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useFollowNewest.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useGrowingField.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useTalkBinding.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/talkBinding.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-panel-scaffold.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/companion-kit.mjs
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionComposer.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionDraftCard.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/companion-fake.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionHeader.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionLog.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionNotes.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionPanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionSentence.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionSettingsForm.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionSettingsSection.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionVoiceSwitch.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionWalkStrip.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useCardFloor.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useFollowNewest.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useGrowingField.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useTalkBinding.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/talkBinding.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-panel-scaffold.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/companion-kit.mjs
 
 ## MAN-9089 — src/modules/companion — Kaylee's panel, rail door and Settings section: the — The door: an `aria-label`ed rail button, `data-companion-door`, `aria-expanded` = the open state
 section: src/modules/companion — Kaylee's panel, rail door and Settings section: the views, the stance, the status line, the rules and the fixture/001 The door: an `aria-label`ed rail button, `data-companion-door`, `aria-expanded` = the open state
 
 - The door: an `aria-label`ed rail button, `data-companion-door`, `aria-expanded` = the open state; `RAIL_BUTTON_LIT` while the panel is open, `RAIL_BUTTON_UNLIT` at rest. Its words carry `defaultValue`s: it stands in the rail before anything else of hers loads. Its name and tooltip are her name alone (`companion.door.label`, default `{{name}}`), as the rail's views are named for what they show: it opens and closes the panel, so no action word. "Talk to <name>" is the panel's talk button (MAN-9093).
+- `CompanionDoorView` is drawn in `CompanionDock.tsx`; `CompanionDockView` draws it in her rail cell whenever her disc is out of its seat (MAN-9125), and its press is the disc's own.
 - The palette row ("Talk to Kaylee") and the wiring: MAN-9083.
 
 ## Status line (`statusOf`, `CompanionHeader`)
-What she is doing is ONE value, `presence` (`CompanionPresence`, `src/shared/types.ts`), built by `useCompanionPresence()` (`hooks/useCompanionPresence.ts`, MAN-9113) from her activity, the page's talk press and the page's player, in one order: `cut` > `listening` > `transcribing` > `speaking` > the activity's phase. `CompanionPanel` calls the hook once and hands the value down (`CompanionPanelView presence` → `CompanionHeader presence`); the header reads no other part of her activity, press or voice, so whatever else draws what she is doing reads the same state. The process is NOT in it: asleep, waking, failed and the loading picture are words the line takes from `picture.process` / the null picture, while `presence.state` stays what the activity says (`idle` at rest), so a consumer that must tell them from idle reads the process beside the presence, as the header does. `statusOf(picture, presence)`: the page's four states speak first; then the process (the picture's, not part of presence); an awake process is the presence's activity states. `role="status"`, so a change is announced. Words carry the state; the dot's tone only adds to it.
+What she is doing is ONE value, `presence` (`CompanionPresence`, `src/shared/types.ts`), built by `useCompanionPresence()` (`hooks/useCompanionPresence.ts`, MAN-9134) from her picture (process and activity), the page's talk press and the page's player, in one order: `cut` > `listening` > `transcribing` > `speaking` > `loading` > `failed` > `asleep` > `waking` > the activity's phase. `CompanionPanel` calls the hook once and hands the value down (`CompanionPanelView presence` → `CompanionHeader presence`). `statusOf(presence)` reads the presence alone and takes no picture: the process is inside the one state (`loading`, `failed`, `asleep`, `waking`), and the button's face and label (`CompanionFab`) read the same value, so the status line and the button cannot disagree. `role="status"`, so a change is announced. Words carry the state; the dot's tone only adds to it.
 | state | words | tone |
 |---|---|---|
 | presence `cut` (`voice.cut`: 900 ms after a talk press stopped her voice) | `Cut` | neutral, still |
 | `listening` (his press) | `Listening` | positive, moving |
 | `transcribing` (his press) | `Transcribing` | info, moving |
 | `speaking` (`voice.speaking`: this page's player sounds a sentence: set at its start, held until the next one starts, `null` only when the player falls silent — MAN-9113) | `Speaking` | info, moving |
-| no picture yet | loading | neutral, moving |
-| process `failed` | `Stopped · your next message starts her again` (claims no cause; the Banner carries the server's sentence) | warn |
-| `asleep` / `waking` | `Asleep · your next message wakes her` / `Waking up` | neutral / info, moving |
+| `loading` (no picture yet) | `Loading…` (`companion.panel.loadingStatus`) | neutral, moving |
+| `failed` (her process failed) | `Stopped · your next message starts her again` (claims no cause; the Banner carries the server's sentence) | warn |
+| `asleep` | `Asleep · your next message wakes her` | neutral |
+| `waking` | `Waking up` | info, moving |
 | `idle` (the activity's phase) | `Idle` | positive |
 | `thinking` | `Thinking` | info, moving |
 | `reading_session` | `Reading <chat>` (`Reading a chat` with none) | info, moving |
 | `reading_code` | `Reading code`; with files `Reading code · a.ts, b.ts` (two named at most), more: `· N files` | info, moving |
 | `drafting` | `Drafting for <chat>`; no chat: `Drafting a new chat` | info, moving |
 | `walking` | `Walking <chat> · item k of n`; no walk: `Walking a result` | info, moving |
-- The page's rows win over every other row, loading, `failed` and `asleep` included. why: an open mic is never hidden. `Cut` wins over `Listening` for its breath; the talk button stays lit the whole time, so the open mic is still shown. Their keys `companion.status.cut` / `.listening` / `.transcribing` / `.speaking` carry `defaultValue`s (`Status.fallback`). Her state returns when the page has none.
+- The page's rows win over every other row, her process's four included. why: an open mic is never hidden. `Cut` wins over `Listening` for its breath; the talk button stays lit the whole time, so the open mic is still shown. Their keys `companion.status.cut` / `.listening` / `.transcribing` / `.speaking` carry `defaultValue`s (`Status.fallback`). Her state returns when the page has none.
 - Errors are amber, never red. Row two shows the focus chat while one is held; row three the model picker, Live and Clear; row four, given `voice`, "Voice on this device" (`CompanionVoiceSwitch`, `[data-companion-voice-row]`). why a row of its own: row three has 50px spare on the 400px column and none at 320px, and the switch is this device's where row three's controls are hers on every device.
 
 ## Stance — `CompanionPanelView`
@@ -5090,12 +5102,12 @@ What she is doing is ONE value, `presence` (`CompanionPresence`, `src/shared/typ
 - Stays MOUNTED while closed (`hidden`): his unsent words and the log's scroll survive. why: render it always, never only when open.
 - The panel is `[container-type:size]`: anything placed inside it portals its overlays (a fixed child resolves against the panel). `ConfirmDialog`, menus and toasts already portal.
 - Escape: inside the panel it closes and is claimed (`preventDefault`, window capture phase); outside it is untouched. why: the chat aborts its turn on any unclaimed Escape.
-- Closing from inside returns focus to `[data-companion-door]` when on screen. Opening on `(pointer: fine)` focuses her composer; on touch it does not (no keyboard).
+- Closing from inside returns focus to the first of `DOOR_SELECTOR` (`[data-companion-door], [data-companion-fab] > .vv-fab`: the rail's door, her disc) that `checkVisibility({ visibilityProperty: true })` finds on screen. why: below md the rail's door stands in the closed drawer under `visibility: hidden`, with an `offsetParent` and a refused focus; her disc in its corner takes it. Opening on `(pointer: fine)` focuses her composer; on touch it does not (no keyboard).
 - Height: header and composer stand. Composer field grows to 25% of the panel's height, then scrolls. Log keeps 3.5rem. Dock (walk, notes, draft) is `max-h-[max(55%,23rem)]`, gives way last.
 - Dock order of giving way: notes first (floor: first title + ✕ + count), then the draft's field (floor 88px). The dock scrolls only past those floors, the draft card whole inside it.
 - A failed process draws a warn `Banner` under the header (the server's sentence) beside the log's system line.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionComposer.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionDoorButton.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionDraftCard.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/companion-fake.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionHeader.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionLog.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionNotes.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionPanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionSentence.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionSettingsForm.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionSettingsSection.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionWalkStrip.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useCardFloor.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useFollowNewest.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useGrowingField.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-panel-scaffold.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/companion-kit.mjs
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionComposer.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionDraftCard.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/companion-fake.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionHeader.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionLog.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionNotes.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionPanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionSentence.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionSettingsForm.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionSettingsSection.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionWalkStrip.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useCardFloor.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useFollowNewest.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useGrowingField.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-panel-scaffold.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/companion-kit.mjs
 
 ## MAN-9090 — src/modules/companion — Kaylee's panel, rail door and Settings section: the — Rules later edits keep
 section: src/modules/companion — Kaylee's panel, rail door and Settings section: the views, the stance, the status line, the rules and the fixture/002 Rules later edits keep
@@ -5123,7 +5135,7 @@ section: src/modules/companion — Kaylee's panel, rail door and Settings sectio
 | The send's answer | `sendDraft(mode)` resolves with `'started'` or `'folded'`; the card needs no more (the draft clears and the chat opens by their own frames) and shows a refusal's sentence |
 | Talk button | `CompanionTalkButton` stands in `PromptInputTools` (`data-companion-talk-slot`) before Send, drawn from the panel's `talk?: TalkPress`; without `talk` the cluster draws nothing and takes no room (MAN-9093) |
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionComposer.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionDoorButton.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionDraftCard.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/companion-fake.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionHeader.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionLog.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionNotes.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionPanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionSentence.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionSettingsForm.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionSettingsSection.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionWalkStrip.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useCardFloor.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useFollowNewest.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useGrowingField.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-panel-scaffold.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/companion-kit.mjs
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionComposer.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionDraftCard.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/companion-fake.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionHeader.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionLog.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionNotes.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionPanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionSentence.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionSettingsForm.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionSettingsSection.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionWalkStrip.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useCardFloor.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useFollowNewest.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useGrowingField.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-panel-scaffold.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/companion-kit.mjs
 
 ## MAN-9091 — src/modules/companion — Kaylee's panel, rail door and Settings section: the — Proof — `.verify/companion-panel-scaffold.mjs`
 section: src/modules/companion — Kaylee's panel, rail door and Settings section: the views, the stance, the status line, the rules and the fixture/003 Proof — `.verify/companion-panel-scaffold.mjs`
@@ -5132,14 +5144,14 @@ section: src/modules/companion — Kaylee's panel, rail door and Settings sectio
 node .verify/companion-panel-scaffold.mjs [--states awakeIdle,dense,...] [--evidence <dir>]
 ```
 - Gitignored (`.verify/`): exists on disk only. Live client `:5183`. Exits 1 on any FAIL; zero console errors required.
-- Mounts the three VIEWS on `companion-fake.ts` pictures through `lib/companion-kit.mjs`: panel in the workspace shell's fixed box (`.pwa-status-clear.fixed`), door in the rail's foot above the Inbox, section in a Settings-modal-width column at `z-9999`. Every press is recorded in `window.__companionKit.events`, none acted on.
+- Mounts the three VIEWS on `companion-fake.ts` pictures through `lib/companion-kit.mjs`: panel in the workspace shell's fixed box (`.pwa-status-clear.fixed`), door (`CompanionDoorView`, imported from `CompanionDock.tsx`) in the rail's foot above the Inbox, section in a Settings-modal-width column at `z-9999`. Every press is recorded in `window.__companionKit.events`, none acted on.
 - Photographs 1440×900 and 390×844, light and dark: states `loading asleepEmpty waking awakeIdle thinking readingSession readingCode drafting walking failed longLog draftWorking draftNew walk notes dense closed`, the door lit and unlit, the Settings states.
 - Checks: status line per state; the stance and layers above; no sideways scroll; dock ≤ 55% with the draft whole; Escape claimed inside, ignored outside; draft saved before send; refusals keep words; settings limits; Restore asks first; a short panel (`--keyboard-height` 380px, 390×844) with a draft and a 12-line message cuts nothing; the card keeps its bottom padding, re-checked after narrowing to 320px with no render between.
-- 2026-10-26: 275 of 275 checks, zero console errors.
+- 2026-10-28: 275 of 275 checks, zero console errors. The door checks read the fixture's door inside `#companion-door`: below md the live dock draws its own door in the open drawer.
 - The script is 297 lines (ceiling 300): any new check goes in `lib/companion-kit.mjs`.
 - Fragile against a server restart mid-run.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionComposer.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionDoorButton.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionDraftCard.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/companion-fake.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionHeader.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionLog.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionNotes.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionPanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionSentence.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionSettingsForm.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionSettingsSection.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionWalkStrip.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useCardFloor.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useFollowNewest.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useGrowingField.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-panel-scaffold.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/companion-kit.mjs
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionComposer.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionDraftCard.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/companion-fake.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionHeader.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionLog.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionNotes.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionPanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionSentence.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionSettingsForm.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionSettingsSection.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionWalkStrip.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useCardFloor.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useFollowNewest.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useGrowingField.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-panel-scaffold.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/companion-kit.mjs
 
 ## MAN-9065 — server/modules/companion/tools — stop_session, rename_session and answer_session: acting on a chat through the house's own verbs
 
@@ -5619,32 +5631,33 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session
 ## `createSentenceStream(onSentence)` → `{ push(delta), flush() }`
 | rule | detail |
 |---|---|
-| end of a sentence | `.` `!` `?` `…` then whitespace; or a newline (always). A run of terminators and closers (`?!`, `...`, `."`) is one end |
-| decided by the character AFTER | whitespace ends it; anything else (the `5` of `3.5`, the letter of `e.g.`) does not; the end of the buffer decides nothing yet |
+| end of a sentence | a run of terminators `.` `!` `?` `…` and closers (`?!`, `...`, `."`) is one end, then whitespace, then anything but a lowercase letter; or a newline (always) |
+| decided by what comes AFTER the run | no whitespace (the `5` of `3.5`, the letter of `e.g.`): no end. Whitespace holding a newline: ends. Whitespace, then a lowercase letter (`\p{Ll}`): the sentence goes on. Whitespace, then any other character: ends. The buffer's end right after the run, inside its whitespace, or on the first half of a surrogate pair decides nothing yet; a gap of more than 300 whitespace characters ends the sentence without waiting (`readGapAfterTerminator`). why: she never begins a sentence in lowercase, so `I've drafted "Reply with PONG." for that chat` and `3 p.m. today` stay one |
 | kept whole | `e.g.` `i.e.` `etc.` `vs.` `mr.` `mrs.` `ms.` `dr.` `prof.` `jr.` `sr.` `cf.`; decimals; a leading list number (`1.`, `- 2.`) |
-| run-on | past 300 characters: cut at the last comma (kept) or space (dropped) inside the first 300; never inside a `<…>` or `[…]` opened in the 40 characters before (`SPAN_REACH_CHARS`); with neither, a hard cut at 300 |
+| run-on | past 300 characters: cut at the last comma (kept) or space (dropped) inside the first 300; never inside a `<…>` or `[…]` opened in the 40 characters before (`SPAN_REACH_CHARS`); with neither, a hard cut at 300. An end at or before 300 whose whitespace runs to the buffer's end (`findCut` answers `{ waitingEnd }`) holds the cut off until the next delta decides it (`flush()` still emits it); a waiting end past 300 still gets the run-on cut. `findCut` reads no further than index 300 (`scanEnd`): a decision past it belongs to the run-on cut, and one large push costs a bounded scan |
 | `flush()` | emits what is left. Called at the end of EACH text block (`block_end`) and at a turn's successful end. why: a block ends with no whitespace after its last sentence; without it the next block's first words join it and its `[mood]` is lost |
 - Sentences arrive trimmed and never empty. The cut depends on the text alone: one character at a time and all at once give the same sentences.
 - The buffer moves before the callback runs, so a consumer that throws cannot make a sentence repeat.
 
-## `parseExpression(raw, soundTags)` → `{ mood, speech, display, sounds } | null`
+## `parseExpression(raw, soundTags)` → `{ mood, display, sounds } | null`
 | step | does |
 |---|---|
 | input | U+E000 (the parse's own sound mark) is removed first |
 | list marker | `- ` `* ` `+ ` `• ` `1. ` `2) ` and a heading's `#` run are stripped, on both sides of the mood |
 | mood | a leading `[…]` of 1–3 words → `mood`, lower-cased. More words is not a mood. Every other `[…]` span is dropped |
-| angle spans | a tag on the list → a sound: stays in `speech` as `<tag>`, leaves `display`, listed in `sounds`. Any other span is dropped and the words between its open and close tag stay (`<whisper>secret</whisper>` → `secret`). A `<` followed by whitespace or `=` is a comparison and stays as text; an unclosed `<` stays |
+| angle spans | a tag on the list → a sound: leaves `display`, listed in `sounds`. Any other span is dropped and the words between its open and close tag stay (`<whisper>secret</whisper>` → `secret`). A `<` followed by whitespace or `=` is a comparison and stays as text; an unclosed `<` stays |
 | markdown | `**` `__`, paired `*x*` / `_x_` and backticks go; `snake_case` is not emphasis |
 | spacing | whitespace collapses; a space before punctuation closes up |
 | answer | `null` when `display` is empty and no sound was kept |
 - `sounds[i].at` = the length of `display` (JS string length, UTF-16 units) at the point the sound stood, measured before the space after the word it follows: the mark sits on that word's end.
-- Kept fields by consumer: `display`, `mood`, `sounds` → the `kaylee` log line (the panel draws sounds as marks at their offsets: `CompanionSentence.tsx`). `speech` is not stored: the speech door rebuilds a sentence's words from its log row (`display` with each sound written back as `<tag>` at its `at`, MAN-9110), so `speech` has no consumer.
+- Kept fields: `display`, `mood`, `sounds` → the `kaylee` log line (the panel draws sounds as marks at their offsets: `CompanionSentence.tsx`). The voice's words are `utteranceOf` of that stored row (`display` with each sound written back as `<tag>` at its `at`, MAN-9110): the panel and the voice read one record.
 - `index` of a sentence in its turn counts only sentences that were not `null`.
 
 ## Proof
-`.verify/companion-wire-contract.mjs`: `TSX_TSCONFIG_PATH=server/tsconfig.json node --import tsx .verify/companion-wire-contract.mjs` — parse, stream and fills on real strings; no server, no model call.
+- `.verify/companion-wire-contract.mjs`: `TSX_TSCONFIG_PATH=server/tsconfig.json node --import tsx .verify/companion-wire-contract.mjs` — parse (prints each parse and `utteranceOf` of its row), stream and fills on real strings; no server, no model call.
+- `.verify/kaylee-sentence-replay.mjs`: `TSX_TSCONFIG_PATH=server/tsconfig.json node --import tsx .verify/kaylee-sentence-replay.mjs` — her recorded replies (`assistant` text blocks under `~/.claude/projects/-home-lyphe--claude-state-companion-*/`) through the cut at `f82d09c7` and the tree's; prints each text cut differently and whether the tree's cut is the same at delta sizes 1, 3, 7, 50 and whole; no server, no model call. 2026-10-28: 384 text blocks; 3 cut differently (`"Tea or coffee?"` once, `"…PONG."` twice), each now one sentence (1581 sentences → 1578), same words; 0 cut differently at any delta size.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/sentence-stream.ts
+governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/session/sentence-stream.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-wire-contract.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-sentence-replay.mjs
 
 ## MAN-9082 — server/modules/companion — storage: the four tables, companionDb, relayedSendsDb, the store's frame per write, the floor and Clear
 
@@ -5713,14 +5726,15 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/companion/compani
 The views are MAN-9062. This row is the state they draw from and the places the workspace mounts them. Shapes: `src/shared/companion-types.ts`, mirrored field for field with `server/shared/companion-types.ts` (MAN-9086). Server side: MAN-9058, MAN-9059.
 
 ## Barrel (`src/modules/companion/index.ts`) — everything else is private
-`CompanionProvider`, `useCompanion`, `CompanionPanel`, `CompanionDoorButton`, `CompanionSettingsSection`.
+`CompanionProvider`, `useCompanion`, `CompanionPanel`, `CompanionFab`, `CompanionDock`, `CompanionSettingsSection`.
 
 ## Where each is mounted
 | surface | mounted by |
 |---|---|
-| `CompanionProvider` | `project-workspace/CompanionHost.tsx`, which `ProjectWorkspaceShell` renders around `WorkspaceFrame`, inside `ChatHostProvider`, `AppSwitcherProvider` and `AccountsProvider`. `useCompanion()` throws outside it |
+| `CompanionProvider` | `project-workspace/CompanionHost.tsx`, which `ProjectWorkspaceShell` renders around `WorkspaceFrame`, inside `PageAnchorsProvider` (the shell's outermost: MAN-9131), `ChatHostProvider`, `AppSwitcherProvider` and `AccountsProvider`. `useCompanion()` throws outside it |
 | `CompanionPanel` | `WorkspaceFrame`, after `ChatHostFloating`, before `AppSwitcherFab`; ALWAYS rendered |
-| `CompanionDoorButton` | `WorkspaceRail`'s foot: after `UsageRings`, before the foot views (the Inbox) and Settings |
+| `CompanionFab` | `WorkspaceFrame`, after `AppSwitcherFab`; ALWAYS rendered (her disc, over every application: MAN-9125) |
+| `CompanionDock` | `WorkspaceRail`'s foot: after `UsageRings`, before the foot views (the Inbox) and Settings (her cell; it draws her door while the disc is out: MAN-9125) |
 | palette row | `ProjectCommandPalette` builds `companionGroup` and passes it to `CommandPalette` (prop `companionGroup`), drawn between the Applications and Navigate groups when actions show and the group has rows. One row: key `companion`, label `t('companion.palette.talk', { name })` ("Talk to Kaylee"), icon `AudioLines`, `run: setOpen(true)`. `name` = `picture?.settings.name`, else `t('companion.defaultName')` |
 | Settings section | `VoiceSettingsTab`, after its voice section, NOT gated by `voiceEnabled`; the section fetches and saves for itself (`useCompanionSettings`: `GET /api/companion`, `PUT /api/companion/settings`) |
 - Opening a chat for her (`onOpenChat`, `CompanionHost.openCompanionChat(sessionId)`): `setActiveTab('chat')`, `navigate('/session/<id>')`, and when an application covers the main region (`useCurrentApplication() !== null`) the chat host's `open()` floats the chat over it. The callback changes identity as applications come and go; the provider reads the newest at the moment a frame arrives.
@@ -5736,6 +5750,11 @@ The views are MAN-9062. This row is the state they draw from and the places the 
 | `editDraft(text)` | `PUT /draft`; the answer is folded in as `companion_draft` |
 | `sendDraft(mode)` | `POST /draft/send`; resolves with the `outcome` (`'started'` \| `'folded'`); rejects with the server's sentence on a refusal |
 | `clearDraft`, `dismissNote(id)`, `interrupt`, `clear` | `DELETE /draft`, `DELETE /notes/:id`, `POST /interrupt`, `POST /clear` |
+| `recentSend` | `string \| null`: the id of the chat she sent a draft to in the last `RECENT_SEND_MS` = 4000 ms (counted from the `companion_open_chat` frame this page heard), else null. `useAvatarTarget` points the button at that chat's composer while it is set |
+| `fabPosition`, `moveFab(next)` | where her disc rests (`{ docked: true }` or a point) and its setter, which stores `companion-fab`: from `useCompanionFab()`, called once in the provider (MAN-9129) |
+| `dockRect`, `registerDock(rect)` | the rail cell's rect while on screen, and the cell's report of it (MAN-9129) |
+| `fabAway`, `setFabAway(away)` | a look holds her disc off its seat; set by `CompanionFab`, read by `CompanionDock` (MAN-9129) |
+| `level()` | the page player's level, 0..1: what her face's mouth follows while she speaks (MAN-9129) |
 | `talk` | `TalkPress` = `{ state: 'idle' \| 'listening' \| 'transcribing'; toggle(); error }`: this page's ONE talk press, from `useTalkPress(speech)` called once in the provider (MAN-9101). Readers: the panel's talk button, the bound key or mouse button, and `useCompanionPresence` (`state`, into the status line's Listening and Transcribing). Not part of the picture: it is this page's mic. A press cuts her off when this page's player sounds (MAN-9113) |
 | `voice` | `CompanionVoice` = `{ on, setOn, speaking, cut }`: this page's voice, from `useCompanionVoice` called once in the provider (MAN-9113). Readers: the panel (the switch, the log's mark) and `useCompanionPresence` (`speaking`, `cut`, into the status line's Speaking and Cut). Not part of the picture: it is this device's switch and this page's player |
 - The provider also calls `useTalkBinding(picture?.settings.talkBinding ?? null, talk.toggle)` (MAN-9062 §Parts). A press never opens her panel.
@@ -5918,7 +5937,7 @@ A probe that makes her think, or that makes a chat think through her, spends a r
 | live :3011 / :5183 | `companion-lands.mjs`, `kaylee-whole.mjs`: the dev account, Haiku, probe chats in `PROBE_PROJECT` |
 | scratch server + Vite on a copy of the database | `companion-send-scratch.sh`, `companion-act-tools-scratch.sh`, `kaylee-hears-unasked.sh`: never touch :3011 |
 | the real module on express over a `.backup` copy under `/tmp` | `companion-module.mjs`, `companion-draft-tools.mjs`: runs as account 1, leaves her JSONL under `~/.claude/projects/-home-lyphe--claude-state-companion-1/`; refuse a database outside `/tmp` |
-| `tsx`, no server | `companion-wire-contract.mjs`, `companion-reducer.mjs`, `companion-turn-windows.mjs` |
+| `tsx`, no server | `companion-wire-contract.mjs`, `kaylee-sentence-replay.mjs`, `companion-reducer.mjs`, `companion-turn-windows.mjs` |
 
 ## The probes (`.verify/`, gitignored: on disk only)
 | script | shows |
@@ -5942,7 +5961,15 @@ A probe that makes her think, or that makes a chat think through her, spends a r
 | `kaylee-voice-pcm-player.mjs` | the page's player on generated tones, live :5183, no Gemini call (MAN-9112) |
 | `kaylee-voice-scaffold.sh` (`.mjs`) | the voice switch, the speaking mark, Speaking and Cut and the Gemini section's voice rows on fixtures; its live half exits 1 against the wired panel; run `--only fixtures` (MAN-9106) |
 | `kaylee-voice-whole.mjs` | the whole voice once: two pages, the pull, the cut, the floor, the switch, Settings; one counting turn on `gemini-3.8-flash-lite-tts`; step 7 with no Gemini call (MAN-9113) |
-| `kaylee-whole.mjs` | the whole system once on :3011 / :5183: panel from the rail door, Haiku in the picker, a probe chat named "probe kaylee", "What chats are working?", "Draft for probe kaylee: reply with the single word PONG.", "Send it."; screenshots 1440×900 and 390×844 under `.verify/shots/kaylee-whole/` |
+| `kaylee-whole.mjs` | the whole system once on :3011 / :5183: panel from her door (the rail's door, or her disc docked in its cell), Haiku in the picker, a probe chat named "probe kaylee", "What chats are working?", "Draft for probe kaylee: reply with the single word PONG.", "Send it."; screenshots 1440×900 and 390×844 under `.verify/shots/kaylee-whole/` |
+| `page-anchors-live.mjs` | the page's anchors on :5183: the registry's rules in a fixture, then the keys on screen in four views; no model call (MAN-9131) |
+| `kaylee-avatar-states.mjs` | her face in every state, light and dark, full and reduced motion; no model call (MAN-9124) |
+| `kaylee-one-state.mjs` | the status line, the button's label and the face's `data-state` for each of the fourteen presence states on fixtures, the order through `presenceOf`, the live page with her process as it is, and a `companion_process` frame alone moving the button; read-only page on :5183, no word to her, no model call (MAN-9135) |
+| `kaylee-sentence-replay.mjs` (`node --import tsx`) | her recorded replies (`assistant` text blocks under `~/.claude/projects/-home-lyphe--claude-state-companion-*/`) through the sentence cut at `f82d09c7` and the tree's; the texts cut differently, and each text at delta sizes 1, 3, 7, 50 and whole; no server, no model call (MAN-9081) |
+| `kaylee-avatar-placement.mjs` (`node --import tsx`), `kaylee-avatar-target.mjs` | where her disc stands beside an anchor, on bare numbers; `useAvatarTarget` stepped through a scripted presence over four fixture anchors; no model call (MAN-9132) |
+| `kaylee-fab-chrome.mjs` | her disc and rail cell on fixtures: seated, dragged, gliding, at 1440 and 390; no model call (MAN-9125) |
+| `kaylee-fab-motion.mjs`, `kaylee-fab-presence-frames.mjs`, `kaylee-fab-speaking.mjs` | her button on the live page: where it goes on a read (Haiku); the status line and the face in the same frame (Haiku, voice off); the mouth while she speaks (Gemini speech, one sentence: run on purpose) (MAN-9130) |
+| `kaylee-presence-whole.mjs` | the status line's words frame by frame across a read, a draft, a talk press and a spoken sentence (Haiku; one speech call) (MAN-9113) |
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/companion-lands.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-whole.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/probe-project.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/scratch-chat.mjs
 
@@ -6027,7 +6054,7 @@ The views of the page's one talk press: the talk button in her composer, the bin
 | prop | on | absent |
 |---|---|---|
 | `talk?: TalkPress` | `CompanionPanelView`, then `CompanionComposer` | no talk button |
-| `presence: CompanionPresence` (required) | `CompanionPanelView`, then `CompanionHeader`'s status line; `CompanionPanel` gets it from `useCompanionPresence()`, which reads `talk.state` into `listening` / `transcribing` (MAN-9089, MAN-9113) | — |
+| `presence: CompanionPresence` (required) | `CompanionPanelView`, then `CompanionHeader`'s status line; `CompanionPanel` gets it from `useCompanionPresence()`, which reads `talk.state` into `listening` / `transcribing` (MAN-9089, MAN-9134) | — |
 | `voice?: CompanionVoice` (`src/shared/types.ts`: `on`, `setOn`, `speaking`, `cut`) | `CompanionPanelView`, then `CompanionHeader` (`on`/`setOn`: the "Voice on this device" row) and `CompanionLog` (`speaking`: the sentence marked) | no voice row, nothing marked |
 | `talkBinding?: ReactNode` | `CompanionSettingsView` | nothing drawn. Present, it stands in a `SettingsCard` above her fields once settings are read |
 
@@ -6168,7 +6195,7 @@ node .verify/kaylee-talk-scaffold.mjs [--evidence <dir>] [--before <url>] [--onl
 - Checks: the button per state (name, plain button, 32px, before send, ring only listening, spinner only transcribing, taken in every state); status line per press (also over `thinking`, `failed`, `loading`); the error right above the box, amber, announced, inside the panel, standing over nothing with a draft docked; the log's spoken and empty lines; the picker hands its value and drops only the speech-to-text field on Gemini; the Gemini section per key source, refused, waiting, unread; a short key refused under its field, a good one sent on Enter and gone from the page; the model saved on leaving its field only when valid; Clear asks first; the binding row's focus follows capture and `data-talk-binding-capture` exists only while capturing.
 
 ## Live (`lib/talk-live.mjs`, `lib/talk-probe.mjs`)
-- Her panel (from the rail's door) and Settings > Voice, as they stand. Settings > Voice asserts the sections `Voice`, `Backend`, `Gemini`, `Companion` in that order, the six OpenAI-compatible fields, picker 1, Gemini section 1, binding row 1 (`lib/talk-live.mjs:141`: the row is mounted, MAN-9093 §Mounting). Her panel's live check asserts the talk button mounted in its slot (`[data-companion-talk-slot]` holds 1 child of width > 0, `[data-companion-talk]` 1) and her own status line (not Listening or Transcribing). The whole plan on the live page: `.verify/kaylee-talk-whole.mjs` (MAN-9100).
+- Her panel (from her door: the rail's door, or her disc docked in its cell) and Settings > Voice, as they stand. Settings > Voice asserts the sections `Voice`, `Backend`, `Gemini`, `Companion` in that order, the six OpenAI-compatible fields, picker 1, Gemini section 1, binding row 1 (`lib/talk-live.mjs:141`: the row is mounted, MAN-9093 §Mounting). Her panel's live check asserts the talk button mounted in its slot (`[data-companion-talk-slot]` holds 1 child of width > 0, `[data-companion-talk]` 1) and her own status line (not Listening or Transcribing). The whole plan on the live page: `.verify/kaylee-talk-whole.mjs` (MAN-9100).
 - With `--before`, her panel on an untouched client: the DOM must be identical (exact) and the picture within `ANTI_ALIASING_ALLOWANCE` = 8 pixels. The `voice-*` surfaces are not paired: the untouched client has no picker or Gemini section. The one live redraw, his empty spoken line ("Nothing heard"), is photographed as drawn and set aside on both before the pair is compared.
 - Opening her panel takes account 1's floor; opening Settings makes the app's own settings write.
 
@@ -6471,7 +6498,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useT
 
 ## MAN-9105 — server/modules/voice — synthesizeSentence: Kaylee's voice from Gemini, the streamed Interactions call, the answer, the abort and what is never counted
 
-`synthesizeSentence(userId, { text, style, signal }): Promise<SpeechAnswer>` (`gemini-speech.ts`) speaks one sentence of hers in the account's Gemini voice, streamed as PCM. `text` is the sentence's `speech` (sounds kept as `<tag>`), `style` its delivery. It never throws for an expected failure. Settings, key, routes: MAN-9098. The transcribing twin: MAN-9099. Rules: INV-9908. The sound-tag list's one home: INV-9938. Proof: `.verify/kaylee-voice-speech.mjs`.
+`synthesizeSentence(userId, { text, style, signal }): Promise<SpeechAnswer>` (`gemini-speech.ts`) speaks one sentence of hers in the account's Gemini voice, streamed as PCM. `text` is the sentence's words as `utteranceOf` rebuilds them from her stored row (sounds written back as `<tag>`, MAN-9110), `style` its delivery. It never throws for an expected failure. Settings, key, routes: MAN-9098. The transcribing twin: MAN-9099. Rules: INV-9908. The sound-tag list's one home: INV-9938. Proof: `.verify/kaylee-voice-speech.mjs`.
 
 | consumer | reaches it as |
 |---|---|
@@ -6528,7 +6555,7 @@ node .verify/kaylee-voice-scaffold.mjs [--evidence <dir>] [--before <url>] [--on
 - Not asserted: the speaking mark's ink bar (the ring check passes on any shadow that contains the ground), the focus move after a removed chip, the 44px removable chip under `(pointer: coarse)`, Restore's place in the row's control slot (only that it exists).
 
 ## Live (`lib/voice-live.mjs`) — exits 1 against the wired panel
-- Photographs her panel from the rail's door and Settings > Voice, and asserts the panel before the voice was wired: `facts.voiceRow === 0` and no mark (`voice-live.mjs:63-64`), the Gemini section's rows `API key` and `Transcription model` only (`:90`), and with `--before` every pair the same DOM. `CompanionPanel` now passes `voice` and the tab passes the speech rows, so `bash .verify/kaylee-voice-scaffold.sh` and `--only live` exit 1. Run `--only fixtures`. The live voice: `.verify/kaylee-voice-whole.mjs` (MAN-9113).
+- Photographs her panel from her door (the rail's door, or her disc docked in its cell) and Settings > Voice, and asserts the panel before the voice was wired: `facts.voiceRow === 0` and no mark (`voice-live.mjs:63-64`), the Gemini section's rows `API key` and `Transcription model` only (`:90`), and with `--before` every pair the same DOM. `CompanionPanel` now passes `voice` and the tab passes the speech rows, so `bash .verify/kaylee-voice-scaffold.sh` and `--only live` exit 1. Run `--only fixtures`. The live voice: `.verify/kaylee-voice-whole.mjs` (MAN-9113).
 - Opening her panel takes account 1's floor; opening Settings makes the app's own settings write.
 
 ## The untouched client (`kaylee-voice-scaffold.sh`)
@@ -6580,7 +6607,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-voice-scaffold.mj
 
 ## The sentence, rebuilt from its log row (`companion-utterance.ts`, pure)
 - Row: `companionDb.readSentence(userId, turnId, index)`, the newest `kaylee` row of that turn and index (`turn_id`, `turn_index`). The cache holds audio only; the words come from the row.
-- `text` = the row's display `text` with each sound written back as `<tag>` at its offset `at` (clamped to the text), ordered by offset then by the order made. A space on each side of a tag, none outside at the start or end; `.,!?;:…` right after a tag closes up. Equals `parseExpression`'s `speech` up to spacing; `speech` itself is not stored.
+- `text` = the row's display `text` with each sound written back as `<tag>` at its offset `at` (clamped to the text), ordered by offset then by the order made. A space on each side of a tag, none outside at the start or end; `.,!?;:…` right after a tag closes up. The row is the one record the panel draws and the voice speaks.
 - `style` = the account's `deliveryNote` (`readCompanionSettings`), or `<deliveryNote>; <mood>` when the sentence led with a mood; the mood alone when the note is empty; both empty = no style (no `annotations` in the request). why short: Google warns that a long style block makes the voice drift.
 - Nothing to say = no letter or digit (any script) once `<…>` spans are removed, so `<short pause>` alone, or punctuation alone, answers 204.
 
@@ -6689,7 +6716,7 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/pcmP
 
 ## MAN-9113 — src/modules/companion — her voice on the page: useCompanionVoice, the pull (speechPull.ts), the per-device switch, the cut on the press and the presence that orders the page's states
 
-The page that holds the floor pulls her sentences from `GET /speech` (MAN-9110) and plays them through its player (MAN-9112). A press while she sounds is the cut (MAN-9111). Server side of the floor: MAN-9082. Rules: INV-9940.
+The page that holds the floor pulls her sentences from `GET /speech` (MAN-9110) and plays them through its player (MAN-9112). A press while she sounds is the cut (MAN-9111). Server side of the floor: MAN-9082. The presence (the one state, her process in it): MAN-9134; the cut on the press: MAN-9133; proof: MAN-9135. Rules: INV-9940.
 
 ## `useCompanionVoice({ picture, clientId })` (`hooks/useCompanionVoice.ts`)
 - Called ONCE, by `CompanionProvider`. Answers `{ voice, unlock, cutOff, release, silence }`.
@@ -6720,7 +6747,11 @@ Plain closures; the only clocks are a picture, an answer and the player's `start
 | `speaking` | set at a sentence's `start`, held until the next one starts, `null` only when the player is silent and nothing is pending: never between two sentences |
 | `silence()` | hang up, `stopped` for the turn, `player.stop()`, `speaking` null; the floor is kept. Called by Stop (`interrupt`, before the request) and the `companion_cleared` frame |
 
-## The cut on the press (`useTalkPress.toggle`, MAN-9101)
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionPanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionVoiceSwitch.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/context/CompanionContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useCompanionPresence.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useCompanionVoice.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useTalkPress.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/speechPull.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-presence-whole.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-voice-whole.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/voice-whole-edges.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/voice-whole-kit.mjs
+
+## MAN-9133 — src/modules/companion — her voice on the page: useCompanionVoice, the pull — The cut on the press (`useTalkPress.toggle`, MAN-9101)
+section: src/modules/companion — her voice on the page: useCompanionVoice, the pull (speechPull.ts), the per-device switch, the cut on the press and the presence that orders the page's states/001 The cut on the press (`useTalkPress.toggle`, MAN-9101)
+
 1. `unlock()`.
 2. The press that OPENS the mic calls `cutOff()`: `held` = true (nothing is asked for while he records, so her voice never enters his clip).
    - If `player.playing()` or a request is pending: `turnId` = the playing sentence's, else the pending one's; `heard` = `player.lastEnded().index` when it is of that turn, else `null`; `interrupted` = the playing index when of that turn, else `null`. Then `silence()` and `POST /api/companion/cut { turnId, heard, interrupted }` (MAN-9111). `cutOff` answers that request's settling, never rejecting. Nothing sounding and nothing on its way: `null`, no request, the press only holds the pull.
@@ -6728,15 +6759,55 @@ Plain closures; the only clocks are a picture, an answer and the player's `start
 3. The mic opens at once; the clip's upload awaits the cut's settling (`cutOwedRef`), so the cut is owed before the press is pushed.
 4. The press that ends the recording, a mic that never opened and a device that went away each call `release()`: `held` false, `next` = at least one past every sentence in the log, then the pull resumes. What she said while his mic was open is not read out afterwards.
 
-## The presence — the one state, in one order
-`presenceOf(activity, talkState, cut, speaking)` (`hooks/useCompanionPresence.ts`, pure): `cut` (`voice.cut`) > `listening` > `transcribing` (`talk.state`) > `speaking` (`voice.speaking !== null`) > the activity's phase (`reading_code`, `reading_session`, `drafting`, `walking`, `thinking`, `idle`: one at a time, so they never compete; a phase this build cannot name reads as `thinking`; no picture yet reads as `idle`). `session`, `files` and `walk` always come from the activity, whatever the state. `useCompanionPresence()` is that function over `useCompanion()`'s `picture.activity`, `talk.state` and `voice`, memoized on those parts: THE ONLY READER of the three (not of the process: the header still reads `picture.process` for asleep, waking and failed), keyed on the activity's value so a repeated frame mints no new object, called by `CompanionPanel`, whose `presence` reaches `CompanionHeader`'s status line (words and tones: MAN-9089). The `.verify/lib/*-kit.mjs` fixtures call `presenceOf` where no provider stands. The log marks the sentence whose `turnId` and `index` equal `voice.speaking` (`CompanionLog`, `[data-companion-speaking-sentence]`; MAN-9062).
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionPanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionVoiceSwitch.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/context/CompanionContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useCompanionPresence.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useCompanionVoice.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useTalkPress.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/speechPull.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-presence-whole.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-voice-whole.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/voice-whole-edges.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/voice-whole-kit.mjs
 
-## Proof
+## MAN-9134 — src/modules/companion — her voice on the page: useCompanionVoice, the pull — The presence — the one state, in one order
+section: src/modules/companion — her voice on the page: useCompanionVoice, the pull (speechPull.ts), the per-device switch, the cut on the press and the presence that orders the page's states/002 The presence — the one state, in one order
+
+`useCompanionPresence(): CompanionPresence` (`hooks/useCompanionPresence.ts`). Types in `src/shared/types.ts`: `CompanionPresence` = `{ state, session: CompanionSessionRef | null, files: string[] | null, walk: { at, total } | null }`; `CompanionPresenceState` = the fourteen words below.
+| source | read from `useCompanion()` | gives |
+|---|---|---|
+| her server-held picture | `picture` (null while it loads) | `loading` while it is null |
+| her process | `picture.process.state` | `failed`, `asleep`, `waking`; `awake` gives no word of its own |
+| her activity | `picture.activity` | the phase when her process is awake, and ALWAYS `session`, `files`, `walk`, whatever the state |
+| this page's talk press | `talk.state` | `listening`, `transcribing` |
+| this page's player | `voice.cut`, `voice.speaking !== null` | `cut`, `speaking` |
+Priority, first that holds wins — `presenceOf(picture, talkState, cut, speaking)`, pure; `picture` is `Pick<CompanionPicture, 'activity' | 'process'> | null`:
+1. `cut` (`voice.cut`: 900 ms after a press stopped her voice)
+2. `listening` or `transcribing` (`talk.state`; `listening` wins when a new recording started over a clip still out)
+3. `speaking`
+4. `loading` (`picture` null)
+5. `failed`, then `asleep`, then `waking` (`picture.process.state`)
+6. the activity's phase: `reading_code`, `reading_session`, `drafting`, `walking`, `thinking`, `idle`. One phase at a time, so they never compete. A phase this build cannot name (a newer server's) reads `thinking`.
+- The fourteen words, in their order: `cut` > `listening` > `transcribing` > `speaking` > `loading` > `failed` > `asleep` > `waking` > `reading_code` > `reading_session` > `drafting` > `walking` > `thinking` > `idle`.
+- why the page first: his open mic shows even while she is mid-sentence or her process is down; `cut` is the one word for the instant her voice stopped.
+- why her process before her activity: a Kaylee who cannot answer never reads as ready (ruling 19: never fake good news).
+- Memoized on the process's state, the activity's VALUE (`JSON.stringify(activity)`), `talk.state`, `cut`, `speaking`. why: the server sends a fresh object with every `companion_activity` frame, repeats included; a presence minted for words that did not change would restart what a consumer holds on it. A `companion_process` frame alone moves the state.
+- THE ONLY RESOLVER of the picture (process and activity), the press and the player into a state: the status line and the button read this one value, so they cannot disagree. A consumer may still read one source for its own part (the talk button reads `talk.state`, the log reads `voice.speaking`, the header's controls read the picture).
+| reader | draws |
+|---|---|
+| `CompanionPanel` → `CompanionHeader` (`presence` prop) | the status line: words and tones from the state alone, MAN-9089 |
+| `CompanionFab` | the face's `data-state` (`CompanionAvatar`, MAN-9124), the button's label (`presenceWords`, MAN-9129) and where she looks (`useAvatarTarget`, MAN-9132) |
+- The line and the button change in the same frame: `.verify/kaylee-fab-presence-frames.mjs` (MAN-9130).
+- `presenceOf` is exported for the `.verify/lib/*-kit.mjs` fixtures that mount a view where no provider stands: each hands in its fixture's picture (null for the loading one).
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionPanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionVoiceSwitch.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/context/CompanionContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useCompanionPresence.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useCompanionVoice.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useTalkPress.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/speechPull.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/types.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-presence-whole.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-voice-whole.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/voice-whole-edges.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/voice-whole-kit.mjs
+
+## MAN-9135 — src/modules/companion — her voice on the page: useCompanionVoice, the pull — Proof
+section: src/modules/companion — her voice on the page: useCompanionVoice, the pull (speechPull.ts), the per-device switch, the cut on the press and the presence that orders the page's states/003 Proof
+
 `node .verify/kaylee-voice-whole.mjs [--steps 0,…,7]`: live :5183 and :3011 as account 1, Kaylee on `haiku`, the speech model on `gemini-3.8-flash-lite-tts`; two Chromium pages (a laptop 1440×900, a phone 390×844) with the fake-media flags. Steps: 0 setup; 1 the phone asks "Count from one to six, one number per sentence." (the phone speaks and marks, the laptop makes no speech request); 2 the cut on the third sentence (silent within 0.1 s, `{ turnId, heard: 1, interrupted: 2 }`, her next JSONL user message opens with `<cut heard=… interrupted=…/>`); 3 the laptop presses talk and the floor moves; 4 the laptop's switch off; 5 Settings (the speech model, voice and sound tags; `hum` into her next `<register>`; Restore); 6 the spend ledger before and after; 7 the pull's edges with the door answered by the probe, no Gemini call (`lib/voice-whole-edges.mjs`). It puts Kaylee's model, the speech model and the sound tags back as found.
 
 `node .verify/kaylee-presence-whole.mjs` (live :5183 and :3011 as account 1, Kaylee on `haiku`, the speech model on `gemini-3.8-flash-lite-tts`, Chromium with the fake-media flags; the voice switch OFF until the last step, so the long turn costs no Gemini call): a requestAnimationFrame loop installed before the app runs keeps every change of `[data-companion-status]` with its frame. One turn naming a probe chat by id (a hidden project's chat is on her roster only through the `<view>`, the freshest tab of the shared account, or an id she is handed): `Reading <chat>`, `Drafting for <chat>`, each drawn within 250 ms of its `companion_activity` frame (asserted; 2026-10-27 measured about 15 ms); two talk presses in 0.26 s: `Listening`, then `Transcribing`; the voice switch on and one short sentence: `Speaking`, exactly one speech call, answered. The four in their order, no console error from the recorder on; the longest gap between read frames is printed, not asserted (it is the host's load). It leaves her focus on the deleted probe chat (no route sets it back; only her Clear empties it). 2026-10-27: all pass, before the `Transcribing` and exactly-one checks were added.
 
-governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionPanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionVoiceSwitch.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/context/CompanionContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useCompanionPresence.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useCompanionVoice.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useTalkPress.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/speechPull.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-presence-whole.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-voice-whole.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/voice-whole-edges.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/voice-whole-kit.mjs
+`node .verify/kaylee-one-state.mjs` (live :5183, account 1, a read-only page via `lib/read-only-page.mjs`: nothing written to the account, no word sent to her, no model call, no Gemini call). Legs, numbered as the probe numbers them, in the order it runs them:
+- Leg 3, the live page: her `process.state` from `GET /api/companion` beside the live status line, the live button's label and its face's `data-state`; all three are in the words of one state, and with her process asleep the line and the label both say asleep.
+- Leg 1, the fourteen states on fixtures: the app's own `CompanionHeader` and `CompanionFabView` (face `CompanionAvatar`, label `presenceWords`) drawn for each, printing the status line, the label and the face's `data-state`; checks that all three name the state, the face's accessible name is the label, only idle's label says "ready", the failed row's face reads `data-state="failed"`, and the process rows keep their tones. Photographs: `.verify/shots/kaylee-one-state-<state>.png`.
+- Leg 2, the order, through the app's own `presenceOf`: the page's four states over every process state, the process over every phase, an unknown phase as `thinking`, no picture as `loading`.
+- Leg 4, the hook on the live page: the picture read is answered asleep and idle, then `companion_process` frames (waking, awake, failed) are sent to the page's own socket; the button, face and line move on the process alone (the memo key on the process's state).
+- 2026-10-28: 62 of 62 checks passed; account 1 was asleep: line "Asleep · your next message wakes her", label "Kaylee, asleep", face `asleep`.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionPanel.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionVoiceSwitch.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/context/CompanionContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useCompanionPresence.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useCompanionVoice.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useTalkPress.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/speechPull.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-one-state.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-presence-whole.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-voice-whole.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/voice-whole-edges.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/voice-whole-kit.mjs
 
 ## MAN-9123 — The queued message — one per session, appended to on the server, sent by the dispatcher: routes, merge, claim, restore and the composer's rules
 
@@ -6803,13 +6874,13 @@ governs: /home/lyphe/.claude/claudecodeui_lyphe/server/modules/database/reposito
 
 ## `CompanionAvatar` — Kaylee's face (`src/modules/companion/CompanionAvatar.tsx`, `CompanionAvatar.css`)
 
-One SVG drawn in code on Verve tokens, no image. Fills a square of `size` px and owns no chrome: the disc, the dock and the motion around her are the button's. Mounted by: nothing yet; `FILL(fill)` in `CompanionFab.tsx` marks the mount and the one in `CompanionAvatar.tsx` marks the mouth loop.
+One SVG drawn in code on Verve tokens, no image. Fills a square of `size` px and owns no chrome: the disc, the dock and the motion around her are the button's. Mounted by `CompanionFab` (the button's face, 26 px: MAN-9129) and by the fixtures.
 
 ### Props — `CompanionAvatar({ presence, level, size, name? })`
 | prop | type | use |
 |---|---|---|
 | `presence` | `CompanionPresence` | `state` picks the look; `walk` feeds the ring; `session.name` / `files` feed the accessible name |
-| `level` | `() => number` | the page player's `level()`; read only by the mouth loop, never a changing prop (a level through React redraws sixty times a second). Raw RMS ~0.02–0.3: the loop scales it to 0..1 before writing the variable |
+| `level` | `() => number` | the page player's `level()`; read only by the mouth loop, never a changing prop (a level through React redraws sixty times a second). Already 0..1 (the player clamps it): the loop writes it as it is. Measured at a spoken sentence's peaks: 0.38–0.42 (MAN-9130) |
 | `size` | `number` | px |
 | `name` | `string?` | her name as he set it; absent ⇒ `t('companion.defaultName')` |
 
@@ -6826,20 +6897,23 @@ One SVG drawn in code on Verve tokens, no image. Fills a square of `size` px and
 | `drafting` | `.kaylee__draft` | pencil writes a stroke under her chin |
 | `walking` | `.kaylee__walk` | ring filled clockwise from the top to `walk.at / walk.total`; `.kaylee__halo` is `display: none` in both motion modes |
 | `cut` | `.kaylee__surprise` | wide eyes, high brows, round mouth, one blink; `.kaylee__mouth-open` is `display: none` |
+| `failed` | `.kaylee__walk` (the closed ring) and `.kaylee__surprise` (the level mouth) | still in both motion modes: no breath, no glow, no blink loop (`animation: none` on body, halo and eye, in the motion block). Eyes level and a little lowered (`scale: 1 0.84`), no tilt, no brows. `.kaylee__lip` is `display: none` and `.kaylee__surprise` is drawn as a level line (`scale: 1.3 0.22`), so there is no smile. The ring's stroke is `--kaylee-stopped` = `--warn-dot`, the colour of the status line's amber dot; `.kaylee__progress`, `.kaylee__count` and `.kaylee__halo` are off. why a ring and not the rim: the orb is amber in both themes (`--warn-dot` #d9a64a on the lamp's `--garnish` in dark), so an amber accent ON the orb would vanish; the ring stands 5 px clear of it at 96 px with the ground between |
+| `asleep`, `loading` | none | exactly idle's look: no rule of their own |
+| `waking` | `.kaylee__dots` | exactly thinking's look: the stylesheet's thinking selectors are `:is([data-state='thinking'], [data-state='waking'])` |
 
-- Markup always holds every part; `[data-state]` turns on one accent and sets the pose. A look is a still frame; movement lives only inside `@media (prefers-reduced-motion: no-preference)` at the foot of the stylesheet. why: reduced motion keeps each look and drops the movement with no rule of its own.
+- Markup always holds every part; `[data-state]` turns on its accent (one part; `failed` has two, the ring and the level mouth) and sets the pose. A look is a still frame; movement lives only inside `@media (prefers-reduced-motion: no-preference)` at the foot of the stylesheet. why: reduced motion keeps each look and drops the movement with no rule of its own.
 - Pose uses `rotate` / `scale` / `translate`, never `transform`. why: a breathing keyframe (`scale`) must not fight the tilt (`rotate`).
-- Palette: Verve tokens only, plus two `#fff` glints (white in both themes). `--kaylee-rim` is the face's own darker edge (garnish 40% over `--ink` in light, over `--canvas` in dark). why: it holds on any ground, the FAB's green disc included.
+- Palette: Verve tokens only, plus two `#fff` glints (white in both themes). `--kaylee-rim` is the face's own darker edge (garnish 40% over `--ink` in light, over `--canvas` in dark). The button draws her on `bg-card` inside the kit's accent rim (MAN-9125), never on the accent itself. Measured on `--accent` in the light theme: rim against ground 1.65:1 at the head's edge, 1.12:1 at the chin; on `--surface`: 4.97:1 and 2.68:1 (INV-9979).
 - Ids: one `useId()` per face prefixes the gradient and clip ids. why: a page holds several faces.
 
 ### `--kaylee-mouth` — the mouth contract
 | rule | detail |
 |---|---|
 | range | `0` closed smile .. `1` open wide; default `0` on `.kaylee` |
-| writer | the `fill` loop, on the svg element's own `style`; React never sets it, so a redraw cannot overwrite it |
+| writer | the mouth loop (a `useEffect` in `CompanionAvatar`, MAN-9129) on the svg's own `style`, only while `data-state` is `speaking`; React never sets it, so a redraw cannot overwrite it. Its cleanup removes the variable |
 | open mouth | `.kaylee__mouth-open` scales on it (`0.4 + v * 0.6`) and is hidden at `0` (`opacity: clamp(0, v * 40, 1)`) |
-| heard only while `data-state='speaking'` | `.kaylee:not([data-state='speaking']) .kaylee__mouth-open { opacity: 0 }`; a value left in the variable never opens a stopped face, so the loop need not reset it |
-| reduced motion | the CSS ignores the variable while speaking: `scale: 1 0.78; opacity: 1` (half open, still); the loop may run, need not |
+| heard only while `data-state='speaking'` | `.kaylee:not([data-state='speaking']) .kaylee__mouth-open { opacity: 0 }`; a value left in the variable never opens a stopped face, so a stale frame after the cleanup shows nothing |
+| reduced motion | the CSS ignores the variable while speaking: `scale: 1 0.78; opacity: 1` (half open, still); the loop still runs while she speaks |
 
 ### Ring numbers
 - `walk.at/walk.total` in a pill over the lower face, hidden until `.kaylee:hover`, or hover / `:focus-visible` of any `button`, `a`, `[role='button']`, `[tabindex]` ancestor. The button around her needs no wiring.
@@ -6847,14 +6921,318 @@ One SVG drawn in code on Verve tokens, no image. Fills a square of `size` px and
 - `walk.total` 0 ⇒ the track alone; `walk.at` 0 ⇒ the arc is empty.
 
 ### Accessible name
-- `role="img"`, `aria-label` = `nameOf()`: her name, then the state in words, keys `companion.avatar.*` in `en/common.json` (`defaultValue` carries the English; other locales fall back to English).
-- `reading_session`: chat name, else "a chat". `reading_code`: 0 files ⇒ "code"; ≤ `FILES_NAMED` (2) ⇒ base names joined by `, `; more ⇒ "{{count}} files". `drafting`: "for {{chat}}", else "a new chat". `walking`: chat + `walk` ⇒ "walking {{chat}}, item {{at}} of {{total}}", else "walking a result". `cut`: "stopped talking".
+- `role="img"`, `aria-label` = `presenceWords(t, name, presence)` (`utils/presenceWords.ts`, MAN-9129): her name, then the state in words, keys `companion.avatar.*` in `en/common.json` (`defaultValue` carries the English; other locales fall back to English). The button wearing her uses the same sentence as its label.
+- `reading_session`: chat name, else "a chat". `reading_code`: 0 files ⇒ "code"; ≤ `FILES_NAMED` (2) ⇒ base names joined by `, `; more ⇒ "{{count}} files". `drafting`: "for {{chat}}", else "a new chat". `walking`: chat + `walk` ⇒ "walking {{chat}}, item {{at}} of {{total}}", else "walking a result". `cut`: "stopped talking". Her process: `loading` "loading", `failed` "stopped", `asleep` "asleep", `waking` "waking up"; only `idle` says "ready" (MAN-9129).
 - A button around her may replace it with its own label.
-- `FILES_NAMED` and `baseName` are copied in `CompanionHeader.tsx`: edit both.
+- `FILES_NAMED` and `baseName` live in `utils/presenceWords.ts`; `CompanionHeader.tsx` imports them.
 
 ### Proof — `.verify/kaylee-avatar-states.mjs`
-- `node .verify/kaylee-avatar-states.mjs` (live page on :5183): every state at 48 and 96 px, light and dark, the speaking mouth at 0.15 / 0.55 / 1 (the variable written straight onto the svg), the ring at 2 of 5; once with full motion, once with `prefers-reduced-motion: reduce` emulated. PASS/FAIL per line, exit 1 on any FAIL.
-- Checks: name, gate (reduced motion: no element of any face names an animation), accent, mouth, left-over variable opens only a speaking face, ring, names, pose, numbers, motion, phone (390 px), errors.
+- `node .verify/kaylee-avatar-states.mjs` (live page on :5183): every state at 48 and 96 px, light and dark, the speaking mouth at 0.15 / 0.55 / 1 (`level` returns the opening and the face's own mouth loop writes the variable), the ring at 2 of 5; once with full motion, once with `prefers-reduced-motion: reduce` emulated. PASS/FAIL per line, exit 1 on any FAIL.
+- Checks: name, gate (reduced motion: no element of any face names an animation), accent, mouth, left-over variable opens only a speaking face, ring, names, pose, numbers, motion (every state but walking and failed moves; failed runs no animation, and holds its body and eye while idle breathes), looks (asleep and loading compute idle's look, waking thinking's: 24 reads with motion, 27 reduced, over halo, body, eyes, brows, lip, surprise and dots, with the accents on), failed (the ring's computed stroke is the warn dot's colour and clear of the orb, with the halo off; eyes level, no smile, a level mouth; no breath, glow or blink loop named), phone (390 px), errors. Sixteen cells: nine looks, speaking at three openings, and the four of her process, named by `presenceWords` ("Kaylee, stopped", "asleep", "waking up", "loading").
+- Measured contrast of the failed ring on the button's ground: 2.21:1 on `--surface` in light, 7.77:1 in dark. In light that is below 3:1: the ring is not the only signal (the level mouth, the lowered eyes, the button's label and the status line say it too).
 - Shots: `.verify/shots/kaylee-avatar-{motion,reduced,numbers,phone}-{light,dark}.png`.
 
 governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionAvatar.css, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionAvatar.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-avatar-states.mjs
+
+## MAN-9125 — src/modules/companion — her disc and her rail cell: CompanionFabView, CompanionDockView, the layer, the glide and hop, her phone corner, stacking and the fixture
+
+Live: `WorkspaceFrame` renders `CompanionFab` after `AppSwitcherFab`; `WorkspaceRail` renders `CompanionDock` in its foot after `UsageRings` (MAN-9083). What the two wrappers read and keep: MAN-9129. Her face: MAN-9124. Where a look sends her: MAN-9132 (`useAvatarTarget`, `avatarPlacement`), over the page's anchors (MAN-9131). Proof on the live page: MAN-9130.
+
+## Parts — `src/modules/companion/`
+| file | holds |
+|---|---|
+| `CompanionFab.tsx` | `CompanionFabView` (every state from props) · `CompanionFab` (binds it to the provider: MAN-9129) |
+| `CompanionFab.css` | `.companion-fab`: the glide, the hop, the reduced-motion jump |
+| `CompanionDock.tsx` | `CompanionDockView` (her rail cell) · `CompanionDock` (binds it to the provider: MAN-9129) · `CompanionDoorView` (the plain door the cell draws while the disc is out of its seat, MAN-9089) |
+
+## `CompanionFabView` props
+| prop | use |
+|---|---|
+| `label` | accessible name and tooltip ("Kaylee, reading Bugfixes") |
+| `face` | `ReactNode` handed to the kit's `icon`, drawn `FACE_PX` = `FAB_SIZE_PX` − 2 = 26 px square, on `bg-card`, inside the kit's 1px accent rim |
+| `position` | `DockableFabPosition`: docked, or a point |
+| `dockRect` | the rail cell's rect while the rail is docked (md+) and the rect is on screen, else `null` |
+| `active` | panel open: `aria-expanded`, the kit's pressed look |
+| `target` | `{ key, left, top } \| null`: a look, the disc's top-left in viewport px (what `avatarPlacement` returns plus the look's key). A new `key` = a new look = glide then hop |
+| `onPress` | a press that ended no drag: opens or closes her panel |
+| `onPositionChange(next)` | once per drag, at release: docked or the drop point |
+| `onRestChange(rect)` | her rest's box before any look's offset, each time it moves (drop, dock, resize): the `buttonRect` of `useAvatarTarget(presence, buttonRect)` |
+
+## The layer
+- `[data-companion-fab]`: `fixed inset-0 pointer-events-none`; the disc (`.vv-fab`, the kit's `DockableFab`, unchanged) takes `pointer-events: auto`. why a layer: the kit's button scales itself with its own `transform` and is one fixed node, so her glide cannot be its transform.
+- Its `translate` = 0 at rest, target − rest on a look. The layer is the disc's containing block and its box is the viewport, so the kit's `left`/`top` mean what they always mean.
+- Her rest is never worked out here: it is the kit's `onRectChange` rect less the layer's drawn offset at that instant (docked = the cell's centre; floating = the kit's CSS clamp).
+| attribute on the layer | set while |
+|---|---|
+| `data-target="<key>"` | a look is drawn |
+| `data-dragging` | a drag is in hand, first move to release |
+| `data-landing` | the hop runs |
+| `data-tracking` | she has landed at the look drawn |
+
+## Motion (`CompanionFab.css`)
+- Glide: `translate` over 450 ms on `var(--ease-enter)`. `translate`, not `transform`, so the hop animates `transform` without fighting it.
+- Hop: 5 px up, `--dur-quick` (200 ms), once per look (on the glide's `transitionend` for `translate`). A look's re-measures (scroll, resize) carry her at once (`data-tracking`: `transition: none`), no second hop. Home: the glide back, no hop; the next look lands again.
+- Drag: the offset drops at once (`data-dragging`: `transition: none`); the look in hand is set aside (`cancelledKey`) until another key or none begins; the drop sets the new rest.
+- `prefers-reduced-motion: reduce`: no transition, so no glide and no hop. The hop is declared only under `no-preference`.
+
+## Stacking — the workspace shell's stacking context
+| where | layer z |
+|---|---|
+| md and up | 59 |
+| below md, at rest | 49 |
+| below md, a look holds her (`data-target`) | 59 |
+- Classes: `z-[49] data-[target]:z-[59] md:z-[59]`.
+- 59 is over the applications (40), the floating chat and her desktop panel (45; the disc is how that panel closes) and the docked rail (50), under the applications button and its radial (60), which stay on top where they meet.
+- 49 is under the sidebar drawer (50): an open drawer covers her corner, its cell draws her door, and the controls of its rows stay pressable; over the floating chat (45) and the applications.
+- Below `lg` her panel is a sheet at 61 that covers both discs and has its own close.
+
+## Her corner — docked with `dockRect === null` (a phone: the rail is in the drawer)
+- `CORNER_INSET` = `{ x: 72 + FAB_CATCH_PX, y: 112 }`: rest = top-left at (`innerWidth` − 116, `innerHeight` − 112), on the applications button's line, one 44 px catch left of it; the catches meet edge to edge. Handed to the kit as a point, so its clamp holds her inside the safe area and she wears the floating look.
+- It follows the window's size (`useSyncExternalStore` on `resize`, subscribed only while in the corner). Opening or closing the drawer never moves her.
+- 72 and 112 are `FAB_DEFAULT_INSET_X` / `_Y` (`src/shared/constants.ts`), the applications button's phone default, read by its storage too: a change to the 72 overlaps the two catches with nothing to catch it (MAN-9010).
+- Measured at 390×844 on a chat: she hides ~4 characters of one line of his text ("ay f"), beside the 4 the applications button hides ("m th"); that line is a short message's only line, or the line before the one he types. Keyboard up on Android (390×508): she at y 396 on the field, the applications button at y 472.
+- Rejected spots: directly above the applications button (the conversation's newest lines and the thumb's scroll lane; `touch-action: none` makes a scroll that starts on a catch drag the disc); high in that column (Files chips, Git tabs: a press meant for them opens her panel).
+
+## `CompanionDockView({ seated, away, open, name, onPress, onRect })`
+- `[data-companion-dock-cell]`: `RAIL_BUTTON_BASE` (40 px; 44 below md), the rail foot's rhythm whether it holds her disc or her door. In it, a 28 px `size-7` `aria-hidden` box that paints nothing and reports its rect through `onRect`; the disc is drawn centred on that rect.
+| prop | cell draws |
+|---|---|
+| `seated` true (her rest is docked and the dock is believed) | the box only |
+| `seated` false (disc out, or no rect) | `CompanionDoorView` over the box, the disc's own press: the rail always has a way to her |
+| `away` true (a look holds her off the seat) | a dashed ring on the box, `border-muted-foreground/70`; her place kept |
+| `open` and `seated` | `RAIL_BUTTON_LIT` on the cell. why: the kit's pressed ring is too faint at 28 px. Unseated, the door lights itself |
+- A look keeps `seated` true. why: the door must not flicker into the rail each time she glides away and back.
+- `onRect` fires from a layout effect: on mount, on window `resize`, whenever the box enters or leaves the viewport (an `IntersectionObserver` on the box, disconnected on cleanup), and `null` on unmount and below md (`(min-width: 768px)` false). From md up nothing slides the sidebar, so a resize and the crossing of md are the movers. why the observer: `resize` fires BEFORE React draws the layout the new width asks for, so growing from a phone to a desktop width reads the drawer's off-screen box and the context refuses it; the observer reports after that layout. Nothing polls. The rect is reported as measured.
+
+## Seams to keep
+- Two `.vv-fab` discs stand in the page. `FAB_SELECTOR` (`src/shared/constants.ts`) is `.vv-fab:not([data-companion-fab] .vv-fab)`: the applications button, whatever order the two mount in (MAN-9014). A probe names the one it wants: `lib/switcher.mjs`'s `FAB` for the applications button, `lib/kaylee-fab-live.mjs`'s `FAB` (`[data-companion-fab] .vv-fab`) for hers.
+- `registerDock` believes a rect only through `dockableRect` (`src/shared/utils.ts`, shared with app-switcher). why: a phone's hidden rail keeps a layout box and would place her off screen.
+- Outside her module: with the keyboard up on Android the applications button's stored point is clamped onto the left half of Send (app-switcher's placement rule).
+
+## Proof — `.verify/kaylee-fab-chrome.mjs`
+```bash
+node .verify/kaylee-fab-chrome.mjs
+```
+- Gitignored (`.verify/`). Live client `:5183`. PASS/FAIL per line, exit 1 on any FAIL; light and dark.
+- Mounts the app's own `CompanionFabView` and `CompanionDockView` (face: `CompanionAvatar`) through `lib/kaylee-fab-kit.mjs`: the dock in the rail foot's cell, the disc in the shell's fixed container (`.pwa-status-clear.fixed`) after the applications button. The LIVE cell and layer stand in the page too: the kit hides them and takes off the cell's `data-companion-dock-cell`, its door's `data-companion-door` and the layer's `data-companion-fab`, so every query finds the fixtures'. Two React roots, one fixture state in `window.__fabKit`. Real mouse drags; a real touch swipe through `lib/kaylee-fab-phone.mjs`.
+- 1440×900: seated (centred on the box, named "Kaylee, ready", z 59, no door in the cell) · press · out (door drawn, unlit; disc and door light together) · back (a drop near the cell docks) · glide (450 ms ease-out, one 200 ms hop, re-measure moves her at once) · cancel (drag during a look) · reduced motion.
+- 390×844 touch, on a chat, applications button seeded at its phone default: her corner, her catch on the composer and none of the conversation, a swipe where she once rested scrolls the conversation, the drawer's cell draws her door, the open drawer leaves her in her corner.
+- Shots: `.verify/shots/kaylee-fab-*-{light,dark}.png` (docked, docked-rail, open-rail, out, out-rail, out-open, glide-mid, glide-hop, glide-landed, visit-open, reduced, phone, phone-drawer).
+- Kit residual: a dragged disc sits 1.12 px off the pointer (pressed `.vv-fab:active` scales to 0.92 and `heldFrom` halves the scaled width); the applications disc too. Pointer checks allow 1.5 px.
+- 2026-10-27: 64 of 64 checks passed, with the disc and the cell mounted live beside the fixtures.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionDock.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionFab.css, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionFab.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-fab-chrome.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/kaylee-fab-kit.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/kaylee-fab-phone.mjs
+
+## MAN-9129 — src/modules/companion — her disc and her cell on the page: the provider's fab state, `companion-fab`, the button's label and look, the mouth loop
+
+What the live `CompanionFab` and `CompanionDock` read from `useCompanion()` and what the provider keeps for them. The views (`CompanionFabView`, `CompanionDockView`: MAN-9125) take everything as props; these wrappers bind them to the page. Mounted: `CompanionFab` by `WorkspaceFrame` after `AppSwitcherFab`, `CompanionDock` by `WorkspaceRail`'s foot after `UsageRings` (MAN-9083). Proof: MAN-9130.
+
+## Provider state — `useCompanionFab()` (`hooks/useCompanionFab.ts`), called once by `CompanionProvider`
+| `useCompanion()` member | holds | written by |
+|---|---|---|
+| `fabPosition: DockableFabPosition` | where she rests: `{ docked: true }` or `{ docked: false, x, y }` | `moveFab` |
+| `moveFab(next)` | sets `fabPosition` and writes `companion-fab`, at the release of a drag | `CompanionFab` (`onPositionChange`) |
+| `dockRect: DOMRect \| null` | the rail cell's rect while the rail is docked (md and up) and the rect is on screen | `registerDock` |
+| `registerDock(rect)` | believes a rect only through `dockableRect`; keeps the held object when `sameRect` says the same place | `CompanionDock` (`onRect`) |
+| `fabAway: boolean` | a look holds the disc off its seat | `setFabAway` |
+| `setFabAway(away)` | `true` while a look holds her, `false` when `CompanionFab` unmounts | `CompanionFab` |
+| `level: () => number` | the page player's level, 0..1 | `useCompanionVoice` |
+- `moveFab`, `registerDock`, `setFabAway` and `level` keep one identity for the page's life.
+- `dockableRect` and `sameRect` are `src/shared/utils.ts`'s, shared with app-switcher's provider (MAN-9010).
+
+## `companion-fab` — `utils/companionFabStorage.ts`
+- `localStorage` key `companion-fab`: per browser, never the server. why: it describes where a button was dropped in this window.
+- The record is the kit's position: `{"docked":true}` or `{"docked":false,"x":<n>,"y":<n>}`.
+- `readFabPosition()`: the stored position, else `{ docked: true }` on absent, unparseable, not-a-position or storage refused. Never throws.
+- `writeFabPosition(position)`: a refused write is swallowed. why: the provider's state is the truth for the page's life.
+
+## `CompanionFab` — what binds each view prop
+| view prop | from |
+|---|---|
+| `label` | `presenceWords(t, name, presence)`; `name` = `picture.settings.name`, else `t('companion.defaultName')` |
+| `face` | `<CompanionAvatar presence level size={26} name />`; `presence` = `useCompanionPresence()` (the one value the status line reads too: MAN-9134) |
+| `position`, `dockRect`, `active` | `fabPosition`, `dockRect`, `open` |
+| `onPress`, `onPositionChange` | `setOpen(!open)`, `moveFab` |
+| `onRestChange` | state `restRect`, the `buttonRect` of `useAvatarTarget(presence, restRect)` |
+| `target` | (MAN-9132) `useAvatarTarget` gives `look`; `avatarPlacement(look.rect, FAB_SIZE_PX, viewport)` gives `{ key, left, top }`; `null` with no look |
+- `viewport` = `{ width, height, safe }`. Width and height come from `useSyncExternalStore` on `resize`, subscribed only while a look holds her. `safe` = `readSafeInsets()` (a hidden node wearing `env(safe-area-inset-*)`), read once per hold and again only when the window's size changes (memo on `holding`, width, height). why: a scroll frame re-measures the look and must not build a node each time.
+
+## `CompanionDock` — what binds each view prop
+- `seated` = `fabPosition.docked && dockRect !== null`; `away` = `fabAway`; `open`; `name` = `picture?.settings.name ?? null`; `onPress` = `setOpen(!open)`; `onRect` = `registerDock`.
+
+## `presenceWords(t, name, presence)` — `utils/presenceWords.ts`
+- One sentence, her name then what she is doing ("Kaylee, reading Bugfixes"): the face's accessible name and the button's label and tooltip. Words and keys: MAN-9124 §"Accessible name".
+- One word for each of the fourteen presence states. The four of her process: `loading` "{{name}}, loading", `failed` "{{name}}, stopped", `asleep` "{{name}}, asleep", `waking` "{{name}}, waking up" (keys `companion.avatar.loading`, `.failed`, `.asleep`, `.waking`; the English is in `en/common.json` too). Only `idle` says "ready": the button never says she is ready while her process has failed, is asleep or waking, or her picture is unread (ruling 19: never fake good news).
+- Exports `FILES_NAMED` = 2 and `baseName(path)` too; `CompanionHeader` imports both.
+
+## The mouth loop — `CompanionAvatar.tsx`
+- A `requestAnimationFrame` loop runs only while `data-state` is `speaking`: each frame writes `String(level())` to `--kaylee-mouth` on the face's own `<svg>` (a ref; React never redraws). The cleanup cancels the frame and `removeProperty`s the variable.
+- `level` is 0..1 already, so the gain is 1. Measured peaks of a spoken sentence: MAN-9130.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionAvatar.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionDock.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionFab.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useCompanionFab.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/companionFabStorage.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/presenceWords.ts
+
+## MAN-9130 — src/modules/companion — Proof — .verify/kaylee-fab-motion.mjs, kaylee-fab-presence-frames.mjs, kaylee-fab-speaking.mjs (her button on the live page) and lib/kaylee-fab-live.mjs
+
+Her button on the live page: dev client `:5183`, server `:3011`, as the dev account `verve`. Gitignored (`.verify/`). PASS/FAIL per line, exit 1 on any FAIL. The fixture proof (no live turn): MAN-9125 §Proof. What is proved: MAN-9125, MAN-9129.
+
+## Scene — `.verify/lib/kaylee-fab-live.mjs`
+- `openLiveScene({ viewport, touch, dark, voice, speechModel, label, deviceScaleFactor })` → `scene`: her model on Haiku; the speech model set when asked; a probe chat in `lib/probe-project.mjs`'s scratch project, given one turn and renamed; the simple list pinned on; the recorder installed.
+- Exports `FAB` (`[data-companion-fab] .vv-fab`), `LAYER`, `CELL` (`[data-companion-dock-cell]`), `PANEL`, `FIELD`, `VOICE_ROW`, `FILES_BUTTON`, `SMALL_FILE` (`src/shared/ui/buttonVariants.ts`), `CHEAP_SPEECH_MODEL` (`gemini-3.8-flash-lite-tts`).
+- Recorder `window.__fabRec`: one entry per animation frame while `rec.on`: the disc's centre, the face's `data-state` and `--kaylee-mouth`, the layer's `data-target` and drawn `translate`, the status line's words, the probe chat row's rect (`rec.rowKey` = `chat-row:<id>`), the Files rail button's rect (`rail:files`).
+- The probe chat has no row on the simple list: a chat under `/tmp` is hidden by `server/shared/hidden-project-paths.ts`, which the feed filters in SQL. The page's own read of the feed (`GET /api/providers/sessions/recent?…simpleList=true`) is answered with the probe chat added on top; the row, its anchor and her look at it are the app's own. Nothing is written to the server.
+- Read-only page: opened through `openReadOnlyPage` (`lib/read-only-page.mjs`): preference writes answered and dropped, nothing PATCHed from node, Vite hot updates held off. Its optional `contextOptions` passes Playwright context options on (the phone leg: `isMobile`, `hasTouch`, `deviceScaleFactor`).
+- `speechModel` set: the `PUT` is read back, and the scene throws before anything is spoken if it did not take.
+- `scene.tearDown()`: puts back her model and the speech model (read back), clears the draft, removes `companion-voice` and `companion-fab` from this browser, deletes the probe chat, and returns the list of restores that did not answer ok. Each probe counts that list as failures.
+- What stays on the account (no route removes it; only her Clear empties it, which would wipe a conversation other probes use): her focus (it names the deleted probe chat) and her log, about four entries per turn.
+
+## `node .verify/kaylee-fab-motion.mjs` — where the button goes (Haiku)
+| step | checks |
+|---|---|
+| 1 rest | her line quiet and the label ends in the word of her process (`, ready` awake; `, asleep` after a restart of :3011 or two idle hours, which is where the probe usually finds her); centre on the Kaylee cell's centre (≤ 1.5 px); no door in the cell; a real press opens her panel (`aria-expanded`); label = `<picture.settings.name>, <that word>` |
+| 2 chat | "Read the last turn of <probe chat>": at the end of her look (the read plus the hold) the centre is within 12 px of the row's right edge; ≥ 8 frames between cell and row; the hold lets go 1.4–1.8 s after the read ended and she is home 0.3–0.65 s after that |
+| 3 file | a dactyl reads `SMALL_FILE`: centre within 12 px of the Files rail button's right edge (key `rail:files`), then home |
+| 4 drop | dragged to (700, 430): centre ≤ 3 px of it, `companion-fab` stored as a point, the cell draws her door; reloaded: ≤ 1 px of the same centre; dragged back on the cell: docked, `{"docked":true}` stored, door gone |
+| 5 reduced | `prefers-reduced-motion: reduce`: the layer's transition computes `none` (`translate 0.45s` otherwise); she reaches the row and goes home with 0 frames between |
+- "While she reads" is her LOOK, not the read: `read_session` on a tiny chat answers in about 30 ms, so she lands on the row during the hold.
+- The hold (1.5 s) and the glide home (0.45 s) cannot both give "back in the cell 1.5 s after the read": the hold lets go at 1.5 s and she is in the cell at about 1.9 s.
+- 2026-10-27: ALL PASS (Haiku). Chat: centre 10.0 px from the row's right edge (centre (324, 89), edge 314), 19 frames between; hold let go 1.52 s after the read, home 1.90 s after it. File: 10.0 px from the Files button's right edge. Drop: centre (701.1, 431.1), stored `{"docked":false,"x":687.1,"y":417.1}`, the same centre after reload. Reduced: `none 1e-05s` against `translate 0.45s`, 0 frames between.
+
+## `node .verify/kaylee-fab-presence-frames.mjs` — one state, drawn twice
+- Voice off (no speech call), panel open, one turn: read the probe chat, then draft a message for it. Every animation frame compares the status line's words (`[data-companion-status]`, read as a state through `companion.status.*`) with the face's `data-state`.
+- All fourteen states are compared, her process's four too: a frame on Asleep, Waking up, Stopped or Loading is read as `asleep`, `waking`, `failed` or `loading` and compared with the face like any other.
+- Checks: the turn showed `reading_session` and then `drafting`; no frame where the two differ; no console error.
+- 2026-10-27, before the probe compared her process words: ALL PASS; 375 frames (212 `idle`, 158 `thinking`, 3 `reading_session`, 2 `drafting`), 0 where the words and the state differ. The probe as it stands has not run (a Haiku turn).
+
+## `node .verify/kaylee-fab-speaking.mjs` — the face speaking
+- 1440×900 and 390×844 (touch); voice on; speech model `CHEAP_SPEECH_MODEL`. Asks "Reply with exactly one short sentence: hello." How many sentences she answers with is hers.
+- Checks: the face reaches `speaking`; `--kaylee-mouth` takes more than 3 distinct values and opens past 0.1 while it does; within a few frames of the voice ending the loop has released it (`''`; the effect's cleanup leaves at most a stale frame or two, hidden by the stylesheet); a clip of the disc was kept; one `/api/companion/speech/` request per sentence she answered with (counted from her log entries of the turn after the question); no console error.
+- Below lg her panel is a sheet over both discs: the probe closes it after sending, and she speaks on from her corner.
+- Evidence of the mouth is the face clip taken at 8× whose window held the widest mouth. The whole-viewport shot is taken at the first speaking frame and may show the mouth shut.
+- Shots: `.verify/shots/kaylee-fab-speaking-{desktop,phone}-{page,face}.png`. Every run spends Gemini speech requests: run it on purpose.
+- Last run 2026-10-27, before the one-request-per-sentence check and the "within a few frames" release check were written: the mouth variable took 29 distinct values on desktop (peak 0.42) and 25 on the phone (peak 0.38); the stale value after the voice ended lasted one frame. The probe as it stands has not run.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-fab-motion.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-fab-presence-frames.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-fab-speaking.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/kaylee-fab-live.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/read-only-page.mjs
+
+## MAN-9131 — src/shared/context — the page's anchor registry: PageAnchorsProvider, usePageAnchor, usePageAnchors, PAGE_ANCHOR, data-page-anchor
+
+The page's anchors: elements a floating guide can point at, registered under stable keys. Registers: the sidebar's rows, the chat composer, the file tree, the rail. Reader: the companion's button (`useAvatarTarget`: MAN-9132). `src/shared/context/PageAnchorsContext.tsx`, no feature owner.
+
+## Mount
+- `ProjectWorkspaceShell` renders `PageAnchorsProvider` OUTERMOST: `PageAnchorsProvider` > `ChatHostProvider` > `AppSwitcherProvider` > `AccountsProvider` > `CompanionHost` (`CompanionProvider`) > `WorkspaceFrame`. why: registrars and the reader sit below it.
+- The registrars (`SidebarSimpleListRow`, `SidebarSessionItem`, `ChatComposer`, `FileTree`, `RailButton`) import `usePageAnchor` and nothing of the companion; the companion imports none of the `sidebar`, `chat`, `file-tree` or `project-workspace` modules (`chat-host`, which registers nothing, it does) and reads through `usePageAnchors`. why: both sides depend on `shared`, neither on the other.
+- Their modules' other files may import the companion: `project-workspace` mounts it (`WorkspaceFrame`, `WorkspaceRail`, `CompanionHost`, `ProjectCommandPalette`). The boundary is the registrar files, not the modules.
+
+## Not the live bus
+- The bus retains JSON per allow-listed topic and compares readings by `JSON.stringify`; it is also the vocabulary the widget bridge shows untrusted frames. An element is not JSON; a rect published per scroll would stringify the sidebar sixty times a second.
+- The registry holds ELEMENTS and nothing measured; the reader measures at the moment it looks one up.
+- State is two refs (`Map<string, HTMLElement>`, `Set` of listeners), never React state. why: a registration must not re-render the tree under the provider; sidebar rows register on every mount.
+
+## Keys — `PAGE_ANCHOR` (`src/shared/constants.ts`, group `PAGE ANCHORS`)
+| key | spelling | registered by | on |
+|---|---|---|---|
+| `chatRow(id)` | `chat-row:<id>` | `SidebarSimpleListRow` (`row.sessionId`), `SidebarSessionItem` (`session.id`) | the row's root `div` |
+| `composer(id)` | `composer:<id>` | `ChatComposer`, `id` = its own `sessionId`; `null` without one (a new chat has no key) | the `div.relative.mx-auto.max-w-[54.25rem]` around the field |
+| `filesView` | `files-view` | `FileTree` | its root, one callback ref handing the node to the upload's `treeRef` and the anchor |
+| `railFiles` | `rail:files` | `RailButton` through its optional `anchorKey` prop (absent registers nothing); `WorkspaceRail` passes it for `view.id === 'files'` | the rail button |
+
+## `data-page-anchor`
+- The provider stamps `data-page-anchor="<key>"` on each element it HOLDS and takes it off on release or displacement. why: one selector finds the registrations on screen, for a probe and for the console.
+- Console: `document.querySelectorAll('[data-page-anchor]').length` = anchors registered on screen, one `chat-row:` per visible sidebar row.
+- One element carries one stamp: registered under two keys it shows only the later.
+
+## API
+| export | does |
+|---|---|
+| `PageAnchorsProvider({ children })` | holds the registry; its value has one identity for its life, so no consumer is woken by it |
+| `usePageAnchor(key: string \| null): (element: HTMLElement \| null) => void` | returns a ref callback; `null` key registers nothing. One identity per `key` (`useCallback` on the provider and the key), so React never detaches and re-attaches it on a plain re-render |
+| `usePageAnchors(): { element(key): HTMLElement \| null; subscribe(listener): () => void }` | the reader. Throws `usePageAnchors must be used within a PageAnchorsProvider` outside one. One identity for the provider's life |
+- `usePageAnchor` outside a provider registers nothing and does not throw. why: the rows and the tree are also drawn in surfaces with no guide above them.
+
+## Rules
+1. The last element mounted under a key wins; the displaced element loses its stamp.
+2. An element unmounting, or its key changing, releases only its own claim; a newer holder of the same key stays. why: the ref callback is handed `null` on detach and cannot say which element left, so the call site remembers the one it registered.
+3. `claim` of the element already held notifies nobody.
+4. `subscribe(listener)`: the listener is told THAT a registration changed, never which; the reader looks its own key up again. Returns the unsubscribe.
+5. A listener that throws is `console.error`ed (`[PageAnchors] a listener threw …`) and does not stop the others.
+
+## Held is not drawn — the reader measures and refuses
+`element(key)` returns what is MOUNTED. Measured on the dev client:
+| case | what the registry holds |
+|---|---|
+| Files view open; the chat view stays mounted and hidden | `composer:<id>` at 0×0 at 0,0 |
+| phone, drawer closed | every `chat-row:` and `rail:files` mounted off screen (44×44 at −329,114) |
+| row scrolled out of the sidebar's own scroller | still held |
+| chat floated into another window | the same node under another `ownerDocument`; its rect is in that window's coordinates |
+| off the Files view | `files-view` absent: the tree unmounts. The only key that is "drawn or absent" |
+- The reader refuses a rect with no area, one outside its viewport, an element whose `ownerDocument` is not its own, and one something stands over; it falls to the next anchor. `sightOf` in `useAvatarTarget`: MAN-9132 §"In sight".
+
+## Proof — `node .verify/page-anchors-live.mjs`
+- Gitignored (`.verify/`). Live client `:5183` (`ANCHORS_APP=<url>` for a scratch client). No model call; preference writes are dropped, so the dev account is never changed.
+- Registry rules in a fixture mounting the app's own provider: last wins, unmount clears its own claim only, `null` registers nothing, a changed key moves the stamp, `subscribe` hears each change and stops when told.
+- On the page: (1) simple list, no chat open: a `chat-row:` per visible row and `rail:files`, no `composer:`; (2) a chat opened from its row: `composer:<its id>` on the input box; (3) Files view: `files-view` on the tree root and `rail:files` on the rail's Files button, `files-view` gone back on Chat; (4) tree list (`simpleChatList: false`): a `chat-row:` per session row, none doubled.
+- 2026-10-27: PASS, 30 ok, 0 failed. Counts on the dev account at 1440×900: 19 (simple list), 20 (chat open), 21 (Files open), 22 (tree list).
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/chat/composer/ChatComposer.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/file-tree/FileTree.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/ProjectWorkspaceShell.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/RailButton.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/project-workspace/WorkspaceRail.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/SidebarSessionItem.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/sidebar/SidebarSimpleListRow.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/shared/context/PageAnchorsContext.tsx, /home/lyphe/.claude/claudecodeui_lyphe/.verify/page-anchors-live.mjs
+
+## MAN-9132 — src/modules/companion — where she looks: useAvatarTarget, the targets and their order, the in-sight test, the 1.5 s hold, avatarPlacement
+
+Her button (`CompanionFab`, MAN-9125) is drawn at `avatarPlacement` of the rect `useAvatarTarget` returns while a look holds her, and rests otherwise. The anchors are the page's registry (MAN-9131). The presence it reads: MAN-9134. `CompanionFab` binds both: MAN-9129.
+
+## `useAvatarTarget(presence: CompanionPresence, buttonRect: DOMRect | null = null): { key: string; rect: DOMRect } | null` — `hooks/useAvatarTarget.ts`
+- `buttonRect`: her rest's box (`restRect` of `CompanionFab`), for in-sight test 4; null = nothing is under the button.
+- Reads `usePageAnchors()` (throws outside `PageAnchorsProvider`) and `useCompanion().recentSend`.
+- Returns the first anchor of the look that is in sight, with its rect as measured then in viewport px; null when none.
+- Barrel: not exported. `CompanionFab` is its one caller.
+
+## Targets and their order
+Three looks, tried in this order; the first that applies is the only one tried.
+| # | applies when | anchors, best first |
+|---|---|---|
+| 1 | `presence.state === 'reading_code'` or `presence.files !== null` | `files-view`, `rail:files` |
+| 2 | `presence.session !== null`: a chat read, drafted for or walked | `chat-row:<sessionId>`, `composer:<sessionId>` |
+| 3 | `recentSend !== null`: a draft sent in the last `RECENT_SEND_MS` = 4000 ms (MAN-9083) | `composer:<recentSend>` |
+- The look is the presence's SUBJECT (`files`, `session`), not its state word. why: a sentence she speaks while reading turns `state` to `speaking`; the target must hold through it.
+- A chat read outranks the send look: reading A within 4 s of a send to A stands on the row; when the read ends the composer takes over inside the send window.
+
+## In sight — `sightOf(element, buttonRect)`: all four hold, else the anchor is no target and the next anchor is tried
+1. Connected, and `ownerDocument === document`. why: a chat floated into another window is the same node with a rect in that window's coordinates.
+2. The rect has width and height > 0 and meets the viewport (`right > 0`, `bottom > 0`, `left < innerWidth`, `top < innerHeight`). why: a hidden chat view holds its composer at 0×0; a phone's closed drawer holds every row off to the left.
+3. `document.elementFromPoint` at the rect's centre lands on the anchor or inside it. why: an application, a dialog or her own panel over it, or the sidebar's scroller clipping it, leaves her at home; a centre off screen has no element and fails.
+4. The rect is not wholly inside `buttonRect`. why: she is already standing on it.
+
+## Hold — `TARGET_HOLD_MS` = 1500
+- The look ends (no anchor keys) with a target standing: a timer drops it 1500 ms later. A look that returns inside the window takes the hold back; a held anchor that leaves sight ends it early.
+- why: a run of tool calls (each ends, the next begins a moment later) keeps her where she is. 0.9 s between two calls: she never left.
+- While held, only the held key is re-tested.
+- Send look: 4000 ms window + 1500 ms hold = dropped 5501 ms after the frame.
+
+## Events, not watchdogs — what is attached
+| state | `scroll` (capture, passive) | `resize` | registry `subscribe` |
+|---|---|---|---|
+| no look, no target | no | no | no |
+| a look, nothing in sight | no | no | yes |
+| a target holds (look or hold) | yes | yes | yes |
+- Re-measured when: the look changes; the registry announces a registration; and, only while a target holds, `scroll` or `resize`. Each schedules ONE `requestAnimationFrame` (`measureOnNextFrame`): a burst measures once.
+- `isSameTarget`: the same key at the same rect keeps the held object; a re-measure that found nothing new renders nothing.
+- Nothing polls. A look standing with nothing in sight has no scroll or resize listener: only a registration or a change of look brings her back (an overlay closing announces neither).
+- Unmount cancels the pending frame.
+
+## `avatarPlacement(anchor: DOMRect, size: number, viewport: { width; height; safe?: { top; right; bottom; left } }): { left: number; top: number }` — `utils/avatarPlacement.ts`
+- Returns the disc's top-left in viewport px, whole numbers (a half pixel blurs the rim).
+- Imports nothing. why: `tsx` loads it with no `@/` resolver, so the proof runs it on bare numbers.
+- `CompanionFab` calls it with `look.rect`, `FAB_SIZE_PX` (28) and `{ width, height, safe }`: `width`/`height` from `useSyncExternalStore` on `resize`, subscribed only while a look holds her; `safe` from `readSafeInsets()` (`env(safe-area-inset-*)`), read once per hold and again when the window's size changes.
+| anchor, told by height alone | place |
+|---|---|
+| ROW: height ≤ `ROW_MAX_HEIGHT_PX` = 88 (sidebar row 54, rail Files button 40) | disc centre `ROW_CENTRE_PAST_EDGE_PX` = 10 past the row's right edge, centred on the row |
+| BOX: taller (composer 123 desktop / 115 phone, file tree) | disc centre on the box's top-right corner |
+- 88 sits between the tallest row and the shortest composer, nearer the rows: a row that grows a line stays a row.
+- 10 because the measure is the disc's CENTRE within 12 px of the row's right edge, true at any disc size (28 and 44 both read 10).
+- The clamp comes last and always applies: each edge of the safe area + `VIEWPORT_EDGE_PX` = 8 (the kit's `DockableFab` edge, not exported). A window too small for the disc gives the top-left. A non-finite width, height or inset counts as 0, so the answer is always a number.
+- Residual: beside the rail button and at the file tree's corner her 44 px catch lies over real controls (INV-9982).
+
+## Proof
+- `node --import tsx .verify/kaylee-avatar-placement.mjs`: the placement on bare numbers; rects measured on the dev client (row 242×54, Files button 40×40, composer 836×123 / 374×115). 2026-10-27: ALL PASS, 23 checks.
+- `node .verify/kaylee-avatar-target.mjs [--strict]` (live client `:5183`; `--strict` mounts under `React.StrictMode`): `lib/avatar-target-kit.mjs` registers four anchors and steps a scripted presence; prints key, rect and what is attached at each step. No model call. 2026-10-27: ALL PASS, 32 checks: row, tree, rail fallback, covered, clipped, 0×0, below the fold, under the button, the 1.5 s hold, the send look's 5501 ms, nothing attached at home, nothing left after unmount.
+- On the live page with a real turn (Haiku): MAN-9130.
+
+governs: /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/CompanionFab.tsx, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/hooks/useAvatarTarget.ts, /home/lyphe/.claude/claudecodeui_lyphe/src/modules/companion/utils/avatarPlacement.ts, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-avatar-placement.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/kaylee-avatar-target.mjs, /home/lyphe/.claude/claudecodeui_lyphe/.verify/lib/avatar-target-kit.mjs

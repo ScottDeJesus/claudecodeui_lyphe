@@ -1,8 +1,8 @@
-import type { TFunction } from 'i18next';
-import { useId } from 'react';
+import { useEffect, useId, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import '@/modules/companion/CompanionAvatar.css';
+import { presenceWords } from '@/modules/companion/utils/presenceWords';
 import type { CompanionPresence } from '@/shared/types';
 
 type CompanionAvatarProps = {
@@ -22,50 +22,6 @@ type CompanionAvatarProps = {
 /** The walk ring's radius in the 100-unit square: it runs just outside the head (radius 37) and inside the square's edge, whose stroke the stylesheet sets. */
 const RING_RADIUS = 45;
 
-/** At most this many file names ride the accessible name of "reading code"; more are counted instead. */
-const FILES_NAMED = 2;
-
-/** A path's last segment: a name says which file, never where it lives. */
-const baseName = (path: string): string => path.split(/[\\/]/).filter(Boolean).pop() ?? path;
-
-/**
- * The words under her face, as the accessible name: her name, then what she is doing ("Kaylee, reading Bugfixes"). The
- * subject is the chat or the files the presence carries; a presence that names none says "a chat" or "code" instead. Every
- * word is a `t()` with its English default, since only English carries them yet.
- */
-function nameOf(t: TFunction, name: string, presence: CompanionPresence): string {
-  const chat = presence.session?.name;
-  const files = presence.files ?? [];
-  const words = (key: string, english: string, extra?: Record<string, unknown>) =>
-    t(`companion.avatar.${key}`, { name, defaultValue: english, ...extra });
-  switch (presence.state) {
-    case 'idle':
-      return words('idle', '{{name}}, ready');
-    case 'listening':
-      return words('listening', '{{name}}, listening');
-    case 'transcribing':
-      return words('transcribing', '{{name}}, transcribing');
-    case 'thinking':
-      return words('thinking', '{{name}}, thinking');
-    case 'speaking':
-      return words('speaking', '{{name}}, speaking');
-    case 'reading_session':
-      return chat ? words('readingSession', '{{name}}, reading {{chat}}', { chat }) : words('readingAChat', '{{name}}, reading a chat');
-    case 'reading_code':
-      if (files.length === 0) return words('readingCode', '{{name}}, reading code');
-      if (files.length <= FILES_NAMED) return words('readingFiles', '{{name}}, reading {{files}}', { files: files.map(baseName).join(', ') });
-      return words('readingManyFiles', '{{name}}, reading {{count}} files', { count: files.length });
-    case 'drafting':
-      return chat ? words('draftingFor', '{{name}}, drafting for {{chat}}', { chat }) : words('draftingNew', '{{name}}, drafting a new chat');
-    case 'walking':
-      return chat && presence.walk
-        ? words('walking', '{{name}}, walking {{chat}}, item {{at}} of {{total}}', { chat, at: presence.walk.at, total: presence.walk.total })
-        : words('walkingPlain', '{{name}}, walking a result');
-    case 'cut':
-      return words('cut', '{{name}}, stopped talking');
-  }
-}
-
 /**
  * Kaylee's face, "the light that guides this project": a round, warm, bright face drawn in code (SVG and CSS on Verve's
  * tokens, no image), so it follows the theme, scales without blur and moves cheaply. Used by this module's button, which
@@ -76,6 +32,12 @@ function nameOf(t: TFunction, name: string, presence: CompanionPresence): string
  * beside this file holds every look and every keyframe. A state's LOOK is its still frame and its MOVEMENT is added only
  * under `prefers-reduced-motion: no-preference`, so reduced motion keeps each look and drops the movement.
  *
+ * WHICH STATE DRAWS WHICH LOOK. `data-state` carries the presence state as it is, fourteen words. Ten have a look of their
+ * own (idle, listening, transcribing, thinking, speaking, reading_session, reading_code, drafting, walking, cut) and `failed`
+ * is the eleventh: she is still (no breath, no blink loop, in either motion mode), her eyes level and soft, her mouth a level
+ * line, and the status line's amber, `--warn-dot`, a ring that stands clear of the orb. The other three share a look:
+ * `asleep` and `loading` draw idle's, and `waking` draws thinking's (a word is on its way).
+ *
  * THE MOUTH is one CSS variable, `--kaylee-mouth`, 0 (closed smile) to 1 (open wide): the open mouth scales on it, so
  * whatever writes the variable moves her lips and nothing in React redraws. Only a speaking face hears it: the open mouth is
  * off in every other state, so a value left in the variable never opens the mouth of a face that has stopped. She walks a result on a ring at
@@ -84,7 +46,7 @@ function nameOf(t: TFunction, name: string, presence: CompanionPresence): string
  * Her accessible name is her name and the state in words ("Kaylee, reading Bugfixes"), which a button around her may
  * replace with a label of its own.
  */
-export function CompanionAvatar({ presence, size, name }: CompanionAvatarProps) {
+export function CompanionAvatar({ presence, level, size, name }: CompanionAvatarProps) {
   const { t } = useTranslation();
   // One id per face: a page holds several (the button, the panel, the fixtures) and a gradient or clip reached by a shared
   // id would be the first face's, or nothing once that one unmounts.
@@ -104,17 +66,39 @@ export function CompanionAvatar({ presence, size, name }: CompanionAvatarProps) 
   // A walk with no items has nowhere to fill: the track alone. At 0 of n ("set up, not begun") the arc is empty too.
   const filled = walk && walk.total > 0 ? Math.min(1, Math.max(0, walk.at / walk.total)) : 0;
 
-  // FILL(fill): a requestAnimationFrame loop that runs only while the state is speaking and writes level() into --kaylee-mouth
+  // The face's own element, which the mouth loop writes the variable onto: the CSS reads it there, and nothing in React redraws.
+  const faceRef = useRef<SVGSVGElement>(null);
+  const speaking = state === 'speaking';
+
+  // THE MOUTH LOOP runs only while she is speaking: a frame is scheduled by the one before it, so a face that is not
+  // speaking schedules none, and the cleanup both stops the loop and hands the variable back to the stylesheet's 0. `level`
+  // is the provider's one function for the page's life, so the loop is not restarted mid-sentence, and it already answers
+  // 0..1 (the player clamps it), which is the variable's range: measured, a spoken sentence opens the mouth to 0.4 at its peaks.
+  useEffect(() => {
+    const face = faceRef.current;
+    if (!speaking || !face) return undefined;
+    let frame = 0;
+    const follow = () => {
+      face.style.setProperty('--kaylee-mouth', String(level()));
+      frame = requestAnimationFrame(follow);
+    };
+    frame = requestAnimationFrame(follow);
+    return () => {
+      cancelAnimationFrame(frame);
+      face.style.removeProperty('--kaylee-mouth');
+    };
+  }, [speaking, level]);
 
   return (
     <svg
+      ref={faceRef}
       className="kaylee"
       data-state={state}
       viewBox="0 0 100 100"
       width={size}
       height={size}
       role="img"
-      aria-label={nameOf(t, her, presence)}
+      aria-label={presenceWords(t, her, presence)}
     >
       <defs>
         <radialGradient id={skinId} cx="38%" cy="32%" r="78%">

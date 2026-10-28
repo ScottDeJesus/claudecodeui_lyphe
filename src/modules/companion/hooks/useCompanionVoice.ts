@@ -39,6 +39,8 @@ type CompanionVoiceHook = {
   release: () => void;
   /** Stops what sounds and asks for nothing more of the turn, with the floor kept (Stop, Clear). */
   silence: () => void;
+  /** The player's `level()` — its RMS over the last 43 ms, 0..1, and 0 when nothing sounds — for her face's mouth. One function for the page's life. */
+  level: () => number;
 };
 
 /**
@@ -123,5 +125,7 @@ export function useCompanionVoice({ picture, clientId }: { picture: CompanionPic
   const release = useCallback(() => engine.release(), [engine]);
 
   const voice = useMemo<CompanionVoice>(() => ({ on, setOn, speaking, cut }), [on, setOn, speaking, cut]);
-  return useMemo(() => ({ voice, unlock, cutOff, release, silence }), [voice, unlock, cutOff, release, silence]);
+  // The player's `level` closes over the player's own graph and never reads `this`, so it is handed out as it stands and keeps one identity.
+  const { level } = player;
+  return useMemo(() => ({ voice, unlock, cutOff, release, silence, level }), [voice, unlock, cutOff, release, silence, level]);
 }

@@ -334,13 +334,36 @@ export const FAB_SIZE_PX = 28;
 export const FAB_CATCH_PX = 44;
 
 /**
- * The kit's FAB, found in the page: the node the switcher's radial fans out from and gives focus back to, and the
- * node the dock hands focus to when the list collapses. There is one. The class is `DockableFab`'s own (surfaces.css).
+ * The floating default's inset, in px, from the window's bottom-right corner to the FAB's own top-left corner: 72 leaves
+ * the button's right edge 44px off the right of the window, 112 its foot 84px above the bottom edge (measured at
+ * 390x844, 2026-09-17). The retired hub's numbers, carried over when the button was 56px and kept when it became
+ * 28 — which is why the gaps read wider than the margin they once meant.
+ *
+ * 84px up is NOT clear of a phone's chat composer, which docks to the same edge: the 44px catch around the dot covers
+ * the right end of the composer's first line, and a press there opens the sheet instead of placing the caret. Left as it
+ * stands, deliberately — no pair of fixed insets clears a composer whose height follows the text in it and the
+ * keyboard, and lifting the button past the composer puts that same 44px catch in the middle of the conversation's
+ * scroll, where a press meant for the text moves the button.
+ *
+ * Used by the app-switcher module's storage (where a reader who never touched the button starts on a phone) and the
+ * companion module's disc, whose phone corner stands one catch to the left of that spot: change the 72 and the two
+ * discs' catches overlap.
+ */
+export const FAB_DEFAULT_INSET_X = 72;
+
+/** The same default's vertical inset (see `FAB_DEFAULT_INSET_X`): the window's bottom edge to the FAB's top edge, in px. */
+export const FAB_DEFAULT_INSET_Y = 112;
+
+/**
+ * The switcher's FAB, found in the page: the node the switcher's radial fans out from and gives focus back to, and the
+ * node the dock hands focus to when the list collapses. The class is `DockableFab`'s own (surfaces.css), and the
+ * companion's disc, which is the same kit piece inside its `[data-companion-fab]` layer, is left out, so the match is
+ * the applications button whatever order the two mount in.
  *
  * Used by the app-switcher module's AppSwitcherRadial (the press that is its own toggle, and where an Escape or a
  * keyboard-chosen act returns focus) and AppSwitcherDock (where focus lands as the list collapses).
  */
-export const FAB_SELECTOR = '.vv-fab';
+export const FAB_SELECTOR = '.vv-fab:not([data-companion-fab] .vv-fab)';
 
 // ---------------------------
 

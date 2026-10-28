@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 
 import { AccountRailButton, UsageRings } from '@/modules/accounts';
 import { AppSwitcherDock } from '@/modules/app-switcher';
-import { CompanionDoorButton } from '@/modules/companion';
+import { CompanionDock } from '@/modules/companion';
 import { useProjectSidebarState } from '@/modules/project-workspace/context/ProjectsStateContext';
 import { useRailBadges } from '@/modules/project-workspace/hooks/useRailBadges';
 import { useWorkspaceViews } from '@/modules/project-workspace/hooks/useWorkspaceViews';
@@ -157,7 +157,7 @@ export default function WorkspaceRail({ list, isMobile }: { list: SidebarListSta
       </div>
       <div className="relative z-40 flex flex-none flex-col items-center">
         <UsageRings />
-        <CompanionDoorButton />
+        <CompanionDock />
         {footViews.map(viewButton)}
         <RailButton
           label={t('rail.settings')}

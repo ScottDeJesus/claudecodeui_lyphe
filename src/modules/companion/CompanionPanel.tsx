@@ -22,7 +22,7 @@ type CompanionPanelViewProps = {
   open: boolean;
   /** Whether the draft's target chat is working right now. */
   targetWorking: boolean;
-  /** What she is doing on this page (`useCompanionPresence`): the header's status line draws it. */
+  /** What she is doing on this page, her process included (`useCompanionPresence`): the header's status line draws it, and only it. */
   presence: CompanionPresence;
   /** The page's one talk press: the composer's talk button draws and presses it. Absent, the composer has no talk button. */
   talk?: TalkPress;
@@ -41,17 +41,18 @@ type CompanionPanelViewProps = {
 };
 
 /**
- * Her door, the panel's way back when it closes from the keyboard: the rail's door where it is drawn, else her disc (the
- * kit's button in CompanionFab's layer), which is the door while it is seated and the rail's cell draws none. The rail's
- * door comes first in the document, so it wins wherever both stand.
+ * Her door, the panel's way back when it closes from the keyboard: the rail's door where it is drawn, and her disc (the
+ * kit's button in CompanionFab's layer), which is the door while it is seated and the rail's cell draws none. The first
+ * of them on screen takes the focus: below md the rail's door stands in the closed drawer, drawn but hidden, while her
+ * disc is in its corner.
  */
 const DOOR_SELECTOR = '[data-companion-door], [data-companion-fab] > .vv-fab';
 
 /**
  * HER PANEL, drawn: Kaylee beside every chat, tied to none. Exported for this file's CompanionPanel, which hands it the
  * page's picture and verbs, and for `.verify/companion-panel-scaffold.mjs`, `.verify/kaylee-talk-scaffold.mjs` and
- * `.verify/kaylee-voice-scaffold.mjs`, which mount it on fixture pictures, each with the `presence` its fixture's activity,
- * press and voice resolve to (the second with a talk press, the third with a voice too).
+ * `.verify/kaylee-voice-scaffold.mjs`, which mount it on fixture pictures, each with the `presence` its fixture's picture
+ * (process and activity), press and voice resolve to (the second with a talk press, the third with a voice too).
  *
  * WHERE IT STANDS. It floats over whatever view or application is up — never a view, so the chat and the application
  * stay in sight beside her. From lg it is a 400px column at the right edge, 12px in, at the floating chat's level (z-45:
@@ -66,8 +67,9 @@ const DOOR_SELECTOR = '[data-companion-door], [data-companion-fab] > .vv-fab';
  * floating chat at 45 — would open under the sheet anyway; dialogs, menus and toasts are portalled and stay above it.
  *
  * TOP TO BOTTOM: the header (who, what she is doing, the focus, the controls, and this device's voice switch given
- * `voice`; its status line draws `presence`, in which the page's own state wins over her activity: Cut for a breath after
- * a press that stopped her voice, then his press, Listening or Transcribing, then Speaking while this page sounds her); a warn
+ * `voice`; its status line draws `presence` alone, in which the page's own state wins over her process and her activity: Cut
+ * for a breath after a press that stopped her voice, then his press, Listening or Transcribing, then Speaking while this
+ * page sounds her, then Loading, Stopped, Asleep or Waking while her process is not awake); a warn
  * Banner while her process has failed — the server's sentence, pinned where the eye lands, while the log keeps the
  * system line as history and the status line says the next message starts her again; the log, marking the sentence
  * being spoken; the dock — the walkthrough, her notes, the draft; the composer, with the talk button before send.
@@ -90,7 +92,7 @@ const DOOR_SELECTOR = '[data-companion-door], [data-companion-fab] > .vv-fab';
  * phase): the chat stops its running turn on any Escape nobody claimed, and a key pressed in her composer is not his
  * chat's. Opened on a desktop it puts the cursor in her composer; on a touch screen it does not, so opening her to read
  * the draft does not raise the keyboard. Closed from inside, it hands focus back to her door when it is on screen: the
- * rail's door, or her disc while it sits in the rail's cell in the door's place.
+ * rail's door, or her disc, wherever it stands on screen.
  */
 export function CompanionPanelView({
   picture, open, targetWorking, presence, talk, voice, onClose, onSendText, onModelChange, onLiveChange, onInterrupt, onClear,
@@ -106,8 +108,10 @@ export function CompanionPanelView({
   const close = useCallback(() => {
     const focusWasInside = panelRef.current?.contains(document.activeElement) ?? false;
     onClose();
-    const door = document.querySelector<HTMLElement>(DOOR_SELECTOR);
-    if (focusWasInside && door && door.offsetParent !== null) door.focus();
+    // On screen, not merely in the page: a door in the closed drawer keeps its `offsetParent` under `visibility: hidden`,
+    // and refuses the focus.
+    const door = [...document.querySelectorAll<HTMLElement>(DOOR_SELECTOR)].find((el) => el.checkVisibility({ visibilityProperty: true }));
+    if (focusWasInside && door) door.focus();
   }, [onClose]);
 
   useEffect(() => {

@@ -714,3 +714,37 @@ export function recordingFileName(mimeType: string): string {
   const extension = mimeType.includes('mp4') ? 'm4a' : mimeType.includes('ogg') ? 'ogg' : 'webm';
   return `recording.${extension}`;
 }
+
+// ---------------------------
+
+//----------------- A DOCK'S MEASURED RECT ------------
+
+/**
+ * The rect a floating button may dock to, or null — the two rules a measured rect has to pass before it is believed.
+ *
+ * A NON-ZERO RECT IS NOT ENOUGH. The sidebar's mobile drawer is hidden with `invisible opacity-0`, and
+ * `visibility: hidden` KEEPS the layout box: `getBoundingClientRect()` answers the dock's full size from a point a
+ * drawer's width off the left edge, roughly 85vw away. A record reading `docked: true` against that rect paints the
+ * button off-screen — and the button is the reader's only way out of a pane. So the rect must also INTERSECT THE
+ * VIEWPORT. Null in, null out, and null is a real answer rather than an error: it means the button has nowhere to dock
+ * and the kit floats it at its clamped resting corner instead of at a remembered ghost.
+ *
+ * Used by the app-switcher module's provider (`registerDock`) and the companion module's (`registerDock`): each dock
+ * hands over what `getBoundingClientRect()` said about its box in the sidebar's views rail.
+ */
+export function dockableRect(rect: DOMRect | null): DOMRect | null {
+  if (rect === null || rect.width === 0 || rect.height === 0) return null;
+  const intersectsViewport =
+    rect.right > 0 && rect.bottom > 0 && rect.left < window.innerWidth && rect.top < window.innerHeight;
+  return intersectsViewport ? rect : null;
+}
+
+/**
+ * Whether two rects are the same place. A dock re-measures on every resize, so an unchanged measurement has to leave the
+ * state object it found: a fresh `DOMRect` with the same numbers would re-render the provider, and a re-render that moved
+ * the button would ask for another measurement. Used by the same two providers, beside `dockableRect`.
+ */
+export function sameRect(a: DOMRect | null, b: DOMRect | null): boolean {
+  if (a === null || b === null) return a === b;
+  return a.left === b.left && a.top === b.top && a.width === b.width && a.height === b.height;
+}

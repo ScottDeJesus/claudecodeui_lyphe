@@ -2,6 +2,7 @@ import { AudioLines } from 'lucide-react';
 import { useLayoutEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { useCompanion } from '@/modules/companion/context/CompanionContext';
 import { RAIL_BUTTON_BASE, RAIL_BUTTON_LIT, RAIL_BUTTON_UNLIT } from '@/shared/constants';
 import { Tooltip } from '@/shared/ui';
 import { cn } from '@/shared/utils';
@@ -102,11 +103,14 @@ type CompanionDockViewProps = {
  * no rect: her disc rests in its own corner on a phone, the drawer's cell draws her door, and opening or closing the
  * drawer never carries her in or out of it.
  *
- * WHEN THE BOX MOVES, and there are two ways it can: a window resize reflows the rail (and crosses md), and the sidebar's
- * drawer slides in and out under a transform, whose `transitionend` is the one signal it gives without being imported.
- * The foot holds nothing that changes height beside the cell (the rings always draw, the Inbox always stands), so no
- * observer is needed. The rect is reported as measured; the companion's context decides whether it is a place a disc
- * can be sent (non-empty, and on screen).
+ * WHEN THE BOX MOVES: with a window resize, which reflows the rail, and when the rail changes layout at md. From md up the
+ * sidebar is docked and nothing slides it (its drawer's transform and fade exist only below md, where the box reports
+ * nothing), and the foot holds nothing that changes height beside the cell (the rings always draw, the Inbox always
+ * stands). The one move a resize cannot see is the crossing of md itself: the `resize` event fires BEFORE React draws the
+ * layout the new width asks for, so growing from a phone to a desktop width reads the drawer's off-screen box and the
+ * context rightly refuses it. The browser's own word that the box has come into view, or left it, arrives after that
+ * layout (an IntersectionObserver on the box), and reports once more; nothing polls. The rect is reported as measured;
+ * the companion's context decides whether it is a place a disc can be sent (non-empty, and on screen).
  *
  * The cell's size and shape are `RAIL_BUTTON_BASE`'s own, so the cell and the door it draws can never part.
  */
@@ -127,10 +131,12 @@ export function CompanionDockView({ seated, away, open, name, onPress, onRect }:
     const report = () => rectListener.current(window.matchMedia(RAIL_DOCKED_QUERY).matches ? box.getBoundingClientRect() : null);
     report();
     window.addEventListener('resize', report);
-    document.addEventListener('transitionend', report);
+    // Told after the layout that moved the box (see "WHEN THE BOX MOVES"): its first call, on observing, is one more report of the same rect.
+    const sight = new IntersectionObserver(report);
+    sight.observe(box);
     return () => {
       window.removeEventListener('resize', report);
-      document.removeEventListener('transitionend', report);
+      sight.disconnect();
       // Gone, so the rect goes with it: a remembered rect is exactly where a disc would be drawn, out of reach.
       rectListener.current(null);
     };
@@ -159,24 +165,18 @@ export function CompanionDockView({ seated, away, open, name, onPress, onRect }:
  * from the door; CompanionDockView draws it.
  */
 export function CompanionDock() {
-  // FILL(fill): seated — her rest is docked and this dock is believed: `fabPosition.docked && dockRect !== null` from useCompanion()
-  const seated = true;
-  // FILL(fill): away — a look holds her disc away from its seat: the look CompanionFab is drawn at, shared through the context
-  const away = false;
-  // FILL(fill): open and her name — `const { picture, open, setOpen } = useCompanion();`, the name being `picture?.settings.name ?? null`
-  const open = false;
-  const name: string | null = null;
+  const { picture, open, setOpen, fabPosition, dockRect, fabAway, registerDock } = useCompanion();
+  // Seated: her rest is docked AND the cell is believed (on screen, rail docked). A disc docked on a phone rests in its corner, so the drawer's cell draws her door.
+  const seated = fabPosition.docked && dockRect !== null;
 
   return (
     <CompanionDockView
       seated={seated}
-      away={away}
+      away={fabAway}
       open={open}
-      name={name}
-      // FILL(fill): press — setOpen(!open), the disc's own press
-      onPress={() => {}}
-      // FILL(fill): registerDock — the companion context's `registerDock(rect)`, which believes a rect only while it is on screen; the view hands it null below md
-      onRect={() => {}}
+      name={picture?.settings.name ?? null}
+      onPress={() => setOpen(!open)}
+      onRect={registerDock}
     />
   );
 }

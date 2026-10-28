@@ -1068,13 +1068,15 @@ export type CompanionVoice = { on: boolean; setOn: (on: boolean) => void; speaki
 //----------------- COMPANION PRESENCE ON THE PAGE ------------
 
 /**
- * What Kaylee is doing on this page right now, as the one word for her activity, her talk press and her player together.
- * It has no word for her process (asleep, waking, failed) or a picture still loading: the status line takes those words
- * from the picture, and here the state is what her activity says ('idle' at rest). The first three beat everything else,
- * in this order, because they are the page's own: 'cut' (the 900 ms breath after a talk press stopped her voice
- * mid-sentence) > 'listening' > 'transcribing' (his talk press) > 'speaking' (this page's player is sounding a sentence of
- * hers). Below them it is her activity's phase, named as it is: 'reading_code' > 'reading_session' > 'drafting' >
- * 'walking' > 'thinking' > 'idle'. Produced only by the companion module's `useCompanionPresence`.
+ * What Kaylee is doing on this page right now, as the one word for her activity, her talk press, her player and her
+ * process together: the button's face and label and the panel's status line both read it, so they never differ. Fourteen
+ * words, in the order they win. The first four are the page's own: 'cut' (the 900 ms breath after a talk press stopped
+ * her voice mid-sentence) > 'listening' > 'transcribing' (his talk press) > 'speaking' (this page's player is sounding a
+ * sentence of hers). Then her picture and her process: 'loading' (this page has not read her picture yet) > 'failed' >
+ * 'asleep' > 'waking' (her process is not awake); a button that said "ready" while she could not answer would be good
+ * news she has not earned. Last is her activity's phase, named as it is: 'reading_code' > 'reading_session' > 'drafting'
+ * > 'walking' > 'thinking' > 'idle'.
+ * Produced only by the companion module's `presenceOf`, through `useCompanionPresence`.
  */
 export type CompanionPresenceState =
   | 'idle'
@@ -1086,15 +1088,22 @@ export type CompanionPresenceState =
   | 'reading_code'
   | 'drafting'
   | 'walking'
-  | 'cut';
+  | 'cut'
+  | 'loading' // this page has not read her picture yet
+  | 'failed' // her process failed: picture.process.state is 'failed'
+  | 'asleep' // her process is closed; his next word wakes her
+  | 'waking'; // her process is starting
 
 /**
- * Kaylee's presence on this page: the `state` and what it concerns, all taken from her server-held activity. `session` is
- * the chat a read, a draft or a walk is about, `files` the file names a code read has open and `walk` the walkthrough's
- * place (`at` of `total`, 1-based; `0` when it is set up and not begun); each is null when her activity names none. They
- * are carried whatever the `state`, so a page-owned state such as 'listening' still knows where she was looking. One value
- * per change of its parts, so a consumer that memoizes on it redraws only when she does. Built by the companion module's
- * `useCompanionPresence` and drawn by its CompanionHeader, whose status line CompanionPanel hands it to.
+ * Kaylee's presence on this page: the `state`, which is the page's own talk press or player when one outranks the rest,
+ * else 'loading' while her picture is unread, else her process when it is not awake, else her activity's phase, and what
+ * it concerns, which is taken from her server-held activity. `session` is the chat a read, a draft or a walk is about,
+ * `files` the file names a code read has open and `walk` the walkthrough's place (`at` of `total`, 1-based; `0` when it is
+ * set up and not begun); each is null when her activity names none. They are carried whatever the `state`, so a
+ * page-owned state such as 'listening' still knows where she was looking. One value per change of its parts, so a
+ * consumer that memoizes on it redraws only when she does. Built by the companion module's `useCompanionPresence` and
+ * read by two of its consumers: CompanionHeader, whose status line CompanionPanel hands it to, and CompanionFab, which
+ * draws it as the button's face and label and points the button by it (`useAvatarTarget`).
  */
 export type CompanionPresence = {
   state: CompanionPresenceState;
