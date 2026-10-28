@@ -15,7 +15,7 @@ const RETRY_DELAY_MS = 2_000;
  */
 const NO_SPEECH_MARK = '[no speech]';
 
-const TRANSCRIPTION_INSTRUCTION = 'Transcribe the speech in this audio verbatim, in the language it is spoken. '
+const TRANSCRIPTION_INSTRUCTION = 'Transcribe the speech in this audio in the language it is spoken, as clean speech: leave out filler sounds (um, uh, er, ah, hmm, mm), stutters and false starts, write a word or short phrase said twice in a row once ("the, the lane" is "the lane", "and, and" is "and"), and keep every other word as it was spoken, in its order, with no paraphrase and no other correction. '
   + 'Output only the words spoken, with no commentary, labels, timestamps or quotation marks. '
   + `If the audio holds no spoken words at all (silence, room noise, a click, breathing, music), output exactly ${NO_SPEECH_MARK} and nothing else. `
   + 'Never write words that were not spoken.';
